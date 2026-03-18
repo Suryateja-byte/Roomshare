@@ -1,29 +1,29 @@
-import '@testing-library/jest-dom'
-import 'whatwg-fetch'
-import { TextEncoder, TextDecoder } from 'util'
+import "@testing-library/jest-dom";
+import "whatwg-fetch";
+import { TextEncoder, TextDecoder } from "util";
 
 // Polyfill TextEncoder/TextDecoder for Next.js server components
-global.TextEncoder = TextEncoder
-global.TextDecoder = TextDecoder
+global.TextEncoder = TextEncoder;
+global.TextDecoder = TextDecoder;
 
 // Environment variables are now set in jest.env.js (via setupFiles)
 // which runs BEFORE module imports to prevent initialization errors
 
 // Polyfill Response.json static method for Next.js API routes
 if (!Response.json) {
-  Response.json = function(data, init = {}) {
-    const body = JSON.stringify(data)
-    const headers = new Headers(init.headers || {})
-    headers.set('content-type', 'application/json')
+  Response.json = function (data, init = {}) {
+    const body = JSON.stringify(data);
+    const headers = new Headers(init.headers || {});
+    headers.set("content-type", "application/json");
     return new Response(body, {
       ...init,
       headers,
-    })
-  }
+    });
+  };
 }
 
 // Mock Next.js router
-jest.mock('next/navigation', () => ({
+jest.mock("next/navigation", () => ({
   useRouter: () => ({
     push: jest.fn(),
     replace: jest.fn(),
@@ -32,15 +32,15 @@ jest.mock('next/navigation', () => ({
     forward: jest.fn(),
     refresh: jest.fn(),
   }),
-  usePathname: () => '/',
+  usePathname: () => "/",
   useSearchParams: () => new URLSearchParams(),
   useParams: () => ({}),
   redirect: jest.fn(),
   notFound: jest.fn(),
-}))
+}));
 
 // Mock next/headers
-jest.mock('next/headers', () => ({
+jest.mock("next/headers", () => ({
   cookies: () => ({
     get: jest.fn(),
     set: jest.fn(),
@@ -56,29 +56,29 @@ jest.mock('next/headers', () => ({
     values: jest.fn(() => []),
     forEach: jest.fn(),
   }),
-}))
+}));
 
 // Mock next/image
-jest.mock('next/image', () => ({
+jest.mock("next/image", () => ({
   __esModule: true,
   default: (props) => {
     // eslint-disable-next-line @next/next/no-img-element, jsx-a11y/alt-text
-    return <img {...props} />
+    return <img {...props} />;
   },
-}))
+}));
 
 // Mock next/link
-jest.mock('next/link', () => ({
+jest.mock("next/link", () => ({
   __esModule: true,
   default: ({ children, href, ...props }) => (
     <a href={href} {...props}>
       {children}
     </a>
   ),
-}))
+}));
 
 // Mock next-auth (ESM module)
-jest.mock('next-auth', () => ({
+jest.mock("next-auth", () => ({
   __esModule: true,
   default: jest.fn(() => ({
     handlers: { GET: jest.fn(), POST: jest.fn() },
@@ -87,50 +87,54 @@ jest.mock('next-auth', () => ({
     signOut: jest.fn(),
   })),
   getServerSession: jest.fn(),
-}))
+}));
 
 // Mock next-auth/react
-jest.mock('next-auth/react', () => ({
+jest.mock("next-auth/react", () => ({
   __esModule: true,
-  useSession: jest.fn(() => ({ data: null, status: 'unauthenticated' })),
+  useSession: jest.fn(() => ({ data: null, status: "unauthenticated" })),
   signIn: jest.fn(),
   signOut: jest.fn(),
   SessionProvider: ({ children }) => children,
-}))
+}));
 
 // Mock next-auth providers
-jest.mock('next-auth/providers/credentials', () => ({
+jest.mock("next-auth/providers/credentials", () => ({
   __esModule: true,
-  default: jest.fn(() => ({ id: 'credentials', name: 'Credentials', type: 'credentials' })),
-}))
+  default: jest.fn(() => ({
+    id: "credentials",
+    name: "Credentials",
+    type: "credentials",
+  })),
+}));
 
-jest.mock('next-auth/providers/google', () => ({
+jest.mock("next-auth/providers/google", () => ({
   __esModule: true,
-  default: jest.fn(() => ({ id: 'google', name: 'Google', type: 'oauth' })),
-}))
+  default: jest.fn(() => ({ id: "google", name: "Google", type: "oauth" })),
+}));
 
 // Mock @auth/prisma-adapter
-jest.mock('@auth/prisma-adapter', () => ({
+jest.mock("@auth/prisma-adapter", () => ({
   __esModule: true,
   PrismaAdapter: jest.fn(() => ({})),
-}))
+}));
 
 // Mock @marsidev/react-turnstile (ESM-only package — prevents SyntaxError in Jest)
-jest.mock('@marsidev/react-turnstile', () => {
-  const React = require('react')
+jest.mock("@marsidev/react-turnstile", () => {
+  const React = require("react");
   return {
     __esModule: true,
     Turnstile: React.forwardRef(function MockTurnstile({ onSuccess }) {
       React.useEffect(() => {
-        if (onSuccess) onSuccess('mock-turnstile-token')
-      }, [onSuccess])
-      return null
+        if (onSuccess) onSuccess("mock-turnstile-token");
+      }, [onSuccess]);
+      return null;
     }),
-  }
-})
+  };
+});
 
 // Mock @upstash/redis to prevent connection errors in tests
-jest.mock('@upstash/redis', () => ({
+jest.mock("@upstash/redis", () => ({
   Redis: jest.fn().mockImplementation(() => ({
     get: jest.fn(),
     set: jest.fn(),
@@ -140,7 +144,7 @@ jest.mock('@upstash/redis', () => ({
     multi: jest.fn().mockReturnThis(),
     exec: jest.fn(),
   })),
-}))
+}));
 
 // Mock @/lib/prisma to prevent PrismaClient initialization errors in tests
 // Tests that need real DB access should set DATABASE_URL and use jest.unmock
@@ -157,7 +161,7 @@ const mockPrismaModel = {
   aggregate: jest.fn().mockResolvedValue({}),
   groupBy: jest.fn().mockResolvedValue([]),
   updateMany: jest.fn().mockResolvedValue({ count: 0 }),
-}
+};
 
 // Build the mock prisma client once so $transaction can pass it as the tx argument.
 // This ensures code like `fn(tx)` inside $transaction receives a client with all
@@ -203,7 +207,7 @@ const mockPrismaClient = {
   conversationDeletion: { ...mockPrismaModel },
   passwordResetToken: { ...mockPrismaModel },
   // listing_search_docs is a raw SQL table, no Prisma model
-}
+};
 
 // Interactive transactions receive the full mock client as `tx` param,
 // so code like `prisma.$transaction(async (tx) => { tx.user.findUnique(...) })` works.
@@ -211,68 +215,71 @@ const mockPrismaClient = {
 // TEST-05: Captures isolation options so tests can assert transaction config:
 //   expect(prisma.$transaction.mock.calls[0][1]).toEqual({ isolationLevel: 'Serializable' })
 mockPrismaClient.$transaction = jest.fn((fnOrArray, _options) =>
-  typeof fnOrArray === 'function' ? fnOrArray(mockPrismaClient) : Promise.all(fnOrArray)
-)
+  typeof fnOrArray === "function"
+    ? fnOrArray(mockPrismaClient)
+    : Promise.all(fnOrArray)
+);
 
-jest.mock('@/lib/prisma', () => ({
+jest.mock("@/lib/prisma", () => ({
   prisma: mockPrismaClient,
-}))
+}));
 
 // Mock window.matchMedia (only in jsdom environment)
-if (typeof window !== 'undefined') Object.defineProperty(window, 'matchMedia', {
-  writable: true,
-  value: jest.fn().mockImplementation(query => ({
-    matches: false,
-    media: query,
-    onchange: null,
-    addListener: jest.fn(),
-    removeListener: jest.fn(),
-    addEventListener: jest.fn(),
-    removeEventListener: jest.fn(),
-    dispatchEvent: jest.fn(),
-  })),
-})
+if (typeof window !== "undefined")
+  Object.defineProperty(window, "matchMedia", {
+    writable: true,
+    value: jest.fn().mockImplementation((query) => ({
+      matches: false,
+      media: query,
+      onchange: null,
+      addListener: jest.fn(),
+      removeListener: jest.fn(),
+      addEventListener: jest.fn(),
+      removeEventListener: jest.fn(),
+      dispatchEvent: jest.fn(),
+    })),
+  });
 
 // Mock IntersectionObserver
 class MockIntersectionObserver {
   constructor(callback) {
-    this.callback = callback
+    this.callback = callback;
   }
-  observe = jest.fn()
-  unobserve = jest.fn()
-  disconnect = jest.fn()
+  observe = jest.fn();
+  unobserve = jest.fn();
+  disconnect = jest.fn();
 }
-global.IntersectionObserver = MockIntersectionObserver
+global.IntersectionObserver = MockIntersectionObserver;
 
 // Mock ResizeObserver
 class MockResizeObserver {
   constructor(callback) {
-    this.callback = callback
+    this.callback = callback;
   }
-  observe = jest.fn()
-  unobserve = jest.fn()
-  disconnect = jest.fn()
+  observe = jest.fn();
+  unobserve = jest.fn();
+  disconnect = jest.fn();
 }
-global.ResizeObserver = MockResizeObserver
+global.ResizeObserver = MockResizeObserver;
 
 // Mock scrollTo (only in jsdom environment)
-if (typeof window !== 'undefined') window.scrollTo = jest.fn()
+if (typeof window !== "undefined") window.scrollTo = jest.fn();
 
 // Suppress console errors in tests unless in debug mode
-const originalConsoleError = console.error
+const originalConsoleError = console.error;
 console.error = (...args) => {
   if (
-    typeof args[0] === 'string' &&
-    (args[0].includes('Warning: ReactDOM.render is no longer supported') ||
-      args[0].includes('Warning: An update to') ||
-      args[0].includes('act(...)'))
+    typeof args[0] === "string" &&
+    (args[0].includes("Warning: ReactDOM.render is no longer supported") ||
+      args[0].includes("Warning: An update to") ||
+      args[0].includes("act(...)"))
   ) {
-    return
+    return;
   }
-  originalConsoleError.call(console, ...args)
-}
+  originalConsoleError.call(console, ...args);
+};
 
 // Clean up after each test
 afterEach(() => {
-  jest.clearAllMocks()
-})
+  jest.clearAllMocks();
+});

@@ -84,17 +84,19 @@ test.describe("Price Range Filter", () => {
   test.use({ storageState: { cookies: [], origins: [] } });
 
   test.beforeEach(async ({}, testInfo) => {
-    if (testInfo.project.name.includes('webkit')) {
-      test.skip(true, 'Radix UI hydration issues on webkit');
+    if (testInfo.project.name.includes("webkit")) {
+      test.skip(true, "Radix UI hydration issues on webkit");
     }
-    if (testInfo.project.name.includes('firefox')) {
-      test.skip(true, 'Filter-price tests timeout on Firefox CI runners');
+    if (testInfo.project.name.includes("firefox")) {
+      test.skip(true, "Filter-price tests timeout on Firefox CI runners");
     }
     test.slow();
   });
 
   // 1. Set min price -> URL gets minPrice param
-  test(`${tags.core} - setting min price updates URL with minPrice param`, async ({ page }) => {
+  test(`${tags.core} - setting min price updates URL with minPrice param`, async ({
+    page,
+  }) => {
     await waitForSearchReady(page);
     // Wait for map "Search as I move" URL updates to settle — useBatchedFilters
     // resets pending state whenever searchParams change (committed → pending sync).
@@ -109,7 +111,9 @@ test.describe("Price Range Filter", () => {
   });
 
   // 2. Set max price -> URL gets maxPrice param
-  test(`${tags.core} - setting max price updates URL with maxPrice param`, async ({ page }) => {
+  test(`${tags.core} - setting max price updates URL with maxPrice param`, async ({
+    page,
+  }) => {
     await waitForSearchReady(page);
     await waitForUrlStable(page, 2500);
 
@@ -121,7 +125,9 @@ test.describe("Price Range Filter", () => {
   });
 
   // 3. Set both min and max -> URL has both params
-  test(`${tags.core} - setting both min and max price updates URL with both params`, async ({ page }) => {
+  test(`${tags.core} - setting both min and max price updates URL with both params`, async ({
+    page,
+  }) => {
     await waitForSearchReady(page);
     // Generous settle — CI runners are slower; map bounds can take >500ms
     await waitForUrlStable(page, 2500);
@@ -135,7 +141,9 @@ test.describe("Price Range Filter", () => {
   });
 
   // 4. Clear price filter -> params removed from URL
-  test(`${tags.core} - clearing price inputs removes params from URL`, async ({ page }) => {
+  test(`${tags.core} - clearing price inputs removes params from URL`, async ({
+    page,
+  }) => {
     // Start with price filters applied
     await page.goto(`${SEARCH_URL}&minPrice=500&maxPrice=2000`);
     await page.waitForLoadState("domcontentloaded");
@@ -156,7 +164,9 @@ test.describe("Price Range Filter", () => {
   });
 
   // 5. Price filter narrows results
-  test(`${tags.core} - price filter narrows visible results`, async ({ page }) => {
+  test(`${tags.core} - price filter narrows visible results`, async ({
+    page,
+  }) => {
     await waitForSearchReady(page);
     const container = searchResultsContainer(page);
 
@@ -168,17 +178,22 @@ test.describe("Price Range Filter", () => {
     await page.waitForLoadState("domcontentloaded");
     await waitForUrlParam(page, "maxPrice", "500");
 
-    const filteredCount = await container.locator(selectors.listingCard).count();
+    const filteredCount = await container
+      .locator(selectors.listingCard)
+      .count();
 
     // Filtered count should be <= initial (or page shows empty state)
-    const hasEmptyState = await container.locator(selectors.emptyState).count() > 0;
+    const hasEmptyState =
+      (await container.locator(selectors.emptyState).count()) > 0;
     if (!hasEmptyState) {
       expect(filteredCount).toBeLessThanOrEqual(initialCount);
     }
   });
 
   // 6. Invalid price (negative) -> handled gracefully (clamped to 0)
-  test(`${tags.core} - negative price is handled gracefully`, async ({ page }) => {
+  test(`${tags.core} - negative price is handled gracefully`, async ({
+    page,
+  }) => {
     await waitForSearchReady(page);
 
     await setInlineMinPrice(page, "-100");
@@ -196,7 +211,9 @@ test.describe("Price Range Filter", () => {
   });
 
   // 7. Min > max -> handled (auto-swap)
-  test(`${tags.core} - inverted price range is auto-swapped`, async ({ page }) => {
+  test(`${tags.core} - inverted price range is auto-swapped`, async ({
+    page,
+  }) => {
     await waitForSearchReady(page);
 
     // Set min higher than max
@@ -220,7 +237,9 @@ test.describe("Price Range Filter", () => {
   });
 
   // 8. Price filter persists across page refresh (URL-driven)
-  test(`${tags.core} - price filter persists across page refresh`, async ({ page }) => {
+  test(`${tags.core} - price filter persists across page refresh`, async ({
+    page,
+  }) => {
     await page.goto(`${SEARCH_URL}&minPrice=800&maxPrice=2500`);
     await page.waitForLoadState("domcontentloaded");
     await waitForUrlParam(page, "minPrice", "800");
@@ -250,7 +269,9 @@ test.describe("Price Range Filter", () => {
   });
 
   // 9. Price displayed in filter chips when active
-  test(`${tags.core} - price filter shows as chip in applied filters`, async ({ page }) => {
+  test(`${tags.core} - price filter shows as chip in applied filters`, async ({
+    page,
+  }) => {
     await page.goto(`${SEARCH_URL}&minPrice=500&maxPrice=2000`);
     await page.waitForLoadState("domcontentloaded");
     await waitForUrlParam(page, "minPrice", "500");
@@ -262,7 +283,9 @@ test.describe("Price Range Filter", () => {
 
     if (regionVisible) {
       // Should show a price chip (e.g., "$500 - $2,000" or "Min $500" + "Max $2,000")
-      const priceChip = filtersRegion.locator("text=/\\$500|\\$2,000|price/i").first();
+      const priceChip = filtersRegion
+        .locator("text=/\\$500|\\$2,000|price/i")
+        .first();
       const chipVisible = await priceChip.isVisible().catch(() => false);
 
       if (chipVisible) {
@@ -275,7 +298,9 @@ test.describe("Price Range Filter", () => {
   });
 
   // 10. Price slider in filter modal adjusts price range
-  test(`${tags.core} - price slider in modal adjusts pending price`, async ({ page }) => {
+  test(`${tags.core} - price slider in modal adjusts pending price`, async ({
+    page,
+  }) => {
     await waitForSearchReady(page);
 
     // Open filter modal using shared hydration-aware helper
@@ -287,7 +312,7 @@ test.describe("Price Range Filter", () => {
     if (await priceSlider.isVisible({ timeout: 5_000 }).catch(() => false)) {
       // Adjust the max price thumb via keyboard
       const maxThumb = page.locator('[aria-label="Maximum price"]');
-      if (await maxThumb.count() > 0) {
+      if ((await maxThumb.count()) > 0) {
         await maxThumb.focus();
         // Press left arrow to decrease max price
         for (let i = 0; i < 5; i++) {

@@ -1,11 +1,11 @@
-'use client';
+"use client";
 
 /// <reference path="../../types/google-places-ui-kit.d.ts" />
 
-import React, { useEffect, useRef, useState, useCallback } from 'react';
-import { MapPin, Loader2, AlertCircle, RefreshCw } from 'lucide-react';
-import { loadPlacesUiKit } from '@/lib/googleMapsUiKitLoader';
-import type { NeighborhoodSearchResult } from '@/lib/places/types';
+import React, { useEffect, useRef, useState, useCallback } from "react";
+import { MapPin, Loader2, AlertCircle, RefreshCw } from "lucide-react";
+import { loadPlacesUiKit } from "@/lib/googleMapsUiKitLoader";
+import type { NeighborhoodSearchResult } from "@/lib/places/types";
 
 /**
  * NearbyPlacesCard - Renders Google Places UI Kit components.
@@ -27,7 +27,7 @@ export interface NearbyPlacesCardProps {
   queryText?: string;
   /** Normalized intent from detectNearbyIntent */
   normalizedIntent: {
-    mode: 'type' | 'text';
+    mode: "type" | "text";
     includedTypes?: string[];
     textQuery?: string;
   };
@@ -67,13 +67,13 @@ export function NearbyPlacesCard({
   onSearchComplete,
   onSearchSuccess,
   isVisible = true,
-  canSearch = true,  // C2 FIX: Default to true for backwards compatibility
+  canSearch = true, // C2 FIX: Default to true for backwards compatibility
   remainingSearches,
-  multiBrandDetected = false,  // P2-C3 FIX: Multi-brand warning
-  radiusMeters: _radiusMeters,      // Used by NeighborhoodModule (passed through)
+  multiBrandDetected = false, // P2-C3 FIX: Multi-brand warning
+  radiusMeters: _radiusMeters, // Used by NeighborhoodModule (passed through)
   onSearchResultsReady: _onSearchResultsReady, // Used by NeighborhoodModule
-  onError: _onError,           // Used by NeighborhoodModule
-  onLoadingChange: _onLoadingChange,   // Used by NeighborhoodModule
+  onError: _onError, // Used by NeighborhoodModule
+  onLoadingChange: _onLoadingChange, // Used by NeighborhoodModule
 }: NearbyPlacesCardProps) {
   const containerRef = useRef<HTMLDivElement>(null);
   const searchContainerRef = useRef<HTMLDivElement>(null);
@@ -82,10 +82,10 @@ export function NearbyPlacesCard({
   const searchTimeoutRef = useRef<NodeJS.Timeout | null>(null);
 
   // C2 FIX: If rate limited (canSearch explicitly false), show rate limit error immediately
-  const [status, setStatus] = useState<'loading' | 'ready' | 'error' | 'no-results' | 'rate-limited'>(
-    canSearch === false ? 'rate-limited' : 'loading'
-  );
-  const [errorMessage, setErrorMessage] = useState<string>('');
+  const [status, setStatus] = useState<
+    "loading" | "ready" | "error" | "no-results" | "rate-limited"
+  >(canSearch === false ? "rate-limited" : "loading");
+  const [errorMessage, setErrorMessage] = useState<string>("");
   const [currentRadius, setCurrentRadius] = useState(INITIAL_RADIUS);
   const [hasExpandedOnce, setHasExpandedOnce] = useState(false);
 
@@ -95,8 +95,7 @@ export function NearbyPlacesCard({
     // P0-B27 FIX: If rate limited, don't even try to load Places API
     // This sync is needed because canSearch prop can change after initial render
     if (!canSearch) {
-       
-      setStatus('rate-limited');
+      setStatus("rate-limited");
       return;
     }
 
@@ -106,8 +105,8 @@ export function NearbyPlacesCard({
 
     async function initializePlaces() {
       try {
-        setStatus('loading');
-        setErrorMessage('');
+        setStatus("loading");
+        setErrorMessage("");
 
         await loadPlacesUiKit();
 
@@ -118,15 +117,20 @@ export function NearbyPlacesCard({
 
         if (!isMounted) return;
 
-        setStatus('ready');
+        setStatus("ready");
       } catch (error) {
         if (!isMounted) return;
 
-        console.error('[NearbyPlacesCard] Failed to load Places UI Kit:', error);
-        setErrorMessage(
-          error instanceof Error ? error.message : 'Failed to load Places UI Kit'
+        console.error(
+          "[NearbyPlacesCard] Failed to load Places UI Kit:",
+          error
         );
-        setStatus('error');
+        setErrorMessage(
+          error instanceof Error
+            ? error.message
+            : "Failed to load Places UI Kit"
+        );
+        setStatus("error");
       }
     }
 
@@ -147,7 +151,7 @@ export function NearbyPlacesCard({
       }
 
       const searchElement = event.target as HTMLElement & {
-        places?: Array<{ id?: string }>;  // ONLY id, nothing else
+        places?: Array<{ id?: string }>; // ONLY id, nothing else
       };
 
       const results = searchElement?.places || [];
@@ -156,14 +160,18 @@ export function NearbyPlacesCard({
       // NO coordinate extraction - just count results
 
       // If no results and haven't expanded yet, try with larger radius
-      if (resultCount === 0 && !hasExpandedOnce && currentRadius < EXPANDED_RADIUS) {
+      if (
+        resultCount === 0 &&
+        !hasExpandedOnce &&
+        currentRadius < EXPANDED_RADIUS
+      ) {
         setHasExpandedOnce(true);
         setCurrentRadius(EXPANDED_RADIUS);
         return;
       }
 
       if (resultCount === 0) {
-        setStatus('no-results');
+        setStatus("no-results");
       } else {
         // P1-03 FIX: Only call onSearchSuccess when we have results
         onSearchSuccess?.();
@@ -178,25 +186,29 @@ export function NearbyPlacesCard({
   // This ensures locationRestriction is set BEFORE element is added to DOM
   // B2 FIX: Changed from useLayoutEffect to useEffect with proper cleanup
   useEffect(() => {
-    if (status !== 'ready' || !searchContainerRef.current) return;
+    if (status !== "ready" || !searchContainerRef.current) return;
 
     const container = searchContainerRef.current;
 
     // Clear previous elements
-    container.innerHTML = '';
+    container.innerHTML = "";
     searchRef.current = null;
 
     // Create elements imperatively
-    const searchEl = document.createElement('gmp-place-search') as HTMLElement & {
+    const searchEl = document.createElement(
+      "gmp-place-search"
+    ) as HTMLElement & {
       selectable?: boolean;
     };
-    searchEl.setAttribute('selectable', '');
+    searchEl.setAttribute("selectable", "");
 
     const center = { lat: latitude, lng: longitude };
 
-    if (normalizedIntent.mode === 'type' && normalizedIntent.includedTypes) {
+    if (normalizedIntent.mode === "type" && normalizedIntent.includedTypes) {
       // Type-based Nearby Search
-      const requestEl = document.createElement('gmp-place-nearby-search-request') as HTMLElement & {
+      const requestEl = document.createElement(
+        "gmp-place-nearby-search-request"
+      ) as HTMLElement & {
         includedTypes?: string[];
         locationRestriction?: unknown;
         maxResultCount?: number;
@@ -219,7 +231,9 @@ export function NearbyPlacesCard({
       searchEl.appendChild(requestEl);
     } else {
       // Text-based Search
-      const requestEl = document.createElement('gmp-place-text-search-request') as HTMLElement & {
+      const requestEl = document.createElement(
+        "gmp-place-text-search-request"
+      ) as HTMLElement & {
         textQuery?: string;
         locationBias?: unknown;
         maxResultCount?: number;
@@ -243,11 +257,11 @@ export function NearbyPlacesCard({
     }
 
     // Add content element
-    const contentEl = document.createElement('gmp-place-all-content');
+    const contentEl = document.createElement("gmp-place-all-content");
     searchEl.appendChild(contentEl);
 
     // Add event listener BEFORE adding to DOM
-    searchEl.addEventListener('gmp-load', handleSearchLoad);
+    searchEl.addEventListener("gmp-load", handleSearchLoad);
 
     // Store ref
     searchRef.current = searchEl;
@@ -258,12 +272,16 @@ export function NearbyPlacesCard({
     // B6 FIX: Set timeout for Places API search
     // P1-05 FIX: Improved timeout error message with more context
     searchTimeoutRef.current = setTimeout(() => {
-      console.error('[NearbyPlacesCard] Places API search timed out after', SEARCH_TIMEOUT_MS, 'ms');
+      console.error(
+        "[NearbyPlacesCard] Places API search timed out after",
+        SEARCH_TIMEOUT_MS,
+        "ms"
+      );
       const timeoutSec = Math.round(SEARCH_TIMEOUT_MS / 1000);
       setErrorMessage(
         `Search for "${queryText}" timed out after ${timeoutSec}s. This may be due to a slow connection. Please try again.`
       );
-      setStatus('error');
+      setStatus("error");
     }, SEARCH_TIMEOUT_MS);
 
     // B2 FIX: Proper cleanup - remove listener, clear container, null ref
@@ -273,34 +291,44 @@ export function NearbyPlacesCard({
         clearTimeout(searchTimeoutRef.current);
         searchTimeoutRef.current = null;
       }
-      searchEl.removeEventListener('gmp-load', handleSearchLoad);
+      searchEl.removeEventListener("gmp-load", handleSearchLoad);
       // Clear container to prevent DOM leaks
       if (container) {
-        container.innerHTML = '';
+        container.innerHTML = "";
       }
       searchRef.current = null;
     };
-  }, [status, latitude, longitude, currentRadius, normalizedIntent, queryText, handleSearchLoad]);
+  }, [
+    status,
+    latitude,
+    longitude,
+    currentRadius,
+    normalizedIntent,
+    queryText,
+    handleSearchLoad,
+  ]);
 
   // Retry search
   const handleRetry = useCallback(() => {
-    setStatus('loading');
-    setErrorMessage('');
+    setStatus("loading");
+    setErrorMessage("");
     setCurrentRadius(INITIAL_RADIUS);
     setHasExpandedOnce(false);
 
     // Re-trigger load
     loadPlacesUiKit()
-      .then(() => setStatus('ready'))
+      .then(() => setStatus("ready"))
       .catch((error: Error) => {
-        setErrorMessage(error instanceof Error ? error.message : 'Failed to load');
-        setStatus('error');
+        setErrorMessage(
+          error instanceof Error ? error.message : "Failed to load"
+        );
+        setStatus("error");
       });
   }, []);
 
   // Render loading state
   // C13 FIX: Enhanced skeleton UI during Google Maps script load
-  if (status === 'loading') {
+  if (status === "loading") {
     return (
       <div className="bg-white dark:bg-zinc-800 rounded-[24px] shadow-lg shadow-zinc-200/50 dark:shadow-zinc-900/50 border border-zinc-100 dark:border-zinc-700 overflow-hidden">
         {/* Header skeleton */}
@@ -328,9 +356,18 @@ export function NearbyPlacesCard({
             </div>
           ))}
           {/* Loading indicator */}
-          <div className="flex items-center justify-center gap-2 pt-2" role="status" aria-label="Searching nearby places">
-            <Loader2 className="w-4 h-4 animate-spin text-zinc-400" aria-hidden="true" />
-            <span className="text-xs text-zinc-500 dark:text-zinc-400">Searching nearby...</span>
+          <div
+            className="flex items-center justify-center gap-2 pt-2"
+            role="status"
+            aria-label="Searching nearby places"
+          >
+            <Loader2
+              className="w-4 h-4 animate-spin text-zinc-400"
+              aria-hidden="true"
+            />
+            <span className="text-xs text-zinc-500 dark:text-zinc-400">
+              Searching nearby...
+            </span>
           </div>
         </div>
       </div>
@@ -338,7 +375,7 @@ export function NearbyPlacesCard({
   }
 
   // Render error state
-  if (status === 'error') {
+  if (status === "error") {
     return (
       <div className="bg-white dark:bg-zinc-800 rounded-[24px] p-5 shadow-lg shadow-zinc-200/50 dark:shadow-zinc-900/50 border border-red-100 dark:border-red-900/50">
         <div className="flex items-start gap-3">
@@ -350,7 +387,7 @@ export function NearbyPlacesCard({
               Unable to search places
             </p>
             <p className="text-xs text-red-600/80 dark:text-red-400/70 mt-1">
-              {errorMessage || 'An unexpected error occurred'}
+              {errorMessage || "An unexpected error occurred"}
             </p>
             <button
               onClick={handleRetry}
@@ -366,7 +403,7 @@ export function NearbyPlacesCard({
   }
 
   // C2 FIX: Render rate limited state (when LLM tool invoked but rate limit exceeded)
-  if (status === 'rate-limited') {
+  if (status === "rate-limited") {
     return (
       <div className="bg-white dark:bg-zinc-800 rounded-[24px] p-5 shadow-lg shadow-zinc-200/50 dark:shadow-zinc-900/50 border border-amber-100 dark:border-amber-900/50">
         <div className="flex items-start gap-3">
@@ -378,8 +415,9 @@ export function NearbyPlacesCard({
               Search limit reached
             </p>
             <p className="text-xs text-amber-600/80 dark:text-amber-400/70 mt-1">
-              You&apos;ve used all {remainingSearches === 0 ? 'your' : ''} nearby searches for this listing.
-              Try asking the AI about the neighborhood instead!
+              You&apos;ve used all {remainingSearches === 0 ? "your" : ""}{" "}
+              nearby searches for this listing. Try asking the AI about the
+              neighborhood instead!
             </p>
           </div>
         </div>
@@ -389,7 +427,7 @@ export function NearbyPlacesCard({
 
   // Render no results state
   // C8 FIX: Show actual search radius and indicate if search was expanded
-  if (status === 'no-results') {
+  if (status === "no-results") {
     const radiusKm = (currentRadius / 1000).toFixed(1);
     const wasExpanded = hasExpandedOnce || currentRadius > INITIAL_RADIUS;
 
@@ -404,8 +442,10 @@ export function NearbyPlacesCard({
               No places found nearby
             </p>
             <p className="text-xs text-zinc-500 dark:text-zinc-400 mt-1">
-              We couldn&apos;t find any &quot;{queryText}&quot; within {radiusKm}km of this listing
-              {wasExpanded && ' (we expanded the search area)'}. Try a different search term.
+              We couldn&apos;t find any &quot;{queryText}&quot; within{" "}
+              {radiusKm}km of this listing
+              {wasExpanded && " (we expanded the search area)"}. Try a different
+              search term.
             </p>
           </div>
         </div>
@@ -424,7 +464,10 @@ export function NearbyPlacesCard({
     >
       {/* Header - P2-01 FIX: Show query context for clarity */}
       {/* P3-B21 FIX: Added aria-label for header */}
-      <header className="px-5 py-4 border-b border-zinc-50 dark:border-zinc-700" aria-label="Search results header">
+      <header
+        className="px-5 py-4 border-b border-zinc-50 dark:border-zinc-700"
+        aria-label="Search results header"
+      >
         <div className="flex items-center gap-2">
           <div
             className="w-6 h-6 rounded-full bg-blue-50 dark:bg-blue-900/30 flex items-center justify-center flex-shrink-0"
@@ -435,8 +478,9 @@ export function NearbyPlacesCard({
           <div className="flex flex-col min-w-0">
             <span className="text-sm font-semibold text-zinc-800 dark:text-zinc-200 tracking-tight truncate">
               {/* P2-01 FIX: Show what was searched for */}
-              {normalizedIntent.includedTypes && normalizedIntent.includedTypes.length > 1
-                ? `Nearby ${normalizedIntent.includedTypes.map(t => t.replace(/_/g, ' ')).join(', ')}`
+              {normalizedIntent.includedTypes &&
+              normalizedIntent.includedTypes.length > 1
+                ? `Nearby ${normalizedIntent.includedTypes.map((t) => t.replace(/_/g, " ")).join(", ")}`
                 : `Nearby "${queryText}"`}
             </span>
             {currentRadius > INITIAL_RADIUS && (
@@ -450,7 +494,9 @@ export function NearbyPlacesCard({
         {multiBrandDetected && (
           <div className="mt-2 px-3 py-1.5 bg-amber-50 dark:bg-amber-900/20 border border-amber-100 dark:border-amber-800 rounded-lg">
             <p className="text-[11px] text-amber-700 dark:text-amber-300 leading-snug">
-              <strong>Note:</strong> Results may not include all brands mentioned. Try searching for each brand separately for best results.
+              <strong>Note:</strong> Results may not include all brands
+              mentioned. Try searching for each brand separately for best
+              results.
             </p>
           </div>
         )}

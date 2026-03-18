@@ -28,8 +28,8 @@ export const mockMarkerInstance = {
   addTo: jest.fn().mockReturnThis(),
   remove: jest.fn(),
   getElement: jest.fn(() => {
-    const el = document.createElement('div');
-    el.dataset.placeId = '';
+    const el = document.createElement("div");
+    el.dataset.placeId = "";
     return el;
   }),
 };
@@ -55,7 +55,7 @@ export const MockLngLatBounds = jest.fn(() => mockLngLatBoundsInstance);
 
 // Setup function to install the mock
 export function setupMapLibreMock() {
-  jest.mock('maplibre-gl', () => ({
+  jest.mock("maplibre-gl", () => ({
     Map: MockMap,
     Marker: MockMarker,
     Popup: MockPopup,

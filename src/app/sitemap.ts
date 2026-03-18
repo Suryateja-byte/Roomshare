@@ -1,24 +1,24 @@
-import type { MetadataRoute } from 'next';
-import { prisma } from '@/lib/prisma';
+import type { MetadataRoute } from "next";
+import { prisma } from "@/lib/prisma";
 
-export const dynamic = 'force-dynamic';
+export const dynamic = "force-dynamic";
 
 const URLS_PER_SITEMAP = 5000;
 
 const STATIC_PAGES = [
-  { path: '', changeFrequency: 'daily' as const, priority: 1.0 },
-  { path: '/search', changeFrequency: 'hourly' as const, priority: 0.9 },
-  { path: '/about', changeFrequency: 'monthly' as const, priority: 0.5 },
-  { path: '/terms', changeFrequency: 'monthly' as const, priority: 0.3 },
-  { path: '/privacy', changeFrequency: 'monthly' as const, priority: 0.3 },
-  { path: '/signup', changeFrequency: 'monthly' as const, priority: 0.7 },
-  { path: '/login', changeFrequency: 'monthly' as const, priority: 0.5 },
+  { path: "", changeFrequency: "daily" as const, priority: 1.0 },
+  { path: "/search", changeFrequency: "hourly" as const, priority: 0.9 },
+  { path: "/about", changeFrequency: "monthly" as const, priority: 0.5 },
+  { path: "/terms", changeFrequency: "monthly" as const, priority: 0.3 },
+  { path: "/privacy", changeFrequency: "monthly" as const, priority: 0.3 },
+  { path: "/signup", changeFrequency: "monthly" as const, priority: 0.7 },
+  { path: "/login", changeFrequency: "monthly" as const, priority: 0.5 },
 ];
 
 export async function generateSitemaps() {
   try {
     const [listingCount, userCount] = await Promise.all([
-      prisma.listing.count({ where: { status: 'ACTIVE' } }),
+      prisma.listing.count({ where: { status: "ACTIVE" } }),
       prisma.user.count({ where: { isSuspended: false } }),
     ]);
 
@@ -32,8 +32,12 @@ export async function generateSitemaps() {
   }
 }
 
-export default async function sitemap({ id }: { id: number }): Promise<MetadataRoute.Sitemap> {
-  const baseUrl = process.env.NEXT_PUBLIC_APP_URL || 'https://roomshare.app';
+export default async function sitemap({
+  id,
+}: {
+  id: number;
+}): Promise<MetadataRoute.Sitemap> {
+  const baseUrl = process.env.NEXT_PUBLIC_APP_URL || "https://roomshare.app";
   const offset = id * URLS_PER_SITEMAP;
   const entries: MetadataRoute.Sitemap = [];
 
@@ -53,10 +57,13 @@ export default async function sitemap({ id }: { id: number }): Promise<MetadataR
 
   // Calculate the dynamic offset accounting for static pages in sitemap 0
   const dynamicOffset = id === 0 ? 0 : offset - staticCount;
-  const dynamicLimit = id === 0 ? URLS_PER_SITEMAP - staticCount : URLS_PER_SITEMAP;
+  const dynamicLimit =
+    id === 0 ? URLS_PER_SITEMAP - staticCount : URLS_PER_SITEMAP;
 
   // Count listings to know how to split between listings and users
-  const listingCount = await prisma.listing.count({ where: { status: 'ACTIVE' } });
+  const listingCount = await prisma.listing.count({
+    where: { status: "ACTIVE" },
+  });
 
   let remaining = dynamicLimit;
 
@@ -66,9 +73,9 @@ export default async function sitemap({ id }: { id: number }): Promise<MetadataR
     const listingTake = Math.min(remaining, listingCount - dynamicOffset);
 
     const listings = await prisma.listing.findMany({
-      where: { status: 'ACTIVE' },
+      where: { status: "ACTIVE" },
       select: { id: true, updatedAt: true },
-      orderBy: { updatedAt: 'desc' },
+      orderBy: { updatedAt: "desc" },
       skip: listingSkip,
       take: listingTake,
     });
@@ -77,7 +84,7 @@ export default async function sitemap({ id }: { id: number }): Promise<MetadataR
       entries.push({
         url: `${baseUrl}/listings/${listing.id}`,
         lastModified: listing.updatedAt,
-        changeFrequency: 'weekly',
+        changeFrequency: "weekly",
         priority: 0.8,
       });
     }
@@ -99,7 +106,7 @@ export default async function sitemap({ id }: { id: number }): Promise<MetadataR
       entries.push({
         url: `${baseUrl}/users/${user.id}`,
         lastModified: user.createdAt,
-        changeFrequency: 'weekly',
+        changeFrequency: "weekly",
         priority: 0.4,
       });
     }

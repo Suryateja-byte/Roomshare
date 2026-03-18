@@ -1,4 +1,4 @@
-import type { NextAuthConfig } from "next-auth"
+import type { NextAuthConfig } from "next-auth";
 
 export const authConfig = {
   pages: {
@@ -12,32 +12,40 @@ export const authConfig = {
   },
   callbacks: {
     authorized({ auth, request: { nextUrl } }) {
-      const isLoggedIn = !!auth?.user
-      const pathname = nextUrl.pathname
-      const isAdmin = !!auth?.user?.isAdmin
+      const isLoggedIn = !!auth?.user;
+      const pathname = nextUrl.pathname;
+      const isAdmin = !!auth?.user?.isAdmin;
 
       const protectedPaths = [
-        '/dashboard', '/bookings', '/messages', '/settings', '/profile',
-        '/notifications', '/saved', '/recently-viewed', '/saved-searches'
-      ]
-      const isProtected = protectedPaths.some(p => pathname.startsWith(p))
-      const isAdminRoute = pathname.startsWith('/admin')
-      const isOnAuth = pathname.startsWith('/login') || pathname.startsWith('/signup')
+        "/dashboard",
+        "/bookings",
+        "/messages",
+        "/settings",
+        "/profile",
+        "/notifications",
+        "/saved",
+        "/recently-viewed",
+        "/saved-searches",
+      ];
+      const isProtected = protectedPaths.some((p) => pathname.startsWith(p));
+      const isAdminRoute = pathname.startsWith("/admin");
+      const isOnAuth =
+        pathname.startsWith("/login") || pathname.startsWith("/signup");
 
       if (isAdminRoute) {
-        if (!isLoggedIn) return false
-        if (!isAdmin) return Response.redirect(new URL('/', nextUrl))
-        return true
+        if (!isLoggedIn) return false;
+        if (!isAdmin) return Response.redirect(new URL("/", nextUrl));
+        return true;
       }
       if (isProtected) {
-        if (isLoggedIn) return true
-        return false
+        if (isLoggedIn) return true;
+        return false;
       }
       if (isLoggedIn && isOnAuth) {
-        return Response.redirect(new URL('/', nextUrl))
+        return Response.redirect(new URL("/", nextUrl));
       }
-      return true
+      return true;
     },
   },
   providers: [],
-} satisfies NextAuthConfig
+} satisfies NextAuthConfig;

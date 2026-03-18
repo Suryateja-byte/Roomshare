@@ -19,7 +19,7 @@ export interface MapMovedBannerProps {
  */
 function formatSearchLabel(
   areaCount: number | null | undefined,
-  isLoading: boolean,
+  isLoading: boolean
 ): string {
   if (isLoading || areaCount === undefined) return "Search this area";
   if (areaCount === null) return "Search this area (100+)";
@@ -51,7 +51,9 @@ export function MapMovedBanner({
           disabled={isSearchLoading}
           className="text-sm font-medium text-white dark:text-zinc-900 hover:text-indigo-400 dark:hover:text-indigo-600 disabled:opacity-50 disabled:cursor-not-allowed h-11 px-4 inline-flex items-center gap-2 rounded-full focus:outline-none focus-visible:ring-2 focus-visible:ring-zinc-900/30 dark:focus-visible:ring-zinc-400/40 focus-visible:ring-offset-2 transition-colors"
         >
-          {isSearchLoading && <Loader2 className="w-3.5 h-3.5 animate-spin" aria-hidden="true" />}
+          {isSearchLoading && (
+            <Loader2 className="w-3.5 h-3.5 animate-spin" aria-hidden="true" />
+          )}
           {label}
         </button>
         <div className="w-[1px] h-6 bg-white/20 dark:bg-zinc-900/20" />
@@ -79,7 +81,9 @@ export function MapMovedBanner({
           disabled={isSearchLoading}
           className="text-sm font-medium text-amber-700 dark:text-amber-300 hover:text-amber-800 dark:hover:text-amber-200 disabled:opacity-50 disabled:cursor-not-allowed h-11 px-2 inline-flex items-center gap-1.5 rounded-md focus:outline-none focus-visible:ring-2 focus-visible:ring-amber-500 focus-visible:ring-offset-2"
         >
-          {isSearchLoading && <Loader2 className="w-3.5 h-3.5 animate-spin" aria-hidden="true" />}
+          {isSearchLoading && (
+            <Loader2 className="w-3.5 h-3.5 animate-spin" aria-hidden="true" />
+          )}
           {label}
         </button>
         <button

@@ -80,7 +80,7 @@ export interface PaginationMockHandle {
  */
 export function createMockListing(
   index: number,
-  overrides?: Partial<MockListing>,
+  overrides?: Partial<MockListing>
 ): MockListing {
   const id = `mock-listing-${String(index).padStart(3, "0")}`;
   return {
@@ -110,10 +110,10 @@ export function createMockListing(
  */
 export function createListingBatch(
   startIndex: number,
-  count: number,
+  count: number
 ): MockListing[] {
   return Array.from({ length: count }, (_, i) =>
-    createMockListing(startIndex + i),
+    createMockListing(startIndex + i)
   );
 }
 
@@ -204,7 +204,7 @@ export function createFetchMoreResult(options: {
 
 function encodeMockCursor(offset: number): string {
   return Buffer.from(JSON.stringify({ offset, _mock: true })).toString(
-    "base64url",
+    "base64url"
   );
 }
 
@@ -259,7 +259,7 @@ function encodeAsRSCResponse(value: unknown): string {
  */
 export async function setupPaginationMock(
   page: Page,
-  options: PaginationMockOptions,
+  options: PaginationMockOptions
 ): Promise<PaginationMockHandle> {
   const {
     totalLoadMoreItems,

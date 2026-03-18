@@ -171,7 +171,7 @@ describe("createMap", () => {
         style: options.style,
         center: options.center,
         zoom: options.zoom,
-      }),
+      })
     );
   });
 

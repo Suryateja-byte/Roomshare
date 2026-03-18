@@ -86,11 +86,12 @@ export interface ListingFocusActionsValue {
 // ─── Contexts ─────────────────────────────────────────────────────────────────
 
 const ListingFocusContext = createContext<ListingFocusContextValue | null>(
-  null,
+  null
 );
 
-const ListingFocusStateContext =
-  createContext<ListingFocusStateValue | null>(null);
+const ListingFocusStateContext = createContext<ListingFocusStateValue | null>(
+  null
+);
 
 const ListingFocusActionsContext =
   createContext<ListingFocusActionsValue | null>(null);
@@ -145,13 +146,15 @@ export function ListingFocusProvider({
   const [hoveredId, setHoveredId] = useState<string | null>(null);
   const [activeId, setActiveId] = useState<string | null>(null);
   const [scrollRequest, setScrollRequest] = useState<ScrollRequest | null>(
-    null,
+    null
   );
   const [focusSource, setFocusSource] = useState<FocusSource>(null);
 
   // Nonce counter for scroll requests - allows triggering scroll to same listing twice
   const nonceRef = useRef(0);
-  const focusSourceTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const focusSourceTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(
+    null
+  );
 
   // Ref mirror of focusSource — actions subscribers read this without subscribing to state
   const focusSourceRef = useRef<FocusSource>(null);
@@ -159,7 +162,8 @@ export function ListingFocusProvider({
   // Cleanup timeout on unmount
   useEffect(() => {
     return () => {
-      if (focusSourceTimeoutRef.current) clearTimeout(focusSourceTimeoutRef.current);
+      if (focusSourceTimeoutRef.current)
+        clearTimeout(focusSourceTimeoutRef.current);
     };
   }, []);
 
@@ -168,7 +172,8 @@ export function ListingFocusProvider({
     if (id && source) {
       setFocusSource(source);
       focusSourceRef.current = source;
-      if (focusSourceTimeoutRef.current) clearTimeout(focusSourceTimeoutRef.current);
+      if (focusSourceTimeoutRef.current)
+        clearTimeout(focusSourceTimeoutRef.current);
       focusSourceTimeoutRef.current = setTimeout(() => {
         setFocusSource(null);
         focusSourceRef.current = null;
@@ -176,7 +181,8 @@ export function ListingFocusProvider({
     } else if (!id) {
       setFocusSource(null);
       focusSourceRef.current = null;
-      if (focusSourceTimeoutRef.current) clearTimeout(focusSourceTimeoutRef.current);
+      if (focusSourceTimeoutRef.current)
+        clearTimeout(focusSourceTimeoutRef.current);
     }
   }, []);
 
@@ -204,13 +210,14 @@ export function ListingFocusProvider({
     setScrollRequest(null);
     setFocusSource(null);
     focusSourceRef.current = null;
-    if (focusSourceTimeoutRef.current) clearTimeout(focusSourceTimeoutRef.current);
+    if (focusSourceTimeoutRef.current)
+      clearTimeout(focusSourceTimeoutRef.current);
   }, []);
 
   // Split memos: state changes frequently, actions are stable
   const stateValue = useMemo<ListingFocusStateValue>(
     () => ({ hoveredId, activeId, scrollRequest, focusSource }),
-    [hoveredId, activeId, scrollRequest, focusSource],
+    [hoveredId, activeId, scrollRequest, focusSource]
   );
 
   const actionsValue = useMemo<ListingFocusActionsValue>(
@@ -223,7 +230,7 @@ export function ListingFocusProvider({
       clearFocus,
       focusSourceRef,
     }),
-    [setHovered, setActive, requestScrollTo, ackScrollTo, clearFocus],
+    [setHovered, setActive, requestScrollTo, ackScrollTo, clearFocus]
   );
 
   // Backward-compat combined context value
@@ -250,7 +257,7 @@ export function ListingFocusProvider({
       requestScrollTo,
       ackScrollTo,
       clearFocus,
-    ],
+    ]
   );
 
   return (
@@ -306,6 +313,6 @@ export function useIsListingFocused(listingId: string) {
       isActive: activeId === listingId,
       isFocused: hoveredId === listingId || activeId === listingId,
     }),
-    [hoveredId, activeId, listingId],
+    [hoveredId, activeId, listingId]
   );
 }

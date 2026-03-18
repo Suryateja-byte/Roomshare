@@ -87,7 +87,7 @@ describe("orchestrateSearch - v2→v1 fallback behavior", () => {
       filterParams,
       1,
       12,
-      true, // useV2 = true
+      true // useV2 = true
     );
 
     // Assert: v2 was called, then v1 was called as fallback
@@ -177,7 +177,7 @@ describe("orchestrateSearch - v2→v1 fallback behavior", () => {
       filterParams,
       1,
       12,
-      true, // useV2 = true
+      true // useV2 = true
     );
 
     // Assert: v2 was called, v1 was NOT called
@@ -203,7 +203,7 @@ describe("orchestrateSearch - v2→v1 fallback behavior", () => {
       filterParams,
       1,
       12,
-      false, // useV2 = false
+      false // useV2 = false
     );
 
     // Assert: v2 was NOT called, v1 was called directly
@@ -226,7 +226,7 @@ describe("orchestrateSearch - v2→v1 fallback behavior", () => {
       error: "V2 database error",
     });
     mockGetListingsPaginated.mockRejectedValue(
-      new Error("Database connection failed"),
+      new Error("Database connection failed")
     );
 
     // Act
@@ -235,7 +235,7 @@ describe("orchestrateSearch - v2→v1 fallback behavior", () => {
       filterParams,
       1,
       12,
-      true, // useV2 = true
+      true // useV2 = true
     );
 
     // Assert: both services were called
@@ -245,7 +245,9 @@ describe("orchestrateSearch - v2→v1 fallback behavior", () => {
     // Assert: result is empty fallback with GENERIC error message (no raw leak)
     expect(result.paginatedResult.items).toHaveLength(0);
     expect(result.paginatedResult.total).toBe(0);
-    expect(result.fetchError).toBe("Unable to load listings. Please try again.");
+    expect(result.fetchError).toBe(
+      "Unable to load listings. Please try again."
+    );
     expect(result.usedV1Fallback).toBe(true);
     expect(result.v2MapData).toBeNull();
   });
@@ -258,7 +260,9 @@ describe("orchestrateSearch - v2→v1 fallback behavior", () => {
       error: "V2 failed",
     });
     mockGetListingsPaginated.mockRejectedValue(
-      new Error("connection to server at 192.168.1.5:5432 failed: FATAL password authentication failed"),
+      new Error(
+        "connection to server at 192.168.1.5:5432 failed: FATAL password authentication failed"
+      )
     );
 
     // Act
@@ -267,11 +271,13 @@ describe("orchestrateSearch - v2→v1 fallback behavior", () => {
       filterParams,
       1,
       12,
-      true,
+      true
     );
 
     // Assert: fetchError must be generic, never contain raw details
-    expect(result.fetchError).toBe("Unable to load listings. Please try again.");
+    expect(result.fetchError).toBe(
+      "Unable to load listings. Please try again."
+    );
     expect(result.fetchError).not.toContain("192.168");
     expect(result.fetchError).not.toContain("5432");
     expect(result.fetchError).not.toContain("password");
@@ -292,12 +298,12 @@ describe("orchestrateSearch - v2→v1 fallback behavior", () => {
       filterParams,
       1,
       12,
-      true,
+      true
     );
 
     // Assert: generic error message used for non-Error
     expect(result.fetchError).toBe(
-      "Unable to load listings. Please try again.",
+      "Unable to load listings. Please try again."
     );
     expect(result.paginatedResult.items).toHaveLength(0);
   });

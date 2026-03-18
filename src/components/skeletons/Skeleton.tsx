@@ -27,7 +27,8 @@ export function Skeleton({
 
   const animationClasses = {
     pulse: "animate-pulse",
-    shimmer: "animate-shimmer bg-gradient-to-r from-zinc-200 via-zinc-100 to-zinc-200 dark:from-zinc-700 dark:via-zinc-600 dark:to-zinc-700 bg-[length:200%_100%]",
+    shimmer:
+      "animate-shimmer bg-gradient-to-r from-zinc-200 via-zinc-100 to-zinc-200 dark:from-zinc-700 dark:via-zinc-600 dark:to-zinc-700 bg-[length:200%_100%]",
     none: "",
   };
 
@@ -49,9 +50,19 @@ export function Skeleton({
 }
 
 // Convenience components for common skeleton patterns
-export function TextSkeleton({ lines = 3, className = "" }: { lines?: number; className?: string }) {
+export function TextSkeleton({
+  lines = 3,
+  className = "",
+}: {
+  lines?: number;
+  className?: string;
+}) {
   return (
-    <div className={`space-y-2 ${className}`} aria-hidden="true" role="presentation">
+    <div
+      className={`space-y-2 ${className}`}
+      aria-hidden="true"
+      role="presentation"
+    >
       {Array.from({ length: lines }).map((_, i) => (
         <Skeleton
           key={i}
@@ -106,12 +117,21 @@ export function ListItemSkeleton({ className = "" }: { className?: string }) {
 // Deterministic widths to avoid Math.random() during render
 const SKELETON_WIDTHS = [75, 60, 85, 70, 65, 80, 72, 68, 78, 62];
 
-export function TableRowSkeleton({ columns = 4, className = "" }: { columns?: number; className?: string }) {
+export function TableRowSkeleton({
+  columns = 4,
+  className = "",
+}: {
+  columns?: number;
+  className?: string;
+}) {
   return (
     <tr className={className} aria-hidden="true" role="presentation">
       {Array.from({ length: columns }).map((_, i) => (
         <td key={i} className="p-3">
-          <Skeleton variant="text" width={`${SKELETON_WIDTHS[i % SKELETON_WIDTHS.length]}%`} />
+          <Skeleton
+            variant="text"
+            width={`${SKELETON_WIDTHS[i % SKELETON_WIDTHS.length]}%`}
+          />
         </td>
       ))}
     </tr>
@@ -121,7 +141,7 @@ export function TableRowSkeleton({ columns = 4, className = "" }: { columns?: nu
 export function ImageSkeleton({
   width = "100%",
   height = 200,
-  className = ""
+  className = "",
 }: {
   width?: string | number;
   height?: string | number;

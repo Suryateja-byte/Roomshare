@@ -36,7 +36,7 @@ test.describe("Pagination API", () => {
   test("2.2 API page 2 contains no IDs from page 1", async ({ request }) => {
     // Fetch page 1
     const page1Res = await request.get(
-      `/api/search/v2?sort=newest&${boundsQS}`,
+      `/api/search/v2?sort=newest&${boundsQS}`
     );
 
     // The endpoint may return 404 if v2 is not enabled via feature flag.
@@ -64,14 +64,14 @@ test.describe("Pagination API", () => {
       // Fewer than 13 listings in seed data; cannot test page 2
       test.skip(
         true,
-        `Only ${page1Items.length} listings in seed data (need >12 for two pages)`,
+        `Only ${page1Items.length} listings in seed data (need >12 for two pages)`
       );
       return;
     }
 
     // Fetch page 2 using the cursor from page 1
     const page2Res = await request.get(
-      `/api/search/v2?sort=newest&cursor=${encodeURIComponent(nextCursor)}&${boundsQS}`,
+      `/api/search/v2?sort=newest&cursor=${encodeURIComponent(nextCursor)}&${boundsQS}`
     );
     expect(page2Res.status()).toBe(200);
 
@@ -89,7 +89,7 @@ test.describe("Pagination API", () => {
 
     expect(
       duplicates.length,
-      `Expected 0 duplicate IDs between page 1 (${page1Ids.length} items) and page 2 (${page2Ids.length} items), but found ${duplicates.length}: ${duplicates.join(", ")}`,
+      `Expected 0 duplicate IDs between page 1 (${page1Ids.length} items) and page 2 (${page2Ids.length} items), but found ${duplicates.length}: ${duplicates.join(", ")}`
     ).toBe(0);
 
     // Sanity: page 2 should have at least 1 item
@@ -115,7 +115,7 @@ test.describe("Pagination API", () => {
 
     for (const cursor of invalidCursors) {
       const res = await request.get(
-        `/api/search/v2?cursor=${encodeURIComponent(cursor)}&${boundsQS}`,
+        `/api/search/v2?cursor=${encodeURIComponent(cursor)}&${boundsQS}`
       );
 
       // The endpoint may return 404 if v2 is not enabled via feature flag.
@@ -130,7 +130,7 @@ test.describe("Pagination API", () => {
       // Must NOT be a 500 Internal Server Error (graceful handling required)
       expect(
         status,
-        `Invalid cursor "${cursor.slice(0, 30)}..." should not cause a 500. Got status ${status}`,
+        `Invalid cursor "${cursor.slice(0, 30)}..." should not cause a 500. Got status ${status}`
       ).not.toBe(500);
 
       // Acceptable responses:

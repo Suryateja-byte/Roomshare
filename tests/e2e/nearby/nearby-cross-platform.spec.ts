@@ -6,16 +6,16 @@
  * configured projects by default. Viewport-specific tests use skip guards.
  */
 
-import { test, expect } from '../helpers/test-utils';
-import { NearbyPlacesPage } from './nearby-page.pom';
+import { test, expect } from "../helpers/test-utils";
+import { NearbyPlacesPage } from "./nearby-page.pom";
 import {
   mockNearbyApi,
   buildNearbyResponse,
   groceryPlaces,
   emptyPlacesResponse,
-} from './nearby-mock-factory';
+} from "./nearby-mock-factory";
 
-test.describe('Nearby Places — Cross-Platform @nearby', () => {
+test.describe("Nearby Places — Cross-Platform @nearby", () => {
   let nearby: NearbyPlacesPage;
 
   test.beforeEach(async ({ page }) => {
@@ -26,7 +26,9 @@ test.describe('Nearby Places — Cross-Platform @nearby', () => {
   // Core flow (runs on all browsers/viewports)
   // --------------------------------------------------------------------------
 
-  test('X-001: Full functional flow — search + results + attribution', async ({ page }) => {
+  test("X-001: Full functional flow — search + results + attribution", async ({
+    page,
+  }) => {
     await mockNearbyApi(page, { body: buildNearbyResponse(groceryPlaces) });
     await nearby.goto();
     await nearby.scrollToSection();
@@ -36,17 +38,19 @@ test.describe('Nearby Places — Cross-Platform @nearby', () => {
     await expect(nearby.initialState).toBeVisible();
 
     // Search via category
-    await nearby.selectCategory('Grocery');
+    await nearby.selectCategory("Grocery");
     await nearby.waitForResults();
 
     // Verify results
     const count = await nearby.getPlaceCount();
     expect(count).toBe(groceryPlaces.length);
-    await expect(nearby.placeByName('Whole Foods Market')).toBeVisible();
+    await expect(nearby.placeByName("Whole Foods Market")).toBeVisible();
 
     // Verify place link
-    const href = await nearby.placeByName('Whole Foods Market').getAttribute('href');
-    expect(href).toContain('google.com/maps/dir');
+    const href = await nearby
+      .placeByName("Whole Foods Market")
+      .getAttribute("href");
+    expect(href).toContain("google.com/maps/dir");
 
     // Verify attribution (if map is visible)
     const mapVisible = await nearby.isMapVisible();
@@ -55,27 +59,27 @@ test.describe('Nearby Places — Cross-Platform @nearby', () => {
     }
   });
 
-  test('X-002: Search input + results rendering', async ({ page }) => {
+  test("X-002: Search input + results rendering", async ({ page }) => {
     await mockNearbyApi(page, { body: buildNearbyResponse(groceryPlaces) });
     await nearby.goto();
     await nearby.scrollToSection();
 
     // Type search
-    await nearby.searchFor('Whole Foods');
+    await nearby.searchFor("Whole Foods");
     await nearby.waitForResults();
 
     // Results should render with proper content
-    const firstPlace = nearby.placeByName('Whole Foods Market');
+    const firstPlace = nearby.placeByName("Whole Foods Market");
     await expect(firstPlace).toBeVisible();
     const text = await firstPlace.textContent();
-    expect(text).toContain('Whole Foods Market');
+    expect(text).toContain("Whole Foods Market");
   });
 
   // --------------------------------------------------------------------------
   // Mobile-specific (< 1024px viewport)
   // --------------------------------------------------------------------------
 
-  test('X-004: Mobile layout + view toggle', async ({ page }) => {
+  test("X-004: Mobile layout + view toggle", async ({ page }) => {
     const viewport = page.viewportSize();
     if (!viewport || viewport.width >= 1024) {
       test.skip();
@@ -108,7 +112,7 @@ test.describe('Nearby Places — Cross-Platform @nearby', () => {
   // Tablet-specific (768-1023px viewport)
   // --------------------------------------------------------------------------
 
-  test('X-005: Tablet layout', async ({ page }) => {
+  test("X-005: Tablet layout", async ({ page }) => {
     const viewport = page.viewportSize();
     if (!viewport || viewport.width < 768 || viewport.width >= 1024) {
       test.skip();
@@ -127,7 +131,7 @@ test.describe('Nearby Places — Cross-Platform @nearby', () => {
   // Desktop-specific (>= 1024px viewport)
   // --------------------------------------------------------------------------
 
-  test('X-006: Desktop split layout (panel + map)', async ({ page }) => {
+  test("X-006: Desktop split layout (panel + map)", async ({ page }) => {
     const viewport = page.viewportSize();
     if (!viewport || viewport.width < 1024) {
       test.skip();
@@ -160,7 +164,7 @@ test.describe('Nearby Places — Cross-Platform @nearby', () => {
   // Wide viewport
   // --------------------------------------------------------------------------
 
-  test('X-008: Wide viewport layout', async ({ page }) => {
+  test("X-008: Wide viewport layout", async ({ page }) => {
     const viewport = page.viewportSize();
     if (!viewport || viewport.width < 1920) {
       test.skip();
@@ -177,7 +181,7 @@ test.describe('Nearby Places — Cross-Platform @nearby', () => {
 
     // Content should still be usable
     await expect(nearby.searchInput).toBeVisible();
-    await nearby.selectCategory('Grocery');
+    await nearby.selectCategory("Grocery");
     await nearby.waitForResults();
     expect(await nearby.getPlaceCount()).toBe(groceryPlaces.length);
   });

@@ -23,7 +23,10 @@ import {
   waitForMapReady,
   searchResultsContainer,
 } from "./helpers/test-utils";
-import { pollForUrlParam, pollForUrlParamPresent } from "./helpers/sync-helpers";
+import {
+  pollForUrlParam,
+  pollForUrlParamPresent,
+} from "./helpers/sync-helpers";
 import { openFilterModal } from "./helpers/filter-helpers";
 import type { Page } from "@playwright/test";
 
@@ -87,10 +90,10 @@ async function applyMaxPriceFilter(page: Page, maxPrice: number) {
   // The price filter uses Radix Slider with aria-label="Price range"
   const priceSlider = page.locator('[aria-label="Price range"]');
 
-  if (await priceSlider.count() > 0) {
+  if ((await priceSlider.count()) > 0) {
     // Find the max price thumb (second thumb) and adjust it
     const maxThumb = page.locator('[aria-label="Maximum price"]');
-    if (await maxThumb.count() > 0) {
+    if ((await maxThumb.count()) > 0) {
       // Use keyboard to adjust - press left arrow to decrease max price
       await maxThumb.focus();
       // Press left multiple times to lower the max price
@@ -102,7 +105,7 @@ async function applyMaxPriceFilter(page: Page, maxPrice: number) {
 
   // Apply the filter
   const applyBtn = page.locator('[data-testid="filter-modal-apply"]');
-  if (await applyBtn.count() > 0) {
+  if ((await applyBtn.count()) > 0) {
     await applyBtn.click();
   } else {
     // Fallback: close dialog by clicking outside or pressing escape
@@ -126,22 +129,35 @@ async function navigateWithRoomTypeFilter(page: Page, roomType: string) {
  * Clear all filters using the clear button
  */
 async function clearAllFilters(page: Page) {
-  const clearBtn = page.locator('[data-testid="filter-bar-clear-all"]')
+  const clearBtn = page
+    .locator('[data-testid="filter-bar-clear-all"]')
     .or(page.locator('button[aria-label="Clear all filters"]'))
     .or(page.locator('button:has-text("Clear all")'));
 
-  const clearVisible = await clearBtn.first().isVisible().catch(() => false);
+  const clearVisible = await clearBtn
+    .first()
+    .isVisible()
+    .catch(() => false);
 
   if (clearVisible) {
     await clearBtn.first().click();
     // Wait for URL to update (filters removed) — use expect.poll for soft navigation
-    await expect.poll(
-      () => {
-        const params = new URL(page.url(), "http://localhost").searchParams;
-        return !params.has("roomType") && !params.has("maxPrice") && !params.has("amenities");
-      },
-      { timeout: 10_000, message: "URL filter params to be removed after clearing" },
-    ).toBe(true);
+    await expect
+      .poll(
+        () => {
+          const params = new URL(page.url(), "http://localhost").searchParams;
+          return (
+            !params.has("roomType") &&
+            !params.has("maxPrice") &&
+            !params.has("amenities")
+          );
+        },
+        {
+          timeout: 10_000,
+          message: "URL filter params to be removed after clearing",
+        }
+      )
+      .toBe(true);
     await waitForMapReady(page);
   }
 }
@@ -152,21 +168,29 @@ async function clearAllFilters(page: Page) {
 // eslint-disable-next-line @typescript-eslint/no-unused-vars
 async function changeSortOption(page: Page, sortValue: string) {
   // Desktop: use the sort dropdown
-  const sortTrigger = page.locator('button:has-text("Sort by")')
+  const sortTrigger = page
+    .locator('button:has-text("Sort by")')
     .or(page.locator('[aria-label*="sort" i]'))
     .or(page.locator('button:has-text("Recommended")'));
 
-  const sortVisible = await sortTrigger.first().isVisible().catch(() => false);
+  const sortVisible = await sortTrigger
+    .first()
+    .isVisible()
+    .catch(() => false);
 
   if (sortVisible) {
     await sortTrigger.first().click();
 
     // Click the sort option (Playwright auto-waits for actionability)
-    const sortOption = page.getByRole("option", { name: new RegExp(sortValue, "i") })
+    const sortOption = page
+      .getByRole("option", { name: new RegExp(sortValue, "i") })
       .or(page.locator(`button:has-text("${sortValue}")`))
       .or(page.locator(`[data-value="${sortValue}"]`));
 
-    await sortOption.first().waitFor({ state: "visible", timeout: 5_000 }).catch(() => {});
+    await sortOption
+      .first()
+      .waitFor({ state: "visible", timeout: 5_000 })
+      .catch(() => {});
     if (await sortOption.first().isVisible()) {
       await sortOption.first().click();
     }
@@ -176,14 +200,18 @@ async function changeSortOption(page: Page, sortValue: string) {
 /**
  * Track network requests for map marker data
  */
-async function trackMapDataRequests(page: Page): Promise<{ getCount: () => number }> {
+async function trackMapDataRequests(
+  page: Page
+): Promise<{ getCount: () => number }> {
   let requestCount = 0;
 
   page.on("request", (request) => {
     const url = request.url();
     // Track only map-specific marker data requests (not general search/SSR)
-    if (url.includes("/api/map-listings") ||
-        url.includes("/api/search/map-markers")) {
+    if (
+      url.includes("/api/map-listings") ||
+      url.includes("/api/search/map-markers")
+    ) {
       requestCount++;
     }
   });
@@ -200,20 +228,27 @@ test.describe("Map + Filter Interactions", () => {
   test.use({ storageState: { cookies: [], origins: [] } });
 
   // Map tests need extra time for WebGL rendering and tile loading in CI
-  test.beforeEach(async () => { test.slow(); });
+  test.beforeEach(async () => {
+    test.slow();
+  });
 
   // ---------------------------------------------------------------------------
   // 5.1: Filter change updates map markers (count decreases) [P0]
   // ---------------------------------------------------------------------------
   test.describe("5.1: Filter change updates map markers", () => {
-    test(`${tags.core} - applying room type filter reduces marker count`, async ({ page }) => {
+    test(`${tags.core} - applying room type filter reduces marker count`, async ({
+      page,
+    }) => {
       // Navigate to search page without filters
       await waitForSearchPageReady(page);
 
       // Wait for map markers to appear
       let initialMarkerCount: number;
       try {
-        initialMarkerCount = await waitForMapMarkers(page, { timeout: 30_000, minCount: 1 });
+        initialMarkerCount = await waitForMapMarkers(page, {
+          timeout: 30_000,
+          minCount: 1,
+        });
       } catch {
         // If no markers appear (WebGL issue), skip the test
         test.skip(true, "Map markers not rendered (WebGL may be unavailable)");
@@ -242,14 +277,19 @@ test.describe("Map + Filter Interactions", () => {
       expect(url.searchParams.get("roomType")).toBe("Private Room");
     });
 
-    test(`${tags.core} - applying price filter via URL reduces markers`, async ({ page }) => {
+    test(`${tags.core} - applying price filter via URL reduces markers`, async ({
+      page,
+    }) => {
       // Navigate to search page without filters
       await waitForSearchPageReady(page);
 
       // Wait for map markers
       let initialMarkerCount: number;
       try {
-        initialMarkerCount = await waitForMapMarkers(page, { timeout: 30_000, minCount: 1 });
+        initialMarkerCount = await waitForMapMarkers(page, {
+          timeout: 30_000,
+          minCount: 1,
+        });
       } catch {
         test.skip(true, "Map markers not rendered (WebGL may be unavailable)");
         return;
@@ -264,7 +304,9 @@ test.describe("Map + Filter Interactions", () => {
 
       // Get new marker count
       const filteredMarkerCount = await getMarkerCount(page);
-      console.log(`[Test] Filtered marker count (maxPrice=500): ${filteredMarkerCount}`);
+      console.log(
+        `[Test] Filtered marker count (maxPrice=500): ${filteredMarkerCount}`
+      );
 
       // Filtered count should be less than or equal to initial
       expect(filteredMarkerCount).toBeLessThanOrEqual(initialMarkerCount);
@@ -273,7 +315,9 @@ test.describe("Map + Filter Interactions", () => {
       expect(new URL(page.url()).searchParams.get("maxPrice")).toBe("500");
     });
 
-    test(`${tags.core} - map instance persists during filter change (no reinitialization)`, async ({ page }) => {
+    test(`${tags.core} - map instance persists during filter change (no reinitialization)`, async ({
+      page,
+    }) => {
       await waitForSearchPageReady(page);
 
       // Check if map exists
@@ -306,17 +350,24 @@ test.describe("Map + Filter Interactions", () => {
   // 5.2: Clear filter restores all matching markers [P0]
   // ---------------------------------------------------------------------------
   test.describe("5.2: Clear filter restores markers", () => {
-    test(`${tags.core} - clearing filters restores original marker count`, async ({ page }) => {
+    test(`${tags.core} - clearing filters restores original marker count`, async ({
+      page,
+    }) => {
       // First get unfiltered marker count as baseline
       await waitForSearchPageReady(page);
       let unfilteredBaseline: number;
       try {
-        unfilteredBaseline = await waitForMapMarkers(page, { timeout: 30_000, minCount: 1 });
+        unfilteredBaseline = await waitForMapMarkers(page, {
+          timeout: 30_000,
+          minCount: 1,
+        });
       } catch {
         test.skip(true, "Map markers not rendered (WebGL may be unavailable)");
         return;
       }
-      console.log(`[Test] Unfiltered baseline marker count: ${unfilteredBaseline}`);
+      console.log(
+        `[Test] Unfiltered baseline marker count: ${unfilteredBaseline}`
+      );
 
       // Navigate to search page with a filter applied
       await navigateWithRoomTypeFilter(page, "Private Room");
@@ -333,11 +384,16 @@ test.describe("Map + Filter Interactions", () => {
       // Wait for markers to render after navigation (same wait as baseline)
       let unfilteredMarkerCount: number;
       try {
-        unfilteredMarkerCount = await waitForMapMarkers(page, { timeout: 30_000, minCount: 1 });
+        unfilteredMarkerCount = await waitForMapMarkers(page, {
+          timeout: 30_000,
+          minCount: 1,
+        });
       } catch {
         unfilteredMarkerCount = await getMarkerCount(page);
       }
-      console.log(`[Test] Unfiltered marker count after clear: ${unfilteredMarkerCount}`);
+      console.log(
+        `[Test] Unfiltered marker count after clear: ${unfilteredMarkerCount}`
+      );
 
       // Unfiltered count should be greater than or equal to filtered
       expect(unfilteredMarkerCount).toBeGreaterThanOrEqual(filteredMarkerCount);
@@ -347,7 +403,9 @@ test.describe("Map + Filter Interactions", () => {
       expect(url.searchParams.has("roomType")).toBe(false);
     });
 
-    test(`${tags.core} - clicking individual filter chip removes only that filter`, async ({ page }) => {
+    test(`${tags.core} - clicking individual filter chip removes only that filter`, async ({
+      page,
+    }) => {
       // Navigate with multiple filters
       await page.goto(`${SEARCH_URL}&roomType=Private+Room&amenities=Wifi`);
       await page.waitForLoadState("domcontentloaded");
@@ -364,8 +422,10 @@ test.describe("Map + Filter Interactions", () => {
       }
 
       // Find and click the roomType filter chip's remove button
-      const roomTypeChip = filtersRegion.locator('button:has-text("Private Room")');
-      if (await roomTypeChip.count() > 0) {
+      const roomTypeChip = filtersRegion.locator(
+        'button:has-text("Private Room")'
+      );
+      if ((await roomTypeChip.count()) > 0) {
         await roomTypeChip.click();
 
         // Wait for roomType param to be removed from URL
@@ -383,7 +443,9 @@ test.describe("Map + Filter Interactions", () => {
   // 5.3: Sort change does NOT refetch map data [P1]
   // ---------------------------------------------------------------------------
   test.describe("5.3: Sort change behavior", () => {
-    test(`${tags.core} - changing sort order does not reinitialize map`, async ({ page }) => {
+    test(`${tags.core} - changing sort order does not reinitialize map`, async ({
+      page,
+    }) => {
       await waitForSearchPageReady(page);
 
       // Check if map exists
@@ -396,7 +458,10 @@ test.describe("Map + Filter Interactions", () => {
       // Wait for markers to render before measuring
       let initialMarkerCount: number;
       try {
-        initialMarkerCount = await waitForMapMarkers(page, { timeout: 30_000, minCount: 1 });
+        initialMarkerCount = await waitForMapMarkers(page, {
+          timeout: 30_000,
+          minCount: 1,
+        });
       } catch {
         // If markers don't appear, use 0 but the test may be unreliable
         initialMarkerCount = await getMarkerCount(page);
@@ -417,7 +482,10 @@ test.describe("Map + Filter Interactions", () => {
       // Wait for markers to render after sort navigation, then compare
       let afterSortMarkerCount: number;
       try {
-        afterSortMarkerCount = await waitForMapMarkers(page, { timeout: 30_000, minCount: 1 });
+        afterSortMarkerCount = await waitForMapMarkers(page, {
+          timeout: 30_000,
+          minCount: 1,
+        });
       } catch {
         afterSortMarkerCount = await getMarkerCount(page);
       }
@@ -426,20 +494,22 @@ test.describe("Map + Filter Interactions", () => {
       // Sort should not change marker count (same data, different order).
       // Allow tolerance of +-5 for CI timing variance in marker rendering.
       expect(afterSortMarkerCount).toBeGreaterThanOrEqual(
-        Math.max(0, initialMarkerCount - 5),
+        Math.max(0, initialMarkerCount - 5)
       );
-      expect(afterSortMarkerCount).toBeLessThanOrEqual(
-        initialMarkerCount + 5,
-      );
+      expect(afterSortMarkerCount).toBeLessThanOrEqual(initialMarkerCount + 5);
     });
 
-    test(`${tags.core} - sort change updates list order but preserves map markers`, async ({ page }) => {
+    test(`${tags.core} - sort change updates list order but preserves map markers`, async ({
+      page,
+    }) => {
       await waitForSearchPageReady(page);
 
       // Get initial listing prices from card text content (no data-testid for prices)
       const getListingPrices = async (): Promise<string[]> => {
         return page.evaluate(() => {
-          const cards = document.querySelectorAll('[data-testid="listing-card"], a[href^="/listings/"]');
+          const cards = document.querySelectorAll(
+            '[data-testid="listing-card"], a[href^="/listings/"]'
+          );
           const prices: string[] = [];
           cards.forEach((card) => {
             const match = card.textContent?.match(/\$[\d,]+/);
@@ -455,7 +525,10 @@ test.describe("Map + Filter Interactions", () => {
       // Wait for markers to render before measuring
       let initialMarkerCount: number;
       try {
-        initialMarkerCount = await waitForMapMarkers(page, { timeout: 30_000, minCount: 1 });
+        initialMarkerCount = await waitForMapMarkers(page, {
+          timeout: 30_000,
+          minCount: 1,
+        });
       } catch {
         initialMarkerCount = await getMarkerCount(page);
       }
@@ -477,17 +550,18 @@ test.describe("Map + Filter Interactions", () => {
       // Wait for markers to render after sort navigation, then compare
       let afterSortMarkerCount: number;
       try {
-        afterSortMarkerCount = await waitForMapMarkers(page, { timeout: 30_000, minCount: 1 });
+        afterSortMarkerCount = await waitForMapMarkers(page, {
+          timeout: 30_000,
+          minCount: 1,
+        });
       } catch {
         afterSortMarkerCount = await getMarkerCount(page);
       }
       // Sort should not change marker count. Allow tolerance of +-5 for CI timing.
       expect(afterSortMarkerCount).toBeGreaterThanOrEqual(
-        Math.max(0, initialMarkerCount - 5),
+        Math.max(0, initialMarkerCount - 5)
       );
-      expect(afterSortMarkerCount).toBeLessThanOrEqual(
-        initialMarkerCount + 5,
-      );
+      expect(afterSortMarkerCount).toBeLessThanOrEqual(initialMarkerCount + 5);
 
       // If we have prices, the order may have changed
       // (can't guarantee order change if all same price)
@@ -497,7 +571,9 @@ test.describe("Map + Filter Interactions", () => {
       }
     });
 
-    test(`${tags.core} - rapid sort changes do not cause multiple map refetches`, async ({ page }) => {
+    test(`${tags.core} - rapid sort changes do not cause multiple map refetches`, async ({
+      page,
+    }) => {
       await waitForSearchPageReady(page);
 
       // Check if map exists
@@ -527,7 +603,9 @@ test.describe("Map + Filter Interactions", () => {
       const finalRequestCount = tracker.getCount();
       const additionalRequests = finalRequestCount - initialRequestCount;
 
-      console.log(`[Test] Additional requests after 3 sort changes: ${additionalRequests}`);
+      console.log(
+        `[Test] Additional requests after 3 sort changes: ${additionalRequests}`
+      );
 
       // We expect some requests for list data updates
       // But map marker data should not be refetched multiple times
@@ -557,8 +635,12 @@ test.describe("Map + Filter Interactions", () => {
       expect(pageTitle).toBeTruthy();
 
       // Check for listings or empty state
-      const hasListings = await searchResultsContainer(page).locator(selectors.listingCard).count() > 0;
-      const hasEmptyState = await page.locator(selectors.emptyState).count() > 0;
+      const hasListings =
+        (await searchResultsContainer(page)
+          .locator(selectors.listingCard)
+          .count()) > 0;
+      const hasEmptyState =
+        (await page.locator(selectors.emptyState).count()) > 0;
 
       // Either listings or empty state should be present
       expect(hasListings || hasEmptyState).toBe(true);

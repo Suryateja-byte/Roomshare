@@ -1,45 +1,45 @@
-import { auth } from '@/auth';
-import { prisma } from '@/lib/prisma';
-import { redirect } from 'next/navigation';
-import ProfileClient from './ProfileClient';
+import { auth } from "@/auth";
+import { prisma } from "@/lib/prisma";
+import { redirect } from "next/navigation";
+import ProfileClient from "./ProfileClient";
 
 export default async function ProfilePage() {
-    const session = await auth();
+  const session = await auth();
 
-    if (!session || !session.user || !session.user.id) {
-        redirect('/login');
-    }
+  if (!session || !session.user || !session.user.id) {
+    redirect("/login");
+  }
 
-    // Fetch user data with their listings
-    const user = await prisma.user.findUnique({
-        where: { id: session.user.id },
-        include: {
-            listings: {
-                select: {
-                    id: true,
-                    title: true,
-                    description: true,
-                    price: true,
-                    availableSlots: true,
-                    images: true,
-                    location: true,
-                },
-                orderBy: {
-                    createdAt: 'desc',
-                },
-            },
+  // Fetch user data with their listings
+  const user = await prisma.user.findUnique({
+    where: { id: session.user.id },
+    include: {
+      listings: {
+        select: {
+          id: true,
+          title: true,
+          description: true,
+          price: true,
+          availableSlots: true,
+          images: true,
+          location: true,
         },
-    });
+        orderBy: {
+          createdAt: "desc",
+        },
+      },
+    },
+  });
 
-    if (!user) {
-        redirect('/login');
-    }
+  if (!user) {
+    redirect("/login");
+  }
 
-    // Convert Prisma Decimal price fields to plain numbers at the query boundary
-    const userWithNumberPrices = {
-        ...user,
-        listings: user.listings.map(l => ({ ...l, price: Number(l.price) })),
-    };
+  // Convert Prisma Decimal price fields to plain numbers at the query boundary
+  const userWithNumberPrices = {
+    ...user,
+    listings: user.listings.map((l) => ({ ...l, price: Number(l.price) })),
+  };
 
-    return <ProfileClient user={userWithNumberPrices} />;
+  return <ProfileClient user={userWithNumberPrices} />;
 }

@@ -8,7 +8,14 @@
  * Run: pnpm playwright test tests/e2e/search-url-deeplink.spec.ts
  */
 
-import { test, expect, SF_BOUNDS, selectors, timeouts, searchResultsContainer } from "./helpers/test-utils";
+import {
+  test,
+  expect,
+  SF_BOUNDS,
+  selectors,
+  timeouts,
+  searchResultsContainer,
+} from "./helpers/test-utils";
 import type { Page } from "@playwright/test";
 
 // ---------------------------------------------------------------------------
@@ -27,14 +34,20 @@ function buildSearchUrl(params?: Record<string, string>): string {
 async function assertUrlParams(page: Page, expected: Record<string, string>) {
   const url = new URL(page.url());
   for (const [key, value] of Object.entries(expected)) {
-    expect(url.searchParams.get(key), `URL param "${key}" should be "${value}"`).toBe(value);
+    expect(
+      url.searchParams.get(key),
+      `URL param "${key}" should be "${value}"`
+    ).toBe(value);
   }
 }
 
 async function assertUrlExcludesParams(page: Page, keys: string[]) {
   const url = new URL(page.url());
   for (const key of keys) {
-    expect(url.searchParams.has(key), `URL should NOT contain param "${key}"`).toBe(false);
+    expect(
+      url.searchParams.has(key),
+      `URL should NOT contain param "${key}"`
+    ).toBe(false);
   }
 }
 
@@ -43,7 +56,9 @@ async function waitForSearchContent(page: Page) {
   const container = searchResultsContainer(page);
   const cards = container.locator('[data-testid="listing-card"]');
   // ZeroResultsSuggestions uses h3 "No exact matches", older UI might use h2 "No matches found"
-  const zeroResults = page.locator('h2:has-text("No matches found"), h3:has-text("No exact matches")');
+  const zeroResults = page.locator(
+    'h2:has-text("No matches found"), h3:has-text("No exact matches")'
+  );
   await expect(cards.or(zeroResults).first()).toBeAttached({ timeout: 30_000 });
 }
 
@@ -55,7 +70,9 @@ test.describe("Search URL Deep Links (P0)", () => {
   // -------------------------------------------------------------------------
   // 1. Deep link with query
   // -------------------------------------------------------------------------
-  test("1: deep link with query shows results and query visible in UI", async ({ page }) => {
+  test("1: deep link with query shows results and query visible in UI", async ({
+    page,
+  }) => {
     await page.goto(buildSearchUrl({ q: "Mission" }));
     await waitForSearchContent(page);
 
@@ -70,7 +87,9 @@ test.describe("Search URL Deep Links (P0)", () => {
   // -------------------------------------------------------------------------
   // 2. Deep link with price filter
   // -------------------------------------------------------------------------
-  test("2: deep link with maxPrice filter is active in UI", async ({ page }) => {
+  test("2: deep link with maxPrice filter is active in UI", async ({
+    page,
+  }) => {
     await page.goto(buildSearchUrl({ maxPrice: "1500" }));
     await waitForSearchContent(page);
 
@@ -79,7 +98,9 @@ test.describe("Search URL Deep Links (P0)", () => {
     // The price filter input or chip should reflect the value
     // Check for the budget input being prefilled or a chip showing the price
     const maxPriceInput = page.getByLabel(/maximum budget/i);
-    const chipsRegion = page.locator('[role="region"][aria-label="Applied filters"]').first();
+    const chipsRegion = page
+      .locator('[role="region"][aria-label="Applied filters"]')
+      .first();
 
     const inputVisible = await maxPriceInput.isVisible().catch(() => false);
     const chipsVisible = await chipsRegion.isVisible().catch(() => false);
@@ -97,7 +118,9 @@ test.describe("Search URL Deep Links (P0)", () => {
   // -------------------------------------------------------------------------
   // 3. Deep link with room type
   // -------------------------------------------------------------------------
-  test("3: deep link with roomType=private filter is active", async ({ page }) => {
+  test("3: deep link with roomType=private filter is active", async ({
+    page,
+  }) => {
     await page.goto(buildSearchUrl({ roomType: "private" }));
     await page.waitForLoadState("domcontentloaded");
     await waitForSearchContent(page);
@@ -107,11 +130,13 @@ test.describe("Search URL Deep Links (P0)", () => {
     const roomTypeParam = url.searchParams.get("roomType");
     // Accept both alias and canonical form
     expect(
-      roomTypeParam === "private" || roomTypeParam === "Private Room",
+      roomTypeParam === "private" || roomTypeParam === "Private Room"
     ).toBe(true);
 
     // Check for a chip or active state referencing Private Room
-    const chipsRegion = page.locator('[role="region"][aria-label="Applied filters"]').first();
+    const chipsRegion = page
+      .locator('[role="region"][aria-label="Applied filters"]')
+      .first();
     const chipsVisible = await chipsRegion.isVisible().catch(() => false);
     if (chipsVisible) {
       const chipText = await chipsRegion.textContent();
@@ -122,7 +147,9 @@ test.describe("Search URL Deep Links (P0)", () => {
   // -------------------------------------------------------------------------
   // 4. Deep link with sort
   // -------------------------------------------------------------------------
-  test("4: deep link with sort=price_asc reflects in sort control", async ({ page }) => {
+  test("4: deep link with sort=price_asc reflects in sort control", async ({
+    page,
+  }) => {
     test.slow();
     await page.goto(buildSearchUrl({ sort: "price_asc" }));
     await waitForSearchContent(page);
@@ -149,13 +176,17 @@ test.describe("Search URL Deep Links (P0)", () => {
   // -------------------------------------------------------------------------
   // 5. Deep link with multiple filters
   // -------------------------------------------------------------------------
-  test("5: deep link with multiple filters all reflected in UI", async ({ page }) => {
-    await page.goto(buildSearchUrl({
-      q: "room",
-      maxPrice: "2000",
-      sort: "price_asc",
-      roomType: "private",
-    }));
+  test("5: deep link with multiple filters all reflected in UI", async ({
+    page,
+  }) => {
+    await page.goto(
+      buildSearchUrl({
+        q: "room",
+        maxPrice: "2000",
+        sort: "price_asc",
+        roomType: "private",
+      })
+    );
     await waitForSearchContent(page);
 
     // All params in URL
@@ -170,7 +201,9 @@ test.describe("Search URL Deep Links (P0)", () => {
   // -------------------------------------------------------------------------
   // 6. Deep link with bounds only
   // -------------------------------------------------------------------------
-  test("6: deep link with bounds only centers map on those bounds", async ({ page }) => {
+  test("6: deep link with bounds only centers map on those bounds", async ({
+    page,
+  }) => {
     // Use custom bounds (different from default SF)
     const customBounds = {
       minLat: "37.75",
@@ -178,7 +211,9 @@ test.describe("Search URL Deep Links (P0)", () => {
       minLng: "-122.45",
       maxLng: "-122.40",
     };
-    await page.goto(`/search?minLat=${customBounds.minLat}&maxLat=${customBounds.maxLat}&minLng=${customBounds.minLng}&maxLng=${customBounds.maxLng}`);
+    await page.goto(
+      `/search?minLat=${customBounds.minLat}&maxLat=${customBounds.maxLat}&minLng=${customBounds.minLng}&maxLng=${customBounds.maxLng}`
+    );
     await page.waitForLoadState("domcontentloaded");
 
     await assertUrlParams(page, customBounds);
@@ -191,14 +226,16 @@ test.describe("Search URL Deep Links (P0)", () => {
   // -------------------------------------------------------------------------
   // 7. Deep link with no bounds
   // -------------------------------------------------------------------------
-  test("7: deep link with no bounds shows browse mode or location prompt", async ({ page }) => {
+  test("7: deep link with no bounds shows browse mode or location prompt", async ({
+    page,
+  }) => {
     await page.goto("/search");
     await page.waitForLoadState("domcontentloaded");
 
     // Should either show browse-mode results (capped) or a location prompt
     // Give the page time to settle
     const cards = page.locator('[data-testid="listing-card"]');
-    const suggestedSearches = page.locator('text=/Suggested|Popular|Browse/i');
+    const suggestedSearches = page.locator("text=/Suggested|Popular|Browse/i");
     const body = page.locator("body");
 
     // Wait for any content to appear
@@ -206,7 +243,10 @@ test.describe("Search URL Deep Links (P0)", () => {
 
     // Either browse results appear, or suggested searches, or the page is in browse mode
     const cardCount = await cards.count().catch(() => 0);
-    const hasSuggestions = await suggestedSearches.first().isVisible().catch(() => false);
+    const hasSuggestions = await suggestedSearches
+      .first()
+      .isVisible()
+      .catch(() => false);
 
     // Both outcomes are valid: browse results or suggestions/prompt
     expect(cardCount >= 0 || hasSuggestions).toBe(true);
@@ -215,9 +255,15 @@ test.describe("Search URL Deep Links (P0)", () => {
   // -------------------------------------------------------------------------
   // 8. Deep link shared URL - second context sees same results pattern
   // -------------------------------------------------------------------------
-  test("8: shared URL produces same results pattern in separate context", async ({ browser }) => {
+  test("8: shared URL produces same results pattern in separate context", async ({
+    browser,
+  }) => {
     test.slow();
-    const sharedUrl = buildSearchUrl({ q: "room", maxPrice: "2000", sort: "price_asc" });
+    const sharedUrl = buildSearchUrl({
+      q: "room",
+      maxPrice: "2000",
+      sort: "price_asc",
+    });
 
     // Open in first context
     const context1 = await browser.newContext();
@@ -227,9 +273,14 @@ test.describe("Search URL Deep Links (P0)", () => {
 
     // Wait for search to fully settle (cards or zero-results)
     const cards1 = page1.locator('[data-testid="listing-card"]');
-    const zeroResults1 = page1.locator('h2:has-text("No matches found"), h3:has-text("No exact matches")');
+    const zeroResults1 = page1.locator(
+      'h2:has-text("No matches found"), h3:has-text("No exact matches")'
+    );
     try {
-      await cards1.or(zeroResults1).first().waitFor({ state: "attached", timeout: 30_000 });
+      await cards1
+        .or(zeroResults1)
+        .first()
+        .waitFor({ state: "attached", timeout: 30_000 });
     } catch {
       // Zero results is also valid
     }
@@ -244,9 +295,14 @@ test.describe("Search URL Deep Links (P0)", () => {
     await page2.waitForLoadState("domcontentloaded");
 
     const cards2 = page2.locator('[data-testid="listing-card"]');
-    const zeroResults2 = page2.locator('h2:has-text("No matches found"), h3:has-text("No exact matches")');
+    const zeroResults2 = page2.locator(
+      'h2:has-text("No matches found"), h3:has-text("No exact matches")'
+    );
     try {
-      await cards2.or(zeroResults2).first().waitFor({ state: "attached", timeout: 30_000 });
+      await cards2
+        .or(zeroResults2)
+        .first()
+        .waitFor({ state: "attached", timeout: 30_000 });
     } catch {
       // Zero results is also valid
     }
@@ -260,7 +316,9 @@ test.describe("Search URL Deep Links (P0)", () => {
     const url1 = new URL(page1.url());
     const url2 = new URL(page2.url());
     expect(url1.searchParams.get("q")).toBe(url2.searchParams.get("q"));
-    expect(url1.searchParams.get("maxPrice")).toBe(url2.searchParams.get("maxPrice"));
+    expect(url1.searchParams.get("maxPrice")).toBe(
+      url2.searchParams.get("maxPrice")
+    );
     expect(url1.searchParams.get("sort")).toBe(url2.searchParams.get("sort"));
 
     await context1.close();
@@ -270,7 +328,9 @@ test.describe("Search URL Deep Links (P0)", () => {
   // -------------------------------------------------------------------------
   // 9. Copy URL, open in new context - same filters, same results pattern
   // -------------------------------------------------------------------------
-  test("9: navigated URL copied to new context preserves filters and results", async ({ browser }) => {
+  test("9: navigated URL copied to new context preserves filters and results", async ({
+    browser,
+  }) => {
     // First context: navigate and apply filters via URL
     const context1 = await browser.newContext();
     const page1 = await context1.newPage();
@@ -289,8 +349,12 @@ test.describe("Search URL Deep Links (P0)", () => {
     // URL params should match
     const url1 = new URL(page1.url());
     const url2 = new URL(page2.url());
-    expect(url2.searchParams.get("maxPrice")).toBe(url1.searchParams.get("maxPrice"));
-    expect(url2.searchParams.get("amenities")).toBe(url1.searchParams.get("amenities"));
+    expect(url2.searchParams.get("maxPrice")).toBe(
+      url1.searchParams.get("maxPrice")
+    );
+    expect(url2.searchParams.get("amenities")).toBe(
+      url1.searchParams.get("amenities")
+    );
 
     await context1.close();
     await context2.close();

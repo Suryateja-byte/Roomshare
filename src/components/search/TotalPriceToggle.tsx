@@ -1,6 +1,6 @@
-'use client';
+"use client";
 
-import { useCallback } from 'react';
+import { useCallback } from "react";
 
 interface TotalPriceToggleProps {
   showTotal: boolean;
@@ -11,12 +11,15 @@ interface TotalPriceToggleProps {
  * TotalPriceToggle — Switch between nightly and total price display.
  * Renders as a compact toggle in the search results header.
  */
-export function TotalPriceToggle({ showTotal, onToggle }: TotalPriceToggleProps) {
+export function TotalPriceToggle({
+  showTotal,
+  onToggle,
+}: TotalPriceToggleProps) {
   const handleToggle = useCallback(() => {
     const next = !showTotal;
     onToggle(next);
     try {
-      sessionStorage.setItem('showTotalPrice', JSON.stringify(next));
+      sessionStorage.setItem("showTotalPrice", JSON.stringify(next));
     } catch {
       // sessionStorage unavailable (SSR, private browsing)
     }
@@ -35,9 +38,10 @@ export function TotalPriceToggle({ showTotal, onToggle }: TotalPriceToggleProps)
         className={`
           relative inline-flex h-5 w-9 shrink-0 items-center rounded-full
           transition-colors duration-200 focus-visible:ring-2 focus-visible:ring-zinc-900/30 dark:focus-visible:ring-zinc-400/40 focus-visible:ring-offset-2
-          ${showTotal
-            ? 'bg-zinc-900 dark:bg-white'
-            : 'bg-zinc-300 dark:bg-zinc-600'
+          ${
+            showTotal
+              ? "bg-zinc-900 dark:bg-white"
+              : "bg-zinc-300 dark:bg-zinc-600"
           }
         `}
       >
@@ -45,7 +49,7 @@ export function TotalPriceToggle({ showTotal, onToggle }: TotalPriceToggleProps)
           className={`
             inline-block h-3.5 w-3.5 rounded-full bg-white dark:bg-zinc-900 shadow-sm
             transition-transform duration-200
-            ${showTotal ? 'translate-x-[18px]' : 'translate-x-[3px]'}
+            ${showTotal ? "translate-x-[18px]" : "translate-x-[3px]"}
           `}
         />
       </button>

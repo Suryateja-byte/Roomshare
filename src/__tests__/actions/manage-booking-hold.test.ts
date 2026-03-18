@@ -7,7 +7,7 @@
  * counting HELD bookings, and feature-flag independence.
  */
 
-jest.mock('@/lib/booking-audit', () => ({ logBookingAudit: jest.fn() }));
+jest.mock("@/lib/booking-audit", () => ({ logBookingAudit: jest.fn() }));
 
 // Mock dependencies before imports
 jest.mock("@/lib/prisma", () => ({
@@ -101,7 +101,7 @@ import {
   isInvalidStateTransitionError,
 } from "@/lib/booking-state-machine";
 import { checkRateLimit } from "@/lib/rate-limit";
-import { logBookingAudit } from '@/lib/booking-audit';
+import { logBookingAudit } from "@/lib/booking-audit";
 
 describe("manage-booking-hold — Phase 4 hold management paths", () => {
   const mockOwnerSession = {
@@ -250,7 +250,7 @@ describe("manage-booking-hold — Phase 4 hold management paths", () => {
     expect(result.success).toBe(true);
     expect(logBookingAudit).toHaveBeenCalledWith(
       expect.anything(),
-      expect.objectContaining({ action: 'ACCEPTED', previousStatus: 'HELD' }),
+      expect.objectContaining({ action: "ACCEPTED", previousStatus: "HELD" })
     );
   });
 
@@ -381,9 +381,7 @@ describe("manage-booking-hold — Phase 4 hold management paths", () => {
 
     (prisma.$transaction as jest.Mock).mockImplementation(async (callback) => {
       const tx = {
-        $queryRaw: jest
-          .fn()
-          .mockResolvedValue([{ ownerId: "owner-123" }]),
+        $queryRaw: jest.fn().mockResolvedValue([{ ownerId: "owner-123" }]),
         $executeRaw: mockTxExecuteRaw,
         booking: { updateMany: mockTxUpdateMany },
       };
@@ -509,13 +507,13 @@ describe("manage-booking-hold — Phase 4 hold management paths", () => {
     (validateTransition as jest.Mock).mockImplementation(() => {
       throw { code: "INVALID_STATE_TRANSITION" };
     });
-    (isInvalidStateTransitionError as unknown as jest.Mock).mockReturnValue(true);
+    (isInvalidStateTransitionError as unknown as jest.Mock).mockReturnValue(
+      true
+    );
 
     const result = await updateBookingStatus("booking-expired-1", "ACCEPTED");
 
-    expect(result.error).toBe(
-      "Cannot change booking from EXPIRED to ACCEPTED"
-    );
+    expect(result.error).toBe("Cannot change booking from EXPIRED to ACCEPTED");
     expect(result.code).toBe("INVALID_STATE_TRANSITION");
     expect(prisma.$transaction).not.toHaveBeenCalled();
   });
@@ -537,12 +535,11 @@ describe("manage-booking-hold — Phase 4 hold management paths", () => {
     (validateTransition as jest.Mock).mockImplementation(() => {
       throw { code: "INVALID_STATE_TRANSITION" };
     });
-    (isInvalidStateTransitionError as unknown as jest.Mock).mockReturnValue(true);
-
-    const result = await updateBookingStatus(
-      "booking-pending-1",
-      "HELD"
+    (isInvalidStateTransitionError as unknown as jest.Mock).mockReturnValue(
+      true
     );
+
+    const result = await updateBookingStatus("booking-pending-1", "HELD");
 
     expect(result.error).toBe("Cannot change booking from PENDING to HELD");
     expect(result.code).toBe("INVALID_STATE_TRANSITION");
@@ -589,10 +586,7 @@ describe("manage-booking-hold — Phase 4 hold management paths", () => {
       return callback(tx);
     });
 
-    const result = await updateBookingStatus(
-      "booking-pending-cap",
-      "ACCEPTED"
-    );
+    const result = await updateBookingStatus("booking-pending-cap", "ACCEPTED");
 
     // Capacity exceeded because HELD bookings are counted
     expect(result.error).toBe(
@@ -636,9 +630,7 @@ describe("manage-booking-hold — Phase 4 hold management paths", () => {
 
     (prisma.$transaction as jest.Mock).mockImplementation(async (callback) => {
       const tx = {
-        $queryRaw: jest
-          .fn()
-          .mockResolvedValue([{ ownerId: "owner-123" }]),
+        $queryRaw: jest.fn().mockResolvedValue([{ ownerId: "owner-123" }]),
         $executeRaw: jest.fn(),
         booking: { updateMany: mockTxUpdateMany },
       };

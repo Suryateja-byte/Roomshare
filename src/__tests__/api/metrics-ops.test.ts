@@ -9,20 +9,20 @@
  */
 
 // Mock getServerEnv to read from process.env directly (avoids lazy-init caching)
-jest.mock('@/lib/env', () => ({
+jest.mock("@/lib/env", () => ({
   getServerEnv: () => process.env,
 }));
 
-import { GET } from '@/app/api/metrics/ops/route';
+import { GET } from "@/app/api/metrics/ops/route";
 
-describe('GET /api/metrics/ops', () => {
+describe("GET /api/metrics/ops", () => {
   const originalEnv = process.env;
 
   beforeEach(() => {
     jest.clearAllMocks();
     process.env = {
       ...originalEnv,
-      METRICS_SECRET: 'test-metrics-secret-32-chars-min!!',
+      METRICS_SECRET: "test-metrics-secret-32-chars-min!!",
     } as unknown as NodeJS.ProcessEnv;
   });
 
@@ -30,37 +30,37 @@ describe('GET /api/metrics/ops', () => {
     process.env = originalEnv;
   });
 
-  it('returns 401 when no Authorization header', async () => {
-    const req = new Request('http://localhost/api/metrics/ops');
+  it("returns 401 when no Authorization header", async () => {
+    const req = new Request("http://localhost/api/metrics/ops");
     const res = await GET(req);
     expect(res.status).toBe(401);
   });
 
-  it('returns 401 when bearer token does not match', async () => {
-    const req = new Request('http://localhost/api/metrics/ops', {
-      headers: { authorization: 'Bearer wrong-token' },
+  it("returns 401 when bearer token does not match", async () => {
+    const req = new Request("http://localhost/api/metrics/ops", {
+      headers: { authorization: "Bearer wrong-token" },
     });
     const res = await GET(req);
     expect(res.status).toBe(401);
   });
 
-  it('returns 401 when METRICS_SECRET is not set', async () => {
+  it("returns 401 when METRICS_SECRET is not set", async () => {
     delete process.env.METRICS_SECRET;
-    const req = new Request('http://localhost/api/metrics/ops', {
-      headers: { authorization: 'Bearer anything' },
+    const req = new Request("http://localhost/api/metrics/ops", {
+      headers: { authorization: "Bearer anything" },
     });
     const res = await GET(req);
     expect(res.status).toBe(401);
   });
 
-  it('returns 200 with Prometheus metrics when token matches', async () => {
-    const req = new Request('http://localhost/api/metrics/ops', {
-      headers: { authorization: 'Bearer test-metrics-secret-32-chars-min!!' },
+  it("returns 200 with Prometheus metrics when token matches", async () => {
+    const req = new Request("http://localhost/api/metrics/ops", {
+      headers: { authorization: "Bearer test-metrics-secret-32-chars-min!!" },
     });
     const res = await GET(req);
     expect(res.status).toBe(200);
     const text = await res.text();
-    expect(text).toContain('process_uptime_seconds');
-    expect(text).toContain('nodejs_heap_size_used_bytes');
+    expect(text).toContain("process_uptime_seconds");
+    expect(text).toContain("nodejs_heap_size_used_bytes");
   });
 });

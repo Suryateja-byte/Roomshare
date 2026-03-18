@@ -31,7 +31,7 @@ export const DEFAULT_WEIGHTS: RankingWeights = {
 export function computeScore(
   listing: RankableListing,
   context: RankingContext,
-  weights: RankingWeights = DEFAULT_WEIGHTS,
+  weights: RankingWeights = DEFAULT_WEIGHTS
 ): number {
   const signals = computeSignals(listing, context);
 
@@ -50,14 +50,14 @@ export function computeScore(
  */
 export function computeSignals(
   listing: RankableListing,
-  context: RankingContext,
+  context: RankingContext
 ): SignalValues {
   return {
     quality: normalizeRecommendedScore(listing.recommendedScore),
     rating: normalizeRating(listing.avgRating, listing.reviewCount),
     price: normalizePriceCompetitiveness(
       listing.price,
-      context.localMedianPrice,
+      context.localMedianPrice
     ),
     recency: normalizeRecency(listing.createdAt),
     geo: normalizeDistance(listing.lat, listing.lng, context.center),
@@ -72,7 +72,7 @@ export function computeSignals(
  * @returns Normalized value 0-1
  */
 export function normalizeRecommendedScore(
-  score: number | null | undefined,
+  score: number | null | undefined
 ): number {
   if (score == null || score <= 0) return 0.3; // Neutral default for missing data
 
@@ -93,7 +93,7 @@ export function normalizeRecommendedScore(
  */
 export function normalizeRating(
   rating: number | null | undefined,
-  reviewCount: number | null | undefined,
+  reviewCount: number | null | undefined
 ): number {
   if (rating == null) return 0.5; // Neutral for no rating
 
@@ -119,7 +119,7 @@ export function normalizeRating(
  */
 export function normalizePriceCompetitiveness(
   price: number | null | undefined,
-  medianPrice: number | null | undefined,
+  medianPrice: number | null | undefined
 ): number {
   if (price == null || medianPrice == null || medianPrice <= 0) {
     return 0.5; // Neutral for missing data
@@ -144,7 +144,7 @@ export function normalizePriceCompetitiveness(
  * @returns Normalized value 0-1 (1.0 = brand new, decays over time)
  */
 export function normalizeRecency(
-  createdAt: Date | string | null | undefined,
+  createdAt: Date | string | null | undefined
 ): number {
   if (createdAt == null) return 0.5; // Neutral for missing data
 
@@ -175,7 +175,7 @@ export function normalizeRecency(
 export function normalizeDistance(
   lat: number | null | undefined,
   lng: number | null | undefined,
-  center: { lat: number; lng: number } | undefined,
+  center: { lat: number; lng: number } | undefined
 ): number {
   // No geo scoring if center is not provided (skip signal)
   if (center == null) return 0.5;
@@ -198,7 +198,7 @@ function haversineDistance(
   lat1: number,
   lng1: number,
   lat2: number,
-  lng2: number,
+  lng2: number
 ): number {
   const R = 6371; // Earth radius in km
   const dLat = toRad(lat2 - lat1);
@@ -227,7 +227,7 @@ function toRad(deg: number): number {
  * @returns Median price or undefined if no valid prices
  */
 export function computeMedianPrice(
-  listings: Array<{ price?: number | null }>,
+  listings: Array<{ price?: number | null }>
 ): number | undefined {
   const prices = listings
     .map((l) => l.price)

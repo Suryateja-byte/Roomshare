@@ -26,9 +26,9 @@ const boundsQS = `minLat=${SF_BOUNDS.minLat}&maxLat=${SF_BOUNDS.maxLat}&minLng=$
 async function waitForSearchOutcome(page: import("@playwright/test").Page) {
   const container = searchResultsContainer(page);
   const cards = container.locator('[data-testid="listing-card"]');
-  const cardOrEmpty = cards.first().or(
-    container.getByText(/no (matches|results|listings)/i).first()
-  );
+  const cardOrEmpty = cards
+    .first()
+    .or(container.getByText(/no (matches|results|listings)/i).first());
   await expect(cardOrEmpty).toBeVisible({ timeout: 30_000 });
 }
 
@@ -41,7 +41,9 @@ test.describe("Semantic Search - Results Quality", () => {
     test.slow();
   });
 
-  test(`${tags.core} SS-08: semantic search listing cards display all required fields`, async ({ page }) => {
+  test(`${tags.core} SS-08: semantic search listing cards display all required fields`, async ({
+    page,
+  }) => {
     test.skip(!SEMANTIC_ENABLED, "Requires ENABLE_SEMANTIC_SEARCH=true");
 
     await page.goto(`/search?q=cozy+room+near+campus&${boundsQS}`);
@@ -59,10 +61,12 @@ test.describe("Semantic Search - Results Quality", () => {
     await expect(cardLink).toBeVisible();
 
     // Price
-    await expect(firstCard.locator('[data-testid="listing-price"]')).toBeVisible();
+    await expect(
+      firstCard.locator('[data-testid="listing-price"]')
+    ).toBeVisible();
 
     // Image (carousel or placeholder)
-    const img = firstCard.locator('img').first();
+    const img = firstCard.locator("img").first();
     await expect(img).toBeVisible();
 
     // Location text (city, state somewhere in the card)
@@ -70,7 +74,9 @@ test.describe("Semantic Search - Results Quality", () => {
     expect(cardText).toBeTruthy();
   });
 
-  test(`${tags.core} SS-09: Load More pagination adds semantic results without duplicates`, async ({ page }) => {
+  test(`${tags.core} SS-09: Load More pagination adds semantic results without duplicates`, async ({
+    page,
+  }) => {
     test.skip(!SEMANTIC_ENABLED, "Requires ENABLE_SEMANTIC_SEARCH=true");
 
     await page.goto(`/search?q=room&${boundsQS}`);
@@ -79,12 +85,15 @@ test.describe("Semantic Search - Results Quality", () => {
     const container = searchResultsContainer(page);
     const cards = container.locator('[data-testid="listing-card"]');
     const initialCount = await cards.count();
-    test.skip(initialCount < 12, "Fewer than 12 results — Load More won't appear");
+    test.skip(
+      initialCount < 12,
+      "Fewer than 12 results — Load More won't appear"
+    );
 
     // Collect initial listing IDs
     const initialIds = new Set<string>();
     for (let i = 0; i < initialCount; i++) {
-      const id = await cards.nth(i).getAttribute('data-listing-id');
+      const id = await cards.nth(i).getAttribute("data-listing-id");
       if (id) initialIds.add(id);
     }
 
@@ -96,10 +105,12 @@ test.describe("Semantic Search - Results Quality", () => {
     await loadMoreBtn.click();
 
     // Wait for more cards to appear
-    await expect.poll(
-      () => cards.count(),
-      { timeout: 30_000, message: "Expected more cards after Load More" }
-    ).toBeGreaterThan(initialCount);
+    await expect
+      .poll(() => cards.count(), {
+        timeout: 30_000,
+        message: "Expected more cards after Load More",
+      })
+      .toBeGreaterThan(initialCount);
 
     const newCount = await cards.count();
     expect(newCount).toBeGreaterThan(initialCount);
@@ -107,7 +118,7 @@ test.describe("Semantic Search - Results Quality", () => {
     // Verify no duplicates
     const allIds = new Set<string>();
     for (let i = 0; i < newCount; i++) {
-      const id = await cards.nth(i).getAttribute('data-listing-id');
+      const id = await cards.nth(i).getAttribute("data-listing-id");
       if (id) {
         expect(allIds.has(id)).toBe(false);
         allIds.add(id);
@@ -115,7 +126,9 @@ test.describe("Semantic Search - Results Quality", () => {
     }
   });
 
-  test(`${tags.core} SS-10: filters apply to semantic search results`, async ({ page }) => {
+  test(`${tags.core} SS-10: filters apply to semantic search results`, async ({
+    page,
+  }) => {
     test.skip(!SEMANTIC_ENABLED, "Requires ENABLE_SEMANTIC_SEARCH=true");
 
     await page.goto(
@@ -129,15 +142,20 @@ test.describe("Semantic Search - Results Quality", () => {
 
     if (count > 0) {
       for (let i = 0; i < Math.min(count, 3); i++) {
-        const priceText = await cards.nth(i).locator('[data-testid="listing-price"]').textContent();
-        const price = parseFloat((priceText || '0').replace(/[^0-9.]/g, ''));
+        const priceText = await cards
+          .nth(i)
+          .locator('[data-testid="listing-price"]')
+          .textContent();
+        const price = parseFloat((priceText || "0").replace(/[^0-9.]/g, ""));
         expect(price).toBeGreaterThanOrEqual(500);
         expect(price).toBeLessThanOrEqual(1500);
       }
     }
   });
 
-  test(`SS-11: semantic search with current SEMANTIC_WEIGHT returns results without errors`, async ({ page }) => {
+  test(`SS-11: semantic search with current SEMANTIC_WEIGHT returns results without errors`, async ({
+    page,
+  }) => {
     test.skip(!SEMANTIC_ENABLED, "Requires ENABLE_SEMANTIC_SEARCH=true");
 
     await page.goto(`/search?q=cozy+room+near+campus&${boundsQS}`);
@@ -145,14 +163,16 @@ test.describe("Semantic Search - Results Quality", () => {
 
     const container = searchResultsContainer(page);
     const cards = container.locator('[data-testid="listing-card"]');
-    const cardOrEmpty = cards.first().or(
-      container.getByText(/no (matches|results|listings)/i).first()
-    );
+    const cardOrEmpty = cards
+      .first()
+      .or(container.getByText(/no (matches|results|listings)/i).first());
     // Search completes without crash — results or empty state visible
     await expect(cardOrEmpty).toBeVisible({ timeout: 30_000 });
   });
 
-  test(`${tags.core} SS-12: semantic search results are within geographic bounds`, async ({ page }) => {
+  test(`${tags.core} SS-12: semantic search results are within geographic bounds`, async ({
+    page,
+  }) => {
     test.skip(!SEMANTIC_ENABLED, "Requires ENABLE_SEMANTIC_SEARCH=true");
 
     await page.goto(`/search?q=cozy+room&${boundsQS}`);
@@ -163,14 +183,17 @@ test.describe("Semantic Search - Results Quality", () => {
     const count = await cards.count();
     test.skip(count === 0, "No results to verify bounds against");
 
-    const firstCardLink = cards.first().locator('a[href*="/listings/"]').first();
-    const href = await firstCardLink.getAttribute('href');
+    const firstCardLink = cards
+      .first()
+      .locator('a[href*="/listings/"]')
+      .first();
+    const href = await firstCardLink.getAttribute("href");
     expect(href).toBeTruthy();
 
     await page.goto(href!);
-    await page.waitForLoadState('domcontentloaded');
+    await page.waitForLoadState("domcontentloaded");
 
-    const listingTitle = page.getByRole('heading', { level: 1 }).first();
+    const listingTitle = page.getByRole("heading", { level: 1 }).first();
     await expect(listingTitle).toBeVisible({ timeout: 30_000 });
   });
 });

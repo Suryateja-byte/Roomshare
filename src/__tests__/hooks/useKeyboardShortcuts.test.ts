@@ -19,7 +19,7 @@ import {
 // Helper to dispatch keyboard events
 function dispatchKeyDown(
   key: string,
-  options: Partial<KeyboardEventInit> = {},
+  options: Partial<KeyboardEventInit> = {}
 ) {
   const event = new KeyboardEvent("keydown", {
     key,
@@ -199,7 +199,7 @@ describe("useKeyboardShortcuts", () => {
       let isDisabled = false;
 
       const { rerender } = renderHook(() =>
-        useKeyboardShortcuts([{ key: "k", action, disabled: isDisabled }]),
+        useKeyboardShortcuts([{ key: "k", action, disabled: isDisabled }])
       );
 
       // Should trigger when not disabled
@@ -383,7 +383,7 @@ describe("formatShortcut", () => {
 
     expect(formatShortcut({ key: "k", meta: true })).toBe("Ctrl+K");
     expect(formatShortcut({ key: "f", meta: true, shift: true })).toBe(
-      "Ctrl+Shift+F",
+      "Ctrl+Shift+F"
     );
   });
 });

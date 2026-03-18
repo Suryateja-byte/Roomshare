@@ -39,7 +39,7 @@ export async function orchestrateSearch(
   filterParams: FilterParams,
   requestedPage: number,
   limit: number,
-  useV2: boolean,
+  useV2: boolean
 ): Promise<SearchOrchestrationResult> {
   let paginatedResult: PaginatedResultHybrid<ListingData> | null = null;
   let fetchError: string | null = null;
@@ -98,5 +98,10 @@ export async function orchestrateSearch(
   }
 
   // Control flow guarantees paginatedResult is non-null: set by v2, v1, or the catch fallback
-  return { paginatedResult: paginatedResult!, v2MapData, fetchError, usedV1Fallback };
+  return {
+    paginatedResult: paginatedResult!,
+    v2MapData,
+    fetchError,
+    usedV1Fallback,
+  };
 }

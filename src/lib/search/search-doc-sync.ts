@@ -11,7 +11,7 @@
  * - Uses the same field mappings and scoring as the cron job
  */
 
-import 'server-only';
+import "server-only";
 
 import { prisma } from "@/lib/prisma";
 import { logger } from "@/lib/logger";

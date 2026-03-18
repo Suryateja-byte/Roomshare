@@ -10,7 +10,12 @@
  * Run: pnpm playwright test tests/e2e/search-url-navigation.spec.ts
  */
 
-import { test, expect, SF_BOUNDS, searchResultsContainer } from "./helpers/test-utils";
+import {
+  test,
+  expect,
+  SF_BOUNDS,
+  searchResultsContainer,
+} from "./helpers/test-utils";
 import { pollForUrlParam } from "./helpers/sync-helpers";
 import type { Page } from "@playwright/test";
 
@@ -45,7 +50,9 @@ test.describe("Search URL Browser Navigation (P1)", () => {
   // -------------------------------------------------------------------------
   // 1. Filter change creates history entry -> back restores previous
   // -------------------------------------------------------------------------
-  test("1: filter change creates history entry, back restores previous state", async ({ page }) => {
+  test("1: filter change creates history entry, back restores previous state", async ({
+    page,
+  }) => {
     // State A: no price filter
     await page.goto(buildSearchUrl());
     await waitForSearchContent(page);
@@ -71,7 +78,9 @@ test.describe("Search URL Browser Navigation (P1)", () => {
   // -------------------------------------------------------------------------
   // 2. Sort change creates history entry -> back restores previous sort
   // -------------------------------------------------------------------------
-  test("2: sort change creates history entry, back restores previous sort", async ({ page }) => {
+  test("2: sort change creates history entry, back restores previous sort", async ({
+    page,
+  }) => {
     // State A: default sort (no sort param)
     await page.goto(buildSearchUrl());
     await waitForSearchContent(page);
@@ -94,7 +103,9 @@ test.describe("Search URL Browser Navigation (P1)", () => {
   // -------------------------------------------------------------------------
   // 3. Query change creates history entry -> back restores previous query
   // -------------------------------------------------------------------------
-  test("3: query change creates history entry, back restores previous query", async ({ page }) => {
+  test("3: query change creates history entry, back restores previous query", async ({
+    page,
+  }) => {
     // State A: no query
     await page.goto(buildSearchUrl());
     await waitForSearchContent(page);
@@ -117,7 +128,9 @@ test.describe("Search URL Browser Navigation (P1)", () => {
   // -------------------------------------------------------------------------
   // 4. Map bounds change does NOT create history entry (uses replaceState)
   // -------------------------------------------------------------------------
-  test("4: map bounds update uses replaceState -- no extra history entry", async ({ page }) => {
+  test("4: map bounds update uses replaceState -- no extra history entry", async ({
+    page,
+  }) => {
     // Navigate to search page with initial bounds
     await page.goto(buildSearchUrl());
     await waitForSearchContent(page);
@@ -161,7 +174,9 @@ test.describe("Search URL Browser Navigation (P1)", () => {
   // -------------------------------------------------------------------------
   // 5. Multiple filter changes -> multiple back presses restore each state
   // -------------------------------------------------------------------------
-  test("5: multiple filter changes create stacked history entries", async ({ page }) => {
+  test("5: multiple filter changes create stacked history entries", async ({
+    page,
+  }) => {
     // State A: base search
     await page.goto(buildSearchUrl());
     await waitForSearchContent(page);
@@ -175,7 +190,13 @@ test.describe("Search URL Browser Navigation (P1)", () => {
     await page.waitForLoadState("domcontentloaded");
 
     // State D: add roomType
-    await page.goto(buildSearchUrl({ maxPrice: "1500", sort: "price_asc", roomType: "private" }));
+    await page.goto(
+      buildSearchUrl({
+        maxPrice: "1500",
+        sort: "price_asc",
+        roomType: "private",
+      })
+    );
     await page.waitForLoadState("domcontentloaded");
 
     // Verify we are in state D
@@ -235,8 +256,13 @@ test.describe("Search URL Browser Navigation (P1)", () => {
   // -------------------------------------------------------------------------
   // 7. Navigate to listing detail -> back -> search params preserved
   // -------------------------------------------------------------------------
-  test("7: navigate to listing detail then back preserves search params", async ({ page }) => {
-    const searchUrlWithFilters = buildSearchUrl({ maxPrice: "2000", sort: "price_asc" });
+  test("7: navigate to listing detail then back preserves search params", async ({
+    page,
+  }) => {
+    const searchUrlWithFilters = buildSearchUrl({
+      maxPrice: "2000",
+      sort: "price_asc",
+    });
     await page.goto(searchUrlWithFilters);
     await waitForSearchContent(page);
 
@@ -252,11 +278,14 @@ test.describe("Search URL Browser Navigation (P1)", () => {
 
     // Click h3 title instead of <a> to avoid ImageCarousel's pointerDown setting isDragging=true
     const firstCard = cards.first();
-    const href = await firstCard.locator('a[href^="/listings/"]').first().getAttribute("href");
+    const href = await firstCard
+      .locator('a[href^="/listings/"]')
+      .first()
+      .getAttribute("href");
     expect(href).toBeTruthy();
 
     // Navigate via h3 click (inside Link but outside carousel area)
-    await firstCard.locator('h3').first().click();
+    await firstCard.locator("h3").first().click();
     await expect(page).toHaveURL(/\/listings\//, { timeout: 15_000 });
 
     // Go back to search
@@ -273,7 +302,9 @@ test.describe("Search URL Browser Navigation (P1)", () => {
   // -------------------------------------------------------------------------
   // 8. Browser back after load-more -> load-more state lost (only initial results)
   // -------------------------------------------------------------------------
-  test("8: back after load-more loses ephemeral pagination state", async ({ page }) => {
+  test("8: back after load-more loses ephemeral pagination state", async ({
+    page,
+  }) => {
     await page.goto(buildSearchUrl());
     await waitForSearchContent(page);
 
@@ -286,22 +317,30 @@ test.describe("Search URL Browser Navigation (P1)", () => {
     const hasLoadMore = await loadMoreBtn.isVisible().catch(() => false);
 
     if (!hasLoadMore) {
-      test.skip(true, "No load-more button -- insufficient data for pagination test");
+      test.skip(
+        true,
+        "No load-more button -- insufficient data for pagination test"
+      );
       return;
     }
 
     await loadMoreBtn.click();
 
     // Wait for additional cards
-    await page.waitForFunction(
-      (count) => {
-        return document.querySelectorAll('[data-testid="listing-card"]').length > count;
-      },
-      initialCount,
-      { timeout: 30_000 },
-    ).catch(() => {
-      // May not produce additional results
-    });
+    await page
+      .waitForFunction(
+        (count) => {
+          return (
+            document.querySelectorAll('[data-testid="listing-card"]').length >
+            count
+          );
+        },
+        initialCount,
+        { timeout: 30_000 }
+      )
+      .catch(() => {
+        // May not produce additional results
+      });
 
     const afterLoadMoreCount = await cards.count();
 

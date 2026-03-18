@@ -59,7 +59,7 @@ function normalizeQuery(query: string): string {
 // --- Public API ---
 
 export async function getCachedResults(
-  query: string,
+  query: string
 ): Promise<GeocodingResult[] | null> {
   const normalized = normalizeQuery(query);
   const redisClient = getRedis();
@@ -67,7 +67,7 @@ export async function getCachedResults(
   if (redisClient) {
     try {
       const cached = await redisClient.get<GeocodingResult[]>(
-        `${CACHE_PREFIX}${normalized}`,
+        `${CACHE_PREFIX}${normalized}`
       );
       return cached ?? null;
     } catch {
@@ -92,7 +92,7 @@ export async function getCachedResults(
 
 export async function setCachedResults(
   query: string,
-  results: GeocodingResult[],
+  results: GeocodingResult[]
 ): Promise<void> {
   const normalized = normalizeQuery(query);
   const redisClient = getRedis();

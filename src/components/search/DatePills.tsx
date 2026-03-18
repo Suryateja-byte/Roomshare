@@ -1,7 +1,7 @@
-'use client';
+"use client";
 
-import { useCallback } from 'react';
-import { useRouter, useSearchParams } from 'next/navigation';
+import { useCallback } from "react";
+import { useRouter, useSearchParams } from "next/navigation";
 
 export interface DateSuggestion {
   /** Display label, e.g. "Feb 15 – Mar 15" */
@@ -33,7 +33,7 @@ export function DatePills({ suggestions }: DatePillsProps) {
       }
       router.push(`/search?${sp.toString()}`);
     },
-    [router, currentParams],
+    [router, currentParams]
   );
 
   if (suggestions.length === 0) return null;
@@ -55,7 +55,11 @@ export function DatePills({ suggestions }: DatePillsProps) {
               {suggestion.label}
             </span>
             <span className="text-xs text-green-600 dark:text-green-400 font-medium whitespace-nowrap">
-              ~${suggestion.avgPrice.toLocaleString('en-US', { maximumFractionDigits: 0 })}/mo
+              ~$
+              {suggestion.avgPrice.toLocaleString("en-US", {
+                maximumFractionDigits: 0,
+              })}
+              /mo
             </span>
           </button>
         ))}

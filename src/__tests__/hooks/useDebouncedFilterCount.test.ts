@@ -19,8 +19,12 @@ jest.mock("next/navigation", () => ({
 // Mock fetch — save original and restore in afterAll to prevent cross-file leaks
 const originalFetch = global.fetch;
 const mockFetch = jest.fn();
-beforeAll(() => { global.fetch = mockFetch; });
-afterAll(() => { global.fetch = originalFetch; });
+beforeAll(() => {
+  global.fetch = mockFetch;
+});
+afterAll(() => {
+  global.fetch = originalFetch;
+});
 
 describe("useDebouncedFilterCount", () => {
   const defaultPending = {
@@ -64,7 +68,7 @@ describe("useDebouncedFilterCount", () => {
           pending: defaultPending,
           isDirty: true,
           isDrawerOpen: true,
-        }),
+        })
       );
 
       // Advance timers to trigger debounced fetch
@@ -91,7 +95,7 @@ describe("useDebouncedFilterCount", () => {
           pending: defaultPending,
           isDirty: true,
           isDrawerOpen: true,
-        }),
+        })
       );
 
       act(() => {
@@ -118,7 +122,7 @@ describe("useDebouncedFilterCount", () => {
           pending: defaultPending,
           isDirty: true,
           isDrawerOpen: true,
-        }),
+        })
       );
 
       act(() => {
@@ -145,7 +149,7 @@ describe("useDebouncedFilterCount", () => {
           pending: defaultPending,
           isDirty: true,
           isDrawerOpen: true,
-        }),
+        })
       );
 
       act(() => {
@@ -168,7 +172,7 @@ describe("useDebouncedFilterCount", () => {
           pending: defaultPending,
           isDirty: true,
           isDrawerOpen: true,
-        }),
+        })
       );
 
       act(() => {
@@ -191,7 +195,7 @@ describe("useDebouncedFilterCount", () => {
           pending: defaultPending,
           isDirty: true,
           isDrawerOpen: true,
-        }),
+        })
       );
 
       act(() => {
@@ -216,7 +220,7 @@ describe("useDebouncedFilterCount", () => {
           pending: defaultPending,
           isDirty: true,
           isDrawerOpen: true,
-        }),
+        })
       );
 
       act(() => {
@@ -242,7 +246,7 @@ describe("useDebouncedFilterCount", () => {
           pending: defaultPending,
           isDirty: true,
           isDrawerOpen: true,
-        }),
+        })
       );
 
       act(() => {
@@ -265,7 +269,7 @@ describe("useDebouncedFilterCount", () => {
           pending: defaultPending,
           isDirty: true,
           isDrawerOpen: false,
-        }),
+        })
       );
 
       act(() => {
@@ -282,7 +286,7 @@ describe("useDebouncedFilterCount", () => {
           pending: defaultPending,
           isDirty: false,
           isDrawerOpen: true,
-        }),
+        })
       );
 
       act(() => {
@@ -310,7 +314,7 @@ describe("useDebouncedFilterCount", () => {
             isDirty: true,
             isDrawerOpen: true,
           },
-        },
+        }
       );
 
       act(() => {
@@ -341,7 +345,7 @@ describe("useDebouncedFilterCount", () => {
             isDirty: true,
             isDrawerOpen: true,
           },
-        },
+        }
       );
 
       act(() => {
@@ -373,7 +377,7 @@ describe("useDebouncedFilterCount", () => {
             isDirty: true,
             isDrawerOpen: true,
           },
-        },
+        }
       );
 
       act(() => {
@@ -385,7 +389,11 @@ describe("useDebouncedFilterCount", () => {
       });
 
       // Close then reopen drawer - this triggers cache lookup
-      rerender({ pending: defaultPending, isDirty: false, isDrawerOpen: false });
+      rerender({
+        pending: defaultPending,
+        isDirty: false,
+        isDrawerOpen: false,
+      });
       clearCountCache(); // Clear cache to force fresh state
 
       // Second call: boundsRequired=false (normal response)

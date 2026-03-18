@@ -84,8 +84,8 @@ export function LazyImage({
       )}
 
       {/* Error fallback */}
-      {hasError && (
-        fallback || (
+      {hasError &&
+        (fallback || (
           <div className="absolute inset-0 flex items-center justify-center bg-zinc-100 ">
             <svg
               className="h-8 w-8 text-zinc-400"
@@ -102,8 +102,7 @@ export function LazyImage({
               />
             </svg>
           </div>
-        )
-      )}
+        ))}
 
       {/* Actual image */}
       {isInView && !hasError && (
@@ -129,10 +128,7 @@ interface BlurImageProps extends LazyImageProps {
   blurDataURL?: string;
 }
 
-export function BlurImage({
-  blurDataURL,
-  ...props
-}: BlurImageProps) {
+export function BlurImage({ blurDataURL, ...props }: BlurImageProps) {
   return (
     <LazyImage
       {...props}

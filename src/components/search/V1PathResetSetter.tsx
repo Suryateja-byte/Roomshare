@@ -1,7 +1,10 @@
 "use client";
 
 import { useEffect } from "react";
-import { useV2MapDataSetter, useSearchV2Setters } from "@/contexts/SearchV2DataContext";
+import {
+  useV2MapDataSetter,
+  useSearchV2Setters,
+} from "@/contexts/SearchV2DataContext";
 
 /**
  * V1PathResetSetter - Resets V2 context state when V1 fallback path runs.

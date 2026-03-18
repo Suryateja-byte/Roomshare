@@ -19,9 +19,9 @@
  * @see https://stadiamaps.com/attribution/
  */
 
-const STADIA_BASE = 'https://tiles.stadiamaps.com/styles';
+const STADIA_BASE = "https://tiles.stadiamaps.com/styles";
 
-export type StadiaStyle = 'alidade_smooth' | 'alidade_smooth_dark';
+export type StadiaStyle = "alidade_smooth" | "alidade_smooth_dark";
 
 /**
  * Build Stadia Maps style URL with optional API key
@@ -31,7 +31,7 @@ export type StadiaStyle = 'alidade_smooth' | 'alidade_smooth_dark';
  * @returns Complete style JSON URL
  */
 export function getStadiaStyleUrl(
-  style: StadiaStyle = 'alidade_smooth',
+  style: StadiaStyle = "alidade_smooth",
   apiKey?: string
 ): string {
   const baseUrl = `${STADIA_BASE}/${style}.json`;
@@ -46,7 +46,9 @@ export function getStadiaStyleUrl(
  * @returns Complete style JSON URL
  */
 export function getStadiaStyle(isDarkMode: boolean, apiKey?: string): string {
-  const style: StadiaStyle = isDarkMode ? 'alidade_smooth_dark' : 'alidade_smooth';
+  const style: StadiaStyle = isDarkMode
+    ? "alidade_smooth_dark"
+    : "alidade_smooth";
   return getStadiaStyleUrl(style, apiKey);
 }
 
@@ -55,6 +57,6 @@ export function getStadiaStyle(isDarkMode: boolean, apiKey?: string): string {
  * Add these to both connect-src and img-src
  */
 export const STADIA_DOMAINS = [
-  'https://tiles.stadiamaps.com',
-  'https://api.stadiamaps.com',
+  "https://tiles.stadiamaps.com",
+  "https://api.stadiamaps.com",
 ] as const;

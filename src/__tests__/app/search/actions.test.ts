@@ -11,9 +11,7 @@ jest.mock("next/headers", () => ({
 
 // Mock rate limiting — always allow
 jest.mock("@/lib/with-rate-limit", () => ({
-  checkServerComponentRateLimit: jest
-    .fn()
-    .mockResolvedValue({ allowed: true }),
+  checkServerComponentRateLimit: jest.fn().mockResolvedValue({ allowed: true }),
 }));
 
 // Mock env — enable V2
@@ -89,7 +87,10 @@ describe("fetchMoreListings", () => {
   it("falls back gracefully when V2 times out", async () => {
     // withTimeout rejects with TimeoutError
     mockWithTimeout.mockRejectedValue(
-      new TimeoutError("fetchMoreListings-executeSearchV2", DEFAULT_TIMEOUTS.DATABASE)
+      new TimeoutError(
+        "fetchMoreListings-executeSearchV2",
+        DEFAULT_TIMEOUTS.DATABASE
+      )
     );
 
     const warnSpy = jest.spyOn(console, "warn").mockImplementation(() => {});

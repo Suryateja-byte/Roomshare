@@ -14,7 +14,14 @@
  * via the PRESERVED_PARAMS constant in the codebase.
  */
 
-import { test, expect, selectors, timeouts, tags, searchResultsContainer } from "../helpers/test-utils";
+import {
+  test,
+  expect,
+  selectors,
+  timeouts,
+  tags,
+  searchResultsContainer,
+} from "../helpers/test-utils";
 import {
   boundsQS,
   SEARCH_URL,
@@ -34,8 +41,8 @@ test.describe("Filter Reset", () => {
   test.use({ storageState: { cookies: [], origins: [] } });
 
   test.beforeEach(async ({}, testInfo) => {
-    if (testInfo.project.name.includes('webkit')) {
-      test.skip(true, 'Radix UI hydration issues on webkit');
+    if (testInfo.project.name.includes("webkit")) {
+      test.skip(true, "Radix UI hydration issues on webkit");
     }
     test.slow();
   });
@@ -43,10 +50,12 @@ test.describe("Filter Reset", () => {
   // -------------------------------------------------------------------------
   // 13.1 "Clear all" in modal resets all filters
   // -------------------------------------------------------------------------
-  test(`${tags.core} 13.1 - "Clear all" in modal resets all filter values`, async ({ page }) => {
+  test(`${tags.core} 13.1 - "Clear all" in modal resets all filter values`, async ({
+    page,
+  }) => {
     // Navigate with three distinct filters applied
     await page.goto(
-      `${SEARCH_URL}&minPrice=500&amenities=Wifi&roomType=Private+Room`,
+      `${SEARCH_URL}&minPrice=500&amenities=Wifi&roomType=Private+Room`
     );
     await page.waitForLoadState("domcontentloaded");
     await page.waitForTimeout(3_000);
@@ -97,7 +106,9 @@ test.describe("Filter Reset", () => {
   // -------------------------------------------------------------------------
   // 13.2 "Clear all filters" link from zero-results state
   // -------------------------------------------------------------------------
-  test(`${tags.core} 13.2 - "Clear all filters" from zero-results resets URL and refreshes results`, async ({ page }) => {
+  test(`${tags.core} 13.2 - "Clear all filters" from zero-results resets URL and refreshes results`, async ({
+    page,
+  }) => {
     // Navigate with extreme price filter that should yield zero results
     await page.goto(`${SEARCH_URL}&minPrice=99999&maxPrice=100000`);
     await page.waitForLoadState("domcontentloaded");
@@ -107,22 +118,34 @@ test.describe("Filter Reset", () => {
     // (typically rendered inside the empty state / zero-results component)
     const container = searchResultsContainer(page);
     const clearLink = container
-      .locator('a:has-text("Clear all filters"), button:has-text("Clear all filters")')
+      .locator(
+        'a:has-text("Clear all filters"), button:has-text("Clear all filters")'
+      )
       .first();
 
-    const clearVisible = await clearLink.isVisible({ timeout: 10_000 }).catch(() => false);
-    test.skip(!clearVisible, "Zero-results 'Clear all filters' link not visible -- may need mocked empty state");
+    const clearVisible = await clearLink
+      .isVisible({ timeout: 10_000 })
+      .catch(() => false);
+    test.skip(
+      !clearVisible,
+      "Zero-results 'Clear all filters' link not visible -- may need mocked empty state"
+    );
 
     await clearLink.click();
 
     // Wait for filter params to be stripped from URL via soft navigation
-    await expect.poll(
-      () => {
-        const params = new URL(page.url(), "http://localhost").searchParams;
-        return !params.has("minPrice") && !params.has("maxPrice");
-      },
-      { timeout: timeouts.action, message: "URL to have no price params after clear" },
-    ).toBe(true);
+    await expect
+      .poll(
+        () => {
+          const params = new URL(page.url(), "http://localhost").searchParams;
+          return !params.has("minPrice") && !params.has("maxPrice");
+        },
+        {
+          timeout: timeouts.action,
+          message: "URL to have no price params after clear",
+        }
+      )
+      .toBe(true);
 
     // Bounds must be preserved
     expect(getUrlParam(page, "minLat")).toBeTruthy();
@@ -136,16 +159,20 @@ test.describe("Filter Reset", () => {
     const listingOrHeading = container
       .locator(`${selectors.listingCard}, h1, h3`)
       .first();
-    await expect(listingOrHeading).toBeVisible({ timeout: timeouts.navigation });
+    await expect(listingOrHeading).toBeVisible({
+      timeout: timeouts.navigation,
+    });
   });
 
   // -------------------------------------------------------------------------
   // 13.3 Clear all via chips bar removes everything
   // -------------------------------------------------------------------------
-  test(`${tags.core} 13.3 - chips bar "Clear all filters" removes all chips and cleans URL`, async ({ page }) => {
+  test(`${tags.core} 13.3 - chips bar "Clear all filters" removes all chips and cleans URL`, async ({
+    page,
+  }) => {
     // Navigate with 3+ filters
     await page.goto(
-      `${SEARCH_URL}&amenities=Wifi,Parking&roomType=Private+Room&sort=price_asc&q=downtown`,
+      `${SEARCH_URL}&amenities=Wifi,Parking&roomType=Private+Room&sort=price_asc&q=downtown`
     );
     await page.waitForLoadState("domcontentloaded");
 
@@ -167,13 +194,18 @@ test.describe("Filter Reset", () => {
     await expect(clearAllBtn).not.toBeVisible({ timeout: 30_000 });
 
     // Wait for all filter params to be removed from URL via soft navigation
-    await expect.poll(
-      () => {
-        const params = new URL(page.url(), "http://localhost").searchParams;
-        return !params.has("amenities") && !params.has("roomType");
-      },
-      { timeout: 30_000, message: "URL to have no filter params after clear all" },
-    ).toBe(true);
+    await expect
+      .poll(
+        () => {
+          const params = new URL(page.url(), "http://localhost").searchParams;
+          return !params.has("amenities") && !params.has("roomType");
+        },
+        {
+          timeout: 30_000,
+          message: "URL to have no filter params after clear all",
+        }
+      )
+      .toBe(true);
 
     // All chips should be gone -- region should disappear
     await expect(region).not.toBeVisible({ timeout: timeouts.action });
@@ -192,7 +224,9 @@ test.describe("Filter Reset", () => {
   // -------------------------------------------------------------------------
   // 13.4 Results refresh after reset
   // -------------------------------------------------------------------------
-  test(`${tags.core} 13.4 - listing cards appear after clearing restrictive filters`, async ({ page }) => {
+  test(`${tags.core} 13.4 - listing cards appear after clearing restrictive filters`, async ({
+    page,
+  }) => {
     // Start with extreme filter that should yield zero or very few results
     await page.goto(`${SEARCH_URL}&minPrice=99999&maxPrice=100000`);
     await page.waitForLoadState("domcontentloaded");
@@ -202,32 +236,48 @@ test.describe("Filter Reset", () => {
 
     // Try the chips bar "Clear all" first; fall back to "Clear all filters" link
     const chipsClearAll = chipsClearAllButton(page);
-    const chipsVisible = await chipsClearAll.isVisible({ timeout: 5_000 }).catch(() => false);
+    const chipsVisible = await chipsClearAll
+      .isVisible({ timeout: 5_000 })
+      .catch(() => false);
 
     const pageBodyClearAll = container
-      .locator('a:has-text("Clear all filters"), button:has-text("Clear all filters")')
+      .locator(
+        'a:has-text("Clear all filters"), button:has-text("Clear all filters")'
+      )
       .first();
 
     if (chipsVisible) {
       await chipsClearAll.click();
     } else {
-      const bodyLinkVisible = await pageBodyClearAll.isVisible({ timeout: 5_000 }).catch(() => false);
-      test.skip(!bodyLinkVisible, "No clear-all mechanism found for zero-results state");
+      const bodyLinkVisible = await pageBodyClearAll
+        .isVisible({ timeout: 5_000 })
+        .catch(() => false);
+      test.skip(
+        !bodyLinkVisible,
+        "No clear-all mechanism found for zero-results state"
+      );
       await pageBodyClearAll.click();
     }
 
     // Wait for filter params to be cleaned via soft navigation
-    await expect.poll(
-      () => {
-        const params = new URL(page.url(), "http://localhost").searchParams;
-        return !params.has("minPrice") && !params.has("maxPrice");
-      },
-      { timeout: timeouts.action, message: "URL to have no price params after clear" },
-    ).toBe(true);
+    await expect
+      .poll(
+        () => {
+          const params = new URL(page.url(), "http://localhost").searchParams;
+          return !params.has("minPrice") && !params.has("maxPrice");
+        },
+        {
+          timeout: timeouts.action,
+          message: "URL to have no price params after clear",
+        }
+      )
+      .toBe(true);
 
     // Wait for listing cards to appear (results refreshed)
     const listingCards = container.locator(selectors.listingCard);
-    await expect(listingCards.first()).toBeVisible({ timeout: timeouts.navigation });
+    await expect(listingCards.first()).toBeVisible({
+      timeout: timeouts.navigation,
+    });
 
     // Confirm there is at least one result
     const count = await listingCards.count();

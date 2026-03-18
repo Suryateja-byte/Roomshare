@@ -25,7 +25,9 @@ import type { Page } from "@playwright/test";
 // ---------------------------------------------------------------------------
 
 function recommendedRow(page: Page) {
-  return searchResultsContainer(page).locator('.flex.items-center.gap-2').filter({ hasText: "Try:" });
+  return searchResultsContainer(page)
+    .locator(".flex.items-center.gap-2")
+    .filter({ hasText: "Try:" });
 }
 
 // ---------------------------------------------------------------------------
@@ -40,14 +42,19 @@ test.describe("Recommended Filters", () => {
   });
 
   // 16.1: Recommended filter pills shown on base search
-  test("16.1 - recommended filter pills shown with Try label and up to 5 pills", async ({ page }) => {
+  test("16.1 - recommended filter pills shown with Try label and up to 5 pills", async ({
+    page,
+  }) => {
     await page.goto(SEARCH_URL);
     await page.waitForLoadState("domcontentloaded");
     await page.waitForTimeout(3_000);
 
     const row = recommendedRow(page);
     const rowVisible = await row.isVisible().catch(() => false);
-    test.skip(!rowVisible, "Recommended filters row not visible (may require results)");
+    test.skip(
+      !rowVisible,
+      "Recommended filters row not visible (may require results)"
+    );
 
     // "Try:" label should be visible
     await expect(row.locator("text=Try:")).toBeVisible({ timeout: 10_000 });
@@ -61,7 +68,13 @@ test.describe("Recommended Filters", () => {
     expect(pillCount).toBeLessThanOrEqual(5);
 
     // Pills should include known suggestions (at least one recognizable label)
-    const knownLabels = ["Furnished", "Pet Friendly", "Wifi", "Parking", "Washer"];
+    const knownLabels = [
+      "Furnished",
+      "Pet Friendly",
+      "Wifi",
+      "Parking",
+      "Washer",
+    ];
     let foundKnown = false;
     for (const label of knownLabels) {
       const pill = row.getByRole("button", { name: label, exact: true });
@@ -74,7 +87,9 @@ test.describe("Recommended Filters", () => {
   });
 
   // 16.2: Clicking suggestion applies the filter
-  test("16.2 - clicking Furnished pill applies amenities filter and shows chip", async ({ page }) => {
+  test("16.2 - clicking Furnished pill applies amenities filter and shows chip", async ({
+    page,
+  }) => {
     await page.goto(SEARCH_URL);
     await page.waitForLoadState("domcontentloaded");
     await page.waitForTimeout(3_000);
@@ -84,18 +99,29 @@ test.describe("Recommended Filters", () => {
     test.skip(!rowVisible, "Recommended filters row not visible");
 
     // Find and click "Furnished" pill
-    const furnishedPill = row.getByRole("button", { name: "Furnished", exact: true });
+    const furnishedPill = row.getByRole("button", {
+      name: "Furnished",
+      exact: true,
+    });
     await expect(furnishedPill).toBeVisible({ timeout: 10_000 });
     await furnishedPill.click();
 
     // Wait for URL to update with amenities param via soft navigation
-    await expect.poll(
-      () => {
-        const amenities = new URL(page.url(), "http://localhost").searchParams.get("amenities") ?? "";
-        return amenities.includes("Furnished");
-      },
-      { timeout: 30_000, message: 'URL param "amenities" to contain "Furnished"' },
-    ).toBe(true);
+    await expect
+      .poll(
+        () => {
+          const amenities =
+            new URL(page.url(), "http://localhost").searchParams.get(
+              "amenities"
+            ) ?? "";
+          return amenities.includes("Furnished");
+        },
+        {
+          timeout: 30_000,
+          message: 'URL param "amenities" to contain "Furnished"',
+        }
+      )
+      .toBe(true);
 
     // URL should contain the amenity
     const amenities = getUrlParam(page, "amenities") ?? "";
@@ -105,7 +131,10 @@ test.describe("Recommended Filters", () => {
     const updatedRow = recommendedRow(page);
     const updatedRowVisible = await updatedRow.isVisible().catch(() => false);
     if (updatedRowVisible) {
-      const furnishedPillAfter = updatedRow.getByRole("button", { name: "Furnished", exact: true });
+      const furnishedPillAfter = updatedRow.getByRole("button", {
+        name: "Furnished",
+        exact: true,
+      });
       await expect(furnishedPillAfter).not.toBeVisible({ timeout: 5_000 });
     }
 
@@ -113,12 +142,16 @@ test.describe("Recommended Filters", () => {
     const region = appliedFiltersRegion(page);
     const regionVisible = await region.isVisible().catch(() => false);
     if (regionVisible) {
-      await expect(region.locator("text=/Furnished/i").first()).toBeVisible({ timeout: 10_000 });
+      await expect(region.locator("text=/Furnished/i").first()).toBeVisible({
+        timeout: 10_000,
+      });
     }
   });
 
   // 16.3: Suggestions update after filter changes
-  test("16.3 - clicking Wifi removes it from suggestions while others remain", async ({ page }) => {
+  test("16.3 - clicking Wifi removes it from suggestions while others remain", async ({
+    page,
+  }) => {
     await page.goto(SEARCH_URL);
     await page.waitForLoadState("domcontentloaded");
     await page.waitForTimeout(3_000);
@@ -139,13 +172,18 @@ test.describe("Recommended Filters", () => {
     await wifiPill.click();
 
     // Wait for URL to update via soft navigation
-    await expect.poll(
-      () => {
-        const amenities = new URL(page.url(), "http://localhost").searchParams.get("amenities") ?? "";
-        return amenities.includes("Wifi");
-      },
-      { timeout: 30_000, message: 'URL param "amenities" to contain "Wifi"' },
-    ).toBe(true);
+    await expect
+      .poll(
+        () => {
+          const amenities =
+            new URL(page.url(), "http://localhost").searchParams.get(
+              "amenities"
+            ) ?? "";
+          return amenities.includes("Wifi");
+        },
+        { timeout: 30_000, message: 'URL param "amenities" to contain "Wifi"' }
+      )
+      .toBe(true);
 
     // Pagination params should be reset
     expect(getUrlParam(page, "cursor")).toBeNull();
@@ -158,7 +196,10 @@ test.describe("Recommended Filters", () => {
 
     if (updatedRowVisible) {
       // "Wifi" should no longer appear in suggestions
-      const wifiPillAfter = updatedRow.getByRole("button", { name: "Wifi", exact: true });
+      const wifiPillAfter = updatedRow.getByRole("button", {
+        name: "Wifi",
+        exact: true,
+      });
       await expect(wifiPillAfter).not.toBeVisible({ timeout: 5_000 });
 
       // Other suggestions should still be present
@@ -169,7 +210,9 @@ test.describe("Recommended Filters", () => {
   });
 
   // 16.4: No recommendations when all suggestion filters are applied
-  test("16.4 - no Try section when all suggestion filters are already applied", async ({ page }) => {
+  test("16.4 - no Try section when all suggestion filters are already applied", async ({
+    page,
+  }) => {
     // Apply all 10 suggestions from the SUGGESTIONS array via URL params:
     // Furnished, Wifi, Parking, Washer (amenities), Pets allowed + Couples allowed (houseRules),
     // Private Room (roomType), Month-to-month (leaseDuration), 1000 (maxPrice)

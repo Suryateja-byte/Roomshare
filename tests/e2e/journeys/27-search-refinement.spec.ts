@@ -6,7 +6,14 @@
  * J44: Recently viewed tracking
  */
 
-import { test, expect, selectors, timeouts, SF_BOUNDS, searchResultsContainer } from "../helpers";
+import {
+  test,
+  expect,
+  selectors,
+  timeouts,
+  SF_BOUNDS,
+  searchResultsContainer,
+} from "../helpers";
 
 test.beforeEach(async () => {
   test.slow();
@@ -24,7 +31,9 @@ test.describe("J42: Filter Refinement Chain", () => {
       maxPrice: 1500,
       bounds: SF_BOUNDS,
     });
-    await expect(searchResultsContainer(page)).toBeAttached({ timeout: timeouts.navigation });
+    await expect(searchResultsContainer(page)).toBeAttached({
+      timeout: timeouts.navigation,
+    });
 
     const url1 = page.url();
     expect(url1).toContain("minPrice");
@@ -44,7 +53,9 @@ test.describe("J42: Filter Refinement Chain", () => {
       roomType: "Private Room",
       bounds: SF_BOUNDS,
     });
-    await expect(searchResultsContainer(page)).toBeAttached({ timeout: timeouts.navigation });
+    await expect(searchResultsContainer(page)).toBeAttached({
+      timeout: timeouts.navigation,
+    });
 
     const url2 = page.url();
     expect(url2).toContain("roomType");
@@ -82,7 +93,9 @@ test.describe("J43: Search → Detail → Back Preserves State", () => {
       maxPrice: 2000,
       bounds: SF_BOUNDS,
     });
-    await expect(searchResultsContainer(page)).toBeAttached({ timeout: timeouts.navigation });
+    await expect(searchResultsContainer(page)).toBeAttached({
+      timeout: timeouts.navigation,
+    });
 
     const searchUrl = page.url();
     expect(searchUrl).toContain("minPrice");
@@ -93,7 +106,10 @@ test.describe("J43: Search → Detail → Back Preserves State", () => {
     test.skip(count === 0, "No listings — skipping");
 
     // Step 2: Click a listing — on mobile, wait for the listing card link to be ready
-    const firstCardLink = cards.first().locator('a[href^="/listings/"]').first();
+    const firstCardLink = cards
+      .first()
+      .locator('a[href^="/listings/"]')
+      .first();
     await expect(firstCardLink).toBeAttached({ timeout: 10000 });
     const href = await firstCardLink.getAttribute("href");
     if (!href) {
@@ -102,17 +118,22 @@ test.describe("J43: Search → Detail → Back Preserves State", () => {
     }
     // Navigate directly (more reliable than click on mobile)
     await page.goto(href);
-    await page.waitForURL(/\/listings\//, { timeout: timeouts.navigation, waitUntil: "commit" });
+    await page.waitForURL(/\/listings\//, {
+      timeout: timeouts.navigation,
+      waitUntil: "commit",
+    });
 
     // Step 3: Go back
     await page.goBack();
     await page.waitForLoadState("domcontentloaded");
 
     // Step 4: Verify URL still has filters — poll for URL to settle after history navigation
-    await expect.poll(
-      () => page.url().includes("minPrice"),
-      { timeout: 15000, message: "URL to contain minPrice after goBack" },
-    ).toBe(true);
+    await expect
+      .poll(() => page.url().includes("minPrice"), {
+        timeout: 15000,
+        message: "URL to contain minPrice after goBack",
+      })
+      .toBe(true);
 
     // Step 5: Verify results still present — scope to visible container
     const containerAfter = searchResultsContainer(page);
@@ -131,7 +152,9 @@ test.describe("J44: Recently Viewed Tracking", () => {
   }) => {
     // Step 1: Search for listings
     await nav.goToSearch({ bounds: SF_BOUNDS });
-    await expect(searchResultsContainer(page)).toBeAttached({ timeout: timeouts.navigation });
+    await expect(searchResultsContainer(page)).toBeAttached({
+      timeout: timeouts.navigation,
+    });
 
     const j44Container = searchResultsContainer(page);
     const cards = j44Container.locator(selectors.listingCard);
@@ -140,30 +163,59 @@ test.describe("J44: Recently Viewed Tracking", () => {
 
     // Step 2: Visit first listing
     await nav.clickListingCard(0);
-    await page.waitForURL(/\/listings\//, { timeout: timeouts.navigation, waitUntil: "commit" });
-    const title1 = await page.locator("main h1, main h2").first().textContent().catch(() => "");
+    await page.waitForURL(/\/listings\//, {
+      timeout: timeouts.navigation,
+      waitUntil: "commit",
+    });
+    const title1 = await page
+      .locator("main h1, main h2")
+      .first()
+      .textContent()
+      .catch(() => "");
 
     // Step 3: Go back and visit second listing
     await page.goBack();
     await page.waitForLoadState("domcontentloaded");
     await nav.clickListingCard(1);
-    await page.waitForURL(/\/listings\//, { timeout: timeouts.navigation, waitUntil: "commit" });
-    const title2 = await page.locator("main h1, main h2").first().textContent().catch(() => "");
+    await page.waitForURL(/\/listings\//, {
+      timeout: timeouts.navigation,
+      waitUntil: "commit",
+    });
+    const title2 = await page
+      .locator("main h1, main h2")
+      .first()
+      .textContent()
+      .catch(() => "");
 
     // Step 4: Check recently viewed page if it exists
     await page.goto("/recently-viewed");
     await page.waitForLoadState("domcontentloaded");
 
     // The page may not exist (404) — that's ok
-    const is404 = page.url().includes("404") || page.url().includes("/search") || page.url() === page.url();
-    const recentlyViewedContent = page.locator("main").getByText(/recently|viewed/i);
-    const hasRecentPage = await recentlyViewedContent.isVisible().catch(() => false);
+    const is404 =
+      page.url().includes("404") ||
+      page.url().includes("/search") ||
+      page.url() === page.url();
+    const recentlyViewedContent = page
+      .locator("main")
+      .getByText(/recently|viewed/i);
+    const hasRecentPage = await recentlyViewedContent
+      .isVisible()
+      .catch(() => false);
 
     if (hasRecentPage) {
       // Verify at least one of the visited listings appears
       const hasTitles =
-        (title1 && (await page.getByText(title1).isVisible().catch(() => false))) ||
-        (title2 && (await page.getByText(title2).isVisible().catch(() => false)));
+        (title1 &&
+          (await page
+            .getByText(title1)
+            .isVisible()
+            .catch(() => false))) ||
+        (title2 &&
+          (await page
+            .getByText(title2)
+            .isVisible()
+            .catch(() => false)));
       expect(hasTitles).toBeTruthy();
     } else {
       // Recently viewed may not be implemented — page should at least not crash

@@ -20,7 +20,15 @@
  *   pnpm playwright test tests/e2e/map-interactions-advanced.anon.spec.ts --project=chromium-anon --headed
  */
 
-import { test, expect, selectors, timeouts, SF_BOUNDS, searchResultsContainer, waitForMapReady } from "./helpers";
+import {
+  test,
+  expect,
+  selectors,
+  timeouts,
+  SF_BOUNDS,
+  searchResultsContainer,
+  waitForMapReady,
+} from "./helpers";
 import {
   waitForMapRef,
   isMapAvailable,
@@ -66,7 +74,7 @@ async function getMapZoom(page: Page): Promise<number | null> {
  * Get map center from E2E hook.
  */
 async function getMapCenter(
-  page: Page,
+  page: Page
 ): Promise<{ lat: number; lng: number } | null> {
   return page.evaluate(() => {
     const map = (window as any).__e2eMapRef;
@@ -104,23 +112,20 @@ function getUrlBounds(url: string): {
  * Waits for the map idle event (tiles loaded and rendered).
  */
 async function jumpToZoom(page: Page, zoom: number): Promise<boolean> {
-  return page.evaluate(
-    (z) => {
-      return new Promise<boolean>((resolve) => {
-        const map = (window as any).__e2eMapRef;
-        const setProgrammatic = (window as any).__e2eSetProgrammaticMove;
-        if (!map || !setProgrammatic) {
-          resolve(false);
-          return;
-        }
-        setProgrammatic(true);
-        map.once("idle", () => resolve(true));
-        map.jumpTo({ zoom: z });
-        setTimeout(() => resolve(true), 10_000);
-      });
-    },
-    zoom,
-  );
+  return page.evaluate((z) => {
+    return new Promise<boolean>((resolve) => {
+      const map = (window as any).__e2eMapRef;
+      const setProgrammatic = (window as any).__e2eSetProgrammaticMove;
+      if (!map || !setProgrammatic) {
+        resolve(false);
+        return;
+      }
+      setProgrammatic(true);
+      map.once("idle", () => resolve(true));
+      map.jumpTo({ zoom: z });
+      setTimeout(() => resolve(true), 10_000);
+    });
+  }, zoom);
 }
 
 /**
@@ -142,7 +147,7 @@ async function triggerMarkerUpdate(page: Page): Promise<void> {
 async function simulateMapPan(
   page: Page,
   deltaX = 100,
-  deltaY = 0,
+  deltaY = 0
 ): Promise<boolean> {
   const map = page.locator(selectors.map).first();
   if ((await map.count()) === 0) return false;
@@ -173,26 +178,32 @@ async function simulateMapPan(
 async function programmaticMapPan(
   page: Page,
   deltaX = 100,
-  deltaY = 0,
+  deltaY = 0
 ): Promise<boolean> {
-  const result = await page.evaluate(({ dx, dy }) => {
-    return new Promise<boolean>((resolve) => {
-      const map = (window as any).__e2eMapRef;
-      const setProgrammatic = (window as any).__e2eSetProgrammaticMove;
-      if (!map) { resolve(false); return; }
-      const centerBefore = map.getCenter();
-      if (setProgrammatic) setProgrammatic(false);
-      map.once("idle", () => {
-        const centerAfter = map.getCenter();
-        const moved =
-          Math.abs(centerAfter.lng - centerBefore.lng) > 0.0001 ||
-          Math.abs(centerAfter.lat - centerBefore.lat) > 0.0001;
-        resolve(moved);
+  const result = await page.evaluate(
+    ({ dx, dy }) => {
+      return new Promise<boolean>((resolve) => {
+        const map = (window as any).__e2eMapRef;
+        const setProgrammatic = (window as any).__e2eSetProgrammaticMove;
+        if (!map) {
+          resolve(false);
+          return;
+        }
+        const centerBefore = map.getCenter();
+        if (setProgrammatic) setProgrammatic(false);
+        map.once("idle", () => {
+          const centerAfter = map.getCenter();
+          const moved =
+            Math.abs(centerAfter.lng - centerBefore.lng) > 0.0001 ||
+            Math.abs(centerAfter.lat - centerBefore.lat) > 0.0001;
+          resolve(moved);
+        });
+        map.panBy([dx, dy], { animate: false });
+        setTimeout(() => resolve(true), 10_000);
       });
-      map.panBy([dx, dy], { animate: false });
-      setTimeout(() => resolve(true), 10_000);
-    });
-  }, { dx: deltaX, dy: deltaY });
+    },
+    { dx: deltaX, dy: deltaY }
+  );
   if (result) {
     await waitForMapReady(page);
   }
@@ -204,13 +215,15 @@ async function programmaticMapPan(
  */
 async function ensureSearchAsMoveOn(page: Page): Promise<void> {
   const toggle = page.locator(
-    'button[role="switch"]:has-text("Search as I move")',
+    'button[role="switch"]:has-text("Search as I move")'
   );
   if ((await toggle.count()) === 0) return;
   const isChecked = await toggle.getAttribute("aria-checked");
   if (isChecked === "false") {
     await toggle.click();
-    await expect(toggle).toHaveAttribute("aria-checked", "true", { timeout: 5_000 });
+    await expect(toggle).toHaveAttribute("aria-checked", "true", {
+      timeout: 5_000,
+    });
   }
 }
 
@@ -223,16 +236,16 @@ test.describe("Map Interactions Advanced (Stories 5-8)", () => {
   test.use({ storageState: { cookies: [], origins: [] } });
 
   // Map tests need extra time for WebGL rendering and tile loading in CI
-  test.beforeEach(async () => { test.slow(); });
+  test.beforeEach(async () => {
+    test.slow();
+  });
 
   // =========================================================================
   // Story 5: Map Marker Clustering
   // =========================================================================
 
   test.describe("5 - Map Marker Clustering", () => {
-    test("5.1 (P1) - zooming out creates cluster markers", async ({
-      page,
-    }) => {
+    test("5.1 (P1) - zooming out creates cluster markers", async ({ page }) => {
       await waitForSearchPage(page);
 
       if (!(await isMapAvailable(page))) {
@@ -291,7 +304,7 @@ test.describe("Map Interactions Advanced (Stories 5-8)", () => {
       if (markersAtZoom14 <= 1 && !hasClusterBehavior) {
         test.skip(
           true,
-          "Only 1 listing available -- clustering not applicable",
+          "Only 1 listing available -- clustering not applicable"
         );
         return;
       }
@@ -339,7 +352,9 @@ test.describe("Map Interactions Advanced (Stories 5-8)", () => {
         .count();
 
       // Click the first cluster via evaluate to bypass actionability timeout
-      await clusterMarkers.first().evaluate((el) => (el as HTMLElement).click());
+      await clusterMarkers
+        .first()
+        .evaluate((el) => (el as HTMLElement).click());
 
       // Wait for cluster expansion animation to complete
       await waitForMapReady(page);
@@ -351,9 +366,7 @@ test.describe("Map Interactions Advanced (Stories 5-8)", () => {
         .count();
 
       const zoomIncreased =
-        zoomBefore !== null &&
-        zoomAfter !== null &&
-        zoomAfter > zoomBefore;
+        zoomBefore !== null && zoomAfter !== null && zoomAfter > zoomBefore;
       const markerCountChanged = markerCountAfter !== markerCountBefore;
 
       expect(zoomIncreased || markerCountChanged).toBe(true);
@@ -408,10 +421,10 @@ test.describe("Map Interactions Advanced (Stories 5-8)", () => {
           if (!box2) continue;
 
           const dx = Math.abs(
-            box1.x + box1.width / 2 - (box2.x + box2.width / 2),
+            box1.x + box1.width / 2 - (box2.x + box2.width / 2)
           );
           const dy = Math.abs(
-            box1.y + box1.height / 2 - (box2.y + box2.height / 2),
+            box1.y + box1.height / 2 - (box2.y + box2.height / 2)
           );
 
           if (dx < 5 && dy < 5) {
@@ -435,7 +448,7 @@ test.describe("Map Interactions Advanced (Stories 5-8)", () => {
           .locator('button:has-text("View Details")')
           .count();
         const hasStackedText = await popup
-          .locator('text=/\\d+ listings? at this location/')
+          .locator("text=/\\d+ listings? at this location/")
           .count();
 
         expect(hasViewDetails + hasStackedText).toBeGreaterThan(0);
@@ -449,7 +462,9 @@ test.describe("Map Interactions Advanced (Stories 5-8)", () => {
       }
 
       // Click the overlapping marker via evaluate to bypass actionability timeout
-      await markers.nth(overlappingIndex).evaluate((el) => (el as HTMLElement).click());
+      await markers
+        .nth(overlappingIndex)
+        .evaluate((el) => (el as HTMLElement).click());
 
       const popup = page.locator(".maplibregl-popup");
       await expect(popup).toBeVisible({ timeout: timeouts.action });
@@ -501,7 +516,10 @@ test.describe("Map Interactions Advanced (Stories 5-8)", () => {
       for (let i = 0; i < Math.min(markerCount, 10); i++) {
         await markers.nth(i).evaluate((el) => (el as HTMLElement).click());
         // Wait for popup to appear before checking if it's a stacked popup
-        await page.locator(".maplibregl-popup").waitFor({ state: 'visible', timeout: timeouts.action }).catch(() => {});
+        await page
+          .locator(".maplibregl-popup")
+          .waitFor({ state: "visible", timeout: timeouts.action })
+          .catch(() => {});
 
         const stackedPopup = page.locator('[data-testid="stacked-popup"]');
         if ((await stackedPopup.count()) > 0) {
@@ -543,7 +561,7 @@ test.describe("Map Interactions Advanced (Stories 5-8)", () => {
       if (!foundStackedPopup) {
         test.skip(
           true,
-          "No stacked popup found -- seed data may lack co-located listings",
+          "No stacked popup found -- seed data may lack co-located listings"
         );
       }
     });
@@ -554,9 +572,7 @@ test.describe("Map Interactions Advanced (Stories 5-8)", () => {
   // =========================================================================
 
   test.describe("7 - Map + Sort Interaction", () => {
-    test("7.1 (P1) - changing sort preserves map markers", async ({
-      page,
-    }) => {
+    test("7.1 (P1) - changing sort preserves map markers", async ({ page }) => {
       await waitForSearchPage(page);
 
       if (!(await isMapAvailable(page))) {
@@ -609,11 +625,9 @@ test.describe("Map Interactions Advanced (Stories 5-8)", () => {
       // Marker count should be the same -- sort does not affect which listings
       // are within bounds. Allow a tolerance of 1 for timing variance.
       expect(afterSortMarkerCount).toBeGreaterThanOrEqual(
-        initialMarkerCount - 1,
+        initialMarkerCount - 1
       );
-      expect(afterSortMarkerCount).toBeLessThanOrEqual(
-        initialMarkerCount + 1,
-      );
+      expect(afterSortMarkerCount).toBeLessThanOrEqual(initialMarkerCount + 1);
     });
 
     test("7.2 (P2) - sort change does not trigger map data re-fetch", async ({
@@ -695,10 +709,8 @@ test.describe("Map Interactions Advanced (Stories 5-8)", () => {
       }
 
       // Center should be approximately in the middle of the bounds
-      const expectedLat =
-        (specificBounds.minLat + specificBounds.maxLat) / 2; // 37.775
-      const expectedLng =
-        (specificBounds.minLng + specificBounds.maxLng) / 2; // -122.425
+      const expectedLat = (specificBounds.minLat + specificBounds.maxLat) / 2; // 37.775
+      const expectedLng = (specificBounds.minLng + specificBounds.maxLng) / 2; // -122.425
 
       const tolerance = 0.02;
       expect(center.lat).toBeGreaterThanOrEqual(expectedLat - tolerance);
@@ -724,7 +736,9 @@ test.describe("Map Interactions Advanced (Stories 5-8)", () => {
       expect(initialBounds.minLng).not.toBeNull();
 
       // Pan map east with a large delta to ensure bounds change is detectable
-      const panned = await programmaticMapPan(page, -300, 0) || await simulateMapPan(page, -300, 0);
+      const panned =
+        (await programmaticMapPan(page, -300, 0)) ||
+        (await simulateMapPan(page, -300, 0));
       if (!panned) {
         test.skip(true, "Map pan failed");
         return;
@@ -738,14 +752,20 @@ test.describe("Map Interactions Advanced (Stories 5-8)", () => {
       const pollDeadline = Date.now() + 30_000;
       while (Date.now() < pollDeadline) {
         const currentBounds = getUrlBounds(page.url());
-        if (currentBounds.minLng !== null && currentBounds.minLng !== initialBounds.minLng) {
+        if (
+          currentBounds.minLng !== null &&
+          currentBounds.minLng !== initialBounds.minLng
+        ) {
           boundsUpdated = true;
           break;
         }
         await page.waitForTimeout(500);
       }
       if (!boundsUpdated) {
-        test.skip(true, "URL bounds not updated after pan (Search as I move may not have triggered)");
+        test.skip(
+          true,
+          "URL bounds not updated after pan (Search as I move may not have triggered)"
+        );
         return;
       }
 
@@ -831,8 +851,12 @@ test.describe("Map Interactions Advanced (Stories 5-8)", () => {
         expect(lngDiff).toBeLessThan(0.01);
 
         // Both pages should show listing cards
-        const cards1 = searchResultsContainer(page).locator('[data-testid="listing-card"]');
-        const cards2 = searchResultsContainer(page2).locator('[data-testid="listing-card"]');
+        const cards1 = searchResultsContainer(page).locator(
+          '[data-testid="listing-card"]'
+        );
+        const cards2 = searchResultsContainer(page2).locator(
+          '[data-testid="listing-card"]'
+        );
 
         // At least verify both pages loaded content (cards may or may not exist
         // depending on seed data, but body should be visible)

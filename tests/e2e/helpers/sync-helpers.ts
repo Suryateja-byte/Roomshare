@@ -25,7 +25,7 @@ import { timeouts } from "./test-utils";
  */
 export async function getMarkerState(
   page: Page,
-  listingId: string,
+  listingId: string
 ): Promise<{
   isActive: boolean;
   isHovered: boolean;
@@ -36,7 +36,7 @@ export async function getMarkerState(
   return page.evaluate((id) => {
     // The marker inner div carries data-listing-id
     const markers = Array.from(
-      document.querySelectorAll(`[data-listing-id="${id}"]`),
+      document.querySelectorAll(`[data-listing-id="${id}"]`)
     );
     // Find the one inside a .maplibregl-marker (not the listing card)
     const markerEl = markers.find((el) => el.closest(".maplibregl-marker"));
@@ -60,7 +60,7 @@ export async function getMarkerState(
 
     // Pulsing ring child present (appears when hovered or active)
     const ringChild = markerEl.querySelector(
-      "[class*='animate-ping'], [class*='pulse-ring']",
+      "[class*='animate-ping'], [class*='pulse-ring']"
     );
     const hasRing = ringChild !== null || isHovered || isActive;
 
@@ -82,7 +82,7 @@ export async function getMarkerState(
  */
 export async function getCardState(
   page: Page,
-  listingId: string,
+  listingId: string
 ): Promise<{
   isActive: boolean;
   isHovered: boolean;
@@ -92,12 +92,15 @@ export async function getCardState(
   return page.evaluate((id) => {
     // Find the VISIBLE listing card (skip hidden dual-container duplicate)
     const cards = document.querySelectorAll(
-      `[data-testid="listing-card"][data-listing-id="${id}"]`,
+      `[data-testid="listing-card"][data-listing-id="${id}"]`
     );
     let cardEl: Element | null = null;
     for (const c of cards) {
       const r = c.getBoundingClientRect();
-      if (r.width > 0 && r.height > 0) { cardEl = c; break; }
+      if (r.width > 0 && r.height > 0) {
+        cardEl = c;
+        break;
+      }
     }
     if (!cardEl) cardEl = cards[0] ?? null;
     if (!cardEl) {
@@ -133,17 +136,20 @@ export async function getCardState(
  */
 export async function isCardInViewport(
   page: Page,
-  listingId: string,
+  listingId: string
 ): Promise<boolean> {
   return page.evaluate((id) => {
     // Find the VISIBLE card (skip hidden dual-container duplicate)
     const cards = document.querySelectorAll(
-      `[data-testid="listing-card"][data-listing-id="${id}"]`,
+      `[data-testid="listing-card"][data-listing-id="${id}"]`
     );
     let card: Element | null = null;
     for (const c of cards) {
       const r = c.getBoundingClientRect();
-      if (r.width > 0 && r.height > 0) { card = c; break; }
+      if (r.width > 0 && r.height > 0) {
+        card = c;
+        break;
+      }
     }
     if (!card) return false;
     const rect = card.getBoundingClientRect();
@@ -164,12 +170,10 @@ export async function isCardInViewport(
  * Get the listing ID of the currently active (ring-2) card.
  * Returns null if no card has the active ring.
  */
-export async function getActiveListingId(
-  page: Page,
-): Promise<string | null> {
+export async function getActiveListingId(page: Page): Promise<string | null> {
   return page.evaluate(() => {
     const all = document.querySelectorAll(
-      '[data-testid="listing-card"][data-focus-state="active"]',
+      '[data-testid="listing-card"][data-focus-state="active"]'
     );
     // Return the visible one (skip hidden dual-container duplicate)
     for (const el of all) {
@@ -184,14 +188,12 @@ export async function getActiveListingId(
 /**
  * Get all listing IDs that have the hovered ring (ring-1) class.
  */
-export async function getHoveredListingIds(
-  page: Page,
-): Promise<string[]> {
+export async function getHoveredListingIds(page: Page): Promise<string[]> {
   return page.evaluate(() => {
     return Array.from(
       document.querySelectorAll(
-        '[data-testid="listing-card"][data-focus-state="hovered"]',
-      ),
+        '[data-testid="listing-card"][data-focus-state="hovered"]'
+      )
     )
       .filter((el) => {
         const r = el.getBoundingClientRect();
@@ -213,7 +215,7 @@ export async function getHoveredListingIds(
 export async function waitForCardHighlight(
   page: Page,
   listingId: string,
-  timeout = timeouts.action,
+  timeout = timeouts.action
 ): Promise<void> {
   await expect(async () => {
     const state = await getCardState(page, listingId);
@@ -227,7 +229,7 @@ export async function waitForCardHighlight(
 export async function waitForCardHighlightClear(
   page: Page,
   listingId: string,
-  timeout = timeouts.action,
+  timeout = timeouts.action
 ): Promise<void> {
   await expect(async () => {
     const state = await getCardState(page, listingId);
@@ -241,7 +243,7 @@ export async function waitForCardHighlightClear(
 export async function waitForCardHover(
   page: Page,
   listingId: string,
-  timeout = timeouts.action,
+  timeout = timeouts.action
 ): Promise<void> {
   await expect(async () => {
     const state = await getCardState(page, listingId);
@@ -255,7 +257,7 @@ export async function waitForCardHover(
 export async function waitForMarkerHover(
   page: Page,
   listingId: string,
-  timeout = timeouts.action,
+  timeout = timeouts.action
 ): Promise<void> {
   await expect(async () => {
     const state = await getMarkerState(page, listingId);
@@ -269,7 +271,7 @@ export async function waitForMarkerHover(
 export async function waitForMarkerUnhover(
   page: Page,
   listingId: string,
-  timeout = timeouts.action,
+  timeout = timeouts.action
 ): Promise<void> {
   await expect(async () => {
     const state = await getMarkerState(page, listingId);
@@ -287,11 +289,11 @@ export async function waitForMarkerUnhover(
  */
 export async function getMarkerListingId(
   page: Page,
-  markerIndex: number,
+  markerIndex: number
 ): Promise<string | null> {
   return page.evaluate((idx) => {
     const visible = Array.from(
-      document.querySelectorAll(".maplibregl-marker"),
+      document.querySelectorAll(".maplibregl-marker")
     ).filter((m) => {
       const rect = m.getBoundingClientRect();
       return rect.width > 0 && rect.height > 0;
@@ -305,9 +307,7 @@ export async function getMarkerListingId(
 /**
  * Get all visible marker listing IDs.
  */
-export async function getAllMarkerListingIds(
-  page: Page,
-): Promise<string[]> {
+export async function getAllMarkerListingIds(page: Page): Promise<string[]> {
   return page.evaluate(() => {
     return Array.from(document.querySelectorAll(".maplibregl-marker"))
       .filter((m) => {
@@ -325,14 +325,10 @@ export async function getAllMarkerListingIds(
 /**
  * Get all visible listing card IDs.
  */
-export async function getAllCardListingIds(
-  page: Page,
-): Promise<string[]> {
+export async function getAllCardListingIds(page: Page): Promise<string[]> {
   return page.evaluate(() => {
     return Array.from(
-      document.querySelectorAll(
-        '[data-testid="listing-card"][data-listing-id]',
-      ),
+      document.querySelectorAll('[data-testid="listing-card"][data-listing-id]')
     )
       .filter((el) => {
         const r = el.getBoundingClientRect();
@@ -353,13 +349,12 @@ export async function getAllCardListingIds(
  */
 export async function waitForMapRef(
   page: Page,
-  timeout = 30000,
+  timeout = 30000
 ): Promise<boolean> {
   try {
-    await page.waitForFunction(
-      () => !!(window as any).__e2eMapRef,
-      { timeout },
-    );
+    await page.waitForFunction(() => !!(window as any).__e2eMapRef, {
+      timeout,
+    });
     return true;
   } catch {
     return false;
@@ -385,11 +380,11 @@ export async function isMapAvailable(page: Page): Promise<boolean> {
  * Zoom in programmatically to expand clusters into individual markers.
  * Uses E2E hooks to avoid triggering "Search as I move" URL updates.
  */
-export async function zoomToExpandClusters(
-  page: Page,
-): Promise<boolean> {
+export async function zoomToExpandClusters(page: Page): Promise<boolean> {
   // Check if individual markers are already visible
-  const existingCount = await page.locator(".maplibregl-marker:visible").count();
+  const existingCount = await page
+    .locator(".maplibregl-marker:visible")
+    .count();
   if (existingCount > 0) return true;
 
   const hasMapRef = await waitForMapRef(page);
@@ -430,7 +425,7 @@ export async function zoomToExpandClusters(
         setTimeout(() => resolve(true), 10000);
       });
     },
-    { center: listingCenter },
+    { center: listingCenter }
   );
 
   if (!zoomed) return false;
@@ -444,10 +439,10 @@ export async function zoomToExpandClusters(
   // Poll until markers appear rather than using a fixed timeout
   try {
     await expect
-      .poll(
-        () => page.locator(".maplibregl-marker:visible").count(),
-        { timeout: 15_000, message: "Waiting for markers after cluster expansion" },
-      )
+      .poll(() => page.locator(".maplibregl-marker:visible").count(), {
+        timeout: 15_000,
+        message: "Waiting for markers after cluster expansion",
+      })
       .toBeGreaterThan(0);
     return true;
   } catch {
@@ -460,7 +455,7 @@ export async function zoomToExpandClusters(
  */
 export async function waitForMarkersWithClusterExpansion(
   page: Page,
-  options?: { minCount?: number },
+  options?: { minCount?: number }
 ): Promise<number> {
   const minCount = options?.minCount ?? 1;
   let markerCount = await page.locator(".maplibregl-marker:visible").count();
@@ -471,10 +466,10 @@ export async function waitForMarkersWithClusterExpansion(
     await page.evaluate(() => (window as any).__e2eUpdateMarkers?.());
     // Poll for markers to appear after cluster expansion (CI can be slow)
     await expect
-      .poll(
-        () => page.locator(".maplibregl-marker:visible").count(),
-        { timeout: 15_000, message: `Waiting for ${minCount}+ markers after cluster expansion` },
-      )
+      .poll(() => page.locator(".maplibregl-marker:visible").count(), {
+        timeout: 15_000,
+        message: `Waiting for ${minCount}+ markers after cluster expansion`,
+      })
       .toBeGreaterThanOrEqual(minCount)
       .catch(() => {});
   }
@@ -490,8 +485,8 @@ export async function countActiveCards(page: Page): Promise<number> {
   return page.evaluate(() => {
     return Array.from(
       document.querySelectorAll(
-        '[data-testid="listing-card"][data-focus-state="active"]',
-      ),
+        '[data-testid="listing-card"][data-focus-state="active"]'
+      )
     ).filter((el) => {
       const r = el.getBoundingClientRect();
       return r.width > 0 && r.height > 0;
@@ -510,13 +505,13 @@ export async function countActiveCards(page: Page): Promise<number> {
 export async function pollForMarkers(
   page: Page,
   minCount = 1,
-  timeout = 15_000,
+  timeout = 15_000
 ): Promise<void> {
   await expect
-    .poll(
-      () => page.locator(".maplibregl-marker:visible").count(),
-      { timeout, message: `Expected at least ${minCount} visible map markers` },
-    )
+    .poll(() => page.locator(".maplibregl-marker:visible").count(), {
+      timeout,
+      message: `Expected at least ${minCount} visible map markers`,
+    })
     .toBeGreaterThanOrEqual(minCount);
 }
 
@@ -528,20 +523,20 @@ export async function pollForUrlParam(
   page: Page,
   key: string,
   expected: string | null,
-  timeout = 10_000,
+  timeout = 10_000
 ): Promise<void> {
   if (expected === null) {
     await expect
       .poll(
         () => new URL(page.url(), "http://localhost").searchParams.get(key),
-        { timeout, message: `Expected URL param "${key}" to be absent` },
+        { timeout, message: `Expected URL param "${key}" to be absent` }
       )
       .toBeNull();
   } else {
     await expect
       .poll(
         () => new URL(page.url(), "http://localhost").searchParams.get(key),
-        { timeout, message: `Expected URL param "${key}" to be "${expected}"` },
+        { timeout, message: `Expected URL param "${key}" to be "${expected}"` }
       )
       .toBe(expected);
   }
@@ -554,13 +549,13 @@ export async function pollForUrlParam(
 export async function pollForUrlParamPresent(
   page: Page,
   key: string,
-  timeout = 10_000,
+  timeout = 10_000
 ): Promise<void> {
   await expect
-    .poll(
-      () => new URL(page.url(), "http://localhost").searchParams.has(key),
-      { timeout, message: `Expected URL param "${key}" to be present` },
-    )
+    .poll(() => new URL(page.url(), "http://localhost").searchParams.has(key), {
+      timeout,
+      message: `Expected URL param "${key}" to be present`,
+    })
     .toBe(true);
 }
 
@@ -571,12 +566,12 @@ export async function pollForUrlParamPresent(
 export async function pollForCardCount(
   page: Page,
   minCount: number,
-  timeout = 15_000,
+  timeout = 15_000
 ): Promise<void> {
   await expect
-    .poll(
-      () => page.locator('[data-testid="listing-card"]:visible').count(),
-      { timeout, message: `Expected at least ${minCount} visible listing cards` },
-    )
+    .poll(() => page.locator('[data-testid="listing-card"]:visible').count(), {
+      timeout,
+      message: `Expected at least ${minCount} visible listing cards`,
+    })
     .toBeGreaterThanOrEqual(minCount);
 }

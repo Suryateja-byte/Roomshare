@@ -5,49 +5,49 @@
 
 // Mock the DB rate-limiter for fallback
 const mockCheckRateLimit = jest.fn();
-jest.mock('@/lib/rate-limit', () => ({
+jest.mock("@/lib/rate-limit", () => ({
   checkRateLimit: mockCheckRateLimit,
 }));
 
 // Mock the timeout-wrapper module
-jest.mock('@/lib/timeout-wrapper', () => ({
+jest.mock("@/lib/timeout-wrapper", () => ({
   withTimeout: jest.fn((promise) => promise),
   DEFAULT_TIMEOUTS: { REDIS: 1000 },
   TimeoutError: class TimeoutError extends Error {
-    code = 'TIMEOUT_ERROR';
+    code = "TIMEOUT_ERROR";
     operation: string;
     timeoutMs: number;
     constructor(operation: string, timeoutMs: number) {
       super(`${operation} timed out after ${timeoutMs}ms`);
-      this.name = 'TimeoutError';
+      this.name = "TimeoutError";
       this.operation = operation;
       this.timeoutMs = timeoutMs;
     }
   },
-  isTimeoutError: jest.fn((error) => error?.name === 'TimeoutError'),
+  isTimeoutError: jest.fn((error) => error?.name === "TimeoutError"),
 }));
 
 // Mock the circuit-breaker module
-jest.mock('@/lib/circuit-breaker', () => {
+jest.mock("@/lib/circuit-breaker", () => {
   const mockExecute = jest.fn((fn) => fn());
   return {
     circuitBreakers: {
       redis: {
         execute: mockExecute,
-        getState: jest.fn(() => 'CLOSED'),
+        getState: jest.fn(() => "CLOSED"),
         reset: jest.fn(),
       },
     },
     CircuitOpenError: class CircuitOpenError extends Error {
-      code = 'CIRCUIT_OPEN';
+      code = "CIRCUIT_OPEN";
       circuitName: string;
       constructor(name: string) {
         super(`Circuit breaker '${name}' is open`);
-        this.name = 'CircuitOpenError';
+        this.name = "CircuitOpenError";
         this.circuitName = name;
       }
     },
-    isCircuitOpenError: jest.fn((error) => error?.name === 'CircuitOpenError'),
+    isCircuitOpenError: jest.fn((error) => error?.name === "CircuitOpenError"),
   };
 });
 
@@ -57,17 +57,18 @@ const MockRatelimit = jest.fn().mockImplementation(() => ({
   limit: mockLimit,
 }));
 // Add static method for slidingWindow
-(MockRatelimit as unknown as { slidingWindow: jest.Mock }).slidingWindow = jest.fn(() => ({}));
+(MockRatelimit as unknown as { slidingWindow: jest.Mock }).slidingWindow =
+  jest.fn(() => ({}));
 
-jest.mock('@upstash/ratelimit', () => ({
+jest.mock("@upstash/ratelimit", () => ({
   Ratelimit: MockRatelimit,
 }));
 
-jest.mock('@upstash/redis', () => ({
+jest.mock("@upstash/redis", () => ({
   Redis: jest.fn().mockImplementation(() => ({})),
 }));
 
-describe('rate-limit-redis', () => {
+describe("rate-limit-redis", () => {
   const originalEnv = process.env;
 
   beforeEach(() => {
@@ -84,9 +85,9 @@ describe('rate-limit-redis', () => {
 
     process.env = {
       ...originalEnv,
-      UPSTASH_REDIS_REST_URL: 'https://test-redis.upstash.io',
-      UPSTASH_REDIS_REST_TOKEN: 'test-token',
-      NODE_ENV: 'production',
+      UPSTASH_REDIS_REST_URL: "https://test-redis.upstash.io",
+      UPSTASH_REDIS_REST_TOKEN: "test-token",
+      NODE_ENV: "production",
     };
     // Default mock: successful rate limit check
     mockLimit.mockResolvedValue({ success: true, reset: Date.now() + 60000 });
@@ -104,300 +105,342 @@ describe('rate-limit-redis', () => {
   // These mocks are used at runtime, not at module load time
   function restoreRuntimeMocks() {
     // eslint-disable-next-line @typescript-eslint/no-require-imports
-    const circuitBreakerMock = require('@/lib/circuit-breaker');
+    const circuitBreakerMock = require("@/lib/circuit-breaker");
     circuitBreakerMock.circuitBreakers.redis.execute.mockImplementation(
       (fn: () => Promise<unknown>) => fn()
     );
 
     // eslint-disable-next-line @typescript-eslint/no-require-imports
-    const timeoutMock = require('@/lib/timeout-wrapper');
-    timeoutMock.withTimeout.mockImplementation((promise: Promise<unknown>) => promise);
+    const timeoutMock = require("@/lib/timeout-wrapper");
+    timeoutMock.withTimeout.mockImplementation(
+      (promise: Promise<unknown>) => promise
+    );
   }
 
   afterEach(() => {
     process.env = originalEnv;
   });
 
-  describe('checkChatRateLimit', () => {
-    let checkChatRateLimit: (ip: string) => Promise<{ success: boolean; retryAfter?: number }>;
+  describe("checkChatRateLimit", () => {
+    let checkChatRateLimit: (
+      ip: string
+    ) => Promise<{ success: boolean; retryAfter?: number }>;
 
     beforeEach(async () => {
       // Restore MockRatelimit BEFORE resetModules - instances created at module load time
       restoreRatelimitMock();
       // Dynamic import to get fresh module with mocks
       jest.resetModules();
-      const rateLimitModule = await import('@/lib/rate-limit-redis');
+      const rateLimitModule = await import("@/lib/rate-limit-redis");
       checkChatRateLimit = rateLimitModule.checkChatRateLimit;
       // Restore runtime mocks after import
       restoreRuntimeMocks();
     });
 
-    it('returns success when both burst and sustained limits pass', async () => {
+    it("returns success when both burst and sustained limits pass", async () => {
       mockLimit.mockResolvedValue({ success: true, reset: Date.now() + 60000 });
 
-      const result = await checkChatRateLimit('127.0.0.1');
+      const result = await checkChatRateLimit("127.0.0.1");
 
       expect(result.success).toBe(true);
     });
 
-    it('returns failure with retryAfter when burst limit exceeded', async () => {
+    it("returns failure with retryAfter when burst limit exceeded", async () => {
       const resetTime = Date.now() + 30000;
       mockLimit
         .mockResolvedValueOnce({ success: false, reset: resetTime }) // burst
         .mockResolvedValueOnce({ success: true, reset: Date.now() + 60000 }); // sustained
 
-      const result = await checkChatRateLimit('127.0.0.1');
+      const result = await checkChatRateLimit("127.0.0.1");
 
       expect(result.success).toBe(false);
       expect(result.retryAfter).toBeGreaterThan(0);
     });
 
-    it('returns failure when sustained limit exceeded', async () => {
+    it("returns failure when sustained limit exceeded", async () => {
       const resetTime = Date.now() + 3600000;
       mockLimit
         .mockResolvedValueOnce({ success: true, reset: Date.now() + 60000 }) // burst
         .mockResolvedValueOnce({ success: false, reset: resetTime }); // sustained
 
-      const result = await checkChatRateLimit('127.0.0.1');
+      const result = await checkChatRateLimit("127.0.0.1");
 
       expect(result.success).toBe(false);
       expect(result.retryAfter).toBeGreaterThan(0);
     });
 
-    it('fails closed in production when Redis is not configured', async () => {
-      process.env.UPSTASH_REDIS_REST_URL = '';
-      process.env.UPSTASH_REDIS_REST_TOKEN = '';
-      Object.defineProperty(process.env, 'NODE_ENV', { value: 'production', writable: true });
+    it("fails closed in production when Redis is not configured", async () => {
+      process.env.UPSTASH_REDIS_REST_URL = "";
+      process.env.UPSTASH_REDIS_REST_TOKEN = "";
+      Object.defineProperty(process.env, "NODE_ENV", {
+        value: "production",
+        writable: true,
+      });
 
       restoreRatelimitMock();
       jest.resetModules();
-      const rateLimitModule = await import('@/lib/rate-limit-redis');
+      const rateLimitModule = await import("@/lib/rate-limit-redis");
 
-      const result = await rateLimitModule.checkChatRateLimit('127.0.0.1');
+      const result = await rateLimitModule.checkChatRateLimit("127.0.0.1");
 
       expect(result.success).toBe(false);
       expect(result.retryAfter).toBe(30);
     });
 
-    it('allows requests in development when Redis not configured', async () => {
-      process.env.UPSTASH_REDIS_REST_URL = '';
-      process.env.UPSTASH_REDIS_REST_TOKEN = '';
-      Object.defineProperty(process.env, 'NODE_ENV', { value: 'development', writable: true });
+    it("allows requests in development when Redis not configured", async () => {
+      process.env.UPSTASH_REDIS_REST_URL = "";
+      process.env.UPSTASH_REDIS_REST_TOKEN = "";
+      Object.defineProperty(process.env, "NODE_ENV", {
+        value: "development",
+        writable: true,
+      });
 
       jest.resetModules();
-      const rateLimitModule = await import('@/lib/rate-limit-redis');
+      const rateLimitModule = await import("@/lib/rate-limit-redis");
 
-      const result = await rateLimitModule.checkChatRateLimit('127.0.0.1');
+      const result = await rateLimitModule.checkChatRateLimit("127.0.0.1");
 
       expect(result.success).toBe(true);
     });
 
-    it('fails closed (denies) when Redis errors in production', async () => {
-      mockLimit.mockRejectedValue(new Error('Redis connection failed'));
+    it("fails closed (denies) when Redis errors in production", async () => {
+      mockLimit.mockRejectedValue(new Error("Redis connection failed"));
 
-      const result = await checkChatRateLimit('127.0.0.1');
+      const result = await checkChatRateLimit("127.0.0.1");
 
       expect(result.success).toBe(false);
       expect(result.retryAfter).toBe(30);
     });
   });
 
-  describe('timeout protection', () => {
-    let checkChatRateLimit: (ip: string) => Promise<{ success: boolean; retryAfter?: number }>;
+  describe("timeout protection", () => {
+    let checkChatRateLimit: (
+      ip: string
+    ) => Promise<{ success: boolean; retryAfter?: number }>;
     let withTimeout: jest.Mock;
 
     beforeEach(async () => {
       restoreRatelimitMock();
       jest.resetModules();
-      const timeoutWrapper = await import('@/lib/timeout-wrapper');
+      const timeoutWrapper = await import("@/lib/timeout-wrapper");
       withTimeout = timeoutWrapper.withTimeout as jest.Mock;
 
-      const rateLimitModule = await import('@/lib/rate-limit-redis');
+      const rateLimitModule = await import("@/lib/rate-limit-redis");
       checkChatRateLimit = rateLimitModule.checkChatRateLimit;
       restoreRuntimeMocks();
     });
 
-    it('wraps rate limit calls with timeout', async () => {
+    it("wraps rate limit calls with timeout", async () => {
       mockLimit.mockResolvedValue({ success: true, reset: Date.now() + 60000 });
 
-      await checkChatRateLimit('127.0.0.1');
+      await checkChatRateLimit("127.0.0.1");
 
       // withTimeout should be called for rate limit operations
       expect(withTimeout).toHaveBeenCalled();
     });
 
-    it('fails closed on timeout for chat (LLM cost protection)', async () => {
-      const { TimeoutError } = await import('@/lib/timeout-wrapper');
-      withTimeout.mockRejectedValue(new TimeoutError('Redis rate limit', 1000));
+    it("fails closed on timeout for chat (LLM cost protection)", async () => {
+      const { TimeoutError } = await import("@/lib/timeout-wrapper");
+      withTimeout.mockRejectedValue(new TimeoutError("Redis rate limit", 1000));
 
-      const result = await checkChatRateLimit('127.0.0.1');
+      const result = await checkChatRateLimit("127.0.0.1");
 
       expect(result.success).toBe(false);
       expect(result.retryAfter).toBe(30);
     });
   });
 
-  describe('circuit breaker protection', () => {
-    let checkChatRateLimit: (ip: string) => Promise<{ success: boolean; retryAfter?: number }>;
+  describe("circuit breaker protection", () => {
+    let checkChatRateLimit: (
+      ip: string
+    ) => Promise<{ success: boolean; retryAfter?: number }>;
     let circuitBreakers: { redis: { execute: jest.Mock } };
 
     beforeEach(async () => {
       // Restore MockRatelimit BEFORE resetModules - instances created at module load time
       restoreRatelimitMock();
       jest.resetModules();
-      const circuitBreakerModule = await import('@/lib/circuit-breaker');
-      circuitBreakers = circuitBreakerModule.circuitBreakers as unknown as { redis: { execute: jest.Mock } };
+      const circuitBreakerModule = await import("@/lib/circuit-breaker");
+      circuitBreakers = circuitBreakerModule.circuitBreakers as unknown as {
+        redis: { execute: jest.Mock };
+      };
 
-      const rateLimitModule = await import('@/lib/rate-limit-redis');
+      const rateLimitModule = await import("@/lib/rate-limit-redis");
       checkChatRateLimit = rateLimitModule.checkChatRateLimit;
       // Restore runtime mocks after import
       restoreRuntimeMocks();
     });
 
-    it('uses circuit breaker for Redis operations', async () => {
+    it("uses circuit breaker for Redis operations", async () => {
       mockLimit.mockResolvedValue({ success: true, reset: Date.now() + 60000 });
 
-      await checkChatRateLimit('127.0.0.1');
+      await checkChatRateLimit("127.0.0.1");
 
       // Circuit breaker should be used
       expect(circuitBreakers.redis.execute).toHaveBeenCalled();
     });
 
-    it('fails closed when circuit is open (chat)', async () => {
-      const { CircuitOpenError } = await import('@/lib/circuit-breaker');
-      circuitBreakers.redis.execute.mockRejectedValue(new CircuitOpenError('redis'));
+    it("fails closed when circuit is open (chat)", async () => {
+      const { CircuitOpenError } = await import("@/lib/circuit-breaker");
+      circuitBreakers.redis.execute.mockRejectedValue(
+        new CircuitOpenError("redis")
+      );
 
-      const result = await checkChatRateLimit('127.0.0.1');
+      const result = await checkChatRateLimit("127.0.0.1");
 
       expect(result.success).toBe(false);
       expect(result.retryAfter).toBe(30);
     });
   });
 
-  describe('checkMetricsRateLimit', () => {
-    let checkMetricsRateLimit: (ip: string) => Promise<{ success: boolean; retryAfter?: number }>;
+  describe("checkMetricsRateLimit", () => {
+    let checkMetricsRateLimit: (
+      ip: string
+    ) => Promise<{ success: boolean; retryAfter?: number }>;
 
     beforeEach(async () => {
       // Restore MockRatelimit BEFORE resetModules - instances created at module load time
       restoreRatelimitMock();
       jest.resetModules();
-      const rateLimitModule = await import('@/lib/rate-limit-redis');
+      const rateLimitModule = await import("@/lib/rate-limit-redis");
       checkMetricsRateLimit = rateLimitModule.checkMetricsRateLimit;
       // Restore runtime mocks after import
       restoreRuntimeMocks();
     });
 
-    it('returns success when both limits pass', async () => {
+    it("returns success when both limits pass", async () => {
       mockLimit.mockResolvedValue({ success: true, reset: Date.now() + 60000 });
 
-      const result = await checkMetricsRateLimit('127.0.0.1');
+      const result = await checkMetricsRateLimit("127.0.0.1");
 
       expect(result.success).toBe(true);
     });
 
-    it('falls back to DB rate limiter on Redis error', async () => {
-      mockLimit.mockRejectedValue(new Error('Redis error'));
+    it("falls back to DB rate limiter on Redis error", async () => {
+      mockLimit.mockRejectedValue(new Error("Redis error"));
       mockCheckRateLimit.mockResolvedValue({
-        success: true, remaining: 99, resetAt: new Date(Date.now() + 60000),
+        success: true,
+        remaining: 99,
+        resetAt: new Date(Date.now() + 60000),
       });
 
-      const result = await checkMetricsRateLimit('127.0.0.1');
+      const result = await checkMetricsRateLimit("127.0.0.1");
       expect(result.success).toBe(true);
       expect(mockCheckRateLimit).toHaveBeenCalledWith(
-        '127.0.0.1', 'redis-fallback:metrics', { limit: 100, windowMs: 60000 }
+        "127.0.0.1",
+        "redis-fallback:metrics",
+        { limit: 100, windowMs: 60000 }
       );
     });
 
-    it('falls back to in-memory if DB fallback also fails', async () => {
-      mockLimit.mockRejectedValue(new Error('Redis error'));
-      mockCheckRateLimit.mockRejectedValue(new Error('DB error'));
-      const result = await checkMetricsRateLimit('127.0.0.1');
+    it("falls back to in-memory if DB fallback also fails", async () => {
+      mockLimit.mockRejectedValue(new Error("Redis error"));
+      mockCheckRateLimit.mockRejectedValue(new Error("DB error"));
+      const result = await checkMetricsRateLimit("127.0.0.1");
       expect(result.success).toBe(true); // ultimate in-memory fallback
     });
   });
 
-  describe('checkMapRateLimit', () => {
-    let checkMapRateLimit: (ip: string) => Promise<{ success: boolean; retryAfter?: number }>;
+  describe("checkMapRateLimit", () => {
+    let checkMapRateLimit: (
+      ip: string
+    ) => Promise<{ success: boolean; retryAfter?: number }>;
 
     beforeEach(async () => {
       // Restore MockRatelimit BEFORE resetModules - instances created at module load time
       restoreRatelimitMock();
       jest.resetModules();
-      const rateLimitModule = await import('@/lib/rate-limit-redis');
+      const rateLimitModule = await import("@/lib/rate-limit-redis");
       checkMapRateLimit = rateLimitModule.checkMapRateLimit;
       // Restore runtime mocks after import
       restoreRuntimeMocks();
     });
 
-    it('returns success when both limits pass', async () => {
+    it("returns success when both limits pass", async () => {
       mockLimit.mockResolvedValue({ success: true, reset: Date.now() + 60000 });
 
-      const result = await checkMapRateLimit('127.0.0.1');
+      const result = await checkMapRateLimit("127.0.0.1");
 
       expect(result.success).toBe(true);
     });
 
-    it('falls back to DB rate limiter on Redis error', async () => {
-      mockLimit.mockRejectedValue(new Error('Redis error'));
+    it("falls back to DB rate limiter on Redis error", async () => {
+      mockLimit.mockRejectedValue(new Error("Redis error"));
       mockCheckRateLimit.mockResolvedValue({
-        success: true, remaining: 59, resetAt: new Date(Date.now() + 60000),
+        success: true,
+        remaining: 59,
+        resetAt: new Date(Date.now() + 60000),
       });
 
-      const result = await checkMapRateLimit('127.0.0.1');
+      const result = await checkMapRateLimit("127.0.0.1");
       expect(result.success).toBe(true);
       expect(mockCheckRateLimit).toHaveBeenCalledWith(
-        '127.0.0.1', 'redis-fallback:map', { limit: 60, windowMs: 60000 }
+        "127.0.0.1",
+        "redis-fallback:map",
+        { limit: 60, windowMs: 60000 }
       );
     });
   });
 
-  describe('checkSearchCountRateLimit', () => {
-    let checkSearchCountRateLimit: (ip: string) => Promise<{ success: boolean; retryAfter?: number }>;
+  describe("checkSearchCountRateLimit", () => {
+    let checkSearchCountRateLimit: (
+      ip: string
+    ) => Promise<{ success: boolean; retryAfter?: number }>;
 
     beforeEach(async () => {
       // Restore MockRatelimit BEFORE resetModules - instances created at module load time
       restoreRatelimitMock();
       jest.resetModules();
-      const rateLimitModule = await import('@/lib/rate-limit-redis');
+      const rateLimitModule = await import("@/lib/rate-limit-redis");
       checkSearchCountRateLimit = rateLimitModule.checkSearchCountRateLimit;
       // Restore runtime mocks after import
       restoreRuntimeMocks();
     });
 
-    it('returns success when both limits pass', async () => {
+    it("returns success when both limits pass", async () => {
       mockLimit.mockResolvedValue({ success: true, reset: Date.now() + 60000 });
 
-      const result = await checkSearchCountRateLimit('127.0.0.1');
+      const result = await checkSearchCountRateLimit("127.0.0.1");
 
       expect(result.success).toBe(true);
     });
 
-    it('falls back to DB rate limiter on Redis error', async () => {
-      mockLimit.mockRejectedValue(new Error('Redis error'));
+    it("falls back to DB rate limiter on Redis error", async () => {
+      mockLimit.mockRejectedValue(new Error("Redis error"));
       mockCheckRateLimit.mockResolvedValue({
-        success: true, remaining: 29, resetAt: new Date(Date.now() + 60000),
+        success: true,
+        remaining: 29,
+        resetAt: new Date(Date.now() + 60000),
       });
 
-      const result = await checkSearchCountRateLimit('127.0.0.1');
+      const result = await checkSearchCountRateLimit("127.0.0.1");
       expect(result.success).toBe(true);
       expect(mockCheckRateLimit).toHaveBeenCalledWith(
-        '127.0.0.1', 'redis-fallback:searchCount', { limit: 30, windowMs: 60000 }
+        "127.0.0.1",
+        "redis-fallback:searchCount",
+        { limit: 30, windowMs: 60000 }
       );
     });
 
-    it('uses DB fallback when Redis times out in production', async () => {
-      Object.defineProperty(process.env, 'NODE_ENV', { value: 'production', writable: true, configurable: true });
-
-      // eslint-disable-next-line @typescript-eslint/no-require-imports
-      const circuitBreakerMock = require('@/lib/circuit-breaker');
-      circuitBreakerMock.circuitBreakers.redis.execute.mockRejectedValue(
-        new Error('Redis timeout')
-      );
-      mockCheckRateLimit.mockResolvedValue({
-        success: true, remaining: 29, resetAt: new Date(Date.now() + 60000),
+    it("uses DB fallback when Redis times out in production", async () => {
+      Object.defineProperty(process.env, "NODE_ENV", {
+        value: "production",
+        writable: true,
+        configurable: true,
       });
 
-      const result = await checkSearchCountRateLimit('127.0.0.1');
+      // eslint-disable-next-line @typescript-eslint/no-require-imports
+      const circuitBreakerMock = require("@/lib/circuit-breaker");
+      circuitBreakerMock.circuitBreakers.redis.execute.mockRejectedValue(
+        new Error("Redis timeout")
+      );
+      mockCheckRateLimit.mockResolvedValue({
+        success: true,
+        remaining: 29,
+        resetAt: new Date(Date.now() + 60000),
+      });
+
+      const result = await checkSearchCountRateLimit("127.0.0.1");
 
       expect(result.success).toBe(true);
       expect(mockCheckRateLimit).toHaveBeenCalled();

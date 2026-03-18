@@ -12,7 +12,17 @@
  * - Selecting a category resets pagination (removes page/cursor params)
  */
 
-import { test, expect, selectors, timeouts, tags, searchResultsContainer, boundsQS, SEARCH_URL, getUrlParam } from "../helpers";
+import {
+  test,
+  expect,
+  selectors,
+  timeouts,
+  tags,
+  searchResultsContainer,
+  boundsQS,
+  SEARCH_URL,
+  getUrlParam,
+} from "../helpers";
 import type { Page } from "@playwright/test";
 
 // ---------------------------------------------------------------------------
@@ -20,11 +30,15 @@ import type { Page } from "@playwright/test";
 // ---------------------------------------------------------------------------
 
 function categoryBar(page: Page) {
-  return searchResultsContainer(page).locator('[aria-label="Category filters"]');
+  return searchResultsContainer(page).locator(
+    '[aria-label="Category filters"]'
+  );
 }
 
 function categoryButton(page: Page, label: string) {
-  return searchResultsContainer(page).locator(`[aria-label="Category filters"] button:has-text("${label}")`);
+  return searchResultsContainer(page).locator(
+    `[aria-label="Category filters"] button:has-text("${label}")`
+  );
 }
 
 // ---------------------------------------------------------------------------
@@ -41,7 +55,9 @@ test.describe("Category Bar", () => {
   // -------------------------------------------------------------------------
   // 14.1 Category bar renders with buttons
   // -------------------------------------------------------------------------
-  test(`${tags.core} 14.1 - category bar visible with accessible toggle buttons`, async ({ page }) => {
+  test(`${tags.core} 14.1 - category bar visible with accessible toggle buttons`, async ({
+    page,
+  }) => {
     await page.goto(SEARCH_URL);
     await page.waitForLoadState("domcontentloaded");
     await page.waitForTimeout(3_000);
@@ -64,13 +80,17 @@ test.describe("Category Bar", () => {
   // -------------------------------------------------------------------------
   // 14.2 Clicking category applies filter to URL
   // -------------------------------------------------------------------------
-  test(`${tags.core} 14.2 - clicking a category button adds amenity to URL`, async ({ page }) => {
+  test(`${tags.core} 14.2 - clicking a category button adds amenity to URL`, async ({
+    page,
+  }) => {
     await page.goto(SEARCH_URL);
     await page.waitForLoadState("domcontentloaded");
     await page.waitForTimeout(3_000);
 
     const furnishedBtn = categoryButton(page, "Furnished");
-    const btnVisible = await furnishedBtn.isVisible({ timeout: timeouts.action }).catch(() => false);
+    const btnVisible = await furnishedBtn
+      .isVisible({ timeout: timeouts.action })
+      .catch(() => false);
     test.skip(!btnVisible, "Furnished category button not visible in bar");
 
     // Should start unpressed
@@ -79,13 +99,21 @@ test.describe("Category Bar", () => {
     await furnishedBtn.click();
 
     // Wait for URL to contain the amenity via soft navigation
-    await expect.poll(
-      () => {
-        const amenities = new URL(page.url(), "http://localhost").searchParams.get("amenities") ?? "";
-        return amenities.includes("Furnished");
-      },
-      { timeout: timeouts.action, message: 'URL param "amenities" to contain "Furnished"' },
-    ).toBe(true);
+    await expect
+      .poll(
+        () => {
+          const amenities =
+            new URL(page.url(), "http://localhost").searchParams.get(
+              "amenities"
+            ) ?? "";
+          return amenities.includes("Furnished");
+        },
+        {
+          timeout: timeouts.action,
+          message: 'URL param "amenities" to contain "Furnished"',
+        }
+      )
+      .toBe(true);
 
     // Button should now be pressed
     await expect(furnishedBtn).toHaveAttribute("aria-pressed", "true");
@@ -98,14 +126,18 @@ test.describe("Category Bar", () => {
   // -------------------------------------------------------------------------
   // 14.3 Clicking active category toggles it off
   // -------------------------------------------------------------------------
-  test(`${tags.core} 14.3 - clicking an active category toggles it off and removes from URL`, async ({ page }) => {
+  test(`${tags.core} 14.3 - clicking an active category toggles it off and removes from URL`, async ({
+    page,
+  }) => {
     // Start with Furnished already active in the URL
     await page.goto(`${SEARCH_URL}&amenities=Furnished`);
     await page.waitForLoadState("domcontentloaded");
     await page.waitForTimeout(3_000);
 
     const furnishedBtn = categoryButton(page, "Furnished");
-    const btnVisible = await furnishedBtn.isVisible({ timeout: timeouts.action }).catch(() => false);
+    const btnVisible = await furnishedBtn
+      .isVisible({ timeout: timeouts.action })
+      .catch(() => false);
     test.skip(!btnVisible, "Furnished category button not visible in bar");
 
     // Should start pressed since it is in the URL
@@ -115,13 +147,21 @@ test.describe("Category Bar", () => {
     await furnishedBtn.click();
 
     // Wait for amenities param to be removed from URL via soft navigation
-    await expect.poll(
-      () => {
-        const amenities = new URL(page.url(), "http://localhost").searchParams.get("amenities");
-        return !amenities || !amenities.includes("Furnished");
-      },
-      { timeout: timeouts.action, message: 'URL param "amenities" to not contain "Furnished"' },
-    ).toBe(true);
+    await expect
+      .poll(
+        () => {
+          const amenities = new URL(
+            page.url(),
+            "http://localhost"
+          ).searchParams.get("amenities");
+          return !amenities || !amenities.includes("Furnished");
+        },
+        {
+          timeout: timeouts.action,
+          message: 'URL param "amenities" to not contain "Furnished"',
+        }
+      )
+      .toBe(true);
 
     // Button reverts to unpressed
     await expect(furnishedBtn).toHaveAttribute("aria-pressed", "false");
@@ -136,7 +176,9 @@ test.describe("Category Bar", () => {
   // -------------------------------------------------------------------------
   // 14.4 Category bar scrolls horizontally on narrow viewport
   // -------------------------------------------------------------------------
-  test(`${tags.mobile} 14.4 - category bar is scrollable on narrow viewport`, async ({ page }) => {
+  test(`${tags.mobile} 14.4 - category bar is scrollable on narrow viewport`, async ({
+    page,
+  }) => {
     // Set narrow mobile viewport
     await page.setViewportSize({ width: 375, height: 812 });
 
@@ -181,7 +223,9 @@ test.describe("Category Bar", () => {
   // -------------------------------------------------------------------------
   // 14.5 Keyboard navigation through categories
   // -------------------------------------------------------------------------
-  test(`${tags.a11y} 14.5 - keyboard Tab + Enter navigates and activates categories`, async ({ page }) => {
+  test(`${tags.a11y} 14.5 - keyboard Tab + Enter navigates and activates categories`, async ({
+    page,
+  }) => {
     await page.goto(SEARCH_URL);
     await page.waitForLoadState("domcontentloaded");
     await page.waitForTimeout(3_000);
@@ -208,7 +252,10 @@ test.describe("Category Bar", () => {
       }
     }
 
-    test.skip(!reachedCategoryButton, "Could not Tab into category bar buttons");
+    test.skip(
+      !reachedCategoryButton,
+      "Could not Tab into category bar buttons"
+    );
 
     // Record which button is focused
     const focusedLabel = await page.evaluate(() => {
@@ -233,19 +280,28 @@ test.describe("Category Bar", () => {
       await page.keyboard.press("Enter");
 
       // Wait for URL to update with any valid category filter param via soft navigation
-      await expect.poll(
-        () => {
-          const params = new URL(page.url(), "http://localhost").searchParams;
-          return params.has("amenities") || params.has("roomType") ||
-            params.has("leaseDuration") || params.has("houseRules");
-        },
-        { timeout: 30_000, message: "URL to contain a category filter param" },
-      ).toBe(true);
+      await expect
+        .poll(
+          () => {
+            const params = new URL(page.url(), "http://localhost").searchParams;
+            return (
+              params.has("amenities") ||
+              params.has("roomType") ||
+              params.has("leaseDuration") ||
+              params.has("houseRules")
+            );
+          },
+          { timeout: 30_000, message: "URL to contain a category filter param" }
+        )
+        .toBe(true);
 
       // Verify some category param was set
       const params = new URL(page.url()).searchParams;
-      const hasCategoryParam = params.has("amenities") || params.has("roomType") ||
-        params.has("leaseDuration") || params.has("houseRules");
+      const hasCategoryParam =
+        params.has("amenities") ||
+        params.has("roomType") ||
+        params.has("leaseDuration") ||
+        params.has("houseRules");
       expect(hasCategoryParam).toBe(true);
     }
   });
@@ -253,27 +309,39 @@ test.describe("Category Bar", () => {
   // -------------------------------------------------------------------------
   // 14.6 Category selection resets pagination
   // -------------------------------------------------------------------------
-  test(`${tags.core} 14.6 - clicking a category removes page and cursor params`, async ({ page }) => {
+  test(`${tags.core} 14.6 - clicking a category removes page and cursor params`, async ({
+    page,
+  }) => {
     // Start on "page 2" with a cursor param
     await page.goto(`${SEARCH_URL}&page=2`);
     await page.waitForLoadState("domcontentloaded");
     await page.waitForTimeout(3_000);
 
     const furnishedBtn = categoryButton(page, "Furnished");
-    const btnVisible = await furnishedBtn.isVisible({ timeout: timeouts.action }).catch(() => false);
+    const btnVisible = await furnishedBtn
+      .isVisible({ timeout: timeouts.action })
+      .catch(() => false);
     test.skip(!btnVisible, "Furnished category button not visible in bar");
 
     // Click a category
     await furnishedBtn.click();
 
     // Wait for URL to include the amenity via soft navigation
-    await expect.poll(
-      () => {
-        const amenities = new URL(page.url(), "http://localhost").searchParams.get("amenities") ?? "";
-        return amenities.includes("Furnished");
-      },
-      { timeout: timeouts.action, message: 'URL param "amenities" to contain "Furnished"' },
-    ).toBe(true);
+    await expect
+      .poll(
+        () => {
+          const amenities =
+            new URL(page.url(), "http://localhost").searchParams.get(
+              "amenities"
+            ) ?? "";
+          return amenities.includes("Furnished");
+        },
+        {
+          timeout: timeouts.action,
+          message: 'URL param "amenities" to contain "Furnished"',
+        }
+      )
+      .toBe(true);
 
     // Pagination params should be stripped
     expect(getUrlParam(page, "page")).toBeNull();

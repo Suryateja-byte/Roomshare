@@ -1,9 +1,9 @@
-'use client';
+"use client";
 
-import { memo, useState, useCallback, useEffect } from 'react';
-import Image from 'next/image';
-import useEmblaCarousel from 'embla-carousel-react';
-import { ChevronLeft, ChevronRight } from 'lucide-react';
+import { memo, useState, useCallback, useEffect } from "react";
+import Image from "next/image";
+import useEmblaCarousel from "embla-carousel-react";
+import { ChevronLeft, ChevronRight } from "lucide-react";
 
 interface ImageCarouselProps {
   images: string[];
@@ -30,7 +30,7 @@ const MAX_DOTS = 5;
 
 function areCarouselPropsEqual(
   prev: ImageCarouselProps,
-  next: ImageCarouselProps,
+  next: ImageCarouselProps
 ): boolean {
   return (
     prev.images === next.images &&
@@ -46,7 +46,7 @@ function ImageCarouselInner({
   images,
   alt,
   priority = false,
-  className = '',
+  className = "",
   onImageError,
   onDragStateChange,
 }: ImageCarouselProps) {
@@ -56,23 +56,32 @@ function ImageCarouselInner({
   const fallbackImage =
     "https://images.unsplash.com/photo-1522708323590-d24dbb6b0267?auto=format&fit=crop&w=800&q=80";
 
-  const scrollPrev = useCallback((e: React.MouseEvent) => {
-    e.preventDefault();
-    e.stopPropagation();
-    emblaApi?.scrollPrev();
-  }, [emblaApi]);
+  const scrollPrev = useCallback(
+    (e: React.MouseEvent) => {
+      e.preventDefault();
+      e.stopPropagation();
+      emblaApi?.scrollPrev();
+    },
+    [emblaApi]
+  );
 
-  const scrollNext = useCallback((e: React.MouseEvent) => {
-    e.preventDefault();
-    e.stopPropagation();
-    emblaApi?.scrollNext();
-  }, [emblaApi]);
+  const scrollNext = useCallback(
+    (e: React.MouseEvent) => {
+      e.preventDefault();
+      e.stopPropagation();
+      emblaApi?.scrollNext();
+    },
+    [emblaApi]
+  );
 
-  const scrollTo = useCallback((e: React.MouseEvent, index: number) => {
-    e.preventDefault();
-    e.stopPropagation();
-    emblaApi?.scrollTo(index);
-  }, [emblaApi]);
+  const scrollTo = useCallback(
+    (e: React.MouseEvent, index: number) => {
+      e.preventDefault();
+      e.stopPropagation();
+      emblaApi?.scrollTo(index);
+    },
+    [emblaApi]
+  );
 
   const onSelect = useCallback(() => {
     if (!emblaApi) return;
@@ -82,9 +91,9 @@ function ImageCarouselInner({
   useEffect(() => {
     if (!emblaApi) return;
     onSelect();
-    emblaApi.on('select', onSelect);
+    emblaApi.on("select", onSelect);
     return () => {
-      emblaApi.off('select', onSelect);
+      emblaApi.off("select", onSelect);
     };
   }, [emblaApi, onSelect]);
 
@@ -119,26 +128,29 @@ function ImageCarouselInner({
       hasDragged = false;
     };
 
-    emblaApi.on('pointerDown', onPointerDown);
-    emblaApi.on('scroll', onScroll);
-    emblaApi.on('pointerUp', onPointerUp);
+    emblaApi.on("pointerDown", onPointerDown);
+    emblaApi.on("scroll", onScroll);
+    emblaApi.on("pointerUp", onPointerUp);
     return () => {
-      emblaApi.off('pointerDown', onPointerDown);
-      emblaApi.off('scroll', onScroll);
-      emblaApi.off('pointerUp', onPointerUp);
+      emblaApi.off("pointerDown", onPointerDown);
+      emblaApi.off("scroll", onScroll);
+      emblaApi.off("pointerUp", onPointerUp);
     };
   }, [emblaApi, onDragStateChange]);
 
   // Handle keyboard navigation
-  const handleKeyDown = useCallback((e: React.KeyboardEvent) => {
-    if (e.key === 'ArrowLeft') {
-      e.preventDefault();
-      emblaApi?.scrollPrev();
-    } else if (e.key === 'ArrowRight') {
-      e.preventDefault();
-      emblaApi?.scrollNext();
-    }
-  }, [emblaApi]);
+  const handleKeyDown = useCallback(
+    (e: React.KeyboardEvent) => {
+      if (e.key === "ArrowLeft") {
+        e.preventDefault();
+        emblaApi?.scrollPrev();
+      } else if (e.key === "ArrowRight") {
+        e.preventDefault();
+        emblaApi?.scrollNext();
+      }
+    },
+    [emblaApi]
+  );
 
   // Single image - no carousel needed
   if (images.length <= 1) {
@@ -175,7 +187,10 @@ function ImageCarouselInner({
       aria-roledescription="carousel"
     >
       {/* Embla viewport */}
-      <div ref={emblaRef} className="overflow-hidden h-full [touch-action:pan-y]">
+      <div
+        ref={emblaRef}
+        className="overflow-hidden h-full [touch-action:pan-y]"
+      >
         <div className="flex h-full">
           {images.map((src, index) => (
             <div
@@ -192,7 +207,7 @@ function ImageCarouselInner({
                 className="object-cover"
                 sizes="(max-width: 640px) 100vw, (max-width: 1024px) 50vw, 33vw"
                 priority={priority && index === 0}
-                loading={index === 0 ? undefined : 'lazy'}
+                loading={index === 0 ? undefined : "lazy"}
                 placeholder="blur"
                 blurDataURL="data:image/svg+xml;base64,PHN2ZyB3aWR0aD0iNDAwIiBoZWlnaHQ9IjMwMCIgeG1sbnM9Imh0dHA6Ly93d3cudzMub3JnLzIwMDAvc3ZnIj48cmVjdCB3aWR0aD0iMTAwJSIgaGVpZ2h0PSIxMDAlIiBmaWxsPSIjZTRlNGU3Ii8+PC9zdmc+"
                 onError={() => onImageError?.(index)}
@@ -213,7 +228,7 @@ function ImageCarouselInner({
           transition-all duration-200
           hover:bg-white dark:hover:bg-zinc-700
           focus:outline-none focus:ring-2 focus:ring-zinc-900 dark:focus:ring-white
-          ${showControls ? 'opacity-100 translate-x-0 pointer-events-auto' : 'opacity-0 -translate-x-2 pointer-events-none'}
+          ${showControls ? "opacity-100 translate-x-0 pointer-events-auto" : "opacity-0 -translate-x-2 pointer-events-none"}
         `}
         aria-label="Previous image"
         aria-hidden={!showControls}
@@ -232,7 +247,7 @@ function ImageCarouselInner({
           transition-all duration-200
           hover:bg-white dark:hover:bg-zinc-700
           focus:outline-none focus:ring-2 focus:ring-zinc-900 dark:focus:ring-white
-          ${showControls ? 'opacity-100 translate-x-0 pointer-events-auto' : 'opacity-0 translate-x-2 pointer-events-none'}
+          ${showControls ? "opacity-100 translate-x-0 pointer-events-auto" : "opacity-0 translate-x-2 pointer-events-none"}
         `}
         aria-label="Next image"
         aria-hidden={!showControls}
@@ -263,8 +278,8 @@ function ImageCarouselInner({
                 <span
                   className={`block rounded-full transition-all duration-200 ${
                     index === selectedIndex
-                      ? 'bg-white w-2.5 h-1.5'
-                      : 'bg-white/60 w-1.5 h-1.5'
+                      ? "bg-white w-2.5 h-1.5"
+                      : "bg-white/60 w-1.5 h-1.5"
                   }`}
                 />
               </button>
@@ -273,7 +288,10 @@ function ImageCarouselInner({
           // Windowed dots: keep selected dot centered when possible
           let start = Math.max(0, selectedIndex - Math.floor(MAX_DOTS / 2));
           if (start + MAX_DOTS > count) start = count - MAX_DOTS;
-          const visibleIndices = Array.from({ length: MAX_DOTS }, (_, i) => start + i);
+          const visibleIndices = Array.from(
+            { length: MAX_DOTS },
+            (_, i) => start + i
+          );
           return visibleIndices.map((index) => (
             <button
               key={index}
@@ -286,10 +304,11 @@ function ImageCarouselInner({
               <span
                 className={`block rounded-full transition-all duration-200 ${
                   index === selectedIndex
-                    ? 'bg-white w-2.5 h-1.5'
-                    : (index === visibleIndices[0] || index === visibleIndices[MAX_DOTS - 1])
-                      ? 'bg-white/40 w-1 h-1'
-                      : 'bg-white/60 w-1.5 h-1.5'
+                    ? "bg-white w-2.5 h-1.5"
+                    : index === visibleIndices[0] ||
+                        index === visibleIndices[MAX_DOTS - 1]
+                      ? "bg-white/40 w-1 h-1"
+                      : "bg-white/60 w-1.5 h-1.5"
                 }`}
               />
             </button>

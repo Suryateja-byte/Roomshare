@@ -8,8 +8,8 @@
  * Auth comes from Playwright's storageState (not cookie injection).
  */
 
-import { test, expect } from '../helpers/test-utils';
-import { NearbyPlacesPage } from './nearby-page.pom';
+import { test, expect } from "../helpers/test-utils";
+import { NearbyPlacesPage } from "./nearby-page.pom";
 import {
   mockNearbyApi,
   mockNearbyApiSequence,
@@ -19,9 +19,9 @@ import {
   pharmacyPlaces,
   singlePlace,
   emptyPlacesResponse,
-} from './nearby-mock-factory';
+} from "./nearby-mock-factory";
 
-test.describe('Nearby Places — Functional Core @nearby', () => {
+test.describe("Nearby Places — Functional Core @nearby", () => {
   let nearby: NearbyPlacesPage;
 
   test.beforeEach(async ({ page }) => {
@@ -32,7 +32,7 @@ test.describe('Nearby Places — Functional Core @nearby', () => {
   // Section rendering
   // --------------------------------------------------------------------------
 
-  test('F-001: Section renders with heading', async ({ page }) => {
+  test("F-001: Section renders with heading", async ({ page }) => {
     await mockNearbyApi(page, { body: emptyPlacesResponse });
     await nearby.goto();
     await nearby.scrollToSection();
@@ -46,7 +46,7 @@ test.describe('Nearby Places — Functional Core @nearby', () => {
   // Auth states
   // --------------------------------------------------------------------------
 
-  test('F-004: Authenticated user sees search UI', async ({ page }) => {
+  test("F-004: Authenticated user sees search UI", async ({ page }) => {
     await mockNearbyApi(page, { body: emptyPlacesResponse });
     await nearby.goto();
     await nearby.scrollToSection();
@@ -56,7 +56,9 @@ test.describe('Nearby Places — Functional Core @nearby', () => {
     await expect(nearby.categoryChips.first()).toBeVisible();
   });
 
-  test('F-005: Initial state shows "Discover what\'s nearby"', async ({ page }) => {
+  test('F-005: Initial state shows "Discover what\'s nearby"', async ({
+    page,
+  }) => {
     await mockNearbyApi(page, { body: emptyPlacesResponse });
     await nearby.goto();
     await nearby.scrollToSection();
@@ -68,26 +70,26 @@ test.describe('Nearby Places — Functional Core @nearby', () => {
   // Text search
   // --------------------------------------------------------------------------
 
-  test('F-006: Text search returns results on Enter', async ({ page }) => {
+  test("F-006: Text search returns results on Enter", async ({ page }) => {
     await mockNearbyApi(page, { body: buildNearbyResponse(restaurantPlaces) });
     await nearby.goto();
     await nearby.scrollToSection();
 
-    await nearby.searchFor('Chipotle');
+    await nearby.searchFor("Chipotle");
     await nearby.waitForResults();
 
     const count = await nearby.getPlaceCount();
     expect(count).toBe(restaurantPlaces.length);
-    await expect(nearby.placeByName('Chipotle Mexican Grill')).toBeVisible();
+    await expect(nearby.placeByName("Chipotle Mexican Grill")).toBeVisible();
   });
 
-  test('F-007: Text search requires minimum 2 chars', async ({ page }) => {
+  test("F-007: Text search requires minimum 2 chars", async ({ page }) => {
     let apiCalled = false;
-    await page.route('**/api/nearby', async (route) => {
+    await page.route("**/api/nearby", async (route) => {
       apiCalled = true;
       await route.fulfill({
         status: 200,
-        contentType: 'application/json',
+        contentType: "application/json",
         body: JSON.stringify(emptyPlacesResponse),
       });
     });
@@ -95,8 +97,8 @@ test.describe('Nearby Places — Functional Core @nearby', () => {
     await nearby.goto();
     await nearby.scrollToSection();
 
-    await nearby.searchInput.fill('C');
-    await nearby.searchInput.press('Enter');
+    await nearby.searchInput.fill("C");
+    await nearby.searchInput.press("Enter");
     // Brief wait to ensure no request fires
     await page.waitForTimeout(500);
 
@@ -107,31 +109,33 @@ test.describe('Nearby Places — Functional Core @nearby', () => {
   // Category chips
   // --------------------------------------------------------------------------
 
-  test('F-008: Category chip search (Grocery)', async ({ page }) => {
+  test("F-008: Category chip search (Grocery)", async ({ page }) => {
     await mockNearbyApi(page, { body: buildNearbyResponse(groceryPlaces) });
     await nearby.goto();
     await nearby.scrollToSection();
 
-    await nearby.selectCategory('Grocery');
+    await nearby.selectCategory("Grocery");
     await nearby.waitForResults();
 
     const count = await nearby.getPlaceCount();
     expect(count).toBe(groceryPlaces.length);
   });
 
-  test('F-009: Category chip shows aria-pressed when selected', async ({ page }) => {
+  test("F-009: Category chip shows aria-pressed when selected", async ({
+    page,
+  }) => {
     await mockNearbyApi(page, { body: buildNearbyResponse(groceryPlaces) });
     await nearby.goto();
     await nearby.scrollToSection();
 
-    const chip = nearby.chipByName('Grocery');
-    await expect(chip).toHaveAttribute('aria-pressed', 'false');
+    const chip = nearby.chipByName("Grocery");
+    await expect(chip).toHaveAttribute("aria-pressed", "false");
 
     await chip.click();
-    await expect(chip).toHaveAttribute('aria-pressed', 'true');
+    await expect(chip).toHaveAttribute("aria-pressed", "true");
   });
 
-  test('F-010: Only one category active at a time', async ({ page }) => {
+  test("F-010: Only one category active at a time", async ({ page }) => {
     await mockNearbyApiSequence(page, [
       { body: buildNearbyResponse(groceryPlaces) },
       { body: buildNearbyResponse(restaurantPlaces) },
@@ -140,74 +144,87 @@ test.describe('Nearby Places — Functional Core @nearby', () => {
     await nearby.scrollToSection();
 
     // Select Grocery
-    await nearby.selectCategory('Grocery');
+    await nearby.selectCategory("Grocery");
     await nearby.waitForResults();
-    await expect(nearby.chipByName('Grocery')).toHaveAttribute('aria-pressed', 'true');
+    await expect(nearby.chipByName("Grocery")).toHaveAttribute(
+      "aria-pressed",
+      "true"
+    );
 
     // Select Restaurants
-    await nearby.selectCategory('Restaurants');
+    await nearby.selectCategory("Restaurants");
     await nearby.waitForResults();
-    await expect(nearby.chipByName('Restaurants')).toHaveAttribute('aria-pressed', 'true');
-    await expect(nearby.chipByName('Grocery')).toHaveAttribute('aria-pressed', 'false');
+    await expect(nearby.chipByName("Restaurants")).toHaveAttribute(
+      "aria-pressed",
+      "true"
+    );
+    await expect(nearby.chipByName("Grocery")).toHaveAttribute(
+      "aria-pressed",
+      "false"
+    );
   });
 
   // --------------------------------------------------------------------------
   // Radius
   // --------------------------------------------------------------------------
 
-  test('F-011: Radius change updates aria-pressed', async ({ page }) => {
+  test("F-011: Radius change updates aria-pressed", async ({ page }) => {
     await mockNearbyApi(page, { body: buildNearbyResponse(groceryPlaces) });
     await nearby.goto();
     await nearby.scrollToSection();
 
     // Default is 1 mi
-    const radius1mi = nearby.radiusByLabel('1 mi');
-    const radius2mi = nearby.radiusByLabel('2 mi');
-    const radius5mi = nearby.radiusByLabel('5 mi');
+    const radius1mi = nearby.radiusByLabel("1 mi");
+    const radius2mi = nearby.radiusByLabel("2 mi");
+    const radius5mi = nearby.radiusByLabel("5 mi");
 
-    await expect(radius1mi).toHaveAttribute('aria-pressed', 'true');
+    await expect(radius1mi).toHaveAttribute("aria-pressed", "true");
 
     // Select 2 mi
     await radius2mi.click();
-    await expect(radius2mi).toHaveAttribute('aria-pressed', 'true');
-    await expect(radius1mi).toHaveAttribute('aria-pressed', 'false');
+    await expect(radius2mi).toHaveAttribute("aria-pressed", "true");
+    await expect(radius1mi).toHaveAttribute("aria-pressed", "false");
 
     // Select 5 mi
     await radius5mi.click();
-    await expect(radius5mi).toHaveAttribute('aria-pressed', 'true');
-    await expect(radius2mi).toHaveAttribute('aria-pressed', 'false');
+    await expect(radius5mi).toHaveAttribute("aria-pressed", "true");
+    await expect(radius2mi).toHaveAttribute("aria-pressed", "false");
   });
 
   // --------------------------------------------------------------------------
   // Results display
   // --------------------------------------------------------------------------
 
-  test('F-012: Results display place name, address, and distance', async ({ page }) => {
+  test("F-012: Results display place name, address, and distance", async ({
+    page,
+  }) => {
     await mockNearbyApi(page, { body: buildNearbyResponse(singlePlace) });
     await nearby.goto();
     await nearby.scrollToSection();
 
-    await nearby.selectCategory('Grocery');
+    await nearby.selectCategory("Grocery");
     await nearby.waitForResults();
 
-    const placeLink = nearby.placeByName('Whole Foods Market');
+    const placeLink = nearby.placeByName("Whole Foods Market");
     await expect(placeLink).toBeVisible();
     // Check address and distance are within the same link
     const text = await placeLink.textContent();
-    expect(text).toContain('1765 California St');
-    expect(text).toContain('0.4');
+    expect(text).toContain("1765 California St");
+    expect(text).toContain("0.4");
   });
 
-  test('F-013: Place link opens Google Maps directions', async ({ page }) => {
+  test("F-013: Place link opens Google Maps directions", async ({ page }) => {
     await mockNearbyApi(page, { body: buildNearbyResponse(singlePlace) });
     await nearby.goto();
     await nearby.scrollToSection();
 
-    await nearby.selectCategory('Grocery');
+    await nearby.selectCategory("Grocery");
     await nearby.waitForResults();
 
-    const href = await nearby.placeByName('Whole Foods Market').getAttribute('href');
-    expect(href).toContain('google.com/maps/dir');
+    const href = await nearby
+      .placeByName("Whole Foods Market")
+      .getAttribute("href");
+    expect(href).toContain("google.com/maps/dir");
     expect(href).toContain(String(singlePlace[0].location.lat));
   });
 
@@ -216,7 +233,7 @@ test.describe('Nearby Places — Functional Core @nearby', () => {
     await nearby.goto();
     await nearby.scrollToSection();
 
-    await nearby.selectCategory('Pharmacy');
+    await nearby.selectCategory("Pharmacy");
     await nearby.waitForResults();
 
     await expect(nearby.emptyState).toBeVisible();
@@ -226,7 +243,7 @@ test.describe('Nearby Places — Functional Core @nearby', () => {
   // Map
   // --------------------------------------------------------------------------
 
-  test('F-015: Map renders with container', async ({ page }) => {
+  test("F-015: Map renders with container", async ({ page }) => {
     await mockNearbyApi(page, { body: emptyPlacesResponse });
     await nearby.goto();
     await nearby.scrollToSection();
@@ -239,12 +256,12 @@ test.describe('Nearby Places — Functional Core @nearby', () => {
     }
   });
 
-  test('F-016: Search results add markers to map', async ({ page }) => {
+  test("F-016: Search results add markers to map", async ({ page }) => {
     await mockNearbyApi(page, { body: buildNearbyResponse(groceryPlaces) });
     await nearby.goto();
     await nearby.scrollToSection();
 
-    await nearby.selectCategory('Grocery');
+    await nearby.selectCategory("Grocery");
     await nearby.waitForResults();
 
     // Wait a bit for markers to render on map
@@ -257,25 +274,25 @@ test.describe('Nearby Places — Functional Core @nearby', () => {
     }
   });
 
-  test('F-017: Hover place in list highlights marker', async ({ page }) => {
+  test("F-017: Hover place in list highlights marker", async ({ page }) => {
     await mockNearbyApi(page, { body: buildNearbyResponse(groceryPlaces) });
     await nearby.goto();
     await nearby.scrollToSection();
 
-    await nearby.selectCategory('Grocery');
+    await nearby.selectCategory("Grocery");
     await nearby.waitForResults();
     await page.waitForTimeout(500);
 
     const mapVisible = await nearby.isMapVisible();
     if (mapVisible) {
-      await nearby.hoverPlace('Whole Foods Market');
+      await nearby.hoverPlace("Whole Foods Market");
       // Check that the marker for g1 has highlighted class
-      const marker = nearby.markerById('g1');
+      const marker = nearby.markerById("g1");
       await expect(marker).toHaveClass(/highlighted/);
     }
   });
 
-  test('F-018: Map zoom controls visible', async ({ page }) => {
+  test("F-018: Map zoom controls visible", async ({ page }) => {
     await mockNearbyApi(page, { body: emptyPlacesResponse });
     await nearby.goto();
     await nearby.scrollToSection();
@@ -288,7 +305,9 @@ test.describe('Nearby Places — Functional Core @nearby', () => {
     }
   });
 
-  test('F-020: Fit all markers button appears after search', async ({ page }) => {
+  test("F-020: Fit all markers button appears after search", async ({
+    page,
+  }) => {
     await mockNearbyApi(page, { body: buildNearbyResponse(groceryPlaces) });
     await nearby.goto();
     await nearby.scrollToSection();
@@ -298,7 +317,7 @@ test.describe('Nearby Places — Functional Core @nearby', () => {
       // Before search, fit all should not be visible (no places)
       await expect(nearby.fitAll).toBeHidden();
 
-      await nearby.selectCategory('Grocery');
+      await nearby.selectCategory("Grocery");
       await nearby.waitForResults();
       await page.waitForTimeout(500);
 
@@ -310,7 +329,7 @@ test.describe('Nearby Places — Functional Core @nearby', () => {
   // Mobile view toggle
   // --------------------------------------------------------------------------
 
-  test('F-021: Mobile view toggle switches list/map', async ({ page }) => {
+  test("F-021: Mobile view toggle switches list/map", async ({ page }) => {
     // Only test on mobile viewport
     const viewport = page.viewportSize();
     if (!viewport || viewport.width >= 1024) {
@@ -341,7 +360,7 @@ test.describe('Nearby Places — Functional Core @nearby', () => {
   // Attribution
   // --------------------------------------------------------------------------
 
-  test('F-022: Radar attribution visible', async ({ page }) => {
+  test("F-022: Radar attribution visible", async ({ page }) => {
     await mockNearbyApi(page, { body: emptyPlacesResponse });
     await nearby.goto();
     await nearby.scrollToSection();
@@ -349,8 +368,8 @@ test.describe('Nearby Places — Functional Core @nearby', () => {
     const mapVisible = await nearby.isMapVisible();
     if (mapVisible) {
       await expect(nearby.radarAttribution).toBeVisible();
-      const href = await nearby.radarAttribution.getAttribute('href');
-      expect(href).toContain('radar.com');
+      const href = await nearby.radarAttribution.getAttribute("href");
+      expect(href).toContain("radar.com");
     }
   });
 
@@ -358,7 +377,7 @@ test.describe('Nearby Places — Functional Core @nearby', () => {
   // Search state management
   // --------------------------------------------------------------------------
 
-  test('F-023: New search clears previous results', async ({ page }) => {
+  test("F-023: New search clears previous results", async ({ page }) => {
     await mockNearbyApiSequence(page, [
       { body: buildNearbyResponse(groceryPlaces) },
       { body: buildNearbyResponse(restaurantPlaces) },
@@ -367,28 +386,30 @@ test.describe('Nearby Places — Functional Core @nearby', () => {
     await nearby.scrollToSection();
 
     // First search: Grocery
-    await nearby.selectCategory('Grocery');
+    await nearby.selectCategory("Grocery");
     await nearby.waitForResults();
-    await expect(nearby.placeByName('Whole Foods Market')).toBeVisible();
+    await expect(nearby.placeByName("Whole Foods Market")).toBeVisible();
 
     // Second search: Restaurants
-    await nearby.selectCategory('Restaurants');
+    await nearby.selectCategory("Restaurants");
     await nearby.waitForResults();
 
     // Old results should be gone
-    await expect(nearby.placeByName('Whole Foods Market')).toBeHidden();
+    await expect(nearby.placeByName("Whole Foods Market")).toBeHidden();
     // New results should be visible
-    await expect(nearby.placeByName('Chipotle Mexican Grill')).toBeVisible();
+    await expect(nearby.placeByName("Chipotle Mexican Grill")).toBeVisible();
   });
 
-  test('F-024: Keyword search uses Places API (sends categories)', async ({ page }) => {
+  test("F-024: Keyword search uses Places API (sends categories)", async ({
+    page,
+  }) => {
     let requestBody: Record<string, unknown> | null = null;
-    await page.route('**/api/nearby', async (route) => {
+    await page.route("**/api/nearby", async (route) => {
       const body = route.request().postDataJSON();
       requestBody = body;
       await route.fulfill({
         status: 200,
-        contentType: 'application/json',
+        contentType: "application/json",
         body: JSON.stringify(buildNearbyResponse(pharmacyPlaces)),
       });
     });
@@ -396,11 +417,11 @@ test.describe('Nearby Places — Functional Core @nearby', () => {
     await nearby.goto();
     await nearby.scrollToSection();
 
-    await nearby.searchFor('pharmacy');
+    await nearby.searchFor("pharmacy");
     await nearby.waitForResults();
 
     // The API should receive a query param (keyword search goes through server)
     expect(requestBody).not.toBeNull();
-    expect(requestBody!.query).toBe('pharmacy');
+    expect(requestBody!.query).toBe("pharmacy");
   });
 });

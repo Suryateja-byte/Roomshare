@@ -1,47 +1,48 @@
-'use client';
+"use client";
 
-import { useEffect } from 'react';
-import { RefreshCw, ShieldCheck } from 'lucide-react';
-import Link from 'next/link';
-import * as Sentry from '@sentry/nextjs';
+import { useEffect } from "react";
+import { RefreshCw, ShieldCheck } from "lucide-react";
+import Link from "next/link";
+import * as Sentry from "@sentry/nextjs";
 
 export default function VerifyError({
-    error,
-    reset,
+  error,
+  reset,
 }: {
-    error: Error & { digest?: string };
-    reset: () => void;
+  error: Error & { digest?: string };
+  reset: () => void;
 }) {
-    useEffect(() => {
-        Sentry.captureException(error);
-    }, [error]);
+  useEffect(() => {
+    Sentry.captureException(error);
+  }, [error]);
 
-    return (
-        <div className="min-h-[60vh] flex flex-col items-center justify-center px-4 py-16 text-center">
-            <div className="w-20 h-20 bg-red-100 dark:bg-red-900/30 rounded-full flex items-center justify-center mb-6">
-                <ShieldCheck className="w-10 h-10 text-red-600 dark:text-red-400" />
-            </div>
-            <h2 className="text-2xl font-bold text-zinc-900 dark:text-white mb-2">
-                Verification error
-            </h2>
-            <p className="text-zinc-600 dark:text-zinc-400 mb-6 max-w-md">
-                We encountered an error during verification. Please try again or contact support.
-            </p>
-            <div className="flex gap-3">
-                <button
-                    onClick={() => reset()}
-                    className="inline-flex items-center gap-2 px-6 py-3 bg-zinc-900 dark:bg-white text-white dark:text-zinc-900 rounded-xl font-medium hover:bg-zinc-800 dark:hover:bg-zinc-200 transition-colors"
-                >
-                    <RefreshCw className="w-4 h-4" />
-                    Try again
-                </button>
-                <Link
-                    href="/"
-                    className="inline-flex items-center gap-2 px-6 py-3 border border-zinc-300 dark:border-zinc-700 text-zinc-900 dark:text-white rounded-xl font-medium hover:bg-zinc-100 dark:hover:bg-zinc-800 transition-colors"
-                >
-                    Go home
-                </Link>
-            </div>
-        </div>
-    );
+  return (
+    <div className="min-h-[60vh] flex flex-col items-center justify-center px-4 py-16 text-center">
+      <div className="w-20 h-20 bg-red-100 dark:bg-red-900/30 rounded-full flex items-center justify-center mb-6">
+        <ShieldCheck className="w-10 h-10 text-red-600 dark:text-red-400" />
+      </div>
+      <h2 className="text-2xl font-bold text-zinc-900 dark:text-white mb-2">
+        Verification error
+      </h2>
+      <p className="text-zinc-600 dark:text-zinc-400 mb-6 max-w-md">
+        We encountered an error during verification. Please try again or contact
+        support.
+      </p>
+      <div className="flex gap-3">
+        <button
+          onClick={() => reset()}
+          className="inline-flex items-center gap-2 px-6 py-3 bg-zinc-900 dark:bg-white text-white dark:text-zinc-900 rounded-xl font-medium hover:bg-zinc-800 dark:hover:bg-zinc-200 transition-colors"
+        >
+          <RefreshCw className="w-4 h-4" />
+          Try again
+        </button>
+        <Link
+          href="/"
+          className="inline-flex items-center gap-2 px-6 py-3 border border-zinc-300 dark:border-zinc-700 text-zinc-900 dark:text-white rounded-xl font-medium hover:bg-zinc-100 dark:hover:bg-zinc-800 transition-colors"
+        >
+          Go home
+        </Link>
+      </div>
+    </div>
+  );
 }

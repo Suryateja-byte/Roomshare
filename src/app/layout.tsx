@@ -66,7 +66,10 @@ export default async function RootLayout({
         {/* OpenFreeMap - map tiles and glyphs */}
         <link rel="preconnect" href="https://tiles.openfreemap.org" />
         {/* Supabase - storage for listing images */}
-        <link rel="preconnect" href="https://qolpgfdmkqvxraafucvu.supabase.co" />
+        <link
+          rel="preconnect"
+          href="https://qolpgfdmkqvxraafucvu.supabase.co"
+        />
         {/* Unsplash - fallback images */}
         <link rel="preconnect" href="https://images.unsplash.com" />
       </head>
@@ -80,9 +83,7 @@ export default async function RootLayout({
               </NavbarWrapper>
               <EmailVerificationWrapper />
               <SuspensionBannerWrapper />
-              <MainLayout>
-                {children}
-              </MainLayout>
+              <MainLayout>{children}</MainLayout>
               <FooterWrapper>
                 <Footer />
               </FooterWrapper>

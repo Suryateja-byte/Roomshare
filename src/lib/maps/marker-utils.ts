@@ -50,7 +50,7 @@ export interface ListingGroup {
  */
 export function groupListingsByCoord(
   listings: MapMarkerListing[],
-  precision = COORD_PRECISION,
+  precision = COORD_PRECISION
 ): ListingGroup[] {
   const groups = new Map<string, MapMarkerListing[]>();
 
@@ -133,7 +133,7 @@ export function getPrimaryPinLimit(): number {
  * @returns Map of listing ID to rank index
  */
 export function buildRankMap(
-  listings: MapMarkerListing[],
+  listings: MapMarkerListing[]
 ): Map<string, number> {
   const map = new Map<string, number>();
   listings.forEach((listing, index) => {
@@ -153,7 +153,7 @@ export function buildRankMap(
  */
 export function buildRankMapFromScores(
   listings: MapMarkerListing[],
-  scoreMap?: Map<string, number>,
+  scoreMap?: Map<string, number>
 ): Map<string, number> {
   // Fallback to position-based ranking (current behavior)
   if (!scoreMap || scoreMap.size === 0) {
@@ -193,12 +193,12 @@ export function buildRankMapFromScores(
 export function computeTieredGroups(
   groups: ListingGroup[],
   rankMap: Map<string, number>,
-  primaryLimit: number = DEFAULT_PRIMARY_LIMIT,
+  primaryLimit: number = DEFAULT_PRIMARY_LIMIT
 ): TieredGroup[] {
   // Clamp limit for safety
   const limit = Math.max(
     MIN_PRIMARY_LIMIT,
-    Math.min(MAX_PRIMARY_LIMIT, primaryLimit),
+    Math.min(MAX_PRIMARY_LIMIT, primaryLimit)
   );
 
   const tieredGroups: TieredGroup[] = groups.map((group) => {
@@ -245,7 +245,7 @@ export function computeTieredGroups(
  */
 export function getBestListingInGroup(
   listings: MapMarkerListing[],
-  rankMap: Map<string, number>,
+  rankMap: Map<string, number>
 ): MapMarkerListing {
   if (listings.length === 0) {
     throw new Error("Cannot get best listing from empty group");

@@ -67,7 +67,7 @@ function generateId(): string {
  * Check if a search entry is in the legacy format
  */
 function isLegacyFormat(
-  search: RecentSearch | LegacyRecentSearch,
+  search: RecentSearch | LegacyRecentSearch
 ): search is LegacyRecentSearch {
   return !("id" in search) || !("filters" in search);
 }
@@ -169,7 +169,7 @@ export function useRecentSearches() {
 
         // Migrate any legacy entries to new format
         const migrated: RecentSearch[] = parsed.map((entry) =>
-          isLegacyFormat(entry) ? migrateLegacySearch(entry) : entry,
+          isLegacyFormat(entry) ? migrateLegacySearch(entry) : entry
         );
 
         setRecentSearches(migrated);
@@ -199,7 +199,7 @@ export function useRecentSearches() {
       location: string,
       coords?: { lat: number; lng: number },
       filters: RecentSearchFilters = {},
-      resultCount?: number,
+      resultCount?: number
     ) => {
       const trimmedLocation = location.trim();
       if (!trimmedLocation) return;
@@ -216,7 +216,7 @@ export function useRecentSearches() {
       setRecentSearches((prev) => {
         // Remove duplicates by location (case-insensitive)
         const filtered = prev.filter(
-          (s) => s.location.toLowerCase() !== trimmedLocation.toLowerCase(),
+          (s) => s.location.toLowerCase() !== trimmedLocation.toLowerCase()
         );
 
         // Add new search at the beginning, limit to max
@@ -232,7 +232,7 @@ export function useRecentSearches() {
         return updated;
       });
     },
-    [],
+    []
   );
 
   /**

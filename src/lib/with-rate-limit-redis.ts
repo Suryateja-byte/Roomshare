@@ -60,7 +60,7 @@ const RATE_LIMIT_CONFIGS: Record<
  */
 export async function withRateLimitRedis(
   request: Request,
-  options: RateLimitRedisOptions,
+  options: RateLimitRedisOptions
 ): Promise<NextResponse | null> {
   const { type, getIdentifier } = options;
   const config = RATE_LIMIT_CONFIGS[type];
@@ -111,7 +111,7 @@ export async function withRateLimitRedis(
           "X-RateLimit-Remaining": "0",
           "x-request-id": getRequestId(),
         },
-      },
+      }
     );
   }
 
@@ -123,7 +123,7 @@ export async function withRateLimitRedis(
  */
 export function addRedisRateLimitHeaders(
   response: NextResponse,
-  type: RedisRateLimitType,
+  type: RedisRateLimitType
 ): NextResponse {
   const config = RATE_LIMIT_CONFIGS[type];
   response.headers.set("X-RateLimit-Limit", String(config.burstLimit));

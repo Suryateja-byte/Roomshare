@@ -6,7 +6,14 @@
  * J30: Review summary display
  */
 
-import { test, expect, selectors, timeouts, SF_BOUNDS, searchResultsContainer } from "../helpers";
+import {
+  test,
+  expect,
+  selectors,
+  timeouts,
+  SF_BOUNDS,
+  searchResultsContainer,
+} from "../helpers";
 
 test.beforeEach(async () => {
   test.slow();
@@ -20,14 +27,22 @@ test.describe("J28: Write a Review", () => {
   }) => {
     // Step 1: Find a listing NOT owned by test user (reviewer's listing)
     await nav.goToSearch({ q: "Reviewer Nob Hill", bounds: SF_BOUNDS });
-    await expect(searchResultsContainer(page)).toBeAttached({ timeout: timeouts.navigation });
+    await expect(searchResultsContainer(page)).toBeAttached({
+      timeout: timeouts.navigation,
+    });
 
     const cards = searchResultsContainer(page).locator(selectors.listingCard);
-    test.skip((await cards.count()) === 0, "Reviewer listing not found — skipping");
+    test.skip(
+      (await cards.count()) === 0,
+      "Reviewer listing not found — skipping"
+    );
 
     // Step 2: Go to listing detail
     await nav.clickListingCard(0);
-    await page.waitForURL(/\/listings\//, { timeout: timeouts.navigation, waitUntil: "commit" });
+    await page.waitForURL(/\/listings\//, {
+      timeout: timeouts.navigation,
+      waitUntil: "commit",
+    });
     await page.waitForLoadState("domcontentloaded");
 
     // Step 3: Scroll to reviews section
@@ -35,21 +50,31 @@ test.describe("J28: Write a Review", () => {
       .getByText(/review/i)
       .or(page.locator('[data-testid="reviews-section"]'))
       .or(page.locator("#reviews"));
-    if (await reviewSection.first().isVisible().catch(() => false)) {
+    if (
+      await reviewSection
+        .first()
+        .isVisible()
+        .catch(() => false)
+    ) {
       await reviewSection.first().scrollIntoViewIfNeeded();
     }
 
     // Step 4: Look for review form — it's inline (always visible for eligible users)
     // The form has an h3 "Write a Review" heading, star buttons, textarea, and "Post Review" button
     const reviewFormHeading = page.getByText(/write a review/i);
-    const starButtons = page.locator('button[aria-label*="star"], button[aria-label*="Star"]');
-    const reviewTextarea = page.locator('textarea').last();
+    const starButtons = page.locator(
+      'button[aria-label*="star"], button[aria-label*="Star"]'
+    );
+    const reviewTextarea = page.locator("textarea").last();
 
     const hasForm = await reviewFormHeading.isVisible().catch(() => false);
     const hasStars = (await starButtons.count()) > 0;
     const hasTextarea = await reviewTextarea.isVisible().catch(() => false);
 
-    test.skip(!hasForm && !hasStars && !hasTextarea, "No review form — may be own listing, no booking, or already reviewed");
+    test.skip(
+      !hasForm && !hasStars && !hasTextarea,
+      "No review form — may be own listing, no booking, or already reviewed"
+    );
 
     // Step 5: Fill review form
     // Click 5th star for 5-star rating
@@ -59,18 +84,25 @@ test.describe("J28: Write a Review", () => {
 
     // Fill comment
     if (hasTextarea) {
-      await reviewTextarea.fill("Excellent place! Very clean and well-maintained. E2E test review.");
+      await reviewTextarea.fill(
+        "Excellent place! Very clean and well-maintained. E2E test review."
+      );
     }
 
     // Submit via "Post Review" button
-    const submitBtn = page.getByRole("button", { name: /post review|submit|save/i }).first();
+    const submitBtn = page
+      .getByRole("button", { name: /post review|submit|save/i })
+      .first();
     if (await submitBtn.isVisible().catch(() => false)) {
       await submitBtn.click();
       await page.waitForLoadState("domcontentloaded");
     }
 
     // Step 6: Verify review appeared or toast
-    const hasToast = await page.locator(selectors.toast).isVisible().catch(() => false);
+    const hasToast = await page
+      .locator(selectors.toast)
+      .isVisible()
+      .catch(() => false);
     const reviewText = page.getByText(/E2E test review/i);
     const hasReview = await reviewText.isVisible().catch(() => false);
     expect(hasToast || hasReview).toBeTruthy();
@@ -88,7 +120,9 @@ test.describe("J29: Host Responds to Review", () => {
       q: "Sunny Mission Room",
       bounds: SF_BOUNDS,
     });
-    await expect(searchResultsContainer(page)).toBeAttached({ timeout: timeouts.navigation });
+    await expect(searchResultsContainer(page)).toBeAttached({
+      timeout: timeouts.navigation,
+    });
 
     const cards = searchResultsContainer(page).locator(selectors.listingCard);
     const count = await cards.count();
@@ -96,7 +130,10 @@ test.describe("J29: Host Responds to Review", () => {
 
     // Step 2: Go to the listing
     await nav.clickListingCard(0);
-    await page.waitForURL(/\/listings\//, { timeout: timeouts.navigation, waitUntil: "commit" });
+    await page.waitForURL(/\/listings\//, {
+      timeout: timeouts.navigation,
+      waitUntil: "commit",
+    });
     await page.waitForLoadState("domcontentloaded");
 
     // Step 3: Look for reviews section and a respond button
@@ -104,25 +141,38 @@ test.describe("J29: Host Responds to Review", () => {
       .getByRole("button", { name: /respond|reply/i })
       .or(page.locator('[data-testid="respond-review"]'));
 
-    const canRespond = await respondBtn.first().isVisible().catch(() => false);
-    test.skip(!canRespond, "No respond button — may not be own listing or no reviews");
+    const canRespond = await respondBtn
+      .first()
+      .isVisible()
+      .catch(() => false);
+    test.skip(
+      !canRespond,
+      "No respond button — may not be own listing or no reviews"
+    );
 
     await respondBtn.first().click();
 
     // Step 4: Type response
     const responseField = page.locator("textarea").last();
     if (await responseField.isVisible().catch(() => false)) {
-      await responseField.fill("Thank you for the kind words! E2E test response.");
+      await responseField.fill(
+        "Thank you for the kind words! E2E test response."
+      );
     }
 
-    const submitBtn = page.getByRole("button", { name: /submit|post|save|send/i }).first();
+    const submitBtn = page
+      .getByRole("button", { name: /submit|post|save|send/i })
+      .first();
     if (await submitBtn.isVisible().catch(() => false)) {
       await submitBtn.click();
       await page.waitForLoadState("domcontentloaded");
     }
 
     // Step 5: Verify response appeared
-    const hasToast = await page.locator(selectors.toast).isVisible().catch(() => false);
+    const hasToast = await page
+      .locator(selectors.toast)
+      .isVisible()
+      .catch(() => false);
     const responseText = page.getByText(/E2E test response/i);
     const hasResponse = await responseText.isVisible().catch(() => false);
     expect(hasToast || hasResponse).toBeTruthy();
@@ -140,14 +190,19 @@ test.describe("J30: Review Summary Display", () => {
       q: "Sunny Mission Room",
       bounds: SF_BOUNDS,
     });
-    await expect(searchResultsContainer(page)).toBeAttached({ timeout: timeouts.navigation });
+    await expect(searchResultsContainer(page)).toBeAttached({
+      timeout: timeouts.navigation,
+    });
 
     const cards = searchResultsContainer(page).locator(selectors.listingCard);
     test.skip((await cards.count()) === 0, "Listing not found — skipping");
 
     // Step 2: Open listing
     await nav.clickListingCard(0);
-    await page.waitForURL(/\/listings\//, { timeout: timeouts.navigation, waitUntil: "commit" });
+    await page.waitForURL(/\/listings\//, {
+      timeout: timeouts.navigation,
+      waitUntil: "commit",
+    });
     await page.waitForLoadState("domcontentloaded");
 
     // Step 3: Look for review-related content
@@ -156,7 +211,10 @@ test.describe("J30: Review Summary Display", () => {
       .or(page.locator('[data-testid="reviews-section"]'))
       .or(page.locator('[class*="review"]'));
 
-    const hasReviews = await reviewIndicator.first().isVisible().catch(() => false);
+    const hasReviews = await reviewIndicator
+      .first()
+      .isVisible()
+      .catch(() => false);
     test.skip(!hasReviews, "No reviews section visible — skipping");
 
     // Step 4: Check for rating display (stars or number)
@@ -173,7 +231,10 @@ test.describe("J30: Review Summary Display", () => {
       .or(page.locator("main").getByText(/great|clean|responsive/i));
 
     const hasCards = (await reviewCards.count()) > 0;
-    const hasRating = await ratingDisplay.first().isVisible().catch(() => false);
+    const hasRating = await ratingDisplay
+      .first()
+      .isVisible()
+      .catch(() => false);
 
     // Should have at least review content visible
     expect(hasCards || hasRating).toBeTruthy();

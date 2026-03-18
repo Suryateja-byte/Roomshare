@@ -60,7 +60,7 @@ export async function GET(request: NextRequest) {
         {
           status: 404,
           headers: { "x-request-id": requestId },
-        },
+        }
       );
     }
 
@@ -92,7 +92,11 @@ export async function GET(request: NextRequest) {
             unboundedSearch: true,
             list: null,
             map: null,
-            meta: { mode: "pins", queryHash: null, generatedAt: new Date().toISOString() },
+            meta: {
+              mode: "pins",
+              queryHash: null,
+              generatedAt: new Date().toISOString(),
+            },
           },
           {
             status: 200,
@@ -100,7 +104,7 @@ export async function GET(request: NextRequest) {
               "Cache-Control": "no-cache, no-store",
               "x-request-id": requestId,
             },
-          },
+          }
         );
       }
 
@@ -111,7 +115,7 @@ export async function GET(request: NextRequest) {
           {
             status: 503,
             headers: { "x-request-id": requestId },
-          },
+          }
         );
       }
 
@@ -150,7 +154,7 @@ export async function GET(request: NextRequest) {
         {
           status: isValidationError ? 400 : 500,
           headers: { "x-request-id": requestId },
-        },
+        }
       );
     }
   });

@@ -43,7 +43,9 @@ test.describe("Filter URL-UI Desync", () => {
     const wifiButton = amenitiesGroup.getByRole("button", { name: /^Wifi/i });
     await wifiButton.click();
     // Wait for React to process the startTransition state update
-    await expect(wifiButton).toHaveAttribute("aria-pressed", "true", { timeout: 5_000 });
+    await expect(wifiButton).toHaveAttribute("aria-pressed", "true", {
+      timeout: 5_000,
+    });
     await applyFilters(page, { expectUrlChange: false });
 
     // Wait for URL to contain amenities=Wifi
@@ -51,16 +53,24 @@ test.describe("Filter URL-UI Desync", () => {
 
     // Verify Wifi chip is visible in applied filters region
     const filtersRegion = appliedFiltersRegion(page);
-    await expect(filtersRegion.getByRole("button", { name: /Wifi/i })).toBeVisible();
+    await expect(
+      filtersRegion.getByRole("button", { name: /Wifi/i })
+    ).toBeVisible();
 
     // Click browser Back
     await page.goBack();
 
     // Wait for URL to NOT contain amenities param
-    await expect.poll(
-      () => new URL(page.url(), "http://localhost").searchParams.get("amenities"),
-      { timeout: 30_000, message: 'URL param "amenities" to be absent after goBack' },
-    ).toBeNull();
+    await expect
+      .poll(
+        () =>
+          new URL(page.url(), "http://localhost").searchParams.get("amenities"),
+        {
+          timeout: 30_000,
+          message: 'URL param "amenities" to be absent after goBack',
+        }
+      )
+      .toBeNull();
 
     // Verify URL no longer has amenities param
     const currentUrl = new URL(page.url());
@@ -79,7 +89,9 @@ test.describe("Filter URL-UI Desync", () => {
     // Verify if we reopen the filter modal, Wifi should NOT be pressed
     await openFilterModal(page);
     const amenitiesGroupAfter = page.locator('[aria-label="Select amenities"]');
-    const wifiButtonAfter = amenitiesGroupAfter.getByRole("button", { name: /^Wifi/i });
+    const wifiButtonAfter = amenitiesGroupAfter.getByRole("button", {
+      name: /^Wifi/i,
+    });
     await expect(wifiButtonAfter).toHaveAttribute("aria-pressed", "false");
     await closeFilterModal(page);
   });
@@ -106,10 +118,16 @@ test.describe("Filter URL-UI Desync", () => {
 
     // Go back - wait for amenities gone
     await page.goBack();
-    await expect.poll(
-      () => new URL(page.url(), "http://localhost").searchParams.get("amenities"),
-      { timeout: 30_000, message: 'URL param "amenities" to be absent after goBack' },
-    ).toBeNull();
+    await expect
+      .poll(
+        () =>
+          new URL(page.url(), "http://localhost").searchParams.get("amenities"),
+        {
+          timeout: 30_000,
+          message: 'URL param "amenities" to be absent after goBack',
+        }
+      )
+      .toBeNull();
 
     // Wait for page to fully settle after goBack before going forward.
     // Without this, Next.js router re-render may clear forward history.
@@ -120,10 +138,16 @@ test.describe("Filter URL-UI Desync", () => {
     await page.goForward();
 
     // Use expect.poll for URL param check — handles Next.js soft navigation timing
-    await expect.poll(
-      () => new URL(page.url(), "http://localhost").searchParams.get("amenities"),
-      { timeout: 30_000, message: 'URL param "amenities" to be "Wifi" after goForward' },
-    ).toBe("Wifi");
+    await expect
+      .poll(
+        () =>
+          new URL(page.url(), "http://localhost").searchParams.get("amenities"),
+        {
+          timeout: 30_000,
+          message: 'URL param "amenities" to be "Wifi" after goForward',
+        }
+      )
+      .toBe("Wifi");
 
     // Verify URL has amenities=Wifi
     const currentUrl = new URL(page.url());
@@ -131,7 +155,9 @@ test.describe("Filter URL-UI Desync", () => {
 
     // Verify Wifi chip is visible in applied filters
     const filtersRegion = appliedFiltersRegion(page);
-    await expect(filtersRegion.getByRole("button", { name: /Wifi/i })).toBeVisible({ timeout: 30_000 });
+    await expect(
+      filtersRegion.getByRole("button", { name: /Wifi/i })
+    ).toBeVisible({ timeout: 30_000 });
   });
 
   test(`${tags.filter} Manual URL edit with filter params syncs UI state`, async ({
@@ -152,8 +178,12 @@ test.describe("Filter URL-UI Desync", () => {
 
     // Verify applied filters region shows chips for all three filters
     const filtersRegion = appliedFiltersRegion(page);
-    await expect(filtersRegion.getByRole("button", { name: /Wifi/i })).toBeVisible();
-    await expect(filtersRegion.getByRole("button", { name: /Parking/i })).toBeVisible();
+    await expect(
+      filtersRegion.getByRole("button", { name: /Wifi/i })
+    ).toBeVisible();
+    await expect(
+      filtersRegion.getByRole("button", { name: /Parking/i })
+    ).toBeVisible();
     await expect(
       filtersRegion.getByRole("button", { name: /Private Room/i })
     ).toBeVisible();
@@ -164,7 +194,9 @@ test.describe("Filter URL-UI Desync", () => {
     // Verify Wifi and Parking buttons have aria-pressed="true"
     const amenitiesGroup = page.locator('[aria-label="Select amenities"]');
     const wifiButton = amenitiesGroup.getByRole("button", { name: /^Wifi/i });
-    const parkingButton = amenitiesGroup.getByRole("button", { name: /^Parking/i });
+    const parkingButton = amenitiesGroup.getByRole("button", {
+      name: /^Parking/i,
+    });
     await expect(wifiButton).toHaveAttribute("aria-pressed", "true");
     await expect(parkingButton).toHaveAttribute("aria-pressed", "true");
 
@@ -213,7 +245,7 @@ test.describe("Filter URL-UI Desync", () => {
 
     // Verify no error state
     const hasError = await page
-      .locator('text=/error|something went wrong/i')
+      .locator("text=/error|something went wrong/i")
       .isVisible()
       .catch(() => false);
     expect(hasError).toBe(false);
@@ -238,7 +270,9 @@ test.describe("Filter URL-UI Desync", () => {
 
     // Toggle Parking amenity (this is PENDING state, not committed)
     const amenitiesGroup = page.locator('[aria-label="Select amenities"]');
-    const parkingButton = amenitiesGroup.getByRole("button", { name: /^Parking/i });
+    const parkingButton = amenitiesGroup.getByRole("button", {
+      name: /^Parking/i,
+    });
     await parkingButton.click();
 
     // Do NOT click Apply - instead refresh the page
@@ -263,7 +297,9 @@ test.describe("Filter URL-UI Desync", () => {
 
     // Verify Wifi should be pressed, Parking should NOT be pressed
     const amenitiesGroupAfter = page.locator('[aria-label="Select amenities"]');
-    const wifiButtonAfter = amenitiesGroupAfter.getByRole("button", { name: /^Wifi/i });
+    const wifiButtonAfter = amenitiesGroupAfter.getByRole("button", {
+      name: /^Wifi/i,
+    });
     const parkingButtonAfter = amenitiesGroupAfter.getByRole("button", {
       name: /^Parking/i,
     });
@@ -296,13 +332,18 @@ test.describe("Filter URL-UI Desync", () => {
 
     // Go back once - should return to amenities=Wifi only
     await page.goBack();
-    await expect.poll(
-      () => {
-        const params = new URL(page.url(), "http://localhost").searchParams;
-        return params.has("amenities") && !params.has("roomType");
-      },
-      { timeout: 30_000, message: "URL to have amenities but not roomType after goBack" },
-    ).toBe(true);
+    await expect
+      .poll(
+        () => {
+          const params = new URL(page.url(), "http://localhost").searchParams;
+          return params.has("amenities") && !params.has("roomType");
+        },
+        {
+          timeout: 30_000,
+          message: "URL to have amenities but not roomType after goBack",
+        }
+      )
+      .toBe(true);
 
     // Verify URL has amenities=Wifi but no roomType
     let currentUrl = new URL(page.url());
@@ -311,13 +352,18 @@ test.describe("Filter URL-UI Desync", () => {
 
     // Go back again - should return to no filters
     await page.goBack();
-    await expect.poll(
-      () => {
-        const params = new URL(page.url(), "http://localhost").searchParams;
-        return !params.has("amenities") && !params.has("roomType");
-      },
-      { timeout: 30_000, message: "URL to have neither amenities nor roomType after goBack" },
-    ).toBe(true);
+    await expect
+      .poll(
+        () => {
+          const params = new URL(page.url(), "http://localhost").searchParams;
+          return !params.has("amenities") && !params.has("roomType");
+        },
+        {
+          timeout: 30_000,
+          message: "URL to have neither amenities nor roomType after goBack",
+        }
+      )
+      .toBe(true);
 
     // Verify URL has neither amenities nor roomType
     currentUrl = new URL(page.url());

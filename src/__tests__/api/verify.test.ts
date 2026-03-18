@@ -2,81 +2,83 @@
  * Tests for verify API route
  */
 
-jest.mock('@/lib/prisma', () => ({
+jest.mock("@/lib/prisma", () => ({
   prisma: {
     listing: {
       findFirst: jest.fn(),
     },
   },
-}))
+}));
 
-jest.mock('next/server', () => ({
+jest.mock("next/server", () => ({
   NextResponse: {
     json: (data: any, init?: { status?: number }) => {
       return {
         status: init?.status || 200,
         json: async () => data,
         headers: new Map(),
-      }
+      };
     },
   },
-}))
+}));
 
-jest.mock('next/headers', () => ({
+jest.mock("next/headers", () => ({
   headers: jest.fn(async () => ({
-    get: (key: string) => (key === 'x-dev-verify-key' ? 'test-secret' : null),
+    get: (key: string) => (key === "x-dev-verify-key" ? "test-secret" : null),
   })),
-}))
+}));
 
-import { GET } from '@/app/api/verify/route'
-import { prisma } from '@/lib/prisma'
+import { GET } from "@/app/api/verify/route";
+import { prisma } from "@/lib/prisma";
 
-describe('Verify API', () => {
+describe("Verify API", () => {
   beforeEach(() => {
-    jest.clearAllMocks()
-    process.env.NEXTAUTH_SECRET = 'test-secret'
-  })
+    jest.clearAllMocks();
+    process.env.NEXTAUTH_SECRET = "test-secret";
+  });
 
-  describe('GET', () => {
-    it('returns 404 when listing not found', async () => {
-      ;(prisma.listing.findFirst as jest.Mock).mockResolvedValue(null)
+  describe("GET", () => {
+    it("returns 404 when listing not found", async () => {
+      (prisma.listing.findFirst as jest.Mock).mockResolvedValue(null);
 
-      const response = await GET()
+      const response = await GET();
 
-      expect(response.status).toBe(404)
-      const data = await response.json()
-      expect(data.error).toBe('Listing not found')
-    })
+      expect(response.status).toBe(404);
+      const data = await response.json();
+      expect(data.error).toBe("Listing not found");
+    });
 
-    it('returns listing with location', async () => {
+    it("returns listing with location", async () => {
       const mockListing = {
-        id: 'listing-123',
-        title: 'Test Room',
+        id: "listing-123",
+        title: "Test Room",
         location: {
-          address: '123 Main St',
-          city: 'San Francisco',
-          state: 'CA',
+          address: "123 Main St",
+          city: "San Francisco",
+          state: "CA",
         },
-      }
-      ;(prisma.listing.findFirst as jest.Mock).mockResolvedValue(mockListing)
+      };
+      (prisma.listing.findFirst as jest.Mock).mockResolvedValue(mockListing);
 
-      const response = await GET()
+      const response = await GET();
 
-      expect(response.status).toBe(200)
-      const data = await response.json()
-      expect(data.listing).toEqual(mockListing)
+      expect(response.status).toBe(200);
+      const data = await response.json();
+      expect(data.listing).toEqual(mockListing);
       expect(prisma.listing.findFirst).toHaveBeenCalledWith({
-        where: { title: 'Test Room' },
+        where: { title: "Test Room" },
         include: { location: true },
-      })
-    })
+      });
+    });
 
-    it('handles database errors', async () => {
-      ;(prisma.listing.findFirst as jest.Mock).mockRejectedValue(new Error('DB Error'))
+    it("handles database errors", async () => {
+      (prisma.listing.findFirst as jest.Mock).mockRejectedValue(
+        new Error("DB Error")
+      );
 
-      const response = await GET()
+      const response = await GET();
 
-      expect(response.status).toBe(500)
-    })
-  })
-})
+      expect(response.status).toBe(500);
+    });
+  });
+});

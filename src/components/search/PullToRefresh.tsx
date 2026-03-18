@@ -50,7 +50,7 @@ export default function PullToRefresh({
         setIsPulling(true);
       }
     },
-    [enabled, isRefreshing, scrollContainerRef],
+    [enabled, isRefreshing, scrollContainerRef]
   );
 
   const handleTouchMove = useCallback(
@@ -65,7 +65,7 @@ export default function PullToRefresh({
       const dampened = Math.min(MAX_PULL, dy * 0.5);
       setPullDistance(dampened);
     },
-    [isPulling, isRefreshing],
+    [isPulling, isRefreshing]
   );
 
   const handleTouchEnd = useCallback(async () => {

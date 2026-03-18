@@ -4,7 +4,11 @@
  * Tests the feature flag logic and SearchDoc query structure.
  */
 
-import { isSearchDocEnabled, buildOrderByClause, buildSearchDocWhereConditions } from "@/lib/search/search-doc-queries";
+import {
+  isSearchDocEnabled,
+  buildOrderByClause,
+  buildSearchDocWhereConditions,
+} from "@/lib/search/search-doc-queries";
 
 describe("buildSearchDocWhereConditions", () => {
   it("excludes listings with null coordinates from map results (F1.1)", () => {
@@ -23,7 +27,7 @@ describe("buildSearchDocWhereConditions", () => {
     // PAUSED, DRAFT, ARCHIVED, etc. listings must never appear in search
     expect(conditions).toContain("d.status = 'ACTIVE'");
     // Verify no other status values are included
-    const statusConditions = conditions.filter(c => c.includes("d.status"));
+    const statusConditions = conditions.filter((c) => c.includes("d.status"));
     expect(statusConditions).toHaveLength(1);
   });
 
@@ -89,7 +93,13 @@ describe("buildOrderByClause", () => {
   });
 
   it("works correctly for all sort options with keyset", () => {
-    const sorts = ["recommended", "newest", "price_asc", "price_desc", "rating"] as const;
+    const sorts = [
+      "recommended",
+      "newest",
+      "price_asc",
+      "price_desc",
+      "rating",
+    ] as const;
     for (const sort of sorts) {
       const result = buildOrderByClause(sort, 2, true);
       expect(result).not.toContain("ts_rank_cd");

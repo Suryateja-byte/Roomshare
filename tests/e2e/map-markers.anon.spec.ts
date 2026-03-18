@@ -110,10 +110,9 @@ async function getMapZoom(page: Page): Promise<number | null> {
  */
 async function waitForMapRef(page: Page, timeout = 30000): Promise<boolean> {
   try {
-    await page.waitForFunction(
-      () => !!(window as any).__e2eMapRef,
-      { timeout }
-    );
+    await page.waitForFunction(() => !!(window as any).__e2eMapRef, {
+      timeout,
+    });
     return true;
   } catch {
     return false;
@@ -133,7 +132,9 @@ async function waitForMapRef(page: Page, timeout = 30000): Promise<boolean> {
  */
 async function zoomToExpandClusters(page: Page): Promise<boolean> {
   // Check if individual markers are already visible
-  const existingCount = await page.locator(".maplibregl-marker:visible").count();
+  const existingCount = await page
+    .locator(".maplibregl-marker:visible")
+    .count();
   if (existingCount > 0) return true;
 
   // Wait for map E2E hook to be available
@@ -483,8 +484,12 @@ test.describe("Map Marker Interactions", () => {
 
       // Find View Details button/link
       const popup = page.locator(".maplibregl-popup");
-      const viewDetailsLink = popup.locator('a:has(button:has-text("View Details"))');
-      const stackedItemLink = popup.locator('[data-testid^="stacked-popup-open-"]');
+      const viewDetailsLink = popup.locator(
+        'a:has(button:has-text("View Details"))'
+      );
+      const stackedItemLink = popup.locator(
+        '[data-testid^="stacked-popup-open-"]'
+      );
 
       // Check if it's a single listing popup or stacked popup
       const isSingleListing = (await viewDetailsLink.count()) > 0;
@@ -497,7 +502,10 @@ test.describe("Map Marker Interactions", () => {
 
         // Click and verify navigation
         await viewDetailsLink.click();
-        await page.waitForURL(`**${href}`, { timeout: timeouts.navigation, waitUntil: "commit" });
+        await page.waitForURL(`**${href}`, {
+          timeout: timeouts.navigation,
+          waitUntil: "commit",
+        });
         expect(page.url()).toContain("/listings/");
       } else if (isStackedListing) {
         // For stacked popup, click the arrow/link to navigate
@@ -505,7 +513,10 @@ test.describe("Map Marker Interactions", () => {
         expect(href).toMatch(/^\/listings\//);
 
         await stackedItemLink.first().click();
-        await page.waitForURL(`**${href}`, { timeout: timeouts.navigation, waitUntil: "commit" });
+        await page.waitForURL(`**${href}`, {
+          timeout: timeouts.navigation,
+          waitUntil: "commit",
+        });
         expect(page.url()).toContain("/listings/");
       } else {
         test.skip(true, "No navigation link found in popup");
@@ -746,7 +757,9 @@ test.describe("Map Marker Interactions", () => {
       });
     });
 
-    test("3.8b - Escape closes popup but card highlight persists (activeId independent)", async ({ page }) => {
+    test("3.8b - Escape closes popup but card highlight persists (activeId independent)", async ({
+      page,
+    }) => {
       if (!(await isMapAvailable(page))) {
         test.skip(true, "Map not available");
         return;
@@ -765,8 +778,9 @@ test.describe("Map Marker Interactions", () => {
       // Check for highlighted card using evaluate (Tailwind v4 classes may not
       // be reliably matched via Playwright CSS selectors)
       const highlightCountBefore = await page.evaluate(() => {
-        return Array.from(document.querySelectorAll('[data-testid="listing-card"]'))
-          .filter(el => el.getAttribute("data-focus-state") === "active")
+        return Array.from(
+          document.querySelectorAll('[data-testid="listing-card"]')
+        ).filter((el) => el.getAttribute("data-focus-state") === "active")
           .length;
       });
 
@@ -783,8 +797,9 @@ test.describe("Map Marker Interactions", () => {
       // is called on Escape — setActive(null) is NOT called.
       // This is by design: the "last viewed" card stays highlighted.
       const highlightCountAfter = await page.evaluate(() => {
-        return Array.from(document.querySelectorAll('[data-testid="listing-card"]'))
-          .filter(el => el.getAttribute("data-focus-state") === "active")
+        return Array.from(
+          document.querySelectorAll('[data-testid="listing-card"]')
+        ).filter((el) => el.getAttribute("data-focus-state") === "active")
           .length;
       });
       expect(highlightCountAfter).toBe(highlightCountBefore);
@@ -843,19 +858,13 @@ test.describe("Map Marker Interactions", () => {
     test("3.9b - stacked popup allows selecting individual listings", async () => {
       // TODO: StackedListingPopup exists but is not imported in Map.tsx.
       // Skip until the stacked popup is integrated into the map component.
-      test.skip(
-        true,
-        "StackedListingPopup not yet integrated into Map.tsx"
-      );
+      test.skip(true, "StackedListingPopup not yet integrated into Map.tsx");
     });
 
     test("3.9c - stacked popup is keyboard accessible", async () => {
       // TODO: StackedListingPopup exists but is not imported in Map.tsx.
       // Skip until the stacked popup is integrated into the map component.
-      test.skip(
-        true,
-        "StackedListingPopup not yet integrated into Map.tsx"
-      );
+      test.skip(true, "StackedListingPopup not yet integrated into Map.tsx");
     });
   });
 

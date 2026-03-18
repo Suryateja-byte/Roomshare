@@ -86,7 +86,7 @@ export function LowResultsGuidance({
         router.push(`/search?${params.toString()}`, { scroll: false });
       });
     },
-    [router, searchParams],
+    [router, searchParams]
   );
 
   // Don't show if we have enough results or no results at all

@@ -265,7 +265,7 @@ describe("near-matches", () => {
       const suggestions = generateFilterSuggestions(params, 2);
 
       const amenitiesSuggestion = suggestions.find(
-        (s) => s.type === "amenities",
+        (s) => s.type === "amenities"
       );
       expect(amenitiesSuggestion).toBeDefined();
       expect(amenitiesSuggestion?.label).toContain("Fewer amenities");
@@ -278,7 +278,7 @@ describe("near-matches", () => {
       const suggestions = generateFilterSuggestions(params, 2);
 
       const leaseSuggestion = suggestions.find(
-        (s) => s.type === "leaseDuration",
+        (s) => s.type === "leaseDuration"
       );
       expect(leaseSuggestion).toBeDefined();
       expect(leaseSuggestion?.label).toContain("Any lease duration");
@@ -325,7 +325,7 @@ describe("near-matches", () => {
       const suggestions = generateFilterSuggestions(params, 2);
 
       const amenitiesSuggestion = suggestions.find(
-        (s) => s.type === "amenities",
+        (s) => s.type === "amenities"
       );
       expect(amenitiesSuggestion).toBeUndefined();
     });

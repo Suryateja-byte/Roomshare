@@ -14,7 +14,7 @@ interface RadarAttributionProps {
 }
 
 export default function RadarAttribution({
-  className = '',
+  className = "",
 }: RadarAttributionProps) {
   return (
     <a
@@ -39,8 +39,8 @@ export default function RadarAttribution({
         ${className}
       `}
       style={{
-        paddingBottom: 'max(6px, env(safe-area-inset-bottom))',
-        marginLeft: 'max(12px, env(safe-area-inset-left))',
+        paddingBottom: "max(6px, env(safe-area-inset-bottom))",
+        marginLeft: "max(12px, env(safe-area-inset-left))",
       }}
       aria-label="Places data by Radar"
     >

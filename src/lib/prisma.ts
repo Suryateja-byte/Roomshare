@@ -1,14 +1,14 @@
-import 'server-only';
+import "server-only";
 
-import { PrismaClient, Prisma } from '@prisma/client'
-import { logger } from './logger'
+import { PrismaClient, Prisma } from "@prisma/client";
+import { logger } from "./logger";
 
 const globalForPrisma = globalThis as unknown as {
-    prisma: PrismaClient | undefined
-}
+  prisma: PrismaClient | undefined;
+};
 
 const FALLBACK_DATABASE_URL =
-    'postgresql://placeholder:placeholder@127.0.0.1:5432/placeholder?schema=public';
+  "postgresql://placeholder:placeholder@127.0.0.1:5432/placeholder?schema=public";
 
 // P2-15: Connection pool configuration for serverless environments
 // Vercel serverless functions have short lifecycles, so we need to optimize connection handling
@@ -17,79 +17,87 @@ const FALLBACK_DATABASE_URL =
 // - connect_timeout: Time to establish a new connection
 // See: https://www.prisma.io/docs/guides/performance-and-optimization/connection-management
 const getDatasourceUrl = () => {
-    const baseUrl = process.env.DATABASE_URL;
-    if (!baseUrl) {
-        if (process.env.NODE_ENV === 'test') {
-            return FALLBACK_DATABASE_URL;
-        }
-
-        const message = 'DATABASE_URL is not configured. Refusing to start Prisma outside test environment.';
-        logger.sync.error(message);
-        throw new Error(message);
+  const baseUrl = process.env.DATABASE_URL;
+  if (!baseUrl) {
+    if (process.env.NODE_ENV === "test") {
+      return FALLBACK_DATABASE_URL;
     }
 
-    // Only add connection params if not already present
-    if (baseUrl.includes('connection_limit')) return baseUrl;
+    const message =
+      "DATABASE_URL is not configured. Refusing to start Prisma outside test environment.";
+    logger.sync.error(message);
+    throw new Error(message);
+  }
 
-    const separator = baseUrl.includes('?') ? '&' : '?';
-    // Lower limits for serverless: 5 connections max, 10s pool timeout, 5s connect timeout
-    return `${baseUrl}${separator}connection_limit=5&pool_timeout=10&connect_timeout=5`;
+  // Only add connection params if not already present
+  if (baseUrl.includes("connection_limit")) return baseUrl;
+
+  const separator = baseUrl.includes("?") ? "&" : "?";
+  // Lower limits for serverless: 5 connections max, 10s pool timeout, 5s connect timeout
+  return `${baseUrl}${separator}connection_limit=5&pool_timeout=10&connect_timeout=5`;
 };
 
 // P3-03 FIX: Configure Prisma logging
 // Development: log queries to stdout, errors/warnings via events for structured logging
 // Production: log errors/warnings via events only for structured logging with correlation
-type LogConfig = Prisma.PrismaClientOptions['log'];
+type LogConfig = Prisma.PrismaClientOptions["log"];
 
 const getLogConfig = (): LogConfig => {
-    if (process.env.NODE_ENV === 'development') {
-        return [
-            { emit: 'stdout', level: 'query' },
-            { emit: 'event', level: 'error' },
-            { emit: 'event', level: 'warn' },
-        ];
-    }
-    // Production: route all through structured logger
+  if (process.env.NODE_ENV === "development") {
     return [
-        { emit: 'event', level: 'error' },
-        { emit: 'event', level: 'warn' },
+      { emit: "stdout", level: "query" },
+      { emit: "event", level: "error" },
+      { emit: "event", level: "warn" },
     ];
+  }
+  // Production: route all through structured logger
+  return [
+    { emit: "event", level: "error" },
+    { emit: "event", level: "warn" },
+  ];
 };
 
 function createPrismaClient(): PrismaClient {
-    const client = new PrismaClient({
-        log: getLogConfig(),
-        datasources: {
-            db: {
-                url: getDatasourceUrl(),
-            },
-        },
+  const client = new PrismaClient({
+    log: getLogConfig(),
+    datasources: {
+      db: {
+        url: getDatasourceUrl(),
+      },
+    },
+  });
+
+  // P3-03 FIX: Route Prisma errors through structured logger for correlation
+  // This provides requestId, userId context and PII redaction
+  // Using type assertion since $on is available when log emit is 'event'
+  const extendedClient = client as PrismaClient & {
+    $on: (
+      eventType: "error" | "warn",
+      callback: (event: {
+        message: string;
+        target: string;
+        timestamp: Date;
+      }) => void
+    ) => void;
+  };
+
+  extendedClient.$on("error", (e) => {
+    logger.sync.error("Prisma error", {
+      target: e.target,
+      message: e.message,
+      timestamp: e.timestamp.toISOString(),
     });
+  });
 
-    // P3-03 FIX: Route Prisma errors through structured logger for correlation
-    // This provides requestId, userId context and PII redaction
-    // Using type assertion since $on is available when log emit is 'event'
-    const extendedClient = client as PrismaClient & {
-        $on: (eventType: 'error' | 'warn', callback: (event: { message: string; target: string; timestamp: Date }) => void) => void;
-    };
-
-    extendedClient.$on('error', (e) => {
-        logger.sync.error('Prisma error', {
-            target: e.target,
-            message: e.message,
-            timestamp: e.timestamp.toISOString(),
-        });
+  extendedClient.$on("warn", (e) => {
+    logger.sync.warn("Prisma warning", {
+      target: e.target,
+      message: e.message,
+      timestamp: e.timestamp.toISOString(),
     });
+  });
 
-    extendedClient.$on('warn', (e) => {
-        logger.sync.warn('Prisma warning', {
-            target: e.target,
-            message: e.message,
-            timestamp: e.timestamp.toISOString(),
-        });
-    });
-
-    return client;
+  return client;
 }
 
 export const prisma = globalForPrisma.prisma ?? createPrismaClient();

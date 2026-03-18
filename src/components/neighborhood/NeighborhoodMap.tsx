@@ -1,4 +1,4 @@
-'use client';
+"use client";
 
 /**
  * NeighborhoodMap - Interactive map for Pro users
@@ -11,14 +11,20 @@
  * - Dark/light mode support
  */
 
-import ReactMapGL, { Marker, Popup, Source, Layer, type LayerProps } from 'react-map-gl/maplibre';
-import type { GeoJSONSource } from 'maplibre-gl';
-import 'maplibre-gl/dist/maplibre-gl.css';
-import { useState, useMemo, useEffect, useRef, useCallback } from 'react';
-import { MapPin } from 'lucide-react';
-import { getWalkabilityRings, formatDistance } from '@/lib/geo/distance';
-import type { POI } from '@/lib/places/types';
-import { fixMarkerWrapperRole } from '@/components/map/fixMarkerA11y';
+import ReactMapGL, {
+  Marker,
+  Popup,
+  Source,
+  Layer,
+  type LayerProps,
+} from "react-map-gl/maplibre";
+import type { GeoJSONSource } from "maplibre-gl";
+import "maplibre-gl/dist/maplibre-gl.css";
+import { useState, useMemo, useEffect, useRef, useCallback } from "react";
+import { MapPin } from "lucide-react";
+import { getWalkabilityRings, formatDistance } from "@/lib/geo/distance";
+import type { POI } from "@/lib/places/types";
+import { fixMarkerWrapperRole } from "@/components/map/fixMarkerA11y";
 
 interface NeighborhoodMapProps {
   /** Listing center coordinates */
@@ -41,93 +47,99 @@ interface NeighborhoodMapProps {
 
 // Cluster layer styles
 const clusterLayer: LayerProps = {
-  id: 'poi-clusters',
-  type: 'circle',
-  filter: ['has', 'point_count'],
+  id: "poi-clusters",
+  type: "circle",
+  filter: ["has", "point_count"],
   paint: {
-    'circle-color': '#ef4444', // red-500
-    'circle-radius': ['step', ['get', 'point_count'], 18, 5, 22, 10, 26],
-    'circle-stroke-width': 2,
-    'circle-stroke-color': '#ffffff',
+    "circle-color": "#ef4444", // red-500
+    "circle-radius": ["step", ["get", "point_count"], 18, 5, 22, 10, 26],
+    "circle-stroke-width": 2,
+    "circle-stroke-color": "#ffffff",
   },
 };
 
 const clusterLayerDark: LayerProps = {
-  id: 'poi-clusters-dark',
-  type: 'circle',
-  filter: ['has', 'point_count'],
+  id: "poi-clusters-dark",
+  type: "circle",
+  filter: ["has", "point_count"],
   paint: {
-    'circle-color': '#f87171', // red-400
-    'circle-radius': ['step', ['get', 'point_count'], 18, 5, 22, 10, 26],
-    'circle-stroke-width': 2,
-    'circle-stroke-color': '#18181b',
+    "circle-color": "#f87171", // red-400
+    "circle-radius": ["step", ["get", "point_count"], 18, 5, 22, 10, 26],
+    "circle-stroke-width": 2,
+    "circle-stroke-color": "#18181b",
   },
 };
 
 const clusterCountLayer: LayerProps = {
-  id: 'poi-cluster-count',
-  type: 'symbol',
-  filter: ['has', 'point_count'],
+  id: "poi-cluster-count",
+  type: "symbol",
+  filter: ["has", "point_count"],
   layout: {
-    'text-field': '{point_count_abbreviated}',
-    'text-font': ['Noto Sans Regular'],
-    'text-size': 12,
+    "text-field": "{point_count_abbreviated}",
+    "text-font": ["Noto Sans Regular"],
+    "text-size": 12,
   },
-  paint: { 'text-color': '#ffffff' },
+  paint: { "text-color": "#ffffff" },
 };
 
 const clusterCountLayerDark: LayerProps = {
-  id: 'poi-cluster-count-dark',
-  type: 'symbol',
-  filter: ['has', 'point_count'],
+  id: "poi-cluster-count-dark",
+  type: "symbol",
+  filter: ["has", "point_count"],
   layout: {
-    'text-field': '{point_count_abbreviated}',
-    'text-font': ['Noto Sans Regular'],
-    'text-size': 12,
+    "text-field": "{point_count_abbreviated}",
+    "text-font": ["Noto Sans Regular"],
+    "text-size": 12,
   },
-  paint: { 'text-color': '#18181b' },
+  paint: { "text-color": "#18181b" },
 };
 
 // Walkability ring layer styles
 const walkabilityRingLayer: LayerProps = {
-  id: 'walkability-rings',
-  type: 'line',
+  id: "walkability-rings",
+  type: "line",
   paint: {
-    'line-color': [
-      'match',
-      ['get', 'minutes'],
-      5, '#22c55e', // green-500
-      10, '#eab308', // yellow-500
-      15, '#f97316', // orange-500
-      '#94a3b8', // slate-400 default
+    "line-color": [
+      "match",
+      ["get", "minutes"],
+      5,
+      "#22c55e", // green-500
+      10,
+      "#eab308", // yellow-500
+      15,
+      "#f97316", // orange-500
+      "#94a3b8", // slate-400 default
     ],
-    'line-width': 2,
-    'line-dasharray': [4, 2],
-    'line-opacity': 0.6,
+    "line-width": 2,
+    "line-dasharray": [4, 2],
+    "line-opacity": 0.6,
   },
 };
 
 const walkabilityRingLabelLayer: LayerProps = {
-  id: 'walkability-ring-labels',
-  type: 'symbol',
+  id: "walkability-ring-labels",
+  type: "symbol",
   layout: {
-    'text-field': ['concat', ['get', 'minutes'], ' min'],
-    'text-font': ['Noto Sans Regular'],
-    'text-size': 11,
-    'symbol-placement': 'line',
-    'text-max-angle': 30,
+    "text-field": ["concat", ["get", "minutes"], " min"],
+    "text-font": ["Noto Sans Regular"],
+    "text-size": 11,
+    "symbol-placement": "line",
+    "text-max-angle": 30,
   },
   paint: {
-    'text-color': [
-      'match',
-      ['get', 'minutes'],
-      5, '#16a34a', // green-600
-      10, '#ca8a04', // yellow-600
-      15, '#ea580c', // orange-600
-      '#64748b', // slate-500 default
+    "text-color": [
+      "match",
+      ["get", "minutes"],
+      5,
+      "#16a34a", // green-600
+      10,
+      "#ca8a04", // yellow-600
+      15,
+      "#ea580c", // orange-600
+      "#64748b", // slate-500 default
     ],
-    'text-halo-color': '#ffffff',
-    'text-halo-width': 1,
+    "text-halo-color": "#ffffff",
+    "text-halo-width": 1,
   },
 };
 
@@ -139,7 +151,7 @@ export function NeighborhoodMap({
   onPoiClick,
   onPoiHover,
   showWalkabilityRings = true,
-  className = '',
+  className = "",
 }: NeighborhoodMapProps) {
   const [isMapLoaded, setIsMapLoaded] = useState(false);
   const [isDarkMode, setIsDarkMode] = useState(false);
@@ -165,13 +177,13 @@ export function NeighborhoodMap({
   // Detect dark mode
   useEffect(() => {
     const checkDarkMode = () => {
-      setIsDarkMode(document.documentElement.classList.contains('dark'));
+      setIsDarkMode(document.documentElement.classList.contains("dark"));
     };
     checkDarkMode();
     const observer = new MutationObserver(checkDarkMode);
     observer.observe(document.documentElement, {
       attributes: true,
-      attributeFilter: ['class'],
+      attributeFilter: ["class"],
     });
     return () => observer.disconnect();
   }, []);
@@ -188,11 +200,11 @@ export function NeighborhoodMap({
   // Convert POIs to GeoJSON for clustering
   const poiGeojson = useMemo(
     () => ({
-      type: 'FeatureCollection' as const,
+      type: "FeatureCollection" as const,
       features: pois.map((poi) => ({
-        type: 'Feature' as const,
+        type: "Feature" as const,
         geometry: {
-          type: 'Point' as const,
+          type: "Point" as const,
           coordinates: [poi.lng, poi.lat],
         },
         properties: {
@@ -230,9 +242,9 @@ export function NeighborhoodMap({
       }
 
       return {
-        type: 'Feature' as const,
+        type: "Feature" as const,
         geometry: {
-          type: 'LineString' as const,
+          type: "LineString" as const,
           coordinates,
         },
         properties: {
@@ -242,7 +254,7 @@ export function NeighborhoodMap({
     });
 
     return {
-      type: 'FeatureCollection' as const,
+      type: "FeatureCollection" as const,
       features,
     };
   }, [center.lat, center.lng, showWalkabilityRings]);
@@ -263,21 +275,21 @@ export function NeighborhoodMap({
     const clusterId = feature.properties?.cluster_id;
     if (!clusterId) return;
 
-    const mapboxSource = mapRef.current.getSource('pois') as
+    const mapboxSource = mapRef.current.getSource("pois") as
       | GeoJSONSource
       | undefined;
     if (!mapboxSource) return;
 
     try {
       const zoom = await mapboxSource.getClusterExpansionZoom(clusterId);
-      if (!feature.geometry || feature.geometry.type !== 'Point') return;
+      if (!feature.geometry || feature.geometry.type !== "Point") return;
       mapRef.current?.flyTo({
         center: feature.geometry.coordinates as [number, number],
         zoom: zoom,
         duration: 500,
       });
     } catch (error) {
-      console.warn('Cluster expansion failed', error);
+      console.warn("Cluster expansion failed", error);
     }
   }, []);
 
@@ -313,9 +325,16 @@ export function NeighborhoodMap({
     >
       {/* Loading state */}
       {!isMapLoaded && (
-        <div className="absolute inset-0 bg-zinc-100 dark:bg-zinc-800 z-20 flex items-center justify-center" role="status" aria-label="Loading map">
+        <div
+          className="absolute inset-0 bg-zinc-100 dark:bg-zinc-800 z-20 flex items-center justify-center"
+          role="status"
+          aria-label="Loading map"
+        >
           <div className="flex flex-col items-center gap-3">
-            <MapPin className="w-10 h-10 text-zinc-300 dark:text-zinc-600 animate-pulse" aria-hidden="true" />
+            <MapPin
+              className="w-10 h-10 text-zinc-300 dark:text-zinc-600 animate-pulse"
+              aria-hidden="true"
+            />
             <span className="text-sm text-zinc-500 dark:text-zinc-400">
               Loading map...
             </span>
@@ -330,13 +349,15 @@ export function NeighborhoodMap({
         onLoad={() => setIsMapLoaded(true)}
         onClick={useClustering ? onClusterClick : undefined}
         interactiveLayerIds={
-          useClustering ? [isDarkMode ? 'poi-clusters-dark' : 'poi-clusters'] : []
+          useClustering
+            ? [isDarkMode ? "poi-clusters-dark" : "poi-clusters"]
+            : []
         }
-        style={{ width: '100%', height: '100%' }}
+        style={{ width: "100%", height: "100%" }}
         mapStyle={
           isDarkMode
-            ? '/map-styles/liberty-dark.json'
-            : 'https://tiles.openfreemap.org/styles/liberty'
+            ? "/map-styles/liberty-dark.json"
+            : "https://tiles.openfreemap.org/styles/liberty"
         }
       >
         {/* Walkability rings */}
@@ -385,29 +406,32 @@ export function NeighborhoodMap({
             }}
           >
             <div
-              ref={(el) => { if (el) fixMarkerWrapperRole(el); }}
+              ref={(el) => {
+                if (el) fixMarkerWrapperRole(el);
+              }}
               className={`
                 w-6 h-6 rounded-full flex items-center justify-center cursor-pointer
                 transition-transform duration-150
                 focus:outline-none focus:ring-2 focus:ring-primary focus:ring-offset-2
                 ${
-                  hoveredPlaceId === poi.placeId || selectedPlaceId === poi.placeId
-                    ? 'scale-125 z-10'
-                    : ''
+                  hoveredPlaceId === poi.placeId ||
+                  selectedPlaceId === poi.placeId
+                    ? "scale-125 z-10"
+                    : ""
                 }
                 ${
                   selectedPlaceId === poi.placeId
-                    ? 'bg-primary ring-2 ring-primary/30'
-                    : 'bg-red-500 dark:bg-red-400'
+                    ? "bg-primary ring-2 ring-primary/30"
+                    : "bg-red-500 dark:bg-red-400"
                 }
               `}
               role="button"
               tabIndex={0}
-              aria-label={`${poi.name}${poi.distanceMiles ? `, ${formatDistance(poi.distanceMiles)}` : ''}`}
+              aria-label={`${poi.name}${poi.distanceMiles ? `, ${formatDistance(poi.distanceMiles)}` : ""}`}
               onMouseEnter={() => onPoiHover?.(poi)}
               onMouseLeave={() => onPoiHover?.(null)}
               onKeyDown={(e) => {
-                if (e.key === 'Enter' || e.key === ' ') {
+                if (e.key === "Enter" || e.key === " ") {
                   e.preventDefault();
                   e.stopPropagation();
                   setPopupPoi(poi);
@@ -444,20 +468,20 @@ export function NeighborhoodMap({
             closeOnClick={false}
             className={`z-50 [&_.maplibregl-popup-content]:rounded-lg [&_.maplibregl-popup-content]:p-0 ${
               isDarkMode
-                ? '[&_.maplibregl-popup-tip]:border-t-zinc-800'
-                : '[&_.maplibregl-popup-tip]:border-t-white'
+                ? "[&_.maplibregl-popup-tip]:border-t-zinc-800"
+                : "[&_.maplibregl-popup-tip]:border-t-white"
             }`}
             maxWidth="250px"
           >
             <div
               className={`p-3 rounded-lg ${
-                isDarkMode ? 'bg-zinc-800 text-white' : 'bg-white text-zinc-900'
+                isDarkMode ? "bg-zinc-800 text-white" : "bg-white text-zinc-900"
               }`}
             >
               <h4 className="font-medium text-sm">{popupPoi.name}</h4>
               {popupPoi.primaryType && (
                 <p className="text-xs text-muted-foreground mt-0.5">
-                  {popupPoi.primaryType.replace(/_/g, ' ')}
+                  {popupPoi.primaryType.replace(/_/g, " ")}
                 </p>
               )}
               <div className="flex items-center gap-3 mt-2 text-xs">
@@ -488,8 +512,8 @@ export function NeighborhoodMap({
         <div
           className={`absolute bottom-4 left-4 p-2 rounded-lg text-xs ${
             isDarkMode
-              ? 'bg-zinc-800/90 text-white'
-              : 'bg-white/90 text-zinc-900'
+              ? "bg-zinc-800/90 text-white"
+              : "bg-white/90 text-zinc-900"
           } shadow-sm`}
           role="region"
           aria-label="Map legend showing walking time zones"
@@ -509,7 +533,6 @@ export function NeighborhoodMap({
           </div>
         </div>
       )}
-
     </div>
   );
 }

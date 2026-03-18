@@ -32,9 +32,7 @@ import {
   isValidQuery,
   crossesAntimeridian,
 } from "@/lib/data";
-import {
-  clampBoundsToMaxSpan,
-} from "@/lib/validation";
+import { clampBoundsToMaxSpan } from "@/lib/validation";
 import {
   MAP_FETCH_MAX_LAT_SPAN,
   MAP_FETCH_MAX_LNG_SPAN,
@@ -131,7 +129,12 @@ function buildFacetWhereConditions(
     minAvailableSlots?: number;
     bounds?: { minLng: number; minLat: number; maxLng: number; maxLat: number };
   },
-  excludeFilter?: "amenities" | "houseRules" | "roomType" | "price" | "bookingMode",
+  excludeFilter?:
+    | "amenities"
+    | "houseRules"
+    | "roomType"
+    | "price"
+    | "bookingMode"
 ): WhereBuilder {
   // SECURITY INVARIANT:
   // - All user-derived values must be pushed to `params` and referenced as $N placeholders.
@@ -154,7 +157,7 @@ function buildFacetWhereConditions(
   // Base conditions
   const slotThreshold = Math.max(filterParams.minAvailableSlots ?? 1, 1);
   const conditions: string[] = [
-    (features.softHoldsEnabled || features.softHoldsDraining)
+    features.softHoldsEnabled || features.softHoldsDraining
       ? `(d.available_slots - COALESCE((
           SELECT SUM("slotsRequested") FROM "Booking" b
           WHERE b."listingId" = d.id
@@ -180,7 +183,7 @@ function buildFacetWhereConditions(
       paramIndex += 4;
     } else {
       conditions.push(
-        `d.location_geog && ST_MakeEnvelope($${paramIndex}, $${paramIndex + 1}, $${paramIndex + 2}, $${paramIndex + 3}, 4326)::geography`,
+        `d.location_geog && ST_MakeEnvelope($${paramIndex}, $${paramIndex + 1}, $${paramIndex + 2}, $${paramIndex + 3}, 4326)::geography`
       );
       params.push(bounds.minLng, bounds.minLat, bounds.maxLng, bounds.maxLat);
       paramIndex += 4;
@@ -206,7 +209,9 @@ function buildFacetWhereConditions(
     if (sanitizedQuery) {
       // P2a Fix: Use FTS instead of LIKE for semantic alignment
       // plainto_tsquery handles multi-word queries as AND by default
-      conditions.push(`d.search_tsv @@ plainto_tsquery('english', $${paramIndex})`);
+      conditions.push(
+        `d.search_tsv @@ plainto_tsquery('english', $${paramIndex})`
+      );
       params.push(sanitizedQuery);
       paramIndex++;
     }
@@ -227,7 +232,7 @@ function buildFacetWhereConditions(
   // Move-in date filter
   if (moveInDate) {
     conditions.push(
-      `(d.move_in_date IS NULL OR d.move_in_date <= $${paramIndex++})`,
+      `(d.move_in_date IS NULL OR d.move_in_date <= $${paramIndex++})`
     );
     params.push(parseLocalDate(moveInDate));
   }
@@ -239,7 +244,7 @@ function buildFacetWhereConditions(
       .filter(Boolean);
     if (normalized.length > 0) {
       conditions.push(
-        `d.household_languages_lower && $${paramIndex++}::text[]`,
+        `d.household_languages_lower && $${paramIndex++}::text[]`
       );
       params.push(normalized);
     }
@@ -253,7 +258,7 @@ function buildFacetWhereConditions(
       .filter(Boolean);
     if (normalizedAmenities.length > 0) {
       conditions.push(
-        `NOT EXISTS (SELECT 1 FROM unnest($${paramIndex++}::text[]) AS search_term WHERE NOT EXISTS (SELECT 1 FROM unnest(d.amenities_lower) AS la WHERE la LIKE '%' || search_term || '%'))`,
+        `NOT EXISTS (SELECT 1 FROM unnest($${paramIndex++}::text[]) AS search_term WHERE NOT EXISTS (SELECT 1 FROM unnest(d.amenities_lower) AS la WHERE la LIKE '%' || search_term || '%'))`
       );
       params.push(normalizedAmenities);
     }
@@ -271,7 +276,10 @@ function buildFacetWhereConditions(
   }
 
   // Gender preference filter (e.g., "female", "male", "any")
-  if (filterParams.genderPreference && filterParams.genderPreference !== "any") {
+  if (
+    filterParams.genderPreference &&
+    filterParams.genderPreference !== "any"
+  ) {
     conditions.push(`d.gender_preference = $${paramIndex++}`);
     params.push(filterParams.genderPreference);
   }
@@ -283,7 +291,11 @@ function buildFacetWhereConditions(
   }
 
   // Phase 3: Booking mode filter
-  if (excludeFilter !== "bookingMode" && filterParams.bookingMode && filterParams.bookingMode !== "any") {
+  if (
+    excludeFilter !== "bookingMode" &&
+    filterParams.bookingMode &&
+    filterParams.bookingMode !== "any"
+  ) {
     conditions.push(`d."booking_mode" = $${paramIndex++}`);
     params.push(filterParams.bookingMode);
   }
@@ -296,11 +308,11 @@ function buildFacetWhereConditions(
  */
 async function getAmenitiesFacet(
   filterParams: Parameters<typeof buildFacetWhereConditions>[0],
-  tx: FacetTxClient,
+  tx: FacetTxClient
 ): Promise<Record<string, number>> {
   const { conditions, params, paramIndex } = buildFacetWhereConditions(
     filterParams,
-    "amenities",
+    "amenities"
   );
   const whereClause = joinWhereClauseWithSecurityInvariant(conditions);
 
@@ -335,11 +347,11 @@ async function getAmenitiesFacet(
  */
 async function getHouseRulesFacet(
   filterParams: Parameters<typeof buildFacetWhereConditions>[0],
-  tx: FacetTxClient,
+  tx: FacetTxClient
 ): Promise<Record<string, number>> {
   const { conditions, params, paramIndex } = buildFacetWhereConditions(
     filterParams,
-    "houseRules",
+    "houseRules"
   );
   const whereClause = joinWhereClauseWithSecurityInvariant(conditions);
 
@@ -360,7 +372,7 @@ async function getHouseRulesFacet(
   const results = await tx.$queryRawUnsafe<{ rule: string; count: bigint }[]>(
     query,
     ...params,
-    MAX_FACET_RESULTS,
+    MAX_FACET_RESULTS
   );
 
   const facets: Record<string, number> = {};
@@ -375,11 +387,11 @@ async function getHouseRulesFacet(
  */
 async function getRoomTypesFacet(
   filterParams: Parameters<typeof buildFacetWhereConditions>[0],
-  tx: FacetTxClient,
+  tx: FacetTxClient
 ): Promise<Record<string, number>> {
   const { conditions, params, paramIndex } = buildFacetWhereConditions(
     filterParams,
-    "roomType",
+    "roomType"
   );
   const whereClause = joinWhereClauseWithSecurityInvariant(conditions);
 
@@ -413,11 +425,11 @@ async function getRoomTypesFacet(
  */
 async function getPriceRanges(
   filterParams: Parameters<typeof buildFacetWhereConditions>[0],
-  tx: FacetTxClient,
+  tx: FacetTxClient
 ): Promise<{ min: number | null; max: number | null; median: number | null }> {
   const { conditions, params } = buildFacetWhereConditions(
     filterParams,
-    "price",
+    "price"
   );
   const whereClause = joinWhereClauseWithSecurityInvariant(conditions);
 
@@ -466,7 +478,7 @@ async function getPriceHistogram(
   filterParams: Parameters<typeof buildFacetWhereConditions>[0],
   priceMin: number | null,
   priceMax: number | null,
-  tx: FacetTxClient,
+  tx: FacetTxClient
 ): Promise<FacetsResponse["priceHistogram"]> {
   if (priceMin === null || priceMax === null || priceMin >= priceMax) {
     return null;
@@ -476,7 +488,7 @@ async function getPriceHistogram(
 
   const { conditions, params, paramIndex } = buildFacetWhereConditions(
     filterParams,
-    "price",
+    "price"
   );
   const whereClause = joinWhereClauseWithSecurityInvariant(conditions);
 
@@ -509,7 +521,7 @@ async function getPriceHistogram(
  * Generate cache key for facets request
  */
 function generateFacetsCacheKey(
-  filterParams: Parameters<typeof buildFacetWhereConditions>[0],
+  filterParams: Parameters<typeof buildFacetWhereConditions>[0]
 ): string {
   // P3 fix: Sort keys explicitly for deterministic JSON.stringify output
   const normalized: Record<string, string | number | boolean> = {
@@ -535,7 +547,7 @@ function generateFacetsCacheKey(
  * Internal facets fetch function (to be cached)
  */
 async function getFacetsInternal(
-  filterParams: Parameters<typeof buildFacetWhereConditions>[0],
+  filterParams: Parameters<typeof buildFacetWhereConditions>[0]
 ): Promise<FacetsResponse> {
   // Single transaction for all facet queries — reduces connection pool usage
   // from 5 separate transactions to 1. Promise.all inside the callback still
@@ -543,29 +555,30 @@ async function getFacetsInternal(
   return prisma.$transaction(
     async (tx) => {
       await tx.$executeRawUnsafe(
-        `SET LOCAL statement_timeout = ${FACET_QUERY_TIMEOUT_MS}`,
+        `SET LOCAL statement_timeout = ${FACET_QUERY_TIMEOUT_MS}`
       );
 
       // Run amenity/houseRule/roomType/priceRange queries in parallel
-      const [amenities, houseRules, roomTypes, priceRanges] =
-        await Promise.all([
+      const [amenities, houseRules, roomTypes, priceRanges] = await Promise.all(
+        [
           getAmenitiesFacet(filterParams, tx),
           getHouseRulesFacet(filterParams, tx),
           getRoomTypesFacet(filterParams, tx),
           getPriceRanges(filterParams, tx),
-        ]);
+        ]
+      );
 
       // Histogram depends on priceRanges (needs min/max for bucket sizing)
       const priceHistogram = await getPriceHistogram(
         filterParams,
         priceRanges.min,
         priceRanges.max,
-        tx,
+        tx
       );
 
       return { amenities, houseRules, roomTypes, priceRanges, priceHistogram };
     },
-    { timeout: FACET_QUERY_TIMEOUT_MS * 2 },
+    { timeout: FACET_QUERY_TIMEOUT_MS * 2 }
   );
 }
 
@@ -607,22 +620,28 @@ export async function GET(request: NextRequest) {
       // Security: Return empty facets for unbounded requests to prevent
       // full-table GROUP BY aggregation DoS (5 parallel scans with no WHERE bounds).
       if (!filterParams.bounds && !filterParams.query) {
-        logger.debug("[search/facets] Unbounded browse — returning empty facets", {
-          hasQuery: false,
-          hasBounds: false,
-        });
-        return NextResponse.json({
-          amenities: {},
-          houseRules: {},
-          roomTypes: {},
-          priceRanges: { min: null, max: null, median: null },
-          priceHistogram: null,
-        } satisfies FacetsResponse, {
-          headers: {
-            "Cache-Control": "private, no-store",
-            "x-request-id": getRequestId(),
-          },
-        });
+        logger.debug(
+          "[search/facets] Unbounded browse — returning empty facets",
+          {
+            hasQuery: false,
+            hasBounds: false,
+          }
+        );
+        return NextResponse.json(
+          {
+            amenities: {},
+            houseRules: {},
+            roomTypes: {},
+            priceRanges: { min: null, max: null, median: null },
+            priceHistogram: null,
+          } satisfies FacetsResponse,
+          {
+            headers: {
+              "Cache-Control": "private, no-store",
+              "x-request-id": getRequestId(),
+            },
+          }
+        );
       }
 
       // P1 Fix: Validate bounds when text query is present (DoS prevention)
@@ -648,7 +667,7 @@ export async function GET(request: NextRequest) {
                 "Cache-Control": "private, no-store",
                 "x-request-id": getRequestId(),
               },
-            },
+            }
           );
         }
 
@@ -675,7 +694,7 @@ export async function GET(request: NextRequest) {
                 "Cache-Control": "private, no-store",
                 "x-request-id": getRequestId(),
               },
-            },
+            }
           );
         }
 
@@ -685,12 +704,22 @@ export async function GET(request: NextRequest) {
           ? 180 - bounds.minLng + (bounds.maxLng + 180)
           : bounds.maxLng - bounds.minLng;
 
-        if (latSpan > MAP_FETCH_MAX_LAT_SPAN || lngSpan > MAP_FETCH_MAX_LNG_SPAN) {
+        if (
+          latSpan > MAP_FETCH_MAX_LAT_SPAN ||
+          lngSpan > MAP_FETCH_MAX_LNG_SPAN
+        ) {
           // Clamp bounds silently (user preference: silent clamp over rejection)
-          const clampedBounds = clampBoundsToMaxSpan(bounds, MAP_FETCH_MAX_LAT_SPAN, MAP_FETCH_MAX_LNG_SPAN);
+          const clampedBounds = clampBoundsToMaxSpan(
+            bounds,
+            MAP_FETCH_MAX_LAT_SPAN,
+            MAP_FETCH_MAX_LNG_SPAN
+          );
           filterParams.bounds = clampedBounds;
           logger.debug("[search/facets] Oversized bounds clamped", {
-            original: { latSpan: latSpan.toFixed(2), lngSpan: lngSpan.toFixed(2) },
+            original: {
+              latSpan: latSpan.toFixed(2),
+              lngSpan: lngSpan.toFixed(2),
+            },
             clamped: {
               latSpan: (clampedBounds.maxLat - clampedBounds.minLat).toFixed(2),
               lngSpan: (clampedBounds.maxLng - clampedBounds.minLng).toFixed(2),
@@ -706,10 +735,10 @@ export async function GET(request: NextRequest) {
         unstable_cache(
           async () => getFacetsInternal(filterParams),
           ["search-facets", cacheKey],
-          { revalidate: CACHE_TTL },
+          { revalidate: CACHE_TTL }
         )(),
         DEFAULT_TIMEOUTS.DATABASE,
-        "search-facets-getFacetsInternal",
+        "search-facets-getFacetsInternal"
       );
 
       return NextResponse.json(facets, {
@@ -729,14 +758,16 @@ export async function GET(request: NextRequest) {
         error: sanitizeErrorMessage(error),
         requestId,
       });
-      Sentry.captureException(error, { tags: { route: "/api/search/facets", method: "GET" } });
+      Sentry.captureException(error, {
+        tags: { route: "/api/search/facets", method: "GET" },
+      });
 
       return NextResponse.json(
         { error: "Failed to fetch facets" },
         {
           status: 500,
           headers: { "x-request-id": requestId },
-        },
+        }
       );
     }
   });

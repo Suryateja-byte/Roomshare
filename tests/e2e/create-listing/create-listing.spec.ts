@@ -6,29 +6,36 @@
  * progress indicator, character counter, and redirect behavior.
  */
 
-import { test, expect, tags } from '../helpers/test-utils';
-import { CreateListingPage, CreateListingData } from '../page-objects/create-listing.page';
+import { test, expect, tags } from "../helpers/test-utils";
+import {
+  CreateListingPage,
+  CreateListingData,
+} from "../page-objects/create-listing.page";
 
-test.describe('Create Listing — Functional Tests', () => {
-  test.use({ storageState: 'playwright/.auth/user.json' });
-  test.beforeEach(async () => { test.slow(); });
+test.describe("Create Listing — Functional Tests", () => {
+  test.use({ storageState: "playwright/.auth/user.json" });
+  test.beforeEach(async () => {
+    test.slow();
+  });
 
   // ────────────────────────────────────────────────────────
   // Helpers
   // ────────────────────────────────────────────────────────
 
   /** Build valid default data; caller can override individual fields. */
-  function validData(overrides?: Partial<CreateListingData>): CreateListingData {
+  function validData(
+    overrides?: Partial<CreateListingData>
+  ): CreateListingData {
     const prefix = `e2e-${Date.now()}`;
     return {
       title: `Test Listing ${prefix}`,
       description: `A comfortable room in a sunny apartment near downtown. Perfect for students or young professionals looking for a great living situation. ${prefix}`,
-      price: '1200',
-      totalSlots: '3',
-      address: '123 Test Street',
-      city: 'San Francisco',
-      state: 'CA',
-      zipCode: '94102',
+      price: "1200",
+      totalSlots: "3",
+      address: "123 Test Street",
+      city: "San Francisco",
+      state: "CA",
+      zipCode: "94102",
       ...overrides,
     };
   }
@@ -37,9 +44,10 @@ test.describe('Create Listing — Functional Tests', () => {
   // P0 — Must Ship (F-001 … F-008)
   // ────────────────────────────────────────────────────────
 
-  test.describe('P0: Core creation & validation', () => {
-
-    test(`F-001: Happy path — required fields only ${tags.auth} ${tags.core}`, async ({ page }) => {
+  test.describe("P0: Core creation & validation", () => {
+    test(`F-001: Happy path — required fields only ${tags.auth} ${tags.core}`, async ({
+      page,
+    }) => {
       const clp = new CreateListingPage(page);
       const data = validData();
 
@@ -59,18 +67,20 @@ test.describe('Create Listing — Functional Tests', () => {
       await clp.expectSuccess();
     });
 
-    test(`F-002: Happy path — ALL fields ${tags.auth} ${tags.core}`, async ({ page }) => {
+    test(`F-002: Happy path — ALL fields ${tags.auth} ${tags.core}`, async ({
+      page,
+    }) => {
       const clp = new CreateListingPage(page);
       const futureDate = new Date();
       futureDate.setDate(futureDate.getDate() + 30);
-      const moveInISO = futureDate.toISOString().split('T')[0];
+      const moveInISO = futureDate.toISOString().split("T")[0];
 
       const data = validData({
-        amenities: 'wifi, parking',
+        amenities: "wifi, parking",
         moveInDate: moveInISO,
-        leaseDuration: '12 months',
-        roomType: 'Private Room',
-        houseRules: 'Pets allowed, Guests allowed',
+        leaseDuration: "12 months",
+        roomType: "Private Room",
+        houseRules: "Pets allowed, Guests allowed",
       });
 
       await clp.goto();
@@ -95,7 +105,9 @@ test.describe('Create Listing — Functional Tests', () => {
       await clp.expectSuccess();
     });
 
-    test(`F-003: Validation — empty form submit ${tags.auth} ${tags.core}`, async ({ page }) => {
+    test(`F-003: Validation — empty form submit ${tags.auth} ${tags.core}`, async ({
+      page,
+    }) => {
       const clp = new CreateListingPage(page);
       await clp.goto();
 
@@ -112,12 +124,14 @@ test.describe('Create Listing — Functional Tests', () => {
       expect(titleInvalid).toBe(true);
     });
 
-    test(`F-004: Validation — description too short ${tags.auth} ${tags.core}`, async ({ page }) => {
+    test(`F-004: Validation — description too short ${tags.auth} ${tags.core}`, async ({
+      page,
+    }) => {
       const clp = new CreateListingPage(page);
       // 'short' (5 chars) fails client-side Zod validation (min 10),
       // so handleSubmit returns early WITHOUT calling fetch.
       // We verify client-side validation catches it — no network wait needed.
-      const data = validData({ description: 'short' });
+      const data = validData({ description: "short" });
 
       await clp.goto();
       await clp.fillRequiredFields(data);
@@ -129,14 +143,16 @@ test.describe('Create Listing — Functional Tests', () => {
       await clp.submit();
 
       // Client-side validation should show field error for description
-      await clp.expectValidationError('description');
+      await clp.expectValidationError("description");
     });
 
-    test(`F-005: Validation — invalid zip code ${tags.auth} ${tags.core}`, async ({ page }) => {
+    test(`F-005: Validation — invalid zip code ${tags.auth} ${tags.core}`, async ({
+      page,
+    }) => {
       const clp = new CreateListingPage(page);
       // 'ABCDE' fails client-side Zod regex /^\d{5}(-\d{4})?$/,
       // so handleSubmit returns early WITHOUT calling fetch.
-      const data = validData({ zipCode: 'ABCDE' });
+      const data = validData({ zipCode: "ABCDE" });
 
       await clp.goto();
       await clp.fillRequiredFields(data);
@@ -147,12 +163,14 @@ test.describe('Create Listing — Functional Tests', () => {
       // Click submit — client Zod blocks the fetch, so don't use submitAndWaitForResponse
       await clp.submit();
       await clp.expectOnCreatePage();
-      await clp.expectValidationError('zip');
+      await clp.expectValidationError("zip");
     });
 
-    test(`F-006: Validation — price is 0 ${tags.auth} ${tags.core}`, async ({ page }) => {
+    test(`F-006: Validation — price is 0 ${tags.auth} ${tags.core}`, async ({
+      page,
+    }) => {
       const clp = new CreateListingPage(page);
-      const data = validData({ price: '0' });
+      const data = validData({ price: "0" });
 
       await clp.goto();
       await clp.fillRequiredFields(data);
@@ -163,12 +181,14 @@ test.describe('Create Listing — Functional Tests', () => {
       // Client-side Zod .positive() catches price=0 — no fetch occurs
       await clp.submit();
       await clp.expectOnCreatePage();
-      await clp.expectValidationError('price');
+      await clp.expectValidationError("price");
     });
 
-    test(`F-007: Validation — price exceeds maximum ${tags.auth} ${tags.core}`, async ({ page }) => {
+    test(`F-007: Validation — price exceeds maximum ${tags.auth} ${tags.core}`, async ({
+      page,
+    }) => {
       const clp = new CreateListingPage(page);
-      const data = validData({ price: '99999' });
+      const data = validData({ price: "99999" });
 
       await clp.goto();
       await clp.fillRequiredFields(data);
@@ -179,10 +199,12 @@ test.describe('Create Listing — Functional Tests', () => {
       // Client-side Zod .max(50000) catches price=99999 — no fetch occurs
       await clp.submit();
       await clp.expectOnCreatePage();
-      await clp.expectValidationError('price');
+      await clp.expectValidationError("price");
     });
 
-    test(`F-008: Validation — image required ${tags.auth} ${tags.core}`, async ({ page }) => {
+    test(`F-008: Validation — image required ${tags.auth} ${tags.core}`, async ({
+      page,
+    }) => {
       const clp = new CreateListingPage(page);
       const data = validData();
 
@@ -201,11 +223,12 @@ test.describe('Create Listing — Functional Tests', () => {
   // P1 — Should Ship (F-009 … F-015)
   // ────────────────────────────────────────────────────────
 
-  test.describe('P1: Optional fields & UX', () => {
-
-    test(`F-009: Optional — lease duration "12 months" ${tags.auth}`, async ({ page }) => {
+  test.describe("P1: Optional fields & UX", () => {
+    test(`F-009: Optional — lease duration "12 months" ${tags.auth}`, async ({
+      page,
+    }) => {
       const clp = new CreateListingPage(page);
-      const data = validData({ leaseDuration: '12 months' });
+      const data = validData({ leaseDuration: "12 months" });
 
       await clp.goto();
       await clp.fillRequiredFields(data);
@@ -219,9 +242,11 @@ test.describe('Create Listing — Functional Tests', () => {
       await clp.expectSuccess();
     });
 
-    test(`F-010: Optional — room type "Private Room" ${tags.auth}`, async ({ page }) => {
+    test(`F-010: Optional — room type "Private Room" ${tags.auth}`, async ({
+      page,
+    }) => {
       const clp = new CreateListingPage(page);
-      const data = validData({ roomType: 'Private Room' });
+      const data = validData({ roomType: "Private Room" });
 
       await clp.goto();
       await clp.fillRequiredFields(data);
@@ -235,11 +260,13 @@ test.describe('Create Listing — Functional Tests', () => {
       await clp.expectSuccess();
     });
 
-    test(`F-011: Optional — future move-in date ${tags.auth}`, async ({ page }) => {
+    test(`F-011: Optional — future move-in date ${tags.auth}`, async ({
+      page,
+    }) => {
       const clp = new CreateListingPage(page);
       const futureDate = new Date();
       futureDate.setDate(futureDate.getDate() + 60);
-      const moveInISO = futureDate.toISOString().split('T')[0];
+      const moveInISO = futureDate.toISOString().split("T")[0];
 
       const data = validData({ moveInDate: moveInISO });
 
@@ -255,9 +282,11 @@ test.describe('Create Listing — Functional Tests', () => {
       await clp.expectSuccess();
     });
 
-    test(`F-012: Optional — amenities "wifi, parking" ${tags.auth}`, async ({ page }) => {
+    test(`F-012: Optional — amenities "wifi, parking" ${tags.auth}`, async ({
+      page,
+    }) => {
       const clp = new CreateListingPage(page);
-      const data = validData({ amenities: 'wifi, parking' });
+      const data = validData({ amenities: "wifi, parking" });
 
       await clp.goto();
       await clp.fillRequiredFields(data);
@@ -273,7 +302,7 @@ test.describe('Create Listing — Functional Tests', () => {
 
     test(`F-013: Optional — house rules ${tags.auth}`, async ({ page }) => {
       const clp = new CreateListingPage(page);
-      const data = validData({ houseRules: 'Pets allowed' });
+      const data = validData({ houseRules: "Pets allowed" });
 
       await clp.goto();
       await clp.fillRequiredFields(data);
@@ -287,7 +316,9 @@ test.describe('Create Listing — Functional Tests', () => {
       await clp.expectSuccess();
     });
 
-    test(`F-014: Progress indicator tracks section completion ${tags.auth}`, async ({ page }) => {
+    test(`F-014: Progress indicator tracks section completion ${tags.auth}`, async ({
+      page,
+    }) => {
       const clp = new CreateListingPage(page);
       const data = validData();
 
@@ -317,7 +348,9 @@ test.describe('Create Listing — Functional Tests', () => {
       expect(afterPhotos).toBe(4); // All 4 sections complete
     });
 
-    test(`F-015: Redirect URL contains valid listing ID ${tags.auth}`, async ({ page }) => {
+    test(`F-015: Redirect URL contains valid listing ID ${tags.auth}`, async ({
+      page,
+    }) => {
       const clp = new CreateListingPage(page);
       const data = validData();
 
@@ -335,7 +368,7 @@ test.describe('Create Listing — Functional Tests', () => {
       // URL should be /listings/{some-id} where id is NOT "create"
       const match = url.match(/\/listings\/([a-zA-Z0-9_-]+)/);
       expect(match).not.toBeNull();
-      expect(match![1]).not.toBe('create');
+      expect(match![1]).not.toBe("create");
       expect(match![1].length).toBeGreaterThan(0);
     });
   });
@@ -344,36 +377,43 @@ test.describe('Create Listing — Functional Tests', () => {
   // P2 — Nice to Have (F-016 … F-018)
   // ────────────────────────────────────────────────────────
 
-  test.describe('P2: Edge cases & polish', () => {
-
-    test(`F-016: Character counter on description ${tags.auth}`, async ({ page }) => {
+  test.describe("P2: Edge cases & polish", () => {
+    test(`F-016: Character counter on description ${tags.auth}`, async ({
+      page,
+    }) => {
       const clp = new CreateListingPage(page);
       await clp.goto();
 
       // Type some text into the description field
-      const testText = 'Hello world test description for counting';
+      const testText = "Hello world test description for counting";
       await clp.descriptionInput.fill(testText);
 
       // The CharacterCounter component should show "{n} / 1000"
-      const counter = page.getByText(new RegExp(`${testText.length}\\s*/\\s*1,?000`));
+      const counter = page.getByText(
+        new RegExp(`${testText.length}\\s*/\\s*1,?000`)
+      );
       await expect(counter).toBeVisible({ timeout: 3000 });
 
       // Type more and verify counter updates
-      const longerText = testText + ' with more content added here';
+      const longerText = testText + " with more content added here";
       await clp.descriptionInput.fill(longerText);
-      const updatedCounter = page.getByText(new RegExp(`${longerText.length}\\s*/\\s*1,?000`));
+      const updatedCounter = page.getByText(
+        new RegExp(`${longerText.length}\\s*/\\s*1,?000`)
+      );
       await expect(updatedCounter).toBeVisible({ timeout: 3000 });
     });
 
-    test(`F-017: Title max length (100 chars) ${tags.auth}`, async ({ page }) => {
+    test(`F-017: Title max length (100 chars) ${tags.auth}`, async ({
+      page,
+    }) => {
       const clp = new CreateListingPage(page);
       await clp.goto();
 
       // Verify the title input has a maxLength attribute
-      const maxLength = await clp.titleInput.getAttribute('maxLength');
+      const maxLength = await clp.titleInput.getAttribute("maxLength");
 
       // Type 120 characters via keyboard to test browser enforcement
-      const longTitle = 'A'.repeat(120);
+      const longTitle = "A".repeat(120);
       await clp.titleInput.fill(longTitle);
 
       const inputValue = await clp.titleInput.inputValue();
@@ -387,7 +427,9 @@ test.describe('Create Listing — Functional Tests', () => {
       }
     });
 
-    test(`F-018: Profile warning banner — visible state or dismissible ${tags.auth}`, async ({ page }) => {
+    test(`F-018: Profile warning banner — visible state or dismissible ${tags.auth}`, async ({
+      page,
+    }) => {
       // The banner visibility depends on the test user's profile completion
       // (< 60% → shown). Rather than assuming a specific profile state, we
       // handle both cases: if the banner appears we verify it can be dismissed;
@@ -400,7 +442,7 @@ test.describe('Create Listing — Functional Tests', () => {
 
       if (isVisible) {
         // Banner is shown — verify it can be dismissed
-        const dismissBtn = page.getByRole('button', { name: /dismiss/i });
+        const dismissBtn = page.getByRole("button", { name: /dismiss/i });
         await dismissBtn.click();
         await expect(profileWarning).not.toBeVisible({ timeout: 3000 });
       }

@@ -50,9 +50,7 @@ test.describe("RV: Recently Viewed", () => {
   });
 
   // RV-04: Click listing navigates
-  test("RV-04  clicking listing card navigates to detail", async ({
-    page,
-  }) => {
+  test("RV-04  clicking listing card navigates to detail", async ({ page }) => {
     await page.goto("/recently-viewed");
     await page.waitForLoadState("domcontentloaded");
 
@@ -88,9 +86,9 @@ test.describe("RV: Recently Viewed", () => {
     ).toBeVisible({ timeout: timeouts.navigation });
 
     // Time badges should be visible (e.g., "5m ago", "2h ago", "1d ago")
-    await expect(
-      page.getByText(/ago|just now/i).first()
-    ).toBeVisible({ timeout: timeouts.action });
+    await expect(page.getByText(/ago|just now/i).first()).toBeVisible({
+      timeout: timeouts.action,
+    });
   });
 
   // RV-06: Image error handling
@@ -159,7 +157,10 @@ test.describe("RV: Empty State", () => {
     await page.goto("/recently-viewed");
     await page.waitForLoadState("domcontentloaded");
 
-    const heading = page.getByRole("heading", { name: /recently viewed/i, level: 1 });
+    const heading = page.getByRole("heading", {
+      name: /recently viewed/i,
+      level: 1,
+    });
     await expect(heading).toBeVisible({ timeout: timeouts.navigation });
 
     // User2 has no recently viewed listings
@@ -182,7 +183,10 @@ test.describe("RV: Empty State", () => {
     await page.goto("/recently-viewed");
     await page.waitForLoadState("domcontentloaded");
 
-    const heading = page.getByRole("heading", { name: /recently viewed/i, level: 1 });
+    const heading = page.getByRole("heading", {
+      name: /recently viewed/i,
+      level: 1,
+    });
     await expect(heading).toBeVisible({ timeout: timeouts.navigation });
 
     const exploreLink = page.getByRole("link", { name: /start exploring/i });

@@ -40,8 +40,12 @@ test.describe("V2 State Reset on Bounds-Required Path", () => {
     // SSR can be slow in CI — use the search-results-heading ID for reliability.
     // The #search-results-heading is sr-only (visually hidden), so use toBeAttached.
     const resultsHeading = page.locator("#search-results-heading");
-    const zeroResults = page.locator('h2:has-text("No matches found"), h3:has-text("No exact matches")');
-    await expect(resultsHeading.or(zeroResults).first()).toBeAttached({ timeout: timeouts.navigation });
+    const zeroResults = page.locator(
+      'h2:has-text("No matches found"), h3:has-text("No exact matches")'
+    );
+    await expect(resultsHeading.or(zeroResults).first()).toBeAttached({
+      timeout: timeouts.navigation,
+    });
 
     // 2. Navigate to bounds-required path (query without bounds)
     // This triggers the boundsRequired early return in page.tsx
@@ -64,7 +68,9 @@ test.describe("V2 State Reset on Bounds-Required Path", () => {
     const isMapLoading = await mapLoadingText.isVisible().catch(() => false);
     if (isMapLoading) {
       // If somehow still loading, it should resolve within action timeout
-      await expect(mapLoadingText).not.toBeVisible({ timeout: timeouts.action });
+      await expect(mapLoadingText).not.toBeVisible({
+        timeout: timeouts.action,
+      });
     }
   });
 

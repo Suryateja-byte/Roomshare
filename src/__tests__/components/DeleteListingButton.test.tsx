@@ -14,8 +14,12 @@ jest.mock("next/navigation", () => ({
 // Mock fetch — save original and restore in afterAll to prevent cross-file leaks
 const originalFetch = global.fetch;
 const mockFetch = jest.fn();
-beforeAll(() => { global.fetch = mockFetch; });
-afterAll(() => { global.fetch = originalFetch; });
+beforeAll(() => {
+  global.fetch = mockFetch;
+});
+afterAll(() => {
+  global.fetch = originalFetch;
+});
 
 // Mock sonner toast
 jest.mock("sonner", () => ({
@@ -82,7 +86,7 @@ describe("DeleteListingButton", () => {
 
     await waitFor(() => {
       expect(
-        screen.getByText("Are you sure? This action cannot be undone."),
+        screen.getByText("Are you sure? This action cannot be undone.")
       ).toBeInTheDocument();
       expect(screen.getByText("Cancel")).toBeInTheDocument();
       expect(screen.getByText("Delete Anyway")).toBeInTheDocument();
@@ -110,7 +114,7 @@ describe("DeleteListingButton", () => {
     await userEvent.click(screen.getByText("Cancel"));
 
     expect(
-      screen.queryByText("Are you sure? This action cannot be undone."),
+      screen.queryByText("Are you sure? This action cannot be undone.")
     ).not.toBeInTheDocument();
     expect(screen.getByText("Delete Listing")).toBeInTheDocument();
   });
@@ -144,7 +148,7 @@ describe("DeleteListingButton", () => {
         method: "DELETE",
       });
       expect(toast.success).toHaveBeenCalledWith(
-        "Listing deleted successfully",
+        "Listing deleted successfully"
       );
       expect(mockPush).toHaveBeenCalledWith("/search");
     });
@@ -181,7 +185,7 @@ describe("DeleteListingButton", () => {
 
     await waitFor(() => {
       expect(toast.error).toHaveBeenCalledWith(
-        "Cannot delete listing with active bookings",
+        "Cannot delete listing with active bookings"
       );
     });
   });
@@ -203,7 +207,7 @@ describe("DeleteListingButton", () => {
     await waitFor(() => {
       expect(screen.getByText("Cannot delete listing")).toBeInTheDocument();
       expect(
-        screen.getByText(/You have 2 active bookings/),
+        screen.getByText(/You have 2 active bookings/)
       ).toBeInTheDocument();
     });
   });

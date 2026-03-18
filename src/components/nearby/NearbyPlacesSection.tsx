@@ -1,4 +1,4 @@
-'use client';
+"use client";
 
 /**
  * NearbyPlacesSection Component
@@ -10,11 +10,11 @@
  * Features: Mobile list/map toggle, taller container, view mode switching.
  */
 
-import { useState } from 'react';
-import { MapPin, Map as MapIcon, List as ListIcon } from 'lucide-react';
-import NearbyPlacesPanel from './NearbyPlacesPanel';
-import NearbyPlacesMap from './NearbyPlacesMap';
-import type { NearbyPlace } from '@/types/nearby';
+import { useState } from "react";
+import { MapPin, Map as MapIcon, List as ListIcon } from "lucide-react";
+import NearbyPlacesPanel from "./NearbyPlacesPanel";
+import NearbyPlacesMap from "./NearbyPlacesMap";
+import type { NearbyPlace } from "@/types/nearby";
 
 interface NearbyPlacesSectionProps {
   listingLat: number;
@@ -26,11 +26,14 @@ export default function NearbyPlacesSection({
   listingLng,
 }: NearbyPlacesSectionProps) {
   const [places, setPlaces] = useState<NearbyPlace[]>([]);
-  const [viewMode, setViewMode] = useState<'list' | 'map'>('list');
+  const [viewMode, setViewMode] = useState<"list" | "map">("list");
   const [hoveredPlaceId, setHoveredPlaceId] = useState<string | null>(null);
 
   return (
-    <section id="nearby-places" className="mt-12 pt-8 border-t border-zinc-100 dark:border-zinc-800">
+    <section
+      id="nearby-places"
+      className="mt-12 pt-8 border-t border-zinc-100 dark:border-zinc-800"
+    >
       {/* Minimal Section Header */}
       <div className="flex items-center justify-between mb-6 px-1 sm:px-0">
         <div>
@@ -42,7 +45,6 @@ export default function NearbyPlacesSection({
             Discover convenience at your doorstep
           </p>
         </div>
-
       </div>
 
       {/* Main Container - Clean Border */}
@@ -68,9 +70,10 @@ export default function NearbyPlacesSection({
             border-b lg:border-b-0 lg:border-r border-zinc-200 dark:border-zinc-800
             bg-white dark:bg-zinc-900
             transition-all duration-300 ease-out
-            ${viewMode === 'list'
-              ? 'translate-y-0 opacity-100 pointer-events-auto'
-              : 'translate-y-4 opacity-0 pointer-events-none lg:translate-y-0 lg:opacity-100 lg:pointer-events-auto'
+            ${
+              viewMode === "list"
+                ? "translate-y-0 opacity-100 pointer-events-auto"
+                : "translate-y-4 opacity-0 pointer-events-none lg:translate-y-0 lg:opacity-100 lg:pointer-events-auto"
             }
           `}
         >
@@ -96,11 +99,11 @@ export default function NearbyPlacesSection({
         {/* Mobile Floating Toggle Button — rendered at container level for correct z-index stacking */}
         <div className="absolute bottom-6 left-1/2 -translate-x-1/2 z-40 lg:hidden">
           <button
-            onClick={() => setViewMode(viewMode === 'list' ? 'map' : 'list')}
+            onClick={() => setViewMode(viewMode === "list" ? "map" : "list")}
             className="flex items-center gap-2 px-5 py-2.5 bg-zinc-900 dark:bg-white text-white dark:text-zinc-900 rounded-full shadow-xl shadow-zinc-900/20 font-semibold text-sm transform transition-transform active:scale-95 hover:scale-105"
           >
-            <span>{viewMode === 'list' ? 'Map' : 'List'}</span>
-            {viewMode === 'list' ? (
+            <span>{viewMode === "list" ? "Map" : "List"}</span>
+            {viewMode === "list" ? (
               <MapIcon className="w-4 h-4" />
             ) : (
               <ListIcon className="w-4 h-4" />

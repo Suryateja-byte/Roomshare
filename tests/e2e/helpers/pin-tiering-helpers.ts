@@ -17,7 +17,7 @@ import { Page } from "@playwright/test";
  * @returns Array of lat/lng coordinates
  */
 export function generateUniqueCoordinates(
-  count: number = 10,
+  count: number = 10
 ): Array<{ lat: number; lng: number }> {
   const coords: Array<{ lat: number; lng: number }> = [];
   // Center point in SF
@@ -52,7 +52,7 @@ const PRIMARY_PIN_LIMIT = 40;
 
 export function createMockListingsForTiering(
   ids: string[],
-  coordinates: Array<{ lat: number; lng: number }>,
+  coordinates: Array<{ lat: number; lng: number }>
 ): Array<{
   id: string;
   title: string;
@@ -111,7 +111,7 @@ export async function setupPinTieringMock(page: Page): Promise<{
     mockCallCount++;
     console.log(`[Pin Tiering Mock] Intercepted request #${mockCallCount}`);
     console.log(
-      `[Pin Tiering Mock] Returning ${mockListings.length} mock listings`,
+      `[Pin Tiering Mock] Returning ${mockListings.length} mock listings`
     );
     await route.fulfill({
       status: 200,

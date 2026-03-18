@@ -35,7 +35,7 @@ function haversineMiles(
   lat1: number,
   lng1: number,
   lat2: number,
-  lng2: number,
+  lng2: number
 ): number {
   const R = 3959; // Earth's radius in miles
   const dLat = ((lat2 - lat1) * Math.PI) / 180;
@@ -188,7 +188,7 @@ describe("PostGIS Spatial Edge Cases - Category C", () => {
         point1.lat,
         point1.lng,
         point2.lat,
-        point2.lng,
+        point2.lng
       );
 
       // At 65°N, this should be roughly 500 miles (not 180+ degrees worth)
@@ -226,7 +226,7 @@ describe("PostGIS Spatial Edge Cases - Category C", () => {
         point1.lat,
         point1.lng,
         point2.lat,
-        point2.lng,
+        point2.lng
       );
 
       // Should be roughly 14 miles (across the pole)
@@ -265,7 +265,7 @@ describe("PostGIS Spatial Edge Cases - Category C", () => {
       let result = null;
       try {
         await fetch(
-          "https://nominatim.openstreetmap.org/search?q=test&format=jsonv2&limit=1",
+          "https://nominatim.openstreetmap.org/search?q=test&format=jsonv2&limit=1"
         );
       } catch {
         result = null;
@@ -281,7 +281,7 @@ describe("PostGIS Spatial Edge Cases - Category C", () => {
       });
 
       const response = await fetch(
-        "https://nominatim.openstreetmap.org/search?q=xyz123&format=jsonv2&limit=1",
+        "https://nominatim.openstreetmap.org/search?q=xyz123&format=jsonv2&limit=1"
       );
       const data = await response.json();
 
@@ -296,7 +296,7 @@ describe("PostGIS Spatial Edge Cases - Category C", () => {
       });
 
       const response = await fetch(
-        "https://nominatim.openstreetmap.org/search?q=test&format=jsonv2&limit=1",
+        "https://nominatim.openstreetmap.org/search?q=test&format=jsonv2&limit=1"
       );
 
       expect(response.ok).toBe(false);
@@ -328,7 +328,7 @@ describe("PostGIS Spatial Edge Cases - Category C", () => {
       });
 
       const response = await fetch(
-        `https://nominatim.openstreetmap.org/reverse?lat=${lat}&lon=${lng}&format=jsonv2`,
+        `https://nominatim.openstreetmap.org/reverse?lat=${lat}&lon=${lng}&format=jsonv2`
       );
       const data = await response.json();
 
@@ -348,7 +348,7 @@ describe("PostGIS Spatial Edge Cases - Category C", () => {
       });
 
       const response = await fetch(
-        `https://nominatim.openstreetmap.org/reverse?lat=${lat}&lon=${lng}&format=jsonv2`,
+        `https://nominatim.openstreetmap.org/reverse?lat=${lat}&lon=${lng}&format=jsonv2`
       );
       const data = await response.json();
 
@@ -446,7 +446,7 @@ describe("PostGIS Spatial Edge Cases - Category C", () => {
       });
 
       expect(listings.every((l: any) => l.lat != null && l.lng != null)).toBe(
-        true,
+        true
       );
     });
 
@@ -680,7 +680,7 @@ describe("PostGIS Spatial Edge Cases - Category C", () => {
       (prisma.listing.findMany as jest.Mock).mockResolvedValue(
         Array(maxResults)
           .fill(null)
-          .map((_, i) => ({ id: `listing-${i}` })),
+          .map((_, i) => ({ id: `listing-${i}` }))
       );
 
       const listings = await prisma.listing.findMany({
@@ -700,7 +700,7 @@ describe("PostGIS Spatial Edge Cases - Category C", () => {
       (prisma.listing.findMany as jest.Mock).mockResolvedValue(
         Array(pageSize)
           .fill(null)
-          .map((_, i) => ({ id: `listing-${i}` })),
+          .map((_, i) => ({ id: `listing-${i}` }))
       );
 
       const listings = await prisma.listing.findMany({

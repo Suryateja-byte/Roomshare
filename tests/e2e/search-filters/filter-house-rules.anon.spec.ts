@@ -40,7 +40,9 @@ test.describe("House Rules Filter", () => {
   });
 
   // 6.1: Select single house rule -> aria-pressed="true", URL has houseRules param
-  test(`${tags.core} - selecting a single house rule updates URL`, async ({ page }) => {
+  test(`${tags.core} - selecting a single house rule updates URL`, async ({
+    page,
+  }) => {
     await waitForSearchReady(page);
     await openFilterModal(page);
 
@@ -48,27 +50,39 @@ test.describe("House Rules Filter", () => {
     await toggleHouseRule(page, "Pets allowed");
 
     // Verify it's pressed
-    const petsBtn = houseRulesGroup(page).getByRole("button", { name: /^Pets allowed/i });
+    const petsBtn = houseRulesGroup(page).getByRole("button", {
+      name: /^Pets allowed/i,
+    });
     await expect(petsBtn).toHaveAttribute("aria-pressed", "true");
 
     // Apply
     await applyFilters(page);
 
     // URL should have houseRules=Pets allowed
-    await expect.poll(
-      () => {
-        const param = new URL(page.url(), "http://localhost").searchParams.get("houseRules");
-        return param !== null && param.includes("Pets allowed");
-      },
-      { timeout: 30_000, message: 'URL param "houseRules" to contain "Pets allowed"' },
-    ).toBe(true);
+    await expect
+      .poll(
+        () => {
+          const param = new URL(
+            page.url(),
+            "http://localhost"
+          ).searchParams.get("houseRules");
+          return param !== null && param.includes("Pets allowed");
+        },
+        {
+          timeout: 30_000,
+          message: 'URL param "houseRules" to contain "Pets allowed"',
+        }
+      )
+      .toBe(true);
 
     const houseRules = getUrlParam(page, "houseRules") ?? "";
     expect(houseRules).toContain("Pets allowed");
   });
 
   // 6.2: Select multiple house rules -> comma-separated in URL, two chips
-  test(`${tags.core} - selecting multiple house rules creates comma-separated param`, async ({ page }) => {
+  test(`${tags.core} - selecting multiple house rules creates comma-separated param`, async ({
+    page,
+  }) => {
     await waitForSearchReady(page);
     await openFilterModal(page);
 
@@ -77,8 +91,12 @@ test.describe("House Rules Filter", () => {
     await toggleHouseRule(page, "Couples allowed");
 
     // Verify both are pressed
-    const petsBtn = houseRulesGroup(page).getByRole("button", { name: /^Pets allowed/i });
-    const couplesBtn = houseRulesGroup(page).getByRole("button", { name: /^Couples allowed/i });
+    const petsBtn = houseRulesGroup(page).getByRole("button", {
+      name: /^Pets allowed/i,
+    });
+    const couplesBtn = houseRulesGroup(page).getByRole("button", {
+      name: /^Couples allowed/i,
+    });
     await expect(petsBtn).toHaveAttribute("aria-pressed", "true");
     await expect(couplesBtn).toHaveAttribute("aria-pressed", "true");
 
@@ -86,13 +104,26 @@ test.describe("House Rules Filter", () => {
     await applyFilters(page);
 
     // URL should have both rules comma-separated
-    await expect.poll(
-      () => {
-        const param = new URL(page.url(), "http://localhost").searchParams.get("houseRules");
-        return param !== null && param.includes("Pets allowed") && param.includes("Couples allowed");
-      },
-      { timeout: 30_000, message: 'URL param "houseRules" to contain both "Pets allowed" and "Couples allowed"' },
-    ).toBe(true);
+    await expect
+      .poll(
+        () => {
+          const param = new URL(
+            page.url(),
+            "http://localhost"
+          ).searchParams.get("houseRules");
+          return (
+            param !== null &&
+            param.includes("Pets allowed") &&
+            param.includes("Couples allowed")
+          );
+        },
+        {
+          timeout: 30_000,
+          message:
+            'URL param "houseRules" to contain both "Pets allowed" and "Couples allowed"',
+        }
+      )
+      .toBe(true);
 
     const houseRules = getUrlParam(page, "houseRules") ?? "";
     expect(houseRules).toContain("Pets allowed");
@@ -105,14 +136,18 @@ test.describe("House Rules Filter", () => {
 
     if (regionVisible) {
       const petsChip = filtersRegion.locator("text=/Pets allowed/i").first();
-      const couplesChip = filtersRegion.locator("text=/Couples allowed/i").first();
+      const couplesChip = filtersRegion
+        .locator("text=/Couples allowed/i")
+        .first();
       await expect(petsChip).toBeVisible({ timeout: 10_000 });
       await expect(couplesChip).toBeVisible({ timeout: 10_000 });
     }
   });
 
   // 6.3: Deselect house rule -> only remaining rule in URL
-  test(`${tags.core} - deselecting a house rule removes it from URL`, async ({ page }) => {
+  test(`${tags.core} - deselecting a house rule removes it from URL`, async ({
+    page,
+  }) => {
     // Start with two house rules applied
     await page.goto(`${SEARCH_URL}&houseRules=Pets+allowed,Smoking+allowed`);
     await page.waitForLoadState("domcontentloaded");
@@ -121,8 +156,12 @@ test.describe("House Rules Filter", () => {
     await openFilterModal(page);
 
     // Both should be pressed initially
-    const petsBtn = houseRulesGroup(page).getByRole("button", { name: /^Pets allowed/i });
-    const smokingBtn = houseRulesGroup(page).getByRole("button", { name: /^Smoking allowed/i });
+    const petsBtn = houseRulesGroup(page).getByRole("button", {
+      name: /^Pets allowed/i,
+    });
+    const smokingBtn = houseRulesGroup(page).getByRole("button", {
+      name: /^Smoking allowed/i,
+    });
     await expect(petsBtn).toHaveAttribute("aria-pressed", "true");
     await expect(smokingBtn).toHaveAttribute("aria-pressed", "true");
 
@@ -139,13 +178,24 @@ test.describe("House Rules Filter", () => {
     await applyFilters(page);
 
     // URL should have only Pets allowed
-    await expect.poll(
-      () => {
-        const param = new URL(page.url(), "http://localhost").searchParams.get("houseRules") ?? "";
-        return param.includes("Pets allowed") && !param.includes("Smoking allowed");
-      },
-      { timeout: 30_000, message: 'URL param "houseRules" to contain "Pets allowed" but not "Smoking allowed"' },
-    ).toBe(true);
+    await expect
+      .poll(
+        () => {
+          const param =
+            new URL(page.url(), "http://localhost").searchParams.get(
+              "houseRules"
+            ) ?? "";
+          return (
+            param.includes("Pets allowed") && !param.includes("Smoking allowed")
+          );
+        },
+        {
+          timeout: 30_000,
+          message:
+            'URL param "houseRules" to contain "Pets allowed" but not "Smoking allowed"',
+        }
+      )
+      .toBe(true);
 
     const houseRules = getUrlParam(page, "houseRules") ?? "";
     expect(houseRules).toContain("Pets allowed");
@@ -153,7 +203,10 @@ test.describe("House Rules Filter", () => {
   });
 
   // 6.4: House rule facet counts shown (mocked /api/search/facets)
-  test(`${tags.core} - house rule buttons display facet counts when available`, async ({ page, network }) => {
+  test(`${tags.core} - house rule buttons display facet counts when available`, async ({
+    page,
+    network,
+  }) => {
     // Mock facets API with deterministic counts
     await network.mockApiResponse("**/api/search/facets*", {
       body: {

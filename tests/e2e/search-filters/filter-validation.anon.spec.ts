@@ -42,7 +42,9 @@ test.describe("Filter Validation & Security", () => {
   });
 
   // 17.1: XSS in filter params sanitized
-  test("17.1 - XSS payload in amenities param is sanitized and ignored", async ({ page }) => {
+  test("17.1 - XSS payload in amenities param is sanitized and ignored", async ({
+    page,
+  }) => {
     // Track console errors and script execution
     const scriptExecuted: string[] = [];
     page.on("dialog", (dialog) => {
@@ -50,7 +52,9 @@ test.describe("Filter Validation & Security", () => {
       dialog.dismiss();
     });
 
-    await page.goto(`${SEARCH_URL}&amenities=${encodeURIComponent("<script>alert('xss')</script>")}`);
+    await page.goto(
+      `${SEARCH_URL}&amenities=${encodeURIComponent("<script>alert('xss')</script>")}`
+    );
     await page.waitForLoadState("domcontentloaded");
     await page.waitForTimeout(3_000);
 
@@ -58,7 +62,9 @@ test.describe("Filter Validation & Security", () => {
     expect(scriptExecuted).toHaveLength(0);
 
     // No script tag should be rendered in page content
-    const scriptContent = await page.locator("script:has-text('alert')").count();
+    const scriptContent = await page
+      .locator("script:has-text('alert')")
+      .count();
     expect(scriptContent).toBe(0);
 
     // The XSS payload is not in the valid amenities allowlist, so no chip
@@ -75,8 +81,12 @@ test.describe("Filter Validation & Security", () => {
   });
 
   // 17.2: Invalid enum values ignored
-  test("17.2 - invalid enum values for roomType, genderPreference, householdGender are dropped", async ({ page }) => {
-    await page.goto(`${SEARCH_URL}&roomType=InvalidType&genderPreference=WRONG&householdGender=BAD`);
+  test("17.2 - invalid enum values for roomType, genderPreference, householdGender are dropped", async ({
+    page,
+  }) => {
+    await page.goto(
+      `${SEARCH_URL}&roomType=InvalidType&genderPreference=WRONG&householdGender=BAD`
+    );
     await page.waitForLoadState("domcontentloaded");
     await page.waitForTimeout(3_000);
 
@@ -94,7 +104,9 @@ test.describe("Filter Validation & Security", () => {
     }
 
     // Page should render without visible error messages
-    const errorAlert = page.locator('[role="alert"]').filter({ hasText: /invalid|error/i });
+    const errorAlert = page
+      .locator('[role="alert"]')
+      .filter({ hasText: /invalid|error/i });
     const hasError = await errorAlert.isVisible().catch(() => false);
     expect(hasError).toBe(false);
 
@@ -103,7 +115,9 @@ test.describe("Filter Validation & Security", () => {
   });
 
   // 17.3: Negative price handled
-  test("17.3 - negative minPrice is clamped to 0 or ignored", async ({ page }) => {
+  test("17.3 - negative minPrice is clamped to 0 or ignored", async ({
+    page,
+  }) => {
     await page.goto(`${SEARCH_URL}&minPrice=-100`);
     await page.waitForLoadState("domcontentloaded");
     await page
@@ -146,7 +160,10 @@ test.describe("Filter Validation & Security", () => {
 
     if (!loaded) {
       // Page may be stuck in SSR for these edge-case params in CI
-      test.skip(true, 'Page failed to render visible content within timeout for zero-price params');
+      test.skip(
+        true,
+        "Page failed to render visible content within timeout for zero-price params"
+      );
       return;
     }
 
@@ -164,7 +181,9 @@ test.describe("Filter Validation & Security", () => {
   });
 
   // 17.5: Extremely large price clamped
-  test("17.5 - extremely large maxPrice is clamped to MAX_SAFE_PRICE", async ({ page }) => {
+  test("17.5 - extremely large maxPrice is clamped to MAX_SAFE_PRICE", async ({
+    page,
+  }) => {
     test.slow(); // WSL2/NTFS compilation delay for edge-case params
     await page.goto(`${SEARCH_URL}&maxPrice=999999999999`);
     await page.waitForLoadState("domcontentloaded");
@@ -192,12 +211,18 @@ test.describe("Filter Validation & Security", () => {
     const hasContent =
       (await container.locator(selectors.listingCard).count()) > 0 ||
       (await container.locator(selectors.emptyState).count()) > 0 ||
-      (await page.locator("h1, h2, h3").first().isVisible().catch(() => false));
+      (await page
+        .locator("h1, h2, h3")
+        .first()
+        .isVisible()
+        .catch(() => false));
     expect(hasContent).toBe(true);
   });
 
   // 17.6: Duplicate amenity values deduplicated
-  test("17.6 - duplicate amenities are deduplicated to a single chip", async ({ page }) => {
+  test("17.6 - duplicate amenities are deduplicated to a single chip", async ({
+    page,
+  }) => {
     await page.goto(`${SEARCH_URL}&amenities=Wifi,Wifi,Wifi`);
     await page.waitForLoadState("domcontentloaded");
     await page.waitForTimeout(3_000);
@@ -215,13 +240,17 @@ test.describe("Filter Validation & Security", () => {
     expect(wifiCount).toBe(1);
 
     // Only one remove button for Wifi
-    const removeWifi = region.getByRole("button", { name: /remove filter.*wifi/i });
+    const removeWifi = region.getByRole("button", {
+      name: /remove filter.*wifi/i,
+    });
     const removeCount = await removeWifi.count();
     expect(removeCount).toBe(1);
   });
 
   // 17.7: Case-insensitive filter values normalized
-  test("17.7 - case-insensitive amenity values are normalized to canonical form", async ({ page }) => {
+  test("17.7 - case-insensitive amenity values are normalized to canonical form", async ({
+    page,
+  }) => {
     await page.goto(`${SEARCH_URL}&amenities=wifi,PARKING`);
     await page.waitForLoadState("domcontentloaded");
     await page.waitForTimeout(3_000);
@@ -249,7 +278,9 @@ test.describe("Filter Validation & Security", () => {
   });
 
   // 17.8: Max array items enforced
-  test("17.8 - excessive amenity values are truncated to MAX_ARRAY_ITEMS", async ({ page }) => {
+  test("17.8 - excessive amenity values are truncated to MAX_ARRAY_ITEMS", async ({
+    page,
+  }) => {
     test.slow(); // WSL2/NTFS compilation delay
     // Generate 50 amenity values by repeating the valid set many times
     // Only valid values from the allowlist will be kept (9 unique amenities max)
@@ -260,7 +291,9 @@ test.describe("Filter Validation & Security", () => {
       return `FakeAmenity${i}`;
     }).join(",");
 
-    await page.goto(`${SEARCH_URL}&amenities=${encodeURIComponent(manyAmenities)}`);
+    await page.goto(
+      `${SEARCH_URL}&amenities=${encodeURIComponent(manyAmenities)}`
+    );
     await page.waitForLoadState("domcontentloaded");
     // Wait for ANY visible content (cards, empty state, or headings)
     const loaded = await page
@@ -272,7 +305,10 @@ test.describe("Filter Validation & Security", () => {
 
     if (!loaded) {
       // Page may be stuck in SSR for these edge-case params in CI
-      test.skip(true, 'Page failed to render visible content within timeout for excessive amenities');
+      test.skip(
+        true,
+        "Page failed to render visible content within timeout for excessive amenities"
+      );
       return;
     }
 

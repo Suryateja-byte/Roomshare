@@ -82,7 +82,7 @@ describe("NearbyPlacesPanel", () => {
 
       // Check for the link to login
       expect(
-        screen.getByRole("link", { name: /sign in/i }),
+        screen.getByRole("link", { name: /sign in/i })
       ).toBeInTheDocument();
     });
 
@@ -141,7 +141,7 @@ describe("NearbyPlacesPanel", () => {
 
       CATEGORY_CHIPS.forEach((chip) => {
         expect(
-          screen.getByRole("button", { name: chip.label }),
+          screen.getByRole("button", { name: chip.label })
         ).toBeInTheDocument();
       });
     });
@@ -169,7 +169,7 @@ describe("NearbyPlacesPanel", () => {
           expect.objectContaining({
             method: "POST",
             body: expect.stringContaining("restaurant"),
-          }),
+          })
         );
       });
     });
@@ -239,7 +239,7 @@ describe("NearbyPlacesPanel", () => {
 
       RADIUS_OPTIONS.forEach((option) => {
         expect(
-          screen.getByRole("button", { name: option.label }),
+          screen.getByRole("button", { name: option.label })
         ).toBeInTheDocument();
       });
     });
@@ -325,7 +325,7 @@ describe("NearbyPlacesPanel", () => {
       const onPlacesChange = jest.fn();
       const user = userEvent.setup({ advanceTimers: jest.advanceTimersByTime });
       render(
-        <NearbyPlacesPanel {...defaultProps} onPlacesChange={onPlacesChange} />,
+        <NearbyPlacesPanel {...defaultProps} onPlacesChange={onPlacesChange} />
       );
 
       await user.click(screen.getByRole("button", { name: /Restaurants/i }));
@@ -361,7 +361,7 @@ describe("NearbyPlacesPanel", () => {
 
       await waitFor(() => {
         expect(
-          screen.queryByTestId("loading-skeleton"),
+          screen.queryByTestId("loading-skeleton")
         ).not.toBeInTheDocument();
       });
     });
@@ -466,7 +466,7 @@ describe("NearbyPlacesPanel", () => {
         const link = screen.getByRole("link", { name: /get directions/i });
         expect(link).toHaveAttribute(
           "href",
-          expect.stringContaining("google.com/maps"),
+          expect.stringContaining("google.com/maps")
         );
         expect(link).toHaveAttribute("target", "_blank");
       });
@@ -711,21 +711,21 @@ describe("NearbyPlacesPanel", () => {
       // Click first chip and wait for completion (results shown = chips re-enabled)
       await user.click(screen.getByRole("button", { name: /Restaurants/i }));
       await waitFor(() =>
-        expect(screen.getByText("Indian Restaurant")).toBeInTheDocument(),
+        expect(screen.getByText("Indian Restaurant")).toBeInTheDocument()
       );
       expect(mockFetch).toHaveBeenCalledTimes(1);
 
       // Click second chip and wait for completion
       await user.click(screen.getByRole("button", { name: /Shopping/i }));
       await waitFor(() =>
-        expect(screen.getByText("Indian Restaurant")).toBeInTheDocument(),
+        expect(screen.getByText("Indian Restaurant")).toBeInTheDocument()
       );
       expect(mockFetch).toHaveBeenCalledTimes(2);
 
       // Click third chip and wait for completion
       await user.click(screen.getByRole("button", { name: /Pharmacy/i }));
       await waitFor(() =>
-        expect(screen.getByText("Indian Restaurant")).toBeInTheDocument(),
+        expect(screen.getByText("Indian Restaurant")).toBeInTheDocument()
       );
       expect(mockFetch).toHaveBeenCalledTimes(3);
 
@@ -792,10 +792,10 @@ describe("NearbyPlacesPanel", () => {
 
       await waitFor(() => {
         expect(
-          screen.getByText(/radar api authentication failed/i),
+          screen.getByText(/radar api authentication failed/i)
         ).toBeInTheDocument();
         expect(
-          screen.getByText(/invalid or expired api key/i),
+          screen.getByText(/invalid or expired api key/i)
         ).toBeInTheDocument();
       });
     });
@@ -835,7 +835,7 @@ describe("NearbyPlacesPanel", () => {
       // Should show discover prompts (both heading and subtitle)
       expect(screen.getByText(/Discover what's nearby/i)).toBeInTheDocument();
       expect(
-        screen.getByText(/Select a category or search/i),
+        screen.getByText(/Select a category or search/i)
       ).toBeInTheDocument();
     });
   });
@@ -925,7 +925,7 @@ describe("NearbyPlacesPanel", () => {
       const onPlaceHover = jest.fn();
       const user = userEvent.setup({ advanceTimers: jest.advanceTimersByTime });
       render(
-        <NearbyPlacesPanel {...defaultProps} onPlaceHover={onPlaceHover} />,
+        <NearbyPlacesPanel {...defaultProps} onPlaceHover={onPlaceHover} />
       );
 
       await user.click(screen.getByRole("button", { name: /Restaurants/i }));
@@ -948,7 +948,7 @@ describe("NearbyPlacesPanel", () => {
       const onPlaceHover = jest.fn();
       const user = userEvent.setup({ advanceTimers: jest.advanceTimersByTime });
       render(
-        <NearbyPlacesPanel {...defaultProps} onPlaceHover={onPlaceHover} />,
+        <NearbyPlacesPanel {...defaultProps} onPlaceHover={onPlaceHover} />
       );
 
       await user.click(screen.getByRole("button", { name: /Restaurants/i }));

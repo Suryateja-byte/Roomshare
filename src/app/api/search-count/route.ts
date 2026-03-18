@@ -62,20 +62,24 @@ export async function GET(request: NextRequest) {
             headers: {
               "Cache-Control": "private, no-store",
             },
-          },
+          }
         );
       }
 
       // Handle unbounded browse (no query, no bounds, no filters)
       // Return null count with browseMode flag to indicate capped results
-      if (!filterParams.query && !filterParams.bounds && !hasActiveFilters(filterParams)) {
+      if (
+        !filterParams.query &&
+        !filterParams.bounds &&
+        !hasActiveFilters(filterParams)
+      ) {
         return NextResponse.json(
           { count: null, browseMode: true },
           {
             headers: {
               "Cache-Control": "private, no-store",
             },
-          },
+          }
         );
       }
 
@@ -96,14 +100,16 @@ export async function GET(request: NextRequest) {
             // Short CDN cache for identical requests; private fallback for auth-dependent counts
             "Cache-Control": "public, s-maxage=15, stale-while-revalidate=30",
           },
-        },
+        }
       );
     } catch (error) {
       logger.error("Search count error", {
         requestId,
         error: sanitizeErrorMessage(error),
       });
-      Sentry.captureException(error, { tags: { route: "/api/search-count", method: "GET" } });
+      Sentry.captureException(error, {
+        tags: { route: "/api/search-count", method: "GET" },
+      });
 
       return NextResponse.json(
         { error: "Failed to get count" },
@@ -112,7 +118,7 @@ export async function GET(request: NextRequest) {
           headers: {
             "Cache-Control": "private, no-store",
           },
-        },
+        }
       );
     }
   });

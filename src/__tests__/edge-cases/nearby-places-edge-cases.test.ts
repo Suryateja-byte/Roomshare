@@ -255,7 +255,7 @@ describe("Category E: Nearby Places Cross-Feature Edge Cases", () => {
       lat1: number,
       lng1: number,
       lat2: number,
-      lng2: number,
+      lng2: number
     ): number => {
       const R = 3959; // Earth's radius in miles
       const dLat = ((lat2 - lat1) * Math.PI) / 180;
@@ -322,7 +322,7 @@ describe("Category E: Nearby Places Cross-Feature Edge Cases", () => {
     it("should handle multi-category chips correctly", () => {
       // Some chips have multiple categories
       const restaurantChip = CATEGORY_CHIPS.find(
-        (c) => c.label === "Restaurants",
+        (c) => c.label === "Restaurants"
       );
       expect(restaurantChip?.categories).toContain("restaurant");
       expect(restaurantChip?.categories).toContain("food-beverage");
@@ -387,7 +387,7 @@ describe("Category E: Nearby Places Cross-Feature Edge Cases", () => {
           listingLat: 37.7749,
           listingLng: -122.4194,
           radiusMeters: 1609,
-        }),
+        })
       ).toBe(true);
 
       expect(
@@ -395,7 +395,7 @@ describe("Category E: Nearby Places Cross-Feature Edge Cases", () => {
           listingLat: 91,
           listingLng: -122.4194,
           radiusMeters: 1609,
-        }),
+        })
       ).toBe(false);
 
       expect(
@@ -403,7 +403,7 @@ describe("Category E: Nearby Places Cross-Feature Edge Cases", () => {
           listingLat: 37.7749,
           listingLng: -122.4194,
           radiusMeters: 999,
-        }),
+        })
       ).toBe(false);
     });
   });
@@ -475,7 +475,7 @@ describe("Category E: Nearby Places Cross-Feature Edge Cases", () => {
 
     it("should maintain type safety on partial data", () => {
       const safeTransform = (
-        radarPlace: Partial<RadarPlace>,
+        radarPlace: Partial<RadarPlace>
       ): NearbyPlace | null => {
         if (!radarPlace._id || !radarPlace.name || !radarPlace.location) {
           return null;
@@ -502,7 +502,7 @@ describe("Category E: Nearby Places Cross-Feature Edge Cases", () => {
           name: "Test",
           location: { type: "Point", coordinates: [-122, 37] },
           categories: ["restaurant"],
-        }),
+        })
       ).not.toBeNull();
 
       // Missing required field
@@ -551,7 +551,7 @@ describe("Category E: Nearby Places Cross-Feature Edge Cases", () => {
           radius: 1609,
           results: [],
           isLoading: false,
-        }),
+        })
       ).toBe(true);
 
       expect(
@@ -561,7 +561,7 @@ describe("Category E: Nearby Places Cross-Feature Edge Cases", () => {
           radius: 3218,
           results: [],
           isLoading: true,
-        }),
+        })
       ).toBe(true);
 
       // Invalid radius
@@ -572,7 +572,7 @@ describe("Category E: Nearby Places Cross-Feature Edge Cases", () => {
           radius: 999,
           results: [],
           isLoading: false,
-        }),
+        })
       ).toBe(false);
     });
 
@@ -594,7 +594,7 @@ describe("Category E: Nearby Places Cross-Feature Edge Cases", () => {
       expect(stateHistory).toContain("loading");
       expect(stateHistory).toContain("success");
       expect(stateHistory.indexOf("loading")).toBeLessThan(
-        stateHistory.indexOf("success"),
+        stateHistory.indexOf("success")
       );
     });
   });

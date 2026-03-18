@@ -48,14 +48,14 @@ import {
  */
 async function setupCountMock(
   page: import("@playwright/test").Page,
-  countResponse: { count: number | null; boundsRequired?: boolean },
+  countResponse: { count: number | null; boundsRequired?: boolean }
 ) {
   await page.addInitScript(
     (mockData: { count: number | null; boundsRequired?: boolean }) => {
       const originalFetch = window.fetch.bind(window);
       window.fetch = async function (
         input: RequestInfo | URL,
-        init?: RequestInit,
+        init?: RequestInit
       ) {
         const url =
           typeof input === "string"
@@ -87,7 +87,7 @@ async function setupCountMock(
         return res;
       } as typeof fetch;
     },
-    countResponse,
+    countResponse
   );
 }
 
@@ -100,7 +100,7 @@ async function prevent429s(page: import("@playwright/test").Page) {
     const originalFetch = window.fetch.bind(window);
     window.fetch = async function (
       input: RequestInfo | URL,
-      init?: RequestInit,
+      init?: RequestInit
     ) {
       let res = await originalFetch(input, init);
       if (res.status === 429) {
@@ -137,7 +137,9 @@ test.describe("Filter Count Preview", () => {
   // -------------------------------------------------------------------------
   // 11.1: Apply button shows result count when dirty
   // -------------------------------------------------------------------------
-  test(`${tags.core} - apply button shows result count after filter change`, async ({ page }) => {
+  test(`${tags.core} - apply button shows result count after filter change`, async ({
+    page,
+  }) => {
     test.slow(); // WSL2/NTFS: Turbopack compilation + full navigation
 
     // Mock search-count to return 42, set up BEFORE navigation
@@ -159,7 +161,9 @@ test.describe("Filter Count Preview", () => {
   // -------------------------------------------------------------------------
   // 11.2: Count shows loading spinner while fetching
   // -------------------------------------------------------------------------
-  test(`${tags.core} - apply button shows loading spinner during count fetch`, async ({ page }) => {
+  test(`${tags.core} - apply button shows loading spinner during count fetch`, async ({
+    page,
+  }) => {
     test.slow(); // WSL2/NTFS: Turbopack compilation + full navigation
 
     // Mock search-count with a 1s delay to observe the loading/spinner state
@@ -167,7 +171,7 @@ test.describe("Filter Count Preview", () => {
       const originalFetch = window.fetch.bind(window);
       window.fetch = async function (
         input: RequestInfo | URL,
-        init?: RequestInit,
+        init?: RequestInit
       ) {
         const url =
           typeof input === "string"
@@ -219,7 +223,9 @@ test.describe("Filter Count Preview", () => {
   // -------------------------------------------------------------------------
   // 11.3: Count shows "100+" for large result sets
   // -------------------------------------------------------------------------
-  test(`${tags.core} - apply button shows 100+ when count is null`, async ({ page }) => {
+  test(`${tags.core} - apply button shows 100+ when count is null`, async ({
+    page,
+  }) => {
     // Mock search-count to return null (server signals "too many to count")
     await setupCountMock(page, { count: null });
 
@@ -239,7 +245,9 @@ test.describe("Filter Count Preview", () => {
   // -------------------------------------------------------------------------
   // 11.4: Count shows "Select a location" when bounds are missing
   // -------------------------------------------------------------------------
-  test(`${tags.core} - apply button disabled with select-a-location when no bounds`, async ({ page }) => {
+  test(`${tags.core} - apply button disabled with select-a-location when no bounds`, async ({
+    page,
+  }) => {
     test.slow(); // WSL2/NTFS: Turbopack compilation + full navigation
 
     // Mock search-count to return boundsRequired
@@ -271,7 +279,9 @@ test.describe("Filter Count Preview", () => {
   // -------------------------------------------------------------------------
   // 11.5: Count request debounced (rapid changes produce single request)
   // -------------------------------------------------------------------------
-  test(`${tags.core} - rapid filter changes produce single debounced count request`, async ({ page }) => {
+  test(`${tags.core} - rapid filter changes produce single debounced count request`, async ({
+    page,
+  }) => {
     // Track how many times the count API is called
     let countRequestCount = 0;
 

@@ -21,10 +21,10 @@ describe("MAP_RELEVANT_KEYS includes nearMatches", () => {
     const path = require("path");
     const source = fs.readFileSync(
       path.resolve(__dirname, "../../components/PersistentMapWrapper.tsx"),
-      "utf-8",
+      "utf-8"
     );
     const keysMatch = source.match(
-      /MAP_RELEVANT_KEYS\s*=\s*\[([\s\S]*?)\]\s*as\s*const/,
+      /MAP_RELEVANT_KEYS\s*=\s*\[([\s\S]*?)\]\s*as\s*const/
     );
     expect(keysMatch).not.toBeNull();
     expect(keysMatch![1]).toContain('"nearMatches"');
@@ -44,11 +44,8 @@ describe("V2MapDataSetter source does NOT pass dataVersion", () => {
     const fs = require("fs");
     const path = require("path");
     const source = fs.readFileSync(
-      path.resolve(
-        __dirname,
-        "../../components/search/V2MapDataSetter.tsx",
-      ),
-      "utf-8",
+      path.resolve(__dirname, "../../components/search/V2MapDataSetter.tsx"),
+      "utf-8"
     );
     // Verify setV2MapData is called WITHOUT dataVersion argument
     expect(source).toMatch(/setV2MapData\(data\)/);
@@ -93,7 +90,23 @@ describe("SearchV2DataContext version guard", () => {
 
     // Try stale version
     const staleData: V2MapData = {
-      geojson: { type: "FeatureCollection", features: [{ type: "Feature", geometry: { type: "Point", coordinates: [0, 0] }, properties: { id: "stale-1", title: "Stale", price: 100, image: null, availableSlots: 1, ownerId: "u1" } }] },
+      geojson: {
+        type: "FeatureCollection",
+        features: [
+          {
+            type: "Feature",
+            geometry: { type: "Point", coordinates: [0, 0] },
+            properties: {
+              id: "stale-1",
+              title: "Stale",
+              price: 100,
+              image: null,
+              availableSlots: 1,
+              ownerId: "u1",
+            },
+          },
+        ],
+      },
       mode: "geojson",
     };
 
@@ -124,7 +137,7 @@ describe("SearchLayoutView includes SearchMapUIProvider", () => {
     const path = require("path");
     const source = fs.readFileSync(
       path.resolve(__dirname, "../../components/SearchLayoutView.tsx"),
-      "utf-8",
+      "utf-8"
     );
     expect(source).toContain("SearchMapUIProvider");
     expect(source).toMatch(/<SearchMapUIProvider/);

@@ -35,7 +35,7 @@ export function AppliedFilterChips({
   const searchParamsString = searchParams.toString();
   const chips = useMemo(
     () => urlToFilterChips(new URLSearchParams(searchParamsString)),
-    [searchParamsString],
+    [searchParamsString]
   );
 
   // Don't render if no chips

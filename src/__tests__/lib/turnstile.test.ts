@@ -22,7 +22,7 @@ beforeEach(() => {
   // Reset env to known state
   delete process.env.TURNSTILE_ENABLED;
   delete process.env.TURNSTILE_SECRET_KEY;
-  jest.spyOn(global, 'fetch').mockImplementation(jest.fn());
+  jest.spyOn(global, "fetch").mockImplementation(jest.fn());
 });
 
 afterEach(() => {
@@ -109,7 +109,7 @@ describe("verifyTurnstileToken", () => {
     // Verify POST body contains correct params
     const [url, options] = (global.fetch as jest.Mock).mock.calls[0];
     expect(url).toBe(
-      "https://challenges.cloudflare.com/turnstile/v0/siteverify",
+      "https://challenges.cloudflare.com/turnstile/v0/siteverify"
     );
     expect(options.method).toBe("POST");
     const body = options.body as URLSearchParams;

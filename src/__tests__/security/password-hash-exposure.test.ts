@@ -34,7 +34,9 @@ jest.mock("bcryptjs", () => ({
 }));
 
 jest.mock("@/lib/rate-limit", () => ({
-  checkRateLimit: jest.fn().mockResolvedValue({ success: true, remaining: 10, resetAt: new Date() }),
+  checkRateLimit: jest
+    .fn()
+    .mockResolvedValue({ success: true, remaining: 10, resetAt: new Date() }),
   getClientIPFromHeaders: jest.fn().mockReturnValue("127.0.0.1"),
   RATE_LIMITS: {
     changePassword: { limit: 5, windowMs: 3600000 },
@@ -151,7 +153,10 @@ describe("Password Hash Exposure Prevention", () => {
         },
       };
 
-      const responseStr = JSON.stringify([safeUserResponse, safeListingResponse]);
+      const responseStr = JSON.stringify([
+        safeUserResponse,
+        safeListingResponse,
+      ]);
 
       // No bcrypt hash patterns
       expect(responseStr).not.toContain("$2a$");

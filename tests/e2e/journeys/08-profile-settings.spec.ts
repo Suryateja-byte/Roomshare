@@ -6,16 +6,16 @@
  * notification preferences, and account operations.
  */
 
-import { test, expect, tags, selectors } from '../helpers';
+import { test, expect, tags, selectors } from "../helpers";
 
-test.describe('Profile & Settings Journeys', () => {
-  test.use({ storageState: 'playwright/.auth/user.json' });
+test.describe("Profile & Settings Journeys", () => {
+  test.use({ storageState: "playwright/.auth/user.json" });
 
   test.beforeEach(async () => {
     test.slow();
   });
 
-  test.describe('J067: View user profile', () => {
+  test.describe("J067: View user profile", () => {
     test(`${tags.auth} - View own profile`, async ({ page, nav, assert }) => {
       await nav.goToProfile();
 
@@ -23,46 +23,63 @@ test.describe('Profile & Settings Journeys', () => {
       await assert.pageLoaded();
 
       // Should show profile information
-      await expect(page.getByRole('heading', { level: 1 })).toBeVisible();
+      await expect(page.getByRole("heading", { level: 1 })).toBeVisible();
 
       // Should show user details
       const profileSections = [
-        page.locator('[data-testid="user-avatar"]').or(page.locator('img[alt*="avatar" i], img[alt*="profile" i]')),
+        page
+          .locator('[data-testid="user-avatar"]')
+          .or(page.locator('img[alt*="avatar" i], img[alt*="profile" i]')),
         page.getByText(/member since|joined/i),
       ];
 
       for (const section of profileSections) {
         // At least avatar should be visible
-        if (await section.first().isVisible().catch(() => false)) {
+        if (
+          await section
+            .first()
+            .isVisible()
+            .catch(() => false)
+        ) {
           await expect(section.first()).toBeVisible();
           break;
         }
       }
     });
 
-    test(`${tags.core} - View other user's public profile`, async ({ page }) => {
+    test(`${tags.core} - View other user's public profile`, async ({
+      page,
+    }) => {
       // Navigate directly to a user profile (would need existing user ID)
-      await page.goto('/users/1');
+      await page.goto("/users/1");
 
       // Should show public profile or redirect
-      await page.waitForLoadState('domcontentloaded');
+      await page.waitForLoadState("domcontentloaded");
 
       // Public profile should show limited info
-      const publicProfile = page.getByRole('heading');
-      const notFound = page.getByText(/not found|404|couldn't find|doesn't exist/i);
+      const publicProfile = page.getByRole("heading");
+      const notFound = page.getByText(
+        /not found|404|couldn't find|doesn't exist/i
+      );
 
-      await expect(publicProfile.or(notFound).first()).toBeVisible({ timeout: 10000 });
+      await expect(publicProfile.or(notFound).first()).toBeVisible({
+        timeout: 10000,
+      });
     });
   });
 
-  test.describe('J068: Edit profile information', () => {
-    test(`${tags.auth} - Update profile name and bio`, async ({ page, nav }) => {
+  test.describe("J068: Edit profile information", () => {
+    test(`${tags.auth} - Update profile name and bio`, async ({
+      page,
+      nav,
+    }) => {
       await nav.goToProfile();
 
       // Find edit button — profile page uses Edit2 icon link or button
-      const editButton = page.getByRole('link', { name: /edit.*profile/i })
-        .or(page.getByRole('button', { name: /edit.*profile/i }))
-        .or(page.getByRole('link', { name: /edit/i }))
+      const editButton = page
+        .getByRole("link", { name: /edit.*profile/i })
+        .or(page.getByRole("button", { name: /edit.*profile/i }))
+        .or(page.getByRole("link", { name: /edit/i }))
         .first();
 
       if (await editButton.isVisible().catch(() => false)) {
@@ -71,31 +88,37 @@ test.describe('Profile & Settings Journeys', () => {
         // Wait for edit form page to load
         await page.waitForURL(/\/edit|\/settings/, { timeout: 30000 });
         // Wait for the form to hydrate and become interactive
-        await page.locator('form').first().waitFor({ state: 'visible', timeout: 10000 });
+        await page
+          .locator("form")
+          .first()
+          .waitFor({ state: "visible", timeout: 10000 });
 
         // Update name — label is "Full Name" on the edit profile page
         const nameInput = page.getByLabel(/full.*name|name/i).first();
         if (await nameInput.isVisible().catch(() => false)) {
           await nameInput.clear();
-          await nameInput.fill('Updated Test User');
+          await nameInput.fill("Updated Test User");
         }
 
         // Update bio
         const bioInput = page.getByLabel(/bio|about/i).first();
         if (await bioInput.isVisible().catch(() => false)) {
           await bioInput.clear();
-          await bioInput.fill('Updated bio for testing purposes.');
+          await bioInput.fill("Updated bio for testing purposes.");
         }
 
         // Save changes — button text is "Save Changes"
-        const saveButton = page.getByRole('button', { name: /save|update/i }).first();
-        await saveButton.waitFor({ state: 'visible', timeout: 5000 });
+        const saveButton = page
+          .getByRole("button", { name: /save|update/i })
+          .first();
+        await saveButton.waitFor({ state: "visible", timeout: 5000 });
         await saveButton.click();
 
         // Verify success — EditProfileClient shows "Profile updated successfully! Redirecting..."
         // or it may redirect back to /profile. Wait for either success text or navigation.
         await expect(
-          page.getByText(/updated successfully|profile updated/i)
+          page
+            .getByText(/updated successfully|profile updated/i)
             .or(page.locator(selectors.toast))
             .first()
         ).toBeVisible({ timeout: 30000 });
@@ -105,8 +128,9 @@ test.describe('Profile & Settings Journeys', () => {
     test(`${tags.auth} - Upload profile picture`, async ({ page, nav }) => {
       await nav.goToProfile();
 
-      const editButton = page.getByRole('button', { name: /edit.*profile/i })
-        .or(page.getByRole('link', { name: /edit/i }))
+      const editButton = page
+        .getByRole("button", { name: /edit.*profile/i })
+        .or(page.getByRole("link", { name: /edit/i }))
         .first();
 
       if (await editButton.isVisible()) {
@@ -123,21 +147,26 @@ test.describe('Profile & Settings Journeys', () => {
     });
   });
 
-  test.describe('J069: Notification settings', () => {
+  test.describe("J069: Notification settings", () => {
     test(`${tags.auth} - Toggle email notifications`, async ({ page, nav }) => {
       await nav.goToSettings();
 
       // Check we weren't redirected to login
-      if (page.url().includes('/login')) {
-        test.skip(true, 'Auth session expired - redirected to login');
+      if (page.url().includes("/login")) {
+        test.skip(true, "Auth session expired - redirected to login");
         return;
       }
 
       // Wait for the settings page to fully hydrate
-      await page.locator('h1').first().waitFor({ state: 'visible', timeout: 10000 });
+      await page
+        .locator("h1")
+        .first()
+        .waitFor({ state: "visible", timeout: 10000 });
 
       // Find notification settings section — SettingsClient renders "Email Notifications" as h2
-      const notificationSection = page.getByRole('heading', { name: /notification/i }).first()
+      const notificationSection = page
+        .getByRole("heading", { name: /notification/i })
+        .first()
         .or(page.locator('[data-testid="notification-settings"]'))
         .first();
 
@@ -147,44 +176,50 @@ test.describe('Profile & Settings Journeys', () => {
       const emailToggle = page.locator('[role="switch"]').first();
 
       if (await emailToggle.isVisible().catch(() => false)) {
-        const initialState = (await emailToggle.getAttribute('aria-checked')) === 'true';
+        const initialState =
+          (await emailToggle.getAttribute("aria-checked")) === "true";
         await emailToggle.click();
 
         // State should toggle
-        const newState = (await emailToggle.getAttribute('aria-checked')) === 'true';
+        const newState =
+          (await emailToggle.getAttribute("aria-checked")) === "true";
         expect(newState).not.toBe(initialState);
 
         // Save preferences button
-        const saveButton = page.getByRole('button', { name: /save/i }).first();
+        const saveButton = page.getByRole("button", { name: /save/i }).first();
         if (await saveButton.isVisible().catch(() => false)) {
           await saveButton.click();
         }
       }
     });
 
-    test(`${tags.auth} - Configure notification preferences`, async ({ page, nav }) => {
+    test(`${tags.auth} - Configure notification preferences`, async ({
+      page,
+      nav,
+    }) => {
       await nav.goToSettings();
 
       // Check we weren't redirected to login
-      if (page.url().includes('/login')) {
-        test.skip(true, 'Auth session expired - redirected to login');
+      if (page.url().includes("/login")) {
+        test.skip(true, "Auth session expired - redirected to login");
         return;
       }
 
       // Wait for the settings page to fully hydrate
-      await page.locator('h1').first().waitFor({ state: 'visible', timeout: 10000 });
+      await page
+        .locator("h1")
+        .first()
+        .waitFor({ state: "visible", timeout: 10000 });
 
       // SettingsClient renders notification toggles as role="switch" with aria-label like "Toggle Booking Requests"
-      const notificationTypes = [
-        'Booking',
-        'Messages',
-        'Reviews',
-        'Marketing',
-      ];
+      const notificationTypes = ["Booking", "Messages", "Reviews", "Marketing"];
 
       for (const type of notificationTypes) {
-        const toggle = page.locator(`[role="switch"][aria-label*="${type}" i]`)
-          .or(page.locator(`[data-testid="${type.toLowerCase()}-notifications"]`))
+        const toggle = page
+          .locator(`[role="switch"][aria-label*="${type}" i]`)
+          .or(
+            page.locator(`[data-testid="${type.toLowerCase()}-notifications"]`)
+          )
           .first();
 
         if (await toggle.isVisible().catch(() => false)) {
@@ -195,23 +230,26 @@ test.describe('Profile & Settings Journeys', () => {
     });
   });
 
-  test.describe('J070: Privacy settings', () => {
+  test.describe("J070: Privacy settings", () => {
     test(`${tags.auth} - Toggle profile visibility`, async ({ page, nav }) => {
       await nav.goToSettings();
 
       // Check we weren't redirected to login
-      if (page.url().includes('/login')) {
-        test.skip(true, 'Auth session expired - redirected to login');
+      if (page.url().includes("/login")) {
+        test.skip(true, "Auth session expired - redirected to login");
         return;
       }
 
       // Find privacy section
-      const privacySection = page.getByRole('heading', { name: /privacy/i })
+      const privacySection = page
+        .getByRole("heading", { name: /privacy/i })
         .or(page.locator('[data-testid="privacy-settings"]'))
         .first();
 
       if (await privacySection.isVisible().catch(() => false)) {
-        const visibilityToggle = page.getByLabel(/public.*profile|profile.*visibility/i);
+        const visibilityToggle = page.getByLabel(
+          /public.*profile|profile.*visibility/i
+        );
 
         if (await visibilityToggle.isVisible()) {
           const initialState = await visibilityToggle.isChecked();
@@ -222,23 +260,30 @@ test.describe('Profile & Settings Journeys', () => {
     });
   });
 
-  test.describe('J071: Change password', () => {
+  test.describe("J071: Change password", () => {
     test(`${tags.auth} - Change password flow`, async ({ page, nav }) => {
       await nav.goToSettings();
 
       // Check we weren't redirected to login
-      if (page.url().includes('/login')) {
-        test.skip(true, 'Auth session expired - redirected to login');
+      if (page.url().includes("/login")) {
+        test.skip(true, "Auth session expired - redirected to login");
         return;
       }
 
       // Wait for the settings page to fully hydrate
-      await page.locator('h1').first().waitFor({ state: 'visible', timeout: 10000 });
+      await page
+        .locator("h1")
+        .first()
+        .waitFor({ state: "visible", timeout: 10000 });
 
       // The password section is only rendered when hasPassword=true.
       // Look for the "Change Password" heading (h2) which indicates the section exists.
-      const passwordHeading = page.getByRole('heading', { name: /change.*password/i });
-      const hasPasswordSection = await passwordHeading.isVisible({ timeout: 5000 }).catch(() => false);
+      const passwordHeading = page.getByRole("heading", {
+        name: /change.*password/i,
+      });
+      const hasPasswordSection = await passwordHeading
+        .isVisible({ timeout: 5000 })
+        .catch(() => false);
 
       if (!hasPasswordSection) {
         // User has no password (OAuth-only) — skip gracefully
@@ -251,41 +296,54 @@ test.describe('Profile & Settings Journeys', () => {
       const confirmPasswordInput = page.getByLabel(/confirm/i);
 
       // Wait for the form inputs to be interactive (hydration)
-      await currentPasswordInput.waitFor({ state: 'visible', timeout: 10000 });
+      await currentPasswordInput.waitFor({ state: "visible", timeout: 10000 });
 
-      const currentPwd = process.env.E2E_TEST_PASSWORD || 'TestPassword123!';
-      const newPwd = process.env.E2E_TEST_NEW_PASSWORD || 'NewTestPassword123!';
+      const currentPwd = process.env.E2E_TEST_PASSWORD || "TestPassword123!";
+      const newPwd = process.env.E2E_TEST_NEW_PASSWORD || "NewTestPassword123!";
 
       await currentPasswordInput.fill(currentPwd);
       await newPasswordInput.fill(newPwd);
       await confirmPasswordInput.fill(newPwd);
 
       // Submit — button text is "Change Password"
-      await page.getByRole('button', { name: /change.*password/i }).click();
+      await page.getByRole("button", { name: /change.*password/i }).click();
 
       // Should show success message, error message, or toast
       await expect(
-        page.getByText(/password changed|password updated|do not match|at least|failed/i)
+        page
+          .getByText(
+            /password changed|password updated|do not match|at least|failed/i
+          )
           .or(page.locator(selectors.toast))
           .first()
       ).toBeVisible({ timeout: 10000 });
     });
 
-    test(`${tags.auth} - Password strength validation`, async ({ page, nav }) => {
+    test(`${tags.auth} - Password strength validation`, async ({
+      page,
+      nav,
+    }) => {
       await nav.goToSettings();
 
       // Check we weren't redirected to login
-      if (page.url().includes('/login')) {
-        test.skip(true, 'Auth session expired - redirected to login');
+      if (page.url().includes("/login")) {
+        test.skip(true, "Auth session expired - redirected to login");
         return;
       }
 
       // Wait for the settings page to fully hydrate
-      await page.locator('h1').first().waitFor({ state: 'visible', timeout: 10000 });
+      await page
+        .locator("h1")
+        .first()
+        .waitFor({ state: "visible", timeout: 10000 });
 
       // The password section is only rendered when hasPassword=true.
-      const passwordHeading = page.getByRole('heading', { name: /change.*password/i });
-      const hasPasswordSection = await passwordHeading.isVisible({ timeout: 5000 }).catch(() => false);
+      const passwordHeading = page.getByRole("heading", {
+        name: /change.*password/i,
+      });
+      const hasPasswordSection = await passwordHeading
+        .isVisible({ timeout: 5000 })
+        .catch(() => false);
 
       if (!hasPasswordSection) {
         // User has no password (OAuth-only) — skip gracefully
@@ -293,31 +351,38 @@ test.describe('Profile & Settings Journeys', () => {
       }
 
       const newPasswordInput = page.getByLabel(/^new password$/i);
-      await newPasswordInput.waitFor({ state: 'visible', timeout: 10000 });
+      await newPasswordInput.waitFor({ state: "visible", timeout: 10000 });
 
       // Try weak password
-      await newPasswordInput.fill('weak');
+      await newPasswordInput.fill("weak");
 
       // PasswordStrengthMeter component should render below the input
       const strengthMeter = page.locator('[data-testid="password-strength"]');
       const strengthText = page.getByText(/weak|fair|strong|very strong/i);
 
-      await expect(strengthMeter.or(strengthText).first()).toBeVisible({ timeout: 5000 });
+      await expect(strengthMeter.or(strengthText).first()).toBeVisible({
+        timeout: 5000,
+      });
     });
   });
 
-  test.describe('J072: Connected accounts', () => {
-    test(`${tags.auth} - View connected OAuth providers`, async ({ page, nav }) => {
+  test.describe("J072: Connected accounts", () => {
+    test(`${tags.auth} - View connected OAuth providers`, async ({
+      page,
+      nav,
+    }) => {
       await nav.goToSettings();
 
       // Check we weren't redirected to login
-      if (page.url().includes('/login')) {
-        test.skip(true, 'Auth session expired - redirected to login');
+      if (page.url().includes("/login")) {
+        test.skip(true, "Auth session expired - redirected to login");
         return;
       }
 
       // Find connected accounts section
-      const connectedSection = page.getByRole('heading', { name: /connected|linked|accounts/i });
+      const connectedSection = page.getByRole("heading", {
+        name: /connected|linked|accounts/i,
+      });
 
       if (await connectedSection.isVisible().catch(() => false)) {
         // Should show OAuth providers (Google, GitHub, etc.)
@@ -327,23 +392,26 @@ test.describe('Profile & Settings Journeys', () => {
     });
   });
 
-  test.describe('J073-J074: Account management', () => {
+  test.describe("J073-J074: Account management", () => {
     test(`${tags.auth} - Deactivate account option`, async ({ page, nav }) => {
       await nav.goToSettings();
 
       // Check we weren't redirected to login
-      if (page.url().includes('/login')) {
-        test.skip(true, 'Auth session expired - redirected to login');
+      if (page.url().includes("/login")) {
+        test.skip(true, "Auth session expired - redirected to login");
         return;
       }
 
       // Find account management or danger zone
-      const dangerSection = page.getByRole('heading', { name: /danger|account.*management|delete/i })
+      const dangerSection = page
+        .getByRole("heading", { name: /danger|account.*management|delete/i })
         .or(page.locator('[data-testid="danger-zone"]'))
         .first();
 
       if (await dangerSection.isVisible().catch(() => false)) {
-        const deactivateButton = page.getByRole('button', { name: /deactivate|disable/i });
+        const deactivateButton = page.getByRole("button", {
+          name: /deactivate|disable/i,
+        });
 
         if (await deactivateButton.isVisible()) {
           await deactivateButton.click();
@@ -353,7 +421,9 @@ test.describe('Profile & Settings Journeys', () => {
           await expect(confirmDialog).toBeVisible({ timeout: 5000 });
 
           // Cancel - don't actually deactivate
-          const cancelButton = confirmDialog.getByRole('button', { name: /cancel|no/i });
+          const cancelButton = confirmDialog.getByRole("button", {
+            name: /cancel|no/i,
+          });
           if (await cancelButton.isVisible()) {
             await cancelButton.click();
           }
@@ -366,47 +436,67 @@ test.describe('Profile & Settings Journeys', () => {
       // are unreliable on narrow viewports in CI
       const viewport = page.viewportSize();
       if (!viewport || viewport.width < 768) {
-        test.skip(true, 'Test designed for desktop viewport');
+        test.skip(true, "Test designed for desktop viewport");
         return;
       }
 
       await nav.goToSettings();
-      await page.waitForLoadState('domcontentloaded');
+      await page.waitForLoadState("domcontentloaded");
       // Wait for any client-side redirects to settle (CI can be slow)
       await page.waitForTimeout(2000);
 
       // Check we weren't redirected to login or signup
       const currentUrl = page.url();
-      if (currentUrl.includes('/login') || currentUrl.includes('/signup') || currentUrl.includes('/signin')) {
-        test.skip(true, 'Auth redirect — session not available in CI');
+      if (
+        currentUrl.includes("/login") ||
+        currentUrl.includes("/signup") ||
+        currentUrl.includes("/signin")
+      ) {
+        test.skip(true, "Auth redirect — session not available in CI");
         return;
       }
 
       // Wait for the settings page to fully hydrate
-      await page.locator('h1').first().waitFor({ state: 'visible', timeout: 30000 }).catch(() => {});
+      await page
+        .locator("h1")
+        .first()
+        .waitFor({ state: "visible", timeout: 30000 })
+        .catch(() => {});
       // Extra wait for hydration in CI
       await page.waitForTimeout(1000);
 
-      const deleteButton = page.getByRole('button', { name: /delete.*account/i });
+      const deleteButton = page.getByRole("button", {
+        name: /delete.*account/i,
+      });
 
       // On mobile viewports, the delete button may be below the fold
-      await deleteButton.scrollIntoViewIfNeeded({ timeout: 5000 }).catch(() => {});
+      await deleteButton
+        .scrollIntoViewIfNeeded({ timeout: 5000 })
+        .catch(() => {});
 
       if (await deleteButton.isVisible({ timeout: 5000 }).catch(() => false)) {
         await deleteButton.click();
 
         // Should show serious warning — dialog may not appear in CI (feature may be disabled)
-        const warningDialog = page.locator('[role="dialog"][aria-modal="true"]')
+        const warningDialog = page
+          .locator('[role="dialog"][aria-modal="true"]')
           .or(page.locator('[data-testid="modal"]:visible'));
-        const dialogVisible = await warningDialog.first().isVisible({ timeout: 10000 }).catch(() => false);
+        const dialogVisible = await warningDialog
+          .first()
+          .isVisible({ timeout: 10000 })
+          .catch(() => false);
 
         if (dialogVisible) {
           // Should require confirmation
-          const confirmInput = warningDialog.first().getByPlaceholder(/delete|confirm/i);
+          const confirmInput = warningDialog
+            .first()
+            .getByPlaceholder(/delete|confirm/i);
           await confirmInput.isVisible().catch(() => false);
 
           // Cancel
-          const cancelButton = warningDialog.first().getByRole('button', { name: /cancel|no/i });
+          const cancelButton = warningDialog
+            .first()
+            .getByRole("button", { name: /cancel|no/i });
           if (await cancelButton.isVisible()) {
             await cancelButton.click();
           }
@@ -415,33 +505,38 @@ test.describe('Profile & Settings Journeys', () => {
     });
   });
 
-  test.describe('J075-J076: Theme and preferences', () => {
+  test.describe("J075-J076: Theme and preferences", () => {
     test(`${tags.auth} - Toggle dark mode`, async ({ page, nav }) => {
       await nav.goToSettings();
 
       // Check we weren't redirected to login
-      if (page.url().includes('/login')) {
-        test.skip(true, 'Auth session expired - redirected to login');
+      if (page.url().includes("/login")) {
+        test.skip(true, "Auth session expired - redirected to login");
         return;
       }
 
       // Find theme toggle
-      const themeToggle = page.getByRole('button', { name: /dark.*mode|theme/i })
+      const themeToggle = page
+        .getByRole("button", { name: /dark.*mode|theme/i })
         .or(page.getByLabel(/dark.*mode|theme/i))
         .or(page.locator('[data-testid="theme-toggle"]'))
         .first();
 
       if (await themeToggle.isVisible().catch(() => false)) {
         // Get initial theme
-        const html = page.locator('html');
-        const initialDark = await html.getAttribute('class').then(c => c?.includes('dark')) || false;
+        const html = page.locator("html");
+        const initialDark =
+          (await html.getAttribute("class").then((c) => c?.includes("dark"))) ||
+          false;
 
         // Toggle
         await themeToggle.click();
         await page.waitForTimeout(500);
 
         // Theme should change
-        const newDark = await html.getAttribute('class').then(c => c?.includes('dark')) || false;
+        const newDark =
+          (await html.getAttribute("class").then((c) => c?.includes("dark"))) ||
+          false;
         // May or may not change depending on implementation
       }
     });
@@ -450,13 +545,14 @@ test.describe('Profile & Settings Journeys', () => {
       await nav.goToSettings();
 
       // Check we weren't redirected to login
-      if (page.url().includes('/login')) {
-        test.skip(true, 'Auth session expired - redirected to login');
+      if (page.url().includes("/login")) {
+        test.skip(true, "Auth session expired - redirected to login");
         return;
       }
 
       // Find language selector
-      const languageSelect = page.getByLabel(/language/i)
+      const languageSelect = page
+        .getByLabel(/language/i)
         .or(page.locator('[data-testid="language-select"]'))
         .first();
 

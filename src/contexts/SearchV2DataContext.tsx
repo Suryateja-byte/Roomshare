@@ -78,9 +78,9 @@ interface SearchV2DataContextValue {
 
 const SearchV2DataContext = createContext<SearchV2DataContextValue>({
   v2MapData: null,
-  setV2MapData: () => { },
+  setV2MapData: () => {},
   isV2Enabled: false,
-  setIsV2Enabled: () => { },
+  setIsV2Enabled: () => {},
   dataVersion: 0,
 });
 
@@ -106,8 +106,8 @@ const SearchV2DataStateContext = createContext<SearchV2DataStateValue>({
 });
 
 const SearchV2DataSetterContext = createContext<SearchV2DataSetterValue>({
-  setV2MapData: () => { },
-  setIsV2Enabled: () => { },
+  setV2MapData: () => {},
+  setIsV2Enabled: () => {},
 });
 
 /**
@@ -132,8 +132,7 @@ export function SearchV2DataProvider({ children }: { children: ReactNode }) {
       prevFilterParamsRef.current !== null &&
       prevFilterParamsRef.current !== currentParams;
     const boundsChanged =
-      prevBoundsRef.current !== null &&
-      prevBoundsRef.current !== currentBounds;
+      prevBoundsRef.current !== null && prevBoundsRef.current !== currentBounds;
 
     // We no longer setV2MapDataInternal(null) here!
     // Next.js searchParams ONLY update after the RSC transition commits.
@@ -152,14 +151,17 @@ export function SearchV2DataProvider({ children }: { children: ReactNode }) {
 
   // P1-FIX (#118): Wrap setV2MapData in useCallback to prevent breaking consumer dependency arrays.
   // Versioned setter that rejects stale data from out-of-order responses.
-  const setV2MapData = useCallback((data: V2MapData | null, version?: number) => {
-    // If version provided, only accept if it matches current version
-    // This prevents stale data from completing requests overwriting fresh data
-    if (version !== undefined && version !== dataVersionRef.current) {
-      return; // Reject stale data
-    }
-    setV2MapDataInternal(data);
-  }, []);
+  const setV2MapData = useCallback(
+    (data: V2MapData | null, version?: number) => {
+      // If version provided, only accept if it matches current version
+      // This prevents stale data from completing requests overwriting fresh data
+      if (version !== undefined && version !== dataVersionRef.current) {
+        return; // Reject stale data
+      }
+      setV2MapDataInternal(data);
+    },
+    []
+  );
 
   // Memoize STATE value — changes when data changes
   const stateValue = useMemo<SearchV2DataStateValue>(

@@ -10,9 +10,19 @@ import { useRecentSearches } from "@/hooks/useRecentSearches";
  */
 const POPULAR_AREAS = [
   { label: "Austin, TX", q: "Austin, TX", lat: 30.2672, lng: -97.7431 },
-  { label: "San Francisco, CA", q: "San Francisco, CA", lat: 37.7749, lng: -122.4194 },
+  {
+    label: "San Francisco, CA",
+    q: "San Francisco, CA",
+    lat: 37.7749,
+    lng: -122.4194,
+  },
   { label: "New York, NY", q: "New York, NY", lat: 40.7128, lng: -74.006 },
-  { label: "Los Angeles, CA", q: "Los Angeles, CA", lat: 34.0522, lng: -118.2437 },
+  {
+    label: "Los Angeles, CA",
+    q: "Los Angeles, CA",
+    lat: 34.0522,
+    lng: -118.2437,
+  },
   { label: "Chicago, IL", q: "Chicago, IL", lat: 41.8781, lng: -87.6298 },
   { label: "Seattle, WA", q: "Seattle, WA", lat: 47.6062, lng: -122.3321 },
   { label: "Denver, CO", q: "Denver, CO", lat: 39.7392, lng: -104.9903 },

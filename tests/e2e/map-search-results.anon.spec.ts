@@ -18,7 +18,15 @@
  * Debug: pnpm playwright test tests/e2e/map-search-results.anon.spec.ts --project=chromium-anon --headed
  */
 
-import { test, expect, SF_BOUNDS, selectors, timeouts, searchResultsContainer, waitForMapReady } from "./helpers/test-utils";
+import {
+  test,
+  expect,
+  SF_BOUNDS,
+  selectors,
+  timeouts,
+  searchResultsContainer,
+  waitForMapReady,
+} from "./helpers/test-utils";
 import type { Page, Route } from "@playwright/test";
 
 // ---------------------------------------------------------------------------
@@ -51,7 +59,9 @@ const toggleSelectors = {
 async function waitForSearchPage(page: Page) {
   await page.goto(SEARCH_URL);
   await page.waitForLoadState("domcontentloaded");
-  await page.waitForSelector(toggleSelectors.searchAsMoveToggle, { timeout: 30_000 });
+  await page.waitForSelector(toggleSelectors.searchAsMoveToggle, {
+    timeout: 30_000,
+  });
   await waitForMapReady(page);
 }
 
@@ -61,8 +71,9 @@ async function waitForSearchPage(page: Page) {
 async function waitForMapRef(page: Page, timeout = 30_000): Promise<boolean> {
   try {
     await page.waitForFunction(
-      () => !!(window as any).__e2eMapRef && !!(window as any).__e2eSimulateUserPan,
-      { timeout },
+      () =>
+        !!(window as any).__e2eMapRef && !!(window as any).__e2eSimulateUserPan,
+      { timeout }
     );
     return true;
   } catch {
@@ -103,7 +114,9 @@ async function turnToggleOff(page: Page) {
   const isChecked = await toggle.getAttribute("aria-checked");
   if (isChecked === "true") {
     await toggle.click();
-    await expect(toggle).toHaveAttribute("aria-checked", "false", { timeout: 5_000 });
+    await expect(toggle).toHaveAttribute("aria-checked", "false", {
+      timeout: 5_000,
+    });
   }
 }
 
@@ -115,7 +128,9 @@ async function turnToggleOn(page: Page) {
   const isChecked = await toggle.getAttribute("aria-checked");
   if (isChecked === "false") {
     await toggle.click();
-    await expect(toggle).toHaveAttribute("aria-checked", "true", { timeout: 5_000 });
+    await expect(toggle).toHaveAttribute("aria-checked", "true", {
+      timeout: 5_000,
+    });
   }
 }
 
@@ -126,14 +141,17 @@ async function turnToggleOn(page: Page) {
 async function simulateMapPan(
   page: Page,
   deltaX = 100,
-  deltaY = 50,
+  deltaY = 50
 ): Promise<boolean> {
   // Try E2E hook first (reliable in headless WebGL)
-  const hooked = await page.evaluate(({ dx, dy }) => {
-    const fn = (window as any).__e2eSimulateUserPan;
-    if (!fn) return false;
-    return fn(dx, dy);
-  }, { dx: deltaX, dy: deltaY });
+  const hooked = await page.evaluate(
+    ({ dx, dy }) => {
+      const fn = (window as any).__e2eSimulateUserPan;
+      if (!fn) return false;
+      return fn(dx, dy);
+    },
+    { dx: deltaX, dy: deltaY }
+  );
 
   if (hooked) {
     await waitForMapReady(page);
@@ -170,7 +188,7 @@ async function simulateMapPan(
 async function moveMapProgrammatically(
   page: Page,
   deltaLng: number,
-  deltaLat: number,
+  deltaLat: number
 ): Promise<boolean> {
   return page.evaluate(
     ({ dLng, dLat }) => {
@@ -193,7 +211,7 @@ async function moveMapProgrammatically(
         setTimeout(() => resolve(true), 5000);
       });
     },
-    { dLng: deltaLng, dLat: deltaLat },
+    { dLng: deltaLng, dLat: deltaLat }
   );
 }
 
@@ -215,7 +233,7 @@ function getUrlBounds(url: string) {
  */
 async function mockSearchCountApi(
   page: Page,
-  options: { count?: number | null; delay?: number } = {},
+  options: { count?: number | null; delay?: number } = {}
 ) {
   const { count = 42, delay = 0 } = options;
 
@@ -232,7 +250,9 @@ async function mockSearchCountApi(
 }
 
 // Map tests need extra time for WebGL rendering and tile loading in CI
-test.beforeEach(async () => { test.slow(); });
+test.beforeEach(async () => {
+  test.slow();
+});
 
 // ---------------------------------------------------------------------------
 // Group 1: Search As I Move
@@ -249,14 +269,18 @@ test.describe("Search as I move: Toggle behavior", () => {
 
     const toggle = page.locator(toggleSelectors.searchAsMoveToggle);
     await expect(toggle).toBeVisible();
-    await expect(toggle).toHaveAttribute("aria-checked", "true", { timeout: 5_000 });
+    await expect(toggle).toHaveAttribute("aria-checked", "true", {
+      timeout: 5_000,
+    });
 
     // Green indicator dot should be visible when ON
     const greenDot = toggle.locator('[data-testid="search-toggle-indicator"]');
     await expect(greenDot).toBeVisible();
   });
 
-  test("2 - Pan map with toggle ON triggers URL bounds update", async ({ page }) => {
+  test("2 - Pan map with toggle ON triggers URL bounds update", async ({
+    page,
+  }) => {
     await waitForSearchPage(page);
 
     if (!(await isMapInteractive(page))) {
@@ -284,11 +308,14 @@ test.describe("Search as I move: Toggle behavior", () => {
     // Wait for debounce (600ms) + server RSC fetch inside startTransition
     // On WSL2 with Turbopack, the full round-trip can take 10+ seconds
     const initialUrlStr = page.url();
-    const urlChanged = await page.waitForFunction(
-      (prevUrl: string) => window.location.href !== prevUrl,
-      initialUrlStr,
-      { timeout: 20_000 },
-    ).then(() => true).catch(() => false);
+    const urlChanged = await page
+      .waitForFunction(
+        (prevUrl: string) => window.location.href !== prevUrl,
+        initialUrlStr,
+        { timeout: 20_000 }
+      )
+      .then(() => true)
+      .catch(() => false);
 
     if (!urlChanged) {
       // URL didn't change — likely slow server or animation frame issues in headless
@@ -307,7 +334,9 @@ test.describe("Search as I move: Toggle behavior", () => {
     expect(boundsChanged).toBe(true);
   });
 
-  test("3 - Zoom map with toggle ON triggers URL bounds update", async ({ page }) => {
+  test("3 - Zoom map with toggle ON triggers URL bounds update", async ({
+    page,
+  }) => {
     await waitForSearchPage(page);
 
     if (!(await isMapInteractive(page))) {
@@ -342,22 +371,31 @@ test.describe("Search as I move: Toggle behavior", () => {
 
     if (!zoomed) {
       // Fallback: scroll wheel on map center
-      const mapBox = await page.locator(toggleSelectors.mapContainer).first().boundingBox();
+      const mapBox = await page
+        .locator(toggleSelectors.mapContainer)
+        .first()
+        .boundingBox();
       if (!mapBox) {
         test.skip(true, "Could not get map bounding box");
         return;
       }
-      await page.mouse.move(mapBox.x + mapBox.width / 2, mapBox.y + mapBox.height / 2);
+      await page.mouse.move(
+        mapBox.x + mapBox.width / 2,
+        mapBox.y + mapBox.height / 2
+      );
       await page.mouse.wheel(0, -300);
     }
 
     // Wait for URL bounds to update (debounce + server RSC fetch)
     const zoomInitialUrl = page.url();
-    const urlChanged = await page.waitForFunction(
-      (prevUrl: string) => window.location.href !== prevUrl,
-      zoomInitialUrl,
-      { timeout: 20_000 },
-    ).then(() => true).catch(() => false);
+    const urlChanged = await page
+      .waitForFunction(
+        (prevUrl: string) => window.location.href !== prevUrl,
+        zoomInitialUrl,
+        { timeout: 20_000 }
+      )
+      .then(() => true)
+      .catch(() => false);
 
     if (!urlChanged) {
       test.skip(true, "URL did not update within timeout (slow WSL2 server)");
@@ -406,7 +444,9 @@ test.describe("Search as I move: Toggle behavior", () => {
     expect(page.url()).toBe(initialUrl);
   });
 
-  test("5 - Toggle OFF, move map, 'Search this area' banner appears", async ({ page }) => {
+  test("5 - Toggle OFF, move map, 'Search this area' banner appears", async ({
+    page,
+  }) => {
     await mockSearchCountApi(page, { count: 15 });
     await waitForSearchPage(page);
 
@@ -429,12 +469,16 @@ test.describe("Search as I move: Toggle behavior", () => {
     }
 
     // Scope to map region to avoid picking the mobile-hidden (md:hidden) variant
-    const mapRegion = page.locator('[aria-label="Interactive map showing listing locations"]');
+    const mapRegion = page.locator(
+      '[aria-label="Interactive map showing listing locations"]'
+    );
     const searchAreaBtn = mapRegion.locator(toggleSelectors.searchThisAreaBtn);
     await expect(searchAreaBtn).toBeVisible({ timeout: 8000 });
   });
 
-  test("6 - Click 'Search this area' triggers search with new bounds", async ({ page }) => {
+  test("6 - Click 'Search this area' triggers search with new bounds", async ({
+    page,
+  }) => {
     await mockSearchCountApi(page, { count: 28 });
     await waitForSearchPage(page);
 
@@ -457,7 +501,9 @@ test.describe("Search as I move: Toggle behavior", () => {
     }
 
     // Scope to map region to avoid picking the mobile-hidden (md:hidden) variant
-    const mapRegion = page.locator('[aria-label="Interactive map showing listing locations"]');
+    const mapRegion = page.locator(
+      '[aria-label="Interactive map showing listing locations"]'
+    );
     const searchAreaBtn = mapRegion.locator(toggleSelectors.searchThisAreaBtn);
     await expect(searchAreaBtn).toBeVisible({ timeout: 8000 });
 
@@ -468,7 +514,7 @@ test.describe("Search as I move: Toggle behavior", () => {
     await page.waitForFunction(
       (prevUrl: string) => window.location.href !== prevUrl,
       initialUrl,
-      { timeout: 20_000 },
+      { timeout: 20_000 }
     );
     const newUrl = page.url();
     expect(newUrl).not.toBe(initialUrl);
@@ -477,7 +523,9 @@ test.describe("Search as I move: Toggle behavior", () => {
     await expect(searchAreaBtn).not.toBeVisible({ timeout: 5000 });
   });
 
-  test("7 - Re-enable toggle, future moves trigger search again", async ({ page }) => {
+  test("7 - Re-enable toggle, future moves trigger search again", async ({
+    page,
+  }) => {
     await waitForSearchPage(page);
 
     if (!(await isMapInteractive(page))) {
@@ -510,11 +558,13 @@ test.describe("Search as I move: Toggle behavior", () => {
       return;
     }
 
-    await page.waitForFunction(
-      (prevUrl: string) => window.location.href !== prevUrl,
-      urlBeforePan,
-      { timeout: 20_000 },
-    ).catch(() => {});
+    await page
+      .waitForFunction(
+        (prevUrl: string) => window.location.href !== prevUrl,
+        urlBeforePan,
+        { timeout: 20_000 }
+      )
+      .catch(() => {});
     const urlAfterPan = page.url();
 
     // URL bounds should have updated
@@ -535,7 +585,9 @@ test.describe("Search as I move: Toggle behavior", () => {
 // ---------------------------------------------------------------------------
 
 test.describe("Search as I move: Result synchronization", () => {
-  test("8 - Map move updates listing results (new cards appear)", async ({ page }) => {
+  test("8 - Map move updates listing results (new cards appear)", async ({
+    page,
+  }) => {
     await waitForSearchPage(page);
 
     if (!(await isMapInteractive(page))) {
@@ -550,7 +602,9 @@ test.describe("Search as I move: Result synchronization", () => {
     await turnToggleOn(page);
 
     // Get initial listing card count
-    const initialCards = await searchResultsContainer(page).locator(selectors.listingCard).count();
+    const initialCards = await searchResultsContainer(page)
+      .locator(selectors.listingCard)
+      .count();
 
     // Pan the map significantly
     const panned = await simulateMapPan(page, 200, 100);
@@ -567,7 +621,9 @@ test.describe("Search as I move: Result synchronization", () => {
     expect(await page.locator("body").isVisible()).toBe(true);
 
     // Listing cards should be present (may be different count)
-    const newCards = await searchResultsContainer(page).locator(selectors.listingCard).count();
+    const newCards = await searchResultsContainer(page)
+      .locator(selectors.listingCard)
+      .count();
     // We cannot guarantee count changed (depends on data), but page should be functional
     expect(newCards).toBeGreaterThanOrEqual(0);
     void initialCards; // Informational - count may or may not change
@@ -601,9 +657,8 @@ test.describe("Search as I move: Result synchronization", () => {
 
     // Get E2E marker count
     const state = await page.evaluate(() => {
-      const roomshare = (window as unknown as Record<string, unknown>).__roomshare as
-        | Record<string, unknown>
-        | undefined;
+      const roomshare = (window as unknown as Record<string, unknown>)
+        .__roomshare as Record<string, unknown> | undefined;
       return roomshare?.markerCount as number | undefined;
     });
 
@@ -616,7 +671,9 @@ test.describe("Search as I move: Result synchronization", () => {
     expect(await page.locator("body").isVisible()).toBe(true);
   });
 
-  test("10 - Map move cancels previous pending search (AbortController)", async ({ page }) => {
+  test("10 - Map move cancels previous pending search (AbortController)", async ({
+    page,
+  }) => {
     // Track search API calls to verify abort behavior
     const searchCalls: { time: number; url: string }[] = [];
 
@@ -658,7 +715,9 @@ test.describe("Search as I move: Result synchronization", () => {
     expect(await page.locator("body").isVisible()).toBe(true);
   });
 
-  test("11 - Rapid panning results in only final position search (debounce)", async ({ page }) => {
+  test("11 - Rapid panning results in only final position search (debounce)", async ({
+    page,
+  }) => {
     let searchApiCalls = 0;
 
     // Track map-listings API calls (used by PersistentMapWrapper)
@@ -704,7 +763,9 @@ test.describe("Search as I move: Result synchronization", () => {
 // ---------------------------------------------------------------------------
 
 test.describe("Search as I move: Debounce and performance", () => {
-  test("12 - 600ms debounce: no immediate URL change, change after ~600ms", async ({ page }) => {
+  test("12 - 600ms debounce: no immediate URL change, change after ~600ms", async ({
+    page,
+  }) => {
     await waitForSearchPage(page);
 
     if (!(await isMapInteractive(page))) {
@@ -735,11 +796,14 @@ test.describe("Search as I move: Debounce and performance", () => {
 
     // Wait for debounce (600ms) + server RSC fetch inside startTransition
     // On WSL2 with Turbopack, the full round-trip can take 10+ seconds
-    const urlChanged = await page.waitForFunction(
-      (prevUrl: string) => window.location.href !== prevUrl,
-      initialUrl,
-      { timeout: 20_000 },
-    ).then(() => true).catch(() => false);
+    const urlChanged = await page
+      .waitForFunction(
+        (prevUrl: string) => window.location.href !== prevUrl,
+        initialUrl,
+        { timeout: 20_000 }
+      )
+      .then(() => true)
+      .catch(() => false);
 
     if (!urlChanged) {
       test.skip(true, "URL did not update within timeout (slow WSL2 server)");
@@ -749,7 +813,8 @@ test.describe("Search as I move: Debounce and performance", () => {
     // URL should have changed now
     const urlAfterDebounce = page.url();
     const boundsChanged =
-      getUrlBounds(initialUrl).minLat !== getUrlBounds(urlAfterDebounce).minLat ||
+      getUrlBounds(initialUrl).minLat !==
+        getUrlBounds(urlAfterDebounce).minLat ||
       getUrlBounds(initialUrl).maxLat !== getUrlBounds(urlAfterDebounce).maxLat;
 
     // Verify the debounced URL update occurred
@@ -757,7 +822,9 @@ test.describe("Search as I move: Debounce and performance", () => {
     void urlRightAfterPan; // Informational
   });
 
-  test("13 - Multiple rapid moves result in only one search execution", async ({ page }) => {
+  test("13 - Multiple rapid moves result in only one search execution", async ({
+    page,
+  }) => {
     const urlChanges: string[] = [];
 
     // Listen for URL changes via history API
@@ -781,7 +848,9 @@ test.describe("Search as I move: Debounce and performance", () => {
     // Inject URL change listener
     await page.evaluate(() => {
       const originalReplaceState = history.replaceState.bind(history);
-      history.replaceState = function (...args: Parameters<typeof history.replaceState>) {
+      history.replaceState = function (
+        ...args: Parameters<typeof history.replaceState>
+      ) {
         (window as any).__e2eUrlChanged?.(args[2]?.toString() || "");
         return originalReplaceState(...args);
       };
@@ -805,7 +874,9 @@ test.describe("Search as I move: Debounce and performance", () => {
     expect(urlChanges.length).toBeLessThanOrEqual(3);
   });
 
-  test("14 - AbortController cancels stale search requests", async ({ page }) => {
+  test("14 - AbortController cancels stale search requests", async ({
+    page,
+  }) => {
     const completedRequests: string[] = [];
     const abortedRequests: string[] = [];
 

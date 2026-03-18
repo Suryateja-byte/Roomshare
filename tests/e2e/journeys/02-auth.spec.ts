@@ -6,9 +6,9 @@
  * password reset, and session management.
  */
 
-import { test, expect, tags } from '../helpers';
+import { test, expect, tags } from "../helpers";
 
-test.describe('Authentication Journeys', () => {
+test.describe("Authentication Journeys", () => {
   // All auth tests must start unauthenticated — clear any inherited storageState
   test.use({ storageState: { cookies: [], origins: [] } });
 
@@ -16,16 +16,21 @@ test.describe('Authentication Journeys', () => {
     test.slow();
   });
 
-  test.describe('J007: User signup with email', () => {
-    test(`${tags.auth} ${tags.a11y} - Complete signup flow`, async ({ page, data }) => {
+  test.describe("J007: User signup with email", () => {
+    test(`${tags.auth} ${tags.a11y} - Complete signup flow`, async ({
+      page,
+      data,
+    }) => {
       const userData = data.generateUserData();
 
       // Step 1: Navigate to signup
-      await page.goto('/signup');
-      await page.waitForLoadState('domcontentloaded');
+      await page.goto("/signup");
+      await page.waitForLoadState("domcontentloaded");
 
       // Wait for Suspense boundary to resolve and form to hydrate
-      await expect(page.getByRole('heading', { name: /sign up|create.*account|register/i })).toBeVisible({ timeout: 30000 });
+      await expect(
+        page.getByRole("heading", { name: /sign up|create.*account|register/i })
+      ).toBeVisible({ timeout: 30000 });
 
       // Step 2: Fill name
       const nameInput = page.getByLabel(/name/i).first();
@@ -41,7 +46,9 @@ test.describe('Authentication Journeys', () => {
       await passwordInputs.first().fill(userData.password);
 
       // Step 5: Check password strength meter if present
-      const strengthMeter = page.locator('[data-testid="password-strength"], [class*="strength"]').first();
+      const strengthMeter = page
+        .locator('[data-testid="password-strength"], [class*="strength"]')
+        .first();
       if (await strengthMeter.isVisible({ timeout: 1000 }).catch(() => false)) {
         await expect(strengthMeter).toBeVisible();
       }
@@ -58,44 +65,54 @@ test.describe('Authentication Journeys', () => {
       }
 
       // Step 7: Submit form
-      await page.getByRole('button', { name: /sign up|create|register/i }).first().click();
+      await page
+        .getByRole("button", { name: /sign up|create|register/i })
+        .first()
+        .click();
 
       // Step 8-9: Wait for redirect and verify logged in
       // Signup redirects to /login?registered=true via router.push
-      await expect.poll(
-        () => !new URL(page.url()).pathname.includes('/signup'),
-        { timeout: 30000, message: 'Expected to navigate away from signup' }
-      ).toBe(true);
+      await expect
+        .poll(() => !new URL(page.url()).pathname.includes("/signup"), {
+          timeout: 30000,
+          message: "Expected to navigate away from signup",
+        })
+        .toBe(true);
 
       // Should redirect to login (with registered=true), verify email page, or onboarding
       const currentUrl = page.url();
       expect(
-        currentUrl.includes('/login') ||
-        currentUrl.includes('/') ||
-        currentUrl.includes('/verify') ||
-        currentUrl.includes('/onboarding')
+        currentUrl.includes("/login") ||
+          currentUrl.includes("/") ||
+          currentUrl.includes("/verify") ||
+          currentUrl.includes("/onboarding")
       ).toBeTruthy();
     });
 
-    test(`${tags.auth} - Signup with existing email shows error`, async ({ page, auth }) => {
-      await page.goto('/signup');
-      await page.waitForLoadState('domcontentloaded');
+    test(`${tags.auth} - Signup with existing email shows error`, async ({
+      page,
+      auth,
+    }) => {
+      await page.goto("/signup");
+      await page.waitForLoadState("domcontentloaded");
 
       // Wait for the signup form to render (Suspense boundary + hydration)
-      await expect(page.getByRole('heading', { name: /sign up|create.*account|register/i })).toBeVisible({ timeout: 30000 });
+      await expect(
+        page.getByRole("heading", { name: /sign up|create.*account|register/i })
+      ).toBeVisible({ timeout: 30000 });
 
       // Use existing test email
       const creds = auth.getCredentials();
 
       const nameInput = page.getByLabel(/name/i).first();
       if (await nameInput.isVisible({ timeout: 2000 }).catch(() => false)) {
-        await nameInput.fill('Test User');
+        await nameInput.fill("Test User");
       }
 
       await page.getByLabel(/email/i).first().fill(creds.email);
 
       const passwordInputs = page.locator('input[type="password"]');
-      const testPassword = process.env.E2E_TEST_PASSWORD || 'TestPassword123!';
+      const testPassword = process.env.E2E_TEST_PASSWORD || "TestPassword123!";
       await passwordInputs.first().fill(testPassword);
       if ((await passwordInputs.count()) > 1) {
         await passwordInputs.nth(1).fill(testPassword);
@@ -106,32 +123,44 @@ test.describe('Authentication Journeys', () => {
         await termsCheckbox.check();
       }
 
-      await page.getByRole('button', { name: /sign up|create/i }).first().click();
+      await page
+        .getByRole("button", { name: /sign up|create/i })
+        .first()
+        .click();
 
       // Should show error about existing email
       await expect(
-        page.getByText(/already exists|already registered|account exists/i).first()
+        page
+          .getByText(/already exists|already registered|account exists/i)
+          .first()
           .or(page.locator('[role="alert"]').first())
       ).toBeVisible({ timeout: 30000 });
     });
 
     test(`${tags.auth} - Weak password validation`, async ({ page }) => {
-      await page.goto('/signup');
-      await page.waitForLoadState('domcontentloaded');
+      await page.goto("/signup");
+      await page.waitForLoadState("domcontentloaded");
 
       // Wait for the signup form to render (Suspense boundary + hydration)
-      await expect(page.getByRole('heading', { name: /sign up|create.*account|register/i })).toBeVisible({ timeout: 30000 });
+      await expect(
+        page.getByRole("heading", { name: /sign up|create.*account|register/i })
+      ).toBeVisible({ timeout: 30000 });
 
-      await page.getByLabel(/email/i).first().fill('test@example.com');
-      await page.locator('input[type="password"]').first().fill('weak');
+      await page.getByLabel(/email/i).first().fill("test@example.com");
+      await page.locator('input[type="password"]').first().fill("weak");
 
       // Try to submit or check for immediate validation
-      const submitButton = page.getByRole('button', { name: /sign up|create/i }).first();
+      const submitButton = page
+        .getByRole("button", { name: /sign up|create/i })
+        .first();
 
       // Either button disabled or validation message shown
       const buttonDisabled = await submitButton.isDisabled().catch(() => false);
-      const errorVisible = await page.getByText(/password.*weak|password.*short|password.*requirements/i)
-        .first().isVisible().catch(() => false);
+      const errorVisible = await page
+        .getByText(/password.*weak|password.*short|password.*requirements/i)
+        .first()
+        .isVisible()
+        .catch(() => false);
 
       // At least one validation mechanism should be present
       // (may need to click submit to trigger validation)
@@ -141,61 +170,83 @@ test.describe('Authentication Journeys', () => {
         // After clicking submit, check for any error message related to password
         const passwordError = page.getByText(/password/i).first();
         const alertError = page.locator('[role="alert"]').first();
-        await expect(
-          passwordError.or(alertError)
-        ).toBeVisible({ timeout: 10000 });
+        await expect(passwordError.or(alertError)).toBeVisible({
+          timeout: 10000,
+        });
       }
     });
   });
 
-  test.describe('J008: User login', () => {
-    test(`${tags.auth} - Successful login flow`, async ({ page, auth, assert }) => {
+  test.describe("J008: User login", () => {
+    test(`${tags.auth} - Successful login flow`, async ({
+      page,
+      auth,
+      assert,
+    }) => {
       const creds = auth.getCredentials();
 
       // Step 1: Navigate to login
-      await page.goto('/login');
-      await page.waitForLoadState('domcontentloaded');
-      await expect(page.getByRole('heading', { name: /log in|sign in|welcome back/i })).toBeVisible({ timeout: 30000 });
+      await page.goto("/login");
+      await page.waitForLoadState("domcontentloaded");
+      await expect(
+        page.getByRole("heading", { name: /log in|sign in|welcome back/i })
+      ).toBeVisible({ timeout: 30000 });
 
       // Step 2-3: Fill credentials
       await page.getByLabel(/email/i).first().fill(creds.email);
-      await page.getByLabel(/password/i).first().fill(creds.password);
+      await page
+        .getByLabel(/password/i)
+        .first()
+        .fill(creds.password);
 
       // Step 4: Submit
-      await page.getByRole('button', { name: /log in|sign in/i }).first().click();
+      await page
+        .getByRole("button", { name: /log in|sign in/i })
+        .first()
+        .click();
 
       // Step 5: Wait for redirect
       // Login uses window.location.href = '/' (full page navigation)
-      await expect.poll(
-        () => !new URL(page.url()).pathname.includes('/login'),
-        { timeout: 30000, message: 'Expected to navigate away from login' }
-      ).toBe(true);
+      await expect
+        .poll(() => !new URL(page.url()).pathname.includes("/login"), {
+          timeout: 30000,
+          message: "Expected to navigate away from login",
+        })
+        .toBe(true);
 
       // Step 6: Verify logged in
       await assert.isLoggedIn();
 
       // Step 7-8: Refresh and verify session persists
       await page.reload();
-      await page.waitForLoadState('domcontentloaded');
+      await page.waitForLoadState("domcontentloaded");
       await assert.isLoggedIn();
     });
 
     test(`${tags.auth} - Invalid credentials show error`, async ({ page }) => {
-      await page.goto('/login');
-      await page.waitForLoadState('domcontentloaded');
+      await page.goto("/login");
+      await page.waitForLoadState("domcontentloaded");
 
       // Wait for the login form to render (Suspense boundary + hydration)
       await expect(
-        page.getByRole('heading', { name: /log in|sign in|welcome back/i })
+        page.getByRole("heading", { name: /log in|sign in|welcome back/i })
       ).toBeVisible({ timeout: 30000 });
 
-      await page.getByLabel(/email/i).first().fill('invalid@example.com');
-      await page.getByLabel(/password/i).first().fill('wrongpassword');
-      await page.getByRole('button', { name: /log in|sign in/i }).first().click();
+      await page.getByLabel(/email/i).first().fill("invalid@example.com");
+      await page
+        .getByLabel(/password/i)
+        .first()
+        .fill("wrongpassword");
+      await page
+        .getByRole("button", { name: /log in|sign in/i })
+        .first()
+        .click();
 
       // Should show error without revealing which field is wrong
       await expect(
-        page.getByText(/invalid|incorrect|wrong|failed/i).first()
+        page
+          .getByText(/invalid|incorrect|wrong|failed/i)
+          .first()
           .or(page.locator('[role="alert"]').first())
       ).toBeVisible({ timeout: 30000 });
 
@@ -204,18 +255,26 @@ test.describe('Authentication Journeys', () => {
     });
   });
 
-  test.describe('J009: User logout', () => {
-    test(`${tags.auth} - Logout clears session`, async ({ page, auth, nav, assert }) => {
+  test.describe("J009: User logout", () => {
+    test(`${tags.auth} - Logout clears session`, async ({
+      page,
+      auth,
+      nav,
+      assert,
+    }) => {
       // Skip in CI — the user menu button has transition-all duration-300 which
       // causes Playwright's stability check to consistently fail. The button is
       // inside a hidden lg:flex container that requires ≥1024px viewport.
       // This test passes locally but is not reliable in GitHub Actions.
-      test.skip(!!process.env.CI, 'User menu click unreliable in CI due to CSS transition stability check');
+      test.skip(
+        !!process.env.CI,
+        "User menu click unreliable in CI due to CSS transition stability check"
+      );
 
       // Skip on mobile viewports — hamburger menu + user menu interaction is unreliable in CI
       const viewport = page.viewportSize();
       if (viewport && viewport.width < 768) {
-        test.skip(true, 'Test designed for desktop viewport');
+        test.skip(true, "Test designed for desktop viewport");
         return;
       }
 
@@ -223,13 +282,16 @@ test.describe('Authentication Journeys', () => {
       try {
         await auth.loginViaUI(page);
       } catch {
-        test.skip(true, 'Login did not succeed — test credentials may not work in CI');
+        test.skip(
+          true,
+          "Login did not succeed — test credentials may not work in CI"
+        );
         return;
       }
 
       // Verify login actually succeeded before trying logout
-      if (page.url().includes('/login')) {
-        test.skip(true, 'Login did not redirect — skipping logout test');
+      if (page.url().includes("/login")) {
+        test.skip(true, "Login did not redirect — skipping logout test");
         return;
       }
 
@@ -243,40 +305,62 @@ test.describe('Authentication Journeys', () => {
       await assert.isLoggedOut();
 
       // Step 7-8: Protected route should redirect to login
-      await page.goto('/profile');
+      await page.goto("/profile");
       await expect(page).toHaveURL(/\/login/, { timeout: 30000 });
     });
   });
 
-  test.describe('J010: Password reset', () => {
-    test(`${tags.auth} ${tags.flaky} - Request password reset`, async ({ page }) => {
+  test.describe("J010: Password reset", () => {
+    test(`${tags.auth} ${tags.flaky} - Request password reset`, async ({
+      page,
+    }) => {
       // Step 1: Navigate to forgot password
-      await page.goto('/forgot-password');
-      await page.waitForLoadState('domcontentloaded');
+      await page.goto("/forgot-password");
+      await page.waitForLoadState("domcontentloaded");
 
       // Wait for the forgot password form to render
-      await expect(page.getByRole('heading', { name: /forgot password|reset password/i })).toBeVisible({ timeout: 30000 });
+      await expect(
+        page.getByRole("heading", { name: /forgot password|reset password/i })
+      ).toBeVisible({ timeout: 30000 });
 
       // Step 2: Fill email
       const emailInput = page.getByLabel(/email/i).first();
-      await emailInput.fill(process.env.E2E_TEST_EMAIL || 'test@example.com');
+      await emailInput.fill(process.env.E2E_TEST_EMAIL || "test@example.com");
 
       // Step 3: Submit
-      await page.getByRole('button', { name: /reset|send|submit/i }).first().click();
+      await page
+        .getByRole("button", { name: /reset|send|submit/i })
+        .first()
+        .click();
 
       // Step 4: Success message (should show same message regardless of email existence)
       await expect(
-        page.getByText(/check.*email|sent|instructions/i).first()
+        page
+          .getByText(/check.*email|sent|instructions/i)
+          .first()
           .or(page.locator('[data-testid="success-message"]').first())
       ).toBeVisible({ timeout: 30000 });
 
       // Step 5-7: Test with non-existent email (should show same message - no enumeration)
       // After success, there may be a "Try another email" button to return to the form
-      const tryAnotherBtn = page.getByRole('button', { name: /try another email/i }).first();
-      if (await tryAnotherBtn.waitFor({ state: 'visible', timeout: 5000 }).then(() => true).catch(() => false)) {
+      const tryAnotherBtn = page
+        .getByRole("button", { name: /try another email/i })
+        .first();
+      if (
+        await tryAnotherBtn
+          .waitFor({ state: "visible", timeout: 5000 })
+          .then(() => true)
+          .catch(() => false)
+      ) {
         await tryAnotherBtn.click();
-        await page.getByLabel(/email/i).first().fill('nonexistent-email-12345@example.com');
-        await page.getByRole('button', { name: /reset|send|submit/i }).first().click();
+        await page
+          .getByLabel(/email/i)
+          .first()
+          .fill("nonexistent-email-12345@example.com");
+        await page
+          .getByRole("button", { name: /reset|send|submit/i })
+          .first()
+          .click();
 
         // Should show same success-like message
         await expect(
@@ -286,17 +370,17 @@ test.describe('Authentication Journeys', () => {
     });
   });
 
-  test.describe('J011-J012: Protected route access', () => {
+  test.describe("J011-J012: Protected route access", () => {
     test(`${tags.auth} - Unauthenticated user redirected from protected routes`, async ({
       page,
       auth,
     }) => {
       const protectedRoutes = [
-        '/profile',
-        '/settings',
-        '/bookings',
-        '/messages',
-        '/listings/create',
+        "/profile",
+        "/settings",
+        "/bookings",
+        "/messages",
+        "/listings/create",
       ];
 
       for (const route of protectedRoutes) {
@@ -304,19 +388,26 @@ test.describe('Authentication Journeys', () => {
       }
     });
 
-    test(`${tags.auth} - Protected route redirects to login then allows access`, async ({ page, auth }) => {
+    test(`${tags.auth} - Protected route redirects to login then allows access`, async ({
+      page,
+      auth,
+    }) => {
       // Try to access protected route
-      await page.goto('/profile');
+      await page.goto("/profile");
 
       // Should redirect to login
       await expect(page).toHaveURL(/\/login/, { timeout: 30000 });
 
       // Wait for the login form to render (Suspense boundary + hydration)
-      await page.waitForLoadState('domcontentloaded');
-      const loginHeading = page.getByRole('heading', { name: /log in|sign in|welcome back/i });
-      const loginFormVisible = await loginHeading.isVisible({ timeout: 30000 }).catch(() => false);
+      await page.waitForLoadState("domcontentloaded");
+      const loginHeading = page.getByRole("heading", {
+        name: /log in|sign in|welcome back/i,
+      });
+      const loginFormVisible = await loginHeading
+        .isVisible({ timeout: 30000 })
+        .catch(() => false);
       if (!loginFormVisible) {
-        test.skip(true, 'Login form did not render (CI hydration/SSR issue)');
+        test.skip(true, "Login form did not render (CI hydration/SSR issue)");
         return;
       }
 
@@ -326,15 +417,20 @@ test.describe('Authentication Journeys', () => {
       const passwordInput = page.getByLabel(/password/i).first();
 
       // Guard: inputs must be visible and interactable
-      if (!(await emailInput.isVisible({ timeout: 5000 }).catch(() => false)) ||
-          !(await passwordInput.isVisible({ timeout: 5000 }).catch(() => false))) {
-        test.skip(true, 'Login form inputs not visible');
+      if (
+        !(await emailInput.isVisible({ timeout: 5000 }).catch(() => false)) ||
+        !(await passwordInput.isVisible({ timeout: 5000 }).catch(() => false))
+      ) {
+        test.skip(true, "Login form inputs not visible");
         return;
       }
 
       await emailInput.fill(creds.email);
       await passwordInput.fill(creds.password);
-      await page.getByRole('button', { name: /log in|sign in/i }).first().click();
+      await page
+        .getByRole("button", { name: /log in|sign in/i })
+        .first()
+        .click();
 
       // Login form redirects to home after successful login (via window.location.href).
       // Use a longer timeout — CI can be slow for full page navigation.
@@ -342,31 +438,41 @@ test.describe('Authentication Journeys', () => {
       let navigatedAway = false;
       const loginDeadline = Date.now() + 60000;
       while (Date.now() < loginDeadline) {
-        if (!new URL(page.url()).pathname.includes('/login')) { navigatedAway = true; break; }
+        if (!new URL(page.url()).pathname.includes("/login")) {
+          navigatedAway = true;
+          break;
+        }
         await page.waitForTimeout(500);
       }
       if (!navigatedAway) {
-        test.skip(true, 'Login did not redirect (test credentials may not work in CI)');
+        test.skip(
+          true,
+          "Login did not redirect (test credentials may not work in CI)"
+        );
         return;
       }
       expect(navigatedAway).toBe(true);
     });
   });
 
-  test.describe('J013-J014: Session management', () => {
-    test(`${tags.auth} - Session persists across tabs`, async ({ page, context, auth }) => {
+  test.describe("J013-J014: Session management", () => {
+    test(`${tags.auth} - Session persists across tabs`, async ({
+      page,
+      context,
+      auth,
+    }) => {
       // Login in first tab
       await auth.loginViaUI(page);
 
       // Open new tab
       const newPage = await context.newPage();
-      await newPage.goto('/');
-      await newPage.waitForLoadState('domcontentloaded');
+      await newPage.goto("/");
+      await newPage.waitForLoadState("domcontentloaded");
 
       // Should be logged in on new tab too.
       // On mobile viewports the user menu is behind a hamburger — check attached.
       const userMenu = newPage
-        .getByRole('button', { name: /menu|profile|account/i })
+        .getByRole("button", { name: /menu|profile|account/i })
         .or(newPage.locator('[data-testid="user-menu"]'));
 
       const viewport = newPage.viewportSize();
@@ -382,34 +488,44 @@ test.describe('Authentication Journeys', () => {
     });
   });
 
-  test.describe('J015-J016: Rate limiting on auth', () => {
-    test(`${tags.auth} ${tags.flaky} - Rate limit on failed logins`, async ({ page }) => {
-      await page.goto('/login');
-      await page.waitForLoadState('domcontentloaded');
+  test.describe("J015-J016: Rate limiting on auth", () => {
+    test(`${tags.auth} ${tags.flaky} - Rate limit on failed logins`, async ({
+      page,
+    }) => {
+      await page.goto("/login");
+      await page.waitForLoadState("domcontentloaded");
 
       // Wait for the login form to render (Suspense boundary + hydration)
       await expect(
-        page.getByRole('heading', { name: /log in|sign in|welcome back/i })
+        page.getByRole("heading", { name: /log in|sign in|welcome back/i })
       ).toBeVisible({ timeout: 30000 });
 
       // Attempt multiple failed logins
       for (let i = 0; i < 5; i++) {
         await page.getByLabel(/email/i).first().fill(`test${i}@example.com`);
-        await page.getByLabel(/password/i).first().fill('wrongpassword');
-        await page.getByRole('button', { name: /log in|sign in/i }).first().click();
+        await page
+          .getByLabel(/password/i)
+          .first()
+          .fill("wrongpassword");
+        await page
+          .getByRole("button", { name: /log in|sign in/i })
+          .first()
+          .click();
 
         // Wait for the error response or form to be re-interactable
         await page.waitForTimeout(1000);
 
         // Wait for form to be ready for next iteration (button re-enabled)
-        await expect(page.getByRole('button', { name: /log in|sign in/i }).first()).toBeEnabled({ timeout: 10000 });
+        await expect(
+          page.getByRole("button", { name: /log in|sign in/i }).first()
+        ).toBeEnabled({ timeout: 10000 });
       }
 
       // After multiple attempts, should see rate limit or be slowed down
       // (exact behavior depends on implementation)
       // Rate limiting may or may not be visible, but login should still work eventually
       // This test mainly ensures the app doesn't crash under rapid auth attempts
-      expect(page.url()).toContain('/login');
+      expect(page.url()).toContain("/login");
     });
   });
 });

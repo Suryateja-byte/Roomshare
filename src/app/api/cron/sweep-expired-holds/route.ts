@@ -20,8 +20,11 @@ import { validateCronAuth } from "@/lib/cron-auth";
 import { features } from "@/lib/env";
 import { createInternalNotification } from "@/lib/notifications";
 import { markListingsDirty } from "@/lib/search/search-doc-dirty";
-import { SWEEPER_BATCH_SIZE, SWEEPER_ADVISORY_LOCK_KEY } from "@/lib/hold-constants";
-import { logBookingAudit } from '@/lib/booking-audit';
+import {
+  SWEEPER_BATCH_SIZE,
+  SWEEPER_ADVISORY_LOCK_KEY,
+} from "@/lib/hold-constants";
+import { logBookingAudit } from "@/lib/booking-audit";
 
 interface ExpiredHoldInfo {
   bookingId: string;
@@ -124,16 +127,23 @@ export async function GET(request: NextRequest) {
 
         await logBookingAudit(tx, {
           bookingId: hold.id,
-          action: 'EXPIRED',
-          previousStatus: 'HELD',
-          newStatus: 'EXPIRED',
+          action: "EXPIRED",
+          previousStatus: "HELD",
+          newStatus: "EXPIRED",
           actorId: null,
-          actorType: 'SYSTEM',
-          details: { slotsRequested: hold.slotsRequested, heldUntil: hold.heldUntil },
+          actorType: "SYSTEM",
+          details: {
+            slotsRequested: hold.slotsRequested,
+            heldUntil: hold.heldUntil,
+          },
         });
       }
 
-      return { skipped: false, expired: expiredBookings.length, holds: expiredBookings } as const;
+      return {
+        skipped: false,
+        expired: expiredBookings.length,
+        holds: expiredBookings,
+      } as const;
     });
 
     if (result.skipped) {
@@ -183,15 +193,18 @@ export async function GET(request: NextRequest) {
         // Log but do not fail the sweep for notification errors
         logger.sync.error("[sweep-expired-holds] Notification failed", {
           bookingId: hold.bookingId,
-          error: notifError instanceof Error ? notifError.message : "Unknown error",
+          error:
+            notifError instanceof Error ? notifError.message : "Unknown error",
         });
       }
     }
 
     // Mark affected listings dirty for search doc refresh (availableSlots changed)
     if (expiredHolds.length > 0) {
-      const affectedListingIds = [...new Set(expiredHolds.map(h => h.listingId))];
-      await markListingsDirty(affectedListingIds, 'booking_hold_expired');
+      const affectedListingIds = [
+        ...new Set(expiredHolds.map((h) => h.listingId)),
+      ];
+      await markListingsDirty(affectedListingIds, "booking_hold_expired");
     }
 
     const durationMs = Date.now() - startTime;
@@ -213,9 +226,6 @@ export async function GET(request: NextRequest) {
     logger.sync.error("[sweep-expired-holds] Transaction failed", {
       error: error instanceof Error ? error.message : "Unknown error",
     });
-    return NextResponse.json(
-      { error: "Sweeper failed" },
-      { status: 500 },
-    );
+    return NextResponse.json({ error: "Sweeper failed" }, { status: 500 });
   }
 }

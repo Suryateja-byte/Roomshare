@@ -26,7 +26,7 @@ const AUTH_COOKIES = [
  */
 export async function expireSession(
   page: Page,
-  options: { mockEndpoint?: boolean; triggerRefetch?: boolean } = {},
+  options: { mockEndpoint?: boolean; triggerRefetch?: boolean } = {}
 ): Promise<void> {
   const { mockEndpoint = true, triggerRefetch = false } = options;
 
@@ -50,7 +50,10 @@ export async function expireSession(
     // always trigger the same listeners as real user interactions.
     await page.evaluate(() => {
       window.dispatchEvent(new Event("focus"));
-      Object.defineProperty(document, 'visibilityState', { value: 'visible', writable: true });
+      Object.defineProperty(document, "visibilityState", {
+        value: "visible",
+        writable: true,
+      });
       document.dispatchEvent(new Event("visibilitychange"));
     });
     await page.waitForTimeout(1000);
@@ -67,7 +70,7 @@ export async function expireSession(
 export async function mockApi401(
   page: Page,
   urlPattern: string | RegExp,
-  options?: { method?: string },
+  options?: { method?: string }
 ): Promise<void> {
   await page.route(urlPattern, async (route: Route) => {
     if (options?.method && route.request().method() !== options.method) {
@@ -98,14 +101,16 @@ export async function triggerSessionPoll(page: Page): Promise<void> {
 export async function expectLoginRedirect(
   page: Page,
   callbackUrl?: string,
-  timeout = 30000,
+  timeout = 30000
 ): Promise<void> {
   // Poll for redirect — may go through /api/auth/signin first,
   // and may take a moment after domcontentloaded to complete.
-  await expect.poll(
-    () => /\/(login|signin|auth)/.test(page.url()),
-    { timeout, message: `Expected URL to contain /login, /signin, or /auth but got: ${page.url()}` },
-  ).toBe(true);
+  await expect
+    .poll(() => /\/(login|signin|auth)/.test(page.url()), {
+      timeout,
+      message: `Expected URL to contain /login, /signin, or /auth but got: ${page.url()}`,
+    })
+    .toBe(true);
   if (callbackUrl) {
     const url = new URL(page.url());
     const raw = url.searchParams.get("callbackUrl") ?? url.search;
@@ -123,7 +128,7 @@ export async function expectLoginRedirect(
 export async function expectDraftSaved(
   page: Page,
   key: string,
-  expectedContent?: string,
+  expectedContent?: string
 ): Promise<string | null> {
   const value = await page.evaluate((k) => sessionStorage.getItem(k), key);
   expect(value).not.toBeNull();

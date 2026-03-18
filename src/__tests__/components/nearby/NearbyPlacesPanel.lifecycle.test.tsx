@@ -7,13 +7,19 @@
  * @see Plan Category E - UI State, React Lifecycle (10 tests)
  */
 
-import React from 'react';
-import { render, screen, fireEvent, waitFor, act } from '@testing-library/react';
-import { renderHook } from '@testing-library/react';
+import React from "react";
+import {
+  render,
+  screen,
+  fireEvent,
+  waitFor,
+  act,
+} from "@testing-library/react";
+import { renderHook } from "@testing-library/react";
 
 // Mock next-auth with different session states
 const mockUseSession = jest.fn();
-jest.mock('next-auth/react', () => ({
+jest.mock("next-auth/react", () => ({
   useSession: () => mockUseSession(),
 }));
 
@@ -22,7 +28,7 @@ const mockFetch = jest.fn();
 global.fetch = mockFetch;
 
 // Mock Lucide icons
-jest.mock('lucide-react', () => ({
+jest.mock("lucide-react", () => ({
   MapPin: () => <span data-testid="map-pin-icon">M</span>,
   Search: () => <span data-testid="search-icon">S</span>,
   AlertCircle: () => <span data-testid="alert-icon">!</span>,
@@ -40,32 +46,32 @@ jest.mock('lucide-react', () => ({
 }));
 
 // Mock UI components
-jest.mock('@/components/ui/button', () => ({
-  Button: ({ children, asChild, ...props }: React.PropsWithChildren<{ asChild?: boolean }>) =>
-    asChild ? (
-      <>{children}</>
-    ) : (
-      <button {...props}>{children}</button>
-    ),
+jest.mock("@/components/ui/button", () => ({
+  Button: ({
+    children,
+    asChild,
+    ...props
+  }: React.PropsWithChildren<{ asChild?: boolean }>) =>
+    asChild ? <>{children}</> : <button {...props}>{children}</button>,
 }));
 
-import NearbyPlacesPanel from '@/components/nearby/NearbyPlacesPanel';
-import type { NearbyPlace } from '@/types/nearby';
+import NearbyPlacesPanel from "@/components/nearby/NearbyPlacesPanel";
+import type { NearbyPlace } from "@/types/nearby";
 
-describe('NearbyPlacesPanel - UI State & React Lifecycle', () => {
+describe("NearbyPlacesPanel - UI State & React Lifecycle", () => {
   const listingLat = 37.7749;
   const listingLng = -122.4194;
 
   const mockSession = {
-    user: { id: 'user-123', name: 'Test User', email: 'test@example.com' },
+    user: { id: "user-123", name: "Test User", email: "test@example.com" },
     expires: new Date(Date.now() + 86400000).toISOString(),
   };
 
   const createMockPlace = (id: string): NearbyPlace => ({
     id,
     name: `Place ${id}`,
-    address: '123 Test St',
-    category: 'food-grocery',
+    address: "123 Test St",
+    category: "food-grocery",
     location: { lat: 37.7749, lng: -122.4194 },
     distanceMiles: 0.5,
   });
@@ -75,13 +81,13 @@ describe('NearbyPlacesPanel - UI State & React Lifecycle', () => {
     jest.useFakeTimers();
     mockUseSession.mockReturnValue({
       data: mockSession,
-      status: 'authenticated',
+      status: "authenticated",
     });
     mockFetch.mockResolvedValue({
       ok: true,
       status: 200,
       json: async () => ({
-        places: [createMockPlace('place-1')],
+        places: [createMockPlace("place-1")],
         meta: { count: 1, cached: false },
       }),
     });
@@ -102,9 +108,9 @@ describe('NearbyPlacesPanel - UI State & React Lifecycle', () => {
   };
 
   // E1: Unmount while fetch in flight doesn't setState
-  describe('E1: Memory Leak Prevention', () => {
-    it('does not update state after unmount', async () => {
-      const consoleError = jest.spyOn(console, 'error').mockImplementation();
+  describe("E1: Memory Leak Prevention", () => {
+    it("does not update state after unmount", async () => {
+      const consoleError = jest.spyOn(console, "error").mockImplementation();
 
       // Delay the response to simulate in-flight request
       let resolveRequest: (() => void) | null = null;
@@ -116,7 +122,7 @@ describe('NearbyPlacesPanel - UI State & React Lifecycle', () => {
                 ok: true,
                 status: 200,
                 json: async () => ({
-                  places: [createMockPlace('place-1')],
+                  places: [createMockPlace("place-1")],
                   meta: { count: 1, cached: false },
                 }),
               });
@@ -126,7 +132,7 @@ describe('NearbyPlacesPanel - UI State & React Lifecycle', () => {
       const { unmount } = renderPanel();
 
       // Start a request
-      const groceryChip = screen.getByRole('button', { name: /grocery/i });
+      const groceryChip = screen.getByRole("button", { name: /grocery/i });
       await act(async () => {
         fireEvent.click(groceryChip);
       });
@@ -143,21 +149,23 @@ describe('NearbyPlacesPanel - UI State & React Lifecycle', () => {
       // Should not have React warning about updating unmounted component
       const reactWarnings = consoleError.mock.calls.filter(
         (call) =>
-          call[0]?.toString?.()?.includes?.('unmounted') ||
-          call[0]?.toString?.()?.includes?.("Can't perform a React state update")
+          call[0]?.toString?.()?.includes?.("unmounted") ||
+          call[0]
+            ?.toString?.()
+            ?.includes?.("Can't perform a React state update")
       );
 
       expect(reactWarnings.length).toBe(0);
       consoleError.mockRestore();
     });
 
-    it('aborts in-flight request on unmount', () => {
-      const abortSpy = jest.spyOn(AbortController.prototype, 'abort');
+    it("aborts in-flight request on unmount", () => {
+      const abortSpy = jest.spyOn(AbortController.prototype, "abort");
 
       const { unmount } = renderPanel();
 
       // Start a request
-      const groceryChip = screen.getByRole('button', { name: /grocery/i });
+      const groceryChip = screen.getByRole("button", { name: /grocery/i });
       fireEvent.click(groceryChip);
 
       // Unmount
@@ -170,9 +178,9 @@ describe('NearbyPlacesPanel - UI State & React Lifecycle', () => {
   });
 
   // E2: StrictMode double-invokes effects correctly
-  describe('E2: React StrictMode', () => {
-    it('handles double effect invocation in StrictMode', () => {
-      const consoleError = jest.spyOn(console, 'error').mockImplementation();
+  describe("E2: React StrictMode", () => {
+    it("handles double effect invocation in StrictMode", () => {
+      const consoleError = jest.spyOn(console, "error").mockImplementation();
 
       // Render in StrictMode
       render(
@@ -186,8 +194,8 @@ describe('NearbyPlacesPanel - UI State & React Lifecycle', () => {
       consoleError.mockRestore();
     });
 
-    it('cleans up properly on StrictMode remount', async () => {
-      const abortSpy = jest.spyOn(AbortController.prototype, 'abort');
+    it("cleans up properly on StrictMode remount", async () => {
+      const abortSpy = jest.spyOn(AbortController.prototype, "abort");
 
       const { unmount } = render(
         <React.StrictMode>
@@ -196,7 +204,7 @@ describe('NearbyPlacesPanel - UI State & React Lifecycle', () => {
       );
 
       // Start a request
-      const groceryChip = screen.getByRole('button', { name: /grocery/i });
+      const groceryChip = screen.getByRole("button", { name: /grocery/i });
       await act(async () => {
         fireEvent.click(groceryChip);
       });
@@ -210,8 +218,8 @@ describe('NearbyPlacesPanel - UI State & React Lifecycle', () => {
   });
 
   // E3: SSR hydration mismatch avoided
-  describe('E3: Hydration', () => {
-    it('renders consistently on initial mount', () => {
+  describe("E3: Hydration", () => {
+    it("renders consistently on initial mount", () => {
       const { container: container1 } = renderPanel();
       const html1 = container1.innerHTML;
 
@@ -222,7 +230,7 @@ describe('NearbyPlacesPanel - UI State & React Lifecycle', () => {
       expect(html1).toBe(html2);
     });
 
-    it('does not use browser-only APIs in initial render', () => {
+    it("does not use browser-only APIs in initial render", () => {
       // Verify component renders without errors on initial render
       // The component should handle the case where browser APIs may not be available
       const { container } = renderPanel();
@@ -236,8 +244,8 @@ describe('NearbyPlacesPanel - UI State & React Lifecycle', () => {
   });
 
   // E4: Panel/map places sync after update
-  describe('E4: State Sync', () => {
-    it('calls onPlacesChange when places are fetched', async () => {
+  describe("E4: State Sync", () => {
+    it("calls onPlacesChange when places are fetched", async () => {
       const onPlacesChange = jest.fn();
 
       render(
@@ -248,7 +256,7 @@ describe('NearbyPlacesPanel - UI State & React Lifecycle', () => {
         />
       );
 
-      const groceryChip = screen.getByRole('button', { name: /grocery/i });
+      const groceryChip = screen.getByRole("button", { name: /grocery/i });
       await act(async () => {
         fireEvent.click(groceryChip);
         jest.runAllTimers();
@@ -256,14 +264,12 @@ describe('NearbyPlacesPanel - UI State & React Lifecycle', () => {
 
       await waitFor(() => {
         expect(onPlacesChange).toHaveBeenCalledWith(
-          expect.arrayContaining([
-            expect.objectContaining({ id: 'place-1' }),
-          ])
+          expect.arrayContaining([expect.objectContaining({ id: "place-1" })])
         );
       });
     });
 
-    it('syncs places on category change', async () => {
+    it("syncs places on category change", async () => {
       const onPlacesChange = jest.fn();
 
       mockFetch
@@ -271,7 +277,7 @@ describe('NearbyPlacesPanel - UI State & React Lifecycle', () => {
           ok: true,
           status: 200,
           json: async () => ({
-            places: [createMockPlace('grocery-1')],
+            places: [createMockPlace("grocery-1")],
             meta: { count: 1, cached: false },
           }),
         })
@@ -279,7 +285,7 @@ describe('NearbyPlacesPanel - UI State & React Lifecycle', () => {
           ok: true,
           status: 200,
           json: async () => ({
-            places: [createMockPlace('pharmacy-1')],
+            places: [createMockPlace("pharmacy-1")],
             meta: { count: 1, cached: false },
           }),
         });
@@ -293,14 +299,14 @@ describe('NearbyPlacesPanel - UI State & React Lifecycle', () => {
       );
 
       // Click grocery
-      const groceryChip = screen.getByRole('button', { name: /grocery/i });
+      const groceryChip = screen.getByRole("button", { name: /grocery/i });
       await act(async () => {
         fireEvent.click(groceryChip);
         jest.runAllTimers();
       });
 
       // Click pharmacy
-      const pharmacyChip = screen.getByRole('button', { name: /pharmacy/i });
+      const pharmacyChip = screen.getByRole("button", { name: /pharmacy/i });
       await act(async () => {
         fireEvent.click(pharmacyChip);
         jest.runAllTimers();
@@ -312,8 +318,8 @@ describe('NearbyPlacesPanel - UI State & React Lifecycle', () => {
   });
 
   // E5: Hovered state clears after results cleared
-  describe('E5: Stale Hover', () => {
-    it('calls onPlaceHover with null on mouse leave', async () => {
+  describe("E5: Stale Hover", () => {
+    it("calls onPlaceHover with null on mouse leave", async () => {
       const onPlaceHover = jest.fn();
 
       render(
@@ -325,7 +331,7 @@ describe('NearbyPlacesPanel - UI State & React Lifecycle', () => {
       );
 
       // Fetch results
-      const groceryChip = screen.getByRole('button', { name: /grocery/i });
+      const groceryChip = screen.getByRole("button", { name: /grocery/i });
       await act(async () => {
         fireEvent.click(groceryChip);
         jest.runAllTimers();
@@ -333,13 +339,15 @@ describe('NearbyPlacesPanel - UI State & React Lifecycle', () => {
 
       // Wait for results
       await waitFor(() => {
-        expect(screen.getByText('Place place-1')).toBeInTheDocument();
+        expect(screen.getByText("Place place-1")).toBeInTheDocument();
       });
 
       // Hover on result
-      const resultItem = screen.getByLabelText(/get directions to place place-1/i);
+      const resultItem = screen.getByLabelText(
+        /get directions to place place-1/i
+      );
       fireEvent.mouseEnter(resultItem);
-      expect(onPlaceHover).toHaveBeenCalledWith('place-1');
+      expect(onPlaceHover).toHaveBeenCalledWith("place-1");
 
       // Mouse leave
       fireEvent.mouseLeave(resultItem);
@@ -348,37 +356,39 @@ describe('NearbyPlacesPanel - UI State & React Lifecycle', () => {
   });
 
   // E6: hasSearched resets on input clear
-  describe('E6: Flag Reset', () => {
-    it('shows initial prompt when no search has been done', () => {
+  describe("E6: Flag Reset", () => {
+    it("shows initial prompt when no search has been done", () => {
       renderPanel();
 
       expect(screen.getByText(/discover what's nearby/i)).toBeInTheDocument();
     });
 
-    it('shows results after search', async () => {
+    it("shows results after search", async () => {
       renderPanel();
 
-      const groceryChip = screen.getByRole('button', { name: /grocery/i });
+      const groceryChip = screen.getByRole("button", { name: /grocery/i });
       await act(async () => {
         fireEvent.click(groceryChip);
         jest.runAllTimers();
       });
 
       await waitFor(() => {
-        expect(screen.queryByText(/discover what's nearby/i)).not.toBeInTheDocument();
+        expect(
+          screen.queryByText(/discover what's nearby/i)
+        ).not.toBeInTheDocument();
       });
     });
   });
 
   // E7: Error state cleared on new search
-  describe('E7: Error Clear', () => {
-    it('clears error when new search starts', async () => {
+  describe("E7: Error Clear", () => {
+    it("clears error when new search starts", async () => {
       // First request fails
-      mockFetch.mockRejectedValueOnce(new Error('Network error'));
+      mockFetch.mockRejectedValueOnce(new Error("Network error"));
 
       renderPanel();
 
-      const groceryChip = screen.getByRole('button', { name: /grocery/i });
+      const groceryChip = screen.getByRole("button", { name: /grocery/i });
       await act(async () => {
         fireEvent.click(groceryChip);
         jest.runAllTimers();
@@ -394,13 +404,13 @@ describe('NearbyPlacesPanel - UI State & React Lifecycle', () => {
         ok: true,
         status: 200,
         json: async () => ({
-          places: [createMockPlace('place-1')],
+          places: [createMockPlace("place-1")],
           meta: { count: 1, cached: false },
         }),
       });
 
       // Start new search
-      const pharmacyChip = screen.getByRole('button', { name: /pharmacy/i });
+      const pharmacyChip = screen.getByRole("button", { name: /pharmacy/i });
       await act(async () => {
         fireEvent.click(pharmacyChip);
         jest.runAllTimers();
@@ -414,13 +424,13 @@ describe('NearbyPlacesPanel - UI State & React Lifecycle', () => {
   });
 
   // E8: Loading spinner stops on thrown error
-  describe('E8: Loading State', () => {
-    it('stops loading state on error', async () => {
-      mockFetch.mockRejectedValueOnce(new Error('Network error'));
+  describe("E8: Loading State", () => {
+    it("stops loading state on error", async () => {
+      mockFetch.mockRejectedValueOnce(new Error("Network error"));
 
       renderPanel();
 
-      const groceryChip = screen.getByRole('button', { name: /grocery/i });
+      const groceryChip = screen.getByRole("button", { name: /grocery/i });
       await act(async () => {
         fireEvent.click(groceryChip);
         jest.runAllTimers();
@@ -428,11 +438,13 @@ describe('NearbyPlacesPanel - UI State & React Lifecycle', () => {
 
       // Loading should be stopped
       await waitFor(() => {
-        expect(screen.queryByTestId('loading-skeleton')).not.toBeInTheDocument();
+        expect(
+          screen.queryByTestId("loading-skeleton")
+        ).not.toBeInTheDocument();
       });
     });
 
-    it('shows loading skeleton during fetch', async () => {
+    it("shows loading skeleton during fetch", async () => {
       // Delay the response
       mockFetch.mockImplementation(
         () =>
@@ -443,7 +455,7 @@ describe('NearbyPlacesPanel - UI State & React Lifecycle', () => {
                   ok: true,
                   status: 200,
                   json: async () => ({
-                    places: [createMockPlace('place-1')],
+                    places: [createMockPlace("place-1")],
                     meta: { count: 1, cached: false },
                   }),
                 }),
@@ -454,13 +466,13 @@ describe('NearbyPlacesPanel - UI State & React Lifecycle', () => {
 
       renderPanel();
 
-      const groceryChip = screen.getByRole('button', { name: /grocery/i });
+      const groceryChip = screen.getByRole("button", { name: /grocery/i });
       await act(async () => {
         fireEvent.click(groceryChip);
       });
 
       // Should show loading skeleton
-      expect(screen.getByTestId('loading-skeleton')).toBeInTheDocument();
+      expect(screen.getByTestId("loading-skeleton")).toBeInTheDocument();
 
       // Complete the request
       await act(async () => {
@@ -469,14 +481,16 @@ describe('NearbyPlacesPanel - UI State & React Lifecycle', () => {
 
       // Loading should be gone
       await waitFor(() => {
-        expect(screen.queryByTestId('loading-skeleton')).not.toBeInTheDocument();
+        expect(
+          screen.queryByTestId("loading-skeleton")
+        ).not.toBeInTheDocument();
       });
     });
   });
 
   // E9: Rapid list/map toggle preserves scroll
-  describe('E9: Scroll Position', () => {
-    it('maintains scroll position on rerender', async () => {
+  describe("E9: Scroll Position", () => {
+    it("maintains scroll position on rerender", async () => {
       const { rerender } = render(
         <NearbyPlacesPanel
           listingLat={listingLat}
@@ -487,7 +501,7 @@ describe('NearbyPlacesPanel - UI State & React Lifecycle', () => {
       );
 
       // Trigger search
-      const groceryChip = screen.getByRole('button', { name: /grocery/i });
+      const groceryChip = screen.getByRole("button", { name: /grocery/i });
       await act(async () => {
         fireEvent.click(groceryChip);
         jest.runAllTimers();
@@ -509,14 +523,14 @@ describe('NearbyPlacesPanel - UI State & React Lifecycle', () => {
   });
 
   // E10: Click chip during loading queues correctly
-  describe('E10: Debounce Queue', () => {
-    it('cancels previous request when new chip is clicked during loading', async () => {
-      const abortSpy = jest.spyOn(AbortController.prototype, 'abort');
+  describe("E10: Debounce Queue", () => {
+    it("cancels previous request when new chip is clicked during loading", async () => {
+      const abortSpy = jest.spyOn(AbortController.prototype, "abort");
 
       renderPanel();
 
-      const groceryChip = screen.getByRole('button', { name: /grocery/i });
-      const pharmacyChip = screen.getByRole('button', { name: /pharmacy/i });
+      const groceryChip = screen.getByRole("button", { name: /grocery/i });
+      const pharmacyChip = screen.getByRole("button", { name: /pharmacy/i });
 
       // Click first chip
       await act(async () => {
@@ -535,24 +549,24 @@ describe('NearbyPlacesPanel - UI State & React Lifecycle', () => {
   });
 
   // Additional lifecycle tests
-  describe('Session State Changes', () => {
-    it('shows loading skeleton when session is loading', () => {
+  describe("Session State Changes", () => {
+    it("shows loading skeleton when session is loading", () => {
       mockUseSession.mockReturnValue({
         data: null,
-        status: 'loading',
+        status: "loading",
       });
 
       const { container } = renderPanel();
 
       // Should show loading skeleton (has animate-pulse class)
-      const skeleton = container.querySelector('.animate-pulse');
+      const skeleton = container.querySelector(".animate-pulse");
       expect(skeleton).toBeInTheDocument();
     });
 
-    it('shows login prompt when unauthenticated', () => {
+    it("shows login prompt when unauthenticated", () => {
       mockUseSession.mockReturnValue({
         data: null,
-        status: 'unauthenticated',
+        status: "unauthenticated",
       });
 
       renderPanel();
@@ -562,14 +576,14 @@ describe('NearbyPlacesPanel - UI State & React Lifecycle', () => {
     });
   });
 
-  describe('AbortController Cleanup', () => {
-    it('aborts in-flight request on unmount', async () => {
-      const abortSpy = jest.spyOn(AbortController.prototype, 'abort');
+  describe("AbortController Cleanup", () => {
+    it("aborts in-flight request on unmount", async () => {
+      const abortSpy = jest.spyOn(AbortController.prototype, "abort");
 
       const { unmount } = renderPanel();
 
       // Click a chip to trigger fetch
-      const groceryChip = screen.getByRole('button', { name: /grocery/i });
+      const groceryChip = screen.getByRole("button", { name: /grocery/i });
       await act(async () => {
         fireEvent.click(groceryChip);
       });

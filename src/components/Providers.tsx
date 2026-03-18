@@ -1,11 +1,11 @@
-'use client';
+"use client";
 
-import { SessionProvider } from 'next-auth/react';
-import { Session } from 'next-auth';
-import { Toaster } from 'sonner';
-import { MotionConfig } from 'framer-motion';
-import { ReactNode } from 'react';
-import { ThemeProvider } from './ThemeProvider';
+import { SessionProvider } from "next-auth/react";
+import { Session } from "next-auth";
+import { Toaster } from "sonner";
+import { MotionConfig } from "framer-motion";
+import { ReactNode } from "react";
+import { ThemeProvider } from "./ThemeProvider";
 
 interface ProvidersProps {
   children: ReactNode;
@@ -13,7 +13,11 @@ interface ProvidersProps {
   nonce?: string;
 }
 
-export default function Providers({ children, session, nonce }: ProvidersProps) {
+export default function Providers({
+  children,
+  session,
+  nonce,
+}: ProvidersProps) {
   return (
     <MotionConfig reducedMotion="user">
       <SessionProvider

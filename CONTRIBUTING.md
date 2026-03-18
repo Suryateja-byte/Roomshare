@@ -22,27 +22,27 @@ Thank you for your interest in contributing to Roomshare. This guide covers ever
 
 Before you begin, make sure you have the following installed:
 
-| Requirement | Version | Notes |
-|---|---|---|
-| **Node.js** | 20+ | LTS recommended |
-| **pnpm** | 9+ | Package manager (`npm install -g pnpm`) |
-| **PostgreSQL** | 16+ | With PostGIS extension |
-| **Docker** (optional) | Latest | For running PostgreSQL via docker-compose |
-| **Git** | 2.30+ | Version control |
+| Requirement           | Version | Notes                                     |
+| --------------------- | ------- | ----------------------------------------- |
+| **Node.js**           | 20+     | LTS recommended                           |
+| **pnpm**              | 9+      | Package manager (`npm install -g pnpm`)   |
+| **PostgreSQL**        | 16+     | With PostGIS extension                    |
+| **Docker** (optional) | Latest  | For running PostgreSQL via docker-compose |
+| **Git**               | 2.30+   | Version control                           |
 
 ### Required Accounts (for full functionality)
 
-| Service | Purpose | Required? |
-|---|---|---|
-| **Google OAuth** | Social login | Yes (for auth testing) |
-| **Supabase** | File storage, realtime | Yes |
-| **Resend** | Transactional email | Yes |
-| **Cloudflare Turnstile** | Bot protection | Optional (test keys provided) |
-| **Upstash Redis** | Rate limiting | Optional (falls back to DB) |
-| **Groq** | AI chat features | Optional |
-| **Sentry** | Error tracking | Optional |
-| **Stadia Maps** | Map tiles | Optional (localhost works without key) |
-| **Radar** | Nearby places search | Optional |
+| Service                  | Purpose                | Required?                              |
+| ------------------------ | ---------------------- | -------------------------------------- |
+| **Google OAuth**         | Social login           | Yes (for auth testing)                 |
+| **Supabase**             | File storage, realtime | Yes                                    |
+| **Resend**               | Transactional email    | Yes                                    |
+| **Cloudflare Turnstile** | Bot protection         | Optional (test keys provided)          |
+| **Upstash Redis**        | Rate limiting          | Optional (falls back to DB)            |
+| **Groq**                 | AI chat features       | Optional                               |
+| **Sentry**               | Error tracking         | Optional                               |
+| **Stadia Maps**          | Map tiles              | Optional (localhost works without key) |
+| **Radar**                | Nearby places search   | Optional                               |
 
 ---
 
@@ -202,11 +202,11 @@ These boundaries must not be crossed:
 
 ### Layer separation
 
-| Layer | Responsibility | Must NOT |
-|---|---|---|
-| **Client components** | UI state, rendering, user interactions | Call the database directly |
+| Layer                                  | Responsibility                                                       | Must NOT                   |
+| -------------------------------------- | -------------------------------------------------------------------- | -------------------------- |
+| **Client components**                  | UI state, rendering, user interactions                               | Call the database directly |
 | **Server layer** (actions, API routes) | Validation, authorization, business invariants, transactional writes | Contain UI rendering logic |
-| **DB layer** (Prisma, migrations) | Constraints, indexes, RLS/policies | Contain business logic |
+| **DB layer** (Prisma, migrations)      | Constraints, indexes, RLS/policies                                   | Contain business logic     |
 
 ### Data flow rules
 
@@ -237,13 +237,13 @@ Any hold/reserve/apply/book logic must satisfy:
 
 New behavior must be test-backed:
 
-| Test type | When to write | Location |
-|---|---|---|
-| **Unit tests** | Pure logic, utilities, schemas | `src/__tests__/lib/` |
-| **Integration tests** | Server actions, API routes | `src/__tests__/api/`, `src/__tests__/actions/` |
-| **Component tests** | React components with user interaction | `src/__tests__/components/` |
-| **Property-based tests** | Filter invariants, schemas | `src/__tests__/property/` |
-| **E2E tests** | Critical user flows (search, booking, auth) | `tests/e2e/` |
+| Test type                | When to write                               | Location                                       |
+| ------------------------ | ------------------------------------------- | ---------------------------------------------- |
+| **Unit tests**           | Pure logic, utilities, schemas              | `src/__tests__/lib/`                           |
+| **Integration tests**    | Server actions, API routes                  | `src/__tests__/api/`, `src/__tests__/actions/` |
+| **Component tests**      | React components with user interaction      | `src/__tests__/components/`                    |
+| **Property-based tests** | Filter invariants, schemas                  | `src/__tests__/property/`                      |
+| **E2E tests**            | Critical user flows (search, booking, auth) | `tests/e2e/`                                   |
 
 ### Test requirements
 
@@ -282,44 +282,44 @@ If your PR modifies the database schema:
 
 All scripts use `pnpm`. Run `pnpm <script>` from the project root.
 
-| Script | Description |
-|---|---|
-| `dev` | Start Next.js development server |
-| `build` | Production build |
-| `start` | Start production server |
-| `lint` | Run ESLint |
-| `typecheck` | Run TypeScript type checking (`tsc --noEmit`) |
-| `verify` | Run verification script |
-| `test` | Run Jest test suite |
-| `test:watch` | Run Jest in watch mode |
-| `test:coverage` | Run Jest with coverage report |
-| `test:ci` | Run Jest in CI mode (coverage, limited workers) |
-| `test:unit` | Run unit tests only (lib, hooks, utils) |
-| `test:components` | Run component tests only |
-| `test:api` | Run API and server action tests |
-| `test:filters` | Run all filter-related tests |
-| `test:filters:schema` | Run filter schema unit tests |
-| `test:filters:integration` | Run filter integration (pairwise) tests |
-| `test:filters:property` | Run filter property-based tests |
-| `test:filters:e2e` | Run filter E2E tests (Jest) |
-| `test:filters:regression` | Run filter regression tests |
-| `test:filters:perf` | Run filter performance tests (60s timeout) |
-| `test:filters:all` | Run all filter tests with extended timeout |
-| `test:e2e` | Seed data + run Playwright E2E tests |
-| `test:e2e:ui` | Open Playwright UI mode |
-| `test:e2e:headed` | Run E2E tests in headed browser |
-| `test:e2e:debug` | Run E2E tests in debug mode |
-| `test:e2e:report` | Open Playwright HTML report |
-| `test:e2e:chromium` | Run E2E in Chromium only |
-| `test:e2e:mobile` | Run E2E on mobile viewports |
-| `test:e2e:anon` | Run anonymous (no auth) E2E tests |
-| `test:e2e:ci` | CI-optimized E2E (Chromium, list+html reporter) |
-| `seed:e2e` | Seed E2E test data without running tests |
-| `clean:next-locks` | Remove Next.js dev lockfiles |
-| `dev` | Start the webpack-based dev server with the shared startup wrapper |
-| `geocode:compare` | Run geocoding accuracy comparison |
-| `geocode:compare:extended` | Extended geocoding comparison |
-| `geocode:compare:json` | Geocoding comparison (JSON output) |
+| Script                     | Description                                                        |
+| -------------------------- | ------------------------------------------------------------------ |
+| `dev`                      | Start Next.js development server                                   |
+| `build`                    | Production build                                                   |
+| `start`                    | Start production server                                            |
+| `lint`                     | Run ESLint                                                         |
+| `typecheck`                | Run TypeScript type checking (`tsc --noEmit`)                      |
+| `verify`                   | Run verification script                                            |
+| `test`                     | Run Jest test suite                                                |
+| `test:watch`               | Run Jest in watch mode                                             |
+| `test:coverage`            | Run Jest with coverage report                                      |
+| `test:ci`                  | Run Jest in CI mode (coverage, limited workers)                    |
+| `test:unit`                | Run unit tests only (lib, hooks, utils)                            |
+| `test:components`          | Run component tests only                                           |
+| `test:api`                 | Run API and server action tests                                    |
+| `test:filters`             | Run all filter-related tests                                       |
+| `test:filters:schema`      | Run filter schema unit tests                                       |
+| `test:filters:integration` | Run filter integration (pairwise) tests                            |
+| `test:filters:property`    | Run filter property-based tests                                    |
+| `test:filters:e2e`         | Run filter E2E tests (Jest)                                        |
+| `test:filters:regression`  | Run filter regression tests                                        |
+| `test:filters:perf`        | Run filter performance tests (60s timeout)                         |
+| `test:filters:all`         | Run all filter tests with extended timeout                         |
+| `test:e2e`                 | Seed data + run Playwright E2E tests                               |
+| `test:e2e:ui`              | Open Playwright UI mode                                            |
+| `test:e2e:headed`          | Run E2E tests in headed browser                                    |
+| `test:e2e:debug`           | Run E2E tests in debug mode                                        |
+| `test:e2e:report`          | Open Playwright HTML report                                        |
+| `test:e2e:chromium`        | Run E2E in Chromium only                                           |
+| `test:e2e:mobile`          | Run E2E on mobile viewports                                        |
+| `test:e2e:anon`            | Run anonymous (no auth) E2E tests                                  |
+| `test:e2e:ci`              | CI-optimized E2E (Chromium, list+html reporter)                    |
+| `seed:e2e`                 | Seed E2E test data without running tests                           |
+| `clean:next-locks`         | Remove Next.js dev lockfiles                                       |
+| `dev`                      | Start the webpack-based dev server with the shared startup wrapper |
+| `geocode:compare`          | Run geocoding accuracy comparison                                  |
+| `geocode:compare:extended` | Extended geocoding comparison                                      |
+| `geocode:compare:json`     | Geocoding comparison (JSON output)                                 |
 
 ---
 

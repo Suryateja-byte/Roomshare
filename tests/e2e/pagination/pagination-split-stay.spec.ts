@@ -24,7 +24,12 @@
  * Run: pnpm playwright test tests/e2e/pagination/pagination-split-stay.spec.ts --project=chromium
  */
 
-import { test, expect, SF_BOUNDS, searchResultsContainer } from "../helpers/test-utils";
+import {
+  test,
+  expect,
+  SF_BOUNDS,
+  searchResultsContainer,
+} from "../helpers/test-utils";
 import { setupPaginationMock } from "../helpers/pagination-mock-factory";
 
 const boundsQS = `minLat=${SF_BOUNDS.minLat}&maxLat=${SF_BOUNDS.maxLat}&minLng=${SF_BOUNDS.minLng}&maxLng=${SF_BOUNDS.maxLng}`;
@@ -34,7 +39,7 @@ const sel = {
   card: '[data-testid="listing-card"]',
   loadMoreBtn: 'button:has-text("Show more places")',
   splitStayHeading: 'h3:has-text("Split your stay")',
-  splitStayLabel: 'text=/Split Stay/',
+  splitStayLabel: "text=/Split Stay/",
   combinedTotal: 'text="Combined total"',
 } as const;
 
@@ -68,7 +73,10 @@ test.describe("Split-Stay Feature (Scenario 9)", () => {
     // The leaseDuration filter may reduce results significantly depending on seed data.
     const cardCount = await cards.count();
     if (cardCount < 2) {
-      test.skip(true, `Only ${cardCount} listing(s) match leaseDuration=6 months. Need ≥2 for split-stay.`);
+      test.skip(
+        true,
+        `Only ${cardCount} listing(s) match leaseDuration=6 months. Need ≥2 for split-stay.`
+      );
     }
 
     // Split-stay section heading should be visible
@@ -124,9 +132,15 @@ test.describe("Split-Stay Feature (Scenario 9)", () => {
     // depending on seed data. If no cards appear, skip the test.
     await page.waitForLoadState("domcontentloaded");
     const cards = container.locator(sel.card);
-    const hasCards = await cards.first().isVisible({ timeout: 30_000 }).catch(() => false);
+    const hasCards = await cards
+      .first()
+      .isVisible({ timeout: 30_000 })
+      .catch(() => false);
     if (!hasCards) {
-      test.skip(true, "No listings match leaseDuration=3 months filter. Seed data may not support this filter value.");
+      test.skip(
+        true,
+        "No listings match leaseDuration=3 months filter. Seed data may not support this filter value."
+      );
     }
 
     // Verify listings are present (the search itself still works)
@@ -165,7 +179,10 @@ test.describe("Split-Stay Feature (Scenario 9)", () => {
     await expect(cards.first()).toBeVisible({ timeout: 30_000 });
     const initialCardCount = await cards.count();
     if (initialCardCount < 2) {
-      test.skip(true, `Only ${initialCardCount} listing(s) match leaseDuration=6 months. Need ≥2 for split-stay.`);
+      test.skip(
+        true,
+        `Only ${initialCardCount} listing(s) match leaseDuration=6 months. Need ≥2 for split-stay.`
+      );
     }
 
     // Verify initial split-stay section is visible
@@ -180,9 +197,14 @@ test.describe("Split-Stay Feature (Scenario 9)", () => {
 
     // Click "Show more places" to load mock listings
     const loadMoreBtn = container.locator(sel.loadMoreBtn);
-    const hasLoadMore = await loadMoreBtn.isVisible({ timeout: 30_000 }).catch(() => false);
+    const hasLoadMore = await loadMoreBtn
+      .isVisible({ timeout: 30_000 })
+      .catch(() => false);
     if (!hasLoadMore) {
-      test.skip(true, 'Load more button not available (fewer results than page size)');
+      test.skip(
+        true,
+        "Load more button not available (fewer results than page size)"
+      );
       return;
     }
     await loadMoreBtn.click();

@@ -52,23 +52,23 @@ graph TB
 
 ## Tech Stack
 
-| Layer | Technology |
-|---|---|
-| Framework | Next.js 16 (App Router), React 19 |
-| Database | PostgreSQL + PostGIS via Prisma ORM v6 |
-| Auth | NextAuth v5 (email/password + Google OAuth) |
-| Maps | MapLibre GL, react-map-gl, Stadia Maps tiles |
-| Storage | Supabase |
-| Cache / Rate Limiting | Upstash Redis (DB fallback) |
-| Monitoring | Sentry (client + server + edge) |
-| AI | Vercel AI SDK with Groq + OpenAI |
-| Styling | Tailwind CSS 4 |
-| UI | Radix UI, Lucide icons, Framer Motion |
-| Validation | Zod 4 |
-| CAPTCHA | Cloudflare Turnstile |
-| Nearby Places | Radar API |
-| Email | Resend |
-| Testing | Jest 30, Playwright, Testing Library, fast-check |
+| Layer                 | Technology                                       |
+| --------------------- | ------------------------------------------------ |
+| Framework             | Next.js 16 (App Router), React 19                |
+| Database              | PostgreSQL + PostGIS via Prisma ORM v6           |
+| Auth                  | NextAuth v5 (email/password + Google OAuth)      |
+| Maps                  | MapLibre GL, react-map-gl, Stadia Maps tiles     |
+| Storage               | Supabase                                         |
+| Cache / Rate Limiting | Upstash Redis (DB fallback)                      |
+| Monitoring            | Sentry (client + server + edge)                  |
+| AI                    | Vercel AI SDK with Groq + OpenAI                 |
+| Styling               | Tailwind CSS 4                                   |
+| UI                    | Radix UI, Lucide icons, Framer Motion            |
+| Validation            | Zod 4                                            |
+| CAPTCHA               | Cloudflare Turnstile                             |
+| Nearby Places         | Radar API                                        |
+| Email                 | Resend                                           |
+| Testing               | Jest 30, Playwright, Testing Library, fast-check |
 
 ## Features
 
@@ -90,20 +90,20 @@ graph TB
 
 ## Documentation
 
-| Document | Description |
-|---|---|
-| [Architecture](docs/ARCHITECTURE.md) | System design, layer boundaries, data flow diagrams |
-| [API Reference](docs/API_REFERENCE.md) | All 31 API endpoints with schemas and examples |
-| [Database](docs/DATABASE.md) | Schema, ERD, 25 models, migration guide |
-| [Search System](docs/SEARCH_SYSTEM.md) | Search architecture, ranking, filters, pagination |
-| [State Machines](docs/STATE_MACHINES.md) | Booking, listing, report, and verification lifecycles |
-| [Components](docs/COMPONENTS.md) | Component catalog, hooks, contexts, UI library |
-| [Security](docs/SECURITY.md) | Auth flows, rate limiting, PII protection, CAPTCHA |
-| [Deployment](docs/DEPLOYMENT.md) | Vercel deployment, env vars, cron jobs |
-| [Monitoring](docs/MONITORING.md) | Sentry, health probes, metrics, logging |
-| [Testing](docs/TESTING.md) | Test strategy, Jest/Playwright setup, coverage |
-| [Contributing](CONTRIBUTING.md) | Dev setup, code style, PR checklist |
-| [Troubleshooting](docs/TROUBLESHOOTING.md) | Common issues and debugging guides |
+| Document                                   | Description                                           |
+| ------------------------------------------ | ----------------------------------------------------- |
+| [Architecture](docs/ARCHITECTURE.md)       | System design, layer boundaries, data flow diagrams   |
+| [API Reference](docs/API_REFERENCE.md)     | All 31 API endpoints with schemas and examples        |
+| [Database](docs/DATABASE.md)               | Schema, ERD, 25 models, migration guide               |
+| [Search System](docs/SEARCH_SYSTEM.md)     | Search architecture, ranking, filters, pagination     |
+| [State Machines](docs/STATE_MACHINES.md)   | Booking, listing, report, and verification lifecycles |
+| [Components](docs/COMPONENTS.md)           | Component catalog, hooks, contexts, UI library        |
+| [Security](docs/SECURITY.md)               | Auth flows, rate limiting, PII protection, CAPTCHA    |
+| [Deployment](docs/DEPLOYMENT.md)           | Vercel deployment, env vars, cron jobs                |
+| [Monitoring](docs/MONITORING.md)           | Sentry, health probes, metrics, logging               |
+| [Testing](docs/TESTING.md)                 | Test strategy, Jest/Playwright setup, coverage        |
+| [Contributing](CONTRIBUTING.md)            | Dev setup, code style, PR checklist                   |
+| [Troubleshooting](docs/TROUBLESHOOTING.md) | Common issues and debugging guides                    |
 
 ## Project Structure
 
@@ -177,23 +177,23 @@ See [CONTRIBUTING.md](CONTRIBUTING.md) for the full development setup guide and 
 
 ## Scripts
 
-| Command | Description |
-|---|---|
-| `pnpm dev` | Start development server (webpack dev + startup cleanup wrapper) |
-| `pnpm build` | Production build |
-| `pnpm start` | Start production server |
-| `pnpm lint` | Run ESLint |
-| `pnpm typecheck` | Run TypeScript type checking |
-| `pnpm test` | Run all unit tests (Jest) |
-| `pnpm test:coverage` | Run tests with coverage report |
-| `pnpm test:unit` | Run unit tests only (lib, hooks, utils) |
-| `pnpm test:api` | Run API route tests |
-| `pnpm test:components` | Run component tests |
+| Command                 | Description                                                                            |
+| ----------------------- | -------------------------------------------------------------------------------------- |
+| `pnpm dev`              | Start development server (webpack dev + startup cleanup wrapper)                       |
+| `pnpm build`            | Production build                                                                       |
+| `pnpm start`            | Start production server                                                                |
+| `pnpm lint`             | Run ESLint                                                                             |
+| `pnpm typecheck`        | Run TypeScript type checking                                                           |
+| `pnpm test`             | Run all unit tests (Jest)                                                              |
+| `pnpm test:coverage`    | Run tests with coverage report                                                         |
+| `pnpm test:unit`        | Run unit tests only (lib, hooks, utils)                                                |
+| `pnpm test:api`         | Run API route tests                                                                    |
+| `pnpm test:components`  | Run component tests                                                                    |
 | `pnpm test:filters:all` | Run full filter test suite (schema + integration + property + e2e + regression + perf) |
-| `pnpm test:e2e` | Run Playwright E2E tests (seeds DB, cleans locks) |
-| `pnpm test:e2e:ui` | Run E2E tests with Playwright UI mode |
-| `pnpm test:e2e:headed` | Run E2E tests in headed browser |
-| `pnpm test:e2e:debug` | Run E2E tests in debug mode |
+| `pnpm test:e2e`         | Run Playwright E2E tests (seeds DB, cleans locks)                                      |
+| `pnpm test:e2e:ui`      | Run E2E tests with Playwright UI mode                                                  |
+| `pnpm test:e2e:headed`  | Run E2E tests in headed browser                                                        |
+| `pnpm test:e2e:debug`   | Run E2E tests in debug mode                                                            |
 
 See [docs/TESTING.md](docs/TESTING.md) for the full testing guide.
 

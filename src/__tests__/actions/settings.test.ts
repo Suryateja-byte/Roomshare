@@ -28,7 +28,9 @@ jest.mock("bcryptjs", () => ({
 
 // Mock rate limiting to allow all requests
 jest.mock("@/lib/rate-limit", () => ({
-  checkRateLimit: jest.fn().mockResolvedValue({ success: true, remaining: 10, resetAt: new Date() }),
+  checkRateLimit: jest
+    .fn()
+    .mockResolvedValue({ success: true, remaining: 10, resetAt: new Date() }),
   getClientIPFromHeaders: jest.fn().mockReturnValue("127.0.0.1"),
   RATE_LIMITS: {
     changePassword: { limit: 5, windowMs: 3600000 },
@@ -169,7 +171,7 @@ describe("settings actions", () => {
 
     it("returns error on database failure", async () => {
       (prisma.user.update as jest.Mock).mockRejectedValue(
-        new Error("DB Error"),
+        new Error("DB Error")
       );
 
       const result = await updateNotificationPreferences(defaultPreferences);
@@ -218,7 +220,7 @@ describe("settings actions", () => {
 
       expect(result.success).toBe(false);
       expect(result.error).toBe(
-        "Password login not available for this account",
+        "Password login not available for this account"
       );
     });
 
@@ -246,7 +248,7 @@ describe("settings actions", () => {
 
       expect(bcrypt.compare).toHaveBeenCalledWith(
         "correctpass",
-        "hashedpassword",
+        "hashedpassword"
       );
     });
 
@@ -282,7 +284,7 @@ describe("settings actions", () => {
 
     it("returns error on database failure", async () => {
       (prisma.user.findUnique as jest.Mock).mockRejectedValue(
-        new Error("DB Error"),
+        new Error("DB Error")
       );
 
       const result = await changePassword("correctpass", "newpass123!!");
@@ -360,7 +362,7 @@ describe("settings actions", () => {
 
       expect(bcrypt.compare).toHaveBeenCalledWith(
         "correctpassword",
-        "hashedpassword",
+        "hashedpassword"
       );
       expect(prisma.user.delete).toHaveBeenCalledWith({
         where: { id: "user-123" },
@@ -373,7 +375,7 @@ describe("settings actions", () => {
         password: null,
       });
       (prisma.user.delete as jest.Mock).mockRejectedValue(
-        new Error("DB Error"),
+        new Error("DB Error")
       );
 
       const result = await deleteAccount();

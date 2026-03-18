@@ -7,13 +7,13 @@
  * Custom error for timeout failures
  */
 export class TimeoutError extends Error {
-  public readonly code = 'TIMEOUT_ERROR';
+  public readonly code = "TIMEOUT_ERROR";
   public readonly operation: string;
   public readonly timeoutMs: number;
 
   constructor(operation: string, timeoutMs: number) {
     super(`${operation} timed out after ${timeoutMs}ms`);
-    this.name = 'TimeoutError';
+    this.name = "TimeoutError";
     this.operation = operation;
     this.timeoutMs = timeoutMs;
   }
@@ -112,7 +112,7 @@ export async function fetchWithTimeout(
     return response;
   } catch (error) {
     // Convert AbortError to TimeoutError for consistent error handling
-    if (error instanceof Error && error.name === 'AbortError') {
+    if (error instanceof Error && error.name === "AbortError") {
       throw new TimeoutError(operation, timeoutMs);
     }
     throw error;

@@ -46,10 +46,9 @@ async function isMapAvailable(page: Page): Promise<boolean> {
 /** Wait for the E2E map ref to be exposed */
 async function waitForMapRef(page: Page, timeout = 30_000): Promise<boolean> {
   try {
-    await page.waitForFunction(
-      () => !!(window as any).__e2eMapRef,
-      { timeout },
-    );
+    await page.waitForFunction(() => !!(window as any).__e2eMapRef, {
+      timeout,
+    });
     return true;
   } catch {
     return false;
@@ -62,8 +61,8 @@ async function waitForMapRef(page: Page, timeout = 30_000): Promise<boolean> {
  * and aria-pressed="true"/"false".
  */
 function poiButtons(page: Page) {
-  return page.locator('button[aria-pressed]').filter({
-    has: page.locator('text=/Transit|POIs|Parks/'),
+  return page.locator("button[aria-pressed]").filter({
+    has: page.locator("text=/Transit|POIs|Parks/"),
   });
 }
 
@@ -108,7 +107,9 @@ test.describe("POI Layer Hydration Safety", () => {
     }
   });
 
-  test("toggling a POI button activates it (aria-pressed=true)", async ({ page }) => {
+  test("toggling a POI button activates it (aria-pressed=true)", async ({
+    page,
+  }) => {
     await page.goto(SEARCH_URL);
     await page.waitForLoadState("domcontentloaded");
 
@@ -189,7 +190,9 @@ test.describe("POI Layer Hydration Safety", () => {
     expect(criticalHydrationIssues).toHaveLength(0);
   });
 
-  test("POI button aria-labels are correct for accessibility", async ({ page }) => {
+  test("POI button aria-labels are correct for accessibility", async ({
+    page,
+  }) => {
     await page.goto(SEARCH_URL);
     await page.waitForLoadState("domcontentloaded");
 

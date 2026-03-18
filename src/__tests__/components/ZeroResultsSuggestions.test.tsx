@@ -30,12 +30,9 @@ jest.mock("next/link", () => ({
 }));
 
 jest.mock("@/components/ui/button", () => ({
-  Button: ({
-    children,
-    ...props
-  }: {
-    children: ReactNode;
-  }) => <button {...props}>{children}</button>,
+  Button: ({ children, ...props }: { children: ReactNode }) => (
+    <button {...props}>{children}</button>
+  ),
 }));
 
 describe("ZeroResultsSuggestions", () => {
@@ -58,7 +55,9 @@ describe("ZeroResultsSuggestions", () => {
       "q=Austin&minLat=37&maxLat=38&minLng=-123&maxLng=-122&page=2&cursor=abc&cursorStack=foo&pageNumber=2"
     );
 
-    render(<ZeroResultsSuggestions suggestions={locationSuggestion} query="Austin" />);
+    render(
+      <ZeroResultsSuggestions suggestions={locationSuggestion} query="Austin" />
+    );
 
     fireEvent.click(
       screen.getByRole("button", {
@@ -93,7 +92,9 @@ describe("ZeroResultsSuggestions", () => {
       "q=Fiji&minLat=-20&maxLat=-10&minLng=170&maxLng=-170"
     );
 
-    render(<ZeroResultsSuggestions suggestions={locationSuggestion} query="Fiji" />);
+    render(
+      <ZeroResultsSuggestions suggestions={locationSuggestion} query="Fiji" />
+    );
 
     fireEvent.click(
       screen.getByRole("button", {
@@ -117,7 +118,12 @@ describe("ZeroResultsSuggestions", () => {
   it("drops query as fallback when location suggestion has no coordinates", () => {
     mockSearchParams = new URLSearchParams("q=Nowhere&page=3");
 
-    render(<ZeroResultsSuggestions suggestions={locationSuggestion} query="Nowhere" />);
+    render(
+      <ZeroResultsSuggestions
+        suggestions={locationSuggestion}
+        query="Nowhere"
+      />
+    );
 
     fireEvent.click(
       screen.getByRole("button", {

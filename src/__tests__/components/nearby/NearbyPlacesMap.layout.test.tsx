@@ -7,8 +7,8 @@
  * @see Plan Category G - Map Container, Layout, CSS (Jest portion)
  */
 
-import React from 'react';
-import { render, waitFor, act } from '@testing-library/react';
+import React from "react";
+import { render, waitFor, act } from "@testing-library/react";
 
 // Mock MapLibre GL
 const mockMap = {
@@ -18,8 +18,8 @@ const mockMap = {
   off: jest.fn(),
   remove: jest.fn(),
   resize: jest.fn(),
-  getContainer: jest.fn(() => document.createElement('div')),
-  getCanvas: jest.fn(() => document.createElement('canvas')),
+  getContainer: jest.fn(() => document.createElement("div")),
+  getCanvas: jest.fn(() => document.createElement("canvas")),
   flyTo: jest.fn(),
   fitBounds: jest.fn(),
   setCenter: jest.fn(),
@@ -42,7 +42,7 @@ class MockLngLatBounds {
   }
 }
 
-jest.mock('maplibre-gl', () => ({
+jest.mock("maplibre-gl", () => ({
   Map: jest.fn(() => mockMap),
   NavigationControl: jest.fn(),
   LngLatBounds: jest.fn(() => new MockLngLatBounds()),
@@ -58,15 +58,15 @@ jest.mock('maplibre-gl', () => ({
     setPopup: jest.fn().mockReturnThis(),
     addTo: jest.fn().mockReturnThis(),
     remove: jest.fn(),
-    getElement: jest.fn(() => document.createElement('div')),
+    getElement: jest.fn(() => document.createElement("div")),
   })),
 }));
 
 // Mock next-auth
-jest.mock('next-auth/react', () => ({
+jest.mock("next-auth/react", () => ({
   useSession: jest.fn(() => ({
-    data: { user: { id: 'user-123', name: 'Test User' } },
-    status: 'authenticated',
+    data: { user: { id: "user-123", name: "Test User" } },
+    status: "authenticated",
   })),
 }));
 
@@ -105,18 +105,18 @@ class MockResizeObserver {
 
 global.ResizeObserver = MockResizeObserver as unknown as typeof ResizeObserver;
 
-import NearbyPlacesMap from '@/components/nearby/NearbyPlacesMap';
-import type { NearbyPlace } from '@/types/nearby';
+import NearbyPlacesMap from "@/components/nearby/NearbyPlacesMap";
+import type { NearbyPlace } from "@/types/nearby";
 
-describe('NearbyPlacesMap - Layout Smoke Tests', () => {
+describe("NearbyPlacesMap - Layout Smoke Tests", () => {
   const listingLat = 37.7749;
   const listingLng = -122.4194;
 
   const createMockPlace = (id: string): NearbyPlace => ({
     id,
     name: `Place ${id}`,
-    address: '123 Test St',
-    category: 'food-grocery',
+    address: "123 Test St",
+    category: "food-grocery",
     location: { lat: 37.7749, lng: -122.4194 },
     distanceMiles: 0.5,
   });
@@ -127,13 +127,13 @@ describe('NearbyPlacesMap - Layout Smoke Tests', () => {
   });
 
   // G10: map.resize() called on container change
-  describe('G10: Map Resize Handling', () => {
-    it('calls map.resize() when container size changes', async () => {
+  describe("G10: Map Resize Handling", () => {
+    it("calls map.resize() when container size changes", async () => {
       const { container } = render(
         <NearbyPlacesMap
           listingLat={listingLat}
           listingLng={listingLng}
-          places={[createMockPlace('place-1')]}
+          places={[createMockPlace("place-1")]}
         />
       );
 
@@ -169,24 +169,27 @@ describe('NearbyPlacesMap - Layout Smoke Tests', () => {
         });
 
         // Map resize should be called
-        await waitFor(() => {
-          // The component may debounce resize calls
-          expect(mockMap.resize).toHaveBeenCalled();
-        }, { timeout: 1000 }).catch(() => {
+        await waitFor(
+          () => {
+            // The component may debounce resize calls
+            expect(mockMap.resize).toHaveBeenCalled();
+          },
+          { timeout: 1000 }
+        ).catch(() => {
           // Some implementations don't call resize on observer
           // This is acceptable behavior
         });
       }
     });
 
-    it('debounces rapid resize events', async () => {
+    it("debounces rapid resize events", async () => {
       jest.useFakeTimers();
 
       render(
         <NearbyPlacesMap
           listingLat={listingLat}
           listingLng={listingLng}
-          places={[createMockPlace('place-1')]}
+          places={[createMockPlace("place-1")]}
         />
       );
 
@@ -215,7 +218,7 @@ describe('NearbyPlacesMap - Layout Smoke Tests', () => {
                   y: 0,
                   toJSON: () => ({}),
                 },
-                target: document.createElement('div'),
+                target: document.createElement("div"),
                 borderBoxSize: [],
                 contentBoxSize: [],
                 devicePixelContentBoxSize: [],
@@ -241,7 +244,7 @@ describe('NearbyPlacesMap - Layout Smoke Tests', () => {
       jest.useRealTimers();
     });
 
-    it('cleans up ResizeObserver on unmount', () => {
+    it("cleans up ResizeObserver on unmount", () => {
       const { unmount } = render(
         <NearbyPlacesMap
           listingLat={listingLat}
@@ -262,24 +265,26 @@ describe('NearbyPlacesMap - Layout Smoke Tests', () => {
     });
   });
 
-  describe('Container Handling', () => {
-    it('renders map container with appropriate dimensions', () => {
+  describe("Container Handling", () => {
+    it("renders map container with appropriate dimensions", () => {
       const { container } = render(
         <NearbyPlacesMap
           listingLat={listingLat}
           listingLng={listingLng}
-          places={[createMockPlace('place-1')]}
+          places={[createMockPlace("place-1")]}
         />
       );
 
       // Find map container
-      const mapContainer = container.querySelector('[class*="map"], .map-container, [data-testid="nearby-places-map"]');
+      const mapContainer = container.querySelector(
+        '[class*="map"], .map-container, [data-testid="nearby-places-map"]'
+      );
 
       // Container should exist
       expect(mapContainer || container.firstChild).toBeInTheDocument();
     });
 
-    it('handles missing container gracefully', () => {
+    it("handles missing container gracefully", () => {
       // Component should not throw if rendered without parent
       expect(() => {
         render(
@@ -292,7 +297,7 @@ describe('NearbyPlacesMap - Layout Smoke Tests', () => {
       }).not.toThrow();
     });
 
-    it('updates map when coordinates change', async () => {
+    it("updates map when coordinates change", async () => {
       const { rerender } = render(
         <NearbyPlacesMap
           listingLat={listingLat}
@@ -303,11 +308,7 @@ describe('NearbyPlacesMap - Layout Smoke Tests', () => {
 
       // Change coordinates
       rerender(
-        <NearbyPlacesMap
-          listingLat={38.0}
-          listingLng={-123.0}
-          places={[]}
-        />
+        <NearbyPlacesMap listingLat={38.0} listingLng={-123.0} places={[]} />
       );
 
       // Map should update center
@@ -322,19 +323,19 @@ describe('NearbyPlacesMap - Layout Smoke Tests', () => {
     });
   });
 
-  describe('Responsive Behavior', () => {
-    it('handles window resize events', async () => {
+  describe("Responsive Behavior", () => {
+    it("handles window resize events", async () => {
       render(
         <NearbyPlacesMap
           listingLat={listingLat}
           listingLng={listingLng}
-          places={[createMockPlace('place-1')]}
+          places={[createMockPlace("place-1")]}
         />
       );
 
       // Simulate window resize
       act(() => {
-        window.dispatchEvent(new Event('resize'));
+        window.dispatchEvent(new Event("resize"));
       });
 
       // Should not throw errors
@@ -343,18 +344,18 @@ describe('NearbyPlacesMap - Layout Smoke Tests', () => {
       });
     });
 
-    it('handles visibility change events', async () => {
+    it("handles visibility change events", async () => {
       render(
         <NearbyPlacesMap
           listingLat={listingLat}
           listingLng={listingLng}
-          places={[createMockPlace('place-1')]}
+          places={[createMockPlace("place-1")]}
         />
       );
 
       // Simulate visibility change (tab becoming visible)
       act(() => {
-        document.dispatchEvent(new Event('visibilitychange'));
+        document.dispatchEvent(new Event("visibilitychange"));
       });
 
       // Should handle without errors

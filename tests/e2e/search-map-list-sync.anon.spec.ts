@@ -59,9 +59,7 @@ const SEARCH_URL = `/search?${boundsQS}`;
  * Get the first visible marker and return its listing ID.
  * Skips the test if map or markers are unavailable.
  */
-async function getFirstMarkerIdOrSkip(
-  page: Page,
-): Promise<string> {
+async function getFirstMarkerIdOrSkip(page: Page): Promise<string> {
   if (!(await isMapAvailable(page))) {
     test.skip(true, "Map not available (WebGL unavailable in headless)");
   }
@@ -96,23 +94,26 @@ async function getFirstMarkerIdOrSkip(
  * the verification fails and the entire click+verify retries — the re-click will
  * find the listener attached and succeed.
  */
-async function clickMarkerByListingId(page: Page, listingId: string): Promise<void> {
+async function clickMarkerByListingId(
+  page: Page,
+  listingId: string
+): Promise<void> {
   await expect(async () => {
     const result = await page.evaluate((id) => {
       const inner = document.querySelector(
-        `.maplibregl-marker [data-listing-id="${id}"]`,
+        `.maplibregl-marker [data-listing-id="${id}"]`
       ) as HTMLElement | null;
-      if (!inner?.isConnected) return 'not-found';
+      if (!inner?.isConnected) return "not-found";
       // Click the .maplibregl-marker wrapper (react-map-gl native handler).
       // REMOVED keyboard Enter dispatch — it caused double-easeTo race condition
       // where two moveend events cleared isProgrammaticMoveRef → triggered
       // search-as-move → cleared activeId. .toPass() retry handles cases
       // where the first click doesn't register.
-      const wrapper = inner.closest('.maplibregl-marker') as HTMLElement;
+      const wrapper = inner.closest(".maplibregl-marker") as HTMLElement;
       if (wrapper) wrapper.click();
-      return 'ok';
+      return "ok";
     }, listingId);
-    expect(result).toBe('ok');
+    expect(result).toBe("ok");
 
     // Wait for React state propagation + easeTo animation before checking card state
     await page.waitForTimeout(500);
@@ -143,11 +144,11 @@ async function clickMarkerByIndex(page: Page, index: number): Promise<void> {
 async function clickMarkerFast(page: Page, listingId: string): Promise<void> {
   await page.evaluate((id) => {
     const inner = document.querySelector(
-      `.maplibregl-marker [data-listing-id="${id}"]`,
+      `.maplibregl-marker [data-listing-id="${id}"]`
     ) as HTMLElement | null;
     if (!inner?.isConnected) return;
     // Click wrapper only — keyboard Enter removed to avoid double-easeTo race
-    const wrapper = inner.closest('.maplibregl-marker') as HTMLElement;
+    const wrapper = inner.closest(".maplibregl-marker") as HTMLElement;
     if (wrapper) wrapper.click();
   }, listingId);
 }
@@ -164,27 +165,32 @@ async function clickMarkerFast(page: Page, listingId: string): Promise<void> {
  * the marker tree, React would suppress the enter.
  * Sets pointerType='mouse' to pass the touch guard in Map.tsx:1815.
  */
-async function hoverMarkerByListingId(page: Page, listingId: string): Promise<void> {
+async function hoverMarkerByListingId(
+  page: Page,
+  listingId: string
+): Promise<void> {
   await expect(async () => {
     const hovered = await page.evaluate((id) => {
       const inner = document.querySelector(
-        `.maplibregl-marker [data-listing-id="${id}"]`,
+        `.maplibregl-marker [data-listing-id="${id}"]`
       ) as HTMLElement | null;
       if (!inner?.isConnected) return false;
       // Target the wrapper where onPointerEnter is attached
-      const wrapper = inner.closest('.maplibregl-marker') as HTMLElement;
+      const wrapper = inner.closest(".maplibregl-marker") as HTMLElement;
       if (!wrapper) return false;
       const rect = wrapper.getBoundingClientRect();
-      wrapper.dispatchEvent(new PointerEvent('pointerover', {
-        bubbles: true,
-        cancelable: true,
-        pointerType: 'mouse',
-        // relatedTarget MUST be outside the marker tree for React to treat
-        // this as an "enter" event (not just moving between children)
-        relatedTarget: document.body,
-        clientX: rect.left + rect.width / 2,
-        clientY: rect.top + rect.height / 2,
-      }));
+      wrapper.dispatchEvent(
+        new PointerEvent("pointerover", {
+          bubbles: true,
+          cancelable: true,
+          pointerType: "mouse",
+          // relatedTarget MUST be outside the marker tree for React to treat
+          // this as an "enter" event (not just moving between children)
+          relatedTarget: document.body,
+          clientX: rect.left + rect.width / 2,
+          clientY: rect.top + rect.height / 2,
+        })
+      );
       return true;
     }, listingId);
     expect(hovered).toBe(true);
@@ -214,20 +220,22 @@ async function hoverMarkerByIndex(page: Page, index: number): Promise<void> {
 async function hoverMarkerFast(page: Page, listingId: string): Promise<void> {
   await page.evaluate((id) => {
     const inner = document.querySelector(
-      `.maplibregl-marker [data-listing-id="${id}"]`,
+      `.maplibregl-marker [data-listing-id="${id}"]`
     ) as HTMLElement | null;
     if (!inner?.isConnected) return;
-    const wrapper = inner.closest('.maplibregl-marker') as HTMLElement;
+    const wrapper = inner.closest(".maplibregl-marker") as HTMLElement;
     if (!wrapper) return;
     const rect = wrapper.getBoundingClientRect();
-    wrapper.dispatchEvent(new PointerEvent('pointerover', {
-      bubbles: true,
-      cancelable: true,
-      pointerType: 'mouse',
-      relatedTarget: document.body,
-      clientX: rect.left + rect.width / 2,
-      clientY: rect.top + rect.height / 2,
-    }));
+    wrapper.dispatchEvent(
+      new PointerEvent("pointerover", {
+        bubbles: true,
+        cancelable: true,
+        pointerType: "mouse",
+        relatedTarget: document.body,
+        clientX: rect.left + rect.width / 2,
+        clientY: rect.top + rect.height / 2,
+      })
+    );
   }, listingId);
 }
 
@@ -239,14 +247,17 @@ async function hoverMarkerFast(page: Page, listingId: string): Promise<void> {
  * unhoverCardElement resets it — resetting immediately would let the overlay
  * re-cover the card and the browser would recalculate hover state.
  */
-async function hoverCardElement(page: Page, card: import('@playwright/test').Locator): Promise<void> {
+async function hoverCardElement(
+  page: Page,
+  card: import("@playwright/test").Locator
+): Promise<void> {
   const isMobile = (page.viewportSize()?.width ?? 1024) < 768;
   if (isMobile) {
     // Raise card above bottom sheet overlay for trusted mouse events
     // Z-index is reset in unhoverCardElement, not here, to maintain hover state
     await card.evaluate((el) => {
-      (el as HTMLElement).style.position = 'relative';
-      (el as HTMLElement).style.zIndex = '9999';
+      (el as HTMLElement).style.position = "relative";
+      (el as HTMLElement).style.zIndex = "9999";
     });
     await card.hover();
   } else {
@@ -259,13 +270,16 @@ async function hoverCardElement(page: Page, card: import('@playwright/test').Loc
  * elevated above the bottom sheet overlay. Then moves mouse away to trigger
  * real mouseleave.
  */
-async function unhoverCardElement(page: Page, card: import('@playwright/test').Locator): Promise<void> {
+async function unhoverCardElement(
+  page: Page,
+  card: import("@playwright/test").Locator
+): Promise<void> {
   const isMobile = (page.viewportSize()?.width ?? 1024) < 768;
   if (isMobile) {
     // Reset z-index that was raised in hoverCardElement
     await card.evaluate((el) => {
-      (el as HTMLElement).style.position = '';
-      (el as HTMLElement).style.zIndex = '';
+      (el as HTMLElement).style.position = "";
+      (el as HTMLElement).style.zIndex = "";
     });
   }
   await page.mouse.move(0, 0);
@@ -275,7 +289,9 @@ async function unhoverCardElement(page: Page, card: import('@playwright/test').L
  * Get the first card listing ID from the page.
  */
 async function getFirstCardId(page: Page): Promise<string | null> {
-  const card = searchResultsContainer(page).locator(selectors.listingCard).first();
+  const card = searchResultsContainer(page)
+    .locator(selectors.listingCard)
+    .first();
   return card.getAttribute("data-listing-id");
 }
 
@@ -298,7 +314,10 @@ test.describe("Map-List Synchronization", () => {
     // Handle rate-limit page: wait and retry if search returned 429
     const rateLimited = page.locator('h1:has-text("Too Many Requests")');
     if (await rateLimited.isVisible({ timeout: 2000 }).catch(() => false)) {
-      const retryText = await page.locator('text=/Try again in \\d+ seconds/').textContent().catch(() => null);
+      const retryText = await page
+        .locator("text=/Try again in \\d+ seconds/")
+        .textContent()
+        .catch(() => null);
       const seconds = parseInt(retryText?.match(/\d+/)?.[0] || "10");
       await page.waitForTimeout((seconds + 1) * 1000);
       await page.goto(SEARCH_URL);
@@ -306,7 +325,9 @@ test.describe("Map-List Synchronization", () => {
     }
 
     // Wait for listing cards to render (SSR) — scoped to visible container
-    await expect(searchResultsContainer(page).locator(selectors.listingCard).first()).toBeVisible({
+    await expect(
+      searchResultsContainer(page).locator(selectors.listingCard).first()
+    ).toBeVisible({
       timeout: timeouts.navigation,
     });
 
@@ -350,24 +371,24 @@ test.describe("Map-List Synchronization", () => {
       const listingId = await getFirstMarkerIdOrSkip(page);
 
       // Scroll the list container to bottom so the target card is offscreen
-      await page.evaluate((isMobile) => {
-        const testId = isMobile
-          ? 'mobile-search-results-container'
-          : 'search-results-container';
-        const container = document.querySelector(
-          `[data-testid="${testId}"]`,
-        );
-        if (container) container.scrollTop = container.scrollHeight;
-      }, (page.viewportSize()?.width ?? 1024) < 768);
+      await page.evaluate(
+        (isMobile) => {
+          const testId = isMobile
+            ? "mobile-search-results-container"
+            : "search-results-container";
+          const container = document.querySelector(`[data-testid="${testId}"]`);
+          if (container) container.scrollTop = container.scrollHeight;
+        },
+        (page.viewportSize()?.width ?? 1024) < 768
+      );
 
       // Click the marker
       await clickMarkerByIndex(page, 0);
 
       // Wait for smooth scroll to complete by polling card viewport position
-      await expect.poll(
-        () => isCardInViewport(page, listingId),
-        { timeout: 5000 },
-      ).toBe(true);
+      await expect
+        .poll(() => isCardInViewport(page, listingId), { timeout: 5000 })
+        .toBe(true);
     });
 
     test("1.3 - Click different marker -> previous card loses highlight, new card highlighted", async ({
@@ -453,7 +474,7 @@ test.describe("Map-List Synchronization", () => {
       // Close popup via close button
       const closeBtn = page
         .locator(
-          'button[aria-label="Close listing preview"], button[aria-label="Close popup"]',
+          'button[aria-label="Close listing preview"], button[aria-label="Close popup"]'
         )
         .first();
       if (await closeBtn.isVisible()) {
@@ -567,18 +588,14 @@ test.describe("Map-List Synchronization", () => {
 
       // Hover first card (uses evaluate on mobile to bypass bottom sheet overlay)
       const firstCard = searchResultsContainer(page)
-        .locator(
-          `[data-testid="listing-card"][data-listing-id="${firstId}"]`,
-        )
+        .locator(`[data-testid="listing-card"][data-listing-id="${firstId}"]`)
         .first();
       await hoverCardElement(page, firstCard);
       await waitForMarkerHover(page, firstId, timeouts.action);
 
       // Hover second card
       const secondCard = searchResultsContainer(page)
-        .locator(
-          `[data-testid="listing-card"][data-listing-id="${secondId}"]`,
-        )
+        .locator(`[data-testid="listing-card"][data-listing-id="${secondId}"]`)
         .first();
       await hoverCardElement(page, secondCard);
       await waitForMarkerHover(page, secondId, timeouts.action);
@@ -600,7 +617,9 @@ test.describe("Map-List Synchronization", () => {
       // Get the card's navigation link href — the Link component wraps the
       // card content including ImageCarousel which has drag handlers that can
       // intercept Playwright clicks. Verify href and navigate via evaluate.
-      const card = searchResultsContainer(page).locator(selectors.listingCard).first();
+      const card = searchResultsContainer(page)
+        .locator(selectors.listingCard)
+        .first();
       const cardLink = card.locator(`a[href*="/listings/"]`).first();
       await expect(cardLink).toBeAttached({ timeout: 5000 });
       const href = await cardLink.getAttribute("href");
@@ -612,9 +631,11 @@ test.describe("Map-List Synchronization", () => {
       // native navigation and Next.js Link's React onClick handler.
       await page.evaluate((id) => {
         const cardEl = document.querySelector(
-          `[data-testid="listing-card"][data-listing-id="${id}"]`,
+          `[data-testid="listing-card"][data-listing-id="${id}"]`
         );
-        const link = cardEl?.querySelector('a[href*="/listings/"]') as HTMLAnchorElement;
+        const link = cardEl?.querySelector(
+          'a[href*="/listings/"]'
+        ) as HTMLAnchorElement;
         if (link) link.click();
       }, cardId);
 
@@ -659,9 +680,7 @@ test.describe("Map-List Synchronization", () => {
 
       // Hover a DIFFERENT card (uses evaluate on mobile to bypass bottom sheet overlay)
       const hoverCard = searchResultsContainer(page)
-        .locator(
-          `[data-testid="listing-card"][data-listing-id="${hoverId}"]`,
-        )
+        .locator(`[data-testid="listing-card"][data-listing-id="${hoverId}"]`)
         .first();
       await hoverCardElement(page, hoverCard);
       await waitForCardHover(page, hoverId, timeouts.action);
@@ -695,17 +714,16 @@ test.describe("Map-List Synchronization", () => {
 
       // Now hover the same card (uses evaluate on mobile to bypass bottom sheet overlay)
       const card = searchResultsContainer(page)
-        .locator(
-          `[data-testid="listing-card"][data-listing-id="${listingId}"]`,
-        )
+        .locator(`[data-testid="listing-card"][data-listing-id="${listingId}"]`)
         .first();
       await hoverCardElement(page, card);
 
       // Wait for hover event to propagate, then verify active takes precedence
-      await expect.poll(
-        async () => (await getCardState(page, listingId)).isActive,
-        { timeout: timeouts.action },
-      ).toBe(true);
+      await expect
+        .poll(async () => (await getCardState(page, listingId)).isActive, {
+          timeout: timeouts.action,
+        })
+        .toBe(true);
 
       // Card should have ring-2 (active takes precedence over hover)
       // ListingCard.tsx: isActive && "ring-2 ring-blue-500 ring-offset-2"
@@ -820,21 +838,25 @@ test.describe("Map-List Synchronization", () => {
 
       // Get initial card order
       const initialCardIds = await getAllCardListingIds(page);
-      if (initialCardIds.length < 2) test.skip(true, "Need 2+ cards for sort test");
+      if (initialCardIds.length < 2)
+        test.skip(true, "Need 2+ cards for sort test");
 
       // Change sort via URL
       const url = new URL(page.url());
       url.searchParams.set("sort", "price_asc");
       await page.goto(url.toString());
       await page.waitForLoadState("domcontentloaded");
-      await expect(searchResultsContainer(page).locator(selectors.listingCard).first()).toBeVisible({
+      await expect(
+        searchResultsContainer(page).locator(selectors.listingCard).first()
+      ).toBeVisible({
         timeout: timeouts.navigation,
       });
 
       // Wait for map and cards to settle after sort change
       await waitForMapReady(page);
-      await expect(searchResultsContainer(page).locator(selectors.listingCard).first())
-        .toBeVisible({ timeout: timeouts.navigation });
+      await expect(
+        searchResultsContainer(page).locator(selectors.listingCard).first()
+      ).toBeVisible({ timeout: timeouts.navigation });
 
       const sortedCardIds = await getAllCardListingIds(page);
 
@@ -887,14 +909,16 @@ test.describe("Map-List Synchronization", () => {
       await waitForMapReady(page);
       // Wait for markers to appear after pan
       await expect(
-        page.locator('.maplibregl-marker:visible').first()
+        page.locator(".maplibregl-marker:visible").first()
       ).toBeVisible({ timeout: timeouts.navigation });
 
       // Page should still have markers and cards
       const newMarkerCount = await page
         .locator(".maplibregl-marker:visible")
         .count();
-      const newCardCount = await searchResultsContainer(page).locator(selectors.listingCard).count();
+      const newCardCount = await searchResultsContainer(page)
+        .locator(selectors.listingCard)
+        .count();
 
       // At least one of markers or cards should exist
       expect(newMarkerCount + newCardCount).toBeGreaterThan(0);
@@ -913,38 +937,36 @@ test.describe("Map-List Synchronization", () => {
 
       // Verify the card exists
       const cardExists = await searchResultsContainer(page)
-        .locator(
-          `[data-testid="listing-card"][data-listing-id="${listingId}"]`,
-        )
+        .locator(`[data-testid="listing-card"][data-listing-id="${listingId}"]`)
         .count();
       if (cardExists === 0) {
         test.skip(true, "Card not found for this marker's listing");
       }
 
       // Scroll the results container to the bottom to ensure card is offscreen
-      await page.evaluate((isMobile) => {
-        const testId = isMobile
-          ? 'mobile-search-results-container'
-          : 'search-results-container';
-        const container = document.querySelector(
-          `[data-testid="${testId}"]`,
-        );
-        if (container) {
-          container.scrollTop = container.scrollHeight;
-        } else {
-          // Fallback: scroll window
-          window.scrollTo(0, document.body.scrollHeight);
-        }
-      }, (page.viewportSize()?.width ?? 1024) < 768);
+      await page.evaluate(
+        (isMobile) => {
+          const testId = isMobile
+            ? "mobile-search-results-container"
+            : "search-results-container";
+          const container = document.querySelector(`[data-testid="${testId}"]`);
+          if (container) {
+            container.scrollTop = container.scrollHeight;
+          } else {
+            // Fallback: scroll window
+            window.scrollTo(0, document.body.scrollHeight);
+          }
+        },
+        (page.viewportSize()?.width ?? 1024) < 768
+      );
 
       // Click the marker
       await clickMarkerByIndex(page, 0);
 
       // Wait for smooth scroll to bring card into viewport
-      await expect.poll(
-        () => isCardInViewport(page, listingId),
-        { timeout: 5000 },
-      ).toBe(true);
+      await expect
+        .poll(() => isCardInViewport(page, listingId), { timeout: 5000 })
+        .toBe(true);
     });
 
     test("5.2 - Rapid marker clicks -> only last clicked card is highlighted", async ({
@@ -970,7 +992,10 @@ test.describe("Map-List Synchronization", () => {
       try {
         await clickMarkerByListingId(page, id2!);
       } catch {
-        test.skip(true, "Marker click did not trigger card activation (headless CI WebGL limitation)");
+        test.skip(
+          true,
+          "Marker click did not trigger card activation (headless CI WebGL limitation)"
+        );
         return;
       }
 
@@ -978,7 +1003,10 @@ test.describe("Map-List Synchronization", () => {
       try {
         await waitForCardHighlight(page, id2!);
       } catch {
-        test.skip(true, "Card highlight did not appear after marker click (headless CI)");
+        test.skip(
+          true,
+          "Card highlight did not appear after marker click (headless CI)"
+        );
         return;
       }
 
@@ -1046,7 +1074,9 @@ test.describe("Map-List Synchronization", () => {
       await page.waitForLoadState("domcontentloaded");
 
       // Wait for content — scoped to visible container (mobile viewport)
-      await expect(searchResultsContainer(page).locator(selectors.listingCard).first()).toBeVisible({
+      await expect(
+        searchResultsContainer(page).locator(selectors.listingCard).first()
+      ).toBeVisible({
         timeout: timeouts.navigation,
       });
 
@@ -1099,12 +1129,15 @@ test.describe("Map-List Synchronization", () => {
       // Verify focus state via data attribute (filter by visibility to skip hidden dual-container duplicate)
       const focusState = await page.evaluate((id) => {
         const cards = document.querySelectorAll(
-          `[data-testid="listing-card"][data-listing-id="${id}"]`,
+          `[data-testid="listing-card"][data-listing-id="${id}"]`
         );
         let card: Element | null = null;
         for (const c of cards) {
           const r = c.getBoundingClientRect();
-          if (r.width > 0 && r.height > 0) { card = c; break; }
+          if (r.width > 0 && r.height > 0) {
+            card = c;
+            break;
+          }
         }
         if (!card) card = cards[0] ?? null;
         return card?.getAttribute("data-focus-state") ?? "none";
@@ -1130,9 +1163,7 @@ test.describe("Map-List Synchronization", () => {
 
       // Hover the card (uses evaluate on mobile to bypass bottom sheet overlay)
       const card = searchResultsContainer(page)
-        .locator(
-          `[data-testid="listing-card"][data-listing-id="${cardId}"]`,
-        )
+        .locator(`[data-testid="listing-card"][data-listing-id="${cardId}"]`)
         .first();
       await hoverCardElement(page, card);
       await waitForCardHover(page, cardId!, timeouts.action);
@@ -1140,12 +1171,15 @@ test.describe("Map-List Synchronization", () => {
       // Verify hover state via data attribute
       const focusState = await page.evaluate((id) => {
         const cards = document.querySelectorAll(
-          `[data-testid="listing-card"][data-listing-id="${id}"]`,
+          `[data-testid="listing-card"][data-listing-id="${id}"]`
         );
-        const c = Array.from(cards).find((el) => {
-          const r = el.getBoundingClientRect();
-          return r.width > 0 && r.height > 0;
-        }) ?? cards[0] ?? null;
+        const c =
+          Array.from(cards).find((el) => {
+            const r = el.getBoundingClientRect();
+            return r.width > 0 && r.height > 0;
+          }) ??
+          cards[0] ??
+          null;
         return c?.getAttribute("data-focus-state") ?? "none";
       }, cardId!);
 
@@ -1171,9 +1205,7 @@ test.describe("Map-List Synchronization", () => {
 
       // Hover the card to trigger marker hover state (evaluate on mobile)
       const card = searchResultsContainer(page)
-        .locator(
-          `[data-testid="listing-card"][data-listing-id="${targetId}"]`,
-        )
+        .locator(`[data-testid="listing-card"][data-listing-id="${targetId}"]`)
         .first();
       await hoverCardElement(page, card);
       await waitForMarkerHover(page, targetId, timeouts.action);
@@ -1220,16 +1252,22 @@ test.describe("Map-List Synchronization", () => {
       // Instrument a transition counter to detect flickering
       await page.evaluate(
         ({ targetId1, targetId2 }) => {
-          (window as any).__transitionCounts = { [targetId1]: 0, [targetId2]: 0 };
+          (window as any).__transitionCounts = {
+            [targetId1]: 0,
+            [targetId2]: 0,
+          };
 
           const observe = (id: string) => {
             const els = document.querySelectorAll(
-              `[data-testid="listing-card"][data-listing-id="${id}"]`,
+              `[data-testid="listing-card"][data-listing-id="${id}"]`
             );
             let el: Element | null = null;
             for (const c of els) {
               const r = c.getBoundingClientRect();
-              if (r.width > 0 && r.height > 0) { el = c; break; }
+              if (r.width > 0 && r.height > 0) {
+                el = c;
+                break;
+              }
             }
             if (!el) el = els[0] ?? null;
             if (!el) return;
@@ -1240,24 +1278,23 @@ test.describe("Map-List Synchronization", () => {
                 }
               }
             });
-            observer.observe(el, { attributes: true, attributeFilter: ["class"] });
+            observer.observe(el, {
+              attributes: true,
+              attributeFilter: ["class"],
+            });
           };
           observe(targetId1);
           observe(targetId2);
         },
-        { targetId1: id1, targetId2: id2 },
+        { targetId1: id1, targetId2: id2 }
       );
 
       // Perform rapid hover transitions
       const card1 = searchResultsContainer(page)
-        .locator(
-          `[data-testid="listing-card"][data-listing-id="${id1}"]`,
-        )
+        .locator(`[data-testid="listing-card"][data-listing-id="${id1}"]`)
         .first();
       const card2 = searchResultsContainer(page)
-        .locator(
-          `[data-testid="listing-card"][data-listing-id="${id2}"]`,
-        )
+        .locator(`[data-testid="listing-card"][data-listing-id="${id2}"]`)
         .first();
 
       // Hover card1 -> card2 -> card1 -> card2 -> away (rapid transitions)
@@ -1268,19 +1305,21 @@ test.describe("Map-List Synchronization", () => {
       await unhoverCardElement(page, card2);
 
       // Wait for all class mutations to settle
-      await expect.poll(
-        async () => {
-          const counts = await page.evaluate(
-            () => (window as any).__transitionCounts as Record<string, number>,
-          );
-          return Object.values(counts).every((c) => c > 0);
-        },
-        { timeout: 5000 },
-      ).toBe(true);
+      await expect
+        .poll(
+          async () => {
+            const counts = await page.evaluate(
+              () => (window as any).__transitionCounts as Record<string, number>
+            );
+            return Object.values(counts).every((c) => c > 0);
+          },
+          { timeout: 5000 }
+        )
+        .toBe(true);
 
       // Check transition counts - should be reasonable (not excessive flickering)
       const counts = await page.evaluate(
-        () => (window as any).__transitionCounts as Record<string, number>,
+        () => (window as any).__transitionCounts as Record<string, number>
       );
 
       // Each card should have had a limited number of class changes
@@ -1310,9 +1349,7 @@ test.describe("Map-List Synchronization", () => {
 
       // Check if a card exists for this listing
       const cardExists = await searchResultsContainer(page)
-        .locator(
-          `[data-testid="listing-card"][data-listing-id="${listingId}"]`,
-        )
+        .locator(`[data-testid="listing-card"][data-listing-id="${listingId}"]`)
         .count();
       if (cardExists === 0) {
         test.skip(true, "No card for this marker's listing");
@@ -1323,7 +1360,10 @@ test.describe("Map-List Synchronization", () => {
       try {
         await hoverMarkerByIndex(page, 0);
       } catch {
-        test.skip(true, "Marker hover dispatch did not trigger handler (headless CI limitation)");
+        test.skip(
+          true,
+          "Marker hover dispatch did not trigger handler (headless CI limitation)"
+        );
         return;
       }
 
@@ -1332,7 +1372,10 @@ test.describe("Map-List Synchronization", () => {
       try {
         await waitForCardHover(page, listingId!, timeouts.action);
       } catch {
-        test.skip(true, "Card hover highlight did not appear (headless CI limitation)");
+        test.skip(
+          true,
+          "Card hover highlight did not appear (headless CI limitation)"
+        );
         return;
       }
 
@@ -1350,7 +1393,10 @@ test.describe("Map-List Synchronization", () => {
         await clickMarkerByIndex(page, 0);
         await waitForCardHighlight(page, listingId);
       } catch {
-        test.skip(true, "Marker click did not trigger card highlight (headless CI limitation)");
+        test.skip(
+          true,
+          "Marker click did not trigger card highlight (headless CI limitation)"
+        );
         return;
       }
 
@@ -1372,14 +1418,22 @@ test.describe("Map-List Synchronization", () => {
         await clickMarkerByIndex(page, 0);
         await waitForCardHighlight(page, listingId);
       } catch {
-        test.skip(true, "Marker click did not trigger card highlight (headless CI limitation)");
+        test.skip(
+          true,
+          "Marker click did not trigger card highlight (headless CI limitation)"
+        );
         return;
       }
 
       const popup = page.locator(".maplibregl-popup");
-      const popupVisible = await popup.isVisible({ timeout: timeouts.action }).catch(() => false);
+      const popupVisible = await popup
+        .isVisible({ timeout: timeouts.action })
+        .catch(() => false);
       if (!popupVisible) {
-        test.skip(true, "Popup did not appear after marker click (headless CI limitation)");
+        test.skip(
+          true,
+          "Popup did not appear after marker click (headless CI limitation)"
+        );
         return;
       }
 
@@ -1395,9 +1449,7 @@ test.describe("Map-List Synchronization", () => {
       expect(cardState.isActive).toBe(true);
     });
 
-    test("Marker hover debounces scroll request (300ms)", async ({
-      page,
-    }) => {
+    test("Marker hover debounces scroll request (300ms)", async ({ page }) => {
       if (!(await isMapAvailable(page))) test.skip(true, "Map not available");
 
       const markerCount = await waitForMarkersWithClusterExpansion(page, {
@@ -1415,10 +1467,10 @@ test.describe("Map-List Synchronization", () => {
       await page.evaluate(() => {
         (window as any).__scrollRequestCount = 0;
         const isMobile = window.innerWidth < 768;
-        const testId = isMobile ? 'mobile-search-results-container' : 'search-results-container';
-        const container = document.querySelector(
-          `[data-testid="${testId}"]`,
-        );
+        const testId = isMobile
+          ? "mobile-search-results-container"
+          : "search-results-container";
+        const container = document.querySelector(`[data-testid="${testId}"]`);
         if (container) {
           container.addEventListener("scroll", () => {
             (window as any).__scrollRequestCount++;
@@ -1436,7 +1488,10 @@ test.describe("Map-List Synchronization", () => {
       try {
         await hoverMarkerByListingId(page, hid2!);
       } catch {
-        test.skip(true, "Marker hover dispatch did not trigger handler (headless CI limitation)");
+        test.skip(
+          true,
+          "Marker hover dispatch did not trigger handler (headless CI limitation)"
+        );
         return;
       }
 
@@ -1446,7 +1501,7 @@ test.describe("Map-List Synchronization", () => {
       // The scroll container should have received at most 1 scroll event
       // (the debounced one from the last hovered marker)
       const scrollCount = await page.evaluate(
-        () => (window as any).__scrollRequestCount ?? 0,
+        () => (window as any).__scrollRequestCount ?? 0
       );
       // Due to debouncing, only the last hover should trigger a scroll
       // May be 0 if the card was already in view
@@ -1465,9 +1520,7 @@ test.describe("Map-List Synchronization", () => {
       if (!listingId) test.skip(true, "No marker ID");
 
       const cardExists = await searchResultsContainer(page)
-        .locator(
-          `[data-testid="listing-card"][data-listing-id="${listingId}"]`,
-        )
+        .locator(`[data-testid="listing-card"][data-listing-id="${listingId}"]`)
         .count();
       if (cardExists === 0) test.skip(true, "No card for listing");
 
@@ -1475,7 +1528,10 @@ test.describe("Map-List Synchronization", () => {
       try {
         await hoverMarkerByIndex(page, 0);
       } catch {
-        test.skip(true, "Marker hover dispatch did not trigger handler (headless CI limitation)");
+        test.skip(
+          true,
+          "Marker hover dispatch did not trigger handler (headless CI limitation)"
+        );
         return;
       }
 
@@ -1485,7 +1541,10 @@ test.describe("Map-List Synchronization", () => {
       try {
         await waitForCardHover(page, listingId!, timeouts.action);
       } catch {
-        test.skip(true, "Card hover highlight did not appear (headless CI limitation)");
+        test.skip(
+          true,
+          "Card hover highlight did not appear (headless CI limitation)"
+        );
         return;
       }
       // This is hard to assert directly, but we verify no infinite loop
@@ -1504,7 +1563,7 @@ test.describe("Map-List Synchronization", () => {
 
       // Find the "Show on map" button on the first card
       const showOnMapBtn = searchResultsContainer(page).locator(
-        `[data-testid="listing-card"][data-listing-id="${cardId}"] button[aria-label="Show on map"]`,
+        `[data-testid="listing-card"][data-listing-id="${cardId}"] button[aria-label="Show on map"]`
       );
 
       if ((await showOnMapBtn.count()) === 0) {

@@ -7,20 +7,26 @@
  * @see Plan Category D - Networking, Timing, Concurrency (10 tests)
  */
 
-import React from 'react';
-import { render, screen, fireEvent, waitFor, act } from '@testing-library/react';
-import userEvent from '@testing-library/user-event';
+import React from "react";
+import {
+  render,
+  screen,
+  fireEvent,
+  waitFor,
+  act,
+} from "@testing-library/react";
+import userEvent from "@testing-library/user-event";
 
 // Mock next-auth
 const mockSession = {
-  user: { id: 'user-123', name: 'Test User', email: 'test@example.com' },
+  user: { id: "user-123", name: "Test User", email: "test@example.com" },
   expires: new Date(Date.now() + 86400000).toISOString(),
 };
 
-jest.mock('next-auth/react', () => ({
+jest.mock("next-auth/react", () => ({
   useSession: jest.fn(() => ({
     data: mockSession,
-    status: 'authenticated',
+    status: "authenticated",
   })),
 }));
 
@@ -29,7 +35,7 @@ const mockFetch = jest.fn();
 global.fetch = mockFetch;
 
 // Mock Lucide icons
-jest.mock('lucide-react', () => ({
+jest.mock("lucide-react", () => ({
   MapPin: () => <span data-testid="map-pin-icon">M</span>,
   Search: () => <span data-testid="search-icon">S</span>,
   AlertCircle: () => <span data-testid="alert-icon">!</span>,
@@ -47,13 +53,16 @@ jest.mock('lucide-react', () => ({
 }));
 
 // Mock UI components
-jest.mock('@/components/ui/button', () => ({
-  Button: ({ children, ...props }: React.PropsWithChildren<{ asChild?: boolean }>) => (
+jest.mock("@/components/ui/button", () => ({
+  Button: ({
+    children,
+    ...props
+  }: React.PropsWithChildren<{ asChild?: boolean }>) => (
     <button {...props}>{children}</button>
   ),
 }));
 
-import NearbyPlacesPanel from '@/components/nearby/NearbyPlacesPanel';
+import NearbyPlacesPanel from "@/components/nearby/NearbyPlacesPanel";
 import {
   mockSlowThenFastResponses,
   mock429WithRetryAfter,
@@ -62,9 +71,9 @@ import {
   mockConnectionError,
   createNetworkStatusMock,
   createMockPlace,
-} from '@/__tests__/utils/mocks/network-conditions.mock';
+} from "@/__tests__/utils/mocks/network-conditions.mock";
 
-describe('NearbyPlacesPanel - Networking, Timing, Concurrency', () => {
+describe("NearbyPlacesPanel - Networking, Timing, Concurrency", () => {
   const listingLat = 37.7749;
   const listingLng = -122.4194;
 
@@ -75,7 +84,7 @@ describe('NearbyPlacesPanel - Networking, Timing, Concurrency', () => {
       ok: true,
       status: 200,
       json: async () => ({
-        places: [createMockPlace('place-1')],
+        places: [createMockPlace("place-1")],
         meta: { count: 1, cached: false },
       }),
     });
@@ -92,8 +101,8 @@ describe('NearbyPlacesPanel - Networking, Timing, Concurrency', () => {
   };
 
   // D1: Slower earlier response discarded (latest wins)
-  describe('D1: Race Condition - Latest Wins', () => {
-    it('discards slower earlier response when faster newer request completes', async () => {
+  describe("D1: Race Condition - Latest Wins", () => {
+    it("discards slower earlier response when faster newer request completes", async () => {
       jest.useRealTimers();
 
       // Track abort signals to verify "latest wins" implementation
@@ -113,7 +122,7 @@ describe('NearbyPlacesPanel - Networking, Timing, Concurrency', () => {
                 ok: true,
                 status: 200,
                 json: async () => ({
-                  places: [createMockPlace('slow-place')],
+                  places: [createMockPlace("slow-place")],
                   meta: { count: 1, cached: false },
                 }),
               } as Response);
@@ -123,7 +132,7 @@ describe('NearbyPlacesPanel - Networking, Timing, Concurrency', () => {
           ok: true,
           status: 200,
           json: async () => ({
-            places: [createMockPlace('fast-place')],
+            places: [createMockPlace("fast-place")],
             meta: { count: 1, cached: false },
           }),
         } as Response);
@@ -133,7 +142,7 @@ describe('NearbyPlacesPanel - Networking, Timing, Concurrency', () => {
       );
 
       // Click first category chip
-      const groceryChip = screen.getByRole('button', { name: /grocery/i });
+      const groceryChip = screen.getByRole("button", { name: /grocery/i });
       fireEvent.click(groceryChip);
 
       // Wait for first request to be initiated
@@ -152,7 +161,9 @@ describe('NearbyPlacesPanel - Networking, Timing, Concurrency', () => {
       });
 
       // Wait for loading to finish
-      const pharmacyChip = await screen.findByRole('button', { name: /pharmacy/i });
+      const pharmacyChip = await screen.findByRole("button", {
+        name: /pharmacy/i,
+      });
       await waitFor(() => {
         expect(pharmacyChip).not.toBeDisabled();
       });
@@ -172,20 +183,20 @@ describe('NearbyPlacesPanel - Networking, Timing, Concurrency', () => {
   });
 
   // D2: Browser auto-retry handled without duplicate
-  describe('D2: Connection Glitch Retry', () => {
-    it('handles failed request followed by successful retry', async () => {
+  describe("D2: Connection Glitch Retry", () => {
+    it("handles failed request followed by successful retry", async () => {
       jest.useRealTimers();
       const onPlacesChange = jest.fn();
 
       // First request fails, second succeeds
       mockFetch.mockReset();
       mockFetch
-        .mockRejectedValueOnce(new Error('Network error'))
+        .mockRejectedValueOnce(new Error("Network error"))
         .mockResolvedValueOnce({
           ok: true,
           status: 200,
           json: async () => ({
-            places: [createMockPlace('place-1')],
+            places: [createMockPlace("place-1")],
             meta: { count: 1, cached: false },
           }),
         });
@@ -199,38 +210,47 @@ describe('NearbyPlacesPanel - Networking, Timing, Concurrency', () => {
       );
 
       // First click triggers error
-      const groceryChip = screen.getByRole('button', { name: /grocery/i });
+      const groceryChip = screen.getByRole("button", { name: /grocery/i });
       fireEvent.click(groceryChip);
 
       // Wait for first call to complete (with error)
-      await waitFor(() => {
-        expect(mockFetch).toHaveBeenCalledTimes(1);
-      }, { timeout: 3000 });
+      await waitFor(
+        () => {
+          expect(mockFetch).toHaveBeenCalledTimes(1);
+        },
+        { timeout: 3000 }
+      );
 
       // Use the pharmacy chip for retry (different button to avoid disabled state)
-      const pharmacyChip = screen.getByRole('button', { name: /pharmacy/i });
+      const pharmacyChip = screen.getByRole("button", { name: /pharmacy/i });
 
       // Wait for buttons to be enabled (loading finished)
-      await waitFor(() => {
-        expect(pharmacyChip).not.toBeDisabled();
-      }, { timeout: 3000 });
+      await waitFor(
+        () => {
+          expect(pharmacyChip).not.toBeDisabled();
+        },
+        { timeout: 3000 }
+      );
 
       // Click different chip to retry
       fireEvent.click(pharmacyChip);
 
       // Should have made second call and succeeded
-      await waitFor(() => {
-        expect(mockFetch).toHaveBeenCalledTimes(2);
-        expect(onPlacesChange).toHaveBeenCalledWith(
-          expect.arrayContaining([expect.objectContaining({ id: 'place-1' })])
-        );
-      }, { timeout: 3000 });
+      await waitFor(
+        () => {
+          expect(mockFetch).toHaveBeenCalledTimes(2);
+          expect(onPlacesChange).toHaveBeenCalledWith(
+            expect.arrayContaining([expect.objectContaining({ id: "place-1" })])
+          );
+        },
+        { timeout: 3000 }
+      );
     });
   });
 
   // D3: Mobile Wi-Fi→LTE switch aborts cleanly
-  describe('D3: Network Change', () => {
-    it('aborts in-flight request when component unmounts', async () => {
+  describe("D3: Network Change", () => {
+    it("aborts in-flight request when component unmounts", async () => {
       jest.useRealTimers(); // Need real timers for abort signal tracking
 
       // Reset the mock completely and track abort signals
@@ -247,13 +267,16 @@ describe('NearbyPlacesPanel - Networking, Timing, Concurrency', () => {
       const { unmount } = renderPanel();
 
       // Start a request by clicking a chip
-      const groceryChip = screen.getByRole('button', { name: /grocery/i });
+      const groceryChip = screen.getByRole("button", { name: /grocery/i });
       fireEvent.click(groceryChip);
 
       // Wait for fetch to be called
-      await waitFor(() => {
-        expect(mockFetch).toHaveBeenCalledTimes(1);
-      }, { timeout: 2000 });
+      await waitFor(
+        () => {
+          expect(mockFetch).toHaveBeenCalledTimes(1);
+        },
+        { timeout: 2000 }
+      );
 
       // Unmount component while request is in flight
       unmount();
@@ -268,8 +291,8 @@ describe('NearbyPlacesPanel - Networking, Timing, Concurrency', () => {
   });
 
   // D4: DNS hiccup late rejection ignored after success
-  describe('D4: Timing Race', () => {
-    it('ignores late error after successful response', async () => {
+  describe("D4: Timing Race", () => {
+    it("ignores late error after successful response", async () => {
       const onPlacesChange = jest.fn();
 
       // Successful response
@@ -277,7 +300,7 @@ describe('NearbyPlacesPanel - Networking, Timing, Concurrency', () => {
         ok: true,
         status: 200,
         json: async () => ({
-          places: [createMockPlace('place-1')],
+          places: [createMockPlace("place-1")],
           meta: { count: 1, cached: false },
         }),
       });
@@ -290,7 +313,7 @@ describe('NearbyPlacesPanel - Networking, Timing, Concurrency', () => {
         />
       );
 
-      const groceryChip = screen.getByRole('button', { name: /grocery/i });
+      const groceryChip = screen.getByRole("button", { name: /grocery/i });
       await act(async () => {
         fireEvent.click(groceryChip);
         jest.runAllTimers();
@@ -298,31 +321,29 @@ describe('NearbyPlacesPanel - Networking, Timing, Concurrency', () => {
 
       await waitFor(() => {
         expect(onPlacesChange).toHaveBeenCalledWith(
-          expect.arrayContaining([
-            expect.objectContaining({ id: 'place-1' }),
-          ])
+          expect.arrayContaining([expect.objectContaining({ id: "place-1" })])
         );
       });
 
       // No error should be shown after success
       // Either no status element exists, or it doesn't contain error text
-      const statusElement = screen.queryByRole('status');
+      const statusElement = screen.queryByRole("status");
       if (statusElement) {
         expect(statusElement).not.toHaveTextContent(/error/i);
       }
       // Also verify no error icon is visible
-      expect(screen.queryByTestId('alert-icon')).not.toBeInTheDocument();
+      expect(screen.queryByTestId("alert-icon")).not.toBeInTheDocument();
     });
   });
 
   // D5: Offline event after response shows error
-  describe('D5: Offline Detection', () => {
-    it('handles fetch failure gracefully', async () => {
-      mockFetch.mockRejectedValue(new TypeError('Failed to fetch'));
+  describe("D5: Offline Detection", () => {
+    it("handles fetch failure gracefully", async () => {
+      mockFetch.mockRejectedValue(new TypeError("Failed to fetch"));
 
       renderPanel();
 
-      const groceryChip = screen.getByRole('button', { name: /grocery/i });
+      const groceryChip = screen.getByRole("button", { name: /grocery/i });
       await act(async () => {
         fireEvent.click(groceryChip);
         jest.runAllTimers();
@@ -335,8 +356,8 @@ describe('NearbyPlacesPanel - Networking, Timing, Concurrency', () => {
   });
 
   // D6: Spam radius toggles rate limited client-side
-  describe('D6: Client Throttle', () => {
-    it('does not call API until explicit search action', async () => {
+  describe("D6: Client Throttle", () => {
+    it("does not call API until explicit search action", async () => {
       jest.useRealTimers();
 
       renderPanel();
@@ -344,7 +365,7 @@ describe('NearbyPlacesPanel - Networking, Timing, Concurrency', () => {
       const searchInput = screen.getByPlaceholderText(/search/i);
 
       // Type rapidly
-      await userEvent.type(searchInput, 'coffee', { delay: 50 });
+      await userEvent.type(searchInput, "coffee", { delay: 50 });
 
       // Wait a bit - should not make any API call
       await act(async () => {
@@ -355,11 +376,11 @@ describe('NearbyPlacesPanel - Networking, Timing, Concurrency', () => {
       expect(mockFetch).not.toHaveBeenCalled();
     });
 
-    it('debounces multiple chip clicks', async () => {
+    it("debounces multiple chip clicks", async () => {
       renderPanel();
 
       // Rapid clicks on different chips
-      const chips = screen.getAllByRole('button').slice(0, 3);
+      const chips = screen.getAllByRole("button").slice(0, 3);
 
       await act(async () => {
         chips.forEach((chip) => fireEvent.click(chip));
@@ -373,14 +394,14 @@ describe('NearbyPlacesPanel - Networking, Timing, Concurrency', () => {
   });
 
   // D7: 429 with Retry-After header respected
-  describe('D7: Rate Limit Header', () => {
-    it('handles 429 rate limit response', async () => {
+  describe("D7: Rate Limit Header", () => {
+    it("handles 429 rate limit response", async () => {
       const rateLimitResponse = mock429WithRetryAfter(60);
       mockFetch.mockResolvedValue(rateLimitResponse);
 
       renderPanel();
 
-      const groceryChip = screen.getByRole('button', { name: /grocery/i });
+      const groceryChip = screen.getByRole("button", { name: /grocery/i });
       await act(async () => {
         fireEvent.click(groceryChip);
         jest.runAllTimers();
@@ -394,14 +415,14 @@ describe('NearbyPlacesPanel - Networking, Timing, Concurrency', () => {
   });
 
   // D8: Request cancellation doesn't leak memory
-  describe('D8: AbortController Cleanup', () => {
-    it('cleans up abort controller on unmount', async () => {
-      const abortSpy = jest.spyOn(AbortController.prototype, 'abort');
+  describe("D8: AbortController Cleanup", () => {
+    it("cleans up abort controller on unmount", async () => {
+      const abortSpy = jest.spyOn(AbortController.prototype, "abort");
 
       const { unmount } = renderPanel();
 
       // Start a request
-      const groceryChip = screen.getByRole('button', { name: /grocery/i });
+      const groceryChip = screen.getByRole("button", { name: /grocery/i });
       await act(async () => {
         fireEvent.click(groceryChip);
       });
@@ -415,8 +436,8 @@ describe('NearbyPlacesPanel - Networking, Timing, Concurrency', () => {
       abortSpy.mockRestore();
     });
 
-    it('does not update state after unmount', async () => {
-      const consoleError = jest.spyOn(console, 'error').mockImplementation();
+    it("does not update state after unmount", async () => {
+      const consoleError = jest.spyOn(console, "error").mockImplementation();
 
       // Delay the response
       mockFetch.mockImplementation(
@@ -428,7 +449,7 @@ describe('NearbyPlacesPanel - Networking, Timing, Concurrency', () => {
                   ok: true,
                   status: 200,
                   json: async () => ({
-                    places: [createMockPlace('place-1')],
+                    places: [createMockPlace("place-1")],
                     meta: { count: 1, cached: false },
                   }),
                 }),
@@ -440,7 +461,7 @@ describe('NearbyPlacesPanel - Networking, Timing, Concurrency', () => {
       const { unmount } = renderPanel();
 
       // Start a request
-      const groceryChip = screen.getByRole('button', { name: /grocery/i });
+      const groceryChip = screen.getByRole("button", { name: /grocery/i });
       await act(async () => {
         fireEvent.click(groceryChip);
       });
@@ -457,7 +478,7 @@ describe('NearbyPlacesPanel - Networking, Timing, Concurrency', () => {
       // The component uses isMountedRef to prevent this
       const reactWarnings = consoleError.mock.calls.filter(
         (call) =>
-          call[0]?.includes?.('unmounted') ||
+          call[0]?.includes?.("unmounted") ||
           call[0]?.includes?.("Can't perform a React state update")
       );
 
@@ -468,19 +489,21 @@ describe('NearbyPlacesPanel - Networking, Timing, Concurrency', () => {
   });
 
   // D9: bfcache navigation restores fresh state
-  describe('D9: Back/Forward Cache', () => {
-    it('maintains state across component lifecycle', async () => {
+  describe("D9: Back/Forward Cache", () => {
+    it("maintains state across component lifecycle", async () => {
       const { rerender } = renderPanel();
 
       // Trigger a search
-      const groceryChip = screen.getByRole('button', { name: /grocery/i });
+      const groceryChip = screen.getByRole("button", { name: /grocery/i });
       await act(async () => {
         fireEvent.click(groceryChip);
         jest.runAllTimers();
       });
 
       // Component re-renders (simulating page restore)
-      rerender(<NearbyPlacesPanel listingLat={listingLat} listingLng={listingLng} />);
+      rerender(
+        <NearbyPlacesPanel listingLat={listingLat} listingLng={listingLng} />
+      );
 
       // Component should still be functional
       expect(screen.getByPlaceholderText(/search/i)).toBeInTheDocument();
@@ -488,22 +511,22 @@ describe('NearbyPlacesPanel - Networking, Timing, Concurrency', () => {
   });
 
   // D10: Router prefetch doesn't trigger API
-  describe('D10: Prefetch Prevention', () => {
-    it('does not make API call on initial mount', () => {
+  describe("D10: Prefetch Prevention", () => {
+    it("does not make API call on initial mount", () => {
       renderPanel();
 
       // No API call should be made on mount
       expect(mockFetch).not.toHaveBeenCalled();
     });
 
-    it('only fetches on explicit user interaction', async () => {
+    it("only fetches on explicit user interaction", async () => {
       renderPanel();
 
       // Verify no fetch on mount
       expect(mockFetch).not.toHaveBeenCalled();
 
       // Click a category chip
-      const groceryChip = screen.getByRole('button', { name: /grocery/i });
+      const groceryChip = screen.getByRole("button", { name: /grocery/i });
       await act(async () => {
         fireEvent.click(groceryChip);
         jest.runAllTimers();
@@ -515,14 +538,14 @@ describe('NearbyPlacesPanel - Networking, Timing, Concurrency', () => {
   });
 
   // Additional networking tests
-  describe('Error Recovery', () => {
-    it('clears error on new successful search', async () => {
+  describe("Error Recovery", () => {
+    it("clears error on new successful search", async () => {
       // First request fails
-      mockFetch.mockRejectedValueOnce(new Error('Network error'));
+      mockFetch.mockRejectedValueOnce(new Error("Network error"));
 
       renderPanel();
 
-      const groceryChip = screen.getByRole('button', { name: /grocery/i });
+      const groceryChip = screen.getByRole("button", { name: /grocery/i });
       await act(async () => {
         fireEvent.click(groceryChip);
         jest.runAllTimers();
@@ -538,13 +561,13 @@ describe('NearbyPlacesPanel - Networking, Timing, Concurrency', () => {
         ok: true,
         status: 200,
         json: async () => ({
-          places: [createMockPlace('place-1')],
+          places: [createMockPlace("place-1")],
           meta: { count: 1, cached: false },
         }),
       });
 
       // Click another category
-      const pharmacyChip = screen.getByRole('button', { name: /pharmacy/i });
+      const pharmacyChip = screen.getByRole("button", { name: /pharmacy/i });
       await act(async () => {
         fireEvent.click(pharmacyChip);
         jest.runAllTimers();
@@ -557,12 +580,12 @@ describe('NearbyPlacesPanel - Networking, Timing, Concurrency', () => {
     });
   });
 
-  describe('Concurrent Requests', () => {
-    it('handles sequential category and search requests', async () => {
+  describe("Concurrent Requests", () => {
+    it("handles sequential category and search requests", async () => {
       renderPanel();
 
       // Click category
-      const groceryChip = screen.getByRole('button', { name: /grocery/i });
+      const groceryChip = screen.getByRole("button", { name: /grocery/i });
       await act(async () => {
         fireEvent.click(groceryChip);
         jest.runAllTimers();
@@ -574,8 +597,8 @@ describe('NearbyPlacesPanel - Networking, Timing, Concurrency', () => {
       // Type in search and press Enter (explicit search required)
       const searchInput = screen.getByPlaceholderText(/search/i);
       await act(async () => {
-        fireEvent.change(searchInput, { target: { value: 'coffee' } });
-        fireEvent.keyDown(searchInput, { key: 'Enter' });
+        fireEvent.change(searchInput, { target: { value: "coffee" } });
+        fireEvent.keyDown(searchInput, { key: "Enter" });
         jest.runAllTimers();
       });
 

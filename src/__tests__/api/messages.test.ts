@@ -2,7 +2,7 @@
  * Tests for messages API route
  */
 
-jest.mock('@/lib/prisma', () => {
+jest.mock("@/lib/prisma", () => {
   const mockPrisma: Record<string, any> = {
     conversation: {
       findUnique: jest.fn(),
@@ -31,313 +31,341 @@ jest.mock('@/lib/prisma', () => {
   // $transaction passes mockPrisma as tx so existing assertions still work
   mockPrisma.$transaction.mockImplementation((fn: any) => fn(mockPrisma));
   return { prisma: mockPrisma };
-})
+});
 
-jest.mock('@/auth', () => ({
+jest.mock("@/auth", () => ({
   auth: jest.fn(),
-}))
+}));
 
-jest.mock('@/app/actions/suspension', () => ({
+jest.mock("@/app/actions/suspension", () => ({
   checkSuspension: jest.fn().mockResolvedValue({ suspended: false }),
   checkEmailVerified: jest.fn().mockResolvedValue({ verified: true }),
-}))
+}));
 
-jest.mock('@/app/actions/block', () => ({
+jest.mock("@/app/actions/block", () => ({
   checkBlockBeforeAction: jest.fn().mockResolvedValue({ allowed: true }),
-}))
+}));
 
-jest.mock('next/server', () => ({
+jest.mock("next/server", () => ({
   NextResponse: {
     json: (data: any, init?: { status?: number }) => {
       return {
         status: init?.status || 200,
         json: async () => data,
         headers: new Map(),
-      }
+      };
     },
   },
-}))
+}));
 
 // P1-4: Mock rate limiting to return null (allow request)
-jest.mock('@/lib/with-rate-limit', () => ({
+jest.mock("@/lib/with-rate-limit", () => ({
   withRateLimit: jest.fn().mockResolvedValue(null),
-}))
+}));
 
-import { GET, POST } from '@/app/api/messages/route'
-import { prisma } from '@/lib/prisma'
-import { auth } from '@/auth'
-import { checkEmailVerified } from '@/app/actions/suspension'
-import { checkBlockBeforeAction } from '@/app/actions/block'
+import { GET, POST } from "@/app/api/messages/route";
+import { prisma } from "@/lib/prisma";
+import { auth } from "@/auth";
+import { checkEmailVerified } from "@/app/actions/suspension";
+import { checkBlockBeforeAction } from "@/app/actions/block";
 
-describe('Messages API', () => {
+describe("Messages API", () => {
   const mockSession = {
-    user: { id: 'user-123', name: 'Test User', email: 'test@example.com' },
-  }
+    user: { id: "user-123", name: "Test User", email: "test@example.com" },
+  };
 
   beforeEach(() => {
-    jest.clearAllMocks()
-    ;(auth as jest.Mock).mockResolvedValue(mockSession)
+    jest.clearAllMocks();
+    (auth as jest.Mock).mockResolvedValue(mockSession);
     // Mock user.findUnique for suspension check
-    ;(prisma.user.findUnique as jest.Mock).mockResolvedValue({
-      id: 'user-123',
+    (prisma.user.findUnique as jest.Mock).mockResolvedValue({
+      id: "user-123",
       isSuspended: false,
-    })
-  })
+    });
+  });
 
-  describe('GET', () => {
-    it('returns 401 when not authenticated', async () => {
-      ;(auth as jest.Mock).mockResolvedValue(null)
+  describe("GET", () => {
+    it("returns 401 when not authenticated", async () => {
+      (auth as jest.Mock).mockResolvedValue(null);
 
-      const request = new Request('http://localhost/api/messages')
-      const response = await GET(request)
+      const request = new Request("http://localhost/api/messages");
+      const response = await GET(request);
 
-      expect(response.status).toBe(401)
-    })
+      expect(response.status).toBe(401);
+    });
 
-    it('returns messages for specific conversation', async () => {
+    it("returns messages for specific conversation", async () => {
       const mockConversation = {
-        id: 'conv-123',
-        participants: [{ id: 'user-123' }, { id: 'user-456' }],
+        id: "conv-123",
+        participants: [{ id: "user-123" }, { id: "user-456" }],
         deletions: [],
-      }
+      };
       const mockMessages = [
-        { id: 'msg-1', content: 'Hello', sender: { id: 'user-123', name: 'User', image: null } },
-        { id: 'msg-2', content: 'Hi', sender: { id: 'user-456', name: 'Other', image: null } },
-      ]
-      ;(prisma.conversation.findUnique as jest.Mock).mockResolvedValue(mockConversation)
-      ;(prisma.message.findMany as jest.Mock).mockResolvedValue(mockMessages)
-      ;(prisma.message.count as jest.Mock).mockResolvedValue(2)
+        {
+          id: "msg-1",
+          content: "Hello",
+          sender: { id: "user-123", name: "User", image: null },
+        },
+        {
+          id: "msg-2",
+          content: "Hi",
+          sender: { id: "user-456", name: "Other", image: null },
+        },
+      ];
+      (prisma.conversation.findUnique as jest.Mock).mockResolvedValue(
+        mockConversation
+      );
+      (prisma.message.findMany as jest.Mock).mockResolvedValue(mockMessages);
+      (prisma.message.count as jest.Mock).mockResolvedValue(2);
 
-      const request = new Request('http://localhost/api/messages?conversationId=conv-123')
-      const response = await GET(request)
+      const request = new Request(
+        "http://localhost/api/messages?conversationId=conv-123"
+      );
+      const response = await GET(request);
 
-      expect(response.status).toBe(200)
-      const data = await response.json()
-      expect(data.messages).toEqual(mockMessages)
-    })
+      expect(response.status).toBe(200);
+      const data = await response.json();
+      expect(data.messages).toEqual(mockMessages);
+    });
 
-    it('returns 403 when user is not participant', async () => {
-      ;(prisma.conversation.findUnique as jest.Mock).mockResolvedValue({
-        id: 'conv-123',
-        participants: [{ id: 'other-1' }, { id: 'other-2' }],
+    it("returns 403 when user is not participant", async () => {
+      (prisma.conversation.findUnique as jest.Mock).mockResolvedValue({
+        id: "conv-123",
+        participants: [{ id: "other-1" }, { id: "other-2" }],
         deletions: [],
-      })
+      });
 
-      const request = new Request('http://localhost/api/messages?conversationId=conv-123')
-      const response = await GET(request)
+      const request = new Request(
+        "http://localhost/api/messages?conversationId=conv-123"
+      );
+      const response = await GET(request);
 
-      expect(response.status).toBe(403)
-    })
+      expect(response.status).toBe(403);
+    });
 
-    it('supports safe polling reads without mutating message state', async () => {
+    it("supports safe polling reads without mutating message state", async () => {
       const mockConversation = {
-        id: 'conv-123',
-        participants: [{ id: 'user-123' }, { id: 'user-456' }],
+        id: "conv-123",
+        participants: [{ id: "user-123" }, { id: "user-456" }],
         deletions: [],
-      }
+      };
       const cursorMessage = {
-        id: 'msg-1',
-        conversationId: 'conv-123',
-        createdAt: new Date('2026-03-06T12:00:00.000Z'),
-      }
+        id: "msg-1",
+        conversationId: "conv-123",
+        createdAt: new Date("2026-03-06T12:00:00.000Z"),
+      };
       const polledMessages = [
         {
-          id: 'msg-2',
-          content: 'Hello after cursor',
-          sender: { id: 'user-456', name: 'Other', image: null },
-          createdAt: new Date('2026-03-06T12:01:00.000Z'),
+          id: "msg-2",
+          content: "Hello after cursor",
+          sender: { id: "user-456", name: "Other", image: null },
+          createdAt: new Date("2026-03-06T12:01:00.000Z"),
         },
-      ]
+      ];
 
-      ;(prisma.conversation.findUnique as jest.Mock).mockResolvedValue(mockConversation)
-      ;(prisma.message.findUnique as jest.Mock).mockResolvedValue(cursorMessage)
-      ;(prisma.message.findMany as jest.Mock).mockResolvedValue(polledMessages)
-      ;(prisma.typingStatus.findMany as jest.Mock).mockResolvedValue([
+      (prisma.conversation.findUnique as jest.Mock).mockResolvedValue(
+        mockConversation
+      );
+      (prisma.message.findUnique as jest.Mock).mockResolvedValue(cursorMessage);
+      (prisma.message.findMany as jest.Mock).mockResolvedValue(polledMessages);
+      (prisma.typingStatus.findMany as jest.Mock).mockResolvedValue([
         {
-          user: { id: 'user-456', name: 'Other User' },
+          user: { id: "user-456", name: "Other User" },
         },
-      ])
+      ]);
 
-      const request = new Request('http://localhost/api/messages?conversationId=conv-123&poll=1&lastMessageId=msg-1')
-      const response = await GET(request)
+      const request = new Request(
+        "http://localhost/api/messages?conversationId=conv-123&poll=1&lastMessageId=msg-1"
+      );
+      const response = await GET(request);
 
-      expect(response.status).toBe(200)
-      const data = await response.json()
+      expect(response.status).toBe(200);
+      const data = await response.json();
       expect(data).toEqual({
         messages: polledMessages,
-        typingUsers: [{ id: 'user-456', name: 'Other User' }],
+        typingUsers: [{ id: "user-456", name: "Other User" }],
         hasNewMessages: true,
-      })
-      expect(prisma.message.updateMany).not.toHaveBeenCalled()
-      expect(prisma.message.count).not.toHaveBeenCalled()
-    })
+      });
+      expect(prisma.message.updateMany).not.toHaveBeenCalled();
+      expect(prisma.message.count).not.toHaveBeenCalled();
+    });
 
-    it('returns all conversations when no conversationId', async () => {
+    it("returns all conversations when no conversationId", async () => {
       const mockConversations = [
         {
-          id: 'conv-1',
+          id: "conv-1",
           participants: [
-            { id: 'user-123', name: 'User', image: null },
-            { id: 'other-1', name: 'Other 1', image: null },
+            { id: "user-123", name: "User", image: null },
+            { id: "other-1", name: "Other 1", image: null },
           ],
-          messages: [{ content: 'Last message', createdAt: new Date() }],
-          listing: { title: 'Listing 1' },
+          messages: [{ content: "Last message", createdAt: new Date() }],
+          listing: { title: "Listing 1" },
         },
-      ]
-      ;(prisma.conversation.findMany as jest.Mock).mockResolvedValue(mockConversations)
-      ;(prisma.conversation.count as jest.Mock).mockResolvedValue(1)
+      ];
+      (prisma.conversation.findMany as jest.Mock).mockResolvedValue(
+        mockConversations
+      );
+      (prisma.conversation.count as jest.Mock).mockResolvedValue(1);
 
-      const request = new Request('http://localhost/api/messages')
-      const response = await GET(request)
+      const request = new Request("http://localhost/api/messages");
+      const response = await GET(request);
 
-      expect(response.status).toBe(200)
-      const data = await response.json()
-      expect(data.conversations[0].id).toBe('conv-1')
-    })
+      expect(response.status).toBe(200);
+      const data = await response.json();
+      expect(data.conversations[0].id).toBe("conv-1");
+    });
 
-    it('handles database errors', async () => {
-      ;(prisma.conversation.findMany as jest.Mock).mockRejectedValue(new Error('DB Error'))
+    it("handles database errors", async () => {
+      (prisma.conversation.findMany as jest.Mock).mockRejectedValue(
+        new Error("DB Error")
+      );
 
-      const request = new Request('http://localhost/api/messages')
-      const response = await GET(request)
+      const request = new Request("http://localhost/api/messages");
+      const response = await GET(request);
 
-      expect(response.status).toBe(500)
-    })
-  })
+      expect(response.status).toBe(500);
+    });
+  });
 
-  describe('POST', () => {
-    it('returns 401 when not authenticated', async () => {
-      ;(auth as jest.Mock).mockResolvedValue(null)
+  describe("POST", () => {
+    it("returns 401 when not authenticated", async () => {
+      (auth as jest.Mock).mockResolvedValue(null);
 
-      const request = new Request('http://localhost/api/messages', {
-        method: 'POST',
-        body: JSON.stringify({ conversationId: 'conv-123', content: 'Hello' }),
-      })
-      const response = await POST(request)
+      const request = new Request("http://localhost/api/messages", {
+        method: "POST",
+        body: JSON.stringify({ conversationId: "conv-123", content: "Hello" }),
+      });
+      const response = await POST(request);
 
-      expect(response.status).toBe(401)
-    })
+      expect(response.status).toBe(401);
+    });
 
-    it('returns 400 when missing fields', async () => {
-      const request = new Request('http://localhost/api/messages', {
-        method: 'POST',
-        body: JSON.stringify({ conversationId: 'conv-123' }),
-      })
-      const response = await POST(request)
+    it("returns 400 when missing fields", async () => {
+      const request = new Request("http://localhost/api/messages", {
+        method: "POST",
+        body: JSON.stringify({ conversationId: "conv-123" }),
+      });
+      const response = await POST(request);
 
-      expect(response.status).toBe(400)
-    })
+      expect(response.status).toBe(400);
+    });
 
-    it('returns 403 when user is not participant', async () => {
-      ;(prisma.conversation.findUnique as jest.Mock).mockResolvedValue({
-        id: 'conv-123',
-        participants: [{ id: 'other-1' }, { id: 'other-2' }],
-      })
+    it("returns 403 when user is not participant", async () => {
+      (prisma.conversation.findUnique as jest.Mock).mockResolvedValue({
+        id: "conv-123",
+        participants: [{ id: "other-1" }, { id: "other-2" }],
+      });
 
-      const request = new Request('http://localhost/api/messages', {
-        method: 'POST',
-        body: JSON.stringify({ conversationId: 'conv-123', content: 'Hello' }),
-      })
-      const response = await POST(request)
+      const request = new Request("http://localhost/api/messages", {
+        method: "POST",
+        body: JSON.stringify({ conversationId: "conv-123", content: "Hello" }),
+      });
+      const response = await POST(request);
 
-      expect(response.status).toBe(403)
-    })
+      expect(response.status).toBe(403);
+    });
 
-    it('returns 403 when email is not verified', async () => {
-      ;(checkEmailVerified as jest.Mock).mockResolvedValueOnce({
+    it("returns 403 when email is not verified", async () => {
+      (checkEmailVerified as jest.Mock).mockResolvedValueOnce({
         verified: false,
-        error: 'Please verify your email to continue',
-      })
+        error: "Please verify your email to continue",
+      });
 
-      const request = new Request('http://localhost/api/messages', {
-        method: 'POST',
-        body: JSON.stringify({ conversationId: 'conv-123', content: 'Hello' }),
-      })
-      const response = await POST(request)
+      const request = new Request("http://localhost/api/messages", {
+        method: "POST",
+        body: JSON.stringify({ conversationId: "conv-123", content: "Hello" }),
+      });
+      const response = await POST(request);
 
-      expect(response.status).toBe(403)
-      const data = await response.json()
-      expect(data.error).toMatch(/verify your email/i)
-    })
+      expect(response.status).toBe(403);
+      const data = await response.json();
+      expect(data.error).toMatch(/verify your email/i);
+    });
 
-    it('returns 403 when sender is blocked by recipient', async () => {
-      ;(prisma.conversation.findUnique as jest.Mock).mockResolvedValue({
-        id: 'conv-123',
-        participants: [{ id: 'user-123' }, { id: 'user-456' }],
-      })
-      ;(checkBlockBeforeAction as jest.Mock).mockResolvedValueOnce({
+    it("returns 403 when sender is blocked by recipient", async () => {
+      (prisma.conversation.findUnique as jest.Mock).mockResolvedValue({
+        id: "conv-123",
+        participants: [{ id: "user-123" }, { id: "user-456" }],
+      });
+      (checkBlockBeforeAction as jest.Mock).mockResolvedValueOnce({
         allowed: false,
-        message: 'This user has blocked you',
-      })
+        message: "This user has blocked you",
+      });
 
-      const request = new Request('http://localhost/api/messages', {
-        method: 'POST',
-        body: JSON.stringify({ conversationId: 'conv-123', content: 'Hello' }),
-      })
-      const response = await POST(request)
+      const request = new Request("http://localhost/api/messages", {
+        method: "POST",
+        body: JSON.stringify({ conversationId: "conv-123", content: "Hello" }),
+      });
+      const response = await POST(request);
 
-      expect(response.status).toBe(403)
-      const data = await response.json()
-      expect(data.error).toBe('This user has blocked you')
-    })
+      expect(response.status).toBe(403);
+      const data = await response.json();
+      expect(data.error).toBe("This user has blocked you");
+    });
 
-    it('returns 403 when sender has blocked recipient', async () => {
-      ;(prisma.conversation.findUnique as jest.Mock).mockResolvedValue({
-        id: 'conv-123',
-        participants: [{ id: 'user-123' }, { id: 'user-456' }],
-      })
-      ;(checkBlockBeforeAction as jest.Mock).mockResolvedValueOnce({
+    it("returns 403 when sender has blocked recipient", async () => {
+      (prisma.conversation.findUnique as jest.Mock).mockResolvedValue({
+        id: "conv-123",
+        participants: [{ id: "user-123" }, { id: "user-456" }],
+      });
+      (checkBlockBeforeAction as jest.Mock).mockResolvedValueOnce({
         allowed: false,
-        message: 'You have blocked this user. Unblock them to interact.',
-      })
+        message: "You have blocked this user. Unblock them to interact.",
+      });
 
-      const request = new Request('http://localhost/api/messages', {
-        method: 'POST',
-        body: JSON.stringify({ conversationId: 'conv-123', content: 'Hello' }),
-      })
-      const response = await POST(request)
+      const request = new Request("http://localhost/api/messages", {
+        method: "POST",
+        body: JSON.stringify({ conversationId: "conv-123", content: "Hello" }),
+      });
+      const response = await POST(request);
 
-      expect(response.status).toBe(403)
-      const data = await response.json()
-      expect(data.error).toBe('You have blocked this user. Unblock them to interact.')
-    })
+      expect(response.status).toBe(403);
+      const data = await response.json();
+      expect(data.error).toBe(
+        "You have blocked this user. Unblock them to interact."
+      );
+    });
 
-    it('creates message successfully', async () => {
+    it("creates message successfully", async () => {
       const mockConversation = {
-        id: 'conv-123',
-        participants: [{ id: 'user-123' }, { id: 'user-456' }],
-      }
+        id: "conv-123",
+        participants: [{ id: "user-123" }, { id: "user-456" }],
+      };
       const mockMessage = {
-        id: 'msg-new',
-        content: 'Hello',
-        senderId: 'user-123',
-        sender: { id: 'user-123', name: 'User', image: null },
-      }
-      ;(prisma.conversation.findUnique as jest.Mock).mockResolvedValue(mockConversation)
-      ;(prisma.message.create as jest.Mock).mockResolvedValue(mockMessage)
-      ;(prisma.conversation.update as jest.Mock).mockResolvedValue({})
+        id: "msg-new",
+        content: "Hello",
+        senderId: "user-123",
+        sender: { id: "user-123", name: "User", image: null },
+      };
+      (prisma.conversation.findUnique as jest.Mock).mockResolvedValue(
+        mockConversation
+      );
+      (prisma.message.create as jest.Mock).mockResolvedValue(mockMessage);
+      (prisma.conversation.update as jest.Mock).mockResolvedValue({});
 
-      const request = new Request('http://localhost/api/messages', {
-        method: 'POST',
-        body: JSON.stringify({ conversationId: 'conv-123', content: 'Hello' }),
-      })
-      const response = await POST(request)
+      const request = new Request("http://localhost/api/messages", {
+        method: "POST",
+        body: JSON.stringify({ conversationId: "conv-123", content: "Hello" }),
+      });
+      const response = await POST(request);
 
-      expect(response.status).toBe(201)
-      expect(prisma.message.create).toHaveBeenCalled()
-      expect(prisma.conversation.update).toHaveBeenCalled()
-    })
+      expect(response.status).toBe(201);
+      expect(prisma.message.create).toHaveBeenCalled();
+      expect(prisma.conversation.update).toHaveBeenCalled();
+    });
 
-    it('handles database errors', async () => {
-      ;(prisma.conversation.findUnique as jest.Mock).mockRejectedValue(new Error('DB Error'))
+    it("handles database errors", async () => {
+      (prisma.conversation.findUnique as jest.Mock).mockRejectedValue(
+        new Error("DB Error")
+      );
 
-      const request = new Request('http://localhost/api/messages', {
-        method: 'POST',
-        body: JSON.stringify({ conversationId: 'conv-123', content: 'Hello' }),
-      })
-      const response = await POST(request)
+      const request = new Request("http://localhost/api/messages", {
+        method: "POST",
+        body: JSON.stringify({ conversationId: "conv-123", content: "Hello" }),
+      });
+      const response = await POST(request);
 
-      expect(response.status).toBe(500)
-    })
-  })
-})
+      expect(response.status).toBe(500);
+    });
+  });
+});

@@ -1,10 +1,10 @@
-import { Page, expect } from '@playwright/test';
+import { Page, expect } from "@playwright/test";
 
 /**
  * Centralized mock session token for route-level auth mocking.
  * Use this instead of hardcoding 'mock-session-token' in specs.
  */
-export const MOCK_SESSION_TOKEN = 'mock-session-token';
+export const MOCK_SESSION_TOKEN = "mock-session-token";
 
 /**
  * Wait for Turnstile to auto-solve, or skip if widget not rendered.
@@ -12,13 +12,21 @@ export const MOCK_SESSION_TOKEN = 'mock-session-token';
  * and no hidden input is created — this function detects that and proceeds.
  * See: https://developers.cloudflare.com/turnstile/tutorials/excluding-turnstile-from-e2e-tests/
  */
-export async function waitForTurnstileIfPresent(page: Page, timeout = 15_000): Promise<void> {
-  await page.waitForFunction(() => {
-    const widget = document.querySelector('[data-testid="turnstile-widget"]');
-    if (!widget) return true; // No Turnstile widget rendered, skip
-    const input = document.querySelector('input[name="cf-turnstile-response"]') as HTMLInputElement | null;
-    return input !== null && input.value.length > 0;
-  }, { timeout });
+export async function waitForTurnstileIfPresent(
+  page: Page,
+  timeout = 15_000
+): Promise<void> {
+  await page.waitForFunction(
+    () => {
+      const widget = document.querySelector('[data-testid="turnstile-widget"]');
+      if (!widget) return true; // No Turnstile widget rendered, skip
+      const input = document.querySelector(
+        'input[name="cf-turnstile-response"]'
+      ) as HTMLInputElement | null;
+      return input !== null && input.value.length > 0;
+    },
+    { timeout }
+  );
 }
 
 /**
@@ -30,8 +38,8 @@ export const authHelpers = {
    */
   getCredentials() {
     return {
-      email: process.env.E2E_TEST_EMAIL || 'test@example.com',
-      password: process.env.E2E_TEST_PASSWORD || 'TestPassword123!',
+      email: process.env.E2E_TEST_EMAIL || "test@example.com",
+      password: process.env.E2E_TEST_PASSWORD || "TestPassword123!",
     };
   },
 
@@ -40,8 +48,8 @@ export const authHelpers = {
    */
   getAdminCredentials() {
     return {
-      email: process.env.E2E_ADMIN_EMAIL || 'admin@example.com',
-      password: process.env.E2E_ADMIN_PASSWORD || 'AdminPassword123!',
+      email: process.env.E2E_ADMIN_EMAIL || "admin@example.com",
+      password: process.env.E2E_ADMIN_PASSWORD || "AdminPassword123!",
     };
   },
 
@@ -53,28 +61,36 @@ export const authHelpers = {
     const useEmail = email || creds.email;
     const usePassword = password || creds.password;
 
-    await page.goto('/login');
-    await page.waitForLoadState('domcontentloaded');
+    await page.goto("/login");
+    await page.waitForLoadState("domcontentloaded");
 
     // Wait for the login form to render (Suspense boundary + hydration)
     await expect(
-      page.getByRole('heading', { name: /log in|sign in|welcome back/i })
+      page.getByRole("heading", { name: /log in|sign in|welcome back/i })
     ).toBeVisible({ timeout: 30000 });
 
     await page.getByLabel(/email/i).first().fill(useEmail);
-    await page.getByLabel(/password/i).first().fill(usePassword);
+    await page
+      .getByLabel(/password/i)
+      .first()
+      .fill(usePassword);
 
     // Wait for Turnstile widget to auto-solve (skips if widget not rendered)
     await waitForTurnstileIfPresent(page);
 
-    await page.getByRole('button', { name: /sign in|log in|login/i }).first().click();
+    await page
+      .getByRole("button", { name: /sign in|log in|login/i })
+      .first()
+      .click();
 
     // Wait for redirect away from login
     // Login uses window.location.href = '/' (full page navigation)
-    await expect.poll(
-      () => !new URL(page.url()).pathname.includes('/login'),
-      { timeout: 30000, message: 'Expected to navigate away from login after auth' }
-    ).toBe(true);
+    await expect
+      .poll(() => !new URL(page.url()).pathname.includes("/login"), {
+        timeout: 30000,
+        message: "Expected to navigate away from login after auth",
+      })
+      .toBe(true);
   },
 
   /**
@@ -88,12 +104,12 @@ export const authHelpers = {
       name?: string;
     }
   ) {
-    await page.goto('/signup');
-    await page.waitForLoadState('domcontentloaded');
+    await page.goto("/signup");
+    await page.waitForLoadState("domcontentloaded");
 
     // Wait for the signup form to render (Suspense boundary + hydration)
     await expect(
-      page.getByRole('heading', { name: /sign up|create.*account|register/i })
+      page.getByRole("heading", { name: /sign up|create.*account|register/i })
     ).toBeVisible({ timeout: 30000 });
 
     // Fill registration form
@@ -116,7 +132,10 @@ export const authHelpers = {
     // Wait for Turnstile widget to auto-solve (skips if widget not rendered)
     await waitForTurnstileIfPresent(page);
 
-    await page.getByRole('button', { name: /sign up|register|create account/i }).first().click();
+    await page
+      .getByRole("button", { name: /sign up|register|create account/i })
+      .first()
+      .click();
 
     // Wait for redirect or success message
     await expect(page).not.toHaveURL(/\/signup/, { timeout: 30000 });
@@ -131,10 +150,14 @@ export const authHelpers = {
     const isMobile = viewport ? viewport.width < 768 : false;
 
     if (isMobile) {
-      const hamburger = page.getByRole('button', { name: /menu/i })
+      const hamburger = page
+        .getByRole("button", { name: /menu/i })
         .or(page.locator('[data-testid="mobile-menu"]'))
         .or(page.locator('[class*="hamburger"]'));
-      const hamburgerVisible = await hamburger.first().isVisible().catch(() => false);
+      const hamburgerVisible = await hamburger
+        .first()
+        .isVisible()
+        .catch(() => false);
       if (hamburgerVisible) {
         await hamburger.first().click();
         await page.waitForTimeout(500);
@@ -146,7 +169,7 @@ export const authHelpers = {
     const userMenuButton = page.locator('[aria-label="User menu"]');
 
     // Wait for the button to be attached and visible
-    await userMenuButton.waitFor({ state: 'visible', timeout: 30000 });
+    await userMenuButton.waitFor({ state: "visible", timeout: 30000 });
     // The button has transition-all duration-300 which causes Playwright's
     // stability check to fail in CI (element detected as "not stable").
     // Use evaluate to dispatch click directly, bypassing actionability checks.
@@ -155,8 +178,8 @@ export const authHelpers = {
 
     // Click logout option
     const logoutOption = page
-      .getByRole('menuitem', { name: /log ?out|sign ?out/i })
-      .or(page.getByRole('button', { name: /log ?out|sign ?out/i }));
+      .getByRole("menuitem", { name: /log ?out|sign ?out/i })
+      .or(page.getByRole("button", { name: /log ?out|sign ?out/i }));
 
     await logoutOption.first().click();
 
@@ -172,7 +195,7 @@ export const authHelpers = {
   async isLoggedIn(page: Page): Promise<boolean> {
     try {
       const userMenu = page
-        .getByRole('button', { name: /menu|profile|account/i })
+        .getByRole("button", { name: /menu|profile|account/i })
         .or(page.locator('[data-testid="user-menu"]'))
         .or(page.locator('[aria-label*="user"]'));
 
@@ -181,9 +204,9 @@ export const authHelpers = {
       const isMobile = viewport ? viewport.width < 768 : false;
 
       if (isMobile) {
-        await userMenu.first().waitFor({ state: 'attached', timeout: 5000 });
+        await userMenu.first().waitFor({ state: "attached", timeout: 5000 });
       } else {
-        await userMenu.first().waitFor({ state: 'visible', timeout: 5000 });
+        await userMenu.first().waitFor({ state: "visible", timeout: 5000 });
       }
       return true;
     } catch {
@@ -205,30 +228,34 @@ export const authHelpers = {
    * Verify admin access
    */
   async verifyAdminAccess(page: Page) {
-    await page.goto('/admin');
+    await page.goto("/admin");
     await expect(page).toHaveURL(/\/admin/);
-    await expect(page.locator('h1, h2').filter({ hasText: /admin/i }).first()).toBeVisible();
+    await expect(
+      page.locator("h1, h2").filter({ hasText: /admin/i }).first()
+    ).toBeVisible();
   },
 
   /**
    * Verify admin access denied for non-admin
    */
   async verifyAdminDenied(page: Page) {
-    await page.goto('/admin');
+    await page.goto("/admin");
 
     // Should redirect away or show access denied
     // Wait for either a redirect away from /admin or an access denied message.
     // Client-side auth redirects may fire after domcontentloaded, so we
     // race a URL change against a visible denial message.
     const redirected = await page
-      .waitForURL((url) => !url.pathname.startsWith('/admin'), { timeout: 10_000 })
+      .waitForURL((url) => !url.pathname.startsWith("/admin"), {
+        timeout: 10_000,
+      })
       .then(() => true)
       .catch(() => false);
 
     if (!redirected) {
       // Still on /admin — must show access denied
       await expect(
-        page.locator('text=/access denied|unauthorized|forbidden/i'),
+        page.locator("text=/access denied|unauthorized|forbidden/i")
       ).toBeVisible({ timeout: 5_000 });
     }
   },

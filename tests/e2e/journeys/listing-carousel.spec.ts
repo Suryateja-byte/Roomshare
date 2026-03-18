@@ -8,7 +8,15 @@
  * - Single image cards don't show carousel controls
  */
 
-import { test, expect, selectors, timeouts, tags, SF_BOUNDS, searchResultsContainer } from "../helpers";
+import {
+  test,
+  expect,
+  selectors,
+  timeouts,
+  tags,
+  SF_BOUNDS,
+  searchResultsContainer,
+} from "../helpers";
 
 test.describe("Listing Card Carousel", () => {
   // Run as anonymous user
@@ -21,7 +29,9 @@ test.describe("Listing Card Carousel", () => {
     await nav.goToSearch({ bounds: SF_BOUNDS });
 
     // Wait for listings to load
-    await expect(searchResultsContainer(page).locator(selectors.listingCard).first()).toBeVisible({
+    await expect(
+      searchResultsContainer(page).locator(selectors.listingCard).first()
+    ).toBeVisible({
       timeout: timeouts.navigation,
     });
   });
@@ -42,7 +52,7 @@ test.describe("Listing Card Carousel", () => {
     // ImageCarousel renders prev/next buttons directly (not in a wrapper).
     // When hidden they carry opacity-0 + pointer-events-none on themselves.
     const nextButton = carouselRegion.locator(
-      'button[aria-label="Next image"]',
+      'button[aria-label="Next image"]'
     );
     await expect(nextButton).toHaveCount(1);
 
@@ -60,7 +70,7 @@ test.describe("Listing Card Carousel", () => {
     const hoveredClasses = await nextButton.getAttribute("class");
     // In headless mode, CSS group-hover may not always fire; skip assertion if still opacity-0
     if (hoveredClasses?.includes("opacity-0")) {
-      test.skip(true, 'CSS group-hover not triggering in headless mode');
+      test.skip(true, "CSS group-hover not triggering in headless mode");
       return;
     }
     expect(hoveredClasses).toContain("opacity-100");
@@ -99,7 +109,7 @@ test.describe("Listing Card Carousel", () => {
     // Click next button (force: true bypasses actionability checks for
     // hover-reveal controls that may still have pointer-events-none in CI)
     const nextButton = carouselRegion.locator(
-      'button[aria-label="Next image"]',
+      'button[aria-label="Next image"]'
     );
     await nextButton.click({ force: true });
 
@@ -112,12 +122,17 @@ test.describe("Listing Card Carousel", () => {
     expect(page.url()).toBe(initialUrl);
   });
 
-  test(`${tags.anon} - Clicking dot navigates to image`, async ({ page }, testInfo) => {
+  test(`${tags.anon} - Clicking dot navigates to image`, async ({
+    page,
+  }, testInfo) => {
     // Embla scrollTo() doesn't fire scroll events under Playwright's Mobile
     // Chrome touch emulation, so aria-selected never updates. Desktop
     // Chromium (same test, different project) validates this interaction.
-    if (testInfo.project.name.includes('Mobile')) {
-      test.skip(true, 'Embla dot scrollTo unreliable under mobile touch emulation');
+    if (testInfo.project.name.includes("Mobile")) {
+      test.skip(
+        true,
+        "Embla dot scrollTo unreliable under mobile touch emulation"
+      );
     }
 
     const carouselRegion = searchResultsContainer(page)
@@ -149,7 +164,9 @@ test.describe("Listing Card Carousel", () => {
     // Second dot should be selected (Embla scroll animation can be slow on
     // Mobile Chrome CI — use toPass polling to handle delayed onSelect callback)
     await expect(async () => {
-      await expect(secondDot).toHaveAttribute("aria-selected", "true", { timeout: 2000 });
+      await expect(secondDot).toHaveAttribute("aria-selected", "true", {
+        timeout: 2000,
+      });
     }).toPass({ timeout: 10_000, intervals: [500, 1000, 2000] });
 
     // URL should not have changed
@@ -162,7 +179,10 @@ test.describe("Listing Card Carousel", () => {
     // Carousel hover controls rely on CSS group-hover which doesn't fire on
     // touch/mobile devices. Skip this test on mobile viewports.
     const viewport = page.viewportSize();
-    test.skip(!!viewport && viewport.width < 768, 'Desktop-only: carousel hover controls not applicable on mobile');
+    test.skip(
+      !!viewport && viewport.width < 768,
+      "Desktop-only: carousel hover controls not applicable on mobile"
+    );
 
     const carouselRegion = searchResultsContainer(page)
       .locator('[aria-label^="Image carousel"]')
@@ -177,10 +197,10 @@ test.describe("Listing Card Carousel", () => {
     // ImageCarousel (Embla, loop:true) always renders both buttons in the DOM.
     // Before hover they are hidden via opacity-0 / pointer-events-none.
     const prevButton = carouselRegion.locator(
-      'button[aria-label="Previous image"]',
+      'button[aria-label="Previous image"]'
     );
     const nextButton = carouselRegion.locator(
-      'button[aria-label="Next image"]',
+      'button[aria-label="Next image"]'
     );
 
     // Both buttons exist in the DOM even before hover
@@ -195,7 +215,7 @@ test.describe("Listing Card Carousel", () => {
     const prevClasses = await prevButton.getAttribute("class");
     // In headless mode, CSS group-hover may not always fire; skip if still hidden
     if (prevClasses?.includes("opacity-0")) {
-      test.skip(true, 'CSS group-hover not triggering in headless mode');
+      test.skip(true, "CSS group-hover not triggering in headless mode");
       return;
     }
     expect(prevClasses).toContain("opacity-100");
@@ -210,7 +230,7 @@ test.describe("Listing Card Carousel", () => {
     // Previous button should still be visible after navigation
     const prevClassesAfter = await prevButton.getAttribute("class");
     if (prevClassesAfter?.includes("opacity-0")) {
-      test.skip(true, 'CSS group-hover not triggering in headless mode');
+      test.skip(true, "CSS group-hover not triggering in headless mode");
       return;
     }
     expect(prevClassesAfter).toContain("opacity-100");
@@ -233,7 +253,7 @@ test.describe("Listing Card Carousel", () => {
     await expect(carouselRegion).toHaveAttribute("role", "region");
     await expect(carouselRegion).toHaveAttribute(
       "aria-roledescription",
-      "carousel",
+      "carousel"
     );
 
     // Check slides have proper roles

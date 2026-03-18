@@ -24,7 +24,12 @@
  * Run: pnpm playwright test tests/e2e/pagination/pagination-reset.spec.ts --project=chromium
  */
 
-import { test, expect, SF_BOUNDS, searchResultsContainer } from "../helpers/test-utils";
+import {
+  test,
+  expect,
+  SF_BOUNDS,
+  searchResultsContainer,
+} from "../helpers/test-utils";
 import { setupPaginationMock } from "../helpers/pagination-mock-factory";
 
 const boundsQS = `minLat=${SF_BOUNDS.minLat}&maxLat=${SF_BOUNDS.maxLat}&minLng=${SF_BOUNDS.minLng}&maxLng=${SF_BOUNDS.maxLng}`;
@@ -168,7 +173,7 @@ test.describe("Pagination Reset on Param Change", () => {
 
     // Collect IDs from initial page
     const initialIds = await cards.evaluateAll((elements) =>
-      elements.map((el) => el.getAttribute("data-listing-id")).filter(Boolean),
+      elements.map((el) => el.getAttribute("data-listing-id")).filter(Boolean)
     );
 
     // Load more
@@ -186,7 +191,7 @@ test.describe("Pagination Reset on Param Change", () => {
 
     // Collect IDs after remount
     const remountedIds = await cards.evaluateAll((elements) =>
-      elements.map((el) => el.getAttribute("data-listing-id")).filter(Boolean),
+      elements.map((el) => el.getAttribute("data-listing-id")).filter(Boolean)
     );
 
     // After remount, the initial IDs should be present again
@@ -200,7 +205,7 @@ test.describe("Pagination Reset on Param Change", () => {
     // (if seenIdsRef was stale, these would be deduped out)
     if (initialIds.length > 0 && remountedIds.length > 0) {
       const overlap = remountedIds.filter((id) =>
-        initialIds.includes(id as string),
+        initialIds.includes(id as string)
       );
       // There SHOULD be overlap (same real DB data), proving dedup was reset
       expect(overlap.length).toBeGreaterThan(0);

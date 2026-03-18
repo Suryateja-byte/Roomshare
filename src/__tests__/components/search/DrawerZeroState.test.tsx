@@ -27,7 +27,9 @@ describe("DrawerZeroState", () => {
         onRemoveSuggestion={mockOnRemove}
       />
     );
-    expect(screen.getByText("No exact matches for these filters")).toBeInTheDocument();
+    expect(
+      screen.getByText("No exact matches for these filters")
+    ).toBeInTheDocument();
   });
 
   it("renders at most 2 suggestion pills", () => {
@@ -44,7 +46,9 @@ describe("DrawerZeroState", () => {
     );
     expect(screen.getByText("Remove price filter")).toBeInTheDocument();
     expect(screen.getByText("Remove date filter")).toBeInTheDocument();
-    expect(screen.queryByText("Remove room type filter")).not.toBeInTheDocument();
+    expect(
+      screen.queryByText("Remove room type filter")
+    ).not.toBeInTheDocument();
   });
 
   it("calls onRemoveSuggestion with correct suggestion on click", () => {
@@ -71,7 +75,10 @@ describe("DrawerZeroState", () => {
       { type: "price", label: "Remove price filter", priority: 1 },
     ];
     render(
-      <DrawerZeroState suggestions={suggestions} onRemoveSuggestion={mockOnRemove} />
+      <DrawerZeroState
+        suggestions={suggestions}
+        onRemoveSuggestion={mockOnRemove}
+      />
     );
     const container = screen.getByRole("status");
     expect(container).toHaveAttribute("aria-live", "polite");

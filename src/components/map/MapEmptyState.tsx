@@ -1,26 +1,33 @@
-'use client';
+"use client";
 
-import { useMemo } from 'react';
-import { useRouter } from 'next/navigation';
-import { MapPin, Sparkles, X } from 'lucide-react';
-import { Button } from '@/components/ui/button';
+import { useMemo } from "react";
+import { useRouter } from "next/navigation";
+import { MapPin, Sparkles, X } from "lucide-react";
+import { Button } from "@/components/ui/button";
 import {
   urlToFilterChips,
   clearAllFilters,
-} from '@/components/filters/filter-chip-utils';
-import { getPriceParam, buildRawParamsFromSearchParams, parseSearchParams } from '@/lib/search-params';
-import { generateFilterSuggestions, type FilterSuggestion } from '@/lib/near-matches';
+} from "@/components/filters/filter-chip-utils";
+import {
+  getPriceParam,
+  buildRawParamsFromSearchParams,
+  parseSearchParams,
+} from "@/lib/search-params";
+import {
+  generateFilterSuggestions,
+  type FilterSuggestion,
+} from "@/lib/near-matches";
 
 const MAX_VISIBLE_CHIPS = 3;
 const MAX_SUGGESTIONS = 2;
 
 /** Map suggestion type to the URL param keys that should be removed */
-const SUGGESTION_TYPE_TO_PARAMS: Record<FilterSuggestion['type'], string[]> = {
-  price: ['minPrice', 'maxPrice', 'minBudget', 'maxBudget'],
-  date: ['moveInDate'],
-  roomType: ['roomType'],
-  amenities: ['amenities'],
-  leaseDuration: ['leaseDuration'],
+const SUGGESTION_TYPE_TO_PARAMS: Record<FilterSuggestion["type"], string[]> = {
+  price: ["minPrice", "maxPrice", "minBudget", "maxBudget"],
+  date: ["moveInDate"],
+  roomType: ["roomType"],
+  amenities: ["amenities"],
+  leaseDuration: ["leaseDuration"],
 };
 
 interface MapEmptyStateProps {
@@ -38,11 +45,13 @@ export function MapEmptyState({ onZoomOut, searchParams }: MapEmptyStateProps) {
 
   // Near matches: show toggle when price or date filters are active and nearMatches not already on
   const hasPriceOrDateFilter = useMemo(() => {
-    const hasPrice = getPriceParam(searchParams, 'min') !== undefined || getPriceParam(searchParams, 'max') !== undefined;
-    const hasDate = !!searchParams.get('moveInDate');
+    const hasPrice =
+      getPriceParam(searchParams, "min") !== undefined ||
+      getPriceParam(searchParams, "max") !== undefined;
+    const hasDate = !!searchParams.get("moveInDate");
     return hasPrice || hasDate;
   }, [searchParams]);
-  const nearMatchesAlreadyOn = searchParams.get('nearMatches') === '1';
+  const nearMatchesAlreadyOn = searchParams.get("nearMatches") === "1";
   const showNearMatches = hasPriceOrDateFilter && !nearMatchesAlreadyOn;
 
   // Smart filter suggestions
@@ -55,13 +64,13 @@ export function MapEmptyState({ onZoomOut, searchParams }: MapEmptyStateProps) {
 
   const handleClearFilters = () => {
     const cleared = clearAllFilters(searchParams);
-    router.push('/search?' + cleared);
+    router.push("/search?" + cleared);
   };
 
   const handleNearMatches = () => {
     const newParams = new URLSearchParams(searchParams);
-    newParams.set('nearMatches', '1');
-    router.push('/search?' + newParams.toString());
+    newParams.set("nearMatches", "1");
+    router.push("/search?" + newParams.toString());
   };
 
   const handleRemoveSuggestion = (suggestion: FilterSuggestion) => {
@@ -71,22 +80,32 @@ export function MapEmptyState({ onZoomOut, searchParams }: MapEmptyStateProps) {
       newParams.delete(key);
     }
     // Reset pagination
-    newParams.delete('page');
-    newParams.delete('cursor');
-    newParams.delete('cursorStack');
-    newParams.delete('pageNumber');
-    router.push('/search?' + newParams.toString());
+    newParams.delete("page");
+    newParams.delete("cursor");
+    newParams.delete("cursorStack");
+    newParams.delete("pageNumber");
+    router.push("/search?" + newParams.toString());
   };
 
   return (
     <div className="absolute bottom-20 left-1/2 -translate-x-1/2 z-10 bg-white dark:bg-zinc-800 rounded-xl shadow-lg border border-zinc-200 dark:border-zinc-700 px-5 py-4 max-w-[320px] text-center pointer-events-auto">
-      <MapPin className="w-8 h-8 text-zinc-300 dark:text-zinc-600 mx-auto mb-2" aria-hidden="true" />
-      <p className="text-sm font-medium text-zinc-700 dark:text-zinc-300 mb-1">No listings in this area</p>
-      <p className="text-xs text-zinc-500 dark:text-zinc-400 mb-3">Try zooming out or adjusting your filters</p>
+      <MapPin
+        className="w-8 h-8 text-zinc-300 dark:text-zinc-600 mx-auto mb-2"
+        aria-hidden="true"
+      />
+      <p className="text-sm font-medium text-zinc-700 dark:text-zinc-300 mb-1">
+        No listings in this area
+      </p>
+      <p className="text-xs text-zinc-500 dark:text-zinc-400 mb-3">
+        Try zooming out or adjusting your filters
+      </p>
 
       {/* Active filter chips */}
       {filtersActive && (
-        <div className="flex flex-wrap gap-1.5 justify-center mb-3" data-testid="filter-chips">
+        <div
+          className="flex flex-wrap gap-1.5 justify-center mb-3"
+          data-testid="filter-chips"
+        >
           {visibleChips.map((chip) => (
             <span
               key={chip.id}
@@ -106,7 +125,10 @@ export function MapEmptyState({ onZoomOut, searchParams }: MapEmptyStateProps) {
 
       {/* Smart filter suggestions */}
       {suggestions.length > 0 && (
-        <div className="flex flex-wrap gap-1.5 justify-center mb-3" data-testid="filter-suggestions">
+        <div
+          className="flex flex-wrap gap-1.5 justify-center mb-3"
+          data-testid="filter-suggestions"
+        >
           {suggestions.map((suggestion, i) => (
             <button
               key={`${suggestion.type}-${i}`}

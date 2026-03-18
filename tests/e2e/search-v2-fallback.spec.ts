@@ -35,8 +35,12 @@ async function waitForResults(page: import("@playwright/test").Page) {
   // The #search-results-heading is sr-only (visually hidden), so use toBeAttached.
   // SSR can be slow in CI — use navigation timeout (30s) instead of 15s.
   const resultsHeading = page.locator("#search-results-heading");
-  const zeroResults = page.locator('h2:has-text("No matches found"), h3:has-text("No exact matches")');
-  await expect(resultsHeading.or(zeroResults).first()).toBeAttached({ timeout: timeouts.navigation });
+  const zeroResults = page.locator(
+    'h2:has-text("No matches found"), h3:has-text("No exact matches")'
+  );
+  await expect(resultsHeading.or(zeroResults).first()).toBeAttached({
+    timeout: timeouts.navigation,
+  });
 }
 
 // --------------------------------------------------------------------------
@@ -153,11 +157,17 @@ test.describe("Search V2/V1 Fallback Behavior", () => {
 
       // Next page items should be different from first page
       if (json.list.items.length > 0 && nextJson.list.items.length > 0) {
-        const firstPageIds = new Set(json.list.items.map((i: { id: string }) => i.id));
-        const nextPageIds = nextJson.list.items.map((i: { id: string }) => i.id);
+        const firstPageIds = new Set(
+          json.list.items.map((i: { id: string }) => i.id)
+        );
+        const nextPageIds = nextJson.list.items.map(
+          (i: { id: string }) => i.id
+        );
 
         // At least some items should be different (no complete overlap)
-        const overlap = nextPageIds.filter((id: string) => firstPageIds.has(id));
+        const overlap = nextPageIds.filter((id: string) =>
+          firstPageIds.has(id)
+        );
         expect(overlap.length).toBeLessThan(nextJson.list.items.length);
       }
     } else {
@@ -166,7 +176,9 @@ test.describe("Search V2/V1 Fallback Behavior", () => {
   });
 
   // 6. [SSR limitation] V2 failure cannot be mocked via route interception for SSR
-  test("6. SSR V2 failure fallback is not testable via route interception", async ({ page }) => {
+  test("6. SSR V2 failure fallback is not testable via route interception", async ({
+    page,
+  }) => {
     // DOCUMENTATION TEST: This test documents a known testing limitation.
     //
     // page.route() only intercepts client-side fetches (browser network requests).
@@ -194,7 +206,9 @@ test.describe("Search V2/V1 Fallback Behavior", () => {
   });
 
   // 7. Client-side V2 failure: search-as-I-move error handling
-  test("7. client-side V2 error handling for dynamic fetches", async ({ page }) => {
+  test("7. client-side V2 error handling for dynamic fetches", async ({
+    page,
+  }) => {
     // Navigate to search page first
     await page.goto(SEARCH_URL);
     await waitForResults(page);
@@ -211,7 +225,9 @@ test.describe("Search V2/V1 Fallback Behavior", () => {
 
     // The load-more button uses fetchMoreListings (server action),
     // not the V2 API directly. So we test the load-more error path instead.
-    const loadMoreButton = page.getByRole("button", { name: /show more places/i });
+    const loadMoreButton = page.getByRole("button", {
+      name: /show more places/i,
+    });
 
     if (await loadMoreButton.isVisible().catch(() => false)) {
       // Mock the server action to fail
@@ -244,7 +260,9 @@ test.describe("Search V2/V1 Fallback Behavior", () => {
   });
 
   // 8. V2 response version mismatch: stale responses are discarded
-  test("8. page renders correctly and stale data is not shown", async ({ page }) => {
+  test("8. page renders correctly and stale data is not shown", async ({
+    page,
+  }) => {
     // This test verifies the versionCheckedSetter mechanism indirectly.
     // SearchResultsClient is keyed by searchParamsString, which means:
     // - When search params change, the entire component remounts

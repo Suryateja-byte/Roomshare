@@ -115,7 +115,7 @@ describe("parseSearchParams - price cases", () => {
       const result = parseSearchParams({ minPrice, maxPrice });
       expect(result.filterParams.minPrice).toBe(expectedMin);
       expect(result.filterParams.maxPrice).toBe(expectedMax);
-    },
+    }
   );
 
   it("drops inverted price range instead of throwing", () => {
@@ -300,7 +300,7 @@ describe("parseSearchParams - enum cases", () => {
     expect(result.filterParams.roomType).toBe(expected.roomType);
     expect(result.filterParams.leaseDuration).toBe(expected.leaseDuration);
     expect(result.filterParams.genderPreference).toBe(
-      expected.genderPreference,
+      expected.genderPreference
     );
     expect(result.filterParams.householdGender).toBe(expected.householdGender);
   });
@@ -550,8 +550,9 @@ describe("validateSearchFilters - server action validation", () => {
 
     // P1-13: Inverted price ranges now throw error instead of silently swapping
     it("throws error for inverted min/max", () => {
-      expect(() => validateSearchFilters({ minPrice: 2000, maxPrice: 1000 }))
-        .toThrow("minPrice cannot exceed maxPrice");
+      expect(() =>
+        validateSearchFilters({ minPrice: 2000, maxPrice: 1000 })
+      ).toThrow("minPrice cannot exceed maxPrice");
     });
 
     it("rejects Infinity", () => {
@@ -750,7 +751,7 @@ describe("buildRawParamsFromSearchParams", () => {
 
   it("converts duplicate keys to arrays", () => {
     const searchParams = new URLSearchParams(
-      "amenities=Wifi&amenities=Parking",
+      "amenities=Wifi&amenities=Parking"
     );
     const result = buildRawParamsFromSearchParams(searchParams);
 
@@ -759,7 +760,7 @@ describe("buildRawParamsFromSearchParams", () => {
 
   it("handles mixed single and duplicate keys", () => {
     const searchParams = new URLSearchParams(
-      "q=downtown&amenities=Wifi&amenities=AC&minPrice=500",
+      "q=downtown&amenities=Wifi&amenities=AC&minPrice=500"
     );
     const result = buildRawParamsFromSearchParams(searchParams);
 
@@ -777,7 +778,7 @@ describe("buildRawParamsFromSearchParams", () => {
 
   it("handles three or more duplicate values", () => {
     const searchParams = new URLSearchParams(
-      "amenities=Wifi&amenities=AC&amenities=Parking&amenities=Kitchen",
+      "amenities=Wifi&amenities=AC&amenities=Parking&amenities=Kitchen"
     );
     const result = buildRawParamsFromSearchParams(searchParams);
 
@@ -786,7 +787,7 @@ describe("buildRawParamsFromSearchParams", () => {
 
   it("preserves order of values", () => {
     const searchParams = new URLSearchParams(
-      "languages=en&languages=es&languages=fr",
+      "languages=en&languages=es&languages=fr"
     );
     const result = buildRawParamsFromSearchParams(searchParams);
 
@@ -814,7 +815,7 @@ describe("buildRawParamsFromSearchParams", () => {
 describe("buildCanonicalFilterParamsFromSearchParams", () => {
   it("normalizes language aliases to canonical codes", () => {
     const searchParams = new URLSearchParams(
-      "languages=Telugu&languages=English",
+      "languages=Telugu&languages=English"
     );
     const result = buildCanonicalFilterParamsFromSearchParams(searchParams);
 
@@ -823,7 +824,7 @@ describe("buildCanonicalFilterParamsFromSearchParams", () => {
 
   it("excludes pagination and sort keys", () => {
     const searchParams = new URLSearchParams(
-      "q=room&page=3&sort=price_desc&cursor=abc",
+      "q=room&page=3&sort=price_desc&cursor=abc"
     );
     const result = buildCanonicalFilterParamsFromSearchParams(searchParams);
 

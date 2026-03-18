@@ -1,4 +1,4 @@
-'use client';
+"use client";
 
 /**
  * NearbyPlacesPanel Component
@@ -13,8 +13,8 @@
  * - Requires authentication to search
  */
 
-import React, { useState, useCallback, useRef, useEffect } from 'react';
-import { useSession } from 'next-auth/react';
+import React, { useState, useCallback, useRef, useEffect } from "react";
+import { useSession } from "next-auth/react";
 import {
   MapPin,
   Search,
@@ -26,14 +26,14 @@ import {
   Fuel,
   Dumbbell,
   Pill,
-} from 'lucide-react';
-import { Button } from '@/components/ui/button';
+} from "lucide-react";
+import { Button } from "@/components/ui/button";
 import {
   CATEGORY_CHIPS,
   RADIUS_OPTIONS,
   type NearbyPlace,
   type CategoryChip,
-} from '@/types/nearby';
+} from "@/types/nearby";
 
 // Icon mapping for category chips
 const ICON_MAP = {
@@ -50,8 +50,8 @@ interface NearbyPlacesPanelProps {
   listingLng: number;
   onPlacesChange?: (places: NearbyPlace[]) => void;
   onPlaceHover?: (placeId: string | null) => void;
-  viewMode?: 'list' | 'map';
-  onViewModeChange?: (mode: 'list' | 'map') => void;
+  viewMode?: "list" | "map";
+  onViewModeChange?: (mode: "list" | "map") => void;
 }
 
 export default function NearbyPlacesPanel({
@@ -61,9 +61,11 @@ export default function NearbyPlacesPanel({
   onPlaceHover,
 }: NearbyPlacesPanelProps) {
   const { data: session, status } = useSession();
-  const [searchQuery, setSearchQuery] = useState('');
+  const [searchQuery, setSearchQuery] = useState("");
   const [selectedChip, setSelectedChip] = useState<CategoryChip | null>(null);
-  const [selectedRadius, setSelectedRadius] = useState<number>(RADIUS_OPTIONS[0].meters);
+  const [selectedRadius, setSelectedRadius] = useState<number>(
+    RADIUS_OPTIONS[0].meters
+  );
   const [places, setPlaces] = useState<NearbyPlace[]>([]);
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -76,79 +78,84 @@ export default function NearbyPlacesPanel({
   const shouldRestoreFocusRef = useRef(false);
 
   // Fetch places from API with "latest request wins" pattern
-  const fetchPlaces = useCallback(async (
-    categories?: string[],
-    query?: string,
-    radius?: number
-  ) => {
-    // Cancel any in-flight request
-    abortControllerRef.current?.abort();
-    abortControllerRef.current = new AbortController();
+  const fetchPlaces = useCallback(
+    async (categories?: string[], query?: string, radius?: number) => {
+      // Cancel any in-flight request
+      abortControllerRef.current?.abort();
+      abortControllerRef.current = new AbortController();
 
-    setIsLoading(true);
-    setError(null);
-    setErrorDetails(null);
-
-    try {
-      const response = await fetch('/api/nearby', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          listingLat,
-          listingLng,
-          categories,
-          query,
-          radiusMeters: radius || selectedRadius,
-        }),
-        signal: abortControllerRef.current.signal,
-      });
-
-      const data = await response.json();
-
-      // Check if still mounted before updating state
-      if (!isMountedRef.current) return;
-
-      if (!response.ok) {
-        setError(data.error || 'Failed to fetch nearby places');
-        setErrorDetails(data.details || null);
-        setPlaces([]);
-        return;
-      }
-
-      setPlaces(data.places);
-      setHasSearched(true);
-      onPlacesChange?.(data.places);
-    } catch (err) {
-      // Ignore abort errors - this is expected when cancelling in-flight requests
-      if (err instanceof Error && err.name === 'AbortError') {
-        return;
-      }
-      // Check if still mounted before updating state
-      if (!isMountedRef.current) return;
-      console.error('Nearby search error:', err);
-      setError(err instanceof Error ? err.message : 'An error occurred');
+      setIsLoading(true);
+      setError(null);
       setErrorDetails(null);
-      setPlaces([]);
-    } finally {
-      if (isMountedRef.current) {
-        shouldRestoreFocusRef.current = true;
-        setIsLoading(false);
+
+      try {
+        const response = await fetch("/api/nearby", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({
+            listingLat,
+            listingLng,
+            categories,
+            query,
+            radiusMeters: radius || selectedRadius,
+          }),
+          signal: abortControllerRef.current.signal,
+        });
+
+        const data = await response.json();
+
+        // Check if still mounted before updating state
+        if (!isMountedRef.current) return;
+
+        if (!response.ok) {
+          setError(data.error || "Failed to fetch nearby places");
+          setErrorDetails(data.details || null);
+          setPlaces([]);
+          return;
+        }
+
+        setPlaces(data.places);
+        setHasSearched(true);
+        onPlacesChange?.(data.places);
+      } catch (err) {
+        // Ignore abort errors - this is expected when cancelling in-flight requests
+        if (err instanceof Error && err.name === "AbortError") {
+          return;
+        }
+        // Check if still mounted before updating state
+        if (!isMountedRef.current) return;
+        console.error("Nearby search error:", err);
+        setError(err instanceof Error ? err.message : "An error occurred");
+        setErrorDetails(null);
+        setPlaces([]);
+      } finally {
+        if (isMountedRef.current) {
+          shouldRestoreFocusRef.current = true;
+          setIsLoading(false);
+        }
       }
-    }
-  }, [listingLat, listingLng, selectedRadius, onPlacesChange]);
+    },
+    [listingLat, listingLng, selectedRadius, onPlacesChange]
+  );
 
   // Handle chip click
-  const handleChipClick = useCallback((chip: CategoryChip) => {
-    setSelectedChip(chip);
-    setSearchQuery('');
-    fetchPlaces(chip.categories, chip.query);
-  }, [fetchPlaces]);
+  const handleChipClick = useCallback(
+    (chip: CategoryChip) => {
+      setSelectedChip(chip);
+      setSearchQuery("");
+      fetchPlaces(chip.categories, chip.query);
+    },
+    [fetchPlaces]
+  );
 
   // Handle search input change - no auto-search, wait for explicit action
-  const handleSearchChange = useCallback((e: React.ChangeEvent<HTMLInputElement>) => {
-    setSearchQuery(e.target.value);
-    setSelectedChip(null);
-  }, []);
+  const handleSearchChange = useCallback(
+    (e: React.ChangeEvent<HTMLInputElement>) => {
+      setSearchQuery(e.target.value);
+      setSelectedChip(null);
+    },
+    []
+  );
 
   // Handle explicit search (Enter key or button click)
   const handleSearch = useCallback(() => {
@@ -159,16 +166,19 @@ export default function NearbyPlacesPanel({
   }, [searchQuery, fetchPlaces]);
 
   // Handle radius change
-  const handleRadiusChange = useCallback((newRadius: number) => {
-    setSelectedRadius(newRadius);
-    // Only refetch if we have an active search
-    const trimmedQuery = searchQuery.trim();
-    if (selectedChip) {
-      fetchPlaces(selectedChip.categories, selectedChip.query, newRadius);
-    } else if (trimmedQuery.length >= 2) {
-      fetchPlaces(undefined, trimmedQuery, newRadius);
-    }
-  }, [selectedChip, searchQuery, fetchPlaces]);
+  const handleRadiusChange = useCallback(
+    (newRadius: number) => {
+      setSelectedRadius(newRadius);
+      // Only refetch if we have an active search
+      const trimmedQuery = searchQuery.trim();
+      if (selectedChip) {
+        fetchPlaces(selectedChip.categories, selectedChip.query, newRadius);
+      } else if (trimmedQuery.length >= 2) {
+        fetchPlaces(undefined, trimmedQuery, newRadius);
+      }
+    },
+    [selectedChip, searchQuery, fetchPlaces]
+  );
 
   // Restore focus to search input after loading completes (WCAG focus management).
   // Runs as a useEffect so React has committed the render (input no longer disabled).
@@ -191,7 +201,7 @@ export default function NearbyPlacesPanel({
 
   // Reset state when listing coordinates change (new listing context)
   useEffect(() => {
-    setSearchQuery('');
+    setSearchQuery("");
     setSelectedChip(null);
     setPlaces([]);
     setHasSearched(false);
@@ -202,13 +212,16 @@ export default function NearbyPlacesPanel({
   }, [listingLat, listingLng]);
 
   // Auth gate - show loading skeleton
-  if (status === 'loading') {
+  if (status === "loading") {
     return (
       <div className="p-4 sm:p-6 animate-pulse space-y-4">
         <div className="h-12 bg-zinc-100 dark:bg-zinc-800 rounded-2xl" />
         <div className="flex gap-2 overflow-x-auto hide-scrollbar">
           {[1, 2, 3, 4].map((i) => (
-            <div key={i} className="h-10 w-28 flex-shrink-0 bg-zinc-100 dark:bg-zinc-800 rounded-full" />
+            <div
+              key={i}
+              className="h-10 w-28 flex-shrink-0 bg-zinc-100 dark:bg-zinc-800 rounded-full"
+            />
           ))}
         </div>
       </div>
@@ -216,7 +229,7 @@ export default function NearbyPlacesPanel({
   }
 
   // Auth gate - show login prompt
-  if (status === 'unauthenticated' || !session) {
+  if (status === "unauthenticated" || !session) {
     return (
       <div
         className="
@@ -240,7 +253,8 @@ export default function NearbyPlacesPanel({
           Explore nearby places
         </h3>
         <p className="text-sm text-zinc-500 dark:text-zinc-400 mt-1 mb-4 max-w-xs">
-          Sign in to discover restaurants, stores, and services near this listing
+          Sign in to discover restaurants, stores, and services near this
+          listing
         </p>
         <Button variant="primary" size="sm" asChild>
           <a href="/login" className="gap-2">
@@ -274,7 +288,7 @@ export default function NearbyPlacesPanel({
               value={searchQuery}
               onChange={handleSearchChange}
               onKeyDown={(e) => {
-                if (e.key === 'Enter') {
+                if (e.key === "Enter") {
                   e.preventDefault();
                   handleSearch();
                 }
@@ -342,9 +356,10 @@ export default function NearbyPlacesPanel({
                     text-xs font-medium whitespace-nowrap
                     border
                     transition-all duration-200 ease-out
-                    ${isSelected
-                      ? 'bg-zinc-900 dark:bg-white border-zinc-900 dark:border-white text-white dark:text-zinc-900'
-                      : 'bg-white dark:bg-zinc-900 border-zinc-200 dark:border-zinc-700 text-zinc-600 dark:text-zinc-400 hover:border-zinc-300 dark:hover:border-zinc-600'
+                    ${
+                      isSelected
+                        ? "bg-zinc-900 dark:bg-white border-zinc-900 dark:border-white text-white dark:text-zinc-900"
+                        : "bg-white dark:bg-zinc-900 border-zinc-200 dark:border-zinc-700 text-zinc-600 dark:text-zinc-400 hover:border-zinc-300 dark:hover:border-zinc-600"
                     }
                     disabled:opacity-60 disabled:cursor-not-allowed
                   `}
@@ -376,9 +391,10 @@ export default function NearbyPlacesPanel({
                   px-2 py-0.5 rounded-md
                   text-xs font-medium
                   transition-all duration-200
-                  ${selectedRadius === option.meters
-                    ? 'bg-white dark:bg-zinc-600 shadow-sm text-zinc-900 dark:text-white'
-                    : 'text-zinc-500 dark:text-zinc-400 hover:text-zinc-900 dark:hover:text-zinc-200'
+                  ${
+                    selectedRadius === option.meters
+                      ? "bg-white dark:bg-zinc-600 shadow-sm text-zinc-900 dark:text-white"
+                      : "text-zinc-500 dark:text-zinc-400 hover:text-zinc-900 dark:hover:text-zinc-200"
                   }
                   disabled:opacity-60 disabled:cursor-not-allowed
                 `}
@@ -425,11 +441,16 @@ export default function NearbyPlacesPanel({
             aria-live="polite"
             className="flex items-start gap-3 p-4 bg-red-50 dark:bg-red-900/20 text-red-600 dark:text-red-400 rounded-2xl"
           >
-            <AlertCircle className="w-5 h-5 flex-shrink-0 mt-0.5" aria-hidden="true" />
+            <AlertCircle
+              className="w-5 h-5 flex-shrink-0 mt-0.5"
+              aria-hidden="true"
+            />
             <div>
               <p className="text-sm font-medium">{error}</p>
               {errorDetails && (
-                <p className="text-xs text-red-500 dark:text-red-400/80 mt-1">{errorDetails}</p>
+                <p className="text-xs text-red-500 dark:text-red-400/80 mt-1">
+                  {errorDetails}
+                </p>
               )}
             </div>
           </div>
@@ -446,7 +467,10 @@ export default function NearbyPlacesPanel({
                 <p className="text-zinc-900 dark:text-zinc-100 font-medium text-sm">
                   No places found
                   {searchQuery.trim() && (
-                    <span className="font-normal"> for &ldquo;{searchQuery.trim()}&rdquo;</span>
+                    <span className="font-normal">
+                      {" "}
+                      for &ldquo;{searchQuery.trim()}&rdquo;
+                    </span>
                   )}
                 </p>
                 <p className="text-xs text-zinc-500 dark:text-zinc-400 mt-1">
@@ -529,7 +553,7 @@ export default function NearbyPlacesPanel({
       </div>
 
       {/* Mobile toggle button moved to NearbyPlacesSection for correct z-index stacking */}
-    </div >
+    </div>
   );
 }
 
@@ -539,16 +563,22 @@ export default function NearbyPlacesPanel({
  */
 function getIconForCategory(category: string) {
   // Grocery - Radar API uses 'grocery'
-  if (category.includes('grocery')) return ShoppingCart;
+  if (category.includes("grocery")) return ShoppingCart;
   // Restaurants - Radar API uses 'restaurant' and 'food-beverage'
-  if (category.includes('restaurant') || category.includes('food-beverage')) return Utensils;
+  if (category.includes("restaurant") || category.includes("food-beverage"))
+    return Utensils;
   // Shopping - Radar API uses 'shopping'
-  if (category.includes('shopping')) return ShoppingBag;
+  if (category.includes("shopping")) return ShoppingBag;
   // Gas stations - Radar API uses 'gas-station'
-  if (category.includes('gas') || category.includes('fuel')) return Fuel;
+  if (category.includes("gas") || category.includes("fuel")) return Fuel;
   // Fitness - Radar API uses 'gym' and 'fitness-recreation'
-  if (category.includes('gym') || category.includes('fitness')) return Dumbbell;
+  if (category.includes("gym") || category.includes("fitness")) return Dumbbell;
   // Pharmacy - Radar API uses 'health-medicine' and 'drugstore'
-  if (category.includes('pharmacy') || category.includes('drugstore') || category.includes('health-medicine')) return Pill;
+  if (
+    category.includes("pharmacy") ||
+    category.includes("drugstore") ||
+    category.includes("health-medicine")
+  )
+    return Pill;
   return MapPin;
 }

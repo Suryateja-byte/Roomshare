@@ -26,11 +26,9 @@ test.describe("VE: Page Structure", () => {
     await page.waitForLoadState("domcontentloaded");
 
     await expect(
-      page.getByRole("heading", { name: /Verification Link Expired/i }),
+      page.getByRole("heading", { name: /Verification Link Expired/i })
     ).toBeVisible({ timeout: timeouts.navigation });
-    await expect(
-      page.getByText(/no longer valid/i),
-    ).toBeVisible();
+    await expect(page.getByText(/no longer valid/i)).toBeVisible();
   });
 
   test("VE-02  'Back to Home' footer link", async ({ page }) => {
@@ -49,28 +47,30 @@ test.describe("VE: Page Structure", () => {
 // Block 2: Authenticated State
 // ═══════════════════════════════════════════════════════════════════════════
 test.describe("VE: Authenticated State", () => {
-  test("VE-03  shows resend button and informational text", async ({ page }) => {
+  test("VE-03  shows resend button and informational text", async ({
+    page,
+  }) => {
     await page.goto("/verify-expired");
     await page.waitForLoadState("domcontentloaded");
 
     // Wait for session to load (useSession())
     await expect(
-      page.getByRole("button", { name: /Resend Verification Email/i }),
+      page.getByRole("button", { name: /Resend Verification Email/i })
     ).toBeVisible({ timeout: timeouts.navigation });
 
     // Informational text about resending (email may render asynchronously)
-    await expect(
-      page.getByText(/new link will be sent/i),
-    ).toBeVisible({ timeout: timeouts.navigation });
+    await expect(page.getByText(/new link will be sent/i)).toBeVisible({
+      timeout: timeouts.navigation,
+    });
   });
 
   test("VE-04  security warning about 24h expiry", async ({ page }) => {
     await page.goto("/verify-expired");
     await page.waitForLoadState("domcontentloaded");
 
-    await expect(
-      page.getByText(/expire after 24 hours/i),
-    ).toBeVisible({ timeout: timeouts.navigation });
+    await expect(page.getByText(/expire after 24 hours/i)).toBeVisible({
+      timeout: timeouts.navigation,
+    });
   });
 
   test("VE-06  loading state during resend", async ({ page }) => {
@@ -80,13 +80,15 @@ test.describe("VE: Authenticated State", () => {
       await route.fulfill({
         status: 200,
         contentType: "application/json",
-        body: JSON.stringify({ message: "Verification email sent successfully" }),
+        body: JSON.stringify({
+          message: "Verification email sent successfully",
+        }),
       });
     });
 
     await page.goto("/verify-expired");
     await expect(
-      page.getByRole("button", { name: /Resend Verification Email/i }),
+      page.getByRole("button", { name: /Resend Verification Email/i })
     ).toBeVisible({ timeout: timeouts.navigation });
 
     await page
@@ -107,13 +109,15 @@ test.describe("VE: Resend Flow", () => {
       await route.fulfill({
         status: 200,
         contentType: "application/json",
-        body: JSON.stringify({ message: "Verification email sent successfully" }),
+        body: JSON.stringify({
+          message: "Verification email sent successfully",
+        }),
       });
     });
 
     await page.goto("/verify-expired");
     await expect(
-      page.getByRole("button", { name: /Resend Verification Email/i }),
+      page.getByRole("button", { name: /Resend Verification Email/i })
     ).toBeVisible({ timeout: timeouts.navigation });
 
     await page
@@ -122,12 +126,12 @@ test.describe("VE: Resend Flow", () => {
 
     // Success state
     await expect(
-      page.getByRole("heading", { name: /Check Your Inbox/i }),
+      page.getByRole("heading", { name: /Check Your Inbox/i })
     ).toBeVisible({ timeout: 10_000 });
 
     // Toast
     await expect(
-      page.locator(selectors.toast).filter({ hasText: /sent/i }),
+      page.locator(selectors.toast).filter({ hasText: /sent/i })
     ).toBeVisible({ timeout: 5_000 });
   });
 
@@ -136,13 +140,15 @@ test.describe("VE: Resend Flow", () => {
       await route.fulfill({
         status: 200,
         contentType: "application/json",
-        body: JSON.stringify({ message: "Verification email sent successfully" }),
+        body: JSON.stringify({
+          message: "Verification email sent successfully",
+        }),
       });
     });
 
     await page.goto("/verify-expired");
     await expect(
-      page.getByRole("button", { name: /Resend Verification Email/i }),
+      page.getByRole("button", { name: /Resend Verification Email/i })
     ).toBeVisible({ timeout: timeouts.navigation });
 
     // Trigger success state
@@ -150,7 +156,7 @@ test.describe("VE: Resend Flow", () => {
       .getByRole("button", { name: /Resend Verification Email/i })
       .click();
     await expect(
-      page.getByRole("heading", { name: /Check Your Inbox/i }),
+      page.getByRole("heading", { name: /Check Your Inbox/i })
     ).toBeVisible({ timeout: 10_000 });
 
     // Click "try again"
@@ -158,7 +164,7 @@ test.describe("VE: Resend Flow", () => {
 
     // Back to resend button
     await expect(
-      page.getByRole("button", { name: /Resend Verification Email/i }),
+      page.getByRole("button", { name: /Resend Verification Email/i })
     ).toBeVisible({ timeout: 5_000 });
   });
 });
@@ -178,7 +184,7 @@ test.describe("VE: Error Handling", () => {
 
     await page.goto("/verify-expired");
     await expect(
-      page.getByRole("button", { name: /Resend Verification Email/i }),
+      page.getByRole("button", { name: /Resend Verification Email/i })
     ).toBeVisible({ timeout: timeouts.navigation });
 
     await page
@@ -187,7 +193,9 @@ test.describe("VE: Error Handling", () => {
 
     // Error toast — shows data.error from response ("Internal server error")
     await expect(
-      page.locator(selectors.toast).filter({ hasText: /Internal server error|Failed to send/i }),
+      page
+        .locator(selectors.toast)
+        .filter({ hasText: /Internal server error|Failed to send/i })
     ).toBeVisible({ timeout: 5_000 });
   });
 
@@ -202,7 +210,7 @@ test.describe("VE: Error Handling", () => {
 
     await page.goto("/verify-expired");
     await expect(
-      page.getByRole("button", { name: /Resend Verification Email/i }),
+      page.getByRole("button", { name: /Resend Verification Email/i })
     ).toBeVisible({ timeout: timeouts.navigation });
 
     await page
@@ -210,7 +218,7 @@ test.describe("VE: Error Handling", () => {
       .click();
 
     await expect(
-      page.locator(selectors.toast).filter({ hasText: /Too many requests/i }),
+      page.locator(selectors.toast).filter({ hasText: /Too many requests/i })
     ).toBeVisible({ timeout: 5_000 });
   });
 
@@ -225,7 +233,7 @@ test.describe("VE: Error Handling", () => {
 
     await page.goto("/verify-expired");
     await expect(
-      page.getByRole("button", { name: /Resend Verification Email/i }),
+      page.getByRole("button", { name: /Resend Verification Email/i })
     ).toBeVisible({ timeout: timeouts.navigation });
 
     await page
@@ -233,7 +241,7 @@ test.describe("VE: Error Handling", () => {
       .click();
 
     await expect(
-      page.locator(selectors.toast).filter({ hasText: /already verified/i }),
+      page.locator(selectors.toast).filter({ hasText: /already verified/i })
     ).toBeVisible({ timeout: 5_000 });
   });
 });
@@ -249,26 +257,24 @@ test.describe("VE: Unauthenticated State", () => {
     await page.waitForLoadState("domcontentloaded");
 
     // Session check resolves → shows login prompt
-    await expect(
-      page.getByText(/Log In to Continue/i),
-    ).toBeVisible({ timeout: timeouts.navigation });
+    await expect(page.getByText(/Log In to Continue/i)).toBeVisible({
+      timeout: timeouts.navigation,
+    });
 
-    await expect(
-      page.getByText(/Please log in/i),
-    ).toBeVisible();
+    await expect(page.getByText(/Please log in/i)).toBeVisible();
 
     // No resend button visible
     await expect(
-      page.getByRole("button", { name: /Resend Verification Email/i }),
+      page.getByRole("button", { name: /Resend Verification Email/i })
     ).not.toBeVisible({ timeout: 3_000 });
   });
 
   test("VE-12  login button navigates with callback", async ({ page }) => {
     await page.goto("/verify-expired");
 
-    await expect(
-      page.getByText(/Log In to Continue/i),
-    ).toBeVisible({ timeout: timeouts.navigation });
+    await expect(page.getByText(/Log In to Continue/i)).toBeVisible({
+      timeout: timeouts.navigation,
+    });
 
     await page.getByText(/Log In to Continue/i).click();
     await expect(page).toHaveURL(/\/login/);
@@ -281,12 +287,13 @@ test.describe("VE: Unauthenticated State", () => {
   test("VE-13  signup link for new users", async ({ page }) => {
     await page.goto("/verify-expired");
 
-    await expect(
-      page.getByText(/Log In to Continue/i),
-    ).toBeVisible({ timeout: timeouts.navigation });
+    await expect(page.getByText(/Log In to Continue/i)).toBeVisible({
+      timeout: timeouts.navigation,
+    });
 
     // Scope to main content to avoid matching nav "Sign up" link
-    const signupLink = page.locator("#main-content, main, [role='main']")
+    const signupLink = page
+      .locator("#main-content, main, [role='main']")
       .getByRole("link", { name: /Sign up/i });
     await expect(signupLink).toBeVisible();
 

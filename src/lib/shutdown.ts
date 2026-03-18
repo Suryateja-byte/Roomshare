@@ -56,26 +56,26 @@ async function performShutdown(signal: string): Promise<void> {
     try {
       // 1. Flush Sentry events (if available)
       try {
-        const Sentry = await import('@sentry/nextjs');
-        console.log('[Shutdown] Flushing Sentry events...');
+        const Sentry = await import("@sentry/nextjs");
+        console.log("[Shutdown] Flushing Sentry events...");
         await Promise.race([
           Sentry.close(5000), // 5 second timeout for Sentry
           new Promise((resolve) => setTimeout(resolve, 5500)),
         ]);
-        console.log('[Shutdown] Sentry flush complete');
+        console.log("[Shutdown] Sentry flush complete");
       } catch {
         // Sentry may not be initialized or available
       }
 
       // 2. Disconnect Prisma (if singleton exists)
       try {
-        const { prisma } = await import('./prisma');
-        console.log('[Shutdown] Disconnecting Prisma...');
+        const { prisma } = await import("./prisma");
+        console.log("[Shutdown] Disconnecting Prisma...");
         await Promise.race([
           prisma.$disconnect(),
           new Promise((resolve) => setTimeout(resolve, 3000)),
         ]);
-        console.log('[Shutdown] Prisma disconnected');
+        console.log("[Shutdown] Prisma disconnected");
       } catch {
         // Prisma may not be initialized
       }
@@ -83,13 +83,15 @@ async function performShutdown(signal: string): Promise<void> {
       const duration = Date.now() - startTime;
       console.log(`[Shutdown] Graceful shutdown complete in ${duration}ms`);
     } catch (error) {
-      console.error('[Shutdown] Error during shutdown:', error);
+      console.error("[Shutdown] Error during shutdown:", error);
     }
   })();
 
   // Set a maximum timeout to force exit if graceful shutdown takes too long
   setTimeout(() => {
-    console.error(`[Shutdown] Timeout after ${SHUTDOWN_TIMEOUT}ms, forcing exit`);
+    console.error(
+      `[Shutdown] Timeout after ${SHUTDOWN_TIMEOUT}ms, forcing exit`
+    );
     process.exit(1);
   }, SHUTDOWN_TIMEOUT).unref();
 
@@ -104,13 +106,15 @@ async function performShutdown(signal: string): Promise<void> {
  */
 export function registerShutdownHandlers(): void {
   // Only register in Node.js runtime (not Edge)
-  if (typeof process === 'undefined' || !process.on) {
-    console.log('[Shutdown] Not in Node.js environment, skipping handler registration');
+  if (typeof process === "undefined" || !process.on) {
+    console.log(
+      "[Shutdown] Not in Node.js environment, skipping handler registration"
+    );
     return;
   }
 
   // Prevent duplicate registration across hot reloads
-  const SHUTDOWN_REGISTERED = Symbol.for('roomshare.shutdown.registered');
+  const SHUTDOWN_REGISTERED = Symbol.for("roomshare.shutdown.registered");
   const globalWithShutdown = globalThis as typeof globalThis & {
     [key: symbol]: boolean;
   };
@@ -120,7 +124,7 @@ export function registerShutdownHandlers(): void {
   }
   globalWithShutdown[SHUTDOWN_REGISTERED] = true;
 
-  const signals: NodeJS.Signals[] = ['SIGTERM', 'SIGINT'];
+  const signals: NodeJS.Signals[] = ["SIGTERM", "SIGINT"];
 
   for (const signal of signals) {
     process.on(signal, async () => {
@@ -130,20 +134,20 @@ export function registerShutdownHandlers(): void {
   }
 
   // Handle SIGUSR2 for nodemon restarts
-  process.on('SIGUSR2', async () => {
-    await performShutdown('SIGUSR2');
-    process.kill(process.pid, 'SIGUSR2');
+  process.on("SIGUSR2", async () => {
+    await performShutdown("SIGUSR2");
+    process.kill(process.pid, "SIGUSR2");
   });
 
   // Handle uncaught exceptions - log and exit (ignore benign connection resets)
-  process.on('uncaughtException', async (error) => {
+  process.on("uncaughtException", async (error) => {
     const code = (error as NodeJS.ErrnoException).code;
-    if (code === 'ECONNRESET' || code === 'ECONNABORTED' || code === 'EPIPE') {
+    if (code === "ECONNRESET" || code === "ECONNABORTED" || code === "EPIPE") {
       // Benign: client disconnected mid-request (e.g. browser navigation)
       return;
     }
-    console.error('[Shutdown] Uncaught exception:', error);
-    await performShutdown('uncaughtException');
+    console.error("[Shutdown] Uncaught exception:", error);
+    await performShutdown("uncaughtException");
     process.exit(1);
   });
 
@@ -151,24 +155,27 @@ export function registerShutdownHandlers(): void {
   // In production: fail fast after graceful shutdown.
   // In dev/test: log but do NOT crash — prevents a single parse error from
   // killing the dev server and failing all remaining E2E tests in a shard.
-  process.on('unhandledRejection', async (reason) => {
+  process.on("unhandledRejection", async (reason) => {
     const code = (reason as NodeJS.ErrnoException | undefined)?.code;
-    if (code === 'ECONNRESET' || code === 'ECONNABORTED' || code === 'EPIPE') {
+    if (code === "ECONNRESET" || code === "ECONNABORTED" || code === "EPIPE") {
       return;
     }
 
     // In dev/test, log-only for non-fatal errors (SyntaxError from truncated
     // JSON, TypeError from race conditions, etc.) to keep the server alive.
-    const isDev = process.env.NODE_ENV !== 'production';
+    const isDev = process.env.NODE_ENV !== "production";
     if (isDev) {
-      console.error('[Shutdown] Unhandled rejection (dev — not exiting):', reason);
+      console.error(
+        "[Shutdown] Unhandled rejection (dev — not exiting):",
+        reason
+      );
       return;
     }
 
-    console.error('[Shutdown] Unhandled rejection:', reason);
-    await performShutdown('unhandledRejection');
+    console.error("[Shutdown] Unhandled rejection:", reason);
+    await performShutdown("unhandledRejection");
     process.exit(1);
   });
 
-  console.log('[Shutdown] Handlers registered for: SIGTERM, SIGINT, SIGUSR2');
+  console.log("[Shutdown] Handlers registered for: SIGTERM, SIGINT, SIGUSR2");
 }

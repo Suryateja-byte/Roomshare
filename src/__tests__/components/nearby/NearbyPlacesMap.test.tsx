@@ -151,7 +151,7 @@ describe("NearbyPlacesMap - Smoke Tests", () => {
         if (event === "load") {
           setTimeout(callback, 0);
         }
-      },
+      }
     );
   });
 
@@ -171,7 +171,7 @@ describe("NearbyPlacesMap - Smoke Tests", () => {
         expect.objectContaining({
           center: [-122.4194, 37.7749], // [lng, lat] order
           zoom: 14,
-        }),
+        })
       );
     });
 
@@ -195,7 +195,7 @@ describe("NearbyPlacesMap - Smoke Tests", () => {
 
       expect(mockMapInstance.on).toHaveBeenCalledWith(
         "error",
-        expect.any(Function),
+        expect.any(Function)
       );
     });
   });
@@ -216,7 +216,7 @@ describe("NearbyPlacesMap - Smoke Tests", () => {
 
     it("removes old markers when places change", async () => {
       const { rerender } = render(
-        <NearbyPlacesMap {...defaultProps} places={mockPlaces} />,
+        <NearbyPlacesMap {...defaultProps} places={mockPlaces} />
       );
 
       await act(async () => {
@@ -239,7 +239,7 @@ describe("NearbyPlacesMap - Smoke Tests", () => {
 
     it("creates markers for new places when places change", async () => {
       const { rerender } = render(
-        <NearbyPlacesMap {...defaultProps} places={[mockPlaces[0]]} />,
+        <NearbyPlacesMap {...defaultProps} places={[mockPlaces[0]]} />
       );
 
       await act(async () => {
@@ -277,13 +277,13 @@ describe("NearbyPlacesMap - Smoke Tests", () => {
         expect.objectContaining({
           padding: 50,
           maxZoom: 15,
-        }),
+        })
       );
     });
 
     it("does NOT call fitBounds on subsequent place updates", async () => {
       const { rerender } = render(
-        <NearbyPlacesMap {...defaultProps} places={mockPlaces} />,
+        <NearbyPlacesMap {...defaultProps} places={mockPlaces} />
       );
 
       await act(async () => {
@@ -333,7 +333,7 @@ describe("NearbyPlacesMap - Smoke Tests", () => {
           {...defaultProps}
           places={mockPlaces}
           highlightedPlaceId="place-1"
-        />,
+        />
       );
 
       await act(async () => {
@@ -342,12 +342,12 @@ describe("NearbyPlacesMap - Smoke Tests", () => {
 
       // Find markers with matching placeId and check for highlighted class
       const highlightedMarker = createdMarkers.find(
-        (m) => m.element.dataset.placeId === "place-1",
+        (m) => m.element.dataset.placeId === "place-1"
       );
 
       if (highlightedMarker) {
         expect(
-          highlightedMarker.element.classList.contains("highlighted"),
+          highlightedMarker.element.classList.contains("highlighted")
         ).toBe(true);
       }
     });
@@ -358,7 +358,7 @@ describe("NearbyPlacesMap - Smoke Tests", () => {
           {...defaultProps}
           places={mockPlaces}
           highlightedPlaceId="place-1"
-        />,
+        />
       );
 
       await act(async () => {
@@ -371,7 +371,7 @@ describe("NearbyPlacesMap - Smoke Tests", () => {
           {...defaultProps}
           places={mockPlaces}
           highlightedPlaceId="place-2"
-        />,
+        />
       );
 
       await act(async () => {
@@ -380,12 +380,12 @@ describe("NearbyPlacesMap - Smoke Tests", () => {
 
       // First marker should no longer be highlighted
       const firstMarker = createdMarkers.find(
-        (m) => m.element.dataset.placeId === "place-1",
+        (m) => m.element.dataset.placeId === "place-1"
       );
 
       if (firstMarker) {
         expect(firstMarker.element.classList.contains("highlighted")).toBe(
-          false,
+          false
         );
       }
     });
@@ -398,7 +398,7 @@ describe("NearbyPlacesMap - Smoke Tests", () => {
             {...defaultProps}
             places={mockPlaces}
             highlightedPlaceId="non-existent-id"
-          />,
+          />
         );
       }).not.toThrow();
     });
@@ -409,7 +409,7 @@ describe("NearbyPlacesMap - Smoke Tests", () => {
       render(<NearbyPlacesMap {...defaultProps} />);
 
       expect(
-        screen.getByRole("button", { name: /zoom in/i }),
+        screen.getByRole("button", { name: /zoom in/i })
       ).toBeInTheDocument();
     });
 
@@ -417,7 +417,7 @@ describe("NearbyPlacesMap - Smoke Tests", () => {
       render(<NearbyPlacesMap {...defaultProps} />);
 
       expect(
-        screen.getByRole("button", { name: /zoom out/i }),
+        screen.getByRole("button", { name: /zoom out/i })
       ).toBeInTheDocument();
     });
 
@@ -425,25 +425,25 @@ describe("NearbyPlacesMap - Smoke Tests", () => {
       render(<NearbyPlacesMap {...defaultProps} />);
 
       expect(
-        screen.getByRole("button", { name: /reset to listing/i }),
+        screen.getByRole("button", { name: /reset to listing/i })
       ).toBeInTheDocument();
     });
 
     it("renders fit all markers button only when places exist", () => {
       const { rerender } = render(
-        <NearbyPlacesMap {...defaultProps} places={[]} />,
+        <NearbyPlacesMap {...defaultProps} places={[]} />
       );
 
       // No places, no fit button
       expect(
-        screen.queryByRole("button", { name: /fit all/i }),
+        screen.queryByRole("button", { name: /fit all/i })
       ).not.toBeInTheDocument();
 
       // Add places
       rerender(<NearbyPlacesMap {...defaultProps} places={mockPlaces} />);
 
       expect(
-        screen.getByRole("button", { name: /fit all/i }),
+        screen.getByRole("button", { name: /fit all/i })
       ).toBeInTheDocument();
     });
 
@@ -479,14 +479,14 @@ describe("NearbyPlacesMap - Smoke Tests", () => {
       });
 
       fireEvent.click(
-        screen.getByRole("button", { name: /reset to listing/i }),
+        screen.getByRole("button", { name: /reset to listing/i })
       );
 
       expect(mockMapInstance.flyTo).toHaveBeenCalledWith(
         expect.objectContaining({
           center: [-122.4194, 37.7749],
           zoom: 14,
-        }),
+        })
       );
     });
 
@@ -521,7 +521,7 @@ describe("NearbyPlacesMap - Smoke Tests", () => {
 
     it("removes all markers on unmount", async () => {
       const { unmount } = render(
-        <NearbyPlacesMap {...defaultProps} places={mockPlaces} />,
+        <NearbyPlacesMap {...defaultProps} places={mockPlaces} />
       );
 
       await act(async () => {
@@ -582,7 +582,7 @@ describe("NearbyPlacesMap - Smoke Tests", () => {
       // Popup.setHTML should have been called with escaped content
       const setHTMLCalls = mockPopupInstance.setHTML.mock.calls;
       const hasUnescapedScript = setHTMLCalls.some((call: string[]) =>
-        call[0].includes("<script>"),
+        call[0].includes("<script>")
       );
 
       // Should NOT contain raw script tags

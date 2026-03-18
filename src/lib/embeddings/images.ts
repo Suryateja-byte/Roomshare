@@ -48,20 +48,20 @@ function validateImageUrl(url: string): boolean {
  */
 export async function fetchAndProcessListingImages(
   imageUrls: string[],
-  maxImages = MAX_IMAGES_PER_EMBEDDING,
+  maxImages = MAX_IMAGES_PER_EMBEDDING
 ): Promise<ImagePart[]> {
   const validUrls = imageUrls.slice(0, maxImages).filter(validateImageUrl);
 
   if (validUrls.length === 0) return [];
 
   const results = await Promise.allSettled(
-    validUrls.map((url) => fetchAndPrepareImage(url)),
+    validUrls.map((url) => fetchAndPrepareImage(url))
   );
 
   return results
     .filter(
       (r): r is PromiseFulfilledResult<ImagePart | null> =>
-        r.status === "fulfilled",
+        r.status === "fulfilled"
     )
     .map((r) => r.value)
     .filter((v): v is ImagePart => v !== null);

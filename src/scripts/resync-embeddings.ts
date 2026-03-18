@@ -26,7 +26,7 @@ async function main() {
   for (let i = 0; i < rows.length; i += CONCURRENCY) {
     const batch = rows.slice(i, i + CONCURRENCY);
     const results = await Promise.allSettled(
-      batch.map((r) => syncListingEmbedding(r.id)),
+      batch.map((r) => syncListingEmbedding(r.id))
     );
 
     for (const r of results) {

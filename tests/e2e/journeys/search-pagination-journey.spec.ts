@@ -9,7 +9,14 @@
  * Uses SF_BOUNDS which has guaranteed seed data.
  */
 
-import { test, expect, selectors, tags, SF_BOUNDS, searchResultsContainer } from "../helpers";
+import {
+  test,
+  expect,
+  selectors,
+  tags,
+  SF_BOUNDS,
+  searchResultsContainer,
+} from "../helpers";
 
 test.describe("Search Pagination Journey", () => {
   // Use slow mode for map operations that can take time
@@ -32,7 +39,9 @@ test.describe("Search Pagination Journey", () => {
     await page.waitForLoadState("domcontentloaded");
 
     // Wait for listings to load
-    const listingCard = searchResultsContainer(page).locator(selectors.listingCard).first();
+    const listingCard = searchResultsContainer(page)
+      .locator(selectors.listingCard)
+      .first();
     await expect(listingCard).toBeVisible({ timeout: 30000 });
 
     // Capture first listing ID on page 1
@@ -115,13 +124,18 @@ test.describe("Search Pagination Journey", () => {
     }
   });
 
-  test(`${tags.core} - Sort change resets pagination`, async ({ page, nav }) => {
+  test(`${tags.core} - Sort change resets pagination`, async ({
+    page,
+    nav,
+  }) => {
     // Step 1: Navigate to search with bounds
     await nav.goToSearch({ bounds: SF_BOUNDS });
     await page.waitForLoadState("domcontentloaded");
 
     // Wait for listings
-    const listingCard = searchResultsContainer(page).locator(selectors.listingCard).first();
+    const listingCard = searchResultsContainer(page)
+      .locator(selectors.listingCard)
+      .first();
     await expect(listingCard).toBeVisible({ timeout: 30000 });
 
     // Step 2: Navigate to page 2 if possible
@@ -144,7 +158,7 @@ test.describe("Search Pagination Journey", () => {
 
       // Step 3: Change sort option
       const sortSelect = page.locator(
-        '[data-testid="sort-select"], select[name="sort"], [aria-label*="sort" i]',
+        '[data-testid="sort-select"], select[name="sort"], [aria-label*="sort" i]'
       );
 
       if (await sortSelect.isVisible({ timeout: 5000 }).catch(() => false)) {
@@ -153,10 +167,10 @@ test.describe("Search Pagination Journey", () => {
 
         // Select a different sort option (e.g., price_asc, newest)
         const priceOption = page.locator(
-          'option[value="price_asc"], [data-value="price_asc"], [role="option"]:has-text("price")',
+          'option[value="price_asc"], [data-value="price_asc"], [role="option"]:has-text("price")'
         );
         const newestOption = page.locator(
-          'option[value="newest"], [data-value="newest"], [role="option"]:has-text("newest")',
+          'option[value="newest"], [data-value="newest"], [role="option"]:has-text("newest")'
         );
 
         if (await priceOption.isVisible().catch(() => false)) {
@@ -204,7 +218,9 @@ test.describe("Search Pagination Journey", () => {
     await page.waitForLoadState("domcontentloaded");
 
     // Wait for listings
-    const listingCard = searchResultsContainer(page).locator(selectors.listingCard).first();
+    const listingCard = searchResultsContainer(page)
+      .locator(selectors.listingCard)
+      .first();
     await expect(listingCard).toBeVisible({ timeout: 30000 });
 
     // Step 2: Navigate to page 2
@@ -231,7 +247,9 @@ test.describe("Search Pagination Journey", () => {
       await page.waitForLoadState("domcontentloaded");
 
       // Wait for listings to load after refresh
-      await expect(searchResultsContainer(page).locator(selectors.listingCard).first()).toBeVisible({
+      await expect(
+        searchResultsContainer(page).locator(selectors.listingCard).first()
+      ).toBeVisible({
         timeout: 30000,
       });
 
@@ -244,13 +262,13 @@ test.describe("Search Pagination Journey", () => {
 
       // Check key pagination params are preserved
       expect(urlAfter.searchParams.get("cursor")).toBe(
-        urlBefore.searchParams.get("cursor"),
+        urlBefore.searchParams.get("cursor")
       );
 
       // If using cursorStack, it should also be preserved
       if (urlBefore.searchParams.has("cursorStack")) {
         expect(urlAfter.searchParams.get("cursorStack")).toBe(
-          urlBefore.searchParams.get("cursorStack"),
+          urlBefore.searchParams.get("cursorStack")
         );
       }
 

@@ -1,4 +1,4 @@
-import { NextResponse } from 'next/server';
+import { NextResponse } from "next/server";
 
 /**
  * Liveness probe - confirms the process is running
@@ -14,12 +14,12 @@ export async function GET() {
   // P2-1: Health checks must never be cached - always return fresh data
   const response = NextResponse.json(
     {
-      status: 'alive',
+      status: "alive",
       timestamp: new Date().toISOString(),
-      version: process.env.VERCEL_GIT_COMMIT_SHA?.slice(0, 7) || 'dev',
+      version: process.env.VERCEL_GIT_COMMIT_SHA?.slice(0, 7) || "dev",
     },
     { status: 200 }
   );
-  response.headers.set('Cache-Control', 'no-cache, no-store, must-revalidate');
+  response.headers.set("Cache-Control", "no-cache, no-store, must-revalidate");
   return response;
 }

@@ -71,13 +71,17 @@ export interface RateLimitedFetchInit extends RequestInit {
  */
 export async function rateLimitedFetch(
   input: RequestInfo | URL,
-  init?: RateLimitedFetchInit,
+  init?: RateLimitedFetchInit
 ): Promise<Response> {
   if (isThrottled()) {
     throw new RateLimitError(getRetryAfterMs());
   }
 
-  const { timeout = DEFAULT_TIMEOUT_MS, signal: callerSignal, ...restInit } = init ?? {};
+  const {
+    timeout = DEFAULT_TIMEOUT_MS,
+    signal: callerSignal,
+    ...restInit
+  } = init ?? {};
 
   // Set up timeout via internal AbortController + didTimeout flag
   let didTimeout = false;
@@ -103,7 +107,7 @@ export async function rateLimitedFetch(
           if (timeoutId !== undefined) clearTimeout(timeoutId);
           timeoutController.abort();
         },
-        { once: true },
+        { once: true }
       );
     }
   }

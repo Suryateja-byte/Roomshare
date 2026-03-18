@@ -66,7 +66,9 @@ describe("MapEmptyState", () => {
   });
 
   it("shows no filter section when no filters active", () => {
-    render(<MapEmptyState {...defaultProps} searchParams={new URLSearchParams()} />);
+    render(
+      <MapEmptyState {...defaultProps} searchParams={new URLSearchParams()} />
+    );
     expect(screen.queryByText("Clear filters")).not.toBeInTheDocument();
   });
 
@@ -77,7 +79,9 @@ describe("MapEmptyState", () => {
   });
 
   it('does NOT render "Clear filters" when no filters', () => {
-    render(<MapEmptyState {...defaultProps} searchParams={new URLSearchParams()} />);
+    render(
+      <MapEmptyState {...defaultProps} searchParams={new URLSearchParams()} />
+    );
     expect(screen.queryByText("Clear filters")).not.toBeInTheDocument();
   });
 
@@ -151,17 +155,23 @@ describe("MapEmptyState", () => {
     const params = new URLSearchParams("maxPrice=1500&roomType=Private+Room");
     render(<MapEmptyState {...defaultProps} searchParams={params} />);
     const suggestions = screen.getByTestId("filter-suggestions");
-    const pills = suggestions.querySelectorAll("[data-testid='suggestion-pill']");
+    const pills = suggestions.querySelectorAll(
+      "[data-testid='suggestion-pill']"
+    );
     expect(pills.length).toBeGreaterThanOrEqual(1);
     expect(pills.length).toBeLessThanOrEqual(2);
   });
 
   it("clicking a suggestion removes that filter from URL", () => {
-    const params = new URLSearchParams("maxPrice=1500&roomType=Private+Room&q=Austin");
+    const params = new URLSearchParams(
+      "maxPrice=1500&roomType=Private+Room&q=Austin"
+    );
     render(<MapEmptyState {...defaultProps} searchParams={params} />);
     // First suggestion should be price (highest priority)
     const suggestions = screen.getByTestId("filter-suggestions");
-    const firstPill = suggestions.querySelector("[data-testid='suggestion-pill']");
+    const firstPill = suggestions.querySelector(
+      "[data-testid='suggestion-pill']"
+    );
     expect(firstPill).toBeTruthy();
     fireEvent.click(firstPill!);
     expect(mockPush).toHaveBeenCalledTimes(1);
@@ -173,7 +183,9 @@ describe("MapEmptyState", () => {
   });
 
   it("shows no suggestions when no filters active", () => {
-    render(<MapEmptyState {...defaultProps} searchParams={new URLSearchParams()} />);
+    render(
+      <MapEmptyState {...defaultProps} searchParams={new URLSearchParams()} />
+    );
     expect(screen.queryByTestId("filter-suggestions")).not.toBeInTheDocument();
   });
 });

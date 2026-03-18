@@ -1,3 +1,3 @@
-'use client';
+"use client";
 
-export { default } from '@/components/error/AuthError';
+export { default } from "@/components/error/AuthError";

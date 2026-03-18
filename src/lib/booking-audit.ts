@@ -1,27 +1,38 @@
-import 'server-only';
+import "server-only";
 
-import { Prisma, BookingStatus } from '@prisma/client';
-import { features } from '@/lib/env';
+import { Prisma, BookingStatus } from "@prisma/client";
+import { features } from "@/lib/env";
 
 export type BookingAuditAction =
-  | 'CREATED'
-  | 'HELD'
-  | 'ACCEPTED'
-  | 'REJECTED'
-  | 'CANCELLED'
-  | 'EXPIRED';
+  | "CREATED"
+  | "HELD"
+  | "ACCEPTED"
+  | "REJECTED"
+  | "CANCELLED"
+  | "EXPIRED";
 
-export type BookingAuditActorType = 'USER' | 'HOST' | 'SYSTEM' | 'ADMIN';
+export type BookingAuditActorType = "USER" | "HOST" | "SYSTEM" | "ADMIN";
 
 // PII keys that must never appear in audit details
 // Fix 5: Include compound variants (tenantEmail, hostName, etc.)
 const PII_KEYS = new Set([
-  'email', 'phone', 'name', 'address',
-  'firstName', 'lastName', 'fullName', 'phoneNumber',
-  'tenantEmail', 'tenantName', 'hostEmail', 'hostName',
+  "email",
+  "phone",
+  "name",
+  "address",
+  "firstName",
+  "lastName",
+  "fullName",
+  "phoneNumber",
+  "tenantEmail",
+  "tenantName",
+  "hostEmail",
+  "hostName",
 ]);
 
-function stripPii(details?: Record<string, unknown>): Record<string, unknown> | undefined {
+function stripPii(
+  details?: Record<string, unknown>
+): Record<string, unknown> | undefined {
   if (!details) return undefined;
   const clean: Record<string, unknown> = {};
   for (const [key, value] of Object.entries(details)) {
@@ -47,7 +58,7 @@ export async function logBookingAudit(
     actorType: BookingAuditActorType;
     details?: Record<string, unknown>;
     ipAddress?: string | null;
-  },
+  }
 ): Promise<void> {
   if (!features.bookingAudit) return;
 

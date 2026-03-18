@@ -27,7 +27,9 @@ import { getCursorSecret } from "@/lib/env";
 function toBase64Url(str: string): string {
   // Use TextEncoder for proper UTF-8 encoding
   const bytes = new TextEncoder().encode(str);
-  const binString = Array.from(bytes, (byte) => String.fromCodePoint(byte)).join("");
+  const binString = Array.from(bytes, (byte) =>
+    String.fromCodePoint(byte)
+  ).join("");
   const base64 = btoa(binString);
   // Convert to base64url
   return base64.replace(/\+/g, "-").replace(/\//g, "_").replace(/=+$/, "");
@@ -155,7 +157,7 @@ export function encodeKeysetCursor(cursor: KeysetCursor): string {
  */
 export function decodeKeysetCursor(
   cursorStr: string,
-  expectedSort?: SortOption,
+  expectedSort?: SortOption
 ): KeysetCursor | null {
   try {
     const decoded = fromBase64Url(cursorStr);
@@ -181,7 +183,10 @@ export function decodeKeysetCursor(
 
       const provided = Buffer.from(parsedEnvelope.s);
       const expected = Buffer.from(expectedSignature);
-      if (provided.length !== expected.length || !timingSafeEqual(provided, expected)) {
+      if (
+        provided.length !== expected.length ||
+        !timingSafeEqual(provided, expected)
+      ) {
         return null;
       }
 
@@ -255,7 +260,7 @@ export interface CursorRowData {
  */
 export function buildCursorFromRow(
   row: CursorRowData,
-  sort: SortOption,
+  sort: SortOption
 ): KeysetCursor {
   let keys: (string | null)[];
 
@@ -326,7 +331,10 @@ export function decodeStack(encoded: string): string[] {
   try {
     const json = fromBase64Url(encoded);
     const parsed = JSON.parse(json);
-    if (Array.isArray(parsed) && parsed.every((item) => typeof item === "string")) {
+    if (
+      Array.isArray(parsed) &&
+      parsed.every((item) => typeof item === "string")
+    ) {
       return parsed;
     }
     return [];
@@ -388,7 +396,7 @@ export function decodeLegacyCursor(cursorStr: string): number | null {
  */
 export function decodeCursorAny(
   cursorStr: string,
-  expectedSort: SortOption,
+  expectedSort: SortOption
 ):
   | { type: "keyset"; cursor: KeysetCursor }
   | { type: "legacy"; page: number }

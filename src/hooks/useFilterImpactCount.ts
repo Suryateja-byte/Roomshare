@@ -49,7 +49,7 @@ export interface UseFilterImpactCountReturn {
  */
 function generateCacheKey(
   searchParams: URLSearchParams,
-  chip: FilterChipData,
+  chip: FilterChipData
 ): string {
   // The cache key is the URL query string WITHOUT the filter being removed
   const queryWithoutFilter = removeFilterFromUrl(searchParams, chip);
@@ -71,7 +71,7 @@ export function useFilterImpactCount({
   currentCount,
 }: UseFilterImpactCountOptions): UseFilterImpactCountReturn {
   const [countWithoutFilter, setCountWithoutFilter] = useState<number | null>(
-    null,
+    null
   );
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState<Error | null>(null);
@@ -129,8 +129,7 @@ export function useFilterImpactCount({
       if (typeof data !== "object" || data === null) {
         throw new Error("Invalid count response: expected object");
       }
-      const newCount =
-        typeof data.count === "number" ? data.count : null;
+      const newCount = typeof data.count === "number" ? data.count : null;
 
       // Cache the result
       setCachedCount(cacheKey, newCount);

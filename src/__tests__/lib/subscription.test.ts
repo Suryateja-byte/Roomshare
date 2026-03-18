@@ -9,9 +9,9 @@ import {
   getNeighborhoodProFeatures,
   getProFeatureList,
   PRO_FEATURE_NAMES,
-} from '@/lib/subscription';
+} from "@/lib/subscription";
 
-describe('subscription', () => {
+describe("subscription", () => {
   const originalEnv = process.env;
 
   beforeEach(() => {
@@ -25,92 +25,92 @@ describe('subscription', () => {
     process.env = originalEnv;
   });
 
-  describe('isProUser', () => {
+  describe("isProUser", () => {
     it('returns true for "pro" tier', () => {
-      expect(isProUser('pro')).toBe(true);
+      expect(isProUser("pro")).toBe(true);
     });
 
     it('returns false for "free" tier', () => {
-      expect(isProUser('free')).toBe(false);
+      expect(isProUser("free")).toBe(false);
     });
 
-    it('returns false for undefined', () => {
+    it("returns false for undefined", () => {
       expect(isProUser(undefined)).toBe(false);
     });
 
-    it('returns false for null', () => {
+    it("returns false for null", () => {
       expect(isProUser(null)).toBe(false);
     });
 
-    it('returns false for empty string', () => {
-      expect(isProUser('')).toBe(false);
+    it("returns false for empty string", () => {
+      expect(isProUser("")).toBe(false);
     });
 
-    it('returns false for arbitrary string', () => {
-      expect(isProUser('premium')).toBe(false);
-      expect(isProUser('PRO')).toBe(false);
-      expect(isProUser('Pro')).toBe(false);
+    it("returns false for arbitrary string", () => {
+      expect(isProUser("premium")).toBe(false);
+      expect(isProUser("PRO")).toBe(false);
+      expect(isProUser("Pro")).toBe(false);
     });
 
-    describe('development override', () => {
-      it('returns true when FORCE_PRO_MODE is true in development', () => {
-        (process.env as Record<string, string>).NODE_ENV = 'development';
-        process.env.NEXT_PUBLIC_FORCE_PRO_MODE = 'true';
+    describe("development override", () => {
+      it("returns true when FORCE_PRO_MODE is true in development", () => {
+        (process.env as Record<string, string>).NODE_ENV = "development";
+        process.env.NEXT_PUBLIC_FORCE_PRO_MODE = "true";
 
-        expect(isProUser('free')).toBe(true);
+        expect(isProUser("free")).toBe(true);
         expect(isProUser(undefined)).toBe(true);
         expect(isProUser(null)).toBe(true);
       });
 
-      it('does not override in production even if env var is set', () => {
-        (process.env as Record<string, string>).NODE_ENV = 'production';
-        process.env.NEXT_PUBLIC_FORCE_PRO_MODE = 'true';
+      it("does not override in production even if env var is set", () => {
+        (process.env as Record<string, string>).NODE_ENV = "production";
+        process.env.NEXT_PUBLIC_FORCE_PRO_MODE = "true";
 
-        expect(isProUser('free')).toBe(false);
+        expect(isProUser("free")).toBe(false);
         expect(isProUser(undefined)).toBe(false);
       });
 
       it('does not override when FORCE_PRO_MODE is not "true"', () => {
-        (process.env as Record<string, string>).NODE_ENV = 'development';
-        process.env.NEXT_PUBLIC_FORCE_PRO_MODE = 'false';
+        (process.env as Record<string, string>).NODE_ENV = "development";
+        process.env.NEXT_PUBLIC_FORCE_PRO_MODE = "false";
 
-        expect(isProUser('free')).toBe(false);
+        expect(isProUser("free")).toBe(false);
       });
     });
   });
 
-  describe('getSubscriptionTier', () => {
+  describe("getSubscriptionTier", () => {
     it('returns "pro" for "pro" input', () => {
-      expect(getSubscriptionTier('pro')).toBe('pro');
+      expect(getSubscriptionTier("pro")).toBe("pro");
     });
 
     it('returns "free" for "free" input', () => {
-      expect(getSubscriptionTier('free')).toBe('free');
+      expect(getSubscriptionTier("free")).toBe("free");
     });
 
     it('returns "free" for undefined', () => {
-      expect(getSubscriptionTier(undefined)).toBe('free');
+      expect(getSubscriptionTier(undefined)).toBe("free");
     });
 
     it('returns "free" for null', () => {
-      expect(getSubscriptionTier(null)).toBe('free');
+      expect(getSubscriptionTier(null)).toBe("free");
     });
 
     it('returns "free" for unknown tier strings', () => {
-      expect(getSubscriptionTier('premium')).toBe('free');
-      expect(getSubscriptionTier('enterprise')).toBe('free');
-      expect(getSubscriptionTier('')).toBe('free');
+      expect(getSubscriptionTier("premium")).toBe("free");
+      expect(getSubscriptionTier("enterprise")).toBe("free");
+      expect(getSubscriptionTier("")).toBe("free");
     });
 
     it('is case-sensitive (only lowercase "pro" matches)', () => {
-      expect(getSubscriptionTier('Pro')).toBe('free');
-      expect(getSubscriptionTier('PRO')).toBe('free');
+      expect(getSubscriptionTier("Pro")).toBe("free");
+      expect(getSubscriptionTier("PRO")).toBe("free");
     });
   });
 
-  describe('getNeighborhoodProFeatures', () => {
-    it('returns all features enabled for pro users', () => {
-      const features = getNeighborhoodProFeatures('pro');
+  describe("getNeighborhoodProFeatures", () => {
+    it("returns all features enabled for pro users", () => {
+      const features = getNeighborhoodProFeatures("pro");
 
       expect(features.showInteractiveMap).toBe(true);
       expect(features.showCustomPlaceList).toBe(true);
@@ -120,8 +120,8 @@ describe('subscription', () => {
       expect(features.showPlaceDetailsPanel).toBe(true);
     });
 
-    it('returns all features disabled for free users', () => {
-      const features = getNeighborhoodProFeatures('free');
+    it("returns all features disabled for free users", () => {
+      const features = getNeighborhoodProFeatures("free");
 
       expect(features.showInteractiveMap).toBe(false);
       expect(features.showCustomPlaceList).toBe(false);
@@ -131,66 +131,66 @@ describe('subscription', () => {
       expect(features.showPlaceDetailsPanel).toBe(false);
     });
 
-    it('returns all features disabled for undefined tier', () => {
+    it("returns all features disabled for undefined tier", () => {
       const features = getNeighborhoodProFeatures(undefined);
 
       expect(features.showInteractiveMap).toBe(false);
       expect(features.showCustomPlaceList).toBe(false);
     });
 
-    it('returns all features disabled for null tier', () => {
+    it("returns all features disabled for null tier", () => {
       const features = getNeighborhoodProFeatures(null);
 
       expect(features.showInteractiveMap).toBe(false);
     });
 
-    it('returns consistent feature set structure', () => {
-      const features = getNeighborhoodProFeatures('free');
+    it("returns consistent feature set structure", () => {
+      const features = getNeighborhoodProFeatures("free");
       const keys = Object.keys(features);
 
       expect(keys).toEqual([
-        'showInteractiveMap',
-        'showCustomPlaceList',
-        'showPerItemDistance',
-        'enableListMapSync',
-        'showWalkabilityRings',
-        'showPlaceDetailsPanel',
+        "showInteractiveMap",
+        "showCustomPlaceList",
+        "showPerItemDistance",
+        "enableListMapSync",
+        "showWalkabilityRings",
+        "showPlaceDetailsPanel",
       ]);
     });
   });
 
-  describe('PRO_FEATURE_NAMES', () => {
-    it('contains all expected feature names', () => {
+  describe("PRO_FEATURE_NAMES", () => {
+    it("contains all expected feature names", () => {
       expect(PRO_FEATURE_NAMES.interactiveMap).toBeDefined();
       expect(PRO_FEATURE_NAMES.customList).toBeDefined();
       expect(PRO_FEATURE_NAMES.walkabilityRings).toBeDefined();
       expect(PRO_FEATURE_NAMES.placeDetails).toBeDefined();
     });
 
-    it('values are non-empty strings', () => {
+    it("values are non-empty strings", () => {
       Object.values(PRO_FEATURE_NAMES).forEach((name) => {
-        expect(typeof name).toBe('string');
+        expect(typeof name).toBe("string");
         expect(name.length).toBeGreaterThan(0);
       });
     });
   });
 
-  describe('getProFeatureList', () => {
-    it('returns an array of strings', () => {
+  describe("getProFeatureList", () => {
+    it("returns an array of strings", () => {
       const list = getProFeatureList();
       expect(Array.isArray(list)).toBe(true);
       list.forEach((item) => {
-        expect(typeof item).toBe('string');
+        expect(typeof item).toBe("string");
       });
     });
 
-    it('returns all values from PRO_FEATURE_NAMES', () => {
+    it("returns all values from PRO_FEATURE_NAMES", () => {
       const list = getProFeatureList();
       const expected = Object.values(PRO_FEATURE_NAMES);
       expect(list).toEqual(expected);
     });
 
-    it('returns a non-empty list', () => {
+    it("returns a non-empty list", () => {
       expect(getProFeatureList().length).toBeGreaterThan(0);
     });
   });

@@ -6,11 +6,11 @@
  * Time to Interactive (TTI), and overall page load time against budgets.
  */
 
-import { test, expect, tags, timeouts } from '../helpers/test-utils';
-import { CreateListingPage } from '../page-objects/create-listing.page';
+import { test, expect, tags, timeouts } from "../helpers/test-utils";
+import { CreateListingPage } from "../page-objects/create-listing.page";
 
-test.describe('Create Listing — Performance Tests', () => {
-  test.use({ storageState: 'playwright/.auth/user.json' });
+test.describe("Create Listing — Performance Tests", () => {
+  test.use({ storageState: "playwright/.auth/user.json" });
 
   // Performance tests need extended timeouts for measurement windows
   test.slow();
@@ -21,8 +21,8 @@ test.describe('Create Listing — Performance Tests', () => {
 
   test(`P-001: LCP under 2.5s ${tags.slow}`, async ({ page }) => {
     // Navigate to the create listing page
-    await page.goto('/listings/create');
-    await page.waitForLoadState('domcontentloaded');
+    await page.goto("/listings/create");
+    await page.waitForLoadState("domcontentloaded");
 
     const lcp = await page.evaluate(() => {
       return new Promise<number>((resolve) => {
@@ -35,7 +35,7 @@ test.describe('Create Listing — Performance Tests', () => {
           }
         });
 
-        observer.observe({ type: 'largest-contentful-paint', buffered: true });
+        observer.observe({ type: "largest-contentful-paint", buffered: true });
 
         // Give the observer time to pick up the buffered LCP entry,
         // then disconnect and resolve.
@@ -46,9 +46,12 @@ test.describe('Create Listing — Performance Tests', () => {
       });
     });
 
-    expect(lcp, 'LCP should be recorded').toBeGreaterThan(0);
+    expect(lcp, "LCP should be recorded").toBeGreaterThan(0);
     const lcpBudget = process.env.CI ? 4000 : 2500;
-    expect(lcp, `LCP was ${lcp.toFixed(0)}ms, budget is ${lcpBudget}ms`).toBeLessThan(lcpBudget);
+    expect(
+      lcp,
+      `LCP was ${lcp.toFixed(0)}ms, budget is ${lcpBudget}ms`
+    ).toBeLessThan(lcpBudget);
   });
 
   test(`P-002: CLS under 0.5 ${tags.slow}`, async ({ page }) => {
@@ -62,12 +65,12 @@ test.describe('Create Listing — Performance Tests', () => {
           }
         }
       });
-      observer.observe({ type: 'layout-shift', buffered: true });
+      observer.observe({ type: "layout-shift", buffered: true });
     });
 
     // Navigate and wait for initial render
-    await page.goto('/listings/create');
-    await page.waitForLoadState('load');
+    await page.goto("/listings/create");
+    await page.waitForLoadState("load");
 
     // Wait for page to settle
     await page.waitForTimeout(3000);
@@ -80,46 +83,63 @@ test.describe('Create Listing — Performance Tests', () => {
     // don't reproduce in real browsers.  The CWV "good" threshold is 0.1 but
     // synthetic CI environments routinely measure 0.25-0.40.
     const clsBudget = process.env.CI ? 0.5 : 0.5;
-    expect(cls, `CLS was ${cls.toFixed(4)}, budget is ${clsBudget}`).toBeLessThan(clsBudget);
+    expect(
+      cls,
+      `CLS was ${cls.toFixed(4)}, budget is ${clsBudget}`
+    ).toBeLessThan(clsBudget);
   });
 
   // ────────────────────────────────────────────────────────
   // P2 — Load timing
   // ────────────────────────────────────────────────────────
 
-  test(`P-003: TTI — form interactive within 3s ${tags.slow}`, async ({ page }) => {
+  test(`P-003: TTI — form interactive within 3s ${tags.slow}`, async ({
+    page,
+  }) => {
     const navStart = Date.now();
 
-    await page.goto('/listings/create');
-    await page.waitForLoadState('domcontentloaded');
+    await page.goto("/listings/create");
+    await page.waitForLoadState("domcontentloaded");
 
     // Wait until the title input is visible and editable (form is interactive)
     const clp = new CreateListingPage(page);
-    await clp.titleInput.waitFor({ state: 'visible', timeout: timeouts.navigation });
+    await clp.titleInput.waitFor({
+      state: "visible",
+      timeout: timeouts.navigation,
+    });
 
     // Verify the input is actually interactive by filling it
-    await clp.titleInput.fill('TTI test');
+    await clp.titleInput.fill("TTI test");
     const value = await clp.titleInput.inputValue();
-    expect(value).toBe('TTI test');
+    expect(value).toBe("TTI test");
 
     const tti = Date.now() - navStart;
     const ttiBudget = process.env.CI ? 8000 : 5000;
-    expect(tti, `TTI was ${tti}ms, budget is ${ttiBudget}ms`).toBeLessThan(ttiBudget);
+    expect(tti, `TTI was ${tti}ms, budget is ${ttiBudget}ms`).toBeLessThan(
+      ttiBudget
+    );
   });
 
   test(`P-004: page load time under 5s ${tags.slow}`, async ({ page }) => {
-    await page.goto('/listings/create');
-    await page.waitForLoadState('load');
+    await page.goto("/listings/create");
+    await page.waitForLoadState("load");
 
     const loadTime = await page.evaluate(() => {
-      const entries = performance.getEntriesByType('navigation') as PerformanceNavigationTiming[];
+      const entries = performance.getEntriesByType(
+        "navigation"
+      ) as PerformanceNavigationTiming[];
       if (entries.length === 0) return -1;
       const nav = entries[0];
       return nav.loadEventEnd - nav.startTime;
     });
 
-    expect(loadTime, 'Navigation timing should be available').toBeGreaterThan(0);
+    expect(loadTime, "Navigation timing should be available").toBeGreaterThan(
+      0
+    );
     const loadBudget = process.env.CI ? 8000 : 5000;
-    expect(loadTime, `Load time was ${loadTime.toFixed(0)}ms, budget is ${loadBudget}ms`).toBeLessThan(loadBudget);
+    expect(
+      loadTime,
+      `Load time was ${loadTime.toFixed(0)}ms, budget is ${loadBudget}ms`
+    ).toBeLessThan(loadBudget);
   });
 });

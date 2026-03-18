@@ -114,7 +114,7 @@ describe("isPublicListingSafe", () => {
           [field]: "some-value",
         };
         expect(isPublicListingSafe(poisonedListing)).toBe(false);
-      },
+      }
     );
 
     it("should reject listing with isSaved boolean", () => {
@@ -210,7 +210,7 @@ describe("assertPublicListing", () => {
       isSaved: true,
     };
     expect(() => assertPublicListing(poisonedListing)).toThrow(
-      "Cache safety violation",
+      "Cache safety violation"
     );
     expect(() => assertPublicListing(poisonedListing)).toThrow("isSaved");
   });
@@ -223,7 +223,7 @@ describe("assertPublicListing", () => {
       bookingStatus: "pending",
     };
     expect(() => assertPublicListing(poisonedListing)).toThrow(
-      /isSaved.*viewedAt.*bookingStatus|isSaved.*bookingStatus.*viewedAt|viewedAt.*isSaved.*bookingStatus|viewedAt.*bookingStatus.*isSaved|bookingStatus.*isSaved.*viewedAt|bookingStatus.*viewedAt.*isSaved/,
+      /isSaved.*viewedAt.*bookingStatus|isSaved.*bookingStatus.*viewedAt|viewedAt.*isSaved.*bookingStatus|viewedAt.*bookingStatus.*isSaved|bookingStatus.*isSaved.*viewedAt|bookingStatus.*viewedAt.*isSaved/
     );
   });
 
@@ -234,7 +234,7 @@ describe("assertPublicListing", () => {
 
   it("should throw for undefined input", () => {
     expect(() => assertPublicListing(undefined)).toThrow(
-      "Cache safety violation",
+      "Cache safety violation"
     );
     expect(() => assertPublicListing(undefined)).toThrow("got undefined");
   });

@@ -20,46 +20,43 @@ test.describe("Session Expiry: Multi-Step Flows", () => {
     test.slow();
   });
 
-  test.fixme(
-    `${tags.auth} ${tags.sessionExpiry} - SE-MS01: DeleteListing session expires after can-delete check`,
-    async ({ page }) => {
-      // FIXME: DeleteListingButton has a 4-step flow:
-      // 1. fetch(`/api/listings/${id}/can-delete`) — checks eligibility
-      // 2. User confirms in modal
-      // 3. User enters password
-      // 4. fetch(`/api/listings/${id}`, { method: 'DELETE' })
-      //
-      // Session can expire between any steps. Currently:
-      // - No 401 check after can-delete (step 1)
-      // - No 401 check after delete (step 4)
-      // - User completes entire 4-step confirmation flow then gets
-      //   a generic "Failed to delete listing" toast.
-      //
-      // Expected: Detect 401 at any step, show session expiry message,
-      // redirect to login with callbackUrl to the listing page.
+  test.fixme(`${tags.auth} ${tags.sessionExpiry} - SE-MS01: DeleteListing session expires after can-delete check`, async ({
+    page,
+  }) => {
+    // FIXME: DeleteListingButton has a 4-step flow:
+    // 1. fetch(`/api/listings/${id}/can-delete`) — checks eligibility
+    // 2. User confirms in modal
+    // 3. User enters password
+    // 4. fetch(`/api/listings/${id}`, { method: 'DELETE' })
+    //
+    // Session can expire between any steps. Currently:
+    // - No 401 check after can-delete (step 1)
+    // - No 401 check after delete (step 4)
+    // - User completes entire 4-step confirmation flow then gets
+    //   a generic "Failed to delete listing" toast.
+    //
+    // Expected: Detect 401 at any step, show session expiry message,
+    // redirect to login with callbackUrl to the listing page.
 
-      // Would need a listing owned by the test user
-      // Navigate to listing management page or a specific listing
-      await page.goto("/");
-      await page.waitForLoadState("domcontentloaded");
+    // Would need a listing owned by the test user
+    // Navigate to listing management page or a specific listing
+    await page.goto("/");
+    await page.waitForLoadState("domcontentloaded");
 
-      // TODO: Navigate to user's own listing that has a delete button
-      // Expire session between confirmation and delete API call
-      // Assert: should detect 401 and redirect instead of showing generic error
-    },
-  );
+    // TODO: Navigate to user's own listing that has a delete button
+    // Expire session between confirmation and delete API call
+    // Assert: should detect 401 and redirect instead of showing generic error
+  });
 
-  test.fixme(
-    `${tags.auth} ${tags.sessionExpiry} - SE-MS02: DeleteListing session expires at can-delete check`,
-    async ({ page: _page }) => {
-      // FIXME: When session expires before the initial can-delete check:
-      // - fetch returns 401
-      // - Component doesn't check response.status
-      // - Shows generic error or undefined behavior
-      //
-      // Expected: Detect 401, show "Session expired" message, redirect.
-
-      // Would need a listing owned by the test user
-    },
-  );
+  test.fixme(`${tags.auth} ${tags.sessionExpiry} - SE-MS02: DeleteListing session expires at can-delete check`, async ({
+    page: _page,
+  }) => {
+    // FIXME: When session expires before the initial can-delete check:
+    // - fetch returns 401
+    // - Component doesn't check response.status
+    // - Shows generic error or undefined behavior
+    //
+    // Expected: Detect 401, show "Session expired" message, redirect.
+    // Would need a listing owned by the test user
+  });
 });

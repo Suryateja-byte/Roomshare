@@ -116,8 +116,8 @@ export const BOUNDS_EPSILON = 0.001;
 
 /** USA maxBounds for MapLibre — covers all 50 states including Alaska + Hawaii */
 export const USA_MAX_BOUNDS: [[number, number], [number, number]] = [
-  [-180, 17],  // SW corner: covers Hawaii (19N) + territories with margin
-  [-64, 72],   // NE corner: covers Alaska (71N) + Maine with margin
+  [-180, 17], // SW corner: covers Hawaii (19N) + territories with margin
+  [-64, 72], // NE corner: covers Alaska (71N) + Maine with margin
 ];
 
 /** Minimum zoom level to prevent world-view zoom out */

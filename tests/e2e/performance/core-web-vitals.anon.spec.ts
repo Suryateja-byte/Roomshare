@@ -7,9 +7,9 @@
  *   LCP <8000ms (CI: 24000ms), CLS <0.5 (CI: 1.5), Page load <10000ms (CI: 30000ms), DCL <8000ms (CI: 24000ms).
  */
 
-import { test, expect, SF_BOUNDS } from '../helpers';
+import { test, expect, SF_BOUNDS } from "../helpers";
 
-test.describe('Core Web Vitals — Anonymous Pages', () => {
+test.describe("Core Web Vitals — Anonymous Pages", () => {
   test.slow(); // Performance measurement needs extended timeouts
 
   // ────────────────────────────────────────────────────────
@@ -17,7 +17,7 @@ test.describe('Core Web Vitals — Anonymous Pages', () => {
   // ────────────────────────────────────────────────────────
 
   /** Inject CLS observer before navigation */
-  async function setupClsObserver(page: import('@playwright/test').Page) {
+  async function setupClsObserver(page: import("@playwright/test").Page) {
     await page.addInitScript(() => {
       (window as any).__cls = 0;
       const observer = new PerformanceObserver((list) => {
@@ -27,12 +27,14 @@ test.describe('Core Web Vitals — Anonymous Pages', () => {
           }
         }
       });
-      observer.observe({ type: 'layout-shift', buffered: true });
+      observer.observe({ type: "layout-shift", buffered: true });
     });
   }
 
   /** Read LCP from buffered PerformanceObserver entries */
-  async function measureLcp(page: import('@playwright/test').Page): Promise<number> {
+  async function measureLcp(
+    page: import("@playwright/test").Page
+  ): Promise<number> {
     return page.evaluate(() => {
       return new Promise<number>((resolve) => {
         let lastLcp = -1;
@@ -42,7 +44,7 @@ test.describe('Core Web Vitals — Anonymous Pages', () => {
             lastLcp = entries[entries.length - 1].startTime;
           }
         });
-        observer.observe({ type: 'largest-contentful-paint', buffered: true });
+        observer.observe({ type: "largest-contentful-paint", buffered: true });
         setTimeout(() => {
           observer.disconnect();
           resolve(lastLcp);
@@ -52,14 +54,20 @@ test.describe('Core Web Vitals — Anonymous Pages', () => {
   }
 
   /** Read accumulated CLS from page */
-  async function readCls(page: import('@playwright/test').Page): Promise<number> {
+  async function readCls(
+    page: import("@playwright/test").Page
+  ): Promise<number> {
     return page.evaluate(() => (window as any).__cls as number);
   }
 
   /** Measure load event timing */
-  async function measureLoadTime(page: import('@playwright/test').Page): Promise<number> {
+  async function measureLoadTime(
+    page: import("@playwright/test").Page
+  ): Promise<number> {
     return page.evaluate(() => {
-      const entries = performance.getEntriesByType('navigation') as PerformanceNavigationTiming[];
+      const entries = performance.getEntriesByType(
+        "navigation"
+      ) as PerformanceNavigationTiming[];
       if (entries.length === 0) return -1;
       return entries[0].loadEventEnd - entries[0].startTime;
     });
@@ -78,33 +86,44 @@ test.describe('Core Web Vitals — Anonymous Pages', () => {
   // Homepage (/)
   // ────────────────────────────────────────────────────────
 
-  test.describe('Homepage (/)', () => {
-    test('LCP under budget', async ({ page }) => {
-      await page.goto('/');
-      await page.waitForLoadState('domcontentloaded');
+  test.describe("Homepage (/)", () => {
+    test("LCP under budget", async ({ page }) => {
+      await page.goto("/");
+      await page.waitForLoadState("domcontentloaded");
 
       const lcp = await measureLcp(page);
-      expect(lcp, 'LCP should be recorded').toBeGreaterThan(0);
-      expect(lcp, `LCP was ${lcp.toFixed(0)}ms, budget is ${LCP_BUDGET}ms`).toBeLessThan(LCP_BUDGET);
+      expect(lcp, "LCP should be recorded").toBeGreaterThan(0);
+      expect(
+        lcp,
+        `LCP was ${lcp.toFixed(0)}ms, budget is ${LCP_BUDGET}ms`
+      ).toBeLessThan(LCP_BUDGET);
     });
 
-    test('CLS under budget', async ({ page }) => {
+    test("CLS under budget", async ({ page }) => {
       await setupClsObserver(page);
-      await page.goto('/');
-      await page.waitForLoadState('load');
+      await page.goto("/");
+      await page.waitForLoadState("load");
       await page.waitForTimeout(3000); // Settle window
 
       const cls = await readCls(page);
-      expect(cls, `CLS was ${cls.toFixed(4)}, budget is ${CLS_BUDGET}`).toBeLessThan(CLS_BUDGET);
+      expect(
+        cls,
+        `CLS was ${cls.toFixed(4)}, budget is ${CLS_BUDGET}`
+      ).toBeLessThan(CLS_BUDGET);
     });
 
-    test('Page load under budget', async ({ page }) => {
-      await page.goto('/');
-      await page.waitForLoadState('load');
+    test("Page load under budget", async ({ page }) => {
+      await page.goto("/");
+      await page.waitForLoadState("load");
 
       const loadTime = await measureLoadTime(page);
-      expect(loadTime, 'Navigation timing should be available').toBeGreaterThan(0);
-      expect(loadTime, `Load time was ${loadTime.toFixed(0)}ms, budget is ${LOAD_BUDGET}ms`).toBeLessThan(LOAD_BUDGET);
+      expect(loadTime, "Navigation timing should be available").toBeGreaterThan(
+        0
+      );
+      expect(
+        loadTime,
+        `Load time was ${loadTime.toFixed(0)}ms, budget is ${LOAD_BUDGET}ms`
+      ).toBeLessThan(LOAD_BUDGET);
     });
   });
 
@@ -112,35 +131,43 @@ test.describe('Core Web Vitals — Anonymous Pages', () => {
   // Search (/search)
   // ────────────────────────────────────────────────────────
 
-  test.describe('Search (/search)', () => {
+  test.describe("Search (/search)", () => {
     const searchUrl = `/search?minLat=${SF_BOUNDS.minLat}&maxLat=${SF_BOUNDS.maxLat}&minLng=${SF_BOUNDS.minLng}&maxLng=${SF_BOUNDS.maxLng}`;
 
-    test('LCP under budget', async ({ page }) => {
+    test("LCP under budget", async ({ page }) => {
       await page.goto(searchUrl);
-      await page.waitForLoadState('domcontentloaded');
+      await page.waitForLoadState("domcontentloaded");
 
       const lcp = await measureLcp(page);
-      expect(lcp, 'LCP should be recorded').toBeGreaterThan(0);
-      expect(lcp, `LCP was ${lcp.toFixed(0)}ms, budget is ${LCP_BUDGET}ms`).toBeLessThan(LCP_BUDGET);
+      expect(lcp, "LCP should be recorded").toBeGreaterThan(0);
+      expect(
+        lcp,
+        `LCP was ${lcp.toFixed(0)}ms, budget is ${LCP_BUDGET}ms`
+      ).toBeLessThan(LCP_BUDGET);
     });
 
-    test('CLS under budget', async ({ page }) => {
+    test("CLS under budget", async ({ page }) => {
       await setupClsObserver(page);
       await page.goto(searchUrl);
-      await page.waitForLoadState('load');
+      await page.waitForLoadState("load");
       await page.waitForTimeout(3000);
 
       const cls = await readCls(page);
-      expect(cls, `CLS was ${cls.toFixed(4)}, budget is ${CLS_BUDGET}`).toBeLessThan(CLS_BUDGET);
+      expect(
+        cls,
+        `CLS was ${cls.toFixed(4)}, budget is ${CLS_BUDGET}`
+      ).toBeLessThan(CLS_BUDGET);
     });
 
-    test('DOMContentLoaded under budget', async ({ page }) => {
+    test("DOMContentLoaded under budget", async ({ page }) => {
       const start = Date.now();
       await page.goto(searchUrl);
-      await page.waitForLoadState('domcontentloaded');
+      await page.waitForLoadState("domcontentloaded");
       const dcl = Date.now() - start;
 
-      expect(dcl, `DCL was ${dcl}ms, budget is ${DCL_BUDGET}ms`).toBeLessThan(DCL_BUDGET);
+      expect(dcl, `DCL was ${dcl}ms, budget is ${DCL_BUDGET}ms`).toBeLessThan(
+        DCL_BUDGET
+      );
     });
   });
 
@@ -148,24 +175,30 @@ test.describe('Core Web Vitals — Anonymous Pages', () => {
   // Login (/login)
   // ────────────────────────────────────────────────────────
 
-  test.describe('Login (/login)', () => {
-    test('LCP under budget', async ({ page }) => {
-      await page.goto('/login');
-      await page.waitForLoadState('domcontentloaded');
+  test.describe("Login (/login)", () => {
+    test("LCP under budget", async ({ page }) => {
+      await page.goto("/login");
+      await page.waitForLoadState("domcontentloaded");
 
       const lcp = await measureLcp(page);
-      expect(lcp, 'LCP should be recorded').toBeGreaterThan(0);
-      expect(lcp, `LCP was ${lcp.toFixed(0)}ms, budget is ${LCP_BUDGET}ms`).toBeLessThan(LCP_BUDGET);
+      expect(lcp, "LCP should be recorded").toBeGreaterThan(0);
+      expect(
+        lcp,
+        `LCP was ${lcp.toFixed(0)}ms, budget is ${LCP_BUDGET}ms`
+      ).toBeLessThan(LCP_BUDGET);
     });
 
-    test('CLS under budget', async ({ page }) => {
+    test("CLS under budget", async ({ page }) => {
       await setupClsObserver(page);
-      await page.goto('/login');
-      await page.waitForLoadState('load');
+      await page.goto("/login");
+      await page.waitForLoadState("load");
       await page.waitForTimeout(3000);
 
       const cls = await readCls(page);
-      expect(cls, `CLS was ${cls.toFixed(4)}, budget is ${CLS_BUDGET}`).toBeLessThan(CLS_BUDGET);
+      expect(
+        cls,
+        `CLS was ${cls.toFixed(4)}, budget is ${CLS_BUDGET}`
+      ).toBeLessThan(CLS_BUDGET);
     });
   });
 
@@ -173,39 +206,53 @@ test.describe('Core Web Vitals — Anonymous Pages', () => {
   // Listing Detail (/listings/[id])
   // ────────────────────────────────────────────────────────
 
-  test.describe('Listing Detail', () => {
-    test('LCP under budget', async ({ page }) => {
+  test.describe("Listing Detail", () => {
+    test("LCP under budget", async ({ page }) => {
       // Find first listing ID
-      await page.goto('/search');
-      await page.waitForLoadState('domcontentloaded');
+      await page.goto("/search");
+      await page.waitForLoadState("domcontentloaded");
       const firstCard = page.locator('[data-testid="listing-card"]').first();
-      await firstCard.waitFor({ state: 'attached', timeout: 30_000 }).catch(() => {});
-      const listingId = await firstCard.getAttribute('data-listing-id').catch(() => null);
-      test.skip(!listingId, 'No listings available');
+      await firstCard
+        .waitFor({ state: "attached", timeout: 30_000 })
+        .catch(() => {});
+      const listingId = await firstCard
+        .getAttribute("data-listing-id")
+        .catch(() => null);
+      test.skip(!listingId, "No listings available");
 
       await page.goto(`/listings/${listingId}`);
-      await page.waitForLoadState('domcontentloaded');
+      await page.waitForLoadState("domcontentloaded");
 
       const lcp = await measureLcp(page);
-      expect(lcp, 'LCP should be recorded').toBeGreaterThan(0);
-      expect(lcp, `LCP was ${lcp.toFixed(0)}ms, budget is ${LCP_BUDGET}ms`).toBeLessThan(LCP_BUDGET);
+      expect(lcp, "LCP should be recorded").toBeGreaterThan(0);
+      expect(
+        lcp,
+        `LCP was ${lcp.toFixed(0)}ms, budget is ${LCP_BUDGET}ms`
+      ).toBeLessThan(LCP_BUDGET);
     });
 
-    test('CLS under budget', async ({ page }) => {
+    test("CLS under budget", async ({ page }) => {
       await setupClsObserver(page);
-      await page.goto('/search');
-      await page.waitForLoadState('domcontentloaded');
+      await page.goto("/search");
+      await page.waitForLoadState("domcontentloaded");
       const firstCard = page.locator('[data-testid="listing-card"]').first();
-      await firstCard.waitFor({ state: 'attached', timeout: 30_000 }).catch(() => {});
-      const listingId = await firstCard.getAttribute('data-listing-id').catch(() => null);
-      test.skip(!listingId, 'No listings available');
+      await firstCard
+        .waitFor({ state: "attached", timeout: 30_000 })
+        .catch(() => {});
+      const listingId = await firstCard
+        .getAttribute("data-listing-id")
+        .catch(() => null);
+      test.skip(!listingId, "No listings available");
 
       await page.goto(`/listings/${listingId}`);
-      await page.waitForLoadState('load');
+      await page.waitForLoadState("load");
       await page.waitForTimeout(3000);
 
       const cls = await readCls(page);
-      expect(cls, `CLS was ${cls.toFixed(4)}, budget is ${CLS_BUDGET}`).toBeLessThan(CLS_BUDGET);
+      expect(
+        cls,
+        `CLS was ${cls.toFixed(4)}, budget is ${CLS_BUDGET}`
+      ).toBeLessThan(CLS_BUDGET);
     });
   });
 });

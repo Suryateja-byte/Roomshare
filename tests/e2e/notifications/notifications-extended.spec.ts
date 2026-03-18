@@ -26,11 +26,14 @@ test.describe("NX: Notifications Extended Read-only", () => {
 
     // Notifications may have been deleted by NX-02 in the serial block
     try {
-      await expect(
-        page.getByTestId("notification-item").first()
-      ).toBeVisible({ timeout: timeouts.action });
+      await expect(page.getByTestId("notification-item").first()).toBeVisible({
+        timeout: timeouts.action,
+      });
     } catch {
-      test.skip(true, "No notifications available (may have been deleted by NX-02)");
+      test.skip(
+        true,
+        "No notifications available (may have been deleted by NX-02)"
+      );
       return;
     }
 
@@ -56,11 +59,14 @@ test.describe("NX: Notifications Extended Read-only", () => {
 
     // Notifications may have been deleted by NX-02 in the serial block
     try {
-      await expect(
-        page.getByTestId("notification-item").first()
-      ).toBeVisible({ timeout: timeouts.action });
+      await expect(page.getByTestId("notification-item").first()).toBeVisible({
+        timeout: timeouts.action,
+      });
     } catch {
-      test.skip(true, "No notifications available (may have been deleted by NX-02)");
+      test.skip(
+        true,
+        "No notifications available (may have been deleted by NX-02)"
+      );
       return;
     }
 
@@ -94,19 +100,20 @@ test.describe("NX: Notifications Extended Read-only", () => {
   });
 
   // NX-10: A11y: keyboard navigation
-  test("NX-10  notification items are keyboard navigable", async ({
-    page,
-  }) => {
+  test("NX-10  notification items are keyboard navigable", async ({ page }) => {
     await page.goto("/notifications");
     await page.waitForLoadState("domcontentloaded");
 
     // Notifications may have been deleted by NX-02 in the serial block
     try {
-      await expect(
-        page.getByTestId("notification-item").first()
-      ).toBeVisible({ timeout: timeouts.action });
+      await expect(page.getByTestId("notification-item").first()).toBeVisible({
+        timeout: timeouts.action,
+      });
     } catch {
-      test.skip(true, "No notifications available (may have been deleted by NX-02)");
+      test.skip(
+        true,
+        "No notifications available (may have been deleted by NX-02)"
+      );
       return;
     }
 
@@ -138,9 +145,9 @@ test.describe("NX: Notifications Mutations", () => {
     await page.goto("/notifications");
     await page.waitForLoadState("domcontentloaded");
 
-    await expect(
-      page.getByTestId("notification-item").first()
-    ).toBeVisible({ timeout: timeouts.action });
+    await expect(page.getByTestId("notification-item").first()).toBeVisible({
+      timeout: timeouts.action,
+    });
 
     // The component shows "You have N unread notification(s)" when unreadCount > 0
     const unreadText = page.getByText(/You have \d+ unread/i);
@@ -176,9 +183,9 @@ test.describe("NX: Notifications Mutations", () => {
     // Count should decrease — wait for the text to update
     if (initialCount === 1) {
       // Should now show "All caught up!" instead of unread count
-      await expect(
-        page.getByText(/All caught up/i)
-      ).toBeVisible({ timeout: timeouts.action });
+      await expect(page.getByText(/All caught up/i)).toBeVisible({
+        timeout: timeouts.action,
+      });
     } else {
       await expect(
         page.getByText(new RegExp(`You have ${initialCount - 1} unread`, "i"))
@@ -193,9 +200,9 @@ test.describe("NX: Notifications Mutations", () => {
     await page.goto("/notifications");
     await page.waitForLoadState("domcontentloaded");
 
-    await expect(
-      page.getByTestId("notification-item").first()
-    ).toBeVisible({ timeout: timeouts.action });
+    await expect(page.getByTestId("notification-item").first()).toBeVisible({
+      timeout: timeouts.action,
+    });
 
     // Click Mark all read
     const markAllBtn = page.getByTestId("mark-all-read-button");
@@ -220,9 +227,9 @@ test.describe("NX: Notifications Mutations", () => {
     await unreadTab.click();
 
     // Should show empty state
-    await expect(
-      page.getByText(/no unread/i)
-    ).toBeVisible({ timeout: timeouts.action });
+    await expect(page.getByText(/no unread/i)).toBeVisible({
+      timeout: timeouts.action,
+    });
   });
 
   // NX-01: Delete all - confirmation dialog
@@ -230,9 +237,9 @@ test.describe("NX: Notifications Mutations", () => {
     await page.goto("/notifications");
     await page.waitForLoadState("domcontentloaded");
 
-    await expect(
-      page.getByTestId("notifications-page")
-    ).toBeVisible({ timeout: timeouts.navigation });
+    await expect(page.getByTestId("notifications-page")).toBeVisible({
+      timeout: timeouts.navigation,
+    });
 
     // Click Delete all button (uses text, no data-testid)
     const deleteAllBtn = page.getByRole("button", { name: /delete all/i });
@@ -250,17 +257,11 @@ test.describe("NX: Notifications Mutations", () => {
     await expect(dialog).toBeVisible({ timeout: 5_000 });
 
     // Should show title and description
-    await expect(
-      page.getByText(/delete all notifications\?/i)
-    ).toBeVisible();
-    await expect(
-      page.getByText(/permanently delete/i)
-    ).toBeVisible();
+    await expect(page.getByText(/delete all notifications\?/i)).toBeVisible();
+    await expect(page.getByText(/permanently delete/i)).toBeVisible();
 
     // Should have confirm and cancel buttons
-    await expect(
-      dialog.getByRole("button", { name: /cancel/i })
-    ).toBeVisible();
+    await expect(dialog.getByRole("button", { name: /cancel/i })).toBeVisible();
     // The confirm button text is "Delete All" inside the dialog
     await expect(
       dialog.getByRole("button", { name: /delete all/i })
@@ -272,9 +273,9 @@ test.describe("NX: Notifications Mutations", () => {
     await page.goto("/notifications");
     await page.waitForLoadState("domcontentloaded");
 
-    await expect(
-      page.getByTestId("notification-item").first()
-    ).toBeVisible({ timeout: timeouts.action });
+    await expect(page.getByTestId("notification-item").first()).toBeVisible({
+      timeout: timeouts.action,
+    });
 
     const countBefore = await page.getByTestId("notification-item").count();
 
@@ -303,15 +304,13 @@ test.describe("NX: Notifications Mutations", () => {
   });
 
   // NX-09: Resilience: intercept server action to simulate failure on single delete
-  test("NX-09  failed delete keeps notification in list", async ({
-    page,
-  }) => {
+  test("NX-09  failed delete keeps notification in list", async ({ page }) => {
     await page.goto("/notifications");
     await page.waitForLoadState("domcontentloaded");
 
-    await expect(
-      page.getByTestId("notification-item").first()
-    ).toBeVisible({ timeout: timeouts.action });
+    await expect(page.getByTestId("notification-item").first()).toBeVisible({
+      timeout: timeouts.action,
+    });
 
     const countBefore = await page.getByTestId("notification-item").count();
 
@@ -319,10 +318,7 @@ test.describe("NX: Notifications Mutations", () => {
     // Next.js server actions are called via POST with Next-Action header.
     await page.route("**/notifications", (route) => {
       const request = route.request();
-      if (
-        request.method() === "POST" &&
-        request.headers()["next-action"]
-      ) {
+      if (request.method() === "POST" && request.headers()["next-action"]) {
         return route.abort("failed");
       }
       return route.continue();
@@ -343,9 +339,7 @@ test.describe("NX: Notifications Mutations", () => {
     // throws, and setNotifications never runs — notification should remain.
     // Give a moment for any potential removal, then verify count unchanged.
     await expect(async () => {
-      const countAfter = await page
-        .getByTestId("notification-item")
-        .count();
+      const countAfter = await page.getByTestId("notification-item").count();
       expect(countAfter).toBe(countBefore);
     }).toPass({ timeout: 5_000 });
 
@@ -384,9 +378,9 @@ test.describe("NX: Notifications Mutations", () => {
     await confirmBtn.click();
 
     // All notifications should be gone — empty state shown
-    await expect(
-      page.getByText(/no notifications/i)
-    ).toBeVisible({ timeout: timeouts.action });
+    await expect(page.getByText(/no notifications/i)).toBeVisible({
+      timeout: timeouts.action,
+    });
   });
 
   // NX-04: Load more (may not trigger if <20 notifications)
@@ -396,9 +390,9 @@ test.describe("NX: Notifications Mutations", () => {
     await page.goto("/notifications");
     await page.waitForLoadState("domcontentloaded");
 
-    await expect(
-      page.getByTestId("notifications-page")
-    ).toBeVisible({ timeout: timeouts.navigation });
+    await expect(page.getByTestId("notifications-page")).toBeVisible({
+      timeout: timeouts.navigation,
+    });
 
     // Load more is only visible when hasMore && filter === 'all'
     const loadMore = page.getByRole("button", { name: /load more/i });
@@ -413,9 +407,7 @@ test.describe("NX: Notifications Mutations", () => {
     await loadMore.click();
 
     await expect(async () => {
-      const countAfter = await page
-        .getByTestId("notification-item")
-        .count();
+      const countAfter = await page.getByTestId("notification-item").count();
       expect(countAfter).toBeGreaterThan(countBefore);
     }).toPass({ timeout: timeouts.action });
   });

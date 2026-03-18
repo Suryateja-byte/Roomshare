@@ -3,11 +3,11 @@ import {
   MAX_LAT_SPAN,
   MAX_LNG_SPAN,
   type MapBounds,
-} from '@/lib/validation';
+} from "@/lib/validation";
 
-describe('clampBoundsToMaxSpan', () => {
-  describe('bounds within limits', () => {
-    it('returns unchanged bounds when within limits', () => {
+describe("clampBoundsToMaxSpan", () => {
+  describe("bounds within limits", () => {
+    it("returns unchanged bounds when within limits", () => {
       const bounds: MapBounds = {
         minLat: 40.0,
         maxLat: 42.0,
@@ -20,7 +20,7 @@ describe('clampBoundsToMaxSpan', () => {
       expect(result).toEqual(bounds);
     });
 
-    it('returns unchanged bounds at exact limit', () => {
+    it("returns unchanged bounds at exact limit", () => {
       const bounds: MapBounds = {
         minLat: 40.0,
         maxLat: 40.0 + MAX_LAT_SPAN,
@@ -35,8 +35,8 @@ describe('clampBoundsToMaxSpan', () => {
     });
   });
 
-  describe('oversized latitude span', () => {
-    it('clamps oversized latitude span centered on original', () => {
+  describe("oversized latitude span", () => {
+    it("clamps oversized latitude span centered on original", () => {
       const bounds: MapBounds = {
         minLat: 30.0,
         maxLat: 50.0, // 20° span - exceeds 5° limit
@@ -55,8 +55,8 @@ describe('clampBoundsToMaxSpan', () => {
     });
   });
 
-  describe('oversized longitude span', () => {
-    it('clamps oversized longitude span centered on original', () => {
+  describe("oversized longitude span", () => {
+    it("clamps oversized longitude span centered on original", () => {
       const bounds: MapBounds = {
         minLat: 40.0,
         maxLat: 42.0,
@@ -75,8 +75,8 @@ describe('clampBoundsToMaxSpan', () => {
     });
   });
 
-  describe('both spans oversized', () => {
-    it('clamps both latitude and longitude spans', () => {
+  describe("both spans oversized", () => {
+    it("clamps both latitude and longitude spans", () => {
       const bounds: MapBounds = {
         minLat: 20.0,
         maxLat: 60.0, // 40° lat span
@@ -90,7 +90,7 @@ describe('clampBoundsToMaxSpan', () => {
       expect(result.maxLng - result.minLng).toBeCloseTo(MAX_LNG_SPAN);
     });
 
-    it('preserves center of original viewport', () => {
+    it("preserves center of original viewport", () => {
       const bounds: MapBounds = {
         minLat: 20.0,
         maxLat: 60.0,
@@ -110,8 +110,8 @@ describe('clampBoundsToMaxSpan', () => {
     });
   });
 
-  describe('antimeridian crossing', () => {
-    it('handles antimeridian crossing correctly', () => {
+  describe("antimeridian crossing", () => {
+    it("handles antimeridian crossing correctly", () => {
       // Crossing antimeridian: minLng > maxLng
       const bounds: MapBounds = {
         minLat: 40.0,
@@ -127,13 +127,13 @@ describe('clampBoundsToMaxSpan', () => {
       // After clamping should be at most 5°
       const crossesAntimeridian = result.minLng > result.maxLng;
       const resultLngSpan = crossesAntimeridian
-        ? (180 - result.minLng) + (result.maxLng + 180)
+        ? 180 - result.minLng + (result.maxLng + 180)
         : result.maxLng - result.minLng;
 
       expect(resultLngSpan).toBeLessThanOrEqual(MAX_LNG_SPAN + 0.01);
     });
 
-    it('preserves antimeridian crossing property after clamping (Task #186)', () => {
+    it("preserves antimeridian crossing property after clamping (Task #186)", () => {
       // This test specifically verifies that when oversized bounds cross the
       // antimeridian, the crossing property (minLng > maxLng) is preserved
       const bounds: MapBounds = {
@@ -157,7 +157,7 @@ describe('clampBoundsToMaxSpan', () => {
       expect(resultCenterLng).toBeCloseTo(180, 0);
     });
 
-    it('returns bounds within [-180, 180] range after antimeridian clamping', () => {
+    it("returns bounds within [-180, 180] range after antimeridian clamping", () => {
       const bounds: MapBounds = {
         minLat: 40.0,
         maxLat: 42.0,
@@ -175,8 +175,8 @@ describe('clampBoundsToMaxSpan', () => {
     });
   });
 
-  describe('edge cases', () => {
-    it('respects latitude limits (-85 to 85)', () => {
+  describe("edge cases", () => {
+    it("respects latitude limits (-85 to 85)", () => {
       const bounds: MapBounds = {
         minLat: 75.0,
         maxLat: 90.0, // 15° span > MAX_LAT_SPAN, triggers clamping near pole
@@ -190,7 +190,7 @@ describe('clampBoundsToMaxSpan', () => {
       expect(result.minLat).toBeGreaterThanOrEqual(-85);
     });
 
-    it('respects longitude limits (-180 to 180)', () => {
+    it("respects longitude limits (-180 to 180)", () => {
       const bounds: MapBounds = {
         minLat: 40.0,
         maxLat: 42.0,
@@ -204,7 +204,7 @@ describe('clampBoundsToMaxSpan', () => {
       expect(result.minLng).toBeGreaterThanOrEqual(-180);
     });
 
-    it('handles world-wide bounds (DoS prevention case)', () => {
+    it("handles world-wide bounds (DoS prevention case)", () => {
       const bounds: MapBounds = {
         minLat: -85.0,
         maxLat: 85.0, // 170° span

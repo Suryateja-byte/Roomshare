@@ -1,32 +1,40 @@
-import { NextResponse } from 'next/server';
-import { prisma } from '@/lib/prisma';
-import { auth } from '@/auth';
-import { checkSuspension, checkEmailVerified } from '@/app/actions/suspension';
-import { checkBlockBeforeAction } from '@/app/actions/block';
-import { withRateLimit } from '@/lib/with-rate-limit';
-import { captureApiError } from '@/lib/api-error-handler';
+import { NextResponse } from "next/server";
+import { prisma } from "@/lib/prisma";
+import { auth } from "@/auth";
+import { checkSuspension, checkEmailVerified } from "@/app/actions/suspension";
+import { checkBlockBeforeAction } from "@/app/actions/block";
+import { withRateLimit } from "@/lib/with-rate-limit";
+import { captureApiError } from "@/lib/api-error-handler";
 import {
   getAccessibleConversation,
   listConversationMessages,
   markConversationMessagesAsReadForUser,
   userCanAccessConversation,
-} from '@/lib/messages';
-import { getClientIP } from '@/lib/rate-limit';
+} from "@/lib/messages";
+import { getClientIP } from "@/lib/rate-limit";
 import {
   parsePaginationParams,
   buildPaginationResponse,
   buildPrismaQueryOptions,
-} from '@/lib/pagination-schema';
+} from "@/lib/pagination-schema";
 
-function getMessageRateLimitIdentifier(request: Request, userId: string): string {
+function getMessageRateLimitIdentifier(
+  request: Request,
+  userId: string
+): string {
   return `${getClientIP(request)}:${userId}`;
 }
 
 async function applyMessageRateLimit(
   request: Request,
   userId: string,
-  type: 'messages' | 'messagesPoll' | 'messageRead' | 'sendMessage' | 'unreadCount',
-  endpoint: string,
+  type:
+    | "messages"
+    | "messagesPoll"
+    | "messageRead"
+    | "sendMessage"
+    | "unreadCount",
+  endpoint: string
 ) {
   return withRateLimit(request, {
     type,
@@ -56,44 +64,51 @@ export async function GET(request: Request) {
   try {
     const session = await auth();
     if (!session?.user?.id) {
-      return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
+      return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
     }
 
     const userId = session.user.id;
     const { searchParams } = new URL(request.url);
-    const conversationId = searchParams.get('conversationId');
-    const lastMessageId = searchParams.get('lastMessageId');
-    const isPollingRequest = searchParams.get('poll') === '1' || !!lastMessageId;
-    const view = searchParams.get('view');
+    const conversationId = searchParams.get("conversationId");
+    const lastMessageId = searchParams.get("lastMessageId");
+    const isPollingRequest =
+      searchParams.get("poll") === "1" || !!lastMessageId;
+    const view = searchParams.get("view");
 
-    if (view === 'unreadCount') {
+    if (view === "unreadCount") {
       const rateLimitResponse = await applyMessageRateLimit(
         request,
         userId,
-        'unreadCount',
-        '/api/messages:unread-count',
+        "unreadCount",
+        "/api/messages:unread-count"
       );
       if (rateLimitResponse) return rateLimitResponse;
 
       const count = await getUnreadMessageCountForUser(userId);
       const response = NextResponse.json({ count });
-      response.headers.set('Cache-Control', 'private, max-age=10, stale-while-revalidate=20');
+      response.headers.set(
+        "Cache-Control",
+        "private, max-age=10, stale-while-revalidate=20"
+      );
       return response;
     }
 
     if (conversationId) {
-      const conversation = await getAccessibleConversation(conversationId, userId);
+      const conversation = await getAccessibleConversation(
+        conversationId,
+        userId
+      );
 
       if (!userCanAccessConversation(conversation, userId)) {
-        return NextResponse.json({ error: 'Unauthorized' }, { status: 403 });
+        return NextResponse.json({ error: "Unauthorized" }, { status: 403 });
       }
 
       if (isPollingRequest) {
         const rateLimitResponse = await applyMessageRateLimit(
           request,
           userId,
-          'messagesPoll',
-          '/api/messages:poll',
+          "messagesPoll",
+          "/api/messages:poll"
         );
         if (rateLimitResponse) return rateLimitResponse;
 
@@ -127,21 +142,24 @@ export async function GET(request: Request) {
           })),
           hasNewMessages: messages.length > 0,
         });
-        response.headers.set('Cache-Control', 'private, no-store');
+        response.headers.set("Cache-Control", "private, no-store");
         return response;
       }
 
       const rateLimitResponse = await applyMessageRateLimit(
         request,
         userId,
-        'messages',
-        '/api/messages:conversation',
+        "messages",
+        "/api/messages:conversation"
       );
       if (rateLimitResponse) return rateLimitResponse;
 
       const paginationResult = parsePaginationParams(searchParams);
       if (!paginationResult.success) {
-        return NextResponse.json({ error: paginationResult.error }, { status: 400 });
+        return NextResponse.json(
+          { error: paginationResult.error },
+          { status: 400 }
+        );
       }
       const { cursor, limit } = paginationResult.data;
 
@@ -149,7 +167,7 @@ export async function GET(request: Request) {
         prisma.message.count({ where: { conversationId, deletedAt: null } }),
         prisma.message.findMany({
           where: { conversationId, deletedAt: null },
-          orderBy: { createdAt: 'desc' },
+          orderBy: { createdAt: "desc" },
           include: {
             sender: { select: { id: true, name: true, image: true } },
           },
@@ -162,21 +180,24 @@ export async function GET(request: Request) {
         messages: paginatedResponse.items,
         pagination: paginatedResponse.pagination,
       });
-      response.headers.set('Cache-Control', 'private, no-store');
+      response.headers.set("Cache-Control", "private, no-store");
       return response;
     }
 
     const rateLimitResponse = await applyMessageRateLimit(
       request,
       userId,
-      'messages',
-      '/api/messages:conversations',
+      "messages",
+      "/api/messages:conversations"
     );
     if (rateLimitResponse) return rateLimitResponse;
 
     const paginationResult = parsePaginationParams(searchParams);
     if (!paginationResult.success) {
-      return NextResponse.json({ error: paginationResult.error }, { status: 400 });
+      return NextResponse.json(
+        { error: paginationResult.error },
+        { status: 400 }
+      );
     }
     const { cursor, limit } = paginationResult.data;
 
@@ -198,27 +219,31 @@ export async function GET(request: Request) {
           },
           messages: {
             where: { deletedAt: null },
-            orderBy: { createdAt: 'desc' },
+            orderBy: { createdAt: "desc" },
             take: 1,
           },
           listing: {
             select: { id: true, title: true, images: true },
           },
         },
-        orderBy: { updatedAt: 'desc' },
+        orderBy: { updatedAt: "desc" },
         ...buildPrismaQueryOptions({ cursor, limit }),
       }),
     ]);
 
-    const paginatedResponse = buildPaginationResponse(conversations, limit, total);
+    const paginatedResponse = buildPaginationResponse(
+      conversations,
+      limit,
+      total
+    );
     const response = NextResponse.json({
       conversations: paginatedResponse.items,
       pagination: paginatedResponse.pagination,
     });
-    response.headers.set('Cache-Control', 'private, no-store');
+    response.headers.set("Cache-Control", "private, no-store");
     return response;
   } catch (error: unknown) {
-    return captureApiError(error, { route: '/api/messages', method: 'GET' });
+    return captureApiError(error, { route: "/api/messages", method: "GET" });
   }
 }
 
@@ -226,7 +251,7 @@ export async function POST(request: Request) {
   try {
     const session = await auth();
     if (!session?.user?.id) {
-      return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
+      return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
     }
 
     const userId = session.user.id;
@@ -235,82 +260,102 @@ export async function POST(request: Request) {
     try {
       body = await request.json();
     } catch {
-      return NextResponse.json({ error: 'Invalid JSON' }, { status: 400 });
+      return NextResponse.json({ error: "Invalid JSON" }, { status: 400 });
     }
 
-    const action = typeof body.action === 'string' ? body.action : undefined;
+    const action = typeof body.action === "string" ? body.action : undefined;
 
-    if (action === 'markRead') {
+    if (action === "markRead") {
       const rateLimitResponse = await applyMessageRateLimit(
         request,
         userId,
-        'messageRead',
-        '/api/messages:mark-read',
+        "messageRead",
+        "/api/messages:mark-read"
       );
       if (rateLimitResponse) return rateLimitResponse;
 
       const conversationId =
-        typeof body.conversationId === 'string' ? body.conversationId.trim() : '';
+        typeof body.conversationId === "string"
+          ? body.conversationId.trim()
+          : "";
 
       if (!conversationId) {
         return NextResponse.json(
-          { error: 'conversationId is required' },
-          { status: 400 },
+          { error: "conversationId is required" },
+          { status: 400 }
         );
       }
 
-      const conversation = await getAccessibleConversation(conversationId, userId);
+      const conversation = await getAccessibleConversation(
+        conversationId,
+        userId
+      );
       if (!userCanAccessConversation(conversation, userId)) {
-        return NextResponse.json({ error: 'Unauthorized' }, { status: 403 });
+        return NextResponse.json({ error: "Unauthorized" }, { status: 403 });
       }
 
       const result = await markConversationMessagesAsReadForUser(
         conversationId,
-        userId,
+        userId
       );
 
-      const response = NextResponse.json({ success: true, count: result.count });
-      response.headers.set('Cache-Control', 'no-store');
+      const response = NextResponse.json({
+        success: true,
+        count: result.count,
+      });
+      response.headers.set("Cache-Control", "no-store");
       return response;
     }
 
     const rateLimitResponse = await applyMessageRateLimit(
       request,
       userId,
-      'sendMessage',
-      '/api/messages:send',
+      "sendMessage",
+      "/api/messages:send"
     );
     if (rateLimitResponse) return rateLimitResponse;
 
     const suspension = await checkSuspension();
     if (suspension.suspended) {
-      return NextResponse.json({ error: suspension.error || 'Account suspended' }, { status: 403 });
+      return NextResponse.json(
+        { error: suspension.error || "Account suspended" },
+        { status: 403 }
+      );
     }
 
     const emailCheck = await checkEmailVerified();
     if (!emailCheck.verified) {
       return NextResponse.json(
-        { error: emailCheck.error || 'Please verify your email to send messages' },
-        { status: 403 },
+        {
+          error:
+            emailCheck.error || "Please verify your email to send messages",
+        },
+        { status: 403 }
       );
     }
 
     const conversationId =
-      typeof body.conversationId === 'string' ? body.conversationId.trim() : '';
-    const content = typeof body.content === 'string' ? body.content : '';
+      typeof body.conversationId === "string" ? body.conversationId.trim() : "";
+    const content = typeof body.content === "string" ? body.content : "";
 
     if (!conversationId || !content) {
-      return NextResponse.json({ error: 'Missing required fields' }, { status: 400 });
+      return NextResponse.json(
+        { error: "Missing required fields" },
+        { status: 400 }
+      );
     }
 
     const trimmedContent = content.trim();
     if (trimmedContent.length === 0) {
-      return NextResponse.json({ error: 'Message cannot be empty' }, { status: 400 });
+      return NextResponse.json(
+        { error: "Message cannot be empty" },
+        { status: 400 }
+      );
     }
     if (trimmedContent.length > 2000) {
       return NextResponse.json(
-        { error: 'Message must not exceed 2000 characters' },
-        { status: 400 },
+        { error: "Message must not exceed 2000 characters" },
+        { status: 400 }
       );
     }
 
@@ -322,18 +367,23 @@ export async function POST(request: Request) {
     if (
       !conversation ||
       conversation.deletedAt ||
-      !conversation.participants.some((participant) => participant.id === userId)
+      !conversation.participants.some(
+        (participant) => participant.id === userId
+      )
     ) {
-      return NextResponse.json({ error: 'Unauthorized' }, { status: 403 });
+      return NextResponse.json({ error: "Unauthorized" }, { status: 403 });
     }
 
     const otherParticipant = conversation.participants.find(
-      (participant) => participant.id !== userId,
+      (participant) => participant.id !== userId
     );
     if (otherParticipant) {
       const blockCheck = await checkBlockBeforeAction(otherParticipant.id);
       if (!blockCheck.allowed) {
-        return NextResponse.json({ error: blockCheck.message }, { status: 403 });
+        return NextResponse.json(
+          { error: blockCheck.message },
+          { status: 403 }
+        );
       }
     }
 
@@ -361,9 +411,9 @@ export async function POST(request: Request) {
     });
 
     const response = NextResponse.json(message, { status: 201 });
-    response.headers.set('Cache-Control', 'no-store');
+    response.headers.set("Cache-Control", "no-store");
     return response;
   } catch (error: unknown) {
-    return captureApiError(error, { route: '/api/messages', method: 'POST' });
+    return captureApiError(error, { route: "/api/messages", method: "POST" });
   }
 }

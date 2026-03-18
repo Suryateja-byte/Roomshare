@@ -6,7 +6,7 @@
  * and message management.
  */
 
-import { test, expect, tags, timeouts, selectors, SF_BOUNDS } from '../helpers';
+import { test, expect, tags, timeouts, selectors, SF_BOUNDS } from "../helpers";
 
 /**
  * On mobile, MessagesPageClient auto-selects the first conversation on mount
@@ -16,9 +16,12 @@ import { test, expect, tags, timeouts, selectors, SF_BOUNDS } from '../helpers';
  *
  * Returns true if a conversation is open and the message area is visible.
  */
-async function ensureConversationOpen(page: import('@playwright/test').Page): Promise<boolean> {
-  const messageArea = page.getByPlaceholder(/message|type/i)
-    .or(page.locator('textarea'))
+async function ensureConversationOpen(
+  page: import("@playwright/test").Page
+): Promise<boolean> {
+  const messageArea = page
+    .getByPlaceholder(/message|type/i)
+    .or(page.locator("textarea"))
     .or(page.locator('[data-testid="message-bubble"]'))
     .first();
 
@@ -41,27 +44,29 @@ async function ensureConversationOpen(page: import('@playwright/test').Page): Pr
   return await messageArea.isVisible({ timeout: 5000 }).catch(() => false);
 }
 
-test.describe('Messaging Journeys', () => {
-  test.use({ storageState: 'playwright/.auth/user.json' });
+test.describe("Messaging Journeys", () => {
+  test.use({ storageState: "playwright/.auth/user.json" });
 
   test.beforeEach(async () => {
     test.slow();
   });
 
-  test.describe('J047: Start new conversation', () => {
+  test.describe("J047: Start new conversation", () => {
     test(`${tags.auth} - Contact host from listing`, async ({ page, nav }) => {
       await nav.goToSearch({ bounds: SF_BOUNDS });
-      await page.waitForLoadState('domcontentloaded');
+      await page.waitForLoadState("domcontentloaded");
 
       // Check if listing cards exist before clicking
       const cards = page.locator(selectors.listingCard);
       if ((await cards.count()) === 0) return;
 
       await nav.clickListingCard(0);
-      await page.waitForLoadState('domcontentloaded');
+      await page.waitForLoadState("domcontentloaded");
 
       // Find contact button
-      const contactButton = page.getByRole('button', { name: /contact|message.*host/i }).first();
+      const contactButton = page
+        .getByRole("button", { name: /contact|message.*host/i })
+        .first();
 
       if (await contactButton.isVisible().catch(() => false)) {
         await contactButton.click();
@@ -69,20 +74,26 @@ test.describe('Messaging Journeys', () => {
         // Should open message modal or navigate to messages
         await page.waitForTimeout(1000);
 
-        const messageInput = page.getByPlaceholder(/message|type.*here/i)
-          .or(page.locator('textarea'))
+        const messageInput = page
+          .getByPlaceholder(/message|type.*here/i)
+          .or(page.locator("textarea"))
           .first();
 
         if (await messageInput.isVisible().catch(() => false)) {
-          await messageInput.fill('Hello, I am interested in this room. Is it still available?');
+          await messageInput.fill(
+            "Hello, I am interested in this room. Is it still available?"
+          );
 
-          const sendButton = page.getByRole('button', { name: /send/i }).first();
+          const sendButton = page
+            .getByRole("button", { name: /send/i })
+            .first();
           if (await sendButton.isVisible().catch(() => false)) {
             await sendButton.click();
 
             // Should show success or navigate to conversation
             await expect(
-              page.locator(selectors.toast)
+              page
+                .locator(selectors.toast)
                 .or(page.getByText(/sent|delivered/i))
                 .or(page.locator('[data-testid="message-sent"]'))
                 .first()
@@ -93,13 +104,17 @@ test.describe('Messaging Journeys', () => {
     });
   });
 
-  test.describe('J048: View conversations', () => {
-    test(`${tags.auth} - View messages inbox`, async ({ page, nav, assert }) => {
+  test.describe("J048: View conversations", () => {
+    test(`${tags.auth} - View messages inbox`, async ({
+      page,
+      nav,
+      assert,
+    }) => {
       await nav.goToMessages();
 
       // Check we weren't redirected to login
       if (!(await nav.isOnAuthenticatedPage())) {
-        test.skip(true, 'Auth session expired - redirected to login');
+        test.skip(true, "Auth session expired - redirected to login");
         return;
       }
 
@@ -109,96 +124,122 @@ test.describe('Messaging Journeys', () => {
       // Should have heading or some messages UI — use .first() to avoid strict mode violations
       // The messages page may render heading in main content or sidebar
       // On mobile the layout may omit a visible heading entirely — fall back to main content check
-      const messagesHeading = page.getByRole('heading', { name: /message|inbox|conversation/i }).first()
-        .or(page.getByRole('heading', { level: 1 }).first())
-        .or(page.locator('main h1, main h2').first());
-      const headingVisible = await messagesHeading.first()
-        .waitFor({ state: 'visible', timeout: 5000 })
+      const messagesHeading = page
+        .getByRole("heading", { name: /message|inbox|conversation/i })
+        .first()
+        .or(page.getByRole("heading", { level: 1 }).first())
+        .or(page.locator("main h1, main h2").first());
+      const headingVisible = await messagesHeading
+        .first()
+        .waitFor({ state: "visible", timeout: 5000 })
         .then(() => true)
         .catch(() => false);
       if (!headingVisible) {
         // Mobile may not show a visible heading — just verify main content is rendered
-        await expect(page.locator('main')).toBeVisible({ timeout: 10000 });
+        await expect(page.locator("main")).toBeVisible({ timeout: 10000 });
       } else {
         await expect(messagesHeading.first()).toBeVisible({ timeout: 30000 });
       }
 
       // Should show conversation list, empty state, or at minimum the main content
-      const conversationList = page.locator('[data-testid="conversation-list"], [class*="conversation"], a[href^="/messages/"]');
+      const conversationList = page.locator(
+        '[data-testid="conversation-list"], [class*="conversation"], a[href^="/messages/"]'
+      );
       const hasConversations = (await conversationList.count()) > 0;
-      const hasEmptyState = await page.locator(selectors.emptyState).isVisible().catch(() => false);
-      const hasMainContent = await page.locator('main').isVisible().catch(() => false);
+      const hasEmptyState = await page
+        .locator(selectors.emptyState)
+        .isVisible()
+        .catch(() => false);
+      const hasMainContent = await page
+        .locator("main")
+        .isVisible()
+        .catch(() => false);
 
       expect(hasConversations || hasEmptyState || hasMainContent).toBeTruthy();
     });
 
-    test(`${tags.auth} - Click conversation to view messages`, async ({ page, nav }) => {
+    test(`${tags.auth} - Click conversation to view messages`, async ({
+      page,
+      nav,
+    }) => {
       await nav.goToMessages();
 
       // Check we weren't redirected to login
       if (!(await nav.isOnAuthenticatedPage())) {
-        test.skip(true, 'Auth session expired - redirected to login');
+        test.skip(true, "Auth session expired - redirected to login");
         return;
       }
 
-      await page.waitForLoadState('domcontentloaded');
+      await page.waitForLoadState("domcontentloaded");
 
       const conversationLoaded = await ensureConversationOpen(page);
 
       if (!conversationLoaded) {
-        test.skip(true, 'No conversations available or conversation did not load');
+        test.skip(
+          true,
+          "No conversations available or conversation did not load"
+        );
         return;
       }
 
       // Should show message input (mobile may need extra time for transition)
-      const messageInput = page.getByPlaceholder(/message|type/i)
+      const messageInput = page
+        .getByPlaceholder(/message|type/i)
         .or(page.locator('[data-testid="message-input"]'))
-        .or(page.locator('textarea'))
+        .or(page.locator("textarea"))
         .first();
-      const inputVisible = await messageInput.isVisible({ timeout: 15000 }).catch(() => false);
+      const inputVisible = await messageInput
+        .isVisible({ timeout: 15000 })
+        .catch(() => false);
       if (!inputVisible) {
         // On mobile the conversation panel may need a moment to fully animate in
-        test.skip(true, 'Message input not visible — mobile auto-select transition not complete');
+        test.skip(
+          true,
+          "Message input not visible — mobile auto-select transition not complete"
+        );
         return;
       }
       await expect(messageInput).toBeVisible();
     });
   });
 
-  test.describe('J049: Send message in conversation', () => {
+  test.describe("J049: Send message in conversation", () => {
     test(`${tags.auth} - Send and receive message`, async ({ page, nav }) => {
       await nav.goToMessages();
 
       // Check we weren't redirected to login
       if (!(await nav.isOnAuthenticatedPage())) {
-        test.skip(true, 'Auth session expired - redirected to login');
+        test.skip(true, "Auth session expired - redirected to login");
         return;
       }
 
-      await page.waitForLoadState('domcontentloaded');
+      await page.waitForLoadState("domcontentloaded");
 
       const conversationLoaded = await ensureConversationOpen(page);
 
       if (!conversationLoaded) {
-        test.skip(true, 'Conversation did not load');
+        test.skip(true, "Conversation did not load");
         return;
       }
 
       // Send a message
-      const messageInput = page.getByPlaceholder(/message|type/i)
-        .or(page.locator('textarea'))
+      const messageInput = page
+        .getByPlaceholder(/message|type/i)
+        .or(page.locator("textarea"))
         .first();
 
       if (await messageInput.isVisible().catch(() => false)) {
         const testMessage = `Test message ${Date.now()}`;
         await messageInput.fill(testMessage);
 
-        const sendButton = page.getByRole('button', { name: /send/i }).first();
+        const sendButton = page.getByRole("button", { name: /send/i }).first();
         if (await sendButton.isVisible().catch(() => false)) {
           await sendButton.click();
 
           // Message should appear in conversation
-          await expect(page.getByText(testMessage)).toBeVisible({ timeout: 10000 });
+          await expect(page.getByText(testMessage)).toBeVisible({
+            timeout: 10000,
+          });
 
           // Input should be cleared
           await expect(messageInput).toBeEmpty();
@@ -207,22 +248,25 @@ test.describe('Messaging Journeys', () => {
     });
   });
 
-  test.describe('J050: Real-time message updates', () => {
-    test(`${tags.auth} ${tags.slow} - Message polling check`, async ({ page, nav }) => {
+  test.describe("J050: Real-time message updates", () => {
+    test(`${tags.auth} ${tags.slow} - Message polling check`, async ({
+      page,
+      nav,
+    }) => {
       await nav.goToMessages();
 
       // Check we weren't redirected to login
       if (!(await nav.isOnAuthenticatedPage())) {
-        test.skip(true, 'Auth session expired - redirected to login');
+        test.skip(true, "Auth session expired - redirected to login");
         return;
       }
 
-      await page.waitForLoadState('domcontentloaded');
+      await page.waitForLoadState("domcontentloaded");
 
       const conversationLoaded = await ensureConversationOpen(page);
 
       if (!conversationLoaded) {
-        test.skip(true, 'Conversation did not load');
+        test.skip(true, "Conversation did not load");
         return;
       }
 
@@ -237,18 +281,20 @@ test.describe('Messaging Journeys', () => {
     });
   });
 
-  test.describe('J051-J052: Unread message indicators', () => {
+  test.describe("J051-J052: Unread message indicators", () => {
     test(`${tags.auth} - Unread badge in navigation`, async ({ page, nav }) => {
       await nav.goHome();
 
       // Check we weren't redirected to login
       if (!(await nav.isOnAuthenticatedPage())) {
-        test.skip(true, 'Auth session expired - redirected to login');
+        test.skip(true, "Auth session expired - redirected to login");
         return;
       }
 
       // Look for unread indicator on messages link/icon
-      const messagesLink = page.getByRole('link', { name: /message/i }).first()
+      const messagesLink = page
+        .getByRole("link", { name: /message/i })
+        .first()
         .or(page.locator('a[href*="/messages"]').first())
         .first();
 
@@ -264,14 +310,16 @@ test.describe('Messaging Journeys', () => {
 
       // Check we weren't redirected to login
       if (!(await nav.isOnAuthenticatedPage())) {
-        test.skip(true, 'Auth session expired - redirected to login');
+        test.skip(true, "Auth session expired - redirected to login");
         return;
       }
 
-      await page.waitForLoadState('domcontentloaded');
+      await page.waitForLoadState("domcontentloaded");
 
       // Find unread conversation indicator
-      const unreadConvo = page.locator('[class*="unread"], [data-unread="true"]').first();
+      const unreadConvo = page
+        .locator('[class*="unread"], [data-unread="true"]')
+        .first();
 
       if (await unreadConvo.isVisible().catch(() => false)) {
         // Click to open and mark as read
@@ -287,49 +335,62 @@ test.describe('Messaging Journeys', () => {
     });
   });
 
-  test.describe('J053-J054: Block user in messaging', () => {
-    test(`${tags.auth} - Block user from conversation`, async ({ page, nav }) => {
+  test.describe("J053-J054: Block user in messaging", () => {
+    test(`${tags.auth} - Block user from conversation`, async ({
+      page,
+      nav,
+    }) => {
       // Block user feature requires desktop layout (menu not reliably accessible on mobile)
       const isMobile = (page.viewportSize()?.width ?? 1024) < 768;
-      test.skip(isMobile, 'Block user menu not reliably accessible on mobile viewport');
+      test.skip(
+        isMobile,
+        "Block user menu not reliably accessible on mobile viewport"
+      );
 
       await nav.goToMessages();
 
       // Check we weren't redirected to login
       if (!(await nav.isOnAuthenticatedPage())) {
-        test.skip(true, 'Auth session expired - redirected to login');
+        test.skip(true, "Auth session expired - redirected to login");
         return;
       }
 
-      await page.waitForLoadState('domcontentloaded');
+      await page.waitForLoadState("domcontentloaded");
 
       const conversationLoaded = await ensureConversationOpen(page);
 
       if (!conversationLoaded) {
-        test.skip(true, 'No conversations available');
+        test.skip(true, "No conversations available");
         return;
       }
 
       // Find block button (often in menu)
-      const menuButton = page.getByRole('button', { name: /menu|more|options/i }).first();
+      const menuButton = page
+        .getByRole("button", { name: /menu|more|options/i })
+        .first();
 
       if (await menuButton.isVisible().catch(() => false)) {
         await menuButton.click();
 
-        const blockOption = page.getByRole('menuitem', { name: /block/i }).first();
+        const blockOption = page
+          .getByRole("menuitem", { name: /block/i })
+          .first();
 
         if (await blockOption.isVisible().catch(() => false)) {
           await blockOption.click();
 
           // Confirm block
-          const confirmButton = page.getByRole('button', { name: /confirm|block|yes/i }).first();
+          const confirmButton = page
+            .getByRole("button", { name: /confirm|block|yes/i })
+            .first();
           if (await confirmButton.isVisible().catch(() => false)) {
             await confirmButton.click();
           }
 
           // Should show blocked state — use longer timeout for slow CI/mobile
           await expect(
-            page.getByText(/blocked/i)
+            page
+              .getByText(/blocked/i)
               .or(page.locator(selectors.toast))
               .first()
           ).toBeVisible({ timeout: 15000 });
@@ -338,26 +399,26 @@ test.describe('Messaging Journeys', () => {
     });
   });
 
-  test.describe('J055-J056: Message edge cases', () => {
+  test.describe("J055-J056: Message edge cases", () => {
     test(`${tags.auth} - Empty message not sent`, async ({ page, nav }) => {
       await nav.goToMessages();
 
       // Check we weren't redirected to login
       if (!(await nav.isOnAuthenticatedPage())) {
-        test.skip(true, 'Auth session expired - redirected to login');
+        test.skip(true, "Auth session expired - redirected to login");
         return;
       }
 
-      await page.waitForLoadState('domcontentloaded');
+      await page.waitForLoadState("domcontentloaded");
 
       const conversationLoaded = await ensureConversationOpen(page);
 
       if (!conversationLoaded) {
-        test.skip(true, 'No conversations available');
+        test.skip(true, "No conversations available");
         return;
       }
 
-      const sendButton = page.getByRole('button', { name: /send/i }).first();
+      const sendButton = page.getByRole("button", { name: /send/i }).first();
 
       // Try to send empty message — verify send button is disabled (or not present)
       // when the input is empty. Skip assertion on mobile where button state may vary.
@@ -379,22 +440,25 @@ test.describe('Messaging Journeys', () => {
     }) => {
       // Offline message queue behavior may differ on mobile
       const isMobile = (page.viewportSize()?.width ?? 1024) < 768;
-      test.skip(isMobile, 'Offline message queue test not reliable on mobile viewport');
+      test.skip(
+        isMobile,
+        "Offline message queue test not reliable on mobile viewport"
+      );
 
       await nav.goToMessages();
 
       // Check we weren't redirected to login
       if (!(await nav.isOnAuthenticatedPage())) {
-        test.skip(true, 'Auth session expired - redirected to login');
+        test.skip(true, "Auth session expired - redirected to login");
         return;
       }
 
-      await page.waitForLoadState('domcontentloaded');
+      await page.waitForLoadState("domcontentloaded");
 
       const conversationLoaded = await ensureConversationOpen(page);
 
       if (!conversationLoaded) {
-        test.skip(true, 'No conversations available');
+        test.skip(true, "No conversations available");
         return;
       }
 
@@ -403,9 +467,9 @@ test.describe('Messaging Journeys', () => {
 
       const messageInput = page.getByPlaceholder(/message|type/i).first();
       if (await messageInput.isVisible().catch(() => false)) {
-        await messageInput.fill('Message while offline');
+        await messageInput.fill("Message while offline");
 
-        const sendButton = page.getByRole('button', { name: /send/i }).first();
+        const sendButton = page.getByRole("button", { name: /send/i }).first();
         if (await sendButton.isVisible().catch(() => false)) {
           await sendButton.click();
 

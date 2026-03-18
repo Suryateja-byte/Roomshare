@@ -291,7 +291,7 @@ describe("Search Filters Edge Cases - Category D", () => {
       const countWithBoth = 5;
 
       expect(countWithBoth).toBeLessThanOrEqual(
-        Math.min(countWithMinPrice, countWithBedrooms),
+        Math.min(countWithMinPrice, countWithBedrooms)
       );
     });
 
@@ -414,7 +414,9 @@ describe("Search Filters Edge Cases - Category D", () => {
 
       // Verify ascending order
       for (let i = 1; i < listings.length; i++) {
-        expect(Number(listings[i].price)).toBeGreaterThanOrEqual(Number(listings[i - 1].price));
+        expect(Number(listings[i].price)).toBeGreaterThanOrEqual(
+          Number(listings[i - 1].price)
+        );
       }
     });
 
@@ -431,7 +433,9 @@ describe("Search Filters Edge Cases - Category D", () => {
 
       // Verify descending order
       for (let i = 1; i < listings.length; i++) {
-        expect(Number(listings[i].price)).toBeLessThanOrEqual(Number(listings[i - 1].price));
+        expect(Number(listings[i].price)).toBeLessThanOrEqual(
+          Number(listings[i - 1].price)
+        );
       }
     });
 

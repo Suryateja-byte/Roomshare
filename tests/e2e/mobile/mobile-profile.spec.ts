@@ -1,12 +1,12 @@
-import { test, expect } from '../helpers';
+import { test, expect } from "../helpers";
 
 test.use({ viewport: { width: 390, height: 844 } });
-test.use({ storageState: 'playwright/.auth/user.json' });
+test.use({ storageState: "playwright/.auth/user.json" });
 
-test.describe('Mobile Profile', () => {
-  test('MP-01: Profile page renders with user info', async ({ page }) => {
-    await page.goto('/profile');
-    await page.waitForLoadState('domcontentloaded');
+test.describe("Mobile Profile", () => {
+  test("MP-01: Profile page renders with user info", async ({ page }) => {
+    await page.goto("/profile");
+    await page.waitForLoadState("domcontentloaded");
 
     // Wait for profile page to load
     await expect(
@@ -25,9 +25,9 @@ test.describe('Mobile Profile', () => {
     expect(noOverflow).toBe(true);
   });
 
-  test('MP-02: Edit profile link visible and navigates', async ({ page }) => {
-    await page.goto('/profile');
-    await page.waitForLoadState('domcontentloaded');
+  test("MP-02: Edit profile link visible and navigates", async ({ page }) => {
+    await page.goto("/profile");
+    await page.waitForLoadState("domcontentloaded");
 
     await expect(
       page.locator('[data-testid="profile-page"]').first()
@@ -46,19 +46,21 @@ test.describe('Mobile Profile', () => {
 
     // Click navigates to /profile/edit
     await editButton.click();
-    await page.waitForLoadState('domcontentloaded');
+    await page.waitForLoadState("domcontentloaded");
     await page.waitForURL(/\/profile\/edit/, { timeout: 10000 });
-    expect(page.url()).toContain('/profile/edit');
+    expect(page.url()).toContain("/profile/edit");
   });
 
-  test('MP-03: Edit profile form renders in mobile layout', async ({ page }) => {
-    await page.goto('/profile/edit');
-    await page.waitForLoadState('domcontentloaded');
+  test("MP-03: Edit profile form renders in mobile layout", async ({
+    page,
+  }) => {
+    await page.goto("/profile/edit");
+    await page.waitForLoadState("domcontentloaded");
 
     // Wait for the edit form to appear
-    await expect(
-      page.locator('[data-testid="edit-profile-form"]')
-    ).toBeVisible({ timeout: 15000 });
+    await expect(page.locator('[data-testid="edit-profile-form"]')).toBeVisible(
+      { timeout: 15000 }
+    );
 
     // No horizontal overflow
     const noOverflow = await page.evaluate(
@@ -67,13 +69,13 @@ test.describe('Mobile Profile', () => {
     expect(noOverflow).toBe(true);
   });
 
-  test('MP-04: Form inputs are full-width on mobile', async ({ page }) => {
-    await page.goto('/profile/edit');
-    await page.waitForLoadState('domcontentloaded');
+  test("MP-04: Form inputs are full-width on mobile", async ({ page }) => {
+    await page.goto("/profile/edit");
+    await page.waitForLoadState("domcontentloaded");
 
-    await expect(
-      page.locator('[data-testid="edit-profile-form"]')
-    ).toBeVisible({ timeout: 15000 });
+    await expect(page.locator('[data-testid="edit-profile-form"]')).toBeVisible(
+      { timeout: 15000 }
+    );
 
     // Check the name input width
     const nameInput = page.locator('[data-testid="profile-name-input"]');
@@ -88,23 +90,36 @@ test.describe('Mobile Profile', () => {
     }
   });
 
-  test('MP-05: Save button accessible (visible on scroll)', async ({ page }) => {
-    await page.goto('/profile/edit');
-    await page.waitForLoadState('domcontentloaded');
+  test("MP-05: Save button accessible (visible on scroll)", async ({
+    page,
+  }) => {
+    await page.goto("/profile/edit");
+    await page.waitForLoadState("domcontentloaded");
 
     // Skip if redirected to login
-    if (page.url().includes('/login') || page.url().includes('/signin')) {
-      test.skip(true, 'Redirected to login — auth session unavailable in CI');
+    if (page.url().includes("/login") || page.url().includes("/signin")) {
+      test.skip(true, "Redirected to login — auth session unavailable in CI");
       return;
     }
 
-    const formVisible = await page.locator('[data-testid="edit-profile-form"]').isVisible({ timeout: 15000 }).catch(() => false);
-    test.skip(!formVisible, 'Edit profile form not visible — auth or routing issue');
+    const formVisible = await page
+      .locator('[data-testid="edit-profile-form"]')
+      .isVisible({ timeout: 15000 })
+      .catch(() => false);
+    test.skip(
+      !formVisible,
+      "Edit profile form not visible — auth or routing issue"
+    );
 
     // The save button is at the bottom of the form
     const saveButton = page.locator('[data-testid="profile-save-button"]');
-    const saveVisible = await saveButton.isVisible({ timeout: 10000 }).catch(() => false);
-    test.skip(!saveVisible, 'Save button not visible — form may not have rendered');
+    const saveVisible = await saveButton
+      .isVisible({ timeout: 10000 })
+      .catch(() => false);
+    test.skip(
+      !saveVisible,
+      "Save button not visible — form may not have rendered"
+    );
 
     // Scroll to it if needed and verify it's interactable
     await saveButton.scrollIntoViewIfNeeded();
@@ -119,9 +134,9 @@ test.describe('Mobile Profile', () => {
     }
   });
 
-  test('MP-06: Profile image/avatar displays correctly', async ({ page }) => {
-    await page.goto('/profile');
-    await page.waitForLoadState('domcontentloaded');
+  test("MP-06: Profile image/avatar displays correctly", async ({ page }) => {
+    await page.goto("/profile");
+    await page.waitForLoadState("domcontentloaded");
 
     await expect(
       page.locator('[data-testid="profile-page"]').first()
@@ -129,9 +144,12 @@ test.describe('Mobile Profile', () => {
 
     // The avatar is rendered by UserAvatar component inside a w-40 h-40 rounded-full container
     // It could be an img tag or a fallback initial letter div
-    const avatarContainer = page.locator('.rounded-full').filter({
-      has: page.locator('img').or(page.locator('span'))
-    }).first();
+    const avatarContainer = page
+      .locator(".rounded-full")
+      .filter({
+        has: page.locator("img").or(page.locator("span")),
+      })
+      .first();
 
     if (await avatarContainer.isVisible({ timeout: 5000 }).catch(() => false)) {
       const box = await avatarContainer.boundingBox();

@@ -1,4 +1,4 @@
-'use client';
+"use client";
 
 /**
  * NearbyPlacesMap Component
@@ -14,33 +14,38 @@
  * - Attribution handled by MapLibre's built-in control (reads from style JSON)
  */
 
-import { useEffect, useRef, useCallback } from 'react';
-import { useTheme } from 'next-themes';
-import maplibregl from 'maplibre-gl';
-import 'maplibre-gl/dist/maplibre-gl.css';
-import '@/styles/nearby-map.css';
-import { Plus, Minus, Navigation, Maximize2 } from 'lucide-react';
-import RadarAttribution from './RadarAttribution';
-import { getCategoryColors } from '@/types/nearby';
-import { escapeHtml } from '@/lib/maps/mapAdapter';
-import type { NearbyPlace } from '@/types/nearby';
+import { useEffect, useRef, useCallback } from "react";
+import { useTheme } from "next-themes";
+import maplibregl from "maplibre-gl";
+import "maplibre-gl/dist/maplibre-gl.css";
+import "@/styles/nearby-map.css";
+import { Plus, Minus, Navigation, Maximize2 } from "lucide-react";
+import RadarAttribution from "./RadarAttribution";
+import { getCategoryColors } from "@/types/nearby";
+import { escapeHtml } from "@/lib/maps/mapAdapter";
+import type { NearbyPlace } from "@/types/nearby";
 
 // SVG icon paths for category markers (14x14 viewBox, stroke-width 2)
 const CATEGORY_ICON_PATHS: Record<string, string> = {
   // ShoppingCart for grocery
-  'food-grocery': 'M1 1h2l1.5 7h7l1.5-5H4.5M5.5 12a1 1 0 1 0 0-2 1 1 0 0 0 0 2zM10.5 12a1 1 0 1 0 0-2 1 1 0 0 0 0 2z',
+  "food-grocery":
+    "M1 1h2l1.5 7h7l1.5-5H4.5M5.5 12a1 1 0 1 0 0-2 1 1 0 0 0 0 2zM10.5 12a1 1 0 1 0 0-2 1 1 0 0 0 0 2z",
   // Utensils for restaurant
-  'indian-restaurant': 'M3 1v5a2 2 0 0 0 2 2v5M11 1v3a2 2 0 0 1-2 2h0a2 2 0 0 1-2-2V1M11 8v5',
+  "indian-restaurant":
+    "M3 1v5a2 2 0 0 0 2 2v5M11 1v3a2 2 0 0 1-2 2h0a2 2 0 0 1-2-2V1M11 8v5",
   // ShoppingBag for shopping
-  'shopping-mall': 'M2 4h10l-1 9H3L2 4zM5 4V2a2 2 0 0 1 2-2h0a2 2 0 0 1 2 2v2',
+  "shopping-mall": "M2 4h10l-1 9H3L2 4zM5 4V2a2 2 0 0 1 2-2h0a2 2 0 0 1 2 2v2",
   // Fuel for gas station
-  'gas-station': 'M3 13V3a1 1 0 0 1 1-1h4a1 1 0 0 1 1 1v10M3 6h6M11 4l1 1v4a1 1 0 0 1-1 1h0',
+  "gas-station":
+    "M3 13V3a1 1 0 0 1 1-1h4a1 1 0 0 1 1 1v10M3 6h6M11 4l1 1v4a1 1 0 0 1-1 1h0",
   // Dumbbell for gym
-  'gym': 'M2 7h10M4 4v6M10 4v6M1 5v4M13 5v4',
+  gym: "M2 7h10M4 4v6M10 4v6M1 5v4M13 5v4",
   // Pill for pharmacy
-  'pharmacy': 'M8.5 2.5a3.5 3.5 0 0 1 0 7l-3 3a3.5 3.5 0 1 1-3-3l3-3a3.5 3.5 0 0 1 3-4z',
+  pharmacy:
+    "M8.5 2.5a3.5 3.5 0 0 1 0 7l-3 3a3.5 3.5 0 1 1-3-3l3-3a3.5 3.5 0 0 1 3-4z",
   // MapPin for default
-  'default': 'M7 13S2 8.5 2 5.5a5 5 0 1 1 10 0C12 8.5 7 13 7 13zM7 7a1.5 1.5 0 1 0 0-3 1.5 1.5 0 0 0 0 3z',
+  default:
+    "M7 13S2 8.5 2 5.5a5 5 0 1 1 10 0C12 8.5 7 13 7 13zM7 7a1.5 1.5 0 1 0 0-3 1.5 1.5 0 0 0 0 3z",
 };
 
 /**
@@ -57,12 +62,12 @@ function getCategoryIconPath(category: string): string {
       return CATEGORY_ICON_PATHS[key];
     }
   }
-  return CATEGORY_ICON_PATHS['default'];
+  return CATEGORY_ICON_PATHS["default"];
 }
 
 // OpenFreeMap tile style URLs (matching search map)
-const OPENFREEMAP_STYLE_LIGHT = 'https://tiles.openfreemap.org/styles/liberty';
-const OPENFREEMAP_STYLE_DARK = '/map-styles/liberty-dark.json';
+const OPENFREEMAP_STYLE_LIGHT = "https://tiles.openfreemap.org/styles/liberty";
+const OPENFREEMAP_STYLE_DARK = "/map-styles/liberty-dark.json";
 
 /**
  * Create a custom home marker element using safe DOM methods
@@ -77,29 +82,34 @@ const OPENFREEMAP_STYLE_DARK = '/map-styles/liberty-dark.json';
 function createHomeMarkerElement(): HTMLDivElement {
   // Outer wrapper - stable hover zone, larger than visual marker
   // This element captures hover events without changing size
-  const wrapper = document.createElement('div');
-  wrapper.className = 'group w-14 h-14 flex items-center justify-center cursor-pointer';
+  const wrapper = document.createElement("div");
+  wrapper.className =
+    "group w-14 h-14 flex items-center justify-center cursor-pointer";
 
   // Inner visual marker - scales on hover via group-hover
-  const container = document.createElement('div');
-  container.className = 'w-10 h-10 bg-zinc-900 rounded-full shadow-xl flex items-center justify-center transition-transform duration-200 ease-out group-hover:scale-110';
+  const container = document.createElement("div");
+  container.className =
+    "w-10 h-10 bg-zinc-900 rounded-full shadow-xl flex items-center justify-center transition-transform duration-200 ease-out group-hover:scale-110";
 
-  const svg = document.createElementNS('http://www.w3.org/2000/svg', 'svg');
-  svg.setAttribute('width', '20');
-  svg.setAttribute('height', '20');
-  svg.setAttribute('viewBox', '0 0 24 24');
-  svg.setAttribute('fill', 'none');
-  svg.setAttribute('stroke', 'white');
-  svg.setAttribute('stroke-width', '2');
-  svg.setAttribute('stroke-linecap', 'round');
-  svg.setAttribute('stroke-linejoin', 'round');
+  const svg = document.createElementNS("http://www.w3.org/2000/svg", "svg");
+  svg.setAttribute("width", "20");
+  svg.setAttribute("height", "20");
+  svg.setAttribute("viewBox", "0 0 24 24");
+  svg.setAttribute("fill", "none");
+  svg.setAttribute("stroke", "white");
+  svg.setAttribute("stroke-width", "2");
+  svg.setAttribute("stroke-linecap", "round");
+  svg.setAttribute("stroke-linejoin", "round");
 
   // Home icon paths
-  const path1 = document.createElementNS('http://www.w3.org/2000/svg', 'path');
-  path1.setAttribute('d', 'm3 9 9-7 9 7v11a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z');
+  const path1 = document.createElementNS("http://www.w3.org/2000/svg", "path");
+  path1.setAttribute("d", "m3 9 9-7 9 7v11a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z");
 
-  const polyline = document.createElementNS('http://www.w3.org/2000/svg', 'polyline');
-  polyline.setAttribute('points', '9 22 9 12 15 12 15 22');
+  const polyline = document.createElementNS(
+    "http://www.w3.org/2000/svg",
+    "polyline"
+  );
+  polyline.setAttribute("points", "9 22 9 12 15 12 15 22");
 
   svg.appendChild(path1);
   svg.appendChild(polyline);
@@ -119,34 +129,46 @@ function createHomeMarkerElement(): HTMLDivElement {
  *
  * @see https://css-tricks.com/avoid-css-jitter/
  */
-function createPOIMarkerElement(category: string, isDark: boolean): HTMLDivElement {
+function createPOIMarkerElement(
+  category: string,
+  isDark: boolean
+): HTMLDivElement {
   const colors = getCategoryColors(category);
   const iconPath = getCategoryIconPath(category);
 
   // Outer wrapper - stable hover zone, larger than visual marker
   // This element captures hover events without changing size
-  const wrapper = document.createElement('div');
-  wrapper.className = 'group w-12 h-12 flex items-center justify-center cursor-pointer poi-marker';
+  const wrapper = document.createElement("div");
+  wrapper.className =
+    "group w-12 h-12 flex items-center justify-center cursor-pointer poi-marker";
 
   // Inner visual marker - scales on hover via group-hover
-  const container = document.createElement('div');
-  container.className = 'w-8 h-8 rounded-full shadow-lg flex items-center justify-center border-2 transition-all duration-200 ease-out group-hover:scale-110 group-active:scale-95';
-  container.style.backgroundColor = isDark ? colors.markerBgDark : colors.markerBg;
-  container.style.borderColor = isDark ? colors.markerBorderDark : colors.markerBorder;
+  const container = document.createElement("div");
+  container.className =
+    "w-8 h-8 rounded-full shadow-lg flex items-center justify-center border-2 transition-all duration-200 ease-out group-hover:scale-110 group-active:scale-95";
+  container.style.backgroundColor = isDark
+    ? colors.markerBgDark
+    : colors.markerBg;
+  container.style.borderColor = isDark
+    ? colors.markerBorderDark
+    : colors.markerBorder;
 
   // Create SVG icon inside the marker
-  const svg = document.createElementNS('http://www.w3.org/2000/svg', 'svg');
-  svg.setAttribute('width', '14');
-  svg.setAttribute('height', '14');
-  svg.setAttribute('viewBox', '0 0 14 14');
-  svg.setAttribute('fill', 'none');
-  svg.setAttribute('stroke', isDark ? colors.markerBorderDark : colors.markerBorder);
-  svg.setAttribute('stroke-width', '1.5');
-  svg.setAttribute('stroke-linecap', 'round');
-  svg.setAttribute('stroke-linejoin', 'round');
+  const svg = document.createElementNS("http://www.w3.org/2000/svg", "svg");
+  svg.setAttribute("width", "14");
+  svg.setAttribute("height", "14");
+  svg.setAttribute("viewBox", "0 0 14 14");
+  svg.setAttribute("fill", "none");
+  svg.setAttribute(
+    "stroke",
+    isDark ? colors.markerBorderDark : colors.markerBorder
+  );
+  svg.setAttribute("stroke-width", "1.5");
+  svg.setAttribute("stroke-linecap", "round");
+  svg.setAttribute("stroke-linejoin", "round");
 
-  const path = document.createElementNS('http://www.w3.org/2000/svg', 'path');
-  path.setAttribute('d', iconPath);
+  const path = document.createElementNS("http://www.w3.org/2000/svg", "path");
+  path.setAttribute("d", iconPath);
   svg.appendChild(path);
   container.appendChild(svg);
 
@@ -167,7 +189,7 @@ export default function NearbyPlacesMap({
   listingLat,
   listingLng,
   places,
-  className = '',
+  className = "",
   highlightedPlaceId,
 }: NearbyPlacesMapProps) {
   const mapContainerRef = useRef<HTMLDivElement>(null);
@@ -178,13 +200,15 @@ export default function NearbyPlacesMap({
 
   // Get current theme for dark mode support
   const { resolvedTheme } = useTheme();
-  const isDarkMode = resolvedTheme === 'dark';
+  const isDarkMode = resolvedTheme === "dark";
 
   // Initialize map with OpenFreeMap Liberty tiles (matching search map)
   useEffect(() => {
     if (!mapContainerRef.current) return;
 
-    const styleUrl = isDarkMode ? OPENFREEMAP_STYLE_DARK : OPENFREEMAP_STYLE_LIGHT;
+    const styleUrl = isDarkMode
+      ? OPENFREEMAP_STYLE_DARK
+      : OPENFREEMAP_STYLE_LIGHT;
 
     const map = new maplibregl.Map({
       container: mapContainerRef.current,
@@ -198,7 +222,7 @@ export default function NearbyPlacesMap({
     // No default navigation controls - we add custom ones
 
     // Wait for map to load before adding markers
-    map.on('load', () => {
+    map.on("load", () => {
       // Add listing marker (center) with custom element
       const homeEl = createHomeMarkerElement();
       const listingMarker = new maplibregl.Marker({ element: homeEl })
@@ -214,8 +238,8 @@ export default function NearbyPlacesMap({
     });
 
     // Handle any map errors
-    map.on('error', (e) => {
-      console.error('Map error:', e.error?.message || e);
+    map.on("error", (e) => {
+      console.error("Map error:", e.error?.message || e);
     });
 
     return () => {
@@ -227,48 +251,53 @@ export default function NearbyPlacesMap({
   }, [listingLat, listingLng, isDarkMode]); // Re-create map when theme changes
 
   // Update POI markers when places change
-  const updateMarkers = useCallback((newPlaces: NearbyPlace[]) => {
-    const map = mapRef.current;
-    if (!map) return;
+  const updateMarkers = useCallback(
+    (newPlaces: NearbyPlace[]) => {
+      const map = mapRef.current;
+      if (!map) return;
 
-    // Differential marker updates to preserve state and reduce DOM churn
-    // Get existing marker IDs
-    const existingMarkerMap = new Map<string, maplibregl.Marker>();
-    markersRef.current.forEach((marker) => {
-      const placeId = marker.getElement().dataset.placeId;
-      if (placeId) {
-        existingMarkerMap.set(placeId, marker);
-      }
-    });
+      // Differential marker updates to preserve state and reduce DOM churn
+      // Get existing marker IDs
+      const existingMarkerMap = new Map<string, maplibregl.Marker>();
+      markersRef.current.forEach((marker) => {
+        const placeId = marker.getElement().dataset.placeId;
+        if (placeId) {
+          existingMarkerMap.set(placeId, marker);
+        }
+      });
 
-    // Track new place IDs
-    const newPlaceIds = new Set(newPlaces.map((p) => p.id));
+      // Track new place IDs
+      const newPlaceIds = new Set(newPlaces.map((p) => p.id));
 
-    // Remove markers that no longer exist
-    markersRef.current = markersRef.current.filter((marker) => {
-      const placeId = marker.getElement().dataset.placeId;
-      if (!placeId || !newPlaceIds.has(placeId)) {
-        marker.remove();
-        return false;
-      }
-      return true;
-    });
+      // Remove markers that no longer exist
+      markersRef.current = markersRef.current.filter((marker) => {
+        const placeId = marker.getElement().dataset.placeId;
+        if (!placeId || !newPlaceIds.has(placeId)) {
+          marker.remove();
+          return false;
+        }
+        return true;
+      });
 
-    // Add only new markers (that don't already exist)
-    newPlaces.forEach((place) => {
-      if (!existingMarkerMap.has(place.id)) {
-        // Create new marker with category icon and theme-aware colors
-        const markerEl = createPOIMarkerElement(place.category, isDarkMode);
-        markerEl.dataset.placeId = place.id; // Track by ID
+      // Add only new markers (that don't already exist)
+      newPlaces.forEach((place) => {
+        if (!existingMarkerMap.has(place.id)) {
+          // Create new marker with category icon and theme-aware colors
+          const markerEl = createPOIMarkerElement(place.category, isDarkMode);
+          markerEl.dataset.placeId = place.id; // Track by ID
 
-        const marker = new maplibregl.Marker({ element: markerEl })
-          .setLngLat([place.location.lng, place.location.lat])
-          .setPopup(
-            new maplibregl.Popup({ offset: 25, closeButton: false, className: 'nearby-popup' }).setHTML(`
+          const marker = new maplibregl.Marker({ element: markerEl })
+            .setLngLat([place.location.lng, place.location.lat])
+            .setPopup(
+              new maplibregl.Popup({
+                offset: 25,
+                closeButton: false,
+                className: "nearby-popup",
+              }).setHTML(`
               <div class="nearby-popup-content">
                 <div class="nearby-popup-category">
                   <span class="nearby-popup-category-dot" style="background-color: ${getCategoryColors(place.category).markerBorder}"></span>
-                  ${escapeHtml(place.category.replace(/-/g, ' '))}
+                  ${escapeHtml(place.category.replace(/-/g, " "))}
                 </div>
                 <div class="nearby-popup-name">${escapeHtml(place.name)}</div>
                 <div class="nearby-popup-address">${escapeHtml(place.address)}</div>
@@ -279,31 +308,33 @@ export default function NearbyPlacesMap({
                 </a>
               </div>
             `)
-          )
-          .addTo(map);
+            )
+            .addTo(map);
 
-        markersRef.current.push(marker);
+          markersRef.current.push(marker);
+        }
+      });
+
+      // Fit bounds to include all markers on initial load only
+      // Prevents camera animation from interfering with marker clicks
+      if (newPlaces.length > 0 && !hasFitBoundsRef.current) {
+        const bounds = new maplibregl.LngLatBounds();
+        bounds.extend([listingLng, listingLat]);
+        newPlaces.forEach((place) => {
+          bounds.extend([place.location.lng, place.location.lat]);
+        });
+
+        map.fitBounds(bounds, {
+          padding: 50,
+          maxZoom: 15,
+          duration: 0, // Disable animation to prevent marker movement during clicks
+        });
+
+        hasFitBoundsRef.current = true;
       }
-    });
-
-    // Fit bounds to include all markers on initial load only
-    // Prevents camera animation from interfering with marker clicks
-    if (newPlaces.length > 0 && !hasFitBoundsRef.current) {
-      const bounds = new maplibregl.LngLatBounds();
-      bounds.extend([listingLng, listingLat]);
-      newPlaces.forEach((place) => {
-        bounds.extend([place.location.lng, place.location.lat]);
-      });
-
-      map.fitBounds(bounds, {
-        padding: 50,
-        maxZoom: 15,
-        duration: 0, // Disable animation to prevent marker movement during clicks
-      });
-
-      hasFitBoundsRef.current = true;
-    }
-  }, [listingLat, listingLng, isDarkMode]);
+    },
+    [listingLat, listingLng, isDarkMode]
+  );
 
   // Update markers when places change
   useEffect(() => {
@@ -316,9 +347,9 @@ export default function NearbyPlacesMap({
       const el = marker.getElement();
       const placeId = el.dataset.placeId;
       if (placeId === highlightedPlaceId) {
-        el.classList.add('highlighted');
+        el.classList.add("highlighted");
       } else {
-        el.classList.remove('highlighted');
+        el.classList.remove("highlighted");
       }
     });
   }, [highlightedPlaceId]);
@@ -362,7 +393,7 @@ export default function NearbyPlacesMap({
       <div
         ref={mapContainerRef}
         className="w-full h-full"
-        style={{ minHeight: '400px' }}
+        style={{ minHeight: "400px" }}
       />
 
       {/* Custom Floating Controls — glass-pill style matching search map */}
@@ -443,7 +474,6 @@ export default function NearbyPlacesMap({
 
       {/* Radar branding — OpenFreeMap/OSM attribution handled by MapLibre attributionControl */}
       <RadarAttribution />
-
     </div>
   );
 }

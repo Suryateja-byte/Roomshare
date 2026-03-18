@@ -18,12 +18,12 @@ export function applySecurityHeaders(request: { headers: Headers }) {
   if (!isDev) {
     responseHeaders.set(
       "Strict-Transport-Security",
-      "max-age=31536000; includeSubDomains; preload",
+      "max-age=31536000; includeSubDomains; preload"
     );
   }
   responseHeaders.set(
     "Permissions-Policy",
-    "camera=(), microphone=(), geolocation=(self), interest-cohort=()",
+    "camera=(), microphone=(), geolocation=(self), interest-cohort=()"
   );
   responseHeaders.set("X-XSS-Protection", "1; mode=block");
   responseHeaders.set("X-DNS-Prefetch-Control", "on");

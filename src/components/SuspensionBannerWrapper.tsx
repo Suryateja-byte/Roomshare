@@ -1,7 +1,7 @@
-'use client';
+"use client";
 
-import { useSession } from 'next-auth/react';
-import SuspensionBanner from './SuspensionBanner';
+import { useSession } from "next-auth/react";
+import SuspensionBanner from "./SuspensionBanner";
 
 /**
  * Wrapper component that conditionally renders the SuspensionBanner
@@ -9,17 +9,17 @@ import SuspensionBanner from './SuspensionBanner';
  * P0-01 / P1-01: Shows suspension notification to affected users.
  */
 export default function SuspensionBannerWrapper() {
-    const { data: session, status } = useSession();
+  const { data: session, status } = useSession();
 
-    // Don't show if loading or not logged in
-    if (status === 'loading' || !session?.user) {
-        return null;
-    }
+  // Don't show if loading or not logged in
+  if (status === "loading" || !session?.user) {
+    return null;
+  }
 
-    // Only show if user is suspended
-    if (!session.user.isSuspended) {
-        return null;
-    }
+  // Only show if user is suspended
+  if (!session.user.isSuspended) {
+    return null;
+  }
 
-    return <SuspensionBanner />;
+  return <SuspensionBanner />;
 }

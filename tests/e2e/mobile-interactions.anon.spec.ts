@@ -13,7 +13,13 @@
  * Run: pnpm playwright test tests/e2e/mobile-interactions.anon.spec.ts --project=chromium-anon
  */
 
-import { test, expect, SF_BOUNDS, selectors, timeouts } from "./helpers/test-utils";
+import {
+  test,
+  expect,
+  SF_BOUNDS,
+  selectors,
+  timeouts,
+} from "./helpers/test-utils";
 import {
   mobileSelectors,
   getSheetSnapIndex,
@@ -34,7 +40,9 @@ const boundsQS = `minLat=${SF_BOUNDS.minLat}&maxLat=${SF_BOUNDS.maxLat}&minLng=$
 // Tests that are NOT covered by mobile-bottom-sheet.spec.ts
 // ---------------------------------------------------------------------------
 
-test.beforeEach(async () => { test.slow(); });
+test.beforeEach(async () => {
+  test.slow();
+});
 
 test.describe("Mobile Bottom Sheet - Snap Transitions", () => {
   test.use({
@@ -172,7 +180,7 @@ test.describe("Mobile Bottom Sheet - Content", () => {
     // The content area should be scrollable when expanded
     const content = page.locator(mobileSelectors.snapContent).first();
     const isScrollable = await content.evaluate(
-      (el) => el.scrollHeight > el.clientHeight,
+      (el) => el.scrollHeight > el.clientHeight
     );
 
     if (!isScrollable) {
@@ -183,7 +191,8 @@ test.describe("Mobile Bottom Sheet - Content", () => {
 
     // Verify overflow-y is auto (not hidden) when expanded
     const overflowY = await content.evaluate(
-      (el) => (el as HTMLElement).style.overflowY || getComputedStyle(el).overflowY,
+      (el) =>
+        (el as HTMLElement).style.overflowY || getComputedStyle(el).overflowY
     );
     expect(overflowY).not.toBe("hidden");
 
@@ -237,7 +246,9 @@ test.describe("Mobile Bottom Sheet - Content", () => {
 
     // The sheet header should display either "Search results" or a count
     const sheet = page.locator(mobileSelectors.bottomSheet);
-    const headerText = sheet.locator('[data-testid="sheet-header-text"]').first();
+    const headerText = sheet
+      .locator('[data-testid="sheet-header-text"]')
+      .first();
     await expect(headerText).toBeVisible();
 
     const text = await headerText.textContent();
@@ -269,7 +280,9 @@ test.describe("Mobile Map and Sheet", () => {
 
     // Map container should be present and visible
     const map = page.locator(mobileSelectors.mapContainer).first();
-    const mapVisible = await map.isVisible({ timeout: 10_000 }).catch(() => false);
+    const mapVisible = await map
+      .isVisible({ timeout: 10_000 })
+      .catch(() => false);
 
     if (!mapVisible) {
       // Map may not be initialized yet on mobile (cost optimization)
@@ -304,7 +317,9 @@ test.describe("Mobile Map and Sheet", () => {
 
     // Map should be visible since sheet is collapsed (only ~15vh)
     const map = page.locator(mobileSelectors.mapContainer).first();
-    const mapVisible = await map.isVisible({ timeout: 10_000 }).catch(() => false);
+    const mapVisible = await map
+      .isVisible({ timeout: 10_000 })
+      .catch(() => false);
 
     if (!mapVisible) {
       test.skip(true, "Map not visible on mobile (may be deferred)");
@@ -413,14 +428,10 @@ test.describe("Mobile Sort Interaction", () => {
     await expect(sortHeading).toBeVisible({ timeout: 3000 });
 
     // Sort options should be visible
-    const recommendedOption = page.locator(
-      'button:has-text("Recommended")',
-    );
+    const recommendedOption = page.locator('button:has-text("Recommended")');
     await expect(recommendedOption.first()).toBeVisible();
 
-    const priceOption = page.locator(
-      'button:has-text("Price: Low to High")',
-    );
+    const priceOption = page.locator('button:has-text("Price: Low to High")');
     await expect(priceOption.first()).toBeVisible();
   });
 
@@ -454,13 +465,17 @@ test.describe("Mobile Sort Interaction", () => {
     await expect(sortHeading).not.toBeVisible({ timeout: 3000 });
 
     // The sort button label should reflect the new selection
-    const updatedSortBtn = page.locator('button[aria-label="Sort: Newest First"]');
+    const updatedSortBtn = page.locator(
+      'button[aria-label="Sort: Newest First"]'
+    );
     const updated = await updatedSortBtn
       .isVisible({ timeout: 5000 })
       .catch(() => false);
     // The page may navigate on sort change, so the button might re-render
     // Just verify the sort sheet closed
-    expect(updated || !(await sortHeading.isVisible().catch(() => false))).toBeTruthy();
+    expect(
+      updated || !(await sortHeading.isVisible().catch(() => false))
+    ).toBeTruthy();
   });
 });
 
@@ -484,7 +499,9 @@ test.describe("Mobile Filter Interaction", () => {
 
     // The Filters button is in the search form header area
     // It uses aria-label containing "Filters"
-    const filtersBtn = page.locator(`${mobileSelectors.filtersButton}:visible`).first();
+    const filtersBtn = page
+      .locator(`${mobileSelectors.filtersButton}:visible`)
+      .first();
     const filtersVisible = await filtersBtn
       .isVisible({ timeout: 5000 })
       .catch(() => false);
@@ -495,7 +512,7 @@ test.describe("Mobile Filter Interaction", () => {
     }
 
     // Click the Filters button (use evaluate click for reliability on WSL2)
-    await filtersBtn.evaluate(el => (el as HTMLElement).click());
+    await filtersBtn.evaluate((el) => (el as HTMLElement).click());
 
     // A dialog/modal should appear (allow extra time for modal animation on WSL2)
     const modal = page.locator(mobileSelectors.filterModal);
@@ -508,7 +525,10 @@ test.describe("Mobile Filter Interaction", () => {
 
     if (!modalOpened) {
       // Retry: try clicking with Playwright's native click
-      await page.locator(`${mobileSelectors.filtersButton}:visible`).first().click({ force: true });
+      await page
+        .locator(`${mobileSelectors.filtersButton}:visible`)
+        .first()
+        .click({ force: true });
     }
 
     await expect(modal.first()).toBeVisible({ timeout: 10_000 });
@@ -522,24 +542,34 @@ test.describe("Mobile Filter Interaction", () => {
       return;
     }
 
-    const filtersBtn = page.locator(`${mobileSelectors.filtersButton}:visible`).first();
+    const filtersBtn = page
+      .locator(`${mobileSelectors.filtersButton}:visible`)
+      .first();
     if (!(await filtersBtn.isVisible({ timeout: 5000 }).catch(() => false))) {
       test.skip(true, "Filters button not visible on mobile");
       return;
     }
 
-    await filtersBtn.evaluate(el => (el as HTMLElement).click());
+    await filtersBtn.evaluate((el) => (el as HTMLElement).click());
 
     // Use specific selector for filter modal (not just any dialog)
-    const modal = page.locator('[role="dialog"][aria-labelledby="filter-drawer-title"]');
+    const modal = page.locator(
+      '[role="dialog"][aria-labelledby="filter-drawer-title"]'
+    );
     const modalOpened = await modal
       .waitFor({ state: "visible", timeout: 30_000 })
       .then(() => true)
       .catch(() => false);
     if (!modalOpened) {
       // Retry: try native click
-      await page.locator(`${mobileSelectors.filtersButton}:visible`).first().click({ force: true });
-      const retryOpened = await modal.waitFor({ state: "visible", timeout: 10_000 }).then(() => true).catch(() => false);
+      await page
+        .locator(`${mobileSelectors.filtersButton}:visible`)
+        .first()
+        .click({ force: true });
+      const retryOpened = await modal
+        .waitFor({ state: "visible", timeout: 10_000 })
+        .then(() => true)
+        .catch(() => false);
       if (!retryOpened) {
         test.skip(true, "Filter modal did not open");
         return;
@@ -549,10 +579,14 @@ test.describe("Mobile Filter Interaction", () => {
     // Use the data-testid for the Apply button (more reliable than text matching)
     const applyBtn = modal.locator('[data-testid="filter-modal-apply"]');
     const applyFallback = modal
-      .locator('button:has-text("Apply"), button:has-text("listing"), button:has-text("Show"), button:has-text("Done")')
+      .locator(
+        'button:has-text("Apply"), button:has-text("listing"), button:has-text("Show"), button:has-text("Done")'
+      )
       .first();
 
-    const targetBtn = (await applyBtn.isVisible({ timeout: 3000 }).catch(() => false))
+    const targetBtn = (await applyBtn
+      .isVisible({ timeout: 3000 })
+      .catch(() => false))
       ? applyBtn
       : applyFallback;
 
@@ -631,7 +665,9 @@ test.describe("Mobile Edge Cases", () => {
     // Verify overscroll-behavior: contain on the content area
     const content = page.locator(mobileSelectors.snapContent).first();
     const overscrollBehavior = await content.evaluate(
-      (el) => (el as HTMLElement).style.overscrollBehavior || getComputedStyle(el).overscrollBehavior,
+      (el) =>
+        (el as HTMLElement).style.overscrollBehavior ||
+        getComputedStyle(el).overscrollBehavior
     );
 
     // Should be "contain" to prevent scroll chaining to the map
@@ -694,7 +730,7 @@ test.describe("Mobile Edge Cases", () => {
       return;
     }
 
-    await expandBtn.evaluate(el => (el as HTMLElement).click());
+    await expandBtn.evaluate((el) => (el as HTMLElement).click());
     await waitForSheetAnimation(page);
     expect(await getSheetSnapIndex(page)).toBe(2);
 
@@ -703,7 +739,7 @@ test.describe("Mobile Edge Cases", () => {
     await expect(collapseBtn).toBeVisible({ timeout: 5000 });
 
     // Click collapse (use evaluate click for reliability on WSL2)
-    await collapseBtn.evaluate(el => (el as HTMLElement).click());
+    await collapseBtn.evaluate((el) => (el as HTMLElement).click());
     await waitForSheetAnimation(page);
     expect(await getSheetSnapIndex(page)).toBe(1);
   });
@@ -765,7 +801,8 @@ test.describe("Mobile Layout Responsiveness", () => {
     // may still be in the DOM (just hidden by the parent's CSS).
     // Check that the mobile parent container is hidden.
     const mobileParent = page.locator(".md\\:hidden.flex-1.flex.flex-col");
-    const mobileParentVisible = await mobileParent.first()
+    const mobileParentVisible = await mobileParent
+      .first()
       .isVisible()
       .catch(() => false);
     expect(mobileParentVisible).toBeFalsy();
@@ -878,8 +915,7 @@ test.describe("Mobile Bottom Sheet - Content Overflow Control", () => {
     const content = page.locator(mobileSelectors.snapContent).first();
     const overflowY = await content.evaluate(
       (el) =>
-        (el as HTMLElement).style.overflowY ||
-        getComputedStyle(el).overflowY,
+        (el as HTMLElement).style.overflowY || getComputedStyle(el).overflowY
     );
     expect(overflowY).toBe("hidden");
 
@@ -887,7 +923,7 @@ test.describe("Mobile Bottom Sheet - Content Overflow Control", () => {
     const pointerEvents = await content.evaluate(
       (el) =>
         (el as HTMLElement).style.pointerEvents ||
-        getComputedStyle(el).pointerEvents,
+        getComputedStyle(el).pointerEvents
     );
     expect(pointerEvents).toBe("none");
   });
@@ -907,8 +943,7 @@ test.describe("Mobile Bottom Sheet - Content Overflow Control", () => {
     const content = page.locator(mobileSelectors.snapContent).first();
     const overflowY = await content.evaluate(
       (el) =>
-        (el as HTMLElement).style.overflowY ||
-        getComputedStyle(el).overflowY,
+        (el as HTMLElement).style.overflowY || getComputedStyle(el).overflowY
     );
     expect(overflowY).toBe("auto");
 
@@ -916,7 +951,7 @@ test.describe("Mobile Bottom Sheet - Content Overflow Control", () => {
     const pointerEvents = await content.evaluate(
       (el) =>
         (el as HTMLElement).style.pointerEvents ||
-        getComputedStyle(el).pointerEvents,
+        getComputedStyle(el).pointerEvents
     );
     expect(pointerEvents).toBe("auto");
   });

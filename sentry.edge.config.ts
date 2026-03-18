@@ -3,12 +3,12 @@
  * Tracks errors and performance in Edge functions (middleware, edge API routes)
  */
 
-import * as Sentry from '@sentry/nextjs';
+import * as Sentry from "@sentry/nextjs";
 
 const SENTRY_DSN = process.env.SENTRY_DSN;
 const SENTRY_ENABLED =
-  process.env.NODE_ENV === 'production' ||
-  process.env.SENTRY_ENABLE_IN_DEV === '1';
+  process.env.NODE_ENV === "production" ||
+  process.env.SENTRY_ENABLE_IN_DEV === "1";
 
 if (SENTRY_DSN && SENTRY_ENABLED) {
   Sentry.init({
@@ -19,13 +19,13 @@ if (SENTRY_DSN && SENTRY_ENABLED) {
     release: process.env.VERCEL_GIT_COMMIT_SHA,
 
     // Performance monitoring - sample rate for edge functions
-    tracesSampleRate: process.env.NODE_ENV === 'production' ? 0.1 : 1.0,
+    tracesSampleRate: process.env.NODE_ENV === "production" ? 0.1 : 1.0,
 
     // Explicit tags for filtering in Sentry dashboard
     initialScope: {
       tags: {
-        runtime: 'edge',
-        service: 'roomshare',
+        runtime: "edge",
+        service: "roomshare",
       },
     },
 
@@ -35,7 +35,7 @@ if (SENTRY_DSN && SENTRY_ENABLED) {
 
       if (error instanceof Error) {
         // Ignore expected middleware redirects
-        if (error.message.includes('NEXT_REDIRECT')) {
+        if (error.message.includes("NEXT_REDIRECT")) {
           return null;
         }
       }

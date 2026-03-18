@@ -22,10 +22,7 @@ import {
   DEFAULT_TIMEOUTS,
   isTimeoutError,
 } from "@/lib/timeout-wrapper";
-import {
-  circuitBreakers,
-  isCircuitOpenError,
-} from "@/lib/circuit-breaker";
+import { circuitBreakers, isCircuitOpenError } from "@/lib/circuit-breaker";
 import type {
   NearbyPlace,
   RadarSearchResponse,
@@ -37,14 +34,27 @@ import {
 } from "@/lib/nearby-categories";
 
 function isFiniteLatitude(value: unknown): value is number {
-  return typeof value === "number" && Number.isFinite(value) && value >= -90 && value <= 90;
+  return (
+    typeof value === "number" &&
+    Number.isFinite(value) &&
+    value >= -90 &&
+    value <= 90
+  );
 }
 
 function isFiniteLongitude(value: unknown): value is number {
-  return typeof value === "number" && Number.isFinite(value) && value >= -180 && value <= 180;
+  return (
+    typeof value === "number" &&
+    Number.isFinite(value) &&
+    value >= -180 &&
+    value <= 180
+  );
 }
 
-function sanitizeNearbyPlace(place: NearbyPlace, source: "autocomplete" | "places"): NearbyPlace | null {
+function sanitizeNearbyPlace(
+  place: NearbyPlace,
+  source: "autocomplete" | "places"
+): NearbyPlace | null {
   const lat = place.location?.lat;
   const lng = place.location?.lng;
   const distanceMiles = place.distanceMiles;
@@ -107,7 +117,7 @@ export async function POST(request: Request) {
       logger.sync.error("RADAR_SECRET_KEY is not configured");
       return NextResponse.json(
         { error: "Nearby search is not configured" },
-        { status: 503 },
+        { status: 503 }
       );
     }
 
@@ -121,7 +131,7 @@ export async function POST(request: Request) {
           error: "Invalid request body",
           details: "Request body must be valid JSON",
         },
-        { status: 400 },
+        { status: 400 }
       );
     }
     const parseResult = requestSchema.safeParse(body);
@@ -132,7 +142,7 @@ export async function POST(request: Request) {
           error: "Invalid request",
           details: parseResult.error.flatten().fieldErrors,
         },
-        { status: 400 },
+        { status: 400 }
       );
     }
 
@@ -183,7 +193,9 @@ export async function POST(request: Request) {
       } catch (error) {
         // Handle circuit breaker or timeout errors
         if (isCircuitOpenError(error)) {
-          logger.sync.error("Radar API circuit breaker open - service unavailable");
+          logger.sync.error(
+            "Radar API circuit breaker open - service unavailable"
+          );
           return NextResponse.json(
             {
               error: "Nearby search temporarily unavailable",
@@ -193,7 +205,7 @@ export async function POST(request: Request) {
           );
         }
         if (isTimeoutError(error)) {
-          logger.sync.error("Radar API timeout", { route: '/api/nearby' });
+          logger.sync.error("Radar API timeout", { route: "/api/nearby" });
           return NextResponse.json(
             {
               error: "Nearby search timed out",
@@ -228,7 +240,7 @@ export async function POST(request: Request) {
           userMessage = "Invalid search parameters";
           logger.sync.error("Radar 400 details", {
             errorLength: errorText.length,
-            route: '/api/nearby',
+            route: "/api/nearby",
           });
           details = "The search parameters were rejected by the service";
         }
@@ -239,7 +251,7 @@ export async function POST(request: Request) {
             details,
             radarStatus: radarResponse.status,
           },
-          { status: radarResponse.status >= 500 ? 500 : radarResponse.status },
+          { status: radarResponse.status >= 500 ? 500 : radarResponse.status }
         );
       }
 
@@ -255,7 +267,7 @@ export async function POST(request: Request) {
           (addr) =>
             addr.layer === "place" &&
             isFiniteLatitude(addr.latitude) &&
-            isFiniteLongitude(addr.longitude),
+            isFiniteLongitude(addr.longitude)
         )
         .map(
           (addr): NearbyPlace => ({
@@ -275,9 +287,9 @@ export async function POST(request: Request) {
               listingLat,
               listingLng,
               addr.latitude,
-              addr.longitude,
+              addr.longitude
             ),
-          }),
+          })
         )
         .map((place) => sanitizeNearbyPlace(place, "autocomplete"))
         .filter((place): place is NearbyPlace => place !== null)
@@ -298,7 +310,7 @@ export async function POST(request: Request) {
             "Cache-Control": "no-store, no-cache, must-revalidate",
             Pragma: "no-cache",
           },
-        },
+        }
       );
     }
 
@@ -355,7 +367,10 @@ export async function POST(request: Request) {
     } catch (error) {
       // Handle circuit breaker or timeout errors
       if (isCircuitOpenError(error)) {
-        logger.sync.error("Radar API circuit breaker open - service unavailable", { route: '/api/nearby' });
+        logger.sync.error(
+          "Radar API circuit breaker open - service unavailable",
+          { route: "/api/nearby" }
+        );
         return NextResponse.json(
           {
             error: "Nearby search temporarily unavailable",
@@ -365,7 +380,7 @@ export async function POST(request: Request) {
         );
       }
       if (isTimeoutError(error)) {
-        logger.sync.error("Radar API timeout", { route: '/api/nearby' });
+        logger.sync.error("Radar API timeout", { route: "/api/nearby" });
         return NextResponse.json(
           {
             error: "Nearby search timed out",
@@ -379,7 +394,10 @@ export async function POST(request: Request) {
 
     if (!radarResponse.ok) {
       const errorText = await radarResponse.text();
-      logger.sync.error("Radar API error", { status: radarResponse.status, errorLength: errorText.length });
+      logger.sync.error("Radar API error", {
+        status: radarResponse.status,
+        errorLength: errorText.length,
+      });
 
       // Parse error for user-friendly message
       let userMessage = "Failed to fetch nearby places";
@@ -398,7 +416,7 @@ export async function POST(request: Request) {
         userMessage = "Invalid search parameters";
         logger.sync.error("Radar 400 details", {
           errorLength: errorText.length,
-          route: '/api/nearby',
+          route: "/api/nearby",
         });
         details = "The search parameters were rejected by the service";
       }
@@ -409,7 +427,7 @@ export async function POST(request: Request) {
           details,
           radarStatus: radarResponse.status,
         },
-        { status: radarResponse.status >= 500 ? 500 : radarResponse.status },
+        { status: radarResponse.status >= 500 ? 500 : radarResponse.status }
       );
     }
 
@@ -429,7 +447,9 @@ export async function POST(request: Request) {
         // Null safety: skip null/undefined entries and places with missing coordinates
         if (!place || !place.location?.coordinates?.length) {
           if (place) {
-            logger.sync.warn("Place missing coordinates", { placeId: place._id });
+            logger.sync.warn("Place missing coordinates", {
+              placeId: place._id,
+            });
           }
           return null;
         }
@@ -439,7 +459,9 @@ export async function POST(request: Request) {
         const placeLng = place.location.coordinates[0];
 
         if (!isFiniteLatitude(placeLat) || !isFiniteLongitude(placeLng)) {
-          logger.sync.warn("Place has invalid coordinates", { placeId: place._id });
+          logger.sync.warn("Place has invalid coordinates", {
+            placeId: place._id,
+          });
           return null;
         }
 
@@ -457,7 +479,7 @@ export async function POST(request: Request) {
             listingLat,
             listingLng,
             placeLat,
-            placeLng,
+            placeLng
           ),
         };
 
@@ -486,9 +508,9 @@ export async function POST(request: Request) {
           "Cache-Control": "no-store, no-cache, must-revalidate",
           Pragma: "no-cache",
         },
-      },
+      }
     );
   } catch (error) {
-    return captureApiError(error, { route: '/api/nearby', method: 'POST' });
+    return captureApiError(error, { route: "/api/nearby", method: "POST" });
   }
 }

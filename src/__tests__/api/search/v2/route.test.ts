@@ -53,7 +53,7 @@ jest.mock("next/server", () => ({
   NextResponse: {
     json: (
       data: unknown,
-      init?: { status?: number; headers?: Record<string, string> },
+      init?: { status?: number; headers?: Record<string, string> }
     ) => {
       const headersMap = new Map(Object.entries(init?.headers || {}));
       return {
@@ -125,7 +125,7 @@ function createRequest(params: Record<string, string> = {}): NextRequest {
 
 /** Build a successful SearchV2Result for mocking executeSearchV2 */
 function createMockSearchResult(
-  overrides: Partial<SearchV2Response> = {},
+  overrides: Partial<SearchV2Response> = {}
 ): SearchV2Result {
   const response: SearchV2Response = {
     meta: {
@@ -166,7 +166,7 @@ function createMockSearchResult(
 /** Build a mock list item in v2 format */
 function createMockListItem(
   id: string,
-  overrides: Record<string, unknown> = {},
+  overrides: Record<string, unknown> = {}
 ) {
   return {
     id,
@@ -183,7 +183,7 @@ function createMockListItem(
 function createMockGeoFeature(
   id: string,
   lat: number = 37.7749,
-  lng: number = -122.4194,
+  lng: number = -122.4194
 ) {
   return {
     type: "Feature" as const,
@@ -211,7 +211,7 @@ describe("Search API v2 route", () => {
     (executeSearchV2 as jest.Mock).mockResolvedValue(createMockSearchResult());
     // Default: withTimeout passes through promise
     (withTimeout as jest.Mock).mockImplementation(
-      (promise: Promise<unknown>) => promise,
+      (promise: Promise<unknown>) => promise
     );
   });
 
@@ -263,7 +263,7 @@ describe("Search API v2 route", () => {
     it("should call executeSearchV2 with rawParams from URL", async () => {
       const mockRawParams = { q: "studio", minPrice: "500" };
       (buildRawParamsFromSearchParams as jest.Mock).mockReturnValue(
-        mockRawParams,
+        mockRawParams
       );
 
       const request = createRequest({ q: "studio", minPrice: "500" });
@@ -283,7 +283,7 @@ describe("Search API v2 route", () => {
       expect(withTimeout).toHaveBeenCalledWith(
         expect.anything(),
         DEFAULT_TIMEOUTS.DATABASE,
-        "executeSearchV2",
+        "executeSearchV2"
       );
     });
   });
@@ -314,11 +314,9 @@ describe("Search API v2 route", () => {
               type: "FeatureCollection",
               features: geoFeatures,
             },
-            pins: [
-              { id: "1", lat: 37.7749, lng: -122.4194, price: 1500 },
-            ],
+            pins: [{ id: "1", lat: 37.7749, lng: -122.4194, price: 1500 }],
           },
-        }),
+        })
       );
 
       const request = createRequest();
@@ -376,7 +374,7 @@ describe("Search API v2 route", () => {
             geojson: { type: "FeatureCollection", features: [] },
             pins: [{ id: "1", lat: 37.7749, lng: -122.4194 }],
           },
-        }),
+        })
       );
 
       const request = createRequest();
@@ -399,7 +397,7 @@ describe("Search API v2 route", () => {
           map: {
             geojson: { type: "FeatureCollection", features: [] },
           },
-        }),
+        })
       );
 
       const request = createRequest();
@@ -423,7 +421,7 @@ describe("Search API v2 route", () => {
             geojson: { type: "FeatureCollection", features: [] },
             pins: [],
           },
-        }),
+        })
       );
 
       const sparseRequest = createRequest();
@@ -444,7 +442,7 @@ describe("Search API v2 route", () => {
           map: {
             geojson: { type: "FeatureCollection", features: [] },
           },
-        }),
+        })
       );
 
       const denseRequest = createRequest();
@@ -469,7 +467,7 @@ describe("Search API v2 route", () => {
             nextCursor: "eyJwIjoyfQ", // encoded cursor
             total: 100,
           },
-        }),
+        })
       );
 
       const request = createRequest();
@@ -488,7 +486,7 @@ describe("Search API v2 route", () => {
             nextCursor: null,
             total: 1,
           },
-        }),
+        })
       );
 
       const request = createRequest();
@@ -520,7 +518,7 @@ describe("Search API v2 route", () => {
             nextCursor: null,
             total: 1,
           },
-        }),
+        })
       );
 
       const request = createRequest();
@@ -540,13 +538,11 @@ describe("Search API v2 route", () => {
       (executeSearchV2 as jest.Mock).mockResolvedValue(
         createMockSearchResult({
           list: {
-            items: [
-              createMockListItem("1", { badges: ["near-match"] }),
-            ],
+            items: [createMockListItem("1", { badges: ["near-match"] })],
             nextCursor: null,
             total: 1,
           },
-        }),
+        })
       );
 
       const request = createRequest();
@@ -560,13 +556,11 @@ describe("Search API v2 route", () => {
       (executeSearchV2 as jest.Mock).mockResolvedValue(
         createMockSearchResult({
           list: {
-            items: [
-              createMockListItem("1", { badges: ["multi-room"] }),
-            ],
+            items: [createMockListItem("1", { badges: ["multi-room"] })],
             nextCursor: null,
             total: 1,
           },
-        }),
+        })
       );
 
       const request = createRequest();
@@ -613,7 +607,7 @@ describe("Search API v2 route", () => {
 
     it("should return 500 when executeSearchV2 throws", async () => {
       (executeSearchV2 as jest.Mock).mockRejectedValue(
-        new Error("Database connection lost"),
+        new Error("Database connection lost")
       );
 
       const request = createRequest();
@@ -626,7 +620,7 @@ describe("Search API v2 route", () => {
 
     it("should return 400 for validation errors", async () => {
       (executeSearchV2 as jest.Mock).mockRejectedValue(
-        new Error("Bounds cannot exceed maximum span"),
+        new Error("Bounds cannot exceed maximum span")
       );
 
       const request = createRequest();
@@ -644,7 +638,7 @@ describe("Search API v2 route", () => {
       jest.clearAllMocks();
       // Default: withTimeout passes through
       (withTimeout as jest.Mock).mockImplementation(
-        (promise: Promise<unknown>) => promise,
+        (promise: Promise<unknown>) => promise
       );
     });
 
@@ -733,7 +727,7 @@ describe("Search API v2 route", () => {
       mockFeatures.searchV2 = true;
       jest.clearAllMocks();
       (withTimeout as jest.Mock).mockImplementation(
-        (promise: Promise<unknown>) => promise,
+        (promise: Promise<unknown>) => promise
       );
     });
 
@@ -750,7 +744,7 @@ describe("Search API v2 route", () => {
             nextCursor: null,
             total: 2,
           },
-        }),
+        })
       );
 
       const request = createRequest();
@@ -782,7 +776,7 @@ describe("Search API v2 route", () => {
               features: geoFeatures,
             },
           },
-        }),
+        })
       );
 
       const request = createRequest();
@@ -806,12 +800,12 @@ describe("Search API v2 route", () => {
           expect(typeof lat).toBe("number");
           expect(Number.isFinite(lng)).toBe(true);
           expect(Number.isFinite(lat)).toBe(true);
-        },
+        }
       );
 
       // Verify feature IDs match
       const featureIds = mapFeatures.map(
-        (f: { properties: { id: string } }) => f.properties.id,
+        (f: { properties: { id: string } }) => f.properties.id
       );
       expect(featureIds).toContain("valid-1");
       expect(featureIds).toContain("valid-2");

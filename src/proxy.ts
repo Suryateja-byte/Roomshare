@@ -15,7 +15,8 @@ export async function proxy(request: NextRequest) {
     return suspensionResponse;
   }
 
-  const { requestHeaders, responseHeaders, nonce } = applySecurityHeaders(request);
+  const { requestHeaders, responseHeaders, nonce } =
+    applySecurityHeaders(request);
 
   if (nonce) {
     requestHeaders.set("x-nonce", nonce);

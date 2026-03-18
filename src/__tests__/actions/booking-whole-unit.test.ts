@@ -9,10 +9,10 @@
  * 5. Sequential non-overlapping bookings are allowed
  */
 
-jest.mock('@/lib/booking-audit', () => ({ logBookingAudit: jest.fn() }));
+jest.mock("@/lib/booking-audit", () => ({ logBookingAudit: jest.fn() }));
 
 // Mock dependencies before imports
-jest.mock('@/lib/prisma', () => ({
+jest.mock("@/lib/prisma", () => ({
   prisma: {
     listing: {
       findUnique: jest.fn(),
@@ -35,45 +35,47 @@ jest.mock('@/lib/prisma', () => ({
   },
 }));
 
-jest.mock('@/auth', () => ({
+jest.mock("@/auth", () => ({
   auth: jest.fn(),
 }));
 
-jest.mock('next/cache', () => ({
+jest.mock("next/cache", () => ({
   revalidatePath: jest.fn(),
 }));
 
-jest.mock('@/lib/notifications', () => ({
+jest.mock("@/lib/notifications", () => ({
   createInternalNotification: jest.fn(),
 }));
 
-jest.mock('@/lib/email', () => ({
+jest.mock("@/lib/email", () => ({
   sendNotificationEmailWithPreference: jest.fn(),
 }));
 
-jest.mock('@/app/actions/block', () => ({
+jest.mock("@/app/actions/block", () => ({
   checkBlockBeforeAction: jest.fn().mockResolvedValue({ allowed: true }),
 }));
 
-jest.mock('@/app/actions/suspension', () => ({
+jest.mock("@/app/actions/suspension", () => ({
   checkSuspension: jest.fn().mockResolvedValue({ suspended: false }),
   checkEmailVerified: jest.fn().mockResolvedValue({ verified: true }),
 }));
 
-jest.mock('@/lib/rate-limit', () => ({
-  checkRateLimit: jest.fn().mockResolvedValue({ success: true, remaining: 9, resetAt: new Date() }),
-  getClientIPFromHeaders: jest.fn().mockReturnValue('127.0.0.1'),
+jest.mock("@/lib/rate-limit", () => ({
+  checkRateLimit: jest
+    .fn()
+    .mockResolvedValue({ success: true, remaining: 9, resetAt: new Date() }),
+  getClientIPFromHeaders: jest.fn().mockReturnValue("127.0.0.1"),
   RATE_LIMITS: {
     createBooking: { limit: 10, windowMs: 3600000 },
     createBookingByIp: { limit: 30, windowMs: 3600000 },
   },
 }));
 
-jest.mock('next/headers', () => ({
+jest.mock("next/headers", () => ({
   headers: jest.fn().mockResolvedValue(new Headers()),
 }));
 
-jest.mock('@/lib/logger', () => ({
+jest.mock("@/lib/logger", () => ({
   logger: {
     sync: {
       debug: jest.fn(),
@@ -84,18 +86,18 @@ jest.mock('@/lib/logger', () => ({
   },
 }));
 
-jest.mock('@prisma/client', () => ({
+jest.mock("@prisma/client", () => ({
   Prisma: {
     TransactionIsolationLevel: {
-      Serializable: 'Serializable',
-      ReadCommitted: 'ReadCommitted',
-      RepeatableRead: 'RepeatableRead',
-      ReadUncommitted: 'ReadUncommitted',
+      Serializable: "Serializable",
+      ReadCommitted: "ReadCommitted",
+      RepeatableRead: "RepeatableRead",
+      ReadUncommitted: "ReadUncommitted",
     },
   },
 }));
 
-jest.mock('@/lib/env', () => ({
+jest.mock("@/lib/env", () => ({
   features: {
     multiSlotBooking: true,
     wholeUnitMode: true,
@@ -104,53 +106,53 @@ jest.mock('@/lib/env', () => ({
   getServerEnv: jest.fn(() => ({})),
 }));
 
-import { createBooking } from '@/app/actions/booking';
-import { prisma } from '@/lib/prisma';
-import { auth } from '@/auth';
-import { createInternalNotification } from '@/lib/notifications';
-import { sendNotificationEmailWithPreference } from '@/lib/email';
-import { logBookingAudit } from '@/lib/booking-audit';
+import { createBooking } from "@/app/actions/booking";
+import { prisma } from "@/lib/prisma";
+import { auth } from "@/auth";
+import { createInternalNotification } from "@/lib/notifications";
+import { sendNotificationEmailWithPreference } from "@/lib/email";
+import { logBookingAudit } from "@/lib/booking-audit";
 
-describe('createBooking — WHOLE_UNIT mode (Phase 3)', () => {
+describe("createBooking — WHOLE_UNIT mode (Phase 3)", () => {
   const mockSession = {
     user: {
-      id: 'user-123',
-      name: 'Test User',
-      email: 'test@example.com',
+      id: "user-123",
+      name: "Test User",
+      email: "test@example.com",
     },
   };
 
   const mockWholeUnitListing = {
-    id: 'listing-123',
-    title: 'Whole Unit',
-    ownerId: 'owner-123',
+    id: "listing-123",
+    title: "Whole Unit",
+    ownerId: "owner-123",
     totalSlots: 4,
     availableSlots: 4,
-    status: 'ACTIVE',
+    status: "ACTIVE",
     price: 800,
-    bookingMode: 'WHOLE_UNIT',
+    bookingMode: "WHOLE_UNIT",
   };
 
   const mockSharedListing = {
-    id: 'listing-456',
-    title: 'Shared Room',
-    ownerId: 'owner-123',
+    id: "listing-456",
+    title: "Shared Room",
+    ownerId: "owner-123",
     totalSlots: 3,
     availableSlots: 3,
-    status: 'ACTIVE',
+    status: "ACTIVE",
     price: 500,
-    bookingMode: 'SHARED',
+    bookingMode: "SHARED",
   };
 
   const mockOwner = {
-    id: 'owner-123',
-    name: 'Host User',
-    email: 'host@example.com',
+    id: "owner-123",
+    name: "Host User",
+    email: "host@example.com",
   };
 
   const mockTenant = {
-    id: 'user-123',
-    name: 'Test User',
+    id: "user-123",
+    name: "Test User",
   };
 
   // Use future dates to pass validation (30+ days)
@@ -158,222 +160,319 @@ describe('createBooking — WHOLE_UNIT mode (Phase 3)', () => {
   const futureEnd = new Date(Date.now() + 210 * 24 * 60 * 60 * 1000); // ~7 months from now
 
   const mockBooking = {
-    id: 'booking-123',
-    listingId: 'listing-123',
-    tenantId: 'user-123',
+    id: "booking-123",
+    listingId: "listing-123",
+    tenantId: "user-123",
     startDate: futureStart,
     endDate: futureEnd,
     totalPrice: 4800,
-    status: 'PENDING',
+    status: "PENDING",
   };
 
   beforeEach(() => {
-    jest.clearAllMocks()
-    ;(auth as jest.Mock).mockResolvedValue(mockSession)
-    ;(prisma.idempotencyKey.findUnique as jest.Mock).mockResolvedValue(null)
+    jest.clearAllMocks();
+    (auth as jest.Mock).mockResolvedValue(mockSession);
+    (prisma.idempotencyKey.findUnique as jest.Mock).mockResolvedValue(null);
     // Mock user.findUnique for suspension and email verification checks
-    ;(prisma.user.findUnique as jest.Mock).mockResolvedValue({
-      id: 'user-123',
+    (prisma.user.findUnique as jest.Mock).mockResolvedValue({
+      id: "user-123",
       isSuspended: false,
       emailVerified: new Date(),
-    })
-    ;(createInternalNotification as jest.Mock).mockResolvedValue({ success: true })
-    ;(sendNotificationEmailWithPreference as jest.Mock).mockResolvedValue({ success: true })
+    });
+    (createInternalNotification as jest.Mock).mockResolvedValue({
+      success: true,
+    });
+    (sendNotificationEmailWithPreference as jest.Mock).mockResolvedValue({
+      success: true,
+    });
   });
 
-  describe('slotsRequested auto-set', () => {
-    it('auto-sets slotsRequested to totalSlots for WHOLE_UNIT listing', async () => {
+  describe("slotsRequested auto-set", () => {
+    it("auto-sets slotsRequested to totalSlots for WHOLE_UNIT listing", async () => {
       let capturedCreateData: Record<string, unknown> | null = null;
 
-      ;(prisma.$transaction as jest.Mock).mockImplementation(async (callback: (tx: unknown) => Promise<unknown>) => {
-        const tx = {
-          $queryRaw: jest.fn()
-            .mockResolvedValueOnce([mockWholeUnitListing]) // FOR UPDATE lock
-            .mockResolvedValueOnce([{ total: BigInt(0) }]), // SUM(slotsRequested)
-          user: {
-            findUnique: jest.fn().mockImplementation(({ where }: { where: { id: string } }) => {
-              if (where.id === 'owner-123') return Promise.resolve(mockOwner);
-              if (where.id === 'user-123') return Promise.resolve(mockTenant);
-              return Promise.resolve(null);
-            }),
-          },
-          booking: {
-            findFirst: jest.fn().mockResolvedValue(null),
-            create: jest.fn().mockImplementation((args: { data: Record<string, unknown> }) => {
-              capturedCreateData = args.data;
-              return Promise.resolve(mockBooking);
-            }),
-          },
-        };
-        return callback(tx);
-      });
+      (prisma.$transaction as jest.Mock).mockImplementation(
+        async (callback: (tx: unknown) => Promise<unknown>) => {
+          const tx = {
+            $queryRaw: jest
+              .fn()
+              .mockResolvedValueOnce([mockWholeUnitListing]) // FOR UPDATE lock
+              .mockResolvedValueOnce([{ total: BigInt(0) }]), // SUM(slotsRequested)
+            user: {
+              findUnique: jest
+                .fn()
+                .mockImplementation(({ where }: { where: { id: string } }) => {
+                  if (where.id === "owner-123")
+                    return Promise.resolve(mockOwner);
+                  if (where.id === "user-123")
+                    return Promise.resolve(mockTenant);
+                  return Promise.resolve(null);
+                }),
+            },
+            booking: {
+              findFirst: jest.fn().mockResolvedValue(null),
+              create: jest
+                .fn()
+                .mockImplementation(
+                  (args: { data: Record<string, unknown> }) => {
+                    capturedCreateData = args.data;
+                    return Promise.resolve(mockBooking);
+                  }
+                ),
+            },
+          };
+          return callback(tx);
+        }
+      );
 
-      const result = await createBooking('listing-123', futureStart, futureEnd, 800);
+      const result = await createBooking(
+        "listing-123",
+        futureStart,
+        futureEnd,
+        800
+      );
 
       expect(result.success).toBe(true);
       expect(capturedCreateData).not.toBeNull();
       expect(capturedCreateData!.slotsRequested).toBe(4); // totalSlots, not default 1
     });
 
-    it('calls logBookingAudit with CREATED action', async () => {
-      ;(prisma.$transaction as jest.Mock).mockImplementation(async (callback: (tx: unknown) => Promise<unknown>) => {
-        const tx = {
-          $queryRaw: jest.fn()
-            .mockResolvedValueOnce([mockWholeUnitListing])
-            .mockResolvedValueOnce([{ total: BigInt(0) }]),
-          user: {
-            findUnique: jest.fn().mockImplementation(({ where }: { where: { id: string } }) => {
-              if (where.id === 'owner-123') return Promise.resolve(mockOwner);
-              if (where.id === 'user-123') return Promise.resolve(mockTenant);
-              return Promise.resolve(null);
-            }),
-          },
-          booking: {
-            findFirst: jest.fn().mockResolvedValue(null),
-            create: jest.fn().mockResolvedValue(mockBooking),
-          },
-        };
-        return callback(tx);
-      });
+    it("calls logBookingAudit with CREATED action", async () => {
+      (prisma.$transaction as jest.Mock).mockImplementation(
+        async (callback: (tx: unknown) => Promise<unknown>) => {
+          const tx = {
+            $queryRaw: jest
+              .fn()
+              .mockResolvedValueOnce([mockWholeUnitListing])
+              .mockResolvedValueOnce([{ total: BigInt(0) }]),
+            user: {
+              findUnique: jest
+                .fn()
+                .mockImplementation(({ where }: { where: { id: string } }) => {
+                  if (where.id === "owner-123")
+                    return Promise.resolve(mockOwner);
+                  if (where.id === "user-123")
+                    return Promise.resolve(mockTenant);
+                  return Promise.resolve(null);
+                }),
+            },
+            booking: {
+              findFirst: jest.fn().mockResolvedValue(null),
+              create: jest.fn().mockResolvedValue(mockBooking),
+            },
+          };
+          return callback(tx);
+        }
+      );
 
-      const result = await createBooking('listing-123', futureStart, futureEnd, 800);
+      const result = await createBooking(
+        "listing-123",
+        futureStart,
+        futureEnd,
+        800
+      );
 
       expect(result.success).toBe(true);
       expect(logBookingAudit).toHaveBeenCalledWith(
         expect.anything(),
-        expect.objectContaining({ action: 'CREATED', newStatus: 'PENDING', previousStatus: null }),
+        expect.objectContaining({
+          action: "CREATED",
+          newStatus: "PENDING",
+          previousStatus: null,
+        })
       );
     });
 
-    it('overrides client-provided slotsRequested=2 to totalSlots=4 for WHOLE_UNIT', async () => {
+    it("overrides client-provided slotsRequested=2 to totalSlots=4 for WHOLE_UNIT", async () => {
       let capturedCreateData: Record<string, unknown> | null = null;
 
-      ;(prisma.$transaction as jest.Mock).mockImplementation(async (callback: (tx: unknown) => Promise<unknown>) => {
-        const tx = {
-          $queryRaw: jest.fn()
-            .mockResolvedValueOnce([mockWholeUnitListing])
-            .mockResolvedValueOnce([{ total: BigInt(0) }]),
-          user: {
-            findUnique: jest.fn().mockImplementation(({ where }: { where: { id: string } }) => {
-              if (where.id === 'owner-123') return Promise.resolve(mockOwner);
-              if (where.id === 'user-123') return Promise.resolve(mockTenant);
-              return Promise.resolve(null);
-            }),
-          },
-          booking: {
-            findFirst: jest.fn().mockResolvedValue(null),
-            create: jest.fn().mockImplementation((args: { data: Record<string, unknown> }) => {
-              capturedCreateData = args.data;
-              return Promise.resolve(mockBooking);
-            }),
-          },
-        };
-        return callback(tx);
-      });
+      (prisma.$transaction as jest.Mock).mockImplementation(
+        async (callback: (tx: unknown) => Promise<unknown>) => {
+          const tx = {
+            $queryRaw: jest
+              .fn()
+              .mockResolvedValueOnce([mockWholeUnitListing])
+              .mockResolvedValueOnce([{ total: BigInt(0) }]),
+            user: {
+              findUnique: jest
+                .fn()
+                .mockImplementation(({ where }: { where: { id: string } }) => {
+                  if (where.id === "owner-123")
+                    return Promise.resolve(mockOwner);
+                  if (where.id === "user-123")
+                    return Promise.resolve(mockTenant);
+                  return Promise.resolve(null);
+                }),
+            },
+            booking: {
+              findFirst: jest.fn().mockResolvedValue(null),
+              create: jest
+                .fn()
+                .mockImplementation(
+                  (args: { data: Record<string, unknown> }) => {
+                    capturedCreateData = args.data;
+                    return Promise.resolve(mockBooking);
+                  }
+                ),
+            },
+          };
+          return callback(tx);
+        }
+      );
 
       // Client sends slotsRequested=2 but WHOLE_UNIT should force it to 4
-      const result = await createBooking('listing-123', futureStart, futureEnd, 800, 2);
+      const result = await createBooking(
+        "listing-123",
+        futureStart,
+        futureEnd,
+        800,
+        2
+      );
 
       expect(result.success).toBe(true);
       expect(capturedCreateData).not.toBeNull();
       expect(capturedCreateData!.slotsRequested).toBe(4); // Forced to totalSlots
     });
 
-    it('WHOLE_UNIT auto-set works without feature flag check (flag only gates creation)', async () => {
+    it("WHOLE_UNIT auto-set works without feature flag check (flag only gates creation)", async () => {
       // The WHOLE_UNIT override happens inside the transaction, independent of feature flags.
       // Feature flags only gate CREATING/CHANGING a listing to WHOLE_UNIT mode.
       let capturedCreateData: Record<string, unknown> | null = null;
 
-      ;(prisma.$transaction as jest.Mock).mockImplementation(async (callback: (tx: unknown) => Promise<unknown>) => {
-        const tx = {
-          $queryRaw: jest.fn()
-            .mockResolvedValueOnce([mockWholeUnitListing])
-            .mockResolvedValueOnce([{ total: BigInt(0) }]),
-          user: {
-            findUnique: jest.fn().mockImplementation(({ where }: { where: { id: string } }) => {
-              if (where.id === 'owner-123') return Promise.resolve(mockOwner);
-              if (where.id === 'user-123') return Promise.resolve(mockTenant);
-              return Promise.resolve(null);
-            }),
-          },
-          booking: {
-            findFirst: jest.fn().mockResolvedValue(null),
-            create: jest.fn().mockImplementation((args: { data: Record<string, unknown> }) => {
-              capturedCreateData = args.data;
-              return Promise.resolve(mockBooking);
-            }),
-          },
-        };
-        return callback(tx);
-      });
+      (prisma.$transaction as jest.Mock).mockImplementation(
+        async (callback: (tx: unknown) => Promise<unknown>) => {
+          const tx = {
+            $queryRaw: jest
+              .fn()
+              .mockResolvedValueOnce([mockWholeUnitListing])
+              .mockResolvedValueOnce([{ total: BigInt(0) }]),
+            user: {
+              findUnique: jest
+                .fn()
+                .mockImplementation(({ where }: { where: { id: string } }) => {
+                  if (where.id === "owner-123")
+                    return Promise.resolve(mockOwner);
+                  if (where.id === "user-123")
+                    return Promise.resolve(mockTenant);
+                  return Promise.resolve(null);
+                }),
+            },
+            booking: {
+              findFirst: jest.fn().mockResolvedValue(null),
+              create: jest
+                .fn()
+                .mockImplementation(
+                  (args: { data: Record<string, unknown> }) => {
+                    capturedCreateData = args.data;
+                    return Promise.resolve(mockBooking);
+                  }
+                ),
+            },
+          };
+          return callback(tx);
+        }
+      );
 
-      const result = await createBooking('listing-123', futureStart, futureEnd, 800);
+      const result = await createBooking(
+        "listing-123",
+        futureStart,
+        futureEnd,
+        800
+      );
 
       expect(result.success).toBe(true);
       expect(capturedCreateData!.slotsRequested).toBe(4);
     });
   });
 
-  describe('capacity check for WHOLE_UNIT', () => {
-    it('fails when any overlapping accepted booking exists (usedSlots > 0)', async () => {
-      ;(prisma.$transaction as jest.Mock).mockImplementation(async (callback: (tx: unknown) => Promise<unknown>) => {
-        const tx = {
-          $queryRaw: jest.fn()
-            .mockResolvedValueOnce([mockWholeUnitListing]) // FOR UPDATE lock
-            .mockResolvedValueOnce([{ total: BigInt(1) }]), // 1 slot already used
-          user: {
-            findUnique: jest.fn().mockImplementation(({ where }: { where: { id: string } }) => {
-              if (where.id === 'owner-123') return Promise.resolve(mockOwner);
-              return Promise.resolve(null);
-            }),
-          },
-          booking: {
-            findFirst: jest.fn().mockResolvedValue(null),
-          },
-        };
-        return callback(tx);
-      });
+  describe("capacity check for WHOLE_UNIT", () => {
+    it("fails when any overlapping accepted booking exists (usedSlots > 0)", async () => {
+      (prisma.$transaction as jest.Mock).mockImplementation(
+        async (callback: (tx: unknown) => Promise<unknown>) => {
+          const tx = {
+            $queryRaw: jest
+              .fn()
+              .mockResolvedValueOnce([mockWholeUnitListing]) // FOR UPDATE lock
+              .mockResolvedValueOnce([{ total: BigInt(1) }]), // 1 slot already used
+            user: {
+              findUnique: jest
+                .fn()
+                .mockImplementation(({ where }: { where: { id: string } }) => {
+                  if (where.id === "owner-123")
+                    return Promise.resolve(mockOwner);
+                  return Promise.resolve(null);
+                }),
+            },
+            booking: {
+              findFirst: jest.fn().mockResolvedValue(null),
+            },
+          };
+          return callback(tx);
+        }
+      );
 
-      const result = await createBooking('listing-123', futureStart, futureEnd, 800);
+      const result = await createBooking(
+        "listing-123",
+        futureStart,
+        futureEnd,
+        800
+      );
 
       expect(result.success).toBe(false);
       // usedSlots(1) + effectiveSlotsRequested(4) > totalSlots(4) → capacity exceeded
-      expect(result.error).toContain('Not enough available slots');
+      expect(result.error).toContain("Not enough available slots");
     });
   });
 
-  describe('SHARED listing regression', () => {
-    it('uses normal slotsRequested for SHARED listing (does not override)', async () => {
+  describe("SHARED listing regression", () => {
+    it("uses normal slotsRequested for SHARED listing (does not override)", async () => {
       let capturedCreateData: Record<string, unknown> | null = null;
 
-      ;(prisma.$transaction as jest.Mock).mockImplementation(async (callback: (tx: unknown) => Promise<unknown>) => {
-        const tx = {
-          $queryRaw: jest.fn()
-            .mockResolvedValueOnce([mockSharedListing])
-            .mockResolvedValueOnce([{ total: BigInt(0) }]),
-          user: {
-            findUnique: jest.fn().mockImplementation(({ where }: { where: { id: string } }) => {
-              if (where.id === 'owner-123') return Promise.resolve(mockOwner);
-              if (where.id === 'user-123') return Promise.resolve(mockTenant);
-              return Promise.resolve(null);
-            }),
-          },
-          booking: {
-            findFirst: jest.fn().mockResolvedValue(null),
-            create: jest.fn().mockImplementation((args: { data: Record<string, unknown> }) => {
-              capturedCreateData = args.data;
-              return Promise.resolve({
-                ...mockBooking,
-                listingId: 'listing-456',
-              });
-            }),
-          },
-        };
-        return callback(tx);
-      });
+      (prisma.$transaction as jest.Mock).mockImplementation(
+        async (callback: (tx: unknown) => Promise<unknown>) => {
+          const tx = {
+            $queryRaw: jest
+              .fn()
+              .mockResolvedValueOnce([mockSharedListing])
+              .mockResolvedValueOnce([{ total: BigInt(0) }]),
+            user: {
+              findUnique: jest
+                .fn()
+                .mockImplementation(({ where }: { where: { id: string } }) => {
+                  if (where.id === "owner-123")
+                    return Promise.resolve(mockOwner);
+                  if (where.id === "user-123")
+                    return Promise.resolve(mockTenant);
+                  return Promise.resolve(null);
+                }),
+            },
+            booking: {
+              findFirst: jest.fn().mockResolvedValue(null),
+              create: jest
+                .fn()
+                .mockImplementation(
+                  (args: { data: Record<string, unknown> }) => {
+                    capturedCreateData = args.data;
+                    return Promise.resolve({
+                      ...mockBooking,
+                      listingId: "listing-456",
+                    });
+                  }
+                ),
+            },
+          };
+          return callback(tx);
+        }
+      );
 
       // Client sends slotsRequested=1 for SHARED listing
-      const result = await createBooking('listing-456', futureStart, futureEnd, 500, 1);
+      const result = await createBooking(
+        "listing-456",
+        futureStart,
+        futureEnd,
+        500,
+        1
+      );
 
       expect(result.success).toBe(true);
       expect(capturedCreateData).not.toBeNull();
@@ -381,39 +480,55 @@ describe('createBooking — WHOLE_UNIT mode (Phase 3)', () => {
     });
   });
 
-  describe('date boundary: sequential bookings', () => {
-    it('allows non-overlapping sequential bookings for WHOLE_UNIT', async () => {
+  describe("date boundary: sequential bookings", () => {
+    it("allows non-overlapping sequential bookings for WHOLE_UNIT", async () => {
       // First booking: futureStart to futureEnd occupies all slots
       // Second booking: starts after first ends → should succeed
-      const secondStart = new Date(futureEnd.getTime() + 1 * 24 * 60 * 60 * 1000); // 1 day after first ends
-      const secondEnd = new Date(secondStart.getTime() + 60 * 24 * 60 * 60 * 1000); // 60 days later
+      const secondStart = new Date(
+        futureEnd.getTime() + 1 * 24 * 60 * 60 * 1000
+      ); // 1 day after first ends
+      const secondEnd = new Date(
+        secondStart.getTime() + 60 * 24 * 60 * 60 * 1000
+      ); // 60 days later
 
-      ;(prisma.$transaction as jest.Mock).mockImplementation(async (callback: (tx: unknown) => Promise<unknown>) => {
-        const tx = {
-          $queryRaw: jest.fn()
-            .mockResolvedValueOnce([mockWholeUnitListing]) // FOR UPDATE lock
-            .mockResolvedValueOnce([{ total: BigInt(0) }]), // No overlapping accepted bookings for this date range
-          user: {
-            findUnique: jest.fn().mockImplementation(({ where }: { where: { id: string } }) => {
-              if (where.id === 'owner-123') return Promise.resolve(mockOwner);
-              if (where.id === 'user-123') return Promise.resolve(mockTenant);
-              return Promise.resolve(null);
-            }),
-          },
-          booking: {
-            findFirst: jest.fn().mockResolvedValue(null), // No existing duplicate
-            create: jest.fn().mockResolvedValue({
-              ...mockBooking,
-              id: 'booking-456',
-              startDate: secondStart,
-              endDate: secondEnd,
-            }),
-          },
-        };
-        return callback(tx);
-      });
+      (prisma.$transaction as jest.Mock).mockImplementation(
+        async (callback: (tx: unknown) => Promise<unknown>) => {
+          const tx = {
+            $queryRaw: jest
+              .fn()
+              .mockResolvedValueOnce([mockWholeUnitListing]) // FOR UPDATE lock
+              .mockResolvedValueOnce([{ total: BigInt(0) }]), // No overlapping accepted bookings for this date range
+            user: {
+              findUnique: jest
+                .fn()
+                .mockImplementation(({ where }: { where: { id: string } }) => {
+                  if (where.id === "owner-123")
+                    return Promise.resolve(mockOwner);
+                  if (where.id === "user-123")
+                    return Promise.resolve(mockTenant);
+                  return Promise.resolve(null);
+                }),
+            },
+            booking: {
+              findFirst: jest.fn().mockResolvedValue(null), // No existing duplicate
+              create: jest.fn().mockResolvedValue({
+                ...mockBooking,
+                id: "booking-456",
+                startDate: secondStart,
+                endDate: secondEnd,
+              }),
+            },
+          };
+          return callback(tx);
+        }
+      );
 
-      const result = await createBooking('listing-123', secondStart, secondEnd, 800);
+      const result = await createBooking(
+        "listing-123",
+        secondStart,
+        secondEnd,
+        800
+      );
 
       expect(result.success).toBe(true);
     });

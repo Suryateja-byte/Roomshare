@@ -8,10 +8,7 @@
  * data.ts re-exports everything here for backward compatibility.
  */
 
-import {
-  MIN_QUERY_LENGTH,
-  MAX_QUERY_LENGTH,
-} from "@/lib/constants";
+import { MIN_QUERY_LENGTH, MAX_QUERY_LENGTH } from "@/lib/constants";
 
 // ============================================
 // Core Types
@@ -195,7 +192,7 @@ export function isValidQuery(query: string): boolean {
 // lat=0, lng=0 is in the Gulf of Guinea and not a valid address
 export function hasValidCoordinates(
   lat: number | null | undefined,
-  lng: number | null | undefined,
+  lng: number | null | undefined
 ): boolean {
   if (lat === null || lat === undefined || lng === null || lng === undefined) {
     return false;

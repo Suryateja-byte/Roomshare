@@ -1,15 +1,17 @@
-import { test, expect } from '../helpers';
+import { test, expect } from "../helpers";
 
 test.use({ viewport: { width: 390, height: 844 } });
-test.use({ storageState: 'playwright/.auth/user.json' });
+test.use({ storageState: "playwright/.auth/user.json" });
 
-test.describe('Mobile Notifications', () => {
+test.describe("Mobile Notifications", () => {
   test.beforeEach(async ({ page }) => {
-    await page.goto('/notifications');
-    await page.waitForLoadState('domcontentloaded');
+    await page.goto("/notifications");
+    await page.waitForLoadState("domcontentloaded");
   });
 
-  test('MN-01: Notifications page renders in mobile layout', async ({ page }) => {
+  test("MN-01: Notifications page renders in mobile layout", async ({
+    page,
+  }) => {
     // Wait for the notifications page to load
     await expect(
       page.locator('[data-testid="notifications-page"]').first()
@@ -17,7 +19,7 @@ test.describe('Mobile Notifications', () => {
 
     // Check heading is visible
     await expect(
-      page.getByRole('heading', { name: /notifications/i }).first()
+      page.getByRole("heading", { name: /notifications/i }).first()
     ).toBeVisible({ timeout: 10000 });
 
     // No horizontal overflow
@@ -27,7 +29,9 @@ test.describe('Mobile Notifications', () => {
     expect(noOverflow).toBe(true);
   });
 
-  test('MN-02: Notification items display correctly (no overflow)', async ({ page }) => {
+  test("MN-02: Notification items display correctly (no overflow)", async ({
+    page,
+  }) => {
     await expect(
       page.locator('[data-testid="notifications-page"]').first()
     ).toBeVisible({ timeout: 15000 });
@@ -54,7 +58,10 @@ test.describe('Mobile Notifications', () => {
     } else {
       // Empty state — should display "No notifications yet"
       await expect(
-        page.getByText(/no notifications/i).or(page.getByText(/all caught up/i)).first()
+        page
+          .getByText(/no notifications/i)
+          .or(page.getByText(/all caught up/i))
+          .first()
       ).toBeVisible({ timeout: 5000 });
     }
 
@@ -65,7 +72,7 @@ test.describe('Mobile Notifications', () => {
     expect(noOverflow).toBe(true);
   });
 
-  test('MN-03: Tap actions work (mark read, delete)', async ({ page }) => {
+  test("MN-03: Tap actions work (mark read, delete)", async ({ page }) => {
     await expect(
       page.locator('[data-testid="notifications-page"]').first()
     ).toBeVisible({ timeout: 15000 });
@@ -100,11 +107,11 @@ test.describe('Mobile Notifications', () => {
         }
       }
     } else {
-      test.skip(true, 'No notifications available to test actions');
+      test.skip(true, "No notifications available to test actions");
     }
   });
 
-  test('MN-04: Filter tabs render and are tappable', async ({ page }) => {
+  test("MN-04: Filter tabs render and are tappable", async ({ page }) => {
     await expect(
       page.locator('[data-testid="notifications-page"]').first()
     ).toBeVisible({ timeout: 15000 });
@@ -114,11 +121,13 @@ test.describe('Mobile Notifications', () => {
     await expect(filterTabs).toBeVisible({ timeout: 10000 });
 
     // Check "All" button
-    const allButton = filterTabs.getByRole('button', { name: /all/i }).first();
+    const allButton = filterTabs.getByRole("button", { name: /all/i }).first();
     await expect(allButton).toBeVisible({ timeout: 5000 });
 
     // Check "Unread" button
-    const unreadButton = filterTabs.getByRole('button', { name: /unread/i }).first();
+    const unreadButton = filterTabs
+      .getByRole("button", { name: /unread/i })
+      .first();
     await expect(unreadButton).toBeVisible({ timeout: 5000 });
 
     // Verify they fit within viewport (no overflow)
@@ -140,7 +149,7 @@ test.describe('Mobile Notifications', () => {
     expect(noOverflow).toBe(true);
   });
 
-  test('MN-05: Empty state renders correctly', async ({ page }) => {
+  test("MN-05: Empty state renders correctly", async ({ page }) => {
     await expect(
       page.locator('[data-testid="notifications-page"]').first()
     ).toBeVisible({ timeout: 15000 });
@@ -148,7 +157,9 @@ test.describe('Mobile Notifications', () => {
     // Switch to unread filter to potentially see empty state
     const filterTabs = page.locator('[data-testid="filter-tabs"]');
     if (await filterTabs.isVisible({ timeout: 5000 }).catch(() => false)) {
-      const unreadButton = filterTabs.getByRole('button', { name: /unread/i }).first();
+      const unreadButton = filterTabs
+        .getByRole("button", { name: /unread/i })
+        .first();
       if (await unreadButton.isVisible({ timeout: 3000 }).catch(() => false)) {
         await unreadButton.click();
         await page.waitForTimeout(500);
@@ -156,13 +167,17 @@ test.describe('Mobile Notifications', () => {
     }
 
     // Check if empty state or notification items are visible
-    const hasItems = await page.locator('[data-testid="notification-item"]').first()
-      .isVisible({ timeout: 3000 }).catch(() => false);
+    const hasItems = await page
+      .locator('[data-testid="notification-item"]')
+      .first()
+      .isVisible({ timeout: 3000 })
+      .catch(() => false);
 
     if (!hasItems) {
       // Should show empty state text
       await expect(
-        page.getByText(/no unread notifications/i)
+        page
+          .getByText(/no unread notifications/i)
           .or(page.getByText(/no notifications/i))
           .or(page.getByText(/all caught up/i))
           .first()
@@ -176,15 +191,18 @@ test.describe('Mobile Notifications', () => {
     expect(noOverflow).toBe(true);
   });
 
-  test('MN-06: Notification count or badge in header area', async ({ page }) => {
+  test("MN-06: Notification count or badge in header area", async ({
+    page,
+  }) => {
     await expect(
       page.locator('[data-testid="notifications-page"]').first()
     ).toBeVisible({ timeout: 15000 });
 
     // The notifications page header shows unread count text:
     // "You have X unread notification(s)" or "All caught up!"
-    const headerText = page.locator('[data-testid="notifications-page"]')
-      .locator('p')
+    const headerText = page
+      .locator('[data-testid="notifications-page"]')
+      .locator("p")
       .filter({ hasText: /unread|caught up/i })
       .first();
 

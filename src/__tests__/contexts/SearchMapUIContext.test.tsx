@@ -322,7 +322,7 @@ describe("SearchMapUIContext", () => {
       });
 
       expect(result.current.pendingFocus?.listingId).toBe(
-        "listing-hydration-test",
+        "listing-hydration-test"
       );
       expect(noOpShowMap).toHaveBeenCalledTimes(1);
 
@@ -333,7 +333,7 @@ describe("SearchMapUIContext", () => {
 
       // pendingFocus should still be present for the Map to consume
       expect(result.current.pendingFocus?.listingId).toBe(
-        "listing-hydration-test",
+        "listing-hydration-test"
       );
     });
 

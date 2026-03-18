@@ -4,7 +4,13 @@
  * Validates that the Filters button is visible and functional on mobile viewports.
  * The Filters button must be accessible to mobile users to access filter options.
  */
-import { test, expect, tags, filtersButton as getFiltersButton, openFilterModal } from "../helpers";
+import {
+  test,
+  expect,
+  tags,
+  filtersButton as getFiltersButton,
+  openFilterModal,
+} from "../helpers";
 
 test.describe("P0-1: Mobile Filters Accessibility", () => {
   // Test at iPhone-sized viewport

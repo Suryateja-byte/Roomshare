@@ -86,7 +86,9 @@ jest.mock("@/lib/search-alerts", () => ({
 }));
 
 jest.mock("@/lib/geocoding", () => ({
-  geocodeAddress: jest.fn().mockResolvedValue({ status: 'success', lat: 37.7749, lng: -122.4194 }),
+  geocodeAddress: jest
+    .fn()
+    .mockResolvedValue({ status: "success", lat: 37.7749, lng: -122.4194 }),
 }));
 
 describe("markListingDirty integration", () => {
@@ -101,28 +103,26 @@ describe("markListingDirty integration", () => {
       });
       mockPrisma.listing.update.mockResolvedValue({ id: "listing-1" });
 
-      const { updateListingStatus } = await import(
-        "@/app/actions/listing-status"
-      );
+      const { updateListingStatus } =
+        await import("@/app/actions/listing-status");
       await updateListingStatus("listing-1", "PAUSED");
 
       expect(mockMarkListingDirty).toHaveBeenCalledWith(
         "listing-1",
-        "status_changed",
+        "status_changed"
       );
     });
 
     it("marks dirty on view count increment", async () => {
       mockPrisma.listing.update.mockResolvedValue({ id: "listing-1" });
 
-      const { incrementViewCount } = await import(
-        "@/app/actions/listing-status"
-      );
+      const { incrementViewCount } =
+        await import("@/app/actions/listing-status");
       await incrementViewCount("listing-1");
 
       expect(mockMarkListingDirty).toHaveBeenCalledWith(
         "listing-1",
-        "view_count",
+        "view_count"
       );
     });
   });
@@ -135,9 +135,8 @@ describe("markListingDirty integration", () => {
       });
       mockPrisma.listing.update.mockResolvedValue({ id: "listing-1" });
 
-      const { updateListingStatus } = await import(
-        "@/app/actions/listing-status"
-      );
+      const { updateListingStatus } =
+        await import("@/app/actions/listing-status");
       const result = await updateListingStatus("listing-1", "ACTIVE");
 
       // Parent mutation should still succeed

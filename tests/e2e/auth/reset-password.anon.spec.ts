@@ -28,7 +28,7 @@ const FAKE_TOKEN = "a".repeat(64); // syntactically valid 64-char hex
  *  Returns null if not in dev mode (CI runs NODE_ENV=production). */
 async function getResetToken(
   request: APIRequestContext,
-  email: string,
+  email: string
 ): Promise<string | null> {
   const response = await request.post("/api/auth/forgot-password", {
     data: { email, turnstileToken: "" },
@@ -62,7 +62,7 @@ test.describe("RP: No Token", () => {
   test("RP-01  no token → invalid link state", async ({ page }) => {
     await page.goto("/reset-password");
     await expect(
-      page.getByRole("heading", { name: /Invalid Reset Link/i }),
+      page.getByRole("heading", { name: /Invalid Reset Link/i })
     ).toBeVisible({ timeout: timeouts.navigation });
     await expect(page.getByText(/invalid or has expired/i)).toBeVisible();
   });
@@ -72,7 +72,7 @@ test.describe("RP: No Token", () => {
   }) => {
     await page.goto("/reset-password");
     await expect(
-      page.getByRole("heading", { name: /Invalid Reset Link/i }),
+      page.getByRole("heading", { name: /Invalid Reset Link/i })
     ).toBeVisible({ timeout: timeouts.navigation });
 
     await page.getByRole("link", { name: /Request New Link/i }).click();
@@ -82,7 +82,7 @@ test.describe("RP: No Token", () => {
   test("RP-03  'Back to Login' navigates to /login", async ({ page }) => {
     await page.goto("/reset-password");
     await expect(
-      page.getByRole("heading", { name: /Invalid Reset Link/i }),
+      page.getByRole("heading", { name: /Invalid Reset Link/i })
     ).toBeVisible({ timeout: timeouts.navigation });
 
     await page.getByRole("link", { name: /Back to Login/i }).click();
@@ -97,14 +97,14 @@ test.describe("RP: Invalid Token", () => {
   test("RP-04  malformed token → invalid state", async ({ page }) => {
     await page.goto("/reset-password?token=not-a-valid-token");
     await expect(
-      page.getByRole("heading", { name: /Invalid Reset Link/i }),
+      page.getByRole("heading", { name: /Invalid Reset Link/i })
     ).toBeVisible({ timeout: timeouts.navigation });
   });
 
   test("RP-05  non-existent hex token → invalid state", async ({ page }) => {
     await page.goto(`/reset-password?token=${FAKE_TOKEN}`);
     await expect(
-      page.getByRole("heading", { name: /Invalid Reset Link/i }),
+      page.getByRole("heading", { name: /Invalid Reset Link/i })
     ).toBeVisible({ timeout: timeouts.navigation });
   });
 
@@ -139,12 +139,12 @@ test.describe("RP: Valid Token Form", () => {
     await page.goto(`/reset-password?token=${FAKE_TOKEN}`);
 
     await expect(
-      page.getByRole("heading", { name: /Set new password/i }),
+      page.getByRole("heading", { name: /Set new password/i })
     ).toBeVisible({ timeout: timeouts.navigation });
     await expect(page.locator("#password")).toBeVisible();
     await expect(page.locator("#confirmPassword")).toBeVisible();
     await expect(
-      page.getByRole("button", { name: /Reset Password/i }),
+      page.getByRole("button", { name: /Reset Password/i })
     ).toBeVisible();
   });
 
@@ -161,7 +161,7 @@ test.describe("RP: Valid Token Form", () => {
 
     await expect(page.locator("#confirmPassword")).toHaveAttribute(
       "type",
-      "password",
+      "password"
     );
   });
 
@@ -232,17 +232,15 @@ test.describe("RP: Valid Token Form", () => {
 
     // May match both password and confirm fields — use .first()
     await expect(
-      page.getByText(/at least 12 characters/i).first(),
+      page.getByText(/at least 12 characters/i).first()
     ).toBeVisible();
   });
 
-  test("RP-17  'Back to login' link navigates to /login", async ({
-    page,
-  }) => {
+  test("RP-17  'Back to login' link navigates to /login", async ({ page }) => {
     await mockTokenValidation(page);
     await page.goto(`/reset-password?token=${FAKE_TOKEN}`);
     await expect(
-      page.getByRole("heading", { name: /Set new password/i }),
+      page.getByRole("heading", { name: /Set new password/i })
     ).toBeVisible({ timeout: timeouts.navigation });
 
     await page.getByText(/Back to login/i).click();
@@ -259,12 +257,15 @@ test.describe.serial("RP: Full Flow", () => {
   test("RP-12  complete forgot → reset flow", async ({ page, request }) => {
     // Step 1: Get a real token (returns null in CI where NODE_ENV != development)
     sharedToken = await getResetToken(request, "e2e-test@roomshare.dev");
-    test.skip(!sharedToken, "Reset token not available (NODE_ENV != development)");
+    test.skip(
+      !sharedToken,
+      "Reset token not available (NODE_ENV != development)"
+    );
 
     // Step 2: Navigate to reset page with token
     await page.goto(`/reset-password?token=${sharedToken}`);
     await expect(
-      page.getByRole("heading", { name: /Set new password/i }),
+      page.getByRole("heading", { name: /Set new password/i })
     ).toBeVisible({ timeout: timeouts.navigation });
 
     // Step 3: Fill form and submit
@@ -275,7 +276,7 @@ test.describe.serial("RP: Full Flow", () => {
 
     // Step 4: Success state
     await expect(
-      page.getByRole("heading", { name: /Password Reset!/i }),
+      page.getByRole("heading", { name: /Password Reset!/i })
     ).toBeVisible({ timeout: timeouts.navigation });
   });
 
@@ -288,7 +289,7 @@ test.describe.serial("RP: Full Flow", () => {
     test.skip(!token, "Reset token not available (NODE_ENV != development)");
     await page.goto(`/reset-password?token=${token}`);
     await expect(
-      page.getByRole("heading", { name: /Set new password/i }),
+      page.getByRole("heading", { name: /Set new password/i })
     ).toBeVisible({ timeout: timeouts.navigation });
 
     await page.locator("#password").fill("AnotherSecure123!");
@@ -296,7 +297,7 @@ test.describe.serial("RP: Full Flow", () => {
     await page.getByRole("button", { name: /Reset Password/i }).click();
 
     await expect(
-      page.getByRole("heading", { name: /Password Reset!/i }),
+      page.getByRole("heading", { name: /Password Reset!/i })
     ).toBeVisible({ timeout: timeouts.navigation });
 
     await page.getByRole("link", { name: /Log in/i }).click();
@@ -309,7 +310,7 @@ test.describe.serial("RP: Full Flow", () => {
 
     await page.goto(`/reset-password?token=${sharedToken}`);
     await expect(
-      page.getByRole("heading", { name: /Invalid Reset Link/i }),
+      page.getByRole("heading", { name: /Invalid Reset Link/i })
     ).toBeVisible({ timeout: timeouts.navigation });
   });
 });
@@ -343,7 +344,9 @@ test.describe("RP: Edge Cases", () => {
     await page.locator("#confirmPassword").fill("ValidPassword123!");
     await page.getByRole("button", { name: /Reset Password/i }).click();
 
-    await expect(page.getByText(/Something went wrong|server error/i)).toBeVisible();
+    await expect(
+      page.getByText(/Something went wrong|server error/i)
+    ).toBeVisible();
   });
 
   test("RP-16  loading state during submission", async ({ page }) => {

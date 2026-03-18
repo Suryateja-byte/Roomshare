@@ -28,7 +28,11 @@ export async function fetchMoreListings(
 
     // Rate limiting
     const headersList = await headers();
-    const rateLimitResult = await checkServerComponentRateLimit(headersList, "search", "/search");
+    const rateLimitResult = await checkServerComponentRateLimit(
+      headersList,
+      "search",
+      "/search"
+    );
     if (!rateLimitResult.allowed) {
       throw new Error("Rate limited");
     }
@@ -57,7 +61,7 @@ export async function fetchMoreListings(
             limit: DEFAULT_PAGE_SIZE,
           }),
           DEFAULT_TIMEOUTS.DATABASE,
-          'fetchMoreListings-executeSearchV2'
+          "fetchMoreListings-executeSearchV2"
         );
 
         if (v2Result.paginatedResult) {
@@ -78,10 +82,14 @@ export async function fetchMoreListings(
     // Return empty result to signal load more is unavailable via V1
     // The initial page was already loaded via SSR; continuing with page-based
     // pagination would return duplicate first-page results
-    console.warn("[fetchMoreListings] V1 fallback reached - cursor pagination not supported");
+    console.warn(
+      "[fetchMoreListings] V1 fallback reached - cursor pagination not supported"
+    );
     return { items: [], nextCursor: null, hasNextPage: false };
   } catch (error) {
-    logger.sync.error('[fetchMoreListings] Unexpected error', { error: sanitizeErrorMessage(error) });
-    throw new Error('Failed to load more listings');
+    logger.sync.error("[fetchMoreListings] Unexpected error", {
+      error: sanitizeErrorMessage(error),
+    });
+    throw new Error("Failed to load more listings");
   }
 }

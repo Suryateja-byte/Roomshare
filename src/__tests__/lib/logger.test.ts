@@ -8,172 +8,172 @@
  * - Sensitive field names are redacted
  */
 
-import { redactSensitive, sanitizeErrorMessage } from '@/lib/logger';
+import { redactSensitive, sanitizeErrorMessage } from "@/lib/logger";
 
-describe('Logger PII Redaction', () => {
-  describe('redactSensitive', () => {
-    describe('Email redaction', () => {
-      it('redacts email addresses in strings', () => {
-        const input = 'Contact user at john.doe@example.com for details';
+describe("Logger PII Redaction", () => {
+  describe("redactSensitive", () => {
+    describe("Email redaction", () => {
+      it("redacts email addresses in strings", () => {
+        const input = "Contact user at john.doe@example.com for details";
         const result = redactSensitive(input);
-        expect(result).toBe('Contact user at [REDACTED] for details');
-        expect(result).not.toContain('john.doe@example.com');
+        expect(result).toBe("Contact user at [REDACTED] for details");
+        expect(result).not.toContain("john.doe@example.com");
       });
 
-      it('redacts multiple email addresses', () => {
-        const input = 'From: sender@test.com To: receiver@test.org';
+      it("redacts multiple email addresses", () => {
+        const input = "From: sender@test.com To: receiver@test.org";
         const result = redactSensitive(input) as string;
-        expect(result).not.toContain('sender@test.com');
-        expect(result).not.toContain('receiver@test.org');
-        expect(result).toBe('From: [REDACTED] To: [REDACTED]');
+        expect(result).not.toContain("sender@test.com");
+        expect(result).not.toContain("receiver@test.org");
+        expect(result).toBe("From: [REDACTED] To: [REDACTED]");
       });
 
-      it('redacts email addresses in object values', () => {
+      it("redacts email addresses in object values", () => {
         const input = {
-          user: 'john',
-          contact: 'john@example.com',
+          user: "john",
+          contact: "john@example.com",
         };
         const result = redactSensitive(input) as Record<string, unknown>;
-        expect(result.contact).toBe('[REDACTED]');
+        expect(result.contact).toBe("[REDACTED]");
       });
     });
 
-    describe('Phone number redaction', () => {
-      it('redacts US phone numbers with dashes', () => {
-        const input = 'Call me at 555-123-4567';
+    describe("Phone number redaction", () => {
+      it("redacts US phone numbers with dashes", () => {
+        const input = "Call me at 555-123-4567";
         const result = redactSensitive(input);
-        expect(result).toBe('Call me at [REDACTED_PHONE]');
+        expect(result).toBe("Call me at [REDACTED_PHONE]");
       });
 
-      it('redacts US phone numbers with dots', () => {
-        const input = 'Phone: 555.123.4567';
+      it("redacts US phone numbers with dots", () => {
+        const input = "Phone: 555.123.4567";
         const result = redactSensitive(input);
-        expect(result).toBe('Phone: [REDACTED_PHONE]');
+        expect(result).toBe("Phone: [REDACTED_PHONE]");
       });
 
-      it('redacts US phone numbers with parentheses', () => {
-        const input = 'Call (555) 123-4567 today';
+      it("redacts US phone numbers with parentheses", () => {
+        const input = "Call (555) 123-4567 today";
         const result = redactSensitive(input);
-        expect(result).toBe('Call [REDACTED_PHONE] today');
+        expect(result).toBe("Call [REDACTED_PHONE] today");
       });
 
-      it('redacts international phone numbers', () => {
-        const input = 'International: +1-555-123-4567';
+      it("redacts international phone numbers", () => {
+        const input = "International: +1-555-123-4567";
         const result = redactSensitive(input);
-        expect(result).toBe('International: [REDACTED_PHONE]');
+        expect(result).toBe("International: [REDACTED_PHONE]");
       });
 
-      it('redacts phone numbers in object values', () => {
-        const input = { phone: '555-123-4567' };
+      it("redacts phone numbers in object values", () => {
+        const input = { phone: "555-123-4567" };
         const result = redactSensitive(input) as Record<string, unknown>;
-        expect(result.phone).toBe('[REDACTED_PHONE]');
+        expect(result.phone).toBe("[REDACTED_PHONE]");
       });
     });
 
-    describe('Address redaction', () => {
-      it('redacts street addresses', () => {
-        const input = 'Located at 123 Main Street, Apt 4B';
+    describe("Address redaction", () => {
+      it("redacts street addresses", () => {
+        const input = "Located at 123 Main Street, Apt 4B";
         const result = redactSensitive(input);
-        expect(result).toBe('Located at [REDACTED_ADDRESS]');
+        expect(result).toBe("Located at [REDACTED_ADDRESS]");
       });
 
-      it('redacts addresses with common suffixes', () => {
+      it("redacts addresses with common suffixes", () => {
         const addresses = [
-          '456 Oak Ave',
-          '789 Pine Blvd',
-          '101 Cedar Dr',
-          '202 Elm Lane',
-          '303 Maple Court',
+          "456 Oak Ave",
+          "789 Pine Blvd",
+          "101 Cedar Dr",
+          "202 Elm Lane",
+          "303 Maple Court",
         ];
         for (const addr of addresses) {
           const result = redactSensitive(addr);
-          expect(result).toBe('[REDACTED_ADDRESS]');
+          expect(result).toBe("[REDACTED_ADDRESS]");
         }
       });
     });
 
-    describe('Sensitive field name redaction', () => {
-      it('redacts password fields', () => {
-        const input = { password: 'secret123' };
+    describe("Sensitive field name redaction", () => {
+      it("redacts password fields", () => {
+        const input = { password: "secret123" };
         const result = redactSensitive(input) as Record<string, unknown>;
-        expect(result.password).toBe('[REDACTED]');
+        expect(result.password).toBe("[REDACTED]");
       });
 
-      it('redacts token fields', () => {
-        const input = { accessToken: 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.xxx' };
+      it("redacts token fields", () => {
+        const input = {
+          accessToken: "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.xxx",
+        };
         const result = redactSensitive(input) as Record<string, unknown>;
-        expect(result.accessToken).toBe('[REDACTED]');
+        expect(result.accessToken).toBe("[REDACTED]");
       });
 
-      it('redacts API key fields', () => {
-        const input = { apiKey: 'sk_live_abc123', api_key: 'pk_test_xyz789' };
+      it("redacts API key fields", () => {
+        const input = { apiKey: "sk_live_abc123", api_key: "pk_test_xyz789" };
         const result = redactSensitive(input) as Record<string, unknown>;
-        expect(result.apiKey).toBe('[REDACTED]');
-        expect(result.api_key).toBe('[REDACTED]');
+        expect(result.apiKey).toBe("[REDACTED]");
+        expect(result.api_key).toBe("[REDACTED]");
       });
 
-      it('redacts credit card fields', () => {
-        const input = { creditCard: '4111111111111111', cvv: '123' };
+      it("redacts credit card fields", () => {
+        const input = { creditCard: "4111111111111111", cvv: "123" };
         const result = redactSensitive(input) as Record<string, unknown>;
-        expect(result.creditCard).toBe('[REDACTED]');
-        expect(result.cvv).toBe('[REDACTED]');
+        expect(result.creditCard).toBe("[REDACTED]");
+        expect(result.cvv).toBe("[REDACTED]");
       });
 
-      it('redacts SSN fields', () => {
-        const input = { ssn: '123-45-6789' };
+      it("redacts SSN fields", () => {
+        const input = { ssn: "123-45-6789" };
         const result = redactSensitive(input) as Record<string, unknown>;
-        expect(result.ssn).toBe('[REDACTED]');
+        expect(result.ssn).toBe("[REDACTED]");
       });
 
-      it('handles case-insensitive field matching', () => {
-        const input = { PASSWORD: 'secret', Token: 'abc', APIKEY: '123' };
+      it("handles case-insensitive field matching", () => {
+        const input = { PASSWORD: "secret", Token: "abc", APIKEY: "123" };
         const result = redactSensitive(input) as Record<string, unknown>;
-        expect(result.PASSWORD).toBe('[REDACTED]');
-        expect(result.Token).toBe('[REDACTED]');
-        expect(result.APIKEY).toBe('[REDACTED]');
+        expect(result.PASSWORD).toBe("[REDACTED]");
+        expect(result.Token).toBe("[REDACTED]");
+        expect(result.APIKEY).toBe("[REDACTED]");
       });
     });
 
-    describe('JWT token redaction', () => {
-      it('redacts JWT tokens in strings', () => {
-        const jwt = 'Bearer eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJzdWIiOiIxMjM0NTY3ODkwIn0.dozjgNryP4J3jVmNHl0w5N_XgL0n3I9PlFUP0THsR8U';
+    describe("JWT token redaction", () => {
+      it("redacts JWT tokens in strings", () => {
+        const jwt =
+          "Bearer eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJzdWIiOiIxMjM0NTY3ODkwIn0.dozjgNryP4J3jVmNHl0w5N_XgL0n3I9PlFUP0THsR8U";
         const input = `Authorization: ${jwt}`;
         const result = redactSensitive(input);
-        expect(result).not.toContain('eyJ');
-        expect(result).toContain('[REDACTED]');
+        expect(result).not.toContain("eyJ");
+        expect(result).toContain("[REDACTED]");
       });
     });
 
-    describe('Nested object handling', () => {
-      it('redacts nested objects', () => {
+    describe("Nested object handling", () => {
+      it("redacts nested objects", () => {
         const input = {
           user: {
-            email: 'test@example.com',
+            email: "test@example.com",
             profile: {
-              password: 'secret',
+              password: "secret",
             },
           },
         };
         const result = redactSensitive(input) as Record<string, unknown>;
         const user = result.user as Record<string, unknown>;
-        expect(user.email).toBe('[REDACTED]');
+        expect(user.email).toBe("[REDACTED]");
         const profile = user.profile as Record<string, unknown>;
-        expect(profile.password).toBe('[REDACTED]');
+        expect(profile.password).toBe("[REDACTED]");
       });
 
-      it('redacts arrays of objects', () => {
-        const input = [
-          { email: 'a@example.com' },
-          { email: 'b@example.com' },
-        ];
+      it("redacts arrays of objects", () => {
+        const input = [{ email: "a@example.com" }, { email: "b@example.com" }];
         const result = redactSensitive(input) as Array<Record<string, unknown>>;
-        expect(result[0].email).toBe('[REDACTED]');
-        expect(result[1].email).toBe('[REDACTED]');
+        expect(result[0].email).toBe("[REDACTED]");
+        expect(result[1].email).toBe("[REDACTED]");
       });
 
-      it('handles max depth to prevent infinite recursion', () => {
+      it("handles max depth to prevent infinite recursion", () => {
         // Create deeply nested object
-        let deep: Record<string, unknown> = { password: 'secret' };
+        let deep: Record<string, unknown> = { password: "secret" };
         for (let i = 0; i < 15; i++) {
           deep = { nested: deep };
         }
@@ -183,123 +183,131 @@ describe('Logger PII Redaction', () => {
       });
     });
 
-    describe('Safe value handling', () => {
-      it('handles null and undefined', () => {
+    describe("Safe value handling", () => {
+      it("handles null and undefined", () => {
         expect(redactSensitive(null)).toBeNull();
         expect(redactSensitive(undefined)).toBeUndefined();
       });
 
-      it('handles primitive values', () => {
+      it("handles primitive values", () => {
         expect(redactSensitive(123)).toBe(123);
         expect(redactSensitive(true)).toBe(true);
-        expect(redactSensitive('safe string')).toBe('safe string');
+        expect(redactSensitive("safe string")).toBe("safe string");
       });
 
-      it('preserves non-sensitive fields', () => {
+      it("preserves non-sensitive fields", () => {
         const input = {
-          id: 'abc123',
-          name: 'John',
-          status: 'active',
+          id: "abc123",
+          name: "John",
+          status: "active",
           count: 42,
         };
         const result = redactSensitive(input) as Record<string, unknown>;
-        expect(result.id).toBe('abc123');
-        expect(result.name).toBe('John');
-        expect(result.status).toBe('active');
+        expect(result.id).toBe("abc123");
+        expect(result.name).toBe("John");
+        expect(result.status).toBe("active");
         expect(result.count).toBe(42);
       });
     });
   });
 
-  describe('sanitizeErrorMessage', () => {
-    it('handles null and undefined', () => {
-      expect(sanitizeErrorMessage(null)).toBe('Unknown error');
-      expect(sanitizeErrorMessage(undefined)).toBe('Unknown error');
+  describe("sanitizeErrorMessage", () => {
+    it("handles null and undefined", () => {
+      expect(sanitizeErrorMessage(null)).toBe("Unknown error");
+      expect(sanitizeErrorMessage(undefined)).toBe("Unknown error");
     });
 
-    it('handles non-Error objects', () => {
-      expect(sanitizeErrorMessage(42)).toBe('Unknown error');
-      expect(sanitizeErrorMessage({ foo: 'bar' })).toBe('Unknown error');
+    it("handles non-Error objects", () => {
+      expect(sanitizeErrorMessage(42)).toBe("Unknown error");
+      expect(sanitizeErrorMessage({ foo: "bar" })).toBe("Unknown error");
     });
 
-    it('extracts Error subclass name', () => {
-      const result = sanitizeErrorMessage(new TypeError('bad type'));
-      expect(result).toBe('TypeError: bad type');
+    it("extracts Error subclass name", () => {
+      const result = sanitizeErrorMessage(new TypeError("bad type"));
+      expect(result).toBe("TypeError: bad type");
     });
 
-    it('handles plain string errors', () => {
-      expect(sanitizeErrorMessage('something broke')).toBe('something broke');
+    it("handles plain string errors", () => {
+      expect(sanitizeErrorMessage("something broke")).toBe("something broke");
     });
 
-    it('truncates messages over 200 characters', () => {
-      const longMsg = 'x'.repeat(250);
+    it("truncates messages over 200 characters", () => {
+      const longMsg = "x".repeat(250);
       const result = sanitizeErrorMessage(new Error(longMsg));
-      expect(result).toContain('...[truncated]');
+      expect(result).toContain("...[truncated]");
       expect(result.length).toBeLessThan(250);
     });
 
-    it('strips connection strings', () => {
-      const err = new Error('Failed to connect to postgres://user:pass@host:5432/db');
+    it("strips connection strings", () => {
+      const err = new Error(
+        "Failed to connect to postgres://user:pass@host:5432/db"
+      );
       const result = sanitizeErrorMessage(err);
-      expect(result).toContain('[REDACTED_URL]');
-      expect(result).not.toContain('user:pass');
+      expect(result).toContain("[REDACTED_URL]");
+      expect(result).not.toContain("user:pass");
     });
 
-    it('strips file system paths', () => {
-      const err = new Error('Error in /home/user/app/src/index.ts');
+    it("strips file system paths", () => {
+      const err = new Error("Error in /home/user/app/src/index.ts");
       const result = sanitizeErrorMessage(err);
-      expect(result).toContain('[REDACTED_PATH]');
-      expect(result).not.toContain('/home/user');
+      expect(result).toContain("[REDACTED_PATH]");
+      expect(result).not.toContain("/home/user");
     });
 
-    it('strips SQL fragments completely', () => {
-      const err = new Error('Failed: SELECT * FROM users WHERE id = 1');
+    it("strips SQL fragments completely", () => {
+      const err = new Error("Failed: SELECT * FROM users WHERE id = 1");
       const result = sanitizeErrorMessage(err);
-      expect(result).toContain('[SQL_REDACTED]');
-      expect(result).not.toContain('SELECT');
-      expect(result).not.toContain('users');
-      expect(result).not.toContain('WHERE');
-      expect(result).not.toContain('id = 1');
+      expect(result).toContain("[SQL_REDACTED]");
+      expect(result).not.toContain("SELECT");
+      expect(result).not.toContain("users");
+      expect(result).not.toContain("WHERE");
+      expect(result).not.toContain("id = 1");
     });
 
-    it('strips complete SQL statements without leaking column names', () => {
-      const err = new Error('Failed: SELECT user_data, email FROM users WHERE id = 1');
+    it("strips complete SQL statements without leaking column names", () => {
+      const err = new Error(
+        "Failed: SELECT user_data, email FROM users WHERE id = 1"
+      );
       const result = sanitizeErrorMessage(err);
-      expect(result).not.toContain('user_data');
-      expect(result).not.toContain('email');
-      expect(result).not.toContain('WHERE');
-      expect(result).not.toContain('id = 1');
-      expect(result).toContain('[SQL_REDACTED]');
+      expect(result).not.toContain("user_data");
+      expect(result).not.toContain("email");
+      expect(result).not.toContain("WHERE");
+      expect(result).not.toContain("id = 1");
+      expect(result).toContain("[SQL_REDACTED]");
     });
 
-    it('strips UPDATE SET clauses', () => {
-      const err = new Error("Failed: UPDATE users SET name = 'John' WHERE id = 1");
+    it("strips UPDATE SET clauses", () => {
+      const err = new Error(
+        "Failed: UPDATE users SET name = 'John' WHERE id = 1"
+      );
       const result = sanitizeErrorMessage(err);
-      expect(result).not.toContain('SET');
-      expect(result).not.toContain('name');
-      expect(result).not.toContain('John');
-      expect(result).not.toContain('WHERE');
+      expect(result).not.toContain("SET");
+      expect(result).not.toContain("name");
+      expect(result).not.toContain("John");
+      expect(result).not.toContain("WHERE");
     });
 
-    it('strips INSERT VALUES', () => {
-      const err = new Error("Failed: INSERT INTO users (email, name) VALUES ('a@b.com', 'Test')");
+    it("strips INSERT VALUES", () => {
+      const err = new Error(
+        "Failed: INSERT INTO users (email, name) VALUES ('a@b.com', 'Test')"
+      );
       const result = sanitizeErrorMessage(err);
       expect(result).not.toContain("a@b.com");
-      expect(result).not.toContain('Test');
-      expect(result).not.toContain('email');
+      expect(result).not.toContain("Test");
+      expect(result).not.toContain("email");
     });
 
-    it('handles SQL without trailing space', () => {
-      const err = new Error('Query: SELECT * FROM users');
+    it("handles SQL without trailing space", () => {
+      const err = new Error("Query: SELECT * FROM users");
       const result = sanitizeErrorMessage(err);
-      expect(result).not.toContain('SELECT');
-      expect(result).not.toContain('users');
+      expect(result).not.toContain("SELECT");
+      expect(result).not.toContain("users");
     });
 
-    it('redacts email addresses in error messages', () => {
-      const err = new Error('User john@example.com not found');
+    it("redacts email addresses in error messages", () => {
+      const err = new Error("User john@example.com not found");
       const result = sanitizeErrorMessage(err);
-      expect(result).not.toContain('john@example.com');
+      expect(result).not.toContain("john@example.com");
     });
   });
 });

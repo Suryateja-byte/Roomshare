@@ -86,7 +86,14 @@ describe("PersistentMapWrapper - Networking & Race Conditions (P1-7)", () => {
       status: 200,
       headers: new Headers({ "x-request-id": "test-123" }),
       json: async () => ({
-        listings: [{ id: "1", title: "Test", price: 1000, location: { lat: 37.7, lng: -122.4 } }],
+        listings: [
+          {
+            id: "1",
+            title: "Test",
+            price: 1000,
+            location: { lat: 37.7, lng: -122.4 },
+          },
+        ],
       }),
     });
   });
@@ -426,7 +433,7 @@ describe("PersistentMapWrapper - Networking & Race Conditions (P1-7)", () => {
       await waitFor(() => {
         expect(getByTestId("dynamic-map")).toHaveAttribute(
           "data-listings-count",
-          "1",
+          "1"
         );
       });
     });
@@ -595,7 +602,9 @@ describe("PersistentMapWrapper - Networking & Race Conditions (P1-7)", () => {
       // P2-FIX (#151): Changed from alert to status role since this is informational, not an error
       const infoBanner = queryByRole("status");
       expect(infoBanner).toBeInTheDocument();
-      expect(infoBanner?.textContent).toContain("Zoom in further to load listings in this area");
+      expect(infoBanner?.textContent).toContain(
+        "Zoom in further to load listings in this area"
+      );
 
       // Should NOT fetch when viewport exceeds max span — early return preserves existing map data
       await act(async () => {

@@ -28,7 +28,9 @@ export interface CreateNotificationInput {
  * Internal-only notification creation helper.
  * Callers are responsible for authorization checks in their own flow.
  */
-export async function createInternalNotification(input: CreateNotificationInput) {
+export async function createInternalNotification(
+  input: CreateNotificationInput
+) {
   try {
     await prisma.notification.create({
       data: {

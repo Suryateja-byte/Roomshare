@@ -41,7 +41,7 @@ function evictOldest(): void {
  * On cache miss, calls `generateQueryEmbedding` and stores the result.
  */
 export async function getCachedQueryEmbedding(
-  query: string,
+  query: string
 ): Promise<number[]> {
   const key = cacheKey(query);
 

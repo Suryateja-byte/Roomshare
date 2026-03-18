@@ -17,11 +17,11 @@ describe("MapMovedBanner", () => {
           variant="map"
           onSearch={mockOnSearch}
           onReset={mockOnReset}
-        />,
+        />
       );
 
       expect(
-        screen.getByRole("button", { name: /search this area/i }),
+        screen.getByRole("button", { name: /search this area/i })
       ).toBeInTheDocument();
     });
 
@@ -31,11 +31,11 @@ describe("MapMovedBanner", () => {
           variant="map"
           onSearch={mockOnSearch}
           onReset={mockOnReset}
-        />,
+        />
       );
 
       expect(
-        screen.getByRole("button", { name: /reset map view/i }),
+        screen.getByRole("button", { name: /reset map view/i })
       ).toBeInTheDocument();
     });
 
@@ -46,11 +46,11 @@ describe("MapMovedBanner", () => {
           variant="map"
           onSearch={mockOnSearch}
           onReset={mockOnReset}
-        />,
+        />
       );
 
       await user.click(
-        screen.getByRole("button", { name: /search this area/i }),
+        screen.getByRole("button", { name: /search this area/i })
       );
       expect(mockOnSearch).toHaveBeenCalledTimes(1);
     });
@@ -62,7 +62,7 @@ describe("MapMovedBanner", () => {
           variant="map"
           onSearch={mockOnSearch}
           onReset={mockOnReset}
-        />,
+        />
       );
 
       await user.click(screen.getByRole("button", { name: /reset map view/i }));
@@ -75,7 +75,7 @@ describe("MapMovedBanner", () => {
           variant="map"
           onSearch={mockOnSearch}
           onReset={mockOnReset}
-        />,
+        />
       );
 
       const wrapper = container.firstChild as HTMLElement;
@@ -92,11 +92,11 @@ describe("MapMovedBanner", () => {
           variant="list"
           onSearch={mockOnSearch}
           onReset={mockOnReset}
-        />,
+        />
       );
 
       expect(
-        screen.getByText(/map moved — results not updated/i),
+        screen.getByText(/map moved — results not updated/i)
       ).toBeInTheDocument();
     });
 
@@ -106,11 +106,11 @@ describe("MapMovedBanner", () => {
           variant="list"
           onSearch={mockOnSearch}
           onReset={mockOnReset}
-        />,
+        />
       );
 
       expect(
-        screen.getByRole("button", { name: /search this area/i }),
+        screen.getByRole("button", { name: /search this area/i })
       ).toBeInTheDocument();
     });
 
@@ -120,11 +120,11 @@ describe("MapMovedBanner", () => {
           variant="list"
           onSearch={mockOnSearch}
           onReset={mockOnReset}
-        />,
+        />
       );
 
       expect(
-        screen.getByRole("button", { name: /reset map view/i }),
+        screen.getByRole("button", { name: /reset map view/i })
       ).toBeInTheDocument();
     });
 
@@ -135,11 +135,11 @@ describe("MapMovedBanner", () => {
           variant="list"
           onSearch={mockOnSearch}
           onReset={mockOnReset}
-        />,
+        />
       );
 
       await user.click(
-        screen.getByRole("button", { name: /search this area/i }),
+        screen.getByRole("button", { name: /search this area/i })
       );
       expect(mockOnSearch).toHaveBeenCalledTimes(1);
     });
@@ -151,7 +151,7 @@ describe("MapMovedBanner", () => {
           variant="list"
           onSearch={mockOnSearch}
           onReset={mockOnReset}
-        />,
+        />
       );
 
       await user.click(screen.getByRole("button", { name: /reset map view/i }));
@@ -164,7 +164,7 @@ describe("MapMovedBanner", () => {
           variant="list"
           onSearch={mockOnSearch}
           onReset={mockOnReset}
-        />,
+        />
       );
 
       const wrapper = container.firstChild as HTMLElement;
@@ -177,7 +177,7 @@ describe("MapMovedBanner", () => {
           variant="list"
           onSearch={mockOnSearch}
           onReset={mockOnReset}
-        />,
+        />
       );
 
       // MapPin icon should be present (lucide-react icons have role="img" or can be found via class)
@@ -194,13 +194,13 @@ describe("MapMovedBanner", () => {
           variant="map"
           onSearch={mockOnSearch}
           onReset={mockOnReset}
-        />,
+        />
       );
 
       // Tab to first button and press Enter
       await user.tab();
       expect(
-        screen.getByRole("button", { name: /search this area/i }),
+        screen.getByRole("button", { name: /search this area/i })
       ).toHaveFocus();
 
       await user.keyboard("{Enter}");
@@ -214,13 +214,13 @@ describe("MapMovedBanner", () => {
           variant="list"
           onSearch={mockOnSearch}
           onReset={mockOnReset}
-        />,
+        />
       );
 
       // Tab to first button and press Enter
       await user.tab();
       expect(
-        screen.getByRole("button", { name: /search this area/i }),
+        screen.getByRole("button", { name: /search this area/i })
       ).toHaveFocus();
 
       await user.keyboard("{Enter}");

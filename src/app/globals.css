@@ -122,10 +122,13 @@
   body {
     background-color: hsl(var(--background));
     color: hsl(var(--foreground));
-    font-feature-settings: 'rlig' 1, 'calt' 1;
+    font-feature-settings:
+      "rlig" 1,
+      "calt" 1;
     -webkit-font-smoothing: antialiased;
     -moz-osx-font-smoothing: grayscale;
-    font-family: var(--font-inter), 'Inter-fallback', ui-sans-serif, system-ui, sans-serif;
+    font-family:
+      var(--font-inter), "Inter-fallback", ui-sans-serif, system-ui, sans-serif;
     /* Fluid base font size: scales with viewport for dynamic type support.
        Respects OS font-size preferences since rem is relative to root.
        Range: 14px (320vw) → 16px (1280vw) */
@@ -136,8 +139,8 @@
 
   /* Font fallback with size-adjust to minimize CLS during font swap */
   @font-face {
-    font-family: 'Inter-fallback';
-    src: local('Arial');
+    font-family: "Inter-fallback";
+    src: local("Arial");
     size-adjust: 107%;
     ascent-override: 90%;
     descent-override: 22%;
@@ -159,7 +162,6 @@
 }
 
 @keyframes float {
-
   0%,
   100% {
     transform: translate(0, 0);
@@ -227,7 +229,6 @@
 }
 
 @keyframes shake {
-
   0%,
   100% {
     transform: translateX(0);
@@ -318,7 +319,11 @@
   background-color: white;
   background-image: radial-gradient(#e5e7eb 1px, transparent 1px);
   background-size: 16px 16px;
-  mask-image: radial-gradient(ellipse 50% 50% at 50% 50%, #000 70%, transparent 100%);
+  mask-image: radial-gradient(
+    ellipse 50% 50% at 50% 50%,
+    #000 70%,
+    transparent 100%
+  );
 }
 
 .dark .mesh-bg {
@@ -377,7 +382,6 @@ textarea:focus-visible {
 
 /* Respect reduced motion preferences */
 @media (prefers-reduced-motion: reduce) {
-
   *,
   *::before,
   *::after {
@@ -459,14 +463,18 @@ textarea:focus-visible {
   }
 
   /* Map pin high contrast: thicker borders, stronger shadows */
-  [role="button"][data-listing-id]>div:first-child {
+  [role="button"][data-listing-id] > div:first-child {
     border: 2px solid black !important;
-    box-shadow: 0 0 0 2px white, 0 2px 8px rgba(0, 0, 0, 0.5) !important;
+    box-shadow:
+      0 0 0 2px white,
+      0 2px 8px rgba(0, 0, 0, 0.5) !important;
   }
 
-  .dark [role="button"][data-listing-id]>div:first-child {
+  .dark [role="button"][data-listing-id] > div:first-child {
     border: 2px solid white !important;
-    box-shadow: 0 0 0 2px black, 0 2px 8px rgba(255, 255, 255, 0.3) !important;
+    box-shadow:
+      0 0 0 2px black,
+      0 2px 8px rgba(255, 255, 255, 0.3) !important;
   }
 
   /* Ensure text meets WCAG AAA (7:1) contrast */
@@ -662,7 +670,6 @@ input:autofill {
   gap: 4px;
 }
 
-
 /* Hide scrollbar utility (explicit class for specific elements) */
 .hide-scrollbar::-webkit-scrollbar {
   display: none;
@@ -675,7 +682,6 @@ input:autofill {
 
 /* Map pin pulse ring animation for active/selected pins */
 @keyframes pulse-ring {
-
   0%,
   100% {
     transform: scale(1);

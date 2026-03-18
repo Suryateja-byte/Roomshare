@@ -16,7 +16,7 @@ jest.mock("next/server", () => ({
   NextResponse: {
     json: (
       data: unknown,
-      init?: { status?: number; headers?: Record<string, string> },
+      init?: { status?: number; headers?: Record<string, string> }
     ) => {
       mockJsonFn(data, init);
       return {

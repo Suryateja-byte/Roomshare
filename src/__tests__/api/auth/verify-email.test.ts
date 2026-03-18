@@ -2,7 +2,7 @@
  * Tests for verify email API route
  */
 
-jest.mock('@/lib/prisma', () => ({
+jest.mock("@/lib/prisma", () => ({
   prisma: {
     verificationToken: {
       findUnique: jest.fn(),
@@ -15,13 +15,13 @@ jest.mock('@/lib/prisma', () => ({
     },
     $transaction: jest.fn(),
   },
-}))
+}));
 
-jest.mock('@/lib/with-rate-limit', () => ({
+jest.mock("@/lib/with-rate-limit", () => ({
   withRateLimit: jest.fn(() => null),
-}))
+}));
 
-jest.mock('next/server', () => ({
+jest.mock("next/server", () => ({
   NextResponse: {
     json: (data: unknown, init?: { status?: number }) => ({
       status: init?.status || 200,
@@ -29,235 +29,263 @@ jest.mock('next/server', () => ({
       headers: new Map(),
     }),
     redirect: (url: URL | string) => {
-      const urlString = url instanceof URL ? url.toString() : url
+      const urlString = url instanceof URL ? url.toString() : url;
       return {
         status: 307,
-        headers: new Map([['location', urlString]]),
+        headers: new Map([["location", urlString]]),
         json: async () => ({}),
-      }
+      };
     },
   },
-}))
+}));
 
-import { GET } from '@/app/api/auth/verify-email/route'
-import { prisma } from '@/lib/prisma'
-import { hashToken } from '@/lib/token-security'
-import type { NextRequest } from 'next/server'
+import { GET } from "@/app/api/auth/verify-email/route";
+import { prisma } from "@/lib/prisma";
+import { hashToken } from "@/lib/token-security";
+import type { NextRequest } from "next/server";
 
-const VALID_TOKEN = 'a'.repeat(64)
-const EXPIRED_TOKEN = 'b'.repeat(64)
-const INVALID_FORMAT_TOKEN = 'invalid-token'
+const VALID_TOKEN = "a".repeat(64);
+const EXPIRED_TOKEN = "b".repeat(64);
+const INVALID_FORMAT_TOKEN = "invalid-token";
 
-describe('Verify Email API', () => {
+describe("Verify Email API", () => {
   beforeEach(() => {
-    jest.clearAllMocks()
-  })
+    jest.clearAllMocks();
+  });
 
   const createRequest = (token: string | null) => {
     const url = token
       ? `http://localhost:3000/api/auth/verify-email?token=${token}`
-      : 'http://localhost:3000/api/auth/verify-email'
-    return new Request(url, { method: 'GET' }) as unknown as NextRequest
-  }
+      : "http://localhost:3000/api/auth/verify-email";
+    return new Request(url, { method: "GET" }) as unknown as NextRequest;
+  };
 
-  it('verifies email successfully with valid token', async () => {
+  it("verifies email successfully with valid token", async () => {
     const validToken = {
       tokenHash: hashToken(VALID_TOKEN),
-      identifier: 'test@example.com',
+      identifier: "test@example.com",
       expires: new Date(Date.now() + 3600000),
-    }
-    const mockUser = { id: 'user-123', email: 'test@example.com' }
+    };
+    const mockUser = { id: "user-123", email: "test@example.com" };
 
-    ;(prisma.verificationToken.findUnique as jest.Mock).mockResolvedValue(validToken)
-    ;(prisma.user.findUnique as jest.Mock).mockResolvedValue(mockUser)
-    ;(prisma.$transaction as jest.Mock).mockImplementation(async (callback) => {
+    (prisma.verificationToken.findUnique as jest.Mock).mockResolvedValue(
+      validToken
+    );
+    (prisma.user.findUnique as jest.Mock).mockResolvedValue(mockUser);
+    (prisma.$transaction as jest.Mock).mockImplementation(async (callback) => {
       const tx = {
-        verificationToken: { deleteMany: jest.fn().mockResolvedValue({ count: 1 }) },
+        verificationToken: {
+          deleteMany: jest.fn().mockResolvedValue({ count: 1 }),
+        },
         user: { update: jest.fn().mockResolvedValue({}) },
-      }
-      return callback(tx)
-    })
+      };
+      return callback(tx);
+    });
 
-    const request = createRequest(VALID_TOKEN)
-    const response = await GET(request)
+    const request = createRequest(VALID_TOKEN);
+    const response = await GET(request);
 
-    expect(response.status).toBe(307)
-    expect(response.headers.get('location')).toContain('verified=true')
+    expect(response.status).toBe(307);
+    expect(response.headers.get("location")).toContain("verified=true");
     expect(prisma.verificationToken.findUnique).toHaveBeenCalledWith({
       where: { tokenHash: hashToken(VALID_TOKEN) },
-    })
-  })
+    });
+  });
 
-  it('redirects with error for missing token', async () => {
-    const request = createRequest(null)
-    const response = await GET(request)
+  it("redirects with error for missing token", async () => {
+    const request = createRequest(null);
+    const response = await GET(request);
 
-    expect(response.status).toBe(307)
-    expect(response.headers.get('location')).toContain('error=missing_token')
-  })
+    expect(response.status).toBe(307);
+    expect(response.headers.get("location")).toContain("error=missing_token");
+  });
 
-  it('redirects with error for invalid token', async () => {
-    ;(prisma.verificationToken.findUnique as jest.Mock).mockResolvedValue(null)
+  it("redirects with error for invalid token", async () => {
+    (prisma.verificationToken.findUnique as jest.Mock).mockResolvedValue(null);
 
-    const request = createRequest(INVALID_FORMAT_TOKEN)
-    const response = await GET(request)
+    const request = createRequest(INVALID_FORMAT_TOKEN);
+    const response = await GET(request);
 
-    expect(response.status).toBe(307)
-    expect(response.headers.get('location')).toContain('error=invalid_token')
-    expect(prisma.verificationToken.findUnique).not.toHaveBeenCalled()
-  })
+    expect(response.status).toBe(307);
+    expect(response.headers.get("location")).toContain("error=invalid_token");
+    expect(prisma.verificationToken.findUnique).not.toHaveBeenCalled();
+  });
 
-  it('redirects to expired page for expired token', async () => {
+  it("redirects to expired page for expired token", async () => {
     const expiredToken = {
       tokenHash: hashToken(EXPIRED_TOKEN),
-      identifier: 'test@example.com',
+      identifier: "test@example.com",
       expires: new Date(Date.now() - 3600000),
-    }
+    };
 
-    ;(prisma.verificationToken.findUnique as jest.Mock).mockResolvedValue(expiredToken)
-    ;(prisma.verificationToken.delete as jest.Mock).mockResolvedValue({})
+    (prisma.verificationToken.findUnique as jest.Mock).mockResolvedValue(
+      expiredToken
+    );
+    (prisma.verificationToken.delete as jest.Mock).mockResolvedValue({});
 
-    const request = createRequest(EXPIRED_TOKEN)
-    const response = await GET(request)
+    const request = createRequest(EXPIRED_TOKEN);
+    const response = await GET(request);
 
-    expect(response.status).toBe(307)
-    expect(response.headers.get('location')).toContain('verify-expired')
+    expect(response.status).toBe(307);
+    expect(response.headers.get("location")).toContain("verify-expired");
     expect(prisma.verificationToken.delete).toHaveBeenCalledWith({
       where: { tokenHash: hashToken(EXPIRED_TOKEN) },
-    })
-  })
+    });
+  });
 
-  it('redirects with error when user not found', async () => {
+  it("redirects with error when user not found", async () => {
     const validToken = {
       tokenHash: hashToken(VALID_TOKEN),
-      identifier: 'nonexistent@example.com',
+      identifier: "nonexistent@example.com",
       expires: new Date(Date.now() + 3600000),
-    }
+    };
 
-    ;(prisma.verificationToken.findUnique as jest.Mock).mockResolvedValue(validToken)
-    ;(prisma.user.findUnique as jest.Mock).mockResolvedValue(null)
+    (prisma.verificationToken.findUnique as jest.Mock).mockResolvedValue(
+      validToken
+    );
+    (prisma.user.findUnique as jest.Mock).mockResolvedValue(null);
 
-    const request = createRequest(VALID_TOKEN)
-    const response = await GET(request)
+    const request = createRequest(VALID_TOKEN);
+    const response = await GET(request);
 
-    expect(response.status).toBe(307)
-    expect(response.headers.get('location')).toContain('error=user_not_found')
-  })
+    expect(response.status).toBe(307);
+    expect(response.headers.get("location")).toContain("error=user_not_found");
+  });
 
-  it('updates user emailVerified timestamp via transaction', async () => {
+  it("updates user emailVerified timestamp via transaction", async () => {
     const validToken = {
       tokenHash: hashToken(VALID_TOKEN),
-      identifier: 'test@example.com',
+      identifier: "test@example.com",
       expires: new Date(Date.now() + 3600000),
-    }
-    const mockUser = { id: 'user-123', email: 'test@example.com' }
-    const mockTxUserUpdate = jest.fn().mockResolvedValue({})
+    };
+    const mockUser = { id: "user-123", email: "test@example.com" };
+    const mockTxUserUpdate = jest.fn().mockResolvedValue({});
 
-    ;(prisma.verificationToken.findUnique as jest.Mock).mockResolvedValue(validToken)
-    ;(prisma.user.findUnique as jest.Mock).mockResolvedValue(mockUser)
-    ;(prisma.$transaction as jest.Mock).mockImplementation(async (callback) => {
+    (prisma.verificationToken.findUnique as jest.Mock).mockResolvedValue(
+      validToken
+    );
+    (prisma.user.findUnique as jest.Mock).mockResolvedValue(mockUser);
+    (prisma.$transaction as jest.Mock).mockImplementation(async (callback) => {
       const tx = {
-        verificationToken: { deleteMany: jest.fn().mockResolvedValue({ count: 1 }) },
+        verificationToken: {
+          deleteMany: jest.fn().mockResolvedValue({ count: 1 }),
+        },
         user: { update: mockTxUserUpdate },
-      }
-      return callback(tx)
-    })
+      };
+      return callback(tx);
+    });
 
-    const request = createRequest(VALID_TOKEN)
-    await GET(request)
+    const request = createRequest(VALID_TOKEN);
+    await GET(request);
 
     expect(mockTxUserUpdate).toHaveBeenCalledWith({
-      where: { id: 'user-123' },
+      where: { id: "user-123" },
       data: { emailVerified: expect.any(Date) },
-    })
-  })
+    });
+  });
 
-  it('deletes token atomically in transaction', async () => {
+  it("deletes token atomically in transaction", async () => {
     const validToken = {
       tokenHash: hashToken(VALID_TOKEN),
-      identifier: 'test@example.com',
+      identifier: "test@example.com",
       expires: new Date(Date.now() + 3600000),
-    }
-    const mockUser = { id: 'user-123', email: 'test@example.com' }
-    const mockTxDeleteMany = jest.fn().mockResolvedValue({ count: 1 })
+    };
+    const mockUser = { id: "user-123", email: "test@example.com" };
+    const mockTxDeleteMany = jest.fn().mockResolvedValue({ count: 1 });
 
-    ;(prisma.verificationToken.findUnique as jest.Mock).mockResolvedValue(validToken)
-    ;(prisma.user.findUnique as jest.Mock).mockResolvedValue(mockUser)
-    ;(prisma.$transaction as jest.Mock).mockImplementation(async (callback) => {
+    (prisma.verificationToken.findUnique as jest.Mock).mockResolvedValue(
+      validToken
+    );
+    (prisma.user.findUnique as jest.Mock).mockResolvedValue(mockUser);
+    (prisma.$transaction as jest.Mock).mockImplementation(async (callback) => {
       const tx = {
         verificationToken: { deleteMany: mockTxDeleteMany },
         user: { update: jest.fn().mockResolvedValue({}) },
-      }
-      return callback(tx)
-    })
+      };
+      return callback(tx);
+    });
 
-    const request = createRequest(VALID_TOKEN)
-    await GET(request)
+    const request = createRequest(VALID_TOKEN);
+    await GET(request);
 
-    expect(prisma.$transaction).toHaveBeenCalled()
+    expect(prisma.$transaction).toHaveBeenCalled();
     expect(mockTxDeleteMany).toHaveBeenCalledWith({
       where: { tokenHash: hashToken(VALID_TOKEN) },
-    })
-  })
+    });
+  });
 
-  it('redirects with already_verified when token already used (race condition)', async () => {
+  it("redirects with already_verified when token already used (race condition)", async () => {
     const validToken = {
       tokenHash: hashToken(VALID_TOKEN),
-      identifier: 'test@example.com',
+      identifier: "test@example.com",
       expires: new Date(Date.now() + 3600000),
-    }
-    const mockUser = { id: 'user-123', email: 'test@example.com' }
+    };
+    const mockUser = { id: "user-123", email: "test@example.com" };
 
-    ;(prisma.verificationToken.findUnique as jest.Mock).mockResolvedValue(validToken)
-    ;(prisma.user.findUnique as jest.Mock).mockResolvedValue(mockUser)
-    ;(prisma.$transaction as jest.Mock).mockImplementation(async (callback) => {
+    (prisma.verificationToken.findUnique as jest.Mock).mockResolvedValue(
+      validToken
+    );
+    (prisma.user.findUnique as jest.Mock).mockResolvedValue(mockUser);
+    (prisma.$transaction as jest.Mock).mockImplementation(async (callback) => {
       const tx = {
-        verificationToken: { deleteMany: jest.fn().mockResolvedValue({ count: 0 }) },
+        verificationToken: {
+          deleteMany: jest.fn().mockResolvedValue({ count: 0 }),
+        },
         user: { update: jest.fn() },
-      }
-      return callback(tx)
-    })
+      };
+      return callback(tx);
+    });
 
-    const request = createRequest(VALID_TOKEN)
-    const response = await GET(request)
+    const request = createRequest(VALID_TOKEN);
+    const response = await GET(request);
 
-    expect(response.status).toBe(307)
-    expect(response.headers.get('location')).toContain('error=already_verified')
-  })
+    expect(response.status).toBe(307);
+    expect(response.headers.get("location")).toContain(
+      "error=already_verified"
+    );
+  });
 
-  it('handles database errors gracefully', async () => {
-    ;(prisma.verificationToken.findUnique as jest.Mock).mockRejectedValue(new Error('DB Error'))
+  it("handles database errors gracefully", async () => {
+    (prisma.verificationToken.findUnique as jest.Mock).mockRejectedValue(
+      new Error("DB Error")
+    );
 
-    const request = createRequest(VALID_TOKEN)
-    const response = await GET(request)
+    const request = createRequest(VALID_TOKEN);
+    const response = await GET(request);
 
-    expect(response.status).toBe(307)
-    expect(response.headers.get('location')).toContain('error=verification_failed')
-  })
+    expect(response.status).toBe(307);
+    expect(response.headers.get("location")).toContain(
+      "error=verification_failed"
+    );
+  });
 
-  it('looks up user by email from token identifier', async () => {
+  it("looks up user by email from token identifier", async () => {
     const validToken = {
       tokenHash: hashToken(VALID_TOKEN),
-      identifier: 'test@example.com',
+      identifier: "test@example.com",
       expires: new Date(Date.now() + 3600000),
-    }
-    const mockUser = { id: 'user-123', email: 'test@example.com' }
+    };
+    const mockUser = { id: "user-123", email: "test@example.com" };
 
-    ;(prisma.verificationToken.findUnique as jest.Mock).mockResolvedValue(validToken)
-    ;(prisma.user.findUnique as jest.Mock).mockResolvedValue(mockUser)
-    ;(prisma.$transaction as jest.Mock).mockImplementation(async (callback) => {
+    (prisma.verificationToken.findUnique as jest.Mock).mockResolvedValue(
+      validToken
+    );
+    (prisma.user.findUnique as jest.Mock).mockResolvedValue(mockUser);
+    (prisma.$transaction as jest.Mock).mockImplementation(async (callback) => {
       const tx = {
-        verificationToken: { deleteMany: jest.fn().mockResolvedValue({ count: 1 }) },
+        verificationToken: {
+          deleteMany: jest.fn().mockResolvedValue({ count: 1 }),
+        },
         user: { update: jest.fn().mockResolvedValue({}) },
-      }
-      return callback(tx)
-    })
+      };
+      return callback(tx);
+    });
 
-    const request = createRequest(VALID_TOKEN)
-    await GET(request)
+    const request = createRequest(VALID_TOKEN);
+    await GET(request);
 
     expect(prisma.user.findUnique).toHaveBeenCalledWith({
-      where: { email: 'test@example.com' },
-    })
-  })
-})
+      where: { email: "test@example.com" },
+    });
+  });
+});

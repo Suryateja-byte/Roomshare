@@ -1,4 +1,4 @@
-import 'server-only';
+import "server-only";
 
 import type { Prisma } from "@prisma/client";
 import { prisma } from "@/lib/prisma";
@@ -26,7 +26,7 @@ export interface AccessibleConversation {
 
 export async function getAccessibleConversation(
   conversationId: string,
-  userId: string,
+  userId: string
 ): Promise<AccessibleConversation | null> {
   return prisma.conversation.findUnique({
     where: { id: conversationId },
@@ -39,19 +39,19 @@ export async function getAccessibleConversation(
 
 export function userCanAccessConversation(
   conversation: AccessibleConversation | null,
-  userId: string,
+  userId: string
 ): conversation is AccessibleConversation {
   return Boolean(
     conversation &&
-      !conversation.deletedAt &&
-      conversation.deletions.length === 0 &&
-      conversation.participants.some((participant) => participant.id === userId),
+    !conversation.deletedAt &&
+    conversation.deletions.length === 0 &&
+    conversation.participants.some((participant) => participant.id === userId)
   );
 }
 
 export async function listConversationMessages(
   conversationId: string,
-  options?: { afterMessageId?: string },
+  options?: { afterMessageId?: string }
 ): Promise<ConversationMessage[]> {
   const afterMessageId = options?.afterMessageId?.trim();
   let where: Prisma.MessageWhereInput = {
@@ -91,7 +91,7 @@ export async function listConversationMessages(
 
 export async function markConversationMessagesAsReadForUser(
   conversationId: string,
-  userId: string,
+  userId: string
 ) {
   return prisma.message.updateMany({
     where: {

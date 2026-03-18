@@ -43,7 +43,8 @@ export default function MobileCardLayout({ children }: MobileCardLayoutProps) {
       )}
       <style jsx>{`
         /* Mobile full-bleed: remove card image rounding and padding */
-        .mobile-card-layout :global([data-mobile-layout] [data-carousel-container]) {
+        .mobile-card-layout
+          :global([data-mobile-layout] [data-carousel-container]) {
           border-radius: 0;
         }
         /* Prevent vertical scroll while swiping carousel horizontally */

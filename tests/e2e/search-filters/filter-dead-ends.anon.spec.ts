@@ -44,17 +44,20 @@ test.describe("Filter Dead-Ends & Edge Cases", () => {
     // Verify recovery paths are available
     // ZeroResultsSuggestions renders "Clear all filters" as a <Button> (not a link)
     // and suggestion buttons with "Remove: {label}" text
-    const clearAllButton = container.getByRole("button", { name: /clear all/i });
+    const clearAllButton = container.getByRole("button", {
+      name: /clear all/i,
+    });
     const browseAllLink = container.getByRole("link", {
       name: /browse all/i,
     });
-    const suggestionButtons = container.locator("button").filter({ hasText: /remove/i });
+    const suggestionButtons = container
+      .locator("button")
+      .filter({ hasText: /remove/i });
 
     // At least one recovery option should be visible
     const hasClearAll = await clearAllButton.isVisible().catch(() => false);
     const hasBrowseAll = await browseAllLink.isVisible().catch(() => false);
-    const hasSuggestions =
-      (await suggestionButtons.count().catch(() => 0)) > 0;
+    const hasSuggestions = (await suggestionButtons.count().catch(() => 0)) > 0;
 
     expect(hasClearAll || hasBrowseAll || hasSuggestions).toBe(true);
 
@@ -66,10 +69,12 @@ test.describe("Filter Dead-Ends & Edge Cases", () => {
       await firstSuggestion.click();
 
       // Wait for URL to change (filter removed) via soft navigation
-      await expect.poll(
-        () => page.url(),
-        { timeout: 30_000, message: "URL to change after suggestion click" },
-      ).not.toBe(currentUrl);
+      await expect
+        .poll(() => page.url(), {
+          timeout: 30_000,
+          message: "URL to change after suggestion click",
+        })
+        .not.toBe(currentUrl);
 
       // Verify we're still on search page
       expect(page.url()).toContain("/search");
@@ -209,10 +214,12 @@ test.describe("Filter Dead-Ends & Edge Cases", () => {
     await wifiRemoveButton.click();
 
     // Wait for URL to update via soft navigation
-    await expect.poll(
-      () => page.url().includes("Wifi"),
-      { timeout: 30_000, message: "URL to not contain Wifi" },
-    ).toBe(false);
+    await expect
+      .poll(() => page.url().includes("Wifi"), {
+        timeout: 30_000,
+        message: "URL to not contain Wifi",
+      })
+      .toBe(false);
 
     // Verify URL still has Parking and roomType
     let amenities = getUrlParam(page, "amenities");
@@ -233,10 +240,13 @@ test.describe("Filter Dead-Ends & Edge Cases", () => {
     await parkingRemoveButton.click();
 
     // Wait for URL update - amenities param should be deleted when last value removed
-    await expect.poll(
-      () => new URL(page.url(), "http://localhost").searchParams.get("amenities"),
-      { timeout: 30_000, message: 'URL param "amenities" to be absent' },
-    ).toBeNull();
+    await expect
+      .poll(
+        () =>
+          new URL(page.url(), "http://localhost").searchParams.get("amenities"),
+        { timeout: 30_000, message: 'URL param "amenities" to be absent' }
+      )
+      .toBeNull();
 
     // Verify amenities param is gone
     amenities = getUrlParam(page, "amenities");
@@ -256,10 +266,13 @@ test.describe("Filter Dead-Ends & Edge Cases", () => {
     await roomTypeRemoveButton.click();
 
     // Wait for URL update - no filters
-    await expect.poll(
-      () => new URL(page.url(), "http://localhost").searchParams.get("roomType"),
-      { timeout: 30_000, message: 'URL param "roomType" to be absent' },
-    ).toBeNull();
+    await expect
+      .poll(
+        () =>
+          new URL(page.url(), "http://localhost").searchParams.get("roomType"),
+        { timeout: 30_000, message: 'URL param "roomType" to be absent' }
+      )
+      .toBeNull();
 
     // Verify no filter params in URL
     expect(getUrlParam(page, "amenities")).toBeNull();
@@ -299,7 +312,7 @@ test.describe("Filter Dead-Ends & Edge Cases", () => {
     // Dismiss any open autocomplete dropdown that may overlay the chips region
     await page.keyboard.press("Escape");
     await page.waitForTimeout(300);
-    await page.locator('body').click({ position: { x: 0, y: 0 }, force: true });
+    await page.locator("body").click({ position: { x: 0, y: 0 }, force: true });
 
     // Click "Clear all" button in chips region
     const clearAllButton = appliedFiltersRegion.getByRole("button", {
@@ -308,10 +321,16 @@ test.describe("Filter Dead-Ends & Edge Cases", () => {
     await clearAllButton.click({ force: true });
 
     // Wait for URL to update (amenities and roomType removed) via soft navigation
-    await expect.poll(
-      () => new URL(page.url(), "http://localhost").searchParams.get("amenities"),
-      { timeout: 30_000, message: 'URL param "amenities" to be absent after clear all' },
-    ).toBeNull();
+    await expect
+      .poll(
+        () =>
+          new URL(page.url(), "http://localhost").searchParams.get("amenities"),
+        {
+          timeout: 30_000,
+          message: 'URL param "amenities" to be absent after clear all',
+        }
+      )
+      .toBeNull();
 
     // Verify filters were removed
     expect(getUrlParam(page, "amenities")).toBeNull();

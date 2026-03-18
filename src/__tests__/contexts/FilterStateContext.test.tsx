@@ -36,7 +36,7 @@ describe("FilterStateContext", () => {
     render(
       <FilterStateProvider>
         <div data-testid="child">hello</div>
-      </FilterStateProvider>,
+      </FilterStateProvider>
     );
 
     expect(screen.getByTestId("child")).toBeInTheDocument();
@@ -142,7 +142,9 @@ describe("FilterStateContext", () => {
 
   it("useFilterState throws when used outside FilterStateProvider", () => {
     // Suppress the expected console.error from React
-    const consoleError = jest.spyOn(console, "error").mockImplementation(() => {});
+    const consoleError = jest
+      .spyOn(console, "error")
+      .mockImplementation(() => {});
 
     expect(() => {
       renderHook(() => useFilterState());

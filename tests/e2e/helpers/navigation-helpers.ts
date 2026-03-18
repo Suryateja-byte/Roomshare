@@ -10,7 +10,7 @@ async function waitForPageReady(
   options?: {
     selector?: string;
     timeout?: number;
-  },
+  }
 ) {
   const timeout = options?.timeout ?? timeouts.action;
   const selector = options?.selector ?? 'main, [role="main"], #__next';
@@ -200,7 +200,7 @@ export function navigationHelpers(page: Page) {
     async clickListingCard(index = 0) {
       // Wait for listing cards to appear
       const cards = page.locator('[data-testid="listing-card"]');
-      await cards.first().waitFor({ state: 'attached', timeout: 30000 });
+      await cards.first().waitFor({ state: "attached", timeout: 30000 });
 
       const count = await cards.count();
       if (count === 0 || index >= count) {
@@ -210,7 +210,7 @@ export function navigationHelpers(page: Page) {
       // Navigate directly to the listing URL from the card's link href
       const card = cards.nth(index);
       const link = card.locator('a[href^="/listings/"]').first();
-      const href = await link.getAttribute('href');
+      const href = await link.getAttribute("href");
       if (!href) {
         throw new Error(`No listing link found in card at index ${index}`);
       }

@@ -13,7 +13,7 @@
  */
 
 // Mock next-auth/jwt to avoid ESM transformation issues
-jest.mock('next-auth/jwt', () => ({
+jest.mock("next-auth/jwt", () => ({
   getToken: jest.fn(),
 }));
 
@@ -314,7 +314,7 @@ describe("Auth Edge Cases - Category A", () => {
       };
 
       (prisma.verificationToken.findUnique as jest.Mock).mockResolvedValue(
-        token,
+        token
       );
       (prisma.user.findUnique as jest.Mock).mockResolvedValue({
         id: "user-123",
@@ -365,7 +365,7 @@ describe("Auth Edge Cases - Category A", () => {
       };
 
       (prisma.passwordResetToken.findUnique as jest.Mock).mockResolvedValue(
-        token,
+        token
       );
       (prisma.user.findUnique as jest.Mock).mockResolvedValue(user);
 
@@ -503,7 +503,7 @@ describe("Auth Edge Cases - Category A", () => {
             user: { delete: jest.fn().mockResolvedValue({ id: userId }) },
           };
           return callback(tx);
-        },
+        }
       );
 
       await prisma.$transaction(async (tx: any) => {
@@ -607,7 +607,7 @@ describe("Auth Edge Cases - Category A", () => {
       };
 
       (prisma.verificationToken.create as jest.Mock).mockResolvedValue(
-        mockWithNewEmail,
+        mockWithNewEmail
       );
 
       const token = await prisma.verificationToken.create({
@@ -615,7 +615,7 @@ describe("Auth Edge Cases - Category A", () => {
       });
 
       expect((token as unknown as { newEmail: string }).newEmail).toBe(
-        "newemail@example.com",
+        "newemail@example.com"
       );
     });
 
@@ -650,7 +650,7 @@ describe("Auth Edge Cases - Category A", () => {
         backupCodes: ["code2", "code3"], // Removed used code
       };
       (prisma.user.update as jest.Mock).mockResolvedValue(
-        mockUserWithBackupCodes,
+        mockUserWithBackupCodes
       );
 
       const updated = await prisma.user.update({
@@ -660,7 +660,7 @@ describe("Auth Edge Cases - Category A", () => {
       });
 
       expect(
-        (updated as unknown as { backupCodes: string[] }).backupCodes,
+        (updated as unknown as { backupCodes: string[] }).backupCodes
       ).not.toContain("code1");
     });
   });
@@ -699,7 +699,7 @@ describe("Auth Edge Cases - Category A", () => {
       });
 
       expect(updated.expires.getTime()).toBeGreaterThan(
-        originalExpiry.getTime(),
+        originalExpiry.getTime()
       );
     });
 
@@ -719,7 +719,7 @@ describe("Auth Edge Cases - Category A", () => {
       });
 
       expect(session?.expires.getTime()).toBeLessThanOrEqual(
-        maxExpiry.getTime(),
+        maxExpiry.getTime()
       );
     });
   });
@@ -805,7 +805,7 @@ describe("Auth Edge Cases - Category A", () => {
         lastFailedLogin: null,
       };
       (prisma.user.update as jest.Mock).mockResolvedValue(
-        mockUserWithLoginAttempts,
+        mockUserWithLoginAttempts
       );
 
       const updated = await prisma.user.update({
@@ -816,7 +816,7 @@ describe("Auth Edge Cases - Category A", () => {
 
       expect(
         (updated as unknown as { failedLoginAttempts: number })
-          .failedLoginAttempts,
+          .failedLoginAttempts
       ).toBe(0);
     });
   });

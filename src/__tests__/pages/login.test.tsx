@@ -76,11 +76,14 @@ describe("LoginPage", () => {
     await userEvent.click(screen.getByRole("button", { name: /sign in/i }));
 
     await waitFor(() => {
-      expect(mockSignIn).toHaveBeenCalledWith("credentials", expect.objectContaining({
-        email: "test@example.com",
-        password: "password123",
-        redirect: false,
-      }));
+      expect(mockSignIn).toHaveBeenCalledWith(
+        "credentials",
+        expect.objectContaining({
+          email: "test@example.com",
+          password: "password123",
+          redirect: false,
+        })
+      );
     });
   });
 
@@ -95,16 +98,19 @@ describe("LoginPage", () => {
 
     await waitFor(() => {
       // Verify signIn was called and completed without error
-      expect(mockSignIn).toHaveBeenCalledWith("credentials", expect.objectContaining({
-        email: "test@example.com",
-        password: "password123",
-        redirect: false,
-      }));
+      expect(mockSignIn).toHaveBeenCalledWith(
+        "credentials",
+        expect.objectContaining({
+          email: "test@example.com",
+          password: "password123",
+          redirect: false,
+        })
+      );
     });
 
     // Verify no error message is shown after successful login
     expect(
-      screen.queryByText("Invalid email or password"),
+      screen.queryByText("Invalid email or password")
     ).not.toBeInTheDocument();
   });
 

@@ -1,21 +1,21 @@
-'use client';
+"use client";
 
-import { useState, useEffect, useCallback, useRef } from 'react';
-import { supabase, safeRemoveChannel } from '@/lib/supabase';
-import { getBlockStatus, type BlockStatus } from '@/app/actions/block';
-import type { RealtimeChannel } from '@supabase/supabase-js';
+import { useState, useEffect, useCallback, useRef } from "react";
+import { supabase, safeRemoveChannel } from "@/lib/supabase";
+import { getBlockStatus, type BlockStatus } from "@/app/actions/block";
+import type { RealtimeChannel } from "@supabase/supabase-js";
 
 /** Shape of the BlockedUser table row from Supabase Realtime payload */
 interface BlockedUserRecord {
-    blockerId: string;
-    blockedId: string;
+  blockerId: string;
+  blockedId: string;
 }
 
 interface UseBlockStatusResult {
-    blockStatus: BlockStatus;
-    isBlocked: boolean;
-    loading: boolean;
-    refetch: () => Promise<void>;
+  blockStatus: BlockStatus;
+  isBlocked: boolean;
+  loading: boolean;
+  refetch: () => Promise<void>;
 }
 
 /**
@@ -27,81 +27,88 @@ interface UseBlockStatusResult {
  * @returns Object with blockStatus, isBlocked boolean, loading state, and refetch function
  */
 export function useBlockStatus(
-    otherUserId: string | undefined,
-    currentUserId: string | undefined
+  otherUserId: string | undefined,
+  currentUserId: string | undefined
 ): UseBlockStatusResult {
-    const [blockStatus, setBlockStatus] = useState<BlockStatus>(null);
-    const [loading, setLoading] = useState(true);
-    const channelRef = useRef<RealtimeChannel | null>(null);
+  const [blockStatus, setBlockStatus] = useState<BlockStatus>(null);
+  const [loading, setLoading] = useState(true);
+  const channelRef = useRef<RealtimeChannel | null>(null);
 
-    const fetchBlockStatus = useCallback(async () => {
-        if (!otherUserId) {
-            setBlockStatus(null);
-            setLoading(false);
-            return;
+  const fetchBlockStatus = useCallback(async () => {
+    if (!otherUserId) {
+      setBlockStatus(null);
+      setLoading(false);
+      return;
+    }
+
+    try {
+      const status = await getBlockStatus(otherUserId);
+      setBlockStatus(status);
+    } catch (error) {
+      console.error("Error fetching block status:", error);
+      setBlockStatus(null);
+    } finally {
+      setLoading(false);
+    }
+  }, [otherUserId]);
+
+  useEffect(() => {
+    // Initial fetch
+    fetchBlockStatus();
+
+    // Set up real-time subscription if Supabase is available
+    if (!supabase || !otherUserId || !currentUserId) {
+      return;
+    }
+
+    // Create a unique channel for this block relationship
+    const channelName = `blocks:${[currentUserId, otherUserId].sort().join("-")}`;
+    const channel = supabase.channel(channelName);
+
+    channelRef.current = channel;
+
+    channel
+      .on(
+        "postgres_changes",
+        {
+          event: "*", // Listen for INSERT and DELETE
+          schema: "public",
+          table: "BlockedUser",
+        },
+        (payload) => {
+          // Check if this change affects our user pair
+          const record =
+            (payload.new as BlockedUserRecord) ||
+            (payload.old as BlockedUserRecord);
+          if (!record) return;
+
+          const isRelevant =
+            (record.blockerId === currentUserId &&
+              record.blockedId === otherUserId) ||
+            (record.blockerId === otherUserId &&
+              record.blockedId === currentUserId);
+
+          if (isRelevant) {
+            // Refetch to get accurate status
+            fetchBlockStatus();
+          }
         }
-
-        try {
-            const status = await getBlockStatus(otherUserId);
-            setBlockStatus(status);
-        } catch (error) {
-            console.error('Error fetching block status:', error);
-            setBlockStatus(null);
-        } finally {
-            setLoading(false);
+      )
+      .subscribe((status) => {
+        if (status === "CHANNEL_ERROR") {
+          console.error("Failed to subscribe to block status changes");
         }
-    }, [otherUserId]);
+      });
 
-    useEffect(() => {
-        // Initial fetch
-        fetchBlockStatus();
-
-        // Set up real-time subscription if Supabase is available
-        if (!supabase || !otherUserId || !currentUserId) {
-            return;
-        }
-
-        // Create a unique channel for this block relationship
-        const channelName = `blocks:${[currentUserId, otherUserId].sort().join('-')}`;
-        const channel = supabase.channel(channelName);
-
-        channelRef.current = channel;
-
-        channel
-            .on('postgres_changes', {
-                event: '*', // Listen for INSERT and DELETE
-                schema: 'public',
-                table: 'BlockedUser'
-            }, (payload) => {
-                // Check if this change affects our user pair
-                const record = (payload.new as BlockedUserRecord) || (payload.old as BlockedUserRecord);
-                if (!record) return;
-
-                const isRelevant = (
-                    (record.blockerId === currentUserId && record.blockedId === otherUserId) ||
-                    (record.blockerId === otherUserId && record.blockedId === currentUserId)
-                );
-
-                if (isRelevant) {
-                    // Refetch to get accurate status
-                    fetchBlockStatus();
-                }
-            })
-            .subscribe((status) => {
-                if (status === 'CHANNEL_ERROR') {
-                    console.error('Failed to subscribe to block status changes');
-                }
-            });
-
-        return () => {
-            safeRemoveChannel(channelRef.current);
-        };
-    }, [otherUserId, currentUserId, fetchBlockStatus]);
-
-    return {
-        blockStatus,
-        isBlocked: blockStatus !== null,
-        loading,
-        refetch: fetchBlockStatus
+    return () => {
+      safeRemoveChannel(channelRef.current);
     };
+  }, [otherUserId, currentUserId, fetchBlockStatus]);
+
+  return {
+    blockStatus,
+    isBlocked: blockStatus !== null,
+    loading,
+    refetch: fetchBlockStatus,
+  };
 }

@@ -447,7 +447,9 @@ describe("useBatchedFilters hook", () => {
 
       // Same rules, different order
       act(() => {
-        result.current.setPending({ houseRules: ["Pets allowed", "Couples allowed"] });
+        result.current.setPending({
+          houseRules: ["Pets allowed", "Couples allowed"],
+        });
       });
 
       expect(result.current.isDirty).toBe(false);
@@ -711,7 +713,11 @@ describe("useBatchedFilters hook", () => {
         result.current.setPending({ amenities: ["Wifi", "Parking", "Washer"] });
       });
 
-      expect(result.current.pending.amenities).toEqual(["Wifi", "Parking", "Washer"]);
+      expect(result.current.pending.amenities).toEqual([
+        "Wifi",
+        "Parking",
+        "Washer",
+      ]);
 
       // Reset
       act(() => {
@@ -943,7 +949,11 @@ describe("useBatchedFilters hook", () => {
         }));
       });
 
-      expect(result.current.pending.amenities).toEqual(["Wifi", "Parking", "Furnished"]);
+      expect(result.current.pending.amenities).toEqual([
+        "Wifi",
+        "Parking",
+        "Furnished",
+      ]);
     });
 
     it("mixes functional and object updaters", () => {

@@ -10,8 +10,8 @@
  * Works for both Free and Pro users.
  */
 
-import { formatDistance } from '@/lib/geo/distance';
-import type { SearchMeta } from '@/lib/places/types';
+import { formatDistance } from "@/lib/geo/distance";
+import type { SearchMeta } from "@/lib/places/types";
 
 interface ContextBarProps {
   meta: SearchMeta | null;
@@ -52,19 +52,21 @@ export function ContextBar({ meta, isLoading, queryText }: ContextBarProps) {
     >
       {/* Result count */}
       <span className="font-medium text-foreground">
-        {resultCount} {resultCount === 1 ? 'place' : 'places'} found
+        {resultCount} {resultCount === 1 ? "place" : "places"} found
       </span>
 
-      <span className="text-muted-foreground/40" aria-hidden="true">•</span>
+      <span className="text-muted-foreground/40" aria-hidden="true">
+        •
+      </span>
 
       {/* Search radius */}
-      <span>
-        Within {radiusMiles.toFixed(1)} mi
-      </span>
+      <span>Within {radiusMiles.toFixed(1)} mi</span>
 
       {resultCount > 0 && (
         <>
-          <span className="text-muted-foreground/40" aria-hidden="true">•</span>
+          <span className="text-muted-foreground/40" aria-hidden="true">
+            •
+          </span>
 
           {/* Distance range */}
           <span>
@@ -77,7 +79,9 @@ export function ContextBar({ meta, isLoading, queryText }: ContextBarProps) {
             )}
           </span>
 
-          <span className="text-muted-foreground/40" aria-hidden="true">•</span>
+          <span className="text-muted-foreground/40" aria-hidden="true">
+            •
+          </span>
 
           {/* Sort indicator */}
           <span className="inline-flex items-center gap-1">
@@ -90,8 +94,16 @@ export function ContextBar({ meta, isLoading, queryText }: ContextBarProps) {
       {/* Query text (optional, for debugging/clarity) */}
       {queryText && (
         <>
-          <span className="text-muted-foreground/40 hidden sm:inline" aria-hidden="true">•</span>
-          <span className="hidden sm:inline text-xs opacity-70" title={`Search: ${queryText}`}>
+          <span
+            className="text-muted-foreground/40 hidden sm:inline"
+            aria-hidden="true"
+          >
+            •
+          </span>
+          <span
+            className="hidden sm:inline text-xs opacity-70"
+            title={`Search: ${queryText}`}
+          >
             &quot;{queryText}&quot;
           </span>
         </>

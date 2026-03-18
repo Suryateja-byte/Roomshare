@@ -14,7 +14,7 @@
  *  RT-A06  Touch targets >= 44px on mobile viewport
  */
 
-import AxeBuilder from '@axe-core/playwright';
+import AxeBuilder from "@axe-core/playwright";
 import {
   test,
   expect,
@@ -23,19 +23,19 @@ import {
   goToMessages,
   openConversation,
   sendMessage,
-} from './messaging-helpers';
-import { A11Y_CONFIG } from '../helpers';
+} from "./messaging-helpers";
+import { A11Y_CONFIG } from "../helpers";
 
 // ---------------------------------------------------------------------------
 // Config
 // ---------------------------------------------------------------------------
-test.use({ storageState: 'playwright/.auth/user.json' });
+test.use({ storageState: "playwright/.auth/user.json" });
 
 /** Shared axe scan runner using A11Y_CONFIG defaults */
 async function runAxeScan(
-  page: import('@playwright/test').Page,
+  page: import("@playwright/test").Page,
   extraExcludes: string[] = [],
-  disabledRules: string[] = [],
+  disabledRules: string[] = []
 ) {
   let builder = new AxeBuilder({ page }).withTags([...A11Y_CONFIG.tags]);
 
@@ -56,7 +56,7 @@ function logViolations(label: string, violations: any[]) {
     console.log(`[axe-messaging] ${label}: ${violations.length} violation(s)`);
     violations.forEach((v) => {
       console.log(
-        `  - ${v.id} (${v.impact}): ${v.description} [${v.nodes.length} node(s)]`,
+        `  - ${v.id} (${v.impact}): ${v.description} [${v.nodes.length} node(s)]`
       );
     });
   }
@@ -65,326 +65,409 @@ function logViolations(label: string, violations: any[]) {
 // ---------------------------------------------------------------------------
 // Tests
 // ---------------------------------------------------------------------------
-test.describe('Messaging: Accessibility', { tag: [tags.auth, tags.a11y] }, () => {
-  test.beforeEach(async ({ page }) => {
-    test.slow();
-    // Messaging tests are designed for the desktop two-panel layout.
-    // On mobile (width < 768px) the conversation list is hidden when a
-    // conversation is active, making most selectors behave differently.
-    // Skip the whole suite on mobile viewports.
-    const viewport = page.viewportSize();
-    test.skip(!!viewport && viewport.width < 768, 'Desktop-only: messaging tests require two-panel layout');
-  });
-
-  // -----------------------------------------------------------------------
-  // RT-A01: Full messages page axe scan
-  // -----------------------------------------------------------------------
-  test('RT-A01: Messages page passes axe-core WCAG 2.1 AA', async ({ page }) => {
-    const ready = await goToMessages(page);
-    test.skip(!ready, 'Could not reach /messages (auth redirect or missing page)');
-
-    // Wait for conversation list to populate
-    await page
-      .locator(MSG_SELECTORS.conversationItem)
-      .first()
-      .waitFor({ state: 'attached', timeout: 15_000 })
-      .catch(() => {});
-
-    const results = await runAxeScan(page, [], [...A11Y_CONFIG.knownExclusions]);
-    logViolations('Messages Page', results.violations);
-    expect(results.violations).toHaveLength(0);
-  });
-
-  // -----------------------------------------------------------------------
-  // RT-A02: Chat window axe scan after loading messages
-  // -----------------------------------------------------------------------
-  test('RT-A02: Chat window passes axe-core after loading', async ({ page }) => {
-    const viewport = page.viewportSize();
-    test.skip(!!viewport && viewport.width < 768, 'Desktop-only: axe results differ on mobile layout');
-    const ready = await goToMessages(page);
-    test.skip(!ready, 'Could not reach /messages');
-
-    await openConversation(page);
-
-    // Wait for message bubbles to render so the DOM is complete
-    await page
-      .locator(MSG_SELECTORS.messageBubble)
-      .first()
-      .waitFor({ state: 'attached', timeout: 10_000 })
-      .catch(() => {});
-
-    const results = await runAxeScan(page, [], [...A11Y_CONFIG.knownExclusions]);
-    logViolations('Chat Window', results.violations);
-    expect(results.violations).toHaveLength(0);
-  });
-
-  // -----------------------------------------------------------------------
-  // RT-A03: Keyboard-only navigation and send
-  // -----------------------------------------------------------------------
-  test('RT-A03: Keyboard-only navigation and send', async ({ page }) => {
-    const viewport = page.viewportSize();
-    test.skip(!!viewport && viewport.width < 768, 'Desktop-only: keyboard navigation not applicable on mobile');
-    const ready = await goToMessages(page);
-    test.skip(!ready, 'Could not reach /messages');
-
-    // Wait for conversation items to appear
-    const conversationItems = page.locator(MSG_SELECTORS.conversationItem);
-    await expect(conversationItems.first()).toBeVisible({ timeout: 15_000 });
-
-    // Tab into the conversation list
-    let reachedConversation = false;
-    for (let i = 0; i < 20; i++) {
-      await page.keyboard.press('Tab');
-      const activeTag = await page.evaluate(() => {
-        const el = document.activeElement;
-        return el?.getAttribute('data-testid') || el?.tagName.toLowerCase() || '';
-      });
-      if (activeTag === 'conversation-item' || activeTag.includes('conversation')) {
-        reachedConversation = true;
-        break;
-      }
-      // Also check if we have focused an element inside a conversation item
-      const isInConversation = await page.evaluate(() => {
-        return !!document.activeElement?.closest('[data-testid="conversation-item"]');
-      });
-      if (isInConversation) {
-        reachedConversation = true;
-        break;
-      }
-    }
-
-    // Press Enter to open the conversation
-    if (reachedConversation) {
-      await page.keyboard.press('Enter');
-    } else {
-      // Fallback: click the first conversation to continue testing the send flow
-      await conversationItems.first().click();
-    }
-
-    // Wait for message input to appear
-    const input = page.locator(MSG_SELECTORS.messageInput);
-    await expect(input).toBeVisible({ timeout: 10_000 });
-
-    // Tab until we reach the message input
-    let reachedInput = false;
-    for (let i = 0; i < 15; i++) {
-      const isFocused = await input.evaluate(
-        (el) => document.activeElement === el,
+test.describe(
+  "Messaging: Accessibility",
+  { tag: [tags.auth, tags.a11y] },
+  () => {
+    test.beforeEach(async ({ page }) => {
+      test.slow();
+      // Messaging tests are designed for the desktop two-panel layout.
+      // On mobile (width < 768px) the conversation list is hidden when a
+      // conversation is active, making most selectors behave differently.
+      // Skip the whole suite on mobile viewports.
+      const viewport = page.viewportSize();
+      test.skip(
+        !!viewport && viewport.width < 768,
+        "Desktop-only: messaging tests require two-panel layout"
       );
-      if (isFocused) {
-        reachedInput = true;
-        break;
-      }
-      await page.keyboard.press('Tab');
-    }
+    });
 
-    // If not focused via tabbing, focus it directly (documents the gap)
-    if (!reachedInput) {
-      await input.focus();
-    }
+    // -----------------------------------------------------------------------
+    // RT-A01: Full messages page axe scan
+    // -----------------------------------------------------------------------
+    test("RT-A01: Messages page passes axe-core WCAG 2.1 AA", async ({
+      page,
+    }) => {
+      const ready = await goToMessages(page);
+      test.skip(
+        !ready,
+        "Could not reach /messages (auth redirect or missing page)"
+      );
 
-    // Type a message via keyboard
-    const uniqueText = `a11y-keyboard-${Date.now()}`;
-    await page.keyboard.type(uniqueText);
+      // Wait for conversation list to populate
+      await page
+        .locator(MSG_SELECTORS.conversationItem)
+        .first()
+        .waitFor({ state: "attached", timeout: 15_000 })
+        .catch(() => {});
 
-    // Send via Enter (most chat inputs submit on Enter)
-    await page.keyboard.press('Enter');
+      const results = await runAxeScan(
+        page,
+        [],
+        [...A11Y_CONFIG.knownExclusions]
+      );
+      logViolations("Messages Page", results.violations);
+      expect(results.violations).toHaveLength(0);
+    });
 
-    // If Enter did not send (some UIs require button click), tab to send + Enter
-    const bubble = page.locator(MSG_SELECTORS.messageBubble).filter({ hasText: uniqueText });
-    const sent = await bubble.first().isVisible({ timeout: 3_000 }).catch(() => false);
+    // -----------------------------------------------------------------------
+    // RT-A02: Chat window axe scan after loading messages
+    // -----------------------------------------------------------------------
+    test("RT-A02: Chat window passes axe-core after loading", async ({
+      page,
+    }) => {
+      const viewport = page.viewportSize();
+      test.skip(
+        !!viewport && viewport.width < 768,
+        "Desktop-only: axe results differ on mobile layout"
+      );
+      const ready = await goToMessages(page);
+      test.skip(!ready, "Could not reach /messages");
 
-    if (!sent) {
-      // Re-type the message (Enter may have added a newline or been consumed)
-      await input.click();
-      await input.fill('');
-      await input.pressSequentially(uniqueText, { delay: 30 });
-      await expect(input).toHaveValue(uniqueText, { timeout: 5_000 });
-      // Tab to send button and press Enter
-      await page.keyboard.press('Tab');
-      await page.keyboard.press('Enter');
-    }
+      await openConversation(page);
 
-    // Verify the message appears
-    await expect(bubble.first()).toBeVisible({ timeout: 10_000 });
-  });
+      // Wait for message bubbles to render so the DOM is complete
+      await page
+        .locator(MSG_SELECTORS.messageBubble)
+        .first()
+        .waitFor({ state: "attached", timeout: 10_000 })
+        .catch(() => {});
 
-  // -----------------------------------------------------------------------
-  // RT-A04: New message announced via aria-live
-  // -----------------------------------------------------------------------
-  test('RT-A04: New message announced via aria-live', async ({ page }) => {
-    const ready = await goToMessages(page);
-    test.skip(!ready, 'Could not reach /messages');
+      const results = await runAxeScan(
+        page,
+        [],
+        [...A11Y_CONFIG.knownExclusions]
+      );
+      logViolations("Chat Window", results.violations);
+      expect(results.violations).toHaveLength(0);
+    });
 
-    await openConversation(page);
+    // -----------------------------------------------------------------------
+    // RT-A03: Keyboard-only navigation and send
+    // -----------------------------------------------------------------------
+    test("RT-A03: Keyboard-only navigation and send", async ({ page }) => {
+      const viewport = page.viewportSize();
+      test.skip(
+        !!viewport && viewport.width < 768,
+        "Desktop-only: keyboard navigation not applicable on mobile"
+      );
+      const ready = await goToMessages(page);
+      test.skip(!ready, "Could not reach /messages");
 
-    // Check that messages container or a parent has aria-live
-    const container = page.locator(MSG_SELECTORS.messagesContainer);
-    const ariaLive = await container.getAttribute('aria-live').catch(() => null);
+      // Wait for conversation items to appear
+      const conversationItems = page.locator(MSG_SELECTORS.conversationItem);
+      await expect(conversationItems.first()).toBeVisible({ timeout: 15_000 });
 
-    // Also check parent elements
-    const parentAriaLive = await page.evaluate((sel) => {
-      const el = document.querySelector(sel);
-      let current = el;
-      while (current) {
-        if (current.getAttribute('aria-live')) {
-          return current.getAttribute('aria-live');
+      // Tab into the conversation list
+      let reachedConversation = false;
+      for (let i = 0; i < 20; i++) {
+        await page.keyboard.press("Tab");
+        const activeTag = await page.evaluate(() => {
+          const el = document.activeElement;
+          return (
+            el?.getAttribute("data-testid") || el?.tagName.toLowerCase() || ""
+          );
+        });
+        if (
+          activeTag === "conversation-item" ||
+          activeTag.includes("conversation")
+        ) {
+          reachedConversation = true;
+          break;
         }
-        current = current.parentElement;
+        // Also check if we have focused an element inside a conversation item
+        const isInConversation = await page.evaluate(() => {
+          return !!document.activeElement?.closest(
+            '[data-testid="conversation-item"]'
+          );
+        });
+        if (isInConversation) {
+          reachedConversation = true;
+          break;
+        }
       }
-      return null;
-    }, MSG_SELECTORS.messagesContainer);
 
-    // Also check for role="log" which implies aria-live="polite"
-    const hasLogRole = await page.evaluate((sel) => {
-      const el = document.querySelector(sel);
-      let current = el;
-      while (current) {
-        if (current.getAttribute('role') === 'log') return true;
-        current = current.parentElement;
+      // Press Enter to open the conversation
+      if (reachedConversation) {
+        await page.keyboard.press("Enter");
+      } else {
+        // Fallback: click the first conversation to continue testing the send flow
+        await conversationItems.first().click();
       }
-      return false;
-    }, MSG_SELECTORS.messagesContainer);
 
-    const hasLiveRegion = ariaLive !== null || parentAriaLive !== null || hasLogRole;
+      // Wait for message input to appear
+      const input = page.locator(MSG_SELECTORS.messageInput);
+      await expect(input).toBeVisible({ timeout: 10_000 });
 
-    if (!hasLiveRegion) {
-      // Document the gap -- screen readers will not announce new messages
-      console.warn(
-        '[a11y-gap] Messages container lacks aria-live or role="log". ' +
-        'Screen reader users will not be notified of new messages.',
-      );
-      test.fixme(true, 'Messages container missing aria-live region for screen reader announcements');
-      return;
-    }
-
-    // If the live region exists, verify a message appears after sending
-    const uniqueText = `a11y-live-${Date.now()}`;
-    await sendMessage(page, uniqueText);
-
-    const bubble = page.locator(MSG_SELECTORS.messageBubble).filter({ hasText: uniqueText });
-    await expect(bubble.first()).toBeVisible({ timeout: 10_000 });
-  });
-
-  // -----------------------------------------------------------------------
-  // RT-A05: Focus management -- opening conversation focuses input
-  // -----------------------------------------------------------------------
-  test('RT-A05: Focus management -- opening conversation focuses input', async ({ page }) => {
-    const ready = await goToMessages(page);
-    test.skip(!ready, 'Could not reach /messages');
-
-    const conversationItems = page.locator(MSG_SELECTORS.conversationItem);
-    await expect(conversationItems.first()).toBeVisible({ timeout: 15_000 });
-
-    // Click first conversation
-    await conversationItems.first().click();
-
-    // Wait for message input to be visible
-    const input = page.locator(MSG_SELECTORS.messageInput);
-    await expect(input).toBeVisible({ timeout: 10_000 });
-
-    // Check if input is auto-focused (allow a brief settling period)
-    let isFocused = false;
-    for (let attempt = 0; attempt < 5; attempt++) {
-      isFocused = await input.evaluate((el) => document.activeElement === el);
-      if (isFocused) break;
-      await page.waitForTimeout(200);
-    }
-
-    if (!isFocused) {
-      console.warn(
-        '[a11y-gap] Message input is not auto-focused when opening a conversation. ' +
-        'Users must manually tab/click to the input field.',
-      );
-      test.fixme(true, 'Product gap: message input not auto-focused on conversation open');
-      return;
-    }
-
-    // Verify input is at least focusable
-    await input.focus();
-    await expect(input).toBeFocused();
-  });
-
-  // -----------------------------------------------------------------------
-  // RT-A06: Touch targets >= 44px on mobile viewport
-  // -----------------------------------------------------------------------
-  test('RT-A06: Touch targets >= 44px on mobile viewport', async ({ page }) => {
-    // Set mobile viewport
-    await page.setViewportSize({ width: 375, height: 812 });
-
-    const ready = await goToMessages(page);
-    test.skip(!ready, 'Could not reach /messages');
-
-    const MIN_TOUCH_TARGET = 44;
-
-    // --- Check conversation items ---
-    const conversationItems = page.locator(MSG_SELECTORS.conversationItem);
-    const convCount = await conversationItems.count();
-    test.skip(convCount === 0, 'No conversation items to measure');
-
-    // On mobile, the component auto-selects the first conversation on mount,
-    // hiding the sidebar (hidden md:flex). Navigate back to the list first.
-    const firstItemVisible = await conversationItems.first().isVisible().catch(() => false);
-    if (!firstItemVisible) {
-      // Try clicking the back button to return to the conversation list
-      const backBtn = page.locator('[data-testid="back-button"], button.md\\:hidden, button[aria-label="Back"]').first();
-      const backVisible = await backBtn.isVisible().catch(() => false);
-      if (backVisible) {
-        await backBtn.click();
-        await expect(conversationItems.first()).toBeVisible({ timeout: 5_000 }).catch(() => {});
+      // Tab until we reach the message input
+      let reachedInput = false;
+      for (let i = 0; i < 15; i++) {
+        const isFocused = await input.evaluate(
+          (el) => document.activeElement === el
+        );
+        if (isFocused) {
+          reachedInput = true;
+          break;
+        }
+        await page.keyboard.press("Tab");
       }
-    }
 
-    // Only check bounding box if the conversation item is visible
-    const convVisible = await conversationItems.first().isVisible().catch(() => false);
-    if (convVisible) {
-      const firstConvBox = await conversationItems.first().boundingBox();
-
-      if (firstConvBox) {
-        expect.soft(
-          firstConvBox.height,
-          `Conversation item height (${firstConvBox.height}px) should be >= ${MIN_TOUCH_TARGET}px`,
-        ).toBeGreaterThanOrEqual(MIN_TOUCH_TARGET);
+      // If not focused via tabbing, focus it directly (documents the gap)
+      if (!reachedInput) {
+        await input.focus();
       }
-    }
 
-    // Open a conversation to check chat controls
-    // On mobile CI, back-button navigation may fail to restore the sidebar;
-    // if so, skip the chat-control checks instead of hard-failing.
-    const conversationOpened = await openConversation(page).then(() => true).catch(() => false);
+      // Type a message via keyboard
+      const uniqueText = `a11y-keyboard-${Date.now()}`;
+      await page.keyboard.type(uniqueText);
 
-    // --- Check send button ---
-    const sendButton = page.locator(MSG_SELECTORS.sendButton);
-    const sendVisible = conversationOpened && await sendButton.isVisible().catch(() => false);
+      // Send via Enter (most chat inputs submit on Enter)
+      await page.keyboard.press("Enter");
 
-    if (sendVisible) {
-      const sendBox = await sendButton.boundingBox();
-      expect(sendBox, 'Send button should have a bounding box').not.toBeNull();
+      // If Enter did not send (some UIs require button click), tab to send + Enter
+      const bubble = page
+        .locator(MSG_SELECTORS.messageBubble)
+        .filter({ hasText: uniqueText });
+      const sent = await bubble
+        .first()
+        .isVisible({ timeout: 3_000 })
+        .catch(() => false);
 
-      if (sendBox) {
-        expect.soft(
-          sendBox.width,
-          `Send button width (${sendBox.width}px) should be >= ${MIN_TOUCH_TARGET}px`,
-        ).toBeGreaterThanOrEqual(MIN_TOUCH_TARGET);
-        expect.soft(
-          sendBox.height,
-          `Send button height (${sendBox.height}px) should be >= ${MIN_TOUCH_TARGET}px`,
-        ).toBeGreaterThanOrEqual(MIN_TOUCH_TARGET);
+      if (!sent) {
+        // Re-type the message (Enter may have added a newline or been consumed)
+        await input.click();
+        await input.fill("");
+        await input.pressSequentially(uniqueText, { delay: 30 });
+        await expect(input).toHaveValue(uniqueText, { timeout: 5_000 });
+        // Tab to send button and press Enter
+        await page.keyboard.press("Tab");
+        await page.keyboard.press("Enter");
       }
-    }
 
-    // --- Check message input ---
-    const messageInput = page.locator(MSG_SELECTORS.messageInput);
-    const inputVisible = await messageInput.isVisible({ timeout: 5000 }).catch(() => false);
-    if (inputVisible) {
-      const inputBox = await messageInput.boundingBox();
-      if (inputBox) {
-        expect.soft(
-          inputBox.height,
-          `Message input height (${inputBox.height}px) should be >= ${MIN_TOUCH_TARGET}px`,
-        ).toBeGreaterThanOrEqual(MIN_TOUCH_TARGET);
+      // Verify the message appears
+      await expect(bubble.first()).toBeVisible({ timeout: 10_000 });
+    });
+
+    // -----------------------------------------------------------------------
+    // RT-A04: New message announced via aria-live
+    // -----------------------------------------------------------------------
+    test("RT-A04: New message announced via aria-live", async ({ page }) => {
+      const ready = await goToMessages(page);
+      test.skip(!ready, "Could not reach /messages");
+
+      await openConversation(page);
+
+      // Check that messages container or a parent has aria-live
+      const container = page.locator(MSG_SELECTORS.messagesContainer);
+      const ariaLive = await container
+        .getAttribute("aria-live")
+        .catch(() => null);
+
+      // Also check parent elements
+      const parentAriaLive = await page.evaluate((sel) => {
+        const el = document.querySelector(sel);
+        let current = el;
+        while (current) {
+          if (current.getAttribute("aria-live")) {
+            return current.getAttribute("aria-live");
+          }
+          current = current.parentElement;
+        }
+        return null;
+      }, MSG_SELECTORS.messagesContainer);
+
+      // Also check for role="log" which implies aria-live="polite"
+      const hasLogRole = await page.evaluate((sel) => {
+        const el = document.querySelector(sel);
+        let current = el;
+        while (current) {
+          if (current.getAttribute("role") === "log") return true;
+          current = current.parentElement;
+        }
+        return false;
+      }, MSG_SELECTORS.messagesContainer);
+
+      const hasLiveRegion =
+        ariaLive !== null || parentAriaLive !== null || hasLogRole;
+
+      if (!hasLiveRegion) {
+        // Document the gap -- screen readers will not announce new messages
+        console.warn(
+          '[a11y-gap] Messages container lacks aria-live or role="log". ' +
+            "Screen reader users will not be notified of new messages."
+        );
+        test.fixme(
+          true,
+          "Messages container missing aria-live region for screen reader announcements"
+        );
+        return;
       }
-    }
-    // If message input not visible, skip the check (no active conversation)
-  });
-});
+
+      // If the live region exists, verify a message appears after sending
+      const uniqueText = `a11y-live-${Date.now()}`;
+      await sendMessage(page, uniqueText);
+
+      const bubble = page
+        .locator(MSG_SELECTORS.messageBubble)
+        .filter({ hasText: uniqueText });
+      await expect(bubble.first()).toBeVisible({ timeout: 10_000 });
+    });
+
+    // -----------------------------------------------------------------------
+    // RT-A05: Focus management -- opening conversation focuses input
+    // -----------------------------------------------------------------------
+    test("RT-A05: Focus management -- opening conversation focuses input", async ({
+      page,
+    }) => {
+      const ready = await goToMessages(page);
+      test.skip(!ready, "Could not reach /messages");
+
+      const conversationItems = page.locator(MSG_SELECTORS.conversationItem);
+      await expect(conversationItems.first()).toBeVisible({ timeout: 15_000 });
+
+      // Click first conversation
+      await conversationItems.first().click();
+
+      // Wait for message input to be visible
+      const input = page.locator(MSG_SELECTORS.messageInput);
+      await expect(input).toBeVisible({ timeout: 10_000 });
+
+      // Check if input is auto-focused (allow a brief settling period)
+      let isFocused = false;
+      for (let attempt = 0; attempt < 5; attempt++) {
+        isFocused = await input.evaluate((el) => document.activeElement === el);
+        if (isFocused) break;
+        await page.waitForTimeout(200);
+      }
+
+      if (!isFocused) {
+        console.warn(
+          "[a11y-gap] Message input is not auto-focused when opening a conversation. " +
+            "Users must manually tab/click to the input field."
+        );
+        test.fixme(
+          true,
+          "Product gap: message input not auto-focused on conversation open"
+        );
+        return;
+      }
+
+      // Verify input is at least focusable
+      await input.focus();
+      await expect(input).toBeFocused();
+    });
+
+    // -----------------------------------------------------------------------
+    // RT-A06: Touch targets >= 44px on mobile viewport
+    // -----------------------------------------------------------------------
+    test("RT-A06: Touch targets >= 44px on mobile viewport", async ({
+      page,
+    }) => {
+      // Set mobile viewport
+      await page.setViewportSize({ width: 375, height: 812 });
+
+      const ready = await goToMessages(page);
+      test.skip(!ready, "Could not reach /messages");
+
+      const MIN_TOUCH_TARGET = 44;
+
+      // --- Check conversation items ---
+      const conversationItems = page.locator(MSG_SELECTORS.conversationItem);
+      const convCount = await conversationItems.count();
+      test.skip(convCount === 0, "No conversation items to measure");
+
+      // On mobile, the component auto-selects the first conversation on mount,
+      // hiding the sidebar (hidden md:flex). Navigate back to the list first.
+      const firstItemVisible = await conversationItems
+        .first()
+        .isVisible()
+        .catch(() => false);
+      if (!firstItemVisible) {
+        // Try clicking the back button to return to the conversation list
+        const backBtn = page
+          .locator(
+            '[data-testid="back-button"], button.md\\:hidden, button[aria-label="Back"]'
+          )
+          .first();
+        const backVisible = await backBtn.isVisible().catch(() => false);
+        if (backVisible) {
+          await backBtn.click();
+          await expect(conversationItems.first())
+            .toBeVisible({ timeout: 5_000 })
+            .catch(() => {});
+        }
+      }
+
+      // Only check bounding box if the conversation item is visible
+      const convVisible = await conversationItems
+        .first()
+        .isVisible()
+        .catch(() => false);
+      if (convVisible) {
+        const firstConvBox = await conversationItems.first().boundingBox();
+
+        if (firstConvBox) {
+          expect
+            .soft(
+              firstConvBox.height,
+              `Conversation item height (${firstConvBox.height}px) should be >= ${MIN_TOUCH_TARGET}px`
+            )
+            .toBeGreaterThanOrEqual(MIN_TOUCH_TARGET);
+        }
+      }
+
+      // Open a conversation to check chat controls
+      // On mobile CI, back-button navigation may fail to restore the sidebar;
+      // if so, skip the chat-control checks instead of hard-failing.
+      const conversationOpened = await openConversation(page)
+        .then(() => true)
+        .catch(() => false);
+
+      // --- Check send button ---
+      const sendButton = page.locator(MSG_SELECTORS.sendButton);
+      const sendVisible =
+        conversationOpened && (await sendButton.isVisible().catch(() => false));
+
+      if (sendVisible) {
+        const sendBox = await sendButton.boundingBox();
+        expect(
+          sendBox,
+          "Send button should have a bounding box"
+        ).not.toBeNull();
+
+        if (sendBox) {
+          expect
+            .soft(
+              sendBox.width,
+              `Send button width (${sendBox.width}px) should be >= ${MIN_TOUCH_TARGET}px`
+            )
+            .toBeGreaterThanOrEqual(MIN_TOUCH_TARGET);
+          expect
+            .soft(
+              sendBox.height,
+              `Send button height (${sendBox.height}px) should be >= ${MIN_TOUCH_TARGET}px`
+            )
+            .toBeGreaterThanOrEqual(MIN_TOUCH_TARGET);
+        }
+      }
+
+      // --- Check message input ---
+      const messageInput = page.locator(MSG_SELECTORS.messageInput);
+      const inputVisible = await messageInput
+        .isVisible({ timeout: 5000 })
+        .catch(() => false);
+      if (inputVisible) {
+        const inputBox = await messageInput.boundingBox();
+        if (inputBox) {
+          expect
+            .soft(
+              inputBox.height,
+              `Message input height (${inputBox.height}px) should be >= ${MIN_TOUCH_TARGET}px`
+            )
+            .toBeGreaterThanOrEqual(MIN_TOUCH_TARGET);
+        }
+      }
+      // If message input not visible, skip the check (no active conversation)
+    });
+  }
+);

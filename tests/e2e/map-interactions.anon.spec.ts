@@ -22,7 +22,14 @@
  *   pnpm playwright test tests/e2e/map-interactions.anon.spec.ts --project=chromium-anon --headed
  */
 
-import { test, expect, SF_BOUNDS, selectors, timeouts, waitForMapReady } from "./helpers/test-utils";
+import {
+  test,
+  expect,
+  SF_BOUNDS,
+  selectors,
+  timeouts,
+  waitForMapReady,
+} from "./helpers/test-utils";
 import type { Page } from "@playwright/test";
 import {
   getCardState,
@@ -70,7 +77,9 @@ async function waitForSearchPage(page: Page, url = SEARCH_URL) {
   // Wait for any button to indicate page hydration, then try the toggle
   await page.waitForSelector("button", { timeout: 30_000 });
   // The "Search as I move" toggle may not render without WebGL -- don't fail here
-  await page.waitForSelector(sel.searchAsMoveToggle, { timeout: 10_000 }).catch(() => {});
+  await page
+    .waitForSelector(sel.searchAsMoveToggle, { timeout: 10_000 })
+    .catch(() => {});
   await waitForMapReady(page);
 }
 
@@ -119,7 +128,9 @@ async function turnToggleOff(page: Page) {
   const isChecked = await toggle.getAttribute("aria-checked");
   if (isChecked === "true") {
     await toggle.click();
-    await expect(toggle).toHaveAttribute("aria-checked", "false", { timeout: 10_000 });
+    await expect(toggle).toHaveAttribute("aria-checked", "false", {
+      timeout: 10_000,
+    });
   }
 }
 
@@ -132,7 +143,7 @@ async function turnToggleOff(page: Page) {
 async function simulateMapPan(
   page: Page,
   deltaX = 100,
-  deltaY = 50,
+  deltaY = 50
 ): Promise<boolean> {
   const map = page.locator(sel.mapContainer).first();
   if ((await map.count()) === 0) return false;
@@ -190,26 +201,32 @@ async function simulateMapPan(
 async function programmaticMapPan(
   page: Page,
   deltaX = 100,
-  deltaY = 50,
+  deltaY = 50
 ): Promise<boolean> {
-  const result = await page.evaluate(({ dx, dy }) => {
-    return new Promise<boolean>((resolve) => {
-      const map = (window as any).__e2eMapRef;
-      const setProgrammatic = (window as any).__e2eSetProgrammaticMove;
-      if (!map) { resolve(false); return; }
-      const centerBefore = map.getCenter();
-      if (setProgrammatic) setProgrammatic(false); // allow search-as-I-move to fire
-      map.once("idle", () => {
-        const centerAfter = map.getCenter();
-        const moved =
-          Math.abs(centerAfter.lng - centerBefore.lng) > 0.0001 ||
-          Math.abs(centerAfter.lat - centerBefore.lat) > 0.0001;
-        resolve(moved);
+  const result = await page.evaluate(
+    ({ dx, dy }) => {
+      return new Promise<boolean>((resolve) => {
+        const map = (window as any).__e2eMapRef;
+        const setProgrammatic = (window as any).__e2eSetProgrammaticMove;
+        if (!map) {
+          resolve(false);
+          return;
+        }
+        const centerBefore = map.getCenter();
+        if (setProgrammatic) setProgrammatic(false); // allow search-as-I-move to fire
+        map.once("idle", () => {
+          const centerAfter = map.getCenter();
+          const moved =
+            Math.abs(centerAfter.lng - centerBefore.lng) > 0.0001 ||
+            Math.abs(centerAfter.lat - centerBefore.lat) > 0.0001;
+          resolve(moved);
+        });
+        map.panBy([dx, dy], { animate: false });
+        setTimeout(() => resolve(true), 10000);
       });
-      map.panBy([dx, dy], { animate: false });
-      setTimeout(() => resolve(true), 10000);
-    });
-  }, { dx: deltaX, dy: deltaY });
+    },
+    { dx: deltaX, dy: deltaY }
+  );
   if (result) {
     await waitForMapReady(page);
   }
@@ -248,7 +265,7 @@ function boundsChanged(initialUrl: string, currentUrl: string): boolean {
  */
 async function mockSearchCountApi(
   page: Page,
-  options: { count?: number | null; delay?: number } = {},
+  options: { count?: number | null; delay?: number } = {}
 ) {
   const { count = 42, delay = 0 } = options;
 
@@ -265,14 +282,18 @@ async function mockSearchCountApi(
 }
 
 // Map tests need extra time for WebGL rendering and tile loading in CI
-test.beforeEach(async () => { test.slow(); });
+test.beforeEach(async () => {
+  test.slow();
+});
 
 // ---------------------------------------------------------------------------
 // Story 1: Map + List Scroll Sync (ListScrollBridge)
 // ---------------------------------------------------------------------------
 
 test.describe("1.x: Map + List Scroll Sync", () => {
-  test("1.1 - Marker click scrolls list to matching card (P0)", async ({ page }) => {
+  test("1.1 - Marker click scrolls list to matching card (P0)", async ({
+    page,
+  }) => {
     await waitForSearchPage(page);
     if (!(await guardMapReady(page))) return;
 
@@ -293,7 +314,7 @@ test.describe("1.x: Map + List Scroll Sync", () => {
     // Scroll the list panel to the very bottom so the target card is NOT in view
     await page.evaluate(() => {
       const listContainer = document.querySelector(
-        '[data-testid="listing-list"], [class*="search-results"], main',
+        '[data-testid="listing-list"], [class*="search-results"], main'
       );
       if (listContainer) {
         listContainer.scrollTop = listContainer.scrollHeight;
@@ -308,7 +329,10 @@ test.describe("1.x: Map + List Scroll Sync", () => {
       const el = document.querySelector(
         `.maplibregl-marker [data-listing-id="${id}"]`
       ) as HTMLElement;
-      if (el) { el.click(); return true; }
+      if (el) {
+        el.click();
+        return true;
+      }
       return false;
     }, listingId);
 
@@ -323,12 +347,18 @@ test.describe("1.x: Map + List Scroll Sync", () => {
     const deadline = Date.now() + 10_000;
     while (Date.now() < deadline) {
       const state = await getCardState(page, listingId);
-      if (state.isActive) { cardBecameActive = true; break; }
+      if (state.isActive) {
+        cardBecameActive = true;
+        break;
+      }
       await page.waitForTimeout(250);
     }
 
     if (!cardBecameActive) {
-      test.skip(true, "Marker click did not activate card (headless CI limitation)");
+      test.skip(
+        true,
+        "Marker click did not activate card (headless CI limitation)"
+      );
       return;
     }
 
@@ -336,17 +366,25 @@ test.describe("1.x: Map + List Scroll Sync", () => {
     let cardInViewport = false;
     const vpDeadline = Date.now() + 15_000;
     while (Date.now() < vpDeadline) {
-      if (await isCardInViewport(page, listingId)) { cardInViewport = true; break; }
+      if (await isCardInViewport(page, listingId)) {
+        cardInViewport = true;
+        break;
+      }
       await page.waitForTimeout(300);
     }
     if (!cardInViewport) {
-      test.skip(true, 'Card not scrolled into viewport (headless CI scroll limitation)');
+      test.skip(
+        true,
+        "Card not scrolled into viewport (headless CI scroll limitation)"
+      );
       return;
     }
     expect(cardInViewport).toBe(true);
   });
 
-  test("1.2 - Marker hover triggers debounced scroll (P1)", async ({ page }) => {
+  test("1.2 - Marker hover triggers debounced scroll (P1)", async ({
+    page,
+  }) => {
     await waitForSearchPage(page);
     if (!(await guardMapReady(page))) return;
 
@@ -365,7 +403,7 @@ test.describe("1.x: Map + List Scroll Sync", () => {
     // Scroll list away from the target card
     await page.evaluate(() => {
       const listContainer = document.querySelector(
-        '[data-testid="listing-list"], [class*="search-results"], main',
+        '[data-testid="listing-list"], [class*="search-results"], main'
       );
       if (listContainer) {
         listContainer.scrollTop = listContainer.scrollHeight;
@@ -381,10 +419,12 @@ test.describe("1.x: Map + List Scroll Sync", () => {
         `.maplibregl-marker [data-listing-id="${id}"]`
       ) as HTMLElement;
       if (el) {
-        el.dispatchEvent(new PointerEvent('pointerenter', {
-          bubbles: true,
-          pointerType: 'mouse',
-        }));
+        el.dispatchEvent(
+          new PointerEvent("pointerenter", {
+            bubbles: true,
+            pointerType: "mouse",
+          })
+        );
       }
     }, listingId);
 
@@ -405,7 +445,9 @@ test.describe("1.x: Map + List Scroll Sync", () => {
     await page.mouse.move(0, 0);
   });
 
-  test("1.3 - Card highlight persists after popup close (P1)", async ({ page }) => {
+  test("1.3 - Card highlight persists after popup close (P1)", async ({
+    page,
+  }) => {
     await waitForSearchPage(page);
     if (!(await guardMapReady(page))) return;
 
@@ -456,17 +498,24 @@ test.describe("1.x: Map + List Scroll Sync", () => {
 // ---------------------------------------------------------------------------
 
 test.describe("2.x: Search as I Move -- Result Auto-Refresh", () => {
-  test("2.1 - Pan with toggle ON updates listings via URL bounds (P0)", async ({ page }) => {
+  test("2.1 - Pan with toggle ON updates listings via URL bounds (P0)", async ({
+    page,
+  }) => {
     await waitForSearchPage(page);
     if (!(await guardMapReady(page))) return;
 
     // Verify toggle is ON by default (with timeout for CI)
     const toggle = page.locator(sel.searchAsMoveToggle);
     if ((await toggle.count()) === 0) {
-      test.skip(true, "Search as I move toggle not found (map may not have loaded)");
+      test.skip(
+        true,
+        "Search as I move toggle not found (map may not have loaded)"
+      );
       return;
     }
-    await expect(toggle).toHaveAttribute("aria-checked", "true", { timeout: 10_000 });
+    await expect(toggle).toHaveAttribute("aria-checked", "true", {
+      timeout: 10_000,
+    });
 
     // Record initial URL bounds
     const initialUrl = page.url();
@@ -479,7 +528,9 @@ test.describe("2.x: Search as I Move -- Result Auto-Refresh", () => {
     }
 
     const panDelta = Math.round(mapBox.width * 0.3);
-    const panned = await programmaticMapPan(page, panDelta, 0) || await simulateMapPan(page, panDelta, 0);
+    const panned =
+      (await programmaticMapPan(page, panDelta, 0)) ||
+      (await simulateMapPan(page, panDelta, 0));
     if (!panned) {
       test.skip(true, "Map pan did not succeed");
       return;
@@ -490,17 +541,21 @@ test.describe("2.x: Search as I Move -- Result Auto-Refresh", () => {
     // In headless CI without GPU, the map pan may not reliably produce bounds changes
     let boundsDidChange = false;
     try {
-      await expect.poll(
-        () => boundsChanged(initialUrl, page.url()),
-        { timeout: MAP_SEARCH_DEBOUNCE_MS + 10_000 },
-      ).toBe(true);
+      await expect
+        .poll(() => boundsChanged(initialUrl, page.url()), {
+          timeout: MAP_SEARCH_DEBOUNCE_MS + 10_000,
+        })
+        .toBe(true);
       boundsDidChange = true;
     } catch {
       // Bounds did not change despite pan succeeding — common in headless CI
     }
 
     if (!boundsDidChange) {
-      test.skip(true, "Map pan did not produce URL bounds change (headless CI WebGL limitation)");
+      test.skip(
+        true,
+        "Map pan did not produce URL bounds change (headless CI WebGL limitation)"
+      );
       return;
     }
 
@@ -512,12 +567,16 @@ test.describe("2.x: Search as I Move -- Result Auto-Refresh", () => {
     expect(await page.locator("body").isVisible()).toBe(true);
   });
 
-  test("2.2 - Rapid pans coalesce into single URL update (P1)", async ({ page }) => {
+  test("2.2 - Rapid pans coalesce into single URL update (P1)", async ({
+    page,
+  }) => {
     // Inject URL change listener before navigation
     await page.addInitScript(() => {
       const origReplace = history.replaceState.bind(history);
       (window as any).__e2eUrlChanges = [];
-      history.replaceState = function (...args: Parameters<typeof history.replaceState>) {
+      history.replaceState = function (
+        ...args: Parameters<typeof history.replaceState>
+      ) {
         const url = args[2]?.toString() ?? "";
         if (url.includes("minLat")) {
           (window as any).__e2eUrlChanges.push(Date.now());
@@ -532,10 +591,15 @@ test.describe("2.x: Search as I Move -- Result Auto-Refresh", () => {
     // Ensure toggle is ON
     const toggle = page.locator(sel.searchAsMoveToggle);
     if ((await toggle.count()) === 0) {
-      test.skip(true, "Search as I move toggle not found (map may not have loaded)");
+      test.skip(
+        true,
+        "Search as I move toggle not found (map may not have loaded)"
+      );
       return;
     }
-    await expect(toggle).toHaveAttribute("aria-checked", "true", { timeout: 10_000 });
+    await expect(toggle).toHaveAttribute("aria-checked", "true", {
+      timeout: 10_000,
+    });
 
     // Clear tracked changes from initial load
     await page.evaluate(() => {
@@ -601,7 +665,9 @@ test.describe("3.x: Search This Area -- Listing Verification", () => {
     await turnToggleOff(page);
 
     // Pan map to shift bounds
-    const panned = await programmaticMapPan(page, 150, 75) || await simulateMapPan(page, 150, 75);
+    const panned =
+      (await programmaticMapPan(page, 150, 75)) ||
+      (await simulateMapPan(page, 150, 75));
     if (!panned) {
       test.skip(true, "Map pan did not succeed");
       return;
@@ -609,9 +675,14 @@ test.describe("3.x: Search This Area -- Listing Verification", () => {
 
     // Wait for banner to appear with count
     const searchAreaBtn = page.locator(sel.searchThisAreaBtn);
-    const bannerVisible = await searchAreaBtn.isVisible({ timeout: MAP_SEARCH_DEBOUNCE_MS + 10_000 }).catch(() => false);
+    const bannerVisible = await searchAreaBtn
+      .isVisible({ timeout: MAP_SEARCH_DEBOUNCE_MS + 10_000 })
+      .catch(() => false);
     if (!bannerVisible) {
-      test.skip(true, "Search this area banner did not appear after pan (headless CI WebGL limitation)");
+      test.skip(
+        true,
+        "Search this area banner did not appear after pan (headless CI WebGL limitation)"
+      );
       return;
     }
 
@@ -630,7 +701,10 @@ test.describe("3.x: Search This Area -- Listing Verification", () => {
     // URL bounds should have changed to match new map position
     const urlChanged = boundsChanged(initialUrl, page.url());
     if (!urlChanged) {
-      test.skip(true, "URL bounds did not change after Search this area click (headless CI)");
+      test.skip(
+        true,
+        "URL bounds did not change after Search this area click (headless CI)"
+      );
       return;
     }
 
@@ -641,14 +715,18 @@ test.describe("3.x: Search This Area -- Listing Verification", () => {
     // Toggle state should be unchanged (still OFF)
     const toggleState = page.locator(sel.searchAsMoveToggle);
     if ((await toggleState.count()) > 0) {
-      await expect(toggleState).toHaveAttribute("aria-checked", "false", { timeout: 10_000 });
+      await expect(toggleState).toHaveAttribute("aria-checked", "false", {
+        timeout: 10_000,
+      });
     }
 
     // Keep reference to avoid unused var lint error
     void cardCountBefore;
   });
 
-  test("3.2 - Reset button restores original URL and listings (P0)", async ({ page }) => {
+  test("3.2 - Reset button restores original URL and listings (P0)", async ({
+    page,
+  }) => {
     // Mock search-count API
     await mockSearchCountApi(page, { count: 20 });
 
@@ -661,7 +739,9 @@ test.describe("3.x: Search This Area -- Listing Verification", () => {
     // Turn toggle OFF and pan map
     await turnToggleOff(page);
 
-    const panned = await programmaticMapPan(page, 200, 100) || await simulateMapPan(page, 200, 100);
+    const panned =
+      (await programmaticMapPan(page, 200, 100)) ||
+      (await simulateMapPan(page, 200, 100));
     if (!panned) {
       test.skip(true, "Map pan did not succeed");
       return;
@@ -669,9 +749,14 @@ test.describe("3.x: Search This Area -- Listing Verification", () => {
 
     // Wait for banner
     const resetBtn = page.locator(sel.resetMapBtn);
-    const resetVisible = await resetBtn.isVisible({ timeout: MAP_SEARCH_DEBOUNCE_MS + 10_000 }).catch(() => false);
+    const resetVisible = await resetBtn
+      .isVisible({ timeout: MAP_SEARCH_DEBOUNCE_MS + 10_000 })
+      .catch(() => false);
     if (!resetVisible) {
-      test.skip(true, "Reset button did not appear after pan (headless CI WebGL limitation)");
+      test.skip(
+        true,
+        "Reset button did not appear after pan (headless CI WebGL limitation)"
+      );
       return;
     }
 
@@ -686,10 +771,7 @@ test.describe("3.x: Search This Area -- Listing Verification", () => {
 
     // URL should match the original (bounds restored)
     // Use poll to wait for URL to update after fly-back animation
-    await expect.poll(
-      () => page.url(),
-      { timeout: 10_000 },
-    ).toBe(initialUrl);
+    await expect.poll(() => page.url(), { timeout: 10_000 }).toBe(initialUrl);
 
     // Map viewport has returned to original bounds (verified via URL match above)
   });
@@ -700,7 +782,9 @@ test.describe("3.x: Search This Area -- Listing Verification", () => {
 // ---------------------------------------------------------------------------
 
 test.describe("4.x: Map Persistence Across Filter Changes", () => {
-  test("4.1 - Map stays mounted when price filter changes (P0)", async ({ page }) => {
+  test("4.1 - Map stays mounted when price filter changes (P0)", async ({
+    page,
+  }) => {
     await waitForSearchPage(page);
     if (!(await guardMapReady(page))) return;
 
@@ -723,9 +807,15 @@ test.describe("4.x: Map Persistence Across Filter Changes", () => {
 
     // Map canvas should STILL be visible (no unmount/remount flash)
     // In CI headless without WebGL, canvas may not persist across navigation
-    const canvasStillVisible = await canvas.first().isVisible().catch(() => false);
+    const canvasStillVisible = await canvas
+      .first()
+      .isVisible()
+      .catch(() => false);
     if (!canvasStillVisible) {
-      test.skip(true, "Map canvas not visible after filter navigation (WebGL unavailable)");
+      test.skip(
+        true,
+        "Map canvas not visible after filter navigation (WebGL unavailable)"
+      );
       return;
     }
 
@@ -769,9 +859,15 @@ test.describe("4.x: Map Persistence Across Filter Changes", () => {
 
     // Map canvas should remain visible throughout
     // In CI headless without WebGL, canvas may not persist across navigation
-    const canvasStillVisible = await canvas.first().isVisible().catch(() => false);
+    const canvasStillVisible = await canvas
+      .first()
+      .isVisible()
+      .catch(() => false);
     if (!canvasStillVisible) {
-      test.skip(true, "Map canvas not visible after query navigation (WebGL unavailable)");
+      test.skip(
+        true,
+        "Map canvas not visible after query navigation (WebGL unavailable)"
+      );
       return;
     }
 

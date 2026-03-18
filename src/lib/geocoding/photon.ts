@@ -7,10 +7,10 @@
  * LocationSuggestion / GeocodingResult interfaces used throughout the app.
  */
 
-import type { GeocodingResult } from '../geocoding-cache';
-import { fetchWithTimeout } from '../fetch-with-timeout';
+import type { GeocodingResult } from "../geocoding-cache";
+import { fetchWithTimeout } from "../fetch-with-timeout";
 
-const PHOTON_BASE_URL = 'https://photon.komoot.io/api';
+const PHOTON_BASE_URL = "https://photon.komoot.io/api";
 const GEOCODING_TIMEOUT_MS = 8000;
 
 /** Max query length (reasonable limit; Photon has no documented cap) */
@@ -33,16 +33,16 @@ interface PhotonProperties {
 }
 
 interface PhotonFeature {
-  type: 'Feature';
+  type: "Feature";
   geometry: {
-    type: 'Point';
+    type: "Point";
     coordinates: [number, number]; // [lng, lat]
   };
   properties: PhotonProperties;
 }
 
 interface PhotonResponse {
-  type: 'FeatureCollection';
+  type: "FeatureCollection";
   features: PhotonFeature[];
 }
 
@@ -73,34 +73,34 @@ function buildPlaceName(props: PhotonProperties): string {
     parts.push(props.country);
   }
 
-  return parts.join(', ') || 'Unknown location';
+  return parts.join(", ") || "Unknown location";
 }
 
 /** Map Photon type to Mapbox-compatible place_type array */
 function inferPlaceType(type?: string): string[] {
-  if (!type) return ['place'];
+  if (!type) return ["place"];
   switch (type) {
-    case 'city':
-    case 'town':
-    case 'village':
-      return ['place'];
-    case 'district':
-    case 'suburb':
-    case 'neighbourhood':
-      return ['neighborhood'];
-    case 'street':
-      return ['address'];
-    case 'state':
-    case 'county':
-      return ['region'];
-    case 'country':
-      return ['country'];
-    case 'house':
-      return ['address'];
-    case 'locality':
-      return ['locality'];
+    case "city":
+    case "town":
+    case "village":
+      return ["place"];
+    case "district":
+    case "suburb":
+    case "neighbourhood":
+      return ["neighborhood"];
+    case "street":
+      return ["address"];
+    case "state":
+    case "county":
+      return ["region"];
+    case "country":
+      return ["country"];
+    case "house":
+      return ["address"];
+    case "locality":
+      return ["locality"];
     default:
-      return ['place'];
+      return ["place"];
   }
 }
 
@@ -108,7 +108,7 @@ function inferPlaceType(type?: string): string[] {
 function toGeocodingResult(feature: PhotonFeature): GeocodingResult {
   const props = feature.properties;
   return {
-    id: `${props.osm_type || 'N'}:${props.osm_id || 0}`,
+    id: `${props.osm_type || "N"}:${props.osm_id || 0}`,
     place_name: buildPlaceName(props),
     center: feature.geometry.coordinates as [number, number],
     place_type: inferPlaceType(props.type),
@@ -122,7 +122,7 @@ function toGeocodingResult(feature: PhotonFeature): GeocodingResult {
  */
 export async function searchPhoton(
   query: string,
-  options?: { signal?: AbortSignal; limit?: number },
+  options?: { signal?: AbortSignal; limit?: number }
 ): Promise<GeocodingResult[]> {
   const limit = options?.limit ?? 5;
   const encoded = encodeURIComponent(query);
@@ -135,9 +135,9 @@ export async function searchPhoton(
 
   if (!response.ok) {
     if (response.status >= 500) {
-      throw new Error('Location service is temporarily unavailable');
+      throw new Error("Location service is temporarily unavailable");
     }
-    throw new Error('Failed to fetch suggestions');
+    throw new Error("Failed to fetch suggestions");
   }
 
   const data: PhotonResponse = await response.json();

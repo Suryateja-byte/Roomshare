@@ -1,7 +1,7 @@
-import { NextResponse } from 'next/server';
-import { prisma } from '@/lib/prisma';
-import { isInShutdownMode } from '@/lib/shutdown';
-import { logger } from '@/lib/logger';
+import { NextResponse } from "next/server";
+import { prisma } from "@/lib/prisma";
+import { isInShutdownMode } from "@/lib/shutdown";
+import { logger } from "@/lib/logger";
 
 /**
  * Readiness probe - confirms the application can serve traffic
@@ -15,15 +15,15 @@ export async function GET() {
   if (isInShutdownMode()) {
     return NextResponse.json(
       {
-        status: 'draining',
-        message: 'Application is shutting down',
+        status: "draining",
+        message: "Application is shutting down",
         timestamp: new Date().toISOString(),
       },
       { status: 503 }
     );
   }
 
-  const publicChecks: Record<string, { status: 'ok' | 'error' }> = {};
+  const publicChecks: Record<string, { status: "ok" | "error" }> = {};
   const internalLatency: Record<string, number> = {};
   let healthy = true;
 
@@ -32,50 +32,56 @@ export async function GET() {
   try {
     await prisma.$queryRaw`SELECT 1`;
     const dbLatency = Date.now() - dbStart;
-    publicChecks.database = { status: 'ok' };
+    publicChecks.database = { status: "ok" };
     internalLatency.database = dbLatency;
   } catch {
-    publicChecks.database = { status: 'error' };
+    publicChecks.database = { status: "error" };
     internalLatency.database = Date.now() - dbStart;
     healthy = false;
   }
 
   // Check Redis connectivity (OPTIONAL - we have DB fallback)
-  if (process.env.UPSTASH_REDIS_REST_URL && process.env.UPSTASH_REDIS_REST_TOKEN) {
+  if (
+    process.env.UPSTASH_REDIS_REST_URL &&
+    process.env.UPSTASH_REDIS_REST_TOKEN
+  ) {
     const redisStart = Date.now();
     try {
       const controller = new AbortController();
       const timeoutId = setTimeout(() => controller.abort(), 2000);
 
-      const fetchResponse = await fetch(`${process.env.UPSTASH_REDIS_REST_URL}/ping`, {
-        headers: {
-          Authorization: `Bearer ${process.env.UPSTASH_REDIS_REST_TOKEN}`
-        },
-        signal: controller.signal,
-      });
+      const fetchResponse = await fetch(
+        `${process.env.UPSTASH_REDIS_REST_URL}/ping`,
+        {
+          headers: {
+            Authorization: `Bearer ${process.env.UPSTASH_REDIS_REST_TOKEN}`,
+          },
+          signal: controller.signal,
+        }
+      );
 
       clearTimeout(timeoutId);
 
       const redisLatency = Date.now() - redisStart;
-      publicChecks.redis = { status: fetchResponse.ok ? 'ok' : 'error' };
+      publicChecks.redis = { status: fetchResponse.ok ? "ok" : "error" };
       internalLatency.redis = redisLatency;
     } catch {
-      publicChecks.redis = { status: 'error' };
+      publicChecks.redis = { status: "error" };
       internalLatency.redis = Date.now() - redisStart;
       // Redis failure is non-fatal - map/metrics/search fall back to DB; chat fails closed
     }
   } else {
-    publicChecks.redis = { status: 'ok' }; // Not configured, using DB fallback
+    publicChecks.redis = { status: "ok" }; // Not configured, using DB fallback
   }
 
   // Check Supabase connectivity (OPTIONAL - affects real-time only)
   if (process.env.NEXT_PUBLIC_SUPABASE_URL) {
-    publicChecks.supabase = { status: 'ok' }; // Just check config exists
+    publicChecks.supabase = { status: "ok" }; // Just check config exists
   }
 
   // Log latency internally (not exposed in public response)
-  logger.sync.debug('Health check latency', {
-    route: '/api/health/ready',
+  logger.sync.debug("Health check latency", {
+    route: "/api/health/ready",
     latency: internalLatency,
     healthy,
   });
@@ -83,16 +89,16 @@ export async function GET() {
   // P2-1: Health checks must never be cached - always return fresh data
   const response = NextResponse.json(
     {
-      status: healthy ? 'ready' : 'unhealthy',
+      status: healthy ? "ready" : "unhealthy",
       timestamp: new Date().toISOString(),
-      version: process.env.VERCEL_GIT_COMMIT_SHA?.slice(0, 7) || 'dev',
+      version: process.env.VERCEL_GIT_COMMIT_SHA?.slice(0, 7) || "dev",
       checks: publicChecks,
     },
     { status: healthy ? 200 : 503 }
   );
-  response.headers.set('Cache-Control', 'no-cache, no-store, must-revalidate');
+  response.headers.set("Cache-Control", "no-cache, no-store, must-revalidate");
   return response;
 }
 
 // Use nodejs runtime for Prisma access
-export const runtime = 'nodejs';
+export const runtime = "nodejs";

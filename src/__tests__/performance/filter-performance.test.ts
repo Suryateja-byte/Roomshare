@@ -9,26 +9,31 @@
  * - Concurrency behavior
  */
 
-import { normalizeFilters, type FilterParams } from '@/lib/filter-schema';
-import { TEST_LISTINGS, ACTIVE_LISTINGS, applyFilters, sortListings } from '../fixtures/listings.fixture';
-import { sanitizeSearchQuery, isValidQuery } from '@/lib/data';
-import { DEFAULT_TIMEOUTS } from '@/lib/timeout-wrapper';
+import { normalizeFilters, type FilterParams } from "@/lib/filter-schema";
+import {
+  TEST_LISTINGS,
+  ACTIVE_LISTINGS,
+  applyFilters,
+  sortListings,
+} from "../fixtures/listings.fixture";
+import { sanitizeSearchQuery, isValidQuery } from "@/lib/data";
+import { DEFAULT_TIMEOUTS } from "@/lib/timeout-wrapper";
 
 // ============================================
 // Performance Benchmarks
 // ============================================
 
-describe('Performance Benchmarks', () => {
-  describe('normalizeFilters performance', () => {
-    it('completes single normalization in under 5ms', () => {
+describe("Performance Benchmarks", () => {
+  describe("normalizeFilters performance", () => {
+    it("completes single normalization in under 5ms", () => {
       const filters = {
         minPrice: 500,
         maxPrice: 3000,
-        roomType: 'Private Room',
-        amenities: ['Wifi', 'AC', 'Parking'],
-        houseRules: ['Pets allowed'],
-        languages: ['en', 'es'],
-        sort: 'price_asc',
+        roomType: "Private Room",
+        amenities: ["Wifi", "AC", "Parking"],
+        houseRules: ["Pets allowed"],
+        languages: ["en", "es"],
+        sort: "price_asc",
       };
 
       const start = performance.now();
@@ -38,13 +43,13 @@ describe('Performance Benchmarks', () => {
       expect(elapsed).toBeLessThan(5);
     });
 
-    it('handles 1000 normalizations in under 100ms', () => {
+    it("handles 1000 normalizations in under 100ms", () => {
       const filters = {
         minPrice: 500,
         maxPrice: 3000,
-        roomType: 'Private Room',
-        amenities: ['Wifi', 'AC'],
-        sort: 'price_asc',
+        roomType: "Private Room",
+        amenities: ["Wifi", "AC"],
+        sort: "price_asc",
       };
 
       const start = performance.now();
@@ -56,18 +61,18 @@ describe('Performance Benchmarks', () => {
       expect(elapsed).toBeLessThan(100);
     });
 
-    it('performance degrades gracefully with complex input', () => {
+    it("performance degrades gracefully with complex input", () => {
       // Create a complex input with max arrays
       const complexFilters = {
         minPrice: 100,
         maxPrice: 5000,
-        roomType: 'Private Room',
-        amenities: Array(50).fill('Wifi'),
-        houseRules: Array(50).fill('Pets allowed'),
-        languages: Array(50).fill('en'),
-        query: 'a'.repeat(200),
+        roomType: "Private Room",
+        amenities: Array(50).fill("Wifi"),
+        houseRules: Array(50).fill("Pets allowed"),
+        languages: Array(50).fill("en"),
+        query: "a".repeat(200),
         bounds: { minLat: 30, maxLat: 50, minLng: -130, maxLng: -70 },
-        sort: 'price_asc',
+        sort: "price_asc",
         page: 1,
         limit: 100,
       };
@@ -81,13 +86,13 @@ describe('Performance Benchmarks', () => {
     });
   });
 
-  describe('applyFilters performance', () => {
-    it('filters 100 listings in under 10ms', () => {
+  describe("applyFilters performance", () => {
+    it("filters 100 listings in under 10ms", () => {
       const filters = normalizeFilters({
         minPrice: 500,
         maxPrice: 3000,
-        roomType: 'Private Room',
-        amenities: ['Wifi'],
+        roomType: "Private Room",
+        amenities: ["Wifi"],
       });
 
       const start = performance.now();
@@ -97,10 +102,10 @@ describe('Performance Benchmarks', () => {
       expect(elapsed).toBeLessThan(10);
     });
 
-    it('handles repeated filter applications efficiently', () => {
+    it("handles repeated filter applications efficiently", () => {
       const filters = normalizeFilters({
         maxPrice: 2000,
-        sort: 'price_asc',
+        sort: "price_asc",
       });
 
       const start = performance.now();
@@ -114,10 +119,10 @@ describe('Performance Benchmarks', () => {
       expect(elapsed).toBeLessThan(500);
     });
 
-    it('performance scales linearly with dataset size', () => {
+    it("performance scales linearly with dataset size", () => {
       const filters = normalizeFilters({
         maxPrice: 3000,
-        amenities: ['Wifi'],
+        amenities: ["Wifi"],
       });
 
       // Time with 50 listings
@@ -141,17 +146,23 @@ describe('Performance Benchmarks', () => {
     });
   });
 
-  describe('sortListings performance', () => {
-    it('sorts 100 listings in under 5ms', () => {
+  describe("sortListings performance", () => {
+    it("sorts 100 listings in under 5ms", () => {
       const start = performance.now();
-      sortListings(TEST_LISTINGS, 'price_asc');
+      sortListings(TEST_LISTINGS, "price_asc");
       const elapsed = performance.now() - start;
 
       expect(elapsed).toBeLessThan(5);
     });
 
-    it('all sort options have similar performance', () => {
-      const sortOptions = ['price_asc', 'price_desc', 'newest', 'rating', 'recommended'] as const;
+    it("all sort options have similar performance", () => {
+      const sortOptions = [
+        "price_asc",
+        "price_desc",
+        "newest",
+        "rating",
+        "recommended",
+      ] as const;
       const times: Record<string, number> = {};
 
       sortOptions.forEach((sort) => {
@@ -174,8 +185,8 @@ describe('Performance Benchmarks', () => {
 // Memory Usage Tests
 // ============================================
 
-describe('Memory Usage', () => {
-  it('normalizeFilters does not leak memory on repeated calls', () => {
+describe("Memory Usage", () => {
+  it("normalizeFilters does not leak memory on repeated calls", () => {
     // Run garbage collection if available (V8 flag --expose-gc)
     if (global.gc) {
       global.gc();
@@ -188,7 +199,7 @@ describe('Memory Usage', () => {
       normalizeFilters({
         minPrice: i,
         maxPrice: i * 2,
-        amenities: ['Wifi', 'AC'],
+        amenities: ["Wifi", "AC"],
       });
     }
 
@@ -205,7 +216,7 @@ describe('Memory Usage', () => {
     expect(memoryIncrease).toBeLessThan(50);
   });
 
-  it('applyFilters does not mutate original array', () => {
+  it("applyFilters does not mutate original array", () => {
     const originalLength = ACTIVE_LISTINGS.length;
     const originalFirst = ACTIVE_LISTINGS[0];
 
@@ -216,10 +227,10 @@ describe('Memory Usage', () => {
     expect(ACTIVE_LISTINGS[0]).toBe(originalFirst);
   });
 
-  it('sortListings does not mutate original array', () => {
+  it("sortListings does not mutate original array", () => {
     const originalOrder = ACTIVE_LISTINGS.map((l) => l.id);
 
-    sortListings(ACTIVE_LISTINGS, 'price_asc');
+    sortListings(ACTIVE_LISTINGS, "price_asc");
 
     const currentOrder = ACTIVE_LISTINGS.map((l) => l.id);
     expect(currentOrder).toEqual(originalOrder);
@@ -230,10 +241,10 @@ describe('Memory Usage', () => {
 // DoS/ReDoS Protection Tests
 // ============================================
 
-describe('DoS/ReDoS Protection', () => {
-  describe('Query sanitization', () => {
-    it('handles extremely long queries without hanging', () => {
-      const longQuery = 'a'.repeat(100000); // 100KB string
+describe("DoS/ReDoS Protection", () => {
+  describe("Query sanitization", () => {
+    it("handles extremely long queries without hanging", () => {
+      const longQuery = "a".repeat(100000); // 100KB string
 
       const start = performance.now();
       const result = sanitizeSearchQuery(longQuery);
@@ -245,13 +256,13 @@ describe('DoS/ReDoS Protection', () => {
       expect(result.length).toBeLessThan(1000);
     });
 
-    it('handles ReDoS attack patterns', () => {
+    it("handles ReDoS attack patterns", () => {
       // Classic ReDoS patterns that cause exponential backtracking
       const redosPatterns = [
-        'a'.repeat(30) + '!', // (a+)+$ pattern
-        'aaaaaaaaaaaaaaaaaaaaaaaaaaaaaab', // Backtracking bomb
-        '((((((((((a))))))))))', // Nested groups
-        'a]]]]]]]]]]]]]]]]]]]]]]]]]]]]]', // Unbalanced brackets
+        "a".repeat(30) + "!", // (a+)+$ pattern
+        "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaab", // Backtracking bomb
+        "((((((((((a))))))))))", // Nested groups
+        "a]]]]]]]]]]]]]]]]]]]]]]]]]]]]]", // Unbalanced brackets
       ];
 
       redosPatterns.forEach((pattern) => {
@@ -264,14 +275,14 @@ describe('DoS/ReDoS Protection', () => {
       });
     });
 
-    it('handles unicode edge cases', () => {
+    it("handles unicode edge cases", () => {
       const unicodePatterns = [
-        '\u0000'.repeat(1000), // Null bytes
-        '\u200B'.repeat(1000), // Zero-width spaces
-        '\uFEFF'.repeat(1000), // BOM characters
-        '👨‍👩‍👧‍👦'.repeat(100), // Complex emoji
-        'مرحبا'.repeat(100), // RTL text
-        '日本語'.repeat(100), // CJK characters
+        "\u0000".repeat(1000), // Null bytes
+        "\u200B".repeat(1000), // Zero-width spaces
+        "\uFEFF".repeat(1000), // BOM characters
+        "👨‍👩‍👧‍👦".repeat(100), // Complex emoji
+        "مرحبا".repeat(100), // RTL text
+        "日本語".repeat(100), // CJK characters
       ];
 
       unicodePatterns.forEach((pattern) => {
@@ -280,15 +291,15 @@ describe('DoS/ReDoS Protection', () => {
         const elapsed = performance.now() - start;
 
         expect(elapsed).toBeLessThan(50);
-        expect(typeof result).toBe('string');
+        expect(typeof result).toBe("string");
       });
     });
   });
 
-  describe('normalizeFilters safety', () => {
-    it('handles deeply nested objects', () => {
+  describe("normalizeFilters safety", () => {
+    it("handles deeply nested objects", () => {
       // Create deeply nested object
-      let nested: any = { value: 'base' };
+      let nested: any = { value: "base" };
       for (let i = 0; i < 100; i++) {
         nested = { inner: nested };
       }
@@ -300,7 +311,7 @@ describe('DoS/ReDoS Protection', () => {
       expect(elapsed).toBeLessThan(50);
     });
 
-    it('handles circular reference attempts', () => {
+    it("handles circular reference attempts", () => {
       const circular: any = { a: 1 };
       circular.self = circular;
 
@@ -308,7 +319,7 @@ describe('DoS/ReDoS Protection', () => {
       expect(() => normalizeFilters(circular)).not.toThrow();
     });
 
-    it('handles prototype pollution attempts', () => {
+    it("handles prototype pollution attempts", () => {
       const malicious = JSON.parse('{"__proto__": {"polluted": true}}');
 
       normalizeFilters(malicious);
@@ -317,8 +328,8 @@ describe('DoS/ReDoS Protection', () => {
       expect(({} as any).polluted).toBeUndefined();
     });
 
-    it('handles array with millions of elements', () => {
-      const hugeArray = new Array(100000).fill('Wifi');
+    it("handles array with millions of elements", () => {
+      const hugeArray = new Array(100000).fill("Wifi");
 
       const start = performance.now();
       const result = normalizeFilters({ amenities: hugeArray });
@@ -335,8 +346,8 @@ describe('DoS/ReDoS Protection', () => {
 // Input Validation Stress Tests
 // ============================================
 
-describe('Input Validation Stress Tests', () => {
-  describe('Price filter edge cases', () => {
+describe("Input Validation Stress Tests", () => {
+  describe("Price filter edge cases", () => {
     const edgeCasePrices = [
       0,
       0.001,
@@ -351,7 +362,7 @@ describe('Input Validation Stress Tests', () => {
       1e-308,
     ];
 
-    it('handles all numeric edge cases', () => {
+    it("handles all numeric edge cases", () => {
       edgeCasePrices.forEach((price) => {
         expect(() =>
           normalizeFilters({ minPrice: price, maxPrice: price })
@@ -359,20 +370,20 @@ describe('Input Validation Stress Tests', () => {
       });
     });
 
-    it('produces valid output for all edge cases', () => {
+    it("produces valid output for all edge cases", () => {
       edgeCasePrices.forEach((price) => {
         const result = normalizeFilters({ minPrice: price });
         // Invalid values (NaN, Infinity) are dropped (undefined)
         // Valid values are kept as finite numbers
         if (result.minPrice !== undefined) {
-          expect(typeof result.minPrice).toBe('number');
+          expect(typeof result.minPrice).toBe("number");
           expect(Number.isFinite(result.minPrice)).toBe(true);
         }
       });
     });
   });
 
-  describe('Bounds filter edge cases', () => {
+  describe("Bounds filter edge cases", () => {
     const edgeCaseBounds = [
       // Valid edge cases
       { minLat: -90, maxLat: 90, minLng: -180, maxLng: 180 },
@@ -382,16 +393,21 @@ describe('Input Validation Stress Tests', () => {
       // Invalid values
       { minLat: -200, maxLat: 200, minLng: -400, maxLng: 400 },
       // Mixed types
-      { minLat: '37' as any, maxLat: null as any, minLng: undefined, maxLng: NaN },
+      {
+        minLat: "37" as any,
+        maxLat: null as any,
+        minLng: undefined,
+        maxLng: NaN,
+      },
     ];
 
-    it('handles all bounds edge cases', () => {
+    it("handles all bounds edge cases", () => {
       edgeCaseBounds.forEach((bounds) => {
         expect(() => normalizeFilters({ bounds })).not.toThrow();
       });
     });
 
-    it('produces clamped output for out-of-range values', () => {
+    it("produces clamped output for out-of-range values", () => {
       const result = normalizeFilters({
         bounds: { minLat: -200, maxLat: 200, minLng: -400, maxLng: 400 },
       });
@@ -403,8 +419,8 @@ describe('Input Validation Stress Tests', () => {
     });
   });
 
-  describe('Array filter edge cases', () => {
-    it('handles empty arrays', () => {
+  describe("Array filter edge cases", () => {
+    it("handles empty arrays", () => {
       const result = normalizeFilters({
         amenities: [],
         houseRules: [],
@@ -413,23 +429,31 @@ describe('Input Validation Stress Tests', () => {
 
       // Empty arrays are either omitted (undefined) or empty
       // The normalizer may drop empty arrays as they don't filter anything
-      expect(result.amenities === undefined || result.amenities.length === 0).toBe(true);
-      expect(result.houseRules === undefined || result.houseRules.length === 0).toBe(true);
-      expect(result.languages === undefined || result.languages.length === 0).toBe(true);
+      expect(
+        result.amenities === undefined || result.amenities.length === 0
+      ).toBe(true);
+      expect(
+        result.houseRules === undefined || result.houseRules.length === 0
+      ).toBe(true);
+      expect(
+        result.languages === undefined || result.languages.length === 0
+      ).toBe(true);
     });
 
-    it('handles arrays with mixed types', () => {
+    it("handles arrays with mixed types", () => {
       const result = normalizeFilters({
-        amenities: ['Wifi', 123, null, undefined, {}, []] as any,
+        amenities: ["Wifi", 123, null, undefined, {}, []] as any,
       });
 
       // Should filter to only valid strings
-      expect(result.amenities?.every((a) => typeof a === 'string') ?? true).toBe(true);
+      expect(
+        result.amenities?.every((a) => typeof a === "string") ?? true
+      ).toBe(true);
     });
 
-    it('handles arrays with duplicate values', () => {
+    it("handles arrays with duplicate values", () => {
       const result = normalizeFilters({
-        amenities: ['Wifi', 'Wifi', 'wifi', 'WIFI', 'AC', 'AC'],
+        amenities: ["Wifi", "Wifi", "wifi", "WIFI", "AC", "AC"],
       });
 
       // Should deduplicate
@@ -438,9 +462,9 @@ describe('Input Validation Stress Tests', () => {
       expect(amenities.length).toBeLessThanOrEqual(uniqueCount + 1);
     });
 
-    it('handles arrays with whitespace strings', () => {
+    it("handles arrays with whitespace strings", () => {
       const result = normalizeFilters({
-        amenities: ['  ', '\t', '\n', '  Wifi  ', ''],
+        amenities: ["  ", "\t", "\n", "  Wifi  ", ""],
       });
 
       // Should filter empty strings and trim others
@@ -456,8 +480,8 @@ describe('Input Validation Stress Tests', () => {
 // Concurrency Behavior Tests
 // ============================================
 
-describe('Concurrency Behavior', () => {
-  it('handles parallel normalization calls', async () => {
+describe("Concurrency Behavior", () => {
+  it("handles parallel normalization calls", async () => {
     const filters = { minPrice: 500, maxPrice: 3000 };
 
     const promises = Array(100)
@@ -473,7 +497,7 @@ describe('Concurrency Behavior', () => {
     });
   });
 
-  it('handles parallel filter applications', async () => {
+  it("handles parallel filter applications", async () => {
     const filters = normalizeFilters({ maxPrice: 2000 });
 
     const promises = Array(50)
@@ -489,7 +513,7 @@ describe('Concurrency Behavior', () => {
     });
   });
 
-  it('isolated execution - one call does not affect another', () => {
+  it("isolated execution - one call does not affect another", () => {
     // Run two filter operations with different parameters
     const filters1 = normalizeFilters({ maxPrice: 1000 });
     const filters2 = normalizeFilters({ minPrice: 2000 });
@@ -509,14 +533,14 @@ describe('Concurrency Behavior', () => {
 // Stability Tests
 // ============================================
 
-describe('Stability Tests', () => {
-  it('produces stable output across runs', () => {
+describe("Stability Tests", () => {
+  it("produces stable output across runs", () => {
     const filters = {
       minPrice: 500,
       maxPrice: 3000,
-      amenities: ['AC', 'Wifi', 'Parking'],
-      roomType: 'Private Room',
-      sort: 'price_asc',
+      amenities: ["AC", "Wifi", "Parking"],
+      roomType: "Private Room",
+      sort: "price_asc",
     };
 
     const results: string[] = [];
@@ -534,10 +558,10 @@ describe('Stability Tests', () => {
     });
   });
 
-  it('array order in input does not affect output order', () => {
-    const amenities1 = ['Wifi', 'AC', 'Parking'];
-    const amenities2 = ['Parking', 'AC', 'Wifi'];
-    const amenities3 = ['AC', 'Parking', 'Wifi'];
+  it("array order in input does not affect output order", () => {
+    const amenities1 = ["Wifi", "AC", "Parking"];
+    const amenities2 = ["Parking", "AC", "Wifi"];
+    const amenities3 = ["AC", "Parking", "Wifi"];
 
     const result1 = normalizeFilters({ amenities: amenities1 });
     const result2 = normalizeFilters({ amenities: amenities2 });
@@ -548,12 +572,12 @@ describe('Stability Tests', () => {
     expect(result2.amenities).toEqual(result3.amenities);
   });
 
-  it('maintains determinism with random-like input', () => {
+  it("maintains determinism with random-like input", () => {
     // Create "random-looking" but deterministic input
     const filters = {
       minPrice: Math.floor(12345 % 1000),
       maxPrice: Math.floor(67890 % 5000),
-      amenities: ['Wifi', 'AC'].sort(),
+      amenities: ["Wifi", "AC"].sort(),
       page: 1,
     };
 
@@ -572,8 +596,8 @@ describe('Stability Tests', () => {
 // API Response Time Budget Constants (C2.1, C2.2)
 // ============================================
 
-describe('API Response Time Budgets', () => {
-  it('database timeout supports <2s API response target (C2.1)', () => {
+describe("API Response Time Budgets", () => {
+  it("database timeout supports <2s API response target (C2.1)", () => {
     // C2.1: /api/search/v2 should respond in <2s for typical queries.
     // The DATABASE timeout must be generous enough to allow the query to complete
     // but bounded to prevent runaway queries. A 10s database timeout with a 2s
@@ -583,13 +607,16 @@ describe('API Response Time Budgets', () => {
     expect(DEFAULT_TIMEOUTS.DATABASE).toBeGreaterThanOrEqual(1_000);
   });
 
-  it('map listings are capped at 200-400 to stay within loading budget (C2.2)', () => {
+  it("map listings are capped at 200-400 to stay within loading budget (C2.2)", () => {
     // C2.2: /api/map-listings should respond in <1s with max 200-400 listings.
     // MAX_MAP_MARKERS (200) is a module-private constant in data.ts.
     // We verify the public contract: MAP_FETCH_MAX_LAT_SPAN and
     // MAP_FETCH_MAX_LNG_SPAN bound the viewport, and the database timeout
     // allows the query to complete within budget.
-    const { MAP_FETCH_MAX_LAT_SPAN, MAP_FETCH_MAX_LNG_SPAN } = require('@/lib/constants');
+    const {
+      MAP_FETCH_MAX_LAT_SPAN,
+      MAP_FETCH_MAX_LNG_SPAN,
+    } = require("@/lib/constants");
 
     // Viewport spans must be bounded to limit result count
     expect(MAP_FETCH_MAX_LAT_SPAN).toBeLessThanOrEqual(180);

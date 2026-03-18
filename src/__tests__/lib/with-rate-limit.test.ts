@@ -3,284 +3,292 @@
  */
 
 // Jest hoists mocks to the top, so we need to use requireActual pattern
-jest.mock('@/lib/rate-limit', () => ({
+jest.mock("@/lib/rate-limit", () => ({
   checkRateLimit: jest.fn(),
-  getClientIP: jest.fn(() => '127.0.0.1'),
-  getClientIPFromHeaders: jest.fn(() => '127.0.0.1'),
+  getClientIP: jest.fn(() => "127.0.0.1"),
+  getClientIPFromHeaders: jest.fn(() => "127.0.0.1"),
   RATE_LIMITS: {
     register: { limit: 5, windowMs: 3600000 },
     forgotPassword: { limit: 3, windowMs: 3600000 },
     login: { limit: 10, windowMs: 900000 },
     search: { limit: 60, windowMs: 60000 },
   },
-}))
+}));
 
 import {
   withRateLimit,
   addRateLimitHeaders,
   checkServerComponentRateLimit,
-} from '@/lib/with-rate-limit'
-import { checkRateLimit, getClientIP, getClientIPFromHeaders } from '@/lib/rate-limit'
-import { NextResponse } from 'next/server'
+} from "@/lib/with-rate-limit";
+import {
+  checkRateLimit,
+  getClientIP,
+  getClientIPFromHeaders,
+} from "@/lib/rate-limit";
+import { NextResponse } from "next/server";
 
-const mockCheckRateLimit = checkRateLimit as jest.Mock
-const mockGetClientIP = getClientIP as jest.Mock
-const mockGetClientIPFromHeaders = getClientIPFromHeaders as jest.Mock
+const mockCheckRateLimit = checkRateLimit as jest.Mock;
+const mockGetClientIP = getClientIP as jest.Mock;
+const mockGetClientIPFromHeaders = getClientIPFromHeaders as jest.Mock;
 
-describe('Rate Limit Wrapper', () => {
-  const originalE2EBypass = process.env.E2E_DISABLE_RATE_LIMIT
-  const originalNodeEnv = process.env.NODE_ENV
+describe("Rate Limit Wrapper", () => {
+  const originalE2EBypass = process.env.E2E_DISABLE_RATE_LIMIT;
+  const originalNodeEnv = process.env.NODE_ENV;
 
   const setNodeEnv = (value: string | undefined) => {
-    Object.defineProperty(process.env, 'NODE_ENV', {
+    Object.defineProperty(process.env, "NODE_ENV", {
       value,
       writable: true,
       configurable: true,
-    })
-  }
+    });
+  };
 
   beforeEach(() => {
-    jest.clearAllMocks()
-    delete process.env.E2E_DISABLE_RATE_LIMIT
-    setNodeEnv(originalNodeEnv)
-  })
+    jest.clearAllMocks();
+    delete process.env.E2E_DISABLE_RATE_LIMIT;
+    setNodeEnv(originalNodeEnv);
+  });
 
   afterAll(() => {
     if (originalE2EBypass !== undefined) {
-      process.env.E2E_DISABLE_RATE_LIMIT = originalE2EBypass
+      process.env.E2E_DISABLE_RATE_LIMIT = originalE2EBypass;
     } else {
-      delete process.env.E2E_DISABLE_RATE_LIMIT
+      delete process.env.E2E_DISABLE_RATE_LIMIT;
     }
-    setNodeEnv(originalNodeEnv)
-  })
+    setNodeEnv(originalNodeEnv);
+  });
 
-  describe('withRateLimit', () => {
+  describe("withRateLimit", () => {
     const mockRequest = {
-      url: 'http://localhost:3000/api/test',
-    } as Request
+      url: "http://localhost:3000/api/test",
+    } as Request;
 
-    it('returns null when rate limit not exceeded', async () => {
+    it("returns null when rate limit not exceeded", async () => {
       mockCheckRateLimit.mockResolvedValue({
         success: true,
         remaining: 4,
         resetAt: new Date(),
-      })
+      });
 
-      const result = await withRateLimit(mockRequest, { type: 'register' })
+      const result = await withRateLimit(mockRequest, { type: "register" });
 
-      expect(result).toBeNull()
-    })
+      expect(result).toBeNull();
+    });
 
-    it('returns 429 response when rate limit exceeded', async () => {
-      const resetAt = new Date()
+    it("returns 429 response when rate limit exceeded", async () => {
+      const resetAt = new Date();
       mockCheckRateLimit.mockResolvedValue({
         success: false,
         remaining: 0,
         retryAfter: 60,
         resetAt,
-      })
+      });
 
-      const result = await withRateLimit(mockRequest, { type: 'register' })
+      const result = await withRateLimit(mockRequest, { type: "register" });
 
-      expect(result).toBeInstanceOf(NextResponse)
-      expect(result?.status).toBe(429)
-    })
+      expect(result).toBeInstanceOf(NextResponse);
+      expect(result?.status).toBe(429);
+    });
 
-    it('includes rate limit headers in 429 response', async () => {
-      const resetAt = new Date()
+    it("includes rate limit headers in 429 response", async () => {
+      const resetAt = new Date();
       mockCheckRateLimit.mockResolvedValue({
         success: false,
         remaining: 0,
         retryAfter: 120,
         resetAt,
-      })
+      });
 
-      const result = await withRateLimit(mockRequest, { type: 'register' })
+      const result = await withRateLimit(mockRequest, { type: "register" });
 
-      expect(result?.headers.get('Retry-After')).toBe('120')
-      expect(result?.headers.get('X-RateLimit-Limit')).toBe('5')
-      expect(result?.headers.get('X-RateLimit-Remaining')).toBe('0')
-      expect(result?.headers.get('X-RateLimit-Reset')).toBe(resetAt.toISOString())
-    })
+      expect(result?.headers.get("Retry-After")).toBe("120");
+      expect(result?.headers.get("X-RateLimit-Limit")).toBe("5");
+      expect(result?.headers.get("X-RateLimit-Remaining")).toBe("0");
+      expect(result?.headers.get("X-RateLimit-Reset")).toBe(
+        resetAt.toISOString()
+      );
+    });
 
-    it('uses IP address as default identifier', async () => {
+    it("uses IP address as default identifier", async () => {
       mockCheckRateLimit.mockResolvedValue({
         success: true,
         remaining: 4,
         resetAt: new Date(),
-      })
+      });
 
-      await withRateLimit(mockRequest, { type: 'register' })
+      await withRateLimit(mockRequest, { type: "register" });
 
-      expect(mockGetClientIP).toHaveBeenCalledWith(mockRequest)
+      expect(mockGetClientIP).toHaveBeenCalledWith(mockRequest);
       expect(mockCheckRateLimit).toHaveBeenCalledWith(
-        '127.0.0.1',
-        '/api/test',
+        "127.0.0.1",
+        "/api/test",
         expect.any(Object)
-      )
-    })
+      );
+    });
 
-    it('uses custom identifier when provided', async () => {
+    it("uses custom identifier when provided", async () => {
       mockCheckRateLimit.mockResolvedValue({
         success: true,
         remaining: 4,
         resetAt: new Date(),
-      })
+      });
 
       await withRateLimit(mockRequest, {
-        type: 'register',
-        getIdentifier: () => 'custom-id-123',
-      })
+        type: "register",
+        getIdentifier: () => "custom-id-123",
+      });
 
       expect(mockCheckRateLimit).toHaveBeenCalledWith(
-        'custom-id-123',
-        '/api/test',
+        "custom-id-123",
+        "/api/test",
         expect.any(Object)
-      )
-    })
+      );
+    });
 
-    it('uses custom endpoint when provided', async () => {
+    it("uses custom endpoint when provided", async () => {
       mockCheckRateLimit.mockResolvedValue({
         success: true,
         remaining: 4,
         resetAt: new Date(),
-      })
+      });
 
       await withRateLimit(mockRequest, {
-        type: 'register',
-        endpoint: '/custom/endpoint',
-      })
+        type: "register",
+        endpoint: "/custom/endpoint",
+      });
 
       expect(mockCheckRateLimit).toHaveBeenCalledWith(
-        '127.0.0.1',
-        '/custom/endpoint',
+        "127.0.0.1",
+        "/custom/endpoint",
         expect.any(Object)
-      )
-    })
+      );
+    });
 
-    it('supports async custom identifier', async () => {
+    it("supports async custom identifier", async () => {
       mockCheckRateLimit.mockResolvedValue({
         success: true,
         remaining: 4,
         resetAt: new Date(),
-      })
+      });
 
       await withRateLimit(mockRequest, {
-        type: 'register',
-        getIdentifier: async () => 'async-id-456',
-      })
+        type: "register",
+        getIdentifier: async () => "async-id-456",
+      });
 
       expect(mockCheckRateLimit).toHaveBeenCalledWith(
-        'async-id-456',
-        '/api/test',
+        "async-id-456",
+        "/api/test",
         expect.any(Object)
-      )
-    })
+      );
+    });
 
-    it('returns correct response and headers when rate limited', async () => {
-      const resetAt = new Date()
+    it("returns correct response and headers when rate limited", async () => {
+      const resetAt = new Date();
       mockCheckRateLimit.mockResolvedValue({
         success: false,
         remaining: 0,
         retryAfter: 60,
         resetAt,
-      })
+      });
 
-      const result = await withRateLimit(mockRequest, { type: 'register' })
+      const result = await withRateLimit(mockRequest, { type: "register" });
 
-      expect(result).not.toBeNull()
-      expect(result).toBeInstanceOf(NextResponse)
-      expect(result?.status).toBe(429)
-      expect(result?.headers.get('Retry-After')).toBe('60')
-    })
+      expect(result).not.toBeNull();
+      expect(result).toBeInstanceOf(NextResponse);
+      expect(result?.status).toBe(429);
+      expect(result?.headers.get("Retry-After")).toBe("60");
+    });
 
-    it('uses default retryAfter of 60 when not provided', async () => {
+    it("uses default retryAfter of 60 when not provided", async () => {
       mockCheckRateLimit.mockResolvedValue({
         success: false,
         remaining: 0,
         retryAfter: undefined,
         resetAt: new Date(),
-      })
+      });
 
-      const result = await withRateLimit(mockRequest, { type: 'register' })
+      const result = await withRateLimit(mockRequest, { type: "register" });
 
-      expect(result?.headers.get('Retry-After')).toBe('60')
-    })
-  })
+      expect(result?.headers.get("Retry-After")).toBe("60");
+    });
+  });
 
-  describe('addRateLimitHeaders', () => {
-    it('adds rate limit headers to response', () => {
-      const response = NextResponse.json({ data: 'test' })
-      const resetAt = new Date()
+  describe("addRateLimitHeaders", () => {
+    it("adds rate limit headers to response", () => {
+      const response = NextResponse.json({ data: "test" });
+      const resetAt = new Date();
 
-      const result = addRateLimitHeaders(response, 4, 5, resetAt)
+      const result = addRateLimitHeaders(response, 4, 5, resetAt);
 
-      expect(result.headers.get('X-RateLimit-Limit')).toBe('5')
-      expect(result.headers.get('X-RateLimit-Remaining')).toBe('4')
-      expect(result.headers.get('X-RateLimit-Reset')).toBe(resetAt.toISOString())
-    })
+      expect(result.headers.get("X-RateLimit-Limit")).toBe("5");
+      expect(result.headers.get("X-RateLimit-Remaining")).toBe("4");
+      expect(result.headers.get("X-RateLimit-Reset")).toBe(
+        resetAt.toISOString()
+      );
+    });
 
-    it('returns the same response object', () => {
-      const response = NextResponse.json({ data: 'test' })
-      const resetAt = new Date()
+    it("returns the same response object", () => {
+      const response = NextResponse.json({ data: "test" });
+      const resetAt = new Date();
 
-      const result = addRateLimitHeaders(response, 4, 5, resetAt)
+      const result = addRateLimitHeaders(response, 4, 5, resetAt);
 
-      expect(result).toBe(response)
-    })
+      expect(result).toBe(response);
+    });
 
-    it('handles zero remaining', () => {
-      const response = NextResponse.json({ data: 'test' })
-      const resetAt = new Date()
+    it("handles zero remaining", () => {
+      const response = NextResponse.json({ data: "test" });
+      const resetAt = new Date();
 
-      const result = addRateLimitHeaders(response, 0, 5, resetAt)
+      const result = addRateLimitHeaders(response, 0, 5, resetAt);
 
-      expect(result.headers.get('X-RateLimit-Remaining')).toBe('0')
-    })
-  })
+      expect(result.headers.get("X-RateLimit-Remaining")).toBe("0");
+    });
+  });
 
-  describe('checkServerComponentRateLimit', () => {
-    it('bypasses rate limit when E2E_DISABLE_RATE_LIMIT is enabled', async () => {
-      setNodeEnv('development')
-      process.env.E2E_DISABLE_RATE_LIMIT = 'true'
+  describe("checkServerComponentRateLimit", () => {
+    it("bypasses rate limit when E2E_DISABLE_RATE_LIMIT is enabled", async () => {
+      setNodeEnv("development");
+      process.env.E2E_DISABLE_RATE_LIMIT = "true";
 
       const result = await checkServerComponentRateLimit(
         new Headers(),
-        'search',
-        '/search'
-      )
+        "search",
+        "/search"
+      );
 
-      expect(result.allowed).toBe(true)
-      expect(result.remaining).toBe(999)
-      expect(mockCheckRateLimit).not.toHaveBeenCalled()
-    })
+      expect(result.allowed).toBe(true);
+      expect(result.remaining).toBe(999);
+      expect(mockCheckRateLimit).not.toHaveBeenCalled();
+    });
 
-    it('enforces rate limit when bypass env is not enabled', async () => {
-      setNodeEnv('development')
+    it("enforces rate limit when bypass env is not enabled", async () => {
+      setNodeEnv("development");
       mockCheckRateLimit.mockResolvedValue({
         success: false,
         remaining: 0,
         retryAfter: 15,
         resetAt: new Date(),
-      })
+      });
 
       const result = await checkServerComponentRateLimit(
-        new Headers({ 'x-real-ip': '1.2.3.4' }),
-        'search',
-        '/search'
-      )
+        new Headers({ "x-real-ip": "1.2.3.4" }),
+        "search",
+        "/search"
+      );
 
-      expect(mockGetClientIPFromHeaders).toHaveBeenCalled()
+      expect(mockGetClientIPFromHeaders).toHaveBeenCalled();
       expect(mockCheckRateLimit).toHaveBeenCalledWith(
-        '127.0.0.1',
-        '/search',
+        "127.0.0.1",
+        "/search",
         expect.any(Object)
-      )
+      );
       expect(result).toEqual({
         allowed: false,
         remaining: 0,
         retryAfter: 15,
-      })
-    })
-  })
-})
+      });
+    });
+  });
+});

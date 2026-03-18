@@ -29,11 +29,28 @@ const boundsQS = `minLat=${SF_BOUNDS.minLat}&maxLat=${SF_BOUNDS.maxLat}&minLng=$
 
 /** Console error patterns that are benign and should not fail tests. */
 const BENIGN_ERROR_PATTERNS = [
-  "mapbox", "webpack", "HMR", "hydrat", "favicon", "ResizeObserver",
-  "WebGL", "Failed to create", "Failed to load resource", "404",
-  "AbortError", "Environment validation", "NEXT_REDIRECT", "ERR_ABORTED",
-  "net::ERR_", "Abort fetching component", "ChunkLoadError", "Loading chunk",
-  "preload", "Download the React DevTools", "search/facets", "x-]",
+  "mapbox",
+  "webpack",
+  "HMR",
+  "hydrat",
+  "favicon",
+  "ResizeObserver",
+  "WebGL",
+  "Failed to create",
+  "Failed to load resource",
+  "404",
+  "AbortError",
+  "Environment validation",
+  "NEXT_REDIRECT",
+  "ERR_ABORTED",
+  "net::ERR_",
+  "Abort fetching component",
+  "ChunkLoadError",
+  "Loading chunk",
+  "preload",
+  "Download the React DevTools",
+  "search/facets",
+  "x-]",
 ];
 
 function isBenignError(msg: string): boolean {
@@ -45,9 +62,9 @@ function isBenignError(msg: string): boolean {
 async function waitForSearchOutcome(page: import("@playwright/test").Page) {
   const container = searchResultsContainer(page);
   const cards = container.locator('[data-testid="listing-card"]');
-  const cardOrEmpty = cards.first().or(
-    container.getByText(/no (matches|results|listings)/i).first()
-  );
+  const cardOrEmpty = cards
+    .first()
+    .or(container.getByText(/no (matches|results|listings)/i).first());
   await expect(cardOrEmpty).toBeVisible({ timeout: 30_000 });
 }
 
@@ -60,7 +77,9 @@ test.describe("Semantic Search - Resilience", () => {
     test.slow();
   });
 
-  test(`${tags.core} SS-40: search returns results via FTS fallback when Gemini is unavailable`, async ({ page }) => {
+  test(`${tags.core} SS-40: search returns results via FTS fallback when Gemini is unavailable`, async ({
+    page,
+  }) => {
     const consoleErrors: string[] = [];
     page.on("console", (msg) => {
       if (msg.type() === "error" && !isBenignError(msg.text())) {
@@ -84,7 +103,9 @@ test.describe("Semantic Search - Resilience", () => {
     await expect(heading).toBeVisible();
   });
 
-  test(`SS-41: search handles Gemini auth errors gracefully`, async ({ page }) => {
+  test(`SS-41: search handles Gemini auth errors gracefully`, async ({
+    page,
+  }) => {
     const consoleErrors: string[] = [];
     page.on("console", (msg) => {
       if (msg.type() === "error" && !isBenignError(msg.text())) {
@@ -105,7 +126,9 @@ test.describe("Semantic Search - Resilience", () => {
     expect(hasError).toBe(false);
   });
 
-  test(`${tags.core} SS-42: search returns results even if SQL function has issues`, async ({ page }) => {
+  test(`${tags.core} SS-42: search returns results even if SQL function has issues`, async ({
+    page,
+  }) => {
     const consoleErrors: string[] = [];
     page.on("console", (msg) => {
       if (msg.type() === "error" && !isBenignError(msg.text())) {
@@ -120,15 +143,17 @@ test.describe("Semantic Search - Resilience", () => {
     await expect(heading).toBeVisible();
   });
 
-  test(`SS-55: search degrades gracefully when GEMINI_API_KEY is missing`, async ({ page }) => {
+  test(`SS-55: search degrades gracefully when GEMINI_API_KEY is missing`, async ({
+    page,
+  }) => {
     await page.goto(`/search?q=cozy+room&sort=recommended&${boundsQS}`);
     await waitForSearchOutcome(page);
 
     const container = searchResultsContainer(page);
     const cards = container.locator('[data-testid="listing-card"]');
-    const cardOrEmpty = cards.first().or(
-      container.getByText(/no (matches|results|listings)/i).first()
-    );
+    const cardOrEmpty = cards
+      .first()
+      .or(container.getByText(/no (matches|results|listings)/i).first());
     await expect(cardOrEmpty).toBeVisible();
 
     const heading = page.getByRole("heading", { level: 1 }).first();

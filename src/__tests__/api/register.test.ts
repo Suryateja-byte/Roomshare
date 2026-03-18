@@ -117,7 +117,9 @@ describe("Register API", () => {
       expect(response.status).toBe(400);
       const data = await response.json();
       // P1-06/P1-07: Generic message prevents user enumeration
-      expect(data.error).toBe("Registration failed. Please try again or use forgot password if you already have an account.");
+      expect(data.error).toBe(
+        "Registration failed. Please try again or use forgot password if you already have an account."
+      );
     });
 
     it("creates user successfully", async () => {
@@ -158,7 +160,7 @@ describe("Register API", () => {
 
     it("handles database errors", async () => {
       (prisma.user.findUnique as jest.Mock).mockRejectedValue(
-        new Error("DB Error"),
+        new Error("DB Error")
       );
 
       const request = new Request("http://localhost/api/register", {

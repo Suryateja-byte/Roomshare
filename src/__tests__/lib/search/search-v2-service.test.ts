@@ -103,9 +103,7 @@ jest.mock("@/lib/env", () => ({
 
 // Mock timeout-wrapper to pass through promises directly
 jest.mock("@/lib/timeout-wrapper", () => ({
-  withTimeout: jest.fn(
-    <T,>(promise: Promise<T>) => promise,
-  ),
+  withTimeout: jest.fn(<T>(promise: Promise<T>) => promise),
   DEFAULT_TIMEOUTS: {
     DATABASE: 10000,
     LLM_STREAM: 30000,
@@ -263,7 +261,7 @@ function makeListingData(overrides: Partial<ListingData> = {}): ListingData {
 }
 
 function makeMapListingData(
-  overrides: Partial<MapListingData> = {},
+  overrides: Partial<MapListingData> = {}
 ): MapListingData {
   return {
     id: "map-listing-1",
@@ -282,7 +280,7 @@ function defaultParsedSearchParams(
     boundsRequired: boolean;
     filterParams: Record<string, unknown>;
     requestedPage: number;
-  }> = {},
+  }> = {}
 ) {
   return {
     q: undefined,
@@ -359,7 +357,7 @@ function setupDefaultMocks({
       image: l.images[0] ?? null,
       lat: l.location.lat,
       lng: l.location.lng,
-    })),
+    }))
   );
   mockTransformToMapResponse.mockReturnValue({
     geojson: { type: "FeatureCollection", features: [] },
@@ -424,7 +422,7 @@ describe("search-v2-service", () => {
 
       // Make withTimeout reject for map query (second call) while passing for list
       let callCount = 0;
-      mockWithTimeout.mockImplementation(<T,>(promise: Promise<T>) => {
+      mockWithTimeout.mockImplementation(<T>(promise: Promise<T>) => {
         callCount++;
         if (callCount === 2) {
           // Map query times out
@@ -452,12 +450,14 @@ describe("search-v2-service", () => {
         "[SearchV2] Map query failed",
         expect.objectContaining({
           error: expect.any(String),
-        }),
+        })
       );
 
       // Response should have warnings about map failure (spread dynamically, not in TS type)
       // eslint-disable-next-line @typescript-eslint/no-explicit-any
-      expect((result.response!.meta as any).warnings).toContain("MAP_QUERY_FAILED");
+      expect((result.response!.meta as any).warnings).toContain(
+        "MAP_QUERY_FAILED"
+      );
     });
 
     it("handles list query failure gracefully (returns empty)", async () => {
@@ -465,7 +465,7 @@ describe("search-v2-service", () => {
 
       // Make withTimeout reject for list query (first call)
       let callCount = 0;
-      mockWithTimeout.mockImplementation(<T,>(_promise: Promise<T>) => {
+      mockWithTimeout.mockImplementation(<T>(_promise: Promise<T>) => {
         callCount++;
         if (callCount === 1) {
           // List query fails
@@ -493,7 +493,7 @@ describe("search-v2-service", () => {
         "[SearchV2] List query failed",
         expect.objectContaining({
           error: expect.any(String),
-        }),
+        })
       );
     });
 
@@ -506,7 +506,7 @@ describe("search-v2-service", () => {
 
       // Map query fails (rejected), list query succeeds
       let callCount = 0;
-      mockWithTimeout.mockImplementation(<T,>(promise: Promise<T>) => {
+      mockWithTimeout.mockImplementation(<T>(promise: Promise<T>) => {
         callCount++;
         if (callCount === 2) {
           return Promise.reject(new Error("map query database timeout"));
@@ -533,7 +533,7 @@ describe("search-v2-service", () => {
       // Map data should be empty (graceful degradation), not cause total failure
       expect(mockTransformToMapResponse).toHaveBeenCalledWith(
         [],
-        expect.any(Object),
+        expect.any(Object)
       );
     });
 
@@ -546,7 +546,7 @@ describe("search-v2-service", () => {
 
       // List query fails (rejected), map query succeeds
       let callCount = 0;
-      mockWithTimeout.mockImplementation(<T,>(_promise: Promise<T>) => {
+      mockWithTimeout.mockImplementation(<T>(_promise: Promise<T>) => {
         callCount++;
         if (callCount === 1) {
           return Promise.reject(new Error("list query database timeout"));
@@ -575,13 +575,13 @@ describe("search-v2-service", () => {
       // — the map query was NOT cancelled by the list query failure
       expect(logger.sync.error).toHaveBeenCalledWith(
         "[SearchV2] List query failed",
-        expect.objectContaining({ error: expect.any(String) }),
+        expect.objectContaining({ error: expect.any(String) })
       );
     });
 
     it("applies ranking when feature flag enabled", async () => {
       const mapItems = Array.from({ length: 10 }, (_, i) =>
-        makeMapListingData({ id: `m-${i}` }),
+        makeMapListingData({ id: `m-${i}` })
       );
       setupDefaultMocks({ mapListings: mapItems });
 
@@ -615,7 +615,7 @@ describe("search-v2-service", () => {
         expect.any(Array),
         expect.objectContaining({
           scoreMap: mockScoreMap,
-        }),
+        })
       );
     });
 
@@ -643,7 +643,7 @@ describe("search-v2-service", () => {
         expect.any(Array),
         expect.objectContaining({
           scoreMap: undefined,
-        }),
+        })
       );
     });
 
@@ -667,7 +667,7 @@ describe("search-v2-service", () => {
           mapCount: expect.any(Number),
           mode: expect.any(String),
           cached: false,
-        }),
+        })
       );
     });
 
@@ -692,14 +692,14 @@ describe("search-v2-service", () => {
       expect(mockGetListingsPaginated).toHaveBeenCalledWith(
         expect.objectContaining({
           page: 3,
-        }),
+        })
       );
     });
 
     it("returns geojson mode when mapCount >= CLUSTER_THRESHOLD", async () => {
       // Create 60 map listings (above CLUSTER_THRESHOLD of 50)
       const manyMapListings = Array.from({ length: 60 }, (_, i) =>
-        makeMapListingData({ id: `m-${i}` }),
+        makeMapListingData({ id: `m-${i}` })
       );
       setupDefaultMocks({
         mapListings: manyMapListings,
@@ -725,7 +725,7 @@ describe("search-v2-service", () => {
 
     it("returns unboundedSearch when boundsRequired is true", async () => {
       mockParseSearchParams.mockReturnValue(
-        defaultParsedSearchParams({ boundsRequired: true }),
+        defaultParsedSearchParams({ boundsRequired: true })
       );
 
       const result = await executeSearchV2({
@@ -754,7 +754,7 @@ describe("search-v2-service", () => {
       mockParseSearchParams.mockReturnValue(
         defaultParsedSearchParams({
           filterParams: { bounds: oversizedBounds },
-        }),
+        })
       );
       // clampBoundsToMaxSpan is only called for the map query (with MAP_FETCH_MAX params)
       mockClampBoundsToMaxSpan.mockReturnValue(mapClampedBounds);
@@ -790,16 +790,20 @@ describe("search-v2-service", () => {
 
       // clampBoundsToMaxSpan called once for map query with MAP_FETCH_MAX params
       expect(mockClampBoundsToMaxSpan).toHaveBeenCalledTimes(1);
-      expect(mockClampBoundsToMaxSpan).toHaveBeenCalledWith(oversizedBounds, 60, 130);
+      expect(mockClampBoundsToMaxSpan).toHaveBeenCalledWith(
+        oversizedBounds,
+        60,
+        130
+      );
 
       // List query receives original unclamped bounds
       expect(mockGetListingsPaginated).toHaveBeenCalledWith(
-        expect.objectContaining({ bounds: oversizedBounds }),
+        expect.objectContaining({ bounds: oversizedBounds })
       );
 
       // Map query receives clamped bounds
       expect(mockGetMapListings).toHaveBeenCalledWith(
-        expect.objectContaining({ bounds: mapClampedBounds }),
+        expect.objectContaining({ bounds: mapClampedBounds })
       );
     });
 
@@ -859,13 +863,13 @@ describe("search-v2-service", () => {
         expect.objectContaining({
           action: "executeSearchV2",
           error: "Unexpected parse error",
-        }),
+        })
       );
     });
 
     it("includes debug signals when debugRank=1 and ranking enabled", async () => {
       const mapItems = Array.from({ length: 5 }, (_, i) =>
-        makeMapListingData({ id: `m-${i}` }),
+        makeMapListingData({ id: `m-${i}` })
       );
       setupDefaultMocks({ mapListings: mapItems });
 
@@ -880,7 +884,15 @@ describe("search-v2-service", () => {
       mockGetBoundsCenter.mockReturnValue({ lat: 37.775, lng: -122.435 });
 
       const debugSignals = [
-        { id: "m-0", quality: 0.8, rating: 0.7, price: 0.9, recency: 0.5, geo: 0.6, total: 0.9 },
+        {
+          id: "m-0",
+          quality: 0.8,
+          rating: 0.7,
+          price: 0.9,
+          recency: 0.5,
+          geo: 0.6,
+          total: 0.9,
+        },
       ];
       mockGetDebugSignals.mockReturnValue(debugSignals);
 
@@ -930,7 +942,7 @@ describe("search-v2-service", () => {
         expect.objectContaining({
           truncated: true,
           totalCandidates: 500,
-        }),
+        })
       );
     });
 
@@ -1005,13 +1017,13 @@ describe("search-v2-service", () => {
       expect(mockGetListingsPaginated).toHaveBeenCalledWith(
         expect.objectContaining({
           limit: 24,
-        }),
+        })
       );
     });
 
     it("skips ranking when shouldIncludePins returns false (geojson mode)", async () => {
       const manyMapListings = Array.from({ length: 60 }, (_, i) =>
-        makeMapListingData({ id: `m-${i}` }),
+        makeMapListingData({ id: `m-${i}` })
       );
       setupDefaultMocks({ mapListings: manyMapListings, mode: "geojson" });
 
@@ -1056,7 +1068,12 @@ describe("search-v2-service", () => {
       setupDefaultMocks({ useSearchDoc: true });
       mockIsSearchDocEnabled.mockReturnValue(true);
 
-      const keysetCursor = { v: 1 as const, s: "newest" as const, k: ["1500"], id: "abc" };
+      const keysetCursor = {
+        v: 1 as const,
+        s: "newest" as const,
+        k: ["1500"],
+        id: "abc",
+      };
       mockDecodeCursorAny.mockReturnValue({
         type: "keyset" as const,
         cursor: keysetCursor,
@@ -1085,11 +1102,11 @@ describe("search-v2-service", () => {
 
       expect(mockDecodeCursorAny).toHaveBeenCalledWith(
         "keyset-cursor-token",
-        "recommended",
+        "recommended"
       );
       expect(mockGetSearchDocListingsWithKeyset).toHaveBeenCalledWith(
         expect.any(Object),
-        keysetCursor,
+        keysetCursor
       );
     });
   });

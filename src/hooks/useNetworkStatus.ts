@@ -1,29 +1,29 @@
-'use client';
+"use client";
 
-import { useState, useEffect } from 'react';
+import { useState, useEffect } from "react";
 
 /**
  * Hook to track network online/offline status
  * Returns current online status and provides a way to show offline UI
  */
 export function useNetworkStatus() {
-    const [isOnline, setIsOnline] = useState(true);
+  const [isOnline, setIsOnline] = useState(true);
 
-    useEffect(() => {
-        // Set initial state
-        setIsOnline(navigator.onLine);
+  useEffect(() => {
+    // Set initial state
+    setIsOnline(navigator.onLine);
 
-        const handleOnline = () => setIsOnline(true);
-        const handleOffline = () => setIsOnline(false);
+    const handleOnline = () => setIsOnline(true);
+    const handleOffline = () => setIsOnline(false);
 
-        window.addEventListener('online', handleOnline);
-        window.addEventListener('offline', handleOffline);
+    window.addEventListener("online", handleOnline);
+    window.addEventListener("offline", handleOffline);
 
-        return () => {
-            window.removeEventListener('online', handleOnline);
-            window.removeEventListener('offline', handleOffline);
-        };
-    }, []);
+    return () => {
+      window.removeEventListener("online", handleOnline);
+      window.removeEventListener("offline", handleOffline);
+    };
+  }, []);
 
-    return { isOnline, isOffline: !isOnline };
+  return { isOnline, isOffline: !isOnline };
 }

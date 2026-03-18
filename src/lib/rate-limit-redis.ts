@@ -16,7 +16,11 @@
 
 import { Ratelimit } from "@upstash/ratelimit";
 import { Redis } from "@upstash/redis";
-import { withTimeout, DEFAULT_TIMEOUTS, isTimeoutError } from "./timeout-wrapper";
+import {
+  withTimeout,
+  DEFAULT_TIMEOUTS,
+  isTimeoutError,
+} from "./timeout-wrapper";
 import { circuitBreakers, isCircuitOpenError } from "./circuit-breaker";
 import { checkRateLimit } from "./rate-limit";
 
@@ -35,7 +39,7 @@ const MAX_IN_MEMORY_FALLBACK_ENTRIES = 10_000;
 
 function setInMemoryRateLimitWithCap(
   key: string,
-  value: InMemoryRateLimitEntry,
+  value: InMemoryRateLimitEntry
 ): void {
   if (!inMemoryRateLimits.has(key)) {
     while (inMemoryRateLimits.size >= MAX_IN_MEMORY_FALLBACK_ENTRIES) {
@@ -140,7 +144,10 @@ const RATE_LIMITS = {
 } as const;
 
 // DB fallback configs (burst limits only — simpler than dual burst+sustained)
-const DB_FALLBACK_CONFIGS: Record<keyof typeof RATE_LIMITS, { limit: number; windowMs: number }> = {
+const DB_FALLBACK_CONFIGS: Record<
+  keyof typeof RATE_LIMITS,
+  { limit: number; windowMs: number }
+> = {
   chat: { limit: 5, windowMs: 60 * 1000 },
   metrics: { limit: 100, windowMs: 60 * 1000 },
   map: { limit: 60, windowMs: 60 * 1000 },
@@ -158,7 +165,10 @@ async function checkDbFallbackRateLimit(
     const dbResult = await checkRateLimit(ip, `redis-fallback:${type}`, config);
     return { success: dbResult.success, retryAfter: dbResult.retryAfter };
   } catch {
-    console.error("[RateLimit] DB fallback also failed (code: RL_DB_FALLBACK_ERR)", { type });
+    console.error(
+      "[RateLimit] DB fallback also failed (code: RL_DB_FALLBACK_ERR)",
+      { type }
+    );
     return checkInMemoryRateLimits(type, ip);
   }
 }
@@ -383,13 +393,18 @@ export async function checkChatRateLimit(ip: string): Promise<RateLimitResult> {
     !process.env.UPSTASH_REDIS_REST_TOKEN
   ) {
     if (process.env.NODE_ENV === "development") {
-      console.warn("[RateLimit] Redis not configured, using in-memory fallback (dev)");
+      console.warn(
+        "[RateLimit] Redis not configured, using in-memory fallback (dev)"
+      );
       return checkInMemoryRateLimits("chat", ip);
     }
     // FAIL CLOSED: Chat uses LLM — protect against cost abuse
-    console.error("[RateLimit] Chat fail-closed: Redis not configured (code: RL_REDIS_CLOSED)", {
-      ip: ip.substring(0, 8) + "...",
-    });
+    console.error(
+      "[RateLimit] Chat fail-closed: Redis not configured (code: RL_REDIS_CLOSED)",
+      {
+        ip: ip.substring(0, 8) + "...",
+      }
+    );
     return { success: false, retryAfter: 30 };
   }
 
@@ -432,10 +447,13 @@ export async function checkChatRateLimit(ip: string): Promise<RateLimitResult> {
       console.error("[RateLimit] Redis error:", error);
     }
     // FAIL CLOSED: Chat uses LLM — protect against cost abuse
-    console.error("[RateLimit] Chat fail-closed: Redis unavailable (code: RL_REDIS_CLOSED)", {
-      error: error instanceof Error ? error.message : "Unknown",
-      ip: ip.substring(0, 8) + "...",
-    });
+    console.error(
+      "[RateLimit] Chat fail-closed: Redis unavailable (code: RL_REDIS_CLOSED)",
+      {
+        error: error instanceof Error ? error.message : "Unknown",
+        ip: ip.substring(0, 8) + "...",
+      }
+    );
     return { success: false, retryAfter: 30 };
   }
 }
@@ -448,7 +466,7 @@ export async function checkChatRateLimit(ip: string): Promise<RateLimitResult> {
  * @returns Rate limit result with optional retry-after seconds
  */
 export async function checkMetricsRateLimit(
-  ip: string,
+  ip: string
 ): Promise<RateLimitResult> {
   // Check if Redis is configured
   if (
@@ -564,7 +582,7 @@ export async function checkMapRateLimit(ip: string): Promise<RateLimitResult> {
  * @returns Rate limit result with optional retry-after seconds
  */
 export async function checkSearchV2RateLimit(
-  ip: string,
+  ip: string
 ): Promise<RateLimitResult> {
   if (
     !process.env.UPSTASH_REDIS_REST_URL ||
@@ -577,7 +595,7 @@ export async function checkSearchV2RateLimit(
     const burstResult = await protectedRateLimitCheck(
       searchV2BurstLimiter,
       ip,
-      "search-v2-burst-limit",
+      "search-v2-burst-limit"
     );
     if (!burstResult.success) {
       return {
@@ -589,7 +607,7 @@ export async function checkSearchV2RateLimit(
     const sustainedResult = await protectedRateLimitCheck(
       searchV2SustainedLimiter,
       ip,
-      "search-v2-sustained-limit",
+      "search-v2-sustained-limit"
     );
     if (!sustainedResult.success) {
       return {
@@ -619,7 +637,7 @@ export async function checkSearchV2RateLimit(
  * @returns Rate limit result with optional retry-after seconds
  */
 export async function checkListingsReadRateLimit(
-  ip: string,
+  ip: string
 ): Promise<RateLimitResult> {
   if (
     !process.env.UPSTASH_REDIS_REST_URL ||
@@ -632,7 +650,7 @@ export async function checkListingsReadRateLimit(
     const burstResult = await protectedRateLimitCheck(
       listingsReadBurstLimiter,
       ip,
-      "listings-read-burst-limit",
+      "listings-read-burst-limit"
     );
     if (!burstResult.success) {
       return {
@@ -644,7 +662,7 @@ export async function checkListingsReadRateLimit(
     const sustainedResult = await protectedRateLimitCheck(
       listingsReadSustainedLimiter,
       ip,
-      "listings-read-sustained-limit",
+      "listings-read-sustained-limit"
     );
     if (!sustainedResult.success) {
       return {
@@ -674,7 +692,7 @@ export async function checkListingsReadRateLimit(
  * @returns Rate limit result with optional retry-after seconds
  */
 export async function checkSearchCountRateLimit(
-  ip: string,
+  ip: string
 ): Promise<RateLimitResult> {
   // Check if Redis is configured
   if (

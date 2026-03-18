@@ -7,7 +7,7 @@
  * that can't be done through the UI (e.g., creating expired holds).
  */
 
-import type { Page, TestInfo } from '@playwright/test';
+import type { Page, TestInfo } from "@playwright/test";
 
 // ─── Test API Client ────────────────────────────────────────────
 
@@ -18,9 +18,9 @@ import type { Page, TestInfo } from '@playwright/test';
 export async function testApi<T = unknown>(
   page: Page,
   action: string,
-  params: Record<string, unknown> = {},
+  params: Record<string, unknown> = {}
 ): Promise<{ ok: boolean; status: number; data: T }> {
-  const response = await page.request.post('/api/test-helpers', {
+  const response = await page.request.post("/api/test-helpers", {
     data: { action, params },
     timeout: 30_000,
   });
@@ -29,7 +29,11 @@ export async function testApi<T = unknown>(
     data = await response.json();
   } catch {
     // Non-JSON response (404 HTML page, route not compiled)
-    return { ok: false, status: response.status(), data: { error: 'Non-JSON response' } as unknown as T };
+    return {
+      ok: false,
+      status: response.status(),
+      data: { error: "Non-JSON response" } as unknown as T,
+    };
   }
   return { ok: response.ok(), status: response.status(), data: data as T };
 }
@@ -42,12 +46,20 @@ export async function createExpiredHold(
   listingId: string,
   tenantEmail: string,
   slotsRequested = 1,
-  minutesAgo = 5,
+  minutesAgo = 5
 ): Promise<{ bookingId: string; heldUntil: string; slotsRequested: number }> {
-  const res = await testApi<{ bookingId: string; heldUntil: string; slotsRequested: number }>(
-    page, 'createExpiredHold', { listingId, tenantEmail, slotsRequested, minutesAgo },
-  );
-  if (!res.ok) throw new Error(`createExpiredHold failed: ${JSON.stringify(res.data)}`);
+  const res = await testApi<{
+    bookingId: string;
+    heldUntil: string;
+    slotsRequested: number;
+  }>(page, "createExpiredHold", {
+    listingId,
+    tenantEmail,
+    slotsRequested,
+    minutesAgo,
+  });
+  if (!res.ok)
+    throw new Error(`createExpiredHold failed: ${JSON.stringify(res.data)}`);
   return res.data;
 }
 
@@ -59,12 +71,20 @@ export async function createHeldBooking(
   listingId: string,
   tenantEmail: string,
   slotsRequested = 1,
-  ttlMinutes = 15,
+  ttlMinutes = 15
 ): Promise<{ bookingId: string; heldUntil: string; slotsRequested: number }> {
-  const res = await testApi<{ bookingId: string; heldUntil: string; slotsRequested: number }>(
-    page, 'createHeldBooking', { listingId, tenantEmail, slotsRequested, ttlMinutes },
-  );
-  if (!res.ok) throw new Error(`createHeldBooking failed: ${JSON.stringify(res.data)}`);
+  const res = await testApi<{
+    bookingId: string;
+    heldUntil: string;
+    slotsRequested: number;
+  }>(page, "createHeldBooking", {
+    listingId,
+    tenantEmail,
+    slotsRequested,
+    ttlMinutes,
+  });
+  if (!res.ok)
+    throw new Error(`createHeldBooking failed: ${JSON.stringify(res.data)}`);
   return res.data;
 }
 
@@ -73,10 +93,15 @@ export async function createHeldBooking(
  */
 export async function cleanupTestBookings(
   page: Page,
-  opts: { listingId?: string; bookingIds?: string[]; resetSlots?: boolean },
+  opts: { listingId?: string; bookingIds?: string[]; resetSlots?: boolean }
 ): Promise<number> {
-  const res = await testApi<{ deleted: number }>(page, 'cleanupTestBookings', opts);
-  if (!res.ok) throw new Error(`cleanupTestBookings failed: ${JSON.stringify(res.data)}`);
+  const res = await testApi<{ deleted: number }>(
+    page,
+    "cleanupTestBookings",
+    opts
+  );
+  if (!res.ok)
+    throw new Error(`cleanupTestBookings failed: ${JSON.stringify(res.data)}`);
   return res.data.deleted;
 }
 
@@ -85,12 +110,15 @@ export async function cleanupTestBookings(
  */
 export async function getSlotInfoViaApi(
   page: Page,
-  listingId: string,
+  listingId: string
 ): Promise<{ availableSlots: number; totalSlots: number }> {
   const res = await testApi<{ availableSlots: number; totalSlots: number }>(
-    page, 'getListingSlots', { listingId },
+    page,
+    "getListingSlots",
+    { listingId }
   );
-  if (!res.ok) throw new Error(`getSlotInfo failed: ${JSON.stringify(res.data)}`);
+  if (!res.ok)
+    throw new Error(`getSlotInfo failed: ${JSON.stringify(res.data)}`);
   return res.data;
 }
 
@@ -98,56 +126,101 @@ export async function getSlotInfoViaApi(
  * Invoke the sweep-expired-holds cron endpoint.
  */
 export async function invokeSweeper(page: Page): Promise<{
-  success: boolean; expired: number; skipped: boolean; reason?: string;
+  success: boolean;
+  expired: number;
+  skipped: boolean;
+  reason?: string;
 }> {
   const cronSecret = process.env.CRON_SECRET;
-  if (!cronSecret) throw new Error('CRON_SECRET env var required for sweeper invocation');
-  const response = await page.request.get('/api/cron/sweep-expired-holds', {
+  if (!cronSecret)
+    throw new Error("CRON_SECRET env var required for sweeper invocation");
+  const response = await page.request.get("/api/cron/sweep-expired-holds", {
     headers: { Authorization: `Bearer ${cronSecret}` },
     timeout: 30_000,
   });
-  return (await response.json()) as { success: boolean; expired: number; skipped: boolean; reason?: string };
+  return (await response.json()) as {
+    success: boolean;
+    expired: number;
+    skipped: boolean;
+    reason?: string;
+  };
 }
 
 // ─── Phase 2 API Helpers ────────────────────────────────────────
 
-export async function getGroundTruthSlots(page: Page, listingId: string): Promise<number> {
-  const res = await testApi<{ expected: number }>(page, 'getGroundTruthSlots', { listingId });
-  if (!res.ok) throw new Error(`getGroundTruthSlots failed: ${JSON.stringify(res.data)}`);
+export async function getGroundTruthSlots(
+  page: Page,
+  listingId: string
+): Promise<number> {
+  const res = await testApi<{ expected: number }>(page, "getGroundTruthSlots", {
+    listingId,
+  });
+  if (!res.ok)
+    throw new Error(`getGroundTruthSlots failed: ${JSON.stringify(res.data)}`);
   return res.data.expected;
 }
 
 export async function updateListingPrice(
-  page: Page, listingId: string, newPrice: number,
+  page: Page,
+  listingId: string,
+  newPrice: number
 ): Promise<{ oldPrice: number }> {
-  const res = await testApi<{ oldPrice: number }>(page, 'updateListingPrice', { listingId, newPrice });
-  if (!res.ok) throw new Error(`updateListingPrice failed: ${JSON.stringify(res.data)}`);
+  const res = await testApi<{ oldPrice: number }>(page, "updateListingPrice", {
+    listingId,
+    newPrice,
+  });
+  if (!res.ok)
+    throw new Error(`updateListingPrice failed: ${JSON.stringify(res.data)}`);
   return res.data;
 }
 
 export async function createPendingBooking(
-  page: Page, listingId: string, tenantEmail: string,
+  page: Page,
+  listingId: string,
+  tenantEmail: string
 ): Promise<{ bookingId: string }> {
-  const res = await testApi<{ bookingId: string }>(page, 'createPendingBooking', { listingId, tenantEmail });
-  if (!res.ok) throw new Error(`createPendingBooking failed: ${JSON.stringify(res.data)}`);
+  const res = await testApi<{ bookingId: string }>(
+    page,
+    "createPendingBooking",
+    { listingId, tenantEmail }
+  );
+  if (!res.ok)
+    throw new Error(`createPendingBooking failed: ${JSON.stringify(res.data)}`);
   return res.data;
 }
 
 export async function createAcceptedBooking(
-  page: Page, listingId: string, tenantEmail: string, slotsRequested = 1,
+  page: Page,
+  listingId: string,
+  tenantEmail: string,
+  slotsRequested = 1
 ): Promise<{ bookingId: string }> {
-  const res = await testApi<{ bookingId: string }>(page, 'createAcceptedBooking', {
-    listingId, tenantEmail, slotsRequested,
-  });
-  if (!res.ok) throw new Error(`createAcceptedBooking failed: ${JSON.stringify(res.data)}`);
+  const res = await testApi<{ bookingId: string }>(
+    page,
+    "createAcceptedBooking",
+    {
+      listingId,
+      tenantEmail,
+      slotsRequested,
+    }
+  );
+  if (!res.ok)
+    throw new Error(
+      `createAcceptedBooking failed: ${JSON.stringify(res.data)}`
+    );
   return res.data;
 }
 
 export async function setListingBookingMode(
-  page: Page, listingId: string, mode: string,
+  page: Page,
+  listingId: string,
+  mode: string
 ): Promise<void> {
-  const res = await testApi(page, 'setListingBookingMode', { listingId, mode });
-  if (!res.ok) throw new Error(`setListingBookingMode failed: ${JSON.stringify(res.data)}`);
+  const res = await testApi(page, "setListingBookingMode", { listingId, mode });
+  if (!res.ok)
+    throw new Error(
+      `setListingBookingMode failed: ${JSON.stringify(res.data)}`
+    );
 }
 
 // ─── Phase 2 UI Helpers ─────────────────────────────────────────
@@ -157,18 +230,21 @@ export async function setListingBookingMode(
  * Waits for hydration, clicks tab, then clicks "All" status filter to show all bookings.
  */
 export async function navigateToBookingsTab(
-  page: Page, tab: 'sent' | 'received',
+  page: Page,
+  tab: "sent" | "received"
 ): Promise<void> {
   // Wait for page hydration
   await page.waitForTimeout(2_000);
 
-  const tabBtn = page.getByRole('button', { name: new RegExp(tab, 'i') }).first();
-  await tabBtn.waitFor({ state: 'visible', timeout: 15_000 });
+  const tabBtn = page
+    .getByRole("button", { name: new RegExp(tab, "i") })
+    .first();
+  await tabBtn.waitFor({ state: "visible", timeout: 15_000 });
   await tabBtn.click();
   await page.waitForTimeout(1_500);
 
   // Click "All" filter to show all status bookings (page may have a filter active)
-  const allFilter = page.getByRole('button', { name: /^all$/i }).first();
+  const allFilter = page.getByRole("button", { name: /^all$/i }).first();
   if (await allFilter.isVisible({ timeout: 3_000 }).catch(() => false)) {
     await allFilter.click();
     await page.waitForTimeout(1_000);
@@ -180,8 +256,8 @@ export async function navigateToBookingsTab(
  */
 export function setupRequestCounter(page: Page): { getCount: () => number } {
   let count = 0;
-  page.on('request', (req) => {
-    if (req.method() === 'POST' && req.headers()['next-action']) {
+  page.on("request", (req) => {
+    if (req.method() === "POST" && req.headers()["next-action"]) {
       count++;
     }
   });
@@ -205,15 +281,17 @@ export async function readSlotBadge(page: Page): Promise<SlotBadgeInfo | null> {
   const visible = await badge.isVisible({ timeout: 5_000 }).catch(() => false);
   if (!visible) return null;
 
-  const text = ((await badge.textContent()) || '').trim();
+  const text = ((await badge.textContent()) || "").trim();
 
   // "X of Y open"
   const xOfY = text.match(/(\d+)\s+of\s+(\d+)\s+open/i);
-  if (xOfY) return { available: parseInt(xOfY[1]), total: parseInt(xOfY[2]), text };
+  if (xOfY)
+    return { available: parseInt(xOfY[1]), total: parseInt(xOfY[2]), text };
 
   // "All X open"
   const allX = text.match(/All\s+(\d+)\s+open/i);
-  if (allX) return { available: parseInt(allX[1]), total: parseInt(allX[1]), text };
+  if (allX)
+    return { available: parseInt(allX[1]), total: parseInt(allX[1]), text };
 
   // "Available" (single slot)
   if (/available/i.test(text)) return { available: 1, total: 1, text };
@@ -229,10 +307,10 @@ export async function readSlotBadge(page: Page): Promise<SlotBadgeInfo | null> {
  */
 export async function getSlotBadgeForListing(
   page: Page,
-  listingId: string,
+  listingId: string
 ): Promise<SlotBadgeInfo | null> {
   await page.goto(`/listings/${listingId}`);
-  await page.waitForLoadState('domcontentloaded');
+  await page.waitForLoadState("domcontentloaded");
   return readSlotBadge(page);
 }
 
@@ -241,14 +319,14 @@ export async function getSlotBadgeForListing(
 export async function clearBookingSession(page: Page): Promise<void> {
   await page.evaluate(() => {
     Object.keys(sessionStorage)
-      .filter((k) => k.startsWith('booking_'))
+      .filter((k) => k.startsWith("booking_"))
       .forEach((k) => sessionStorage.removeItem(k));
   });
 }
 
 export async function clearBookingSessionForListing(
   page: Page,
-  listingId: string,
+  listingId: string
 ): Promise<void> {
   await page.evaluate((id) => {
     sessionStorage.removeItem(`booking_submitted_${id}`);
@@ -263,8 +341,8 @@ const PROJECT_OFFSETS: Record<string, number> = {
   chromium: 24,
   firefox: 26,
   webkit: 28,
-  'Mobile Chrome': 30,
-  'Mobile Safari': 32,
+  "Mobile Chrome": 30,
+  "Mobile Safari": 32,
 };
 
 export function getMonthOffset(testInfo: TestInfo, testIndex = 0): number {
@@ -272,9 +350,10 @@ export function getMonthOffset(testInfo: TestInfo, testIndex = 0): number {
   const retryOffset = testInfo.retry * 5;
   // Use seconds-of-day for unique offset per run (avoids leftover collisions)
   const now = new Date();
-  const secondsOfDay = now.getHours() * 3600 + now.getMinutes() * 60 + now.getSeconds();
+  const secondsOfDay =
+    now.getHours() * 3600 + now.getMinutes() * 60 + now.getSeconds();
   const timeJitter = secondsOfDay % 60; // 0-59 range — gives 5 years of unique months
-  return base + retryOffset + (testIndex * 3) + timeJitter;
+  return base + retryOffset + testIndex * 3 + timeJitter;
 }
 
 /**
@@ -282,53 +361,61 @@ export function getMonthOffset(testInfo: TestInfo, testIndex = 0): number {
  */
 export async function selectStabilityDates(
   page: Page,
-  monthOffset: number,
+  monthOffset: number
 ): Promise<void> {
   // Matches the proven pattern from 21-booking-lifecycle.spec.ts
 
   // --- Start date ---
-  const startTrigger = page.locator('#booking-start-date');
+  const startTrigger = page.locator("#booking-start-date");
   // Wait for Radix hydration first (SSR placeholder lacks data-state)
-  await page.locator('#booking-start-date[data-state]').waitFor({ state: 'attached', timeout: 15_000 });
+  await page
+    .locator("#booking-start-date[data-state]")
+    .waitFor({ state: "attached", timeout: 15_000 });
   await startTrigger.scrollIntoViewIfNeeded();
   await startTrigger.click();
 
   const nextMonthBtnStart = page.locator('button[aria-label="Next month"]');
-  await nextMonthBtnStart.waitFor({ state: 'visible', timeout: 10_000 });
+  await nextMonthBtnStart.waitFor({ state: "visible", timeout: 10_000 });
   for (let i = 0; i < monthOffset; i++) {
-    await nextMonthBtnStart.dispatchEvent('click');
+    await nextMonthBtnStart.dispatchEvent("click");
     await page.waitForTimeout(250);
   }
 
   const day1Start = page
-    .locator('[data-radix-popper-content-wrapper] button, [class*="popover"] button')
+    .locator(
+      '[data-radix-popper-content-wrapper] button, [class*="popover"] button'
+    )
     .filter({ hasText: /^1$/ })
     .first();
-  await day1Start.waitFor({ state: 'visible', timeout: 5_000 });
-  await day1Start.dispatchEvent('click');
+  await day1Start.waitFor({ state: "visible", timeout: 5_000 });
+  await day1Start.dispatchEvent("click");
   await page.waitForTimeout(500);
 
   // --- End date ---
-  const endTrigger = page.locator('#booking-end-date');
+  const endTrigger = page.locator("#booking-end-date");
   await endTrigger.scrollIntoViewIfNeeded();
-  await page.locator('#booking-end-date[data-state]').waitFor({ state: 'attached', timeout: 10_000 });
+  await page
+    .locator("#booking-end-date[data-state]")
+    .waitFor({ state: "attached", timeout: 10_000 });
   await endTrigger.click();
   await page.waitForTimeout(300);
 
   const nextMonthBtnEnd = page.locator('button[aria-label="Next month"]');
-  await nextMonthBtnEnd.waitFor({ state: 'visible', timeout: 10_000 });
+  await nextMonthBtnEnd.waitFor({ state: "visible", timeout: 10_000 });
   // End date picker opens at CURRENT month, navigate monthOffset + 2 to land after start
   for (let i = 0; i < monthOffset + 2; i++) {
-    await nextMonthBtnEnd.dispatchEvent('click');
+    await nextMonthBtnEnd.dispatchEvent("click");
     await page.waitForTimeout(250);
   }
 
   const day1End = page
-    .locator('[data-radix-popper-content-wrapper] button, [class*="popover"] button')
+    .locator(
+      '[data-radix-popper-content-wrapper] button, [class*="popover"] button'
+    )
     .filter({ hasText: /^1$/ })
     .first();
-  await day1End.waitFor({ state: 'visible', timeout: 5_000 });
-  await day1End.dispatchEvent('click');
+  await day1End.waitFor({ state: "visible", timeout: 5_000 });
+  await day1End.dispatchEvent("click");
   await page.waitForTimeout(500);
 }
 
@@ -340,24 +427,24 @@ export async function selectStabilityDates(
  */
 export async function submitBookingViaUI(page: Page): Promise<boolean> {
   const bookBtn = page
-    .locator('main')
-    .getByRole('button', { name: /request to book/i })
+    .locator("main")
+    .getByRole("button", { name: /request to book/i })
     .first();
 
-  await bookBtn.waitFor({ state: 'visible', timeout: 10_000 });
+  await bookBtn.waitFor({ state: "visible", timeout: 10_000 });
   await bookBtn.click();
 
   // Wait for confirmation modal
   const modal = page.locator('[role="dialog"][aria-modal="true"]');
   try {
-    await modal.waitFor({ state: 'visible', timeout: 15_000 });
+    await modal.waitFor({ state: "visible", timeout: 15_000 });
   } catch {
     // Modal didn't appear — check for validation error
     return false;
   }
 
   // Confirm in modal
-  const confirmBtn = modal.getByRole('button', { name: /confirm/i });
+  const confirmBtn = modal.getByRole("button", { name: /confirm/i });
   await confirmBtn.click();
 
   // Wait for outcome — check for success text or toast
@@ -368,16 +455,19 @@ export async function submitBookingViaUI(page: Page): Promise<boolean> {
     await page.waitForFunction(
       () => {
         const body = document.body.innerText;
-        return /request sent|booking confirmed|submitted|already have|error|failed/i.test(body);
+        return /request sent|booking confirmed|submitted|already have|error|failed/i.test(
+          body
+        );
       },
-      { timeout: 60_000 },
+      { timeout: 60_000 }
     );
   } catch {
     // Timeout — check what's visible
   }
 
-  const isSuccess = await success.isVisible().catch(() => false)
-    || await successToast.isVisible().catch(() => false);
+  const isSuccess =
+    (await success.isVisible().catch(() => false)) ||
+    (await successToast.isVisible().catch(() => false));
   return isSuccess;
 }
 
@@ -399,11 +489,11 @@ export function extractListingId(page: Page): string | null {
  */
 export async function findBookableListingUrl(
   page: Page,
-  nthCard = 0,
+  nthCard = 0
 ): Promise<string | null> {
   // Go to search with SF bounds — shows seed listings
-  await page.goto('/search?bounds=37.7,-122.52,37.85,-122.35', {
-    waitUntil: 'domcontentloaded',
+  await page.goto("/search?bounds=37.7,-122.52,37.85,-122.35", {
+    waitUntil: "domcontentloaded",
     timeout: 120_000,
   });
 
@@ -411,12 +501,12 @@ export async function findBookableListingUrl(
   const cards = page.locator('a[href*="/listings/"]');
 
   try {
-    await cards.first().waitFor({ state: 'attached', timeout: 30_000 });
+    await cards.first().waitFor({ state: "attached", timeout: 30_000 });
   } catch {
     return null;
   }
 
   const count = await cards.count();
   const index = Math.min(nthCard, count - 1);
-  return cards.nth(index).getAttribute('href');
+  return cards.nth(index).getAttribute("href");
 }

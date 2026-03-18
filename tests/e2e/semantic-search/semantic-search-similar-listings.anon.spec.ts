@@ -27,14 +27,16 @@ const boundsQS = `minLat=${SF_BOUNDS.minLat}&maxLat=${SF_BOUNDS.maxLat}&minLng=$
  * Find a listing URL from search results to use as the detail page target.
  * Returns null if no listings found.
  */
-async function findListingUrl(page: import("@playwright/test").Page): Promise<string | null> {
+async function findListingUrl(
+  page: import("@playwright/test").Page
+): Promise<string | null> {
   await page.goto(`/search?${boundsQS}`, { waitUntil: "domcontentloaded" });
 
   const container = searchResultsContainer(page);
   const cards = container.locator('[data-testid="listing-card"]');
-  const cardOrEmpty = cards.first().or(
-    container.getByText(/no (matches|results|listings)/i).first()
-  );
+  const cardOrEmpty = cards
+    .first()
+    .or(container.getByText(/no (matches|results|listings)/i).first());
   await expect(cardOrEmpty).toBeVisible({ timeout: 30_000 });
 
   const count = await cards.count();
@@ -63,9 +65,12 @@ function similarListingsHeading(page: import("@playwright/test").Page) {
 }
 
 function similarSection(page: import("@playwright/test").Page) {
-  return page.locator('div').filter({
-    has: page.getByRole('heading', { name: 'Similar listings' }),
-  }).first();
+  return page
+    .locator("div")
+    .filter({
+      has: page.getByRole("heading", { name: "Similar listings" }),
+    })
+    .first();
 }
 
 function similarCards(page: import("@playwright/test").Page) {
@@ -76,7 +81,9 @@ function similarCards(page: import("@playwright/test").Page) {
  * Check if the "Similar listings" section is visible on the page.
  * Uses the correct pattern: expect().toBeVisible() instead of isVisible({ timeout }).
  */
-async function isSimilarSectionVisible(page: import("@playwright/test").Page): Promise<boolean> {
+async function isSimilarSectionVisible(
+  page: import("@playwright/test").Page
+): Promise<boolean> {
   return expect(similarListingsHeading(page))
     .toBeVisible({ timeout: 15_000 })
     .then(() => true)
@@ -92,7 +99,9 @@ test.describe("Semantic Search - Similar Listings", () => {
     test.slow();
   });
 
-  test(`${tags.core} SS-20: similar listings section renders with ListingCards`, async ({ page }) => {
+  test(`${tags.core} SS-20: similar listings section renders with ListingCards`, async ({
+    page,
+  }) => {
     test.skip(!SEMANTIC_ENABLED, "Requires ENABLE_SEMANTIC_SEARCH=true");
 
     const listingUrl = await findListingUrl(page);
@@ -101,7 +110,10 @@ test.describe("Semantic Search - Similar Listings", () => {
     await navigateToListingDetail(page, listingUrl!);
 
     const hasSection = await isSimilarSectionVisible(page);
-    test.skip(!hasSection, "Similar listings section not visible (embeddings may not be backfilled)");
+    test.skip(
+      !hasSection,
+      "Similar listings section not visible (embeddings may not be backfilled)"
+    );
 
     await expect(similarListingsHeading(page)).toHaveText("Similar listings");
 
@@ -115,20 +127,28 @@ test.describe("Semantic Search - Similar Listings", () => {
     await expect(cardLink).toBeVisible();
   });
 
-  test(`${tags.core} SS-21: similar listings hidden when feature flag is off (or no embeddings)`, async ({ page }) => {
+  test(`${tags.core} SS-21: similar listings hidden when feature flag is off (or no embeddings)`, async ({
+    page,
+  }) => {
     const listingUrl = await findListingUrl(page);
     test.skip(!listingUrl, "No listings found in search");
 
     await navigateToListingDetail(page, listingUrl!);
 
     if (!SEMANTIC_ENABLED) {
-      await expect(similarListingsHeading(page)).not.toBeVisible({ timeout: 10_000 });
+      await expect(similarListingsHeading(page)).not.toBeVisible({
+        timeout: 10_000,
+      });
     } else {
-      await expect(page.getByRole("heading", { level: 1 }).first()).toBeVisible();
+      await expect(
+        page.getByRole("heading", { level: 1 }).first()
+      ).toBeVisible();
     }
   });
 
-  test(`SS-22: no similar listings when listing has no embedding`, async ({ page }) => {
+  test(`SS-22: no similar listings when listing has no embedding`, async ({
+    page,
+  }) => {
     test.skip(!SEMANTIC_ENABLED, "Requires ENABLE_SEMANTIC_SEARCH=true");
 
     const listingUrl = await findListingUrl(page);
@@ -140,7 +160,9 @@ test.describe("Semantic Search - Similar Listings", () => {
     await expect(page.getByRole("heading", { level: 1 }).first()).toBeVisible();
   });
 
-  test(`SS-23: no similar listings when no similar above threshold`, async ({ page }) => {
+  test(`SS-23: no similar listings when no similar above threshold`, async ({
+    page,
+  }) => {
     test.skip(!SEMANTIC_ENABLED, "Requires ENABLE_SEMANTIC_SEARCH=true");
 
     const listingUrl = await findListingUrl(page);
@@ -150,7 +172,9 @@ test.describe("Semantic Search - Similar Listings", () => {
     await expect(page.getByRole("heading", { level: 1 }).first()).toBeVisible();
   });
 
-  test(`${tags.core} SS-24: listing detail page renders without crash even if SQL errors occur`, async ({ page }) => {
+  test(`${tags.core} SS-24: listing detail page renders without crash even if SQL errors occur`, async ({
+    page,
+  }) => {
     const listingUrl = await findListingUrl(page);
     test.skip(!listingUrl, "No listings found in search");
 
@@ -169,7 +193,9 @@ test.describe("Semantic Search - Similar Listings", () => {
     expect(hasError).toBe(false);
   });
 
-  test(`${tags.core} SS-25: current listing is excluded from similar listings`, async ({ page }) => {
+  test(`${tags.core} SS-25: current listing is excluded from similar listings`, async ({
+    page,
+  }) => {
     test.skip(!SEMANTIC_ENABLED, "Requires ENABLE_SEMANTIC_SEARCH=true");
 
     const listingUrl = await findListingUrl(page);
@@ -178,7 +204,10 @@ test.describe("Semantic Search - Similar Listings", () => {
     await navigateToListingDetail(page, listingUrl!);
 
     const hasSection = await isSimilarSectionVisible(page);
-    test.skip(!hasSection, "Similar listings section not visible (embeddings may not be backfilled)");
+    test.skip(
+      !hasSection,
+      "Similar listings section not visible (embeddings may not be backfilled)"
+    );
 
     // Extract current listing ID from URL
     const currentUrl = page.url();
@@ -195,7 +224,9 @@ test.describe("Semantic Search - Similar Listings", () => {
     }
   });
 
-  test(`SS-26: only ACTIVE listings shown in similar listings`, async ({ page }) => {
+  test(`SS-26: only ACTIVE listings shown in similar listings`, async ({
+    page,
+  }) => {
     test.skip(!SEMANTIC_ENABLED, "Requires ENABLE_SEMANTIC_SEARCH=true");
 
     const listingUrl = await findListingUrl(page);
@@ -238,7 +269,9 @@ test.describe("Semantic Search - Similar Listings", () => {
     expect(count).toBeGreaterThan(0);
   });
 
-  test(`SS-56: show on map button on similar listing cards is inert`, async ({ page }) => {
+  test(`SS-56: show on map button on similar listing cards is inert`, async ({
+    page,
+  }) => {
     test.skip(!SEMANTIC_ENABLED, "Requires ENABLE_SEMANTIC_SEARCH=true");
 
     const listingUrl = await findListingUrl(page);
@@ -258,7 +291,9 @@ test.describe("Semantic Search - Similar Listings", () => {
     await expect(mapPinBtn).toHaveCount(0);
   });
 
-  test(`SS-57: FavoriteButton on similar listing cards renders in unsaved state`, async ({ page }) => {
+  test(`SS-57: FavoriteButton on similar listing cards renders in unsaved state`, async ({
+    page,
+  }) => {
     test.skip(!SEMANTIC_ENABLED, "Requires ENABLE_SEMANTIC_SEARCH=true");
 
     const listingUrl = await findListingUrl(page);
@@ -273,9 +308,12 @@ test.describe("Semantic Search - Similar Listings", () => {
     const firstCard = cards.first();
 
     // FavoriteButton: button with SVG (no "Show on map" button on detail page)
-    const favoriteBtn = firstCard.locator('button').filter({
-      has: page.locator('svg'),
-    }).first();
+    const favoriteBtn = firstCard
+      .locator("button")
+      .filter({
+        has: page.locator("svg"),
+      })
+      .first();
 
     await expect(favoriteBtn).toBeVisible();
   });
@@ -294,7 +332,7 @@ test.describe("Semantic Search - Similar Listings", () => {
     test.skip(!hasSection, "Similar listings section not visible");
 
     // Desktop: verify grid classes exist on the similar listings grid
-    const grids = page.locator('.pt-8 > .space-y-6 > .grid');
+    const grids = page.locator(".pt-8 > .space-y-6 > .grid");
     const gridCount = await grids.count();
     expect(gridCount).toBeGreaterThan(0);
 

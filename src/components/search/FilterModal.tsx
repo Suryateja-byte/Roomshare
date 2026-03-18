@@ -1,24 +1,24 @@
-'use client';
+"use client";
 
-import { createPortal } from 'react-dom';
-import { X, Minus, Plus } from 'lucide-react';
-import { useBodyScrollLock } from '@/hooks/useBodyScrollLock';
-import { Button } from '@/components/ui/button';
-import { Input } from '@/components/ui/input';
-import { FocusTrap } from '@/components/ui/FocusTrap';
-import { DatePicker } from '@/components/ui/date-picker';
-import { getLanguageName } from '@/lib/languages';
+import { createPortal } from "react-dom";
+import { X, Minus, Plus } from "lucide-react";
+import { useBodyScrollLock } from "@/hooks/useBodyScrollLock";
+import { Button } from "@/components/ui/button";
+import { Input } from "@/components/ui/input";
+import { FocusTrap } from "@/components/ui/FocusTrap";
+import { DatePicker } from "@/components/ui/date-picker";
+import { getLanguageName } from "@/lib/languages";
 import {
   Select,
   SelectContent,
   SelectItem,
   SelectTrigger,
   SelectValue,
-} from '@/components/ui/select';
-import { PriceRangeFilter } from '@/components/search/PriceRangeFilter';
-import { DrawerZeroState } from '@/components/search/DrawerZeroState';
-import type { PriceHistogramBucket } from '@/app/api/search/facets/route';
-import type { FilterSuggestion } from '@/lib/near-matches';
+} from "@/components/ui/select";
+import { PriceRangeFilter } from "@/components/search/PriceRangeFilter";
+import { DrawerZeroState } from "@/components/search/DrawerZeroState";
+import type { PriceHistogramBucket } from "@/app/api/search/facets/route";
+import type { FilterSuggestion } from "@/lib/near-matches";
 
 interface FilterModalProps {
   isOpen: boolean;
@@ -145,7 +145,7 @@ export function FilterModal({
 }: FilterModalProps) {
   useBodyScrollLock(isOpen);
 
-  if (!isOpen || typeof document === 'undefined') {
+  if (!isOpen || typeof document === "undefined") {
     return null;
   }
 
@@ -171,7 +171,10 @@ export function FilterModal({
         >
           {/* Header */}
           <div className="flex items-center justify-between px-6 py-4 border-b border-zinc-100 dark:border-zinc-800 bg-white dark:bg-zinc-900">
-            <h2 id="filter-drawer-title" className="text-lg font-semibold text-zinc-900 dark:text-white">
+            <h2
+              id="filter-drawer-title"
+              className="text-lg font-semibold text-zinc-900 dark:text-white"
+            >
               Filters
               {activeFilterCount > 0 && (
                 <span className="ml-2 inline-flex items-center justify-center min-w-[24px] h-6 px-2 text-sm font-semibold rounded-full bg-indigo-500 text-white">
@@ -206,7 +209,10 @@ export function FilterModal({
 
             {/* Move-in Date */}
             <div className="space-y-2">
-              <label htmlFor="filter-move-in" className="text-sm font-semibold text-zinc-900 dark:text-white">
+              <label
+                htmlFor="filter-move-in"
+                className="text-sm font-semibold text-zinc-900 dark:text-white"
+              >
                 Move-in Date
               </label>
               <DatePicker
@@ -220,10 +226,16 @@ export function FilterModal({
 
             {/* Lease Duration */}
             <div className="space-y-2">
-              <label htmlFor="filter-lease" className="text-sm font-semibold text-zinc-900 dark:text-white">
+              <label
+                htmlFor="filter-lease"
+                className="text-sm font-semibold text-zinc-900 dark:text-white"
+              >
                 Lease Duration
               </label>
-              <Select value={leaseDuration} onValueChange={onLeaseDurationChange}>
+              <Select
+                value={leaseDuration}
+                onValueChange={onLeaseDurationChange}
+              >
                 <SelectTrigger id="filter-lease" aria-label="Lease Duration">
                   <SelectValue placeholder="Any" />
                 </SelectTrigger>
@@ -240,7 +252,10 @@ export function FilterModal({
 
             {/* Room Type */}
             <div className="space-y-2">
-              <label htmlFor="filter-room-type" className="text-sm font-semibold text-zinc-900 dark:text-white">
+              <label
+                htmlFor="filter-room-type"
+                className="text-sm font-semibold text-zinc-900 dark:text-white"
+              >
                 Room Type
               </label>
               <Select value={roomType} onValueChange={onRoomTypeChange}>
@@ -249,7 +264,9 @@ export function FilterModal({
                 </SelectTrigger>
                 <SelectContent>
                   <SelectItem value="any">Any</SelectItem>
-                  {(['Private Room', 'Shared Room', 'Entire Place'] as const).map(type => {
+                  {(
+                    ["Private Room", "Shared Room", "Entire Place"] as const
+                  ).map((type) => {
                     const count = facetCounts?.roomTypes?.[type];
                     const isZero = count === 0;
                     return (
@@ -260,7 +277,9 @@ export function FilterModal({
                       >
                         {type}
                         {count !== undefined && (
-                          <span className="ml-1 text-xs text-zinc-500 dark:text-zinc-500">({count})</span>
+                          <span className="ml-1 text-xs text-zinc-500 dark:text-zinc-500">
+                            ({count})
+                          </span>
                         )}
                       </SelectItem>
                     );
@@ -296,7 +315,7 @@ export function FilterModal({
                   <Minus className="h-4 w-4" />
                 </Button>
                 <span className="min-w-[3rem] text-center text-sm font-medium text-zinc-900 dark:text-white">
-                  {minSlots === undefined ? 'Any' : minSlots}
+                  {minSlots === undefined ? "Any" : minSlots}
                 </span>
                 <Button
                   type="button"
@@ -320,9 +339,15 @@ export function FilterModal({
 
             {/* Amenities */}
             <fieldset className="space-y-3">
-              <legend className="text-sm font-semibold text-zinc-900 dark:text-white">Amenities</legend>
-              <div className="flex flex-wrap gap-2" role="group" aria-label="Select amenities">
-                {amenityOptions.map(amenity => {
+              <legend className="text-sm font-semibold text-zinc-900 dark:text-white">
+                Amenities
+              </legend>
+              <div
+                className="flex flex-wrap gap-2"
+                role="group"
+                aria-label="Select amenities"
+              >
+                {amenityOptions.map((amenity) => {
                   const count = facetCounts?.amenities?.[amenity];
                   const isZero = count === 0;
                   const isActive = amenities.includes(amenity);
@@ -337,16 +362,16 @@ export function FilterModal({
                       aria-disabled={isZero}
                       disabled={isZero && !isActive}
                       className={`rounded-full h-auto py-2 px-3 text-sm font-medium transition-all duration-200 ${
-                        isActive ? 'scale-[1.02]' : 'hover:scale-[1.02]'
-                      } ${isZero && !isActive ? 'opacity-40 cursor-not-allowed' : ''}`}
+                        isActive ? "scale-[1.02]" : "hover:scale-[1.02]"
+                      } ${isZero && !isActive ? "opacity-40 cursor-not-allowed" : ""}`}
                     >
                       {amenity}
                       {count !== undefined && !isActive && (
-                        <span className="ml-1 text-xs text-zinc-500 dark:text-zinc-500">({count})</span>
+                        <span className="ml-1 text-xs text-zinc-500 dark:text-zinc-500">
+                          ({count})
+                        </span>
                       )}
-                      {isActive && (
-                        <X className="w-3.5 h-3.5 ml-1.5" />
-                      )}
+                      {isActive && <X className="w-3.5 h-3.5 ml-1.5" />}
                     </Button>
                   );
                 })}
@@ -355,9 +380,15 @@ export function FilterModal({
 
             {/* House Rules */}
             <fieldset className="space-y-3">
-              <legend className="text-sm font-semibold text-zinc-900 dark:text-white">House Rules</legend>
-              <div className="flex flex-wrap gap-2" role="group" aria-label="Select house rules">
-                {houseRuleOptions.map(rule => {
+              <legend className="text-sm font-semibold text-zinc-900 dark:text-white">
+                House Rules
+              </legend>
+              <div
+                className="flex flex-wrap gap-2"
+                role="group"
+                aria-label="Select house rules"
+              >
+                {houseRuleOptions.map((rule) => {
                   const count = facetCounts?.houseRules?.[rule];
                   const isZero = count === 0;
                   const isActive = houseRules.includes(rule);
@@ -372,16 +403,16 @@ export function FilterModal({
                       aria-disabled={isZero}
                       disabled={isZero && !isActive}
                       className={`rounded-full h-auto py-2 px-3 text-sm font-medium transition-all duration-200 ${
-                        isActive ? 'scale-[1.02]' : 'hover:scale-[1.02]'
-                      } ${isZero && !isActive ? 'opacity-40 cursor-not-allowed' : ''}`}
+                        isActive ? "scale-[1.02]" : "hover:scale-[1.02]"
+                      } ${isZero && !isActive ? "opacity-40 cursor-not-allowed" : ""}`}
                     >
                       {rule}
                       {count !== undefined && !isActive && (
-                        <span className="ml-1 text-xs text-zinc-500 dark:text-zinc-500">({count})</span>
+                        <span className="ml-1 text-xs text-zinc-500 dark:text-zinc-500">
+                          ({count})
+                        </span>
                       )}
-                      {isActive && (
-                        <X className="w-3.5 h-3.5 ml-1.5" />
-                      )}
+                      {isActive && <X className="w-3.5 h-3.5 ml-1.5" />}
                     </Button>
                   );
                 })}
@@ -390,7 +421,9 @@ export function FilterModal({
 
             {/* Languages */}
             <fieldset className="space-y-3">
-              <legend className="text-sm font-semibold text-zinc-900 dark:text-white">Can Communicate In</legend>
+              <legend className="text-sm font-semibold text-zinc-900 dark:text-white">
+                Can Communicate In
+              </legend>
               <p className="text-xs text-zinc-500 dark:text-zinc-400 -mt-1">
                 Show listings where household speaks any of these
               </p>
@@ -402,7 +435,7 @@ export function FilterModal({
                   role="group"
                   aria-label="Selected languages"
                 >
-                  {languages.map(code => (
+                  {languages.map((code) => (
                     <Button
                       key={code}
                       type="button"
@@ -435,8 +468,8 @@ export function FilterModal({
                 aria-label="Available languages"
               >
                 {filteredLanguages
-                  .filter(code => !languages.includes(code))
-                  .map(code => (
+                  .filter((code) => !languages.includes(code))
+                  .map((code) => (
                     <Button
                       key={code}
                       type="button"
@@ -449,9 +482,12 @@ export function FilterModal({
                       {getLanguageName(code)}
                     </Button>
                   ))}
-                {filteredLanguages.filter(code => !languages.includes(code)).length === 0 && (
+                {filteredLanguages.filter((code) => !languages.includes(code))
+                  .length === 0 && (
                   <p className="text-sm text-zinc-500 dark:text-zinc-400">
-                    {languageSearch ? 'No languages found' : 'All languages selected'}
+                    {languageSearch
+                      ? "No languages found"
+                      : "All languages selected"}
                   </p>
                 )}
               </div>
@@ -459,29 +495,53 @@ export function FilterModal({
 
             {/* Gender Preference */}
             <div className="space-y-2">
-              <label htmlFor="filter-gender-pref" className="text-sm font-semibold text-zinc-900 dark:text-white">
+              <label
+                htmlFor="filter-gender-pref"
+                className="text-sm font-semibold text-zinc-900 dark:text-white"
+              >
                 Gender Preference
               </label>
-              <Select value={genderPreference} onValueChange={onGenderPreferenceChange}>
-                <SelectTrigger id="filter-gender-pref" aria-label="Gender Preference">
+              <Select
+                value={genderPreference}
+                onValueChange={onGenderPreferenceChange}
+              >
+                <SelectTrigger
+                  id="filter-gender-pref"
+                  aria-label="Gender Preference"
+                >
                   <SelectValue placeholder="Any" />
                 </SelectTrigger>
                 <SelectContent>
                   <SelectItem value="any">Any</SelectItem>
-                  <SelectItem value="MALE_ONLY">Male Identifying Only</SelectItem>
-                  <SelectItem value="FEMALE_ONLY">Female Identifying Only</SelectItem>
-                  <SelectItem value="NO_PREFERENCE">Any Gender / All Welcome</SelectItem>
+                  <SelectItem value="MALE_ONLY">
+                    Male Identifying Only
+                  </SelectItem>
+                  <SelectItem value="FEMALE_ONLY">
+                    Female Identifying Only
+                  </SelectItem>
+                  <SelectItem value="NO_PREFERENCE">
+                    Any Gender / All Welcome
+                  </SelectItem>
                 </SelectContent>
               </Select>
             </div>
 
             {/* Household Gender */}
             <div className="space-y-2">
-              <label htmlFor="filter-household-gender" className="text-sm font-semibold text-zinc-900 dark:text-white">
+              <label
+                htmlFor="filter-household-gender"
+                className="text-sm font-semibold text-zinc-900 dark:text-white"
+              >
                 Household Gender
               </label>
-              <Select value={householdGender} onValueChange={onHouseholdGenderChange}>
-                <SelectTrigger id="filter-household-gender" aria-label="Household Gender">
+              <Select
+                value={householdGender}
+                onValueChange={onHouseholdGenderChange}
+              >
+                <SelectTrigger
+                  id="filter-household-gender"
+                  aria-label="Household Gender"
+                >
                   <SelectValue placeholder="Any" />
                 </SelectTrigger>
                 <SelectContent>
@@ -496,12 +556,16 @@ export function FilterModal({
 
           {/* Footer */}
           <div className="px-6 py-4 pb-[max(1rem,env(safe-area-inset-bottom,0px))] border-t border-zinc-100 dark:border-zinc-800 bg-white dark:bg-zinc-900 space-y-3">
-            {count === 0 && !isCountLoading && drawerSuggestions && drawerSuggestions.length > 0 && onRemoveFilterSuggestion && (
-              <DrawerZeroState
-                suggestions={drawerSuggestions}
-                onRemoveSuggestion={onRemoveFilterSuggestion}
-              />
-            )}
+            {count === 0 &&
+              !isCountLoading &&
+              drawerSuggestions &&
+              drawerSuggestions.length > 0 &&
+              onRemoveFilterSuggestion && (
+                <DrawerZeroState
+                  suggestions={drawerSuggestions}
+                  onRemoveSuggestion={onRemoveFilterSuggestion}
+                />
+              )}
             <div className="flex items-center gap-3">
               {hasActiveFilters && (
                 <Button
@@ -520,18 +584,18 @@ export function FilterModal({
                 disabled={boundsRequired}
                 className={`flex-1 rounded-xl h-12 text-white shadow-md disabled:opacity-60 disabled:cursor-not-allowed ${
                   count === 0 && !isCountLoading
-                    ? 'bg-amber-500 hover:bg-amber-600'
-                    : 'bg-indigo-500 hover:bg-indigo-600'
+                    ? "bg-amber-500 hover:bg-amber-600"
+                    : "bg-indigo-500 hover:bg-indigo-600"
                 }`}
                 data-testid="filter-modal-apply"
               >
                 {isCountLoading ? (
                   <span className="flex items-center gap-2">
                     <span className="h-4 w-4 border-2 border-white/30 border-t-white rounded-full animate-spin" />
-                    {formattedCount || 'listings'}
+                    {formattedCount || "listings"}
                   </span>
                 ) : (
-                  formattedCount || 'Show Results'
+                  formattedCount || "Show Results"
                 )}
               </Button>
             </div>

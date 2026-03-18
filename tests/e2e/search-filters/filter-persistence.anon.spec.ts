@@ -13,7 +13,14 @@
  * - Deep links with filter params pre-populate the filter modal and chips
  */
 
-import { test, expect, SF_BOUNDS, selectors, tags, searchResultsContainer } from "../helpers/test-utils";
+import {
+  test,
+  expect,
+  SF_BOUNDS,
+  selectors,
+  tags,
+  searchResultsContainer,
+} from "../helpers/test-utils";
 import {
   boundsQS,
   SEARCH_URL,
@@ -66,15 +73,21 @@ test.describe("Filter State Persistence", () => {
     const region = appliedFiltersRegion(page);
     const regionVisible = await region.isVisible().catch(() => false);
     if (regionVisible) {
-      await expect(region.locator("text=/Private Room/i").first()).toBeVisible({ timeout: 10_000 });
-      await expect(region.locator("text=/Wifi/i").first()).toBeVisible({ timeout: 10_000 });
+      await expect(region.locator("text=/Private Room/i").first()).toBeVisible({
+        timeout: 10_000,
+      });
+      await expect(region.locator("text=/Wifi/i").first()).toBeVisible({
+        timeout: 10_000,
+      });
     }
   });
 
   // -------------------------------------------------------------------------
   // 12.2: Filters preserved on back/forward navigation
   // -------------------------------------------------------------------------
-  test(`${tags.core} - filters preserved on browser back navigation`, async ({ page }) => {
+  test(`${tags.core} - filters preserved on browser back navigation`, async ({
+    page,
+  }) => {
     // Step 1: Navigate to search with filters
     const filterUrl = `${SEARCH_URL}&minPrice=800&maxPrice=2000`;
     await page.goto(filterUrl);
@@ -90,7 +103,9 @@ test.describe("Filter State Persistence", () => {
     // Wait longer for listing cards to render (CI can be slow with SSR hydration)
     await page.waitForTimeout(3_000);
     const listingCard = container.locator(selectors.listingCard).first();
-    const hasListing = await listingCard.isVisible({ timeout: 15_000 }).catch(() => false);
+    const hasListing = await listingCard
+      .isVisible({ timeout: 15_000 })
+      .catch(() => false);
 
     if (hasListing) {
       // Click the listing to navigate to the detail page
@@ -99,7 +114,8 @@ test.describe("Filter State Persistence", () => {
 
       // Verify we navigated away (URL should no longer be /search)
       const currentUrl = page.url();
-      const navigatedAway = currentUrl.includes("/listings/") || !currentUrl.includes("/search?");
+      const navigatedAway =
+        currentUrl.includes("/listings/") || !currentUrl.includes("/search?");
 
       if (navigatedAway) {
         // Step 3: Press browser back
@@ -133,7 +149,9 @@ test.describe("Filter State Persistence", () => {
   // -------------------------------------------------------------------------
   // 12.3: Deep link with filter params pre-populates
   // -------------------------------------------------------------------------
-  test(`${tags.core} - deep link with filter params pre-populates chips and modal`, async ({ page }) => {
+  test(`${tags.core} - deep link with filter params pre-populates chips and modal`, async ({
+    page,
+  }) => {
     // Navigate directly with multiple filter params
     const deepLinkUrl = `${SEARCH_URL}&amenities=Wifi,Parking&roomType=Entire+Place&leaseDuration=12+months`;
     await page.goto(deepLinkUrl);
@@ -150,11 +168,19 @@ test.describe("Filter State Persistence", () => {
     // Verify filter chips are visible on load.
     // Chips may take time to render after SSR hydration, so use a generous timeout.
     const region = appliedFiltersRegion(page);
-    const regionVisible = await region.isVisible({ timeout: 30_000 }).catch(() => false);
+    const regionVisible = await region
+      .isVisible({ timeout: 30_000 })
+      .catch(() => false);
     if (regionVisible) {
-      await expect(region.locator("text=/Wifi/i").first()).toBeVisible({ timeout: 30_000 });
-      await expect(region.locator("text=/Parking/i").first()).toBeVisible({ timeout: 30_000 });
-      await expect(region.locator("text=/Entire Place/i").first()).toBeVisible({ timeout: 30_000 });
+      await expect(region.locator("text=/Wifi/i").first()).toBeVisible({
+        timeout: 30_000,
+      });
+      await expect(region.locator("text=/Parking/i").first()).toBeVisible({
+        timeout: 30_000,
+      });
+      await expect(region.locator("text=/Entire Place/i").first()).toBeVisible({
+        timeout: 30_000,
+      });
     }
 
     // Open the filter modal and verify internal state matches URL
@@ -164,7 +190,10 @@ test.describe("Filter State Persistence", () => {
 
     const dialog = filterDialog(page);
     // Retry click if dialog didn't open (hydration race: SSR button renders before onClick attached)
-    const dialogVisible = await dialog.waitFor({ state: "visible", timeout: 5_000 }).then(() => true).catch(() => false);
+    const dialogVisible = await dialog
+      .waitFor({ state: "visible", timeout: 5_000 })
+      .then(() => true)
+      .catch(() => false);
     if (!dialogVisible) {
       await btn.click();
     }
@@ -173,7 +202,9 @@ test.describe("Filter State Persistence", () => {
     // Check amenities are toggled on inside the modal
     const amenitiesGroup = dialog.locator('[aria-label="Select amenities"]');
     const wifiBtn = amenitiesGroup.getByRole("button", { name: /^Wifi/i });
-    const parkingBtn = amenitiesGroup.getByRole("button", { name: /^Parking/i });
+    const parkingBtn = amenitiesGroup.getByRole("button", {
+      name: /^Parking/i,
+    });
 
     if (await wifiBtn.isVisible({ timeout: 3_000 }).catch(() => false)) {
       await expect(wifiBtn).toHaveAttribute("aria-pressed", "true");
@@ -198,7 +229,9 @@ test.describe("Filter State Persistence", () => {
   // -------------------------------------------------------------------------
   // 12.4: Sort preserved independently from filters
   // -------------------------------------------------------------------------
-  test(`${tags.core} - sort param preserved when filter chip is removed`, async ({ page }) => {
+  test(`${tags.core} - sort param preserved when filter chip is removed`, async ({
+    page,
+  }) => {
     // Navigate with both sort and a price filter
     await page.goto(`${SEARCH_URL}&minPrice=500&sort=price_asc`);
     await page.waitForLoadState("domcontentloaded");
@@ -213,17 +246,24 @@ test.describe("Filter State Persistence", () => {
     test.skip(!regionVisible, "Applied filters region not visible");
 
     // Remove the price filter chip
-    const removePrice = region.getByRole("button", { name: /remove filter.*\$/i }).first();
+    const removePrice = region
+      .getByRole("button", { name: /remove filter.*\$/i })
+      .first();
     const removeVisible = await removePrice.isVisible().catch(() => false);
 
     if (removeVisible) {
       await removePrice.click();
 
       // Wait for the price param to be removed from the URL
-      await expect.poll(
-        () => new URL(page.url(), "http://localhost").searchParams.has("minPrice"),
-        { timeout: 30_000, message: 'URL param "minPrice" to be absent' },
-      ).toBe(false);
+      await expect
+        .poll(
+          () =>
+            new URL(page.url(), "http://localhost").searchParams.has(
+              "minPrice"
+            ),
+          { timeout: 30_000, message: 'URL param "minPrice" to be absent' }
+        )
+        .toBe(false);
 
       // Price filter should be gone
       expect(getUrlParam(page, "minPrice")).toBeNull();
@@ -245,14 +285,21 @@ test.describe("Filter State Persistence", () => {
       const retryVisible = await regionRetry.isVisible().catch(() => false);
       test.skip(!retryVisible, "Applied filters region not visible on retry");
 
-      const removeWifi = regionRetry.getByRole("button", { name: /remove filter.*wifi/i });
+      const removeWifi = regionRetry.getByRole("button", {
+        name: /remove filter.*wifi/i,
+      });
       if (await removeWifi.isVisible().catch(() => false)) {
         await removeWifi.click();
 
-        await expect.poll(
-          () => new URL(page.url(), "http://localhost").searchParams.has("amenities"),
-          { timeout: 30_000, message: 'URL param "amenities" to be absent' },
-        ).toBe(false);
+        await expect
+          .poll(
+            () =>
+              new URL(page.url(), "http://localhost").searchParams.has(
+                "amenities"
+              ),
+            { timeout: 30_000, message: 'URL param "amenities" to be absent' }
+          )
+          .toBe(false);
 
         // Amenity removed, sort preserved
         expect(getUrlParam(page, "amenities")).toBeNull();

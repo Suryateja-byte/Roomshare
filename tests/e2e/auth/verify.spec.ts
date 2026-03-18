@@ -21,9 +21,7 @@ test.beforeEach(async () => {
 test.describe("VF: Auth Guard", () => {
   test.use({ storageState: { cookies: [], origins: [] } });
 
-  test("VF-01  unauthenticated user redirects to /login", async ({
-    page,
-  }) => {
+  test("VF-01  unauthenticated user redirects to /login", async ({ page }) => {
     await page.goto("/verify");
 
     // Server component redirects to login with callback
@@ -44,10 +42,10 @@ test.describe("VF: Page Structure", () => {
     await page.waitForLoadState("domcontentloaded");
 
     await expect(
-      page.getByRole("heading", { name: /ID Verification/i }),
+      page.getByRole("heading", { name: /ID Verification/i })
     ).toBeVisible({ timeout: timeouts.navigation });
     await expect(
-      page.getByText(/Build trust by verifying your identity/i),
+      page.getByText(/Build trust by verifying your identity/i)
     ).toBeVisible();
   });
 });
@@ -56,14 +54,12 @@ test.describe("VF: Page Structure", () => {
 // VF: Verified State (seeded user is isVerified: true)
 // ═══════════════════════════════════════════════════════════════════════════
 test.describe("VF: Verified State", () => {
-  test("VF-03  verified user sees badge and profile link", async ({
-    page,
-  }) => {
+  test("VF-03  verified user sees badge and profile link", async ({ page }) => {
     await page.goto("/verify");
     await page.waitForLoadState("domcontentloaded");
 
     await expect(
-      page.getByRole("heading", { name: /You're Verified/i }),
+      page.getByRole("heading", { name: /You're Verified/i })
     ).toBeVisible({ timeout: timeouts.navigation });
     await expect(page.getByText(/View Your Profile/i)).toBeVisible();
   });
@@ -73,7 +69,7 @@ test.describe("VF: Verified State", () => {
     await page.waitForLoadState("domcontentloaded");
 
     await expect(
-      page.getByRole("heading", { name: /You're Verified/i }),
+      page.getByRole("heading", { name: /You're Verified/i })
     ).toBeVisible({ timeout: timeouts.navigation });
 
     await page.getByText(/View Your Profile/i).click();

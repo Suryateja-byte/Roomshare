@@ -68,7 +68,7 @@ describe("Rate Limiting Edge Cases - Category B", () => {
       };
 
       (prisma.rateLimitEntry.findUnique as jest.Mock).mockResolvedValue(
-        existingEntry,
+        existingEntry
       );
       (prisma.rateLimitEntry.update as jest.Mock).mockResolvedValue({
         ...existingEntry,
@@ -92,7 +92,7 @@ describe("Rate Limiting Edge Cases - Category B", () => {
       };
 
       (prisma.rateLimitEntry.findUnique as jest.Mock).mockResolvedValue(
-        existingEntry,
+        existingEntry
       );
 
       const entry = await prisma.rateLimitEntry.findUnique({
@@ -112,7 +112,7 @@ describe("Rate Limiting Edge Cases - Category B", () => {
       };
 
       (prisma.rateLimitEntry.findUnique as jest.Mock).mockResolvedValue(
-        expiredEntry,
+        expiredEntry
       );
       (prisma.rateLimitEntry.upsert as jest.Mock).mockResolvedValue({
         id: "entry-123",
@@ -138,9 +138,18 @@ describe("Rate Limiting Edge Cases - Category B", () => {
       // Each concurrent call to $queryRaw atomically increments and returns
       (prisma.$queryRaw as jest.Mock).mockImplementation(async () => {
         atomicCount++;
-        return [{ id: "entry-123", count: atomicCount, windowStart: now, expiresAt: new Date(now.getTime() + 60000) }];
+        return [
+          {
+            id: "entry-123",
+            count: atomicCount,
+            windowStart: now,
+            expiresAt: new Date(now.getTime() + 60000),
+          },
+        ];
       });
-      (prisma.rateLimitEntry.deleteMany as jest.Mock).mockResolvedValue({ count: 0 });
+      (prisma.rateLimitEntry.deleteMany as jest.Mock).mockResolvedValue({
+        count: 0,
+      });
 
       const config = { limit: 10, windowMs: 60000 };
       const results = await Promise.all([
@@ -150,7 +159,7 @@ describe("Rate Limiting Edge Cases - Category B", () => {
       ]);
 
       // All 3 should succeed (counts 3, 4, 5 — all under limit 10)
-      expect(results.every(r => r.success)).toBe(true);
+      expect(results.every((r) => r.success)).toBe(true);
       // Atomic SQL used, not findUnique+update
       expect(prisma.$queryRaw).toHaveBeenCalledTimes(3);
       expect(prisma.rateLimitEntry.update).not.toHaveBeenCalled();
@@ -161,9 +170,14 @@ describe("Rate Limiting Edge Cases - Category B", () => {
 
       // Atomic UPDATE returns empty (count >= limit)
       (prisma.$queryRaw as jest.Mock).mockResolvedValue([]);
-      (prisma.rateLimitEntry.deleteMany as jest.Mock).mockResolvedValue({ count: 0 });
+      (prisma.rateLimitEntry.deleteMany as jest.Mock).mockResolvedValue({
+        count: 0,
+      });
       (prisma.rateLimitEntry.findUnique as jest.Mock).mockResolvedValue({
-        id: "entry-123", count: 10, windowStart: now, expiresAt: new Date(now.getTime() + 60000),
+        id: "entry-123",
+        count: 10,
+        windowStart: now,
+        expiresAt: new Date(now.getTime() + 60000),
       });
 
       const config = { limit: 10, windowMs: 60000 };
@@ -173,7 +187,7 @@ describe("Rate Limiting Edge Cases - Category B", () => {
       ]);
 
       // Both should be denied
-      expect(results.every(r => !r.success)).toBe(true);
+      expect(results.every((r) => !r.success)).toBe(true);
     });
   });
 
@@ -358,7 +372,7 @@ describe("Rate Limiting Edge Cases - Category B", () => {
       ];
 
       const expiredCount = entries.filter(
-        (e) => e.expiresAt.getTime() < Date.now(),
+        (e) => e.expiresAt.getTime() < Date.now()
       ).length;
       expect(expiredCount).toBe(2);
     });
@@ -423,7 +437,7 @@ describe("Rate Limiting Edge Cases - Category B", () => {
         async () => {
           burstCount++;
           return { count: burstCount };
-        },
+        }
       );
 
       // Simulate burst of 15 requests
@@ -467,7 +481,7 @@ describe("Rate Limiting Edge Cases - Category B", () => {
       const windowStart = Date.now() - 1800000; // 30 min ago
       const windowMs = 3600000; // 1 hour
       const retryAfter = Math.ceil(
-        (windowStart + windowMs - Date.now()) / 1000,
+        (windowStart + windowMs - Date.now()) / 1000
       );
 
       expect(retryAfter).toBeGreaterThan(0);
@@ -479,7 +493,7 @@ describe("Rate Limiting Edge Cases - Category B", () => {
   describe("B11: Error handling and graceful degradation", () => {
     it("allows requests when rate limiter fails", async () => {
       (prisma.rateLimitEntry.findUnique as jest.Mock).mockRejectedValue(
-        new Error("Database connection failed"),
+        new Error("Database connection failed")
       );
 
       let allowed = true;
@@ -537,7 +551,7 @@ describe("Rate Limiting Edge Cases - Category B", () => {
 
       expect(slidingCount).toBeGreaterThan(0);
       expect(slidingCount).toBeLessThanOrEqual(
-        previousWindowCount + currentWindowCount,
+        previousWindowCount + currentWindowCount
       );
     });
   });
@@ -553,7 +567,7 @@ describe("Rate Limiting Edge Cases - Category B", () => {
       const requestPath = "/api/health/live";
 
       const shouldBypass = bypassEndpoints.some((endpoint) =>
-        requestPath.startsWith(endpoint),
+        requestPath.startsWith(endpoint)
       );
 
       expect(shouldBypass).toBe(true);
@@ -568,7 +582,7 @@ describe("Rate Limiting Edge Cases - Category B", () => {
       const requestPath = "/api/messages";
 
       const shouldBypass = bypassEndpoints.some((endpoint) =>
-        requestPath.startsWith(endpoint),
+        requestPath.startsWith(endpoint)
       );
 
       expect(shouldBypass).toBe(false);

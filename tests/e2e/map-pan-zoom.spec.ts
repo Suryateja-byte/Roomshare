@@ -15,7 +15,13 @@
  * Debug: pnpm playwright test tests/e2e/map-pan-zoom.spec.ts --project=chromium --headed
  */
 
-import { test, expect, SF_BOUNDS, selectors, waitForMapReady } from "./helpers/test-utils";
+import {
+  test,
+  expect,
+  SF_BOUNDS,
+  selectors,
+  waitForMapReady,
+} from "./helpers/test-utils";
 
 const boundsQS = `minLat=${SF_BOUNDS.minLat}&maxLat=${SF_BOUNDS.maxLat}&minLng=${SF_BOUNDS.minLng}&maxLng=${SF_BOUNDS.maxLng}`;
 const SEARCH_URL = `/search?${boundsQS}`;
@@ -67,17 +73,24 @@ async function getMapBoundingBox(page: import("@playwright/test").Page) {
 }
 
 // Map tests need extra time for WebGL rendering and tile loading in CI
-test.beforeEach(async () => { test.slow(); });
+test.beforeEach(async () => {
+  test.slow();
+});
 
 // ---------------------------------------------------------------------------
 // 2.1: Pan map with mouse drag - viewport moves, URL updates
 // ---------------------------------------------------------------------------
 test.describe("2.1: Pan map with mouse drag", () => {
-  test("panning map updates URL bounds when 'Search as I move' is enabled", async ({ page }) => {
+  test("panning map updates URL bounds when 'Search as I move' is enabled", async ({
+    page,
+  }) => {
     await waitForSearchPage(page);
 
     if (!(await isMapAvailable(page))) {
-      test.skip(true, "Map not available (WebGL may be unavailable in headless mode)");
+      test.skip(
+        true,
+        "Map not available (WebGL may be unavailable in headless mode)"
+      );
       return;
     }
 
@@ -98,7 +111,9 @@ test.describe("2.1: Pan map with mouse drag", () => {
     // Perform mouse drag
     await page.mouse.move(centerX, centerY);
     await page.mouse.down();
-    await page.mouse.move(centerX + dragDistance, centerY + dragDistance, { steps: 10 });
+    await page.mouse.move(centerX + dragDistance, centerY + dragDistance, {
+      steps: 10,
+    });
     await page.mouse.up();
 
     // Wait for map to settle after pan
@@ -121,16 +136,23 @@ test.describe("2.1: Pan map with mouse drag", () => {
     void boundsChanged;
   });
 
-  test("panning map shows 'search this area' banner when toggle is off", async ({ page }) => {
+  test("panning map shows 'search this area' banner when toggle is off", async ({
+    page,
+  }) => {
     await waitForSearchPage(page);
 
     if (!(await isMapAvailable(page))) {
-      test.skip(true, "Map not available (WebGL may be unavailable in headless mode)");
+      test.skip(
+        true,
+        "Map not available (WebGL may be unavailable in headless mode)"
+      );
       return;
     }
 
     // Find and disable "Search as I move" toggle
-    const searchToggle = page.locator('button[role="switch"]').filter({ hasText: /Search as I move/i });
+    const searchToggle = page
+      .locator('button[role="switch"]')
+      .filter({ hasText: /Search as I move/i });
     const toggleExists = (await searchToggle.count()) > 0;
 
     if (!toggleExists) {
@@ -144,7 +166,9 @@ test.describe("2.1: Pan map with mouse drag", () => {
       // Use evaluate click for reliability on mobile viewports
       await searchToggle.evaluate((el) => (el as HTMLElement).click());
       // Wait for toggle state to update
-      await expect(searchToggle).toHaveAttribute("aria-checked", "false", { timeout: 10_000 });
+      await expect(searchToggle).toHaveAttribute("aria-checked", "false", {
+        timeout: 10_000,
+      });
     }
 
     const mapBox = await getMapBoundingBox(page);
@@ -166,7 +190,9 @@ test.describe("2.1: Pan map with mouse drag", () => {
     await waitForMapReady(page);
 
     // Look for "Search this area" or similar banner
-    const searchAreaButton = page.locator("button").filter({ hasText: /search this area|search here/i });
+    const searchAreaButton = page
+      .locator("button")
+      .filter({ hasText: /search this area|search here/i });
     const bannerVisible = await searchAreaButton
       .first()
       .waitFor({ state: "visible", timeout: 10_000 })
@@ -187,7 +213,10 @@ test.describe("2.2: Zoom with scroll wheel", () => {
     await waitForSearchPage(page);
 
     if (!(await isMapAvailable(page))) {
-      test.skip(true, "Map not available (WebGL may be unavailable in headless mode)");
+      test.skip(
+        true,
+        "Map not available (WebGL may be unavailable in headless mode)"
+      );
       return;
     }
 
@@ -217,14 +246,18 @@ test.describe("2.2: Zoom with scroll wheel", () => {
     // When zooming in, the bounds should get smaller (narrower range)
     // Verify page is still functional
     expect(await page.locator("body").isVisible()).toBe(true);
-    void initialBounds; void newBounds; // Used for debugging zoom behavior
+    void initialBounds;
+    void newBounds; // Used for debugging zoom behavior
   });
 
   test("scrolling to zoom out changes map viewport", async ({ page }) => {
     await waitForSearchPage(page);
 
     if (!(await isMapAvailable(page))) {
-      test.skip(true, "Map not available (WebGL may be unavailable in headless mode)");
+      test.skip(
+        true,
+        "Map not available (WebGL may be unavailable in headless mode)"
+      );
       return;
     }
 
@@ -249,11 +282,16 @@ test.describe("2.2: Zoom with scroll wheel", () => {
     expect(await page.locator("body").isVisible()).toBe(true);
   });
 
-  test("zoom affects marker visibility (clusters expand/collapse)", async ({ page }) => {
+  test("zoom affects marker visibility (clusters expand/collapse)", async ({
+    page,
+  }) => {
     await waitForSearchPage(page);
 
     if (!(await isMapAvailable(page))) {
-      test.skip(true, "Map not available (WebGL may be unavailable in headless mode)");
+      test.skip(
+        true,
+        "Map not available (WebGL may be unavailable in headless mode)"
+      );
       return;
     }
 
@@ -280,7 +318,8 @@ test.describe("2.2: Zoom with scroll wheel", () => {
     // Markers may increase (clusters expand) or decrease (some go out of view)
     // Just verify the page didn't crash and markers are still present
     expect(await page.locator("body").isVisible()).toBe(true);
-    void initialMarkerCount; void newMarkerCount; // Used for debugging cluster behavior
+    void initialMarkerCount;
+    void newMarkerCount; // Used for debugging cluster behavior
   });
 });
 
@@ -297,17 +336,25 @@ test.describe("2.3: Zoom with touch pinch on mobile", () => {
   test.beforeEach(({}, testInfo) => {
     const projectName = testInfo.project.name;
     if (!projectName.includes("Mobile")) {
-      test.skip(true, "Touch tests require mobile project with hasTouch enabled");
+      test.skip(
+        true,
+        "Touch tests require mobile project with hasTouch enabled"
+      );
     }
   });
 
-  test("touch interactions are enabled on mobile viewport", async ({ page }) => {
+  test("touch interactions are enabled on mobile viewport", async ({
+    page,
+  }) => {
     await page.goto(SEARCH_URL);
     await page.waitForLoadState("domcontentloaded");
     await waitForMapReady(page);
 
     if (!(await isMapAvailable(page))) {
-      test.skip(true, "Map not available (WebGL may be unavailable in headless mode)");
+      test.skip(
+        true,
+        "Map not available (WebGL may be unavailable in headless mode)"
+      );
       return;
     }
 
@@ -330,13 +377,18 @@ test.describe("2.3: Zoom with touch pinch on mobile", () => {
     expect(await page.locator("body").isVisible()).toBe(true);
   });
 
-  test("pinch-to-zoom gesture is supported (simulated via double-tap)", async ({ page }) => {
+  test("pinch-to-zoom gesture is supported (simulated via double-tap)", async ({
+    page,
+  }) => {
     await page.goto(SEARCH_URL);
     await page.waitForLoadState("domcontentloaded");
     await waitForMapReady(page);
 
     if (!(await isMapAvailable(page))) {
-      test.skip(true, "Map not available (WebGL may be unavailable in headless mode)");
+      test.skip(
+        true,
+        "Map not available (WebGL may be unavailable in headless mode)"
+      );
       return;
     }
 
@@ -374,7 +426,10 @@ test.describe("2.4: Double-click to zoom in", () => {
     await waitForSearchPage(page);
 
     if (!(await isMapAvailable(page))) {
-      test.skip(true, "Map not available (WebGL may be unavailable in headless mode)");
+      test.skip(
+        true,
+        "Map not available (WebGL may be unavailable in headless mode)"
+      );
       return;
     }
 
@@ -400,14 +455,17 @@ test.describe("2.4: Double-click to zoom in", () => {
 
     // Verify page is still functional
     expect(await page.locator("body").isVisible()).toBe(true);
-    void initialBounds; void newBounds; // Used for debugging zoom behavior
+    void initialBounds;
+    void newBounds; // Used for debugging zoom behavior
 
     // When zooming in via double-click, bounds should narrow
     // (The difference between min/max should decrease)
     // Note: This may not update URL if "Search as I move" is off
   });
 
-  test("double-click zoom is smooth and does not cause errors", async ({ page }) => {
+  test("double-click zoom is smooth and does not cause errors", async ({
+    page,
+  }) => {
     const consoleErrors: string[] = [];
     page.on("console", (msg) => {
       if (msg.type() === "error") consoleErrors.push(msg.text());
@@ -416,7 +474,10 @@ test.describe("2.4: Double-click to zoom in", () => {
     await waitForSearchPage(page);
 
     if (!(await isMapAvailable(page))) {
-      test.skip(true, "Map not available (WebGL may be unavailable in headless mode)");
+      test.skip(
+        true,
+        "Map not available (WebGL may be unavailable in headless mode)"
+      );
       return;
     }
 
@@ -461,7 +522,7 @@ test.describe("2.4: Double-click to zoom in", () => {
         !e.includes("ChunkLoadError") &&
         !e.includes("Loading chunk") &&
         !e.includes("Environment validation") &&
-        !e.includes("Failed to load resource"),
+        !e.includes("Failed to load resource")
     );
 
     expect(realErrors).toHaveLength(0);
@@ -484,12 +545,17 @@ test.describe("2.5: Map bounds update debounced (600ms)", () => {
     await waitForSearchPage(page);
 
     if (!(await isMapAvailable(page))) {
-      test.skip(true, "Map not available (WebGL may be unavailable in headless mode)");
+      test.skip(
+        true,
+        "Map not available (WebGL may be unavailable in headless mode)"
+      );
       return;
     }
 
     // Disable "Search as I move" to enable area count banner
-    const searchToggle = page.locator('button[role="switch"]').filter({ hasText: /Search as I move/i });
+    const searchToggle = page
+      .locator('button[role="switch"]')
+      .filter({ hasText: /Search as I move/i });
     const toggleExists = (await searchToggle.count()) > 0;
 
     if (toggleExists) {
@@ -497,7 +563,9 @@ test.describe("2.5: Map bounds update debounced (600ms)", () => {
       if (isOn) {
         // Use evaluate click for reliability on Mobile Chrome / headless CI
         await searchToggle.evaluate((el) => (el as HTMLElement).click());
-        await expect(searchToggle).toHaveAttribute("aria-checked", "false", { timeout: 10_000 });
+        await expect(searchToggle).toHaveAttribute("aria-checked", "false", {
+          timeout: 10_000,
+        });
       }
     }
 
@@ -518,7 +586,9 @@ test.describe("2.5: Map bounds update debounced (600ms)", () => {
     for (let i = 0; i < 3; i++) {
       await page.mouse.move(centerX, centerY);
       await page.mouse.down();
-      await page.mouse.move(centerX + 30 * (i + 1), centerY + 20 * (i + 1), { steps: 5 });
+      await page.mouse.move(centerX + 30 * (i + 1), centerY + 20 * (i + 1), {
+        steps: 5,
+      });
       await page.mouse.up();
       await page.waitForTimeout(100); // sub-debounce delay between rapid drags to test batching
     }
@@ -544,12 +614,17 @@ test.describe("2.5: Map bounds update debounced (600ms)", () => {
     await waitForSearchPage(page);
 
     if (!(await isMapAvailable(page))) {
-      test.skip(true, "Map not available (WebGL may be unavailable in headless mode)");
+      test.skip(
+        true,
+        "Map not available (WebGL may be unavailable in headless mode)"
+      );
       return;
     }
 
     // Disable "Search as I move" to enable area count
-    const searchToggle = page.locator('button[role="switch"]').filter({ hasText: /Search as I move/i });
+    const searchToggle = page
+      .locator('button[role="switch"]')
+      .filter({ hasText: /Search as I move/i });
     const toggleExists = (await searchToggle.count()) > 0;
 
     if (toggleExists) {
@@ -557,7 +632,9 @@ test.describe("2.5: Map bounds update debounced (600ms)", () => {
       if (isOn) {
         // Use evaluate click for reliability on Mobile Chrome / headless CI
         await searchToggle.evaluate((el) => (el as HTMLElement).click());
-        await expect(searchToggle).toHaveAttribute("aria-checked", "false", { timeout: 10_000 });
+        await expect(searchToggle).toHaveAttribute("aria-checked", "false", {
+          timeout: 10_000,
+        });
       }
     }
 
@@ -596,7 +673,10 @@ test.describe("2.5: Map bounds update debounced (600ms)", () => {
     await waitForSearchPage(page);
 
     if (!(await isMapAvailable(page))) {
-      test.skip(true, "Map not available (WebGL may be unavailable in headless mode)");
+      test.skip(
+        true,
+        "Map not available (WebGL may be unavailable in headless mode)"
+      );
       return;
     }
 
@@ -621,7 +701,9 @@ test.describe("2.5: Map bounds update debounced (600ms)", () => {
     for (let i = 0; i < 5; i++) {
       await page.mouse.move(centerX, centerY);
       await page.mouse.down();
-      await page.mouse.move(centerX + 20 * (i + 1), centerY + 10 * (i + 1), { steps: 3 });
+      await page.mouse.move(centerX + 20 * (i + 1), centerY + 10 * (i + 1), {
+        steps: 3,
+      });
       await page.mouse.up();
       await page.waitForTimeout(50); // sub-debounce delay between rapid drags
     }
@@ -638,7 +720,9 @@ test.describe("2.5: Map bounds update debounced (600ms)", () => {
 // General: Map interactions don't cause crashes
 // ---------------------------------------------------------------------------
 test.describe("General: Map interaction stability", () => {
-  test("combined pan and zoom interactions work without errors", async ({ page }) => {
+  test("combined pan and zoom interactions work without errors", async ({
+    page,
+  }) => {
     const consoleErrors: string[] = [];
     page.on("console", (msg) => {
       if (msg.type() === "error") consoleErrors.push(msg.text());
@@ -647,7 +731,10 @@ test.describe("General: Map interaction stability", () => {
     await waitForSearchPage(page);
 
     if (!(await isMapAvailable(page))) {
-      test.skip(true, "Map not available (WebGL may be unavailable in headless mode)");
+      test.skip(
+        true,
+        "Map not available (WebGL may be unavailable in headless mode)"
+      );
       return;
     }
 
@@ -712,7 +799,7 @@ test.describe("General: Map interaction stability", () => {
         !e.includes("ChunkLoadError") &&
         !e.includes("Loading chunk") &&
         !e.includes("Environment validation") &&
-        !e.includes("Failed to load resource"),
+        !e.includes("Failed to load resource")
     );
 
     expect(realErrors).toHaveLength(0);

@@ -3,7 +3,7 @@
  * Handles Pro vs Free user feature gating.
  */
 
-import type { SubscriptionTier } from './places/types';
+import type { SubscriptionTier } from "./places/types";
 
 /**
  * Check if user has Pro subscription.
@@ -13,10 +13,13 @@ import type { SubscriptionTier } from './places/types';
 export function isProUser(tier?: string | null): boolean {
   // Development override: force Pro mode for testing
   // Uses NEXT_PUBLIC_ prefix so it's available on client-side components
-  if (process.env.NODE_ENV === 'development' && process.env.NEXT_PUBLIC_FORCE_PRO_MODE === 'true') {
+  if (
+    process.env.NODE_ENV === "development" &&
+    process.env.NEXT_PUBLIC_FORCE_PRO_MODE === "true"
+  ) {
     return true;
   }
-  return tier === 'pro';
+  return tier === "pro";
 }
 
 /**
@@ -25,10 +28,10 @@ export function isProUser(tier?: string | null): boolean {
  * @returns Valid SubscriptionTier or 'free' as default
  */
 export function getSubscriptionTier(tier?: string | null): SubscriptionTier {
-  if (tier === 'pro') {
-    return 'pro';
+  if (tier === "pro") {
+    return "pro";
   }
-  return 'free';
+  return "free";
 }
 
 /**
@@ -73,10 +76,10 @@ export function getNeighborhoodProFeatures(
  * Feature names for analytics and UI.
  */
 export const PRO_FEATURE_NAMES = {
-  interactiveMap: 'Interactive neighborhood map',
-  customList: 'Detailed place list with distances',
-  walkabilityRings: 'Walkability visualization',
-  placeDetails: 'Expanded place details',
+  interactiveMap: "Interactive neighborhood map",
+  customList: "Detailed place list with distances",
+  walkabilityRings: "Walkability visualization",
+  placeDetails: "Expanded place details",
 } as const;
 
 /**

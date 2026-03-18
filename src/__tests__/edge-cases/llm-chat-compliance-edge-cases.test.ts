@@ -882,10 +882,10 @@ describe("Category F: LLM Neighborhood Chat + Compliance Edge Cases", () => {
       // Various response formats
       expect(normalizeResponse({ answer: "Test answer" })).toBe("Test answer");
       expect(normalizeResponse({ response: "Test response" })).toBe(
-        "Test response",
+        "Test response"
       );
       expect(normalizeResponse({ message: "Test message" })).toBe(
-        "Test message",
+        "Test message"
       );
       expect(normalizeResponse({})).toBe("No results found");
     });
@@ -906,7 +906,7 @@ describe("Category F: LLM Neighborhood Chat + Compliance Edge Cases", () => {
           answer: "A",
           response: "R",
           message: "M",
-        }),
+        })
       ).toBe("A");
 
       // Response next
@@ -914,14 +914,14 @@ describe("Category F: LLM Neighborhood Chat + Compliance Edge Cases", () => {
         normalizeResponse({
           response: "R",
           message: "M",
-        }),
+        })
       ).toBe("R");
 
       // Message last
       expect(
         normalizeResponse({
           message: "M",
-        }),
+        })
       ).toBe("M");
     });
 
@@ -938,7 +938,7 @@ describe("Category F: LLM Neighborhood Chat + Compliance Edge Cases", () => {
       // Empty string should fall through to next option
       expect(normalizeResponse({ answer: "", response: "R" })).toBe("R");
       expect(
-        normalizeResponse({ answer: "", response: "", message: "M" }),
+        normalizeResponse({ answer: "", response: "", message: "M" })
       ).toBe("M");
     });
   });

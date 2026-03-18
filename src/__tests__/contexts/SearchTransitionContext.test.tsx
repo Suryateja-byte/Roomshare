@@ -66,7 +66,7 @@ describe("SearchTransitionContext", () => {
       render(
         <SearchTransitionProvider>
           <TestConsumer />
-        </SearchTransitionProvider>,
+        </SearchTransitionProvider>
       );
 
       expect(screen.getByTestId("is-pending")).toHaveTextContent("false");
@@ -77,7 +77,7 @@ describe("SearchTransitionContext", () => {
       render(
         <SearchTransitionProvider>
           <TestConsumer />
-        </SearchTransitionProvider>,
+        </SearchTransitionProvider>
       );
 
       await user.click(screen.getByTestId("navigate-btn"));
@@ -91,7 +91,7 @@ describe("SearchTransitionContext", () => {
       render(
         <SearchTransitionProvider>
           <TestConsumer />
-        </SearchTransitionProvider>,
+        </SearchTransitionProvider>
       );
 
       await user.click(screen.getByTestId("navigate-scroll-btn"));
@@ -110,7 +110,7 @@ describe("SearchTransitionContext", () => {
               capturedContext = ctx;
             }}
           />
-        </SearchTransitionProvider>,
+        </SearchTransitionProvider>
       );
 
       expect(capturedContext).not.toBeNull();
@@ -128,7 +128,7 @@ describe("SearchTransitionContext", () => {
       expect(() => {
         render(<TestConsumer />);
       }).toThrow(
-        "useSearchTransition must be used within SearchTransitionProvider",
+        "useSearchTransition must be used within SearchTransitionProvider"
       );
 
       consoleSpy.mockRestore();
@@ -146,7 +146,7 @@ describe("SearchTransitionContext", () => {
       render(
         <SearchTransitionProvider>
           <SafeTestConsumer />
-        </SearchTransitionProvider>,
+        </SearchTransitionProvider>
       );
 
       expect(screen.getByTestId("has-context")).toHaveTextContent("true");
@@ -165,7 +165,7 @@ describe("SearchTransitionContext", () => {
               capturedContext = ctx;
             }}
           />
-        </SearchTransitionProvider>,
+        </SearchTransitionProvider>
       );
 
       // isPending starts as false
@@ -184,7 +184,7 @@ describe("SearchTransitionContext", () => {
               capturedContext = ctx;
             }}
           />
-        </SearchTransitionProvider>,
+        </SearchTransitionProvider>
       );
 
       // No navigation yet + not slow → null
@@ -202,7 +202,7 @@ describe("SearchTransitionContext", () => {
               capturedContext = ctx;
             }}
           />
-        </SearchTransitionProvider>,
+        </SearchTransitionProvider>
       );
 
       await user.click(screen.getByTestId("navigate-btn"));

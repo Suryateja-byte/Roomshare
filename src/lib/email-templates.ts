@@ -1,25 +1,25 @@
 // Email templates (client-safe, no 'use server')
 
-const APP_URL = process.env.NEXT_PUBLIC_APP_URL || 'http://localhost:3000';
+const APP_URL = process.env.NEXT_PUBLIC_APP_URL || "http://localhost:3000";
 const HTML_ESCAPE_MAP: Record<string, string> = {
-    '&': '&amp;',
-    '<': '&lt;',
-    '>': '&gt;',
-    '"': '&quot;',
-    "'": '&#39;',
+  "&": "&amp;",
+  "<": "&lt;",
+  ">": "&gt;",
+  '"': "&quot;",
+  "'": "&#39;",
 };
 
 function escapeHtml(value: string): string {
-    return value.replace(/[&<>"']/g, (char) => HTML_ESCAPE_MAP[char] || char);
+  return value.replace(/[&<>"']/g, (char) => HTML_ESCAPE_MAP[char] || char);
 }
 
 function sanitizeSubject(value: string): string {
-    return value.replace(/[\r\n]+/g, ' ').trim();
+  return value.replace(/[\r\n]+/g, " ").trim();
 }
 
 function buildAppHref(path: string): string {
-    const normalizedPath = path.startsWith('/') ? path : `/${path}`;
-    return escapeHtml(`${APP_URL}${normalizedPath}`);
+  const normalizedPath = path.startsWith("/") ? path : `/${path}`;
+  return escapeHtml(`${APP_URL}${normalizedPath}`);
 }
 
 // Base email template
@@ -69,23 +69,23 @@ export const baseTemplate = (content: string) => `
 
 // Notification email templates
 export const emailTemplates = {
-    bookingRequest: (data: {
-        hostName: string;
-        tenantName: string;
-        listingTitle: string;
-        startDate: string;
-        endDate: string;
-        listingId: string;
-    }) => {
-        const safeHostName = escapeHtml(data.hostName);
-        const safeTenantName = escapeHtml(data.tenantName);
-        const safeListingTitle = escapeHtml(data.listingTitle);
-        const safeStartDate = escapeHtml(data.startDate);
-        const safeEndDate = escapeHtml(data.endDate);
+  bookingRequest: (data: {
+    hostName: string;
+    tenantName: string;
+    listingTitle: string;
+    startDate: string;
+    endDate: string;
+    listingId: string;
+  }) => {
+    const safeHostName = escapeHtml(data.hostName);
+    const safeTenantName = escapeHtml(data.tenantName);
+    const safeListingTitle = escapeHtml(data.listingTitle);
+    const safeStartDate = escapeHtml(data.startDate);
+    const safeEndDate = escapeHtml(data.endDate);
 
-        return {
-        subject: sanitizeSubject(`New booking request for ${data.listingTitle}`),
-        html: baseTemplate(`
+    return {
+      subject: sanitizeSubject(`New booking request for ${data.listingTitle}`),
+      html: baseTemplate(`
             <h2 style="margin: 0 0 16px; color: #18181b; font-size: 20px;">New Booking Request</h2>
             <p style="margin: 0 0 24px; color: #52525b; font-size: 16px; line-height: 1.6;">
                 Hi ${safeHostName},
@@ -99,28 +99,30 @@ export const emailTemplates = {
                     ${safeStartDate} - ${safeEndDate}
                 </p>
             </div>
-            <a href="${buildAppHref('/bookings')}" style="display: inline-block; background-color: #18181b; color: #ffffff; text-decoration: none; padding: 14px 28px; border-radius: 8px; font-weight: 600; font-size: 14px;">
+            <a href="${buildAppHref("/bookings")}" style="display: inline-block; background-color: #18181b; color: #ffffff; text-decoration: none; padding: 14px 28px; border-radius: 8px; font-weight: 600; font-size: 14px;">
                 View Booking Request
             </a>
         `),
     };
-    },
+  },
 
-    bookingAccepted: (data: {
-        tenantName: string;
-        listingTitle: string;
-        hostName: string;
-        startDate: string;
-        listingId: string;
-    }) => {
-        const safeTenantName = escapeHtml(data.tenantName);
-        const safeListingTitle = escapeHtml(data.listingTitle);
-        const safeHostName = escapeHtml(data.hostName);
-        const safeStartDate = escapeHtml(data.startDate);
+  bookingAccepted: (data: {
+    tenantName: string;
+    listingTitle: string;
+    hostName: string;
+    startDate: string;
+    listingId: string;
+  }) => {
+    const safeTenantName = escapeHtml(data.tenantName);
+    const safeListingTitle = escapeHtml(data.listingTitle);
+    const safeHostName = escapeHtml(data.hostName);
+    const safeStartDate = escapeHtml(data.startDate);
 
-        return {
-        subject: sanitizeSubject(`Your booking for ${data.listingTitle} has been accepted!`),
-        html: baseTemplate(`
+    return {
+      subject: sanitizeSubject(
+        `Your booking for ${data.listingTitle} has been accepted!`
+      ),
+      html: baseTemplate(`
             <h2 style="margin: 0 0 16px; color: #18181b; font-size: 20px;">Booking Confirmed!</h2>
             <p style="margin: 0 0 24px; color: #52525b; font-size: 16px; line-height: 1.6;">
                 Hi ${safeTenantName},
@@ -136,27 +138,31 @@ export const emailTemplates = {
             <p style="margin: 0 0 24px; color: #52525b; font-size: 16px; line-height: 1.6;">
                 We recommend reaching out to your host to coordinate move-in details.
             </p>
-            <a href="${buildAppHref('/bookings')}" style="display: inline-block; background-color: #18181b; color: #ffffff; text-decoration: none; padding: 14px 28px; border-radius: 8px; font-weight: 600; font-size: 14px;">
+            <a href="${buildAppHref("/bookings")}" style="display: inline-block; background-color: #18181b; color: #ffffff; text-decoration: none; padding: 14px 28px; border-radius: 8px; font-weight: 600; font-size: 14px;">
                 View Booking Details
             </a>
         `),
     };
-    },
+  },
 
-    bookingRejected: (data: {
-        tenantName: string;
-        listingTitle: string;
-        hostName: string;
-        rejectionReason?: string;
-    }) => {
-        const safeTenantName = escapeHtml(data.tenantName);
-        const safeListingTitle = escapeHtml(data.listingTitle);
-        const safeHostName = escapeHtml(data.hostName);
-        const safeRejectionReason = data.rejectionReason ? escapeHtml(data.rejectionReason) : '';
+  bookingRejected: (data: {
+    tenantName: string;
+    listingTitle: string;
+    hostName: string;
+    rejectionReason?: string;
+  }) => {
+    const safeTenantName = escapeHtml(data.tenantName);
+    const safeListingTitle = escapeHtml(data.listingTitle);
+    const safeHostName = escapeHtml(data.hostName);
+    const safeRejectionReason = data.rejectionReason
+      ? escapeHtml(data.rejectionReason)
+      : "";
 
-        return {
-        subject: sanitizeSubject(`Update on your booking request for ${data.listingTitle}`),
-        html: baseTemplate(`
+    return {
+      subject: sanitizeSubject(
+        `Update on your booking request for ${data.listingTitle}`
+      ),
+      html: baseTemplate(`
             <h2 style="margin: 0 0 16px; color: #18181b; font-size: 20px;">Booking Update</h2>
             <p style="margin: 0 0 24px; color: #52525b; font-size: 16px; line-height: 1.6;">
                 Hi ${safeTenantName},
@@ -164,7 +170,9 @@ export const emailTemplates = {
             <p style="margin: 0 0 24px; color: #52525b; font-size: 16px; line-height: 1.6;">
                 Unfortunately, <strong>${safeHostName}</strong> was unable to accept your booking request for <strong>"${safeListingTitle}"</strong>.
             </p>
-            ${data.rejectionReason ? `
+            ${
+              data.rejectionReason
+                ? `
             <div style="margin: 0 0 24px; padding: 16px; background-color: #f4f4f5; border-radius: 8px; border-left: 4px solid #71717a;">
                 <p style="margin: 0 0 8px; color: #52525b; font-size: 14px; font-weight: 600;">
                     Reason from host:
@@ -173,29 +181,33 @@ export const emailTemplates = {
                     "${safeRejectionReason}"
                 </p>
             </div>
-            ` : ''}
+            `
+                : ""
+            }
             <p style="margin: 0 0 24px; color: #52525b; font-size: 16px; line-height: 1.6;">
                 Don't worry! There are plenty of other great listings available. Keep searching to find your perfect room.
             </p>
-            <a href="${buildAppHref('/search')}" style="display: inline-block; background-color: #18181b; color: #ffffff; text-decoration: none; padding: 14px 28px; border-radius: 8px; font-weight: 600; font-size: 14px;">
+            <a href="${buildAppHref("/search")}" style="display: inline-block; background-color: #18181b; color: #ffffff; text-decoration: none; padding: 14px 28px; border-radius: 8px; font-weight: 600; font-size: 14px;">
                 Browse More Listings
             </a>
         `),
     };
-    },
+  },
 
-    newMessage: (data: {
-        recipientName: string;
-        senderName: string;
-        conversationId: string;
-    }) => {
-        const safeRecipientName = escapeHtml(data.recipientName);
-        const safeSenderName = escapeHtml(data.senderName);
-        const conversationHref = buildAppHref(`/messages/${encodeURIComponent(data.conversationId)}`);
+  newMessage: (data: {
+    recipientName: string;
+    senderName: string;
+    conversationId: string;
+  }) => {
+    const safeRecipientName = escapeHtml(data.recipientName);
+    const safeSenderName = escapeHtml(data.senderName);
+    const conversationHref = buildAppHref(
+      `/messages/${encodeURIComponent(data.conversationId)}`
+    );
 
-        return {
-        subject: sanitizeSubject(`New message from ${data.senderName}`),
-        html: baseTemplate(`
+    return {
+      subject: sanitizeSubject(`New message from ${data.senderName}`),
+      html: baseTemplate(`
             <h2 style="margin: 0 0 16px; color: #18181b; font-size: 20px;">New Message</h2>
             <p style="margin: 0 0 24px; color: #52525b; font-size: 16px; line-height: 1.6;">
                 Hi ${safeRecipientName},
@@ -208,25 +220,27 @@ export const emailTemplates = {
             </a>
         `),
     };
-    },
+  },
 
-    newReview: (data: {
-        hostName: string;
-        reviewerName: string;
-        listingTitle: string;
-        rating: number;
-        listingId: string;
-    }) => {
-        const safeHostName = escapeHtml(data.hostName);
-        const safeReviewerName = escapeHtml(data.reviewerName);
-        const safeListingTitle = escapeHtml(data.listingTitle);
-        const safeRating = Number.isFinite(data.rating)
-            ? Math.max(0, Math.min(5, Math.floor(data.rating)))
-            : 0;
+  newReview: (data: {
+    hostName: string;
+    reviewerName: string;
+    listingTitle: string;
+    rating: number;
+    listingId: string;
+  }) => {
+    const safeHostName = escapeHtml(data.hostName);
+    const safeReviewerName = escapeHtml(data.reviewerName);
+    const safeListingTitle = escapeHtml(data.listingTitle);
+    const safeRating = Number.isFinite(data.rating)
+      ? Math.max(0, Math.min(5, Math.floor(data.rating)))
+      : 0;
 
-        return {
-        subject: sanitizeSubject(`New ${data.rating}-star review on ${data.listingTitle}`),
-        html: baseTemplate(`
+    return {
+      subject: sanitizeSubject(
+        `New ${data.rating}-star review on ${data.listingTitle}`
+      ),
+      html: baseTemplate(`
             <h2 style="margin: 0 0 16px; color: #18181b; font-size: 20px;">New Review Received</h2>
             <p style="margin: 0 0 24px; color: #52525b; font-size: 16px; line-height: 1.6;">
                 Hi ${safeHostName},
@@ -237,7 +251,7 @@ export const emailTemplates = {
             <div style="background-color: #fef3c7; border-radius: 12px; padding: 20px; margin-bottom: 24px; text-align: center;">
                 <p style="margin: 0 0 8px; color: #92400e; font-size: 14px;">Rating</p>
                 <p style="margin: 0; color: #18181b; font-size: 32px;">
-                    ${'★'.repeat(safeRating)}${'☆'.repeat(5 - safeRating)}
+                    ${"★".repeat(safeRating)}${"☆".repeat(5 - safeRating)}
                 </p>
             </div>
             <a href="${buildAppHref(`/listings/${encodeURIComponent(data.listingId)}`)}" style="display: inline-block; background-color: #18181b; color: #ffffff; text-decoration: none; padding: 14px 28px; border-radius: 8px; font-weight: 600; font-size: 14px;">
@@ -245,21 +259,23 @@ export const emailTemplates = {
             </a>
         `),
     };
-    },
+  },
 
-    listingSaved: (data: {
-        hostName: string;
-        saverName: string;
-        listingTitle: string;
-        listingId: string;
-    }) => {
-        const safeHostName = escapeHtml(data.hostName);
-        const safeSaverName = escapeHtml(data.saverName);
-        const safeListingTitle = escapeHtml(data.listingTitle);
+  listingSaved: (data: {
+    hostName: string;
+    saverName: string;
+    listingTitle: string;
+    listingId: string;
+  }) => {
+    const safeHostName = escapeHtml(data.hostName);
+    const safeSaverName = escapeHtml(data.saverName);
+    const safeListingTitle = escapeHtml(data.listingTitle);
 
-        return {
-        subject: sanitizeSubject(`Someone saved your listing "${data.listingTitle}"`),
-        html: baseTemplate(`
+    return {
+      subject: sanitizeSubject(
+        `Someone saved your listing "${data.listingTitle}"`
+      ),
+      html: baseTemplate(`
             <h2 style="margin: 0 0 16px; color: #18181b; font-size: 20px;">Your Listing is Getting Attention!</h2>
             <p style="margin: 0 0 24px; color: #52525b; font-size: 16px; line-height: 1.6;">
                 Hi ${safeHostName},
@@ -275,45 +291,51 @@ export const emailTemplates = {
             </a>
         `),
     };
-    },
+  },
 
-    searchAlert: (data: {
-        userName: string;
-        searchQuery: string;
-        newListingsCount: number;
-        searchId: string;
-    }) => {
-        const safeUserName = escapeHtml(data.userName);
-        const safeSearchQuery = escapeHtml(data.searchQuery);
-        const searchHref = buildAppHref(`/search?q=${encodeURIComponent(data.searchQuery)}`);
+  searchAlert: (data: {
+    userName: string;
+    searchQuery: string;
+    newListingsCount: number;
+    searchId: string;
+  }) => {
+    const safeUserName = escapeHtml(data.userName);
+    const safeSearchQuery = escapeHtml(data.searchQuery);
+    const searchHref = buildAppHref(
+      `/search?q=${encodeURIComponent(data.searchQuery)}`
+    );
 
-        return {
-            subject: sanitizeSubject(`${data.newListingsCount} new listings match your search`),
-            html: baseTemplate(`
+    return {
+      subject: sanitizeSubject(
+        `${data.newListingsCount} new listings match your search`
+      ),
+      html: baseTemplate(`
             <h2 style="margin: 0 0 16px; color: #18181b; font-size: 20px;">New Listings Alert</h2>
             <p style="margin: 0 0 24px; color: #52525b; font-size: 16px; line-height: 1.6;">
                 Hi ${safeUserName},
             </p>
             <p style="margin: 0 0 24px; color: #52525b; font-size: 16px; line-height: 1.6;">
-                We found <strong>${data.newListingsCount} new listing${data.newListingsCount > 1 ? 's' : ''}</strong> matching your saved search: <strong>"${safeSearchQuery}"</strong>
+                We found <strong>${data.newListingsCount} new listing${data.newListingsCount > 1 ? "s" : ""}</strong> matching your saved search: <strong>"${safeSearchQuery}"</strong>
             </p>
             <a href="${searchHref}" style="display: inline-block; background-color: #18181b; color: #ffffff; text-decoration: none; padding: 14px 28px; border-radius: 8px; font-weight: 600; font-size: 14px;">
                 View New Listings
             </a>
             <p style="margin: 24px 0 0; color: #71717a; font-size: 14px;">
-                <a href="${buildAppHref('/saved-searches')}" style="color: #71717a;">Manage your saved searches</a>
+                <a href="${buildAppHref("/saved-searches")}" style="color: #71717a;">Manage your saved searches</a>
             </p>
         `),
-        };
-    },
+    };
+  },
 
-    welcomeEmail: (data: { userName: string; verificationUrl?: string }) => {
-        const safeUserName = escapeHtml(data.userName);
-        const safeVerificationUrl = data.verificationUrl ? escapeHtml(data.verificationUrl) : '';
+  welcomeEmail: (data: { userName: string; verificationUrl?: string }) => {
+    const safeUserName = escapeHtml(data.userName);
+    const safeVerificationUrl = data.verificationUrl
+      ? escapeHtml(data.verificationUrl)
+      : "";
 
-        return {
-        subject: sanitizeSubject(`Welcome to RoomShare, ${data.userName}!`),
-        html: baseTemplate(`
+    return {
+      subject: sanitizeSubject(`Welcome to RoomShare, ${data.userName}!`),
+      html: baseTemplate(`
             <h2 style="margin: 0 0 16px; color: #18181b; font-size: 20px;">Welcome to RoomShare!</h2>
             <p style="margin: 0 0 24px; color: #52525b; font-size: 16px; line-height: 1.6;">
                 Hi ${safeUserName},
@@ -321,7 +343,9 @@ export const emailTemplates = {
             <p style="margin: 0 0 24px; color: #52525b; font-size: 16px; line-height: 1.6;">
                 We're thrilled to have you join our community of roommates and hosts. RoomShare makes it easy to find the perfect shared living space.
             </p>
-            ${data.verificationUrl ? `
+            ${
+              data.verificationUrl
+                ? `
             <div style="background-color: #fef3c7; border-radius: 12px; padding: 20px; margin-bottom: 24px; border: 1px solid #fcd34d;">
                 <p style="margin: 0 0 12px; color: #92400e; font-size: 14px; font-weight: 600;">Please verify your email address</p>
                 <p style="margin: 0 0 16px; color: #78350f; font-size: 14px;">
@@ -331,7 +355,9 @@ export const emailTemplates = {
                     Verify Email Address
                 </a>
             </div>
-            ` : ''}
+            `
+                : ""
+            }
             <div style="background-color: #f4f4f5; border-radius: 12px; padding: 24px; margin-bottom: 24px;">
                 <h3 style="margin: 0 0 16px; color: #18181b; font-size: 16px;">Get Started:</h3>
                 <ul style="margin: 0; padding: 0 0 0 20px; color: #52525b; font-size: 14px; line-height: 1.8;">
@@ -341,20 +367,20 @@ export const emailTemplates = {
                     <li>Message hosts to learn more</li>
                 </ul>
             </div>
-            <a href="${buildAppHref('/profile/edit')}" style="display: inline-block; background-color: #18181b; color: #ffffff; text-decoration: none; padding: 14px 28px; border-radius: 8px; font-weight: 600; font-size: 14px;">
+            <a href="${buildAppHref("/profile/edit")}" style="display: inline-block; background-color: #18181b; color: #ffffff; text-decoration: none; padding: 14px 28px; border-radius: 8px; font-weight: 600; font-size: 14px;">
                 Complete Your Profile
             </a>
         `),
     };
-    },
+  },
 
-    emailVerification: (data: { userName: string; verificationUrl: string }) => {
-        const safeUserName = escapeHtml(data.userName);
-        const safeVerificationUrl = escapeHtml(data.verificationUrl);
+  emailVerification: (data: { userName: string; verificationUrl: string }) => {
+    const safeUserName = escapeHtml(data.userName);
+    const safeVerificationUrl = escapeHtml(data.verificationUrl);
 
-        return {
-        subject: 'Verify your RoomShare email address',
-        html: baseTemplate(`
+    return {
+      subject: "Verify your RoomShare email address",
+      html: baseTemplate(`
             <h2 style="margin: 0 0 16px; color: #18181b; font-size: 20px;">Verify Your Email Address</h2>
             <p style="margin: 0 0 24px; color: #52525b; font-size: 16px; line-height: 1.6;">
                 Hi ${safeUserName},
@@ -379,15 +405,15 @@ export const emailTemplates = {
             </p>
         `),
     };
-    },
+  },
 
-    passwordReset: (data: { userName: string; resetLink: string }) => {
-        const safeUserName = escapeHtml(data.userName);
-        const safeResetLink = escapeHtml(data.resetLink);
+  passwordReset: (data: { userName: string; resetLink: string }) => {
+    const safeUserName = escapeHtml(data.userName);
+    const safeResetLink = escapeHtml(data.resetLink);
 
-        return {
-        subject: 'Reset your RoomShare password',
-        html: baseTemplate(`
+    return {
+      subject: "Reset your RoomShare password",
+      html: baseTemplate(`
             <h2 style="margin: 0 0 16px; color: #18181b; font-size: 20px;">Password Reset Request</h2>
             <p style="margin: 0 0 24px; color: #52525b; font-size: 16px; line-height: 1.6;">
                 Hi ${safeUserName},
@@ -403,26 +429,27 @@ export const emailTemplates = {
             </p>
         `),
     };
-    },
+  },
 
-    reviewResponse: (data: {
-        reviewerName: string;
-        hostName: string;
-        listingTitle: string;
-        responsePreview: string;
-        listingId: string;
-    }) => {
-        const safeReviewerName = escapeHtml(data.reviewerName);
-        const safeHostName = escapeHtml(data.hostName);
-        const safeListingTitle = escapeHtml(data.listingTitle);
-        const responsePreview = data.responsePreview.length > 200
-            ? `${data.responsePreview.substring(0, 200)}...`
-            : data.responsePreview;
-        const safeResponsePreview = escapeHtml(responsePreview);
+  reviewResponse: (data: {
+    reviewerName: string;
+    hostName: string;
+    listingTitle: string;
+    responsePreview: string;
+    listingId: string;
+  }) => {
+    const safeReviewerName = escapeHtml(data.reviewerName);
+    const safeHostName = escapeHtml(data.hostName);
+    const safeListingTitle = escapeHtml(data.listingTitle);
+    const responsePreview =
+      data.responsePreview.length > 200
+        ? `${data.responsePreview.substring(0, 200)}...`
+        : data.responsePreview;
+    const safeResponsePreview = escapeHtml(responsePreview);
 
-        return {
-        subject: sanitizeSubject(`${data.hostName} responded to your review`),
-        html: baseTemplate(`
+    return {
+      subject: sanitizeSubject(`${data.hostName} responded to your review`),
+      html: baseTemplate(`
             <h2 style="margin: 0 0 16px; color: #18181b; font-size: 20px;">Response to Your Review</h2>
             <p style="margin: 0 0 24px; color: #52525b; font-size: 16px; line-height: 1.6;">
                 Hi ${safeReviewerName},
@@ -440,18 +467,15 @@ export const emailTemplates = {
             </a>
         `),
     };
-    },
+  },
 
-    verificationRejected: (data: {
-        userName: string;
-        reason: string;
-    }) => {
-        const safeUserName = escapeHtml(data.userName);
-        const safeReason = escapeHtml(data.reason);
+  verificationRejected: (data: { userName: string; reason: string }) => {
+    const safeUserName = escapeHtml(data.userName);
+    const safeReason = escapeHtml(data.reason);
 
-        return {
-        subject: 'Your Verification Request Update',
-        html: baseTemplate(`
+    return {
+      subject: "Your Verification Request Update",
+      html: baseTemplate(`
             <h2 style="margin: 0 0 16px; color: #18181b; font-size: 20px;">Verification Request Update</h2>
             <p style="margin: 0 0 24px; color: #52525b; font-size: 16px; line-height: 1.6;">
                 Hi ${safeUserName},
@@ -477,27 +501,27 @@ export const emailTemplates = {
             <p style="margin: 0 0 24px; color: #52525b; font-size: 16px; line-height: 1.6;">
                 You can submit a new verification request after 24 hours.
             </p>
-            <a href="${buildAppHref('/verify')}" style="display: inline-block; background-color: #18181b; color: #ffffff; text-decoration: none; padding: 14px 28px; border-radius: 8px; font-weight: 600; font-size: 14px;">
+            <a href="${buildAppHref("/verify")}" style="display: inline-block; background-color: #18181b; color: #ffffff; text-decoration: none; padding: 14px 28px; border-radius: 8px; font-weight: 600; font-size: 14px;">
                 View Verification Status
             </a>
         `),
     };
-    },
+  },
 
-    bookingHoldRequest: (data: {
-        hostName: string;
-        tenantName: string;
-        listingTitle: string;
-        holdExpiresAt: string;
-    }) => {
-        const safeHost = escapeHtml(data.hostName);
-        const safeTenant = escapeHtml(data.tenantName);
-        const safeTitle = escapeHtml(data.listingTitle);
-        const safeExpires = escapeHtml(data.holdExpiresAt);
+  bookingHoldRequest: (data: {
+    hostName: string;
+    tenantName: string;
+    listingTitle: string;
+    holdExpiresAt: string;
+  }) => {
+    const safeHost = escapeHtml(data.hostName);
+    const safeTenant = escapeHtml(data.tenantName);
+    const safeTitle = escapeHtml(data.listingTitle);
+    const safeExpires = escapeHtml(data.holdExpiresAt);
 
-        return {
-            subject: sanitizeSubject(`New hold request on ${data.listingTitle}`),
-            html: baseTemplate(`
+    return {
+      subject: sanitizeSubject(`New hold request on ${data.listingTitle}`),
+      html: baseTemplate(`
             <h2 style="margin: 0 0 16px; color: #18181b; font-size: 20px;">Hold Request</h2>
             <p style="margin: 0 0 24px; color: #52525b; font-size: 16px; line-height: 1.6;">
                 Hi ${safeHost},
@@ -510,23 +534,22 @@ export const emailTemplates = {
                     This hold expires on <strong>${safeExpires}</strong>.
                 </p>
             </div>
-            <a href="${buildAppHref('/bookings')}" style="display: inline-block; background-color: #18181b; color: #ffffff; text-decoration: none; padding: 14px 28px; border-radius: 8px; font-weight: 600; font-size: 14px;">
+            <a href="${buildAppHref("/bookings")}" style="display: inline-block; background-color: #18181b; color: #ffffff; text-decoration: none; padding: 14px 28px; border-radius: 8px; font-weight: 600; font-size: 14px;">
                 View Bookings
             </a>
         `),
-        };
-    },
+    };
+  },
 
-    bookingExpired: (data: {
-        tenantName: string;
-        listingTitle: string;
-    }) => {
-        const safeName = escapeHtml(data.tenantName);
-        const safeTitle = escapeHtml(data.listingTitle);
+  bookingExpired: (data: { tenantName: string; listingTitle: string }) => {
+    const safeName = escapeHtml(data.tenantName);
+    const safeTitle = escapeHtml(data.listingTitle);
 
-        return {
-            subject: sanitizeSubject(`Booking request expired for ${data.listingTitle}`),
-            html: baseTemplate(`
+    return {
+      subject: sanitizeSubject(
+        `Booking request expired for ${data.listingTitle}`
+      ),
+      html: baseTemplate(`
             <h2 style="margin: 0 0 16px; color: #18181b; font-size: 20px;">Booking Expired</h2>
             <p style="margin: 0 0 24px; color: #52525b; font-size: 16px; line-height: 1.6;">
                 Hi ${safeName},
@@ -534,23 +557,20 @@ export const emailTemplates = {
             <p style="margin: 0 0 24px; color: #52525b; font-size: 16px; line-height: 1.6;">
                 Your booking request for <strong>"${safeTitle}"</strong> has expired.
             </p>
-            <a href="${buildAppHref('/search')}" style="display: inline-block; background-color: #18181b; color: #ffffff; text-decoration: none; padding: 14px 28px; border-radius: 8px; font-weight: 600; font-size: 14px;">
+            <a href="${buildAppHref("/search")}" style="display: inline-block; background-color: #18181b; color: #ffffff; text-decoration: none; padding: 14px 28px; border-radius: 8px; font-weight: 600; font-size: 14px;">
                 Browse Listings
             </a>
         `),
-        };
-    },
+    };
+  },
 
-    bookingHoldExpired: (data: {
-        tenantName: string;
-        listingTitle: string;
-    }) => {
-        const safeName = escapeHtml(data.tenantName);
-        const safeTitle = escapeHtml(data.listingTitle);
+  bookingHoldExpired: (data: { tenantName: string; listingTitle: string }) => {
+    const safeName = escapeHtml(data.tenantName);
+    const safeTitle = escapeHtml(data.listingTitle);
 
-        return {
-            subject: sanitizeSubject(`Hold expired for ${data.listingTitle}`),
-            html: baseTemplate(`
+    return {
+      subject: sanitizeSubject(`Hold expired for ${data.listingTitle}`),
+      html: baseTemplate(`
             <h2 style="margin: 0 0 16px; color: #d97706; font-size: 20px;">Hold Expired</h2>
             <p style="margin: 0 0 24px; color: #52525b; font-size: 16px; line-height: 1.6;">
                 Hi ${safeName},
@@ -558,10 +578,10 @@ export const emailTemplates = {
             <p style="margin: 0 0 24px; color: #52525b; font-size: 16px; line-height: 1.6;">
                 Your hold on <strong>"${safeTitle}"</strong> has expired.
             </p>
-            <a href="${buildAppHref('/search')}" style="display: inline-block; background-color: #18181b; color: #ffffff; text-decoration: none; padding: 14px 28px; border-radius: 8px; font-weight: 600; font-size: 14px;">
+            <a href="${buildAppHref("/search")}" style="display: inline-block; background-color: #18181b; color: #ffffff; text-decoration: none; padding: 14px 28px; border-radius: 8px; font-weight: 600; font-size: 14px;">
                 Browse Listings
             </a>
         `),
-        };
-    },
+    };
+  },
 };

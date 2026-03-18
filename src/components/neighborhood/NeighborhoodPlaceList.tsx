@@ -1,4 +1,4 @@
-'use client';
+"use client";
 
 /**
  * NeighborhoodPlaceList - Custom POI list for Pro users
@@ -11,11 +11,11 @@
  * - Hover/click interactions for map sync
  */
 
-import { useCallback, useRef, KeyboardEvent } from 'react';
-import { Card, CardContent } from '@/components/ui/card';
-import { Badge } from '@/components/ui/badge';
-import { formatDistance } from '@/lib/geo/distance';
-import type { POI } from '@/lib/places/types';
+import { useCallback, useRef, KeyboardEvent } from "react";
+import { Card, CardContent } from "@/components/ui/card";
+import { Badge } from "@/components/ui/badge";
+import { formatDistance } from "@/lib/geo/distance";
+import type { POI } from "@/lib/places/types";
 
 interface NeighborhoodPlaceListProps {
   /** Array of POIs to display */
@@ -41,7 +41,7 @@ export function NeighborhoodPlaceList({
   onPlaceClick,
   onPlaceHover,
   isLoading,
-  className = '',
+  className = "",
 }: NeighborhoodPlaceListProps) {
   const listRef = useRef<HTMLDivElement>(null);
 
@@ -68,23 +68,24 @@ export function NeighborhoodPlaceList({
     (e: KeyboardEvent<HTMLDivElement>, currentIndex: number) => {
       if (!listRef.current) return;
 
-      const cards = listRef.current.querySelectorAll<HTMLElement>('[role="option"]');
+      const cards =
+        listRef.current.querySelectorAll<HTMLElement>('[role="option"]');
       let nextIndex = currentIndex;
 
       switch (e.key) {
-        case 'ArrowDown':
+        case "ArrowDown":
           e.preventDefault();
           nextIndex = Math.min(currentIndex + 1, pois.length - 1);
           break;
-        case 'ArrowUp':
+        case "ArrowUp":
           e.preventDefault();
           nextIndex = Math.max(currentIndex - 1, 0);
           break;
-        case 'Home':
+        case "Home":
           e.preventDefault();
           nextIndex = 0;
           break;
-        case 'End':
+        case "End":
           e.preventDefault();
           nextIndex = pois.length - 1;
           break;
@@ -102,7 +103,11 @@ export function NeighborhoodPlaceList({
 
   if (isLoading) {
     return (
-      <div className={`space-y-2 ${className}`} role="status" aria-label="Loading places">
+      <div
+        className={`space-y-2 ${className}`}
+        role="status"
+        aria-label="Loading places"
+      >
         {[...Array(3)].map((_, i) => (
           <PlaceCardSkeleton key={i} />
         ))}
@@ -124,7 +129,9 @@ export function NeighborhoodPlaceList({
       className={`space-y-2 ${className}`}
       role="listbox"
       aria-label="Nearby places"
-      aria-activedescendant={selectedPlaceId ? `place-${selectedPlaceId}` : undefined}
+      aria-activedescendant={
+        selectedPlaceId ? `place-${selectedPlaceId}` : undefined
+      }
     >
       {pois.map((poi, index) => (
         <PlaceCard
@@ -177,17 +184,15 @@ function PlaceCard({
 
   // Format the primary type for display
   const formattedType = primaryType
-    ? primaryType
-        .replace(/_/g, ' ')
-        .replace(/\b\w/g, (c) => c.toUpperCase())
+    ? primaryType.replace(/_/g, " ").replace(/\b\w/g, (c) => c.toUpperCase())
     : null;
 
   return (
     <Card
       className={`
         cursor-pointer transition-all duration-150
-        ${isSelected ? 'ring-2 ring-primary bg-primary/5' : ''}
-        ${isHovered && !isSelected ? 'bg-muted/50' : ''}
+        ${isSelected ? "ring-2 ring-primary bg-primary/5" : ""}
+        ${isHovered && !isSelected ? "bg-muted/50" : ""}
         hover:bg-muted/50
       `}
       role="option"
@@ -197,7 +202,7 @@ function PlaceCard({
       onMouseEnter={onMouseEnter}
       onMouseLeave={onMouseLeave}
       onKeyDown={(e) => {
-        if (e.key === 'Enter' || e.key === ' ') {
+        if (e.key === "Enter" || e.key === " ") {
           e.preventDefault();
           onClick();
         } else {
@@ -228,7 +233,10 @@ function PlaceCard({
                 </span>
               )}
               {openNow && (
-                <Badge variant="outline" className="text-[10px] px-1.5 py-0 h-4 text-green-600 border-green-300 dark:text-green-400 dark:border-green-700">
+                <Badge
+                  variant="outline"
+                  className="text-[10px] px-1.5 py-0 h-4 text-green-600 border-green-300 dark:text-green-400 dark:border-green-700"
+                >
                   Open
                 </Badge>
               )}
@@ -241,7 +249,10 @@ function PlaceCard({
                 <span className="text-xs text-muted-foreground">
                   {rating.toFixed(1)}
                   {userRatingsTotal && (
-                    <span className="opacity-70"> ({formatRatingCount(userRatingsTotal)})</span>
+                    <span className="opacity-70">
+                      {" "}
+                      ({formatRatingCount(userRatingsTotal)})
+                    </span>
                   )}
                 </span>
               </div>
@@ -249,7 +260,10 @@ function PlaceCard({
 
             {/* Address (truncated) */}
             {address && (
-              <p className="text-xs text-muted-foreground/70 truncate mt-1 ml-7" title={address}>
+              <p
+                className="text-xs text-muted-foreground/70 truncate mt-1 ml-7"
+                title={address}
+              >
                 {address}
               </p>
             )}
@@ -264,8 +278,7 @@ function PlaceCard({
             )}
             {walkMins !== undefined && (
               <div className="text-xs text-muted-foreground flex items-center justify-end gap-1">
-                <WalkIcon className="h-3 w-3" />
-                ~{walkMins} min
+                <WalkIcon className="h-3 w-3" />~{walkMins} min
               </div>
             )}
           </div>

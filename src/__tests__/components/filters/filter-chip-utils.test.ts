@@ -152,7 +152,7 @@ describe("filter-chip-utils", () => {
 
       it("handles repeated and CSV amenity params together", () => {
         const params = new URLSearchParams(
-          "amenities=Wifi&amenities=AC,Parking&amenities=Wifi",
+          "amenities=Wifi&amenities=AC,Parking&amenities=Wifi"
         );
         const chips = urlToFilterChips(params);
 
@@ -168,7 +168,7 @@ describe("filter-chip-utils", () => {
     describe("house rules handling", () => {
       it("creates separate chips for each rule", () => {
         const params = new URLSearchParams(
-          "houseRules=Pets%20allowed,Smoking%20allowed",
+          "houseRules=Pets%20allowed,Smoking%20allowed"
         );
         const chips = urlToFilterChips(params);
 
@@ -216,7 +216,7 @@ describe("filter-chip-utils", () => {
 
       it("supports repeated language params and deduplicates chips", () => {
         const params = new URLSearchParams(
-          "languages=en&languages=te,es&languages=te",
+          "languages=en&languages=te,es&languages=te"
         );
         const chips = urlToFilterChips(params);
 
@@ -272,7 +272,7 @@ describe("filter-chip-utils", () => {
     describe("preserved params are ignored", () => {
       it("does not create chips for location params", () => {
         const params = new URLSearchParams(
-          "q=downtown&lat=37.7749&lng=-122.4194&minLat=37.7&maxLat=37.8&minLng=-122.5&maxLng=-122.3",
+          "q=downtown&lat=37.7749&lng=-122.4194&minLat=37.7&maxLat=37.8&minLng=-122.5&maxLng=-122.3"
         );
         const chips = urlToFilterChips(params);
 
@@ -313,7 +313,7 @@ describe("filter-chip-utils", () => {
     describe("combined filters", () => {
       it("handles multiple filter types together", () => {
         const params = new URLSearchParams(
-          "minPrice=500&maxPrice=1500&amenities=Wifi,AC&roomType=Private%20Room&languages=en",
+          "minPrice=500&maxPrice=1500&amenities=Wifi,AC&roomType=Private%20Room&languages=en"
         );
         const chips = urlToFilterChips(params);
 
@@ -322,7 +322,7 @@ describe("filter-chip-utils", () => {
 
       it("handles filters mixed with preserved params", () => {
         const params = new URLSearchParams(
-          "q=downtown&minPrice=500&sort=newest&amenities=Wifi",
+          "q=downtown&minPrice=500&sort=newest&amenities=Wifi"
         );
         const chips = urlToFilterChips(params);
 
@@ -365,7 +365,7 @@ describe("filter-chip-utils", () => {
     describe("price-range removal", () => {
       it("removes both minPrice and maxPrice for price-range chip", () => {
         const params = new URLSearchParams(
-          "minPrice=500&maxPrice=1500&amenities=Wifi",
+          "minPrice=500&maxPrice=1500&amenities=Wifi"
         );
         const chip: FilterChipData = {
           id: "price-range",
@@ -455,7 +455,7 @@ describe("filter-chip-utils", () => {
 
       it("removes keyset pagination params when removing filter", () => {
         const params = new URLSearchParams(
-          "languages=en,te&cursor=abc&cursorStack=a,b&pageNumber=4",
+          "languages=en,te&cursor=abc&cursorStack=a,b&pageNumber=4"
         );
         const chip: FilterChipData = {
           id: "languages:te",
@@ -476,7 +476,7 @@ describe("filter-chip-utils", () => {
     describe("preserves other params", () => {
       it("preserves location and sort params", () => {
         const params = new URLSearchParams(
-          "q=downtown&sort=newest&amenities=Wifi",
+          "q=downtown&sort=newest&amenities=Wifi"
         );
         const chip: FilterChipData = {
           id: "amenities:Wifi",
@@ -496,7 +496,7 @@ describe("filter-chip-utils", () => {
   describe("clearAllFilters", () => {
     it("removes all filter params", () => {
       const params = new URLSearchParams(
-        "minPrice=500&maxPrice=1500&amenities=Wifi,AC&roomType=Private%20Room",
+        "minPrice=500&maxPrice=1500&amenities=Wifi,AC&roomType=Private%20Room"
       );
 
       const result = clearAllFilters(params);
@@ -506,7 +506,7 @@ describe("filter-chip-utils", () => {
 
     it("preserves location params", () => {
       const params = new URLSearchParams(
-        "q=downtown&lat=37.7&lng=-122.4&minPrice=500",
+        "q=downtown&lat=37.7&lng=-122.4&minPrice=500"
       );
 
       const result = clearAllFilters(params);
@@ -519,7 +519,7 @@ describe("filter-chip-utils", () => {
 
     it("preserves bounds params", () => {
       const params = new URLSearchParams(
-        "minLat=37.7&maxLat=37.8&minLng=-122.5&maxLng=-122.3&amenities=Wifi",
+        "minLat=37.7&maxLat=37.8&minLng=-122.5&maxLng=-122.3&amenities=Wifi"
       );
 
       const result = clearAllFilters(params);
@@ -551,7 +551,7 @@ describe("filter-chip-utils", () => {
 
     it("handles all preserved params combined", () => {
       const params = new URLSearchParams(
-        "q=downtown&lat=37.7&lng=-122.4&minLat=37.7&maxLat=37.8&minLng=-122.5&maxLng=-122.3&sort=newest&minPrice=500&amenities=Wifi&nearMatches=1",
+        "q=downtown&lat=37.7&lng=-122.4&minLat=37.7&maxLat=37.8&minLng=-122.5&maxLng=-122.3&sort=newest&minPrice=500&amenities=Wifi&nearMatches=1"
       );
 
       const result = clearAllFilters(params);
@@ -585,7 +585,7 @@ describe("filter-chip-utils", () => {
 
     it("returns false for nearMatches=false", () => {
       expect(hasAnyFilter(new URLSearchParams("nearMatches=false"))).toBe(
-        false,
+        false
       );
     });
 
@@ -601,5 +601,4 @@ describe("filter-chip-utils", () => {
       expect(hasAnyFilter(new URLSearchParams("maxPrice="))).toBe(false);
     });
   });
-
 });

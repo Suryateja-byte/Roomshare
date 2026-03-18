@@ -58,15 +58,20 @@ test.describe("Listing Management Journeys", () => {
           }
 
           // Save changes
-          const saveButton = page.getByRole("button", { name: /save|update/i }).first();
+          const saveButton = page
+            .getByRole("button", { name: /save|update/i })
+            .first();
           if (await saveButton.isVisible().catch(() => false)) {
             await saveButton.click();
 
             // Verify redirect and updated data
-            await page.waitForURL(/\/listings\/(?!.*edit)/, { timeout: 30000, waitUntil: "commit" });
-            await expect(page.getByRole("heading", { level: 1 }).first()).toContainText(
-              "Updated Listing Title",
-            );
+            await page.waitForURL(/\/listings\/(?!.*edit)/, {
+              timeout: 30000,
+              waitUntil: "commit",
+            });
+            await expect(
+              page.getByRole("heading", { level: 1 }).first()
+            ).toContainText("Updated Listing Title");
           }
         }
       }
@@ -101,15 +106,20 @@ test.describe("Listing Management Journeys", () => {
         await expect(confirmDialog).toBeVisible({ timeout: 5000 });
 
         // Confirm deletion
-        const confirmButton = confirmDialog.getByRole("button", {
-          name: /confirm|delete|yes/i,
-        }).first();
+        const confirmButton = confirmDialog
+          .getByRole("button", {
+            name: /confirm|delete|yes/i,
+          })
+          .first();
         if (await confirmButton.isVisible().catch(() => false)) {
           await confirmButton.click();
 
           // Should show success toast or listing removed
           await expect(
-            page.locator(selectors.toast).or(page.getByText(/deleted|removed/i)).first(),
+            page
+              .locator(selectors.toast)
+              .or(page.getByText(/deleted|removed/i))
+              .first()
           ).toBeVisible({ timeout: 10000 });
         }
       }
@@ -136,7 +146,8 @@ test.describe("Listing Management Journeys", () => {
         // Cancel the confirmation
         const cancelButton = page
           .locator(selectors.modal)
-          .getByRole("button", { name: /cancel|no|close/i }).first();
+          .getByRole("button", { name: /cancel|no|close/i })
+          .first();
 
         if (await cancelButton.isVisible().catch(() => false)) {
           await cancelButton.click();
@@ -212,7 +223,7 @@ test.describe("Listing Management Journeys", () => {
 
         // Check for drag-and-drop zone
         const dropZone = page.locator(
-          '[data-testid="drop-zone"], [class*="dropzone"], [class*="upload"]',
+          '[data-testid="drop-zone"], [class*="dropzone"], [class*="upload"]'
         );
         if (await dropZone.isVisible().catch(() => false)) {
           await expect(dropZone).toBeVisible();
@@ -237,11 +248,13 @@ test.describe("Listing Management Journeys", () => {
       await page.waitForLoadState("domcontentloaded");
 
       // Should see user's listings section
-      const listingsSection = page.getByRole("heading", {
-        name: /listings|my rooms/i,
-      }).first();
+      const listingsSection = page
+        .getByRole("heading", {
+          name: /listings|my rooms/i,
+        })
+        .first();
       await expect(
-        listingsSection.or(page.locator(selectors.listingCard).first()),
+        listingsSection.or(page.locator(selectors.listingCard).first())
       ).toBeVisible({
         timeout: 10000,
       });
@@ -292,7 +305,9 @@ test.describe("Listing Management Journeys", () => {
       }
 
       // Try to submit
-      const submitButton = page.getByRole("button", { name: /create|submit/i }).first();
+      const submitButton = page
+        .getByRole("button", { name: /create|submit/i })
+        .first();
       if (await submitButton.isVisible().catch(() => false)) {
         await submitButton.click();
 

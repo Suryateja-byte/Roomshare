@@ -23,7 +23,12 @@
  * Run: pnpm playwright test tests/e2e/pagination/pagination-sort-reset.spec.ts --project=chromium
  */
 
-import { test, expect, SF_BOUNDS, searchResultsContainer } from "../helpers/test-utils";
+import {
+  test,
+  expect,
+  SF_BOUNDS,
+  searchResultsContainer,
+} from "../helpers/test-utils";
 import {
   setupPaginationMock,
   createMockListing,
@@ -72,11 +77,7 @@ async function openDesktopSort(page: Page): Promise<Locator> {
  * Select a sort option via the desktop dropdown or mobile bottom sheet,
  * then wait for the URL to reflect the new sort param.
  */
-async function selectSort(
-  page: Page,
-  label: string,
-  expectedUrlParam: string,
-) {
+async function selectSort(page: Page, label: string, expectedUrlParam: string) {
   if (isMobileViewport(page)) {
     // Mobile: click the sort button to open the bottom sheet
     // Scope to mobile container to avoid strict mode violation when both
@@ -91,7 +92,7 @@ async function selectSort(
     const sheetHeading = page.locator('h3:has-text("Sort by")');
     await expect(sheetHeading).toBeVisible({ timeout: 5_000 });
 
-    const option = page.locator('button').filter({ hasText: label });
+    const option = page.locator("button").filter({ hasText: label });
     await expect(option.first()).toBeVisible({ timeout: 5_000 });
     await option.first().click();
   } else {
@@ -282,7 +283,7 @@ test.describe("5. Cursor Reset on Filter/Sort Change", () => {
 
     // Collect real listing IDs from the initial page
     const initialIds = await cards.evaluateAll((els) =>
-      els.map((el) => el.getAttribute("data-listing-id")).filter(Boolean),
+      els.map((el) => el.getAttribute("data-listing-id")).filter(Boolean)
     );
     expect(initialIds.length).toBeGreaterThanOrEqual(1);
 
@@ -295,7 +296,7 @@ test.describe("5. Cursor Reset on Filter/Sort Change", () => {
     // If seenIdsRef was stale from the previous mount, these IDs would be
     // filtered out by the dedup logic. Their presence proves the ref was reset.
     const remountedIds = await cards.evaluateAll((els) =>
-      els.map((el) => el.getAttribute("data-listing-id")).filter(Boolean),
+      els.map((el) => el.getAttribute("data-listing-id")).filter(Boolean)
     );
     expect(remountedIds.length).toBeGreaterThanOrEqual(1);
     expect(remountedIds.length).toBeLessThanOrEqual(12);
@@ -312,15 +313,17 @@ test.describe("5. Cursor Reset on Filter/Sort Change", () => {
     await loadMoreBtn.click();
 
     // Wait for mock items to render (they append asynchronously)
-    await expect(cards).not.toHaveCount(remountedIds.length, { timeout: 30_000 });
+    await expect(cards).not.toHaveCount(remountedIds.length, {
+      timeout: 30_000,
+    });
     const afterLoadMore = await cards.count();
     expect(afterLoadMore).toBeGreaterThan(remountedIds.length);
 
     const allIds = await cards.evaluateAll((els) =>
-      els.map((el) => el.getAttribute("data-listing-id")).filter(Boolean),
+      els.map((el) => el.getAttribute("data-listing-id")).filter(Boolean)
     );
     const mockIds = allIds.filter((id) =>
-      (id as string).startsWith("mock-listing-"),
+      (id as string).startsWith("mock-listing-")
     );
     expect(mockIds.length).toBeGreaterThan(0);
   });
@@ -445,9 +448,7 @@ test.describe("6. Sort + Pagination Order Preservation", () => {
   // -------------------------------------------------------------------------
   // 6.3: newest maintains date order (verified by DOM ordering of mock IDs)
   // -------------------------------------------------------------------------
-  test("6.3 load more with newest maintains result order", async ({
-    page,
-  }) => {
+  test("6.3 load more with newest maintains result order", async ({ page }) => {
     test.slow();
 
     await setupPaginationMock(page, { totalLoadMoreItems: 12 });
@@ -472,10 +473,10 @@ test.describe("6. Sort + Pagination Order Preservation", () => {
     // Mock IDs are sequential: mock-listing-000, mock-listing-001, ...
     // If the component reordered them, the sequence would break.
     const allIds = await cards.evaluateAll((els) =>
-      els.map((el) => el.getAttribute("data-listing-id")).filter(Boolean),
+      els.map((el) => el.getAttribute("data-listing-id")).filter(Boolean)
     );
     const mockIds = allIds.filter((id) =>
-      (id as string).startsWith("mock-listing-"),
+      (id as string).startsWith("mock-listing-")
     );
     expect(mockIds.length).toBe(12);
 
@@ -490,9 +491,7 @@ test.describe("6. Sort + Pagination Order Preservation", () => {
   // -------------------------------------------------------------------------
   // 6.4: rating maintains rating order (verified by DOM ordering of mock IDs)
   // -------------------------------------------------------------------------
-  test("6.4 load more with rating maintains result order", async ({
-    page,
-  }) => {
+  test("6.4 load more with rating maintains result order", async ({ page }) => {
     test.slow();
 
     await setupPaginationMock(page, { totalLoadMoreItems: 12 });
@@ -515,10 +514,10 @@ test.describe("6. Sort + Pagination Order Preservation", () => {
 
     // Verify mock items rendered in server-returned order (not reordered)
     const allIds = await cards.evaluateAll((els) =>
-      els.map((el) => el.getAttribute("data-listing-id")).filter(Boolean),
+      els.map((el) => el.getAttribute("data-listing-id")).filter(Boolean)
     );
     const mockIds = allIds.filter((id) =>
-      (id as string).startsWith("mock-listing-"),
+      (id as string).startsWith("mock-listing-")
     );
     expect(mockIds.length).toBe(12);
 
@@ -573,10 +572,10 @@ test.describe("6. Sort + Pagination Order Preservation", () => {
 
     // Previous mock listings from the sort=newest load-more should be gone
     const allIds = await cards.evaluateAll((els) =>
-      els.map((el) => el.getAttribute("data-listing-id")).filter(Boolean),
+      els.map((el) => el.getAttribute("data-listing-id")).filter(Boolean)
     );
     const mockIds = allIds.filter((id) =>
-      (id as string).startsWith("mock-listing-"),
+      (id as string).startsWith("mock-listing-")
     );
     expect(mockIds.length).toBe(0);
   });

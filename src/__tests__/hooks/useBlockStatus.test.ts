@@ -89,9 +89,7 @@ describe("useBlockStatus", () => {
 
   // 1. returns loading when IDs are undefined
   it("returns loading: true and null blockStatus when both IDs are undefined", () => {
-    const { result } = renderHook(() =>
-      useBlockStatus(undefined, undefined)
-    );
+    const { result } = renderHook(() => useBlockStatus(undefined, undefined));
 
     // Synchronously: loading = true because the effect hasn't settled yet.
     // (When otherUserId is undefined the hook short-circuits and calls
@@ -157,10 +155,7 @@ describe("useBlockStatus", () => {
     mockGetBlockStatus.mockResolvedValue("blocker");
 
     act(() => {
-      firePostgresEvent(
-        { blockerId: CURRENT_USER, blockedId: OTHER_USER },
-        {}
-      );
+      firePostgresEvent({ blockerId: CURRENT_USER, blockedId: OTHER_USER }, {});
     });
 
     await waitFor(() => {
@@ -180,7 +175,10 @@ describe("useBlockStatus", () => {
 
     act(() => {
       // DELETE events have null/undefined payload.new; the deleted row is in payload.old
-      firePostgresEvent(null, { blockerId: OTHER_USER, blockedId: CURRENT_USER });
+      firePostgresEvent(null, {
+        blockerId: OTHER_USER,
+        blockedId: CURRENT_USER,
+      });
     });
 
     await waitFor(() => {

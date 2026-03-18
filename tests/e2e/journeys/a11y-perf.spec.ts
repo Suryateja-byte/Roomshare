@@ -9,9 +9,9 @@ import { test, expect, SF_BOUNDS, searchResultsContainer } from "../helpers";
 /** Wait for search results to load by checking for heading */
 async function waitForResults(page: import("@playwright/test").Page) {
   await page.waitForLoadState("domcontentloaded");
-  await expect(
-    page.getByRole("heading", { level: 1 }).first(),
-  ).toBeVisible({ timeout: 30000 });
+  await expect(page.getByRole("heading", { level: 1 }).first()).toBeVisible({
+    timeout: 30000,
+  });
 }
 
 test.describe("Accessibility & Performance", () => {
@@ -37,7 +37,9 @@ test.describe("Accessibility & Performance", () => {
       const container = searchResultsContainer(page);
 
       // Listing cards have article role (DOM attribute check)
-      const articleCard = container.locator('[role="article"][data-testid="listing-card"]').first();
+      const articleCard = container
+        .locator('[role="article"][data-testid="listing-card"]')
+        .first();
       await articleCard.waitFor({ state: "attached", timeout: 10000 });
 
       // Article card has aria-label with price info
@@ -54,7 +56,9 @@ test.describe("Accessibility & Performance", () => {
       await waitForResults(page);
 
       const container = searchResultsContainer(page);
-      const articles = container.locator('[role="article"][data-testid="listing-card"]');
+      const articles = container.locator(
+        '[role="article"][data-testid="listing-card"]'
+      );
       await articles.first().waitFor({ state: "attached", timeout: 10000 });
       expect(await articles.count()).toBeGreaterThan(0);
 
@@ -66,7 +70,10 @@ test.describe("Accessibility & Performance", () => {
   });
 
   test.describe("Keyboard navigation", () => {
-    test("Tab navigates through interactive elements", async ({ page, nav }) => {
+    test("Tab navigates through interactive elements", async ({
+      page,
+      nav,
+    }) => {
       await nav.goToSearch({ bounds: SF_BOUNDS });
       await waitForResults(page);
 
@@ -75,12 +82,17 @@ test.describe("Accessibility & Performance", () => {
         await page.keyboard.press("Tab");
       }
 
-      const focusedTag = await page.evaluate(() => document.activeElement?.tagName);
+      const focusedTag = await page.evaluate(
+        () => document.activeElement?.tagName
+      );
       expect(focusedTag).toBeTruthy();
       expect(focusedTag).not.toBe("BODY");
     });
 
-    test("image carousel has keyboard-accessible controls", async ({ page, nav }) => {
+    test("image carousel has keyboard-accessible controls", async ({
+      page,
+      nav,
+    }) => {
       await nav.goToSearch({ bounds: SF_BOUNDS });
       await waitForResults(page);
 
@@ -88,7 +100,9 @@ test.describe("Accessibility & Performance", () => {
       const container = searchResultsContainer(page);
 
       // Verify carousel regions exist with proper ARIA
-      const carousel = container.locator('[aria-roledescription="carousel"]').first();
+      const carousel = container
+        .locator('[aria-roledescription="carousel"]')
+        .first();
       await carousel.waitFor({ state: "attached", timeout: 10000 });
 
       // Carousel should have tabindex for keyboard access
@@ -128,20 +142,23 @@ test.describe("Accessibility & Performance", () => {
       // Check for load-more button and click it to trigger performance.mark('load-more-start')
       const loadMore = page.getByRole("button", { name: /load more/i });
       if (await loadMore.isVisible({ timeout: 5000 }).catch(() => false)) {
-        const countBefore = await page.locator('[data-testid="listing-card"]').count();
+        const countBefore = await page
+          .locator('[data-testid="listing-card"]')
+          .count();
         await loadMore.click();
         // Wait for new cards to appear (Server Actions use /_next POST, not /api/search)
         try {
-          await expect.poll(
-            () => page.locator('[data-testid="listing-card"]').count(),
-            { timeout: 10_000 },
-          ).toBeGreaterThan(countBefore);
+          await expect
+            .poll(() => page.locator('[data-testid="listing-card"]').count(), {
+              timeout: 10_000,
+            })
+            .toBeGreaterThan(countBefore);
         } catch {
           // Load more may not produce new results if all data is on page 1
         }
 
-        const marks = await page.evaluate(() =>
-          performance.getEntriesByName("load-more-start").length,
+        const marks = await page.evaluate(
+          () => performance.getEntriesByName("load-more-start").length
         );
         expect(marks).toBeGreaterThanOrEqual(1);
       } else {
@@ -164,7 +181,9 @@ test.describe("Accessibility & Performance", () => {
       await page.waitForTimeout(2000);
 
       const hasHorizontalScroll = await page.evaluate(
-        () => document.documentElement.scrollWidth > document.documentElement.clientWidth,
+        () =>
+          document.documentElement.scrollWidth >
+          document.documentElement.clientWidth
       );
       expect(hasHorizontalScroll).toBe(false);
     });
@@ -179,7 +198,9 @@ test.describe("Accessibility & Performance", () => {
       const container = searchResultsContainer(page);
 
       // next/image elements inside carousel have sizes
-      const carouselImg = container.locator('[aria-roledescription="carousel"] img').first();
+      const carouselImg = container
+        .locator('[aria-roledescription="carousel"] img')
+        .first();
       await carouselImg.waitFor({ state: "attached", timeout: 10000 });
 
       const sizes = await carouselImg.getAttribute("sizes");

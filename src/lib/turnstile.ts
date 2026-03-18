@@ -8,8 +8,7 @@
 
 import { logger } from "@/lib/logger";
 
-const VERIFY_URL =
-  "https://challenges.cloudflare.com/turnstile/v0/siteverify";
+const VERIFY_URL = "https://challenges.cloudflare.com/turnstile/v0/siteverify";
 const TIMEOUT_MS = 5_000;
 
 interface TurnstileResult {
@@ -37,7 +36,7 @@ export function isTurnstileEnabled(): boolean {
  */
 export async function verifyTurnstileToken(
   token: string | undefined | null,
-  remoteip?: string,
+  remoteip?: string
 ): Promise<TurnstileResult> {
   // Kill switch bypass
   if (!isTurnstileEnabled()) {

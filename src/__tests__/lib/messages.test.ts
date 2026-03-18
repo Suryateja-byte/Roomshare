@@ -44,7 +44,7 @@ const CONVERSATION_ID = "conv-789";
 
 /** Factory for a valid accessible conversation */
 const makeConversation = (
-  overrides: Partial<AccessibleConversation> = {},
+  overrides: Partial<AccessibleConversation> = {}
 ): AccessibleConversation => ({
   id: CONVERSATION_ID,
   deletedAt: null,
@@ -74,7 +74,7 @@ describe("getAccessibleConversation", () => {
             where: { userId: USER_ID },
           }),
         }),
-      }),
+      })
     );
   });
 
@@ -166,10 +166,7 @@ describe("listConversationMessages", () => {
       conversationId: CONVERSATION_ID,
       deletedAt: null,
     });
-    expect(callArgs.orderBy).toEqual([
-      { createdAt: "asc" },
-      { id: "asc" },
-    ]);
+    expect(callArgs.orderBy).toEqual([{ createdAt: "asc" }, { id: "asc" }]);
   });
 
   it("returns messages after cursor when afterMessageId provided", async () => {
@@ -229,7 +226,7 @@ describe("listConversationMessages", () => {
     expect(mockMessageFindUnique).toHaveBeenCalledWith(
       expect.objectContaining({
         where: { id: "msg-1" },
-      }),
+      })
     );
   });
 
@@ -275,7 +272,7 @@ describe("markConversationMessagesAsReadForUser", () => {
 
     const result = await markConversationMessagesAsReadForUser(
       CONVERSATION_ID,
-      USER_ID,
+      USER_ID
     );
 
     expect(result).toEqual({ count: 3 });
@@ -312,7 +309,7 @@ describe("markConversationMessagesAsReadForUser", () => {
 
     const result = await markConversationMessagesAsReadForUser(
       CONVERSATION_ID,
-      USER_ID,
+      USER_ID
     );
 
     expect(result.count).toBe(0);

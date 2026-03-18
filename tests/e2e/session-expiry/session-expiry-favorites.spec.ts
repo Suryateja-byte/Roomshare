@@ -12,7 +12,14 @@
  *   FavoriteButton.tsx:73 — aria-pressed tracks saved state
  */
 
-import { test, expect, tags, SF_BOUNDS, searchResultsContainer, selectors } from "../helpers";
+import {
+  test,
+  expect,
+  tags,
+  SF_BOUNDS,
+  searchResultsContainer,
+  selectors,
+} from "../helpers";
 import { expireSession, mockApi401, expectLoginRedirect } from "../helpers";
 
 test.describe("Session Expiry: Favorites", () => {
@@ -27,7 +34,7 @@ test.describe("Session Expiry: Favorites", () => {
   }) => {
     // Navigate to search results to find a listing with a favorite button
     await page.goto(
-      `/search?minLat=${SF_BOUNDS.minLat}&maxLat=${SF_BOUNDS.maxLat}&minLng=${SF_BOUNDS.minLng}&maxLng=${SF_BOUNDS.maxLng}`,
+      `/search?minLat=${SF_BOUNDS.minLat}&maxLat=${SF_BOUNDS.maxLat}&minLng=${SF_BOUNDS.minLng}&maxLng=${SF_BOUNDS.maxLng}`
     );
     await page.waitForLoadState("domcontentloaded");
 
@@ -51,7 +58,7 @@ test.describe("Session Expiry: Favorites", () => {
     // Find the favorite/save button
     const favBtn = page
       .locator(
-        'button[aria-label="Save listing"], button[aria-label="Remove from saved"]',
+        'button[aria-label="Save listing"], button[aria-label="Remove from saved"]'
       )
       .first();
     if (!(await favBtn.isVisible({ timeout: 5000 }).catch(() => false))) {
@@ -71,7 +78,7 @@ test.describe("Session Expiry: Favorites", () => {
   }) => {
     // Navigate to a listing detail page
     await page.goto(
-      `/search?minLat=${SF_BOUNDS.minLat}&maxLat=${SF_BOUNDS.maxLat}&minLng=${SF_BOUNDS.minLng}&maxLng=${SF_BOUNDS.maxLng}`,
+      `/search?minLat=${SF_BOUNDS.minLat}&maxLat=${SF_BOUNDS.maxLat}&minLng=${SF_BOUNDS.minLng}&maxLng=${SF_BOUNDS.maxLng}`
     );
     await page.waitForLoadState("domcontentloaded");
 
@@ -87,9 +94,7 @@ test.describe("Session Expiry: Favorites", () => {
     await page.waitForURL(/\/listings\/.+/);
 
     // Find an unsaved favorite button
-    const favBtn = page
-      .locator('button[aria-label="Save listing"]')
-      .first();
+    const favBtn = page.locator('button[aria-label="Save listing"]').first();
     if (!(await favBtn.isVisible({ timeout: 5000 }).catch(() => false))) {
       test.skip(true, "No unsaved favorite button found");
       return;

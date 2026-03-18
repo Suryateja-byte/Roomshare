@@ -18,7 +18,14 @@
  * - Viewport validation works in both modes (client-side check)
  */
 
-import { test, expect, tags, timeouts, waitForMapReady, waitForDebounceAndResponse } from "../helpers";
+import {
+  test,
+  expect,
+  tags,
+  timeouts,
+  waitForMapReady,
+  waitForDebounceAndResponse,
+} from "../helpers";
 
 test.describe("Map Error Handling", () => {
   // Map tests run as anonymous user with desktop viewport
@@ -35,7 +42,10 @@ test.describe("Map Error Handling", () => {
     test.slow(); // Map tests need extra time for WebGL rendering in CI
     const projectName = testInfo.project.name;
     if (projectName.includes("Mobile")) {
-      test.skip(true, "Map tests require desktop viewport - skipping on mobile");
+      test.skip(
+        true,
+        "Map tests require desktop viewport - skipping on mobile"
+      );
     }
     if (projectName === "webkit") {
       test.skip(true, "Map tests have timing issues on webkit - skipping");
@@ -46,7 +56,7 @@ test.describe("Map Error Handling", () => {
   async function waitForMapBanner(
     page: import("@playwright/test").Page,
     textPattern: RegExp,
-    options: { timeout?: number; role?: "alert" | "status" } = {},
+    options: { timeout?: number; role?: "alert" | "status" } = {}
   ) {
     const { timeout = timeouts.action, role = "alert" } = options;
 
@@ -93,9 +103,13 @@ test.describe("Map Error Handling", () => {
 
       // The component clamps the viewport and shows zoom-in message
       // as a role="status" info banner (not an error alert)
-      await waitForMapBanner(page, /Zoom in further to load listings in this area/i, {
-        role: "status",
-      });
+      await waitForMapBanner(
+        page,
+        /Zoom in further to load listings in this area/i,
+        {
+          role: "status",
+        }
+      );
     });
 
     test(`${tags.anon} - Clears info banner when viewport becomes valid`, async ({
@@ -105,17 +119,23 @@ test.describe("Map Error Handling", () => {
       await page.goto("/search?minLng=-100&maxLng=50&minLat=-10&maxLat=60");
 
       // Should show info banner initially
-      await waitForMapBanner(page, /Zoom in further to load listings in this area/i, {
-        role: "status",
-      });
+      await waitForMapBanner(
+        page,
+        /Zoom in further to load listings in this area/i,
+        {
+          role: "status",
+        }
+      );
 
       // Navigate to valid viewport (within max span limits)
       await page.goto(
-        "/search?minLng=-122.5&maxLng=-122.0&minLat=37.5&maxLat=38.0",
+        "/search?minLng=-122.5&maxLng=-122.0&minLat=37.5&maxLat=38.0"
       );
 
       // Check that info message is no longer visible
-      const infoBanner = page.getByText(/Zoom in further to load listings in this area/i);
+      const infoBanner = page.getByText(
+        /Zoom in further to load listings in this area/i
+      );
       await expect(infoBanner).not.toBeVisible({ timeout: timeouts.action });
     });
   });
@@ -135,7 +155,7 @@ test.describe("Map Error Handling", () => {
 
       // Navigate to search with valid bounds
       await page.goto(
-        "/search?minLng=-122.5&maxLng=-122.0&minLat=37.5&maxLat=38.0",
+        "/search?minLng=-122.5&maxLng=-122.0&minLat=37.5&maxLat=38.0"
       );
 
       // Wait for hydration
@@ -161,7 +181,7 @@ test.describe("Map Error Handling", () => {
       });
 
       await page.goto(
-        "/search?minLng=-122.5&maxLng=-122.0&minLat=37.5&maxLat=38.0",
+        "/search?minLng=-122.5&maxLng=-122.0&minLat=37.5&maxLat=38.0"
       );
 
       // Wait for hydration
@@ -199,7 +219,7 @@ test.describe("Map Error Handling", () => {
       });
 
       await page.goto(
-        "/search?minLng=-122.5&maxLng=-122.0&minLat=37.5&maxLat=38.0",
+        "/search?minLng=-122.5&maxLng=-122.0&minLat=37.5&maxLat=38.0"
       );
 
       // Wait for hydration
@@ -230,7 +250,7 @@ test.describe("Map Error Handling", () => {
 
       // Navigate to search with valid bounds
       await page.goto(
-        "/search?minLng=-122.5&maxLng=-122.0&minLat=37.5&maxLat=38.0",
+        "/search?minLng=-122.5&maxLng=-122.0&minLat=37.5&maxLat=38.0"
       );
 
       // Wait for initial load
@@ -318,11 +338,16 @@ test.describe("Map Error Handling", () => {
           // Third-party resource loading failures (e.g. fonts, tiles) returning 403/404
           !err.includes("Failed to load resource") &&
           !err.includes("403") &&
-          !err.includes("404"),
+          !err.includes("404")
       );
 
       // Should have no unexpected console errors (soft assertion to surface issues without blocking)
-      expect.soft(unexpectedErrors, `Unexpected console errors: ${unexpectedErrors.join(', ')}`).toEqual([]);
+      expect
+        .soft(
+          unexpectedErrors,
+          `Unexpected console errors: ${unexpectedErrors.join(", ")}`
+        )
+        .toEqual([]);
     });
   });
 
@@ -332,7 +357,10 @@ test.describe("Map Error Handling", () => {
       page,
     }) => {
       // Track all map-listings API requests
-      const mapListingRequests: { url: string; bounds: Record<string, string> }[] = [];
+      const mapListingRequests: {
+        url: string;
+        bounds: Record<string, string>;
+      }[] = [];
 
       await page.route("**/api/map-listings*", async (route) => {
         const url = route.request().url();
@@ -361,12 +389,15 @@ test.describe("Map Error Handling", () => {
         maxLat: "38.0",
       };
       await page.goto(
-        `/search?minLng=${initialBounds.minLng}&maxLng=${initialBounds.maxLng}&minLat=${initialBounds.minLat}&maxLat=${initialBounds.maxLat}`,
+        `/search?minLng=${initialBounds.minLng}&maxLng=${initialBounds.maxLng}&minLat=${initialBounds.minLat}&maxLat=${initialBounds.maxLat}`
       );
 
       // Wait for initial load and API call
       await page.waitForLoadState("domcontentloaded");
-      await waitForDebounceAndResponse(page, { debounceMs: 2000, responsePattern: '/api/map-listings' });
+      await waitForDebounceAndResponse(page, {
+        debounceMs: 2000,
+        responsePattern: "/api/map-listings",
+      });
 
       // Step 2: Verify initial API call was made with correct bounds
       expect(mapListingRequests.length).toBeGreaterThanOrEqual(1);
@@ -387,10 +418,13 @@ test.describe("Map Error Handling", () => {
         maxLat: "38.1",
       };
       await page.goto(
-        `/search?minLng=${pannedBounds.minLng}&maxLng=${pannedBounds.maxLng}&minLat=${pannedBounds.minLat}&maxLat=${pannedBounds.maxLat}`,
+        `/search?minLng=${pannedBounds.minLng}&maxLng=${pannedBounds.maxLng}&minLat=${pannedBounds.minLat}&maxLat=${pannedBounds.maxLat}`
       );
 
-      await waitForDebounceAndResponse(page, { debounceMs: 2000, responsePattern: '/api/map-listings' });
+      await waitForDebounceAndResponse(page, {
+        debounceMs: 2000,
+        responsePattern: "/api/map-listings",
+      });
 
       // Step 5: Verify new API request was made with updated bounds
       expect(mapListingRequests.length).toBeGreaterThan(requestCountBeforePan);
@@ -419,7 +453,7 @@ test.describe("Map Error Handling", () => {
 
       // Navigate to initial position
       await page.goto(
-        "/search?minLng=-122.5&maxLng=-122.0&minLat=37.5&maxLat=38.0",
+        "/search?minLng=-122.5&maxLng=-122.0&minLat=37.5&maxLat=38.0"
       );
       await page.waitForLoadState("domcontentloaded");
 
@@ -448,7 +482,10 @@ test.describe("Map Error Handling", () => {
       }
 
       // Wait for debounce to settle and final response
-      await waitForDebounceAndResponse(page, { debounceMs: 2000, responsePattern: '/api/map-listings' });
+      await waitForDebounceAndResponse(page, {
+        debounceMs: 2000,
+        responsePattern: "/api/map-listings",
+      });
 
       // Count new requests after rapid pans
       const newRequestCount = mapListingRequests.length - initialRequestCount;

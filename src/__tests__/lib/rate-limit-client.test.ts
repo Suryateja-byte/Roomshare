@@ -10,8 +10,12 @@ import { FetchTimeoutError } from "@/lib/fetch-with-timeout";
 // Mock global fetch — save original and restore in afterAll to prevent cross-file leaks
 const originalFetch = global.fetch;
 const mockFetch = jest.fn();
-beforeAll(() => { global.fetch = mockFetch; });
-afterAll(() => { global.fetch = originalFetch; });
+beforeAll(() => {
+  global.fetch = mockFetch;
+});
+afterAll(() => {
+  global.fetch = originalFetch;
+});
 
 beforeEach(() => {
   resetThrottle();
@@ -33,7 +37,7 @@ describe("rate-limit-client", () => {
       });
 
       await expect(rateLimitedFetch("/api/test")).rejects.toThrow(
-        RateLimitError,
+        RateLimitError
       );
       expect(isThrottled()).toBe(true);
       expect(getRetryAfterMs()).toBeGreaterThan(0);
@@ -48,7 +52,7 @@ describe("rate-limit-client", () => {
       });
 
       await expect(rateLimitedFetch("/api/test")).rejects.toThrow(
-        RateLimitError,
+        RateLimitError
       );
 
       // Wait for backoff to expire
@@ -111,7 +115,7 @@ describe("rate-limit-client", () => {
         // Should be roughly 10s
         expect((err as RateLimitError).retryAfterMs).toBeGreaterThan(5000);
         expect((err as RateLimitError).retryAfterMs).toBeLessThanOrEqual(
-          11_000,
+          11_000
         );
       }
     });
@@ -138,13 +142,13 @@ describe("rate-limit-client", () => {
         headers: new Headers({ "Retry-After": "60" }),
       });
       await expect(rateLimitedFetch("/api/first")).rejects.toThrow(
-        RateLimitError,
+        RateLimitError
       );
 
       // Second: should not call fetch at all
       mockFetch.mockClear();
       await expect(rateLimitedFetch("/api/second")).rejects.toThrow(
-        RateLimitError,
+        RateLimitError
       );
       expect(mockFetch).not.toHaveBeenCalled();
     });
@@ -165,9 +169,11 @@ describe("rate-limit-client", () => {
         (_url: string, init: { signal: AbortSignal }) =>
           new Promise((_, reject) => {
             init.signal.addEventListener("abort", () => {
-              reject(new DOMException("The operation was aborted.", "AbortError"));
+              reject(
+                new DOMException("The operation was aborted.", "AbortError")
+              );
             });
-          }),
+          })
       );
 
       let caughtError: unknown;
@@ -189,9 +195,11 @@ describe("rate-limit-client", () => {
         (_url: string, init: { signal: AbortSignal }) =>
           new Promise((_, reject) => {
             init.signal.addEventListener("abort", () => {
-              reject(new DOMException("The operation was aborted.", "AbortError"));
+              reject(
+                new DOMException("The operation was aborted.", "AbortError")
+              );
             });
-          }),
+          })
       );
 
       const promise = rateLimitedFetch("/api/test", {
@@ -221,7 +229,7 @@ describe("rate-limit-client", () => {
       });
 
       await expect(
-        rateLimitedFetch("/api/test", { timeout: 15_000 }),
+        rateLimitedFetch("/api/test", { timeout: 15_000 })
       ).rejects.toThrow(RateLimitError);
     });
 
@@ -231,12 +239,14 @@ describe("rate-limit-client", () => {
         status: 429,
         headers: new Headers({ "Retry-After": "60" }),
       });
-      await expect(rateLimitedFetch("/api/first")).rejects.toThrow(RateLimitError);
+      await expect(rateLimitedFetch("/api/first")).rejects.toThrow(
+        RateLimitError
+      );
 
       // Second call: throttled, never reaches fetch or timeout
       mockFetch.mockClear();
       await expect(
-        rateLimitedFetch("/api/second", { timeout: 15_000 }),
+        rateLimitedFetch("/api/second", { timeout: 15_000 })
       ).rejects.toThrow(RateLimitError);
       expect(mockFetch).not.toHaveBeenCalled();
     });
@@ -261,9 +271,11 @@ describe("rate-limit-client", () => {
         (_url: string, init: { signal: AbortSignal }) =>
           new Promise((_, reject) => {
             init.signal.addEventListener("abort", () => {
-              reject(new DOMException("The operation was aborted.", "AbortError"));
+              reject(
+                new DOMException("The operation was aborted.", "AbortError")
+              );
             });
-          }),
+          })
       );
 
       const promise = rateLimitedFetch("/api/test", {
@@ -287,9 +299,11 @@ describe("rate-limit-client", () => {
         (_url: string, init: { signal: AbortSignal }) =>
           new Promise((_, reject) => {
             init.signal.addEventListener("abort", () => {
-              reject(new DOMException("The operation was aborted.", "AbortError"));
+              reject(
+                new DOMException("The operation was aborted.", "AbortError")
+              );
             });
-          }),
+          })
       );
 
       // This test verifies the FetchTimeoutError includes the default timeout value (15000)
@@ -316,7 +330,7 @@ describe("rate-limit-client", () => {
       // setTimeout should NOT be called for timeout (only for other internal timers)
       // The function skips setTimeout when timeout <= 0
       const timeoutCalls = setTimeoutSpy.mock.calls.filter(
-        (call) => typeof call[1] === "number" && call[1] === 0,
+        (call) => typeof call[1] === "number" && call[1] === 0
       );
       // No timeout scheduled with value 0 (since we skip when timeout <= 0)
       expect(timeoutCalls).toHaveLength(0);

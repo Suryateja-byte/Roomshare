@@ -133,7 +133,7 @@ function isValidCursor(obj: unknown): obj is KeysetCursor {
  */
 export function createCursorFromItem(
   item: { id: string; price?: number; createdAt?: Date | string },
-  sort: KeysetSort,
+  sort: KeysetSort
 ): string {
   let sortValue: number | string;
 
@@ -209,7 +209,7 @@ export type PaginationResult<T> =
  * Type guard to check if a result is keyset-paginated.
  */
 export function isKeysetResult<T>(
-  result: PaginationResult<T>,
+  result: PaginationResult<T>
 ): result is KeysetPaginatedResult<T> {
   return "nextCursor" in result;
 }
@@ -218,7 +218,7 @@ export function isKeysetResult<T>(
  * Type guard to check if a result is offset-paginated.
  */
 export function isOffsetResult<T>(
-  result: PaginationResult<T>,
+  result: PaginationResult<T>
 ): result is OffsetPaginatedResult<T> {
   return "page" in result && "total" in result;
 }

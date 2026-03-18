@@ -53,7 +53,8 @@ describe("getServerEnv() validation behavior", () => {
     }
 
     // Validation must happen: console.error (production) or console.warn (dev) or exception
-    const validated = errorSpy.mock.calls.length > 0 || warnSpy.mock.calls.length > 0 || threw;
+    const validated =
+      errorSpy.mock.calls.length > 0 || warnSpy.mock.calls.length > 0 || threw;
     expect(validated).toBe(true);
 
     errorSpy.mockRestore();

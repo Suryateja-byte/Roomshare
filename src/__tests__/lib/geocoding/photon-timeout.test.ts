@@ -1,44 +1,45 @@
 const mockFetchWithTimeout = jest.fn();
-jest.mock('@/lib/fetch-with-timeout', () => ({
+jest.mock("@/lib/fetch-with-timeout", () => ({
   fetchWithTimeout: (...args: unknown[]) => mockFetchWithTimeout(...args),
-  FetchTimeoutError: jest.requireActual('@/lib/fetch-with-timeout').FetchTimeoutError,
+  FetchTimeoutError: jest.requireActual("@/lib/fetch-with-timeout")
+    .FetchTimeoutError,
 }));
 
-import { searchPhoton } from '@/lib/geocoding/photon';
-import { FetchTimeoutError } from '@/lib/fetch-with-timeout';
+import { searchPhoton } from "@/lib/geocoding/photon";
+import { FetchTimeoutError } from "@/lib/fetch-with-timeout";
 
-describe('Photon adapter timeout', () => {
+describe("Photon adapter timeout", () => {
   beforeEach(() => jest.clearAllMocks());
 
-  it('uses fetchWithTimeout with 8000ms', async () => {
+  it("uses fetchWithTimeout with 8000ms", async () => {
     mockFetchWithTimeout.mockResolvedValue({
       ok: true,
-      json: async () => ({ type: 'FeatureCollection', features: [] }),
+      json: async () => ({ type: "FeatureCollection", features: [] }),
     });
-    await searchPhoton('test');
+    await searchPhoton("test");
     expect(mockFetchWithTimeout).toHaveBeenCalledWith(
-      expect.stringContaining('photon.komoot.io/api'),
-      expect.objectContaining({ timeout: 8000 }),
+      expect.stringContaining("photon.komoot.io/api"),
+      expect.objectContaining({ timeout: 8000 })
     );
   });
 
-  it('passes caller signal through', async () => {
+  it("passes caller signal through", async () => {
     const controller = new AbortController();
     mockFetchWithTimeout.mockResolvedValue({
       ok: true,
-      json: async () => ({ type: 'FeatureCollection', features: [] }),
+      json: async () => ({ type: "FeatureCollection", features: [] }),
     });
-    await searchPhoton('test', { signal: controller.signal });
+    await searchPhoton("test", { signal: controller.signal });
     expect(mockFetchWithTimeout).toHaveBeenCalledWith(
       expect.any(String),
-      expect.objectContaining({ signal: controller.signal }),
+      expect.objectContaining({ signal: controller.signal })
     );
   });
 
-  it('propagates FetchTimeoutError', async () => {
+  it("propagates FetchTimeoutError", async () => {
     mockFetchWithTimeout.mockRejectedValue(
-      new FetchTimeoutError('https://photon.komoot.io/api?q=test', 8000),
+      new FetchTimeoutError("https://photon.komoot.io/api?q=test", 8000)
     );
-    await expect(searchPhoton('test')).rejects.toThrow(FetchTimeoutError);
+    await expect(searchPhoton("test")).rejects.toThrow(FetchTimeoutError);
   });
 });

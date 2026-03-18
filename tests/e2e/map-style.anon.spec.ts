@@ -14,7 +14,13 @@
  *   pnpm playwright test tests/e2e/map-style.anon.spec.ts --project=chromium-anon --headed
  */
 
-import { test, expect, SF_BOUNDS, timeouts, waitForMapReady } from "./helpers/test-utils";
+import {
+  test,
+  expect,
+  SF_BOUNDS,
+  timeouts,
+  waitForMapReady,
+} from "./helpers/test-utils";
 
 const boundsQS = `minLat=${SF_BOUNDS.minLat}&maxLat=${SF_BOUNDS.maxLat}&minLng=${SF_BOUNDS.minLng}&maxLng=${SF_BOUNDS.maxLng}`;
 const SEARCH_URL = `/search?${boundsQS}`;
@@ -27,7 +33,10 @@ function getStyleContainer(page: import("@playwright/test").Page) {
 }
 
 // Helper: get specific style button within the radiogroup
-function getStyleButton(page: import("@playwright/test").Page, style: "Standard" | "Satellite" | "Transit") {
+function getStyleButton(
+  page: import("@playwright/test").Page,
+  style: "Standard" | "Satellite" | "Transit"
+) {
   return getStyleContainer(page).getByRole("radio", { name: style });
 }
 
@@ -41,29 +50,42 @@ async function waitForSearchPage(page: import("@playwright/test").Page) {
 }
 
 // Helper: check if map style controls are rendered (depends on WebGL/map load)
-async function mapStyleControlsAvailable(page: import("@playwright/test").Page): Promise<boolean> {
+async function mapStyleControlsAvailable(
+  page: import("@playwright/test").Page
+): Promise<boolean> {
   const container = getStyleContainer(page);
   return (await container.count()) > 0;
 }
 
 // Helper: clear sessionStorage before test to ensure clean state
 async function clearMapStyleStorage(page: import("@playwright/test").Page) {
-  await page.evaluate((key) => sessionStorage.removeItem(key), SESSION_STORAGE_KEY);
+  await page.evaluate(
+    (key) => sessionStorage.removeItem(key),
+    SESSION_STORAGE_KEY
+  );
 }
 
 // Helper: poll sessionStorage until it matches the expected value
 async function expectSessionStorage(
   page: import("@playwright/test").Page,
-  expectedValue: string,
+  expectedValue: string
 ) {
-  await expect.poll(
-    () => page.evaluate((key) => sessionStorage.getItem(key), SESSION_STORAGE_KEY),
-    { timeout: 5000 },
-  ).toBe(expectedValue);
+  await expect
+    .poll(
+      () =>
+        page.evaluate(
+          (key) => sessionStorage.getItem(key),
+          SESSION_STORAGE_KEY
+        ),
+      { timeout: 5000 }
+    )
+    .toBe(expectedValue);
 }
 
 // Map tests need extra time for WebGL rendering and tile loading in CI
-test.beforeEach(async () => { test.slow(); });
+test.beforeEach(async () => {
+  test.slow();
+});
 
 // ---------------------------------------------------------------------------
 // 9.1: Style toggle buttons visible (Standard/Satellite/Transit) - P0
@@ -72,7 +94,10 @@ test.describe("9.1: Map style toggle buttons visibility", () => {
   test.beforeEach(async ({ page }) => {
     await waitForSearchPage(page);
     if (!(await mapStyleControlsAvailable(page))) {
-      test.skip(true, "Map style controls not rendered (WebGL unavailable in headless mode)");
+      test.skip(
+        true,
+        "Map style controls not rendered (WebGL unavailable in headless mode)"
+      );
     }
   });
 
@@ -91,7 +116,9 @@ test.describe("9.1: Map style toggle buttons visibility", () => {
     await expect(transitBtn).toBeVisible();
   });
 
-  test("all three style toggle buttons are present and clickable", async ({ page }) => {
+  test("all three style toggle buttons are present and clickable", async ({
+    page,
+  }) => {
     const standardBtn = getStyleButton(page, "Standard");
     const satelliteBtn = getStyleButton(page, "Satellite");
     const transitBtn = getStyleButton(page, "Transit");
@@ -115,25 +142,34 @@ test.describe("9.2: Map style sessionStorage persistence", () => {
   test.beforeEach(async ({ page }) => {
     await waitForSearchPage(page);
     if (!(await mapStyleControlsAvailable(page))) {
-      test.skip(true, "Map style controls not rendered (WebGL unavailable in headless mode)");
+      test.skip(
+        true,
+        "Map style controls not rendered (WebGL unavailable in headless mode)"
+      );
     }
     // Clear any existing style preference for clean test
     await clearMapStyleStorage(page);
   });
 
-  test("clicking Standard persists 'standard' to sessionStorage", async ({ page }) => {
+  test("clicking Standard persists 'standard' to sessionStorage", async ({
+    page,
+  }) => {
     const standardBtn = getStyleButton(page, "Standard");
     await standardBtn.click();
     await expectSessionStorage(page, "standard");
   });
 
-  test("clicking Satellite persists 'satellite' to sessionStorage", async ({ page }) => {
+  test("clicking Satellite persists 'satellite' to sessionStorage", async ({
+    page,
+  }) => {
     const satelliteBtn = getStyleButton(page, "Satellite");
     await satelliteBtn.click();
     await expectSessionStorage(page, "satellite");
   });
 
-  test("clicking Transit persists 'transit' to sessionStorage", async ({ page }) => {
+  test("clicking Transit persists 'transit' to sessionStorage", async ({
+    page,
+  }) => {
     const transitBtn = getStyleButton(page, "Transit");
     await transitBtn.click();
     await expectSessionStorage(page, "transit");
@@ -165,7 +201,10 @@ test.describe("9.3: Map style persistence across navigation", () => {
   test.beforeEach(async ({ page }) => {
     await waitForSearchPage(page);
     if (!(await mapStyleControlsAvailable(page))) {
-      test.skip(true, "Map style controls not rendered (WebGL unavailable in headless mode)");
+      test.skip(
+        true,
+        "Map style controls not rendered (WebGL unavailable in headless mode)"
+      );
     }
   });
 
@@ -185,7 +224,9 @@ test.describe("9.3: Map style persistence across navigation", () => {
     await expectSessionStorage(page, "satellite");
   });
 
-  test("transit style persists after navigating to search page", async ({ page }) => {
+  test("transit style persists after navigating to search page", async ({
+    page,
+  }) => {
     // Clear and set transit style
     await clearMapStyleStorage(page);
     const transitBtn = getStyleButton(page, "Transit");
@@ -201,7 +242,9 @@ test.describe("9.3: Map style persistence across navigation", () => {
     await expectSessionStorage(page, "transit");
   });
 
-  test("standard style persists across multiple navigations", async ({ page }) => {
+  test("standard style persists across multiple navigations", async ({
+    page,
+  }) => {
     // Clear and set standard style
     await clearMapStyleStorage(page);
     const standardBtn = getStyleButton(page, "Standard");
@@ -257,7 +300,10 @@ test.describe("9.3: Map style persistence across navigation", () => {
     await waitForMapReady(page2);
 
     // In new session, sessionStorage should be empty
-    const stored2 = await page2.evaluate((key) => sessionStorage.getItem(key), SESSION_STORAGE_KEY);
+    const stored2 = await page2.evaluate(
+      (key) => sessionStorage.getItem(key),
+      SESSION_STORAGE_KEY
+    );
     expect(stored2).toBeNull();
 
     await context2.close();

@@ -11,7 +11,7 @@
  * - Review create/update/delete (affects avg_rating)
  */
 
-import 'server-only';
+import "server-only";
 
 import { prisma } from "@/lib/prisma";
 import { logger } from "@/lib/logger";
@@ -36,7 +36,7 @@ type DirtyReason =
  */
 export async function markListingDirty(
   listingId: string,
-  reason: DirtyReason,
+  reason: DirtyReason
 ): Promise<void> {
   if (!features.searchDoc) return;
 
@@ -65,7 +65,7 @@ export async function markListingDirty(
  */
 export async function markListingsDirty(
   listingIds: string[],
-  reason: DirtyReason,
+  reason: DirtyReason
 ): Promise<void> {
   if (listingIds.length === 0) return;
   if (!features.searchDoc) return;

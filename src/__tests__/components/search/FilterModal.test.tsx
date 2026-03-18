@@ -169,7 +169,11 @@ jest.mock("@/components/search/DrawerZeroState", () => ({
     onRemoveSuggestion,
   }: {
     suggestions: { type: string; label: string; priority: number }[];
-    onRemoveSuggestion: (s: { type: string; label: string; priority: number }) => void;
+    onRemoveSuggestion: (s: {
+      type: string;
+      label: string;
+      priority: number;
+    }) => void;
   }) => (
     <div data-testid="drawer-zero-state">
       {suggestions.map((s) => (
@@ -198,7 +202,9 @@ import { render, screen, fireEvent } from "@testing-library/react";
 import { FilterModal } from "@/components/search/FilterModal";
 
 // Default props factory
-function makeProps(overrides?: Partial<React.ComponentProps<typeof FilterModal>>) {
+function makeProps(
+  overrides?: Partial<React.ComponentProps<typeof FilterModal>>
+) {
   return {
     isOpen: true,
     onClose: jest.fn(),
@@ -240,7 +246,9 @@ describe("FilterModal", () => {
 
   describe("when closed", () => {
     it("renders null when isOpen is false", () => {
-      const { container } = render(<FilterModal {...makeProps({ isOpen: false })} />);
+      const { container } = render(
+        <FilterModal {...makeProps({ isOpen: false })} />
+      );
       expect(container.innerHTML).toBe("");
     });
   });
@@ -335,9 +343,7 @@ describe("FilterModal", () => {
     });
 
     it("has aria-pressed=true for active house rules", () => {
-      render(
-        <FilterModal {...makeProps({ houseRules: ["No Smoking"] })} />,
-      );
+      render(<FilterModal {...makeProps({ houseRules: ["No Smoking"] })} />);
 
       const btn = screen.getByText("No Smoking").closest("button");
       expect(btn).toHaveAttribute("aria-pressed", "true");
@@ -363,7 +369,7 @@ describe("FilterModal", () => {
 
     it("shows formattedCount when provided", () => {
       render(
-        <FilterModal {...makeProps({ formattedCount: "Show 42 listings" })} />,
+        <FilterModal {...makeProps({ formattedCount: "Show 42 listings" })} />
       );
 
       const applyBtn = screen.getByTestId("filter-modal-apply");
@@ -376,7 +382,7 @@ describe("FilterModal", () => {
       render(
         <FilterModal
           {...makeProps({ hasActiveFilters: true, activeFilterCount: 2 })}
-        />,
+        />
       );
 
       const clearBtn = screen.getByTestId("filter-modal-clear-all");
@@ -386,15 +392,15 @@ describe("FilterModal", () => {
     it("is not visible when hasActiveFilters is false", () => {
       render(<FilterModal {...makeProps({ hasActiveFilters: false })} />);
 
-      expect(screen.queryByTestId("filter-modal-clear-all")).not.toBeInTheDocument();
+      expect(
+        screen.queryByTestId("filter-modal-clear-all")
+      ).not.toBeInTheDocument();
     });
 
     it("calls onClearAll when clicked", () => {
       const onClearAll = jest.fn();
       render(
-        <FilterModal
-          {...makeProps({ hasActiveFilters: true, onClearAll })}
-        />,
+        <FilterModal {...makeProps({ hasActiveFilters: true, onClearAll })} />
       );
 
       const clearBtn = screen.getByTestId("filter-modal-clear-all");
@@ -405,11 +411,7 @@ describe("FilterModal", () => {
 
   describe("filter count badge", () => {
     it("shows filter count when activeFilterCount > 0", () => {
-      render(
-        <FilterModal
-          {...makeProps({ activeFilterCount: 3 })}
-        />,
-      );
+      render(<FilterModal {...makeProps({ activeFilterCount: 3 })} />);
 
       // The count badge is inside the title
       expect(screen.getByText("3")).toBeInTheDocument();
@@ -456,7 +458,7 @@ describe("FilterModal", () => {
             ],
             onRemoveFilterSuggestion: jest.fn(),
           })}
-        />,
+        />
       );
 
       const applyBtn = screen.getByTestId("filter-modal-apply");
@@ -472,7 +474,7 @@ describe("FilterModal", () => {
             isCountLoading: false,
             formattedCount: "10 listings",
           })}
-        />,
+        />
       );
 
       const applyBtn = screen.getByTestId("filter-modal-apply");
@@ -492,7 +494,7 @@ describe("FilterModal", () => {
             ],
             onRemoveFilterSuggestion: jest.fn(),
           })}
-        />,
+        />
       );
 
       expect(screen.getByTestId("drawer-zero-state")).toBeInTheDocument();
@@ -507,7 +509,7 @@ describe("FilterModal", () => {
             isCountLoading: false,
             formattedCount: "5 listings",
           })}
-        />,
+        />
       );
 
       expect(screen.queryByTestId("drawer-zero-state")).not.toBeInTheDocument();
@@ -525,7 +527,7 @@ describe("FilterModal", () => {
             ],
             onRemoveFilterSuggestion: jest.fn(),
           })}
-        />,
+        />
       );
 
       expect(screen.queryByTestId("drawer-zero-state")).not.toBeInTheDocument();

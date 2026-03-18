@@ -61,9 +61,7 @@ describe("buildCspHeader", () => {
     it("includes Google Maps origin", () => {
       jest.resetModules();
       const { buildCspHeader } = require("@/lib/csp");
-      expect(buildCspHeader("abc123")).toContain(
-        "https://maps.googleapis.com",
-      );
+      expect(buildCspHeader("abc123")).toContain("https://maps.googleapis.com");
     });
 
     it("includes upgrade-insecure-requests", () => {

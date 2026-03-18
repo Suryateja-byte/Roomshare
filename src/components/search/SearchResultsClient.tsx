@@ -53,12 +53,12 @@ export function SearchResultsClient({
   const [isHydrated, setIsHydrated] = useState(false);
   const [extraListings, setExtraListings] = useState<ListingData[]>([]);
   const [nextCursor, setNextCursor] = useState<string | null>(
-    initialNextCursor,
+    initialNextCursor
   );
   const [isLoadingMore, setIsLoadingMore] = useState(false);
   const isLoadingRef = useRef(false);
   const [loadError, setLoadError] = useState<string | null>(null);
-  const [loadMoreAnnouncement, setLoadMoreAnnouncement] = useState('');
+  const [loadMoreAnnouncement, setLoadMoreAnnouncement] = useState("");
   const [showTotalPrice, setShowTotalPrice] = useState(false);
   const [resolvedSavedListingIds, setResolvedSavedListingIds] =
     useState(savedListingIds);
@@ -69,7 +69,7 @@ export function SearchResultsClient({
   useEffect(() => {
     setIsHydrated(true);
     try {
-      const stored = sessionStorage.getItem('showTotalPrice');
+      const stored = sessionStorage.getItem("showTotalPrice");
       if (stored) setShowTotalPrice(JSON.parse(stored));
     } catch {
       // sessionStorage unavailable or invalid JSON
@@ -77,13 +77,13 @@ export function SearchResultsClient({
   }, []);
   // Track all seen IDs for deduplication (initialized with SSR listings)
   const seenIdsRef = useRef<Set<string>>(
-    new Set(initialListings.map((l) => l.id)),
+    new Set(initialListings.map((l) => l.id))
   );
 
   // Derive a stable fingerprint of the initial data to detect server-side changes
   const initialDataFingerprint = useMemo(
     () => initialListings.map((l) => l.id).join(","),
-    [initialListings],
+    [initialListings]
   );
 
   // Track the previous fingerprint to detect changes
@@ -95,38 +95,41 @@ export function SearchResultsClient({
       prevFingerprintRef.current = initialDataFingerprint;
       setExtraListings([]);
       setNextCursor(initialNextCursor);
-      setLoadMoreAnnouncement('');
+      setLoadMoreAnnouncement("");
       seenIdsRef.current = new Set(initialListings.map((l) => l.id));
     }
   }, [initialDataFingerprint, initialNextCursor, initialListings]);
 
   const allListings = useMemo(
     () => [...initialListings, ...extraListings],
-    [initialListings, extraListings],
+    [initialListings, extraListings]
   );
   const reachedCap = allListings.length >= MAX_ACCUMULATED;
 
   // O(1) lookup for saved listing IDs instead of O(n) .includes()
   const savedIdsSet = useMemo(
     () => new Set(resolvedSavedListingIds),
-    [resolvedSavedListingIds],
+    [resolvedSavedListingIds]
   );
 
   // Derive estimatedMonths from moveInDate/moveOutDate, falling back to leaseDuration
   const estimatedMonths = useMemo(() => {
     const sp = new URLSearchParams(searchParamsString);
-    const moveIn = sp.get('moveInDate');
-    const moveOut = sp.get('moveOutDate');
+    const moveIn = sp.get("moveInDate");
+    const moveOut = sp.get("moveOutDate");
     if (moveIn && moveOut) {
       const start = new Date(moveIn);
       const end = new Date(moveOut);
       if (!isNaN(start.getTime()) && !isNaN(end.getTime()) && end > start) {
         const diffMs = end.getTime() - start.getTime();
-        const months = Math.max(1, Math.round(diffMs / (1000 * 60 * 60 * 24 * 30.44)));
+        const months = Math.max(
+          1,
+          Math.round(diffMs / (1000 * 60 * 60 * 24 * 30.44))
+        );
         return months;
       }
     }
-    const ld = sp.get('leaseDuration');
+    const ld = sp.get("leaseDuration");
     if (!ld) return 1;
     const match = ld.match(/^(\d+)\s+months?$/i);
     return match ? parseInt(match[1], 10) : 1;
@@ -135,7 +138,7 @@ export function SearchResultsClient({
   // Compute split stay pairs for long durations (6+ months)
   const splitStayPairs = useMemo(
     () => findSplitStays(allListings, estimatedMonths),
-    [allListings, estimatedMonths],
+    [allListings, estimatedMonths]
   );
 
   // Parse searchParamsString into raw params for the server action.
@@ -146,7 +149,9 @@ export function SearchResultsClient({
     for (const [key, value] of sp.entries()) {
       const existing = params[key];
       if (existing) {
-        params[key] = Array.isArray(existing) ? [...existing, value] : [existing, value];
+        params[key] = Array.isArray(existing)
+          ? [...existing, value]
+          : [existing, value];
       } else {
         params[key] = value;
       }
@@ -160,12 +165,12 @@ export function SearchResultsClient({
     isLoadingRef.current = true;
     setIsLoadingMore(true);
     setLoadError(null);
-    safeMark('load-more-start');
+    safeMark("load-more-start");
 
     try {
       const result = await fetchMoreListings(nextCursor, rawParams);
-      safeMark('load-more-end');
-      safeMeasure('load-more', 'load-more-start', 'load-more-end');
+      safeMark("load-more-end");
+      safeMeasure("load-more", "load-more-start", "load-more-end");
 
       // Deduplicate by ID
       const dedupedItems = result.items.filter((item) => {
@@ -179,12 +184,13 @@ export function SearchResultsClient({
 
       // Announce to screen readers (after state update)
       const newCount = allListings.length + dedupedItems.length;
-      const totalLabel = initialTotal !== null ? ` of ~${initialTotal}` : '';
+      const totalLabel = initialTotal !== null ? ` of ~${initialTotal}` : "";
       setLoadMoreAnnouncement(
-        `Loaded ${dedupedItems.length} more listing${dedupedItems.length === 1 ? '' : 's'}, showing ${newCount}${totalLabel}`
+        `Loaded ${dedupedItems.length} more listing${dedupedItems.length === 1 ? "" : "s"}, showing ${newCount}${totalLabel}`
       );
     } catch (err) {
-      const raw = err instanceof Error ? err.message : "Failed to load more results";
+      const raw =
+        err instanceof Error ? err.message : "Failed to load more results";
       const friendly = raw.includes("Rate limit")
         ? "Too many requests — please wait a moment and try again."
         : "Failed to load more results. Please try again.";
@@ -209,10 +215,13 @@ export function SearchResultsClient({
 
     void (async () => {
       try {
-        const response = await fetch(`/api/favorites?ids=${encodeURIComponent(idsParam)}`, {
-          cache: "no-store",
-          signal: controller.signal,
-        });
+        const response = await fetch(
+          `/api/favorites?ids=${encodeURIComponent(idsParam)}`,
+          {
+            cache: "no-store",
+            signal: controller.signal,
+          }
+        );
 
         if (!response.ok) {
           return;
@@ -255,7 +264,12 @@ export function SearchResultsClient({
   return (
     <div id="search-results" tabIndex={-1} className="!outline-none">
       {/* Screen reader announcement for search results */}
-      <div role="status" aria-live="polite" aria-atomic="true" className="sr-only">
+      <div
+        role="status"
+        aria-live="polite"
+        aria-atomic="true"
+        className="sr-only"
+      >
         {hasConfirmedZeroResults
           ? `No listings found${query ? ` for "${query}"` : ""}`
           : total === null
@@ -269,7 +283,10 @@ export function SearchResultsClient({
       </div>
 
       {hasConfirmedZeroResults ? (
-        <div data-testid="empty-state" className="flex flex-col items-center justify-center py-12 sm:py-20 border-2 border-dashed border-zinc-100 dark:border-zinc-800 rounded-2xl sm:rounded-3xl bg-zinc-50/50 dark:bg-zinc-900/50">
+        <div
+          data-testid="empty-state"
+          className="flex flex-col items-center justify-center py-12 sm:py-20 border-2 border-dashed border-zinc-100 dark:border-zinc-800 rounded-2xl sm:rounded-3xl bg-zinc-50/50 dark:bg-zinc-900/50"
+        >
           <div className="w-14 h-14 sm:w-16 sm:h-16 rounded-full bg-white dark:bg-zinc-800 flex items-center justify-center shadow-sm mb-4">
             <Search className="w-5 h-5 sm:w-6 sm:h-6 text-zinc-500" />
           </div>
@@ -277,8 +294,7 @@ export function SearchResultsClient({
             No matches found
           </h2>
           <p className="text-zinc-500 dark:text-zinc-400 text-sm max-w-xs text-center px-4">
-            We couldn&apos;t find any listings{" "}
-            {query ? `for "${query}"` : ""}.
+            We couldn&apos;t find any listings {query ? `for "${query}"` : ""}.
           </p>
 
           {/* Smart filter suggestions */}
@@ -310,17 +326,25 @@ export function SearchResultsClient({
             <div className="flex items-center justify-between mb-4">
               <p className="text-sm text-zinc-500 dark:text-zinc-400">
                 {total !== null
-                  ? `${total} ${total === 1 ? 'place' : 'places'}${query ? ` in ${query}` : ''}`
-                  : `100+ places${query ? ` in ${query}` : ''}`}
+                  ? `${total} ${total === 1 ? "place" : "places"}${query ? ` in ${query}` : ""}`
+                  : `100+ places${query ? ` in ${query}` : ""}`}
               </p>
               {estimatedMonths > 1 && (
-                <TotalPriceToggle showTotal={showTotalPrice} onToggle={setShowTotalPrice} />
+                <TotalPriceToggle
+                  showTotal={showTotalPrice}
+                  onToggle={setShowTotalPrice}
+                />
               )}
             </div>
           )}
 
           <h2 className="sr-only">Available listings</h2>
-          <div role="feed" aria-label="Search results" aria-busy={isLoadingMore} className="grid grid-cols-1 sm:grid-cols-2 gap-4 sm:gap-x-6 sm:gap-y-8">
+          <div
+            role="feed"
+            aria-label="Search results"
+            aria-busy={isLoadingMore}
+            className="grid grid-cols-1 sm:grid-cols-2 gap-4 sm:gap-x-6 sm:gap-y-8"
+          >
             {allListings.map((listing, index) => (
               <ListingCard
                 key={listing.id}
@@ -356,18 +380,26 @@ export function SearchResultsClient({
           {isHydrated && nextCursor && !reachedCap && (
             <div className="flex flex-col items-center mt-8 mb-4 gap-2">
               <p className="text-xs text-zinc-500 dark:text-zinc-500">
-                Showing {allListings.length} of {total !== null ? `~${total}` : '100+'} listings
+                Showing {allListings.length} of{" "}
+                {total !== null ? `~${total}` : "100+"} listings
               </p>
               <button
                 onClick={handleLoadMore}
                 disabled={isLoadingMore}
                 aria-busy={isLoadingMore}
-                aria-label={isLoadingMore ? "Loading more results" : `Show more places. Currently showing ${allListings.length}${total !== null ? ` of ${total}` : ''} listings`}
+                aria-label={
+                  isLoadingMore
+                    ? "Loading more results"
+                    : `Show more places. Currently showing ${allListings.length}${total !== null ? ` of ${total}` : ""} listings`
+                }
                 className="inline-flex items-center gap-2 px-6 py-3 rounded-full bg-indigo-500 hover:bg-indigo-600 text-white text-sm font-medium transition-colors disabled:opacity-50 touch-target shadow-sm"
               >
                 {isLoadingMore ? (
                   <>
-                    <Loader2 className="w-4 h-4 animate-spin" aria-hidden="true" />
+                    <Loader2
+                      className="w-4 h-4 animate-spin"
+                      aria-hidden="true"
+                    />
                     Loading…
                   </>
                 ) : (
@@ -401,16 +433,19 @@ export function SearchResultsClient({
           )}
 
           {/* End of results indicator */}
-          {!nextCursor && allListings.length > 0 && extraListings.length > 0 && (
-            <p className="text-center text-sm text-zinc-500 dark:text-zinc-500 mt-8">
-              You&apos;ve seen all {allListings.length} results
-            </p>
-          )}
+          {!nextCursor &&
+            allListings.length > 0 &&
+            extraListings.length > 0 && (
+              <p className="text-center text-sm text-zinc-500 dark:text-zinc-500 mt-8">
+                You&apos;ve seen all {allListings.length} results
+              </p>
+            )}
 
           {/* Contextual footer */}
           {allListings.length > 0 && (
             <p className="text-center text-xs text-zinc-500 dark:text-zinc-500 mt-6 pb-4">
-              {total === null ? '100+' : total} places{query ? ` in ${query}` : ''}
+              {total === null ? "100+" : total} places
+              {query ? ` in ${query}` : ""}
             </p>
           )}
         </>

@@ -94,9 +94,7 @@ jest.mock("@/lib/logger", () => ({
   },
 }));
 
-import {
-  updateBookingStatus,
-} from "@/app/actions/manage-booking";
+import { updateBookingStatus } from "@/app/actions/manage-booking";
 import { prisma } from "@/lib/prisma";
 import { auth } from "@/auth";
 import { createInternalNotification } from "@/lib/notifications";
@@ -157,12 +155,18 @@ describe("manage-booking — WHOLE_UNIT mode (Phase 3)", () => {
   beforeEach(() => {
     jest.clearAllMocks();
     (auth as jest.Mock).mockResolvedValue(mockOwnerSession);
-    (createInternalNotification as jest.Mock).mockResolvedValue({ success: true });
+    (createInternalNotification as jest.Mock).mockResolvedValue({
+      success: true,
+    });
     (sendNotificationEmailWithPreference as jest.Mock).mockResolvedValue({
       success: true,
     });
     (checkSuspension as jest.Mock).mockResolvedValue({ suspended: false });
-    (checkRateLimit as jest.Mock).mockResolvedValue({ success: true, remaining: 29, resetAt: new Date() });
+    (checkRateLimit as jest.Mock).mockResolvedValue({
+      success: true,
+      remaining: 29,
+      resetAt: new Date(),
+    });
     (validateTransition as jest.Mock).mockImplementation(() => {});
     // Mock user.findUnique for suspension check
     (prisma.user.findUnique as jest.Mock).mockResolvedValue({
@@ -173,7 +177,9 @@ describe("manage-booking — WHOLE_UNIT mode (Phase 3)", () => {
 
   describe("ACCEPT flow — WHOLE_UNIT", () => {
     beforeEach(() => {
-      (prisma.booking.findUnique as jest.Mock).mockResolvedValue(mockWholeUnitBooking);
+      (prisma.booking.findUnique as jest.Mock).mockResolvedValue(
+        mockWholeUnitBooking
+      );
     });
 
     it("blocks overlapping accept — first ACCEPTED, second returns CAPACITY_EXCEEDED", async () => {
@@ -181,9 +187,16 @@ describe("manage-booking — WHOLE_UNIT mode (Phase 3)", () => {
       (prisma.$transaction as jest.Mock).mockImplementationOnce(
         async (callback: (tx: unknown) => Promise<unknown>) => {
           const tx = {
-            $queryRaw: jest.fn()
+            $queryRaw: jest
+              .fn()
               .mockResolvedValueOnce([
-                { availableSlots: 4, totalSlots: 4, id: "listing-123", ownerId: "owner-123", bookingMode: "WHOLE_UNIT" },
+                {
+                  availableSlots: 4,
+                  totalSlots: 4,
+                  id: "listing-123",
+                  ownerId: "owner-123",
+                  bookingMode: "WHOLE_UNIT",
+                },
               ])
               .mockResolvedValueOnce([{ total: BigInt(0) }]), // No overlapping accepted
             $executeRaw: jest.fn().mockResolvedValue(1),
@@ -192,7 +205,7 @@ describe("manage-booking — WHOLE_UNIT mode (Phase 3)", () => {
             },
           };
           return callback(tx);
-        },
+        }
       );
 
       const result1 = await updateBookingStatus("booking-wu-1", "ACCEPTED");
@@ -211,20 +224,29 @@ describe("manage-booking — WHOLE_UNIT mode (Phase 3)", () => {
       (prisma.$transaction as jest.Mock).mockImplementationOnce(
         async (callback: (tx: unknown) => Promise<unknown>) => {
           const tx = {
-            $queryRaw: jest.fn()
+            $queryRaw: jest
+              .fn()
               .mockResolvedValueOnce([
                 // availableSlots=4 passes the first check (availableSlots >= slotsNeeded)
                 // but SUM=4 causes usedSlots(4) + slotsNeeded(4) > totalSlots(4) → CAPACITY_EXCEEDED
-                { availableSlots: 4, totalSlots: 4, id: "listing-123", ownerId: "owner-123", bookingMode: "WHOLE_UNIT" },
+                {
+                  availableSlots: 4,
+                  totalSlots: 4,
+                  id: "listing-123",
+                  ownerId: "owner-123",
+                  bookingMode: "WHOLE_UNIT",
+                },
               ])
               .mockResolvedValueOnce([{ total: BigInt(4) }]), // 4 slots used by first booking
           };
           return callback(tx);
-        },
+        }
       );
 
       const result2 = await updateBookingStatus("booking-wu-2", "ACCEPTED");
-      expect(result2.error).toContain("all slots for these dates are already booked");
+      expect(result2.error).toContain(
+        "all slots for these dates are already booked"
+      );
     });
 
     it("allows non-overlapping dates to both succeed", async () => {
@@ -232,9 +254,16 @@ describe("manage-booking — WHOLE_UNIT mode (Phase 3)", () => {
       (prisma.$transaction as jest.Mock).mockImplementationOnce(
         async (callback: (tx: unknown) => Promise<unknown>) => {
           const tx = {
-            $queryRaw: jest.fn()
+            $queryRaw: jest
+              .fn()
               .mockResolvedValueOnce([
-                { availableSlots: 4, totalSlots: 4, id: "listing-123", ownerId: "owner-123", bookingMode: "WHOLE_UNIT" },
+                {
+                  availableSlots: 4,
+                  totalSlots: 4,
+                  id: "listing-123",
+                  ownerId: "owner-123",
+                  bookingMode: "WHOLE_UNIT",
+                },
               ])
               .mockResolvedValueOnce([{ total: BigInt(0) }]),
             $executeRaw: jest.fn().mockResolvedValue(1),
@@ -243,7 +272,7 @@ describe("manage-booking — WHOLE_UNIT mode (Phase 3)", () => {
             },
           };
           return callback(tx);
-        },
+        }
       );
 
       const result1 = await updateBookingStatus("booking-wu-1", "ACCEPTED");
@@ -257,14 +286,23 @@ describe("manage-booking — WHOLE_UNIT mode (Phase 3)", () => {
         endDate: new Date("2026-12-31"),
         version: 1,
       };
-      (prisma.booking.findUnique as jest.Mock).mockResolvedValue(nonOverlappingBooking);
+      (prisma.booking.findUnique as jest.Mock).mockResolvedValue(
+        nonOverlappingBooking
+      );
 
       (prisma.$transaction as jest.Mock).mockImplementationOnce(
         async (callback: (tx: unknown) => Promise<unknown>) => {
           const tx = {
-            $queryRaw: jest.fn()
+            $queryRaw: jest
+              .fn()
               .mockResolvedValueOnce([
-                { availableSlots: 4, totalSlots: 4, id: "listing-123", ownerId: "owner-123", bookingMode: "WHOLE_UNIT" },
+                {
+                  availableSlots: 4,
+                  totalSlots: 4,
+                  id: "listing-123",
+                  ownerId: "owner-123",
+                  bookingMode: "WHOLE_UNIT",
+                },
               ])
               .mockResolvedValueOnce([{ total: BigInt(0) }]), // No overlap for Oct-Dec range
             $executeRaw: jest.fn().mockResolvedValue(1),
@@ -273,7 +311,7 @@ describe("manage-booking — WHOLE_UNIT mode (Phase 3)", () => {
             },
           };
           return callback(tx);
-        },
+        }
       );
 
       const result2 = await updateBookingStatus("booking-wu-3", "ACCEPTED");
@@ -287,9 +325,16 @@ describe("manage-booking — WHOLE_UNIT mode (Phase 3)", () => {
       (prisma.$transaction as jest.Mock).mockImplementation(
         async (callback: (tx: unknown) => Promise<unknown>) => {
           const tx = {
-            $queryRaw: jest.fn()
+            $queryRaw: jest
+              .fn()
               .mockResolvedValueOnce([
-                { availableSlots: 4, totalSlots: 4, id: "listing-123", ownerId: "owner-123", bookingMode: "WHOLE_UNIT" },
+                {
+                  availableSlots: 4,
+                  totalSlots: 4,
+                  id: "listing-123",
+                  ownerId: "owner-123",
+                  bookingMode: "WHOLE_UNIT",
+                },
               ])
               .mockResolvedValueOnce([{ total: BigInt(0) }]),
             $executeRaw: mockExecuteRaw,
@@ -298,7 +343,7 @@ describe("manage-booking — WHOLE_UNIT mode (Phase 3)", () => {
             },
           };
           return callback(tx);
-        },
+        }
       );
 
       const result = await updateBookingStatus("booking-wu-1", "ACCEPTED");
@@ -320,9 +365,16 @@ describe("manage-booking — WHOLE_UNIT mode (Phase 3)", () => {
       (prisma.$transaction as jest.Mock).mockImplementation(
         async (callback: (tx: unknown) => Promise<unknown>) => {
           const tx = {
-            $queryRaw: jest.fn()
+            $queryRaw: jest
+              .fn()
               .mockResolvedValueOnce([
-                { availableSlots: 4, totalSlots: 4, id: "listing-123", ownerId: "owner-123", bookingMode: "WHOLE_UNIT" },
+                {
+                  availableSlots: 4,
+                  totalSlots: 4,
+                  id: "listing-123",
+                  ownerId: "owner-123",
+                  bookingMode: "WHOLE_UNIT",
+                },
               ])
               .mockResolvedValueOnce([{ total: BigInt(0) }]),
             $executeRaw: mockExecuteRaw,
@@ -331,7 +383,7 @@ describe("manage-booking — WHOLE_UNIT mode (Phase 3)", () => {
             },
           };
           return callback(tx);
-        },
+        }
       );
 
       await updateBookingStatus("booking-wu-1", "ACCEPTED");
@@ -352,7 +404,9 @@ describe("manage-booking — WHOLE_UNIT mode (Phase 3)", () => {
       };
 
       (auth as jest.Mock).mockResolvedValue(mockTenantSession);
-      (prisma.booking.findUnique as jest.Mock).mockResolvedValue(acceptedWholeUnitBooking);
+      (prisma.booking.findUnique as jest.Mock).mockResolvedValue(
+        acceptedWholeUnitBooking
+      );
 
       const mockTxExecuteRaw = jest.fn().mockResolvedValue(1);
       (prisma.$transaction as jest.Mock).mockImplementation(
@@ -365,7 +419,7 @@ describe("manage-booking — WHOLE_UNIT mode (Phase 3)", () => {
             $executeRaw: mockTxExecuteRaw,
           };
           return callback(tx);
-        },
+        }
       );
 
       const result = await updateBookingStatus("booking-wu-1", "CANCELLED");
@@ -406,9 +460,16 @@ describe("manage-booking — WHOLE_UNIT mode (Phase 3)", () => {
       (prisma.$transaction as jest.Mock).mockImplementationOnce(
         async (callback: (tx: unknown) => Promise<unknown>) => {
           const tx = {
-            $queryRaw: jest.fn()
+            $queryRaw: jest
+              .fn()
               .mockResolvedValueOnce([
-                { availableSlots: 2, totalSlots: 3, id: "listing-shared", ownerId: "owner-123", bookingMode: "SHARED" },
+                {
+                  availableSlots: 2,
+                  totalSlots: 3,
+                  id: "listing-shared",
+                  ownerId: "owner-123",
+                  bookingMode: "SHARED",
+                },
               ])
               .mockResolvedValueOnce([{ total: BigInt(0) }]),
             $executeRaw: jest.fn().mockResolvedValue(1),
@@ -417,7 +478,7 @@ describe("manage-booking — WHOLE_UNIT mode (Phase 3)", () => {
             },
           };
           return callback(tx);
-        },
+        }
       );
 
       const result1 = await updateBookingStatus("booking-shared-1", "ACCEPTED");
@@ -428,14 +489,23 @@ describe("manage-booking — WHOLE_UNIT mode (Phase 3)", () => {
         ...sharedBooking,
         id: "booking-shared-2",
       };
-      (prisma.booking.findUnique as jest.Mock).mockResolvedValue(sharedBooking2);
+      (prisma.booking.findUnique as jest.Mock).mockResolvedValue(
+        sharedBooking2
+      );
 
       (prisma.$transaction as jest.Mock).mockImplementationOnce(
         async (callback: (tx: unknown) => Promise<unknown>) => {
           const tx = {
-            $queryRaw: jest.fn()
+            $queryRaw: jest
+              .fn()
               .mockResolvedValueOnce([
-                { availableSlots: 1, totalSlots: 3, id: "listing-shared", ownerId: "owner-123", bookingMode: "SHARED" },
+                {
+                  availableSlots: 1,
+                  totalSlots: 3,
+                  id: "listing-shared",
+                  ownerId: "owner-123",
+                  bookingMode: "SHARED",
+                },
               ])
               .mockResolvedValueOnce([{ total: BigInt(1) }]), // 1 slot already used
             $executeRaw: jest.fn().mockResolvedValue(1),
@@ -444,7 +514,7 @@ describe("manage-booking — WHOLE_UNIT mode (Phase 3)", () => {
             },
           };
           return callback(tx);
-        },
+        }
       );
 
       const result2 = await updateBookingStatus("booking-shared-2", "ACCEPTED");
@@ -502,14 +572,23 @@ describe("manage-booking — WHOLE_UNIT mode (Phase 3)", () => {
         startDate: new Date("2026-09-01"), // Starts exactly when first booking ends
         endDate: new Date("2026-12-01"),
       };
-      (prisma.booking.findUnique as jest.Mock).mockResolvedValue(boundaryBooking);
+      (prisma.booking.findUnique as jest.Mock).mockResolvedValue(
+        boundaryBooking
+      );
 
       (prisma.$transaction as jest.Mock).mockImplementation(
         async (callback: (tx: unknown) => Promise<unknown>) => {
           const tx = {
-            $queryRaw: jest.fn()
+            $queryRaw: jest
+              .fn()
               .mockResolvedValueOnce([
-                { availableSlots: 4, totalSlots: 4, id: "listing-123", ownerId: "owner-123", bookingMode: "WHOLE_UNIT" },
+                {
+                  availableSlots: 4,
+                  totalSlots: 4,
+                  id: "listing-123",
+                  ownerId: "owner-123",
+                  bookingMode: "WHOLE_UNIT",
+                },
               ])
               .mockResolvedValueOnce([{ total: BigInt(0) }]), // No overlap at boundary
             $executeRaw: jest.fn().mockResolvedValue(1),
@@ -518,7 +597,7 @@ describe("manage-booking — WHOLE_UNIT mode (Phase 3)", () => {
             },
           };
           return callback(tx);
-        },
+        }
       );
 
       const result = await updateBookingStatus("booking-boundary", "ACCEPTED");

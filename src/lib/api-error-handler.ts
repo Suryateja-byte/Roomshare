@@ -1,7 +1,7 @@
-import * as Sentry from '@sentry/nextjs';
-import { logger, sanitizeErrorMessage } from '@/lib/logger';
-import { NextResponse } from 'next/server';
-import { getRequestId } from '@/lib/request-context';
+import * as Sentry from "@sentry/nextjs";
+import { logger, sanitizeErrorMessage } from "@/lib/logger";
+import { NextResponse } from "next/server";
+import { getRequestId } from "@/lib/request-context";
 
 /**
  * Shared API error handler that captures to Sentry and logs structured error.
@@ -30,10 +30,7 @@ export function captureApiError(
     },
   });
 
-  return NextResponse.json(
-    { error: 'Internal server error' },
-    { status: 500 }
-  );
+  return NextResponse.json({ error: "Internal server error" }, { status: 500 });
 }
 
 /**
@@ -41,5 +38,5 @@ export function captureApiError(
  * Use when you want to capture the error separately or need a non-500 status.
  */
 export function apiErrorResponse(status = 500) {
-  return NextResponse.json({ error: 'Internal server error' }, { status });
+  return NextResponse.json({ error: "Internal server error" }, { status });
 }

@@ -24,7 +24,7 @@ import { computeScore, computeSignals, DEFAULT_WEIGHTS } from "./score";
 export function buildScoreMap<T extends RankableListing>(
   listings: T[],
   context: RankingContext,
-  weights: RankingWeights = DEFAULT_WEIGHTS,
+  weights: RankingWeights = DEFAULT_WEIGHTS
 ): Map<string, number> {
   const map = new Map<string, number>();
 
@@ -46,7 +46,7 @@ export function buildScoreMap<T extends RankableListing>(
  */
 export function rankListings<T extends { id: string }>(
   candidates: T[],
-  scoreMap: Map<string, number>,
+  scoreMap: Map<string, number>
 ): T[] {
   return [...candidates].sort((a, b) => {
     const scoreA = scoreMap.get(a.id) ?? 0;
@@ -74,7 +74,7 @@ export function getDebugSignals<T extends RankableListing>(
   listings: T[],
   scoreMap: Map<string, number>,
   context: RankingContext,
-  limit: number = 5,
+  limit: number = 5
 ): DebugSignals[] {
   // Sort by score to get top listings
   const ranked = rankListings(listings, scoreMap);

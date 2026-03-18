@@ -7,218 +7,235 @@
 import { z } from "zod";
 
 // Schema for server-side environment variables
-const serverEnvSchema = z.object({
-  // Database (REQUIRED)
-  DATABASE_URL: z.string().min(1, "DATABASE_URL is required"),
+const serverEnvSchema = z
+  .object({
+    // Database (REQUIRED)
+    DATABASE_URL: z.string().min(1, "DATABASE_URL is required"),
 
-  // Authentication (REQUIRED)
-  NEXTAUTH_SECRET: z
-    .string()
-    .min(32, "NEXTAUTH_SECRET must be at least 32 characters"),
-  NEXTAUTH_URL: z.string().url("NEXTAUTH_URL must be a valid URL"),
-  GOOGLE_CLIENT_ID: z.string().min(1, "GOOGLE_CLIENT_ID is required"),
-  GOOGLE_CLIENT_SECRET: z.string().min(1, "GOOGLE_CLIENT_SECRET is required"),
+    // Authentication (REQUIRED)
+    NEXTAUTH_SECRET: z
+      .string()
+      .min(32, "NEXTAUTH_SECRET must be at least 32 characters"),
+    NEXTAUTH_URL: z.string().url("NEXTAUTH_URL must be a valid URL"),
+    GOOGLE_CLIENT_ID: z.string().min(1, "GOOGLE_CLIENT_ID is required"),
+    GOOGLE_CLIENT_SECRET: z.string().min(1, "GOOGLE_CLIENT_SECRET is required"),
 
-  // Email (optional - gracefully degrades)
-  RESEND_API_KEY: z.string().optional(),
-  FROM_EMAIL: z.string().optional(),
+    // Email (optional - gracefully degrades)
+    RESEND_API_KEY: z.string().optional(),
+    FROM_EMAIL: z.string().optional(),
 
-  // Geocoding uses Photon + Nominatim (free, no API key needed)
+    // Geocoding uses Photon + Nominatim (free, no API key needed)
 
-  // Redis Rate Limiting (optional - falls back to DB)
-  UPSTASH_REDIS_REST_URL: z.string().url().optional(),
-  UPSTASH_REDIS_REST_TOKEN: z.string().optional(),
+    // Redis Rate Limiting (optional - falls back to DB)
+    UPSTASH_REDIS_REST_URL: z.string().url().optional(),
+    UPSTASH_REDIS_REST_TOKEN: z.string().optional(),
 
-  // AI Chat (optional - gracefully degrades)
-  GROQ_API_KEY: z.string().optional(),
+    // AI Chat (optional - gracefully degrades)
+    GROQ_API_KEY: z.string().optional(),
 
-  // Error Tracking (optional but recommended for production)
-  SENTRY_DSN: z.string().url().optional(),
-  SENTRY_AUTH_TOKEN: z.string().optional(),
+    // Error Tracking (optional but recommended for production)
+    SENTRY_DSN: z.string().url().optional(),
+    SENTRY_AUTH_TOKEN: z.string().optional(),
 
-  // Vercel-specific (auto-populated)
-  VERCEL_ENV: z.enum(["production", "preview", "development"]).optional(),
-  VERCEL_GIT_COMMIT_SHA: z.string().optional(),
+    // Vercel-specific (auto-populated)
+    VERCEL_ENV: z.enum(["production", "preview", "development"]).optional(),
+    VERCEL_GIT_COMMIT_SHA: z.string().optional(),
 
-  // Security: Cron authentication (required in production)
-  CRON_SECRET: z
-    .string()
-    .min(32, "CRON_SECRET must be at least 32 characters")
-    .optional()
-    .refine(
-      (val) =>
-        process.env.NODE_ENV !== "production" ||
-        !val ||
-        !/change-in-production|placeholder|dummy|example|test-secret|YOUR_/i.test(
-          val,
-        ),
-      "CRON_SECRET must not contain placeholder values",
-    )
-    .refine(
-      (val) => process.env.NODE_ENV !== "production" || !!val,
-      "CRON_SECRET is required in production",
-    ),
+    // Security: Cron authentication (required in production)
+    CRON_SECRET: z
+      .string()
+      .min(32, "CRON_SECRET must be at least 32 characters")
+      .optional()
+      .refine(
+        (val) =>
+          process.env.NODE_ENV !== "production" ||
+          !val ||
+          !/change-in-production|placeholder|dummy|example|test-secret|YOUR_/i.test(
+            val
+          ),
+        "CRON_SECRET must not contain placeholder values"
+      )
+      .refine(
+        (val) => process.env.NODE_ENV !== "production" || !!val,
+        "CRON_SECRET is required in production"
+      ),
 
-  // Security: Metrics ops authentication (required in production)
-  METRICS_SECRET: z
-    .string()
-    .min(32, "METRICS_SECRET must be at least 32 characters")
-    .optional()
-    .refine(
-      (val) => process.env.NODE_ENV !== "production" || !!val,
-      "METRICS_SECRET is required in production",
-    ),
+    // Security: Metrics ops authentication (required in production)
+    METRICS_SECRET: z
+      .string()
+      .min(32, "METRICS_SECRET must be at least 32 characters")
+      .optional()
+      .refine(
+        (val) => process.env.NODE_ENV !== "production" || !!val,
+        "METRICS_SECRET is required in production"
+      ),
 
-  // Security: Origin enforcement (comma-separated URLs)
-  ALLOWED_ORIGINS: z.string().optional(),
-  ALLOWED_HOSTS: z.string().optional(),
+    // Security: Origin enforcement (comma-separated URLs)
+    ALLOWED_ORIGINS: z.string().optional(),
+    ALLOWED_HOSTS: z.string().optional(),
 
-  // Privacy: Metrics HMAC
-  LOG_HMAC_SECRET: z
-    .string()
-    .min(32, "LOG_HMAC_SECRET must be at least 32 characters")
-    .optional(),
+    // Privacy: Metrics HMAC
+    LOG_HMAC_SECRET: z
+      .string()
+      .min(32, "LOG_HMAC_SECRET must be at least 32 characters")
+      .optional(),
 
-  // Google Places (server-side, IP-restricted key)
-  GOOGLE_PLACES_API_KEY: z.string().optional(),
+    // Google Places (server-side, IP-restricted key)
+    GOOGLE_PLACES_API_KEY: z.string().optional(),
 
-  // Supabase service key (server-side)
-  SUPABASE_SERVICE_ROLE_KEY: z.string().optional(),
+    // Supabase service key (server-side)
+    SUPABASE_SERVICE_ROLE_KEY: z.string().optional(),
 
-  // Radar API (server-side, for nearby places search)
-  RADAR_SECRET_KEY: z.string().optional(),
+    // Radar API (server-side, for nearby places search)
+    RADAR_SECRET_KEY: z.string().optional(),
 
-  // Security: Cursor pagination HMAC (required in production for tamper-proof cursors)
-  CURSOR_SECRET: z
-    .string()
-    .min(32, "CURSOR_SECRET must be at least 32 characters")
-    .optional(),
+    // Security: Cursor pagination HMAC (required in production for tamper-proof cursors)
+    CURSOR_SECRET: z
+      .string()
+      .min(32, "CURSOR_SECRET must be at least 32 characters")
+      .optional(),
 
-  // Search optimization (optional - defaults to slow LIKE queries if not enabled)
-  // CRITICAL: Should be enabled in production for performance
-  ENABLE_SEARCH_DOC: z.enum(["true", "false"]).optional(),
+    // Search optimization (optional - defaults to slow LIKE queries if not enabled)
+    // CRITICAL: Should be enabled in production for performance
+    ENABLE_SEARCH_DOC: z.enum(["true", "false"]).optional(),
 
-  // Cloudflare Turnstile (bot protection - required in production)
-  TURNSTILE_SECRET_KEY: z.string().optional(),
-  TURNSTILE_ENABLED: z.enum(["true", "false"]).optional(),
+    // Cloudflare Turnstile (bot protection - required in production)
+    TURNSTILE_SECRET_KEY: z.string().optional(),
+    TURNSTILE_ENABLED: z.enum(["true", "false"]).optional(),
 
-  // Multi-slot booking feature flags (Phase 0 — all default OFF)
-  ENABLE_MULTI_SLOT_BOOKING: z.enum(["true", "false"]).optional(),
-  ENABLE_WHOLE_UNIT_MODE: z.enum(["true", "false"]).optional(),
-  ENABLE_SOFT_HOLDS: z.enum(["on", "drain", "off"]).optional(),
-  ENABLE_BOOKING_AUDIT: z.enum(["true", "false"]).optional(),
+    // Multi-slot booking feature flags (Phase 0 — all default OFF)
+    ENABLE_MULTI_SLOT_BOOKING: z.enum(["true", "false"]).optional(),
+    ENABLE_WHOLE_UNIT_MODE: z.enum(["true", "false"]).optional(),
+    ENABLE_SOFT_HOLDS: z.enum(["on", "drain", "off"]).optional(),
+    ENABLE_BOOKING_AUDIT: z.enum(["true", "false"]).optional(),
 
-  // AI / Embeddings
-  GEMINI_API_KEY: z.string().min(1).optional(),
-  ENABLE_SEMANTIC_SEARCH: z.enum(["true", "false"]).optional(),
-  ENABLE_IMAGE_EMBEDDINGS: z.enum(["true", "false"]).optional(),
-  SEMANTIC_WEIGHT: z.coerce.number().min(0).max(1).optional(),
+    // AI / Embeddings
+    GEMINI_API_KEY: z.string().min(1).optional(),
+    ENABLE_SEMANTIC_SEARCH: z.enum(["true", "false"]).optional(),
+    ENABLE_IMAGE_EMBEDDINGS: z.enum(["true", "false"]).optional(),
+    SEMANTIC_WEIGHT: z.coerce.number().min(0).max(1).optional(),
 
-  // Node environment
-  NODE_ENV: z
-    .enum(["development", "production", "test"])
-    .default("development"),
-}).superRefine((data, ctx) => {
-  // Production enforcement: Turnstile must be fully configured
-  // Uses superRefine on the object level because Zod's field-level .refine()
-  // does not reliably run on optional fields with undefined values.
-  if (process.env.NODE_ENV === "production") {
-    if (!data.TURNSTILE_SECRET_KEY) {
+    // Node environment
+    NODE_ENV: z
+      .enum(["development", "production", "test"])
+      .default("development"),
+  })
+  .superRefine((data, ctx) => {
+    // Production enforcement: Turnstile must be fully configured
+    // Uses superRefine on the object level because Zod's field-level .refine()
+    // does not reliably run on optional fields with undefined values.
+    if (process.env.NODE_ENV === "production") {
+      if (!data.TURNSTILE_SECRET_KEY) {
+        ctx.addIssue({
+          code: z.ZodIssueCode.custom,
+          message: "TURNSTILE_SECRET_KEY is required in production",
+          path: ["TURNSTILE_SECRET_KEY"],
+        });
+      }
+      if (data.TURNSTILE_ENABLED !== "true") {
+        ctx.addIssue({
+          code: z.ZodIssueCode.custom,
+          message: "TURNSTILE_ENABLED must be 'true' in production",
+          path: ["TURNSTILE_ENABLED"],
+        });
+      }
+    }
+
+    // Multi-slot booking feature flag cross-validation
+    if (
+      data.ENABLE_WHOLE_UNIT_MODE === "true" &&
+      data.ENABLE_MULTI_SLOT_BOOKING !== "true"
+    ) {
       ctx.addIssue({
         code: z.ZodIssueCode.custom,
-        message: "TURNSTILE_SECRET_KEY is required in production",
-        path: ["TURNSTILE_SECRET_KEY"],
+        message:
+          "ENABLE_WHOLE_UNIT_MODE requires ENABLE_MULTI_SLOT_BOOKING=true",
+        path: ["ENABLE_WHOLE_UNIT_MODE"],
       });
     }
-    if (data.TURNSTILE_ENABLED !== "true") {
+    if (
+      data.ENABLE_BOOKING_AUDIT === "true" &&
+      data.ENABLE_SOFT_HOLDS !== "on"
+    ) {
       ctx.addIssue({
         code: z.ZodIssueCode.custom,
-        message: "TURNSTILE_ENABLED must be 'true' in production",
-        path: ["TURNSTILE_ENABLED"],
+        message: "ENABLE_BOOKING_AUDIT requires ENABLE_SOFT_HOLDS=on",
+        path: ["ENABLE_BOOKING_AUDIT"],
       });
     }
-  }
-
-  // Multi-slot booking feature flag cross-validation
-  if (data.ENABLE_WHOLE_UNIT_MODE === "true" && data.ENABLE_MULTI_SLOT_BOOKING !== "true") {
-    ctx.addIssue({
-      code: z.ZodIssueCode.custom,
-      message: "ENABLE_WHOLE_UNIT_MODE requires ENABLE_MULTI_SLOT_BOOKING=true",
-      path: ["ENABLE_WHOLE_UNIT_MODE"],
-    });
-  }
-  if (data.ENABLE_BOOKING_AUDIT === "true" && data.ENABLE_SOFT_HOLDS !== "on") {
-    ctx.addIssue({
-      code: z.ZodIssueCode.custom,
-      message: "ENABLE_BOOKING_AUDIT requires ENABLE_SOFT_HOLDS=on",
-      path: ["ENABLE_BOOKING_AUDIT"],
-    });
-  }
-  if (data.ENABLE_SOFT_HOLDS === "on" && data.ENABLE_MULTI_SLOT_BOOKING !== "true") {
-    ctx.addIssue({
-      code: z.ZodIssueCode.custom,
-      message: "ENABLE_SOFT_HOLDS=on requires ENABLE_MULTI_SLOT_BOOKING=true",
-      path: ["ENABLE_SOFT_HOLDS"],
-    });
-  }
-  if (data.ENABLE_IMAGE_EMBEDDINGS === "true" && data.ENABLE_SEMANTIC_SEARCH !== "true") {
-    ctx.addIssue({
-      code: z.ZodIssueCode.custom,
-      message: "ENABLE_IMAGE_EMBEDDINGS requires ENABLE_SEMANTIC_SEARCH=true",
-      path: ["ENABLE_IMAGE_EMBEDDINGS"],
-    });
-  }
-});
+    if (
+      data.ENABLE_SOFT_HOLDS === "on" &&
+      data.ENABLE_MULTI_SLOT_BOOKING !== "true"
+    ) {
+      ctx.addIssue({
+        code: z.ZodIssueCode.custom,
+        message: "ENABLE_SOFT_HOLDS=on requires ENABLE_MULTI_SLOT_BOOKING=true",
+        path: ["ENABLE_SOFT_HOLDS"],
+      });
+    }
+    if (
+      data.ENABLE_IMAGE_EMBEDDINGS === "true" &&
+      data.ENABLE_SEMANTIC_SEARCH !== "true"
+    ) {
+      ctx.addIssue({
+        code: z.ZodIssueCode.custom,
+        message: "ENABLE_IMAGE_EMBEDDINGS requires ENABLE_SEMANTIC_SEARCH=true",
+        path: ["ENABLE_IMAGE_EMBEDDINGS"],
+      });
+    }
+  });
 
 // Schema for client-side (public) environment variables
-const clientEnvSchema = z.object({
-  // Supabase (optional - affects real-time features only)
-  NEXT_PUBLIC_SUPABASE_URL: z.string().url().optional(),
-  NEXT_PUBLIC_SUPABASE_ANON_KEY: z.string().optional(),
+const clientEnvSchema = z
+  .object({
+    // Supabase (optional - affects real-time features only)
+    NEXT_PUBLIC_SUPABASE_URL: z.string().url().optional(),
+    NEXT_PUBLIC_SUPABASE_ANON_KEY: z.string().optional(),
 
-  // Google Maps (optional - affects map features)
-  NEXT_PUBLIC_GOOGLE_MAPS_API_KEY: z.string().optional(),
+    // Google Maps (optional - affects map features)
+    NEXT_PUBLIC_GOOGLE_MAPS_API_KEY: z.string().optional(),
 
-  // Radar (optional - for nearby places map style)
-  NEXT_PUBLIC_RADAR_PUBLISHABLE_KEY: z.string().optional(),
+    // Radar (optional - for nearby places map style)
+    NEXT_PUBLIC_RADAR_PUBLISHABLE_KEY: z.string().optional(),
 
-  // Stadia Maps (optional - for premium basemap tiles)
-  // Free tier: non-commercial/evaluation only. Production requires paid plan.
-  // localhost works without API key. Production: use domain auth or API key.
-  NEXT_PUBLIC_STADIA_API_KEY: z.string().optional(),
+    // Stadia Maps (optional - for premium basemap tiles)
+    // Free tier: non-commercial/evaluation only. Production requires paid plan.
+    // localhost works without API key. Production: use domain auth or API key.
+    NEXT_PUBLIC_STADIA_API_KEY: z.string().optional(),
 
-  // Feature flags
-  NEXT_PUBLIC_NEARBY_ENABLED: z.enum(["true", "false"]).optional(),
+    // Feature flags
+    NEXT_PUBLIC_NEARBY_ENABLED: z.enum(["true", "false"]).optional(),
 
-  // Cloudflare Turnstile (bot protection - required in production)
-  NEXT_PUBLIC_TURNSTILE_SITE_KEY: z.string().optional(),
+    // Cloudflare Turnstile (bot protection - required in production)
+    NEXT_PUBLIC_TURNSTILE_SITE_KEY: z.string().optional(),
 
-  // App URL (used for metadataBase, sitemap, robots, structured data)
-  NEXT_PUBLIC_APP_URL: z.string().url().optional(),
-}).superRefine((data, ctx) => {
-  const hasSupabaseUrl = !!data.NEXT_PUBLIC_SUPABASE_URL;
-  const hasSupabaseAnonKey = !!data.NEXT_PUBLIC_SUPABASE_ANON_KEY;
-  if (hasSupabaseUrl !== hasSupabaseAnonKey) {
-    ctx.addIssue({
-      code: z.ZodIssueCode.custom,
-      message:
-        "NEXT_PUBLIC_SUPABASE_URL and NEXT_PUBLIC_SUPABASE_ANON_KEY must both be set or both be omitted",
-      path: hasSupabaseUrl
-        ? ["NEXT_PUBLIC_SUPABASE_ANON_KEY"]
-        : ["NEXT_PUBLIC_SUPABASE_URL"],
-    });
-  }
-
-  if (process.env.NODE_ENV === "production") {
-    if (!data.NEXT_PUBLIC_TURNSTILE_SITE_KEY) {
+    // App URL (used for metadataBase, sitemap, robots, structured data)
+    NEXT_PUBLIC_APP_URL: z.string().url().optional(),
+  })
+  .superRefine((data, ctx) => {
+    const hasSupabaseUrl = !!data.NEXT_PUBLIC_SUPABASE_URL;
+    const hasSupabaseAnonKey = !!data.NEXT_PUBLIC_SUPABASE_ANON_KEY;
+    if (hasSupabaseUrl !== hasSupabaseAnonKey) {
       ctx.addIssue({
         code: z.ZodIssueCode.custom,
-        message: "NEXT_PUBLIC_TURNSTILE_SITE_KEY is required in production",
-        path: ["NEXT_PUBLIC_TURNSTILE_SITE_KEY"],
+        message:
+          "NEXT_PUBLIC_SUPABASE_URL and NEXT_PUBLIC_SUPABASE_ANON_KEY must both be set or both be omitted",
+        path: hasSupabaseUrl
+          ? ["NEXT_PUBLIC_SUPABASE_ANON_KEY"]
+          : ["NEXT_PUBLIC_SUPABASE_URL"],
       });
     }
-  }
-});
+
+    if (process.env.NODE_ENV === "production") {
+      if (!data.NEXT_PUBLIC_TURNSTILE_SITE_KEY) {
+        ctx.addIssue({
+          code: z.ZodIssueCode.custom,
+          message: "NEXT_PUBLIC_TURNSTILE_SITE_KEY is required in production",
+          path: ["NEXT_PUBLIC_TURNSTILE_SITE_KEY"],
+        });
+      }
+    }
+  });
 
 // Type exports for use throughout the application
 export type ServerEnv = z.infer<typeof serverEnvSchema>;
@@ -247,7 +264,7 @@ function validateServerEnv(): ServerEnv {
     if (process.env.NODE_ENV === "production") {
       console.error("Environment validation failed:\n" + errors);
       throw new Error(
-        "Invalid environment configuration. Check logs for details.",
+        "Invalid environment configuration. Check logs for details."
       );
     }
 
@@ -272,8 +289,7 @@ function validateClientEnv(): ClientEnv {
       process.env.NEXT_PUBLIC_RADAR_PUBLISHABLE_KEY,
     NEXT_PUBLIC_STADIA_API_KEY: process.env.NEXT_PUBLIC_STADIA_API_KEY,
     NEXT_PUBLIC_NEARBY_ENABLED: process.env.NEXT_PUBLIC_NEARBY_ENABLED,
-    NEXT_PUBLIC_TURNSTILE_SITE_KEY:
-      process.env.NEXT_PUBLIC_TURNSTILE_SITE_KEY,
+    NEXT_PUBLIC_TURNSTILE_SITE_KEY: process.env.NEXT_PUBLIC_TURNSTILE_SITE_KEY,
     NEXT_PUBLIC_APP_URL: process.env.NEXT_PUBLIC_APP_URL,
   };
 
@@ -289,7 +305,7 @@ function validateClientEnv(): ClientEnv {
     // In production, fail fast (same as server env)
     if (process.env.NODE_ENV === "production") {
       throw new Error(
-        "Invalid client environment configuration. Check logs for details.",
+        "Invalid client environment configuration. Check logs for details."
       );
     }
   }
@@ -339,11 +355,15 @@ export function getCursorSecret(): string {
   const secret = process.env.CURSOR_SECRET ?? "";
   if (!secret) {
     if (process.env.NODE_ENV === "production") {
-      throw new Error("[SECURITY] CURSOR_SECRET is required in production — cursor tokens cannot be verified without it");
+      throw new Error(
+        "[SECURITY] CURSOR_SECRET is required in production — cursor tokens cannot be verified without it"
+      );
     }
     if (!_cursorSecretDevWarned) {
       _cursorSecretDevWarned = true;
-      console.warn("[DEV] CURSOR_SECRET not set — cursors will not be HMAC-verified");
+      console.warn(
+        "[DEV] CURSOR_SECRET not set — cursors will not be HMAC-verified"
+      );
     }
   }
   return secret;
@@ -364,7 +384,11 @@ function hasValue(value: string | undefined): value is string {
 }
 
 function hasStrongSecret(value: string | undefined): boolean {
-  return hasValue(value) && value.length >= 32 && !PLACEHOLDER_SECRET_PATTERN.test(value);
+  return (
+    hasValue(value) &&
+    value.length >= 32 &&
+    !PLACEHOLDER_SECRET_PATTERN.test(value)
+  );
 }
 
 // Helper to check if a feature is available
@@ -378,13 +402,19 @@ export const features = {
     return true;
   },
   get redis() {
-    return hasValue(process.env.UPSTASH_REDIS_REST_URL) && hasValue(process.env.UPSTASH_REDIS_REST_TOKEN);
+    return (
+      hasValue(process.env.UPSTASH_REDIS_REST_URL) &&
+      hasValue(process.env.UPSTASH_REDIS_REST_TOKEN)
+    );
   },
   get aiChat() {
     return hasValue(process.env.GROQ_API_KEY);
   },
   get realtime() {
-    return hasValue(process.env.NEXT_PUBLIC_SUPABASE_URL) && hasValue(process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY);
+    return (
+      hasValue(process.env.NEXT_PUBLIC_SUPABASE_URL) &&
+      hasValue(process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY)
+    );
   },
   get errorTracking() {
     return hasValue(process.env.SENTRY_DSN);
@@ -404,7 +434,10 @@ export const features = {
     return hasStrongSecret(process.env.METRICS_SECRET);
   },
   get originEnforcement() {
-    return hasValue(process.env.ALLOWED_ORIGINS) || hasValue(process.env.ALLOWED_HOSTS);
+    return (
+      hasValue(process.env.ALLOWED_ORIGINS) ||
+      hasValue(process.env.ALLOWED_HOSTS)
+    );
   },
   get metricsHmac() {
     return hasStrongSecret(process.env.LOG_HMAC_SECRET);
@@ -470,8 +503,7 @@ export const features = {
   },
   get imageEmbeddings() {
     return (
-      process.env.ENABLE_IMAGE_EMBEDDINGS === "true" &&
-      features.semanticSearch
+      process.env.ENABLE_IMAGE_EMBEDDINGS === "true" && features.semanticSearch
     );
   },
   get semanticWeight(): number {
@@ -499,7 +531,7 @@ export function logStartupWarnings(): void {
   }
   if (!features.email) {
     warnings.push(
-      "RESEND_API_KEY not configured - email notifications disabled",
+      "RESEND_API_KEY not configured - email notifications disabled"
     );
   }
   if (!features.errorTracking) {
@@ -507,39 +539,41 @@ export function logStartupWarnings(): void {
   }
   if (!features.redis) {
     warnings.push(
-      "Redis not configured - using database-backed rate limiting (slower)",
+      "Redis not configured - using database-backed rate limiting (slower)"
     );
   }
   if (!features.cronAuth) {
     warnings.push("CRON_SECRET not configured - cron endpoints unprotected");
   }
   if (!features.metricsAuth) {
-    warnings.push("METRICS_SECRET not configured - /api/metrics/ops endpoint returns 401");
+    warnings.push(
+      "METRICS_SECRET not configured - /api/metrics/ops endpoint returns 401"
+    );
   }
   if (!features.nearbyPlaces) {
     warnings.push(
-      "Radar API not fully configured - nearby places feature disabled",
+      "Radar API not fully configured - nearby places feature disabled"
     );
   }
   if (!features.searchDoc) {
     warnings.push(
-      "ENABLE_SEARCH_DOC not enabled - using slow LIKE queries for text search (CRITICAL: enable for production)",
+      "ENABLE_SEARCH_DOC not enabled - using slow LIKE queries for text search (CRITICAL: enable for production)"
     );
   }
   if (!features.turnstile) {
     warnings.push(
-      "Turnstile not configured - auth forms have no bot protection",
+      "Turnstile not configured - auth forms have no bot protection"
     );
   }
   if (features.semanticSearch && !process.env.GEMINI_API_KEY) {
     warnings.push(
-      "GEMINI_API_KEY not set - semantic search enabled but unavailable",
+      "GEMINI_API_KEY not set - semantic search enabled but unavailable"
     );
   }
 
   if (warnings.length > 0) {
     console.warn(
-      "[ENV] Optional services not configured:\n  - " + warnings.join("\n  - "),
+      "[ENV] Optional services not configured:\n  - " + warnings.join("\n  - ")
     );
   }
 }

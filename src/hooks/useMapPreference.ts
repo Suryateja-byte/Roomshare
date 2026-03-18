@@ -100,9 +100,7 @@ export function useMapPreference() {
 
   // Compute current visibility based on device type
   // Mobile: map is always visible (bottom sheet overlays it)
-  const shouldShowMap = isMobile
-    ? true
-    : preference.desktop === "split";
+  const shouldShowMap = isMobile ? true : preference.desktop === "split";
 
   // Map should only render if user wants to see it AND we've hydrated
   // This is the key for cost savings - don't mount MapGL until needed

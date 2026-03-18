@@ -28,7 +28,7 @@ test.describe("Discovery & Search Journeys", () => {
         has: page.getByText(/featured|popular|recommended|newest|just listed/i),
       });
       await expect(
-        featuredSection.or(page.locator(selectors.listingCard).first()).first(),
+        featuredSection.or(page.locator(selectors.listingCard).first()).first()
       ).toBeVisible({
         timeout: 10000,
       });
@@ -37,12 +37,16 @@ test.describe("Discovery & Search Journeys", () => {
       await page.evaluate(() => window.scrollBy(0, 300));
 
       // Step 4: Click first listing card via JS (avoids hitting carousel buttons)
-      await expect(page.locator(selectors.listingCard).first()).toBeVisible({ timeout: 30000 });
+      await expect(page.locator(selectors.listingCard).first()).toBeVisible({
+        timeout: 30000,
+      });
       await page.waitForLoadState("load");
       await nav.clickListingCard(0);
 
       // Step 5: Verify listing detail page
-      await expect(page.getByRole("heading", { level: 1 }).first()).toBeVisible({ timeout: 30000 });
+      await expect(page.getByRole("heading", { level: 1 }).first()).toBeVisible(
+        { timeout: 30000 }
+      );
 
       // Step 6: Navigate back
       await nav.goBack();
@@ -50,18 +54,26 @@ test.describe("Discovery & Search Journeys", () => {
 
       // Step 7: Click search CTA
       await page.waitForLoadState("load");
-      const main = page.locator('main');
+      const main = page.locator("main");
       const searchButton = main
         .getByRole("link", { name: /search|find|browse/i })
         .or(main.getByRole("button", { name: /search|find/i }));
 
-      if (await searchButton.first().isVisible({ timeout: 5000 }).catch(() => false)) {
+      if (
+        await searchButton
+          .first()
+          .isVisible({ timeout: 5000 })
+          .catch(() => false)
+      ) {
         await searchButton.first().click();
-        const navigated = await page.waitForURL(/\/search/, { timeout: 15000 }).then(() => true).catch(() => false);
+        const navigated = await page
+          .waitForURL(/\/search/, { timeout: 15000 })
+          .then(() => true)
+          .catch(() => false);
         if (!navigated) {
           // CTA click may not navigate after back-navigation (bfcache/hydration).
           // Fall back to direct navigation — the test's purpose is the search page, not CTA mechanics.
-          await page.goto('/search');
+          await page.goto("/search");
           await expect(page).toHaveURL(/\/search/, { timeout: 15000 });
         }
       }
@@ -116,7 +128,9 @@ test.describe("Discovery & Search Journeys", () => {
       await expect(maxPriceInput).toHaveValue("2000");
 
       // Step 4: Verify results are displayed
-      await expect(page.getByRole("heading", { level: 1 }).first()).toBeVisible();
+      await expect(
+        page.getByRole("heading", { level: 1 }).first()
+      ).toBeVisible();
 
       // Step 5: Refresh and verify persistence
       await page.reload();
@@ -167,7 +181,9 @@ test.describe("Discovery & Search Journeys", () => {
       await nav.clickListingCard(0);
 
       // Step 3-4: Verify listing info
-      await expect(page.getByRole("heading", { level: 1 }).first()).toBeVisible();
+      await expect(
+        page.getByRole("heading", { level: 1 }).first()
+      ).toBeVisible();
       // Price is visible to guests; owners see "Manage Listing" instead
       const priceOrManage = page
         .getByText(/\$[\d,]+/)
@@ -176,10 +192,10 @@ test.describe("Discovery & Search Journeys", () => {
 
       // Step 5-6: Image gallery interaction
       const gallery = page.locator(
-        '[data-testid="gallery"], [class*="gallery"], [class*="image"]',
+        '[data-testid="gallery"], [class*="gallery"], [class*="image"]'
       );
       const thumbnails = page.locator(
-        '[data-testid="thumbnail"], [class*="thumbnail"]',
+        '[data-testid="thumbnail"], [class*="thumbnail"]'
       );
 
       if ((await thumbnails.count()) > 1) {
@@ -188,7 +204,7 @@ test.describe("Discovery & Search Journeys", () => {
 
       // Step 7-8: Scroll to sections
       await page.evaluate(() =>
-        window.scrollTo(0, document.body.scrollHeight / 2),
+        window.scrollTo(0, document.body.scrollHeight / 2)
       );
 
       const amenitiesSection = page.getByText(/amenities/i);
@@ -216,8 +232,12 @@ test.describe("Discovery & Search Journeys", () => {
       await expect(
         page
           .getByText(/not found|404|doesn't exist|couldn't find/i)
-          .or(page.getByRole('heading', { name: /couldn't find|oops|not found|404/i }))
-          .first(),
+          .or(
+            page.getByRole("heading", {
+              name: /couldn't find|oops|not found|404/i,
+            })
+          )
+          .first()
       ).toBeVisible({ timeout: 30_000 });
     });
   });
@@ -232,19 +252,27 @@ test.describe("Discovery & Search Journeys", () => {
       // Use bounds so listings exist for the map
       await nav.goToSearch({ bounds: SF_BOUNDS });
       await page.waitForLoadState("domcontentloaded");
-      await expect(page.getByRole("heading", { level: 1 }).first()).toBeVisible({ timeout: 30000 });
+      await expect(page.getByRole("heading", { level: 1 }).first()).toBeVisible(
+        { timeout: 30000 }
+      );
 
       // Find and click map view toggle — button text is "Map" (mobile) or "Show map" (desktop)
       const mapToggle = page
         .getByRole("button", { name: /show map|^map$/i })
         .or(page.locator('[data-testid="map-toggle"]'));
 
-      if (await mapToggle.first().isVisible({ timeout: 5000 }).catch(() => false)) {
+      if (
+        await mapToggle
+          .first()
+          .isVisible({ timeout: 5000 })
+          .catch(() => false)
+      ) {
         await mapToggle.first().click();
         await page.waitForTimeout(2000); // Map initialization takes time
 
         // Wait for map to render — Mapbox GL adds .maplibregl-map class, or use role="region" aria-label
-        const map = page.locator(selectors.map)
+        const map = page
+          .locator(selectors.map)
           .or(page.locator('[role="region"][aria-label*="map" i]'));
         await expect(map.first()).toBeVisible({ timeout: 20000 });
 
@@ -260,7 +288,7 @@ test.describe("Discovery & Search Journeys", () => {
           // Should show popup or listing info
           const popup = page.locator('[class*="popup"], [class*="Popup"]');
           await expect(
-            popup.or(page.locator('[data-testid="marker-popup"]')).first(),
+            popup.or(page.locator('[data-testid="marker-popup"]')).first()
           ).toBeVisible({
             timeout: 5000,
           });
@@ -343,7 +371,7 @@ test.describe("Discovery & Search Journeys", () => {
       assert,
     }) => {
       await nav.goToSearch({ bounds: SF_BOUNDS });
-      await page.waitForLoadState('domcontentloaded');
+      await page.waitForLoadState("domcontentloaded");
 
       // Check for main landmark and heading (core a11y checks)
       const main = page.locator('main, [role="main"]');

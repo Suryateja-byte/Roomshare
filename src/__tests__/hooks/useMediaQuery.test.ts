@@ -70,7 +70,9 @@ describe("useMediaQuery", () => {
     // very first render value is undefined.
     // After renderHook completes the effect has run; we just confirm the hook
     // settles to a boolean (truthy/falsy check covers both states).
-    expect(typeof result.current === "boolean" || result.current === undefined).toBe(true);
+    expect(
+      typeof result.current === "boolean" || result.current === undefined
+    ).toBe(true);
   });
 
   // 2. returns true when media query matches
@@ -139,7 +141,8 @@ describe("useMediaQuery", () => {
       expect.any(Function)
     );
     const addedFn = (currentMql.addEventListener as jest.Mock).mock.calls[0][1];
-    const removedFn = (currentMql.removeEventListener as jest.Mock).mock.calls[0][1];
+    const removedFn = (currentMql.removeEventListener as jest.Mock).mock
+      .calls[0][1];
     expect(addedFn).toBe(removedFn);
   });
 

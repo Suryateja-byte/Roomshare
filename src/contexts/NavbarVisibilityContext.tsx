@@ -1,6 +1,13 @@
-'use client';
+"use client";
 
-import { createContext, useContext, useState, useCallback, useMemo, type ReactNode } from 'react';
+import {
+  createContext,
+  useContext,
+  useState,
+  useCallback,
+  useMemo,
+  type ReactNode,
+} from "react";
 
 interface NavbarVisibilityState {
   /** Whether the navbar should be hidden (e.g., during immersive scroll animation) */
@@ -11,13 +18,22 @@ interface NavbarVisibilityState {
   show: () => void;
 }
 
-const NavbarVisibilityContext = createContext<NavbarVisibilityState | null>(null);
+const NavbarVisibilityContext = createContext<NavbarVisibilityState | null>(
+  null
+);
 
-export function NavbarVisibilityProvider({ children }: { children: ReactNode }) {
+export function NavbarVisibilityProvider({
+  children,
+}: {
+  children: ReactNode;
+}) {
   const [isHidden, setIsHidden] = useState(false);
   const hide = useCallback(() => setIsHidden(true), []);
   const show = useCallback(() => setIsHidden(false), []);
-  const value = useMemo(() => ({ isHidden, hide, show }), [isHidden, hide, show]);
+  const value = useMemo(
+    () => ({ isHidden, hide, show }),
+    [isHidden, hide, show]
+  );
 
   return (
     <NavbarVisibilityContext.Provider value={value}>

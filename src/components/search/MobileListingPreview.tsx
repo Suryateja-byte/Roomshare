@@ -31,7 +31,8 @@ export default function MobileListingPreview({
 
   // Scroll to active listing when it changes externally (e.g., pin tap)
   useEffect(() => {
-    if (!activeListingId || !scrollRef.current || isScrollingRef.current) return;
+    if (!activeListingId || !scrollRef.current || isScrollingRef.current)
+      return;
     const index = listingIds.indexOf(activeListingId);
     if (index < 0) return;
 
@@ -89,10 +90,7 @@ export default function MobileListingPreview({
       style={{ scrollSnapType: "x mandatory" }}
     >
       {listingIds.map((id) => (
-        <div
-          key={id}
-          className="flex-shrink-0 w-full snap-center px-4 py-2"
-        >
+        <div key={id} className="flex-shrink-0 w-full snap-center px-4 py-2">
           {renderPreview(id)}
         </div>
       ))}

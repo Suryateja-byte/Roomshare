@@ -127,7 +127,7 @@ async function resetScrollBurstCounter(page: Page) {
     ).__scrollBursts;
     if (state) {
       const container = document.querySelector(
-        '[data-testid="search-results-container"]',
+        '[data-testid="search-results-container"]'
       );
       state.count = 0;
       state.events = [];
@@ -140,7 +140,7 @@ async function resetScrollBurstCounter(page: Page) {
  * Get scroll events for debugging
  */
 async function getScrollEvents(
-  page: Page,
+  page: Page
 ): Promise<{ scrollTop: number; timestamp: number }[]> {
   return page.evaluate(() => {
     const state = (
@@ -158,13 +158,17 @@ async function getScrollEvents(
  * interception. Dispatches both wrapper.click() for react-map-gl native
  * handler and Enter keydown for React onKeyDown handler.
  */
-async function clickMarkerViaEvaluate(marker: import("@playwright/test").Locator): Promise<void> {
+async function clickMarkerViaEvaluate(
+  marker: import("@playwright/test").Locator
+): Promise<void> {
   await marker.evaluate((el) => {
     const htmlEl = el as HTMLElement;
     // Strategy 1: Click the wrapper element (react-map-gl native handler)
     htmlEl.click();
     // Strategy 2: Dispatch Enter keydown on inner element for React handler
-    const inner = htmlEl.querySelector("[data-listing-id]") as HTMLElement | null;
+    const inner = htmlEl.querySelector(
+      "[data-listing-id]"
+    ) as HTMLElement | null;
     if (inner) {
       inner.focus();
       inner.dispatchEvent(
@@ -173,7 +177,7 @@ async function clickMarkerViaEvaluate(marker: import("@playwright/test").Locator
           code: "Enter",
           bubbles: true,
           cancelable: true,
-        }),
+        })
       );
     }
   });
@@ -214,7 +218,7 @@ test.describe("List <-> Map Sync", () => {
 
     // Wait for listings to load — scope to visible container
     await expect(
-      searchResultsContainer(page).locator(selectors.listingCard).first(),
+      searchResultsContainer(page).locator(selectors.listingCard).first()
     ).toBeVisible({
       timeout: timeouts.navigation,
     });
@@ -238,7 +242,7 @@ test.describe("List <-> Map Sync", () => {
 
     // Check that no markers have the highlight class initially
     const highlightedMarker = page.locator(
-      '.maplibregl-marker [data-focus-state="active"]',
+      '.maplibregl-marker [data-focus-state="active"]'
     );
     await expect(highlightedMarker).toHaveCount(0);
 
@@ -247,7 +251,7 @@ test.describe("List <-> Map Sync", () => {
 
     // The corresponding marker should now be highlighted (blue with ring)
     const anyHighlightedMarker = page.locator(
-      '.maplibregl-marker [data-focus-state="hovered"]',
+      '.maplibregl-marker [data-focus-state="hovered"]'
     );
 
     // May not have a marker visible if map is not showing this area
@@ -262,7 +266,7 @@ test.describe("List <-> Map Sync", () => {
 
     // Highlight should be removed
     await expect(
-      page.locator('.maplibregl-marker [data-focus-state="hovered"]'),
+      page.locator('.maplibregl-marker [data-focus-state="hovered"]')
     ).toHaveCount(0, { timeout: timeouts.action });
   });
 
@@ -276,7 +280,7 @@ test.describe("List <-> Map Sync", () => {
 
     // Initially no ring highlight
     const hasRingHighlight = await firstCard.evaluate(
-      (el) => el.getAttribute("data-focus-state") === "active",
+      (el) => el.getAttribute("data-focus-state") === "active"
     );
     expect(hasRingHighlight).toBe(false);
 
@@ -294,12 +298,21 @@ test.describe("List <-> Map Sync", () => {
     page,
   }) => {
     const isMobileViewport = (page.viewportSize()?.width ?? 1024) < 768;
-    test.skip(isMobileViewport, "Map markers covered by bottom sheet on mobile");
+    test.skip(
+      isMobileViewport,
+      "Map markers covered by bottom sheet on mobile"
+    );
 
     // Wait for a visible map canvas (may have mobile + desktop views, only one visible)
     const map = page.locator(".maplibregl-canvas:visible").first();
-    const hasMapCanvas = await map.waitFor({ state: "visible", timeout: 10_000 }).then(() => true).catch(() => false);
-    if (!hasMapCanvas) { test.skip(true, "Map canvas not visible in headless CI without WebGL"); return; }
+    const hasMapCanvas = await map
+      .waitFor({ state: "visible", timeout: 10_000 })
+      .then(() => true)
+      .catch(() => false);
+    if (!hasMapCanvas) {
+      test.skip(true, "Map canvas not visible in headless CI without WebGL");
+      return;
+    }
 
     // Wait for map to be fully ready
     await waitForMapReady(page);
@@ -326,7 +339,7 @@ test.describe("List <-> Map Sync", () => {
     // the setSelected() call triggers scroll-to in the list view.
     // Scope to visible container to avoid counting cards in both desktop + mobile containers.
     const highlightedCard = searchResultsContainer(page).locator(
-      '[data-testid="listing-card"][data-focus-state="active"]',
+      '[data-testid="listing-card"][data-focus-state="active"]'
     );
     // Card may or may not be highlighted depending on whether it's a single or stacked marker
     const highlightedCount = await highlightedCard.count();
@@ -337,7 +350,10 @@ test.describe("List <-> Map Sync", () => {
     page,
   }) => {
     const isMobileViewport = (page.viewportSize()?.width ?? 1024) < 768;
-    test.skip(isMobileViewport, "Map markers covered by bottom sheet on mobile");
+    test.skip(
+      isMobileViewport,
+      "Map markers covered by bottom sheet on mobile"
+    );
 
     // Wait for map to be fully ready
     await waitForMapReady(page);
@@ -366,14 +382,14 @@ test.describe("List <-> Map Sync", () => {
           relatedTarget: document.body,
           clientX: rect.left + rect.width / 2,
           clientY: rect.top + rect.height / 2,
-        }),
+        })
       );
     });
 
     // Check if any listing card has the focus ring
     // Scope to visible container to avoid counting cards in both desktop + mobile containers.
     const highlightedCard = searchResultsContainer(page).locator(
-      '[data-testid="listing-card"][data-focus-state="active"]',
+      '[data-testid="listing-card"][data-focus-state="active"]'
     );
 
     // If the marker is for a single listing (not stacked), the card should be highlighted
@@ -402,7 +418,7 @@ test.describe("List <-> Map Sync", () => {
     let attempts = 0;
     while (attempts < 20) {
       const focusedElement = await page.evaluate(() =>
-        document.activeElement?.getAttribute("href"),
+        document.activeElement?.getAttribute("href")
       );
       if (focusedElement?.startsWith("/listings/")) {
         break;
@@ -427,15 +443,24 @@ test.describe("List <-> Map Sync", () => {
     page,
   }) => {
     const isMobileViewport = (page.viewportSize()?.width ?? 1024) < 768;
-    test.skip(isMobileViewport, "Map markers covered by bottom sheet on mobile");
+    test.skip(
+      isMobileViewport,
+      "Map markers covered by bottom sheet on mobile"
+    );
 
     // This test verifies the scrollRequest nonce system prevents double-scroll
     // by ensuring only ONE scroll burst occurs when clicking a marker.
 
     // Wait for map and markers to be ready with proper timing
     const map = page.locator(".maplibregl-canvas:visible").first();
-    const hasMapCanvas = await map.waitFor({ state: "visible", timeout: 10_000 }).then(() => true).catch(() => false);
-    if (!hasMapCanvas) { test.skip(true, "Map canvas not visible in headless CI without WebGL"); return; }
+    const hasMapCanvas = await map
+      .waitFor({ state: "visible", timeout: 10_000 })
+      .then(() => true)
+      .catch(() => false);
+    if (!hasMapCanvas) {
+      test.skip(true, "Map canvas not visible in headless CI without WebGL");
+      return;
+    }
 
     // Wait for map to be fully ready
     await waitForMapReady(page);
@@ -453,7 +478,7 @@ test.describe("List <-> Map Sync", () => {
     // Instrument the scroll container BEFORE clicking
     // Try desktop container first, then mobile
     const desktopContainer = page.locator(
-      '[data-testid="search-results-container"]',
+      '[data-testid="search-results-container"]'
     );
 
     const desktopVisible = await desktopContainer.isVisible();
@@ -480,7 +505,7 @@ test.describe("List <-> Map Sync", () => {
       const events = await getScrollEvents(page);
       console.log(
         "[Test Debug] Scroll events detected:",
-        JSON.stringify(events, null, 2),
+        JSON.stringify(events, null, 2)
       );
     }
   });
@@ -489,15 +514,24 @@ test.describe("List <-> Map Sync", () => {
     page,
   }) => {
     const isMobileViewport = (page.viewportSize()?.width ?? 1024) < 768;
-    test.skip(isMobileViewport, "Map markers covered by bottom sheet on mobile");
+    test.skip(
+      isMobileViewport,
+      "Map markers covered by bottom sheet on mobile"
+    );
 
     // This test verifies that activeId does NOT auto-clear after 1 second
     // (the old selectedId behavior had a setTimeout that cleared it)
 
     // Wait for map and markers with proper timing
     const map = page.locator(".maplibregl-canvas:visible").first();
-    const hasMapCanvas = await map.waitFor({ state: "visible", timeout: 10_000 }).then(() => true).catch(() => false);
-    if (!hasMapCanvas) { test.skip(true, "Map canvas not visible in headless CI without WebGL"); return; }
+    const hasMapCanvas = await map
+      .waitFor({ state: "visible", timeout: 10_000 })
+      .then(() => true)
+      .catch(() => false);
+    if (!hasMapCanvas) {
+      test.skip(true, "Map canvas not visible in headless CI without WebGL");
+      return;
+    }
 
     // Wait for map to be fully ready
     await waitForMapReady(page);
@@ -522,7 +556,7 @@ test.describe("List <-> Map Sync", () => {
     // Check if a card has the active ring immediately after click
     // Scope to visible container to avoid counting cards in both desktop + mobile containers.
     const highlightedCard = searchResultsContainer(page).locator(
-      '[data-testid="listing-card"][data-focus-state="active"]',
+      '[data-testid="listing-card"][data-focus-state="active"]'
     );
     const initialCount = await highlightedCard.count();
 
@@ -550,15 +584,24 @@ test.describe("List <-> Map Sync", () => {
     page,
   }) => {
     const isMobileViewport = (page.viewportSize()?.width ?? 1024) < 768;
-    test.skip(isMobileViewport, "Map markers covered by bottom sheet on mobile");
+    test.skip(
+      isMobileViewport,
+      "Map markers covered by bottom sheet on mobile"
+    );
 
     // This test verifies that requestScrollTo increments nonce correctly,
     // so clicking the same marker twice produces two distinct scroll events.
 
     // Wait for map and markers with proper timing
     const map = page.locator(".maplibregl-canvas:visible").first();
-    const hasMapCanvas = await map.waitFor({ state: "visible", timeout: 10_000 }).then(() => true).catch(() => false);
-    if (!hasMapCanvas) { test.skip(true, "Map canvas not visible in headless CI without WebGL"); return; }
+    const hasMapCanvas = await map
+      .waitFor({ state: "visible", timeout: 10_000 })
+      .then(() => true)
+      .catch(() => false);
+    if (!hasMapCanvas) {
+      test.skip(true, "Map canvas not visible in headless CI without WebGL");
+      return;
+    }
 
     // Wait for map to be fully ready
     await waitForMapReady(page);
@@ -576,10 +619,10 @@ test.describe("List <-> Map Sync", () => {
     // First, scroll the list container to ensure the target card is NOT in view
     // This guarantees scroll will actually happen
     const desktopContainer = page.locator(
-      '[data-testid="search-results-container"]',
+      '[data-testid="search-results-container"]'
     );
     const mobileContainer = page.locator(
-      '[data-testid="mobile-search-results-container"]',
+      '[data-testid="mobile-search-results-container"]'
     );
 
     const desktopVisible = await desktopContainer.isVisible();
@@ -644,7 +687,10 @@ test.describe("List <-> Map Sync", () => {
     page,
   }) => {
     const isMobileViewport = (page.viewportSize()?.width ?? 1024) < 768;
-    test.skip(isMobileViewport, "Map markers covered by bottom sheet on mobile");
+    test.skip(
+      isMobileViewport,
+      "Map markers covered by bottom sheet on mobile"
+    );
 
     // beforeEach already navigated and waited for listing cards
     await page.waitForLoadState("domcontentloaded");
@@ -667,7 +713,10 @@ test.describe("List <-> Map Sync", () => {
       await waitForStackedMarker(page);
     } catch {
       await cleanup();
-      test.skip(true, "Stacked markers not rendered in headless CI without WebGL");
+      test.skip(
+        true,
+        "Stacked markers not rendered in headless CI without WebGL"
+      );
       return;
     }
 
@@ -676,7 +725,10 @@ test.describe("List <-> Map Sync", () => {
 
     // Click the marker (should be the only one or first one with stacked listings)
     const marker = page.locator(".maplibregl-marker:visible").first();
-    const hasMarker = await marker.waitFor({ state: "visible", timeout: 5_000 }).then(() => true).catch(() => false);
+    const hasMarker = await marker
+      .waitFor({ state: "visible", timeout: 5_000 })
+      .then(() => true)
+      .catch(() => false);
     if (!hasMarker) {
       await cleanup();
       test.skip(true, "Map markers not visible in headless CI");
@@ -686,10 +738,16 @@ test.describe("List <-> Map Sync", () => {
 
     // Wait for popup container to appear (mapbox popup)
     const mapboxPopup = page.locator(".maplibregl-popup").first();
-    const popupVisible = await mapboxPopup.waitFor({ state: "visible", timeout: timeouts.action }).then(() => true).catch(() => false);
+    const popupVisible = await mapboxPopup
+      .waitFor({ state: "visible", timeout: timeouts.action })
+      .then(() => true)
+      .catch(() => false);
     if (!popupVisible) {
       await cleanup();
-      test.skip(true, "Popup did not appear — stacked marker feature unavailable in CI");
+      test.skip(
+        true,
+        "Popup did not appear — stacked marker feature unavailable in CI"
+      );
       return;
     }
 
@@ -699,7 +757,10 @@ test.describe("List <-> Map Sync", () => {
     const isStacked = await popupHeader.isVisible().catch(() => false);
     if (!isStacked) {
       await cleanup();
-      test.skip(true, "Stacked popup header not visible — feature unavailable in CI");
+      test.skip(
+        true,
+        "Stacked popup header not visible — feature unavailable in CI"
+      );
       return;
     }
 
@@ -714,9 +775,11 @@ test.describe("List <-> Map Sync", () => {
     // Verify card gets highlight ring (React context state update + re-render)
     // Use longer timeout to let Playwright's auto-retry handle timing
     const highlightedCard = page.locator(
-      `[data-listing-id="${ids[0]}"][data-focus-state="active"]`,
+      `[data-listing-id="${ids[0]}"][data-focus-state="active"]`
     );
-    await expect(highlightedCard.first()).toBeVisible({ timeout: timeouts.action });
+    await expect(highlightedCard.first()).toBeVisible({
+      timeout: timeouts.action,
+    });
 
     // Move mouse away
     await page.mouse.move(0, 0);
@@ -731,7 +794,10 @@ test.describe("List <-> Map Sync", () => {
     page,
   }) => {
     const isMobileViewport = (page.viewportSize()?.width ?? 1024) < 768;
-    test.skip(isMobileViewport, "Map markers covered by bottom sheet on mobile");
+    test.skip(
+      isMobileViewport,
+      "Map markers covered by bottom sheet on mobile"
+    );
 
     await page.waitForLoadState("domcontentloaded");
 
@@ -751,7 +817,10 @@ test.describe("List <-> Map Sync", () => {
       await waitForStackedMarker(page);
     } catch {
       await cleanup();
-      test.skip(true, "Stacked markers not rendered in headless CI without WebGL");
+      test.skip(
+        true,
+        "Stacked markers not rendered in headless CI without WebGL"
+      );
       return;
     }
 
@@ -760,7 +829,10 @@ test.describe("List <-> Map Sync", () => {
 
     // Click marker to open popup using evaluate-based click
     const marker = page.locator(".maplibregl-marker:visible").first();
-    const hasMarker = await marker.waitFor({ state: "visible", timeout: 5_000 }).then(() => true).catch(() => false);
+    const hasMarker = await marker
+      .waitFor({ state: "visible", timeout: 5_000 })
+      .then(() => true)
+      .catch(() => false);
     if (!hasMarker) {
       await cleanup();
       test.skip(true, "Map markers not visible in headless CI");
@@ -770,10 +842,16 @@ test.describe("List <-> Map Sync", () => {
 
     // Wait for popup container to appear (mapbox popup)
     const mapboxPopup = page.locator(".maplibregl-popup").first();
-    const popupVisible = await mapboxPopup.waitFor({ state: "visible", timeout: timeouts.action }).then(() => true).catch(() => false);
+    const popupVisible = await mapboxPopup
+      .waitFor({ state: "visible", timeout: timeouts.action })
+      .then(() => true)
+      .catch(() => false);
     if (!popupVisible) {
       await cleanup();
-      test.skip(true, "Popup did not appear — stacked marker feature unavailable in CI");
+      test.skip(
+        true,
+        "Popup did not appear — stacked marker feature unavailable in CI"
+      );
       return;
     }
 
@@ -782,13 +860,16 @@ test.describe("List <-> Map Sync", () => {
     const isStacked = await popupHeader.isVisible().catch(() => false);
     if (!isStacked) {
       await cleanup();
-      test.skip(true, "Stacked popup header not visible — feature unavailable in CI");
+      test.skip(
+        true,
+        "Stacked popup header not visible — feature unavailable in CI"
+      );
       return;
     }
 
     // Setup scroll detection
     const desktopContainer = page.locator(
-      '[data-testid="search-results-container"]',
+      '[data-testid="search-results-container"]'
     );
     const desktopVisible = await desktopContainer.isVisible();
     const containerSelector = desktopVisible
@@ -808,7 +889,7 @@ test.describe("List <-> Map Sync", () => {
 
     // Card should have active ring (persistent)
     const activeCard = page.locator(
-      `[data-listing-id="${ids[0]}"][data-focus-state="active"]`,
+      `[data-listing-id="${ids[0]}"][data-focus-state="active"]`
     );
     await expect(activeCard.first()).toBeVisible({ timeout: timeouts.action });
 
@@ -828,7 +909,10 @@ test.describe("List <-> Map Sync", () => {
     page,
   }) => {
     const isMobileViewport = (page.viewportSize()?.width ?? 1024) < 768;
-    test.skip(isMobileViewport, "Map markers covered by bottom sheet on mobile");
+    test.skip(
+      isMobileViewport,
+      "Map markers covered by bottom sheet on mobile"
+    );
 
     await page.waitForLoadState("domcontentloaded");
 
@@ -846,7 +930,10 @@ test.describe("List <-> Map Sync", () => {
       await waitForStackedMarker(page);
     } catch {
       await cleanup();
-      test.skip(true, "Stacked markers not rendered in headless CI without WebGL");
+      test.skip(
+        true,
+        "Stacked markers not rendered in headless CI without WebGL"
+      );
       return;
     }
 
@@ -855,7 +942,10 @@ test.describe("List <-> Map Sync", () => {
 
     // Click marker to open popup using evaluate-based click
     const marker = page.locator(".maplibregl-marker:visible").first();
-    const hasMarker = await marker.waitFor({ state: "visible", timeout: 5_000 }).then(() => true).catch(() => false);
+    const hasMarker = await marker
+      .waitFor({ state: "visible", timeout: 5_000 })
+      .then(() => true)
+      .catch(() => false);
     if (!hasMarker) {
       await cleanup();
       test.skip(true, "Map markers not visible in headless CI");
@@ -865,10 +955,16 @@ test.describe("List <-> Map Sync", () => {
 
     // Wait for popup container to appear (mapbox popup)
     const mapboxPopup = page.locator(".maplibregl-popup").first();
-    const popupVisible = await mapboxPopup.waitFor({ state: "visible", timeout: timeouts.action }).then(() => true).catch(() => false);
+    const popupVisible = await mapboxPopup
+      .waitFor({ state: "visible", timeout: timeouts.action })
+      .then(() => true)
+      .catch(() => false);
     if (!popupVisible) {
       await cleanup();
-      test.skip(true, "Popup did not appear — stacked marker feature unavailable in CI");
+      test.skip(
+        true,
+        "Popup did not appear — stacked marker feature unavailable in CI"
+      );
       return;
     }
 
@@ -877,7 +973,10 @@ test.describe("List <-> Map Sync", () => {
     const isStacked = await popupHeader.isVisible().catch(() => false);
     if (!isStacked) {
       await cleanup();
-      test.skip(true, "Stacked popup header not visible — feature unavailable in CI");
+      test.skip(
+        true,
+        "Stacked popup header not visible — feature unavailable in CI"
+      );
       return;
     }
 
@@ -927,7 +1026,7 @@ test.describe("List <-> Map Sync", () => {
 
     // Click "View on map" button (not the card itself)
     const viewOnMapBtn = page.locator(
-      `[data-testid="view-on-map-${listingId}"]`,
+      `[data-testid="view-on-map-${listingId}"]`
     );
     await expect(viewOnMapBtn).toBeVisible();
     await viewOnMapBtn.click();
@@ -945,7 +1044,7 @@ test.describe("List <-> Map Sync", () => {
 
     // Card should be marked as active (stable data attribute)
     const card = searchResultsContainer(page).locator(
-      `[data-testid="listing-card-${listingId}"]`,
+      `[data-testid="listing-card-${listingId}"]`
     );
     await expect(card).toHaveAttribute("data-active", "true", {
       timeout: timeouts.action,
@@ -965,7 +1064,7 @@ test.describe("List <-> Map Sync", () => {
     expect(listingId).toBeTruthy();
 
     const viewOnMapBtn = page.locator(
-      `[data-testid="view-on-map-${listingId}"]`,
+      `[data-testid="view-on-map-${listingId}"]`
     );
     await expect(viewOnMapBtn).toBeVisible();
 
@@ -979,7 +1078,7 @@ test.describe("List <-> Map Sync", () => {
 
     // Card should be marked as active
     const card = searchResultsContainer(page).locator(
-      `[data-testid="listing-card-${listingId}"]`,
+      `[data-testid="listing-card-${listingId}"]`
     );
     await expect(card).toHaveAttribute("data-active", "true", {
       timeout: timeouts.action,
@@ -1017,7 +1116,7 @@ test.describe("List <-> Map Sync", () => {
     // Click the View on Map button IMMEDIATELY (during potential hydration)
     // Don't wait for any additional page readiness
     const viewOnMapBtn = page.locator(
-      `[data-testid="view-on-map-${listingId}"]`,
+      `[data-testid="view-on-map-${listingId}"]`
     );
     await expect(viewOnMapBtn).toBeVisible();
     await viewOnMapBtn.click();
@@ -1029,7 +1128,7 @@ test.describe("List <-> Map Sync", () => {
 
     // The clicked listing should be marked as active
     const card = searchResultsContainer(page).locator(
-      `[data-testid="listing-card-${listingId}"]`,
+      `[data-testid="listing-card-${listingId}"]`
     );
     await expect(card).toHaveAttribute("data-active", "true", {
       timeout: timeouts.action,
@@ -1054,12 +1153,21 @@ test.describe("List <-> Map Sync", () => {
     page,
   }) => {
     const isMobileViewport = (page.viewportSize()?.width ?? 1024) < 768;
-    test.skip(isMobileViewport, "Map markers covered by bottom sheet on mobile");
+    test.skip(
+      isMobileViewport,
+      "Map markers covered by bottom sheet on mobile"
+    );
 
     // Wait for map and markers with proper timing
     const map = page.locator(".maplibregl-canvas:visible").first();
-    const hasMapCanvas = await map.waitFor({ state: "visible", timeout: 10_000 }).then(() => true).catch(() => false);
-    if (!hasMapCanvas) { test.skip(true, "Map canvas not visible in headless CI without WebGL"); return; }
+    const hasMapCanvas = await map
+      .waitFor({ state: "visible", timeout: 10_000 })
+      .then(() => true)
+      .catch(() => false);
+    if (!hasMapCanvas) {
+      test.skip(true, "Map canvas not visible in headless CI without WebGL");
+      return;
+    }
 
     // Wait for map to be fully ready
     await waitForMapReady(page);
@@ -1082,7 +1190,7 @@ test.describe("List <-> Map Sync", () => {
     // Check if a card has the active ring (may not if stacked marker)
     // Scope to visible container to avoid counting cards in both desktop + mobile containers.
     const highlightedCard = searchResultsContainer(page).locator(
-      '[data-testid="listing-card"][data-focus-state="active"]',
+      '[data-testid="listing-card"][data-focus-state="active"]'
     );
     const hadActiveCard = (await highlightedCard.count()) > 0;
 
@@ -1108,12 +1216,21 @@ test.describe("List <-> Map Sync", () => {
     page,
   }) => {
     const isMobileViewport = (page.viewportSize()?.width ?? 1024) < 768;
-    test.skip(isMobileViewport, "Map markers covered by bottom sheet on mobile");
+    test.skip(
+      isMobileViewport,
+      "Map markers covered by bottom sheet on mobile"
+    );
 
     // Wait for map and markers with proper timing
     const map = page.locator(".maplibregl-canvas:visible").first();
-    const hasMapCanvas = await map.waitFor({ state: "visible", timeout: 10_000 }).then(() => true).catch(() => false);
-    if (!hasMapCanvas) { test.skip(true, "Map canvas not visible in headless CI without WebGL"); return; }
+    const hasMapCanvas = await map
+      .waitFor({ state: "visible", timeout: 10_000 })
+      .then(() => true)
+      .catch(() => false);
+    if (!hasMapCanvas) {
+      test.skip(true, "Map canvas not visible in headless CI without WebGL");
+      return;
+    }
 
     // Wait for map to be fully ready
     await waitForMapReady(page);
@@ -1141,7 +1258,7 @@ test.describe("List <-> Map Sync", () => {
     // Use bottom-left corner area
     await page.mouse.click(
       mapBoundingBox!.x + 20,
-      mapBoundingBox!.y + mapBoundingBox!.height - 20,
+      mapBoundingBox!.y + mapBoundingBox!.height - 20
     );
 
     // Popup should be closed (or still visible if we hit another marker)
@@ -1156,7 +1273,10 @@ test.describe("List <-> Map Sync", () => {
     page,
   }) => {
     const isMobileViewport = (page.viewportSize()?.width ?? 1024) < 768;
-    test.skip(isMobileViewport, "Map markers covered by bottom sheet on mobile");
+    test.skip(
+      isMobileViewport,
+      "Map markers covered by bottom sheet on mobile"
+    );
 
     await page.waitForLoadState("domcontentloaded");
 
@@ -1174,7 +1294,10 @@ test.describe("List <-> Map Sync", () => {
       await waitForStackedMarker(page);
     } catch {
       await cleanup();
-      test.skip(true, "Stacked markers not rendered in headless CI without WebGL");
+      test.skip(
+        true,
+        "Stacked markers not rendered in headless CI without WebGL"
+      );
       return;
     }
 
@@ -1183,7 +1306,10 @@ test.describe("List <-> Map Sync", () => {
 
     // Click marker to open stacked popup using evaluate-based click
     const marker = page.locator(".maplibregl-marker:visible").first();
-    const hasMarker = await marker.waitFor({ state: "visible", timeout: 5_000 }).then(() => true).catch(() => false);
+    const hasMarker = await marker
+      .waitFor({ state: "visible", timeout: 5_000 })
+      .then(() => true)
+      .catch(() => false);
     if (!hasMarker) {
       await cleanup();
       test.skip(true, "Map markers not visible in headless CI");
@@ -1193,10 +1319,16 @@ test.describe("List <-> Map Sync", () => {
 
     // Wait for stacked popup
     const mapboxPopup = page.locator(".maplibregl-popup").first();
-    const popupVisible = await mapboxPopup.waitFor({ state: "visible", timeout: timeouts.action }).then(() => true).catch(() => false);
+    const popupVisible = await mapboxPopup
+      .waitFor({ state: "visible", timeout: timeouts.action })
+      .then(() => true)
+      .catch(() => false);
     if (!popupVisible) {
       await cleanup();
-      test.skip(true, "Popup did not appear — stacked marker feature unavailable in CI");
+      test.skip(
+        true,
+        "Popup did not appear — stacked marker feature unavailable in CI"
+      );
       return;
     }
 
@@ -1204,7 +1336,10 @@ test.describe("List <-> Map Sync", () => {
     const isStacked = await popupHeader.isVisible().catch(() => false);
     if (!isStacked) {
       await cleanup();
-      test.skip(true, "Stacked popup header not visible — feature unavailable in CI");
+      test.skip(
+        true,
+        "Stacked popup header not visible — feature unavailable in CI"
+      );
       return;
     }
 
@@ -1216,7 +1351,7 @@ test.describe("List <-> Map Sync", () => {
     // Popup closes, card should be active
     await expect(mapboxPopup).not.toBeVisible({ timeout: timeouts.action });
     const activeCard = page.locator(
-      `[data-listing-id="${ids[0]}"][data-focus-state="active"]`,
+      `[data-listing-id="${ids[0]}"][data-focus-state="active"]`
     );
     await expect(activeCard.first()).toBeVisible({ timeout: timeouts.action });
 
@@ -1233,12 +1368,21 @@ test.describe("List <-> Map Sync", () => {
     page,
   }) => {
     const isMobileViewport = (page.viewportSize()?.width ?? 1024) < 768;
-    test.skip(isMobileViewport, "Map markers covered by bottom sheet on mobile");
+    test.skip(
+      isMobileViewport,
+      "Map markers covered by bottom sheet on mobile"
+    );
 
     // Wait for map and markers with proper timing
     const map = page.locator(".maplibregl-canvas:visible").first();
-    const hasMapCanvas = await map.waitFor({ state: "visible", timeout: 10_000 }).then(() => true).catch(() => false);
-    if (!hasMapCanvas) { test.skip(true, "Map canvas not visible in headless CI without WebGL"); return; }
+    const hasMapCanvas = await map
+      .waitFor({ state: "visible", timeout: 10_000 })
+      .then(() => true)
+      .catch(() => false);
+    if (!hasMapCanvas) {
+      test.skip(true, "Map canvas not visible in headless CI without WebGL");
+      return;
+    }
 
     // Wait for map to be fully ready
     await waitForMapReady(page);
@@ -1267,13 +1411,21 @@ test.describe("List <-> Map Sync", () => {
 
     // Close popup first to avoid overlay interception of the card click
     await page.keyboard.press("Escape");
-    await expect(popup).not.toBeVisible({ timeout: 5_000 }).catch(() => {});
+    await expect(popup)
+      .not.toBeVisible({ timeout: 5_000 })
+      .catch(() => {});
 
     // Click the card — use evaluate click to bypass any remaining overlay interception
     await firstCard.evaluate((el) => {
       // Find the anchor inside the card and click it for proper navigation
-      const link = el.querySelector('a[href*="/listings/"]') as HTMLElement | null;
-      if (link) { link.click(); } else { (el as HTMLElement).click(); }
+      const link = el.querySelector(
+        'a[href*="/listings/"]'
+      ) as HTMLElement | null;
+      if (link) {
+        link.click();
+      } else {
+        (el as HTMLElement).click();
+      }
     });
 
     // Should navigate to listing detail page -- use "commit" to avoid waiting for full resource load

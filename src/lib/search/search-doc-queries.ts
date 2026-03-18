@@ -13,7 +13,7 @@
  * - PostGIS: geography type with GIST index for spatial queries
  */
 
-import 'server-only';
+import "server-only";
 
 import { prisma } from "@/lib/prisma";
 import { wrapDatabaseError } from "@/lib/errors";
@@ -36,7 +36,11 @@ import {
   isNearMatch,
 } from "@/lib/near-matches";
 import { hasActiveFilters } from "@/lib/search-params";
-import { BOUNDS_EPSILON, DEFAULT_PAGE_SIZE, MAX_QUERY_LENGTH } from "@/lib/constants";
+import {
+  BOUNDS_EPSILON,
+  DEFAULT_PAGE_SIZE,
+  MAX_QUERY_LENGTH,
+} from "@/lib/constants";
 import { features } from "@/lib/env";
 import { parseLocalDate } from "@/lib/utils";
 import type { KeysetCursor, SortOption, CursorRowData } from "./cursor";
@@ -107,10 +111,13 @@ interface ListingWithCursorRaw extends ListingRaw {
  * ALL user-supplied values MUST be in the `params` array as $N placeholders.
  * NEVER interpolate a value from filterParams directly into the query string.
  */
-async function queryWithTimeout<T>(query: string, params: unknown[]): Promise<T[]> {
+async function queryWithTimeout<T>(
+  query: string,
+  params: unknown[]
+): Promise<T[]> {
   return prisma.$transaction(async (tx) => {
     await tx.$executeRawUnsafe(
-      `SET LOCAL statement_timeout = ${SEARCH_QUERY_TIMEOUT_MS}`,
+      `SET LOCAL statement_timeout = ${SEARCH_QUERY_TIMEOUT_MS}`
     );
     return tx.$queryRawUnsafe<T[]>(query, ...params);
   });
@@ -202,7 +209,7 @@ function createSearchDocCountCacheKey(params: FilterParams): string {
 function buildKeysetWhereClause(
   cursor: KeysetCursor,
   sort: SortOption,
-  startParamIndex: number,
+  startParamIndex: number
 ): { clause: string; params: unknown[]; nextParamIndex: number } {
   const params: unknown[] = [];
   let paramIndex = startParamIndex;
@@ -262,8 +269,7 @@ function buildKeysetWhereClause(
       const dateParam = nextParam();
       const idParam = nextParam();
 
-      const cursorPrice =
-        cursor.k[0] !== null ? parseFloat(cursor.k[0]) : null;
+      const cursorPrice = cursor.k[0] !== null ? parseFloat(cursor.k[0]) : null;
       params.push(cursorPrice, cursor.k[1], cursor.id);
 
       // Handle NULL cursor price separately to avoid SQL comparison issues (d.price = NULL always false)
@@ -295,8 +301,7 @@ function buildKeysetWhereClause(
       const dateParam = nextParam();
       const idParam = nextParam();
 
-      const cursorPrice =
-        cursor.k[0] !== null ? parseFloat(cursor.k[0]) : null;
+      const cursorPrice = cursor.k[0] !== null ? parseFloat(cursor.k[0]) : null;
       params.push(cursorPrice, cursor.k[1], cursor.id);
 
       // Handle NULL cursor price separately to avoid SQL comparison issues
@@ -372,7 +377,7 @@ function buildKeysetWhereClause(
       return buildKeysetWhereClause(
         { ...cursor, s: "recommended" },
         "recommended",
-        startParamIndex,
+        startParamIndex
       );
   }
 
@@ -392,7 +397,7 @@ export interface WhereBuilder {
 }
 
 export function buildSearchDocWhereConditions(
-  filterParams: FilterParams,
+  filterParams: FilterParams
 ): WhereBuilder {
   // SECURITY INVARIANT:
   // - All user-derived values must be pushed to `params` and referenced as $N placeholders.
@@ -418,7 +423,7 @@ export function buildSearchDocWhereConditions(
   // Base conditions for SearchDoc
   const slotThreshold = Math.max(minAvailableSlots ?? 1, 1);
   const conditions: string[] = [
-    (features.softHoldsEnabled || features.softHoldsDraining)
+    features.softHoldsEnabled || features.softHoldsDraining
       ? `(d.available_slots - COALESCE((
           SELECT SUM("slotsRequested") FROM "Booking" b
           WHERE b."listingId" = d.id
@@ -447,7 +452,7 @@ export function buildSearchDocWhereConditions(
     } else {
       // Normal bounding box using geography operator
       conditions.push(
-        `d.location_geog && ST_MakeEnvelope($${paramIndex}, $${paramIndex + 1}, $${paramIndex + 2}, $${paramIndex + 3}, 4326)::geography`,
+        `d.location_geog && ST_MakeEnvelope($${paramIndex}, $${paramIndex + 1}, $${paramIndex + 2}, $${paramIndex + 3}, 4326)::geography`
       );
       params.push(bounds.minLng, bounds.minLat, bounds.maxLng, bounds.maxLat);
       paramIndex += 4;
@@ -472,7 +477,9 @@ export function buildSearchDocWhereConditions(
       // Use FTS: search_tsv @@ plainto_tsquery('english', $N)
       // plainto_tsquery handles multi-word queries as AND by default
       ftsQueryParamIndex = paramIndex; // Track for ts_rank_cd in ORDER BY
-      conditions.push(`d.search_tsv @@ plainto_tsquery('english', $${paramIndex})`);
+      conditions.push(
+        `d.search_tsv @@ plainto_tsquery('english', $${paramIndex})`
+      );
       params.push(sanitizedQuery);
       paramIndex++;
     }
@@ -493,7 +500,7 @@ export function buildSearchDocWhereConditions(
   // Move-in date filter
   if (moveInDate) {
     conditions.push(
-      `(d.move_in_date IS NULL OR d.move_in_date <= $${paramIndex++})`,
+      `(d.move_in_date IS NULL OR d.move_in_date <= $${paramIndex++})`
     );
     params.push(parseLocalDate(moveInDate));
   }
@@ -506,7 +513,7 @@ export function buildSearchDocWhereConditions(
     if (normalized.length > 0) {
       // GIN array overlap - returns true if any element matches
       conditions.push(
-        `d.household_languages_lower && $${paramIndex++}::text[]`,
+        `d.household_languages_lower && $${paramIndex++}::text[]`
       );
       params.push(normalized);
     }
@@ -520,7 +527,7 @@ export function buildSearchDocWhereConditions(
       .filter(Boolean);
     if (normalizedAmenities.length > 0) {
       conditions.push(
-        `NOT EXISTS (SELECT 1 FROM unnest($${paramIndex++}::text[]) AS search_term WHERE NOT EXISTS (SELECT 1 FROM unnest(d.amenities_lower) AS la WHERE la LIKE '%' || search_term || '%'))`,
+        `NOT EXISTS (SELECT 1 FROM unnest($${paramIndex++}::text[]) AS search_term WHERE NOT EXISTS (SELECT 1 FROM unnest(d.amenities_lower) AS la WHERE la LIKE '%' || search_term || '%'))`
       );
       params.push(normalizedAmenities);
     }
@@ -595,13 +602,14 @@ export function buildSearchDocWhereConditions(
 export function buildOrderByClause(
   sort: SortOption,
   ftsQueryParamIndex: number | null,
-  useKeysetPagination: boolean = false,
+  useKeysetPagination: boolean = false
 ): string {
   // ts_rank_cd expression: only used when FTS is active AND not using keyset pagination
   // Keyset cursors don't capture ts_rank_cd, so including it causes page drift
-  const tsRankExpr = ftsQueryParamIndex !== null && !useKeysetPagination
-    ? `ts_rank_cd(d.search_tsv, plainto_tsquery('english', $${ftsQueryParamIndex})) DESC, `
-    : "";
+  const tsRankExpr =
+    ftsQueryParamIndex !== null && !useKeysetPagination
+      ? `ts_rank_cd(d.search_tsv, plainto_tsquery('english', $${ftsQueryParamIndex})) DESC, `
+      : "";
 
   switch (sort) {
     case "price_asc":
@@ -623,7 +631,7 @@ export function buildOrderByClause(
 // ============================================
 
 async function getSearchDocLimitedCountInternal(
-  params: FilterParams,
+  params: FilterParams
 ): Promise<number | null> {
   // Defense in depth: Return null for unbounded browse (no query, no bounds, no filters)
   // This prevents COUNT(*) full-table scans on listing_search_docs
@@ -648,7 +656,7 @@ async function getSearchDocLimitedCountInternal(
 
   const result = await queryWithTimeout<{ count: bigint }>(
     limitedCountQuery,
-    queryParams,
+    queryParams
   );
 
   const count = Number(result[0]?.count || 0);
@@ -662,7 +670,7 @@ async function getSearchDocLimitedCountInternal(
 }
 
 export async function getSearchDocLimitedCount(
-  params: FilterParams,
+  params: FilterParams
 ): Promise<number | null> {
   const cacheKey = createSearchDocCountCacheKey(params);
 
@@ -671,7 +679,7 @@ export async function getSearchDocLimitedCount(
   const cachedFn = unstable_cache(
     async () => getSearchDocLimitedCountInternal(params),
     ["searchdoc-limited-count", cacheKey],
-    { revalidate: 60 },
+    { revalidate: 60 }
   );
 
   return cachedFn();
@@ -731,14 +739,12 @@ export interface MapListingsResult {
 }
 
 async function getSearchDocMapListingsInternal(
-  params: FilterParams,
+  params: FilterParams
 ): Promise<MapListingsResult> {
   // Defense in depth: map listings ALWAYS require geographic bounds
   // This prevents full-table scans and ensures map has a defined viewport
   if (!params.bounds) {
-    throw new Error(
-      "Geographic bounds required for map listings",
-    );
+    throw new Error("Geographic bounds required for map listings");
   }
 
   // Apply near-match filter expansion for map markers
@@ -779,26 +785,30 @@ async function getSearchDocMapListingsInternal(
   `;
 
   try {
-    const listings = await queryWithTimeout<MapListingRaw>(
-      sqlQuery,
-      [...queryParams, fetchLimit],
-    );
+    const listings = await queryWithTimeout<MapListingRaw>(sqlQuery, [
+      ...queryParams,
+      fetchLimit,
+    ]);
 
     // Detect truncation via LIMIT+1 pattern (avoids COUNT(*) OVER() cost)
     const truncated = listings.length > MAX_MAP_MARKERS;
-    const trimmedListings = truncated ? listings.slice(0, MAX_MAP_MARKERS) : listings;
+    const trimmedListings = truncated
+      ? listings.slice(0, MAX_MAP_MARKERS)
+      : listings;
 
-    const mappedListings = sanitizeMapListings(trimmedListings.map((l) => ({
-      id: l.id,
-      title: l.title,
-      price: Number(l.price),
-      availableSlots: l.availableSlots,
-      images: l.primaryImage ? [l.primaryImage] : [],
-      location: {
-        lat: l.lat,
-        lng: l.lng,
-      },
-    })));
+    const mappedListings = sanitizeMapListings(
+      trimmedListings.map((l) => ({
+        id: l.id,
+        title: l.title,
+        price: Number(l.price),
+        availableSlots: l.availableSlots,
+        images: l.primaryImage ? [l.primaryImage] : [],
+        location: {
+          lat: l.lat,
+          lng: l.lng,
+        },
+      }))
+    );
 
     return {
       listings: mappedListings,
@@ -820,14 +830,14 @@ async function getSearchDocMapListingsInternal(
  * Returns listings with truncation info when more than MAX_MAP_MARKERS exist.
  */
 export async function getSearchDocMapListings(
-  params: FilterParams = {},
+  params: FilterParams = {}
 ): Promise<MapListingsResult> {
   const cacheKey = createSearchDocMapCacheKey(params);
 
   const cachedFn = unstable_cache(
     async () => getSearchDocMapListingsInternal(params),
     ["searchdoc-map-listings", cacheKey],
-    { revalidate: 60 },
+    { revalidate: 60 }
   );
 
   return cachedFn();
@@ -844,7 +854,7 @@ export async function getSearchDocMapListings(
 async function expandWithNearMatches(
   items: ListingData[],
   params: FilterParams,
-  fetchExpanded: (p: FilterParams) => Promise<{ items: ListingData[] }>,
+  fetchExpanded: (p: FilterParams) => Promise<{ items: ListingData[] }>
 ): Promise<{
   items: ListingData[];
   nearMatchCount: number;
@@ -877,7 +887,7 @@ async function expandWithNearMatches(
       const isNearMatchResult = isNearMatch(
         { price: item.price, available_from: availableFromStr },
         params,
-        expansion.expandedDimension,
+        expansion.expandedDimension
       );
       return { ...item, isNearMatch: isNearMatchResult };
     })
@@ -895,19 +905,20 @@ async function expandWithNearMatches(
 // ============================================
 
 async function getSearchDocListingsPaginatedInternal(
-  params: FilterParams = {},
+  params: FilterParams = {}
 ): Promise<PaginatedResultHybrid<ListingData>> {
   const { sort = "recommended", page = 1, limit = 12, nearMatches } = params;
 
   // Defense in depth: block unbounded text searches
   if (params.query && !params.bounds) {
     throw new Error(
-      "Unbounded text search not allowed: geographic bounds required when query is present",
+      "Unbounded text search not allowed: geographic bounds required when query is present"
     );
   }
 
   // Cap limit for unbounded browse (no query, no bounds, no filters) to prevent full-table scans
-  const isUnboundedBrowse = !params.query && !params.bounds && !hasActiveFilters(params);
+  const isUnboundedBrowse =
+    !params.query && !params.bounds && !hasActiveFilters(params);
   const effectiveLimit = isUnboundedBrowse
     ? Math.min(limit, MAX_UNBOUNDED_RESULTS)
     : limit;
@@ -942,7 +953,9 @@ async function getSearchDocListingsPaginatedInternal(
     // For unbounded browse, cap offset to prevent expensive full-table scans
     // This prevents DOS attacks via ?page=1000 which would trigger OFFSET 11988
     if (isUnboundedBrowse) {
-      const maxUnboundedPages = Math.ceil(MAX_UNBOUNDED_RESULTS / effectiveLimit);
+      const maxUnboundedPages = Math.ceil(
+        MAX_UNBOUNDED_RESULTS / effectiveLimit
+      );
       safePage = Math.min(safePage, maxUnboundedPages);
     }
 
@@ -985,10 +998,7 @@ async function getSearchDocListingsPaginatedInternal(
 
     const dataParams = [...queryParams, fetchLimit, offset];
 
-    const listings = await queryWithTimeout<ListingRaw>(
-      dataQuery,
-      dataParams,
-    );
+    const listings = await queryWithTimeout<ListingRaw>(dataQuery, dataParams);
 
     // Map results to ListingData
     const results = mapRawListingsToPublic(listings);
@@ -998,7 +1008,9 @@ async function getSearchDocListingsPaginatedInternal(
     const hasNextPage = results.length > effectiveLimit;
 
     // Only return `effectiveLimit` items (capped for unbounded browse)
-    let items: ListingData[] = hasNextPage ? results.slice(0, effectiveLimit) : results;
+    let items: ListingData[] = hasNextPage
+      ? results.slice(0, effectiveLimit)
+      : results;
 
     // Near-match expansion: if enabled and low results on page 1, fetch near matches
     let nearMatchCount = 0;
@@ -1012,7 +1024,7 @@ async function getSearchDocListingsPaginatedInternal(
       safePage === 1
     ) {
       const result = await expandWithNearMatches(items, params, (p) =>
-        getSearchDocListingsPaginatedInternal(p),
+        getSearchDocListingsPaginatedInternal(p)
       );
       items = result.items;
       nearMatchCount = result.nearMatchCount;
@@ -1048,14 +1060,14 @@ async function getSearchDocListingsPaginatedInternal(
  * Cached with 60s TTL. Uses hybrid pagination for cost efficiency.
  */
 export async function getSearchDocListingsPaginated(
-  params: FilterParams = {},
+  params: FilterParams = {}
 ): Promise<PaginatedResultHybrid<ListingData>> {
   const cacheKey = createSearchDocListCacheKey(params);
 
   const cachedFn = unstable_cache(
     async () => getSearchDocListingsPaginatedInternal(params),
     ["searchdoc-listings-paginated", cacheKey],
-    { revalidate: 60 },
+    { revalidate: 60 }
   );
 
   return cachedFn();
@@ -1087,12 +1099,12 @@ export interface KeysetPaginatedResult<T> extends PaginatedResultHybrid<T> {
  */
 export async function getSearchDocListingsWithKeyset(
   params: FilterParams = {},
-  cursor: KeysetCursor | null = null,
+  cursor: KeysetCursor | null = null
 ): Promise<KeysetPaginatedResult<ListingData>> {
   // Defense in depth: block unbounded text searches
   if (params.query && !params.bounds) {
     throw new Error(
-      "Unbounded text search not allowed: geographic bounds required when query is present",
+      "Unbounded text search not allowed: geographic bounds required when query is present"
     );
   }
 
@@ -1124,7 +1136,7 @@ export async function getSearchDocListingsWithKeyset(
     const keysetResult = buildKeysetWhereClause(
       cursor,
       sortOption,
-      startParamIndex,
+      startParamIndex
     );
     conditions.push(keysetResult.clause);
     const allParams = [...queryParams, ...keysetResult.params];
@@ -1133,7 +1145,11 @@ export async function getSearchDocListingsWithKeyset(
     const whereClause = joinWhereClauseWithSecurityInvariant(conditions);
 
     // Build ORDER BY clause — skip ts_rank_cd for keyset (cursor doesn't capture rank)
-    const orderByClause = buildOrderByClause(sortOption, ftsQueryParamIndex, true);
+    const orderByClause = buildOrderByClause(
+      sortOption,
+      ftsQueryParamIndex,
+      true
+    );
 
     // Fetch limit+1 items to determine hasNextPage
     const fetchLimit = limit + 1;
@@ -1180,7 +1196,7 @@ export async function getSearchDocListingsWithKeyset(
 
     const listings = await queryWithTimeout<ListingWithCursorRaw>(
       dataQuery,
-      dataParams,
+      dataParams
     );
 
     // Map results to ListingData
@@ -1190,7 +1206,9 @@ export async function getSearchDocListingsWithKeyset(
     const hasNextPage = results.length > limit;
 
     // Only return `limit` items
-    const items: ListingData[] = hasNextPage ? results.slice(0, limit) : results;
+    const items: ListingData[] = hasNextPage
+      ? results.slice(0, limit)
+      : results;
 
     // Build nextCursor from the last item
     let nextCursor: string | null = null;
@@ -1199,7 +1217,8 @@ export async function getSearchDocListingsWithKeyset(
       const lastRawItem = listings[limit - 1];
       const cursorRowData: CursorRowData = {
         id: lastRawItem.id,
-        listing_created_at: lastRawItem._cursorCreatedAt ?? new Date().toISOString(),
+        listing_created_at:
+          lastRawItem._cursorCreatedAt ?? new Date().toISOString(),
         recommended_score: lastRawItem._cursorRecommendedScore,
         price: lastRawItem._cursorPrice,
         avg_rating: lastRawItem._cursorAvgRating,
@@ -1232,7 +1251,7 @@ export async function getSearchDocListingsWithKeyset(
   } catch (error) {
     const dataError = wrapDatabaseError(
       error,
-      "getSearchDocListingsWithKeyset",
+      "getSearchDocListingsWithKeyset"
     );
     dataError.log({
       operation: "getSearchDocListingsWithKeyset",
@@ -1255,16 +1274,20 @@ export async function getSearchDocListingsWithKeyset(
  * @returns Paginated results with nextCursor for next page
  */
 export async function getSearchDocListingsFirstPage(
-  params: FilterParams = {},
+  params: FilterParams = {}
 ): Promise<KeysetPaginatedResult<ListingData>> {
   // Defense in depth: block unbounded text searches
   if (params.query && !params.bounds) {
     throw new Error(
-      "Unbounded text search not allowed: geographic bounds required when query is present",
+      "Unbounded text search not allowed: geographic bounds required when query is present"
     );
   }
 
-  const { sort = "recommended" as SortOption, limit = 12, nearMatches } = params;
+  const {
+    sort = "recommended" as SortOption,
+    limit = 12,
+    nearMatches,
+  } = params;
   const sortOption = sort;
 
   // If keyset is disabled, use offset-based pagination
@@ -1286,7 +1309,11 @@ export async function getSearchDocListingsFirstPage(
     const whereClause = joinWhereClauseWithSecurityInvariant(conditions);
 
     // Build ORDER BY clause — skip ts_rank_cd for keyset (cursor doesn't capture rank)
-    const orderByClause = buildOrderByClause(sortOption, ftsQueryParamIndex, true);
+    const orderByClause = buildOrderByClause(
+      sortOption,
+      ftsQueryParamIndex,
+      true
+    );
 
     // Hybrid count
     const limitedCount = await getSearchDocLimitedCount(params);
@@ -1339,7 +1366,7 @@ export async function getSearchDocListingsFirstPage(
 
     const listings = await queryWithTimeout<ListingWithCursorRaw>(
       dataQuery,
-      dataParams,
+      dataParams
     );
 
     // Map results to ListingData
@@ -1362,7 +1389,7 @@ export async function getSearchDocListingsFirstPage(
       items.length > 0
     ) {
       const result = await expandWithNearMatches(items, params, (p) =>
-        getSearchDocListingsFirstPage(p),
+        getSearchDocListingsFirstPage(p)
       );
       items = result.items;
       nearMatchCount = result.nearMatchCount;
@@ -1376,7 +1403,8 @@ export async function getSearchDocListingsFirstPage(
       const lastRawItem = listings[Math.min(limit - 1, listings.length - 1)];
       const cursorRowData: CursorRowData = {
         id: lastRawItem.id,
-        listing_created_at: lastRawItem._cursorCreatedAt ?? new Date().toISOString(),
+        listing_created_at:
+          lastRawItem._cursorCreatedAt ?? new Date().toISOString(),
         recommended_score: lastRawItem._cursorRecommendedScore,
         price: lastRawItem._cursorPrice,
         avg_rating: lastRawItem._cursorAvgRating,
@@ -1546,11 +1574,19 @@ export async function semanticSearchQuery(
         houseRulesLower,
         filterParams.roomType ?? null,
         filterParams.leaseDuration ?? null,
-        filterParams.genderPreference === "any" ? null : (filterParams.genderPreference ?? null),
-        filterParams.householdGender === "any" ? null : (filterParams.householdGender ?? null),
+        filterParams.genderPreference === "any"
+          ? null
+          : (filterParams.genderPreference ?? null),
+        filterParams.householdGender === "any"
+          ? null
+          : (filterParams.householdGender ?? null),
         filterParams.minAvailableSlots ?? 1,
-        filterParams.bookingMode === "any" ? null : (filterParams.bookingMode ?? null),
-        filterParams.moveInDate ? parseLocalDate(filterParams.moveInDate) : null,
+        filterParams.bookingMode === "any"
+          ? null
+          : (filterParams.bookingMode ?? null),
+        filterParams.moveInDate
+          ? parseLocalDate(filterParams.moveInDate)
+          : null,
         languagesLower,
         features.semanticWeight,
         limit,

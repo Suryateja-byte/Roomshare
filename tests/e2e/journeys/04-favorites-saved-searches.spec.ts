@@ -6,7 +6,14 @@
  * and alert configurations.
  */
 
-import { test, expect, tags, selectors, SF_BOUNDS, searchResultsContainer } from "../helpers";
+import {
+  test,
+  expect,
+  tags,
+  selectors,
+  SF_BOUNDS,
+  searchResultsContainer,
+} from "../helpers";
 
 test.describe("Favorites & Saved Searches Journeys", () => {
   test.use({ storageState: "playwright/.auth/user.json" });
@@ -33,7 +40,7 @@ test.describe("Favorites & Saved Searches Journeys", () => {
 
       const favoriteButton = firstCard
         .locator(
-          'button[aria-label*="save" i], button[aria-label*="favorite" i], [data-testid="favorite-button"]',
+          'button[aria-label*="save" i], button[aria-label*="favorite" i], [data-testid="favorite-button"]'
         )
         .first();
 
@@ -57,8 +64,7 @@ test.describe("Favorites & Saved Searches Journeys", () => {
         await page.waitForTimeout(500);
 
         // State should change
-        const newAriaPressed =
-          await targetButton.getAttribute("aria-pressed");
+        const newAriaPressed = await targetButton.getAttribute("aria-pressed");
 
         // Navigate to saved listings
         await nav.goToSaved();
@@ -86,7 +92,7 @@ test.describe("Favorites & Saved Searches Journeys", () => {
 
       // Should have heading — use .first() to avoid strict mode violations
       await expect(
-        page.getByRole("heading", { name: /saved|favorites/i }).first(),
+        page.getByRole("heading", { name: /saved|favorites/i }).first()
       ).toBeVisible({ timeout: 10000 });
 
       // Should show listings or empty state — wait for content to render (CI can be slow)
@@ -104,7 +110,10 @@ test.describe("Favorites & Saved Searches Journeys", () => {
       }
 
       if (!hasListings && !hasEmptyState) {
-        test.skip(true, 'Neither listings nor empty state rendered (page may still be loading in CI)');
+        test.skip(
+          true,
+          "Neither listings nor empty state rendered (page may still be loading in CI)"
+        );
         return;
       }
       expect(hasListings || hasEmptyState).toBeTruthy();
@@ -130,7 +139,7 @@ test.describe("Favorites & Saved Searches Journeys", () => {
         const unsaveButton = listingCards
           .first()
           .locator(
-            'button[aria-label*="remove" i], button[aria-label*="unsave" i]',
+            'button[aria-label*="remove" i], button[aria-label*="unsave" i]'
           )
           .first();
 
@@ -161,12 +170,19 @@ test.describe("Favorites & Saved Searches Journeys", () => {
     test(`${tags.auth} - Save search with filters`, async ({ page, nav }) => {
       const viewport = page.viewportSize();
       if (!viewport || viewport.width < 768) {
-        test.skip(true, 'Save search dialog interactions unreliable on mobile viewport');
+        test.skip(
+          true,
+          "Save search dialog interactions unreliable on mobile viewport"
+        );
         return;
       }
 
       // Navigate to search with filters (include bounds so results load)
-      await nav.goToSearch({ bounds: SF_BOUNDS, minPrice: 500, maxPrice: 2000 });
+      await nav.goToSearch({
+        bounds: SF_BOUNDS,
+        minPrice: 500,
+        maxPrice: 2000,
+      });
       await page.waitForLoadState("domcontentloaded");
 
       // Find save search button
@@ -189,11 +205,15 @@ test.describe("Favorites & Saved Searches Journeys", () => {
         if (await frequencySelect.isVisible().catch(() => false)) {
           // SaveSearchButton renders frequency as buttons, not a native <select>.
           // Prefer clicking "Daily"; fallback to "Instant" if unavailable.
-          const dailyButton = page.getByRole("button", { name: /^Daily$/i }).first();
+          const dailyButton = page
+            .getByRole("button", { name: /^Daily$/i })
+            .first();
           if (await dailyButton.isVisible().catch(() => false)) {
             await dailyButton.click();
           } else {
-            const instantButton = page.getByRole("button", { name: /^Instant$/i }).first();
+            const instantButton = page
+              .getByRole("button", { name: /^Instant$/i })
+              .first();
             if (await instantButton.isVisible().catch(() => false)) {
               await instantButton.click();
             }
@@ -201,16 +221,23 @@ test.describe("Favorites & Saved Searches Journeys", () => {
         }
 
         // Save — confirm button may match multiple elements or be blocked by overlay in CI
-        const confirmButton = page.getByRole("button", {
-          name: /save|confirm/i,
-        }).first();
+        const confirmButton = page
+          .getByRole("button", {
+            name: /save|confirm/i,
+          })
+          .first();
         try {
-          if (await confirmButton.isVisible({ timeout: 5000 }).catch(() => false)) {
+          if (
+            await confirmButton.isVisible({ timeout: 5000 }).catch(() => false)
+          ) {
             await confirmButton.click({ timeout: 10000 });
 
             // Should show success
             await expect(
-              page.locator(selectors.toast).or(page.getByText(/saved|created/i)).first(),
+              page
+                .locator(selectors.toast)
+                .or(page.getByText(/saved|created/i))
+                .first()
             ).toBeVisible({ timeout: 30000 });
           }
         } catch {
@@ -230,9 +257,9 @@ test.describe("Favorites & Saved Searches Journeys", () => {
 
       // Should load without error
       // Target h1 page title specifically to avoid strict mode violation
-      await expect(
-        page.getByRole("heading", { level: 1 }).first(),
-      ).toBeVisible({ timeout: 10000 });
+      await expect(page.getByRole("heading", { level: 1 }).first()).toBeVisible(
+        { timeout: 10000 }
+      );
 
       // Should show searches or empty state
       const hasSearches =
@@ -262,7 +289,7 @@ test.describe("Favorites & Saved Searches Journeys", () => {
       await page.waitForLoadState("domcontentloaded");
 
       const searchItems = page.locator(
-        '[data-testid="saved-search-item"], [class*="search-item"]',
+        '[data-testid="saved-search-item"], [class*="search-item"]'
       );
 
       if ((await searchItems.count()) > 0) {
@@ -300,7 +327,7 @@ test.describe("Favorites & Saved Searches Journeys", () => {
       await page.waitForLoadState("domcontentloaded");
 
       const searchItems = page.locator(
-        '[data-testid="saved-search-item"], [class*="search-item"]',
+        '[data-testid="saved-search-item"], [class*="search-item"]'
       );
 
       if ((await searchItems.count()) > 0) {
@@ -372,7 +399,7 @@ test.describe("Favorites & Saved Searches Journeys", () => {
           .getByRole("heading", { level: 1 })
           .or(page.locator(selectors.listingCard).first())
           .or(page.locator(selectors.emptyState).first())
-          .first(),
+          .first()
       ).toBeVisible({ timeout: 10000 });
     });
   });

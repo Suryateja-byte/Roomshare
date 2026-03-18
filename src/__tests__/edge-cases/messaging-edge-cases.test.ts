@@ -87,7 +87,7 @@ describe("Category G: Messaging Edge Cases", () => {
     it("should prevent conversation with self", () => {
       const canStartConversation = (
         userId: string,
-        ownerId: string,
+        ownerId: string
       ): boolean => {
         return userId !== ownerId;
       };
@@ -106,7 +106,7 @@ describe("Category G: Messaging Edge Cases", () => {
       };
 
       const activeParticipants = conversation.participants.filter(
-        (p) => p.deletedAt === null,
+        (p) => p.deletedAt === null
       );
 
       expect(activeParticipants.length).toBe(1);
@@ -178,7 +178,7 @@ describe("Category G: Messaging Edge Cases", () => {
       ];
 
       const activeConversations = conversations.filter(
-        (c) => c.deletedAt === null,
+        (c) => c.deletedAt === null
       );
 
       expect(activeConversations.length).toBe(2);
@@ -197,7 +197,7 @@ describe("Category G: Messaging Edge Cases", () => {
       ];
 
       const unreadMessages = messages.filter(
-        (m) => m.deletedAt === null && m.read === false,
+        (m) => m.deletedAt === null && m.read === false
       );
 
       expect(unreadMessages.length).toBe(2);
@@ -241,7 +241,7 @@ describe("Category G: Messaging Edge Cases", () => {
       ];
 
       const unreadCount = messages.filter(
-        (m) => m.senderId !== currentUserId && !m.read,
+        (m) => m.senderId !== currentUserId && !m.read
       ).length;
 
       expect(unreadCount).toBe(1);
@@ -264,7 +264,7 @@ describe("Category G: Messaging Edge Cases", () => {
 
       const totalUnread = conversationUnreadCounts.reduce(
         (sum, c) => sum + c._count,
-        0,
+        0
       );
 
       expect(totalUnread).toBe(8);
@@ -295,7 +295,7 @@ describe("Category G: Messaging Edge Cases", () => {
       ];
 
       const sorted = [...conversations].sort(
-        (a, b) => b.updatedAt.getTime() - a.updatedAt.getTime(),
+        (a, b) => b.updatedAt.getTime() - a.updatedAt.getTime()
       );
 
       expect(sorted.map((c) => c.id)).toEqual(["conv-3", "conv-2", "conv-1"]);
@@ -315,7 +315,7 @@ describe("Category G: Messaging Edge Cases", () => {
       ];
 
       const toMarkAsRead = messages.filter(
-        (m) => m.senderId !== currentUserId && !m.read,
+        (m) => m.senderId !== currentUserId && !m.read
       );
 
       expect(toMarkAsRead.length).toBe(2);
@@ -363,12 +363,12 @@ describe("Category G: Messaging Edge Cases", () => {
 
       // Messages should poll more frequently than conversations
       expect(POLLING_INTERVALS.messages).toBeLessThan(
-        POLLING_INTERVALS.conversations,
+        POLLING_INTERVALS.conversations
       );
 
       // Unread count can be less frequent
       expect(POLLING_INTERVALS.unreadCount).toBeGreaterThanOrEqual(
-        POLLING_INTERVALS.conversations,
+        POLLING_INTERVALS.conversations
       );
     });
 
@@ -435,12 +435,12 @@ describe("Category G: Messaging Edge Cases", () => {
 
       const findExisting = (
         listingId: string,
-        participantIds: string[],
+        participantIds: string[]
       ): string | null => {
         const found = existingConversations.find(
           (c) =>
             c.listingId === listingId &&
-            participantIds.every((id) => c.participantIds.includes(id)),
+            participantIds.every((id) => c.participantIds.includes(id))
         );
         return found?.id ?? null;
       };
@@ -491,7 +491,7 @@ describe("Category G: Messaging Edge Cases", () => {
       ];
 
       const sorted = [...messages].sort(
-        (a, b) => a.createdAt.getTime() - b.createdAt.getTime(),
+        (a, b) => a.createdAt.getTime() - b.createdAt.getTime()
       );
 
       expect(sorted.map((m) => m.id)).toEqual(["msg-1", "msg-2", "msg-3"]);
@@ -524,12 +524,12 @@ describe("Category G: Messaging Edge Cases", () => {
       const checkBlockStatus = (
         senderId: string,
         receiverId: string,
-        blockedPairs: Array<{ blockerId: string; blockedId: string }>,
+        blockedPairs: Array<{ blockerId: string; blockedId: string }>
       ): { allowed: boolean; reason?: string } => {
         const isBlocked = blockedPairs.some(
           (pair) =>
             (pair.blockerId === receiverId && pair.blockedId === senderId) ||
-            (pair.blockerId === senderId && pair.blockedId === receiverId),
+            (pair.blockerId === senderId && pair.blockedId === receiverId)
         );
 
         return isBlocked
@@ -562,8 +562,8 @@ describe("Category G: Messaging Edge Cases", () => {
       const visibleConversations = conversations.filter(
         (c) =>
           !c.participantIds.some(
-            (id) => blockedUserIds.includes(id) && id !== "user-1",
-          ),
+            (id) => blockedUserIds.includes(id) && id !== "user-1"
+          )
       );
 
       expect(visibleConversations.map((c) => c.id)).toEqual(["conv-2"]);
@@ -645,7 +645,7 @@ describe("Category G: Messaging Edge Cases", () => {
       const paginate = (
         messages: typeof allMessages,
         page: number,
-        pageSize: number,
+        pageSize: number
       ) => {
         const start = page * pageSize;
         return messages.slice(start, start + pageSize);
@@ -670,7 +670,7 @@ describe("Category G: Messaging Edge Cases", () => {
 
       const getMessagesAfter = (
         cursor: string,
-        limit: number,
+        limit: number
       ): typeof messages => {
         const cursorIndex = messages.findIndex((m) => m.id === cursor);
         if (cursorIndex === -1) return messages.slice(0, limit);
@@ -698,7 +698,7 @@ describe("Category G: Messaging Edge Cases", () => {
       const createMessageNotification = (
         senderId: string,
         receiverId: string,
-        conversationId: string,
+        conversationId: string
       ) => {
         return {
           userId: receiverId,
@@ -712,7 +712,7 @@ describe("Category G: Messaging Edge Cases", () => {
       const notification = createMessageNotification(
         "user-1",
         "user-2",
-        "conv-123",
+        "conv-123"
       );
 
       expect(notification.userId).toBe("user-2");

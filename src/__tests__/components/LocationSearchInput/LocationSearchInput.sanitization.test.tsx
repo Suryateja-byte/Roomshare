@@ -4,28 +4,33 @@
  * Tests input sanitization including whitespace trimming, control character removal,
  * query length limits, and Unicode handling.
  */
-import React, { useState } from 'react';
-import { render, screen, waitFor, act, fireEvent } from '@testing-library/react';
-import userEvent from '@testing-library/user-event';
-import LocationSearchInput from '@/components/LocationSearchInput';
+import React, { useState } from "react";
+import {
+  render,
+  screen,
+  waitFor,
+  act,
+  fireEvent,
+} from "@testing-library/react";
+import userEvent from "@testing-library/user-event";
+import LocationSearchInput from "@/components/LocationSearchInput";
 import {
   UNICODE_INPUTS,
   EMOJI_INPUTS,
   CONTROL_CHAR_INPUTS,
   XSS_PAYLOADS,
-} from '../../utils/mocks/search-input.mock';
+} from "../../utils/mocks/search-input.mock";
 
 // Mock fetch globally
 const mockFetch = jest.fn();
 global.fetch = mockFetch;
 
 // Mock geocoding cache to prevent caching between tests
-jest.mock('@/lib/geocoding-cache', () => ({
+jest.mock("@/lib/geocoding-cache", () => ({
   getCachedResults: jest.fn(() => null), // Always return cache miss
   setCachedResults: jest.fn(),
   clearCache: jest.fn(),
 }));
-
 
 // Controlled wrapper component that manages state for the LocationSearchInput
 // This is necessary because the component uses useDebounce(value, 300) where
@@ -37,7 +42,7 @@ interface WrapperProps {
 }
 
 function ControlledWrapper({
-  initialValue = '',
+  initialValue = "",
   onChangeSpy,
   onLocationSelectSpy,
 }: WrapperProps) {
@@ -57,7 +62,7 @@ function ControlledWrapper({
   );
 }
 
-describe('LocationSearchInput - Input Sanitization', () => {
+describe("LocationSearchInput - Input Sanitization", () => {
   const user = userEvent.setup({ delay: null });
   const mockOnChange = jest.fn();
   const mockOnLocationSelect = jest.fn();
@@ -68,7 +73,7 @@ describe('LocationSearchInput - Input Sanitization', () => {
     mockFetch.mockResolvedValue({
       ok: true,
       status: 200,
-      json: async () => ({ type: 'FeatureCollection', features: [] }),
+      json: async () => ({ type: "FeatureCollection", features: [] }),
     });
   });
 
@@ -79,19 +84,19 @@ describe('LocationSearchInput - Input Sanitization', () => {
   const renderInput = (props: WrapperProps = {}) => {
     return render(
       <ControlledWrapper
-        initialValue={props.initialValue ?? ''}
+        initialValue={props.initialValue ?? ""}
         onChangeSpy={props.onChangeSpy ?? mockOnChange}
         onLocationSelectSpy={props.onLocationSelectSpy ?? mockOnLocationSelect}
       />
     );
   };
 
-  describe('Whitespace Handling', () => {
-    it('trims leading and trailing whitespace before API call', async () => {
+  describe("Whitespace Handling", () => {
+    it("trims leading and trailing whitespace before API call", async () => {
       renderInput();
-      const input = screen.getByRole('combobox');
+      const input = screen.getByRole("combobox");
 
-      await user.type(input, '  San Francisco  ');
+      await user.type(input, "  San Francisco  ");
       await act(async () => {
         jest.advanceTimersByTime(350); // Wait for debounce
       });
@@ -102,15 +107,15 @@ describe('LocationSearchInput - Input Sanitization', () => {
 
       const url = mockFetch.mock.calls[0][0] as string;
       // URL should contain trimmed query
-      expect(url).toContain('San%20Francisco');
-      expect(url).not.toContain('%20%20'); // No double spaces at edges
+      expect(url).toContain("San%20Francisco");
+      expect(url).not.toContain("%20%20"); // No double spaces at edges
     });
 
-    it('does not trigger API for whitespace-only input', async () => {
+    it("does not trigger API for whitespace-only input", async () => {
       renderInput();
-      const input = screen.getByRole('combobox');
+      const input = screen.getByRole("combobox");
 
-      await user.type(input, '   ');
+      await user.type(input, "   ");
       await act(async () => {
         jest.advanceTimersByTime(350);
       });
@@ -118,11 +123,11 @@ describe('LocationSearchInput - Input Sanitization', () => {
       expect(mockFetch).not.toHaveBeenCalled();
     });
 
-    it('handles mixed whitespace (tabs, newlines)', async () => {
+    it("handles mixed whitespace (tabs, newlines)", async () => {
       renderInput();
-      const input = screen.getByRole('combobox');
+      const input = screen.getByRole("combobox");
 
-      await user.type(input, '\tSan\nFrancisco\r');
+      await user.type(input, "\tSan\nFrancisco\r");
       await act(async () => {
         jest.advanceTimersByTime(350);
       });
@@ -136,12 +141,12 @@ describe('LocationSearchInput - Input Sanitization', () => {
     });
   });
 
-  describe('Query Length Limits', () => {
-    it('truncates input exceeding 256 characters for API call', async () => {
+  describe("Query Length Limits", () => {
+    it("truncates input exceeding 256 characters for API call", async () => {
       renderInput();
-      const input = screen.getByRole('combobox');
+      const input = screen.getByRole("combobox");
 
-      const longQuery = 'a'.repeat(300);
+      const longQuery = "a".repeat(300);
       // Use fireEvent.change for long strings (faster than typing 300 chars)
       fireEvent.change(input, { target: { value: longQuery } });
       await act(async () => {
@@ -154,16 +159,16 @@ describe('LocationSearchInput - Input Sanitization', () => {
 
       const url = mockFetch.mock.calls[0][0] as string;
       const parsedUrl = new URL(url);
-      const decodedQuery = parsedUrl.searchParams.get('q') || '';
+      const decodedQuery = parsedUrl.searchParams.get("q") || "";
 
       expect(decodedQuery.length).toBeLessThanOrEqual(500);
     });
 
-    it('allows exactly 500 character queries', async () => {
+    it("allows exactly 500 character queries", async () => {
       renderInput();
-      const input = screen.getByRole('combobox');
+      const input = screen.getByRole("combobox");
 
-      const exactMaxQuery = 'a'.repeat(500);
+      const exactMaxQuery = "a".repeat(500);
       // Use fireEvent.change for long strings (faster than typing 500 chars)
       fireEvent.change(input, { target: { value: exactMaxQuery } });
       await act(async () => {
@@ -178,12 +183,12 @@ describe('LocationSearchInput - Input Sanitization', () => {
     });
   });
 
-  describe('Minimum Character Gate', () => {
-    it('does not trigger API for single character', async () => {
+  describe("Minimum Character Gate", () => {
+    it("does not trigger API for single character", async () => {
       renderInput();
-      const input = screen.getByRole('combobox');
+      const input = screen.getByRole("combobox");
 
-      await user.type(input, 'a');
+      await user.type(input, "a");
       await act(async () => {
         jest.advanceTimersByTime(350);
       });
@@ -193,22 +198,24 @@ describe('LocationSearchInput - Input Sanitization', () => {
 
     it('shows "type more characters" hint for 1 character', async () => {
       renderInput();
-      const input = screen.getByRole('combobox');
+      const input = screen.getByRole("combobox");
 
-      await user.type(input, 'a');
+      await user.type(input, "a");
       await act(async () => {
         jest.advanceTimersByTime(100);
       });
 
       // Hint should appear in the dropdown
-      expect(screen.getByText(/type at least 2 characters/i)).toBeInTheDocument();
+      expect(
+        screen.getByText(/type at least 2 characters/i)
+      ).toBeInTheDocument();
     });
 
-    it('triggers API for 2+ characters', async () => {
+    it("triggers API for 2+ characters", async () => {
       renderInput();
-      const input = screen.getByRole('combobox');
+      const input = screen.getByRole("combobox");
 
-      await user.type(input, 'ab');
+      await user.type(input, "ab");
       await act(async () => {
         jest.advanceTimersByTime(350);
       });
@@ -219,12 +226,12 @@ describe('LocationSearchInput - Input Sanitization', () => {
     });
   });
 
-  describe('Control Character Removal', () => {
+  describe("Control Character Removal", () => {
     it.each(Object.entries(CONTROL_CHAR_INPUTS))(
-      'strips control characters: %s',
+      "strips control characters: %s",
       async (_name, input) => {
         renderInput();
-        const inputEl = screen.getByRole('combobox');
+        const inputEl = screen.getByRole("combobox");
 
         // Use fireEvent.change because userEvent.type() filters control characters
         fireEvent.change(inputEl, { target: { value: input } });
@@ -243,12 +250,12 @@ describe('LocationSearchInput - Input Sanitization', () => {
     );
   });
 
-  describe('Unicode Safety', () => {
+  describe("Unicode Safety", () => {
     it.each(Object.entries(UNICODE_INPUTS))(
-      'handles Unicode safely: %s',
+      "handles Unicode safely: %s",
       async (_name, input) => {
         renderInput();
-        const inputEl = screen.getByRole('combobox');
+        const inputEl = screen.getByRole("combobox");
 
         await user.type(inputEl, input);
         await act(async () => {
@@ -262,16 +269,16 @@ describe('LocationSearchInput - Input Sanitization', () => {
 
           // Should not throw, should properly encode
           const url = mockFetch.mock.calls[0][0] as string;
-          expect(url).toContain('photon.komoot.io');
+          expect(url).toContain("photon.komoot.io");
         }
       }
     );
 
-    it('properly encodes CJK characters in URL', async () => {
+    it("properly encodes CJK characters in URL", async () => {
       renderInput();
-      const input = screen.getByRole('combobox');
+      const input = screen.getByRole("combobox");
 
-      await user.type(input, '東京');
+      await user.type(input, "東京");
       await act(async () => {
         jest.advanceTimersByTime(350);
       });
@@ -282,18 +289,18 @@ describe('LocationSearchInput - Input Sanitization', () => {
 
       const url = mockFetch.mock.calls[0][0] as string;
       // Should be URL encoded
-      expect(url).toContain('%');
+      expect(url).toContain("%");
       // Should decode back to original
-      expect(decodeURIComponent(url)).toContain('東京');
+      expect(decodeURIComponent(url)).toContain("東京");
     });
   });
 
-  describe('Emoji Handling', () => {
+  describe("Emoji Handling", () => {
     it.each(Object.entries(EMOJI_INPUTS))(
-      'handles emoji input: %s',
+      "handles emoji input: %s",
       async (_name, input) => {
         renderInput();
-        const inputEl = screen.getByRole('combobox');
+        const inputEl = screen.getByRole("combobox");
 
         await user.type(inputEl, input);
         await act(async () => {
@@ -301,17 +308,17 @@ describe('LocationSearchInput - Input Sanitization', () => {
         });
 
         // Should not crash
-        expect(screen.getByRole('combobox')).toBeInTheDocument();
+        expect(screen.getByRole("combobox")).toBeInTheDocument();
       }
     );
   });
 
-  describe('XSS Prevention', () => {
+  describe("XSS Prevention", () => {
     it.each(Object.entries(XSS_PAYLOADS))(
-      'safely handles XSS payload: %s',
+      "safely handles XSS payload: %s",
       async (_name, input) => {
         renderInput();
-        const inputEl = screen.getByRole('combobox');
+        const inputEl = screen.getByRole("combobox");
 
         await user.type(inputEl, input);
         await act(async () => {
@@ -319,45 +326,54 @@ describe('LocationSearchInput - Input Sanitization', () => {
         });
 
         // Component should not crash
-        expect(screen.getByRole('combobox')).toBeInTheDocument();
+        expect(screen.getByRole("combobox")).toBeInTheDocument();
 
         if (mockFetch.mock.calls.length > 0) {
           // URL should be properly encoded
           const url = mockFetch.mock.calls[0][0] as string;
-          expect(url).not.toContain('<script>');
-          expect(url).not.toContain('onerror=');
+          expect(url).not.toContain("<script>");
+          expect(url).not.toContain("onerror=");
         }
       }
     );
   });
 
-  describe('Empty Input Handling', () => {
-    it('clears suggestions when input is emptied', async () => {
+  describe("Empty Input Handling", () => {
+    it("clears suggestions when input is emptied", async () => {
       mockFetch.mockResolvedValueOnce({
         ok: true,
         status: 200,
         json: async () => ({
-          type: 'FeatureCollection',
-          features: [{
-            type: 'Feature',
-            geometry: { type: 'Point', coordinates: [-122.4, 37.7] },
-            properties: { osm_id: 1, osm_type: 'R', name: 'San Francisco', state: 'CA', country: 'USA', type: 'city' }
-          }],
+          type: "FeatureCollection",
+          features: [
+            {
+              type: "Feature",
+              geometry: { type: "Point", coordinates: [-122.4, 37.7] },
+              properties: {
+                osm_id: 1,
+                osm_type: "R",
+                name: "San Francisco",
+                state: "CA",
+                country: "USA",
+                type: "city",
+              },
+            },
+          ],
         }),
       });
 
       renderInput();
-      const input = screen.getByRole('combobox');
+      const input = screen.getByRole("combobox");
 
       // Type to get suggestions
-      await user.type(input, 'San');
+      await user.type(input, "San");
       await act(async () => {
         jest.advanceTimersByTime(350);
       });
 
       // Component splits place_name at comma: "San Francisco" in first <p>, "CA, USA" in second
       await waitFor(() => {
-        expect(screen.getByText('San Francisco')).toBeInTheDocument();
+        expect(screen.getByText("San Francisco")).toBeInTheDocument();
       });
 
       // Clear input
@@ -367,7 +383,7 @@ describe('LocationSearchInput - Input Sanitization', () => {
       });
 
       await waitFor(() => {
-        expect(screen.queryByText('San Francisco')).not.toBeInTheDocument();
+        expect(screen.queryByText("San Francisco")).not.toBeInTheDocument();
       });
     });
   });

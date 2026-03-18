@@ -211,14 +211,14 @@ test.describe("Profile Edit — Form Assertions", () => {
 
     // Allow zero violations for WCAG 2.1 AA
     const violations = results.violations.filter(
-      (v) => v.impact === "critical" || v.impact === "serious",
+      (v) => v.impact === "critical" || v.impact === "serious"
     );
 
     if (violations.length > 0) {
       const summary = violations
         .map(
           (v) =>
-            `[${v.impact}] ${v.id}: ${v.description} (${v.nodes.length} nodes)`,
+            `[${v.impact}] ${v.id}: ${v.description} (${v.nodes.length} nodes)`
         )
         .join("\n");
       console.warn(`A11y violations found:\n${summary}`);
@@ -339,15 +339,24 @@ test.describe.serial("Profile Edit — Mutations", () => {
     // Wait for success message OR redirect (redirect may happen before message is visible)
     const successMsg = page.getByText(/profile updated successfully/i);
     const successOrRedirect = await Promise.race([
-      successMsg.waitFor({ state: 'visible', timeout: timeouts.action }).then(() => 'success'),
-      page.waitForURL(/\/profile(?!\/edit)/, { timeout: timeouts.navigation }).then(() => 'redirect'),
-    ]).catch(() => 'timeout');
+      successMsg
+        .waitFor({ state: "visible", timeout: timeouts.action })
+        .then(() => "success"),
+      page
+        .waitForURL(/\/profile(?!\/edit)/, { timeout: timeouts.navigation })
+        .then(() => "redirect"),
+    ]).catch(() => "timeout");
     // Allow either success message or redirect — both indicate a successful save
-    expect(['success', 'redirect'], `Expected save confirmation but got: ${successOrRedirect}`).toContain(successOrRedirect);
+    expect(
+      ["success", "redirect"],
+      `Expected save confirmation but got: ${successOrRedirect}`
+    ).toContain(successOrRedirect);
 
     // Ensure we're on /profile (not /edit) — wait for redirect if not already there
-    if (page.url().includes('/edit')) {
-      await page.waitForURL(/\/profile(?!\/edit)/, { timeout: timeouts.navigation }).catch(() => {});
+    if (page.url().includes("/edit")) {
+      await page
+        .waitForURL(/\/profile(?!\/edit)/, { timeout: timeouts.navigation })
+        .catch(() => {});
     }
 
     // Verify name changed on profile page
@@ -368,11 +377,15 @@ test.describe.serial("Profile Edit — Mutations", () => {
     await page.getByTestId("profile-save-button").click();
     // Wait for success or redirect (same pattern as above)
     await Promise.race([
-      page.getByText(/profile updated successfully/i).waitFor({ state: 'visible', timeout: timeouts.action }),
+      page
+        .getByText(/profile updated successfully/i)
+        .waitFor({ state: "visible", timeout: timeouts.action }),
       page.waitForURL(/\/profile(?!\/edit)/, { timeout: timeouts.navigation }),
     ]).catch(() => {});
-    if (page.url().includes('/edit')) {
-      await page.waitForURL(/\/profile(?!\/edit)/, { timeout: timeouts.navigation }).catch(() => {});
+    if (page.url().includes("/edit")) {
+      await page
+        .waitForURL(/\/profile(?!\/edit)/, { timeout: timeouts.navigation })
+        .catch(() => {});
     }
   });
 
@@ -399,9 +412,9 @@ test.describe.serial("Profile Edit — Mutations", () => {
 
     // Save
     await page.getByTestId("profile-save-button").click();
-    await expect(
-      page.getByText(/profile updated successfully/i),
-    ).toBeVisible({ timeout: timeouts.action });
+    await expect(page.getByText(/profile updated successfully/i)).toBeVisible({
+      timeout: timeouts.action,
+    });
     await page.waitForURL(/\/profile(?!\/edit)/, {
       timeout: timeouts.navigation,
     });
@@ -424,9 +437,9 @@ test.describe.serial("Profile Edit — Mutations", () => {
     await bioTextareaRestore.fill(originalBio);
 
     await page.getByTestId("profile-save-button").click();
-    await expect(
-      page.getByText(/profile updated successfully/i),
-    ).toBeVisible({ timeout: timeouts.action });
+    await expect(page.getByText(/profile updated successfully/i)).toBeVisible({
+      timeout: timeouts.action,
+    });
     await page.waitForURL(/\/profile(?!\/edit)/, {
       timeout: timeouts.navigation,
     });
@@ -509,7 +522,7 @@ test.describe.serial("Profile Edit — Mutations", () => {
 
       // The inline input should appear
       const langInput = page.locator(
-        'input[aria-label="Add a language"], input[placeholder*="language"]',
+        'input[aria-label="Add a language"], input[placeholder*="language"]'
       );
       await expect(langInput.first()).toBeVisible({ timeout: 5000 });
 
@@ -575,9 +588,9 @@ test.describe.serial("Profile Edit — Mutations", () => {
         if (hasSuggestion) {
           await suggestionBtn.click();
           // Wait for the tag to appear instead of fixed timeout
-          await expect(
-            page.getByText("English").first(),
-          ).toBeVisible({ timeout: 5000 });
+          await expect(page.getByText("English").first()).toBeVisible({
+            timeout: 5000,
+          });
         } else {
           test.skip(true, "No languages to remove and no Add button available");
           return;
@@ -590,9 +603,9 @@ test.describe.serial("Profile Edit — Mutations", () => {
         await langInput.fill("TestLang");
         await langInput.press("Enter");
         // Wait for the tag text to appear instead of fixed timeout
-        await expect(
-          page.getByText("TestLang").first(),
-        ).toBeVisible({ timeout: 5000 });
+        await expect(page.getByText("TestLang").first()).toBeVisible({
+          timeout: 5000,
+        });
       }
     }
 

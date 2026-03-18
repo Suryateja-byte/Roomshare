@@ -12,7 +12,7 @@ jest.mock("next/server", () => ({
   NextResponse: {
     json: (
       data: unknown,
-      init?: { status?: number; headers?: Record<string, string> },
+      init?: { status?: number; headers?: Record<string, string> }
     ) => {
       const headersMap = new Map(Object.entries(init?.headers || {}));
       return {
@@ -59,7 +59,7 @@ jest.mock("@/lib/logger", () => ({
     error: jest.fn(),
   },
   sanitizeErrorMessage: jest.fn((err: unknown) =>
-    err instanceof Error ? err.message : String(err),
+    err instanceof Error ? err.message : String(err)
   ),
 }));
 
@@ -109,7 +109,13 @@ describe("GET /api/search-count", () => {
     });
     mockGetLimitedCount.mockResolvedValue(42);
 
-    const request = createRequest({ q: "downtown", minLat: "37.7", maxLat: "37.8", minLng: "-122.5", maxLng: "-122.4" });
+    const request = createRequest({
+      q: "downtown",
+      minLat: "37.7",
+      maxLat: "37.8",
+      minLng: "-122.5",
+      maxLng: "-122.4",
+    });
     const response = await GET(request);
 
     expect(response.status).toBe(200);
@@ -126,7 +132,12 @@ describe("GET /api/search-count", () => {
     });
     mockGetLimitedCount.mockResolvedValue(null);
 
-    const request = createRequest({ minLat: "37.7", maxLat: "37.8", minLng: "-122.5", maxLng: "-122.4" });
+    const request = createRequest({
+      minLat: "37.7",
+      maxLat: "37.8",
+      minLng: "-122.5",
+      maxLng: "-122.4",
+    });
     const response = await GET(request);
 
     expect(response.status).toBe(200);
@@ -174,7 +185,12 @@ describe("GET /api/search-count", () => {
     mockHasActiveFilters.mockReturnValue(false);
     mockGetLimitedCount.mockResolvedValue(7);
 
-    const request = createRequest({ minLat: "40.0", maxLat: "40.1", minLng: "-74.1", maxLng: "-74.0" });
+    const request = createRequest({
+      minLat: "40.0",
+      maxLat: "40.1",
+      minLng: "-74.1",
+      maxLng: "-74.0",
+    });
     const response = await GET(request);
 
     expect(response.status).toBe(200);
@@ -223,7 +239,12 @@ describe("GET /api/search-count", () => {
     });
     mockGetLimitedCount.mockRejectedValue(new Error("DB connection failure"));
 
-    const request = createRequest({ minLat: "37.7", maxLat: "37.8", minLng: "-122.5", maxLng: "-122.4" });
+    const request = createRequest({
+      minLat: "37.7",
+      maxLat: "37.8",
+      minLng: "-122.5",
+      maxLng: "-122.4",
+    });
     const response = await GET(request);
 
     expect(response.status).toBe(500);
@@ -240,12 +261,17 @@ describe("GET /api/search-count", () => {
     });
     mockGetLimitedCount.mockResolvedValue(5);
 
-    const request = createRequest({ minLat: "37.7", maxLat: "37.8", minLng: "-122.5", maxLng: "-122.4" });
+    const request = createRequest({
+      minLat: "37.7",
+      maxLat: "37.8",
+      minLng: "-122.5",
+      maxLng: "-122.4",
+    });
     const response = await GET(request);
 
     expect(response.status).toBe(200);
     expect(response.headers.get("Cache-Control")).toBe(
-      "public, s-maxage=15, stale-while-revalidate=30",
+      "public, s-maxage=15, stale-while-revalidate=30"
     );
   });
 
@@ -258,7 +284,12 @@ describe("GET /api/search-count", () => {
     });
     mockGetLimitedCount.mockRejectedValue(new Error("Unexpected failure"));
 
-    const request = createRequest({ minLat: "37.7", maxLat: "37.8", minLng: "-122.5", maxLng: "-122.4" });
+    const request = createRequest({
+      minLat: "37.7",
+      maxLat: "37.8",
+      minLng: "-122.5",
+      maxLng: "-122.4",
+    });
     const response = await GET(request);
 
     expect(response.status).toBe(500);
@@ -300,12 +331,19 @@ describe("GET /api/search-count", () => {
     });
     mockGetLimitedCount.mockRejectedValue(dbError);
 
-    const request = createRequest({ minLat: "37.7", maxLat: "37.8", minLng: "-122.5", maxLng: "-122.4" });
+    const request = createRequest({
+      minLat: "37.7",
+      maxLat: "37.8",
+      minLng: "-122.5",
+      maxLng: "-122.4",
+    });
     await GET(request);
 
     expect(Sentry.captureException).toHaveBeenCalledWith(
       dbError,
-      expect.objectContaining({ tags: { route: "/api/search-count", method: "GET" } }),
+      expect.objectContaining({
+        tags: { route: "/api/search-count", method: "GET" },
+      })
     );
   });
 
@@ -319,7 +357,13 @@ describe("GET /api/search-count", () => {
     });
     mockGetLimitedCount.mockResolvedValue(0);
 
-    const request = createRequest({ q: "penthouse", minLat: "37.7", maxLat: "37.8", minLng: "-122.5", maxLng: "-122.4" });
+    const request = createRequest({
+      q: "penthouse",
+      minLat: "37.7",
+      maxLat: "37.8",
+      minLng: "-122.5",
+      maxLng: "-122.4",
+    });
     const response = await GET(request);
 
     expect(response.status).toBe(200);

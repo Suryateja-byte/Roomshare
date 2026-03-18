@@ -7,7 +7,9 @@ import type { FilterParams } from "@/lib/search-params";
  *
  * Empty strings and empty arrays become undefined so they are omitted from queries.
  */
-export function pendingToFilterParams(pending: BatchedFilterValues): FilterParams {
+export function pendingToFilterParams(
+  pending: BatchedFilterValues
+): FilterParams {
   const parsePrice = (val: string): number | undefined => {
     if (val === "") return undefined;
     const num = Number(val);
@@ -25,6 +27,8 @@ export function pendingToFilterParams(pending: BatchedFilterValues): FilterParam
     languages: pending.languages.length > 0 ? pending.languages : undefined,
     genderPreference: pending.genderPreference || undefined,
     householdGender: pending.householdGender || undefined,
-    minAvailableSlots: pending.minSlots ? parseInt(pending.minSlots, 10) || undefined : undefined,
+    minAvailableSlots: pending.minSlots
+      ? parseInt(pending.minSlots, 10) || undefined
+      : undefined,
   };
 }

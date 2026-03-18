@@ -9,10 +9,10 @@
  * - No autocomplete use (use Photon for that)
  */
 
-import { fetchWithTimeout } from '../fetch-with-timeout';
+import { fetchWithTimeout } from "../fetch-with-timeout";
 
-const NOMINATIM_BASE_URL = 'https://nominatim.openstreetmap.org';
-const USER_AGENT = 'Roomshare/1.0 (contact@roomshare.app)';
+const NOMINATIM_BASE_URL = "https://nominatim.openstreetmap.org";
+const USER_AGENT = "Roomshare/1.0 (contact@roomshare.app)";
 const MIN_REQUEST_INTERVAL_MS = 1100; // Slightly over 1s to be safe
 const GEOCODING_TIMEOUT_MS = 5000;
 
@@ -24,7 +24,7 @@ async function rateLimitWait(): Promise<void> {
   const elapsed = now - lastRequestTimestamp;
   if (elapsed < MIN_REQUEST_INTERVAL_MS) {
     await new Promise((resolve) =>
-      setTimeout(resolve, MIN_REQUEST_INTERVAL_MS - elapsed),
+      setTimeout(resolve, MIN_REQUEST_INTERVAL_MS - elapsed)
     );
   }
   lastRequestTimestamp = Date.now();
@@ -32,8 +32,8 @@ async function rateLimitWait(): Promise<void> {
 
 /** Common headers for all Nominatim requests */
 const NOMINATIM_HEADERS = {
-  'User-Agent': USER_AGENT,
-  Accept: 'application/json',
+  "User-Agent": USER_AGENT,
+  Accept: "application/json",
 };
 
 interface NominatimSearchResult {
@@ -65,7 +65,7 @@ interface NominatimReverseResult {
  */
 export async function forwardGeocode(
   query: string,
-  options?: { signal?: AbortSignal },
+  options?: { signal?: AbortSignal }
 ): Promise<{ lat: number; lng: number } | null> {
   await rateLimitWait();
 
@@ -80,7 +80,7 @@ export async function forwardGeocode(
 
   if (!response.ok) {
     throw new Error(
-      `Nominatim search failed: ${response.status} ${response.statusText}`,
+      `Nominatim search failed: ${response.status} ${response.statusText}`
     );
   }
 
@@ -104,7 +104,7 @@ export async function forwardGeocode(
 export async function reverseGeocode(
   lat: number,
   lng: number,
-  options?: { signal?: AbortSignal },
+  options?: { signal?: AbortSignal }
 ): Promise<string | null> {
   const url = `${NOMINATIM_BASE_URL}/reverse?lat=${lat}&lon=${lng}&format=jsonv2&addressdetails=1`;
 
@@ -137,7 +137,7 @@ export interface BoundaryResult {
  */
 export async function searchBoundary(
   query: string,
-  options?: { signal?: AbortSignal },
+  options?: { signal?: AbortSignal }
 ): Promise<BoundaryResult | null> {
   const encoded = encodeURIComponent(query);
   const url = `${NOMINATIM_BASE_URL}/search?q=${encoded}&format=jsonv2&polygon_geojson=1&limit=1`;
@@ -163,7 +163,12 @@ export async function searchBoundary(
   // Convert Nominatim boundingbox [minLat, maxLat, minLon, maxLon] (strings)
   // to [minLng, minLat, maxLng, maxLat] (numbers, GeoJSON order)
   const [minLat, maxLat, minLon, maxLon] = result.boundingbox.map(parseFloat);
-  const bbox: [number, number, number, number] = [minLon, minLat, maxLon, maxLat];
+  const bbox: [number, number, number, number] = [
+    minLon,
+    minLat,
+    maxLon,
+    maxLat,
+  ];
 
   return {
     displayName: result.display_name,

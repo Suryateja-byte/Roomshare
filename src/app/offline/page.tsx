@@ -1,7 +1,7 @@
 "use client";
 
-import { RefreshCw, WifiOff } from 'lucide-react';
-import { Button } from '@/components/ui/button';
+import { RefreshCw, WifiOff } from "lucide-react";
+import { Button } from "@/components/ui/button";
 
 export default function OfflinePage() {
   return (
@@ -19,11 +19,16 @@ export default function OfflinePage() {
       </h1>
 
       <p className="mb-8 max-w-md text-center text-zinc-600 dark:text-zinc-400">
-        It looks like you&apos;ve lost your internet connection. Some features may be unavailable until you&apos;re back online.
+        It looks like you&apos;ve lost your internet connection. Some features
+        may be unavailable until you&apos;re back online.
       </p>
 
       <div className="flex flex-col items-center gap-4">
-        <Button onClick={() => window.location.reload()} size="lg" className="gap-2">
+        <Button
+          onClick={() => window.location.reload()}
+          size="lg"
+          className="gap-2"
+        >
           <RefreshCw className="h-4 w-4" />
           Try again
         </Button>

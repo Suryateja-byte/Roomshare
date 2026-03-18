@@ -10,12 +10,7 @@
  */
 
 import maplibregl from "maplibre-gl";
-import type {
-  Map,
-  Marker,
-  Popup,
-  LngLatBounds,
-} from "maplibre-gl";
+import type { Map, Marker, Popup, LngLatBounds } from "maplibre-gl";
 
 // Re-export types for consumers
 export type {
@@ -142,7 +137,7 @@ export function removeMarker(marker: Marker): void {
  */
 export function setMarkerPosition(
   marker: Marker,
-  lngLat: [number, number],
+  lngLat: [number, number]
 ): Marker {
   return marker.setLngLat(lngLat);
 }
@@ -167,7 +162,7 @@ export function setPopupContent(popup: Popup, html: string): Popup {
 export function fitMapBounds(
   map: Map,
   bounds: LngLatBounds,
-  options?: FitBoundsOptions,
+  options?: FitBoundsOptions
 ): void {
   map.fitBounds(bounds, options);
 }
@@ -177,7 +172,7 @@ export function fitMapBounds(
  */
 export function extendBounds(
   bounds: LngLatBounds,
-  lngLat: [number, number],
+  lngLat: [number, number]
 ): LngLatBounds {
   return bounds.extend(lngLat);
 }
@@ -223,7 +218,7 @@ export function getCenter(map: Map): { lng: number; lat: number } {
 export function onMapEvent(
   map: Map,
   event: string,
-  handler: (e: unknown) => void,
+  handler: (e: unknown) => void
 ): void {
   map.on(event as keyof maplibregl.MapEventType, handler as () => void);
 }
@@ -234,7 +229,7 @@ export function onMapEvent(
 export function offMapEvent(
   map: Map,
   event: string,
-  handler: (e: unknown) => void,
+  handler: (e: unknown) => void
 ): void {
   map.off(event as keyof maplibregl.MapEventType, handler as () => void);
 }

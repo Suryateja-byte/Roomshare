@@ -6,7 +6,7 @@
  * @see https://developers.google.com/maps/documentation/javascript/places-ui-kit/place-list
  */
 
-import 'react';
+import "react";
 
 // Types for Google Places API
 interface PlacesSearchRequest {
@@ -61,11 +61,18 @@ declare global {
         importLibrary: (library: string) => Promise<unknown>;
         places?: {
           Place?: {
-            searchNearby: (request: PlacesSearchRequest) => Promise<PlacesSearchResponse>;
-            searchByText: (request: PlacesSearchRequest) => Promise<PlacesSearchResponse>;
+            searchNearby: (
+              request: PlacesSearchRequest
+            ) => Promise<PlacesSearchResponse>;
+            searchByText: (
+              request: PlacesSearchRequest
+            ) => Promise<PlacesSearchResponse>;
           };
         };
-        LatLng?: new (lat: number, lng: number) => { lat: () => number; lng: () => number };
+        LatLng?: new (
+          lat: number,
+          lng: number
+        ) => { lat: () => number; lng: () => number };
         Circle?: new (options: GoogleMapsCircleOptions) => GoogleMapsCircle;
       };
     };
@@ -84,13 +91,13 @@ declare global {
 }
 
 // Module augmentation for React JSX
-declare module 'react' {
+declare module "react" {
   namespace JSX {
     interface IntrinsicElements {
       /**
        * The main Place Search element that renders a list of places.
        */
-      'gmp-place-search': React.DetailedHTMLProps<
+      "gmp-place-search": React.DetailedHTMLProps<
         React.HTMLAttributes<HTMLElement> & {
           selectable?: boolean | string;
           slot?: string;
@@ -101,9 +108,9 @@ declare module 'react' {
       /**
        * Nearby Search request element.
        */
-      'gmp-place-nearby-search-request': React.DetailedHTMLProps<
+      "gmp-place-nearby-search-request": React.DetailedHTMLProps<
         React.HTMLAttributes<HTMLElement> & {
-          'max-result-count'?: number | string;
+          "max-result-count"?: number | string;
         },
         HTMLElement
       >;
@@ -111,10 +118,10 @@ declare module 'react' {
       /**
        * Text Search request element.
        */
-      'gmp-place-text-search-request': React.DetailedHTMLProps<
+      "gmp-place-text-search-request": React.DetailedHTMLProps<
         React.HTMLAttributes<HTMLElement> & {
-          'text-query'?: string;
-          'max-result-count'?: number | string;
+          "text-query"?: string;
+          "max-result-count"?: number | string;
         },
         HTMLElement
       >;
@@ -122,7 +129,7 @@ declare module 'react' {
       /**
        * Displays all place content.
        */
-      'gmp-place-all-content': React.DetailedHTMLProps<
+      "gmp-place-all-content": React.DetailedHTMLProps<
         React.HTMLAttributes<HTMLElement>,
         HTMLElement
       >;
@@ -130,7 +137,7 @@ declare module 'react' {
       /**
        * Displays detailed information about a place.
        */
-      'gmp-place-details-compact': React.DetailedHTMLProps<
+      "gmp-place-details-compact": React.DetailedHTMLProps<
         React.HTMLAttributes<HTMLElement> & {
           place?: string;
         },
@@ -140,9 +147,9 @@ declare module 'react' {
       /**
        * Required attribution element - DO NOT remove/alter/obscure.
        */
-      'gmp-place-attribution': React.DetailedHTMLProps<
+      "gmp-place-attribution": React.DetailedHTMLProps<
         React.HTMLAttributes<HTMLElement> & {
-          'color-scheme'?: 'light' | 'dark';
+          "color-scheme"?: "light" | "dark";
         },
         HTMLElement
       >;

@@ -35,7 +35,9 @@ test.describe("Map Pin Tiering", () => {
   test.use({ storageState: { cookies: [], origins: [] } });
 
   // Map tests need extra time for WebGL rendering and tile loading in CI
-  test.beforeEach(async () => { test.slow(); });
+  test.beforeEach(async () => {
+    test.slow();
+  });
 
   test(`${tags.anon} - Renders both primary and mini pins`, async ({
     page,
@@ -51,10 +53,10 @@ test.describe("Map Pin Tiering", () => {
       // With 49 unique locations and PRIMARY_PIN_LIMIT=40, expect 40 primary + 9 mini
       // Use .maplibregl-marker as base selector (react-map-gl wrapper class)
       const miniPins = page.locator(
-        '.maplibregl-marker:visible [data-testid^="map-pin-mini-"]',
+        '.maplibregl-marker:visible [data-testid^="map-pin-mini-"]'
       );
       const primaryPins = page.locator(
-        '.maplibregl-marker:visible [data-testid^="map-pin-primary-"]',
+        '.maplibregl-marker:visible [data-testid^="map-pin-primary-"]'
       );
 
       // Assert both types exist (mock guarantees this)
@@ -99,7 +101,7 @@ test.describe("Map Pin Tiering", () => {
 
       // Popup should appear
       const popup = page.locator(
-        '.maplibregl-popup, [data-testid="stacked-popup"]',
+        '.maplibregl-popup, [data-testid="stacked-popup"]'
       );
       await expect(popup).toBeVisible({ timeout: timeouts.action });
     } finally {
@@ -120,9 +122,7 @@ test.describe("Map Pin Tiering", () => {
 
       // Get a mini pin's wrapper (the parent div with data-listing-id and data-focus-state)
       const miniPinWrapper = page
-        .locator(
-          '.maplibregl-marker:visible [data-testid^="map-pin-mini-"]',
-        )
+        .locator('.maplibregl-marker:visible [data-testid^="map-pin-mini-"]')
         .first();
       await expect(miniPinWrapper).toBeVisible();
 
@@ -134,12 +134,14 @@ test.describe("Map Pin Tiering", () => {
           new PointerEvent("pointerenter", {
             bubbles: true,
             pointerType: "mouse",
-          }),
+          })
         );
       });
 
       // On hover, the wrapper div gets data-focus-state="hovered" and scale-[1.15]
-      await expect(wrapperEl).toHaveAttribute("data-focus-state", "hovered", { timeout: 5_000 });
+      await expect(wrapperEl).toHaveAttribute("data-focus-state", "hovered", {
+        timeout: 5_000,
+      });
     } finally {
       await cleanup();
     }

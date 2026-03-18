@@ -11,7 +11,7 @@
  *   - Never interpolate a value from user input directly into the query string.
  */
 
-import 'server-only';
+import "server-only";
 
 /**
  * SQL string literals that are allowed to appear verbatim inside a
@@ -22,12 +22,7 @@ import 'server-only';
  * %       — LIKE wildcard
  * HELD    — booking status enum value (hard-coded in condition strings)
  */
-const ALLOWED_SQL_STRING_LITERALS = new Set([
-  'ACTIVE',
-  'english',
-  '%',
-  'HELD',
-]);
+const ALLOWED_SQL_STRING_LITERALS = new Set(["ACTIVE", "english", "%", "HELD"]);
 
 /**
  * Assert that a WHERE clause string contains no raw user-supplied string
@@ -42,7 +37,7 @@ export function assertParameterizedWhereClause(whereClause: string): void {
     const literalValue = match[1];
     if (!ALLOWED_SQL_STRING_LITERALS.has(literalValue)) {
       throw new Error(
-        'SECURITY: Raw string detected in whereClause — use parameterized $N placeholders',
+        "SECURITY: Raw string detected in whereClause — use parameterized $N placeholders"
       );
     }
   }
@@ -56,9 +51,9 @@ export function assertParameterizedWhereClause(whereClause: string): void {
  * call site so the security assertion is never accidentally skipped.
  */
 export function joinWhereClauseWithSecurityInvariant(
-  conditions: string[],
+  conditions: string[]
 ): string {
-  const whereClause = conditions.join(' AND ');
+  const whereClause = conditions.join(" AND ");
   assertParameterizedWhereClause(whereClause);
   return whereClause;
 }
@@ -71,11 +66,11 @@ export function joinWhereClauseWithSecurityInvariant(
  */
 export function assertValidSortColumn(
   column: string,
-  allowedColumns: string[],
+  allowedColumns: string[]
 ): void {
   if (!allowedColumns.includes(column)) {
     throw new Error(
-      `SECURITY: Invalid sort column "${column}". Allowed: ${allowedColumns.join(', ')}`,
+      `SECURITY: Invalid sort column "${column}". Allowed: ${allowedColumns.join(", ")}`
     );
   }
 }
@@ -88,9 +83,9 @@ export function assertValidSortColumn(
  */
 export function assertValidSortDirection(direction: string): void {
   const normalized = direction.toLowerCase();
-  if (normalized !== 'asc' && normalized !== 'desc') {
+  if (normalized !== "asc" && normalized !== "desc") {
     throw new Error(
-      `SECURITY: Invalid sort direction "${direction}". Must be "asc" or "desc"`,
+      `SECURITY: Invalid sort direction "${direction}". Must be "asc" or "desc"`
     );
   }
 }
@@ -101,13 +96,10 @@ export function assertValidSortDirection(direction: string): void {
  *
  * @throws if value is not in allowedValues.
  */
-export function assertValidEnum(
-  value: string,
-  allowedValues: string[],
-): void {
+export function assertValidEnum(value: string, allowedValues: string[]): void {
   if (!allowedValues.includes(value)) {
     throw new Error(
-      `SECURITY: Invalid enum value "${value}". Allowed: ${allowedValues.join(', ')}`,
+      `SECURITY: Invalid enum value "${value}". Allowed: ${allowedValues.join(", ")}`
     );
   }
 }
