@@ -42,7 +42,7 @@ const sel = {
   card: '[data-testid="listing-card"]',
   loadMoreBtn: 'button:has-text("Show more places")',
   busyBtn: 'button[aria-busy="true"]',
-  srLiveRegion: '[aria-live="polite"][aria-atomic="true"]',
+  srLiveRegion: '[role="status"][aria-live="polite"][aria-atomic="true"]',
   searchResults: "#search-results",
 } as const;
 

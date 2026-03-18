@@ -308,7 +308,7 @@ test.describe("Pagination URL State", () => {
     // Scope to the visible container to avoid strict mode violation
     // (desktop + mobile containers both have aria-live regions).
     const liveRegion = container.locator(
-      '[aria-live="polite"][aria-atomic="true"]',
+      '[role="status"][aria-live="polite"][aria-atomic="true"]',
     );
     await expect(liveRegion).toBeAttached({ timeout: 30_000 });
 

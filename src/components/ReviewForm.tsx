@@ -1,6 +1,7 @@
 'use client';
 
 import { useState } from 'react';
+import { useRouter } from 'next/navigation';
 import { Star, LogIn, CheckCircle2, Edit3, Trash2, Loader2, Calendar, AlertTriangle } from 'lucide-react';
 import { Button } from './ui/button';
 import { cn } from '@/lib/utils';
@@ -56,6 +57,7 @@ export default function ReviewForm({
     const [isDeleting, setIsDeleting] = useState(false);
     const [wasDeleted, setWasDeleted] = useState(false);
     const [showDeleteDialog, setShowDeleteDialog] = useState(false);
+    const router = useRouter();
 
     // Handle editing an existing review
     const handleUpdate = async () => {
@@ -117,6 +119,7 @@ export default function ReviewForm({
 
             toast.success('Review deleted successfully');
             setWasDeleted(true);
+            router.refresh(); // Route handler delete — no server action revalidation
         } catch (err) {
             toast.error(err instanceof Error ? err.message : 'Failed to delete review');
         } finally {
