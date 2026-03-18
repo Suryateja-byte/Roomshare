@@ -58,6 +58,7 @@ export function SearchResultsClient({
   const [isLoadingMore, setIsLoadingMore] = useState(false);
   const isLoadingRef = useRef(false);
   const [loadError, setLoadError] = useState<string | null>(null);
+  const [loadMoreAnnouncement, setLoadMoreAnnouncement] = useState('');
   const [showTotalPrice, setShowTotalPrice] = useState(false);
   const [resolvedSavedListingIds, setResolvedSavedListingIds] =
     useState(savedListingIds);
@@ -94,6 +95,7 @@ export function SearchResultsClient({
       prevFingerprintRef.current = initialDataFingerprint;
       setExtraListings([]);
       setNextCursor(initialNextCursor);
+      setLoadMoreAnnouncement('');
       seenIdsRef.current = new Set(initialListings.map((l) => l.id));
     }
   }, [initialDataFingerprint, initialNextCursor, initialListings]);
@@ -174,6 +176,13 @@ export function SearchResultsClient({
 
       setExtraListings((prev) => [...prev, ...dedupedItems]);
       setNextCursor(result.nextCursor);
+
+      // Announce to screen readers (after state update)
+      const newCount = allListings.length + dedupedItems.length;
+      const totalLabel = initialTotal !== null ? ` of ~${initialTotal}` : '';
+      setLoadMoreAnnouncement(
+        `Loaded ${dedupedItems.length} more listing${dedupedItems.length === 1 ? '' : 's'}, showing ${newCount}${totalLabel}`
+      );
     } catch (err) {
       const raw = err instanceof Error ? err.message : "Failed to load more results";
       const friendly = raw.includes("Rate limit")
@@ -184,7 +193,7 @@ export function SearchResultsClient({
       isLoadingRef.current = false;
       setIsLoadingMore(false);
     }
-  }, [nextCursor, rawParams]);
+  }, [nextCursor, rawParams, allListings, initialTotal]);
 
   const total = initialTotal;
 
@@ -254,6 +263,11 @@ export function SearchResultsClient({
             : `Found ${total} ${total === 1 ? "listing" : "listings"}${query ? ` for "${query}"` : ""}`}
       </div>
 
+      {/* Load-more announcement — separate from initial status to avoid re-announcing on mount */}
+      <div role="log" aria-live="polite" aria-atomic="true" className="sr-only">
+        {loadMoreAnnouncement}
+      </div>
+
       {hasConfirmedZeroResults ? (
         <div data-testid="empty-state" className="flex flex-col items-center justify-center py-12 sm:py-20 border-2 border-dashed border-zinc-100 dark:border-zinc-800 rounded-2xl sm:rounded-3xl bg-zinc-50/50 dark:bg-zinc-900/50">
           <div className="w-14 h-14 sm:w-16 sm:h-16 rounded-full bg-white dark:bg-zinc-800 flex items-center justify-center shadow-sm mb-4">
@@ -306,7 +320,7 @@ export function SearchResultsClient({
           )}
 
           <h2 className="sr-only">Available listings</h2>
-          <div role="feed" aria-label="Search results" className="grid grid-cols-1 sm:grid-cols-2 gap-4 sm:gap-x-6 sm:gap-y-8">
+          <div role="feed" aria-label="Search results" aria-busy={isLoadingMore} className="grid grid-cols-1 sm:grid-cols-2 gap-4 sm:gap-x-6 sm:gap-y-8">
             {allListings.map((listing, index) => (
               <ListingCard
                 key={listing.id}

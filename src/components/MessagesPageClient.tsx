@@ -122,7 +122,6 @@ export default function MessagesPageClient({ currentUserId, initialConversations
                 toast.success(`Marked ${result.count} messages as read`);
                 // Update local state to reflect changes
                 setConversations(prev => prev.map(c => ({ ...c, unreadCount: 0 })));
-                router.refresh();
             }
         } catch (error) {
             toast.error('Failed to mark messages as read');
@@ -254,7 +253,6 @@ export default function MessagesPageClient({ currentUserId, initialConversations
                 setActiveId(null);
                 setMsgs([]);
                 lastMsgIdRef.current = undefined;
-                router.refresh();
             }
         } catch (error) {
             toast.error('Failed to delete conversation');

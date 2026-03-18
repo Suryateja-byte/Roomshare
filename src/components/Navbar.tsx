@@ -1,6 +1,8 @@
 import NavbarClient from './NavbarClient';
+import { auth } from '@/auth';
 
 export default async function Navbar() {
-    return <NavbarClient user={null} unreadCount={0} />;
+    const session = await auth();
+    return <NavbarClient user={session?.user ?? null} unreadCount={0} />;
 }
 

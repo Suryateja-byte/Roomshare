@@ -252,21 +252,10 @@ test.describe("Semantic Search - Similar Listings", () => {
     const cards = similarCards(page);
     const firstCard = cards.first();
 
-    // Find the "Show on map" button
+    // "Show on map" button should NOT be present on listing detail page
+    // (no ListingFocusProvider — button is hidden when no map context exists)
     const mapPinBtn = firstCard.locator('button[aria-label="Show on map"]');
-    await expect(mapPinBtn).toBeVisible();
-
-    // Record current URL before clicking
-    const urlBefore = page.url();
-
-    // Click the button
-    await mapPinBtn.click();
-
-    // URL should not have changed (no navigation) — deterministic assertion
-    await expect.poll(() => page.url(), { timeout: 2_000 }).toBe(urlBefore);
-
-    // Page content should not have changed
-    await expect(page.getByRole("heading", { level: 1 }).first()).toBeVisible();
+    await expect(mapPinBtn).toHaveCount(0);
   });
 
   test(`SS-57: FavoriteButton on similar listing cards renders in unsaved state`, async ({ page }) => {
@@ -283,8 +272,8 @@ test.describe("Semantic Search - Similar Listings", () => {
     const cards = similarCards(page);
     const firstCard = cards.first();
 
-    // FavoriteButton: button with SVG, excluding "Show on map"
-    const favoriteBtn = firstCard.locator('button:not([aria-label="Show on map"])').filter({
+    // FavoriteButton: button with SVG (no "Show on map" button on detail page)
+    const favoriteBtn = firstCard.locator('button').filter({
       has: page.locator('svg'),
     }).first();
 

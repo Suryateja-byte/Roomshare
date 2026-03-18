@@ -86,7 +86,6 @@ test.describe("Listing Card Carousel", () => {
     // Focus the carousel to trigger showControls via onFocus (more reliable
     // than hover in headless CI where mouse-enter events can be flaky).
     await carouselRegion.focus();
-    await page.waitForTimeout(timeouts.animation);
 
     // Find the dots indicator - first dot should be selected
     const dots = carouselRegion.locator('[role="tab"]');
@@ -103,7 +102,6 @@ test.describe("Listing Card Carousel", () => {
       'button[aria-label="Next image"]',
     );
     await nextButton.click({ force: true });
-    await page.waitForTimeout(timeouts.animation);
 
     // Second dot should now be selected
     const secondDot = dots.nth(1);
@@ -138,7 +136,6 @@ test.describe("Listing Card Carousel", () => {
     // Focus the carousel to trigger showControls via onFocus (more reliable
     // than hover in headless CI where mouse-enter events can be flaky).
     await carouselRegion.focus();
-    await page.waitForTimeout(timeouts.animation);
 
     // Click the second dot (force: true bypasses actionability checks for
     // hover-reveal controls that may still have pointer-events-none in CI)
@@ -148,7 +145,6 @@ test.describe("Listing Card Carousel", () => {
 
     const secondDot = dots.nth(1);
     await secondDot.click({ force: true });
-    await page.waitForTimeout(timeouts.animation);
 
     // Second dot should be selected (Embla scroll animation can be slow on
     // Mobile Chrome CI — use toPass polling to handle delayed onSelect callback)
@@ -206,7 +202,6 @@ test.describe("Listing Card Carousel", () => {
 
     // Click next to navigate (validates navigation still works)
     await nextButton.click({ force: true });
-    await page.waitForTimeout(timeouts.animation);
 
     // Keep hovering to ensure controls stay visible
     await carouselRegion.hover();

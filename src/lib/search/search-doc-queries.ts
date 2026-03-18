@@ -13,6 +13,8 @@
  * - PostGIS: geography type with GIST index for spatial queries
  */
 
+import 'server-only';
+
 import { prisma } from "@/lib/prisma";
 import { wrapDatabaseError } from "@/lib/errors";
 import { unstable_cache } from "next/cache";
@@ -42,6 +44,7 @@ import { buildCursorFromRow, encodeKeysetCursor } from "./cursor";
 import pgvector from "pgvector";
 import { getCachedQueryEmbedding } from "@/lib/embeddings/query-cache";
 import { logger } from "@/lib/logger";
+import { joinWhereClauseWithSecurityInvariant } from "@/lib/sql-safety";
 
 // Statement timeout for search queries (5 seconds)
 const SEARCH_QUERY_TIMEOUT_MS = 5000;
@@ -123,26 +126,6 @@ const HYBRID_COUNT_THRESHOLD = 100;
 // Prevents full-table scans while allowing homepage browsing.
 // 48 = 4 pages of 12 items - enough for initial exploration
 export const MAX_UNBOUNDED_RESULTS = 48;
-
-const ALLOWED_SQL_STRING_LITERALS = new Set(["ACTIVE", "english", "%", "HELD"]);
-
-function assertParameterizedWhereClause(whereClause: string): void {
-  const literalPattern = /'([^']*)'/g;
-  for (const match of whereClause.matchAll(literalPattern)) {
-    const literalValue = match[1];
-    if (!ALLOWED_SQL_STRING_LITERALS.has(literalValue)) {
-      throw new Error(
-        "SECURITY: Raw string detected in whereClause — use parameterized $N placeholders",
-      );
-    }
-  }
-}
-
-function joinWhereClauseWithSecurityInvariant(conditions: string[]): string {
-  const whereClause = conditions.join(" AND ");
-  assertParameterizedWhereClause(whereClause);
-  return whereClause;
-}
 
 // ============================================
 // Cache Key Generators

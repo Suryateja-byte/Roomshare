@@ -5,11 +5,9 @@ import { toast } from "sonner";
 
 // Mock next/navigation
 const mockPush = jest.fn();
-const mockRefresh = jest.fn();
 jest.mock("next/navigation", () => ({
   useRouter: () => ({
     push: mockPush,
-    refresh: mockRefresh,
   }),
 }));
 
@@ -149,7 +147,6 @@ describe("DeleteListingButton", () => {
         "Listing deleted successfully",
       );
       expect(mockPush).toHaveBeenCalledWith("/search");
-      expect(mockRefresh).toHaveBeenCalled();
     });
   });
 

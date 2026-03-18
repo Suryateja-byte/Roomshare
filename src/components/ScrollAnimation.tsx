@@ -1,7 +1,7 @@
 'use client';
 
 import { useRef, useEffect, useState, useCallback } from 'react';
-import { useScroll, useTransform, useMotionValueEvent, m, LazyMotion, domAnimation } from 'framer-motion';
+import { useScroll, useTransform, useMotionValueEvent, m } from 'framer-motion';
 import { useScrollContainer } from '@/contexts/ScrollContainerContext';
 
 // ─────────────────────────────────────────────────────────────
@@ -22,15 +22,33 @@ function getFrameSrc(index: number, isMobile: boolean): string {
 // ─────────────────────────────────────────────────────────────
 // Hook: Preload frames with progress
 // ─────────────────────────────────────────────────────────────
-function useFramePreloader(frameCount: number, isMobile: boolean) {
+// rIC polyfill for Safari < 16.4
+const rIC =
+  typeof window !== 'undefined' && typeof window.requestIdleCallback === 'function'
+    ? window.requestIdleCallback.bind(window)
+    : // eslint-disable-next-line @typescript-eslint/no-unused-vars
+      (cb: IdleRequestCallback, _opts?: IdleRequestOptions) =>
+        setTimeout(() => cb({ didTimeout: false, timeRemaining: () => 50 } as IdleDeadline), 1) as unknown as number;
+const cIC =
+  typeof window !== 'undefined' && typeof window.cancelIdleCallback === 'function'
+    ? window.cancelIdleCallback.bind(window)
+    : (id: number) => clearTimeout(id);
+
+function useFramePreloader(frameCount: number, isMobile: boolean, shouldStart: boolean) {
   const [progress, setProgress] = useState(0);
   const [ready, setReady] = useState(false);
+  const [failed, setFailed] = useState(false);
   const framesRef = useRef<HTMLImageElement[]>([]);
 
   useEffect(() => {
+    if (!shouldStart) return;
+
     let cancelled = false;
+    let idleHandle: number | undefined;
     const frames: HTMLImageElement[] = new Array(frameCount);
+    const allImages: HTMLImageElement[] = []; // Track all created images for cleanup
     let loaded = 0;
+    let succeeded = 0;
 
     // Load keyframes first (every 8th) for instant interactivity
     const keyframeIndices: number[] = [];
@@ -46,17 +64,22 @@ function useFramePreloader(frameCount: number, isMobile: boolean) {
     const loadFrame = (idx: number): Promise<void> =>
       new Promise((resolve) => {
         const img = new Image();
+        allImages.push(img);
         img.onload = () => {
-          if (cancelled) return;
-          frames[idx] = img;
-          loaded++;
-          setProgress(loaded / frameCount);
-          resolve();
+          if (!cancelled) {
+            frames[idx] = img;
+            loaded++;
+            succeeded++;
+            setProgress(loaded / frameCount);
+          }
+          resolve(); // ALWAYS resolve — prevents promise leak
         };
         img.onerror = () => {
-          loaded++;
-          setProgress(loaded / frameCount);
-          resolve();
+          if (!cancelled) {
+            loaded++;
+            setProgress(loaded / frameCount);
+          }
+          resolve(); // ALWAYS resolve
         };
         img.src = getFrameSrc(idx, isMobile);
       });
@@ -69,25 +92,46 @@ function useFramePreloader(frameCount: number, isMobile: boolean) {
       }
       if (cancelled) return;
       framesRef.current = frames;
+
+      // If no keyframes loaded at all, show fallback instead of blank canvas
+      if (succeeded === 0) {
+        setFailed(true);
+        return;
+      }
+
       setReady(true);
 
-      // Phase 2: fill remaining frames (parallel, batch of 8)
-      for (let i = 0; i < fillIndices.length; i += 8) {
-        if (cancelled) return;
-        await Promise.all(fillIndices.slice(i, i + 8).map(loadFrame));
+      // Phase 2: fill remaining frames via requestIdleCallback to yield to main thread
+      let fillIdx = 0;
+      function loadNextFillBatch() {
+        if (cancelled || fillIdx >= fillIndices.length) return;
+        const batch = fillIndices.slice(fillIdx, fillIdx + 8);
+        fillIdx += 8;
+        Promise.all(batch.map(loadFrame)).then(() => {
+          if (!cancelled) {
+            framesRef.current = frames;
+            if (fillIdx < fillIndices.length) {
+              idleHandle = rIC(loadNextFillBatch, { timeout: 2000 });
+            }
+          }
+        });
       }
-      if (cancelled) return;
-      framesRef.current = frames;
+      idleHandle = rIC(loadNextFillBatch, { timeout: 2000 });
     }
 
     preload();
 
     return () => {
       cancelled = true;
+      if (idleHandle !== undefined) cIC(idleHandle);
+      // Cancel in-flight HTTP requests — triggers onerror which calls resolve()
+      for (const img of allImages) {
+        img.src = '';
+      }
     };
-  }, [frameCount, isMobile]);
+  }, [frameCount, isMobile, shouldStart]);
 
-  return { framesRef, progress, ready };
+  return { framesRef, progress, ready, failed };
 }
 
 // ─────────────────────────────────────────────────────────────
@@ -100,12 +144,13 @@ export default function ScrollAnimation() {
   const [isMobile, setIsMobile] = useState(() =>
     typeof window !== 'undefined' ? window.innerWidth < MOBILE_BREAKPOINT : false
   );
-  const [reducedMotion] = useState(() =>
+  const [reducedMotion, setReducedMotion] = useState(() =>
     typeof window !== 'undefined'
       ? window.matchMedia('(prefers-reduced-motion: reduce)').matches
       : false
   );
   const lastFrameRef = useRef(-1);
+  const [isNearViewport, setIsNearViewport] = useState(false);
 
   // Listen for viewport changes
   useEffect(() => {
@@ -115,8 +160,35 @@ export default function ScrollAnimation() {
     return () => mql.removeEventListener('change', handler);
   }, []);
 
+  // Listen for reduced-motion preference changes
+  useEffect(() => {
+    const mql = window.matchMedia('(prefers-reduced-motion: reduce)');
+    const handler = (e: MediaQueryListEvent) => setReducedMotion(e.matches);
+    mql.addEventListener('change', handler);
+    return () => mql.removeEventListener('change', handler);
+  }, []);
+
+  // Gate preloading: only start when section is within ~1 viewport of visibility
+  useEffect(() => {
+    const section = sectionRef.current;
+    if (!section) return;
+
+    const observer = new IntersectionObserver(
+      ([entry]) => {
+        if (entry.isIntersecting) {
+          setIsNearViewport(true);
+          observer.disconnect();
+        }
+      },
+      { rootMargin: '100% 0px 100% 0px' } // ~1 viewport above and below
+    );
+
+    observer.observe(section);
+    return () => observer.disconnect();
+  }, []);
+
   const frameCount = isMobile ? MOBILE_FRAME_COUNT : DESKTOP_FRAME_COUNT;
-  const { framesRef, progress, ready } = useFramePreloader(frameCount, isMobile);
+  const { framesRef, progress, ready, failed } = useFramePreloader(frameCount, isMobile, isNearViewport);
 
   // Scroll tracking — must specify container ref because the page scrolls
   // inside CustomScrollContainer (div with overflow-y: auto), not window
@@ -135,6 +207,9 @@ export default function ScrollAnimation() {
   const textOpacity2 = useTransform(scrollYProgress, [0.38, 0.45, 0.55, 0.6], [0, 1, 1, 0]);
   const textOpacity3 = useTransform(scrollYProgress, [0.55, 0.62, 0.72, 0.78], [0, 1, 1, 0]);
   const scrollHintOpacity = useTransform(scrollYProgress, [0, 0.08], [1, 0]);
+
+  // Full-bleed background: page goes dark when animation is in view (Apple technique)
+  const bgOpacity = useTransform(scrollYProgress, [0.12, 0.18, 0.88, 0.95], [0, 1, 1, 0]);
 
   // Draw frame to canvas
   const drawFrame = useCallback(
@@ -216,16 +291,17 @@ export default function ScrollAnimation() {
     };
   }, []);
 
-  // Draw initial frame when ready
+  // Draw initial frame when ready — use current scroll position (not 0)
+  // to prevent a frame-0 flash if the user scrolled mid-section before frames loaded
   useEffect(() => {
-    if (ready) drawFrame(0);
-  }, [ready, drawFrame]);
+    if (ready) drawFrame(frameIndex.get());
+  }, [ready, drawFrame, frameIndex]);
 
   // Reduced motion: show static end frame
   if (reducedMotion) {
     return (
       <section
-        className="relative bg-zinc-950 dark:bg-zinc-950"
+        className="relative py-24 md:py-32 bg-zinc-50 dark:bg-zinc-950"
         aria-label="A person entering their new home"
       >
         <div className="max-w-7xl mx-auto px-4 sm:px-6">
@@ -248,44 +324,79 @@ export default function ScrollAnimation() {
     );
   }
 
+  // Failed to load any frames: show text-only fallback
+  if (failed) {
+    return (
+      <section
+        className="relative py-24 md:py-32 bg-zinc-950"
+        aria-label="A person entering their new home"
+      >
+        <div className="max-w-7xl mx-auto px-4 sm:px-6">
+          <div className="relative aspect-video rounded-3xl overflow-hidden bg-zinc-900">
+            <div className="absolute inset-0 flex items-center justify-center">
+              <p className="text-white text-3xl md:text-5xl font-medium tracking-tight text-center drop-shadow-lg">
+                Love where you live.
+              </p>
+            </div>
+          </div>
+        </div>
+      </section>
+    );
+  }
+
   return (
-    <LazyMotion features={domAnimation}>
-      {/* The section height creates the scroll runway */}
       <section
         ref={sectionRef}
         className="relative"
         style={{ height: '400vh' }}
         aria-label="Scroll animation showing a person entering their new home"
-        role="img"
+        role="region"
       >
+        {/* Full-bleed dark overlay — entire viewport goes dark during animation */}
+        <m.div
+          style={{ opacity: bgOpacity }}
+          className="fixed inset-0 bg-zinc-950 pointer-events-none z-0"
+          aria-hidden="true"
+        />
+
         {/* Sticky canvas container */}
-        <div className="sticky top-0 h-screen w-full overflow-hidden bg-zinc-950">
-          {/* Loading state */}
-          {!ready && (
-            <div className="absolute inset-0 z-20 flex flex-col items-center justify-center bg-zinc-950">
-              <div className="relative w-16 h-16 mb-6">
-                <div
-                  className="absolute inset-0 rounded-full border-2 border-zinc-800"
-                />
-                <svg className="absolute inset-0 -rotate-90" viewBox="0 0 64 64">
-                  <circle
-                    cx="32"
-                    cy="32"
-                    r="30"
-                    fill="none"
-                    stroke="currentColor"
-                    strokeWidth="2"
-                    strokeDasharray={`${progress * 188.5} 188.5`}
-                    className="text-indigo-500 transition-all duration-150"
-                  />
-                </svg>
-              </div>
-              <p className="text-[10px] font-bold uppercase tracking-[0.2em] text-zinc-500">
-                Loading experience
-              </p>
-              <p className="text-sm font-medium text-zinc-400 mt-2 tabular-nums">
-                {Math.round(progress * 100)}%
-              </p>
+        <div className="sticky top-0 h-screen-safe w-full overflow-hidden bg-zinc-950">
+          {/* Poster / loading state — visible before frames are ready */}
+          {!ready && !failed && (
+            <div className="absolute inset-0 z-20 bg-zinc-950">
+              {isNearViewport && (
+                <div className="absolute inset-0 flex flex-col items-center justify-center z-10" role="progressbar" aria-valuenow={Math.round(progress * 100)} aria-valuemin={0} aria-valuemax={100} aria-label="Loading animation frames">
+                  <div className="relative w-16 h-16 mb-6">
+                    <div className="absolute inset-0 rounded-full border-2 border-zinc-800" />
+                    <svg className="absolute inset-0 -rotate-90" viewBox="0 0 64 64">
+                      <circle
+                        cx="32"
+                        cy="32"
+                        r="30"
+                        fill="none"
+                        stroke="currentColor"
+                        strokeWidth="2"
+                        strokeDasharray={`${progress * 188.5} 188.5`}
+                        className="text-indigo-500 transition-all duration-150"
+                      />
+                    </svg>
+                  </div>
+                  <p className="text-xs font-bold uppercase tracking-[0.2em] text-zinc-500">
+                    Loading experience
+                  </p>
+                  <p className="text-sm font-medium text-zinc-400 mt-2 tabular-nums">
+                    {Math.round(progress * 100)}%
+                  </p>
+                </div>
+              )}
+              {/* eslint-disable-next-line @next/next/no-img-element */}
+              <img
+                src={getFrameSrc(0, isMobile)}
+                alt=""
+                aria-hidden="true"
+                className="w-full h-full object-cover opacity-40"
+                loading="eager"
+              />
             </div>
           )}
 
@@ -297,28 +408,26 @@ export default function ScrollAnimation() {
             }`}
           />
 
-          {/* Edge blend — blends canvas into page background */}
-          <div className="absolute inset-x-0 top-0 h-24 bg-gradient-to-b from-white dark:from-zinc-950 to-transparent pointer-events-none z-10" />
-          <div className="absolute inset-x-0 bottom-0 h-32 bg-gradient-to-t from-white dark:from-zinc-950 to-transparent pointer-events-none z-10" />
+          {/* Sharp edges — no gradient blend, clean cut between sections */}
 
-          {/* Text overlays */}
+          {/* Text overlays — grid stacking so phrases overlap instead of pushing each other */}
           <div className="absolute inset-0 flex items-center justify-center z-10 pointer-events-none">
-            <div className="text-center px-6 max-w-3xl">
+            <div className="grid px-6 max-w-3xl justify-items-center">
               <m.p
                 style={{ opacity: textOpacity1 }}
-                className="text-white text-3xl md:text-5xl lg:text-6xl font-medium tracking-tight drop-shadow-[0_2px_12px_rgba(0,0,0,0.5)]"
+                className="text-white text-3xl md:text-5xl lg:text-6xl font-medium tracking-tight drop-shadow-[0_2px_12px_rgba(0,0,0,0.5)] text-center [grid-area:1/1]"
               >
                 Find your space.
               </m.p>
               <m.p
                 style={{ opacity: textOpacity2 }}
-                className="text-white text-3xl md:text-5xl lg:text-6xl font-medium tracking-tight drop-shadow-[0_2px_12px_rgba(0,0,0,0.5)]"
+                className="text-white text-3xl md:text-5xl lg:text-6xl font-medium tracking-tight drop-shadow-[0_2px_12px_rgba(0,0,0,0.5)] text-center [grid-area:1/1]"
               >
                 Feel at home.
               </m.p>
               <m.p
                 style={{ opacity: textOpacity3 }}
-                className="text-white text-3xl md:text-5xl lg:text-6xl font-medium tracking-tight drop-shadow-[0_2px_12px_rgba(0,0,0,0.5)]"
+                className="text-white text-3xl md:text-5xl lg:text-6xl font-medium tracking-tight drop-shadow-[0_2px_12px_rgba(0,0,0,0.5)] text-center [grid-area:1/1]"
               >
                 Love where you live.
               </m.p>
@@ -331,7 +440,7 @@ export default function ScrollAnimation() {
               style={{ opacity: scrollHintOpacity }}
               className="absolute bottom-8 left-1/2 -translate-x-1/2 z-10 flex flex-col items-center gap-2"
             >
-              <span className="text-[10px] font-bold uppercase tracking-[0.2em] text-white/40">
+              <span className="text-xs font-bold uppercase tracking-[0.2em] text-white/40">
                 Scroll to explore
               </span>
               <div className="w-5 h-8 rounded-full border border-white/20 relative">
@@ -341,7 +450,6 @@ export default function ScrollAnimation() {
           )}
         </div>
       </section>
-    </LazyMotion>
   );
 }
 

@@ -48,7 +48,7 @@ const staggerContainer: Variants = {
     hidden: { opacity: 0 },
     visible: {
         opacity: 1,
-        transition: { staggerChildren: 0.1 }
+        transition: { staggerChildren: 0.05 }
     }
 };
 
@@ -72,12 +72,12 @@ export default function FeaturedListingsClient({ listings }: FeaturedListingsCli
                             No rooms listed in this area yet. Share your space and find the perfect roommate today.
                         </m.p>
                         <m.div variants={fadeInUp}>
-                            <Link href="/listings/create">
-                                <Button size="lg" className="rounded-full px-8 h-12 text-base font-medium gap-2">
+                            <Button asChild size="lg" className="rounded-full px-8 h-12 text-base font-medium gap-2">
+                                <Link href="/listings/create">
                                     List Your Room
                                     <ArrowRight className="w-4 h-4" />
-                                </Button>
-                            </Link>
+                                </Link>
+                            </Button>
                         </m.div>
                     </m.div>
                 </div>
@@ -98,7 +98,7 @@ export default function FeaturedListingsClient({ listings }: FeaturedListingsCli
                     className="flex flex-col md:flex-row md:items-end justify-between gap-8 mb-16"
                 >
                     <div className="max-w-2xl">
-                        <m.div variants={fadeInUp} className="inline-flex items-center gap-2 px-3 py-1.5 rounded-full border border-zinc-200/50 dark:border-zinc-800 bg-zinc-50 dark:bg-zinc-900/50 text-zinc-600 dark:text-zinc-400 text-[10px] font-bold uppercase tracking-[0.2em] mb-6">
+                        <m.div variants={fadeInUp} className="inline-flex items-center gap-2 px-3 py-1.5 rounded-full border border-zinc-200/50 dark:border-zinc-800 bg-zinc-50 dark:bg-zinc-900/50 text-zinc-600 dark:text-zinc-400 text-xs font-bold uppercase tracking-[0.2em] mb-6">
                             <span className="w-1.5 h-1.5 rounded-full bg-green-500"></span>
                             New Arrivals
                         </m.div>
@@ -111,11 +111,11 @@ export default function FeaturedListingsClient({ listings }: FeaturedListingsCli
                     </div>
                     
                     <m.div variants={fadeInUp} className="hidden md:block">
-                        <Link href="/search" className="group">
-                            <Button variant="ghost" className="rounded-full text-zinc-600 dark:text-zinc-400 hover:text-zinc-900 dark:hover:text-white hover:bg-zinc-100 dark:hover:bg-zinc-900 px-6 gap-2">
+                        <Button asChild variant="ghost" className="group rounded-full text-zinc-600 dark:text-zinc-400 hover:text-zinc-900 dark:hover:text-white hover:bg-zinc-100 dark:hover:bg-zinc-900 px-6 gap-2">
+                            <Link href="/search">
                                 View all <ArrowRight size={16} className="group-hover:translate-x-1 transition-transform" />
-                            </Button>
-                        </Link>
+                            </Link>
+                        </Button>
                     </m.div>
                 </m.div>
 
@@ -144,12 +144,12 @@ export default function FeaturedListingsClient({ listings }: FeaturedListingsCli
                     transition={{ delay: 0.2 }}
                     className="flex justify-center mt-12 md:hidden"
                 >
-                    <Link href="/search" className="group w-full">
-                        <Button variant="outline" size="lg" className="w-full rounded-full border-zinc-200 dark:border-zinc-800 hover:bg-zinc-50 dark:hover:bg-zinc-900">
+                    <Button asChild variant="outline" size="lg" className="group w-full rounded-full border-zinc-200 dark:border-zinc-800 hover:bg-zinc-50 dark:hover:bg-zinc-900">
+                        <Link href="/search" className="w-full">
                             Explore All Listings
                             <ArrowRight className="w-4 h-4 ml-2 group-hover:translate-x-1 transition-transform" />
-                        </Button>
-                    </Link>
+                        </Link>
+                    </Button>
                 </m.div>
             </div>
         </section>

@@ -2,7 +2,6 @@
 
 import { useState } from 'react';
 import { toast } from 'sonner';
-import { useRouter } from 'next/navigation';
 import { Eye, EyeOff, Home, ChevronDown } from 'lucide-react';
 import { updateListingStatus, ListingStatus } from '@/app/actions/listing-status';
 
@@ -39,7 +38,6 @@ export default function ListingStatusToggle({ listingId, currentStatus }: Listin
     const [status, setStatus] = useState<ListingStatus>(currentStatus);
     const [isOpen, setIsOpen] = useState(false);
     const [isUpdating, setIsUpdating] = useState(false);
-    const router = useRouter();
 
     const config = statusConfig[status];
     const Icon = config.icon;
@@ -57,7 +55,6 @@ export default function ListingStatusToggle({ listingId, currentStatus }: Listin
             toast.error(result.error);
         } else {
             setStatus(newStatus);
-            router.refresh();
         }
 
         setIsUpdating(false);

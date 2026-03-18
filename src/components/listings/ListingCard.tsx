@@ -1,13 +1,13 @@
 'use client';
 
-import { useState, useCallback } from 'react';
+import { memo, useState, useCallback } from 'react';
 import Link from 'next/link';
 import { Star, Home, Globe, MapPin } from 'lucide-react';
 import FavoriteButton from '../FavoriteButton';
 import { ImageCarousel } from './ImageCarousel';
 import { cn } from '@/lib/utils';
 import { getLanguageName } from '@/lib/languages';
-import { useListingFocus, useIsListingFocused } from '@/contexts/ListingFocusContext';
+import { useListingFocusActions, useIsListingFocused } from '@/contexts/ListingFocusContext';
 import { TrustBadge } from '@/components/ui/TrustBadge';
 import { SlotBadge } from './SlotBadge';
 
@@ -96,10 +96,34 @@ interface ListingCardProps {
     estimatedMonths?: number;
 }
 
-export default function ListingCard({ listing, isSaved, className, priority = false, showTotalPrice = false, estimatedMonths = 1 }: ListingCardProps) {
+function arePropsEqual(prev: ListingCardProps, next: ListingCardProps): boolean {
+    const pl = prev.listing;
+    const nl = next.listing;
+    return (
+        pl.id === nl.id &&
+        pl.price === nl.price &&
+        pl.title === nl.title &&
+        pl.availableSlots === nl.availableSlots &&
+        pl.totalSlots === nl.totalSlots &&
+        pl.avgRating === nl.avgRating &&
+        pl.reviewCount === nl.reviewCount &&
+        pl.images === nl.images &&
+        pl.amenities === nl.amenities &&
+        pl.householdLanguages === nl.householdLanguages &&
+        pl.location.city === nl.location.city &&
+        pl.location.state === nl.location.state &&
+        prev.isSaved === next.isSaved &&
+        prev.className === next.className &&
+        prev.priority === next.priority &&
+        prev.showTotalPrice === next.showTotalPrice &&
+        prev.estimatedMonths === next.estimatedMonths
+    );
+}
+
+function ListingCardInner({ listing, isSaved, className, priority = false, showTotalPrice = false, estimatedMonths = 1 }: ListingCardProps) {
     const [imageErrors, setImageErrors] = useState<Set<number>>(new Set());
     const [isDragging, setIsDragging] = useState(false);
-    const { setHovered, setActive, focusSource } = useListingFocus();
+    const { setHovered, setActive, hasProvider, focusSourceRef } = useListingFocusActions();
     const { isHovered, isActive } = useIsListingFocused(listing.id);
 
     // Track image errors by index
@@ -154,12 +178,12 @@ export default function ListingCard({ listing, isSaved, className, priority = fa
             data-listing-id={listing.id}
             data-focus-state={isActive ? "active" : isHovered ? "hovered" : "none"}
             onMouseEnter={() => {
-                if (focusSource === "map") return;
+                if (focusSourceRef.current === "map") return;
                 setHovered(listing.id, "list");
             }}
             onMouseLeave={() => setHovered(null)}
             onFocus={() => {
-                if (focusSource === "map") return;
+                if (focusSourceRef.current === "map") return;
                 setHovered(listing.id, "list");
             }}
             onBlur={() => setHovered(null)}
@@ -171,19 +195,21 @@ export default function ListingCard({ listing, isSaved, className, priority = fa
             )}
         >
             <div className="absolute top-3 right-3 z-20 flex items-center gap-1.5">
-                <button
-                    type="button"
-                    onClick={(e) => {
-                        e.preventDefault();
-                        e.stopPropagation();
-                        setActive(listing.id);
-                    }}
-                    className="relative p-1.5 rounded-full bg-white/80 dark:bg-zinc-800/80 backdrop-blur-sm shadow-sm hover:bg-white dark:hover:bg-zinc-700 transition-colors before:absolute before:inset-0 before:-m-[10px] before:content-['']"
-                    aria-label="Show on map"
-                    title="Show on map"
-                >
-                    <MapPin className="w-3.5 h-3.5 text-zinc-600 dark:text-zinc-300" />
-                </button>
+                {hasProvider && (
+                    <button
+                        type="button"
+                        onClick={(e) => {
+                            e.preventDefault();
+                            e.stopPropagation();
+                            setActive(listing.id);
+                        }}
+                        className="relative p-1.5 rounded-full bg-white/80 dark:bg-zinc-800/80 backdrop-blur-sm shadow-sm hover:bg-white dark:hover:bg-zinc-700 transition-colors before:absolute before:inset-0 before:-m-[10px] before:content-['']"
+                        aria-label="Show on map"
+                        title="Show on map"
+                    >
+                        <MapPin className="w-3.5 h-3.5 text-zinc-600 dark:text-zinc-300" />
+                    </button>
+                )}
                 <FavoriteButton listingId={listing.id} initialIsSaved={isSaved} />
             </div>
             <Link
@@ -220,6 +246,7 @@ export default function ListingCard({ listing, isSaved, className, priority = fa
 
                     {/* Badges — top-left stack */}
                     <div className="absolute top-4 left-4 z-20 flex flex-col gap-2">
+                        <TrustBadge avgRating={listing.avgRating} reviewCount={listing.reviewCount} />
                         <SlotBadge
                             availableSlots={listing.availableSlots}
                             totalSlots={listing.totalSlots}
@@ -286,7 +313,7 @@ export default function ListingCard({ listing, isSaved, className, priority = fa
                                 </span>
                             ))}
                         </div>
-                        
+
                         {listing.householdLanguages && listing.householdLanguages.length > 0 && (
                             <div className="flex items-center gap-1 flex-shrink-0 ml-auto">
                                 <Globe className="w-3 h-3 text-zinc-400" />
@@ -303,3 +330,5 @@ export default function ListingCard({ listing, isSaved, className, priority = fa
         </div>
     );
 }
+
+export default memo(ListingCardInner, arePropsEqual);

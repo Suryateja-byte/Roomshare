@@ -3,7 +3,6 @@
 import { useState } from 'react';
 import { submitVerificationRequest, DocumentType } from '@/app/actions/verification';
 import { Upload, FileText, CreditCard, Fingerprint, Loader2, Camera } from 'lucide-react';
-import { useRouter } from 'next/navigation';
 
 const documentTypes: { value: DocumentType; label: string; icon: React.ReactNode }[] = [
     { value: 'passport', label: 'Passport', icon: <FileText className="w-5 h-5" /> },
@@ -17,7 +16,6 @@ export default function VerificationForm() {
     const [selfieUrl, setSelfieUrl] = useState('');
     const [isSubmitting, setIsSubmitting] = useState(false);
     const [error, setError] = useState<string | null>(null);
-    const router = useRouter();
 
     // In a real implementation, these would handle file uploads to a storage service
     const handleDocumentUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
@@ -58,8 +56,6 @@ export default function VerificationForm() {
 
             if (result.error) {
                 setError(result.error);
-            } else {
-                router.refresh();
             }
         } catch (err) {
             setError('Something went wrong. Please try again.');

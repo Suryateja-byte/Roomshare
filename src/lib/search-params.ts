@@ -6,7 +6,31 @@ import {
   MAX_QUERY_LENGTH,
   LAT_OFFSET_DEGREES,
 } from "./constants";
-import { VALID_BOOKING_MODES } from "./filter-schema";
+import {
+  VALID_BOOKING_MODES,
+  VALID_AMENITIES,
+  VALID_HOUSE_RULES,
+  VALID_LEASE_DURATIONS,
+  LEASE_DURATION_ALIASES,
+  VALID_ROOM_TYPES,
+  ROOM_TYPE_ALIASES,
+  VALID_GENDER_PREFERENCES,
+  VALID_HOUSEHOLD_GENDERS,
+  VALID_SORT_OPTIONS,
+} from "./filter-schema";
+
+// Re-export filter constants for consumers that import from search-params
+export {
+  VALID_AMENITIES,
+  VALID_HOUSE_RULES,
+  VALID_LEASE_DURATIONS,
+  LEASE_DURATION_ALIASES,
+  VALID_ROOM_TYPES,
+  ROOM_TYPE_ALIASES,
+  VALID_GENDER_PREFERENCES,
+  VALID_HOUSEHOLD_GENDERS,
+  VALID_SORT_OPTIONS,
+};
 
 // Re-export for backward compatibility
 export { MAX_SAFE_PRICE, MAX_SAFE_PAGE, MAX_ARRAY_ITEMS };
@@ -233,92 +257,7 @@ export function buildCanonicalFilterParamsFromSearchParams(
   return canonical;
 }
 
-export const VALID_AMENITIES = [
-  "Wifi",
-  "AC",
-  "Parking",
-  "Washer",
-  "Dryer",
-  "Kitchen",
-  "Gym",
-  "Pool",
-  "Furnished",
-] as const;
-export const VALID_HOUSE_RULES = [
-  "Pets allowed",
-  "Smoking allowed",
-  "Couples allowed",
-  "Guests allowed",
-] as const;
-export const VALID_LEASE_DURATIONS = [
-  "any",
-  "Month-to-month",
-  "3 months",
-  "6 months",
-  "12 months",
-  "Flexible",
-] as const;
-// Alias mappings for alternative formats (URL-friendly formats like 6_MONTHS)
-export const LEASE_DURATION_ALIASES: Record<string, string> = {
-  "month-to-month": "Month-to-month",
-  month_to_month: "Month-to-month",
-  mtm: "Month-to-month",
-  "3_months": "3 months",
-  "3months": "3 months",
-  "6_months": "6 months",
-  "6months": "6 months",
-  "12_months": "12 months",
-  "12months": "12 months",
-  "1_year": "12 months",
-  "1year": "12 months",
-};
-export const VALID_ROOM_TYPES = [
-  "any",
-  "Private Room",
-  "Shared Room",
-  "Entire Place",
-] as const;
-// Alias mappings for alternative formats (URL-friendly formats like PRIVATE)
-export const ROOM_TYPE_ALIASES: Record<string, string> = {
-  private: "Private Room",
-  private_room: "Private Room",
-  privateroom: "Private Room",
-  shared: "Shared Room",
-  shared_room: "Shared Room",
-  sharedroom: "Shared Room",
-  entire: "Entire Place",
-  entire_place: "Entire Place",
-  entireplace: "Entire Place",
-  whole: "Entire Place",
-  studio: "Entire Place",
-};
-export const VALID_GENDER_PREFERENCES = [
-  "any",
-  "MALE_ONLY",
-  "FEMALE_ONLY",
-  "NO_PREFERENCE",
-] as const;
-export const VALID_HOUSEHOLD_GENDERS = [
-  "any",
-  "ALL_MALE",
-  "ALL_FEMALE",
-  "MIXED",
-] as const;
-export const VALID_SORT_OPTIONS = [
-  "recommended",
-  "price_asc",
-  "price_desc",
-  "newest",
-  "rating",
-] as const;
-
-const validSortOptions: SortOption[] = [
-  "recommended",
-  "price_asc",
-  "price_desc",
-  "newest",
-  "rating",
-];
+const validSortOptions: SortOption[] = [...VALID_SORT_OPTIONS];
 
 const getFirstValue = (
   value: string | string[] | undefined,

@@ -11,6 +11,8 @@
  * - Review create/update/delete (affects avg_rating)
  */
 
+import 'server-only';
+
 import { prisma } from "@/lib/prisma";
 import { logger } from "@/lib/logger";
 import { features } from "@/lib/env";

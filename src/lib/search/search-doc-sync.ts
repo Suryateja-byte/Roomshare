@@ -11,6 +11,8 @@
  * - Uses the same field mappings and scoring as the cron job
  */
 
+import 'server-only';
+
 import { prisma } from "@/lib/prisma";
 import { logger } from "@/lib/logger";
 import { computeRecommendedScore } from "@/lib/search/recommended-score";

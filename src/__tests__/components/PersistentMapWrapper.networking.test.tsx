@@ -39,6 +39,12 @@ jest.mock("@/contexts/SearchV2DataContext", () => ({
   useSearchV2Data: () => ({
     v2MapData: mockHasV2Data ? mockV2MapData : null,
     isV2Enabled: mockIsV2Enabled,
+    setIsV2Enabled: jest.fn(),
+  }),
+  useV2MapData: () => (mockHasV2Data ? mockV2MapData : null),
+  useIsV2Enabled: () => ({
+    isV2Enabled: mockIsV2Enabled,
+    setIsV2Enabled: jest.fn(),
   }),
 }));
 

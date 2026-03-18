@@ -16,6 +16,8 @@
  * so the client can retry with the same key.
  */
 
+import 'server-only';
+
 import crypto from "crypto";
 import { Prisma } from "@prisma/client";
 import { prisma } from "@/lib/prisma";

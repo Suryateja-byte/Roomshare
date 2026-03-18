@@ -123,14 +123,20 @@ export async function POST(request: NextRequest) {
         let processedBuffer: Buffer;
         try {
             if (file.type === 'image/gif') {
-                // Skip sharp for GIF to preserve animation frames
-                processedBuffer = buffer;
+                // Re-encode GIF through sharp to strip metadata while preserving animation
+                processedBuffer = await sharp(buffer, { animated: true }).gif().toBuffer();
             } else {
                 // rotate() auto-applies EXIF orientation then strips all metadata
                 processedBuffer = await sharp(buffer).rotate().toBuffer();
             }
-        } catch {
-            // Corrupt image: fallback to original buffer (graceful degradation)
+        } catch (sharpError) {
+            // Log the failure — unprocessed images retain metadata (GPS, camera info)
+            logger.sync.warn('Sharp image processing failed, using original buffer', {
+                route: '/api/upload',
+                fileType: file.type,
+                fileSize: buffer.length,
+                error: sharpError instanceof Error ? sharpError.message : String(sharpError),
+            });
             processedBuffer = buffer;
         }
 

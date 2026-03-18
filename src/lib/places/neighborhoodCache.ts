@@ -8,6 +8,8 @@
  * Remove them once the NeighborhoodCache model is added to schema.prisma.
  */
 
+import 'server-only';
+
 import { prisma } from "@/lib/prisma";
 import type {
   POI,

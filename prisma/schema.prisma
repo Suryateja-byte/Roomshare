@@ -135,6 +135,8 @@ model Listing {
   @@index([ownerId])
   @@index([status])
   @@index([createdAt])
+  @@index([status, createdAt])
+  @@index([status, price])
 }
 
 model SavedListing {
@@ -146,6 +148,7 @@ model SavedListing {
   listing   Listing  @relation(fields: [listingId], references: [id], onDelete: Cascade)
 
   @@unique([userId, listingId])
+  @@index([listingId])
 }
 
 model Review {

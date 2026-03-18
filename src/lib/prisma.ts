@@ -1,3 +1,5 @@
+import 'server-only';
+
 import { PrismaClient, Prisma } from '@prisma/client'
 import { logger } from './logger'
 

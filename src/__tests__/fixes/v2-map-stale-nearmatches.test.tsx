@@ -54,7 +54,9 @@ describe("V2MapDataSetter source does NOT pass dataVersion", () => {
     expect(source).toMatch(/setV2MapData\(data\)/);
     // Should NOT have dataVersion in the setV2MapData call
     expect(source).not.toMatch(/setV2MapData\(data,\s*dataVersion\)/);
-    expect(source).toMatch(/useSearchV2Data\(\)/);
+    // PERF-H2: V2MapDataSetter now uses useSearchV2Setters() (setter-only context)
+    // to avoid re-renders when v2MapData/isV2Enabled/dataVersion state changes.
+    expect(source).toMatch(/useSearchV2Setters\(\)/);
   });
 });
 

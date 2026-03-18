@@ -233,6 +233,7 @@ test.describe('Accessibility Audit (axe-core)', () => {
 
       for (let i = 0; i < 10; i++) {
         await page.keyboard.press('Tab');
+        // Intentional: pacing between Tab presses for focus ring evaluation
         await page.waitForTimeout(100);
 
         const focused = page.locator(':focus');
@@ -312,6 +313,7 @@ test.describe('Accessibility Audit (axe-core)', () => {
       let foundFilterButton = false;
       for (let i = 0; i < 15; i++) {
         await page.keyboard.press('Tab');
+        // Intentional: pacing between Tab presses for focus ring evaluation
         await page.waitForTimeout(100);
 
         const focused = page.locator(':focus');
@@ -372,6 +374,7 @@ test.describe('Accessibility Audit (axe-core)', () => {
 
           for (let i = 0; i < tabCount; i++) {
             await page.keyboard.press('Tab');
+            // Intentional: pacing between Tab presses for focus ring evaluation
             await page.waitForTimeout(100);
 
             const focused = page.locator(':focus');

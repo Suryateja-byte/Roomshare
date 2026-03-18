@@ -413,13 +413,12 @@ export default function EditListingForm({ listing, enableWholeUnitMode = false }
             clearPersistedData();
             navGuard.disable();
             router.push(`/listings/${listing.id}`);
-            router.refresh();
-        } catch (err: any) {
-            if (err.name === 'AbortError') return; // Component unmounted
+        } catch (err: unknown) {
+            if (err instanceof Error && err.name === 'AbortError') return; // Component unmounted
             Sentry.captureException(err, {
                 tags: { component: 'EditListingForm', action: 'submit' },
             });
-            setError(err.message);
+            setError(err instanceof Error ? err.message : 'An unexpected error occurred');
             // Save current form state on error so nothing is lost
             saveData(collectFormData());
             window.scrollTo({ top: 0, behavior: 'smooth' });

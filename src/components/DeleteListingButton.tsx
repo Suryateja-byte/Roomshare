@@ -77,7 +77,6 @@ export default function DeleteListingButton({ listingId }: { listingId: string }
             if (response.ok) {
                 toast.success('Listing deleted successfully');
                 router.push('/search');
-                router.refresh();
             } else {
                 const data = await response.json();
                 toast.error(data.message || data.error || 'Failed to delete listing');

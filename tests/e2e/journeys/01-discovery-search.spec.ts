@@ -6,7 +6,7 @@
  * search with filters, map view, sorting, and pagination.
  */
 
-import { test, expect, selectors, timeouts, tags, SF_BOUNDS } from "../helpers";
+import { test, expect, selectors, tags, SF_BOUNDS } from "../helpers";
 
 test.describe("Discovery & Search Journeys", () => {
   test.beforeEach(async () => {
@@ -35,7 +35,6 @@ test.describe("Discovery & Search Journeys", () => {
 
       // Step 3: Scroll to listings
       await page.evaluate(() => window.scrollBy(0, 300));
-      await page.waitForTimeout(timeouts.animation);
 
       // Step 4: Click first listing card via JS (avoids hitting carousel buttons)
       await expect(page.locator(selectors.listingCard).first()).toBeVisible({ timeout: 30000 });
@@ -185,14 +184,12 @@ test.describe("Discovery & Search Journeys", () => {
 
       if ((await thumbnails.count()) > 1) {
         await thumbnails.nth(1).click();
-        await page.waitForTimeout(timeouts.animation);
       }
 
       // Step 7-8: Scroll to sections
       await page.evaluate(() =>
         window.scrollTo(0, document.body.scrollHeight / 2),
       );
-      await page.waitForTimeout(timeouts.animation);
 
       const amenitiesSection = page.getByText(/amenities/i);
       if (await amenitiesSection.isVisible()) {

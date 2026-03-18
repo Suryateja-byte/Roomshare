@@ -640,6 +640,69 @@ describe('SearchResultsClient', () => {
     });
   });
 
+  describe('accessibility: load-more announcements', () => {
+    it('announces loaded count after successful load-more', async () => {
+      const mockFetch = fetchMoreListings as jest.Mock;
+      mockFetch.mockResolvedValueOnce({
+        items: [createMockListing('3'), createMockListing('4')],
+        nextCursor: 'cursor-2',
+        hasNextPage: true,
+      });
+
+      render(<SearchResultsClient {...defaultProps} />);
+
+      // Click load more
+      fireEvent.click(screen.getByRole('button', { name: /show more/i }));
+
+      await waitFor(() => {
+        // The load-more announcement region (role="log") should contain the announcement
+        const logRegion = screen.getByRole('log');
+        expect(logRegion).toHaveTextContent(/loaded 2 more listings/i);
+      });
+    });
+
+    it('does not announce on initial render', () => {
+      render(<SearchResultsClient {...defaultProps} />);
+
+      // The load-more announcement region should be empty on mount
+      const logRegion = screen.getByRole('log');
+      expect(logRegion).toHaveTextContent('');
+    });
+
+    it('sets aria-busy on feed during load-more', async () => {
+      const mockFetch = fetchMoreListings as jest.Mock;
+      let resolvePromise: (value: unknown) => void;
+      const pending = new Promise((resolve) => { resolvePromise = resolve; });
+      mockFetch.mockReturnValueOnce(pending);
+
+      render(<SearchResultsClient {...defaultProps} />);
+
+      const feed = screen.getByRole('feed');
+      // Before loading, aria-busy should be false
+      expect(feed).toHaveAttribute('aria-busy', 'false');
+
+      // Click load more
+      fireEvent.click(screen.getByRole('button', { name: /show more/i }));
+
+      // During loading, aria-busy should be true
+      await waitFor(() => {
+        expect(feed).toHaveAttribute('aria-busy', 'true');
+      });
+
+      // Resolve fetch
+      resolvePromise!({
+        items: [createMockListing('3')],
+        nextCursor: null,
+        hasNextPage: false,
+      });
+
+      // After loading, aria-busy should be false
+      await waitFor(() => {
+        expect(feed).toHaveAttribute('aria-busy', 'false');
+      });
+    });
+  });
+
   describe('sessionStorage hydration', () => {
     it('hydrates showTotalPrice from sessionStorage after mount', async () => {
       mockSessionStorage['showTotalPrice'] = 'true';

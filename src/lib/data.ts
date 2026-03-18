@@ -1,3 +1,5 @@
+import 'server-only';
+
 import { prisma } from "@/lib/prisma";
 import { wrapDatabaseError } from "@/lib/errors";
 import { logger } from "@/lib/logger";

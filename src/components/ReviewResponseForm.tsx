@@ -3,7 +3,6 @@
 import { useState } from 'react';
 import { createReviewResponse, updateReviewResponse } from '@/app/actions/review-response';
 import { MessageSquare, Loader2, X, Check } from 'lucide-react';
-import { useRouter } from 'next/navigation';
 
 interface ReviewResponseFormProps {
     reviewId: string;
@@ -22,7 +21,6 @@ export default function ReviewResponseForm({
     const [content, setContent] = useState(existingResponse?.content || '');
     const [isSubmitting, setIsSubmitting] = useState(false);
     const [error, setError] = useState<string | null>(null);
-    const router = useRouter();
 
     const isEditing = !!existingResponse;
 
@@ -45,7 +43,6 @@ export default function ReviewResponseForm({
             if (result.error) {
                 setError(result.error);
             } else {
-                router.refresh();
                 onClose?.();
             }
         } catch (err) {

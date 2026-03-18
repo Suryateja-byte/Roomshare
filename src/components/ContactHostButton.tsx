@@ -27,7 +27,7 @@ export default function ContactHostButton({ listingId }: { listingId: string }) 
             if (result.conversationId) {
                 router.push(`/messages/${result.conversationId}`);
             }
-        } catch (error: any) {
+        } catch (error: unknown) {
             console.error('Failed to start conversation:', error);
             toast.error('Failed to start conversation');
         } finally {

@@ -102,6 +102,7 @@ test.describe("Search A11y: Filter Modal Accessibility", () => {
 
     for (let i = 0; i < TAB_COUNT; i++) {
       await page.keyboard.press("Tab");
+      // Intentional: pacing between Tab presses for focus ring observation
       await page.waitForTimeout(50);
 
       const isInModal = await page.evaluate(() => {

@@ -11,8 +11,8 @@ const SearchForm = lazy(() => import('@/components/SearchForm'));
 const ScrollAnimation = dynamic(() => import('@/components/ScrollAnimation'), {
     ssr: false,
     loading: () => (
-        <div className="h-screen bg-zinc-950 flex items-center justify-center">
-            <div className="w-12 h-12 rounded-full border-2 border-zinc-800 border-t-indigo-500 animate-spin" />
+        <div className="relative bg-zinc-950" style={{ height: '400vh' }}>
+            <div className="sticky top-0 h-screen" />
         </div>
     ),
 });
@@ -41,7 +41,7 @@ export default function HomeClient() {
         <LazyMotion features={domAnimation}>
             <div className="flex flex-col bg-white dark:bg-zinc-950 text-zinc-900 dark:text-zinc-50 font-sans selection:bg-zinc-900 selection:text-white dark:selection:bg-white dark:selection:text-zinc-900">
                 {/* Hero Section */}
-                <section className="relative pt-32 pb-24 md:pt-48 md:pb-32 min-h-screen flex flex-col justify-center overflow-hidden">
+                <section className="relative pt-32 pb-24 md:pt-48 md:pb-32 min-h-screen flex flex-col justify-center overflow-x-hidden">
                     <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 w-full z-10">
                         <div className="flex flex-col lg:flex-row gap-16 items-center">
 
@@ -52,7 +52,7 @@ export default function HomeClient() {
                                     animate="visible"
                                     variants={staggerContainer}
                                 >
-                                    <m.div variants={fadeInUp} className="inline-flex items-center gap-2 px-3 py-1.5 rounded-full border border-zinc-200/50 dark:border-zinc-800 bg-zinc-50 dark:bg-zinc-900/50 text-zinc-600 dark:text-zinc-400 text-[10px] font-bold uppercase tracking-[0.2em] mb-8">
+                                    <m.div variants={fadeInUp} className="inline-flex items-center gap-2 px-3 py-1.5 rounded-full border border-zinc-200/50 dark:border-zinc-800 bg-zinc-50 dark:bg-zinc-900/50 text-zinc-600 dark:text-zinc-400 text-xs font-bold uppercase tracking-[0.2em] mb-8">
                                         <span className="w-1.5 h-1.5 rounded-full bg-indigo-500"></span>
                                         Reimagining Shared Living
                                     </m.div>
@@ -89,7 +89,7 @@ export default function HomeClient() {
                                     initial={{ opacity: 0, scale: 0.98 }}
                                     animate={{ opacity: 1, scale: 1 }}
                                     transition={{ duration: 0.8, ease: [0.16, 1, 0.3, 1] }}
-                                    className="relative aspect-[4/5] lg:aspect-[4/4] rounded-[2rem] overflow-hidden bg-zinc-100 dark:bg-zinc-900 shadow-2xl shadow-zinc-900/10"
+                                    className="relative aspect-[4/5] lg:aspect-square rounded-[2rem] overflow-hidden bg-zinc-100 dark:bg-zinc-900 shadow-2xl shadow-zinc-900/10"
                                 >
                                     <Image
                                         src="https://images.unsplash.com/photo-1522708323590-d24dbb6b0267?ixlib=rb-4.0.3&auto=format&fit=crop&w=2340&q=80"
@@ -100,10 +100,6 @@ export default function HomeClient() {
                                         className="object-cover"
                                     />
                                     <div className="absolute inset-0 bg-gradient-to-t from-black/20 to-transparent"></div>
-                                    <div className="absolute bottom-8 left-8">
-                                        <p className="text-white/80 text-[10px] font-bold uppercase tracking-[0.2em] mb-1">Featured Space</p>
-                                        <p className="text-white text-lg font-medium tracking-tight">Downtown Minimalist Loft</p>
-                                    </div>
                                 </m.div>
                             </div>
 
@@ -137,7 +133,7 @@ export default function HomeClient() {
                             whileInView="visible"
                             viewport={{ once: true, margin: "-100px" }}
                             variants={staggerContainer}
-                            className="grid sm:grid-cols-3 gap-12 max-w-5xl mx-auto"
+                            className="grid sm:grid-cols-2 lg:grid-cols-3 gap-8 sm:gap-12 max-w-5xl mx-auto"
                         >
                             <FeatureCard
                                 icon={ShieldCheck}
@@ -159,13 +155,13 @@ export default function HomeClient() {
                 </section>
 
                 {/* CTA Section */}
-                <section className="py-24 md:py-32 px-6 bg-white dark:bg-zinc-950 text-center">
+                <section className="py-24 md:py-32 bg-white dark:bg-zinc-950 text-center">
                     <m.div
                         initial={{ opacity: 0, y: 20 }}
                         whileInView={{ opacity: 1, y: 0 }}
                         viewport={{ once: true }}
                         transition={{ duration: 0.6, ease: [0.16, 1, 0.3, 1] }}
-                        className="max-w-3xl mx-auto"
+                        className="max-w-3xl mx-auto px-4 sm:px-6"
                     >
                         <h2 className="text-4xl md:text-5xl lg:text-6xl font-medium tracking-tight mb-6 text-zinc-900 dark:text-white">
                             Ready to find your people?
@@ -175,16 +171,16 @@ export default function HomeClient() {
                         </p>
 
                         <div className="flex flex-col sm:flex-row gap-4 justify-center items-center">
-                            <Link href="/signup">
-                                <Button size="lg" className="w-full sm:w-auto rounded-full px-8 h-12 text-base font-medium">
+                            <Button asChild size="lg" className="w-full sm:w-auto rounded-full px-8 h-12 text-base font-medium">
+                                <Link href="/signup">
                                     Get Started
-                                </Button>
-                            </Link>
-                            <Link href="/search" className="group">
-                                <Button variant="outline" size="lg" className="w-full sm:w-auto rounded-full px-8 h-12 text-base font-medium gap-2 border-zinc-200 dark:border-zinc-800 hover:bg-zinc-50 dark:hover:bg-zinc-900">
+                                </Link>
+                            </Button>
+                            <Button asChild variant="outline" size="lg" className="group w-full sm:w-auto rounded-full px-8 h-12 text-base font-medium gap-2 border-zinc-200 dark:border-zinc-800 hover:bg-zinc-50 dark:hover:bg-zinc-900">
+                                <Link href="/search">
                                     Browse Listings <ArrowRight size={16} className="group-hover:translate-x-1 transition-transform" />
-                                </Button>
-                            </Link>
+                                </Link>
+                            </Button>
                         </div>
                     </m.div>
                 </section>

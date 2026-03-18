@@ -56,7 +56,6 @@ export default function FavoriteButton({ listingId, initialIsSaved = false, clas
 
             const data = await response.json();
             setIsSaved(data.saved);
-            router.refresh(); // Refresh server components to update lists if needed
         } catch (error) {
             console.error('Error toggling favorite:', error);
             setIsSaved(previousState); // Revert on error
@@ -72,7 +71,7 @@ export default function FavoriteButton({ listingId, initialIsSaved = false, clas
             aria-label={isSaved ? "Remove from saved" : "Save listing"}
             aria-pressed={isSaved}
             className={cn(
-                "p-2 rounded-full bg-white/90 backdrop-blur-sm hover:bg-white transition-colors shadow-sm group min-w-[44px] min-h-[44px] flex items-center justify-center focus-visible:ring-2 focus-visible:ring-zinc-900/20 focus-visible:ring-offset-2",
+                "p-2 rounded-full bg-white/90 dark:bg-zinc-800/90 backdrop-blur-sm hover:bg-white dark:hover:bg-zinc-700 transition-colors shadow-sm group min-w-[44px] min-h-[44px] flex items-center justify-center focus-visible:ring-2 focus-visible:ring-zinc-900/20 dark:focus-visible:ring-zinc-400/40 focus-visible:ring-offset-2 dark:focus-visible:ring-offset-zinc-950",
                 isSaved ? "text-red-500" : "text-zinc-400 hover:text-red-500",
                 className
             )}

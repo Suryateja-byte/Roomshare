@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useCallback, useEffect } from 'react';
+import { memo, useState, useCallback, useEffect } from 'react';
 import Image from 'next/image';
 import useEmblaCarousel from 'embla-carousel-react';
 import { ChevronLeft, ChevronRight } from 'lucide-react';
@@ -28,7 +28,21 @@ interface ImageCarouselProps {
 /** Max dots to display — window shifts to keep selected dot visible */
 const MAX_DOTS = 5;
 
-export function ImageCarousel({
+function areCarouselPropsEqual(
+  prev: ImageCarouselProps,
+  next: ImageCarouselProps,
+): boolean {
+  return (
+    prev.images === next.images &&
+    prev.alt === next.alt &&
+    prev.priority === next.priority &&
+    prev.className === next.className &&
+    prev.onImageError === next.onImageError &&
+    prev.onDragStateChange === next.onDragStateChange
+  );
+}
+
+function ImageCarouselInner({
   images,
   alt,
   priority = false,
@@ -161,7 +175,7 @@ export function ImageCarousel({
       aria-roledescription="carousel"
     >
       {/* Embla viewport */}
-      <div ref={emblaRef} className="overflow-hidden h-full aspect-[16/9] [touch-action:pan-y]">
+      <div ref={emblaRef} className="overflow-hidden h-full [touch-action:pan-y]">
         <div className="flex h-full">
           {images.map((src, index) => (
             <div
@@ -286,4 +300,5 @@ export function ImageCarousel({
   );
 }
 
+export const ImageCarousel = memo(ImageCarouselInner, areCarouselPropsEqual);
 export default ImageCarousel;

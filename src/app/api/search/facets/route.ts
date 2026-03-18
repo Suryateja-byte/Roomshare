@@ -43,6 +43,7 @@ import { logger, sanitizeErrorMessage } from "@/lib/logger";
 import { withTimeout, DEFAULT_TIMEOUTS } from "@/lib/timeout-wrapper";
 import { parseLocalDate } from "@/lib/utils";
 import { features } from "@/lib/env";
+import { joinWhereClauseWithSecurityInvariant } from "@/lib/sql-safety";
 
 // Cache TTL in seconds
 const CACHE_TTL = 30;
@@ -50,26 +51,6 @@ const FACET_QUERY_TIMEOUT_MS = 5000;
 
 // Maximum results per facet to prevent expensive aggregations
 const MAX_FACET_RESULTS = 100;
-
-const ALLOWED_SQL_STRING_LITERALS = new Set(["ACTIVE", "english", "%", "HELD"]);
-
-function assertParameterizedWhereClause(whereClause: string): void {
-  const literalPattern = /'([^']*)'/g;
-  for (const match of whereClause.matchAll(literalPattern)) {
-    const literalValue = match[1];
-    if (!ALLOWED_SQL_STRING_LITERALS.has(literalValue)) {
-      throw new Error(
-        "SECURITY: Raw string detected in whereClause — use parameterized $N placeholders",
-      );
-    }
-  }
-}
-
-function joinWhereClauseWithSecurityInvariant(conditions: string[]): string {
-  const whereClause = conditions.join(" AND ");
-  assertParameterizedWhereClause(whereClause);
-  return whereClause;
-}
 
 /**
  * Prisma interactive-transaction client used by facet query helpers.

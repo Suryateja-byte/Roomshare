@@ -1,3 +1,5 @@
+import 'server-only';
+
 import { prisma } from './prisma';
 import { sendNotificationEmail } from './email';
 import { Prisma } from '@prisma/client';

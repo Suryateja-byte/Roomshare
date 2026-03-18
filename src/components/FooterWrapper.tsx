@@ -9,6 +9,9 @@ export default function FooterWrapper({ children }: { children: React.ReactNode 
     const shouldHideFooter =
         pathname === '/login' ||
         pathname === '/signup' ||
+        pathname === '/forgot-password' ||
+        pathname === '/reset-password' ||
+        pathname === '/verify' ||
         pathname === '/search' ||
         pathname.startsWith('/search/');
 

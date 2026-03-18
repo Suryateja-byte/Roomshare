@@ -6,7 +6,6 @@ import { Button } from '@/components/ui/button';
 import UserAvatar from './UserAvatar';
 import ReviewResponseForm from './ReviewResponseForm';
 import { deleteReviewResponse } from '@/app/actions/review-response';
-import { useRouter } from 'next/navigation';
 
 interface ReviewCardProps {
     review: {
@@ -31,7 +30,6 @@ export default function ReviewCard({ review, isOwner = false }: ReviewCardProps)
     const [showResponseForm, setShowResponseForm] = useState(false);
     const [isEditingResponse, setIsEditingResponse] = useState(false);
     const [isDeleting, setIsDeleting] = useState(false);
-    const router = useRouter();
 
     const handleDeleteResponse = async () => {
         if (!review.response || !confirm('Are you sure you want to delete your response?')) return;
@@ -39,7 +37,6 @@ export default function ReviewCard({ review, isOwner = false }: ReviewCardProps)
         setIsDeleting(true);
         try {
             await deleteReviewResponse(review.response.id);
-            router.refresh();
         } catch (error) {
             console.error('Error deleting response:', error);
         } finally {

@@ -6,6 +6,8 @@
  * Uses structured logger (not console) per project rules.
  * Recovers from stuck 'PROCESSING' via attempt counter + timeout.
  */
+import 'server-only';
+
 import { prisma } from "@/lib/prisma";
 import pgvector from "pgvector";
 import { generateEmbedding, generateMultimodalEmbedding, EMBEDDING_MODEL } from "./gemini";

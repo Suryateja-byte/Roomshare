@@ -1,5 +1,4 @@
 import { render, screen } from '@testing-library/react'
-import userEvent from '@testing-library/user-event'
 import Footer from '@/components/Footer'
 
 // Mock next/link
@@ -9,18 +8,21 @@ jest.mock('next/link', () => {
   }
 })
 
-// Mock sonner toast
-jest.mock('sonner', () => ({
-  toast: { info: jest.fn() },
-}))
-import { toast } from 'sonner'
-const mockToast = toast as jest.Mocked<typeof toast>
+// Mock FooterNavLink — renders as a plain link (usePathname tested separately)
+jest.mock('@/components/FooterNavLink', () => {
+  return function MockFooterNavLink({ children, href, className }: { children: React.ReactNode; href: string; className?: string }) {
+    return <a href={href} className={className}>{children}</a>
+  }
+})
+
+// Mock ComingSoonButton — Footer no longer imports sonner directly
+jest.mock('@/components/ComingSoonButton', () => {
+  return function MockComingSoonButton({ children, className }: { children: React.ReactNode; className?: string }) {
+    return <button className={className}>{children}</button>
+  }
+})
 
 describe('Footer', () => {
-  beforeEach(() => {
-    jest.clearAllMocks()
-  })
-
   it('renders brand name', () => {
     render(<Footer />)
     expect(screen.getByText('RoomShare')).toBeInTheDocument()
@@ -67,14 +69,30 @@ describe('Footer', () => {
     expect(screen.getByText(new RegExp(`© ${currentYear} RoomShare Inc.`))).toBeInTheDocument()
   })
 
-  it('shows toast for coming soon links', async () => {
+  it('has Platform nav landmark', () => {
     render(<Footer />)
+    expect(screen.getByRole('navigation', { name: /platform/i })).toBeInTheDocument()
+  })
 
-    await userEvent.click(screen.getByText('Careers'))
-    expect(mockToast.info).toHaveBeenNthCalledWith(1, 'Coming soon')
+  it('has Company nav landmark', () => {
+    render(<Footer />)
+    expect(screen.getByRole('navigation', { name: /company/i })).toBeInTheDocument()
+  })
 
-    await userEvent.click(screen.getByText('Blog'))
-    expect(mockToast.info).toHaveBeenNthCalledWith(2, 'Coming soon')
+  it('has Support nav landmark', () => {
+    render(<Footer />)
+    expect(screen.getByRole('navigation', { name: /support/i })).toBeInTheDocument()
+  })
+
+  it('has Legal nav landmark', () => {
+    render(<Footer />)
+    expect(screen.getByRole('navigation', { name: /legal/i })).toBeInTheDocument()
+  })
+
+  it('has exactly 4 nav landmarks', () => {
+    render(<Footer />)
+    const navs = screen.getAllByRole('navigation')
+    expect(navs).toHaveLength(4)
   })
 
   it('has correct links for Browse', () => {
@@ -93,5 +111,15 @@ describe('Footer', () => {
     render(<Footer />)
     const listLink = screen.getByText('List a Room')
     expect(listLink.closest('a')).toHaveAttribute('href', '/listings/create')
+  })
+
+  it('uses h2 headings for proper hierarchy', () => {
+    render(<Footer />)
+    const headings = screen.getAllByRole('heading', { level: 2 })
+    const headingTexts = headings.map(h => h.textContent)
+    expect(headingTexts).toContain('Platform')
+    expect(headingTexts).toContain('Company')
+    expect(headingTexts).toContain('Support')
+    expect(headingTexts).toContain('Legal')
   })
 })

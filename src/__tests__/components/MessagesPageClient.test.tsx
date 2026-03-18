@@ -3,14 +3,12 @@ import '@testing-library/jest-dom';
 import { render, screen, waitFor, act, cleanup } from '@testing-library/react';
 
 const mockPush = jest.fn();
-const mockRefresh = jest.fn();
 const mockSendMessage = jest.fn();
 const mockSetTypingStatus = jest.fn();
 const mockMarkAllMessagesAsRead = jest.fn();
 const mockDeleteConversation = jest.fn();
 const mockRouter = {
   push: mockPush,
-  refresh: mockRefresh,
 };
 
 jest.mock('next/navigation', () => ({

@@ -173,6 +173,7 @@ test.describe('Nearby Places — Resilience @nearby', () => {
 
     // Click Grocery, then immediately click Restaurants
     await nearby.selectCategory('Grocery');
+    // Intentional: sub-debounce delay testing rapid category switching
     await page.waitForTimeout(100);
     await nearby.selectCategory('Restaurants');
     await nearby.waitForResults();

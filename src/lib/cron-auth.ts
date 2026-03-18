@@ -1,3 +1,5 @@
+import 'server-only';
+
 import { timingSafeEqual } from 'crypto';
 import { NextResponse } from 'next/server';
 import { logger } from '@/lib/logger';

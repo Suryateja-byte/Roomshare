@@ -200,3 +200,6 @@ jobs:
           name: playwright-html-report
           path: playwright-report/
           retention-days: 14
+
+      - name: Audit test.skip count
+        run: bash scripts/count-test-skips.sh --threshold 1200

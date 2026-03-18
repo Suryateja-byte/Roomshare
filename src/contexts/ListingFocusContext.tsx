@@ -11,6 +11,12 @@
  * - hoveredId: Listing being hovered (from either list or map)
  * - activeId: Listing actively selected (persistent, no auto-clear)
  * - scrollRequest: One-shot scroll command with nonce for deduplication
+ *
+ * Split contexts (PERF-H1):
+ * - ListingFocusStateContext: read-only state (hoveredId, activeId, scrollRequest, focusSource)
+ * - ListingFocusActionsContext: stable callbacks (setHovered, setActive, etc.)
+ * Components that only call actions subscribe to neither state context and won't
+ * re-render when hover/active changes.
  */
 
 import {
@@ -54,11 +60,42 @@ interface ListingFocusContextValue extends ListingFocusState {
   ackScrollTo: (nonce: number) => void;
   /** Clear all focus state (hovered + active + scrollRequest) */
   clearFocus: () => void;
+  /** Whether a ListingFocusProvider is present in the tree (false = no map available) */
+  hasProvider: boolean;
 }
+
+// ─── Split context interfaces (PERF-H1) ──────────────────────────────────────
+
+export interface ListingFocusStateValue {
+  hoveredId: string | null;
+  activeId: string | null;
+  scrollRequest: ScrollRequest | null;
+  focusSource: FocusSource;
+}
+
+export interface ListingFocusActionsValue {
+  setHovered: (id: string | null, source?: FocusSource) => void;
+  setActive: (id: string | null) => void;
+  requestScrollTo: (id: string) => void;
+  ackScrollTo: (nonce: number) => void;
+  clearFocus: () => void;
+  hasProvider: boolean;
+  focusSourceRef: React.RefObject<FocusSource>;
+}
+
+// ─── Contexts ─────────────────────────────────────────────────────────────────
 
 const ListingFocusContext = createContext<ListingFocusContextValue | null>(
   null,
 );
+
+const ListingFocusStateContext =
+  createContext<ListingFocusStateValue | null>(null);
+
+const ListingFocusActionsContext =
+  createContext<ListingFocusActionsValue | null>(null);
+
+// ─── SSR Fallbacks ────────────────────────────────────────────────────────────
 
 /**
  * Stable fallback for SSR and when used outside provider.
@@ -70,12 +107,35 @@ const SSR_FALLBACK: ListingFocusContextValue = {
   activeId: null,
   scrollRequest: null,
   focusSource: null,
+  hasProvider: false,
   setHovered: () => {},
   setActive: () => {},
   requestScrollTo: () => {},
   ackScrollTo: () => {},
   clearFocus: () => {},
 };
+
+const SSR_STATE_FALLBACK: ListingFocusStateValue = {
+  hoveredId: null,
+  activeId: null,
+  scrollRequest: null,
+  focusSource: null,
+};
+
+// Stable ref for SSR fallback (never changes identity)
+const SSR_FOCUS_SOURCE_REF: React.RefObject<FocusSource> = { current: null };
+
+const SSR_ACTIONS_FALLBACK: ListingFocusActionsValue = {
+  hasProvider: false,
+  setHovered: () => {},
+  setActive: () => {},
+  requestScrollTo: () => {},
+  ackScrollTo: () => {},
+  clearFocus: () => {},
+  focusSourceRef: SSR_FOCUS_SOURCE_REF,
+};
+
+// ─── Provider ─────────────────────────────────────────────────────────────────
 
 export function ListingFocusProvider({
   children,
@@ -93,6 +153,9 @@ export function ListingFocusProvider({
   const nonceRef = useRef(0);
   const focusSourceTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
+  // Ref mirror of focusSource — actions subscribers read this without subscribing to state
+  const focusSourceRef = useRef<FocusSource>(null);
+
   // Cleanup timeout on unmount
   useEffect(() => {
     return () => {
@@ -104,10 +167,15 @@ export function ListingFocusProvider({
     setHoveredId(id);
     if (id && source) {
       setFocusSource(source);
+      focusSourceRef.current = source;
       if (focusSourceTimeoutRef.current) clearTimeout(focusSourceTimeoutRef.current);
-      focusSourceTimeoutRef.current = setTimeout(() => setFocusSource(null), 300);
+      focusSourceTimeoutRef.current = setTimeout(() => {
+        setFocusSource(null);
+        focusSourceRef.current = null;
+      }, 300);
     } else if (!id) {
       setFocusSource(null);
+      focusSourceRef.current = null;
       if (focusSourceTimeoutRef.current) clearTimeout(focusSourceTimeoutRef.current);
     }
   }, []);
@@ -135,15 +203,37 @@ export function ListingFocusProvider({
     setActiveId(null);
     setScrollRequest(null);
     setFocusSource(null);
+    focusSourceRef.current = null;
     if (focusSourceTimeoutRef.current) clearTimeout(focusSourceTimeoutRef.current);
   }, []);
 
-  const contextValue = useMemo(
+  // Split memos: state changes frequently, actions are stable
+  const stateValue = useMemo<ListingFocusStateValue>(
+    () => ({ hoveredId, activeId, scrollRequest, focusSource }),
+    [hoveredId, activeId, scrollRequest, focusSource],
+  );
+
+  const actionsValue = useMemo<ListingFocusActionsValue>(
+    () => ({
+      hasProvider: true,
+      setHovered,
+      setActive,
+      requestScrollTo,
+      ackScrollTo,
+      clearFocus,
+      focusSourceRef,
+    }),
+    [setHovered, setActive, requestScrollTo, ackScrollTo, clearFocus],
+  );
+
+  // Backward-compat combined context value
+  const contextValue = useMemo<ListingFocusContextValue>(
     () => ({
       hoveredId,
       activeId,
       scrollRequest,
       focusSource,
+      hasProvider: true,
       setHovered,
       setActive,
       requestScrollTo,
@@ -165,10 +255,16 @@ export function ListingFocusProvider({
 
   return (
     <ListingFocusContext.Provider value={contextValue}>
-      {children}
+      <ListingFocusStateContext.Provider value={stateValue}>
+        <ListingFocusActionsContext.Provider value={actionsValue}>
+          {children}
+        </ListingFocusActionsContext.Provider>
+      </ListingFocusStateContext.Provider>
     </ListingFocusContext.Provider>
   );
 }
+
+// ─── Hooks ────────────────────────────────────────────────────────────────────
 
 /**
  * Hook for components that need listing focus state
@@ -177,6 +273,25 @@ export function ListingFocusProvider({
 export function useListingFocus() {
   const context = useContext(ListingFocusContext);
   return context ?? SSR_FALLBACK;
+}
+
+/**
+ * Hook for components that only need read-only focus state.
+ * Re-renders on every state change (hoveredId, activeId, scrollRequest, focusSource).
+ */
+export function useListingFocusState(): ListingFocusStateValue {
+  const context = useContext(ListingFocusStateContext);
+  return context ?? SSR_STATE_FALLBACK;
+}
+
+/**
+ * Hook for components that only call focus actions (setHovered, setActive, etc.).
+ * Never re-renders due to hover/active state changes — actions are stable callbacks.
+ * Uses focusSourceRef to read the current focusSource without subscribing to state.
+ */
+export function useListingFocusActions(): ListingFocusActionsValue {
+  const context = useContext(ListingFocusActionsContext);
+  return context ?? SSR_ACTIONS_FALLBACK;
 }
 
 /**

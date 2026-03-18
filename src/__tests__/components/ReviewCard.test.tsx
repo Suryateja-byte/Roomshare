@@ -24,11 +24,8 @@ jest.mock('@/app/actions/review-response', () => ({
   deleteReviewResponse: jest.fn(),
 }))
 
-const mockRefresh = jest.fn()
 jest.mock('next/navigation', () => ({
-  useRouter: () => ({
-    refresh: mockRefresh,
-  }),
+  useRouter: () => ({}),
 }))
 
 const baseReview = {
@@ -244,7 +241,7 @@ describe('ReviewCard', () => {
       })
     })
 
-    it('refreshes router after successful delete', async () => {
+    it('calls deleteReviewResponse server action on delete', async () => {
       const { deleteReviewResponse } = require('@/app/actions/review-response')
       deleteReviewResponse.mockResolvedValue({ success: true })
 
@@ -253,7 +250,7 @@ describe('ReviewCard', () => {
       await userEvent.click(screen.getByRole('button', { name: 'Delete response' }))
 
       await waitFor(() => {
-        expect(mockRefresh).toHaveBeenCalled()
+        expect(deleteReviewResponse).toHaveBeenCalledWith('response-123')
       })
     })
 

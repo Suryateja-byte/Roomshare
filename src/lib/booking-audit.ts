@@ -1,3 +1,5 @@
+import 'server-only';
+
 import { Prisma, BookingStatus } from '@prisma/client';
 import { features } from '@/lib/env';
 

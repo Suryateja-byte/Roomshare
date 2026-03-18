@@ -1,7 +1,6 @@
-'use client';
-
 import Link from 'next/link';
-import { toast } from 'sonner';
+import FooterNavLink from './FooterNavLink';
+import ComingSoonButton from './ComingSoonButton';
 
 export default function Footer() {
     return (
@@ -24,42 +23,42 @@ export default function Footer() {
                     </div>
 
                     {/* Platform Links */}
-                    <div>
-                        <h4 className="font-semibold text-zinc-900 dark:text-white mb-6 text-xs uppercase tracking-[0.2em]">Platform</h4>
+                    <nav aria-label="Platform">
+                        <h2 className="font-semibold text-zinc-900 dark:text-white mb-6 text-xs uppercase tracking-[0.2em]">Platform</h2>
                         <ul className="flex flex-col gap-4 text-sm text-zinc-500 dark:text-zinc-400 font-light">
-                            <li><Link href="/search" className="hover:text-zinc-900 dark:hover:text-white transition-colors">Browse</Link></li>
-                            <li><Link href="/listings/create" className="hover:text-zinc-900 dark:hover:text-white transition-colors">List a Room</Link></li>
-                            <li><button onClick={() => toast.info('Coming soon')} className="hover:text-zinc-900 dark:hover:text-white transition-colors text-left">Safety</button></li>
+                            <li><FooterNavLink href="/search" className="hover:text-zinc-900 dark:hover:text-white transition-colors">Browse</FooterNavLink></li>
+                            <li><FooterNavLink href="/listings/create" className="hover:text-zinc-900 dark:hover:text-white transition-colors">List a Room</FooterNavLink></li>
+                            <li><ComingSoonButton className="hover:text-zinc-900 dark:hover:text-white transition-colors text-left">Safety</ComingSoonButton></li>
                         </ul>
-                    </div>
+                    </nav>
 
                     {/* Company Links */}
-                    <div>
-                        <h4 className="font-semibold text-zinc-900 dark:text-white mb-6 text-xs uppercase tracking-[0.2em]">Company</h4>
+                    <nav aria-label="Company">
+                        <h2 className="font-semibold text-zinc-900 dark:text-white mb-6 text-xs uppercase tracking-[0.2em]">Company</h2>
                         <ul className="flex flex-col gap-4 text-sm text-zinc-500 dark:text-zinc-400 font-light">
-                            <li><Link href="/about" className="hover:text-zinc-900 dark:hover:text-white transition-colors">About</Link></li>
-                            <li><button onClick={() => toast.info('Coming soon')} className="hover:text-zinc-900 dark:hover:text-white transition-colors text-left">Careers</button></li>
-                            <li><button onClick={() => toast.info('Coming soon')} className="hover:text-zinc-900 dark:hover:text-white transition-colors text-left">Blog</button></li>
+                            <li><FooterNavLink href="/about" className="hover:text-zinc-900 dark:hover:text-white transition-colors">About</FooterNavLink></li>
+                            <li><ComingSoonButton className="hover:text-zinc-900 dark:hover:text-white transition-colors text-left">Careers</ComingSoonButton></li>
+                            <li><ComingSoonButton className="hover:text-zinc-900 dark:hover:text-white transition-colors text-left">Blog</ComingSoonButton></li>
                         </ul>
-                    </div>
+                    </nav>
 
-                    {/* Support Links */}
-                    <div>
-                        <h4 className="font-semibold text-zinc-900 dark:text-white mb-6 text-xs uppercase tracking-[0.2em]">Support</h4>
+                    {/* Support — no real links, only placeholders */}
+                    <nav aria-label="Support">
+                        <h2 className="font-semibold text-zinc-900 dark:text-white mb-6 text-xs uppercase tracking-[0.2em]">Support</h2>
                         <ul className="flex flex-col gap-4 text-sm text-zinc-500 dark:text-zinc-400 font-light">
-                            <li><button onClick={() => toast.info('Coming soon')} className="hover:text-zinc-900 dark:hover:text-white transition-colors text-left">Help Center</button></li>
-                            <li><button onClick={() => toast.info('Coming soon')} className="hover:text-zinc-900 dark:hover:text-white transition-colors text-left">Contact</button></li>
+                            <li><ComingSoonButton className="hover:text-zinc-900 dark:hover:text-white transition-colors text-left">Help Center</ComingSoonButton></li>
+                            <li><ComingSoonButton className="hover:text-zinc-900 dark:hover:text-white transition-colors text-left">Contact</ComingSoonButton></li>
                         </ul>
-                    </div>
+                    </nav>
 
-                    {/* Legal Links */}
-                    <div>
-                        <h4 className="font-semibold text-zinc-900 dark:text-white mb-6 text-xs uppercase tracking-[0.2em]">Legal</h4>
+                    {/* Legal — no real links, only placeholders */}
+                    <nav aria-label="Legal">
+                        <h2 className="font-semibold text-zinc-900 dark:text-white mb-6 text-xs uppercase tracking-[0.2em]">Legal</h2>
                         <ul className="flex flex-col gap-4 text-sm text-zinc-500 dark:text-zinc-400 font-light">
-                            <li><button onClick={() => toast.info('Coming soon')} className="hover:text-zinc-900 dark:hover:text-white transition-colors text-left">Privacy</button></li>
-                            <li><button onClick={() => toast.info('Coming soon')} className="hover:text-zinc-900 dark:hover:text-white transition-colors text-left">Terms</button></li>
+                            <li><ComingSoonButton className="hover:text-zinc-900 dark:hover:text-white transition-colors text-left">Privacy</ComingSoonButton></li>
+                            <li><ComingSoonButton className="hover:text-zinc-900 dark:hover:text-white transition-colors text-left">Terms</ComingSoonButton></li>
                         </ul>
-                    </div>
+                    </nav>
                 </div>
 
                 {/* Bottom Bar */}
@@ -68,9 +67,9 @@ export default function Footer() {
                         © {new Date().getFullYear()} RoomShare Inc.
                     </p>
                     <div className="flex items-center gap-8 order-1 sm:order-2">
-                        <button onClick={() => toast.info('Coming soon')} className="text-[10px] font-bold text-zinc-400 hover:text-zinc-900 dark:hover:text-white uppercase tracking-[0.2em] transition-colors">Instagram</button>
-                        <button onClick={() => toast.info('Coming soon')} className="text-[10px] font-bold text-zinc-400 hover:text-zinc-900 dark:hover:text-white uppercase tracking-[0.2em] transition-colors">X</button>
-                        <button onClick={() => toast.info('Coming soon')} className="text-[10px] font-bold text-zinc-400 hover:text-zinc-900 dark:hover:text-white uppercase tracking-[0.2em] transition-colors">LinkedIn</button>
+                        <ComingSoonButton className="text-[10px] font-bold text-zinc-400 hover:text-zinc-900 dark:hover:text-white uppercase tracking-[0.2em] transition-colors">Instagram</ComingSoonButton>
+                        <ComingSoonButton className="text-[10px] font-bold text-zinc-400 hover:text-zinc-900 dark:hover:text-white uppercase tracking-[0.2em] transition-colors">X</ComingSoonButton>
+                        <ComingSoonButton className="text-[10px] font-bold text-zinc-400 hover:text-zinc-900 dark:hover:text-white uppercase tracking-[0.2em] transition-colors">LinkedIn</ComingSoonButton>
                     </div>
                 </div>
             </div>

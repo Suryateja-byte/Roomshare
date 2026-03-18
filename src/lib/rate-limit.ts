@@ -1,3 +1,5 @@
+import 'server-only';
+
 import { prisma } from "@/lib/prisma";
 import { logger } from "@/lib/logger";
 
@@ -92,7 +94,14 @@ export async function checkRateLimit(
     return { success: true, remaining: 999, resetAt: new Date(Date.now() + config.windowMs) };
   }
 
-  const { limit, windowMs } = config;
+  // In development, apply 10x relaxed limits so normal dev workflows are never
+  // blocked, while still exercising the full rate-limiting code path.
+  // Set DISABLE_RATE_LIMIT_DEV_MULTIPLIER=true to use production limits locally.
+  const isDev = process.env.NODE_ENV !== 'production' && process.env.NODE_ENV !== 'test';
+  const devMultiplier = isDev && process.env.DISABLE_RATE_LIMIT_DEV_MULTIPLIER !== 'true' ? 10 : 1;
+
+  const { windowMs } = config;
+  const limit = config.limit * devMultiplier;
   const now = new Date();
   const windowStart = new Date(now.getTime() - windowMs);
   const expiresAt = new Date(now.getTime() + windowMs);

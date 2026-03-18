@@ -9,7 +9,7 @@
  * Uses SF_BOUNDS which has guaranteed seed data.
  */
 
-import { test, expect, selectors, timeouts, tags, SF_BOUNDS, searchResultsContainer } from "../helpers";
+import { test, expect, selectors, tags, SF_BOUNDS, searchResultsContainer } from "../helpers";
 
 test.describe("Search Pagination Journey", () => {
   // Use slow mode for map operations that can take time
@@ -61,7 +61,6 @@ test.describe("Search Pagination Journey", () => {
     // Step 3: Click next page
     await nextButton.click();
     await page.waitForLoadState("domcontentloaded");
-    await page.waitForTimeout(timeouts.animation);
 
     // Step 4: Verify URL has cursor (keyset pagination)
     const urlAfterNext = new URL(page.url());
@@ -87,7 +86,6 @@ test.describe("Search Pagination Journey", () => {
     if (await prevButton.isVisible()) {
       await prevButton.click();
       await page.waitForLoadState("domcontentloaded");
-      await page.waitForTimeout(timeouts.animation);
 
       // Step 7: Verify back on page 1 (cursor removed or page=1)
       const urlAfterPrev = new URL(page.url());
@@ -136,7 +134,6 @@ test.describe("Search Pagination Journey", () => {
     ) {
       await nextButton.click();
       await page.waitForLoadState("domcontentloaded");
-      await page.waitForTimeout(timeouts.animation);
 
       // Verify we're on page 2
       const urlPage2 = new URL(page.url());
@@ -172,7 +169,6 @@ test.describe("Search Pagination Journey", () => {
         }
 
         await page.waitForLoadState("domcontentloaded");
-        await page.waitForTimeout(timeouts.animation);
 
         // Step 4: Verify pagination reset (cursor/page removed)
         const urlAfterSort = new URL(page.url());
@@ -221,7 +217,6 @@ test.describe("Search Pagination Journey", () => {
     ) {
       await nextButton.click();
       await page.waitForLoadState("domcontentloaded");
-      await page.waitForTimeout(timeouts.animation);
 
       // Step 3: Capture URL and first listing ID
       const urlBeforeRefresh = page.url();
@@ -234,7 +229,6 @@ test.describe("Search Pagination Journey", () => {
       // Step 4: Refresh the page
       await page.reload();
       await page.waitForLoadState("domcontentloaded");
-      await page.waitForTimeout(timeouts.animation);
 
       // Wait for listings to load after refresh
       await expect(searchResultsContainer(page).locator(selectors.listingCard).first()).toBeVisible({

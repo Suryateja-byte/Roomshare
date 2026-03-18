@@ -62,7 +62,7 @@ interface UserProfileClientProps {
     currentUserId?: string;
 }
 
-const Badge = ({ icon: Icon, text, variant = "default" }: { icon?: any; text: string; variant?: "default" | "verified" }) => {
+const Badge = ({ icon: Icon, text, variant = "default" }: { icon?: React.ComponentType<{ className?: string }>; text: string; variant?: "default" | "verified" }) => {
     const styles = variant === "verified"
         ? "bg-green-50 dark:bg-green-900/20 text-green-700 dark:text-green-400 border-green-200 dark:border-green-800"
         : "bg-zinc-50 dark:bg-zinc-800 text-zinc-600 dark:text-zinc-300 border-zinc-200 dark:border-zinc-700";

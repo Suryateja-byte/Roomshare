@@ -37,7 +37,11 @@ async function selectDates(page: import('@playwright/test').Page, startMonths: n
   await nextMonthBtnStart.waitFor({ state: 'visible', timeout: 10_000 });
   for (let i = 0; i < startMonths; i++) {
     await nextMonthBtnStart.dispatchEvent('click');
-    await page.waitForTimeout(250);
+    // Wait for month transition animation (Radix calendar re-renders)
+    await page.waitForFunction(
+      () => !document.querySelector('[data-radix-popper-content-wrapper] [data-disabled]'),
+      { timeout: 2_000 }
+    ).catch(() => {}); // Fallback: if no data-disabled detected, proceed
   }
 
   const startDayBtn = page
@@ -46,20 +50,28 @@ async function selectDates(page: import('@playwright/test').Page, startMonths: n
     .first();
   await startDayBtn.waitFor({ state: 'visible', timeout: 5_000 });
   await startDayBtn.dispatchEvent('click');
-  await page.waitForTimeout(500);
+
+  // Wait for popover to close after start date selection
+  await expect(page.locator('[data-radix-popper-content-wrapper]')).not.toBeVisible({ timeout: 2_000 }).catch(() => {});
 
   // --- End date ---
   const endDateTrigger = page.locator('#booking-end-date');
   // Wait for Radix hydration (data-state attribute) and visibility before interacting
   await page.locator('#booking-end-date[data-state]').waitFor({ state: 'visible', timeout: 10_000 });
   await endDateTrigger.click({ force: true });
-  await page.waitForTimeout(300);
+
+  // Wait for the end-date popover to open
+  await page.locator('[data-radix-popper-content-wrapper]').waitFor({ state: 'visible', timeout: 2_000 }).catch(() => {});
 
   const nextMonthBtnEnd = page.locator('button[aria-label="Next month"]');
   await nextMonthBtnEnd.waitFor({ state: 'visible', timeout: 10_000 });
   for (let i = 0; i < startMonths + 2; i++) {
     await nextMonthBtnEnd.dispatchEvent('click');
-    await page.waitForTimeout(250);
+    // Wait for month transition animation (Radix calendar re-renders)
+    await page.waitForFunction(
+      () => !document.querySelector('[data-radix-popper-content-wrapper] [data-disabled]'),
+      { timeout: 2_000 }
+    ).catch(() => {}); // Fallback: if no data-disabled detected, proceed
   }
 
   const endDayBtn = page
@@ -68,7 +80,9 @@ async function selectDates(page: import('@playwright/test').Page, startMonths: n
     .first();
   await endDayBtn.waitFor({ state: 'visible', timeout: 5_000 });
   await endDayBtn.dispatchEvent('click');
-  await page.waitForTimeout(500);
+
+  // Wait for popover to close after end date selection
+  await expect(page.locator('[data-radix-popper-content-wrapper]')).not.toBeVisible({ timeout: 2_000 }).catch(() => {});
 }
 
 /**
@@ -179,6 +193,9 @@ test.describe('Booking Race Conditions @race', () => {
 
       const canBookA = await requestBtnA.isVisible({ timeout: 5_000 }).catch(() => false);
       const canBookB = await requestBtnB.isVisible({ timeout: 5_000 }).catch(() => false);
+      if (!canBookA || !canBookB) {
+        console.warn(`[RC-01] Booking button visibility: A=${canBookA}, B=${canBookB}. Listing URL: ${listingUrl}`);
+      }
       test.skip(!canBookA || !canBookB, 'Booking button not visible for one or both users');
 
       await requestBtnA.click();
@@ -491,6 +508,9 @@ test.describe('Booking Race Conditions @race', () => {
 
       const canA = await reqA.isVisible({ timeout: 5_000 }).catch(() => false);
       const canB = await reqB.isVisible({ timeout: 5_000 }).catch(() => false);
+      if (!canA || !canB) {
+        console.warn(`[RC-06] Booking button visibility: A=${canA}, B=${canB}. Listing URL: ${listingUrl}`);
+      }
       test.skip(!canA || !canB, 'Booking button not visible');
 
       await reqA.click();
@@ -574,13 +594,32 @@ test.describe('Booking Race Conditions @race', () => {
           expect(classes).toContain('pointer-events-none');
         }
       } else if (hasBookBtn) {
-        // If somehow the book button is visible, clicking should fail gracefully
-        // (server action returns SESSION_EXPIRED)
-        // This path is unlikely but handles edge cases
-        expect(true).toBeTruthy();
+        // Book button visible to anon user — click and verify graceful failure.
+        // Server action returns SESSION_EXPIRED → BookingForm shows auth error or redirects.
+        await bookBtn.click();
+
+        // Wait for either: auth error message, redirect to login, or error alert
+        const authError = page.getByText(/sign in|log in|session expired|unauthorized/i).first();
+        const errorAlert = page.locator('[role="alert"]').first();
+        const redirected = await page.waitForURL(/\/(login|signin|auth)/, { timeout: 10_000 }).then(() => true).catch(() => false);
+
+        const hasAuthError = await authError.isVisible({ timeout: 10_000 }).catch(() => false);
+        const hasErrorAlert = await errorAlert.isVisible({ timeout: 3_000 }).catch(() => false);
+
+        expect(hasAuthError || hasErrorAlert || redirected).toBeTruthy();
       } else {
-        // Page loaded but no booking UI — listing may be PAUSED/RENTED
-        expect(true).toBeTruthy();
+        // No booking UI — listing is PAUSED or RENTED. Verify status message shown.
+        // BookingForm renders "temporarily unavailable" (PAUSED) or "currently rented out" (RENTED)
+        const statusMessage = page.getByText(/temporarily unavailable|currently rented out|not available/i).first();
+        const hasStatusMessage = await statusMessage.isVisible({ timeout: 5_000 }).catch(() => false);
+
+        // The page should show SOME explanation — either a status message or the listing itself
+        // is in a state where booking is not offered (no form, no gate, no button)
+        const pageContent = await page.locator('main').textContent() || '';
+        expect(
+          hasStatusMessage ||
+          /paused|rented|unavailable|not available/i.test(pageContent)
+        ).toBeTruthy();
       }
     } finally {
       await anonContext.close();

@@ -10,11 +10,9 @@ afterAll(() => { global.fetch = originalFetch })
 
 // Mock useRouter
 const mockPush = jest.fn()
-const mockRefresh = jest.fn()
 jest.mock('next/navigation', () => ({
   useRouter: () => ({
     push: mockPush,
-    refresh: mockRefresh,
   }),
 }))
 
@@ -103,7 +101,7 @@ describe('FavoriteButton', () => {
       })
     })
 
-    it('refreshes router after successful toggle', async () => {
+    it('updates local state after successful toggle', async () => {
       mockFetch.mockResolvedValueOnce({
         ok: true,
         status: 200,
@@ -115,7 +113,7 @@ describe('FavoriteButton', () => {
       await userEvent.click(screen.getByRole('button'))
 
       await waitFor(() => {
-        expect(mockRefresh).toHaveBeenCalled()
+        expect(screen.getByRole('button', { name: /remove from saved/i })).toBeInTheDocument()
       })
     })
   })

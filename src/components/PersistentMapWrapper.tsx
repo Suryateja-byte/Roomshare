@@ -30,7 +30,7 @@ import {
 } from "react";
 import type { MapListingData } from "@/lib/data";
 import { buildCanonicalFilterParamsFromSearchParams } from "@/lib/search-params";
-import { useSearchV2Data, type V2MapData } from "@/contexts/SearchV2DataContext";
+import { useV2MapData, useIsV2Enabled, type V2MapData } from "@/contexts/SearchV2DataContext";
 import { useActivePanBounds } from "@/contexts/MapBoundsContext";
 import { MapErrorBoundary } from "@/components/map/MapErrorBoundary";
 import { useSearchTransitionSafe } from "@/contexts/SearchTransitionContext";
@@ -407,7 +407,8 @@ export default function PersistentMapWrapper({
   const [infoMessage, setInfoMessage] = useState<string | null>(null);
 
   // Check for v2 data from context (injected by page.tsx via V2MapDataSetter)
-  const { v2MapData, isV2Enabled, setIsV2Enabled } = useSearchV2Data();
+  const v2MapData = useV2MapData();
+  const { isV2Enabled, setIsV2Enabled } = useIsV2Enabled();
   // P2-FIX (#124): Use state instead of ref for last V2 data to ensure memo dependencies are correct
   // Using a ref in useMemo causes stale data because refs aren't tracked by React
   const [lastV2Data, setLastV2Data] = useState<V2MapData | null>(null);

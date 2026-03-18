@@ -2,7 +2,6 @@
 
 import { useState } from 'react';
 import { Star, LogIn, CheckCircle2, Edit3, Trash2, Loader2, Calendar, AlertTriangle } from 'lucide-react';
-import { useRouter } from 'next/navigation';
 import { Button } from './ui/button';
 import { cn } from '@/lib/utils';
 import { toast } from 'sonner';
@@ -57,7 +56,6 @@ export default function ReviewForm({
     const [isDeleting, setIsDeleting] = useState(false);
     const [wasDeleted, setWasDeleted] = useState(false);
     const [showDeleteDialog, setShowDeleteDialog] = useState(false);
-    const router = useRouter();
 
     // Handle editing an existing review
     const handleUpdate = async () => {
@@ -93,7 +91,6 @@ export default function ReviewForm({
 
             toast.success('Review updated successfully!');
             setIsEditing(false);
-            router.refresh();
         } catch (err) {
             setError(err instanceof Error ? err.message : 'Failed to update review');
             toast.error('Failed to update review');
@@ -120,7 +117,6 @@ export default function ReviewForm({
 
             toast.success('Review deleted successfully');
             setWasDeleted(true);
-            router.refresh();
         } catch (err) {
             toast.error(err instanceof Error ? err.message : 'Failed to delete review');
         } finally {
@@ -177,15 +173,15 @@ export default function ReviewForm({
 
             setRating(0);
             setComment('');
-            router.refresh();
             if (onSuccess) onSuccess();
 
             // Reset submitted state after animation
             setTimeout(() => setIsSubmitted(false), 3000);
-        } catch (err: any) {
-            setError(err.message);
+        } catch (err: unknown) {
+            const message = err instanceof Error ? err.message : 'An unexpected error occurred';
+            setError(message);
             toast.error('Failed to submit review', {
-                description: err.message,
+                description: message,
             });
         } finally {
             setIsSubmitting(false);
@@ -338,7 +334,7 @@ export default function ReviewForm({
                                     key={star}
                                     className={cn(
                                         "w-4 h-4",
-                                        star <= existingReview.rating
+                                        star <= rating
                                             ? "fill-yellow-400 text-yellow-400"
                                             : "text-zinc-300 dark:text-zinc-600"
                                     )}
@@ -349,7 +345,7 @@ export default function ReviewForm({
                             </span>
                         </div>
                         <p className="text-sm text-zinc-600 dark:text-zinc-400">
-                            &ldquo;{existingReview.comment}&rdquo;
+                            &ldquo;{comment}&rdquo;
                         </p>
                     </div>
                 </div>

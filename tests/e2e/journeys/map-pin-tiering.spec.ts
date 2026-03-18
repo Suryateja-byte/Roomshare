@@ -96,7 +96,6 @@ test.describe("Map Pin Tiering", () => {
       await miniPin.evaluate((el) => {
         (el as HTMLElement).click();
       });
-      await page.waitForTimeout(timeouts.animation);
 
       // Popup should appear
       const popup = page.locator(
@@ -138,7 +137,6 @@ test.describe("Map Pin Tiering", () => {
           }),
         );
       });
-      await page.waitForTimeout(timeouts.animation);
 
       // On hover, the wrapper div gets data-focus-state="hovered" and scale-[1.15]
       await expect(wrapperEl).toHaveAttribute("data-focus-state", "hovered", { timeout: 5_000 });
@@ -167,7 +165,6 @@ test.describe("Map Pin Tiering", () => {
       await primaryPin.evaluate((el) => {
         (el as HTMLElement).click();
       });
-      await page.waitForTimeout(timeouts.animation);
 
       // Popup should appear
       await expect(page.locator(".maplibregl-popup")).toBeVisible();

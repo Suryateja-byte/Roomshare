@@ -1,8 +1,10 @@
 'use client';
 
-import { useState, useEffect, useRef, useCallback } from 'react';
+import { useState, useEffect, useRef, useCallback, useId } from 'react';
 import { signOut, useSession } from 'next-auth/react';
+import type { Session } from 'next-auth';
 import Link from 'next/link';
+import { usePathname } from 'next/navigation';
 
 import {
     Plus,
@@ -71,7 +73,10 @@ const MenuItem = ({
     badge,
     danger,
     onClick,
-    href
+    href,
+    role: ariaRole = 'menuitem',
+    tabIndex = -1,
+    onMouseEnter,
 }: {
     icon: React.ReactNode;
     text: string;
@@ -79,8 +84,11 @@ const MenuItem = ({
     danger?: boolean;
     onClick?: () => void;
     href?: string;
+    role?: string;
+    tabIndex?: number;
+    onMouseEnter?: () => void;
 }) => {
-    const className = `w-full flex items-center justify-between px-4 py-2.5 rounded-xl text-sm font-medium transition-colors focus-visible:ring-2 focus-visible:ring-zinc-900/20 focus-visible:ring-offset-2 ${danger
+    const className = `w-full flex items-center justify-between px-4 py-2.5 rounded-xl text-sm font-medium transition-colors focus-visible:ring-2 focus-visible:ring-zinc-900/20 focus-visible:ring-offset-2 dark:focus-visible:ring-zinc-400/40 ${danger
         ? 'text-red-600 dark:text-red-500 hover:bg-red-50 dark:hover:bg-red-950/30'
         : 'text-zinc-700 dark:text-zinc-300 hover:bg-zinc-100 dark:hover:bg-zinc-800 hover:text-zinc-900 dark:hover:text-white'
         }`;
@@ -101,14 +109,14 @@ const MenuItem = ({
 
     if (href) {
         return (
-            <Link href={href} className={className} onClick={onClick}>
+            <Link href={href} className={className} onClick={onClick} role={ariaRole} tabIndex={tabIndex} onMouseEnter={onMouseEnter}>
                 {content}
             </Link>
         );
     }
 
     return (
-        <button onClick={onClick} className={className}>
+        <button onClick={onClick} className={className} role={ariaRole} tabIndex={tabIndex} onMouseEnter={onMouseEnter}>
             {content}
         </button>
     );
@@ -117,7 +125,7 @@ const MenuItem = ({
 // --- Main Navbar Component ---
 
 interface NavbarClientProps {
-    user: any;
+    user: Session['user'] | null;
     unreadCount?: number;
 }
 
@@ -132,11 +140,18 @@ export default function NavbarClient({ user: initialUser, unreadCount = 0 }: Nav
     // Use reactive session data, fall back to server props for SSR hydration
     const user = status === 'loading' ? initialUser : status === 'unauthenticated' ? null : (session?.user ?? initialUser);
 
+    const pathname = usePathname();
+    const menuButtonId = useId();
+    const menuId = useId();
+
     const [isScrolled, setIsScrolled] = useState(false);
     const [isProfileOpen, setIsProfileOpen] = useState(false);
     const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
     const [currentUnreadCount, setCurrentUnreadCount] = useState(unreadCount);
+    const [activeMenuIndex, setActiveMenuIndex] = useState(-1);
     const profileRef = useRef<HTMLDivElement>(null);
+    const menuItemsRef = useRef<HTMLElement[]>([]);
+    const triggerButtonRef = useRef<HTMLButtonElement>(null);
 
     // Refs for exponential backoff polling
     const failureCountRef = useRef(0);
@@ -220,15 +235,47 @@ export default function NavbarClient({ user: initialUser, unreadCount = 0 }: Nav
         return () => document.removeEventListener('mousedown', handleClickOutside);
     }, []);
 
-    // Handle body scroll locking for mobile menu
+    // Handle scroll locking and focus trapping for mobile menu
+    // Body already has overflow:hidden (globals.css). Target the actual scroll container.
     useEffect(() => {
         if (isMobileMenuOpen) {
-            document.body.style.overflow = 'hidden';
+            const scrollContainer = document.querySelector('.custom-scroll-hide') as HTMLElement | null;
+            if (scrollContainer) {
+                scrollContainer.style.overflow = 'hidden';
+            }
+
+            // Prevent focus from escaping mobile menu into background content
+            const mainContent = document.getElementById('main-content');
+            if (mainContent) {
+                mainContent.setAttribute('inert', '');
+            }
+
             return () => {
-                document.body.style.overflow = '';
+                if (scrollContainer) {
+                    scrollContainer.style.overflow = '';
+                }
+                if (mainContent) {
+                    mainContent.removeAttribute('inert');
+                }
             };
         }
     }, [isMobileMenuOpen]);
+
+    // Close menus on Escape key press
+    useEffect(() => {
+        const handleKeyDown = (event: KeyboardEvent) => {
+            if (event.key === 'Escape') {
+                if (isMobileMenuOpen) {
+                    setIsMobileMenuOpen(false);
+                } else if (isProfileOpen) {
+                    setIsProfileOpen(false);
+                    triggerButtonRef.current?.focus();
+                }
+            }
+        };
+        document.addEventListener('keydown', handleKeyDown);
+        return () => document.removeEventListener('keydown', handleKeyDown);
+    }, [isMobileMenuOpen, isProfileOpen]);
 
     // Poll for unread count updates and listen for custom events
     useEffect(() => {
@@ -258,10 +305,139 @@ export default function NavbarClient({ user: initialUser, unreadCount = 0 }: Nav
         };
     }, [user, fetchUnreadCount, scheduleNextPoll]);
 
+    // Collect menu items when dropdown opens
+    useEffect(() => {
+        if (isProfileOpen) {
+            // Use requestAnimationFrame to ensure DOM is painted after CSS transition starts
+            requestAnimationFrame(() => {
+                const menuEl = document.getElementById(menuId);
+                if (menuEl) {
+                    const items = menuEl.querySelectorAll<HTMLElement>(
+                        '[role="menuitem"], [role="menuitemradio"]'
+                    );
+                    menuItemsRef.current = Array.from(items);
+                }
+            });
+        } else {
+            menuItemsRef.current = [];
+            setActiveMenuIndex(-1);
+        }
+    }, [isProfileOpen, menuId]);
+
+    // Keyboard handler for the menu container (roving tabindex)
+    const handleMenuKeyDown = useCallback((e: React.KeyboardEvent) => {
+        const items = menuItemsRef.current;
+        const count = items.length;
+        if (count === 0) return;
+
+        switch (e.key) {
+            case 'ArrowDown': {
+                e.preventDefault();
+                const next = activeMenuIndex < count - 1 ? activeMenuIndex + 1 : 0;
+                setActiveMenuIndex(next);
+                items[next]?.focus();
+                break;
+            }
+            case 'ArrowUp': {
+                e.preventDefault();
+                const prev = activeMenuIndex > 0 ? activeMenuIndex - 1 : count - 1;
+                setActiveMenuIndex(prev);
+                items[prev]?.focus();
+                break;
+            }
+            case 'Home': {
+                e.preventDefault();
+                setActiveMenuIndex(0);
+                items[0]?.focus();
+                break;
+            }
+            case 'End': {
+                e.preventDefault();
+                setActiveMenuIndex(count - 1);
+                items[count - 1]?.focus();
+                break;
+            }
+            case 'Escape': {
+                e.preventDefault();
+                setIsProfileOpen(false);
+                triggerButtonRef.current?.focus();
+                break;
+            }
+            case 'Tab': {
+                // Close menu on Tab, let focus move naturally
+                setIsProfileOpen(false);
+                break;
+            }
+            case 'Enter':
+            case ' ': {
+                e.preventDefault();
+                items[activeMenuIndex]?.click();
+                break;
+            }
+            default: {
+                // Character search: move to next item starting with typed character
+                if (e.key.length === 1 && !e.ctrlKey && !e.metaKey) {
+                    const char = e.key.toLowerCase();
+                    const startIndex = activeMenuIndex + 1;
+                    for (let i = 0; i < count; i++) {
+                        const idx = (startIndex + i) % count;
+                        const text = items[idx]?.textContent?.trim().toLowerCase();
+                        if (text?.startsWith(char)) {
+                            setActiveMenuIndex(idx);
+                            items[idx]?.focus();
+                            break;
+                        }
+                    }
+                }
+            }
+        }
+    }, [activeMenuIndex]);
+
+    // Keyboard handler for the trigger button (opening the menu)
+    const handleTriggerKeyDown = useCallback((e: React.KeyboardEvent) => {
+        if (e.key === 'ArrowDown' || e.key === 'Enter' || e.key === ' ') {
+            if (!isProfileOpen) {
+                e.preventDefault();
+                setIsProfileOpen(true);
+                // Focus first item after menu renders — query DOM directly to avoid race with useEffect ref
+                requestAnimationFrame(() => {
+                    requestAnimationFrame(() => {
+                        const items = document.getElementById(menuId)?.querySelectorAll<HTMLElement>(
+                            '[role="menuitem"], [role="menuitemradio"]'
+                        );
+                        if (items && items.length > 0) {
+                            setActiveMenuIndex(0);
+                            items[0]?.focus();
+                        }
+                    });
+                });
+            }
+        }
+        if (e.key === 'ArrowUp') {
+            if (!isProfileOpen) {
+                e.preventDefault();
+                setIsProfileOpen(true);
+                // Focus last item after menu renders — query DOM directly
+                requestAnimationFrame(() => {
+                    requestAnimationFrame(() => {
+                        const items = document.getElementById(menuId)?.querySelectorAll<HTMLElement>(
+                            '[role="menuitem"], [role="menuitemradio"]'
+                        );
+                        if (items && items.length > 0) {
+                            const lastIdx = items.length - 1;
+                            setActiveMenuIndex(lastIdx);
+                            items[lastIdx]?.focus();
+                        }
+                    });
+                });
+            }
+        }
+    }, [isProfileOpen, menuId]);
+
     return (
         <nav
             aria-label="Main navigation"
-            className={`fixed top-0 left-0 right-0 z-dropdown transition-all duration-500 ease-[cubic-bezier(0.16,1,0.3,1)] data-[anim-hidden=true]:-translate-y-full data-[anim-hidden=true]:opacity-0 data-[anim-hidden=true]:pointer-events-none ${isScrolled
+            className={`fixed top-0 left-0 right-0 z-dropdown transition-all duration-500 ease-[cubic-bezier(0.16,1,0.3,1)] data-[anim-hidden=true]:-translate-y-full data-[anim-hidden=true]:opacity-0 data-[anim-hidden=true]:pointer-events-none data-[anim-hidden=true]:border-transparent ${isScrolled
                 ? 'py-4 bg-white/95 dark:bg-zinc-950/95 backdrop-blur-md shadow-sm border-b border-zinc-200/50 dark:border-zinc-800/50'
                 : 'py-6 bg-transparent'
                 }`}
@@ -283,13 +459,23 @@ export default function NavbarClient({ user: initialUser, unreadCount = 0 }: Nav
                     <div className="hidden lg:flex flex-1 items-center justify-center gap-1">
                         <Link
                             href="/search"
-                            className="text-sm font-medium text-zinc-500 dark:text-zinc-400 hover:text-zinc-900 dark:hover:text-white px-5 py-2 rounded-full transition-all duration-300 hover:bg-zinc-100 dark:hover:bg-white/5"
+                            className={`text-sm font-medium px-5 py-2 rounded-full transition-all duration-300 focus-visible:ring-2 focus-visible:ring-zinc-900/20 focus-visible:ring-offset-2 dark:focus-visible:ring-zinc-400/40 ${
+                                pathname === '/search'
+                                    ? 'text-zinc-900 dark:text-white bg-zinc-100 dark:bg-white/10'
+                                    : 'text-zinc-500 dark:text-zinc-400 hover:text-zinc-900 dark:hover:text-white hover:bg-zinc-100 dark:hover:bg-white/5'
+                            }`}
+                            aria-current={pathname === '/search' ? 'page' : undefined}
                         >
                             Find a Room
                         </Link>
                         <Link
                             href="/about"
-                            className="text-sm font-medium text-zinc-500 dark:text-zinc-400 hover:text-zinc-900 dark:hover:text-white px-5 py-2 rounded-full transition-all duration-300 hover:bg-zinc-100 dark:hover:bg-white/5"
+                            className={`text-sm font-medium px-5 py-2 rounded-full transition-all duration-300 focus-visible:ring-2 focus-visible:ring-zinc-900/20 focus-visible:ring-offset-2 dark:focus-visible:ring-zinc-400/40 ${
+                                pathname === '/about'
+                                    ? 'text-zinc-900 dark:text-white bg-zinc-100 dark:bg-white/10'
+                                    : 'text-zinc-500 dark:text-zinc-400 hover:text-zinc-900 dark:hover:text-white hover:bg-zinc-100 dark:hover:bg-white/5'
+                            }`}
+                            aria-current={pathname === '/about' ? 'page' : undefined}
                         >
                             How it works
                         </Link>
@@ -312,13 +498,17 @@ export default function NavbarClient({ user: initialUser, unreadCount = 0 }: Nav
                         {user ? (
                             <div className="relative" ref={profileRef}>
                                 <button
+                                    ref={triggerButtonRef}
+                                    id={menuButtonId}
                                     onClick={() => setIsProfileOpen(!isProfileOpen)}
+                                    onKeyDown={handleTriggerKeyDown}
                                     className={`group flex items-center gap-2 p-1 pl-1.5 pr-1 min-h-[40px] rounded-full transition-all duration-300 ${isProfileOpen
                                         ? 'bg-zinc-100 dark:bg-zinc-800'
                                         : 'hover:bg-zinc-50 dark:hover:bg-zinc-800'
                                         }`}
                                     aria-expanded={isProfileOpen}
-                                    aria-haspopup="true"
+                                    aria-haspopup="menu"
+                                    aria-controls={isProfileOpen ? menuId : undefined}
                                     data-testid="user-menu"
                                     aria-label="User menu"
                                 >
@@ -329,25 +519,29 @@ export default function NavbarClient({ user: initialUser, unreadCount = 0 }: Nav
                                     />
                                 </button>
 
-                                {/* Dropdown Menu - CSS animated */}
+                                {/* Dropdown Menu - CSS animated, WAI-ARIA Menu Button pattern */}
                                 <div
-                                    className={`absolute right-0 mt-4 w-72 bg-white/95 dark:bg-zinc-900/95 backdrop-blur-xl rounded-[1.5rem] shadow-2xl shadow-zinc-900/10 dark:shadow-black/60 border border-zinc-200/50 dark:border-white/5 overflow-hidden origin-top-right z-sticky transition-all duration-300 cubic-bezier(0.16, 1, 0.3, 1) ${isProfileOpen
+                                    id={menuId}
+                                    role="menu"
+                                    aria-labelledby={menuButtonId}
+                                    onKeyDown={handleMenuKeyDown}
+                                    className={`absolute right-0 mt-4 w-72 bg-white/95 dark:bg-zinc-900/95 backdrop-blur-xl rounded-[1.5rem] shadow-2xl shadow-zinc-900/10 dark:shadow-black/60 border border-zinc-200/50 dark:border-white/5 overflow-hidden origin-top-right z-sticky transition-all duration-300 ease-[cubic-bezier(0.16,1,0.3,1)] ${isProfileOpen
                                         ? 'opacity-100 translate-y-0 visible scale-100'
                                         : 'opacity-0 -translate-y-4 invisible scale-95 pointer-events-none'
                                         }`}
                                 >
-                                    <div className="p-6 border-b border-zinc-100 dark:border-white/5 bg-zinc-50/50 dark:bg-white/[0.02]">
+                                    <div role="none" className="p-6 border-b border-zinc-100 dark:border-white/5 bg-zinc-50/50 dark:bg-white/[0.02]">
                                         <p className="font-semibold text-zinc-900 dark:text-white tracking-tight">{user.name}</p>
                                         <p className="text-xs text-zinc-400 truncate mt-0.5">{user.email}</p>
                                     </div>
-                                    <div className="p-2.5 space-y-0.5">
-                                        <MenuItem icon={<User size={16} />} text="Profile" href="/profile" onClick={() => setIsProfileOpen(false)} />
-                                        <MenuItem icon={<Plus size={16} />} text="List a Room" href="/listings/create" onClick={() => setIsProfileOpen(false)} />
-                                        <MenuItem icon={<Heart size={16} />} text="Saved" href="/saved" onClick={() => setIsProfileOpen(false)} />
-                                        <div className="h-px bg-zinc-100 dark:bg-white/5 my-2 mx-3"></div>
-                                        <MenuItem icon={<Settings size={16} />} text="Settings" href="/settings" onClick={() => setIsProfileOpen(false)} />
+                                    <div role="none" className="p-2.5 space-y-0.5">
+                                        <MenuItem icon={<User size={16} />} text="Profile" href="/profile" onClick={() => setIsProfileOpen(false)} tabIndex={activeMenuIndex === 0 ? 0 : -1} onMouseEnter={() => setActiveMenuIndex(0)} />
+                                        <MenuItem icon={<Plus size={16} />} text="List a Room" href="/listings/create" onClick={() => setIsProfileOpen(false)} tabIndex={activeMenuIndex === 1 ? 0 : -1} onMouseEnter={() => setActiveMenuIndex(1)} />
+                                        <MenuItem icon={<Heart size={16} />} text="Saved" href="/saved" onClick={() => setIsProfileOpen(false)} tabIndex={activeMenuIndex === 2 ? 0 : -1} onMouseEnter={() => setActiveMenuIndex(2)} />
+                                        <div role="separator" className="h-px bg-zinc-100 dark:bg-white/5 my-2 mx-3"></div>
+                                        <MenuItem icon={<Settings size={16} />} text="Settings" href="/settings" onClick={() => setIsProfileOpen(false)} tabIndex={activeMenuIndex === 3 ? 0 : -1} onMouseEnter={() => setActiveMenuIndex(3)} />
                                         <ThemeToggle variant="menu-item" />
-                                        <div className="h-px bg-zinc-100 dark:bg-white/5 my-2 mx-3"></div>
+                                        <div role="separator" className="h-px bg-zinc-100 dark:bg-white/5 my-2 mx-3"></div>
                                         <MenuItem
                                             icon={<LogOut size={16} />}
                                             text="Log out"
@@ -356,6 +550,8 @@ export default function NavbarClient({ user: initialUser, unreadCount = 0 }: Nav
                                                 signOut({ callbackUrl: '/' });
                                                 setIsProfileOpen(false);
                                             }}
+                                            tabIndex={activeMenuIndex === 7 ? 0 : -1}
+                                            onMouseEnter={() => setActiveMenuIndex(7)}
                                         />
                                     </div>
                                 </div>
@@ -368,11 +564,11 @@ export default function NavbarClient({ user: initialUser, unreadCount = 0 }: Nav
                                 >
                                     Log in
                                 </Link>
-                                <Link href="/signup">
-                                    <Button size="sm" className="rounded-full px-6 h-10 shadow-lg shadow-zinc-900/10">
+                                <Button asChild size="sm" className="rounded-full px-6 h-10 shadow-lg shadow-zinc-900/10">
+                                    <Link href="/signup">
                                         Join
-                                    </Button>
-                                </Link>
+                                    </Link>
+                                </Button>
                             </div>
                         )}
 
@@ -380,7 +576,7 @@ export default function NavbarClient({ user: initialUser, unreadCount = 0 }: Nav
                         <div className="lg:hidden flex items-center">
                             <button
                                 onClick={() => setIsMobileMenuOpen(!isMobileMenuOpen)}
-                                className="text-zinc-900 dark:text-white p-2 transition-colors hover:bg-zinc-100 dark:hover:bg-white/5 rounded-full"
+                                className="text-zinc-900 dark:text-white p-2 transition-colors hover:bg-zinc-100 dark:hover:bg-white/5 rounded-full focus-visible:ring-2 focus-visible:ring-zinc-900/20 focus-visible:ring-offset-2 dark:focus-visible:ring-zinc-400/40"
                                 aria-label={isMobileMenuOpen ? 'Close menu' : 'Open menu'}
                                 aria-expanded={isMobileMenuOpen}
                             >
@@ -393,7 +589,7 @@ export default function NavbarClient({ user: initialUser, unreadCount = 0 }: Nav
 
             {/* Mobile Menu - CSS animated with grid for height:auto animation */}
             <div
-                className={`md:hidden bg-white dark:bg-zinc-950 border-b border-zinc-200 dark:border-white/5 overflow-hidden grid transition-all duration-300 ease-out ${isMobileMenuOpen ? 'grid-rows-[1fr] opacity-100' : 'grid-rows-[0fr] opacity-0'
+                className={`lg:hidden bg-white dark:bg-zinc-950 border-b border-zinc-200 dark:border-white/5 overflow-hidden grid transition-all duration-300 ease-out ${isMobileMenuOpen ? 'grid-rows-[1fr] opacity-100' : 'grid-rows-[0fr] opacity-0'
                     }`}
                 role="dialog"
                 aria-modal={isMobileMenuOpen}
@@ -419,6 +615,7 @@ export default function NavbarClient({ user: initialUser, unreadCount = 0 }: Nav
                             href="/search"
                             className="flex items-center gap-3 py-3 text-base font-medium text-zinc-700 dark:text-zinc-300 hover:text-zinc-900 dark:hover:text-white hover:bg-zinc-50 dark:hover:bg-zinc-800 rounded-lg px-2"
                             onClick={() => setIsMobileMenuOpen(false)}
+                            aria-current={pathname === '/search' ? 'page' : undefined}
                         >
                             <Search size={20} className="text-zinc-400 dark:text-zinc-500" /> Find a Room
                         </Link>
@@ -429,6 +626,7 @@ export default function NavbarClient({ user: initialUser, unreadCount = 0 }: Nav
                                     href="/messages"
                                     className="flex items-center gap-3 py-3 text-base font-medium text-zinc-700 dark:text-zinc-300 hover:text-zinc-900 dark:hover:text-white hover:bg-zinc-50 dark:hover:bg-zinc-800 rounded-lg px-2"
                                     onClick={() => setIsMobileMenuOpen(false)}
+                                    aria-current={pathname === '/messages' ? 'page' : undefined}
                                 >
                                     <MessageSquare size={20} className="text-zinc-400 dark:text-zinc-500" />
                                     Messages
@@ -442,6 +640,7 @@ export default function NavbarClient({ user: initialUser, unreadCount = 0 }: Nav
                                     href="/bookings"
                                     className="flex items-center gap-3 py-3 text-base font-medium text-zinc-700 dark:text-zinc-300 hover:text-zinc-900 dark:hover:text-white hover:bg-zinc-50 dark:hover:bg-zinc-800 rounded-lg px-2"
                                     onClick={() => setIsMobileMenuOpen(false)}
+                                    aria-current={pathname === '/bookings' ? 'page' : undefined}
                                 >
                                     <Calendar size={20} className="text-zinc-400 dark:text-zinc-500" /> Bookings
                                 </Link>
@@ -449,6 +648,7 @@ export default function NavbarClient({ user: initialUser, unreadCount = 0 }: Nav
                                     href="/saved"
                                     className="flex items-center gap-3 py-3 text-base font-medium text-zinc-700 dark:text-zinc-300 hover:text-zinc-900 dark:hover:text-white hover:bg-zinc-50 dark:hover:bg-zinc-800 rounded-lg px-2"
                                     onClick={() => setIsMobileMenuOpen(false)}
+                                    aria-current={pathname === '/saved' ? 'page' : undefined}
                                 >
                                     <Heart size={20} className="text-zinc-400 dark:text-zinc-500" /> Saved Listings
                                 </Link>
@@ -457,12 +657,12 @@ export default function NavbarClient({ user: initialUser, unreadCount = 0 }: Nav
 
                         <hr className="border-zinc-100 dark:border-zinc-800" />
 
-                        <Link href="/listings/create" onClick={() => setIsMobileMenuOpen(false)}>
-                            <Button variant="primary" className="w-full flex items-center justify-center gap-2 px-5 py-3 rounded-xl h-auto shadow-lg shadow-zinc-900/10 dark:shadow-white/10">
+                        <Button asChild variant="primary" className="w-full flex items-center justify-center gap-2 px-5 py-3 rounded-xl h-auto shadow-lg shadow-zinc-900/10 dark:shadow-white/10">
+                            <Link href="/listings/create" onClick={() => setIsMobileMenuOpen(false)}>
                                 <Plus size={18} />
                                 List a Room
-                            </Button>
-                        </Link>
+                            </Link>
+                        </Button>
 
                         {!user && (
                             <div className="flex flex-col gap-2 pt-2">
@@ -473,14 +673,14 @@ export default function NavbarClient({ user: initialUser, unreadCount = 0 }: Nav
                                 >
                                     Log In
                                 </Link>
-                                <Link
-                                    href="/signup"
-                                    onClick={() => setIsMobileMenuOpen(false)}
-                                >
-                                    <Button variant="secondary" className="w-full py-3 rounded-xl h-auto">
+                                <Button asChild variant="secondary" className="w-full py-3 rounded-xl h-auto">
+                                    <Link
+                                        href="/signup"
+                                        onClick={() => setIsMobileMenuOpen(false)}
+                                    >
                                         Sign Up
-                                    </Button>
-                                </Link>
+                                    </Link>
+                                </Button>
                             </div>
                         )}
 

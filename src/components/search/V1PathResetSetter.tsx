@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect } from "react";
-import { useSearchV2Data } from "@/contexts/SearchV2DataContext";
+import { useV2MapDataSetter, useSearchV2Setters } from "@/contexts/SearchV2DataContext";
 
 /**
  * V1PathResetSetter - Resets V2 context state when V1 fallback path runs.
@@ -25,7 +25,8 @@ import { useSearchV2Data } from "@/contexts/SearchV2DataContext";
  * @see PersistentMapWrapper for the race guard that depends on this state
  */
 export function V1PathResetSetter() {
-  const { setV2MapData, setIsV2Enabled, dataVersion } = useSearchV2Data();
+  const { setV2MapData, dataVersion } = useV2MapDataSetter();
+  const { setIsV2Enabled } = useSearchV2Setters();
 
   useEffect(() => {
     // Reset v2 state to signal "v1 mode active"

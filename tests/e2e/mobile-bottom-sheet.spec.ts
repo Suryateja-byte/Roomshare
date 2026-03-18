@@ -343,6 +343,7 @@ test.describe("Mobile Bottom Sheet - Expanded Drag Down (7.3)", () => {
     await content.evaluate((el) => {
       el.scrollTop = 100;
     });
+    // Intentional: DOM scroll mutation settling time
     await page.waitForTimeout(100);
 
     // Verify scroll was applied
