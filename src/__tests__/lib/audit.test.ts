@@ -355,4 +355,48 @@ describe("Audit Logging", () => {
       );
     });
   });
+
+  describe("getAuditLogs edge cases", () => {
+    it("combines multiple filters correctly", async () => {
+      (prisma.auditLog.findMany as jest.Mock).mockResolvedValue([]);
+      (prisma.auditLog.count as jest.Mock).mockResolvedValue(0);
+
+      const startDate = new Date("2025-01-01");
+      await getAuditLogs({
+        adminId: "admin-1",
+        action: "USER_SUSPENDED",
+        targetType: "User",
+        startDate,
+      });
+
+      expect(prisma.auditLog.findMany).toHaveBeenCalledWith(
+        expect.objectContaining({
+          where: expect.objectContaining({
+            adminId: "admin-1",
+            action: "USER_SUSPENDED",
+            targetType: "User",
+          }),
+        })
+      );
+    });
+
+    it("calculates totalPages correctly for partial last page", async () => {
+      (prisma.auditLog.findMany as jest.Mock).mockResolvedValue([]);
+      (prisma.auditLog.count as jest.Mock).mockResolvedValue(25);
+
+      const result = await getAuditLogs({ page: 1, limit: 10 });
+
+      expect(result.pagination.totalPages).toBe(3); // ceil(25/10)
+    });
+
+    it("returns totalPages of 0 when no logs exist", async () => {
+      (prisma.auditLog.findMany as jest.Mock).mockResolvedValue([]);
+      (prisma.auditLog.count as jest.Mock).mockResolvedValue(0);
+
+      const result = await getAuditLogs({ page: 1, limit: 10 });
+
+      expect(result.pagination.totalPages).toBe(0);
+      expect(result.logs).toEqual([]);
+    });
+  });
 });

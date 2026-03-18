@@ -283,4 +283,115 @@ describe("logBookingAudit", () => {
       });
     });
   });
+
+  describe("ADMIN actor type", () => {
+    it("accepts ADMIN actorType with actorId", async () => {
+      const tx = createMockTx();
+      await logBookingAudit(tx, {
+        bookingId: "b-1",
+        action: "CANCELLED",
+        previousStatus: "ACCEPTED",
+        newStatus: "CANCELLED",
+        actorId: "admin-1",
+        actorType: "ADMIN",
+        details: { reason: "policy violation" },
+      });
+
+      expect(tx.bookingAuditLog.create).toHaveBeenCalledWith(
+        expect.objectContaining({
+          data: expect.objectContaining({
+            actorId: "admin-1",
+            actorType: "ADMIN",
+          }),
+        })
+      );
+    });
+  });
+
+  describe("PII stripping edge cases", () => {
+    it("only strips top-level PII keys, not nested values", async () => {
+      const tx = createMockTx();
+      await logBookingAudit(tx, {
+        bookingId: "b-1",
+        action: "CREATED",
+        previousStatus: null,
+        newStatus: "PENDING",
+        actorId: "u-1",
+        actorType: "USER",
+        details: {
+          slotsRequested: 1,
+          nested: { email: "should-still-exist@test.com" },
+        },
+      });
+
+      const callData = tx.bookingAuditLog.create.mock.calls[0][0].data;
+      // stripPii only strips top-level keys, nested objects pass through
+      expect(callData.details).toHaveProperty("nested");
+      expect(callData.details.nested).toHaveProperty("email");
+    });
+
+    it("handles undefined details gracefully", async () => {
+      const tx = createMockTx();
+      await logBookingAudit(tx, {
+        bookingId: "b-1",
+        action: "CREATED",
+        previousStatus: null,
+        newStatus: "PENDING",
+        actorId: "u-1",
+        actorType: "USER",
+        // details intentionally omitted
+      });
+
+      expect(tx.bookingAuditLog.create).toHaveBeenCalledWith(
+        expect.objectContaining({
+          data: expect.objectContaining({
+            details: undefined,
+          }),
+        })
+      );
+    });
+
+    it("handles empty details object", async () => {
+      const tx = createMockTx();
+      await logBookingAudit(tx, {
+        bookingId: "b-1",
+        action: "CREATED",
+        previousStatus: null,
+        newStatus: "PENDING",
+        actorId: "u-1",
+        actorType: "USER",
+        details: {},
+      });
+
+      const callData = tx.bookingAuditLog.create.mock.calls[0][0].data;
+      expect(callData.details).toEqual({});
+    });
+
+    it("strips all PII keys while preserving non-PII keys", async () => {
+      const tx = createMockTx();
+      await logBookingAudit(tx, {
+        bookingId: "b-1",
+        action: "CREATED",
+        previousStatus: null,
+        newStatus: "PENDING",
+        actorId: "u-1",
+        actorType: "USER",
+        details: {
+          email: "test@test.com",
+          phone: "555-1234",
+          name: "John",
+          slotsRequested: 2,
+          listingId: "listing-1",
+          hostEmail: "host@test.com",
+          tenantName: "Jane",
+        },
+      });
+
+      const callData = tx.bookingAuditLog.create.mock.calls[0][0].data;
+      expect(callData.details).toEqual({
+        slotsRequested: 2,
+        listingId: "listing-1",
+      });
+    });
+  });
 });

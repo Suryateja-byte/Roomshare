@@ -63,4 +63,24 @@ describe("getListingAvailability", () => {
     expect(result?.ghostHolds).toBe(0);
     expect(result?.availableSlots).toBe(result?.effectiveAvailable);
   });
+
+  it("propagates database errors", async () => {
+    (prisma.$queryRaw as jest.Mock).mockRejectedValueOnce(
+      new Error("Connection refused")
+    );
+
+    await expect(
+      getListingAvailability("listing-123")
+    ).rejects.toThrow("Connection refused");
+  });
+
+  it("handles undefined result from destructuring", async () => {
+    // When $queryRaw returns an array with undefined first element
+    (prisma.$queryRaw as jest.Mock).mockResolvedValueOnce([undefined]);
+
+    const result = await getListingAvailability("listing-123");
+
+    // undefined || null → null
+    expect(result).toBeNull();
+  });
 });

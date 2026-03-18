@@ -26,7 +26,6 @@ describe("booking-utils", () => {
   };
 
   const futureDate = new Date(Date.now() + 30 * 24 * 60 * 60 * 1000);
-  const pastDate = new Date(Date.now() - 30 * 24 * 60 * 60 * 1000);
 
   const mockBookings = [
     {
@@ -220,6 +219,38 @@ describe("booking-utils", () => {
           }),
         })
       );
+    });
+  });
+
+  describe("error handling", () => {
+    it("propagates database errors from findMany", async () => {
+      (prisma.booking.findMany as jest.Mock).mockRejectedValue(
+        new Error("Connection refused")
+      );
+
+      await expect(
+        getActiveBookingsForListing("listing-123")
+      ).rejects.toThrow("Connection refused");
+    });
+
+    it("propagates database errors from count", async () => {
+      (prisma.booking.count as jest.Mock).mockRejectedValue(
+        new Error("Connection refused")
+      );
+
+      await expect(
+        hasActiveAcceptedBookings("listing-123")
+      ).rejects.toThrow("Connection refused");
+    });
+
+    it("propagates database errors from getActiveAcceptedBookingsCount", async () => {
+      (prisma.booking.count as jest.Mock).mockRejectedValue(
+        new Error("Query timeout")
+      );
+
+      await expect(
+        getActiveAcceptedBookingsCount("listing-123")
+      ).rejects.toThrow("Query timeout");
     });
   });
 });
