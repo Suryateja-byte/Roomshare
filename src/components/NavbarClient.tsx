@@ -540,7 +540,7 @@ export default function NavbarClient({ user: initialUser, unreadCount = 0 }: Nav
                                         <MenuItem icon={<Heart size={16} />} text="Saved" href="/saved" onClick={() => setIsProfileOpen(false)} tabIndex={activeMenuIndex === 2 ? 0 : -1} onMouseEnter={() => setActiveMenuIndex(2)} />
                                         <div role="separator" className="h-px bg-zinc-100 dark:bg-white/5 my-2 mx-3"></div>
                                         <MenuItem icon={<Settings size={16} />} text="Settings" href="/settings" onClick={() => setIsProfileOpen(false)} tabIndex={activeMenuIndex === 3 ? 0 : -1} onMouseEnter={() => setActiveMenuIndex(3)} />
-                                        <ThemeToggle variant="menu-item" />
+                                        <ThemeToggle variant="menu-item" onMenuItemMouseEnter={(offset) => setActiveMenuIndex(4 + offset)} />
                                         <div role="separator" className="h-px bg-zinc-100 dark:bg-white/5 my-2 mx-3"></div>
                                         <MenuItem
                                             icon={<LogOut size={16} />}

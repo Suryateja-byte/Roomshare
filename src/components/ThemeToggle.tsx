@@ -6,9 +6,11 @@ import { useEffect, useState } from 'react';
 
 interface ThemeToggleProps {
     variant?: 'button' | 'menu-item';
+    /** Called when user hovers a menuitemradio — syncs parent's roving tabindex */
+    onMenuItemMouseEnter?: (offset: number) => void;
 }
 
-export default function ThemeToggle({ variant = 'button' }: ThemeToggleProps) {
+export default function ThemeToggle({ variant = 'button', onMenuItemMouseEnter }: ThemeToggleProps) {
     const { theme, setTheme, resolvedTheme } = useTheme();
     const [mounted, setMounted] = useState(false);
 
@@ -48,6 +50,7 @@ export default function ThemeToggle({ variant = 'button' }: ThemeToggleProps) {
                         aria-checked={theme === 'light'}
                         tabIndex={-1}
                         onClick={() => setTheme('light')}
+                        onMouseEnter={() => onMenuItemMouseEnter?.(0)}
                         className={`flex-1 flex items-center justify-center gap-1.5 px-2 py-1.5 rounded-md text-xs font-medium transition-colors focus-visible:ring-2 focus-visible:ring-zinc-900/20 focus-visible:ring-offset-2 dark:focus-visible:ring-zinc-400/40 ${
                             theme === 'light'
                                 ? 'bg-zinc-900 text-white dark:bg-white dark:text-zinc-900'
@@ -62,6 +65,7 @@ export default function ThemeToggle({ variant = 'button' }: ThemeToggleProps) {
                         aria-checked={theme === 'dark'}
                         tabIndex={-1}
                         onClick={() => setTheme('dark')}
+                        onMouseEnter={() => onMenuItemMouseEnter?.(1)}
                         className={`flex-1 flex items-center justify-center gap-1.5 px-2 py-1.5 rounded-md text-xs font-medium transition-colors focus-visible:ring-2 focus-visible:ring-zinc-900/20 focus-visible:ring-offset-2 dark:focus-visible:ring-zinc-400/40 ${
                             theme === 'dark'
                                 ? 'bg-zinc-900 text-white dark:bg-white dark:text-zinc-900'
@@ -76,6 +80,7 @@ export default function ThemeToggle({ variant = 'button' }: ThemeToggleProps) {
                         aria-checked={theme === 'system'}
                         tabIndex={-1}
                         onClick={() => setTheme('system')}
+                        onMouseEnter={() => onMenuItemMouseEnter?.(2)}
                         className={`flex-1 flex items-center justify-center gap-1.5 px-2 py-1.5 rounded-md text-xs font-medium transition-colors focus-visible:ring-2 focus-visible:ring-zinc-900/20 focus-visible:ring-offset-2 dark:focus-visible:ring-zinc-400/40 ${
                             theme === 'system'
                                 ? 'bg-zinc-900 text-white dark:bg-white dark:text-zinc-900'
