@@ -114,13 +114,15 @@ test.describe("Create Listing — Accessibility Tests", () => {
     }
 
     // Open the move-in date picker popover (button trigger)
-    // DatePicker has a `mounted` guard — wait for the Radix Popover.Trigger to hydrate
+    // DatePicker has a `mounted` guard — wait for the Radix Popover.Trigger to hydrate.
+    // Radix unmounts/remounts during hydration, so we must wait for stable DOM
+    // before scrolling (scrollIntoViewIfNeeded fails if element detaches mid-scroll).
     const datePickerTrigger = page.locator("#moveInDate");
-    await datePickerTrigger.scrollIntoViewIfNeeded();
     // Wait for Radix Popover.Trigger to be ready (it adds data-state attribute once mounted)
     await expect(datePickerTrigger).toHaveAttribute("data-state", "closed", {
       timeout: 10000,
     });
+    await datePickerTrigger.scrollIntoViewIfNeeded();
     await datePickerTrigger.click();
 
     // Wait for calendar popover content to render (Radix Portal)
