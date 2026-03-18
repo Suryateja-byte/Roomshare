@@ -2,7 +2,7 @@
 
 import { useState, useEffect, useCallback } from 'react';
 import { useRouter, useSearchParams } from 'next/navigation';
-import { SortOption } from '@/lib/data';
+import type { SortOption } from '@/lib/data';
 import { useSearchTransitionSafe } from '@/contexts/SearchTransitionContext';
 import { ArrowUpDown, Check } from 'lucide-react';
 import { FocusTrap } from '@/components/ui/FocusTrap';
