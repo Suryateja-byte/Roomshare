@@ -254,6 +254,7 @@ export function PlaceDetailsPanel({
 
 // Declare the custom elements for TypeScript
 declare global {
+  // eslint-disable-next-line @typescript-eslint/no-namespace -- required for custom element type declaration
   namespace JSX {
     interface IntrinsicElements {
       'gmp-place-details-compact': React.DetailedHTMLProps<

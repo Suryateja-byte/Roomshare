@@ -139,7 +139,7 @@ function SignUpForm() {
                             setError('');
                             try {
                                 await signIn('google', { callbackUrl: '/' });
-                            } catch (err) {
+                            } catch (_err) {
                                 setError('Failed to initiate Google sign-up. Please try again.');
                                 setGoogleLoading(false);
                             }

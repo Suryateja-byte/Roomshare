@@ -356,6 +356,7 @@ export default function ImageUploader({
                 <div className={`${canAddMore ? 'mt-6' : ''} grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 gap-4 animate-in fade-in duration-300`}>
                     {images.map((image, index) => (
                         <div key={image.id} className="group relative aspect-square rounded-xl overflow-hidden border border-zinc-200 dark:border-zinc-700 bg-zinc-100 dark:bg-zinc-800 shadow-sm">
+                            {/* eslint-disable-next-line @next/next/no-img-element -- blob URL preview not compatible with next/image */}
                             <img
                                 src={image.previewUrl}
                                 alt={`Preview ${index + 1}`}

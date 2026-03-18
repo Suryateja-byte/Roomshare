@@ -78,7 +78,7 @@ export default function ProfileCompletionModal({
                 {/* Missing items */}
                 <div className="mb-6">
                     <h3 className="text-sm font-medium text-zinc-700 dark:text-zinc-300 mb-3">
-                        What's missing:
+                        What&apos;s missing:
                     </h3>
                     <ul className="space-y-2">
                         {missing.map((item, index) => (

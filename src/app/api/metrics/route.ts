@@ -1,10 +1,10 @@
-import crypto from 'crypto';
 import { NextResponse } from 'next/server';
 import * as Sentry from '@sentry/nextjs';
 import { checkMetricsRateLimit } from '@/lib/rate-limit-redis';
 import { getClientIP } from '@/lib/rate-limit';
 import { isOriginAllowed, isHostAllowed } from '@/lib/origin-guard';
 import { logger, sanitizeErrorMessage } from '@/lib/logger';
+import { hmacListingId, hasHmacSecret } from './hmac';
 
 /**
  * Metrics API Route - Privacy-Safe Logging
@@ -29,7 +29,6 @@ import { logger, sanitizeErrorMessage } from '@/lib/logger';
 // CRITICAL: Force Node.js runtime for crypto HMAC support
 export const runtime = 'nodejs';
 
-const LOG_HMAC_SECRET = process.env.LOG_HMAC_SECRET || '';
 const MAX_BODY_SIZE = 10_000; // Much smaller than chat - metrics should be tiny
 
 // ============ ALLOWLISTED GOOGLE PLACE TYPES ============
@@ -68,12 +67,6 @@ const ALLOWED_PLACE_TYPES = new Set([
   'museum',
   'art_gallery',
 ]);
-
-// ============ HMAC ============
-
-function hmacListingId(listingId: string): string {
-  return crypto.createHmac('sha256', LOG_HMAC_SECRET).update(listingId).digest('hex').slice(0, 16);
-}
 
 // ============ STRICT SCHEMA VALIDATION ============
 
@@ -225,12 +218,13 @@ export async function POST(request: Request) {
     const payload = validation.payload;
 
     // 7. FAIL CLOSED - do not log if secret is missing
-    if (!LOG_HMAC_SECRET) {
+    if (!hasHmacSecret()) {
       // Accept request but skip logging entirely
       return NextResponse.json({ ok: true });
     }
 
     // 8. COMPUTE HMAC - raw listingId NEVER stored
+    // eslint-disable-next-line @typescript-eslint/no-unused-vars -- prepared for analyticsService integration
     const safeLog = {
       ts: Date.now(),
       lid: hmacListingId(payload.listingId),
@@ -242,11 +236,6 @@ export async function POST(request: Request) {
       ...(payload.types && !payload.blocked && { types: payload.types }),
       ...(payload.count !== undefined && !payload.blocked && { count: payload.count }),
     };
-
-    // 8. Log to console in dev, send to analytics service in prod
-    if (process.env.NODE_ENV === 'development') {
-      console.log('[SafeMetrics]', safeLog);
-    }
 
     // Production: send to Supabase, BigQuery, etc.
     // await analyticsService.log(safeLog);

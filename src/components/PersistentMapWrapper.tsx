@@ -828,6 +828,7 @@ export default function PersistentMapWrapper({
         abortControllerRef.current.abort();
       }
     };
+  // eslint-disable-next-line react-hooks/exhaustive-deps -- intentional dependency omission to prevent infinite loops
   }, [searchParams, fetchListings, shouldRenderMap, isV2Enabled, hasV2Data]);
 
   // Proactive fetching during map pan (triggered via activePanBounds)

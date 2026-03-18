@@ -3,9 +3,8 @@
 import { useState } from 'react';
 import { deleteSavedSearch, toggleSearchAlert } from '@/app/actions/saved-search';
 import { buildSearchUrl, type SearchFilters } from '@/lib/search-utils';
-import { Bell, BellOff, Trash2, ExternalLink, Loader2, Edit2, Check, X } from 'lucide-react';
+import { Bell, BellOff, Trash2, ExternalLink, Loader2 } from 'lucide-react';
 import Link from 'next/link';
-import { useRouter } from 'next/navigation';
 
 interface SavedSearch {
     id: string;
@@ -24,9 +23,6 @@ interface SavedSearchListProps {
 export default function SavedSearchList({ initialSearches }: SavedSearchListProps) {
     const [searches, setSearches] = useState(initialSearches);
     const [loadingId, setLoadingId] = useState<string | null>(null);
-    const [editingId, setEditingId] = useState<string | null>(null);
-    const [editName, setEditName] = useState('');
-    const router = useRouter();
 
     const handleToggleAlert = async (id: string, currentEnabled: boolean) => {
         setLoadingId(id);
@@ -106,7 +102,7 @@ export default function SavedSearchList({ initialSearches }: SavedSearchListProp
                                 </p>
                                 {search.query && (
                                     <p className="text-sm text-zinc-400 mt-1">
-                                        Search: "{search.query}"
+                                        Search: &quot;{search.query}&quot;
                                     </p>
                                 )}
                             </div>

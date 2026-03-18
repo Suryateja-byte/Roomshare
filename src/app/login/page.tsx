@@ -70,7 +70,7 @@ function LoginForm() {
                 // Force full page reload to ensure fresh session from layout
                 window.location.href = '/';
             }
-        } catch (err) {
+        } catch (_err) {
             setError('An error occurred');
             turnstileRef.current?.reset();
             setTurnstileToken('');
@@ -90,7 +90,7 @@ function LoginForm() {
                 </div>
                 <div className="relative z-10 max-w-md">
                     <h2 className="text-2xl xl:text-3xl font-medium leading-tight">
-                        "The verification process made me feel so much safer finding a roommate."
+                        &quot;The verification process made me feel so much safer finding a roommate.&quot;
                     </h2>
                     <div className="mt-8 flex items-center gap-4">
                         <div className="w-10 h-10 rounded-full bg-zinc-800 flex items-center justify-center border border-zinc-700">
@@ -137,7 +137,7 @@ function LoginForm() {
                                     await signOut({ redirect: false });
                                 }
                                 await signIn('google', { callbackUrl: '/' });
-                            } catch (err) {
+                            } catch (_err) {
                                 setError('Failed to initiate Google sign-in. Please try again.');
                                 setGoogleLoading(false);
                             }
@@ -266,7 +266,7 @@ function LoginForm() {
                     </form>
 
                     <p className="text-center text-sm text-zinc-500 dark:text-zinc-400">
-                        Don't have an account?{' '}
+                        Don&apos;t have an account?{' '}
                         <Link href="/signup" className="font-semibold text-zinc-900 dark:text-white hover:underline">
                             Sign up
                         </Link>

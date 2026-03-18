@@ -2,7 +2,7 @@ import { NextRequest, NextResponse } from 'next/server';
 import { auth } from '@/auth';
 import { createClient } from '@supabase/supabase-js';
 import { withRateLimit } from '@/lib/with-rate-limit';
-import { captureApiError, apiErrorResponse } from '@/lib/api-error-handler';
+import { captureApiError } from '@/lib/api-error-handler';
 import { logger } from '@/lib/logger';
 import { z } from 'zod';
 import sharp from 'sharp';

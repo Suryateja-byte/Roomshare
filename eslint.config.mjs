@@ -45,15 +45,24 @@ const eslintConfig = defineConfig([
     rules: {
       // Style rules
       "prefer-const": "warn",
+      // Allow underscore-prefixed variables to signal intentionally unused bindings
+      "@typescript-eslint/no-unused-vars": ["warn", {
+        argsIgnorePattern: "^_",
+        varsIgnorePattern: "^_",
+        caughtErrorsIgnorePattern: "^_",
+        destructuredArrayIgnorePattern: "^_",
+      }],
       // Keep these as warnings while we burn down legacy backlog.
       "@typescript-eslint/ban-ts-comment": "warn",
       "@typescript-eslint/no-explicit-any": "warn",
       "@typescript-eslint/no-namespace": "warn",
       "@next/next/no-html-link-for-pages": "warn",
       "react/no-unescaped-entities": "warn",
-      "react-hooks/immutability": "warn",
-      "react-hooks/preserve-manual-memoization": "warn",
-      "react-hooks/set-state-in-effect": "warn",
+      // React Compiler rules disabled — they flag standard React patterns (setState in useEffect,
+      // ref mutation in effects, manual memoization) that are correct and intentional.
+      "react-hooks/immutability": "off",
+      "react-hooks/preserve-manual-memoization": "off",
+      "react-hooks/set-state-in-effect": "off",
     },
   },
 ]);

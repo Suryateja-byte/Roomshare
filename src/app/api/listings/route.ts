@@ -18,7 +18,6 @@ import { upsertSearchDocSync } from '@/lib/search/search-doc-sync';
 import { triggerInstantAlerts } from '@/lib/search-alerts';
 import { captureApiError } from '@/lib/api-error-handler';
 import { isCircuitOpenError } from '@/lib/circuit-breaker';
-import { normalizeStringList } from '@/lib/utils';
 import { calculateProfileCompletion, PROFILE_REQUIREMENTS } from '@/lib/profile-completion';
 import { features } from '@/lib/env';
 import { syncListingEmbedding } from '@/lib/embeddings/sync';
@@ -153,6 +152,7 @@ export async function POST(request: Request) {
         }
 
         // 6b. Profile completion check (BE-M2)
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any -- Prisma select subset doesn't match full User type expected by calculateProfileCompletion
         const completion = calculateProfileCompletion(user as any);
         if (completion.percentage < PROFILE_REQUIREMENTS.createListing) {
             await logger.warn('Listing create blocked: incomplete profile', {

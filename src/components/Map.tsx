@@ -616,11 +616,6 @@ export default function MapComponent({
 
             // Increment init count each time component mounts
             roomshare.mapInitCount = ((roomshare.mapInitCount as number) || 0) + 1;
-
-            console.log('[Map E2E] Component mounted', {
-                instanceId: roomshare.mapInstanceId,
-                initCount: roomshare.mapInitCount
-            });
         }
     }, []); // Empty deps = only on mount
 

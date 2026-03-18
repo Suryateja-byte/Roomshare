@@ -1044,7 +1044,7 @@ export default function CreateListingForm({ enableWholeUnitMode = false }: Creat
                             'Publish Listing'
                         )}
                     </Button>
-                    {/* TODO: Create /terms and /community-guidelines pages */}
+                    {/* TODO: Create /community-guidelines page (terms page already exists) */}
                     <p className="text-center text-xs text-zinc-400 dark:text-zinc-500 mt-4">
                         By publishing, you agree to our{' '}
                         <a href="/terms" className="underline hover:text-primary-700">Terms of Service</a>

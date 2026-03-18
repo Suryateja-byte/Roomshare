@@ -20,7 +20,7 @@ import { Input } from '@/components/ui/input';
 import { Textarea } from '@/components/ui/textarea';
 import { Label } from '@/components/ui/label';
 import { updateProfile } from '@/app/actions/profile';
-import { useFormPersistence, formatTimeSince } from '@/hooks/useFormPersistence';
+import { useFormPersistence } from '@/hooks/useFormPersistence';
 
 
 type UserProfile = {
@@ -97,8 +97,8 @@ export default function EditProfileClient({ user }: EditProfileClientProps) {
             }
 
             setImageUrl(data.url);
-        } catch (err) {
-            setError(err instanceof Error ? err.message : 'Upload failed');
+        } catch (_err) {
+            setError(_err instanceof Error ? _err.message : 'Upload failed');
         } finally {
             setIsUploading(false);
             // Reset input so same file can be selected again
@@ -158,7 +158,7 @@ export default function EditProfileClient({ user }: EditProfileClientProps) {
                     router.push('/profile');
                 }, 1500);
             }
-        } catch (err) {
+        } catch (_err) {
             setError('An unexpected error occurred');
         } finally {
             setIsLoading(false);
@@ -198,6 +198,7 @@ export default function EditProfileClient({ user }: EditProfileClientProps) {
                             <div className="relative group">
                                 <div className="w-28 h-28 rounded-full overflow-hidden bg-zinc-100 dark:bg-zinc-800 ring-4 ring-zinc-50 dark:ring-zinc-900 border border-zinc-200 dark:border-zinc-700">
                                     {(imageUrl || user.image) ? (
+                                        /* eslint-disable-next-line @next/next/no-img-element -- profile image may be blob URL during upload */
                                         <img
                                             src={imageUrl || user.image || ''}
                                             alt="Profile"

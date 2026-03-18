@@ -1,7 +1,7 @@
 'use client';
 
 import { useState } from 'react';
-import { Star, MessageSquare, MoreVertical, Edit2, Trash2 } from 'lucide-react';
+import { Star, MessageSquare, Edit2, Trash2 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import UserAvatar from './UserAvatar';
 import ReviewResponseForm from './ReviewResponseForm';

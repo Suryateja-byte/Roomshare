@@ -2,7 +2,7 @@
 
 import { useState } from 'react';
 import Link from 'next/link';
-import { AlertTriangle, X, ChevronRight, User } from 'lucide-react';
+import { X, ChevronRight, User } from 'lucide-react';
 
 interface ProfileWarningBannerProps {
     percentage: number;

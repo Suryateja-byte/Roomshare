@@ -16,7 +16,7 @@ import {
     CheckCircle2,
     XCircle
 } from 'lucide-react';
-import { useRouter } from 'next/navigation';
+
 
 interface VerificationRequest {
     id: string;
@@ -60,8 +60,6 @@ export default function VerificationList({ initialRequests }: VerificationListPr
     const [rejectingId, setRejectingId] = useState<string | null>(null);
     const [rejectReason, setRejectReason] = useState('');
     const [filter, setFilter] = useState<'all' | 'PENDING' | 'APPROVED' | 'REJECTED'>('all');
-    const router = useRouter();
-
     const handleApprove = async (requestId: string) => {
         setProcessingId(requestId);
         try {

@@ -33,6 +33,7 @@ interface TeamMemberProps {
 const TeamMember = ({ name, role, image }: TeamMemberProps) => (
     <div className="group">
         <div className="relative aspect-[3/4] overflow-hidden rounded-2xl bg-zinc-100 dark:bg-zinc-800 mb-4">
+            {/* eslint-disable-next-line @next/next/no-img-element -- team member images are static placeholders */}
             <img
                 src={image}
                 alt={name}
@@ -71,6 +72,7 @@ export default function AboutPage() {
                     {/* Hero Image */}
                     <div className="mt-24 container mx-auto max-w-[1600px] px-0 md:px-6">
                         <div className="relative aspect-[21/9] rounded-[3rem] overflow-hidden shadow-2xl shadow-zinc-200 dark:shadow-zinc-900">
+                            {/* eslint-disable-next-line @next/next/no-img-element -- external Unsplash image; next/image would need domain config */}
                             <img
                                 src="https://images.unsplash.com/photo-1529156069898-49953e39b3ac?q=80&w=2832&auto=format&fit=crop"
                                 alt="Friends hanging out in apartment"

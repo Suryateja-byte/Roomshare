@@ -7,19 +7,12 @@ import {
     Star,
     ShieldCheck,
     CheckCircle2,
-    Settings,
     LogOut,
     Edit2,
-    Briefcase,
-    GraduationCap,
     Languages,
-    ArrowLeft,
-    Share2,
     MapPin,
-    MessageSquare,
     ChevronRight,
     Loader2,
-    ImageOff,
     Home
 } from 'lucide-react';
 import { signOut } from 'next-auth/react';
@@ -135,7 +128,6 @@ const ListingCard = ({ listing }: { listing: UserWithListings['listings'][0] }) 
 
 // --- Main Component ---
 export default function ProfileClient({ user }: { user: UserWithListings }) {
-    const [isEditing, setIsEditing] = useState(false);
     const [isLoggingOut, setIsLoggingOut] = useState(false);
 
     const handleEdit = () => {
@@ -240,8 +232,7 @@ export default function ProfileClient({ user }: { user: UserWithListings }) {
                                     <button
                                         data-testid="edit-profile-link"
                                         onClick={handleEdit}
-                                        disabled={isEditing}
-                                        className="h-10 px-6 rounded-full border border-zinc-200 dark:border-zinc-700 text-sm font-bold text-zinc-900 dark:text-white hover:bg-zinc-50 dark:hover:bg-zinc-800 transition-colors flex items-center gap-2 disabled:opacity-60"
+                                        className="h-10 px-6 rounded-full border border-zinc-200 dark:border-zinc-700 text-sm font-bold text-zinc-900 dark:text-white hover:bg-zinc-50 dark:hover:bg-zinc-800 transition-colors flex items-center gap-2"
                                     >
                                         <Edit2 className="w-4 h-4" /> Edit Profile
                                     </button>

@@ -11,7 +11,6 @@ import {
     MapPin,
     Languages,
     MessageSquare,
-    Flag,
     Calendar,
     Home
 } from 'lucide-react';
@@ -85,6 +84,7 @@ const ListingCard = ({ listing }: { listing: UserWithDetails['listings'][0] }) =
         <Link href={`/listings/${listing.id}`}>
             <div className="group relative flex flex-col gap-3 p-3 rounded-2xl bg-white dark:bg-zinc-900 border border-zinc-100 dark:border-zinc-800 hover:border-zinc-200 dark:hover:border-zinc-700 shadow-sm hover:shadow-md transition-all cursor-pointer">
                 <div className="relative aspect-[16/9] rounded-xl overflow-hidden bg-zinc-100 dark:bg-zinc-800">
+                    {/* eslint-disable-next-line @next/next/no-img-element -- listing images from Supabase CDN; using img for simpler sizing */}
                     <img
                         src={imageUrl}
                         alt={listing.title}

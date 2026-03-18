@@ -144,6 +144,7 @@ export function NeighborhoodMap({
   const [isMapLoaded, setIsMapLoaded] = useState(false);
   const [isDarkMode, setIsDarkMode] = useState(false);
   const [popupPoi, setPopupPoi] = useState<POI | null>(null);
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any -- MapRef type from react-map-gl is complex and version-dependent
   const mapRef = useRef<any>(null);
 
   // Initial zoom level based on POI spread
@@ -254,6 +255,7 @@ export function NeighborhoodMap({
   }, [pois]);
 
   // Handle cluster click to zoom
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any -- react-map-gl MapLayerMouseEvent type is complex and version-dependent
   const onClusterClick = useCallback(async (event: any) => {
     const feature = event.features?.[0];
     if (!feature || !mapRef.current) return;

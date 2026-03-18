@@ -61,8 +61,6 @@ export async function sendEmail({ to, subject, html, text }: EmailOptions): Prom
     const RESEND_API_KEY = process.env.RESEND_API_KEY;
     if (!RESEND_API_KEY) {
         console.warn('RESEND_API_KEY not configured. Email not sent:', { subject });
-        // In development, just log the email (no PII — omit recipient address)
-        console.log('Email would be sent:', { subject, htmlLength: html.length });
         return { success: true }; // Return success in dev mode
     }
 

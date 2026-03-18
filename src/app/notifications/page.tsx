@@ -17,5 +17,6 @@ export default async function NotificationsPage() {
 
     const { notifications, hasMore } = await getNotifications(20);
 
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any -- Prisma return type includes Json fields that need runtime casting
     return <NotificationsClient initialNotifications={notifications as any} initialHasMore={hasMore} />;
 }

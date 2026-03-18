@@ -75,7 +75,7 @@ export async function DELETE(
 
         // Wrap ownership check + delete in interactive transaction with FOR UPDATE
         // to prevent TOCTOU race between check and delete
-        let listingTitle: string | null = null;
+        let _listingTitle: string | null = null;
         let listingImages: string[] = [];
         let pendingBookings: { id: string; tenantId: string }[] = [];
 
@@ -92,7 +92,7 @@ export async function DELETE(
                     throw new Error('NOT_FOUND_OR_UNAUTHORIZED');
                 }
 
-                listingTitle = listing.title;
+                _listingTitle = listing.title;
                 listingImages = listing.images || [];
 
                 // Check for active ACCEPTED bookings - block deletion if any exist

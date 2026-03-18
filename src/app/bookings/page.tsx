@@ -28,6 +28,7 @@ export default async function BookingsPage() {
     }
 
     // Convert Prisma Decimal fields to plain numbers at the query boundary
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any -- Prisma Decimal→number conversion at query boundary
     const convertBooking = (b: any) => ({
         ...b,
         totalPrice: Number(b.totalPrice),

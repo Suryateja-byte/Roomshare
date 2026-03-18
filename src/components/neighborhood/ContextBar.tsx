@@ -92,7 +92,7 @@ export function ContextBar({ meta, isLoading, queryText }: ContextBarProps) {
         <>
           <span className="text-muted-foreground/40 hidden sm:inline" aria-hidden="true">•</span>
           <span className="hidden sm:inline text-xs opacity-70" title={`Search: ${queryText}`}>
-            "{queryText}"
+            &quot;{queryText}&quot;
           </span>
         </>
       )}

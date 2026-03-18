@@ -2,7 +2,6 @@ import { NextResponse } from 'next/server';
 import { prisma } from '@/lib/prisma';
 import { auth } from '@/auth';
 import { withRateLimit } from '@/lib/with-rate-limit';
-import { logger } from '@/lib/logger';
 import { captureApiError } from '@/lib/api-error-handler';
 import { z } from 'zod';
 

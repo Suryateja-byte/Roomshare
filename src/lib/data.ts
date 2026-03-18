@@ -514,6 +514,7 @@ export async function getListings(
       LIMIT ${MAX_RESULTS_CAP}
     `;
 
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any -- Raw SQL query returns untyped rows; mapped to ListingData below
     const listings = await prisma.$queryRawUnsafe<any[]>(sqlQuery, ...queryParams);
 
     return listings.map((l) => ({
@@ -773,6 +774,7 @@ export async function getMapListings(
     `;
 
   try {
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any -- Raw SQL query returns untyped rows; mapped to ListingData below
     const listings = await prisma.$queryRawUnsafe<any[]>(
       sqlQuery,
       ...queryParams,
@@ -1090,6 +1092,7 @@ export async function getListingsPaginated(
     // Execute both queries concurrently
     const [countResult, listings] = await Promise.all([
       prisma.$queryRawUnsafe<{ total: bigint }[]>(countQuery, ...queryParams),
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any -- Raw SQL query returns untyped rows
       prisma.$queryRawUnsafe<any[]>(dataQuery, ...dataParams),
     ]);
 

@@ -463,105 +463,36 @@ describe('POST /api/metrics', () => {
   // ============================================================
 
   describe('HMAC computation', () => {
-    function loadFreshPostWithSecret(secret: string): () => typeof POST {
-      let freshPost!: typeof POST;
+    function loadFreshHmac(secret: string): (listingId: string) => string {
+      let freshHmac!: (listingId: string) => string;
       jest.isolateModules(() => {
-        // Re-register dependency mocks for the freshly loaded module
-        jest.mock('@/lib/origin-guard', () => ({
-          isOriginAllowed: () => true,
-          isHostAllowed: () => true,
-        }));
-        jest.mock('@/lib/rate-limit-redis', () => ({
-          checkMetricsRateLimit: () => Promise.resolve({ success: true }),
-        }));
-        jest.mock('@/lib/rate-limit', () => ({
-          getClientIP: () => '127.0.0.1',
-        }));
-        jest.mock('@/lib/logger', () => ({
-          logger: { sync: { error: jest.fn() } },
-          sanitizeErrorMessage: (e: unknown) => String(e),
-        }));
-        jest.mock('@sentry/nextjs', () => ({
-          captureException: jest.fn(),
-          withScope: jest.fn(),
-        }), { virtual: true });
-        jest.mock('next/server', () => ({
-          NextResponse: {
-            json: (data: unknown, init?: { status?: number }) => {
-              return new Response(JSON.stringify(data), {
-                status: init?.status ?? 200,
-                headers: { 'content-type': 'application/json' },
-              });
-            },
-          },
-        }));
-
-        process.env = { ...originalEnv, LOG_HMAC_SECRET: secret, NODE_ENV: 'development' };
+        process.env = { ...originalEnv, LOG_HMAC_SECRET: secret };
         // eslint-disable-next-line @typescript-eslint/no-var-requires
-        freshPost = require('@/app/api/metrics/route').POST;
+        freshHmac = require('@/app/api/metrics/hmac').hmacListingId;
       });
-      return () => freshPost;
+      return freshHmac;
     }
 
-    it('produces a 16 hex-character hash when secret is set', async () => {
-      process.env = { ...originalEnv, LOG_HMAC_SECRET: 'test-secret-value', NODE_ENV: 'development' };
-      const getPost = loadFreshPostWithSecret('test-secret-value');
-
-      const consoleSpy = jest.spyOn(console, 'log').mockImplementation(() => {});
-      try {
-        const req = makeRequest(VALID_PAYLOAD);
-        await getPost()(req);
-
-        const calls = consoleSpy.mock.calls;
-        const metricsCall = calls.find((c) => c[0] === '[SafeMetrics]');
-        expect(metricsCall).toBeDefined();
-        const safeLog = metricsCall![1] as Record<string, unknown>;
-        expect(typeof safeLog.lid).toBe('string');
-        expect(safeLog.lid as string).toHaveLength(16);
-        expect(safeLog.lid as string).toMatch(/^[0-9a-f]{16}$/);
-      } finally {
-        consoleSpy.mockRestore();
-        process.env = originalEnv;
-      }
+    it('produces a 16 hex-character hash when secret is set', () => {
+      const hmac = loadFreshHmac('test-secret-value');
+      const lid = hmac('listing-123');
+      expect(typeof lid).toBe('string');
+      expect(lid).toHaveLength(16);
+      expect(lid).toMatch(/^[0-9a-f]{16}$/);
     });
 
-    it('produces different hashes for different listingIds', async () => {
-      process.env = { ...originalEnv, LOG_HMAC_SECRET: 'test-secret-value', NODE_ENV: 'development' };
-      const getPost = loadFreshPostWithSecret('test-secret-value');
-
-      const consoleSpy = jest.spyOn(console, 'log').mockImplementation(() => {});
-      try {
-        await getPost()(makeRequest({ ...VALID_PAYLOAD, listingId: 'listing-aaa' }));
-        await getPost()(makeRequest({ ...VALID_PAYLOAD, listingId: 'listing-bbb' }));
-
-        const calls = consoleSpy.mock.calls.filter((c) => c[0] === '[SafeMetrics]');
-        expect(calls).toHaveLength(2);
-        const lid1 = (calls[0][1] as Record<string, unknown>).lid as string;
-        const lid2 = (calls[1][1] as Record<string, unknown>).lid as string;
-        expect(lid1).not.toBe(lid2);
-      } finally {
-        consoleSpy.mockRestore();
-        process.env = originalEnv;
-      }
+    it('produces different hashes for different listingIds', () => {
+      const hmac = loadFreshHmac('test-secret-value');
+      const lid1 = hmac('listing-aaa');
+      const lid2 = hmac('listing-bbb');
+      expect(lid1).not.toBe(lid2);
     });
 
-    it('uses the secret — different secrets produce different hashes for same listingId', async () => {
-      const getHashWithSecret = async (secret: string): Promise<string> => {
-        process.env = { ...originalEnv, LOG_HMAC_SECRET: secret, NODE_ENV: 'development' };
-        const getPost = loadFreshPostWithSecret(secret);
-        const consoleSpy = jest.spyOn(console, 'log').mockImplementation(() => {});
-        try {
-          await getPost()(makeRequest(VALID_PAYLOAD));
-          const calls = consoleSpy.mock.calls.filter((c) => c[0] === '[SafeMetrics]');
-          return (calls[0][1] as Record<string, unknown>).lid as string;
-        } finally {
-          consoleSpy.mockRestore();
-          process.env = originalEnv;
-        }
-      };
-
-      const hash1 = await getHashWithSecret('secret-alpha');
-      const hash2 = await getHashWithSecret('secret-beta');
+    it('uses the secret — different secrets produce different hashes for same listingId', () => {
+      const hmac1 = loadFreshHmac('secret-alpha');
+      const hmac2 = loadFreshHmac('secret-beta');
+      const hash1 = hmac1('listing-123');
+      const hash2 = hmac2('listing-123');
       expect(hash1).not.toBe(hash2);
     });
   });
@@ -570,37 +501,20 @@ describe('POST /api/metrics', () => {
   // 8. Conditional logging
   // ============================================================
 
-  describe('conditional logging', () => {
-    it('logs (via console.log) when LOG_HMAC_SECRET is set', async () => {
-      let freshPost!: typeof POST;
-      jest.isolateModules(() => {
-        jest.mock('@/lib/origin-guard', () => ({ isOriginAllowed: () => true, isHostAllowed: () => true }));
-        jest.mock('@/lib/rate-limit-redis', () => ({ checkMetricsRateLimit: () => Promise.resolve({ success: true }) }));
-        jest.mock('@/lib/rate-limit', () => ({ getClientIP: () => '127.0.0.1' }));
-        jest.mock('@/lib/logger', () => ({ logger: { sync: { error: jest.fn() } }, sanitizeErrorMessage: (e: unknown) => String(e) }));
-        jest.mock('@sentry/nextjs', () => ({ captureException: jest.fn(), withScope: jest.fn() }), { virtual: true });
-        jest.mock('next/server', () => ({
-          NextResponse: { json: (data: unknown, init?: { status?: number }) => new Response(JSON.stringify(data), { status: init?.status ?? 200, headers: { 'content-type': 'application/json' } }) },
-        }));
-        process.env = { ...originalEnv, LOG_HMAC_SECRET: 'my-secret', NODE_ENV: 'development' };
-        // eslint-disable-next-line @typescript-eslint/no-var-requires
-        freshPost = require('@/app/api/metrics/route').POST;
-      });
-      process.env = { ...originalEnv, LOG_HMAC_SECRET: 'my-secret', NODE_ENV: 'development' };
-
+  describe('no debug logging in production code', () => {
+    it('does not emit [SafeMetrics] console.log', async () => {
       const consoleSpy = jest.spyOn(console, 'log').mockImplementation(() => {});
       try {
         const req = makeRequest(VALID_PAYLOAD);
-        await freshPost(req);
+        await POST(req);
         const metricsCall = consoleSpy.mock.calls.find((c) => c[0] === '[SafeMetrics]');
-        expect(metricsCall).toBeDefined();
+        expect(metricsCall).toBeUndefined();
       } finally {
         consoleSpy.mockRestore();
-        process.env = originalEnv;
       }
     });
 
-    it('returns 200 but skips logging when LOG_HMAC_SECRET is missing', async () => {
+    it('returns 200 when LOG_HMAC_SECRET is missing (skips HMAC computation)', async () => {
       let freshPost!: typeof POST;
       jest.isolateModules(() => {
         jest.mock('@/lib/origin-guard', () => ({ isOriginAllowed: () => true, isHostAllowed: () => true }));
@@ -621,83 +535,11 @@ describe('POST /api/metrics', () => {
       delete (envWithoutSecret as Record<string, string | undefined>).LOG_HMAC_SECRET;
       process.env = envWithoutSecret as NodeJS.ProcessEnv;
 
-      const consoleSpy = jest.spyOn(console, 'log').mockImplementation(() => {});
       try {
         const req = makeRequest(VALID_PAYLOAD);
         const res = await freshPost(req);
         expect(res.status).toBe(200);
-        const metricsCall = consoleSpy.mock.calls.find((c) => c[0] === '[SafeMetrics]');
-        expect(metricsCall).toBeUndefined();
       } finally {
-        consoleSpy.mockRestore();
-        process.env = originalEnv;
-      }
-    });
-
-    it('excludes type, types, and count from log when blocked=true', async () => {
-      let freshPost!: typeof POST;
-      jest.isolateModules(() => {
-        jest.mock('@/lib/origin-guard', () => ({ isOriginAllowed: () => true, isHostAllowed: () => true }));
-        jest.mock('@/lib/rate-limit-redis', () => ({ checkMetricsRateLimit: () => Promise.resolve({ success: true }) }));
-        jest.mock('@/lib/rate-limit', () => ({ getClientIP: () => '127.0.0.1' }));
-        jest.mock('@/lib/logger', () => ({ logger: { sync: { error: jest.fn() } }, sanitizeErrorMessage: (e: unknown) => String(e) }));
-        jest.mock('@sentry/nextjs', () => ({ captureException: jest.fn(), withScope: jest.fn() }), { virtual: true });
-        jest.mock('next/server', () => ({
-          NextResponse: { json: (data: unknown, init?: { status?: number }) => new Response(JSON.stringify(data), { status: init?.status ?? 200, headers: { 'content-type': 'application/json' } }) },
-        }));
-        process.env = { ...originalEnv, LOG_HMAC_SECRET: 'test-secret', NODE_ENV: 'development' };
-        // eslint-disable-next-line @typescript-eslint/no-var-requires
-        freshPost = require('@/app/api/metrics/route').POST;
-      });
-      process.env = { ...originalEnv, LOG_HMAC_SECRET: 'test-secret', NODE_ENV: 'development' };
-
-      const consoleSpy = jest.spyOn(console, 'log').mockImplementation(() => {});
-      try {
-        const req = makeRequest({ ...VALID_PAYLOAD, blocked: true });
-        await freshPost(req);
-        const calls = consoleSpy.mock.calls.filter((c) => c[0] === '[SafeMetrics]');
-        expect(calls).toHaveLength(1);
-        const safeLog = calls[0][1] as Record<string, unknown>;
-        expect(safeLog).not.toHaveProperty('type');
-        expect(safeLog).not.toHaveProperty('types');
-        expect(safeLog).not.toHaveProperty('count');
-        expect(safeLog).toHaveProperty('blocked', true);
-        expect(safeLog).toHaveProperty('route', 'nearby');
-      } finally {
-        consoleSpy.mockRestore();
-        process.env = originalEnv;
-      }
-    });
-
-    it('includes type, types, and count in log when blocked=false', async () => {
-      let freshPost!: typeof POST;
-      jest.isolateModules(() => {
-        jest.mock('@/lib/origin-guard', () => ({ isOriginAllowed: () => true, isHostAllowed: () => true }));
-        jest.mock('@/lib/rate-limit-redis', () => ({ checkMetricsRateLimit: () => Promise.resolve({ success: true }) }));
-        jest.mock('@/lib/rate-limit', () => ({ getClientIP: () => '127.0.0.1' }));
-        jest.mock('@/lib/logger', () => ({ logger: { sync: { error: jest.fn() } }, sanitizeErrorMessage: (e: unknown) => String(e) }));
-        jest.mock('@sentry/nextjs', () => ({ captureException: jest.fn(), withScope: jest.fn() }), { virtual: true });
-        jest.mock('next/server', () => ({
-          NextResponse: { json: (data: unknown, init?: { status?: number }) => new Response(JSON.stringify(data), { status: init?.status ?? 200, headers: { 'content-type': 'application/json' } }) },
-        }));
-        process.env = { ...originalEnv, LOG_HMAC_SECRET: 'test-secret', NODE_ENV: 'development' };
-        // eslint-disable-next-line @typescript-eslint/no-var-requires
-        freshPost = require('@/app/api/metrics/route').POST;
-      });
-      process.env = { ...originalEnv, LOG_HMAC_SECRET: 'test-secret', NODE_ENV: 'development' };
-
-      const consoleSpy = jest.spyOn(console, 'log').mockImplementation(() => {});
-      try {
-        const req = makeRequest({ ...VALID_PAYLOAD, blocked: false });
-        await freshPost(req);
-        const calls = consoleSpy.mock.calls.filter((c) => c[0] === '[SafeMetrics]');
-        expect(calls).toHaveLength(1);
-        const safeLog = calls[0][1] as Record<string, unknown>;
-        expect(safeLog).toHaveProperty('type', 'type');
-        expect(safeLog).toHaveProperty('types', ['restaurant', 'cafe']);
-        expect(safeLog).toHaveProperty('count', 5);
-      } finally {
-        consoleSpy.mockRestore();
         process.env = originalEnv;
       }
     });

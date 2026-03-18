@@ -5,21 +5,16 @@ import dynamic from 'next/dynamic';
 import {
     MapPin,
     ShieldCheck,
-    Edit,
     Maximize2,
-    Eye,
     Bed,
     ChevronRight,
     Star,
     Zap,
-    Heart,
     Pencil,
-    Trash2,
     ExternalLink,
     type LucideIcon
 } from 'lucide-react';
 import Link from 'next/link';
-import { Button } from '@/components/ui/button';
 import { cn } from '@/lib/utils';
 import { getAmenityIcon } from '@/lib/amenityIcons';
 import { getLanguageName } from '@/lib/languages';
@@ -39,7 +34,6 @@ import SaveListingButton from '@/components/SaveListingButton';
 import ListingStatusToggle from '@/components/ListingStatusToggle';
 import ListingFreshnessCheck from '@/components/ListingFreshnessCheck';
 import UserAvatar from '@/components/UserAvatar';
-import VerifiedBadge from '@/components/verification/VerifiedBadge';
 import RoomPlaceholder from '@/components/listings/RoomPlaceholder';
 import { SlotBadge } from '@/components/listings/SlotBadge';
 import { Badge } from '@/components/ui/badge';

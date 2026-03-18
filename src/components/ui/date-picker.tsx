@@ -166,7 +166,6 @@ export function DatePicker({
                 type="button"
                 id={id}
                 aria-describedby={ariaDescribedBy}
-                aria-invalid={ariaInvalid}
                 className={cn(
                     'w-full flex items-center justify-between gap-2 p-2.5 sm:p-3 rounded-xl',
                     'border border-zinc-200 dark:border-zinc-700',

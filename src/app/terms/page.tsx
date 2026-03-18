@@ -93,7 +93,7 @@ export default function TermsPage() {
                             1. Acceptance of Terms
                         </h2>
                         <p className="text-zinc-600 dark:text-zinc-400 leading-relaxed">
-                            By accessing or using the RoomShare website, mobile application, or any other services provided by RoomShare Inc. (collectively, the "Service"), you agree to be bound by these Terms of Service ("Terms"). If you do not agree to these Terms, you may not use the Service.
+                            By accessing or using the RoomShare website, mobile application, or any other services provided by RoomShare Inc. (collectively, the &quot;Service&quot;), you agree to be bound by these Terms of Service (&quot;Terms&quot;). If you do not agree to these Terms, you may not use the Service.
                         </p>
                     </section>
 
@@ -121,7 +121,7 @@ export default function TermsPage() {
                         </p>
                         <ul className="list-disc pl-5 space-y-2 text-zinc-600 dark:text-zinc-400 marker:text-zinc-300 dark:marker:text-zinc-600">
                             <li>Violate any local, state, national, or international law or regulation.</li>
-                            <li>Transmit any material that is abusive, harassing, tortious, defamatory, vulgar, pornographic, obscene, libelous, invasive of another's privacy, hateful, or racially, ethnically, or otherwise objectionable.</li>
+                            <li>Transmit any material that is abusive, harassing, tortious, defamatory, vulgar, pornographic, obscene, libelous, invasive of another&apos;s privacy, hateful, or racially, ethnically, or otherwise objectionable.</li>
                             <li>Stalk, harass, or harm another individual.</li>
                             <li>Impersonate any person or entity, or falsely state or otherwise misrepresent your affiliation with a person or entity.</li>
                         </ul>
@@ -183,7 +183,7 @@ export default function TermsPage() {
                             <FileCheck className="w-8 h-8 text-zinc-900 dark:text-white shrink-0" />
                             <div>
                                 <p className="text-zinc-600 dark:text-zinc-400 text-sm leading-relaxed m-0">
-                                    We reserve the right to modify or replace these Terms at any time. If a revision is material, we will provide at least 30 days' notice prior to any new terms taking effect. What constitutes a material change will be determined at our sole discretion.
+                                    We reserve the right to modify or replace these Terms at any time. If a revision is material, we will provide at least 30 days&apos; notice prior to any new terms taking effect. What constitutes a material change will be determined at our sole discretion.
                                 </p>
                             </div>
                         </div>

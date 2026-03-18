@@ -25,7 +25,7 @@ export default function BlockedUserMessage({
                     <Ban className="w-8 h-8 text-zinc-400 dark:text-zinc-500" />
                 </div>
                 <h3 className="text-lg font-semibold text-zinc-900 dark:text-white mb-2">
-                    You've Been Blocked
+                    You&apos;ve Been Blocked
                 </h3>
                 <p className="text-sm text-zinc-500 dark:text-zinc-400 max-w-sm">
                     {userName} has blocked you. You cannot send messages or interact with them.

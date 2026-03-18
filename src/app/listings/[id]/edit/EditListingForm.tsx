@@ -312,6 +312,7 @@ export default function EditListingForm({ listing, enableWholeUnitMode = false }
         if (!formModified) return;
         const formData = collectFormData();
         saveData(formData);
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- intentional dependency omission to prevent infinite loops
     }, [description, moveInDate, leaseDuration, roomType, genderPreference, householdGender, bookingMode, selectedLanguages]);
 
     // Track form modifications (legacy - now merged with save)
@@ -333,6 +334,7 @@ export default function EditListingForm({ listing, enableWholeUnitMode = false }
             getLanguageName(code).toLowerCase().includes(search) ||
             code.toLowerCase().includes(search)
         );
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- LANGUAGE_CODES is a stable constant
     }, [languageSearch]);
 
     const toggleLanguage = (lang: string) => {
@@ -356,8 +358,6 @@ export default function EditListingForm({ listing, enableWholeUnitMode = false }
 
     // Check if any images are still uploading
     const isAnyImageUploading = images.some(img => img.isUploading);
-    const hasFailedImages = images.some(img => img.error);
-
     // Retry handler for failed submissions
     const handleRetry = () => {
         setError('');
@@ -452,7 +452,7 @@ export default function EditListingForm({ listing, enableWholeUnitMode = false }
                                     {error}
                                 </p>
                                 <p className="text-xs text-red-500 dark:text-red-500 mt-2">
-                                    Your changes have been saved locally and won't be lost.
+                                    Your changes have been saved locally and won&apos;t be lost.
                                 </p>
                             </div>
                         </div>

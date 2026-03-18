@@ -26,14 +26,11 @@ import {
   Fuel,
   Dumbbell,
   Pill,
-  Footprints,
-  Car,
 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import {
   CATEGORY_CHIPS,
   RADIUS_OPTIONS,
-  getCategoryColors,
   type NearbyPlace,
   type CategoryChip,
 } from '@/types/nearby';

@@ -52,7 +52,7 @@ export default async function CreateListingPage() {
                 </h1>
                 <p className="text-base sm:text-lg text-zinc-500 dark:text-zinc-400 font-light max-w-xl leading-relaxed">
                     Share your space with someone who fits your lifestyle.
-                    Tell us about your place, your vibe, and what you're looking for.
+                    Tell us about your place, your vibe, and what you&apos;re looking for.
                 </p>
             </div>
 

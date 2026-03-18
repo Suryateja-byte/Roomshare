@@ -10,7 +10,7 @@
  * 3. Run regression tests to verify behavior matches expected outcomes
  */
 
-import { normalizeFilters, type FilterParams, type NormalizedFilters } from './filter-schema';
+import { normalizeFilters, type NormalizedFilters } from './filter-schema';
 
 // ============================================
 // Types

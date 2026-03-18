@@ -1,7 +1,7 @@
 'use client';
 
 import { useState } from 'react';
-import { useRouter } from 'next/navigation';
+
 import { signOut } from 'next-auth/react';
 import { toast } from 'sonner';
 import { Bell, Lock, Trash2, Loader2, Check, AlertTriangle, ShieldOff, Ban } from 'lucide-react';
@@ -39,7 +39,6 @@ export default function SettingsClient({
     userEmail,
     blockedUsers: initialBlockedUsers = []
 }: SettingsClientProps) {
-    const router = useRouter();
     const [preferences, setPreferences] = useState<NotificationPreferences>(initialPreferences);
     const [saving, setSaving] = useState(false);
     const [saveSuccess, setSaveSuccess] = useState(false);
@@ -302,7 +301,7 @@ export default function SettingsClient({
                 <div className="p-6">
                     {blockedUsers.length === 0 ? (
                         <p className="text-sm text-zinc-500 dark:text-zinc-400 text-center py-4">
-                            You haven't blocked anyone
+                            You haven&apos;t blocked anyone
                         </p>
                     ) : (
                         <ul className="divide-y divide-zinc-100 dark:divide-zinc-800">

@@ -41,7 +41,7 @@ export default async function VerifyPage() {
                                     <CheckCircle2 className="w-10 h-10 text-green-600 dark:text-green-400" />
                                 </div>
                                 <h2 className="text-2xl font-bold text-zinc-900 dark:text-white mb-2">
-                                    You're Verified!
+                                    You&apos;re Verified!
                                 </h2>
                                 <p className="text-zinc-600 dark:text-zinc-400 mb-6">
                                     Your identity has been verified. You now have a verified badge on your profile.
@@ -64,8 +64,8 @@ export default async function VerifyPage() {
                                     Verification Pending
                                 </h2>
                                 <p className="text-zinc-600 dark:text-zinc-400 mb-6">
-                                    We're reviewing your documents. This usually takes 1-2 business days.
-                                    We'll notify you once your verification is complete.
+                                    We&apos;re reviewing your documents. This usually takes 1-2 business days.
+                                    We&apos;ll notify you once your verification is complete.
                                 </p>
                                 <div className="bg-zinc-50 dark:bg-zinc-800 rounded-xl p-4 inline-block">
                                     <p className="text-sm text-zinc-500 dark:text-zinc-400">
@@ -85,7 +85,7 @@ export default async function VerifyPage() {
                                         Verification Not Approved
                                     </h2>
                                     <p className="text-zinc-600 dark:text-zinc-400 mb-4">
-                                        Unfortunately, we couldn't verify your identity.
+                                        Unfortunately, we couldn&apos;t verify your identity.
                                     </p>
                                     {status.reason && (
                                         <div className="bg-red-50 dark:bg-red-900/30 border border-red-100 dark:border-red-800 rounded-xl p-4 max-w-md mx-auto">

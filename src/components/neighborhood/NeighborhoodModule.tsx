@@ -25,7 +25,7 @@ import { ContextBar } from './ContextBar';
 import { ProUpgradeCTA } from './ProUpgradeCTA';
 import { NeighborhoodPlaceList } from './NeighborhoodPlaceList';
 import { PlaceDetailsPanel } from './PlaceDetailsPanel';
-import type { POI, SearchMeta, NeighborhoodSearchResult } from '@/lib/places/types';
+import type { POI, NeighborhoodSearchResult } from '@/lib/places/types';
 import {
   trackNeighborhoodQuery,
   trackPlaceClicked,
@@ -317,6 +317,7 @@ export function NeighborhoodModule({
 
 // Declare custom element for TypeScript
 declare global {
+  // eslint-disable-next-line @typescript-eslint/no-namespace -- required for custom element type declaration
   namespace JSX {
     interface IntrinsicElements {
       'gmp-place-attribution': React.DetailedHTMLProps<

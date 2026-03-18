@@ -61,6 +61,7 @@ export default async function AuditLogPage({ searchParams }: PageProps) {
     const result = await getAuditLogs({
         page,
         limit: 25,
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any -- URL param string needs cast to AuditAction enum
         action: actionFilter as any
     });
 

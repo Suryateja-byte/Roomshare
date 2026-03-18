@@ -72,12 +72,12 @@ export default function VerifyExpiredPage() {
                                     Check Your Inbox
                                 </h2>
                                 <p className="text-zinc-600 dark:text-zinc-400 mb-6">
-                                    We've sent a new verification link to your email address.
+                                    We&apos;ve sent a new verification link to your email address.
                                     The link will expire in 24 hours.
                                 </p>
                                 <div className="bg-zinc-50 dark:bg-zinc-800 rounded-xl p-4">
                                     <p className="text-sm text-zinc-500 dark:text-zinc-400">
-                                        Didn't receive the email? Check your spam folder or{' '}
+                                        Didn&apos;t receive the email? Check your spam folder or{' '}
                                         <button
                                             onClick={() => setResendSuccess(false)}
                                             className="text-zinc-900 dark:text-white font-medium hover:underline"
@@ -139,7 +139,7 @@ export default function VerifyExpiredPage() {
                                 </Link>
 
                                 <p className="text-sm text-zinc-500 dark:text-zinc-400 mt-4">
-                                    Don't have an account?{' '}
+                                    Don&apos;t have an account?{' '}
                                     <Link href="/signup" className="text-zinc-900 dark:text-white font-medium hover:underline">
                                         Sign up
                                     </Link>

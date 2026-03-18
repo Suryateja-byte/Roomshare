@@ -1,7 +1,7 @@
 'use client';
 
 import { useState, useEffect, Suspense } from 'react';
-import { useSearchParams, useRouter } from 'next/navigation';
+import { useSearchParams } from 'next/navigation';
 import Link from 'next/link';
 import { ArrowLeft, Lock, Loader2, CheckCircle2, AlertCircle, Eye, EyeOff } from 'lucide-react';
 import { Button } from '@/components/ui/button';
@@ -10,7 +10,6 @@ import { Label } from '@/components/ui/label';
 
 function ResetPasswordForm() {
     const searchParams = useSearchParams();
-    const router = useRouter();
     const token = searchParams.get('token');
 
     const [password, setPassword] = useState('');

@@ -83,11 +83,6 @@ async function sendEvent(event: NeighborhoodEvent): Promise<void> {
       ...event.data,
     };
 
-    // Log in development
-    if (process.env.NODE_ENV === 'development') {
-      console.log('[Neighborhood Analytics]', payload);
-    }
-
     // In production, send to analytics endpoint
     // Using navigator.sendBeacon for reliability on page unload
     if (process.env.NODE_ENV === 'production') {

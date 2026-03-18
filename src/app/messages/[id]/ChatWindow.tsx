@@ -118,7 +118,7 @@ export default function ChatWindow({
                 toast.success(`${otherUserName || 'User'} has been blocked`);
                 refetchBlockStatus();
             }
-        } catch (error) {
+        } catch (_error) {
             toast.error('Failed to block user');
         } finally {
             setIsBlocking(false);
@@ -137,7 +137,7 @@ export default function ChatWindow({
                 toast.success(`${otherUserName || 'User'} has been unblocked`);
                 refetchBlockStatus();
             }
-        } catch (error) {
+        } catch (_error) {
             toast.error('Failed to unblock user');
         } finally {
             setIsUnblocking(false);
@@ -221,8 +221,8 @@ export default function ChatWindow({
                 lastReadMessageIdRef.current = targetMessageId;
                 window.dispatchEvent(new CustomEvent('messagesRead'));
             }
-        } catch (error) {
-            console.error('Failed to mark messages as read:', error);
+        } catch (_error) {
+            console.error('Failed to mark messages as read:', _error);
         }
     }, [conversationId, currentUserId]);
 
@@ -302,9 +302,9 @@ export default function ChatWindow({
                     void markConversationRead(result[result.length - 1]?.id ?? null);
                 }
             }
-        } catch (error) {
-            if (!isAbortError(error)) {
-                console.error('Polling error:', error);
+        } catch (_error) {
+            if (!isAbortError(_error)) {
+                console.error('Polling error:', _error);
             }
         } finally {
             if (pollAbortRef.current === abortController) {
@@ -334,6 +334,7 @@ export default function ChatWindow({
                         table: 'Message',
                         filter: `conversationId=eq.${conversationId}`
                     }, (payload) => {
+                        // eslint-disable-next-line @typescript-eslint/no-explicit-any -- Supabase realtime payload type is untyped Record
                         const newMessage = payload.new as any;
                         // SECURITY: No RLS on Message table — client-side guard prevents cross-conversation bleed
                         if (!newMessage.conversationId || newMessage.conversationId !== conversationId) return;
@@ -374,21 +375,21 @@ export default function ChatWindow({
                         const state = channel.presenceState();
                         const otherUsers = Object.values(state)
                             .flat()
-                            .filter((p: any) => p.user_id !== currentUserId);
+                            .filter((p: Record<string, unknown>) => p.user_id !== currentUserId);
                         setIsOnline(otherUsers.length > 0);
                     })
-                    .on('presence', { event: 'join' }, ({ key, newPresences }) => {
-                        const otherJoined = newPresences.some((p: any) => p.user_id !== currentUserId);
+                    .on('presence', { event: 'join' }, ({ newPresences }) => {
+                        const otherJoined = newPresences.some((p: Record<string, unknown>) => p.user_id !== currentUserId);
                         if (otherJoined) setIsOnline(true);
                     })
-                    .on('presence', { event: 'leave' }, ({ key, leftPresences }) => {
-                        const otherLeft = leftPresences.some((p: any) => p.user_id !== currentUserId);
+                    .on('presence', { event: 'leave' }, ({ leftPresences }) => {
+                        const otherLeft = leftPresences.some((p: Record<string, unknown>) => p.user_id !== currentUserId);
                         if (otherLeft) {
                             if (!channel || typeof channel.presenceState !== 'function') return;
                             const state = channel.presenceState();
                             const otherUsers = Object.values(state)
                                 .flat()
-                                .filter((p: any) => p.user_id !== currentUserId);
+                                .filter((p: Record<string, unknown>) => p.user_id !== currentUserId);
                             setIsOnline(otherUsers.length > 0);
                         }
                     })
@@ -507,8 +508,8 @@ export default function ChatWindow({
                 m.id === optimisticId ? { ...result, sender: m.sender } : m
             ));
             lastMessageIdRef.current = result.id;
-        } catch (error) {
-            console.error('Failed to send message:', error);
+        } catch (_error) {
+            console.error('Failed to send message:', _error);
             // Mark message as failed instead of removing it
             setMessages(prev => prev.map(m =>
                 m.id === optimisticId ? { ...m, failed: true } : m
@@ -565,8 +566,8 @@ export default function ChatWindow({
             ));
             lastMessageIdRef.current = result.id;
             toast.success('Message sent');
-        } catch (error) {
-            console.error('Failed to retry message:', error);
+        } catch (_error) {
+            console.error('Failed to retry message:', _error);
             setMessages(prev => prev.map(m =>
                 m.id === failedId ? { ...m, failed: true } : m
             ));
@@ -677,7 +678,7 @@ export default function ChatWindow({
                     <AlertDialogHeader>
                         <AlertDialogTitle>Block {otherUserName}?</AlertDialogTitle>
                         <AlertDialogDescription>
-                            You won't be able to message each other. They won't be notified that you blocked them.
+                            You won&apos;t be able to message each other. They won&apos;t be notified that you blocked them.
                         </AlertDialogDescription>
                     </AlertDialogHeader>
                     <AlertDialogFooter>

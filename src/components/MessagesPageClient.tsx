@@ -69,7 +69,8 @@ interface Conversation {
 
 interface MessagesPageClientProps {
     currentUserId: string;
-    initialConversations: any[]; // Using any[] temporarily to match Prisma return type structure easily, or define strict type
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any -- Prisma nested include return type is complex; typed downstream via component props
+    initialConversations: any[];
 }
 
 function isAbortError(error: unknown): boolean {
@@ -123,7 +124,7 @@ export default function MessagesPageClient({ currentUserId, initialConversations
                 // Update local state to reflect changes
                 setConversations(prev => prev.map(c => ({ ...c, unreadCount: 0 })));
             }
-        } catch (error) {
+        } catch (_error) {
             toast.error('Failed to mark messages as read');
         } finally {
             setIsMarkingAllRead(false);
@@ -194,8 +195,8 @@ export default function MessagesPageClient({ currentUserId, initialConversations
                     : message
             )));
             window.dispatchEvent(new Event('messagesRead'));
-        } catch (error) {
-            console.error('Failed to mark messages as read:', error);
+        } catch (_error) {
+            console.error('Failed to mark messages as read:', _error);
         }
     }, [currentUserId, router]);
 
@@ -212,7 +213,7 @@ export default function MessagesPageClient({ currentUserId, initialConversations
                 toast.success(`${otherParticipant.name || 'User'} has been blocked`);
                 refetchBlockStatus();
             }
-        } catch (error) {
+        } catch (_error) {
             toast.error('Failed to block user');
         } finally {
             setIsBlocking(false);
@@ -232,7 +233,7 @@ export default function MessagesPageClient({ currentUserId, initialConversations
                 toast.success(`${otherParticipant.name || 'User'} has been unblocked`);
                 refetchBlockStatus();
             }
-        } catch (error) {
+        } catch (_error) {
             toast.error('Failed to unblock user');
         } finally {
             setIsUnblocking(false);
@@ -254,7 +255,7 @@ export default function MessagesPageClient({ currentUserId, initialConversations
                 setMsgs([]);
                 lastMsgIdRef.current = undefined;
             }
-        } catch (error) {
+        } catch (_error) {
             toast.error('Failed to delete conversation');
         } finally {
             setIsDeletingConversation(false);
@@ -267,6 +268,7 @@ export default function MessagesPageClient({ currentUserId, initialConversations
         if (initialConversations.length > 0 && !activeId) {
             setActiveId(initialConversations[0].id);
         }
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- intentional dependency omission to prevent infinite loops
     }, [initialConversations]);
 
     // Scroll to bottom when messages change
@@ -379,9 +381,9 @@ export default function MessagesPageClient({ currentUserId, initialConversations
                     .reverse()
                     .find(message => message.senderId !== currentUserId)?.id ?? null;
                 await markConversationRead(activeId, latestIncomingMessageId);
-            } catch (error) {
-                if (!isAbortError(error)) {
-                    console.error(lastMessageId ? 'Polling error:' : 'Failed to fetch messages:', error);
+            } catch (_error) {
+                if (!isAbortError(_error)) {
+                    console.error(lastMessageId ? 'Polling error:' : 'Failed to fetch messages:', _error);
                 }
             } finally {
                 if (pollAbortRef.current === abortController) {
@@ -793,7 +795,7 @@ export default function MessagesPageClient({ currentUserId, initialConversations
                                 <AlertDialogHeader>
                                     <AlertDialogTitle>Block {otherParticipant?.name}?</AlertDialogTitle>
                                     <AlertDialogDescription>
-                                        You won't be able to message each other. They won't be notified that you blocked them.
+                                        You won&apos;t be able to message each other. They won&apos;t be notified that you blocked them.
                                     </AlertDialogDescription>
                                 </AlertDialogHeader>
                                 <AlertDialogFooter>

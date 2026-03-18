@@ -92,16 +92,12 @@ export async function loadPlacesUiKit(): Promise<void> {
     // Create the callback function
     (window as unknown as { [key: string]: () => void })[CALLBACK_NAME] = async () => {
       try {
-        console.log('Google Maps callback fired');
-        console.log('google.maps:', window.google?.maps);
-
         if (!window.google?.maps?.importLibrary) {
           throw new Error('Google Maps API loaded but importLibrary is not available');
         }
 
         // Import the places library
-        const placesLib = await window.google.maps.importLibrary('places');
-        console.log('Places library loaded:', placesLib);
+        await window.google.maps.importLibrary('places');
         isLoaded = true;
         resolve();
       } catch (error) {

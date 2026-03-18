@@ -15,9 +15,6 @@ import type {
   Marker,
   Popup,
   LngLatBounds,
-  MapOptions,
-  MarkerOptions,
-  PopupOptions,
 } from "maplibre-gl";
 
 // Re-export types for consumers

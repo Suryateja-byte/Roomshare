@@ -19,7 +19,6 @@ function ImageWithFallback({
     hasError,
     sizes = "(max-width: 768px) 100vw, (max-width: 1200px) 50vw, 33vw",
     priority = false,
-    ...props
 }: {
     src: string;
     alt: string;
@@ -28,7 +27,6 @@ function ImageWithFallback({
     hasError: boolean;
     sizes?: string;
     priority?: boolean;
-    [key: string]: any;
 }) {
     if (hasError) {
         return (

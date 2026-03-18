@@ -15,7 +15,7 @@
 
 import { Suspense, useCallback, useState, useRef, useEffect } from "react";
 import Link from "next/link";
-import { ArrowLeft, MessageSquare, Menu, User, Plus, Heart, Settings, LogOut } from "lucide-react";
+import { MessageSquare, Menu, User, Plus, Heart, Settings, LogOut } from "lucide-react";
 import { useScrollHeader } from "@/hooks/useScrollHeader";
 import {
   useKeyboardShortcuts,

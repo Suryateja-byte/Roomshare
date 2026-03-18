@@ -88,9 +88,7 @@ export function useBlockStatus(
                 }
             })
             .subscribe((status) => {
-                if (status === 'SUBSCRIBED') {
-                    console.log('Subscribed to block status changes');
-                } else if (status === 'CHANNEL_ERROR') {
+                if (status === 'CHANNEL_ERROR') {
                     console.error('Failed to subscribe to block status changes');
                 }
             });

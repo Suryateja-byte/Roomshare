@@ -102,6 +102,7 @@ export default function ImageUpload({
         e.stopPropagation();
         setDragActive(false);
         handleUpload(e.dataTransfer.files);
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- intentional dependency omission to prevent infinite loops
     }, [images]);
 
     const canAddMore = multiple ? images.length < maxFiles : images.length === 0;
@@ -183,6 +184,7 @@ export default function ImageUpload({
                             key={url}
                             className="relative group aspect-square rounded-xl overflow-hidden border border-zinc-200"
                         >
+                            {/* eslint-disable-next-line @next/next/no-img-element -- blob/object URL preview not compatible with next/image */}
                             <img
                                 src={url}
                                 alt={`Upload ${index + 1}`}

@@ -12,6 +12,7 @@ import { cn } from '@/lib/utils';
 
 interface POILayerProps {
     /** Reference to the Mapbox map instance */
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any -- MapRef type varies by map library (react-map-gl wraps maplibre)
     mapRef: React.RefObject<any>;
     /** Whether map is loaded */
     isMapLoaded: boolean;

@@ -25,14 +25,12 @@ export function ServiceWorkerRegistration({
       navigator.serviceWorker.getRegistrations().then((registrations) => {
         for (const registration of registrations) {
           registration.unregister();
-          console.log('[SW] Unregistered stale service worker in dev mode');
         }
       });
       if ('caches' in window) {
         caches.keys().then((cacheNames) => {
           for (const cacheName of cacheNames) {
             caches.delete(cacheName);
-            console.log('[SW] Deleted cache in dev mode:', cacheName);
           }
         });
       }

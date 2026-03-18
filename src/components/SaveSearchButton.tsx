@@ -144,7 +144,7 @@ export default function SaveSearchButton({ className = '' }: SaveSearchButtonPro
                 setIsOpen(false);
                 toast.success('Search saved successfully!');
             }
-        } catch (err) {
+        } catch (_err) {
             setError('Something went wrong');
         } finally {
             setIsLoading(false);

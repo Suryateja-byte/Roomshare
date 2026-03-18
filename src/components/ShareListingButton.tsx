@@ -22,8 +22,8 @@ export default function ShareListingButton({ listingId, title }: ShareListingBut
             await navigator.clipboard.writeText(url);
             setCopied(true);
             setTimeout(() => setCopied(false), 2000);
-        } catch (error) {
-            console.error('Failed to copy:', error);
+        } catch (_error) {
+            console.error('Failed to copy:', _error);
         }
     };
 
@@ -81,7 +81,7 @@ export default function ShareListingButton({ listingId, title }: ShareListingBut
                     text: `Check out this room on RoomShare!`,
                     url: url
                 });
-            } catch (error) {
+            } catch (_error) {
                 // User cancelled or share failed, open dropdown instead
                 setIsOpen(true);
             }

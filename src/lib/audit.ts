@@ -50,6 +50,7 @@ export async function logAdminAction(params: LogAdminActionParams): Promise<void
                 action: params.action,
                 targetType: params.targetType,
                 targetId: params.targetId,
+                // eslint-disable-next-line @typescript-eslint/no-explicit-any -- Prisma Json field requires any cast
                 details: (params.details || {}) as any,
                 ipAddress: params.ipAddress
             }

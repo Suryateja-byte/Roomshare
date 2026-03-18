@@ -6,7 +6,7 @@
  */
 
 import { z } from 'zod';
-import { normalizeLanguages, isValidLanguageCode, LanguageCode } from './languages';
+import { normalizeLanguages, LanguageCode } from './languages';
 import {
   MAX_SAFE_PRICE,
   MAX_SAFE_PAGE,

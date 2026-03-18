@@ -281,6 +281,7 @@ export default function LocationSearchInput({
         setSelectedIndex(-1);
         break;
     }
+  // eslint-disable-next-line react-hooks/exhaustive-deps -- intentional dependency omission to prevent infinite loops
   }, [showSuggestions, suggestions, selectedIndex]);
 
   const handleSelectSuggestion = useCallback((suggestion: LocationSuggestion) => {

@@ -23,7 +23,7 @@ const durationSamples: number[] = [];
 let durationIndex = 0;
 
 /** Record an API request duration (call from middleware or instrumentation) */
-function recordRequestMetrics(durationMs: number, isError: boolean): void {
+function _recordRequestMetrics(durationMs: number, isError: boolean): void {
   counters.requestTotal++;
   if (isError) counters.errorTotal++;
   durationSamples[durationIndex % MAX_DURATION_SAMPLES] = durationMs;

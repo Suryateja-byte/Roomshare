@@ -4,7 +4,6 @@ import { useMemo } from 'react';
 import Link from 'next/link';
 import {
     CheckCircle2,
-    Circle,
     Camera,
     FileText,
     Globe,

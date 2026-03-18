@@ -52,11 +52,11 @@ export async function toggleSaveListing(listingId: string) {
         revalidatePath(`/listings/${listingId}`);
         revalidatePath('/saved');
         return { saved };
-    } catch (error) {
+    } catch (_error) {
         logger.sync.error('Failed to toggle saved listing', {
             action: 'toggleSaveListing',
             listingId,
-            error: error instanceof Error ? error.message : 'Unknown error',
+            error: _error instanceof Error ? _error.message : 'Unknown error',
         });
         return { error: 'Failed to save listing', saved: false };
     }
@@ -80,7 +80,7 @@ export async function isListingSaved(listingId: string) {
         });
 
         return { saved: !!existing };
-    } catch (error) {
+    } catch (_error) {
         return { saved: false };
     }
 }
@@ -129,11 +129,11 @@ export async function getSavedListings() {
             owner: s.listing.owner,
             savedAt: s.createdAt
         }));
-    } catch (error) {
+    } catch (_error) {
         logger.sync.error('Failed to get saved listings', {
             action: 'getSavedListings',
             userId: session.user.id,
-            error: error instanceof Error ? error.message : 'Unknown error',
+            error: _error instanceof Error ? _error.message : 'Unknown error',
         });
         return [];
     }
@@ -158,7 +158,7 @@ export async function removeSavedListing(listingId: string) {
 
         revalidatePath('/saved');
         return { success: true };
-    } catch (error) {
+    } catch (_error) {
         return { error: 'Failed to remove listing' };
     }
 }

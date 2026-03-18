@@ -26,8 +26,7 @@ function getFrameSrc(index: number, isMobile: boolean): string {
 const rIC =
   typeof window !== 'undefined' && typeof window.requestIdleCallback === 'function'
     ? window.requestIdleCallback.bind(window)
-    : // eslint-disable-next-line @typescript-eslint/no-unused-vars
-      (cb: IdleRequestCallback, _opts?: IdleRequestOptions) =>
+    : (cb: IdleRequestCallback, _opts?: IdleRequestOptions) =>
         setTimeout(() => cb({ didTimeout: false, timeRemaining: () => 50 } as IdleDeadline), 1) as unknown as number;
 const cIC =
   typeof window !== 'undefined' && typeof window.cancelIdleCallback === 'function'

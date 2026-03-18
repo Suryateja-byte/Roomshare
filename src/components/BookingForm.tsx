@@ -60,7 +60,7 @@ const availabilityConfig: Record<ListingStatus, { label: string; colorClass: str
     }
 };
 
-export default function BookingForm({ listingId, price, ownerId, isOwner, isLoggedIn, status = 'ACTIVE', bookedDates = [], holdEnabled = false, totalSlots, availableSlots, bookingMode, holdTtlMinutes }: BookingFormProps) {
+export default function BookingForm({ listingId, price, isOwner, isLoggedIn, status = 'ACTIVE', bookedDates = [], holdEnabled = false, totalSlots, availableSlots, bookingMode, holdTtlMinutes }: BookingFormProps) {
     const [startDate, setStartDate] = useState('');
     const [endDate, setEndDate] = useState('');
 
@@ -334,7 +334,7 @@ export default function BookingForm({ listingId, price, ownerId, isOwner, isLogg
                     setFieldErrors(result.fieldErrors);
                 }
             }
-        } catch (error) {
+        } catch (_error) {
             // Catch unexpected errors (network failures, etc.)
             // Booking submission error caught — user sees generic message below
             setErrorType('server');
@@ -346,6 +346,7 @@ export default function BookingForm({ listingId, price, ownerId, isOwner, isLogg
                 isSubmittingRef.current = false;
             }, 2000);
         }
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- intentional dependency omission to prevent infinite loops
     }, [startDate, endDate, listingId, price, router]);
 
     const handleRetry = useCallback(() => {
@@ -484,7 +485,7 @@ export default function BookingForm({ listingId, price, ownerId, isOwner, isLogg
                     </div>
                     <p className="text-2xs text-zinc-500 dark:text-zinc-400 mt-2 flex items-center gap-1">
                         <Info className="w-3 h-3" />
-                        Select dates that don't overlap with booked periods
+                        Select dates that don&apos;t overlap with booked periods
                     </p>
                 </div>
             )}
@@ -685,7 +686,7 @@ export default function BookingForm({ listingId, price, ownerId, isOwner, isLogg
                 )}
 
                 <p className="text-center text-xs text-zinc-500 dark:text-zinc-400">
-                    You won't be charged yet
+                    You won&apos;t be charged yet
                 </p>
             </form>
             )}

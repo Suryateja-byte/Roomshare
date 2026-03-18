@@ -57,7 +57,7 @@ export default function VerificationForm() {
             if (result.error) {
                 setError(result.error);
             }
-        } catch (err) {
+        } catch (_err) {
             setError('Something went wrong. Please try again.');
         } finally {
             setIsSubmitting(false);

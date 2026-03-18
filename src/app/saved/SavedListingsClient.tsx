@@ -77,7 +77,7 @@ export default function SavedListingsClient({ initialListings }: SavedListingsCl
                 setListings(prev => prev.filter(l => l.id !== listingId));
                 toast.success('Listing removed from saved');
             }
-        } catch (error) {
+        } catch (_error) {
             toast.error('Failed to remove listing', {
                 description: 'Please try again later.',
             });

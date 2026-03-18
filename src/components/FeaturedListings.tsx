@@ -1,4 +1,4 @@
-import { getListingsPaginated, ListingData } from '@/lib/data';
+import { getListingsPaginated } from '@/lib/data';
 import FeaturedListingsClient from './FeaturedListingsClient';
 
 export default async function FeaturedListings() {

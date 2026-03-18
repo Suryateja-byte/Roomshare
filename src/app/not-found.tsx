@@ -11,11 +11,11 @@ export default function NotFound() {
                 </div>
 
                 <h1 className="text-4xl font-bold tracking-tight text-zinc-900 dark:text-white">
-                    Oops! We couldn't find that room.
+                    Oops! We couldn&apos;t find that room.
                 </h1>
 
                 <p className="text-lg text-zinc-600 dark:text-zinc-400">
-                    The listing you're looking for might have been removed or doesn't exist.
+                    The listing you&apos;re looking for might have been removed or doesn&apos;t exist.
                 </p>
 
                 <div className="pt-4">

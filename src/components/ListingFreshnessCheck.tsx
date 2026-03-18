@@ -36,6 +36,7 @@ export default function ListingFreshnessCheck({
                 checkListingExists();
             }
         }, interval);
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- intentional: start interval once on mount
     }, []);
 
     const checkListingExists = useCallback(async () => {

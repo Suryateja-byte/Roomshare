@@ -40,7 +40,6 @@ export default function ListingStatusToggle({ listingId, currentStatus }: Listin
     const [isUpdating, setIsUpdating] = useState(false);
 
     const config = statusConfig[status];
-    const Icon = config.icon;
 
     const handleStatusChange = async (newStatus: ListingStatus) => {
         if (newStatus === status) {

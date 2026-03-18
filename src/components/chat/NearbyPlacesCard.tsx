@@ -70,10 +70,10 @@ export function NearbyPlacesCard({
   canSearch = true,  // C2 FIX: Default to true for backwards compatibility
   remainingSearches,
   multiBrandDetected = false,  // P2-C3 FIX: Multi-brand warning
-  radiusMeters,      // Used by NeighborhoodModule (passed through)
-  onSearchResultsReady, // Used by NeighborhoodModule
-  onError,           // Used by NeighborhoodModule
-  onLoadingChange,   // Used by NeighborhoodModule
+  radiusMeters: _radiusMeters,      // Used by NeighborhoodModule (passed through)
+  onSearchResultsReady: _onSearchResultsReady, // Used by NeighborhoodModule
+  onError: _onError,           // Used by NeighborhoodModule
+  onLoadingChange: _onLoadingChange,   // Used by NeighborhoodModule
 }: NearbyPlacesCardProps) {
   const containerRef = useRef<HTMLDivElement>(null);
   const searchContainerRef = useRef<HTMLDivElement>(null);

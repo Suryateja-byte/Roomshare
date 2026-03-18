@@ -27,15 +27,6 @@ export function WebVitals() {
     useReportWebVitals((metric) => {
         const rating = getRating(metric.name, metric.value);
 
-        // Log in development for debugging
-        if (process.env.NODE_ENV === 'development') {
-            const color = rating === 'good' ? '#0cce6b' : rating === 'needs-improvement' ? '#ffa400' : '#ff4e42';
-            console.log(
-                `%c[Web Vitals] ${metric.name}: ${metric.value.toFixed(metric.name === 'CLS' ? 3 : 0)}${metric.name === 'CLS' ? '' : 'ms'} (${rating})`,
-                `color: ${color}; font-weight: bold;`
-            );
-        }
-
         // In production, send to analytics endpoint
         // Structured for easy integration with analytics services
         if (process.env.NODE_ENV === 'production') {

@@ -2,7 +2,7 @@ import { prisma } from '@/lib/prisma';
 import { notFound } from 'next/navigation';
 import { auth } from '@/auth';
 import UserProfileClient from './UserProfileClient';
-import { getAverageRating, getReviews } from '@/lib/data';
+import { getAverageRating } from '@/lib/data';
 
 export async function generateMetadata({ params }: { params: Promise<{ id: string }> }) {
     const { id } = await params;

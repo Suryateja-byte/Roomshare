@@ -155,6 +155,7 @@ export default function SearchForm({ variant = 'default' }: { variant?: 'default
             getLanguageName(code).toLowerCase().includes(search) ||
             code.toLowerCase().includes(search)
         );
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- intentional dependency omission to prevent infinite loops
     }, [languageSearch]);
 
     // Debounce and submission state to prevent race conditions
@@ -220,6 +221,7 @@ export default function SearchForm({ variant = 'default' }: { variant?: 'default
         }
         // Keep whatQuery in sync with URL
         setWhatQuery(searchParams.get('what') || '');
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- parseCoords is stable; including it would cause infinite re-renders
     }, [searchParams]);
 
     const router = useRouter();
@@ -297,6 +299,7 @@ export default function SearchForm({ variant = 'default' }: { variant?: 'default
             },
             { enableHighAccuracy: false, timeout: 10000, maximumAge: 60000 }
         );
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- geoLoading is read-only within callback; including it would cause re-creation on every state change
     }, []);
 
     const handleSearch = useCallback((e: React.FormEvent) => {

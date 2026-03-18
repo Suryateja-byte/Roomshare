@@ -76,9 +76,6 @@ export default function UserAvatar({ image, name, size = 'md', className }: User
                     sizes={`${sizePx[size]}px`}
                     className={cn("object-cover transition-opacity duration-200", isLoading ? "opacity-0" : "opacity-100")}
                     onLoad={() => {
-                        if (process.env.NODE_ENV === 'development') {
-                            console.log('[UserAvatar] Image loaded successfully:', image);
-                        }
                         setIsLoading(false);
                     }}
                     onError={() => {

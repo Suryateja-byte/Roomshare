@@ -2,7 +2,7 @@
 
 import { useState } from 'react';
 import { createReviewResponse, updateReviewResponse } from '@/app/actions/review-response';
-import { MessageSquare, Loader2, X, Check } from 'lucide-react';
+import { MessageSquare, Loader2, Check } from 'lucide-react';
 
 interface ReviewResponseFormProps {
     reviewId: string;
@@ -45,7 +45,7 @@ export default function ReviewResponseForm({
             } else {
                 onClose?.();
             }
-        } catch (err) {
+        } catch (_err) {
             setError('Something went wrong');
         } finally {
             setIsSubmitting(false);
