@@ -7,6 +7,7 @@ import { checkSuspension } from "@/app/actions/suspension";
 import { withRateLimit } from "@/lib/with-rate-limit";
 import { logger, sanitizeErrorMessage } from "@/lib/logger";
 import { captureApiError } from "@/lib/api-error-handler";
+import { validateCsrf } from "@/lib/csrf";
 import { z } from "zod";
 import { markListingDirty } from "@/lib/search/search-doc-dirty";
 import {
@@ -34,6 +35,9 @@ const updateReviewSchema = z.object({
 });
 
 export async function POST(request: Request) {
+  const csrfResponse = validateCsrf(request);
+  if (csrfResponse) return csrfResponse;
+
   // P1-5 FIX: Add rate limiting to prevent review spam
   const rateLimitResponse = await withRateLimit(request, {
     type: "createReview",
@@ -331,6 +335,9 @@ export async function GET(request: Request) {
 
 // Update a review (only the author can update their own review)
 export async function PUT(request: Request) {
+  const csrfResponse = validateCsrf(request);
+  if (csrfResponse) return csrfResponse;
+
   const rateLimitResponse = await withRateLimit(request, {
     type: "updateReview",
   });
@@ -431,6 +438,9 @@ export async function PUT(request: Request) {
 
 // Delete a review (only the author can delete their own review)
 export async function DELETE(request: Request) {
+  const csrfResponse = validateCsrf(request);
+  if (csrfResponse) return csrfResponse;
+
   const rateLimitResponse = await withRateLimit(request, {
     type: "deleteReview",
   });

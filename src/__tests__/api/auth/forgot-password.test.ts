@@ -15,11 +15,52 @@ jest.mock("@/lib/prisma", () => ({
 }));
 
 jest.mock("@/lib/email", () => ({
-  sendNotificationEmail: jest.fn(),
+  sendNotificationEmail: jest.fn(() =>
+    Promise.resolve({ success: true })
+  ),
 }));
 
 jest.mock("@/lib/with-rate-limit", () => ({
-  withRateLimit: jest.fn(() => null),
+  withRateLimit: jest.fn(() => Promise.resolve(null)),
+}));
+
+jest.mock("@/lib/csrf", () => ({
+  validateCsrf: jest.fn(() => null),
+}));
+
+jest.mock("@/lib/turnstile", () => ({
+  verifyTurnstileToken: jest.fn(() => Promise.resolve({ success: true })),
+}));
+
+jest.mock("@/lib/normalize-email", () => ({
+  normalizeEmail: jest.fn((email: string) => email.toLowerCase()),
+}));
+
+jest.mock("@/lib/token-security", () => ({
+  createTokenPair: jest.fn(() => ({
+    token: "test-plain-token",
+    tokenHash: "test-hash-token",
+  })),
+}));
+
+jest.mock("@/lib/logger", () => ({
+  logger: {
+    info: jest.fn(),
+    error: jest.fn(),
+    warn: jest.fn(),
+    debug: jest.fn(),
+    sync: {
+      debug: jest.fn(),
+      info: jest.fn(),
+      warn: jest.fn(),
+      error: jest.fn(),
+    },
+  },
+  sanitizeErrorMessage: jest.fn((e: unknown) => String(e)),
+}));
+
+jest.mock("@sentry/nextjs", () => ({
+  captureException: jest.fn(),
 }));
 
 jest.mock("next/server", () => ({
@@ -46,7 +87,8 @@ describe("Forgot Password API", () => {
   const createRequest = (body: object) =>
     new Request("http://localhost:3000/api/auth/forgot-password", {
       method: "POST",
-      body: JSON.stringify(body),
+      headers: { "content-type": "application/json", origin: "http://localhost:3000" },
+      body: JSON.stringify({ turnstileToken: "test-token", ...body }),
     }) as unknown as NextRequest;
 
   it("sends reset email for existing user", async () => {
@@ -59,7 +101,7 @@ describe("Forgot Password API", () => {
     (prisma.user.findUnique as jest.Mock).mockResolvedValue(mockUser);
     (prisma.passwordResetToken.deleteMany as jest.Mock).mockResolvedValue({});
     (prisma.passwordResetToken.create as jest.Mock).mockResolvedValue({});
-    (sendNotificationEmail as jest.Mock).mockResolvedValue({});
+    (sendNotificationEmail as jest.Mock).mockResolvedValue({ success: true });
 
     const request = createRequest({ email: "test@example.com" });
     const response = await POST(request);
@@ -95,7 +137,7 @@ describe("Forgot Password API", () => {
     const data = await response.json();
 
     expect(response.status).toBe(400);
-    expect(data.error).toBe("Email is required");
+    expect(data.error).toBe("Invalid input");
   });
 
   it("normalizes email to lowercase", async () => {
@@ -108,7 +150,7 @@ describe("Forgot Password API", () => {
     (prisma.user.findUnique as jest.Mock).mockResolvedValue(mockUser);
     (prisma.passwordResetToken.deleteMany as jest.Mock).mockResolvedValue({});
     (prisma.passwordResetToken.create as jest.Mock).mockResolvedValue({});
-    (sendNotificationEmail as jest.Mock).mockResolvedValue({});
+    (sendNotificationEmail as jest.Mock).mockResolvedValue({ success: true });
 
     const request = createRequest({ email: "TEST@EXAMPLE.COM" });
     await POST(request);
@@ -128,7 +170,7 @@ describe("Forgot Password API", () => {
     (prisma.user.findUnique as jest.Mock).mockResolvedValue(mockUser);
     (prisma.passwordResetToken.deleteMany as jest.Mock).mockResolvedValue({});
     (prisma.passwordResetToken.create as jest.Mock).mockResolvedValue({});
-    (sendNotificationEmail as jest.Mock).mockResolvedValue({});
+    (sendNotificationEmail as jest.Mock).mockResolvedValue({ success: true });
 
     const request = createRequest({ email: "test@example.com" });
     await POST(request);
@@ -148,7 +190,7 @@ describe("Forgot Password API", () => {
     (prisma.user.findUnique as jest.Mock).mockResolvedValue(mockUser);
     (prisma.passwordResetToken.deleteMany as jest.Mock).mockResolvedValue({});
     (prisma.passwordResetToken.create as jest.Mock).mockResolvedValue({});
-    (sendNotificationEmail as jest.Mock).mockResolvedValue({});
+    (sendNotificationEmail as jest.Mock).mockResolvedValue({ success: true });
 
     const request = createRequest({ email: "test@example.com" });
     await POST(request);

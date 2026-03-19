@@ -3,6 +3,7 @@ import { prisma } from "@/lib/prisma";
 import { auth } from "@/auth";
 import { withRateLimit } from "@/lib/with-rate-limit";
 import { captureApiError } from "@/lib/api-error-handler";
+import { validateCsrf } from "@/lib/csrf";
 import { z } from "zod";
 
 // P2-5: Zod schema for request validation
@@ -13,6 +14,9 @@ const createReportSchema = z.object({
 });
 
 export async function POST(request: Request) {
+  const csrfResponse = validateCsrf(request);
+  if (csrfResponse) return csrfResponse;
+
   // P2-5: Add rate limiting to prevent report spam
   const rateLimitResponse = await withRateLimit(request, {
     type: "createReport",

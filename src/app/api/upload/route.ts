@@ -3,6 +3,7 @@ import { auth } from "@/auth";
 import { createClient } from "@supabase/supabase-js";
 import { withRateLimit } from "@/lib/with-rate-limit";
 import { captureApiError } from "@/lib/api-error-handler";
+import { validateCsrf } from "@/lib/csrf";
 import { logger } from "@/lib/logger";
 import { z } from "zod";
 import sharp from "sharp";
@@ -49,6 +50,9 @@ const deleteUploadSchema = z.object({
 });
 
 export async function POST(request: NextRequest) {
+  const csrfResponse = validateCsrf(request);
+  if (csrfResponse) return csrfResponse;
+
   // P1-6 FIX: Add rate limiting to prevent storage abuse
   const rateLimitResponse = await withRateLimit(request, { type: "upload" });
   if (rateLimitResponse) return rateLimitResponse;
@@ -249,6 +253,9 @@ export async function POST(request: NextRequest) {
 
 // Delete uploaded image
 export async function DELETE(request: NextRequest) {
+  const csrfResponse = validateCsrf(request);
+  if (csrfResponse) return csrfResponse;
+
   const rateLimitResponse = await withRateLimit(request, {
     type: "uploadDelete",
   });

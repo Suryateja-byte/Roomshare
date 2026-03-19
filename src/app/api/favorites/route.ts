@@ -3,6 +3,7 @@ import { prisma } from "@/lib/prisma";
 import { auth } from "@/auth";
 import { withRateLimit } from "@/lib/with-rate-limit";
 import { captureApiError } from "@/lib/api-error-handler";
+import { validateCsrf } from "@/lib/csrf";
 import { z } from "zod";
 
 // P2-4: Zod schema for request validation
@@ -62,6 +63,10 @@ export async function GET(request: Request) {
 }
 
 export async function POST(request: Request) {
+  // CSRF protection
+  const csrfResponse = validateCsrf(request);
+  if (csrfResponse) return csrfResponse;
+
   // P2-4: Add rate limiting to prevent abuse
   const rateLimitResponse = await withRateLimit(request, {
     type: "toggleFavorite",

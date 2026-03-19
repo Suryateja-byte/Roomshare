@@ -19,6 +19,9 @@ const customJestConfig = {
     // Tests that transitively import it (via search-doc-queries → query-cache → gemini.ts)
     // get this no-op stub instead of the real ESM .mjs file that Jest can't parse.
     "^@google/genai$": "<rootDir>/src/__tests__/utils/google-genai-stub.js",
+    // Stub server-only — it throws at import time in non-server environments.
+    // All tests that transitively import modules using `import "server-only"` need this.
+    "^server-only$": "<rootDir>/src/__tests__/utils/empty-module.js",
   },
   testPathIgnorePatterns: [
     "<rootDir>/node_modules/",

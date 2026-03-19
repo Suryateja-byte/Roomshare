@@ -21,6 +21,7 @@ import { upsertSearchDocSync } from "@/lib/search/search-doc-sync";
 import { triggerInstantAlerts } from "@/lib/search-alerts";
 import { captureApiError } from "@/lib/api-error-handler";
 import { isCircuitOpenError } from "@/lib/circuit-breaker";
+import { validateCsrf } from "@/lib/csrf";
 import {
   calculateProfileCompletion,
   PROFILE_REQUIREMENTS,
@@ -99,6 +100,10 @@ export async function GET(request: Request) {
 }
 
 export async function POST(request: Request) {
+  // CSRF protection
+  const csrfResponse = validateCsrf(request);
+  if (csrfResponse) return csrfResponse;
+
   // 1. Rate limiting (existing)
   const rateLimitResponse = await withRateLimit(request, {
     type: "createListing",

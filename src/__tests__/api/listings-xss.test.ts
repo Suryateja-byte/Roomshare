@@ -8,6 +8,8 @@
  *   - Boundary-length strings are rejected by Zod max constraints
  */
 
+jest.mock("server-only", () => ({}));
+
 jest.mock("@/lib/prisma", () => ({
   prisma: {
     listing: {

@@ -47,6 +47,11 @@ export async function updateBookingStatus(
     };
   }
 
+  // Validate rejectionReason length if provided
+  if (rejectionReason !== undefined && rejectionReason.trim().length > 1000) {
+    return { error: "Rejection reason must not exceed 1000 characters" };
+  }
+
   try {
     // Get the booking with listing and user info for notifications
     const booking = await prisma.booking.findUnique({

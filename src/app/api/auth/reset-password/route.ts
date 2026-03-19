@@ -5,6 +5,7 @@ import { z } from "zod";
 import { withRateLimit } from "@/lib/with-rate-limit";
 import { hashToken, isValidTokenFormat } from "@/lib/token-security";
 import { logger, sanitizeErrorMessage } from "@/lib/logger";
+import { validateCsrf } from "@/lib/csrf";
 import * as Sentry from "@sentry/nextjs";
 
 const resetPasswordSchema = z.object({
@@ -14,6 +15,9 @@ const resetPasswordSchema = z.object({
 });
 
 export async function POST(request: NextRequest) {
+  const csrfResponse = validateCsrf(request);
+  if (csrfResponse) return csrfResponse;
+
   // P1-2 FIX: Add rate limiting to prevent token brute-forcing
   const rateLimitResponse = await withRateLimit(request, {
     type: "resetPassword",

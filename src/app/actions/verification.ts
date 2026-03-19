@@ -6,6 +6,7 @@ import { revalidatePath } from "next/cache";
 import { sendNotificationEmail } from "@/lib/email";
 import { logAdminAction } from "@/lib/audit";
 import { logger } from "@/lib/logger";
+import { z } from "zod";
 
 export type DocumentType = "passport" | "driver_license" | "national_id";
 
@@ -14,6 +15,12 @@ interface SubmitVerificationInput {
   documentUrl: string;
   selfieUrl?: string;
 }
+
+const submitVerificationSchema = z.object({
+  documentType: z.enum(["passport", "driver_license", "national_id"]),
+  documentUrl: z.string().url().max(2048),
+  selfieUrl: z.string().url().max(2048).optional(),
+});
 
 // 24-hour cooldown period after rejection (balances spam prevention with UX)
 const COOLDOWN_HOURS = 24;
@@ -25,6 +32,12 @@ export async function submitVerificationRequest(
   if (!session?.user?.id) {
     return { error: "Unauthorized", code: "SESSION_EXPIRED" };
   }
+
+  const parsed = submitVerificationSchema.safeParse(input);
+  if (!parsed.success) {
+    return { error: "Invalid verification input" };
+  }
+  const validatedInput = parsed.data;
 
   try {
     // Check if user already has a pending verification request
@@ -78,9 +91,9 @@ export async function submitVerificationRequest(
     const request = await prisma.verificationRequest.create({
       data: {
         userId: session.user.id,
-        documentType: input.documentType,
-        documentUrl: input.documentUrl,
-        selfieUrl: input.selfieUrl,
+        documentType: validatedInput.documentType,
+        documentUrl: validatedInput.documentUrl,
+        selfieUrl: validatedInput.selfieUrl,
       },
     });
 

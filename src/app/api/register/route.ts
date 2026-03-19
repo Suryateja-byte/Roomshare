@@ -5,18 +5,22 @@ import { z } from "zod";
 import { sendNotificationEmail } from "@/lib/email";
 import { withRateLimit } from "@/lib/with-rate-limit";
 import { captureApiError } from "@/lib/api-error-handler";
+import { validateCsrf } from "@/lib/csrf";
 import { logger } from "@/lib/logger";
 import { normalizeEmail } from "@/lib/normalize-email";
 import { createTokenPair } from "@/lib/token-security";
 import { verifyTurnstileToken } from "@/lib/turnstile";
 
 const registerSchema = z.object({
-  name: z.string().min(2),
-  email: z.string().email(),
-  password: z.string().min(12, "Password must be at least 12 characters"),
+  name: z.string().min(2).max(100),
+  email: z.string().email().max(254),
+  password: z.string().min(12, "Password must be at least 12 characters").max(128),
 });
 
 export async function POST(request: Request) {
+  const csrfResponse = validateCsrf(request);
+  if (csrfResponse) return csrfResponse;
+
   // Rate limit: 5 registrations per hour per IP
   const rateLimitResponse = await withRateLimit(request, { type: "register" });
   if (rateLimitResponse) return rateLimitResponse;

@@ -5,6 +5,7 @@ import { checkSuspension, checkEmailVerified } from "@/app/actions/suspension";
 import { checkBlockBeforeAction } from "@/app/actions/block";
 import { withRateLimit } from "@/lib/with-rate-limit";
 import { captureApiError } from "@/lib/api-error-handler";
+import { validateCsrf } from "@/lib/csrf";
 import {
   getAccessibleConversation,
   listConversationMessages,
@@ -17,6 +18,18 @@ import {
   buildPaginationResponse,
   buildPrismaQueryOptions,
 } from "@/lib/pagination-schema";
+import { z } from "zod";
+
+const sendMessageApiSchema = z.object({
+  conversationId: z.string().trim().min(1).max(100),
+  content: z.string().trim().min(1).max(2000),
+  action: z.string().max(20).optional(),
+});
+
+const markReadApiSchema = z.object({
+  conversationId: z.string().trim().min(1).max(100),
+  action: z.literal("markRead"),
+});
 
 function getMessageRateLimitIdentifier(
   request: Request,
@@ -248,6 +261,9 @@ export async function GET(request: Request) {
 }
 
 export async function POST(request: Request) {
+  const csrfResponse = validateCsrf(request);
+  if (csrfResponse) return csrfResponse;
+
   try {
     const session = await auth();
     if (!session?.user?.id) {
@@ -274,17 +290,14 @@ export async function POST(request: Request) {
       );
       if (rateLimitResponse) return rateLimitResponse;
 
-      const conversationId =
-        typeof body.conversationId === "string"
-          ? body.conversationId.trim()
-          : "";
-
-      if (!conversationId) {
+      const markReadParsed = markReadApiSchema.safeParse(body);
+      if (!markReadParsed.success) {
         return NextResponse.json(
-          { error: "conversationId is required" },
+          { error: "Invalid input" },
           { status: 400 }
         );
       }
+      const conversationId = markReadParsed.data.conversationId;
 
       const conversation = await getAccessibleConversation(
         conversationId,
@@ -334,30 +347,14 @@ export async function POST(request: Request) {
       );
     }
 
-    const conversationId =
-      typeof body.conversationId === "string" ? body.conversationId.trim() : "";
-    const content = typeof body.content === "string" ? body.content : "";
-
-    if (!conversationId || !content) {
+    const sendParsed = sendMessageApiSchema.safeParse(body);
+    if (!sendParsed.success) {
       return NextResponse.json(
-        { error: "Missing required fields" },
+        { error: "Invalid message payload" },
         { status: 400 }
       );
     }
-
-    const trimmedContent = content.trim();
-    if (trimmedContent.length === 0) {
-      return NextResponse.json(
-        { error: "Message cannot be empty" },
-        { status: 400 }
-      );
-    }
-    if (trimmedContent.length > 2000) {
-      return NextResponse.json(
-        { error: "Message must not exceed 2000 characters" },
-        { status: 400 }
-      );
-    }
+    const { conversationId, content: trimmedContent } = sendParsed.data;
 
     const conversation = await prisma.conversation.findUnique({
       where: { id: conversationId },

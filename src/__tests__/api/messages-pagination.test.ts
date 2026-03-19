@@ -511,7 +511,7 @@ describe("Messages Pagination (P1-03)", () => {
       const data = await response.json();
 
       expect(response.status).toBe(400);
-      expect(data.error).toContain("2000");
+      expect(data.error).toBe("Invalid message payload");
     });
 
     it("rejects empty message", async () => {

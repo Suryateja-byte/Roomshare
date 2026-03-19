@@ -124,10 +124,10 @@ export async function changePassword(
       error: "Too many requests. Please try again later.",
     };
 
-  if (newPassword.length < 12) {
+  if (newPassword.length < 12 || newPassword.length > 128) {
     return {
       success: false,
-      error: "New password must be at least 12 characters",
+      error: "Password must be between 12 and 128 characters",
     };
   }
 

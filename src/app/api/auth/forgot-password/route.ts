@@ -6,9 +6,19 @@ import { normalizeEmail } from "@/lib/normalize-email";
 import { createTokenPair } from "@/lib/token-security";
 import { verifyTurnstileToken } from "@/lib/turnstile";
 import { logger, sanitizeErrorMessage } from "@/lib/logger";
+import { validateCsrf } from "@/lib/csrf";
 import * as Sentry from "@sentry/nextjs";
+import { z } from "zod";
+
+const forgotPasswordSchema = z.object({
+  email: z.string().email().max(254),
+  turnstileToken: z.string().min(1).max(4096),
+});
 
 export async function POST(request: NextRequest) {
+  const csrfResponse = validateCsrf(request);
+  if (csrfResponse) return csrfResponse;
+
   // Rate limit: 3 password reset requests per hour per IP
   const rateLimitResponse = await withRateLimit(request, {
     type: "forgotPassword",
@@ -23,12 +33,12 @@ export async function POST(request: NextRequest) {
   }
 
   try {
-    const { email, turnstileToken } = await request.json();
-
-    // Validate email BEFORE spending a Turnstile API call
-    if (!email) {
-      return NextResponse.json({ error: "Email is required" }, { status: 400 });
+    const body = await request.json();
+    const parsed = forgotPasswordSchema.safeParse(body);
+    if (!parsed.success) {
+      return NextResponse.json({ error: "Invalid input" }, { status: 400 });
     }
+    const { email, turnstileToken } = parsed.data;
 
     // Verify Turnstile token before processing
     const turnstileResult = await verifyTurnstileToken(turnstileToken);

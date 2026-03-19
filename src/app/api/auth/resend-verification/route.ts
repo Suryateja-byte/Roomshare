@@ -6,9 +6,13 @@ import { withRateLimit } from "@/lib/with-rate-limit";
 import { normalizeEmail } from "@/lib/normalize-email";
 import { createTokenPair } from "@/lib/token-security";
 import { logger, sanitizeErrorMessage } from "@/lib/logger";
+import { validateCsrf } from "@/lib/csrf";
 import * as Sentry from "@sentry/nextjs";
 
 export async function POST(request: NextRequest) {
+  const csrfResponse = validateCsrf(request);
+  if (csrfResponse) return csrfResponse;
+
   // Rate limit: 3 resend requests per hour
   const rateLimitResponse = await withRateLimit(request, {
     type: "resendVerification",

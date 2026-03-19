@@ -22,6 +22,7 @@ import { markListingDirty } from "@/lib/search/search-doc-dirty";
 import { withRateLimit } from "@/lib/with-rate-limit";
 import { captureApiError } from "@/lib/api-error-handler";
 import { isCircuitOpenError } from "@/lib/circuit-breaker";
+import { validateCsrf } from "@/lib/csrf";
 import { logger } from "@/lib/logger";
 import { checkSuspension, checkEmailVerified } from "@/app/actions/suspension";
 import { normalizeStringList } from "@/lib/utils";
@@ -105,6 +106,9 @@ export async function DELETE(
   request: Request,
   { params }: { params: Promise<{ id: string }> }
 ) {
+  const csrfResponse = validateCsrf(request);
+  if (csrfResponse) return csrfResponse;
+
   const rateLimitResponse = await withRateLimit(request, {
     type: "deleteListing",
   });
@@ -272,6 +276,9 @@ export async function PATCH(
   request: Request,
   { params }: { params: Promise<{ id: string }> }
 ) {
+  const csrfResponse = validateCsrf(request);
+  if (csrfResponse) return csrfResponse;
+
   const rateLimitResponse = await withRateLimit(request, {
     type: "updateListing",
   });

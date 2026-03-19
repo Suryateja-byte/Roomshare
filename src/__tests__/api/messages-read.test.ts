@@ -65,7 +65,7 @@ describe("POST /api/messages?action=markRead", () => {
 
     expect(response.status).toBe(400);
     await expect(response.json()).resolves.toEqual({
-      error: "conversationId is required",
+      error: "Invalid input",
     });
   });
 
