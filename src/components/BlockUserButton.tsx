@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { Ban, Loader2, ShieldOff } from "lucide-react";
 import { FocusTrap } from "@/components/ui/FocusTrap";
 import { blockUser, unblockUser } from "@/app/actions/block";
@@ -23,6 +23,16 @@ export default function BlockUserButton({
   const [blocked, setBlocked] = useState(isBlocked);
   const [isLoading, setIsLoading] = useState(false);
   const [showConfirm, setShowConfirm] = useState(false);
+
+  // Close confirmation modal on Escape key
+  useEffect(() => {
+    if (!showConfirm) return;
+    const handleKeyDown = (e: KeyboardEvent) => {
+      if (e.key === "Escape") setShowConfirm(false);
+    };
+    document.addEventListener("keydown", handleKeyDown);
+    return () => document.removeEventListener("keydown", handleKeyDown);
+  }, [showConfirm]);
 
   const handleBlock = async () => {
     setIsLoading(true);

@@ -912,7 +912,7 @@ export default function SearchForm({
                   onFocus={() => handleFieldFocus("what")}
                   onBlur={handleFieldBlur}
                   placeholder="Describe your ideal room..."
-                  className="w-full bg-transparent border-none p-0 text-sm font-medium text-zinc-900 dark:text-white placeholder:text-zinc-300 dark:placeholder:text-zinc-600 focus:ring-0 focus:outline-none"
+                  className="w-full bg-transparent border-none p-0 text-sm font-medium text-zinc-900 dark:text-white placeholder:text-zinc-500 dark:placeholder:text-zinc-400 focus:ring-0 focus:outline-none focus-visible:ring-2 focus-visible:ring-zinc-900/30 dark:focus-visible:ring-zinc-400/40 focus-visible:rounded"
                   autoComplete="off"
                 />
                 {whatQuery && (
@@ -948,7 +948,7 @@ export default function SearchForm({
             <label
               htmlFor="search-location"
               className={cn(
-                "text-[10px] font-bold text-zinc-400 dark:text-zinc-500 uppercase tracking-[0.15em] mb-1 transition-opacity duration-200",
+                "text-[10px] font-bold text-zinc-500 dark:text-zinc-400 uppercase tracking-[0.15em] mb-1 transition-opacity duration-200",
                 focusedField !== null &&
                   focusedField !== "where" &&
                   "md:opacity-0"
@@ -1016,7 +1016,7 @@ export default function SearchForm({
           {showRecentSearches && recentSearches.length > 0 && (
             <div className="absolute top-full left-0 right-0 mt-3 bg-white/95 dark:bg-zinc-900/95 backdrop-blur-xl rounded-2xl shadow-2xl border border-zinc-200/50 dark:border-white/5 z-50 overflow-hidden animate-in fade-in slide-in-from-top-2 duration-300">
               <div className="flex items-center justify-between px-5 py-3 border-b border-zinc-100/50 dark:border-white/5">
-                <span className="text-[10px] font-bold text-zinc-400 uppercase tracking-widest">
+                <span className="text-[10px] font-bold text-zinc-500 uppercase tracking-widest">
                   Recent Searches
                 </span>
                 <Button
@@ -1028,7 +1028,7 @@ export default function SearchForm({
                     e.stopPropagation();
                     clearRecentSearches();
                   }}
-                  className="h-auto py-1 px-2 text-[10px] font-bold uppercase tracking-wider text-zinc-400 hover:text-red-500"
+                  className="h-auto py-1 px-2 text-[10px] font-bold uppercase tracking-wider text-zinc-500 hover:text-red-500"
                 >
                   Clear
                 </Button>
@@ -1075,7 +1075,7 @@ export default function SearchForm({
           {!isCompact && (
             <label
               className={cn(
-                "text-[10px] font-bold text-zinc-400 dark:text-zinc-500 uppercase tracking-[0.15em] mb-1 transition-opacity duration-200",
+                "text-[10px] font-bold text-zinc-500 dark:text-zinc-400 uppercase tracking-[0.15em] mb-1 transition-opacity duration-200",
                 focusedField !== null &&
                   focusedField !== "budget" &&
                   "md:opacity-0"
@@ -1086,7 +1086,7 @@ export default function SearchForm({
           )}
           <div className="flex items-center gap-2">
             <div className="flex items-center gap-1 flex-1">
-              <span className="text-zinc-300 text-xs">$</span>
+              <span className="text-zinc-500 text-xs">$</span>
               <input
                 id="search-budget-min"
                 aria-label="Minimum budget"
@@ -1097,14 +1097,14 @@ export default function SearchForm({
                 onFocus={() => handleFieldFocus("budget")}
                 onBlur={handleFieldBlur}
                 placeholder="Min"
-                className={`w-full bg-transparent border-none p-0 text-sm font-medium text-zinc-900 dark:text-white placeholder:text-zinc-300 dark:placeholder:text-zinc-600 focus:ring-0 focus:outline-none appearance-none [-moz-appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none`}
+                className={`w-full bg-transparent border-none p-0 text-sm font-medium text-zinc-900 dark:text-white placeholder:text-zinc-500 dark:placeholder:text-zinc-400 focus:ring-0 focus:outline-none focus-visible:ring-2 focus-visible:ring-zinc-900/30 dark:focus-visible:ring-zinc-400/40 focus-visible:rounded appearance-none [-moz-appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none`}
                 min="0"
                 step="50"
               />
             </div>
             <span className="text-zinc-200 dark:text-zinc-800 text-xs">—</span>
             <div className="flex items-center gap-1 flex-1">
-              <span className="text-zinc-300 text-xs">$</span>
+              <span className="text-zinc-500 text-xs">$</span>
               <input
                 id="search-budget-max"
                 aria-label="Maximum budget"
@@ -1115,7 +1115,7 @@ export default function SearchForm({
                 onFocus={() => handleFieldFocus("budget")}
                 onBlur={handleFieldBlur}
                 placeholder="Max"
-                className={`w-full bg-transparent border-none p-0 text-sm font-medium text-zinc-900 dark:text-white placeholder:text-zinc-300 dark:placeholder:text-zinc-600 focus:ring-0 focus:outline-none appearance-none [-moz-appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none`}
+                className={`w-full bg-transparent border-none p-0 text-sm font-medium text-zinc-900 dark:text-white placeholder:text-zinc-500 dark:placeholder:text-zinc-400 focus:ring-0 focus:outline-none focus-visible:ring-2 focus-visible:ring-zinc-900/30 dark:focus-visible:ring-zinc-400/40 focus-visible:rounded appearance-none [-moz-appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none`}
                 min="0"
                 step="50"
               />

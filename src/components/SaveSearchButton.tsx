@@ -205,15 +205,16 @@ export default function SaveSearchButton({
               <div className="space-y-4">
                 {/* Search Name */}
                 <div>
-                  <label className="block text-sm font-medium text-zinc-700 dark:text-zinc-300 mb-1">
+                  <label htmlFor="save-search-name" className="block text-sm font-medium text-zinc-700 dark:text-zinc-300 mb-1">
                     Search Name
                   </label>
                   <input
+                    id="save-search-name"
                     type="text"
                     value={name}
                     onChange={(e) => setName(e.target.value)}
                     placeholder="e.g., Downtown apartments under $1500"
-                    className="w-full px-4 py-2.5 border border-zinc-200 dark:border-zinc-700 dark:bg-zinc-800 rounded-lg focus:outline-none focus:ring-2 focus:ring-zinc-900/10 dark:text-white"
+                    className="w-full px-4 py-2.5 border border-zinc-200 dark:border-zinc-700 dark:bg-zinc-800 rounded-lg focus:outline-none focus-visible:ring-2 focus-visible:ring-zinc-900/30 dark:focus-visible:ring-zinc-400/40 dark:text-white"
                     aria-describedby={error ? "save-search-error" : undefined}
                     aria-invalid={!!error}
                   />

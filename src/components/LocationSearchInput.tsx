@@ -419,7 +419,7 @@ export default function LocationSearchInput({
           onCompositionStart={handleCompositionStart}
           onCompositionEnd={handleCompositionEnd}
           placeholder={placeholder}
-          className="w-full bg-transparent border-none p-0 text-zinc-900 dark:text-white placeholder:text-zinc-600 dark:placeholder:text-zinc-300 focus:ring-0 focus:outline-none text-sm truncate pr-8"
+          className="w-full bg-transparent border-none p-0 text-zinc-900 dark:text-white placeholder:text-zinc-500 dark:placeholder:text-zinc-400 focus:ring-0 focus:outline-none focus-visible:ring-2 focus-visible:ring-zinc-900/30 dark:focus-visible:ring-zinc-400/40 focus-visible:rounded text-sm truncate pr-8"
           autoComplete="off"
           // ARIA combobox attributes for screen reader accessibility
           role="combobox"

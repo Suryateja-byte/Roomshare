@@ -325,13 +325,13 @@ export function DatePicker({
                   onClick={() => handleDateSelect(day.date)}
                   className={cn(
                     "h-9 w-9 flex items-center justify-center text-sm rounded-xl transition-all duration-200",
-                    !day.isCurrentMonth && "text-zinc-300 dark:text-zinc-600",
+                    !day.isCurrentMonth && "text-zinc-400 dark:text-zinc-500",
                     day.isCurrentMonth &&
                       !selected &&
                       !day.isDisabled &&
                       "text-zinc-900 dark:text-white hover:bg-zinc-100 dark:hover:bg-zinc-800",
                     day.isDisabled &&
-                      "text-zinc-300 dark:text-zinc-700 cursor-not-allowed",
+                      "text-zinc-400 dark:text-zinc-500 cursor-not-allowed",
                     todayDate &&
                       !selected &&
                       "ring-2 ring-zinc-900/20 dark:ring-white/20",

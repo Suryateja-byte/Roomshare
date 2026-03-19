@@ -8,16 +8,22 @@ jest.mock("next-auth/react", () => ({
   signOut: (...args: any[]) => mockSignOut(...args),
 }));
 
-// Mock next/link
+// Mock next/link — forward all props to <a>
 jest.mock("next/link", () => {
   return function MockLink({
     children,
     href,
+    ...rest
   }: {
     children: React.ReactNode;
     href: string;
+    [key: string]: any;
   }) {
-    return <a href={href}>{children}</a>;
+    return (
+      <a href={href} {...rest}>
+        {children}
+      </a>
+    );
   };
 });
 
@@ -54,6 +60,48 @@ describe("UserMenu", () => {
     expect(screen.getByText("john@example.com")).toBeInTheDocument();
     expect(screen.getByText("Profile")).toBeInTheDocument();
     expect(screen.getByText("Sign out")).toBeInTheDocument();
+  });
+
+  it("has correct ARIA attributes on trigger", () => {
+    render(<UserMenu user={mockUser} />);
+    const trigger = screen.getByRole("button");
+    expect(trigger).toHaveAttribute("aria-haspopup", "menu");
+    expect(trigger).toHaveAttribute("aria-expanded", "false");
+  });
+
+  it("sets aria-expanded when open", async () => {
+    render(<UserMenu user={mockUser} />);
+    const trigger = screen.getByRole("button");
+
+    await userEvent.click(trigger);
+    expect(trigger).toHaveAttribute("aria-expanded", "true");
+  });
+
+  it("closes menu on Escape and returns focus to trigger", async () => {
+    render(<UserMenu user={mockUser} />);
+    const trigger = screen.getByRole("button");
+
+    await userEvent.click(trigger);
+    expect(screen.getByRole("menu")).toBeInTheDocument();
+
+    await userEvent.keyboard("{Escape}");
+    expect(screen.queryByRole("menu")).not.toBeInTheDocument();
+    expect(document.activeElement).toBe(trigger);
+  });
+
+  it("supports arrow key navigation between menu items", async () => {
+    render(<UserMenu user={mockUser} />);
+    await userEvent.click(screen.getByRole("button"));
+
+    const items = screen.getAllByRole("menuitem");
+    expect(items).toHaveLength(2);
+    expect(document.activeElement).toBe(items[0]);
+
+    await userEvent.keyboard("{ArrowDown}");
+    expect(document.activeElement).toBe(items[1]);
+
+    await userEvent.keyboard("{ArrowUp}");
+    expect(document.activeElement).toBe(items[0]);
   });
 
   it("shows profile link", async () => {

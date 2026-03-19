@@ -11,10 +11,15 @@ export async function generateMetadata({
   params: Promise<{ id: string }>;
 }): Promise<Metadata> {
   const { id } = await params;
-  const user = await prisma.user.findUnique({
-    where: { id },
-    select: { name: true },
-  });
+  let user: { name: string | null } | null = null;
+  try {
+    user = await prisma.user.findUnique({
+      where: { id },
+      select: { name: true },
+    });
+  } catch {
+    return { title: "User Profile | RoomShare" };
+  }
 
   if (!user) {
     return { title: "User Not Found" };

@@ -102,7 +102,8 @@ export default function MobileSearchOverlay({
                       type="text"
                       defaultValue={currentQuery}
                       placeholder="Search by city, neighborhood..."
-                      className="w-full h-10 pl-9 pr-4 bg-zinc-100 dark:bg-zinc-800 rounded-full text-sm text-zinc-900 dark:text-white placeholder:text-zinc-500 focus:outline-none focus:ring-2 focus:ring-zinc-900/20 dark:focus:ring-white/20"
+                      aria-label="Search by city or neighborhood"
+                      className="w-full h-10 pl-9 pr-4 bg-zinc-100 dark:bg-zinc-800 rounded-full text-sm text-zinc-900 dark:text-white placeholder:text-zinc-500 focus:outline-none focus-visible:ring-2 focus-visible:ring-zinc-900/30 dark:focus-visible:ring-zinc-400/40"
                       enterKeyHint="search"
                     />
                   </div>

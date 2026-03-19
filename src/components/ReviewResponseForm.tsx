@@ -71,8 +71,9 @@ export default function ReviewResponseForm({
         value={content}
         onChange={(e) => setContent(e.target.value)}
         placeholder="Write a thoughtful response..."
+        aria-label={isEditing ? "Edit your response" : "Respond to this review"}
         rows={3}
-        className="w-full px-4 py-3 border border-zinc-200 dark:border-zinc-700 rounded-lg focus:outline-none focus:ring-2 focus:ring-zinc-900/10 dark:focus:ring-white/10 resize-none text-sm bg-white dark:bg-zinc-900 text-zinc-900 dark:text-white placeholder:text-zinc-600 dark:placeholder:text-zinc-300"
+        className="w-full px-4 py-3 border border-zinc-200 dark:border-zinc-700 rounded-lg focus:outline-none focus-visible:ring-2 focus-visible:ring-zinc-900/30 dark:focus-visible:ring-zinc-400/40 resize-none text-sm bg-white dark:bg-zinc-900 text-zinc-900 dark:text-white placeholder:text-zinc-500 dark:placeholder:text-zinc-400"
         aria-describedby={error ? "review-response-error" : undefined}
         aria-invalid={!!error}
       />

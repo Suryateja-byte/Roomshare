@@ -5,6 +5,10 @@ import path from "path";
  * Playwright global setup — seeds E2E test data before any tests run.
  */
 export default async function globalSetup() {
+  if (process.env.SKIP_E2E_SEED) {
+    console.log("[global-setup] Skipping E2E seed (SKIP_E2E_SEED set)");
+    return;
+  }
   console.log("[global-setup] Running E2E seed...");
   try {
     execFileSync("node", ["scripts/seed-e2e.js"], {

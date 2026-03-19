@@ -74,10 +74,16 @@ export async function generateMetadata({
   params,
 }: PageProps): Promise<Metadata> {
   const { id } = await params;
-  const listing = await getListingWithLocation(id);
+
+  let listing;
+  try {
+    listing = await getListingWithLocation(id);
+  } catch {
+    return { title: "Listing | RoomShare" };
+  }
 
   if (!listing || listing.status !== "ACTIVE") {
-    return { title: "Listing Not Found" };
+    return { title: "Listing Not Found | RoomShare" };
   }
 
   // Use listing's first image if available, otherwise use default

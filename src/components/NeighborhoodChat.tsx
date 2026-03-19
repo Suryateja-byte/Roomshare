@@ -1001,8 +1001,9 @@ export default function NeighborhoodChat({
                     setInput(e.target.value.slice(0, MAX_INPUT_LENGTH))
                   }
                   placeholder="Ask anything..."
+                  aria-label="Ask the AI assistant"
                   disabled={isLoading}
-                  className="w-full relative bg-transparent border-0 px-6 py-4 text-[15px] placeholder:text-zinc-600 dark:placeholder:text-zinc-300 focus:ring-0 focus:outline-none text-zinc-900 dark:text-zinc-100 pr-12 rounded-[28px]"
+                  className="w-full relative bg-transparent border-0 px-6 py-4 text-[15px] placeholder:text-zinc-500 dark:placeholder:text-zinc-400 focus:ring-0 focus:outline-none focus-visible:ring-2 focus-visible:ring-zinc-900/30 dark:focus-visible:ring-zinc-400/40 focus-visible:rounded-[28px] text-zinc-900 dark:text-zinc-100 pr-12 rounded-[28px]"
                 />
                 <button
                   type="submit"

@@ -1003,7 +1003,7 @@ export default function ChatWindow({
                 isOffline ? "You're offline..." : "Type a message..."
               }
               maxLength={MESSAGE_MAX_LENGTH}
-              className="flex-1 bg-zinc-100 dark:bg-zinc-800 border-0 rounded-full px-5 py-3 text-sm text-zinc-900 dark:text-white placeholder:text-zinc-600 dark:placeholder:text-zinc-300 focus:outline-none focus:ring-2 focus:ring-zinc-900/10 dark:focus:ring-white/10 transition-all"
+              className="flex-1 bg-zinc-100 dark:bg-zinc-800 border-0 rounded-full px-5 py-3 text-sm text-zinc-900 dark:text-white placeholder:text-zinc-500 dark:placeholder:text-zinc-400 focus:outline-none focus-visible:ring-2 focus-visible:ring-zinc-900/30 dark:focus-visible:ring-zinc-400/40 transition-all"
               disabled={isSending}
             />
             <button

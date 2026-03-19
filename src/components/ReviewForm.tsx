@@ -271,7 +271,7 @@ export default function ReviewForm({
                   onClick={() => setRating(star)}
                   onMouseEnter={() => setHoveredRating(star)}
                   onMouseLeave={() => setHoveredRating(0)}
-                  className="focus:outline-none transition-transform hover:scale-110"
+                  className="focus:outline-none focus-visible:ring-2 focus-visible:ring-zinc-900/30 dark:focus-visible:ring-zinc-400/40 focus-visible:rounded transition-transform hover:scale-110"
                 >
                   <Star
                     className={cn(
@@ -501,7 +501,7 @@ export default function ReviewForm({
           <button
             key={star}
             type="button"
-            className="focus:outline-none transition-transform hover:scale-110"
+            className="focus:outline-none focus-visible:ring-2 focus-visible:ring-zinc-900/30 dark:focus-visible:ring-zinc-400/40 focus-visible:rounded transition-transform hover:scale-110"
             onMouseEnter={() => setHoveredRating(star)}
             onMouseLeave={() => setHoveredRating(0)}
             onClick={() => setRating(star)}
@@ -532,8 +532,9 @@ export default function ReviewForm({
           value={comment}
           onChange={(e) => setComment(e.target.value)}
           placeholder="Share your experience..."
+          aria-label="Write your review"
           maxLength={COMMENT_MAX_LENGTH}
-          className="w-full min-h-[100px] p-3 rounded-lg border border-zinc-200 dark:border-zinc-700 focus:outline-none focus:ring-2 focus:ring-zinc-900 dark:focus:ring-white/20 resize-y bg-white dark:bg-zinc-800 text-zinc-900 dark:text-white placeholder:text-zinc-600 dark:placeholder:text-zinc-300"
+          className="w-full min-h-[100px] p-3 rounded-lg border border-zinc-200 dark:border-zinc-700 focus:outline-none focus-visible:ring-2 focus-visible:ring-zinc-900/30 dark:focus-visible:ring-zinc-400/40 resize-y bg-white dark:bg-zinc-800 text-zinc-900 dark:text-white placeholder:text-zinc-500 dark:placeholder:text-zinc-400"
           disabled={isSubmitting}
           aria-describedby={error ? "review-form-error" : undefined}
           aria-invalid={!!error}

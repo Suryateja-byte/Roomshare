@@ -1,5 +1,6 @@
 "use client";
 
+import { useEffect } from "react";
 import { X, AlertCircle, ChevronRight } from "lucide-react";
 import Link from "next/link";
 import { FocusTrap } from "@/components/ui/FocusTrap";
@@ -21,10 +22,25 @@ export default function ProfileCompletionModal({
   required,
   missing,
 }: ProfileCompletionModalProps) {
+  // Close on Escape key
+  useEffect(() => {
+    if (!isOpen) return;
+    const handleKeyDown = (e: KeyboardEvent) => {
+      if (e.key === "Escape") onClose();
+    };
+    document.addEventListener("keydown", handleKeyDown);
+    return () => document.removeEventListener("keydown", handleKeyDown);
+  }, [isOpen, onClose]);
+
   if (!isOpen) return null;
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
+    <div
+      className="fixed inset-0 z-50 flex items-center justify-center p-4"
+      role="dialog"
+      aria-modal="true"
+      aria-labelledby="profile-completion-title"
+    >
       {/* Backdrop */}
       <div className="absolute inset-0 bg-black/50" onClick={onClose} />
 
@@ -33,7 +49,7 @@ export default function ProfileCompletionModal({
         <div className="relative bg-white dark:bg-zinc-900 rounded-2xl shadow-xl max-w-md w-full p-6">
           <button
             onClick={onClose}
-            className="absolute top-4 right-4 p-1 min-w-[44px] min-h-[44px] flex items-center justify-center text-zinc-400 dark:text-zinc-500 hover:text-zinc-600 dark:hover:text-zinc-300 transition-colors"
+            className="absolute top-4 right-4 p-1 min-w-[44px] min-h-[44px] flex items-center justify-center text-zinc-500 dark:text-zinc-400 hover:text-zinc-600 dark:hover:text-zinc-300 transition-colors focus-visible:ring-2 focus-visible:ring-zinc-900/30 dark:focus-visible:ring-zinc-400/40 focus-visible:ring-offset-2 rounded-sm"
             aria-label="Close modal"
           >
             <X className="w-5 h-5" />
@@ -44,7 +60,7 @@ export default function ProfileCompletionModal({
               <AlertCircle className="w-6 h-6 text-amber-600 dark:text-amber-400" />
             </div>
             <div>
-              <h2 className="text-lg font-semibold text-zinc-900 dark:text-white">
+              <h2 id="profile-completion-title" className="text-lg font-semibold text-zinc-900 dark:text-white">
                 Complete Your Profile
               </h2>
               <p className="text-sm text-zinc-500 dark:text-zinc-400">
