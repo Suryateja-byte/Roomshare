@@ -113,7 +113,7 @@ export default defineConfig({
       name: "Mobile Chrome",
       testIgnore: /\.(anon|admin)\.spec\.ts/,
       use: {
-        ...devices["Pixel 5"],
+        ...devices["Pixel 7"],
         storageState: "playwright/.auth/user.json",
       },
       dependencies: ["setup"],
@@ -123,7 +123,7 @@ export default defineConfig({
       name: "Mobile Safari",
       testIgnore: /\.(anon|admin)\.spec\.ts/,
       use: {
-        ...devices["iPhone 12"],
+        ...devices["iPhone 14"],
         storageState: "playwright/.auth/user.json",
       },
       dependencies: ["setup"],
