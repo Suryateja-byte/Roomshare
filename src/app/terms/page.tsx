@@ -66,9 +66,9 @@ export default function TermsPage() {
         {/* Sidebar Navigation */}
         <aside className="lg:w-64 flex-shrink-0 hidden lg:block">
           <div className="sticky top-32">
-            <h4 className="font-bold text-sm text-zinc-900 dark:text-white mb-4 uppercase tracking-wider pl-4">
+            <h2 className="font-bold text-sm text-zinc-900 dark:text-white mb-4 uppercase tracking-wider pl-4">
               Contents
-            </h4>
+            </h2>
             <nav className="space-y-1 border-l border-zinc-100 dark:border-zinc-800">
               {SECTIONS.map((section) => (
                 <button
@@ -125,18 +125,18 @@ export default function TermsPage() {
             </p>
             <div className="grid grid-cols-1 md:grid-cols-2 gap-4 not-prose mt-6">
               <div className="p-5 border border-zinc-100 dark:border-zinc-800 rounded-xl bg-white dark:bg-zinc-900 hover:border-zinc-300 dark:hover:border-zinc-600 transition-colors">
-                <h4 className="font-bold text-zinc-900 dark:text-white mb-2">
+                <h3 className="font-bold text-zinc-900 dark:text-white mb-2">
                   Account Security
-                </h4>
+                </h3>
                 <p className="text-sm text-zinc-500 dark:text-zinc-400">
                   You are responsible for safeguarding your password and for all
                   activities that occur under your account.
                 </p>
               </div>
               <div className="p-5 border border-zinc-100 dark:border-zinc-800 rounded-xl bg-white dark:bg-zinc-900 hover:border-zinc-300 dark:hover:border-zinc-600 transition-colors">
-                <h4 className="font-bold text-zinc-900 dark:text-white mb-2">
+                <h3 className="font-bold text-zinc-900 dark:text-white mb-2">
                   Verification
-                </h4>
+                </h3>
                 <p className="text-sm text-zinc-500 dark:text-zinc-400">
                   We reserve the right to verify your identity through various
                   means, including government ID.
@@ -191,9 +191,9 @@ export default function TermsPage() {
               Third-Party Services
             </h2>
             <div className="bg-zinc-50 dark:bg-zinc-900 rounded-2xl p-8 border border-zinc-100 dark:border-zinc-800">
-              <h4 className="font-semibold text-zinc-900 dark:text-white text-base mb-3">
+              <h3 className="font-semibold text-zinc-900 dark:text-white text-base mb-3">
                 Google Maps Platform
-              </h4>
+              </h3>
               <p className="text-zinc-600 dark:text-zinc-400 leading-relaxed mb-4">
                 RoomShare integrates with Google Maps Platform to provide
                 neighborhood exploration features. By using these features, you

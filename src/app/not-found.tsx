@@ -19,11 +19,17 @@ export default function NotFound() {
           doesn&apos;t exist.
         </p>
 
-        <div className="pt-4">
+        <div className="pt-4 flex flex-col sm:flex-row items-center gap-3">
           <Button asChild size="lg" className="rounded-full px-8">
             <Link href="/search">
               <Search className="mr-2 h-4 w-4" />
-              Back to Search
+              Search Rooms
+            </Link>
+          </Button>
+          <Button asChild variant="outline" size="lg" className="rounded-full px-8">
+            <Link href="/">
+              <Home className="mr-2 h-4 w-4" />
+              Go Home
             </Link>
           </Button>
         </div>

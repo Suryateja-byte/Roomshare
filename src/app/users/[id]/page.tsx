@@ -1,3 +1,4 @@
+import type { Metadata } from "next";
 import { prisma } from "@/lib/prisma";
 import { notFound } from "next/navigation";
 import { auth } from "@/auth";
@@ -8,7 +9,7 @@ export async function generateMetadata({
   params,
 }: {
   params: Promise<{ id: string }>;
-}) {
+}): Promise<Metadata> {
   const { id } = await params;
   const user = await prisma.user.findUnique({
     where: { id },
@@ -19,9 +20,25 @@ export async function generateMetadata({
     return { title: "User Not Found" };
   }
 
+  const title = `${user.name || "User"} | RoomShare`;
+  const description = `View ${user.name || "User"}'s profile on RoomShare. See listings, reviews, and verification status.`;
+
   return {
-    title: `${user.name || "User"} | RoomShare`,
-    description: `View ${user.name || "User"}'s profile on RoomShare`,
+    title,
+    description,
+    openGraph: {
+      title,
+      description,
+      type: "profile",
+    },
+    twitter: {
+      card: "summary",
+      title,
+      description,
+    },
+    alternates: {
+      canonical: `/users/${id}`,
+    },
   };
 }
 

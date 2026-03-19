@@ -1,3 +1,4 @@
+import type { Metadata } from "next";
 import { auth } from "@/auth";
 import { redirect } from "next/navigation";
 import { getMySavedSearches } from "@/app/actions/saved-search";
@@ -5,6 +6,12 @@ import SavedSearchList from "./SavedSearchList";
 import { Bookmark } from "lucide-react";
 import Link from "next/link";
 import type { SearchFilters } from "@/lib/search-utils";
+
+export const metadata: Metadata = {
+  title: "Saved Searches | RoomShare",
+  description: "Manage your saved room searches and get notified of new matches.",
+  robots: { index: false, follow: false },
+};
 
 export default async function SavedSearchesPage() {
   const session = await auth();

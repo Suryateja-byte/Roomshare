@@ -86,11 +86,26 @@ export async function generateMetadata({
       ? listing.images[0]
       : "https://images.unsplash.com/photo-1522708323590-d24dbb6b0267?auto=format&fit=crop&w=1200&q=80";
 
+  const title = `Rent this ${sanitizeUnicode(listing.title)} in ${listing.location?.city || "City"} | RoomShare`;
+  const description = sanitizeUnicode(listing.description).substring(0, 160);
+
   return {
-    title: `Rent this ${sanitizeUnicode(listing.title)} in ${listing.location?.city || "City"} | RoomShare`,
-    description: sanitizeUnicode(listing.description).substring(0, 160),
+    title,
+    description,
     openGraph: {
+      title,
+      description,
       images: [ogImage],
+      type: "website",
+    },
+    twitter: {
+      card: "summary_large_image",
+      title,
+      description,
+      images: [ogImage],
+    },
+    alternates: {
+      canonical: `/listings/${id}`,
     },
   };
 }
@@ -197,49 +212,105 @@ export default async function ListingPage({ params }: PageProps) {
     reviewCount: row.review_count,
   }));
 
+  // JSON-LD structured data for search engines.
+  // Content uses sanitizeUnicode() for title/description — safe from injection.
+  const jsonLd = listing.status === "ACTIVE" ? {
+    "@context": "https://schema.org",
+    "@type": "LodgingBusiness",
+    name: sanitizeUnicode(listing.title),
+    description: sanitizeUnicode(listing.description).substring(0, 300),
+    image: listing.images?.[0] || undefined,
+    address: listing.location
+      ? {
+          "@type": "PostalAddress",
+          addressLocality: listing.location.city,
+          addressRegion: listing.location.state,
+        }
+      : undefined,
+    ...(coordinates
+      ? {
+          geo: {
+            "@type": "GeoCoordinates",
+            latitude: coordinates.lat,
+            longitude: coordinates.lng,
+          },
+        }
+      : {}),
+    offers: {
+      "@type": "Offer",
+      price: Number(listing.price),
+      priceCurrency: "USD",
+      availability: listing.availableSlots > 0
+        ? "https://schema.org/InStock"
+        : "https://schema.org/SoldOut",
+    },
+    ...(reviews.length > 0
+      ? {
+          aggregateRating: {
+            "@type": "AggregateRating",
+            ratingValue: (
+              reviews.reduce((sum, r) => sum + r.rating, 0) / reviews.length
+            ).toFixed(1),
+            reviewCount: reviews.length,
+            bestRating: 5,
+            worstRating: 1,
+          },
+        }
+      : {}),
+  } : null;
+
   return (
-    <ListingPageClient
-      listing={{
-        id: listing.id,
-        title: listing.title,
-        description: listing.description,
-        price: Number(listing.price),
-        images: listing.images,
-        amenities: listing.amenities,
-        householdLanguages: listing.householdLanguages,
-        totalSlots: listing.totalSlots,
-        availableSlots: listing.availableSlots,
-        bookingMode: listing.bookingMode ?? "SHARED",
-        status: listing.status,
-        viewCount: listing.viewCount,
-        genderPreference: listing.genderPreference,
-        householdGender: listing.householdGender,
-        location: listing.location
-          ? {
-              city: listing.location.city,
-              state: listing.location.state,
-            }
-          : null,
-        owner: {
-          id: listing.owner.id,
-          name: listing.owner.name,
-          image: listing.owner.image,
-          bio: listing.owner.bio,
-          isVerified: listing.owner.isVerified,
-          createdAt: listing.owner.createdAt,
-        },
-        holdTtlMinutes: listing.holdTtlMinutes ?? 15,
-        ownerId: listing.ownerId,
-      }}
-      reviews={reviews}
-      isOwner={isOwner}
-      isLoggedIn={!!session?.user}
-      userHasBooking={false}
-      userExistingReview={null}
-      bookedDates={bookedDates}
-      holdEnabled={features.softHoldsEnabled}
-      coordinates={coordinates}
-      similarListings={similarListings}
-    />
+    <>
+      {jsonLd && (
+        <script
+          type="application/ld+json"
+          // Server-rendered static JSON — sanitized via sanitizeUnicode(), no XSS risk
+          dangerouslySetInnerHTML={{ __html: JSON.stringify(jsonLd) }}
+        />
+      )}
+      <ListingPageClient
+        listing={{
+          id: listing.id,
+          title: listing.title,
+          description: listing.description,
+          price: Number(listing.price),
+          images: listing.images,
+          amenities: listing.amenities,
+          householdLanguages: listing.householdLanguages,
+          totalSlots: listing.totalSlots,
+          availableSlots: listing.availableSlots,
+          bookingMode: listing.bookingMode ?? "SHARED",
+          status: listing.status,
+          viewCount: listing.viewCount,
+          genderPreference: listing.genderPreference,
+          householdGender: listing.householdGender,
+          location: listing.location
+            ? {
+                city: listing.location.city,
+                state: listing.location.state,
+              }
+            : null,
+          owner: {
+            id: listing.owner.id,
+            name: listing.owner.name,
+            image: listing.owner.image,
+            bio: listing.owner.bio,
+            isVerified: listing.owner.isVerified,
+            createdAt: listing.owner.createdAt,
+          },
+          holdTtlMinutes: listing.holdTtlMinutes ?? 15,
+          ownerId: listing.ownerId,
+        }}
+        reviews={reviews}
+        isOwner={isOwner}
+        isLoggedIn={!!session?.user}
+        userHasBooking={false}
+        userExistingReview={null}
+        bookedDates={bookedDates}
+        holdEnabled={features.softHoldsEnabled}
+        coordinates={coordinates}
+        similarListings={similarListings}
+      />
+    </>
   );
 }

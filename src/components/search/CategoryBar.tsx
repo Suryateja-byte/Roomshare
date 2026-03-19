@@ -214,9 +214,8 @@ export function CategoryBar() {
   };
 
   return (
-    <div
+    <nav
       className="relative border-b border-zinc-100 dark:border-zinc-800/50 bg-white dark:bg-zinc-950"
-      role="navigation"
       aria-label="Category filters"
     >
       {/* Left arrow */}
@@ -296,7 +295,7 @@ export function CategoryBar() {
           <ChevronRight className="w-4 h-4 text-zinc-900 dark:text-white" />
         </button>
       )}
-    </div>
+    </nav>
   );
 }
 

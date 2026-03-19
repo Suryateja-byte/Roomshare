@@ -1,6 +1,28 @@
 import { Suspense } from "react";
+import type { Metadata } from "next";
 import HomeClient from "./HomeClient";
 import FeaturedListings from "@/components/FeaturedListings";
+
+export const metadata: Metadata = {
+  title: "RoomShare — Find Compatible Roommates & Shared Housing",
+  description:
+    "Search verified roommates and shared living spaces. Compatible matching, instant messaging, and flexible leases. Find your ideal home today.",
+  openGraph: {
+    title: "RoomShare — Find Compatible Roommates & Shared Housing",
+    description:
+      "Search verified roommates and shared living spaces. Compatible matching, instant messaging, and flexible leases.",
+    type: "website",
+  },
+  twitter: {
+    card: "summary_large_image",
+    title: "RoomShare — Find Compatible Roommates & Shared Housing",
+    description:
+      "Search verified roommates and shared living spaces. Compatible matching, instant messaging, and flexible leases.",
+  },
+  alternates: {
+    canonical: "/",
+  },
+};
 
 // ISR: Revalidate featured listings every hour — homepage data is not time-critical
 export const revalidate = 3600;

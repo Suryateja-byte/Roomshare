@@ -1,8 +1,15 @@
+import type { Metadata } from "next";
 import { auth } from "@/auth";
 import ChatWindow from "./ChatWindow";
 import { prisma } from "@/lib/prisma";
 import { listConversationMessages } from "@/lib/messages";
 import { redirect } from "next/navigation";
+
+export const metadata: Metadata = {
+  title: "Conversation | RoomShare",
+  description: "Chat with your roommate or host on RoomShare.",
+  robots: { index: false, follow: false },
+};
 
 export default async function ChatPage({
   params,

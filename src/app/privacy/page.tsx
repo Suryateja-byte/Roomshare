@@ -76,9 +76,9 @@ export default function PrivacyPage() {
         {/* Sidebar Navigation (Sticky) */}
         <aside className="lg:w-64 flex-shrink-0 hidden lg:block">
           <div className="sticky top-32">
-            <h4 className="font-bold text-sm text-zinc-900 dark:text-white mb-4 uppercase tracking-wider pl-4">
+            <h2 className="font-bold text-sm text-zinc-900 dark:text-white mb-4 uppercase tracking-wider pl-4">
               Contents
-            </h4>
+            </h2>
             <nav className="space-y-1 border-l border-zinc-100 dark:border-zinc-800">
               {SECTIONS.map((section) => (
                 <button

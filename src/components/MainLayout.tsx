@@ -30,7 +30,6 @@ export default function MainLayout({
     <main
       id="main-content"
       className={`flex-grow${noPadding ? "" : " pt-16 md:pt-20"}`}
-      role="main"
     >
       {children}
     </main>

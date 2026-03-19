@@ -1,3 +1,4 @@
+import type { Metadata } from "next";
 import { auth } from "@/auth";
 import { redirect } from "next/navigation";
 import { prisma } from "@/lib/prisma";
@@ -14,6 +15,12 @@ import {
 } from "lucide-react";
 import Link from "next/link";
 import Image from "next/image";
+
+export const metadata: Metadata = {
+  title: "Audit Log | Admin | RoomShare",
+  description: "Review platform audit logs and administrative actions.",
+  robots: { index: false, follow: false },
+};
 
 // Action icons and labels
 const actionConfig: Record<

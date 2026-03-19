@@ -5,8 +5,7 @@ import { Button } from "@/components/ui/button";
 
 export default function OfflinePage() {
   return (
-    <div
-      role="main"
+    <main
       className="flex min-h-screen flex-col items-center justify-center bg-zinc-50 dark:bg-zinc-950 p-8"
     >
       {/* Offline icon */}
@@ -37,6 +36,6 @@ export default function OfflinePage() {
           We&apos;ll automatically reconnect when you&apos;re back online.
         </p>
       </div>
-    </div>
+    </main>
   );
 }

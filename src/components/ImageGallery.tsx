@@ -488,7 +488,7 @@ export default function ImageGallery({ images, title }: ImageGalleryProps) {
                   >
                     <ImageWithFallback
                       src={img}
-                      alt={`Thumbnail ${i + 1}`}
+                      alt={`${title} - Thumbnail ${i + 1}`}
                       hasError={brokenImages.has(i)}
                       onError={() => markImageBroken(i)}
                       sizes="64px"

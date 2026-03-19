@@ -1,9 +1,16 @@
+import type { Metadata } from "next";
 import { auth } from "@/auth";
 import { redirect } from "next/navigation";
 import { getMyVerificationStatus } from "@/app/actions/verification";
 import VerificationForm from "./VerificationForm";
 import { ShieldCheck, Clock, XCircle, CheckCircle2 } from "lucide-react";
 import Link from "next/link";
+
+export const metadata: Metadata = {
+  title: "Verify Your Identity | RoomShare",
+  description: "Complete identity verification to build trust with potential roommates.",
+  robots: { index: false, follow: false },
+};
 
 export default async function VerifyPage() {
   const session = await auth();

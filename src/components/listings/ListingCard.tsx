@@ -246,8 +246,7 @@ function ListingCardInner({
   const ariaLabel = `${displayTitle}: ${srParts.join(", ")}`;
 
   return (
-    <div
-      role="article"
+    <article
       aria-label={ariaLabel}
       data-testid="listing-card"
       data-listing-id={listing.id}
@@ -438,7 +437,7 @@ function ListingCardInner({
           </div>
         </div>
       </Link>
-    </div>
+    </article>
   );
 }
 

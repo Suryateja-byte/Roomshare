@@ -1,3 +1,4 @@
+import type { Metadata } from "next";
 import { auth } from "@/auth";
 import { redirect } from "next/navigation";
 import CreateListingForm from "./CreateListingForm";
@@ -7,6 +8,12 @@ import { prisma } from "@/lib/prisma";
 import { calculateProfileCompletion } from "@/lib/profile-completion";
 import ProfileWarningBanner from "./ProfileWarningBanner";
 import { features } from "@/lib/env";
+
+export const metadata: Metadata = {
+  title: "Create Listing | RoomShare",
+  description: "List your room or shared space on RoomShare and find the perfect roommate.",
+  robots: { index: false, follow: false },
+};
 
 export default async function CreateListingPage() {
   const session = await auth();

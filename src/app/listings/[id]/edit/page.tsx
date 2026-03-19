@@ -1,8 +1,15 @@
+import type { Metadata } from "next";
 import { prisma } from "@/lib/prisma";
 import { notFound, redirect } from "next/navigation";
 import { auth } from "@/auth";
 import EditListingForm from "./EditListingForm";
 import { features } from "@/lib/env";
+
+export const metadata: Metadata = {
+  title: "Edit Listing | RoomShare",
+  description: "Update your listing details, photos, and availability on RoomShare.",
+  robots: { index: false, follow: false },
+};
 
 interface PageProps {
   params: Promise<{ id: string }>;

@@ -72,6 +72,30 @@ export default async function RootLayout({
         />
         {/* Unsplash - fallback images */}
         <link rel="preconnect" href="https://images.unsplash.com" />
+        {/* JSON-LD: WebSite schema with SearchAction for sitelinks search box.
+            Content is static server-side JSON — no user input, safe from XSS. */}
+        <script
+          type="application/ld+json"
+          dangerouslySetInnerHTML={{
+            __html: JSON.stringify({
+              "@context": "https://schema.org",
+              "@type": "WebSite",
+              name: "RoomShare",
+              url:
+                process.env.NEXT_PUBLIC_APP_URL || "https://roomshare.app",
+              description:
+                "Find compatible roommates and shared housing. Verified profiles, instant messaging, and flexible leases.",
+              potentialAction: {
+                "@type": "SearchAction",
+                target: {
+                  "@type": "EntryPoint",
+                  urlTemplate: `${process.env.NEXT_PUBLIC_APP_URL || "https://roomshare.app"}/search?q={search_term_string}`,
+                },
+                "query-input": "required name=search_term_string",
+              },
+            }),
+          }}
+        />
       </head>
       <body className={inter.className}>
         <Providers nonce={nonce}>

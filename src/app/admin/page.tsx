@@ -1,3 +1,4 @@
+import type { Metadata } from "next";
 import { auth } from "@/auth";
 import { redirect } from "next/navigation";
 import { prisma } from "@/lib/prisma";
@@ -12,6 +13,12 @@ import {
   TrendingUp,
   Shield,
 } from "lucide-react";
+
+export const metadata: Metadata = {
+  title: "Admin Dashboard | RoomShare",
+  description: "RoomShare administration dashboard for platform management.",
+  robots: { index: false, follow: false },
+};
 
 async function getAdminStats() {
   const [

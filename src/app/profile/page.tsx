@@ -1,7 +1,14 @@
+import type { Metadata } from "next";
 import { auth } from "@/auth";
 import { prisma } from "@/lib/prisma";
 import { redirect } from "next/navigation";
 import ProfileClient from "./ProfileClient";
+
+export const metadata: Metadata = {
+  title: "My Profile | RoomShare",
+  description: "View and manage your RoomShare profile.",
+  robots: { index: false, follow: false },
+};
 
 export default async function ProfilePage() {
   const session = await auth();

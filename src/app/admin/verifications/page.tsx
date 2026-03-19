@@ -1,9 +1,16 @@
+import type { Metadata } from "next";
 import { auth } from "@/auth";
 import { redirect } from "next/navigation";
 import { prisma } from "@/lib/prisma";
 import VerificationList from "./VerificationList";
 import Link from "next/link";
 import { ArrowLeft, ShieldCheck } from "lucide-react";
+
+export const metadata: Metadata = {
+  title: "Verification Queue | Admin | RoomShare",
+  description: "Review and manage user identity verification requests.",
+  robots: { index: false, follow: false },
+};
 
 export default async function VerificationsPage() {
   const session = await auth();

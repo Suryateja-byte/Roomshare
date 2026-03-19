@@ -493,14 +493,14 @@ export default function NavbarClient({
   );
 
   return (
-    <nav
-      aria-label="Main navigation"
+    <header
       className={`fixed top-0 left-0 right-0 z-dropdown transition-all duration-500 ease-[cubic-bezier(0.16,1,0.3,1)] data-[anim-hidden=true]:-translate-y-full data-[anim-hidden=true]:opacity-0 data-[anim-hidden=true]:pointer-events-none data-[anim-hidden=true]:border-transparent ${
         isScrolled
           ? "py-4 bg-white/95 dark:bg-zinc-950/95 backdrop-blur-md shadow-sm border-b border-zinc-200/50 dark:border-zinc-800/50"
           : "py-6 bg-transparent"
       }`}
     >
+    <nav aria-label="Main navigation">
       <div className="max-w-7xl mx-auto px-6 sm:px-8">
         <div className="flex justify-between items-center h-10">
           {/* --- LEFT: Logo --- */}
@@ -847,5 +847,6 @@ export default function NavbarClient({
         </div>
       </div>
     </nav>
+    </header>
   );
 }

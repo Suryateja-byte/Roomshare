@@ -1,8 +1,15 @@
 import { Suspense } from "react";
+import type { Metadata } from "next";
 import { auth } from "@/auth";
 import { redirect } from "next/navigation";
 import MessagesPageClient from "@/components/MessagesPageClient";
 import { getConversations } from "@/app/actions/chat";
+
+export const metadata: Metadata = {
+  title: "Messages | RoomShare",
+  description: "View and manage your conversations with roommates and hosts.",
+  robots: { index: false, follow: false },
+};
 
 export default async function MessagesPage() {
   const session = await auth();
