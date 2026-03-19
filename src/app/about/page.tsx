@@ -173,7 +173,7 @@ export default function AboutPage() {
               <TeamMember
                 name="Suryatheja Deverakonda"
                 role="Founder & Creator"
-                image="/images/team/surya.jpg"
+                image="/images/team/surya.webp"
               />
             </div>
           </div>

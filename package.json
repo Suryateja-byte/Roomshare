@@ -2,6 +2,7 @@
   "name": "roomshare",
   "version": "0.1.0",
   "private": true,
+  "sideEffects": false,
   "scripts": {
     "postinstall": "prisma generate",
     "dev": "node scripts/run-dev.js",
