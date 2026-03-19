@@ -191,9 +191,12 @@ export function SearchResultsClient({
     } catch (err) {
       const raw =
         err instanceof Error ? err.message : "Failed to load more results";
-      const friendly = raw.includes("Rate limit")
-        ? "Too many requests — please wait a moment and try again."
-        : "Failed to load more results. Please try again.";
+      const friendly =
+        raw.includes("Rate limit") || raw.includes("Too many requests")
+          ? "Too many requests — please wait 30 seconds and try again."
+          : raw.includes("fetch") || raw.includes("network") || raw.includes("Failed to fetch")
+            ? "Connection lost. Check your internet and try again."
+            : "Failed to load more results. Please try again.";
       setLoadError(friendly);
     } finally {
       isLoadingRef.current = false;

@@ -79,6 +79,10 @@ function SignUpForm() {
 
       if (!res.ok) {
         const json = await res.json();
+        if (res.status === 429) {
+          const retryAfter = json.retryAfter || parseInt(res.headers.get("Retry-After") || "60", 10);
+          throw new Error(`Too many attempts. Please wait ${retryAfter} seconds and try again.`);
+        }
         throw new Error(json.error || "Failed to register");
       }
 

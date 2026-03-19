@@ -79,6 +79,11 @@ function ResetPasswordForm() {
 
       const data = await response.json();
 
+      if (response.status === 429) {
+        const retryAfter = data.retryAfter || parseInt(response.headers.get("Retry-After") || "60", 10);
+        throw new Error(`Too many attempts. Please wait ${retryAfter} seconds and try again.`);
+      }
+
       if (!response.ok) {
         throw new Error(data.error || "Something went wrong");
       }

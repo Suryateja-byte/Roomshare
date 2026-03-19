@@ -4,6 +4,7 @@ import { useState, useCallback } from "react";
 import { Heart } from "lucide-react";
 import { useRouter } from "next/navigation";
 import { cn } from "@/lib/utils";
+import { toast } from "sonner";
 
 interface FavoriteButtonProps {
   listingId: string;
@@ -64,6 +65,7 @@ export default function FavoriteButton({
       } catch (error) {
         console.error("Error toggling favorite:", error);
         setIsSaved(previousState); // Revert on error
+        toast.error("Couldn\u2019t update saved listings. Try again.");
       } finally {
         setIsLoading(false);
       }

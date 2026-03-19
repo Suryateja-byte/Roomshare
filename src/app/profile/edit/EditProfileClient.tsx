@@ -101,10 +101,19 @@ export default function EditProfileClient({ user }: EditProfileClientProps) {
       formData.append("file", file);
       formData.append("type", "profile");
 
-      const response = await fetch("/api/upload", {
-        method: "POST",
-        body: formData,
-      });
+      const controller = new AbortController();
+      const timeoutId = setTimeout(() => controller.abort(), 60_000);
+
+      let response: Response;
+      try {
+        response = await fetch("/api/upload", {
+          method: "POST",
+          body: formData,
+          signal: controller.signal,
+        });
+      } finally {
+        clearTimeout(timeoutId);
+      }
 
       const data = await response.json();
 
@@ -114,7 +123,13 @@ export default function EditProfileClient({ user }: EditProfileClientProps) {
 
       setImageUrl(data.url);
     } catch (_err) {
-      setError(_err instanceof Error ? _err.message : "Upload failed");
+      const message =
+        _err instanceof Error && _err.name === "AbortError"
+          ? "Upload timed out. Please try a smaller file or check your connection."
+          : _err instanceof Error
+            ? _err.message
+            : "Upload failed";
+      setError(message);
     } finally {
       setIsUploading(false);
       // Reset input so same file can be selected again

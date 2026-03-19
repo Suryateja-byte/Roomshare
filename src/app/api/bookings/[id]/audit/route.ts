@@ -2,6 +2,8 @@ import { NextRequest, NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
 import { auth } from "@/auth";
 import { features } from "@/lib/env";
+import { logger, sanitizeErrorMessage } from "@/lib/logger";
+import * as Sentry from "@sentry/nextjs";
 
 export async function GET(
   _request: NextRequest,
@@ -23,43 +25,58 @@ export async function GET(
     return NextResponse.json({ error: "Invalid booking ID" }, { status: 400 });
   }
 
-  const booking = await prisma.booking.findUnique({
-    where: { id },
-    include: { listing: { select: { ownerId: true } } },
-  });
+  try {
+    const booking = await prisma.booking.findUnique({
+      where: { id },
+      include: { listing: { select: { ownerId: true } } },
+    });
 
-  if (!booking) {
-    return NextResponse.json({ error: "Booking not found" }, { status: 404 });
+    if (!booking) {
+      return NextResponse.json(
+        { error: "Booking not found" },
+        { status: 404 }
+      );
+    }
+
+    // Authorization: tenant, host, or admin
+    const userId = session.user.id;
+    const isAuthorized =
+      userId === booking.tenantId ||
+      userId === booking.listing.ownerId ||
+      session.user.isAdmin;
+
+    if (!isAuthorized) {
+      return NextResponse.json({ error: "Forbidden" }, { status: 403 });
+    }
+
+    const auditLogs = await prisma.bookingAuditLog.findMany({
+      where: { bookingId: id },
+      orderBy: { createdAt: "asc" },
+      select: {
+        id: true,
+        action: true,
+        previousStatus: true,
+        newStatus: true,
+        actorType: true,
+        details: true,
+        createdAt: true,
+        // actorId intentionally excluded — PII protection
+      },
+    });
+
+    return NextResponse.json({
+      bookingId: id,
+      entries: auditLogs,
+    });
+  } catch (error) {
+    logger.sync.error("Booking audit log error", {
+      error: sanitizeErrorMessage(error),
+      route: "/api/bookings/[id]/audit",
+    });
+    Sentry.captureException(error);
+    return NextResponse.json(
+      { error: "Internal server error" },
+      { status: 500 }
+    );
   }
-
-  // Authorization: tenant, host, or admin
-  const userId = session.user.id;
-  const isAuthorized =
-    userId === booking.tenantId ||
-    userId === booking.listing.ownerId ||
-    session.user.isAdmin;
-
-  if (!isAuthorized) {
-    return NextResponse.json({ error: "Forbidden" }, { status: 403 });
-  }
-
-  const auditLogs = await prisma.bookingAuditLog.findMany({
-    where: { bookingId: id },
-    orderBy: { createdAt: "asc" },
-    select: {
-      id: true,
-      action: true,
-      previousStatus: true,
-      newStatus: true,
-      actorType: true,
-      details: true,
-      createdAt: true,
-      // actorId intentionally excluded — PII protection
-    },
-  });
-
-  return NextResponse.json({
-    bookingId: id,
-    entries: auditLogs,
-  });
 }

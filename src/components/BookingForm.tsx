@@ -35,6 +35,7 @@ type ErrorType =
   | "network"
   | "blocked"
   | "auth"
+  | "rate_limit"
   | null;
 
 interface BookedDateRange {
@@ -236,6 +237,11 @@ export default function BookingForm({
       return "validation";
 
     const errorMsg = result.error?.toLowerCase() || "";
+    if (
+      errorMsg.includes("too many requests") ||
+      errorMsg.includes("rate limit")
+    )
+      return "rate_limit";
     if (errorMsg.includes("blocked")) return "blocked";
     if (errorMsg.includes("network") || errorMsg.includes("fetch"))
       return "network";
@@ -415,6 +421,10 @@ export default function BookingForm({
           setMessage(
             `The listing price has changed to $${result.currentPrice}/month. Please review and try again.`
           );
+        } else if (errType === "rate_limit") {
+          setMessage(
+            "Too many booking requests. Please wait a minute and try again."
+          );
         } else if (errType === "auth") {
           setMessage("Your session has expired. Please sign in again.");
         } else if (errType === "server") {
@@ -464,14 +474,14 @@ export default function BookingForm({
   const renderErrorBanner = () => {
     if (!message || message.includes("success")) return null;
 
-    const isRetryable = errorType === "server" || errorType === "network";
+    const isRetryable = errorType === "server" || errorType === "network" || errorType === "rate_limit";
     const isAuthError = errorType === "auth";
 
     return (
       <div
         role="alert"
         className={`rounded-xl p-4 ${
-          errorType === "server" || errorType === "network"
+          errorType === "server" || errorType === "network" || errorType === "rate_limit"
             ? "bg-amber-50 dark:bg-amber-900/20 border border-amber-200 dark:border-amber-800"
             : "bg-red-50 dark:bg-red-900/20 border border-red-200 dark:border-red-800"
         }`}
@@ -479,12 +489,12 @@ export default function BookingForm({
         <div className="flex items-start gap-3">
           <div
             className={`flex-shrink-0 w-8 h-8 rounded-full flex items-center justify-center ${
-              errorType === "server" || errorType === "network"
+              errorType === "server" || errorType === "network" || errorType === "rate_limit"
                 ? "bg-amber-100 dark:bg-amber-900/50"
                 : "bg-red-100 dark:bg-red-900/50"
             }`}
           >
-            {errorType === "server" || errorType === "network" ? (
+            {errorType === "server" || errorType === "network" || errorType === "rate_limit" ? (
               <AlertTriangle className="w-4 h-4 text-amber-600 dark:text-amber-400" />
             ) : (
               <XCircle className="w-4 h-4 text-red-600 dark:text-red-400" />
@@ -493,7 +503,7 @@ export default function BookingForm({
           <div className="flex-1 min-w-0">
             <p
               className={`text-sm font-medium ${
-                errorType === "server" || errorType === "network"
+                errorType === "server" || errorType === "network" || errorType === "rate_limit"
                   ? "text-amber-800 dark:text-amber-200"
                   : "text-red-800 dark:text-red-200"
               }`}

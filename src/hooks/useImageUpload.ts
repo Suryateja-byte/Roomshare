@@ -3,6 +3,7 @@
 import { useState, useCallback, useRef } from "react";
 
 const DEFAULT_MAX_SIZE_BYTES = 5 * 1024 * 1024; // 5MB
+const UPLOAD_TIMEOUT_MS = 60_000; // 60s timeout for file uploads
 const DEFAULT_ACCEPTED_TYPES = [
   "image/jpeg",
   "image/png",
@@ -106,10 +107,22 @@ export function useImageUpload(
         formData.append("file", file);
         formData.append("type", uploadType);
 
-        const response = await fetch("/api/upload", {
-          method: "POST",
-          body: formData,
-        });
+        const controller = new AbortController();
+        const timeoutId = setTimeout(
+          () => controller.abort(),
+          UPLOAD_TIMEOUT_MS
+        );
+
+        let response: Response;
+        try {
+          response = await fetch("/api/upload", {
+            method: "POST",
+            body: formData,
+            signal: controller.signal,
+          });
+        } finally {
+          clearTimeout(timeoutId);
+        }
 
         const data = await response.json();
 
@@ -119,7 +132,12 @@ export function useImageUpload(
 
         return data.url;
       } catch (err) {
-        const message = err instanceof Error ? err.message : "Upload failed";
+        const message =
+          err instanceof Error && err.name === "AbortError"
+            ? "Upload timed out. Please try a smaller file or check your connection."
+            : err instanceof Error
+              ? err.message
+              : "Upload failed";
         setError(message);
         throw err;
       } finally {

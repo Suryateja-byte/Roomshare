@@ -62,10 +62,19 @@ export default function ImageUpload({
         formData.append("file", file);
         formData.append("type", type);
 
-        const response = await fetch("/api/upload", {
-          method: "POST",
-          body: formData,
-        });
+        const controller = new AbortController();
+        const timeoutId = setTimeout(() => controller.abort(), 60_000);
+
+        let response: Response;
+        try {
+          response = await fetch("/api/upload", {
+            method: "POST",
+            body: formData,
+            signal: controller.signal,
+          });
+        } finally {
+          clearTimeout(timeoutId);
+        }
 
         const data = await response.json();
 
@@ -82,7 +91,13 @@ export default function ImageUpload({
         onChange(uploadedUrls[0]);
       }
     } catch (err) {
-      setError(err instanceof Error ? err.message : "Upload failed");
+      const message =
+        err instanceof Error && err.name === "AbortError"
+          ? "Upload timed out. Please try a smaller file or check your connection."
+          : err instanceof Error
+            ? err.message
+            : "Upload failed";
+      setError(message);
     } finally {
       setIsUploading(false);
     }

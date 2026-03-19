@@ -33,6 +33,7 @@ export default function ReportButton({ listingId }: ReportButtonProps) {
   const [details, setDetails] = useState("");
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [success, setSuccess] = useState(false);
+  const [error, setError] = useState("");
 
   // Prevent hydration mismatch by only rendering Dialog on client
   useEffect(() => {
@@ -43,6 +44,7 @@ export default function ReportButton({ listingId }: ReportButtonProps) {
     if (!reason) return;
 
     setIsSubmitting(true);
+    setError("");
     try {
       const response = await fetch("/api/reports", {
         method: "POST",
@@ -56,17 +58,25 @@ export default function ReportButton({ listingId }: ReportButtonProps) {
         }),
       });
 
-      if (response.ok) {
-        setSuccess(true);
-        setTimeout(() => {
-          setIsOpen(false);
-          setSuccess(false);
-          setReason("");
-          setDetails("");
-        }, 2000);
+      if (response.status === 429) {
+        setError("Too many reports submitted. Please wait a minute and try again.");
+        return;
       }
-    } catch (error) {
-      console.error("Error submitting report:", error);
+
+      if (!response.ok) {
+        setError("Something went wrong. Please try again.");
+        return;
+      }
+
+      setSuccess(true);
+      setTimeout(() => {
+        setIsOpen(false);
+        setSuccess(false);
+        setReason("");
+        setDetails("");
+      }, 2000);
+    } catch (_err) {
+      setError("Couldn\u2019t connect. Check your internet and try again.");
     } finally {
       setIsSubmitting(false);
     }
@@ -112,6 +122,11 @@ export default function ReportButton({ listingId }: ReportButtonProps) {
           </div>
         ) : (
           <div className="grid gap-4 py-4">
+            {error && (
+              <div className="bg-red-50 dark:bg-red-900/20 border border-red-200 dark:border-red-800 text-red-700 dark:text-red-300 px-4 py-3 rounded-lg text-sm">
+                {error}
+              </div>
+            )}
             <div className="grid gap-2">
               <Label htmlFor="reason">Reason</Label>
               <Select onValueChange={setReason} value={reason}>

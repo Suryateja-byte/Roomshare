@@ -68,7 +68,13 @@ function LoginForm() {
       });
 
       if (result?.error) {
-        setError("Incorrect email or password. Check your details and try again.");
+        const isRateLimited = result.status === 429 ||
+          result.error?.toLowerCase().includes("too many");
+        setError(
+          isRateLimited
+            ? "Too many sign-in attempts. Please wait a minute and try again."
+            : "Incorrect email or password. Check your details and try again."
+        );
         turnstileRef.current?.reset();
         setTurnstileToken("");
         setLoading(false);

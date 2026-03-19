@@ -116,6 +116,7 @@ describe("useImageUpload", () => {
       expect(mockFetch).toHaveBeenCalledWith("/api/upload", {
         method: "POST",
         body: expect.any(FormData),
+        signal: expect.any(AbortSignal),
       });
 
       // Verify FormData contents
