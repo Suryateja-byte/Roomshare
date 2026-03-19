@@ -4,7 +4,7 @@
  * Measures LCP, CLS, and load timing for critical public pages.
  * Budgets are CI-friendly (generous) to account for shared CI runners,
  * cold starts, and network latency:
- *   LCP <8000ms (CI: 24000ms), CLS <0.5 (CI: 1.5), Page load <10000ms (CI: 30000ms), DCL <8000ms (CI: 24000ms).
+ *   LCP <8000ms (CI: 24000ms), CLS <0.1 (CI: 0.25), Page load <10000ms (CI: 30000ms), DCL <8000ms (CI: 24000ms).
  */
 
 import { test, expect, SF_BOUNDS } from "../helpers";
@@ -78,7 +78,7 @@ test.describe("Core Web Vitals — Anonymous Pages", () => {
   // ────────────────────────────────────────────────────────
   const isCI = !!process.env.CI;
   const LCP_BUDGET = isCI ? 24000 : 8000;
-  const CLS_BUDGET = isCI ? 1.5 : 0.5;
+  const CLS_BUDGET = isCI ? 0.25 : 0.1;
   const LOAD_BUDGET = isCI ? 30000 : 10000;
   const DCL_BUDGET = isCI ? 24000 : 8000;
 
