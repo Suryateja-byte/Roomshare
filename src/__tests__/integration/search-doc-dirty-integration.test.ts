@@ -14,7 +14,20 @@ jest.mock("@/lib/search/search-doc-dirty", () => ({
   markListingsDirty: (...args: unknown[]) => mockMarkListingsDirty(...args),
 }));
 
-// Mock prisma
+// Mock prisma — tx object for interactive transactions
+const mockTx = {
+  $queryRaw: jest.fn(),
+  listing: {
+    create: jest.fn(),
+    update: jest.fn(),
+    delete: jest.fn(),
+    findUnique: jest.fn(),
+  },
+  booking: {
+    count: jest.fn().mockResolvedValue(0),
+  },
+};
+
 const mockPrisma = {
   listing: {
     create: jest.fn(),
@@ -45,7 +58,9 @@ const mockPrisma = {
     deleteMany: jest.fn(),
   },
   user: { findUnique: jest.fn().mockResolvedValue({ id: "user-1" }) },
-  $transaction: jest.fn(),
+  $transaction: jest.fn((fn: (tx: typeof mockTx) => Promise<unknown>) =>
+    fn(mockTx)
+  ),
   $executeRaw: jest.fn(),
 };
 
@@ -98,10 +113,8 @@ describe("markListingDirty integration", () => {
 
   describe("listing-status actions", () => {
     it("marks dirty on status change", async () => {
-      mockPrisma.listing.findUnique.mockResolvedValue({
-        ownerId: "user-1",
-      });
-      mockPrisma.listing.update.mockResolvedValue({ id: "listing-1" });
+      mockTx.$queryRaw.mockResolvedValue([{ ownerId: "user-1" }]);
+      mockTx.listing.update.mockResolvedValue({ id: "listing-1" });
 
       const { updateListingStatus } =
         await import("@/app/actions/listing-status");
@@ -130,10 +143,8 @@ describe("markListingDirty integration", () => {
   describe("fire-and-forget safety", () => {
     it("does not fail parent mutation when markListingDirty rejects", async () => {
       mockMarkListingDirty.mockRejectedValueOnce(new Error("DB down"));
-      mockPrisma.listing.findUnique.mockResolvedValue({
-        ownerId: "user-1",
-      });
-      mockPrisma.listing.update.mockResolvedValue({ id: "listing-1" });
+      mockTx.$queryRaw.mockResolvedValue([{ ownerId: "user-1" }]);
+      mockTx.listing.update.mockResolvedValue({ id: "listing-1" });
 
       const { updateListingStatus } =
         await import("@/app/actions/listing-status");

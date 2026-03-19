@@ -90,7 +90,7 @@ export async function checkRateLimit(
 ): Promise<RateLimitResult> {
   // E2E bypass — matches with-rate-limit.ts behavior to prevent cross-shard
   // rate limit accumulation in CI (auth.ts calls this directly, not via middleware)
-  if (process.env.E2E_DISABLE_RATE_LIMIT === "true") {
+  if (process.env.E2E_DISABLE_RATE_LIMIT === "true" && process.env.NODE_ENV !== "production") {
     return {
       success: true,
       remaining: 999,

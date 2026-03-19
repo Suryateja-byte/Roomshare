@@ -309,13 +309,10 @@ describe("Query Search E2E", () => {
         "--"
       );
 
-      // XSS attempts should be escaped
-      expect(sanitizeSearchQuery("<script>alert(1)</script>")).not.toContain(
-        "<"
-      );
-      expect(sanitizeSearchQuery("<script>alert(1)</script>")).not.toContain(
-        ">"
-      );
+      // Angle brackets are preserved for FTS compatibility
+      // XSS is handled at the rendering layer (React auto-escapes JSX output)
+      expect(sanitizeSearchQuery("<script>alert(1)</script>")).toContain("<");
+      expect(sanitizeSearchQuery("<script>alert(1)</script>")).toContain(">");
 
       // Valid queries should work
       expect(sanitizeSearchQuery("San Francisco")).toBe("San Francisco");

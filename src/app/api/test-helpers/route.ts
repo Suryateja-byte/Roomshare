@@ -6,6 +6,7 @@
  * (e.g., creating an already-expired hold for expiry tests).
  */
 
+import crypto from "crypto";
 import { NextRequest, NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
 
@@ -16,8 +17,26 @@ function isEnabled(): boolean {
   );
 }
 
+function isAuthorized(request: NextRequest): boolean {
+  const secret = process.env.E2E_TEST_SECRET;
+  if (!secret || secret.length < 16) return false;
+  const authHeader = request.headers.get("authorization");
+  if (!authHeader?.startsWith("Bearer ")) return false;
+  const token = authHeader.slice(7);
+  if (token.length !== secret.length) return false;
+  try {
+    return crypto.timingSafeEqual(Buffer.from(token), Buffer.from(secret));
+  } catch {
+    return false;
+  }
+}
+
 export async function POST(request: NextRequest) {
   if (!isEnabled()) {
+    return NextResponse.json({ error: "Not found" }, { status: 404 });
+  }
+
+  if (!isAuthorized(request)) {
     return NextResponse.json({ error: "Not found" }, { status: 404 });
   }
 

@@ -71,28 +71,30 @@ export async function POST(request: Request) {
     // Hash password
     const hashedPassword = await bcrypt.hash(password, 12);
 
-    // Create user (emailVerified is null by default for soft verification)
-    await prisma.user.create({
-      data: {
-        name,
-        email,
-        password: hashedPassword,
-        emailVerified: null, // Not verified yet
-      },
-    });
-
-    // Generate email verification token (store only SHA-256 hash)
+    // Generate token pair before transaction (pure computation)
     const { token: verificationToken, tokenHash: verificationTokenHash } =
       createTokenPair();
     const expires = new Date(Date.now() + 24 * 60 * 60 * 1000); // 24 hours
 
-    await prisma.verificationToken.create({
-      data: {
-        identifier: email,
-        tokenHash: verificationTokenHash,
-        expires,
-      },
-    });
+    // Atomic: create user + verification token in single transaction
+    // Prevents orphaned users who can't verify email on partial failure
+    await prisma.$transaction([
+      prisma.user.create({
+        data: {
+          name,
+          email,
+          password: hashedPassword,
+          emailVerified: null,
+        },
+      }),
+      prisma.verificationToken.create({
+        data: {
+          identifier: email,
+          tokenHash: verificationTokenHash,
+          expires,
+        },
+      }),
+    ]);
 
     // Build verification URL
     const baseUrl =

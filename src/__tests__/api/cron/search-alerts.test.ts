@@ -9,6 +9,16 @@ jest.mock("@/lib/search-alerts", () => ({
   processSearchAlerts: jest.fn(),
 }));
 
+jest.mock("@/lib/prisma", () => ({
+  prisma: {
+    $queryRaw: jest.fn(),
+  },
+}));
+
+jest.mock("@/lib/retry", () => ({
+  withRetry: jest.fn((fn: () => unknown) => fn()),
+}));
+
 jest.mock("@/lib/logger", () => ({
   logger: {
     sync: {
@@ -44,6 +54,7 @@ jest.mock("next/server", () => ({
 
 import { GET } from "@/app/api/cron/search-alerts/route";
 import { processSearchAlerts } from "@/lib/search-alerts";
+import { prisma } from "@/lib/prisma";
 import * as Sentry from "@sentry/nextjs";
 import { NextRequest } from "next/server";
 
@@ -55,6 +66,8 @@ describe("GET /api/cron/search-alerts", () => {
   beforeEach(() => {
     jest.clearAllMocks();
     process.env = { ...originalEnv, CRON_SECRET: VALID_CRON_SECRET };
+    // Default: advisory lock acquired successfully
+    (prisma.$queryRaw as jest.Mock).mockResolvedValue([{ locked: true }]);
   });
 
   afterEach(() => {
@@ -218,6 +231,74 @@ describe("GET /api/cron/search-alerts", () => {
       expect(response.status).toBe(500);
       const data = await response.json();
       expect(data.error).toBe("Search alerts processing failed");
+    });
+  });
+
+  describe("advisory lock", () => {
+    it("acquires advisory lock before processing", async () => {
+      (processSearchAlerts as jest.Mock).mockResolvedValue({
+        processed: 0,
+        alertsSent: 0,
+        errors: 0,
+        details: [],
+      });
+
+      await GET(createRequest(`Bearer ${VALID_CRON_SECRET}`));
+
+      // First call should be the lock acquisition
+      const calls = (prisma.$queryRaw as jest.Mock).mock.calls;
+      expect(calls.length).toBeGreaterThanOrEqual(1);
+      // Tagged template: first arg is TemplateStringsArray (a string[])
+      const lockCallStrings = calls[0][0].join("");
+      expect(lockCallStrings).toContain("pg_try_advisory_lock");
+    });
+
+    it("skips processing when lock is held by another instance", async () => {
+      (prisma.$queryRaw as jest.Mock).mockResolvedValue([{ locked: false }]);
+
+      const response = await GET(createRequest(`Bearer ${VALID_CRON_SECRET}`));
+
+      expect(response.status).toBe(200);
+      const data = await response.json();
+      expect(data.skipped).toBe(true);
+      expect(data.reason).toBe("lock_held");
+      expect(processSearchAlerts).not.toHaveBeenCalled();
+    });
+
+    it("releases lock after successful processing", async () => {
+      // First call: lock acquisition (success), second call: lock release
+      (prisma.$queryRaw as jest.Mock)
+        .mockResolvedValueOnce([{ locked: true }])
+        .mockResolvedValueOnce([{ unlocked: true }]);
+      (processSearchAlerts as jest.Mock).mockResolvedValue({
+        processed: 1,
+        alertsSent: 1,
+        errors: 0,
+        details: [],
+      });
+
+      await GET(createRequest(`Bearer ${VALID_CRON_SECRET}`));
+
+      const calls = (prisma.$queryRaw as jest.Mock).mock.calls;
+      expect(calls.length).toBe(2);
+      const unlockCallStrings = calls[1][0].join("");
+      expect(unlockCallStrings).toContain("pg_advisory_unlock");
+    });
+
+    it("releases lock even on error", async () => {
+      (prisma.$queryRaw as jest.Mock)
+        .mockResolvedValueOnce([{ locked: true }])
+        .mockResolvedValueOnce([{ unlocked: true }]);
+      (processSearchAlerts as jest.Mock).mockRejectedValue(
+        new Error("Processing failed")
+      );
+
+      await GET(createRequest(`Bearer ${VALID_CRON_SECRET}`));
+
+      const calls = (prisma.$queryRaw as jest.Mock).mock.calls;
+      expect(calls.length).toBe(2);
+      const unlockCallStrings = calls[1][0].join("");
+      expect(unlockCallStrings).toContain("pg_advisory_unlock");
     });
   });
 });

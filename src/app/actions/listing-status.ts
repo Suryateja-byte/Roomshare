@@ -38,41 +38,50 @@ export async function updateListingStatus(
   }
 
   try {
-    // Verify ownership
-    const listing = await prisma.listing.findUnique({
-      where: { id: listingId },
-      select: { ownerId: true },
-    });
+    const result = await prisma.$transaction(async (tx) => {
+      // Lock listing row to prevent concurrent modifications
+      const rows = await tx.$queryRaw<{ ownerId: string }[]>`
+        SELECT "ownerId" FROM "Listing"
+        WHERE id = ${listingId}
+        FOR UPDATE
+      `;
 
-    if (!listing) {
-      return { error: "Listing not found" };
-    }
-
-    if (listing.ownerId !== session.user.id) {
-      return { error: "You can only update your own listings" };
-    }
-
-    if (status === "PAUSED") {
-      const activeBookings = await prisma.booking.count({
-        where: {
-          listingId,
-          status: { in: ["ACCEPTED", "PENDING"] },
-        },
-      });
-      if (activeBookings > 0) {
-        return {
-          error:
-            "Cannot pause a listing with active or pending bookings. Please resolve them first.",
-        };
+      if (rows.length === 0) {
+        return { error: "Listing not found" } as const;
       }
-    }
 
-    await prisma.listing.update({
-      where: { id: listingId },
-      data: { status },
+      if (rows[0].ownerId !== session.user.id) {
+        return { error: "You can only update your own listings" } as const;
+      }
+
+      if (status === "PAUSED") {
+        const activeBookings = await tx.booking.count({
+          where: {
+            listingId,
+            status: { in: ["ACCEPTED", "PENDING"] },
+          },
+        });
+        if (activeBookings > 0) {
+          return {
+            error:
+              "Cannot pause a listing with active or pending bookings. Please resolve them first.",
+          } as const;
+        }
+      }
+
+      await tx.listing.update({
+        where: { id: listingId },
+        data: { status },
+      });
+
+      return { success: true } as const;
     });
 
-    // Fire-and-forget: mark listing dirty for search doc refresh
+    if ("error" in result) {
+      return result;
+    }
+
+    // Side effects OUTSIDE transaction (no locks held)
     markListingDirty(listingId, "status_changed").catch(() => {});
 
     revalidatePath(`/listings/${listingId}`);

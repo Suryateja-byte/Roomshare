@@ -22,6 +22,9 @@ export async function testApi<T = unknown>(
 ): Promise<{ ok: boolean; status: number; data: T }> {
   const response = await page.request.post("/api/test-helpers", {
     data: { action, params },
+    headers: {
+      Authorization: `Bearer ${process.env.E2E_TEST_SECRET}`,
+    },
     timeout: 30_000,
   });
   let data: unknown;

@@ -230,8 +230,8 @@ export async function DELETE(
       throw error;
     }
 
-    // Fire-and-forget: mark listing dirty for search doc removal
-    markListingDirty(id, "listing_deleted").catch(() => {});
+    // Search doc cleanup handled by ON DELETE CASCADE FK on listing_search_docs
+    // and listing_search_doc_dirty (migration 20260110000000_search_doc).
 
     // Clean up images from Supabase storage (outside transaction — best-effort)
     if (listingImages.length > 0 && supabaseUrl && supabaseServiceKey) {

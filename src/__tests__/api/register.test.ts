@@ -11,6 +11,7 @@ jest.mock("@/lib/prisma", () => ({
     verificationToken: {
       create: jest.fn(),
     },
+    $transaction: jest.fn(),
   },
 }));
 
@@ -130,7 +131,7 @@ describe("Register API", () => {
         email: "new@test.com",
         password: "hashed_password",
       };
-      (prisma.user.create as jest.Mock).mockResolvedValue(mockUser);
+      (prisma.$transaction as jest.Mock).mockResolvedValue([mockUser, {}]);
 
       const request = new Request("http://localhost/api/register", {
         method: "POST",
@@ -144,14 +145,7 @@ describe("Register API", () => {
 
       expect(response.status).toBe(201);
       expect(bcrypt.hash).toHaveBeenCalledWith("password12345", 12);
-      expect(prisma.user.create).toHaveBeenCalledWith({
-        data: {
-          name: "Test User",
-          email: "new@test.com",
-          password: "hashed_password",
-          emailVerified: null,
-        },
-      });
+      expect(prisma.$transaction).toHaveBeenCalledTimes(1);
 
       // Verify password is not in response
       const data = await response.json();

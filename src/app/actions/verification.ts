@@ -7,6 +7,7 @@ import { sendNotificationEmail } from "@/lib/email";
 import { logAdminAction } from "@/lib/audit";
 import { logger } from "@/lib/logger";
 import { z } from "zod";
+import { supabaseStorageUrlSchema } from "@/lib/schemas";
 import { requireAdmin } from "./admin";
 
 export type DocumentType = "passport" | "driver_license" | "national_id";
@@ -19,8 +20,8 @@ interface SubmitVerificationInput {
 
 const submitVerificationSchema = z.object({
   documentType: z.enum(["passport", "driver_license", "national_id"]),
-  documentUrl: z.string().url().max(2048),
-  selfieUrl: z.string().url().max(2048).optional(),
+  documentUrl: supabaseStorageUrlSchema,
+  selfieUrl: supabaseStorageUrlSchema.optional(),
 });
 
 // 24-hour cooldown period after rejection (balances spam prevention with UX)

@@ -3,6 +3,17 @@
  */
 
 // Mock dependencies before imports
+const mockTx = {
+  $queryRaw: jest.fn(),
+  listing: {
+    findUnique: jest.fn(),
+    update: jest.fn(),
+  },
+  booking: {
+    count: jest.fn(),
+  },
+};
+
 jest.mock("@/lib/prisma", () => ({
   prisma: {
     listing: {
@@ -20,6 +31,9 @@ jest.mock("@/lib/prisma", () => ({
       findMany: jest.fn(),
       deleteMany: jest.fn(),
     },
+    $transaction: jest.fn((fn: (tx: typeof mockTx) => Promise<unknown>) =>
+      fn(mockTx)
+    ),
   },
 }));
 
@@ -89,7 +103,7 @@ describe("listing-status actions", () => {
 
     describe("listing validation", () => {
       it("returns error when listing not found", async () => {
-        (prisma.listing.findUnique as jest.Mock).mockResolvedValue(null);
+        (mockTx.$queryRaw as jest.Mock).mockResolvedValue([]);
 
         const result = await updateListingStatus("invalid-listing", "PAUSED");
 
@@ -97,10 +111,9 @@ describe("listing-status actions", () => {
       });
 
       it("returns error when not owner", async () => {
-        (prisma.listing.findUnique as jest.Mock).mockResolvedValue({
-          ...mockListing,
-          ownerId: "other-user",
-        });
+        (mockTx.$queryRaw as jest.Mock).mockResolvedValue([
+          { ownerId: "other-user" },
+        ]);
 
         const result = await updateListingStatus("listing-123", "PAUSED");
 
@@ -110,19 +123,21 @@ describe("listing-status actions", () => {
 
     describe("successful update", () => {
       beforeEach(() => {
-        (prisma.listing.findUnique as jest.Mock).mockResolvedValue(mockListing);
-        (prisma.listing.update as jest.Mock).mockResolvedValue({
+        (mockTx.$queryRaw as jest.Mock).mockResolvedValue([
+          { ownerId: "user-123" },
+        ]);
+        (mockTx.listing.update as jest.Mock).mockResolvedValue({
           ...mockListing,
           status: "PAUSED",
         });
-        (prisma.booking.count as jest.Mock).mockResolvedValue(0);
+        (mockTx.booking.count as jest.Mock).mockResolvedValue(0);
       });
 
       it("updates status to PAUSED", async () => {
         const result = await updateListingStatus("listing-123", "PAUSED");
 
         expect(result.success).toBe(true);
-        expect(prisma.listing.update).toHaveBeenCalledWith({
+        expect(mockTx.listing.update).toHaveBeenCalledWith({
           where: { id: "listing-123" },
           data: { status: "PAUSED" },
         });
@@ -131,7 +146,7 @@ describe("listing-status actions", () => {
       it("updates status to RENTED", async () => {
         await updateListingStatus("listing-123", "RENTED");
 
-        expect(prisma.listing.update).toHaveBeenCalledWith({
+        expect(mockTx.listing.update).toHaveBeenCalledWith({
           where: { id: "listing-123" },
           data: { status: "RENTED" },
         });
@@ -140,7 +155,7 @@ describe("listing-status actions", () => {
       it("updates status to ACTIVE", async () => {
         await updateListingStatus("listing-123", "ACTIVE");
 
-        expect(prisma.listing.update).toHaveBeenCalledWith({
+        expect(mockTx.listing.update).toHaveBeenCalledWith({
           where: { id: "listing-123" },
           data: { status: "ACTIVE" },
         });
@@ -167,17 +182,19 @@ describe("listing-status actions", () => {
 
     describe("RENTED status and availableSlots (F2.2)", () => {
       it("setting RENTED status only updates the status field, not availableSlots", async () => {
-        (prisma.listing.findUnique as jest.Mock).mockResolvedValue(mockListing);
-        (prisma.listing.update as jest.Mock).mockResolvedValue({
+        (mockTx.$queryRaw as jest.Mock).mockResolvedValue([
+          { ownerId: "user-123" },
+        ]);
+        (mockTx.listing.update as jest.Mock).mockResolvedValue({
           ...mockListing,
           status: "RENTED",
         });
-        (prisma.booking.count as jest.Mock).mockResolvedValue(0);
+        (mockTx.booking.count as jest.Mock).mockResolvedValue(0);
 
         await updateListingStatus("listing-123", "RENTED");
 
         // updateListingStatus only sets { status: 'RENTED' } — availableSlots is not modified
-        expect(prisma.listing.update).toHaveBeenCalledWith({
+        expect(mockTx.listing.update).toHaveBeenCalledWith({
           where: { id: "listing-123" },
           data: { status: "RENTED" },
         });
@@ -186,15 +203,83 @@ describe("listing-status actions", () => {
 
     describe("error handling", () => {
       it("returns error on database failure", async () => {
-        (prisma.listing.findUnique as jest.Mock).mockResolvedValue(mockListing);
-        (prisma.booking.count as jest.Mock).mockResolvedValue(0);
-        (prisma.listing.update as jest.Mock).mockRejectedValue(
+        (mockTx.$queryRaw as jest.Mock).mockResolvedValue([
+          { ownerId: "user-123" },
+        ]);
+        (mockTx.booking.count as jest.Mock).mockResolvedValue(0);
+        (mockTx.listing.update as jest.Mock).mockRejectedValue(
           new Error("DB Error")
         );
 
         const result = await updateListingStatus("listing-123", "PAUSED");
 
         expect(result.error).toBe("Failed to update listing status");
+      });
+    });
+
+    describe("transaction safety (FOR UPDATE)", () => {
+      beforeEach(() => {
+        (mockTx.$queryRaw as jest.Mock).mockResolvedValue([
+          { ownerId: "user-123" },
+        ]);
+        (mockTx.booking.count as jest.Mock).mockResolvedValue(0);
+        (mockTx.listing.update as jest.Mock).mockResolvedValue({
+          ...mockListing,
+          status: "PAUSED",
+        });
+      });
+
+      it("uses a transaction with FOR UPDATE when updating status", async () => {
+        await updateListingStatus("listing-123", "PAUSED");
+
+        // Verify prisma.$transaction is called
+        expect(prisma.$transaction).toHaveBeenCalledTimes(1);
+
+        // The ownership check uses $queryRaw (FOR UPDATE) inside the transaction
+        expect(mockTx.$queryRaw).toHaveBeenCalled();
+
+        // Booking count and listing update happen inside the transaction (via tx)
+        expect(mockTx.booking.count).toHaveBeenCalled();
+        expect(mockTx.listing.update).toHaveBeenCalledWith({
+          where: { id: "listing-123" },
+          data: { status: "PAUSED" },
+        });
+      });
+
+      it("keeps revalidatePath outside the transaction", async () => {
+        await updateListingStatus("listing-123", "ACTIVE");
+
+        // revalidatePath should still be called (outside transaction)
+        expect(revalidatePath).toHaveBeenCalledWith("/listings/listing-123");
+        expect(revalidatePath).toHaveBeenCalledWith("/profile");
+        expect(revalidatePath).toHaveBeenCalledWith("/search");
+
+        // But NOT inside the transaction callback — verify by confirming
+        // revalidatePath is called AFTER $transaction resolves
+        const txCallOrder =
+          (prisma.$transaction as jest.Mock).mock.invocationCallOrder[0];
+        const revalidateCallOrder = (
+          revalidatePath as jest.Mock
+        ).mock.invocationCallOrder[0];
+        expect(revalidateCallOrder).toBeGreaterThan(txCallOrder);
+      });
+
+      it("returns listing not found when FOR UPDATE returns empty", async () => {
+        (mockTx.$queryRaw as jest.Mock).mockResolvedValue([]);
+
+        const result = await updateListingStatus("nonexistent", "PAUSED");
+
+        expect(result.error).toBe("Listing not found");
+      });
+
+      it("returns ownership error via transaction when not owner", async () => {
+        (mockTx.$queryRaw as jest.Mock).mockResolvedValue([
+          { ownerId: "other-user" },
+        ]);
+
+        const result = await updateListingStatus("listing-123", "PAUSED");
+
+        expect(result.error).toBe("You can only update your own listings");
       });
     });
   });

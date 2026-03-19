@@ -392,13 +392,15 @@ describe("Access Control Security Tests", () => {
     it("user cannot update another user's listing status", async () => {
       mockAuth.mockResolvedValue(regularUser);
 
-      // Listing owned by a different user
-      mockPrisma.listing.findUnique.mockResolvedValue({
-        id: "listing-1",
-        ownerId: "user-other",
-        status: "ACTIVE",
-      });
+      // Fix 9: updateListingStatus now uses $transaction with FOR UPDATE
+      const mockTx = {
+        $queryRaw: jest.fn().mockResolvedValue([{ ownerId: "user-other" }]),
+        booking: { count: jest.fn() },
+        listing: { update: jest.fn() },
+      };
+      mockPrisma.$transaction.mockImplementation(async (fn: any) => fn(mockTx));
 
+      // Listing owned by a different user (ownerId returned by FOR UPDATE query above)
       const result = await userUpdateListingStatus("listing-1", "PAUSED");
       expect(result.error).toBe("You can only update your own listings");
     });
@@ -406,15 +408,13 @@ describe("Access Control Security Tests", () => {
     it("user can update their own listing status", async () => {
       mockAuth.mockResolvedValue(regularUser);
 
-      mockPrisma.listing.findUnique.mockResolvedValue({
-        id: "listing-1",
-        ownerId: "user-regular",
-        status: "ACTIVE",
-      });
-      mockPrisma.listing.update.mockResolvedValue({
-        id: "listing-1",
-        status: "PAUSED",
-      });
+      // Fix 9: updateListingStatus now uses $transaction with FOR UPDATE
+      const mockTx = {
+        $queryRaw: jest.fn().mockResolvedValue([{ ownerId: "user-regular" }]),
+        booking: { count: jest.fn().mockResolvedValue(0) },
+        listing: { update: jest.fn().mockResolvedValue({ id: "listing-1", status: "PAUSED" }) },
+      };
+      mockPrisma.$transaction.mockImplementation(async (fn: any) => fn(mockTx));
 
       const result = await userUpdateListingStatus("listing-1", "PAUSED");
       expect(result.error).toBeUndefined();

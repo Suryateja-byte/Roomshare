@@ -159,12 +159,11 @@ export function sanitizeSearchQuery(query: string): string {
     .replace(/[\u2060-\u206F]/g, "") // Word joiners, invisible operators
     .replace(/[\uDB40-\uDBFF][\uDC00-\uDFFF]/g, ""); // Tag characters
 
-  // Encode HTML entities to prevent XSS
-  // This ensures that even if displayed, it won't execute as HTML
-  sanitized = sanitized
-    .replace(/&/g, "&amp;")
-    .replace(/</g, "&lt;")
-    .replace(/>/g, "&gt;");
+  // NOTE: HTML entity encoding was intentionally removed here.
+  // It corrupted FTS queries: "&" became "&amp;" which plainto_tsquery
+  // parsed as the false lexeme "amp", breaking searches like "R&B".
+  // SQL injection is prevented by parameterized queries (Prisma tagged templates).
+  // XSS is handled at the rendering layer (React auto-escapes JSX output).
 
   // Escape SQL LIKE special characters
   sanitized = sanitized.replace(/%/g, "\\%").replace(/_/g, "\\_");

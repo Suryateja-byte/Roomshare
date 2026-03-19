@@ -13,6 +13,7 @@ jest.mock("@/lib/prisma", () => ({
     verificationToken: {
       create: jest.fn(),
     },
+    $transaction: jest.fn(),
   },
 }));
 
@@ -89,6 +90,10 @@ describe("POST /api/register — edge cases", () => {
       email: "test@example.com",
     });
     (prisma.verificationToken.create as jest.Mock).mockResolvedValue({});
+    (prisma.$transaction as jest.Mock).mockResolvedValue([
+      { id: "new-user-123", name: "Test User", email: "test@example.com" },
+      {},
+    ]);
   });
 
   it("returns 403 when Turnstile verification fails", async () => {
@@ -190,6 +195,29 @@ describe("POST /api/register — edge cases", () => {
     const response = await POST(request);
 
     expect(response.status).toBe(400);
+  });
+
+  it("creates user and verification token atomically via $transaction", async () => {
+    (prisma.$transaction as jest.Mock).mockResolvedValue([
+      { id: "new-user-123", name: "Test User", email: "test@example.com" },
+      {},
+    ]);
+
+    const request = new Request("http://localhost/api/register", {
+      method: "POST",
+      body: JSON.stringify(validBody),
+    });
+    const response = await POST(request);
+
+    expect(response.status).toBe(201);
+    // Must use $transaction, not separate create calls
+    expect(prisma.$transaction).toHaveBeenCalledTimes(1);
+    expect(prisma.$transaction).toHaveBeenCalledWith([
+      expect.anything(), // prisma.user.create(...)
+      expect.anything(), // prisma.verificationToken.create(...)
+    ]);
+    // Individual creates should NOT be awaited directly
+    // (they are passed as promises to $transaction)
   });
 
   it("returns generic error message when email already exists (does not reveal existence)", async () => {

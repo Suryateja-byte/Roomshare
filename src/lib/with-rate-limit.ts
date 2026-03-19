@@ -121,7 +121,7 @@ export async function checkServerComponentRateLimit(
   // Test environments can opt out to avoid cross-shard contention in CI E2E runs.
   if (
     process.env.NODE_ENV === "test" ||
-    process.env.E2E_DISABLE_RATE_LIMIT === "true"
+    (process.env.E2E_DISABLE_RATE_LIMIT === "true" && process.env.NODE_ENV !== "production")
   ) {
     return { allowed: true, remaining: 999, retryAfter: undefined };
   }

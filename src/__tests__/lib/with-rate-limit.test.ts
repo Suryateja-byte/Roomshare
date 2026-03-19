@@ -263,6 +263,29 @@ describe("Rate Limit Wrapper", () => {
       expect(mockCheckRateLimit).not.toHaveBeenCalled();
     });
 
+    it("does NOT bypass rate limit when NODE_ENV is production even with E2E flag", async () => {
+      setNodeEnv("production");
+      process.env.E2E_DISABLE_RATE_LIMIT = "true";
+
+      mockCheckRateLimit.mockResolvedValue({
+        success: true,
+        remaining: 4,
+        retryAfter: undefined,
+        resetAt: new Date(),
+      });
+
+      const result = await checkServerComponentRateLimit(
+        new Headers({ "x-real-ip": "1.2.3.4" }),
+        "search",
+        "/search"
+      );
+
+      // Should NOT have taken the bypass path — should have called checkRateLimit
+      expect(mockCheckRateLimit).toHaveBeenCalled();
+      // remaining should come from the mock (4), not the bypass value (999)
+      expect(result.remaining).not.toBe(999);
+    });
+
     it("enforces rate limit when bypass env is not enabled", async () => {
       setNodeEnv("development");
       mockCheckRateLimit.mockResolvedValue({

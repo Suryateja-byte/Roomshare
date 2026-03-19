@@ -59,8 +59,16 @@ describe("Verification Actions", () => {
     user: { id: "user-123", name: "Test User", email: "test@example.com" },
   };
 
+  const SUPABASE_BASE =
+    "https://qolpgfdmkqvxraafucvu.supabase.co/storage/v1/object/public";
+  const validDocUrl = `${SUPABASE_BASE}/verification/docs/doc.jpg`;
+  const validSelfieUrl = `${SUPABASE_BASE}/verification/selfies/selfie.jpg`;
+  const validLicenseUrl = `${SUPABASE_BASE}/verification/docs/license.jpg`;
+
   beforeEach(() => {
     jest.clearAllMocks();
+    process.env.NEXT_PUBLIC_SUPABASE_URL =
+      "https://qolpgfdmkqvxraafucvu.supabase.co";
     (auth as jest.Mock).mockResolvedValue(mockSession);
   });
 
@@ -70,7 +78,7 @@ describe("Verification Actions", () => {
 
       const result = await submitVerificationRequest({
         documentType: "passport",
-        documentUrl: "https://example.com/doc.jpg",
+        documentUrl: validDocUrl,
       });
 
       expect(result).toEqual({
@@ -87,7 +95,7 @@ describe("Verification Actions", () => {
 
       const result = await submitVerificationRequest({
         documentType: "passport",
-        documentUrl: "https://example.com/doc.jpg",
+        documentUrl: validDocUrl,
       });
 
       expect(result).toEqual({
@@ -105,7 +113,7 @@ describe("Verification Actions", () => {
 
       const result = await submitVerificationRequest({
         documentType: "passport",
-        documentUrl: "https://example.com/doc.jpg",
+        documentUrl: validDocUrl,
       });
 
       expect(result).toEqual({ error: "You are already verified" });
@@ -124,16 +132,16 @@ describe("Verification Actions", () => {
 
       const result = await submitVerificationRequest({
         documentType: "driver_license",
-        documentUrl: "https://example.com/license.jpg",
-        selfieUrl: "https://example.com/selfie.jpg",
+        documentUrl: validLicenseUrl,
+        selfieUrl: validSelfieUrl,
       });
 
       expect(prisma.verificationRequest.create).toHaveBeenCalledWith({
         data: {
           userId: "user-123",
           documentType: "driver_license",
-          documentUrl: "https://example.com/license.jpg",
-          selfieUrl: "https://example.com/selfie.jpg",
+          documentUrl: validLicenseUrl,
+          selfieUrl: validSelfieUrl,
         },
       });
       expect(result).toEqual({ success: true, requestId: "request-new" });
@@ -156,7 +164,7 @@ describe("Verification Actions", () => {
 
         const result = await submitVerificationRequest({
           documentType: "passport",
-          documentUrl: "https://example.com/doc.jpg",
+          documentUrl: validDocUrl,
         });
 
         expect(result.error).toContain("Please wait");
@@ -177,7 +185,7 @@ describe("Verification Actions", () => {
 
         const result = await submitVerificationRequest({
           documentType: "passport",
-          documentUrl: "https://example.com/doc.jpg",
+          documentUrl: validDocUrl,
         });
 
         expect(result.success).toBe(true);
@@ -198,7 +206,7 @@ describe("Verification Actions", () => {
 
         const result = await submitVerificationRequest({
           documentType: "passport",
-          documentUrl: "https://example.com/doc.jpg",
+          documentUrl: validDocUrl,
         });
 
         expect(result.error).toContain("Please wait");
@@ -214,7 +222,7 @@ describe("Verification Actions", () => {
 
       const result = await submitVerificationRequest({
         documentType: "passport",
-        documentUrl: "https://example.com/doc.jpg",
+        documentUrl: validDocUrl,
       });
 
       expect(result).toEqual({
