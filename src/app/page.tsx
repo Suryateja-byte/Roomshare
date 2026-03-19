@@ -2,6 +2,9 @@ import { Suspense } from "react";
 import HomeClient from "./HomeClient";
 import FeaturedListings from "@/components/FeaturedListings";
 
+// ISR: Revalidate featured listings every hour — homepage data is not time-critical
+export const revalidate = 3600;
+
 export default function HomePage() {
   return (
     <>

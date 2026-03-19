@@ -308,7 +308,8 @@ export async function GET(request: Request) {
     // P1-02: Build paginated response
     const paginatedResponse = buildPaginationResponse(reviews, limit, total);
 
-    // Return with rate limit headers
+    // Return with rate limit + cache headers
+    // Reviews are public data — CDN-cacheable with short TTL
     return NextResponse.json(
       {
         reviews: paginatedResponse.items,
@@ -316,6 +317,8 @@ export async function GET(request: Request) {
       },
       {
         headers: {
+          "Cache-Control":
+            "public, s-maxage=60, max-age=30, stale-while-revalidate=120",
           "X-RateLimit-Limit": "60",
           "X-RateLimit-Remaining": "59", // Approximate, actual value from rate limiter
         },

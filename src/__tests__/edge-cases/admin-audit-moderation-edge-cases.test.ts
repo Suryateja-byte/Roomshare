@@ -396,7 +396,7 @@ describe("Category I: Admin + Audit Logs + Moderation Edge Cases", () => {
             updateMany: jest.fn().mockResolvedValue({ count: 2 }),
           },
           notification: {
-            create: jest.fn().mockResolvedValue({ id: "notif" }),
+            createMany: jest.fn().mockResolvedValue({ count: 3 }),
           },
           listing: {
             delete: jest.fn().mockResolvedValue({ id: "listing-123" }),
@@ -466,7 +466,7 @@ describe("Category I: Admin + Audit Logs + Moderation Edge Cases", () => {
             updateMany: jest.fn().mockResolvedValue({ count: 3 }),
           },
           notification: {
-            create: jest.fn().mockResolvedValue({ id: "notif" }),
+            createMany: jest.fn().mockResolvedValue({ count: 3 }),
           },
           listing: {
             delete: jest.fn().mockResolvedValue({ id: "listing-123" }),
@@ -499,7 +499,7 @@ describe("Category I: Admin + Audit Logs + Moderation Edge Cases", () => {
             findMany: jest.fn().mockResolvedValue([]),
             updateMany: jest.fn().mockResolvedValue({ count: 0 }),
           },
-          notification: { create: jest.fn() },
+          notification: { createMany: jest.fn().mockResolvedValue({ count: 0 }) },
           listing: {
             delete: jest.fn().mockResolvedValue({ id: "listing-123" }),
           },

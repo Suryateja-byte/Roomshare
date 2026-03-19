@@ -148,6 +148,65 @@ const nextConfig: NextConfig = {
           },
         ],
       },
+      // Static assets built by Next.js — content-hashed filenames, safe to cache forever
+      {
+        source: "/_next/static/:path*",
+        headers: [
+          {
+            key: "Cache-Control",
+            value: "public, max-age=31536000, immutable",
+          },
+        ],
+      },
+      // Font files — rarely change, cache for 1 year
+      {
+        source: "/fonts/:path*",
+        headers: [
+          {
+            key: "Cache-Control",
+            value: "public, max-age=31536000, immutable",
+          },
+        ],
+      },
+      // Static icons and manifest — cache 1 day, revalidate in background for 7 days
+      {
+        source: "/icons/:path*",
+        headers: [
+          {
+            key: "Cache-Control",
+            value: "public, max-age=86400, stale-while-revalidate=604800",
+          },
+        ],
+      },
+      {
+        source: "/manifest.json",
+        headers: [
+          {
+            key: "Cache-Control",
+            value: "public, max-age=86400, stale-while-revalidate=604800",
+          },
+        ],
+      },
+      // Next.js optimized images — cache 1 day, stale-while-revalidate for 7 days
+      {
+        source: "/_next/image",
+        headers: [
+          {
+            key: "Cache-Control",
+            value: "public, max-age=86400, stale-while-revalidate=604800",
+          },
+        ],
+      },
+      // API routes — private, short TTL with Vercel edge cache (s-maxage)
+      {
+        source: "/api/:path*",
+        headers: [
+          {
+            key: "Cache-Control",
+            value: "private, no-cache",
+          },
+        ],
+      },
     ];
   },
 

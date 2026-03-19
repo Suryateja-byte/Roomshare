@@ -211,6 +211,7 @@ model Booking {
   @@index([listingId, status])
   @@index([tenantId])
   @@index([listingId, status, startDate, endDate])
+  @@index([status, heldUntil]) // Cron sweep-expired-holds: WHERE status='HELD' AND heldUntil <= NOW()
 }
 
 enum ReportStatus {

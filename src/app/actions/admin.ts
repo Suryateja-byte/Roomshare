@@ -413,16 +413,16 @@ export async function deleteListing(listingId: string) {
         data: { status: "CANCELLED" },
       });
 
-      // Create notifications for affected tenants
-      for (const booking of pendingBookings) {
-        await tx.notification.create({
-          data: {
+      // Batch-create notifications for affected tenants
+      if (pendingBookings.length > 0) {
+        await tx.notification.createMany({
+          data: pendingBookings.map((booking) => ({
             userId: booking.tenantId,
             type: "BOOKING_CANCELLED",
             title: "Booking Request Cancelled",
             message: `Your pending booking request for "${listing.title}" has been cancelled because the listing was removed by an administrator.`,
             link: "/bookings",
-          },
+          })),
         });
       }
 
@@ -664,16 +664,16 @@ export async function resolveReportAndRemoveListing(
         data: { status: "CANCELLED" },
       });
 
-      // Create notifications for affected tenants
-      for (const booking of affectedBookings) {
-        await tx.notification.create({
-          data: {
+      // Batch-create notifications for affected tenants
+      if (affectedBookings.length > 0) {
+        await tx.notification.createMany({
+          data: affectedBookings.map((booking) => ({
             userId: booking.tenantId,
             type: "BOOKING_CANCELLED",
             title: "Booking Cancelled - Listing Removed",
             message: `Your booking for "${listing.title}" has been cancelled because the listing was removed due to a policy violation.`,
             link: "/bookings",
-          },
+          })),
         });
       }
 

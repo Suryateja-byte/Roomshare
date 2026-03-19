@@ -27,8 +27,8 @@ export default async function AdminReportsPage() {
     redirect("/");
   }
 
-  // Fetch all reports
-  const [reports, totalReports] = await Promise.all([
+  // Fetch all reports, total count, and open count in parallel to minimize TTFB
+  const [reports, totalReports, openReportsCount] = await Promise.all([
     prisma.report.findMany({
       include: {
         listing: {
@@ -66,11 +66,8 @@ export default async function AdminReportsPage() {
       take: 100, // Limit for initial load
     }),
     prisma.report.count(),
+    prisma.report.count({ where: { status: "OPEN" } }),
   ]);
-
-  const openReportsCount = await prisma.report.count({
-    where: { status: "OPEN" },
-  });
 
   return (
     <div className="min-h-screen bg-zinc-50">

@@ -660,43 +660,45 @@ export async function getMyBookings() {
   }
 
   try {
-    // Get bookings where user is the tenant
-    const sentBookings = await prisma.booking.findMany({
-      where: { tenantId: session.user.id },
-      include: {
-        listing: {
-          include: {
-            location: {
-              select: { address: true, city: true, state: true, zip: true },
-            },
-            owner: {
-              select: { id: true, name: true, image: true },
-            },
-          },
-        },
-      },
-      orderBy: { createdAt: "desc" },
-    });
-
-    // Get bookings for listings the user owns
-    const receivedBookings = await prisma.booking.findMany({
-      where: {
-        listing: { ownerId: session.user.id },
-      },
-      include: {
-        listing: {
-          include: {
-            location: {
-              select: { address: true, city: true, state: true, zip: true },
+    // Fetch sent and received bookings in parallel (independent queries)
+    const [sentBookings, receivedBookings] = await Promise.all([
+      // Bookings where user is the tenant
+      prisma.booking.findMany({
+        where: { tenantId: session.user.id },
+        include: {
+          listing: {
+            include: {
+              location: {
+                select: { address: true, city: true, state: true, zip: true },
+              },
+              owner: {
+                select: { id: true, name: true, image: true },
+              },
             },
           },
         },
-        tenant: {
-          select: { id: true, name: true, image: true },
+        orderBy: { createdAt: "desc" },
+      }),
+      // Bookings for listings the user owns
+      prisma.booking.findMany({
+        where: {
+          listing: { ownerId: session.user.id },
         },
-      },
-      orderBy: { createdAt: "desc" },
-    });
+        include: {
+          listing: {
+            include: {
+              location: {
+                select: { address: true, city: true, state: true, zip: true },
+              },
+            },
+          },
+          tenant: {
+            select: { id: true, name: true, image: true },
+          },
+        },
+        orderBy: { createdAt: "desc" },
+      }),
+    ]);
 
     return {
       sentBookings,

@@ -18,16 +18,19 @@ export default async function ChatPage({
 
   const userId = session.user.id;
 
-  // Fetch conversation to verify access and get other participant info (check admin + per-user delete)
-  const conversation = await prisma.conversation.findUnique({
-    where: { id },
-    include: {
-      participants: {
-        select: { id: true, name: true, image: true },
+  // Fetch conversation and messages in parallel — messages only needs `id`, not conversation result
+  const [conversation, messages] = await Promise.all([
+    prisma.conversation.findUnique({
+      where: { id },
+      include: {
+        participants: {
+          select: { id: true, name: true, image: true },
+        },
+        deletions: { where: { userId }, select: { id: true } },
       },
-      deletions: { where: { userId }, select: { id: true } },
-    },
-  });
+    }),
+    listConversationMessages(id),
+  ]);
 
   if (
     !conversation ||
@@ -51,7 +54,6 @@ export default async function ChatPage({
   const currentParticipant = conversation.participants.find(
     (p) => p.id === userId
   );
-  const messages = await listConversationMessages(id);
 
   return (
     <ChatWindow

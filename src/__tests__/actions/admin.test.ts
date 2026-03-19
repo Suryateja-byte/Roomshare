@@ -498,7 +498,7 @@ describe("admin actions", () => {
               findMany: jest.fn().mockResolvedValue([]),
               updateMany: jest.fn().mockResolvedValue({ count: 0 }),
             },
-            notification: { create: jest.fn().mockResolvedValue({}) },
+            notification: { createMany: jest.fn().mockResolvedValue({ count: 0 }) },
             listing: { delete: jest.fn().mockResolvedValue({}) },
             report: {
               findUnique: jest.fn().mockResolvedValue(null),
@@ -546,7 +546,7 @@ describe("admin actions", () => {
     });
 
     it("deletes listing and notifies pending tenants", async () => {
-      const mockNotifCreate = jest.fn().mockResolvedValue({});
+      const mockNotifCreateMany = jest.fn().mockResolvedValue({ count: 1 });
       mockInteractiveTx({
         booking: {
           count: jest.fn().mockResolvedValue(0),
@@ -555,7 +555,7 @@ describe("admin actions", () => {
             .mockResolvedValue([{ id: "booking-1", tenantId: "tenant-1" }]),
           updateMany: jest.fn().mockResolvedValue({ count: 1 }),
         },
-        notification: { create: mockNotifCreate },
+        notification: { createMany: mockNotifCreateMany },
       });
       (logAdminAction as jest.Mock).mockResolvedValue({});
 
@@ -563,7 +563,7 @@ describe("admin actions", () => {
 
       expect(result.success).toBe(true);
       expect(result.notifiedTenants).toBe(1);
-      expect(mockNotifCreate).toHaveBeenCalledTimes(1);
+      expect(mockNotifCreateMany).toHaveBeenCalledTimes(1);
     });
 
     it("logs deletion action", async () => {
@@ -719,7 +719,7 @@ describe("admin actions", () => {
               findMany: jest.fn().mockResolvedValue([]),
               updateMany: jest.fn().mockResolvedValue({ count: 0 }),
             },
-            notification: { create: jest.fn().mockResolvedValue({}) },
+            notification: { createMany: jest.fn().mockResolvedValue({ count: 0 }) },
             listing: { delete: jest.fn().mockResolvedValue({}) },
             ...overrides,
           };
