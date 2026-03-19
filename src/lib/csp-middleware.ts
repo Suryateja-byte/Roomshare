@@ -18,7 +18,7 @@ export function applySecurityHeaders(request: { headers: Headers }) {
   if (!isDev) {
     responseHeaders.set(
       "Strict-Transport-Security",
-      "max-age=31536000; includeSubDomains; preload"
+      "max-age=63072000; includeSubDomains; preload"
     );
   }
   responseHeaders.set(
@@ -28,7 +28,7 @@ export function applySecurityHeaders(request: { headers: Headers }) {
   responseHeaders.set("X-XSS-Protection", "1; mode=block");
   responseHeaders.set("X-DNS-Prefetch-Control", "on");
   responseHeaders.set("X-Content-Type-Options", "nosniff");
-  responseHeaders.set("Referrer-Policy", "origin-when-cross-origin");
+  responseHeaders.set("Referrer-Policy", "strict-origin-when-cross-origin");
   // Cross-origin isolation (Phase 2 security hardening)
   // COEP omitted — require-corp breaks third-party resources
   // (Google Maps tiles, Supabase images, Google OAuth avatars)

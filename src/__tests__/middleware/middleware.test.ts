@@ -46,7 +46,7 @@ describe("applySecurityHeaders", () => {
     const { responseHeaders } = applySecurityHeaders(request);
 
     const hsts = responseHeaders.get("Strict-Transport-Security");
-    expect(hsts).toContain("max-age=31536000");
+    expect(hsts).toContain("max-age=63072000");
     expect(hsts).toContain("includeSubDomains");
     expect(hsts).toContain("preload");
   });
@@ -84,7 +84,7 @@ describe("applySecurityHeaders", () => {
     expect(responseHeaders.get("X-DNS-Prefetch-Control")).toBe("on");
   });
 
-  it("sets Referrer-Policy to origin-when-cross-origin", async () => {
+  it("sets Referrer-Policy to strict-origin-when-cross-origin", async () => {
     setNodeEnv("production");
     jest.resetModules();
     const { applySecurityHeaders } = await import("@/lib/csp-middleware");
@@ -93,7 +93,7 @@ describe("applySecurityHeaders", () => {
     const { responseHeaders } = applySecurityHeaders(request);
 
     expect(responseHeaders.get("Referrer-Policy")).toBe(
-      "origin-when-cross-origin"
+      "strict-origin-when-cross-origin"
     );
   });
 

@@ -87,7 +87,7 @@ describe("applySecurityHeaders", () => {
       expect(responseHeaders.get("X-Frame-Options")).toBe("DENY");
       expect(responseHeaders.get("X-Content-Type-Options")).toBe("nosniff");
       expect(responseHeaders.get("Referrer-Policy")).toBe(
-        "origin-when-cross-origin"
+        "strict-origin-when-cross-origin"
       );
       expect(responseHeaders.get("Cross-Origin-Resource-Policy")).toBe(
         "same-origin"
