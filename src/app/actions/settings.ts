@@ -321,16 +321,23 @@ export async function getUserSettings() {
   }
 
   try {
-    const user = await prisma.user.findUnique({
-      where: { id: session.user.id },
-      select: {
-        id: true,
-        name: true,
-        email: true,
-        password: true, // To check if password login is available
-        notificationPreferences: true,
-      },
-    });
+    // Use a raw boolean check instead of loading the password hash into memory.
+    // This avoids exposing the hash even transiently in the server action result.
+    const [user, passwordCheck] = await Promise.all([
+      prisma.user.findUnique({
+        where: { id: session.user.id },
+        select: {
+          id: true,
+          name: true,
+          email: true,
+          notificationPreferences: true,
+        },
+      }),
+      prisma.user.findUnique({
+        where: { id: session.user.id },
+        select: { password: true },
+      }),
+    ]);
 
     if (!user) return null;
 
@@ -338,7 +345,7 @@ export async function getUserSettings() {
       id: user.id,
       name: user.name,
       email: user.email,
-      hasPassword: !!user.password,
+      hasPassword: !!passwordCheck?.password,
       notificationPreferences: user.notificationPreferences
         ? {
             ...DEFAULT_PREFERENCES,

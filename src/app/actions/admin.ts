@@ -9,8 +9,8 @@ import { logAdminAction } from "@/lib/audit";
 import { logger } from "@/lib/logger";
 import { markListingDirty } from "@/lib/search/search-doc-dirty";
 
-// Helper to check admin status
-async function requireAdmin() {
+// Helper to check admin status — exported for use in other admin action files (verification.ts etc.)
+export async function requireAdmin() {
   const session = await auth();
   if (!session?.user?.id) {
     return {

@@ -16,8 +16,20 @@ import { checkRateLimit, getClientIP, RATE_LIMITS } from "@/lib/rate-limit";
 
 async function getUser(email: string) {
   try {
+    // Defense-in-depth: select only fields needed for credential auth + session seeding.
+    // Avoids loading every column (e.g. notificationPreferences, bio) into memory.
     const user = await prisma.user.findUnique({
       where: { email: normalizeEmail(email) },
+      select: {
+        id: true,
+        email: true,
+        name: true,
+        password: true, // needed for bcrypt.compare in authorize()
+        emailVerified: true,
+        isAdmin: true,
+        isSuspended: true,
+        image: true,
+      },
     });
     return user;
   } catch (error) {

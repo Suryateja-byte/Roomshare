@@ -24,14 +24,22 @@ export async function createNotification(input: CreateNotificationInput) {
   try {
     // Only admins or users creating notifications for themselves can use this public server action.
     // Internal business flows should call createInternalNotification() directly.
-    if (!session.user.isAdmin && session.user.id !== input.userId) {
-      logger.sync.warn("Blocked unauthorized notification creation attempt", {
-        action: "createNotification",
-        actorUserId: session.user.id,
-        targetUserId: input.userId,
-        type: input.type,
+    // SEC: Check admin status from DB (not JWT) to prevent stale-token privilege escalation.
+    if (session.user.id !== input.userId) {
+      const user = await prisma.user.findUnique({
+        where: { id: session.user.id },
+        select: { isAdmin: true },
       });
-      return { success: false, error: "Forbidden" };
+
+      if (!user?.isAdmin) {
+        logger.sync.warn("Blocked unauthorized notification creation attempt", {
+          action: "createNotification",
+          actorUserId: session.user.id,
+          targetUserId: input.userId,
+          type: input.type,
+        });
+        return { success: false, error: "Forbidden" };
+      }
     }
 
     return createInternalNotification(input);

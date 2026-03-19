@@ -324,7 +324,11 @@ describe("Verification Actions", () => {
 
       const result = await getPendingVerifications();
 
-      expect(result).toEqual({ error: "Unauthorized", requests: [] });
+      expect(result).toEqual({
+        error: "Unauthorized",
+        code: "NOT_ADMIN",
+        requests: [],
+      });
     });
 
     it("returns pending verifications for admin", async () => {
@@ -380,7 +384,7 @@ describe("Verification Actions", () => {
 
       const result = await approveVerification("request-123");
 
-      expect(result).toEqual({ error: "Unauthorized" });
+      expect(result).toEqual({ error: "Unauthorized", code: "NOT_ADMIN" });
     });
 
     it("returns error when request not found", async () => {
@@ -532,7 +536,7 @@ describe("Verification Actions", () => {
         "Invalid document"
       );
 
-      expect(result).toEqual({ error: "Unauthorized" });
+      expect(result).toEqual({ error: "Unauthorized", code: "NOT_ADMIN" });
     });
 
     it("returns error when request not found", async () => {

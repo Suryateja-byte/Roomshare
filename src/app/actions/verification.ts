@@ -7,6 +7,7 @@ import { sendNotificationEmail } from "@/lib/email";
 import { logAdminAction } from "@/lib/audit";
 import { logger } from "@/lib/logger";
 import { z } from "zod";
+import { requireAdmin } from "./admin";
 
 export type DocumentType = "passport" | "driver_license" | "national_id";
 
@@ -189,19 +190,9 @@ export async function getMyVerificationStatus() {
 
 // Admin functions
 export async function getPendingVerifications() {
-  const session = await auth();
-  if (!session?.user?.id) {
-    return { error: "Unauthorized", code: "SESSION_EXPIRED", requests: [] };
-  }
-
-  // Check if user is admin
-  const user = await prisma.user.findUnique({
-    where: { id: session.user.id },
-    select: { isAdmin: true },
-  });
-
-  if (!user?.isAdmin) {
-    return { error: "Unauthorized", requests: [] };
+  const adminCheck = await requireAdmin();
+  if (adminCheck.error) {
+    return { error: adminCheck.error, code: adminCheck.code, requests: [] };
   }
 
   try {
@@ -231,19 +222,9 @@ export async function getPendingVerifications() {
 }
 
 export async function approveVerification(requestId: string) {
-  const session = await auth();
-  if (!session?.user?.id) {
-    return { error: "Unauthorized", code: "SESSION_EXPIRED" };
-  }
-
-  // Check if user is admin
-  const adminUser = await prisma.user.findUnique({
-    where: { id: session.user.id },
-    select: { isAdmin: true },
-  });
-
-  if (!adminUser?.isAdmin) {
-    return { error: "Unauthorized" };
+  const adminCheck = await requireAdmin();
+  if (adminCheck.error) {
+    return { error: adminCheck.error, code: adminCheck.code };
   }
 
   try {
@@ -267,7 +248,7 @@ export async function approveVerification(requestId: string) {
         data: {
           status: "APPROVED",
           reviewedAt: new Date(),
-          reviewedBy: session.user.id,
+          reviewedBy: adminCheck.userId!,
         },
       });
 
@@ -286,7 +267,7 @@ export async function approveVerification(requestId: string) {
 
     // Audit log
     await logAdminAction({
-      adminId: session.user.id,
+      adminId: adminCheck.userId!,
       action: "VERIFICATION_APPROVED",
       targetType: "VerificationRequest",
       targetId: requestId,
@@ -309,19 +290,9 @@ export async function approveVerification(requestId: string) {
 }
 
 export async function rejectVerification(requestId: string, reason: string) {
-  const session = await auth();
-  if (!session?.user?.id) {
-    return { error: "Unauthorized", code: "SESSION_EXPIRED" };
-  }
-
-  // Check if user is admin
-  const adminUser = await prisma.user.findUnique({
-    where: { id: session.user.id },
-    select: { isAdmin: true },
-  });
-
-  if (!adminUser?.isAdmin) {
-    return { error: "Unauthorized" };
+  const adminCheck = await requireAdmin();
+  if (adminCheck.error) {
+    return { error: adminCheck.error, code: adminCheck.code };
   }
 
   try {
@@ -345,7 +316,7 @@ export async function rejectVerification(requestId: string, reason: string) {
         status: "REJECTED",
         adminNotes: reason,
         reviewedAt: new Date(),
-        reviewedBy: session.user.id,
+        reviewedBy: adminCheck.userId!,
       },
     });
 
@@ -359,7 +330,7 @@ export async function rejectVerification(requestId: string, reason: string) {
 
     // Audit log
     await logAdminAction({
-      adminId: session.user.id,
+      adminId: adminCheck.userId!,
       action: "VERIFICATION_REJECTED",
       targetType: "VerificationRequest",
       targetId: requestId,
