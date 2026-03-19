@@ -132,13 +132,13 @@ export default function FeaturedListingsClient({
                 variants={fadeInUp}
                 className="text-3xl md:text-5xl font-medium tracking-tight text-zinc-900 dark:text-white mb-4"
               >
-                Latest curated spaces.
+                Just listed.
               </m.h2>
               <m.p
                 variants={fadeInUp}
                 className="text-zinc-500 dark:text-zinc-400 text-lg font-light"
               >
-                Find your next home among these hand-picked listings.
+                Fresh rooms from verified hosts — updated daily.
               </m.p>
             </div>
 
@@ -149,7 +149,7 @@ export default function FeaturedListingsClient({
                 className="group rounded-full text-zinc-600 dark:text-zinc-400 hover:text-zinc-900 dark:hover:text-white hover:bg-zinc-100 dark:hover:bg-zinc-900 px-6 gap-2"
               >
                 <Link href="/search">
-                  View all{" "}
+                  See All Listings{" "}
                   <ArrowRight
                     size={16}
                     className="group-hover:translate-x-1 transition-transform"

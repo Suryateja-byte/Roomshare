@@ -68,7 +68,7 @@ function LoginForm() {
       });
 
       if (result?.error) {
-        setError("Invalid email or password");
+        setError("Incorrect email or password. Check your details and try again.");
         turnstileRef.current?.reset();
         setTurnstileToken("");
         setLoading(false);
@@ -77,7 +77,7 @@ function LoginForm() {
         window.location.href = "/";
       }
     } catch (_err) {
-      setError("An error occurred");
+      setError("We couldn\u2019t connect right now. Check your internet and try again.");
       turnstileRef.current?.reset();
       setTurnstileToken("");
       setLoading(false);
@@ -96,8 +96,8 @@ function LoginForm() {
         </div>
         <div className="relative z-10 max-w-md">
           <h2 className="text-2xl xl:text-3xl font-medium leading-tight">
-            &quot;The verification process made me feel so much safer finding a
-            roommate.&quot;
+            &quot;Verified profiles sold me. I knew my roommate was legit
+            before we even met.&quot;
           </h2>
           <div className="mt-8 flex items-center gap-4">
             <div className="w-10 h-10 rounded-full bg-zinc-800 flex items-center justify-center border border-zinc-700">
@@ -122,13 +122,13 @@ function LoginForm() {
               Welcome back
             </h1>
             <p className="text-zinc-500 dark:text-zinc-400 mt-2 text-sm sm:text-base">
-              Enter your email to access your account.
+              Sign in to manage your listings and messages.
             </p>
           </div>
 
           {registered && (
             <div className="bg-green-50 dark:bg-green-900/20 border border-green-200 dark:border-green-800 text-green-700 dark:text-green-400 px-4 py-3 rounded-xl text-sm text-center">
-              Account created successfully! Please sign in.
+              You&apos;re all set! Sign in to get started.
             </div>
           )}
 
@@ -149,7 +149,7 @@ function LoginForm() {
                 await signIn("google", { callbackUrl: "/" });
               } catch (_err) {
                 setError(
-                  "Failed to initiate Google sign-in. Please try again."
+                  "Google sign-in didn\u2019t connect. Refresh the page and try again."
                 );
                 setGoogleLoading(false);
               }

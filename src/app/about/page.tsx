@@ -72,8 +72,8 @@ export default function AboutPage() {
             </h1>
 
             <p className="text-xl md:text-2xl text-zinc-500 dark:text-zinc-400 font-light max-w-3xl mx-auto leading-relaxed animate-in fade-in slide-in-from-bottom-8 duration-1000">
-              We&apos;re building a future where finding a home means finding
-              your people. Less transactional, more human.
+              We got tired of Craigslist horror stories. So we built the
+              roommate platform we wished existed when we were looking.
             </p>
           </div>
 
@@ -122,7 +122,7 @@ export default function AboutPage() {
               </p>
               <p>
                 RoomShare isn&apos;t just about splitting rent. It&apos;s about
-                curating environments where people thrive together.
+                knowing who you&apos;re living with before you sign anything.
               </p>
             </div>
           </div>
@@ -133,10 +133,10 @@ export default function AboutPage() {
           <div className="container mx-auto max-w-6xl">
             <div className="text-center mb-20">
               <h2 className="text-4xl font-bold text-zinc-900 dark:text-white tracking-tight mb-4">
-                Our Principles
+                What we won&apos;t compromise on.
               </h2>
               <p className="text-zinc-500 dark:text-zinc-400 text-lg">
-                The core values that guide every feature we build.
+                Three things we check every decision against.
               </p>
             </div>
 
@@ -144,17 +144,17 @@ export default function AboutPage() {
               <ValueCard
                 icon={Shield}
                 title="Safety First"
-                description="We don't cut corners on verification. Everyone on RoomShare is real, verified, and vetted."
+                description="ID checks, phone verification, and rental history — before anyone can message you. No shortcuts."
               />
               <ValueCard
                 icon={Heart}
                 title="Human Connection"
-                description="Algorithms are great, but chemistry matters. We design for genuine interactions, not just transactions."
+                description="Matching on lifestyle, not just budget. Because the person who leaves dishes in the sink matters more than the rent split."
               />
               <ValueCard
                 icon={Sparkles}
                 title="Standard of Living"
-                description="We curate listings to ensure every home meets a baseline of comfort, cleanliness, and style."
+                description="Every listing has real photos and accurate details. If a place doesn't meet our standards, it doesn't go up."
               />
             </div>
           </div>
@@ -183,24 +183,24 @@ export default function AboutPage() {
         <section className="py-20 px-6 bg-zinc-900 text-white">
           <div className="container mx-auto max-w-4xl text-center py-12">
             <h2 className="text-4xl md:text-6xl font-bold tracking-tighter mb-8">
-              Ready to find your place?
+              Stop scrolling. Start living.
             </h2>
             <p className="text-xl text-zinc-400 mb-12 max-w-2xl mx-auto font-light">
-              Join the community that is redefining what it means to live
-              together in the modern city.
+              Set up your profile in 2 minutes. Browse verified rooms
+              tonight. Move in when you&apos;re ready.
             </p>
             <div className="flex flex-col sm:flex-row gap-4 justify-center">
               <Link
                 href="/signup"
                 className="px-10 py-4 bg-white text-zinc-900 rounded-full font-bold hover:bg-zinc-200 transition-colors"
               >
-                Get Started
+                Create Your Profile
               </Link>
               <Link
                 href="/search"
                 className="px-10 py-4 bg-transparent border border-zinc-700 text-white rounded-full font-bold hover:bg-white/10 transition-colors"
               >
-                Browse Listings
+                See Rooms Near You
               </Link>
             </div>
           </div>

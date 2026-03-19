@@ -60,7 +60,7 @@ export default function HomeClient() {
                     className="inline-flex items-center gap-2 px-3 py-1.5 rounded-full border border-zinc-200/50 dark:border-zinc-800 bg-zinc-50 dark:bg-zinc-900/50 text-zinc-600 dark:text-zinc-400 text-xs font-bold uppercase tracking-[0.2em] mb-8"
                   >
                     <span className="w-1.5 h-1.5 rounded-full bg-indigo-500"></span>
-                    Reimagining Shared Living
+                    Now in 12 cities
                   </m.div>
 
                   <m.h1
@@ -75,8 +75,8 @@ export default function HomeClient() {
                     variants={fadeInUp}
                     className="text-lg md:text-xl text-zinc-500 dark:text-zinc-400 mb-10 max-w-xl mx-auto lg:mx-0 font-light leading-relaxed"
                   >
-                    The modern way to find your sanctuary. Curated spaces and
-                    compatible people, simplified.
+                    Verified roommates. Real listings. People who actually
+                    show up to the tour.
                   </m.p>
 
                   <m.div
@@ -150,14 +150,14 @@ export default function HomeClient() {
                 variants={fadeInUp}
                 className="text-3xl md:text-5xl font-medium tracking-tight text-zinc-900 dark:text-white mb-6"
               >
-                Everything you need.
+                Why people switch to RoomShare.
               </m.h2>
               <m.p
                 variants={fadeInUp}
                 className="text-zinc-500 dark:text-zinc-400 text-lg font-light max-w-xl mx-auto"
               >
-                Simplified roommate search so you can focus on finding your
-                perfect home.
+                Less guesswork. Less ghosting. More &ldquo;I actually like
+                living here.&rdquo;
               </m.p>
             </m.div>
 
@@ -170,18 +170,18 @@ export default function HomeClient() {
             >
               <FeatureCard
                 icon={ShieldCheck}
-                title="Verified Trust"
-                description="Every profile is manually verified. Real people, real homes, real safety."
+                title="No catfishing"
+                description="Every person verifies their ID and phone number before they can message you. No bots, no fakes."
               />
               <FeatureCard
                 icon={Zap}
-                title="Instant Match"
-                description="Our algorithm pairs you based on lifestyle habits and shared values."
+                title="Matched on what matters"
+                description="Sleep schedule, noise tolerance, guests policy — not just budget. You'll know before you visit."
               />
               <FeatureCard
                 icon={Coffee}
-                title="Lifestyle Fit"
-                description="Filter by cleanliness, social battery, and morning person vibes."
+                title="Filters that actually help"
+                description="Clean freak or organized chaos? Early bird or night owl? Set your deal-breakers upfront."
               />
             </m.div>
           </div>
@@ -197,10 +197,10 @@ export default function HomeClient() {
             className="max-w-3xl mx-auto px-4 sm:px-6"
           >
             <h2 className="text-4xl md:text-5xl lg:text-6xl font-medium tracking-tight mb-6 text-zinc-900 dark:text-white">
-              Ready to find your people?
+              Your next roommate is already here.
             </h2>
             <p className="text-lg text-zinc-500 dark:text-zinc-400 mb-10 max-w-xl mx-auto font-light">
-              Join the community changing the way the world lives together.
+              Takes 2 minutes to set up a profile. Then start browsing rooms tonight.
             </p>
 
             <div className="flex flex-col sm:flex-row gap-4 justify-center items-center">
@@ -209,7 +209,7 @@ export default function HomeClient() {
                 size="lg"
                 className="w-full sm:w-auto rounded-full px-8 h-12 text-base font-medium"
               >
-                <Link href="/signup">Get Started</Link>
+                <Link href="/signup">Create Your Profile</Link>
               </Button>
               <Button
                 asChild
@@ -218,7 +218,7 @@ export default function HomeClient() {
                 className="group w-full sm:w-auto rounded-full px-8 h-12 text-base font-medium gap-2 border-zinc-200 dark:border-zinc-800 hover:bg-zinc-50 dark:hover:bg-zinc-900"
               >
                 <Link href="/search">
-                  Browse Listings{" "}
+                  See Rooms Near You{" "}
                   <ArrowRight
                     size={16}
                     className="group-hover:translate-x-1 transition-transform"

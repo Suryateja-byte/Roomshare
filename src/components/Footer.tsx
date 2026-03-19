@@ -22,8 +22,7 @@ export default function Footer() {
               </span>
             </Link>
             <p className="text-zinc-500 dark:text-zinc-400 text-sm font-light leading-relaxed max-w-xs">
-              The modern standard for shared living. Find your perfect home and
-              compatible roommates with ease.
+              Find your people, not just a place.
             </p>
           </div>
 

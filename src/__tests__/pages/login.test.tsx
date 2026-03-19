@@ -110,7 +110,7 @@ describe("LoginPage", () => {
 
     // Verify no error message is shown after successful login
     expect(
-      screen.queryByText("Invalid email or password")
+      screen.queryByText("Incorrect email or password. Check your details and try again.")
     ).not.toBeInTheDocument();
   });
 
@@ -124,7 +124,7 @@ describe("LoginPage", () => {
     await userEvent.click(screen.getByRole("button", { name: /sign in/i }));
 
     await waitFor(() => {
-      expect(screen.getByText("Invalid email or password")).toBeInTheDocument();
+      expect(screen.getByText("Incorrect email or password. Check your details and try again.")).toBeInTheDocument();
     });
   });
 

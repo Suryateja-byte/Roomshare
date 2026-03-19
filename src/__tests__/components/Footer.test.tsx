@@ -55,7 +55,7 @@ describe("Footer", () => {
   it("renders tagline", () => {
     render(<Footer />);
     expect(
-      screen.getByText(/modern standard for shared living/i)
+      screen.getByText(/find your people, not just a place/i)
     ).toBeInTheDocument();
   });
 

@@ -48,7 +48,7 @@ describe("SignUpPage", () => {
   it("renders signup form", () => {
     render(<SignUpPage />);
 
-    expect(screen.getByText("Create an account")).toBeInTheDocument();
+    expect(screen.getByRole("heading", { name: "Join RoomShare" })).toBeInTheDocument();
     expect(screen.getByLabelText(/full name/i)).toBeInTheDocument();
     expect(screen.getByLabelText(/email/i)).toBeInTheDocument();
     expect(screen.getByLabelText("Password")).toBeInTheDocument();
@@ -86,7 +86,7 @@ describe("SignUpPage", () => {
     );
     await userEvent.click(screen.getByRole("checkbox"));
     await userEvent.click(
-      screen.getByRole("button", { name: /create account/i })
+      screen.getByRole("button", { name: /join roomshare/i })
     );
 
     await waitFor(() => {
@@ -122,7 +122,7 @@ describe("SignUpPage", () => {
     );
     await userEvent.click(screen.getByRole("checkbox"));
     await userEvent.click(
-      screen.getByRole("button", { name: /create account/i })
+      screen.getByRole("button", { name: /join roomshare/i })
     );
 
     await waitFor(() => {
@@ -152,7 +152,7 @@ describe("SignUpPage", () => {
     );
     await userEvent.click(screen.getByRole("checkbox"));
     await userEvent.click(
-      screen.getByRole("button", { name: /create account/i })
+      screen.getByRole("button", { name: /join roomshare/i })
     );
 
     // Button should be disabled during loading
@@ -184,7 +184,7 @@ describe("SignUpPage", () => {
     );
     await userEvent.click(screen.getByRole("checkbox"));
     await userEvent.click(
-      screen.getByRole("button", { name: /create account/i })
+      screen.getByRole("button", { name: /join roomshare/i })
     );
 
     await waitFor(() => {

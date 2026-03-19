@@ -11,25 +11,25 @@ export default function NotFound() {
         </div>
 
         <h1 className="text-4xl font-bold tracking-tight text-zinc-900 dark:text-white">
-          Oops! We couldn&apos;t find that room.
+          This page packed up and moved out
         </h1>
 
         <p className="text-lg text-zinc-600 dark:text-zinc-400">
-          The listing you&apos;re looking for might have been removed or
-          doesn&apos;t exist.
+          The page you&apos;re looking for was removed or never existed.
+          Let&apos;s get you somewhere better.
         </p>
 
         <div className="pt-4 flex flex-col sm:flex-row items-center gap-3">
           <Button asChild size="lg" className="rounded-full px-8">
             <Link href="/search">
               <Search className="mr-2 h-4 w-4" />
-              Search Rooms
+              Browse Listings
             </Link>
           </Button>
           <Button asChild variant="outline" size="lg" className="rounded-full px-8">
             <Link href="/">
               <Home className="mr-2 h-4 w-4" />
-              Go Home
+              Back to Home
             </Link>
           </Button>
         </div>

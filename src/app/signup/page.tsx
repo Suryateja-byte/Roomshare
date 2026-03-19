@@ -45,7 +45,7 @@ function SignUpForm() {
     // Validate Terms of Service acceptance
     if (!acceptedTerms) {
       setError(
-        "You must accept the Terms of Service and Privacy Policy to continue."
+        "To create your account, agree to the Terms of Service and Privacy Policy above."
       );
       setLoading(false);
       return;
@@ -53,7 +53,7 @@ function SignUpForm() {
 
     // Validate password confirmation
     if (password !== confirmPassword) {
-      setError("Passwords do not match. Please try again.");
+      setError("Those passwords don\u2019t match. Re-enter them and try again.");
       setLoading(false);
       return;
     }
@@ -84,7 +84,7 @@ function SignUpForm() {
 
       router.push("/login?registered=true");
     } catch (err: unknown) {
-      setError(err instanceof Error ? err.message : "An error occurred");
+      setError(err instanceof Error ? err.message : "We couldn\u2019t connect right now. Check your internet and try again.");
       turnstileRef.current?.reset();
       setTurnstileToken("");
     } finally {
@@ -108,8 +108,8 @@ function SignUpForm() {
         {/* Testimonial / Value Prop */}
         <div className="relative z-10 max-w-md">
           <h2 className="text-2xl xl:text-3xl font-medium leading-tight">
-            &ldquo;I found a roommate who actually respects my space. The
-            verification badge makes all the difference.&rdquo;
+            &ldquo;Moved in two weeks after signing up. My roommate and I
+            actually get along&nbsp;&mdash; that never happened on Craigslist.&rdquo;
           </h2>
           <div className="mt-8 flex items-center gap-4">
             <div className="w-10 h-10 rounded-full bg-zinc-800 flex items-center justify-center border border-zinc-700">
@@ -134,10 +134,10 @@ function SignUpForm() {
           {/* Header */}
           <div className="text-center lg:text-left">
             <h1 className="text-2xl sm:text-3xl font-semibold text-zinc-900 dark:text-white tracking-tight">
-              Create an account
+              Join RoomShare
             </h1>
             <p className="text-zinc-500 dark:text-zinc-400 mt-2 text-sm sm:text-base">
-              Enter your details to get started.
+              Verified roommates, real listings, zero guesswork.
             </p>
           </div>
 
@@ -155,7 +155,7 @@ function SignUpForm() {
                 await signIn("google", { callbackUrl: "/" });
               } catch (_err) {
                 setError(
-                  "Failed to initiate Google sign-up. Please try again."
+                  "Google sign-up didn\u2019t connect. Refresh the page and try again."
                 );
                 setGoogleLoading(false);
               }
@@ -337,7 +337,7 @@ function SignUpForm() {
               </div>
               {confirmPassword && password !== confirmPassword && (
                 <p className="text-xs text-red-500 dark:text-red-400 mt-1 ml-0.5">
-                  Passwords do not match
+                  Passwords don&apos;t match
                 </p>
               )}
               {confirmPassword && password === confirmPassword && (
@@ -418,7 +418,7 @@ function SignUpForm() {
                 <Loader2 className="w-5 h-5 animate-spin" />
               ) : (
                 <>
-                  Create account <ArrowRight className="w-4 h-4 ml-2" />
+                  Join RoomShare <ArrowRight className="w-4 h-4 ml-2" />
                 </>
               )}
             </Button>

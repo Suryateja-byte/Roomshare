@@ -294,7 +294,9 @@ export function SearchResultsClient({
             No matches found
           </h2>
           <p className="text-zinc-500 dark:text-zinc-400 text-sm max-w-xs text-center px-4">
-            We couldn&apos;t find any listings {query ? `for "${query}"` : ""}.
+            Try adjusting your filters, expanding your price range, or
+            searching a nearby area.
+            {query ? ` No results for "${query}".` : ""}
           </p>
 
           {/* Smart filter suggestions */}
