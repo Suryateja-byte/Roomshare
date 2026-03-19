@@ -50,10 +50,11 @@ const getLogConfig = (): LogConfig => {
       { emit: "event", level: "warn" },
     ];
   }
-  // Production: route all through structured logger
+  // Production: route all through structured logger + detect slow queries
   return [
     { emit: "event", level: "error" },
     { emit: "event", level: "warn" },
+    { emit: "event", level: "query" },
   ];
 };
 
@@ -67,18 +68,30 @@ function createPrismaClient(): PrismaClient {
     },
   });
 
-  // P3-03 FIX: Route Prisma errors through structured logger for correlation
+  // Route Prisma errors/warnings through structured logger for correlation
   // This provides requestId, userId context and PII redaction
   // Using type assertion since $on is available when log emit is 'event'
   const extendedClient = client as PrismaClient & {
-    $on: (
-      eventType: "error" | "warn",
-      callback: (event: {
-        message: string;
-        target: string;
-        timestamp: Date;
-      }) => void
-    ) => void;
+    $on: {
+      (
+        eventType: "error" | "warn",
+        callback: (event: {
+          message: string;
+          target: string;
+          timestamp: Date;
+        }) => void
+      ): void;
+      (
+        eventType: "query",
+        callback: (event: {
+          query: string;
+          params: string;
+          duration: number;
+          target: string;
+          timestamp: Date;
+        }) => void
+      ): void;
+    };
   };
 
   extendedClient.$on("error", (e) => {
@@ -95,6 +108,19 @@ function createPrismaClient(): PrismaClient {
       message: e.message,
       timestamp: e.timestamp.toISOString(),
     });
+  });
+
+  // Slow query detection: log queries exceeding 1 second
+  // Query events are emitted for all queries; we filter to only warn on slow ones
+  const SLOW_QUERY_THRESHOLD_MS = 1000;
+  extendedClient.$on("query", (e) => {
+    if (e.duration >= SLOW_QUERY_THRESHOLD_MS) {
+      logger.sync.warn("Slow database query", {
+        durationMs: e.duration,
+        target: e.target,
+        timestamp: e.timestamp.toISOString(),
+      });
+    }
   });
 
   return client;

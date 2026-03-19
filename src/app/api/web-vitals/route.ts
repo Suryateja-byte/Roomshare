@@ -1,4 +1,5 @@
 import { NextResponse } from "next/server";
+import * as Sentry from "@sentry/nextjs";
 import { checkMetricsRateLimit } from "@/lib/rate-limit-redis";
 import { getClientIP } from "@/lib/rate-limit";
 import { isOriginAllowed, isHostAllowed } from "@/lib/origin-guard";
@@ -170,6 +171,9 @@ export async function POST(request: Request) {
 
     return NextResponse.json({ ok: true });
   } catch (error) {
+    Sentry.captureException(error, {
+      tags: { route: "/api/web-vitals", method: "POST" },
+    });
     logger.sync.error("Web Vitals API error", {
       error: sanitizeErrorMessage(error),
     });

@@ -7,6 +7,7 @@ import {
   toggleSaveListing,
   isListingSaved,
 } from "@/app/actions/saved-listings";
+import { toast } from "sonner";
 
 interface SaveListingButtonProps {
   listingId: string;
@@ -21,20 +22,36 @@ export default function SaveListingButton({
 
   useEffect(() => {
     const checkSavedStatus = async () => {
-      const result = await isListingSaved(listingId);
-      setIsSaved(result.saved);
-      setIsLoading(false);
+      try {
+        const result = await isListingSaved(listingId);
+        setIsSaved(result.saved);
+      } catch {
+        // Silently default to unsaved on error
+      } finally {
+        setIsLoading(false);
+      }
     };
     checkSavedStatus();
   }, [listingId]);
 
   const handleToggle = async () => {
     setIsToggling(true);
-    const result = await toggleSaveListing(listingId);
-    if (!result.error) {
-      setIsSaved(result.saved);
+    const previousState = isSaved;
+    setIsSaved(!isSaved); // Optimistic update
+    try {
+      const result = await toggleSaveListing(listingId);
+      if (result.error) {
+        setIsSaved(previousState);
+        toast.error("Couldn\u2019t update saved listings. Try again.");
+      } else {
+        setIsSaved(result.saved);
+      }
+    } catch {
+      setIsSaved(previousState);
+      toast.error("Couldn\u2019t update saved listings. Try again.");
+    } finally {
+      setIsToggling(false);
     }
-    setIsToggling(false);
   };
 
   if (isLoading) {

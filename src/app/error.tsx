@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect } from "react";
+import * as Sentry from "@sentry/nextjs";
 import { AlertTriangle, RefreshCw, Home } from "lucide-react";
 import Link from "next/link";
 import { Button } from "@/components/ui/button";
@@ -13,9 +14,11 @@ export default function Error({
   reset: () => void;
 }) {
   useEffect(() => {
-    // Log in development for debugging
+    Sentry.captureException(error, {
+      tags: { errorBoundary: "app-root" },
+    });
     if (process.env.NODE_ENV === "development") {
-      console.error("Global error boundary caught:", error);
+      console.error("App error boundary caught:", error);
     }
   }, [error]);
 
