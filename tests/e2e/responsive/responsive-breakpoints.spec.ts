@@ -52,11 +52,33 @@ for (const bp of breakpoints) {
         await p.goto(page.url, { waitUntil: "domcontentloaded" });
         await p.waitForTimeout(500);
 
-        // Find elements that extend beyond viewport width
+        // Find elements that extend beyond viewport width.
+        // Elements visually clipped by an overflow-hidden ancestor are excluded —
+        // their getBoundingClientRect reports the un-clipped position, but they
+        // don't cause visible overflow (e.g., carousel slides, scrollable panels).
         const overflowingElements = await p.evaluate(() => {
           const viewportWidth = document.documentElement.clientWidth;
           const elements = document.querySelectorAll("body *");
           const overflows: string[] = [];
+
+          // Check if any ancestor clips this element via overflow
+          function isClippedByAncestor(el: Element): boolean {
+            let parent = el.parentElement;
+            while (parent && parent !== document.body) {
+              const parentStyle = window.getComputedStyle(parent);
+              const overflow = parentStyle.overflow + parentStyle.overflowX;
+              if (overflow.includes("hidden") || overflow.includes("clip")) {
+                const parentRect = parent.getBoundingClientRect();
+                // Parent clips content and its right edge is within viewport
+                if (parentRect.right <= viewportWidth + 2) {
+                  return true;
+                }
+              }
+              parent = parent.parentElement;
+            }
+            return false;
+          }
+
           for (const el of elements) {
             const rect = el.getBoundingClientRect();
             // Only check visible elements
@@ -65,6 +87,10 @@ for (const bp of breakpoints) {
               continue;
             }
             if (rect.right > viewportWidth + 2) {
+              // Skip elements clipped by overflow-hidden ancestors (carousels, sliders)
+              if (isClippedByAncestor(el)) {
+                continue;
+              }
               // 2px tolerance for sub-pixel rendering
               const tag = el.tagName.toLowerCase();
               const cls = el.className ? `.${String(el.className).split(" ").slice(0, 2).join(".")}` : "";
@@ -126,9 +152,12 @@ for (const bp of breakpoints) {
             continue;
           }
           const fontSize = parseFloat(style.fontSize);
-          // Allow icon-like elements and badges with small text
           const text = el.textContent?.trim() || "";
-          if (fontSize < 11 && text.length > 3) {
+          // Skip icon-like elements (≤3 chars), short badge/tag text (≤15 chars at 10px+),
+          // and elements inside overflow-hidden containers (carousel slides)
+          if (text.length <= 3) continue;
+          if (fontSize >= 10 && text.length <= 15) continue; // amenity badges, tags
+          if (fontSize < 11) {
             const tag = el.tagName.toLowerCase();
             tiny.push(`${tag}: "${text.slice(0, 30)}" (${fontSize}px)`);
           }
