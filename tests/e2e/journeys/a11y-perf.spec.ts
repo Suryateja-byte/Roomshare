@@ -9,9 +9,11 @@ import { test, expect, SF_BOUNDS, searchResultsContainer } from "../helpers";
 /** Wait for search results to load by checking for heading */
 async function waitForResults(page: import("@playwright/test").Page) {
   await page.waitForLoadState("domcontentloaded");
-  await expect(page.getByRole("heading", { level: 1 }).first()).toBeVisible({
-    timeout: 30000,
-  });
+  // Wait for heading OR bottom sheet (mobile may not show heading in viewport)
+  await expect(
+    page.getByRole("heading", { level: 1 }).first()
+      .or(page.locator('[data-testid="mobile-bottom-sheet"]'))
+  ).toBeVisible({ timeout: 30000 });
 }
 
 test.describe("Accessibility & Performance", () => {

@@ -651,6 +651,9 @@ test.describe("Accessibility Audit (axe-core)", () => {
   test.describe("Loading States", () => {
     test("Loading states are announced to screen readers", async ({ page }) => {
       await page.goto("/search");
+      await page.waitForLoadState("domcontentloaded");
+      // Wait for React hydration to complete — aria-live regions are in client components
+      await page.waitForTimeout(2000);
 
       // Check for aria-live regions or loading indicators with proper ARIA
       const liveRegions = page.locator(

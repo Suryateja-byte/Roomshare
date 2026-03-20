@@ -150,6 +150,7 @@ export default function ListingList({
             value={search}
             onChange={(e) => setSearch(e.target.value)}
             placeholder="Search by title or owner..."
+            aria-label="Search listings by title or owner"
             className="w-full pl-10 pr-4 py-2 border border-zinc-200 dark:border-zinc-700 dark:bg-zinc-800 dark:text-white rounded-lg focus:outline-none focus:ring-2 focus:ring-zinc-900/20 dark:focus:ring-zinc-400/20"
           />
         </div>
@@ -263,6 +264,7 @@ export default function ListingList({
                         <Link
                           href={`/listings/${listing.id}`}
                           target="_blank"
+                          aria-label={`View listing: ${listing.title}`}
                           className="p-2 hover:bg-zinc-100 rounded-lg text-zinc-500 hover:text-zinc-700"
                         >
                           <ExternalLink className="w-4 h-4" />
@@ -275,6 +277,7 @@ export default function ListingList({
                                 openMenuId === listing.id ? null : listing.id
                               )
                             }
+                            aria-label={`Actions for ${listing.title}`}
                             className="p-2 hover:bg-zinc-100 rounded-lg"
                           >
                             <MoreVertical className="w-5 h-5 text-zinc-400" />
