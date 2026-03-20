@@ -98,7 +98,7 @@ test.describe("Profile Edit — Form Assertions", () => {
     await expect(form).toBeVisible({ timeout: timeouts.navigation });
 
     // Name input should have a non-empty value
-    const nameInput = page.getByTestId("profile-name-input");
+    const nameInput = page.getByTestId("profile-name-input").first();
     await expect(nameInput).toBeVisible({ timeout: timeouts.action });
     const nameValue = await nameInput.inputValue();
     expect(nameValue.length).toBeGreaterThan(0);
@@ -112,12 +112,12 @@ test.describe("Profile Edit — Form Assertions", () => {
     });
 
     // Clear the name field
-    const nameInput = page.getByTestId("profile-name-input");
+    const nameInput = page.getByTestId("profile-name-input").first();
     await expect(nameInput).toBeVisible({ timeout: timeouts.action });
     await nameInput.clear();
 
     // Click save
-    const saveBtn = page.getByTestId("profile-save-button");
+    const saveBtn = page.getByTestId("profile-save-button").first();
     await expect(saveBtn).toBeVisible({ timeout: timeouts.action });
     await saveBtn.click();
 
@@ -178,7 +178,7 @@ test.describe("Profile Edit — Form Assertions", () => {
     });
 
     // Modify the name
-    const nameInput = page.getByTestId("profile-name-input");
+    const nameInput = page.getByTestId("profile-name-input").first();
     await expect(nameInput).toBeVisible({ timeout: timeouts.action });
     await nameInput.clear();
     await nameInput.fill("TEMPORARY_NAME_CHANGE");
@@ -254,7 +254,7 @@ test.describe("Profile Edit — Form Assertions", () => {
     });
 
     // Fill in a name change
-    const nameInput = page.getByTestId("profile-name-input");
+    const nameInput = page.getByTestId("profile-name-input").first();
     await expect(nameInput).toBeVisible({ timeout: timeouts.action });
     const testName = "Error Test Name";
     await nameInput.clear();
@@ -281,7 +281,7 @@ test.describe("Profile Edit — Form Assertions", () => {
     });
 
     // Click save
-    const saveBtn = page.getByTestId("profile-save-button");
+    const saveBtn = page.getByTestId("profile-save-button").first();
     await saveBtn.click();
 
     // Wait for error handling — either error banner appears or we stay on edit page
@@ -350,14 +350,14 @@ test.describe.serial("Profile Edit — Mutations", () => {
     });
 
     // Change the name
-    const nameInput = page.getByTestId("profile-name-input");
+    const nameInput = page.getByTestId("profile-name-input").first();
     await expect(nameInput).toBeVisible({ timeout: timeouts.action });
     const testName = `E2E Test Name ${Date.now()}`;
     await nameInput.clear();
     await nameInput.fill(testName);
 
     // Click save
-    const saveBtn = page.getByTestId("profile-save-button");
+    const saveBtn = page.getByTestId("profile-save-button").first();
     await saveBtn.click();
 
     // Wait for success message OR redirect (redirect may happen before message is visible)
@@ -394,11 +394,11 @@ test.describe.serial("Profile Edit — Mutations", () => {
       timeout: timeouts.navigation,
     });
 
-    const nameInputRestore = page.getByTestId("profile-name-input");
+    const nameInputRestore = page.getByTestId("profile-name-input").first();
     await nameInputRestore.clear();
     await nameInputRestore.fill(originalName);
 
-    await page.getByTestId("profile-save-button").click();
+    await page.getByTestId("profile-save-button").first().click();
     // Wait for success or redirect (same pattern as above)
     await Promise.race([
       page
@@ -435,7 +435,7 @@ test.describe.serial("Profile Edit — Mutations", () => {
     await bioTextarea.fill(testBio);
 
     // Save
-    await page.getByTestId("profile-save-button").click();
+    await page.getByTestId("profile-save-button").first().click();
     await expect(page.getByText(/profile updated successfully/i)).toBeVisible({
       timeout: timeouts.action,
     });
@@ -444,7 +444,7 @@ test.describe.serial("Profile Edit — Mutations", () => {
     });
 
     // Verify bio appears on profile page
-    const profileBio = page.getByTestId("profile-bio");
+    const profileBio = page.getByTestId("profile-bio").first();
     await expect(profileBio).toBeVisible({ timeout: timeouts.action });
     const bioText = await profileBio.textContent();
     expect(bioText).toContain(testBio);
@@ -460,7 +460,7 @@ test.describe.serial("Profile Edit — Mutations", () => {
     await bioTextareaRestore.clear();
     await bioTextareaRestore.fill(originalBio);
 
-    await page.getByTestId("profile-save-button").click();
+    await page.getByTestId("profile-save-button").first().click();
     await expect(page.getByText(/profile updated successfully/i)).toBeVisible({
       timeout: timeouts.action,
     });

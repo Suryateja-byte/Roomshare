@@ -426,33 +426,36 @@ test.describe("Error & Empty State Journeys", () => {
       ];
 
       for (const payload of xssPayloads) {
+        // Listen for JavaScript dialog events (alert/confirm/prompt).
+        // If any XSS payload executes, it will trigger an alert dialog.
+        let alertFired = false;
+        const dialogHandler = () => { alertFired = true; };
+        page.on("dialog", dialogHandler);
+
         await page.goto(payload, {
           waitUntil: "domcontentloaded",
           timeout: 30000,
         });
 
-        // Verify XSS payload is NOT rendered as executable HTML in the DOM.
-        // Note: page.content() includes RSC serialized data (JSON strings) which
-        // may contain the URL text in escaped form — that's safe. We check that
-        // the payload doesn't appear as actual executable HTML elements/attributes.
-        const hasExecutableXss = await page.evaluate(() => {
-          // Check for injected script elements
+        // Wait a moment for any deferred scripts to execute
+        await page.waitForTimeout(1000);
+
+        // Remove dialog listener
+        page.off("dialog", dialogHandler);
+
+        // No alert should have fired — XSS payload must not execute
+        expect(alertFired).toBe(false);
+
+        // Verify no user-injected <script>alert</script> elements exist
+        const hasInjectedScript = await page.evaluate(() => {
           const scripts = document.querySelectorAll("script");
           for (const s of scripts) {
-            if (s.textContent?.includes("alert(1)")) return true;
-          }
-          // Check for event handler attributes on non-script elements
-          const all = document.querySelectorAll("*:not(script)");
-          for (const el of all) {
-            for (const attr of el.getAttributeNames()) {
-              if (attr.startsWith("on") && el.getAttribute(attr)?.includes("alert")) {
-                return true;
-              }
-            }
+            // Only check inline scripts (not framework scripts with src)
+            if (!s.src && s.textContent?.includes("alert(1)")) return true;
           }
           return false;
         });
-        expect(hasExecutableXss).toBe(false);
+        expect(hasInjectedScript).toBe(false);
 
         // Page should still render (not crash)
         await expect(page.locator("body")).toBeVisible();

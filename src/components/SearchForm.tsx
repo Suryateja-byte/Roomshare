@@ -992,8 +992,8 @@ export default function SearchForm({
               placeholder="Search destinations"
               className={
                 isCompact
-                  ? "text-sm flex-1"
-                  : "text-sm font-medium flex-1 bg-transparent border-none p-0 focus:ring-0"
+                  ? "text-base md:text-sm flex-1"
+                  : "text-base md:text-sm font-medium flex-1 bg-transparent border-none p-0 focus:ring-0"
               }
             />
             <button
