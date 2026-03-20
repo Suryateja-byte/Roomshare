@@ -60,6 +60,7 @@ test.describe("Tap target sizes", () => {
         'button, a, [role="button"], input, select, textarea, [tabindex="0"]'
       );
       const violations: string[] = [];
+      const viewportWidth = document.documentElement.clientWidth;
 
       for (const el of interactive) {
         const rect = el.getBoundingClientRect();
@@ -75,6 +76,24 @@ test.describe("Tap target sizes", () => {
         ) {
           continue;
         }
+
+        // Skip elements outside viewport (carousel slides, off-screen nav items)
+        if (rect.right < 0 || rect.left > viewportWidth || rect.bottom < 0) {
+          continue;
+        }
+
+        // Skip elements inside overflow-hidden containers (carousel nav dots, slider controls)
+        let clipped = false;
+        let parent = el.parentElement;
+        while (parent && parent !== document.body) {
+          const ps = window.getComputedStyle(parent);
+          if ((ps.overflow + ps.overflowX).includes("hidden")) {
+            const pr = parent.getBoundingClientRect();
+            if (pr.right <= viewportWidth + 2) { clipped = true; break; }
+          }
+          parent = parent.parentElement;
+        }
+        if (clipped && rect.right > viewportWidth) continue;
 
         // Critically small: below 32px in either dimension
         if (rect.width < 32 || rect.height < 32) {

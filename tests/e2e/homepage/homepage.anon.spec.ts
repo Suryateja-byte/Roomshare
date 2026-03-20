@@ -11,6 +11,10 @@ import { test, expect } from "../helpers";
 
 test.describe("Homepage — Anonymous User", () => {
   test.beforeEach(async ({ page }) => {
+    // Disable Framer Motion animations in CI — JS-driven animations
+    // (requestAnimationFrame) don't reliably complete in headless browsers,
+    // leaving elements at opacity:0 and failing toBeVisible assertions.
+    await page.emulateMedia({ reducedMotion: "reduce" });
     await page.goto("/");
     await page.waitForLoadState("domcontentloaded");
   });
