@@ -46,6 +46,7 @@ jobs:
       E2E_TEST_PASSWORD: TestPassword123!
       E2E_DISABLE_RATE_LIMIT: 'true'
       E2E_TEST_HELPERS: 'true'
+      E2E_TEST_SECRET: 'ci-e2e-test-secret-minimum-16-chars'
       ENABLE_MULTI_SLOT_BOOKING: 'true'
       ENABLE_WHOLE_UNIT_MODE: 'true'
       ENABLE_SOFT_HOLDS: 'on'

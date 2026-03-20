@@ -70,8 +70,10 @@ test.describe("API Response Depth", () => {
 
     test("RD-03: POST with invalid body returns structured error", async ({
       request,
+      baseURL,
     }) => {
       const response = await request.post("/api/favorites", {
+        headers: { Origin: baseURL! },
         data: { invalid: true },
       });
 
@@ -122,7 +124,7 @@ test.describe("API Response Depth", () => {
     });
 
     test("RD-05: GET unread count returns number", async ({ request }) => {
-      const response = await request.get("/api/messages?unread=true");
+      const response = await request.get("/api/messages?view=unreadCount");
 
       expect(response.status()).toBe(200);
       const data = await response.json();
@@ -134,8 +136,10 @@ test.describe("API Response Depth", () => {
 
     test("RD-06: POST with empty content returns 400 error", async ({
       request,
+      baseURL,
     }) => {
       const response = await request.post("/api/messages", {
+        headers: { Origin: baseURL! },
         data: { conversationId: "test-conv", content: "" },
       });
 
@@ -151,8 +155,10 @@ test.describe("API Response Depth", () => {
 
     test("RD-07: POST with oversized content returns 400 error", async ({
       request,
+      baseURL,
     }) => {
       const response = await request.post("/api/messages", {
+        headers: { Origin: baseURL! },
         data: {
           conversationId: "test-conv",
           content: "x".repeat(2001),
@@ -174,8 +180,10 @@ test.describe("API Response Depth", () => {
   test.describe("Listings API (/api/listings)", () => {
     test("RD-08: POST with invalid body returns structured validation error", async ({
       request,
+      baseURL,
     }) => {
       const response = await request.post("/api/listings", {
+        headers: { Origin: baseURL! },
         data: { title: "" },
       });
 
@@ -239,9 +247,10 @@ test.describe("API Response Depth", () => {
 
     test("RD-11: Invalid JSON body returns clean error", async ({
       request,
+      baseURL,
     }) => {
       const response = await request.post("/api/messages", {
-        headers: { "content-type": "application/json" },
+        headers: { "content-type": "application/json", Origin: baseURL! },
         data: "not-valid-json{",
       });
 

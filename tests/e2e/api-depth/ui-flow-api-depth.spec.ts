@@ -158,7 +158,7 @@ test.describe("UI Flow API Depth", () => {
       request,
     }) => {
       // Direct API call to check notifications endpoint response structure
-      const response = await request.get("/api/messages?unread=true");
+      const response = await request.get("/api/messages?view=unreadCount");
 
       if (response.status() === 200) {
         const data = await response.json();

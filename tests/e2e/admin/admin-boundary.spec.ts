@@ -23,7 +23,10 @@ test.describe("Admin Boundary — Regular User", () => {
     page,
   }) => {
     await page.goto("/admin");
-    await page.waitForLoadState("domcontentloaded");
+    await page.waitForLoadState("networkidle");
+
+    // Wait for any redirect to settle after hydration
+    await page.waitForTimeout(2000);
 
     // Regular user should be redirected away from admin
     // (either to /login, home, or shown a 403/unauthorized message)
@@ -48,8 +51,13 @@ test.describe("Admin Boundary — Regular User", () => {
   });
 
   test("ABD-02: regular user cannot access admin API endpoints", async ({
+    page,
     request,
   }) => {
+    // Ensure page is fully loaded before making API requests
+    await page.goto("/");
+    await page.waitForLoadState("networkidle");
+
     // Try to access admin-only operations
     const response = await request.get("/admin");
 
