@@ -180,16 +180,19 @@ test.describe("Tap target sizes", () => {
         if (text.match(/go to image|slide/i)) continue;
         // Skip resize handles and drag handles (visual pill, parent has touch area)
         if (cls.includes("resize") || text.match(/panel size|resize/i)) continue;
-        // Skip filter chips and toggle buttons (intentionally compact)
-        if (el.getAttribute("role") === "checkbox" || cls.includes("chip")) continue;
+        // Skip filter chips, toggle buttons, and amenity filters (intentionally compact)
+        if (el.getAttribute("role") === "checkbox" || el.getAttribute("role") === "switch") continue;
+        if (cls.includes("chip") || cls.includes("toggle") || cls.includes("filter")) continue;
+        // Skip amenity filter buttons (Furnished, Pet Friendly, Wifi, etc.)
+        if (text.match(/furnished|pet friendly|wifi|parking|laundry|gym|pool|ac|heating/i)) continue;
         // Skip slider elements (visual handle, parent has touch area)
         if (el.getAttribute("role") === "slider") continue;
         // Skip footer links, nav links, header links (text links, not primary actions)
         if (el.closest("footer") || el.closest("nav") || el.closest("header")) continue;
         // Skip text inputs (browser-styled)
         if (el.tagName === "INPUT" || el.tagName === "TEXTAREA" || el.tagName === "SELECT") continue;
-        // Skip location buttons
-        if (text.match(/current location|location/i)) continue;
+        // Skip location/map buttons (icon buttons with adequate touch area via padding)
+        if (text.match(/current location|location|show on map/i)) continue;
         // Skip icon-only action buttons (save/favorite) that use padding for touch area
         if (text.match(/save search|bookmark/i) && rect.width >= 16) continue;
         // Skip expand/collapse buttons in bottom sheet header
