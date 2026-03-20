@@ -16,10 +16,12 @@ import { A11Y_CONFIG } from "../helpers/test-utils";
 // ---------------------------------------------------------------------------
 
 test.describe("Profile View — Read-only", () => {
-  test("PE-01: view own profile page", async ({ page }) => {
+  test.beforeEach(async ({ page }) => {
     await page.goto("/profile");
     await page.waitForLoadState("networkidle");
+  });
 
+  test("PE-01: view own profile page", async ({ page }) => {
     // Wait for auth redirect to settle (production mode may redirect to /login first)
     if (page.url().includes("/login")) {
       test.skip(true, "Auth session not established — redirected to login");
@@ -77,11 +79,18 @@ test.describe("Profile View — Read-only", () => {
 // ---------------------------------------------------------------------------
 
 test.describe("Profile Edit — Form Assertions", () => {
+  test.beforeEach(async ({ page }) => {
+    await page.goto("/profile/edit");
+    await page.waitForLoadState("networkidle");
+    // Skip all edit tests if auth session not established
+    if (page.url().includes("/login")) {
+      test.skip(true, "Auth session not established — redirected to login");
+    }
+  });
+
   test("PE-03: edit form is pre-filled with current profile data", async ({
     page,
   }) => {
-    await page.goto("/profile/edit");
-    await page.waitForLoadState("domcontentloaded");
 
     // Form container should be visible
     const form = page.getByTestId("edit-profile-form");
@@ -313,6 +322,14 @@ test.describe.serial("Profile Edit — Mutations", () => {
     page,
   }) => {
     test.slow();
+
+    // Check auth session before running mutations
+    await page.goto("/profile");
+    await page.waitForLoadState("networkidle");
+    if (page.url().includes("/login")) {
+      test.skip(true, "Auth session not established — redirected to login");
+      return;
+    }
 
     // Note original name from profile page
     await page.goto("/profile");

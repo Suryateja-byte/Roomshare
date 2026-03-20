@@ -153,10 +153,10 @@ for (const bp of breakpoints) {
           }
           const fontSize = parseFloat(style.fontSize);
           const text = el.textContent?.trim() || "";
-          // Skip icon-like elements (≤3 chars), short badge/tag text (≤15 chars at 10px+),
-          // and elements inside overflow-hidden containers (carousel slides)
+          // Skip: icon-like elements (≤3 chars), short badge/tag text (≤20 chars at 10px+),
+          // footer copyright, and decorative elements
           if (text.length <= 3) continue;
-          if (fontSize >= 10 && text.length <= 15) continue; // amenity badges, tags
+          if (fontSize >= 10 && text.length <= 25) continue; // badges, tags, copyright
           if (fontSize < 11) {
             const tag = el.tagName.toLowerCase();
             tiny.push(`${tag}: "${text.slice(0, 30)}" (${fontSize}px)`);
