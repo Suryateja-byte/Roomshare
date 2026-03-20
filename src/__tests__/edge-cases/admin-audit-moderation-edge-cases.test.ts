@@ -72,6 +72,31 @@ jest.mock("@/lib/audit", () => ({
   getAdminActionHistory: jest.fn(),
 }));
 
+jest.mock("@/lib/logger", () => ({
+  logger: { sync: { error: jest.fn(), warn: jest.fn(), info: jest.fn() } },
+}));
+
+jest.mock("next/headers", () => ({
+  headers: jest.fn().mockResolvedValue(new Headers()),
+}));
+
+jest.mock("@/lib/rate-limit", () => ({
+  checkRateLimit: jest.fn().mockResolvedValue({
+    success: true,
+    remaining: 19,
+    resetAt: new Date(),
+  }),
+  getClientIPFromHeaders: jest.fn().mockReturnValue("127.0.0.1"),
+  RATE_LIMITS: {
+    adminWrite: { limit: 20, windowMs: 60_000 },
+    adminDelete: { limit: 5, windowMs: 3_600_000 },
+  },
+}));
+
+jest.mock("@/lib/search/search-doc-dirty", () => ({
+  markListingDirty: jest.fn().mockResolvedValue(undefined),
+}));
+
 import {
   getUsers,
   toggleUserAdmin,

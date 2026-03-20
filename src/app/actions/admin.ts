@@ -8,6 +8,8 @@ import { ListingStatus, ReportStatus } from "@prisma/client";
 import { logAdminAction } from "@/lib/audit";
 import { logger } from "@/lib/logger";
 import { markListingDirty } from "@/lib/search/search-doc-dirty";
+import { checkRateLimit, RATE_LIMITS, getClientIPFromHeaders } from "@/lib/rate-limit";
+import { headers } from "next/headers";
 
 // Helper to check admin status — exported for use in other admin action files (verification.ts etc.)
 export async function requireAdmin() {
@@ -130,6 +132,18 @@ export async function toggleUserAdmin(userId: string) {
     return { error: adminCheck.error };
   }
 
+  // Rate limit admin writes
+  const headersList = await headers();
+  const ip = getClientIPFromHeaders(headersList);
+  const rl = await checkRateLimit(
+    `${ip}:${adminCheck.userId}`,
+    "adminWrite",
+    RATE_LIMITS.adminWrite
+  );
+  if (!rl.success) {
+    return { error: "Too many requests. Please slow down." };
+  }
+
   // Prevent self-demotion
   if (userId === adminCheck.userId) {
     return { error: "Cannot change your own admin status" };
@@ -181,6 +195,18 @@ export async function suspendUser(userId: string, suspend: boolean) {
   const adminCheck = await requireAdmin();
   if (adminCheck.error) {
     return { error: adminCheck.error };
+  }
+
+  // Rate limit admin writes
+  const headersList = await headers();
+  const ip = getClientIPFromHeaders(headersList);
+  const rl = await checkRateLimit(
+    `${ip}:${adminCheck.userId}`,
+    "adminWrite",
+    RATE_LIMITS.adminWrite
+  );
+  if (!rl.success) {
+    return { error: "Too many requests. Please slow down." };
   }
 
   // Prevent self-suspension
@@ -327,6 +353,18 @@ export async function updateListingStatus(
     return { error: adminCheck.error };
   }
 
+  // Rate limit admin writes
+  const headersList = await headers();
+  const ip = getClientIPFromHeaders(headersList);
+  const rl = await checkRateLimit(
+    `${ip}:${adminCheck.userId}`,
+    "adminWrite",
+    RATE_LIMITS.adminWrite
+  );
+  if (!rl.success) {
+    return { error: "Too many requests. Please slow down." };
+  }
+
   try {
     const listing = await prisma.listing.findUnique({
       where: { id: listingId },
@@ -348,7 +386,7 @@ export async function updateListingStatus(
     // Audit log
     await logAdminAction({
       adminId: adminCheck.userId!,
-      action: status === "PAUSED" ? "LISTING_HIDDEN" : "LISTING_RESTORED",
+      action: status === "PAUSED" ? "LISTING_HIDDEN" : status === "RENTED" ? "LISTING_RENTED" : "LISTING_RESTORED",
       targetType: "Listing",
       targetId: listingId,
       details: {
@@ -377,6 +415,18 @@ export async function deleteListing(listingId: string) {
   const adminCheck = await requireAdmin();
   if (adminCheck.error) {
     return { error: adminCheck.error };
+  }
+
+  // Rate limit admin deletes
+  const headersList = await headers();
+  const ip = getClientIPFromHeaders(headersList);
+  const rl = await checkRateLimit(
+    `${ip}:${adminCheck.userId}`,
+    "adminDelete",
+    RATE_LIMITS.adminDelete
+  );
+  if (!rl.success) {
+    return { error: "Too many requests. Please slow down." };
   }
 
   try {
@@ -552,6 +602,18 @@ export async function resolveReport(
     return { error: adminCheck.error };
   }
 
+  // Rate limit admin writes
+  const headersList = await headers();
+  const ip = getClientIPFromHeaders(headersList);
+  const rl = await checkRateLimit(
+    `${ip}:${adminCheck.userId}`,
+    "adminWrite",
+    RATE_LIMITS.adminWrite
+  );
+  if (!rl.success) {
+    return { error: "Too many requests. Please slow down." };
+  }
+
   try {
     const report = await prisma.report.findUnique({
       where: { id: reportId },
@@ -609,6 +671,18 @@ export async function resolveReportAndRemoveListing(
   const adminCheck = await requireAdmin();
   if (adminCheck.error) {
     return { error: adminCheck.error };
+  }
+
+  // Rate limit admin deletes
+  const headersList = await headers();
+  const ip = getClientIPFromHeaders(headersList);
+  const rl = await checkRateLimit(
+    `${ip}:${adminCheck.userId}`,
+    "adminDelete",
+    RATE_LIMITS.adminDelete
+  );
+  if (!rl.success) {
+    return { error: "Too many requests. Please slow down." };
   }
 
   try {

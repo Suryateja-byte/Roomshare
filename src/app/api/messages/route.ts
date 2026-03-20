@@ -75,6 +75,13 @@ async function getUnreadMessageCountForUser(userId: string): Promise<number> {
 
 export async function GET(request: Request) {
   try {
+    // IP-based rate limit BEFORE auth() to prevent session-lookup flood
+    const preAuthRl = await withRateLimit(request, {
+      type: "messagesPreAuth",
+      endpoint: "/api/messages:pre-auth",
+    });
+    if (preAuthRl) return preAuthRl;
+
     const session = await auth();
     if (!session?.user?.id) {
       return NextResponse.json({ error: "Unauthorized" }, { status: 401 });

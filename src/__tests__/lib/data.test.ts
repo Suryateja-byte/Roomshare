@@ -10,6 +10,7 @@ jest.mock("@/lib/prisma", () => ({
   prisma: {
     $queryRaw: jest.fn(),
     $queryRawUnsafe: jest.fn(),
+    $transaction: jest.fn(),
     savedListing: {
       findMany: jest.fn(),
     },
@@ -18,6 +19,12 @@ jest.mock("@/lib/prisma", () => ({
       aggregate: jest.fn(),
     },
   },
+}));
+
+// Mock queryWithTimeout to record SQL/params the same way $queryRawUnsafe did
+const mockQueryWithTimeout = jest.fn().mockResolvedValue([]);
+jest.mock("@/lib/query-timeout", () => ({
+  queryWithTimeout: (...args: unknown[]) => mockQueryWithTimeout(...args),
 }));
 
 import { prisma } from "@/lib/prisma";
@@ -40,6 +47,8 @@ import {
   filterByBounds,
   filterByQuery,
   sortListings,
+  getMapListings,
+  getListingsPaginated,
   MIN_QUERY_LENGTH,
   MAX_QUERY_LENGTH,
   ListingWithMetadata,
@@ -1393,6 +1402,81 @@ describe("sortListings", () => {
       const original = [...listings];
       sortListings(listings, "price_asc");
       expect(listings).toEqual(original);
+    });
+  });
+});
+
+describe("slotThreshold parameterization", () => {
+  beforeEach(() => {
+    jest.clearAllMocks();
+  });
+
+  describe("getMapListings", () => {
+    it("parameterizes slotThreshold via $1 placeholder instead of interpolating", async () => {
+      mockQueryWithTimeout.mockResolvedValue([]);
+
+      await getMapListings({ bounds: { minLat: 30, maxLat: 40, minLng: -120, maxLng: -110 } });
+
+      expect(mockQueryWithTimeout).toHaveBeenCalled();
+      const sql = mockQueryWithTimeout.mock.calls[0][0] as string;
+      const params = mockQueryWithTimeout.mock.calls[0][1] as unknown[];
+
+      // The slot threshold condition must use a $N placeholder, not a literal number
+      expect(sql).toContain('"availableSlots" >= $1');
+      expect(sql).not.toMatch(/"availableSlots"\s*>=\s*\d+(?!\$)/);
+
+      // slotThreshold (default 1) must be the first query param
+      expect(params[0]).toBe(1);
+    });
+
+    it("passes custom minAvailableSlots as parameterized value", async () => {
+      mockQueryWithTimeout.mockResolvedValue([]);
+
+      await getMapListings({
+        minAvailableSlots: 3,
+        bounds: { minLat: 30, maxLat: 40, minLng: -120, maxLng: -110 },
+      });
+
+      const params = mockQueryWithTimeout.mock.calls[0][1] as unknown[];
+      expect(params[0]).toBe(3);
+    });
+  });
+
+  describe("getListingsPaginated", () => {
+    it("parameterizes slotThreshold via $1 placeholder instead of interpolating", async () => {
+      mockQueryWithTimeout.mockResolvedValue([{ total: BigInt(0) }]);
+
+      await getListingsPaginated({ bounds: { minLat: 30, maxLat: 40, minLng: -120, maxLng: -110 } });
+
+      expect(mockQueryWithTimeout).toHaveBeenCalled();
+      // getListingsPaginated issues two queries (count + data) — check both
+      for (const call of mockQueryWithTimeout.mock.calls) {
+        const sql = call[0] as string;
+        const params = call[1] as unknown[];
+
+        if (sql.includes('"availableSlots"')) {
+          expect(sql).toContain('"availableSlots" >= $1');
+          expect(sql).not.toMatch(/"availableSlots"\s*>=\s*\d+(?!\$)/);
+          expect(params[0]).toBe(1);
+        }
+      }
+    });
+
+    it("passes custom minAvailableSlots as parameterized value", async () => {
+      mockQueryWithTimeout.mockResolvedValue([{ total: BigInt(0) }]);
+
+      await getListingsPaginated({
+        minAvailableSlots: 5,
+        bounds: { minLat: 30, maxLat: 40, minLng: -120, maxLng: -110 },
+      });
+
+      for (const call of mockQueryWithTimeout.mock.calls) {
+        const sql = call[0] as string;
+        const params = call[1] as unknown[];
+        if (sql.includes('"availableSlots"')) {
+          expect(params[0]).toBe(5);
+        }
+      }
     });
   });
 });

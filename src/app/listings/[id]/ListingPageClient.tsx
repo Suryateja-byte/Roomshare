@@ -678,12 +678,10 @@ export default function ListingPageClient({
                     <div className="space-y-3">
                       <Link
                         href={`/listings/${listing.id}/edit`}
-                        className="block"
+                        className="w-full flex items-center justify-center gap-2 bg-zinc-900 hover:bg-zinc-800 dark:bg-white dark:hover:bg-zinc-100 text-white dark:text-zinc-900 font-medium py-3.5 px-4 rounded-xl transition-all shadow-lg shadow-zinc-900/20 dark:shadow-white/5 active:scale-[0.98]"
                       >
-                        <button className="w-full flex items-center justify-center gap-2 bg-zinc-900 hover:bg-zinc-800 dark:bg-white dark:hover:bg-zinc-100 text-white dark:text-zinc-900 font-medium py-3.5 px-4 rounded-xl transition-all shadow-lg shadow-zinc-900/20 dark:shadow-white/5 active:scale-[0.98]">
-                          <Pencil className="w-4 h-4" />
-                          Edit Listing
-                        </button>
+                        <Pencil className="w-4 h-4" />
+                        Edit Listing
                       </Link>
                       <DeleteListingButton listingId={listing.id} />
                     </div>

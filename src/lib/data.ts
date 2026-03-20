@@ -17,6 +17,7 @@ import {
   MAP_FETCH_MAX_LAT_SPAN,
   MAP_FETCH_MAX_LNG_SPAN,
 } from "@/lib/constants";
+import { queryWithTimeout } from "@/lib/query-timeout";
 
 // Re-export types and utilities from search-types for backward compatibility.
 // These were extracted to break the circular dependency: data.ts <-> search-doc-queries.ts.
@@ -535,10 +536,7 @@ export async function getListings(
     `;
 
     // eslint-disable-next-line @typescript-eslint/no-explicit-any -- Raw SQL query returns untyped rows; mapped to ListingData below
-    const listings = await prisma.$queryRawUnsafe<any[]>(
-      sqlQuery,
-      ...queryParams
-    );
+    const listings = await queryWithTimeout<any>(sqlQuery, queryParams);
 
     return listings.map((l) => ({
       id: l.id,
@@ -628,8 +626,11 @@ export async function getMapListings(
   // Build WHERE conditions dynamically
   // minAvailableSlots defaults to 1 (at least one slot available)
   const slotThreshold = Math.max(minAvailableSlots ?? 1, 1);
+  const queryParams: (string | number | boolean | null | Date | string[])[] =
+    [slotThreshold];
+  let paramIndex = 2;
   const conditions: string[] = [
-    `l."availableSlots" >= ${slotThreshold}`,
+    'l."availableSlots" >= $1',
     "l.status = 'ACTIVE'",
     "ST_X(loc.coords::geometry) IS NOT NULL",
     "ST_Y(loc.coords::geometry) IS NOT NULL",
@@ -637,9 +638,6 @@ export async function getMapListings(
     "ST_Y(loc.coords::geometry) BETWEEN -90 AND 90",
     "ST_X(loc.coords::geometry) BETWEEN -180 AND 180",
   ];
-  const queryParams: (string | number | boolean | null | Date | string[])[] =
-    [];
-  let paramIndex = 1;
 
   // SQL-level bounds filtering using PostGIS spatial index with antimeridian support
   if (bounds) {
@@ -799,10 +797,7 @@ export async function getMapListings(
 
   try {
     // eslint-disable-next-line @typescript-eslint/no-explicit-any -- Raw SQL query returns untyped rows; mapped to ListingData below
-    const listings = await prisma.$queryRawUnsafe<any[]>(
-      sqlQuery,
-      ...queryParams
-    );
+    const listings = await queryWithTimeout<any>(sqlQuery, queryParams);
 
     return sanitizeMapListings(
       listings.map((l) => ({
@@ -891,8 +886,11 @@ export async function getListingsPaginated(
     // Build dynamic WHERE conditions for SQL
     // minAvailableSlots defaults to 1 (at least one slot available)
     const slotThreshold = Math.max(minAvailableSlots ?? 1, 1);
+    const queryParams: (string | number | boolean | null | Date | string[])[] =
+      [slotThreshold];
+    let paramIndex = 2;
     const conditions: string[] = [
-      `l."availableSlots" >= ${slotThreshold}`,
+      'l."availableSlots" >= $1',
       "l.status = 'ACTIVE'",
       // Exclude listings with invalid coordinates (null, zero, or out of range)
       "ST_X(loc.coords::geometry) IS NOT NULL",
@@ -901,9 +899,6 @@ export async function getListingsPaginated(
       "ST_Y(loc.coords::geometry) BETWEEN -90 AND 90",
       "ST_X(loc.coords::geometry) BETWEEN -180 AND 180",
     ];
-    const queryParams: (string | number | boolean | null | Date | string[])[] =
-      [];
-    let paramIndex = 1;
 
     // Geographic bounds filter (SQL level) with antimeridian support
     if (bounds) {
@@ -1124,9 +1119,9 @@ export async function getListingsPaginated(
 
     // Execute both queries concurrently
     const [countResult, listings] = await Promise.all([
-      prisma.$queryRawUnsafe<{ total: bigint }[]>(countQuery, ...queryParams),
+      queryWithTimeout<{ total: bigint }>(countQuery, queryParams),
       // eslint-disable-next-line @typescript-eslint/no-explicit-any -- Raw SQL query returns untyped rows
-      prisma.$queryRawUnsafe<any[]>(dataQuery, ...dataParams),
+      queryWithTimeout<any>(dataQuery, dataParams),
     ]);
 
     const rawTotal = Number(countResult[0]?.total || 0);
@@ -1366,9 +1361,9 @@ async function getListingsCountEfficient(
     `;
 
   try {
-    const result = await prisma.$queryRawUnsafe<[{ total: bigint }]>(
+    const result = await queryWithTimeout<{ total: bigint }>(
       countQuery,
-      ...queryParams
+      queryParams
     );
     return Number(result[0]?.total ?? 0);
   } catch (error) {

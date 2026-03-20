@@ -138,15 +138,17 @@ export async function POST(request: NextRequest) {
         processedBuffer = await sharp(buffer).rotate().toBuffer();
       }
     } catch (sharpError) {
-      // Log the failure — unprocessed images retain metadata (GPS, camera info)
-      logger.sync.warn("Sharp image processing failed, using original buffer", {
+      logger.sync.warn("Sharp image processing failed, rejecting upload", {
         route: "/api/upload",
         fileType: file.type,
         fileSize: buffer.length,
         error:
           sharpError instanceof Error ? sharpError.message : String(sharpError),
       });
-      processedBuffer = buffer;
+      return NextResponse.json(
+        { error: "Image processing failed. Please try a different image." },
+        { status: 400 }
+      );
     }
 
     // Generate unique filename

@@ -256,6 +256,15 @@ describe("listConversationMessages", () => {
     });
   });
 
+  it("limits initial message load to 100", async () => {
+    mockMessageFindMany.mockResolvedValueOnce([]);
+
+    await listConversationMessages(CONVERSATION_ID);
+
+    const callArgs = mockMessageFindMany.mock.calls[0][0];
+    expect(callArgs.take).toBe(100);
+  });
+
   it("only returns non-deleted messages (deletedAt: null)", async () => {
     mockMessageFindMany.mockResolvedValueOnce([]);
 

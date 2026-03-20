@@ -16,6 +16,7 @@ export type AdminAction =
   // Listing management
   | "LISTING_DELETED"
   | "LISTING_HIDDEN"
+  | "LISTING_RENTED"
   | "LISTING_RESTORED"
   // Report management
   | "REPORT_RESOLVED"
@@ -117,7 +118,6 @@ export async function getAuditLogs(params: GetAuditLogsParams = {}) {
           select: {
             id: true,
             name: true,
-            email: true,
             image: true,
           },
         },
@@ -158,7 +158,6 @@ export async function getTargetAuditHistory(
         select: {
           id: true,
           name: true,
-          email: true,
         },
       },
     },

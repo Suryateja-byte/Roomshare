@@ -151,7 +151,6 @@ describe("Audit Logging", () => {
         admin: {
           id: "admin-123",
           name: "Admin",
-          email: "admin@test.com",
           image: null,
         },
       },
@@ -254,26 +253,21 @@ describe("Audit Logging", () => {
       );
     });
 
-    it("includes admin details in response", async () => {
+    it("includes admin details in response without email (PII)", async () => {
       (prisma.auditLog.findMany as jest.Mock).mockResolvedValue(mockLogs);
       (prisma.auditLog.count as jest.Mock).mockResolvedValue(1);
 
       await getAuditLogs();
 
-      expect(prisma.auditLog.findMany).toHaveBeenCalledWith(
-        expect.objectContaining({
-          include: {
-            admin: {
-              select: {
-                id: true,
-                name: true,
-                email: true,
-                image: true,
-              },
-            },
-          },
-        })
-      );
+      const call = (prisma.auditLog.findMany as jest.Mock).mock.calls[0][0];
+      const adminSelect = call.include.admin.select;
+
+      expect(adminSelect).toEqual({
+        id: true,
+        name: true,
+        image: true,
+      });
+      expect(adminSelect).not.toHaveProperty("email");
     });
 
     it("orders by createdAt descending", async () => {
@@ -291,28 +285,23 @@ describe("Audit Logging", () => {
   });
 
   describe("getTargetAuditHistory", () => {
-    it("returns audit history for a specific target", async () => {
+    it("returns audit history for a specific target without email (PII)", async () => {
       const mockHistory = [
         {
           id: "log-1",
           action: "USER_SUSPENDED",
-          admin: { id: "admin-1", name: "Admin", email: "admin@test.com" },
+          admin: { id: "admin-1", name: "Admin" },
         },
       ];
       (prisma.auditLog.findMany as jest.Mock).mockResolvedValue(mockHistory);
 
       const result = await getTargetAuditHistory("User", "user-123");
 
-      expect(prisma.auditLog.findMany).toHaveBeenCalledWith({
-        where: { targetType: "User", targetId: "user-123" },
-        include: {
-          admin: {
-            select: { id: true, name: true, email: true },
-          },
-        },
-        orderBy: { createdAt: "desc" },
-        take: 100,
-      });
+      const call = (prisma.auditLog.findMany as jest.Mock).mock.calls[0][0];
+      const adminSelect = call.include.admin.select;
+
+      expect(adminSelect).toEqual({ id: true, name: true });
+      expect(adminSelect).not.toHaveProperty("email");
       expect(result).toEqual(mockHistory);
     });
 

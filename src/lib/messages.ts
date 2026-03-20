@@ -86,6 +86,7 @@ export async function listConversationMessages(
     where,
     orderBy: [{ createdAt: "asc" }, { id: "asc" }],
     include: conversationMessageInclude,
+    take: 100,
   });
 }
 

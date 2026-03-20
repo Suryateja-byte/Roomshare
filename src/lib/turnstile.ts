@@ -38,8 +38,17 @@ export async function verifyTurnstileToken(
   token: string | undefined | null,
   remoteip?: string
 ): Promise<TurnstileResult> {
-  // Kill switch bypass
+  // Kill switch bypass — keeps auth working during Turnstile outages
   if (!isTurnstileEnabled()) {
+    if (process.env.NODE_ENV === "production") {
+      logger.sync.error(
+        "[Turnstile] CAPTCHA disabled in production — bot protection inactive",
+        {
+          turnstileEnabled: process.env.TURNSTILE_ENABLED,
+          hasSecretKey: !!process.env.TURNSTILE_SECRET_KEY,
+        }
+      );
+    }
     return { success: true };
   }
 

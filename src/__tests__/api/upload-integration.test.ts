@@ -62,6 +62,16 @@ jest.mock("@supabase/supabase-js", () => ({
   })),
 }));
 
+jest.mock("sharp", () => {
+  const chain = {
+    rotate: jest.fn().mockReturnThis(),
+    gif: jest.fn().mockReturnThis(),
+    toBuffer: jest.fn().mockResolvedValue(Buffer.from([0xff, 0xd8, 0xff])),
+  };
+  const fn = jest.fn(() => chain);
+  return fn;
+});
+
 jest.mock("next/server", () => ({
   NextResponse: {
     json: (
@@ -229,6 +239,87 @@ describe("POST /api/upload", () => {
     expect(body.error).toContain("does not match");
   });
 
+  it("returns 400 when sharp image processing fails", async () => {
+    // Mock sharp to throw so EXIF stripping fails
+    jest.resetModules();
+
+    jest.doMock("@/auth", () => ({
+      auth: jest.fn().mockResolvedValue(mockSession),
+    }));
+    jest.doMock("@/lib/with-rate-limit", () => ({
+      withRateLimit: jest.fn().mockResolvedValue(null),
+    }));
+    jest.doMock("@/lib/logger", () => ({
+      logger: {
+        info: jest.fn().mockResolvedValue(undefined),
+        warn: jest.fn().mockResolvedValue(undefined),
+        sync: { error: jest.fn(), warn: jest.fn() },
+      },
+    }));
+    jest.doMock("@/lib/api-error-handler", () => ({
+      captureApiError: jest.fn().mockImplementation(() => {
+        const { NextResponse } = jest.requireMock("next/server");
+        return NextResponse.json(
+          { error: "Internal server error" },
+          { status: 500 }
+        );
+      }),
+      apiErrorResponse: jest.fn(),
+    }));
+    jest.doMock("@supabase/supabase-js", () => ({
+      createClient: jest.fn(() => ({
+        storage: {
+          from: jest.fn(() => ({
+            upload: jest.fn().mockResolvedValue({
+              data: { path: "listings/user-123/123-abc.jpg" },
+              error: null,
+            }),
+            getPublicUrl: jest.fn().mockReturnValue({
+              data: {
+                publicUrl:
+                  "https://test.supabase.co/storage/v1/object/public/images/listings/user-123/123-abc.jpg",
+              },
+            }),
+            remove: jest.fn(),
+          })),
+        },
+      })),
+    }));
+    jest.doMock("next/server", () => ({
+      NextResponse: {
+        json: (
+          data: unknown,
+          init?: { status?: number; headers?: Record<string, string> }
+        ) => {
+          const headers = new Map(Object.entries(init?.headers || {}));
+          return {
+            status: init?.status || 200,
+            json: async () => data,
+            headers,
+          };
+        },
+      },
+    }));
+    // Mock sharp to throw an error simulating processing failure
+    jest.doMock("sharp", () => {
+      return () => {
+        throw new Error("sharp: decode failed");
+      };
+    });
+
+    const { POST: POST_SHARP_FAIL } = await import(
+      "@/app/api/upload/route"
+    );
+
+    const file = createFakeFile(JPEG_MAGIC, "photo.jpg", "image/jpeg");
+    const request = makeUploadRequest(file);
+    const response = await POST_SHARP_FAIL(request as any);
+
+    expect(response.status).toBe(400);
+    const body = await response.json();
+    expect(body.error).toContain("Image processing failed");
+  });
+
   it("returns 200 with URL on successful upload", async () => {
     const file = createFakeFile(JPEG_MAGIC, "photo.jpg", "image/jpeg");
     const request = makeUploadRequest(file);
@@ -310,6 +401,15 @@ describe("POST /api/upload", () => {
         },
       },
     }));
+    // Mock sharp to succeed so we reach the Supabase upload path
+    jest.doMock("sharp", () => {
+      const chain = {
+        rotate: jest.fn().mockReturnThis(),
+        gif: jest.fn().mockReturnThis(),
+        toBuffer: jest.fn().mockResolvedValue(Buffer.from([0xff, 0xd8, 0xff])),
+      };
+      return jest.fn(() => chain);
+    });
 
     const { POST: POST2 } = await import("@/app/api/upload/route");
 

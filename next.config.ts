@@ -55,10 +55,8 @@ const nextConfig: NextConfig = {
         protocol: "https",
         hostname: "qolpgfdmkqvxraafucvu.supabase.co",
       },
-      {
-        protocol: "https",
-        hostname: "*.supabase.co",
-      },
+      // Wildcard *.supabase.co removed — specific project hostname above is sufficient.
+      // Wildcard allowed image proxy to fetch from ANY Supabase project's storage.
       // Placeholder image services — only allowed in development
       ...(process.env.NODE_ENV !== "production"
         ? [

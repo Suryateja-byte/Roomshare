@@ -57,6 +57,23 @@ jest.mock("@/lib/logger", () => ({
   logger: { sync: { error: jest.fn(), warn: jest.fn(), info: jest.fn() } },
 }));
 
+jest.mock("next/headers", () => ({
+  headers: jest.fn().mockResolvedValue(new Headers()),
+}));
+
+jest.mock("@/lib/rate-limit", () => ({
+  checkRateLimit: jest.fn().mockResolvedValue({
+    success: true,
+    remaining: 19,
+    resetAt: new Date(),
+  }),
+  getClientIPFromHeaders: jest.fn().mockReturnValue("127.0.0.1"),
+  RATE_LIMITS: {
+    adminWrite: { limit: 20, windowMs: 60_000 },
+    adminDelete: { limit: 5, windowMs: 3_600_000 },
+  },
+}));
+
 jest.mock("@/lib/search/search-doc-dirty", () => ({
   markListingDirty: jest.fn().mockResolvedValue(undefined),
 }));
@@ -78,6 +95,7 @@ import { auth } from "@/auth";
 import { revalidatePath } from "next/cache";
 import { logAdminAction } from "@/lib/audit";
 import { logger } from "@/lib/logger";
+import { checkRateLimit } from "@/lib/rate-limit";
 
 describe("admin actions", () => {
   const mockAdminSession = {
@@ -468,6 +486,42 @@ describe("admin actions", () => {
       );
     });
 
+    it("logs LISTING_HIDDEN action for PAUSED status", async () => {
+      (prisma.listing.findUnique as jest.Mock).mockResolvedValue(mockListing);
+      (prisma.listing.update as jest.Mock).mockResolvedValue({});
+      (logAdminAction as jest.Mock).mockResolvedValue({});
+
+      await updateListingStatus("listing-123", "PAUSED");
+
+      expect(logAdminAction).toHaveBeenCalledWith(
+        expect.objectContaining({ action: "LISTING_HIDDEN" })
+      );
+    });
+
+    it("logs LISTING_RESTORED action for ACTIVE status", async () => {
+      (prisma.listing.findUnique as jest.Mock).mockResolvedValue(mockListing);
+      (prisma.listing.update as jest.Mock).mockResolvedValue({});
+      (logAdminAction as jest.Mock).mockResolvedValue({});
+
+      await updateListingStatus("listing-123", "ACTIVE");
+
+      expect(logAdminAction).toHaveBeenCalledWith(
+        expect.objectContaining({ action: "LISTING_RESTORED" })
+      );
+    });
+
+    it("logs LISTING_RENTED action for RENTED status", async () => {
+      (prisma.listing.findUnique as jest.Mock).mockResolvedValue(mockListing);
+      (prisma.listing.update as jest.Mock).mockResolvedValue({});
+      (logAdminAction as jest.Mock).mockResolvedValue({});
+
+      await updateListingStatus("listing-123", "RENTED");
+
+      expect(logAdminAction).toHaveBeenCalledWith(
+        expect.objectContaining({ action: "LISTING_RENTED" })
+      );
+    });
+
     it("revalidates admin listings path", async () => {
       (prisma.listing.findUnique as jest.Mock).mockResolvedValue(mockListing);
       (prisma.listing.update as jest.Mock).mockResolvedValue({});
@@ -844,6 +898,247 @@ describe("admin actions", () => {
       const result = await getAdminStats();
 
       expect(result.error).toBe("Failed to fetch stats");
+    });
+  });
+
+  describe("admin rate limiting", () => {
+    beforeEach(() => {
+      (checkRateLimit as jest.Mock).mockResolvedValue({
+        success: true,
+        remaining: 19,
+        resetAt: new Date(),
+      });
+    });
+
+    it("rate-limits toggleUserAdmin", async () => {
+      (checkRateLimit as jest.Mock).mockResolvedValue({
+        success: false,
+        remaining: 0,
+        resetAt: new Date(),
+        retryAfter: 60,
+      });
+
+      const result = await toggleUserAdmin("user-123");
+
+      expect(result.error).toBe("Too many requests. Please slow down.");
+      expect(checkRateLimit).toHaveBeenCalled();
+    });
+
+    it("rate-limits suspendUser", async () => {
+      (checkRateLimit as jest.Mock).mockResolvedValue({
+        success: false,
+        remaining: 0,
+        resetAt: new Date(),
+        retryAfter: 60,
+      });
+
+      const result = await suspendUser("user-123", true);
+
+      expect(result.error).toBe("Too many requests. Please slow down.");
+      expect(checkRateLimit).toHaveBeenCalled();
+    });
+
+    it("rate-limits updateListingStatus", async () => {
+      (checkRateLimit as jest.Mock).mockResolvedValue({
+        success: false,
+        remaining: 0,
+        resetAt: new Date(),
+        retryAfter: 60,
+      });
+
+      const result = await updateListingStatus("listing-123", "PAUSED");
+
+      expect(result.error).toBe("Too many requests. Please slow down.");
+      expect(checkRateLimit).toHaveBeenCalled();
+    });
+
+    it("rate-limits deleteListing", async () => {
+      (checkRateLimit as jest.Mock).mockResolvedValue({
+        success: false,
+        remaining: 0,
+        resetAt: new Date(),
+        retryAfter: 60,
+      });
+
+      const result = await deleteListing("listing-123");
+
+      expect(result.error).toBe("Too many requests. Please slow down.");
+      expect(checkRateLimit).toHaveBeenCalled();
+    });
+
+    it("rate-limits resolveReport", async () => {
+      (checkRateLimit as jest.Mock).mockResolvedValue({
+        success: false,
+        remaining: 0,
+        resetAt: new Date(),
+        retryAfter: 60,
+      });
+
+      const result = await resolveReport("report-123", "RESOLVED");
+
+      expect(result.error).toBe("Too many requests. Please slow down.");
+      expect(checkRateLimit).toHaveBeenCalled();
+    });
+
+    it("rate-limits resolveReportAndRemoveListing", async () => {
+      (checkRateLimit as jest.Mock).mockResolvedValue({
+        success: false,
+        remaining: 0,
+        resetAt: new Date(),
+        retryAfter: 60,
+      });
+
+      const result = await resolveReportAndRemoveListing("report-123");
+
+      expect(result.error).toBe("Too many requests. Please slow down.");
+      expect(checkRateLimit).toHaveBeenCalled();
+    });
+
+    it("does NOT rate-limit getUsers (read action)", async () => {
+      (prisma.user.findMany as jest.Mock).mockResolvedValue([]);
+      (prisma.user.count as jest.Mock).mockResolvedValue(0);
+
+      await getUsers();
+
+      expect(checkRateLimit).not.toHaveBeenCalled();
+    });
+
+    it("does NOT rate-limit getListingsForAdmin (read action)", async () => {
+      (prisma.listing.findMany as jest.Mock).mockResolvedValue([]);
+      (prisma.listing.count as jest.Mock).mockResolvedValue(0);
+
+      await getListingsForAdmin();
+
+      expect(checkRateLimit).not.toHaveBeenCalled();
+    });
+
+    it("does NOT rate-limit getReports (read action)", async () => {
+      (prisma.report.findMany as jest.Mock).mockResolvedValue([]);
+      (prisma.report.count as jest.Mock).mockResolvedValue(0);
+
+      await getReports();
+
+      expect(checkRateLimit).not.toHaveBeenCalled();
+    });
+
+    it("does NOT rate-limit getAdminStats (read action)", async () => {
+      (prisma.user.count as jest.Mock).mockResolvedValue(0);
+      (prisma.listing.count as jest.Mock).mockResolvedValue(0);
+      (prisma.verificationRequest.count as jest.Mock).mockResolvedValue(0);
+      (prisma.report.count as jest.Mock).mockResolvedValue(0);
+      (prisma.booking.count as jest.Mock).mockResolvedValue(0);
+      (prisma.message.count as jest.Mock).mockResolvedValue(0);
+
+      await getAdminStats();
+
+      expect(checkRateLimit).not.toHaveBeenCalled();
+    });
+
+    it("uses adminDelete config for deleteListing", async () => {
+      (checkRateLimit as jest.Mock).mockResolvedValue({
+        success: true,
+        remaining: 4,
+        resetAt: new Date(),
+      });
+
+      // Need to set up the transaction mock for deleteListing to proceed past rate limit
+      (prisma.$transaction as jest.Mock).mockImplementation(
+        async (fn: (tx: unknown) => Promise<unknown>) => {
+          const tx = {
+            $queryRaw: jest.fn().mockResolvedValue([{
+              id: "listing-123",
+              title: "Test",
+              ownerId: "owner-123",
+              status: "ACTIVE",
+            }]),
+            booking: {
+              count: jest.fn().mockResolvedValue(0),
+              findMany: jest.fn().mockResolvedValue([]),
+              updateMany: jest.fn().mockResolvedValue({ count: 0 }),
+            },
+            notification: { createMany: jest.fn().mockResolvedValue({ count: 0 }) },
+            listing: { delete: jest.fn().mockResolvedValue({}) },
+          };
+          return fn(tx);
+        }
+      );
+      (logAdminAction as jest.Mock).mockResolvedValue({});
+
+      await deleteListing("listing-123");
+
+      expect(checkRateLimit).toHaveBeenCalledWith(
+        expect.any(String),
+        "adminDelete",
+        expect.objectContaining({ limit: 5, windowMs: 3_600_000 })
+      );
+    });
+
+    it("uses adminDelete config for resolveReportAndRemoveListing", async () => {
+      (checkRateLimit as jest.Mock).mockResolvedValue({
+        success: true,
+        remaining: 4,
+        resetAt: new Date(),
+      });
+
+      // Need to set up the transaction mock
+      (prisma.$transaction as jest.Mock).mockImplementation(
+        async (fn: (tx: unknown) => Promise<unknown>) => {
+          const tx = {
+            $queryRaw: jest.fn().mockResolvedValue([{
+              id: "listing-123",
+              title: "Test",
+              ownerId: "owner-123",
+            }]),
+            report: {
+              findUnique: jest.fn().mockResolvedValue({
+                listingId: "listing-123",
+                reason: "INAPPROPRIATE",
+                reporterId: "reporter-123",
+                status: "OPEN",
+              }),
+              update: jest.fn().mockResolvedValue({}),
+            },
+            booking: {
+              count: jest.fn().mockResolvedValue(0),
+              findMany: jest.fn().mockResolvedValue([]),
+              updateMany: jest.fn().mockResolvedValue({ count: 0 }),
+            },
+            notification: { createMany: jest.fn().mockResolvedValue({ count: 0 }) },
+            listing: { delete: jest.fn().mockResolvedValue({}) },
+          };
+          return fn(tx);
+        }
+      );
+      (logAdminAction as jest.Mock).mockResolvedValue({});
+
+      await resolveReportAndRemoveListing("report-123");
+
+      expect(checkRateLimit).toHaveBeenCalledWith(
+        expect.any(String),
+        "adminDelete",
+        expect.objectContaining({ limit: 5, windowMs: 3_600_000 })
+      );
+    });
+
+    it("uses adminWrite config for toggleUserAdmin", async () => {
+      (checkRateLimit as jest.Mock).mockResolvedValue({
+        success: true,
+        remaining: 19,
+        resetAt: new Date(),
+      });
+      (prisma.user.findUnique as jest.Mock)
+        .mockResolvedValueOnce({ isAdmin: true }) // requireAdmin
+        .mockResolvedValueOnce({ isAdmin: false, name: "User", email: "u@e.com" }); // user lookup
+      (prisma.user.update as jest.Mock).mockResolvedValue({});
+      (logAdminAction as jest.Mock).mockResolvedValue({});
+
+      await toggleUserAdmin("user-123");
+
+      expect(checkRateLimit).toHaveBeenCalledWith(
+        expect.any(String),
+        "adminWrite",
+        expect.objectContaining({ limit: 20, windowMs: 60_000 })
+      );
     });
   });
 });

@@ -62,6 +62,11 @@ const actionConfig: Record<
     label: "Listing Hidden",
     color: "text-amber-500 bg-amber-100 dark:bg-amber-900/30",
   },
+  LISTING_RENTED: {
+    icon: Home,
+    label: "Listing Rented",
+    color: "text-blue-500 bg-blue-100 dark:bg-blue-900/30",
+  },
   LISTING_RESTORED: {
     icon: Home,
     label: "Listing Restored",
@@ -293,7 +298,7 @@ export default async function AuditLogPage({ searchParams }: PageProps) {
                               </div>
                             )}
                             <span className="text-sm text-zinc-700 dark:text-zinc-300">
-                              {log.admin.name || log.admin.email}
+                              {log.admin.name || `Admin ${log.admin.id.substring(0, 8)}`}
                             </span>
                           </div>
                         </td>

@@ -281,6 +281,11 @@ export const RATE_LIMITS = {
   createHold: { limit: 10, windowMs: 60 * 60 * 1000 }, // 10 holds/hour per user
   createHoldByIp: { limit: 30, windowMs: 60 * 60 * 1000 }, // 30 holds/hour per IP
   createHoldPerListing: { limit: 3, windowMs: 60 * 60 * 1000 }, // 3 holds/hour per user+listing (anti-cycling)
+  // Pre-auth IP-based rate limit (prevents unauthenticated session-lookup flood)
+  messagesPreAuth: { limit: 300, windowMs: 3_600_000 }, // 300 per hour per IP
+  // Admin action rate limits
+  adminWrite: { limit: 20, windowMs: 60_000 }, // 20 per minute (toggle admin, suspend, update status, resolve report)
+  adminDelete: { limit: 5, windowMs: 3_600_000 }, // 5 per hour (delete listing, resolve+remove listing)
 } as const;
 
 function getFirstForwardedIp(forwardedFor: string | null): string | null {

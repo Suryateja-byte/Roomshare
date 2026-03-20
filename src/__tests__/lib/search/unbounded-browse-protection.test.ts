@@ -33,6 +33,14 @@ jest.mock("@/lib/prisma", () => {
   };
 });
 
+// Mock queryWithTimeout used by data.ts — delegates to the same prisma mock
+jest.mock("@/lib/query-timeout", () => ({
+  queryWithTimeout: jest.fn(async (query: string, params: unknown[]) => {
+    const { prisma: p } = require("@/lib/prisma");
+    return p.$queryRawUnsafe(query, ...params);
+  }),
+}));
+
 import { prisma } from "@/lib/prisma";
 import {
   getSearchDocLimitedCount,

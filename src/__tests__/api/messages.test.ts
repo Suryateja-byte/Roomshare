@@ -68,6 +68,7 @@ import { prisma } from "@/lib/prisma";
 import { auth } from "@/auth";
 import { checkEmailVerified } from "@/app/actions/suspension";
 import { checkBlockBeforeAction } from "@/app/actions/block";
+import { withRateLimit } from "@/lib/with-rate-limit";
 
 describe("Messages API", () => {
   const mockSession = {
@@ -92,6 +93,29 @@ describe("Messages API", () => {
       const response = await GET(request);
 
       expect(response.status).toBe(401);
+    });
+
+    it("applies pre-auth rate limit before calling auth()", async () => {
+      // Mock withRateLimit to return a 429 response on the FIRST call (pre-auth)
+      const mock429 = {
+        status: 429,
+        json: async () => ({ error: "Too many requests" }),
+        headers: new Map(),
+      };
+      (withRateLimit as jest.Mock).mockResolvedValueOnce(mock429);
+
+      const request = new Request("http://localhost/api/messages");
+      const response = await GET(request);
+
+      // Pre-auth rate limit should fire before auth()
+      expect(response.status).toBe(429);
+      expect(auth).not.toHaveBeenCalled();
+
+      // Verify withRateLimit was called with messagesPreAuth type
+      expect(withRateLimit).toHaveBeenCalledWith(request, {
+        type: "messagesPreAuth",
+        endpoint: "/api/messages:pre-auth",
+      });
     });
 
     it("returns messages for specific conversation", async () => {
