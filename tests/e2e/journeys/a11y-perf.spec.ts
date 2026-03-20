@@ -38,9 +38,9 @@ test.describe("Accessibility & Performance", () => {
       // Scope to visible search results container (dual-container layout)
       const container = searchResultsContainer(page);
 
-      // Listing cards have article role (DOM attribute check)
+      // Listing cards use semantic <article> element (implicit article role)
       const articleCard = container
-        .locator('[role="article"][data-testid="listing-card"]')
+        .locator('article[data-testid="listing-card"]')
         .first();
       await articleCard.waitFor({ state: "attached", timeout: 10000 });
 
@@ -59,7 +59,7 @@ test.describe("Accessibility & Performance", () => {
 
       const container = searchResultsContainer(page);
       const articles = container.locator(
-        '[role="article"][data-testid="listing-card"]'
+        'article[data-testid="listing-card"]'
       );
       await articles.first().waitFor({ state: "attached", timeout: 10000 });
       expect(await articles.count()).toBeGreaterThan(0);

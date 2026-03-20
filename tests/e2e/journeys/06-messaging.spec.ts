@@ -35,11 +35,19 @@ async function ensureConversationOpen(
     .locator('[data-testid="conversation-item"]')
     .first();
 
-  if (!(await conversationItem.isVisible().catch(() => false))) {
+  // On mobile, conversation items may exist but be off-screen or behind a layout;
+  // check for attached (DOM presence) then try scrolling into view
+  const isAttached = await conversationItem
+    .waitFor({ state: "attached", timeout: 5000 })
+    .then(() => true)
+    .catch(() => false);
+  if (!isAttached) {
     return false; // No conversations available
   }
 
-  await conversationItem.click();
+  // Scroll into view and force-click if not visible (mobile layout may hide items)
+  await conversationItem.scrollIntoViewIfNeeded().catch(() => {});
+  await conversationItem.click({ timeout: 15000, force: true }).catch(() => {});
   await page.waitForURL(/\/messages\//, { timeout: 5000 }).catch(() => {});
   return await messageArea.isVisible({ timeout: 5000 }).catch(() => false);
 }

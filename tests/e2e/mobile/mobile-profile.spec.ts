@@ -33,8 +33,8 @@ test.describe("Mobile Profile", () => {
       page.locator('[data-testid="profile-page"]').first()
     ).toBeVisible({ timeout: 15000 });
 
-    // Find and click the edit profile button
-    const editButton = page.locator('[data-testid="edit-profile-link"]');
+    // Find and click the edit profile button — use .first() for RSC streaming resilience
+    const editButton = page.locator('[data-testid="edit-profile-link"]').first();
     await expect(editButton).toBeVisible({ timeout: 10000 });
 
     // Verify button is touch-friendly (adequate size)

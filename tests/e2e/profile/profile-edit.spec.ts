@@ -29,11 +29,12 @@ test.describe("Profile View — Read-only", () => {
     }
 
     // Main profile container should be visible
-    const profilePage = page.getByTestId("profile-page");
+    // Use .first() to handle RSC streaming which may temporarily create duplicate DOM nodes
+    const profilePage = page.getByTestId("profile-page").first();
     await expect(profilePage).toBeVisible({ timeout: timeouts.navigation });
 
     // User name heading should have text
-    const profileName = page.getByTestId("profile-name");
+    const profileName = page.getByTestId("profile-name").first();
     await expect(profileName).toBeVisible({ timeout: timeouts.action });
     const nameText = await profileName.textContent();
     expect(nameText?.trim().length).toBeGreaterThan(0);
@@ -44,12 +45,12 @@ test.describe("Profile View — Read-only", () => {
   }) => {
     await page.goto("/profile");
     await page.waitForLoadState("domcontentloaded");
-    await expect(page.getByTestId("profile-page")).toBeVisible({
+    await expect(page.getByTestId("profile-page").first()).toBeVisible({
       timeout: timeouts.navigation,
     });
 
-    // Click the "Edit Profile" button
-    const editLink = page.getByTestId("edit-profile-link");
+    // Click the "Edit Profile" button — use .first() for RSC streaming resilience
+    const editLink = page.getByTestId("edit-profile-link").first();
     await expect(editLink).toBeVisible({ timeout: timeouts.action });
     await editLink.click();
 
@@ -63,12 +64,12 @@ test.describe("Profile View — Read-only", () => {
   }) => {
     await page.goto("/profile");
     await page.waitForLoadState("domcontentloaded");
-    await expect(page.getByTestId("profile-page")).toBeVisible({
+    await expect(page.getByTestId("profile-page").first()).toBeVisible({
       timeout: timeouts.navigation,
     });
 
     // The edit-profile-link button should exist and be visible
-    const editLink = page.getByTestId("edit-profile-link");
+    const editLink = page.getByTestId("edit-profile-link").first();
     await expect(editLink).toBeVisible({ timeout: timeouts.action });
     await expect(editLink).toHaveText(/edit profile/i);
   });
@@ -92,8 +93,8 @@ test.describe("Profile Edit — Form Assertions", () => {
     page,
   }) => {
 
-    // Form container should be visible
-    const form = page.getByTestId("edit-profile-form");
+    // Form container should be visible — use .first() for RSC streaming resilience
+    const form = page.getByTestId("edit-profile-form").first();
     await expect(form).toBeVisible({ timeout: timeouts.navigation });
 
     // Name input should have a non-empty value
@@ -106,7 +107,7 @@ test.describe("Profile Edit — Form Assertions", () => {
   test("PE-07: empty name shows validation error", async ({ page }) => {
     await page.goto("/profile/edit");
     await page.waitForLoadState("domcontentloaded");
-    await expect(page.getByTestId("edit-profile-form")).toBeVisible({
+    await expect(page.getByTestId("edit-profile-form").first()).toBeVisible({
       timeout: timeouts.navigation,
     });
 
@@ -131,7 +132,7 @@ test.describe("Profile Edit — Form Assertions", () => {
   test("PE-06: bio character counter reflects limit", async ({ page }) => {
     await page.goto("/profile/edit");
     await page.waitForLoadState("domcontentloaded");
-    await expect(page.getByTestId("edit-profile-form")).toBeVisible({
+    await expect(page.getByTestId("edit-profile-form").first()).toBeVisible({
       timeout: timeouts.navigation,
     });
 
@@ -164,15 +165,15 @@ test.describe("Profile Edit — Form Assertions", () => {
     // First, note the original name on the profile page
     await page.goto("/profile");
     await page.waitForLoadState("domcontentloaded");
-    await expect(page.getByTestId("profile-page")).toBeVisible({
+    await expect(page.getByTestId("profile-page").first()).toBeVisible({
       timeout: timeouts.navigation,
     });
-    const originalName = await page.getByTestId("profile-name").textContent();
+    const originalName = await page.getByTestId("profile-name").first().textContent();
 
     // Navigate to edit page
     await page.goto("/profile/edit");
     await page.waitForLoadState("domcontentloaded");
-    await expect(page.getByTestId("edit-profile-form")).toBeVisible({
+    await expect(page.getByTestId("edit-profile-form").first()).toBeVisible({
       timeout: timeouts.navigation,
     });
 
@@ -195,10 +196,10 @@ test.describe("Profile Edit — Form Assertions", () => {
     });
 
     // Wait for profile page to fully render before reading the name
-    await expect(page.getByTestId("profile-page")).toBeVisible({
+    await expect(page.getByTestId("profile-page").first()).toBeVisible({
       timeout: timeouts.navigation,
     });
-    const profileNameEl = page.getByTestId("profile-name");
+    const profileNameEl = page.getByTestId("profile-name").first();
     await expect(profileNameEl).toBeVisible({ timeout: timeouts.action });
 
     // Name should still be the original (change was not saved)
@@ -209,7 +210,7 @@ test.describe("Profile Edit — Form Assertions", () => {
   test("PE-14: axe-core a11y scan on edit form", async ({ page }) => {
     await page.goto("/profile/edit");
     await page.waitForLoadState("domcontentloaded");
-    await expect(page.getByTestId("edit-profile-form")).toBeVisible({
+    await expect(page.getByTestId("edit-profile-form").first()).toBeVisible({
       timeout: timeouts.navigation,
     });
 
@@ -248,7 +249,7 @@ test.describe("Profile Edit — Form Assertions", () => {
   }) => {
     await page.goto("/profile/edit");
     await page.waitForLoadState("domcontentloaded");
-    await expect(page.getByTestId("edit-profile-form")).toBeVisible({
+    await expect(page.getByTestId("edit-profile-form").first()).toBeVisible({
       timeout: timeouts.navigation,
     });
 
@@ -334,17 +335,17 @@ test.describe.serial("Profile Edit — Mutations", () => {
     // Note original name from profile page
     await page.goto("/profile");
     await page.waitForLoadState("domcontentloaded");
-    await expect(page.getByTestId("profile-page")).toBeVisible({
+    await expect(page.getByTestId("profile-page").first()).toBeVisible({
       timeout: timeouts.navigation,
     });
     originalName =
-      (await page.getByTestId("profile-name").textContent())?.trim() ?? "";
+      (await page.getByTestId("profile-name").first().textContent())?.trim() ?? "";
     expect(originalName.length).toBeGreaterThan(0);
 
     // Go to edit form
     await page.goto("/profile/edit");
     await page.waitForLoadState("domcontentloaded");
-    await expect(page.getByTestId("edit-profile-form")).toBeVisible({
+    await expect(page.getByTestId("edit-profile-form").first()).toBeVisible({
       timeout: timeouts.navigation,
     });
 
@@ -383,13 +384,13 @@ test.describe.serial("Profile Edit — Mutations", () => {
     }
 
     // Verify name changed on profile page
-    const updatedName = await page.getByTestId("profile-name").textContent();
+    const updatedName = await page.getByTestId("profile-name").first().textContent();
     expect(updatedName?.trim()).toBe(testName);
 
     // RESTORE original name
     await page.goto("/profile/edit");
     await page.waitForLoadState("domcontentloaded");
-    await expect(page.getByTestId("edit-profile-form")).toBeVisible({
+    await expect(page.getByTestId("edit-profile-form").first()).toBeVisible({
       timeout: timeouts.navigation,
     });
 
@@ -419,7 +420,7 @@ test.describe.serial("Profile Edit — Mutations", () => {
 
     await page.goto("/profile/edit");
     await page.waitForLoadState("domcontentloaded");
-    await expect(page.getByTestId("edit-profile-form")).toBeVisible({
+    await expect(page.getByTestId("edit-profile-form").first()).toBeVisible({
       timeout: timeouts.navigation,
     });
 
@@ -451,7 +452,7 @@ test.describe.serial("Profile Edit — Mutations", () => {
     // RESTORE original bio
     await page.goto("/profile/edit");
     await page.waitForLoadState("domcontentloaded");
-    await expect(page.getByTestId("edit-profile-form")).toBeVisible({
+    await expect(page.getByTestId("edit-profile-form").first()).toBeVisible({
       timeout: timeouts.navigation,
     });
 
@@ -471,26 +472,26 @@ test.describe.serial("Profile Edit — Mutations", () => {
   test("PE-09: changes persist after reload", async ({ page }) => {
     await page.goto("/profile");
     await page.waitForLoadState("domcontentloaded");
-    await expect(page.getByTestId("profile-page")).toBeVisible({
+    await expect(page.getByTestId("profile-page").first()).toBeVisible({
       timeout: timeouts.navigation,
     });
 
     // Note the current name
     const nameBeforeReload = await page
-      .getByTestId("profile-name")
+      .getByTestId("profile-name").first()
       .textContent();
     expect(nameBeforeReload?.trim().length).toBeGreaterThan(0);
 
     // Reload the page
     await page.reload();
     await page.waitForLoadState("domcontentloaded");
-    await expect(page.getByTestId("profile-page")).toBeVisible({
+    await expect(page.getByTestId("profile-page").first()).toBeVisible({
       timeout: timeouts.navigation,
     });
 
     // Name should be the same after reload
     const nameAfterReload = await page
-      .getByTestId("profile-name")
+      .getByTestId("profile-name").first()
       .textContent();
     expect(nameAfterReload?.trim()).toBe(nameBeforeReload?.trim());
   });
@@ -500,7 +501,7 @@ test.describe.serial("Profile Edit — Mutations", () => {
 
     await page.goto("/profile/edit");
     await page.waitForLoadState("domcontentloaded");
-    await expect(page.getByTestId("edit-profile-form")).toBeVisible({
+    await expect(page.getByTestId("edit-profile-form").first()).toBeVisible({
       timeout: timeouts.navigation,
     });
 
@@ -569,7 +570,7 @@ test.describe.serial("Profile Edit — Mutations", () => {
 
     await page.goto("/profile/edit");
     await page.waitForLoadState("domcontentloaded");
-    await expect(page.getByTestId("edit-profile-form")).toBeVisible({
+    await expect(page.getByTestId("edit-profile-form").first()).toBeVisible({
       timeout: timeouts.navigation,
     });
 
@@ -656,7 +657,7 @@ test.describe.serial("Profile Edit — Mutations", () => {
   }) => {
     await page.goto("/profile/edit");
     await page.waitForLoadState("domcontentloaded");
-    await expect(page.getByTestId("edit-profile-form")).toBeVisible({
+    await expect(page.getByTestId("edit-profile-form").first()).toBeVisible({
       timeout: timeouts.navigation,
     });
 

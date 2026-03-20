@@ -912,7 +912,7 @@ export default function SearchForm({
                   onFocus={() => handleFieldFocus("what")}
                   onBlur={handleFieldBlur}
                   placeholder="Describe your ideal room..."
-                  className="w-full bg-transparent border-none p-0 text-sm font-medium text-zinc-900 dark:text-white placeholder:text-zinc-500 dark:placeholder:text-zinc-400 focus:ring-0 focus:outline-none focus-visible:ring-2 focus-visible:ring-zinc-900/30 dark:focus-visible:ring-zinc-400/40 focus-visible:rounded"
+                  className="w-full bg-transparent border-none p-0 text-base md:text-sm font-medium text-zinc-900 dark:text-white placeholder:text-zinc-500 dark:placeholder:text-zinc-400 focus:ring-0 focus:outline-none focus-visible:ring-2 focus-visible:ring-zinc-900/30 dark:focus-visible:ring-zinc-400/40 focus-visible:rounded"
                   autoComplete="off"
                 />
                 {whatQuery && (
@@ -1097,7 +1097,7 @@ export default function SearchForm({
                 onFocus={() => handleFieldFocus("budget")}
                 onBlur={handleFieldBlur}
                 placeholder="Min"
-                className={`w-full bg-transparent border-none p-0 text-sm font-medium text-zinc-900 dark:text-white placeholder:text-zinc-500 dark:placeholder:text-zinc-400 focus:ring-0 focus:outline-none focus-visible:ring-2 focus-visible:ring-zinc-900/30 dark:focus-visible:ring-zinc-400/40 focus-visible:rounded appearance-none [-moz-appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none`}
+                className={`w-full bg-transparent border-none p-0 text-base md:text-sm font-medium text-zinc-900 dark:text-white placeholder:text-zinc-500 dark:placeholder:text-zinc-400 focus:ring-0 focus:outline-none focus-visible:ring-2 focus-visible:ring-zinc-900/30 dark:focus-visible:ring-zinc-400/40 focus-visible:rounded appearance-none [-moz-appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none`}
                 min="0"
                 step="50"
               />
@@ -1115,7 +1115,7 @@ export default function SearchForm({
                 onFocus={() => handleFieldFocus("budget")}
                 onBlur={handleFieldBlur}
                 placeholder="Max"
-                className={`w-full bg-transparent border-none p-0 text-sm font-medium text-zinc-900 dark:text-white placeholder:text-zinc-500 dark:placeholder:text-zinc-400 focus:ring-0 focus:outline-none focus-visible:ring-2 focus-visible:ring-zinc-900/30 dark:focus-visible:ring-zinc-400/40 focus-visible:rounded appearance-none [-moz-appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none`}
+                className={`w-full bg-transparent border-none p-0 text-base md:text-sm font-medium text-zinc-900 dark:text-white placeholder:text-zinc-500 dark:placeholder:text-zinc-400 focus:ring-0 focus:outline-none focus-visible:ring-2 focus-visible:ring-zinc-900/30 dark:focus-visible:ring-zinc-400/40 focus-visible:rounded appearance-none [-moz-appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none`}
                 min="0"
                 step="50"
               />

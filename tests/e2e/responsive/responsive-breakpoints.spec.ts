@@ -256,11 +256,16 @@ test.describe("listing detail responsive", () => {
     test.use({ viewport: { width: 375, height: 812 } });
 
     test("listing page renders without overflow", async ({ page }) => {
-      // Visit homepage to find a listing link
+      // Visit homepage to find a visible listing link (not hidden menu items)
       await page.goto("/", { waitUntil: "domcontentloaded" });
-      const listingLink = page.locator('a[href^="/listings/"]').first();
+      await page.waitForTimeout(1000);
+      const listingLink = page
+        .locator('[data-testid="listing-card"] a[href*="/listings/"]')
+        .or(page.locator('main a[href^="/listings/"]:visible'))
+        .first();
 
-      if ((await listingLink.count()) > 0) {
+      const hasLink = await listingLink.isVisible({ timeout: 10000 }).catch(() => false);
+      if (hasLink) {
         await listingLink.click();
         await page.waitForLoadState("domcontentloaded");
         await page.waitForTimeout(500);
@@ -269,6 +274,8 @@ test.describe("listing detail responsive", () => {
           return document.documentElement.scrollWidth > document.documentElement.clientWidth;
         });
         expect(hasHScroll).toBe(false);
+      } else {
+        test.skip(true, "No visible listing links on homepage");
       }
     });
   });
@@ -278,9 +285,14 @@ test.describe("listing detail responsive", () => {
 
     test("listing page layout adapts at tablet", async ({ page }) => {
       await page.goto("/", { waitUntil: "domcontentloaded" });
-      const listingLink = page.locator('a[href^="/listings/"]').first();
+      await page.waitForTimeout(1000);
+      const listingLink = page
+        .locator('[data-testid="listing-card"] a[href*="/listings/"]')
+        .or(page.locator('main a[href^="/listings/"]:visible'))
+        .first();
 
-      if ((await listingLink.count()) > 0) {
+      const hasLink = await listingLink.isVisible({ timeout: 10000 }).catch(() => false);
+      if (hasLink) {
         await listingLink.click();
         await page.waitForLoadState("domcontentloaded");
         await page.waitForTimeout(500);
@@ -289,6 +301,8 @@ test.describe("listing detail responsive", () => {
           return document.documentElement.scrollWidth > document.documentElement.clientWidth;
         });
         expect(hasHScroll).toBe(false);
+      } else {
+        test.skip(true, "No visible listing links on homepage");
       }
     });
   });

@@ -65,7 +65,7 @@ test.describe("Notifications", () => {
       await page.goto("/notifications");
       await page.waitForLoadState("domcontentloaded");
 
-      await expect(page.getByTestId("notifications-page")).toBeVisible({
+      await expect(page.getByTestId("notifications-page").first()).toBeVisible({
         timeout: timeouts.navigation,
       });
 
@@ -80,7 +80,7 @@ test.describe("Notifications", () => {
       await page.waitForLoadState("domcontentloaded");
 
       // Wait for the page shell to render
-      await expect(page.getByTestId("notifications-page")).toBeVisible({
+      await expect(page.getByTestId("notifications-page").first()).toBeVisible({
         timeout: timeouts.action,
       });
 
@@ -99,7 +99,7 @@ test.describe("Notifications", () => {
         // Retry once: reload helps if SSR had a transient session error
         await page.reload();
         await page.waitForLoadState("domcontentloaded");
-        await expect(page.getByTestId("notifications-page")).toBeVisible({
+        await expect(page.getByTestId("notifications-page").first()).toBeVisible({
           timeout: timeouts.action,
         });
         hasItems = await items
@@ -407,7 +407,7 @@ test.describe("Notifications", () => {
       await page.goto("/notifications");
       await page.waitForLoadState("domcontentloaded");
 
-      await expect(page.getByTestId("notifications-page")).toBeVisible({
+      await expect(page.getByTestId("notifications-page").first()).toBeVisible({
         timeout: timeouts.navigation,
       });
 
@@ -434,7 +434,7 @@ test.describe("Notifications", () => {
       await page.goto("/notifications");
       await page.waitForLoadState("domcontentloaded");
 
-      await expect(page.getByTestId("notifications-page")).toBeVisible({
+      await expect(page.getByTestId("notifications-page").first()).toBeVisible({
         timeout: timeouts.navigation,
       });
 
@@ -466,7 +466,7 @@ test.describe("Notifications", () => {
       await page.goto("/notifications");
       await page.waitForLoadState("domcontentloaded");
 
-      await expect(page.getByTestId("notifications-page")).toBeVisible({
+      await expect(page.getByTestId("notifications-page").first()).toBeVisible({
         timeout: timeouts.navigation,
       });
 

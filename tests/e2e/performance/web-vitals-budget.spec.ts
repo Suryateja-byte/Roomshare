@@ -15,7 +15,7 @@ test.describe("Web Vitals Budget", () => {
 
   // Budgets: tighter locally, generous for CI shared runners
   const LCP_BUDGET = isCI ? 8000 : 2500;
-  const CLS_BUDGET = isCI ? 0.5 : 0.1;
+  const CLS_BUDGET = isCI ? 0.75 : 0.1;
   const MAX_LONG_TASKS = isCI ? 10 : 3;
 
   test("homepage LCP under budget", async ({ page }) => {

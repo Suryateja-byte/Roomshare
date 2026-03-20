@@ -431,11 +431,28 @@ test.describe("Error & Empty State Journeys", () => {
           timeout: 30000,
         });
 
-        // Verify XSS payload is NOT rendered as executable HTML
-        const html = await page.content();
-        expect(html).not.toContain("<script>alert(1)</script>");
-        expect(html).not.toContain("onerror=alert(1)");
-        expect(html).not.toContain("onmouseover='alert(1)'");
+        // Verify XSS payload is NOT rendered as executable HTML in the DOM.
+        // Note: page.content() includes RSC serialized data (JSON strings) which
+        // may contain the URL text in escaped form — that's safe. We check that
+        // the payload doesn't appear as actual executable HTML elements/attributes.
+        const hasExecutableXss = await page.evaluate(() => {
+          // Check for injected script elements
+          const scripts = document.querySelectorAll("script");
+          for (const s of scripts) {
+            if (s.textContent?.includes("alert(1)")) return true;
+          }
+          // Check for event handler attributes on non-script elements
+          const all = document.querySelectorAll("*:not(script)");
+          for (const el of all) {
+            for (const attr of el.getAttributeNames()) {
+              if (attr.startsWith("on") && el.getAttribute(attr)?.includes("alert")) {
+                return true;
+              }
+            }
+          }
+          return false;
+        });
+        expect(hasExecutableXss).toBe(false);
 
         // Page should still render (not crash)
         await expect(page.locator("body")).toBeVisible();

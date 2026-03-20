@@ -30,7 +30,9 @@ test.describe("Homepage — Anonymous User", () => {
     // Check for the tagline subheading text
     await expect(
       page
-        .getByText(/curated spaces/i)
+        .getByText(/verified roommates/i)
+        .or(page.getByText(/real listings/i))
+        .or(page.getByText(/curated spaces/i))
         .or(page.getByText(/compatible people/i))
         .or(page.getByText(/sanctuary/i))
         .first()
@@ -60,10 +62,11 @@ test.describe("Homepage — Anonymous User", () => {
   test("HP-03: Features section visible with feature cards", async ({
     page,
   }) => {
-    // Features section heading: "Everything you need."
+    // Features section heading
     await expect(
       page
-        .getByText(/everything you need/i)
+        .getByText(/why people switch/i)
+        .or(page.getByText(/everything you need/i))
         .or(page.getByText(/verified trust/i))
         .first()
     ).toBeVisible({ timeout: 10000 });
@@ -71,7 +74,10 @@ test.describe("Homepage — Anonymous User", () => {
     // Check for at least one feature card description
     await expect(
       page
-        .getByText(/instant match/i)
+        .getByText(/no catfishing/i)
+        .or(page.getByText(/matched on what matters/i))
+        .or(page.getByText(/filters that actually/i))
+        .or(page.getByText(/instant match/i))
         .or(page.getByText(/lifestyle fit/i))
         .or(page.getByText(/verified trust/i))
         .first()
@@ -128,10 +134,11 @@ test.describe("Homepage — Anonymous User", () => {
   });
 
   test("HP-06: Search CTA navigates to /search", async ({ page }) => {
-    // The bottom CTA section has "Browse Listings" link pointing to /search
+    // The bottom CTA section has a link pointing to /search
     const main = page.locator("main");
     const searchCta = main
-      .getByRole("link", { name: /browse listings/i })
+      .getByRole("link", { name: /see rooms near you/i })
+      .or(main.getByRole("link", { name: /browse listings/i }))
       .or(main.getByRole("link", { name: /view all listings/i }))
       .or(main.getByRole("link", { name: /search|find|explore/i }))
       .first();

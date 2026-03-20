@@ -15,9 +15,7 @@ import {
   test,
   expect,
   SF_BOUNDS,
-  selectors,
   timeouts,
-  tags,
 } from "./helpers/test-utils";
 
 // --------------------------------------------------------------------------
@@ -56,7 +54,11 @@ test.describe("Search V2/V1 Fallback Behavior", () => {
   test("1. V2 API returns 200 with valid response shape", async ({ page }) => {
     const response = await page.request.get(V2_API_URL);
 
-    // V2 API should return 200
+    // V2 API should return 200 (may return 429 if rate-limited in CI)
+    if (response.status() === 429) {
+      test.skip(true, "Rate-limited in CI — skipping V2 shape validation");
+      return;
+    }
     expect(response.status()).toBe(200);
 
     const json = await response.json();
