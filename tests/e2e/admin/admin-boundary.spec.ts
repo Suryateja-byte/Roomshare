@@ -23,7 +23,9 @@ test.describe("Admin Boundary — Regular User", () => {
     page,
   }) => {
     await page.goto("/admin");
-    await page.waitForLoadState("networkidle");
+    // Use domcontentloaded instead of networkidle — networkidle hangs in CI
+    // when background requests (analytics, Unsplash images) keep the network busy
+    await page.waitForLoadState("domcontentloaded");
 
     // Wait for any redirect to settle after hydration
     await page.waitForTimeout(2000);

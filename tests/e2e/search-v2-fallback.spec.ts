@@ -160,6 +160,10 @@ test.describe("Search V2/V1 Fallback Behavior", () => {
   test("5. V2 API with cursor returns next page", async ({ page }) => {
     // First request to get initial results and cursor
     const response = await page.request.get(V2_API_URL);
+    if (response.status() === 429) {
+      test.skip(true, "Rate-limited in CI — skipping cursor pagination test");
+      return;
+    }
     expect(response.status()).toBe(200);
 
     const json = await response.json();
