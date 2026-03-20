@@ -30,7 +30,7 @@ test.describe("Error & Empty State Journeys", () => {
 
       // Verify 404 heading is rendered (from not-found.tsx)
       const heading = page.getByRole("heading", {
-        name: /couldn.*find|not found|404|oops/i,
+        name: /couldn.*find|not found|404|oops|packed up|moved out/i,
       });
       await expect(heading).toBeVisible({ timeout: 30000 });
 
@@ -64,7 +64,7 @@ test.describe("Error & Empty State Journeys", () => {
 
       const bodyText = await page.locator("body").textContent();
       const has404Content =
-        /not found|404|doesn.*exist|couldn.*find|no longer available/i.test(
+        /not found|404|doesn.*exist|couldn.*find|no longer available|packed up|moved out/i.test(
           bodyText || ""
         );
       const wasRedirected = !page

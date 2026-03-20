@@ -82,7 +82,10 @@ test.describe("Search API v2 Endpoint", () => {
     test(`${tags.core} - Includes Cache-Control header`, async ({
       request,
     }) => {
-      const response = await request.get("/api/search/v2?v2=1");
+      // Must include bounds to hit the normal results path (unbounded returns no-cache)
+      const response = await request.get(
+        `/api/search/v2?v2=1&minLat=${SF_BOUNDS.minLat}&maxLat=${SF_BOUNDS.maxLat}&minLng=${SF_BOUNDS.minLng}&maxLng=${SF_BOUNDS.maxLng}`
+      );
 
       expect(response.headers()["cache-control"]).toContain("s-maxage");
     });

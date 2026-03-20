@@ -273,15 +273,14 @@ test.describe("SEO Meta Tags — Search Page", () => {
   });
 
   test.describe("P2 — Structured Data Baseline", () => {
-    test("SEO-14: no JSON-LD currently present (baseline)", async ({
+    test("SEO-14: JSON-LD structured data is present via root layout", async ({
       request,
     }) => {
       const html = await fetchHTML(request, "/search");
       const hasJsonLd = html.includes("application/ld+json");
 
-      // Documenting current state — no structured data yet
-      // When JSON-LD is added, update this test to validate the schema
-      expect(hasJsonLd).toBe(false);
+      // JSON-LD was added to root layout in commit f6949b4
+      expect(hasJsonLd).toBe(true);
     });
   });
 });

@@ -647,7 +647,7 @@ test.describe("J20: Error Handling & 404", () => {
 
     // Should show some error UI
     const errorUI = page
-      .getByText(/not found|404|doesn.?t exist|page not found|couldn.?t find/i)
+      .getByText(/not found|404|doesn.?t exist|page not found|couldn.?t find|packed up|moved out/i)
       .or(page.locator('[data-testid="not-found"]'));
 
     const hasErrorUI = (await errorUI.count()) > 0;

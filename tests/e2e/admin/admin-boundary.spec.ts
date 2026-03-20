@@ -44,29 +44,30 @@ test.describe("Admin Boundary — Regular User", () => {
       await expect(accessDenied).toBeVisible({ timeout: timeouts.navigation });
     } else {
       // Redirected away — this is the expected behavior
+      // URL may be "http://localhost:3000" (no trailing slash) or "http://localhost:3000/"
+      const urlPath = new URL(currentUrl).pathname;
       expect(
-        currentUrl.includes("/login") || currentUrl.endsWith("/")
+        currentUrl.includes("/login") || urlPath === "/"
       ).toBeTruthy();
     }
   });
 
   test("ABD-02: regular user cannot access admin API endpoints", async ({
-    page,
     request,
   }) => {
-    // Ensure page is fully loaded before making API requests
-    await page.goto("/");
-    await page.waitForLoadState("networkidle");
-
-    // Try to access admin-only operations
+    // Try to access admin-only operations via API
     const response = await request.get("/admin");
 
     // Should not return 200 with admin content
     // (302 redirect or 403 forbidden are acceptable)
-    if (response.status() === 200) {
+    // Playwright follows redirects, so check either the final status or content
+    const status = response.status();
+    if (status === 200) {
       const text = await response.text();
-      // If it returns HTML, it should not contain admin dashboard content
+      // If it returns HTML (e.g., login page after redirect), it should not
+      // contain admin dashboard content
       expect(text).not.toMatch(/admin.*dashboard|manage.*users/i);
     }
+    // Any non-200 is also acceptable (403, 404, etc.)
   });
 });

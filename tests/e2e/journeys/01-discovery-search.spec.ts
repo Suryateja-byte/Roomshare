@@ -231,10 +231,10 @@ test.describe("Discovery & Search Journeys", () => {
       // (both heading and paragraph may match the text pattern)
       await expect(
         page
-          .getByText(/not found|404|doesn't exist|couldn't find/i)
+          .getByText(/not found|404|doesn't exist|couldn't find|packed up|moved out/i)
           .or(
             page.getByRole("heading", {
-              name: /couldn't find|oops|not found|404/i,
+              name: /couldn't find|oops|not found|404|packed up|moved out/i,
             })
           )
           .first()

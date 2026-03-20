@@ -542,7 +542,7 @@ test.describe("30 Critical User Journey Simulations", () => {
     await page.waitForLoadState("domcontentloaded");
 
     const pageText = await page.locator("body").textContent();
-    const has404 = /not found|404|doesn't exist|no longer available/i.test(
+    const has404 = /not found|404|doesn't exist|no longer available|packed up|moved out/i.test(
       pageText || ""
     );
     const isRedirected = !page.url().includes("nonexistent-fake-id");

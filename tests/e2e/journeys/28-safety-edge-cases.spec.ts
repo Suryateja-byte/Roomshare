@@ -284,7 +284,7 @@ test.describe("J49: Offline Page", () => {
     const offlineContent = page.getByText(
       /offline|connection|retry|no internet/i
     );
-    const has404 = page.getByText(/404|not found|couldn't find|doesn't exist/i);
+    const has404 = page.getByText(/404|not found|couldn't find|doesn't exist|packed up|moved out/i);
 
     const hasOffline = await offlineContent
       .first()

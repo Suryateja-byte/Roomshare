@@ -29,7 +29,7 @@ test.describe("Authentication Journeys", () => {
 
       // Wait for Suspense boundary to resolve and form to hydrate
       await expect(
-        page.getByRole("heading", { name: /sign up|create.*account|register/i })
+        page.getByRole("heading", { name: /sign up|create.*account|register|join/i })
       ).toBeVisible({ timeout: 30000 });
 
       // Step 2: Fill name
@@ -66,7 +66,7 @@ test.describe("Authentication Journeys", () => {
 
       // Step 7: Submit form
       await page
-        .getByRole("button", { name: /sign up|create|register/i })
+        .getByRole("button", { name: /sign up|create|register|join/i })
         .first()
         .click();
 
@@ -98,7 +98,7 @@ test.describe("Authentication Journeys", () => {
 
       // Wait for the signup form to render (Suspense boundary + hydration)
       await expect(
-        page.getByRole("heading", { name: /sign up|create.*account|register/i })
+        page.getByRole("heading", { name: /sign up|create.*account|register|join/i })
       ).toBeVisible({ timeout: 30000 });
 
       // Use existing test email
@@ -124,7 +124,7 @@ test.describe("Authentication Journeys", () => {
       }
 
       await page
-        .getByRole("button", { name: /sign up|create/i })
+        .getByRole("button", { name: /sign up|create|join/i })
         .first()
         .click();
 
@@ -143,7 +143,7 @@ test.describe("Authentication Journeys", () => {
 
       // Wait for the signup form to render (Suspense boundary + hydration)
       await expect(
-        page.getByRole("heading", { name: /sign up|create.*account|register/i })
+        page.getByRole("heading", { name: /sign up|create.*account|register|join/i })
       ).toBeVisible({ timeout: 30000 });
 
       await page.getByLabel(/email/i).first().fill("test@example.com");
@@ -151,7 +151,7 @@ test.describe("Authentication Journeys", () => {
 
       // Try to submit or check for immediate validation
       const submitButton = page
-        .getByRole("button", { name: /sign up|create/i })
+        .getByRole("button", { name: /sign up|create|join/i })
         .first();
 
       // Either button disabled or validation message shown

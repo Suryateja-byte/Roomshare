@@ -142,7 +142,7 @@ test.describe("axe-core Page Audit — Anonymous Pages", () => {
       // Wait for the signup form to render (Suspense boundary + hydration)
       await expect(
         page
-          .getByRole("heading", { name: /sign up|create.*account|register/i })
+          .getByRole("heading", { name: /sign up|create.*account|register|join/i })
           .or(page.locator("h1").first())
       ).toBeVisible({ timeout: 30_000 });
 

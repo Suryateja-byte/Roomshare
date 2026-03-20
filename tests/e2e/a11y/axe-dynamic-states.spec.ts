@@ -236,12 +236,12 @@ test.describe("axe-core — Dynamic UI States", () => {
       await page.waitForLoadState("networkidle").catch(() => {});
       // Wait for the signup form to render (Suspense boundary + hydration)
       const signupHeading = page
-        .getByRole("heading", { name: /sign up|create.*account|register/i })
+        .getByRole("heading", { name: /sign up|create.*account|register|join/i })
         .or(page.locator("h1").first());
       await expect(signupHeading).toBeVisible({ timeout: 30_000 });
 
       const submitBtn = page.getByRole("button", {
-        name: /sign up|register|create account|submit/i,
+        name: /sign up|register|create account|submit|join/i,
       });
       if (await submitBtn.isVisible({ timeout: 10_000 }).catch(() => false)) {
         await submitBtn.click();

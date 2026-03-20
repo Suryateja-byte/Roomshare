@@ -315,11 +315,11 @@ test.describe("Edge Case Journeys", () => {
       // Should show 404 page — check text content, heading, or HTTP status indicator
       await expect(
         page
-          .getByText(/404|not found|page.*exist|does not exist|couldn't find/i)
+          .getByText(/404|not found|page.*exist|does not exist|couldn't find|packed up|moved out/i)
           .first()
           .or(
             page.getByRole("heading", {
-              name: /couldn't find|oops|not found|404/i,
+              name: /couldn't find|oops|not found|404|packed up|moved out/i,
             })
           )
       ).toBeVisible({ timeout: 30000 });
@@ -357,12 +357,12 @@ test.describe("Edge Case Journeys", () => {
       await expect(
         page
           .getByText(
-            /not found|error|invalid|does not exist|404|couldn't find/i
+            /not found|error|invalid|does not exist|404|couldn't find|packed up|moved out/i
           )
           .first()
           .or(
             page.getByRole("heading", {
-              name: /couldn't find|oops|not found|error|404/i,
+              name: /couldn't find|oops|not found|error|404|packed up|moved out/i,
             })
           )
       ).toBeVisible({ timeout: 30000 });
