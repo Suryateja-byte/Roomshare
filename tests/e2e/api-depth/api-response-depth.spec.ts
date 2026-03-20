@@ -225,10 +225,13 @@ test.describe("API Response Depth", () => {
       expect(response.status()).toBe(200);
       const data = await response.json();
 
-      // Should have a count field
+      // Should have a count field (null for unbounded browse, number for bounded)
       expect(data).toHaveProperty("count");
-      expect(typeof data.count).toBe("number");
-      expect(data.count).toBeGreaterThanOrEqual(0);
+      // count is either a number or null (null = unbounded browse / 100+ results)
+      expect(data.count === null || typeof data.count === "number").toBe(true);
+      if (typeof data.count === "number") {
+        expect(data.count).toBeGreaterThanOrEqual(0);
+      }
 
       // Should not leak listing details
       expect(data).not.toHaveProperty("listings");

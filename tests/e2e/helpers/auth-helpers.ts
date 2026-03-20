@@ -109,7 +109,7 @@ export const authHelpers = {
 
     // Wait for the signup form to render (Suspense boundary + hydration)
     await expect(
-      page.getByRole("heading", { name: /sign up|create.*account|register/i })
+      page.getByRole("heading", { name: /sign up|create.*account|register|join/i })
     ).toBeVisible({ timeout: 30000 });
 
     // Fill registration form

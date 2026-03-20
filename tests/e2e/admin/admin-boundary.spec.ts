@@ -64,9 +64,12 @@ test.describe("Admin Boundary — Regular User", () => {
     const status = response.status();
     if (status === 200) {
       const text = await response.text();
-      // If it returns HTML (e.g., login page after redirect), it should not
-      // contain admin dashboard content
-      expect(text).not.toMatch(/admin.*dashboard|manage.*users/i);
+      // Check for admin-specific UI elements (not raw HTML that includes JS chunk filenames).
+      // Next.js SSR HTML includes chunk paths like "admin/error-xxx.js" which falsely match
+      // broad regexes. Instead, check for actual admin dashboard UI text content.
+      expect(text).not.toMatch(
+        /Admin Dashboard<|>Manage Users<|>Admin Panel</i
+      );
     }
     // Any non-200 is also acceptable (403, 404, etc.)
   });

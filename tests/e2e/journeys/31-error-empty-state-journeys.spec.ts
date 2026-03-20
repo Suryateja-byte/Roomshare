@@ -40,9 +40,10 @@ test.describe("Error & Empty State Journeys", () => {
       ).toBeVisible();
 
       // Verify "Back to Search" navigation link exists and is clickable
+      // Use .first() because navbar may also have a "Search" link
       const searchLink = page.getByRole("link", {
         name: /back to search|search|browse/i,
-      });
+      }).first();
       await expect(searchLink).toBeVisible();
       await expect(searchLink).toHaveAttribute("href", /\/search/);
 
@@ -296,13 +297,13 @@ test.describe("Error & Empty State Journeys", () => {
       // Wait for the signup form to render
       await expect(
         page.getByRole("heading", {
-          name: /sign up|create.*account|register/i,
+          name: /sign up|create.*account|register|join/i,
         })
       ).toBeVisible({ timeout: 30000 });
 
       // Click submit without filling any fields
       const submitBtn = page
-        .getByRole("button", { name: /sign up|create|register/i })
+        .getByRole("button", { name: /sign up|create|register|join/i })
         .first();
       await expect(submitBtn).toBeVisible({ timeout: 10000 });
       await submitBtn.click();
@@ -336,7 +337,7 @@ test.describe("Error & Empty State Journeys", () => {
 
       await expect(
         page.getByRole("heading", {
-          name: /sign up|create.*account|register/i,
+          name: /sign up|create.*account|register|join/i,
         })
       ).toBeVisible({ timeout: 30000 });
 
@@ -345,7 +346,7 @@ test.describe("Error & Empty State Journeys", () => {
 
       // Submit
       const submitBtn = page
-        .getByRole("button", { name: /sign up|create|register/i })
+        .getByRole("button", { name: /sign up|create|register|join/i })
         .first();
       await submitBtn.click();
       await page.waitForTimeout(1000);

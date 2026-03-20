@@ -38,10 +38,11 @@ test.describe("UI Flow API Depth", () => {
       // Set up response interception before navigating
       const searchResponsePromise = page.waitForResponse(
         (r) =>
-          (r.url().includes("/api/search") ||
-            r.url().includes("/search")) &&
+          r.url().includes("/api/search") &&
+          !r.url().includes("/api/search-count") &&
           r.request().method() === "GET" &&
-          r.status() === 200,
+          r.status() === 200 &&
+          (r.headers()["content-type"] || "").includes("application/json"),
         { timeout: 30_000 }
       );
 
