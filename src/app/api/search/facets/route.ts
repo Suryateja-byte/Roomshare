@@ -251,15 +251,13 @@ function buildFacetWhereConditions(
   }
 
   // Amenities filter (AND logic) - exclude when aggregating amenities facet
-  // Uses partial matching (LIKE) for consistency with V1 paginated query
+  // Uses @> containment with GIN index, matching search query pattern (#40)
   if (excludeFilter !== "amenities" && amenities?.length) {
     const normalizedAmenities = amenities
       .map((a) => a.trim().toLowerCase())
       .filter(Boolean);
     if (normalizedAmenities.length > 0) {
-      conditions.push(
-        `NOT EXISTS (SELECT 1 FROM unnest($${paramIndex++}::text[]) AS search_term WHERE NOT EXISTS (SELECT 1 FROM unnest(d.amenities_lower) AS la WHERE la LIKE '%' || search_term || '%'))`
-      );
+      conditions.push(`d.amenities_lower @> $${paramIndex++}::text[]`);
       params.push(normalizedAmenities);
     }
   }

@@ -527,16 +527,15 @@ export function buildSearchDocWhereConditions(
     }
   }
 
-  // Amenities filter (AND logic) - uses partial matching (LIKE) for consistency
-  // UI sends 'Pool' but DB may have 'Pool Access'; GIN index not used here
+  // Amenities filter (AND logic) - exact containment using GIN index (#40)
+  // VALID_AMENITIES are 9 exact values enforced by schema validation (schemas.ts:216-223).
+  // All stored lowercased in amenities_lower. Uses @> for GIN index performance.
   if (amenities?.length) {
     const normalizedAmenities = amenities
       .map((a) => a.trim().toLowerCase())
       .filter(Boolean);
     if (normalizedAmenities.length > 0) {
-      conditions.push(
-        `NOT EXISTS (SELECT 1 FROM unnest($${paramIndex++}::text[]) AS search_term WHERE NOT EXISTS (SELECT 1 FROM unnest(d.amenities_lower) AS la WHERE la LIKE '%' || search_term || '%'))`
-      );
+      conditions.push(`d.amenities_lower @> $${paramIndex++}::text[]`);
       params.push(normalizedAmenities);
     }
   }
