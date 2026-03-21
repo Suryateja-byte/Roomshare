@@ -634,9 +634,13 @@ export default function PersistentMapWrapper({
             // block keeps isFetchingMapData=true (loading bar stays visible).
             isRetryScheduledRef.current = true;
 
-            // Schedule automatic retry
+            // Schedule automatic retry with a FRESH AbortController.
+            // The original `signal` may have been aborted by effect cleanup
+            // (e.g., user panned) between the 429 and the retry timeout firing.
             retryTimeoutRef.current = setTimeout(() => {
-              fetchListings(paramsString, signal, fetchBounds);
+              const retryController = new AbortController();
+              abortControllerRef.current = retryController;
+              fetchListings(paramsString, retryController.signal, fetchBounds);
             }, retryDelayMs);
 
             return; // Exit without throwing - retry will happen automatically
