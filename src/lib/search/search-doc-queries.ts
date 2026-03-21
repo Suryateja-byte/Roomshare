@@ -1033,8 +1033,10 @@ async function getSearchDocListingsPaginatedInternal(
       items.length > 0 &&
       safePage === 1
     ) {
+      // Route through cached wrapper so near-match expansion benefits from
+      // unstable_cache (60s TTL) instead of hitting DB on every cache miss (#34)
       const result = await expandWithNearMatches(items, params, (p) =>
-        getSearchDocListingsPaginatedInternal(p)
+        getSearchDocListingsPaginated(p)
       );
       items = result.items;
       nearMatchCount = result.nearMatchCount;
@@ -1411,8 +1413,9 @@ export async function getSearchDocListingsFirstPage(
       items.length < LOW_RESULTS_THRESHOLD &&
       items.length > 0
     ) {
+      // Route through cached offset wrapper instead of uncached self-recursion (#34)
       const result = await expandWithNearMatches(items, params, (p) =>
-        getSearchDocListingsFirstPage(p)
+        getSearchDocListingsPaginated(p)
       );
       items = result.items;
       nearMatchCount = result.nearMatchCount;
