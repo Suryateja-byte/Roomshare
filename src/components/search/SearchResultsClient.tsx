@@ -82,6 +82,9 @@ export function SearchResultsClient({
   const seenIdsRef = useRef<Set<string>>(
     new Set(initialListings.map((l) => l.id))
   );
+  // Track which listing IDs have already had favorites fetched (#16)
+  // Prevents refetching favorites for all IDs on every "Load More"
+  const fetchedFavIdsRef = useRef<Set<string>>(new Set());
 
   // Derive a stable fingerprint of the initial data to detect server-side changes
   const initialDataFingerprint = useMemo(
@@ -100,6 +103,7 @@ export function SearchResultsClient({
       setNextCursor(initialNextCursor);
       setLoadMoreAnnouncement("");
       seenIdsRef.current = new Set(initialListings.map((l) => l.id));
+      fetchedFavIdsRef.current = new Set(); // Reset favorites tracking on new search
     }
   }, [initialDataFingerprint, initialNextCursor, initialListings]);
 
@@ -210,14 +214,21 @@ export function SearchResultsClient({
   const total = initialTotal;
 
   useEffect(() => {
-    const listingIds = allListings.map((listing) => listing.id);
-    if (listingIds.length === 0) {
+    const allIds = allListings.map((listing) => listing.id);
+    if (allIds.length === 0) {
       setResolvedSavedListingIds([]);
       return;
     }
 
+    // Only fetch favorites for IDs we haven't fetched yet (#16)
+    // This prevents refetching all 60 IDs on every "Load More"
+    const newIds = allIds.filter((id) => !fetchedFavIdsRef.current.has(id));
+    if (newIds.length === 0) {
+      return; // All IDs already fetched — nothing to do
+    }
+
     const controller = new AbortController();
-    const idsParam = listingIds.join(",");
+    const idsParam = newIds.join(",");
 
     void (async () => {
       try {
@@ -235,7 +246,18 @@ export function SearchResultsClient({
 
         const data = (await response.json()) as { savedIds?: string[] };
         if (Array.isArray(data.savedIds)) {
-          setResolvedSavedListingIds(data.savedIds);
+          // Mark these IDs as fetched
+          for (const id of newIds) {
+            fetchedFavIdsRef.current.add(id);
+          }
+          // Merge new saved IDs with existing ones (no duplicates)
+          setResolvedSavedListingIds((prev) => {
+            const merged = new Set(prev);
+            for (const id of data.savedIds!) {
+              merged.add(id);
+            }
+            return Array.from(merged);
+          });
         }
       } catch (error) {
         if ((error as Error).name !== "AbortError") {
