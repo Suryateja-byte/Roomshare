@@ -1873,6 +1873,12 @@ export default function MapComponent({
       // Skip search/dirty logic during programmatic moves (auto-fly, card click, cluster expand)
       let skipCenterDedup = false;
       if (isProgrammaticMoveRef.current) {
+        // Clear the safety timeout before clearing the flag — prevents orphaned
+        // timeout from firing after a new programmatic move starts (#32)
+        if (programmaticClearTimeoutRef.current) {
+          clearTimeout(programmaticClearTimeoutRef.current);
+          programmaticClearTimeoutRef.current = null;
+        }
         setProgrammaticMove(false); // Clear immediately on moveend instead of waiting for timeout
         setActivePanBounds(null); // Clear active pan bounds
         // CLUSTER FIX: Don't clear isClusterExpandingRef here - wait for onIdle
