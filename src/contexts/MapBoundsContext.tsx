@@ -663,17 +663,18 @@ export function useMapBounds() {
  * Used by both Map (overlay) and SearchLayoutView (inline)
  */
 export function useMapMovedBanner() {
+  // Use split hooks to avoid re-renders from action changes (#18).
+  // State hook re-renders when state changes; actions hook is stable.
   const {
     hasUserMoved,
     boundsDirty,
     searchAsMove,
     locationConflict,
     searchLocationName,
-    searchCurrentArea,
-    resetToUrlBounds,
     areaCount,
     isAreaCountLoading,
-  } = useMapBounds();
+  } = useMapBoundsState();
+  const { searchCurrentArea, resetToUrlBounds } = useMapBoundsActions();
 
   // Show "results not updated" banner when bounds differ but location is still visible
   const showBanner = hasUserMoved && boundsDirty && !searchAsMove;
