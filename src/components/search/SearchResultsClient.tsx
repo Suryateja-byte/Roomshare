@@ -59,6 +59,10 @@ export function SearchResultsClient({
   const [loadError, setLoadError] = useState<string | null>(null);
   const [loadMoreAnnouncement, setLoadMoreAnnouncement] = useState("");
   const [showTotalPrice, setShowTotalPrice] = useState(false);
+  // Effective value: suppress total price display until sessionStorage is read.
+  // isHydrated and showTotalPrice are set in the same batched useEffect,
+  // so they update in one render — no intermediate flicker.
+  const effectiveShowTotalPrice = isHydrated && showTotalPrice;
   const [resolvedSavedListingIds, setResolvedSavedListingIds] =
     useState(savedListingIds);
   const [resolvedFilterSuggestions, setResolvedFilterSuggestions] =
@@ -335,7 +339,7 @@ export function SearchResultsClient({
               </p>
               {estimatedMonths > 1 && (
                 <TotalPriceToggle
-                  showTotal={showTotalPrice}
+                  showTotal={effectiveShowTotalPrice}
                   onToggle={setShowTotalPrice}
                 />
               )}
@@ -355,7 +359,7 @@ export function SearchResultsClient({
                 listing={listing}
                 isSaved={savedIdsSet.has(listing.id)}
                 priority={index === 0}
-                showTotalPrice={showTotalPrice}
+                showTotalPrice={effectiveShowTotalPrice}
                 estimatedMonths={estimatedMonths}
               />
             ))}
@@ -372,7 +376,7 @@ export function SearchResultsClient({
                   <SplitStayCard
                     key={`${pair.first.id}-${pair.second.id}`}
                     pair={pair}
-                    showTotalPrice={showTotalPrice}
+                    showTotalPrice={effectiveShowTotalPrice}
                     estimatedMonths={estimatedMonths}
                   />
                 ))}
