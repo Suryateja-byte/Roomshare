@@ -231,18 +231,19 @@ describe("useFacets", () => {
 
   // ── 5. Price change does NOT refetch ────────────────────────────────────
 
-  it("5. price-only change does not trigger a new fetch (price excluded from cache key)", async () => {
+  it("5. price change triggers refetch to update non-price facet counts (#19)", async () => {
     (useSearchParams as jest.Mock).mockReturnValue(
       makeSearchParams({ lat: "37.3", lng: "-122.3" })
     );
-    mockFetch.mockResolvedValueOnce(mockOkResponse(SAMPLE_FACETS));
-
-    const pendingWithoutPrice = { ...defaultPending };
+    const updatedFacets = { ...SAMPLE_FACETS, roomTypes: { "Private Room": 5 } };
+    mockFetch
+      .mockResolvedValueOnce(mockOkResponse(SAMPLE_FACETS))
+      .mockResolvedValueOnce(mockOkResponse(updatedFacets));
 
     const { result, rerender } = renderHook(
       ({ pending }: { pending: typeof defaultPending }) =>
         useFacets({ pending, isDrawerOpen: true }),
-      { initialProps: { pending: pendingWithoutPrice } }
+      { initialProps: { pending: { ...defaultPending } } }
     );
 
     act(() => {
@@ -253,7 +254,7 @@ describe("useFacets", () => {
       expect(result.current.facets).toEqual(SAMPLE_FACETS);
     });
 
-    // Change only price — cache key must stay the same
+    // Change price — cache key now includes price, so refetch triggers
     rerender({
       pending: { ...defaultPending, minPrice: "500", maxPrice: "1500" },
     });
@@ -262,8 +263,10 @@ describe("useFacets", () => {
       jest.advanceTimersByTime(350);
     });
 
-    // No second fetch because price is excluded from the cache key
-    expect(mockFetch).toHaveBeenCalledTimes(1);
+    // Second fetch with updated price range
+    await waitFor(() => {
+      expect(mockFetch).toHaveBeenCalledTimes(2);
+    });
   });
 
   // ── 6. Non-price filter change triggers refetch ─────────────────────────

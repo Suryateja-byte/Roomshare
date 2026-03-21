@@ -50,7 +50,9 @@ function generateFacetsCacheKey(
   searchParams: URLSearchParams
 ): string {
   const parts = [
-    // Exclude minPrice/maxPrice intentionally
+    // Include price so non-price facet counts update after price changes (#19)
+    `minPrice=${pending.minPrice}`,
+    `maxPrice=${pending.maxPrice}`,
     `roomType=${pending.roomType}`,
     `leaseDuration=${pending.leaseDuration}`,
     `moveInDate=${pending.moveInDate}`,
