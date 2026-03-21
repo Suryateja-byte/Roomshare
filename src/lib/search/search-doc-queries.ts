@@ -207,7 +207,7 @@ function createSearchDocCountCacheKey(params: FilterParams): string {
  * @param startParamIndex - Starting parameter index for SQL placeholders
  * @returns Object with WHERE clause fragment and params
  */
-function buildKeysetWhereClause(
+export function buildKeysetWhereClause(
   cursor: KeysetCursor,
   sort: SortOption,
   startParamIndex: number
@@ -352,11 +352,18 @@ function buildKeysetWhereClause(
           )
         )`;
       } else if (cursorCount === null) {
-        // Cursor has rating but NULL review_count (within the same rating, NULLs come last)
-        // Only compare tie-breaker columns within the NULL review_count group
+        // Cursor has rating but NULL review_count.
+        // ORDER BY uses review_count DESC — PostgreSQL default is NULLS FIRST for DESC,
+        // so NULL counts sort BEFORE non-NULL counts within the same rating.
+        // "After cursor" means:
+        //   1. Lower rating (always after in DESC)
+        //   2. NULL rating (NULLS LAST)
+        //   3. Same rating, non-NULL count (ALL — they sort after NULLs in DESC NULLS FIRST)
+        //   4. Same rating, NULL count, later by date/id tiebreaker
         clause = `(
           (d.avg_rating < ${ratingParam}::float8)
           OR (d.avg_rating IS NULL)
+          OR (d.avg_rating = ${ratingParam}::float8 AND d.review_count IS NOT NULL)
           OR (d.avg_rating = ${ratingParam}::float8 AND d.review_count IS NULL AND d.listing_created_at < ${dateParam}::timestamptz)
           OR (d.avg_rating = ${ratingParam}::float8 AND d.review_count IS NULL AND d.listing_created_at = ${dateParam}::timestamptz AND d.id > ${idParam})
         )`;
