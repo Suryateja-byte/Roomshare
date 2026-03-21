@@ -8,7 +8,14 @@
  * Run: pnpm playwright test tests/e2e/search-url-invalid-params.spec.ts
  */
 
-import { test, expect, SF_BOUNDS, selectors, timeouts, searchResultsContainer } from "./helpers/test-utils";
+import {
+  test,
+  expect,
+  SF_BOUNDS,
+  selectors,
+  timeouts,
+  searchResultsContainer,
+} from "./helpers/test-utils";
 import type { Page } from "@playwright/test";
 
 // ---------------------------------------------------------------------------
@@ -35,7 +42,10 @@ async function gotoRawUrl(page: Page, rawQueryString: string) {
 }
 
 /** Assert the page did not crash (no 500, body visible). */
-async function assertNoCrash(page: Page, response: Awaited<ReturnType<Page["goto"]>>) {
+async function assertNoCrash(
+  page: Page,
+  response: Awaited<ReturnType<Page["goto"]>>
+) {
   // Should not be a 500 error
   if (response) {
     expect(response.status()).not.toBe(500);
@@ -66,7 +76,9 @@ test.describe("Search URL Invalid/Malicious Params (P0)", () => {
   // -------------------------------------------------------------------------
   // 1. XSS in query: script tag injection
   // -------------------------------------------------------------------------
-  test("1: XSS script tag in query param is escaped, no execution", async ({ page }) => {
+  test("1: XSS script tag in query param is escaped, no execution", async ({
+    page,
+  }) => {
     const guard = setupDialogGuard(page);
 
     const encoded = encodeURIComponent("<script>alert('xss')</script>");
@@ -88,7 +100,9 @@ test.describe("Search URL Invalid/Malicious Params (P0)", () => {
   // -------------------------------------------------------------------------
   // 2. SQL injection in query
   // -------------------------------------------------------------------------
-  test("2: SQL injection in query param does not cause 500", async ({ page }) => {
+  test("2: SQL injection in query param does not cause 500", async ({
+    page,
+  }) => {
     const sqlPayload = "'; DROP TABLE listings;--";
     const encoded = encodeURIComponent(sqlPayload);
     const response = await page.goto(`/search?q=${encoded}&${boundsQS}`);
@@ -100,11 +114,15 @@ test.describe("Search URL Invalid/Malicious Params (P0)", () => {
   // -------------------------------------------------------------------------
   // 3. Extreme numeric values for price
   // -------------------------------------------------------------------------
-  test("3: extreme numeric values for price are clamped or handled", async ({ page }) => {
-    const response = await page.goto(buildSearchUrl({
-      minPrice: "-99999",
-      maxPrice: "99999999",
-    }));
+  test("3: extreme numeric values for price are clamped or handled", async ({
+    page,
+  }) => {
+    const response = await page.goto(
+      buildSearchUrl({
+        minPrice: "-99999",
+        maxPrice: "99999999",
+      })
+    );
 
     await page.waitForLoadState("domcontentloaded");
     await assertNoCrash(page, response);
@@ -141,14 +159,18 @@ test.describe("Search URL Invalid/Malicious Params (P0)", () => {
   // 5. Invalid room type
   // -------------------------------------------------------------------------
   test("5: invalid roomType is ignored, no crash", async ({ page }) => {
-    const response = await page.goto(buildSearchUrl({ roomType: "nonexistent" }));
+    const response = await page.goto(
+      buildSearchUrl({ roomType: "nonexistent" })
+    );
 
     await page.waitForLoadState("domcontentloaded");
     await assertNoCrash(page, response);
 
     // The URL may still have the param but it should be ignored by the parser
     // No filter chip for "nonexistent" should appear
-    const chipsRegion = page.locator('[role="region"][aria-label="Applied filters"]').first();
+    const chipsRegion = page
+      .locator('[role="region"][aria-label="Applied filters"]')
+      .first();
     const chipsVisible = await chipsRegion.isVisible().catch(() => false);
     if (chipsVisible) {
       const chipText = await chipsRegion.textContent();
@@ -170,8 +192,12 @@ test.describe("Search URL Invalid/Malicious Params (P0)", () => {
     // wait, the check can fire before Next.js streaming delivers the content.
     // The #search-results-heading is sr-only (visually hidden), so use toBeAttached.
     const resultsHeading = page.locator("#search-results-heading");
-    const zeroResults = page.locator('h2:has-text("No matches found"), h3:has-text("No exact matches")');
-    await expect(resultsHeading.or(zeroResults).first()).toBeAttached({ timeout: timeouts.navigation });
+    const zeroResults = page.locator(
+      'h2:has-text("No matches found"), h3:has-text("No exact matches")'
+    );
+    await expect(resultsHeading.or(zeroResults).first()).toBeAttached({
+      timeout: timeouts.navigation,
+    });
 
     // Sort should display "Recommended" (the default), not "hacked"
     // SortSelect needs hydration (mounted state) before aria-label appears.
@@ -192,8 +218,12 @@ test.describe("Search URL Invalid/Malicious Params (P0)", () => {
   // -------------------------------------------------------------------------
   // 7. Overflow / inverted bounds
   // -------------------------------------------------------------------------
-  test("7: overflow bounds (minLat=999) are clamped, no crash", async ({ page }) => {
-    const response = await page.goto("/search?minLat=999&maxLat=-999&minLng=999&maxLng=-999");
+  test("7: overflow bounds (minLat=999) are clamped, no crash", async ({
+    page,
+  }) => {
+    const response = await page.goto(
+      "/search?minLat=999&maxLat=-999&minLng=999&maxLng=-999"
+    );
 
     await page.waitForLoadState("domcontentloaded");
 
@@ -219,8 +249,12 @@ test.describe("Search URL Invalid/Malicious Params (P0)", () => {
     // This ensures SSR streaming has delivered the full search results block.
     // The #search-results-heading is sr-only (visually hidden), so use toBeAttached.
     const resultsHeading = page.locator("#search-results-heading");
-    const zeroResults = page.locator('h2:has-text("No matches found"), h3:has-text("No exact matches")');
-    await expect(resultsHeading.or(zeroResults).first()).toBeAttached({ timeout: timeouts.navigation });
+    const zeroResults = page.locator(
+      'h2:has-text("No matches found"), h3:has-text("No exact matches")'
+    );
+    await expect(resultsHeading.or(zeroResults).first()).toBeAttached({
+      timeout: timeouts.navigation,
+    });
 
     // The page should behave as if no q, sort, or maxPrice were set
     // Sort should default to "Recommended" (needs hydration via mounted state).
@@ -242,7 +276,9 @@ test.describe("Search URL Invalid/Malicious Params (P0)", () => {
   // -------------------------------------------------------------------------
   test("9: duplicate params are handled without crash", async ({ page }) => {
     // Send duplicate roomType params
-    const response = await page.goto(`/search?roomType=private&roomType=shared&${boundsQS}`);
+    const response = await page.goto(
+      `/search?roomType=private&roomType=shared&${boundsQS}`
+    );
 
     await page.waitForLoadState("domcontentloaded");
     await assertNoCrash(page, response);
@@ -254,11 +290,15 @@ test.describe("Search URL Invalid/Malicious Params (P0)", () => {
   // -------------------------------------------------------------------------
   // 10. URL-encoded special characters in query
   // -------------------------------------------------------------------------
-  test("10: URL-encoded special characters in query are safe", async ({ page }) => {
+  test("10: URL-encoded special characters in query are safe", async ({
+    page,
+  }) => {
     const guard = setupDialogGuard(page);
 
     // %3Cscript%3E is URL-encoded <script>
-    const response = await page.goto(`/search?q=%3Cscript%3Ealert(1)%3C%2Fscript%3E&${boundsQS}`);
+    const response = await page.goto(
+      `/search?q=%3Cscript%3Ealert(1)%3C%2Fscript%3E&${boundsQS}`
+    );
 
     await page.waitForLoadState("domcontentloaded");
     await assertNoCrash(page, response);
@@ -286,7 +326,9 @@ test.describe("Search URL Invalid/Malicious Params (P0)", () => {
   // -------------------------------------------------------------------------
   // 12. Unicode in query
   // -------------------------------------------------------------------------
-  test("12: Unicode characters in query are handled correctly", async ({ page }) => {
+  test("12: Unicode characters in query are handled correctly", async ({
+    page,
+  }) => {
     const unicodeQuery = encodeURIComponent("房间");
     const response = await page.goto(`/search?q=${unicodeQuery}&${boundsQS}`);
 
@@ -306,7 +348,7 @@ test.describe("Search URL Invalid/Malicious Params (P0)", () => {
   test("13: img onerror XSS in query param is blocked", async ({ page }) => {
     const guard = setupDialogGuard(page);
 
-    const payload = encodeURIComponent('<img src=x onerror=alert(1)>');
+    const payload = encodeURIComponent("<img src=x onerror=alert(1)>");
     const response = await page.goto(`/search?q=${payload}&${boundsQS}`);
 
     await page.waitForLoadState("domcontentloaded");
@@ -357,12 +399,16 @@ test.describe("Search URL Invalid/Malicious Params (P0)", () => {
   // -------------------------------------------------------------------------
   // Additional: inverted price range
   // -------------------------------------------------------------------------
-  test("16: inverted price range (minPrice > maxPrice) does not crash", async ({ page }) => {
+  test("16: inverted price range (minPrice > maxPrice) does not crash", async ({
+    page,
+  }) => {
     // parseSearchParams throws for inverted prices, server should handle gracefully
-    const response = await page.goto(buildSearchUrl({
-      minPrice: "5000",
-      maxPrice: "1000",
-    }));
+    const response = await page.goto(
+      buildSearchUrl({
+        minPrice: "5000",
+        maxPrice: "1000",
+      })
+    );
 
     await page.waitForLoadState("domcontentloaded");
 
@@ -376,11 +422,15 @@ test.describe("Search URL Invalid/Malicious Params (P0)", () => {
   // -------------------------------------------------------------------------
   // Additional: NaN / Infinity in numeric params
   // -------------------------------------------------------------------------
-  test("17: NaN and Infinity in numeric params are handled", async ({ page }) => {
-    const response = await page.goto(buildSearchUrl({
-      minPrice: "NaN",
-      maxPrice: "Infinity",
-    }));
+  test("17: NaN and Infinity in numeric params are handled", async ({
+    page,
+  }) => {
+    const response = await page.goto(
+      buildSearchUrl({
+        minPrice: "NaN",
+        maxPrice: "Infinity",
+      })
+    );
 
     await page.waitForLoadState("domcontentloaded");
     await assertNoCrash(page, response);
@@ -396,7 +446,9 @@ test.describe("Search URL Invalid/Malicious Params (P0)", () => {
   // -------------------------------------------------------------------------
   // Additional: zero-width characters in query
   // -------------------------------------------------------------------------
-  test("18: zero-width characters in query do not cause issues", async ({ page }) => {
+  test("18: zero-width characters in query do not cause issues", async ({
+    page,
+  }) => {
     // Zero-width space (U+200B) and zero-width joiner (U+200D)
     const payload = encodeURIComponent("room\u200B\u200Dshare");
     const response = await page.goto(`/search?q=${payload}&${boundsQS}`);
@@ -408,13 +460,17 @@ test.describe("Search URL Invalid/Malicious Params (P0)", () => {
   // -------------------------------------------------------------------------
   // Additional: boolean-like values for non-boolean params
   // -------------------------------------------------------------------------
-  test("19: boolean-like values for non-boolean params do not crash", async ({ page }) => {
-    const response = await page.goto(buildSearchUrl({
-      minPrice: "true",
-      maxPrice: "false",
-      sort: "null",
-      roomType: "undefined",
-    }));
+  test("19: boolean-like values for non-boolean params do not crash", async ({
+    page,
+  }) => {
+    const response = await page.goto(
+      buildSearchUrl({
+        minPrice: "true",
+        maxPrice: "false",
+        sort: "null",
+        roomType: "undefined",
+      })
+    );
 
     await page.waitForLoadState("domcontentloaded");
     await assertNoCrash(page, response);

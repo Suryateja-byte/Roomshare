@@ -8,10 +8,16 @@ import { test, expect, SF_BOUNDS, searchResultsContainer } from "../helpers";
 
 test.describe("Search Visual Regression", () => {
   test.beforeEach(async ({ page }, testInfo) => {
-    test.skip(!!process.env.CI, 'Visual baseline snapshots are platform-specific — skip in CI');
+    test.skip(
+      !!process.env.CI,
+      "Visual baseline snapshots are platform-specific — skip in CI"
+    );
     test.slow();
-    if (testInfo.project.name.includes('Mobile')) {
-      test.skip(true, 'No Mobile Chrome snapshot baselines — skip visual regression');
+    if (testInfo.project.name.includes("Mobile")) {
+      test.skip(
+        true,
+        "No Mobile Chrome snapshot baselines — skip visual regression"
+      );
     }
 
     // Disable animations for stable screenshots
@@ -23,12 +29,14 @@ test.describe("Search Visual Regression", () => {
 
     // Navigate with bounds to get consistent seed data
     await page.goto(
-      `/search?minLat=${SF_BOUNDS.minLat}&maxLat=${SF_BOUNDS.maxLat}&minLng=${SF_BOUNDS.minLng}&maxLng=${SF_BOUNDS.maxLng}`,
+      `/search?minLat=${SF_BOUNDS.minLat}&maxLat=${SF_BOUNDS.maxLat}&minLng=${SF_BOUNDS.minLng}&maxLng=${SF_BOUNDS.maxLng}`
     );
     await page.waitForLoadState("domcontentloaded");
 
     // Wait for listing cards to load (stable selector)
-    const listingCards = searchResultsContainer(page).locator('a[href^="/listings/"]');
+    const listingCards = searchResultsContainer(page).locator(
+      'a[href^="/listings/"]'
+    );
     await expect(listingCards.first()).toBeVisible({ timeout: 30000 });
 
     // Wait for content to stabilize
@@ -40,7 +48,9 @@ test.describe("Search Visual Regression", () => {
       mask: [
         page.locator(".maplibregl-canvas"),
         page.locator(".maplibregl-map"),
-        page.locator('[class*="map"]').filter({ hasNot: page.locator('a[href^="/listings/"]') }),
+        page
+          .locator('[class*="map"]')
+          .filter({ hasNot: page.locator('a[href^="/listings/"]') }),
       ],
       maxDiffPixelRatio: 0.02,
     });
@@ -50,12 +60,14 @@ test.describe("Search Visual Regression", () => {
     await page.setViewportSize({ width: 375, height: 812 });
 
     await page.goto(
-      `/search?minLat=${SF_BOUNDS.minLat}&maxLat=${SF_BOUNDS.maxLat}&minLng=${SF_BOUNDS.minLng}&maxLng=${SF_BOUNDS.maxLng}`,
+      `/search?minLat=${SF_BOUNDS.minLat}&maxLat=${SF_BOUNDS.maxLat}&minLng=${SF_BOUNDS.minLng}&maxLng=${SF_BOUNDS.maxLng}`
     );
     await page.waitForLoadState("domcontentloaded");
 
     // Wait for listing cards to load
-    const listingCards = searchResultsContainer(page).locator('a[href^="/listings/"]');
+    const listingCards = searchResultsContainer(page).locator(
+      'a[href^="/listings/"]'
+    );
     await expect(listingCards.first()).toBeVisible({ timeout: 30000 });
 
     // Wait for content to stabilize
@@ -71,7 +83,7 @@ test.describe("Search Visual Regression", () => {
     await page.setViewportSize({ width: 375, height: 812 });
 
     await page.goto(
-      `/search?minLat=${SF_BOUNDS.minLat}&maxLat=${SF_BOUNDS.maxLat}&minLng=${SF_BOUNDS.minLng}&maxLng=${SF_BOUNDS.maxLng}`,
+      `/search?minLat=${SF_BOUNDS.minLat}&maxLat=${SF_BOUNDS.maxLat}&minLng=${SF_BOUNDS.minLng}&maxLng=${SF_BOUNDS.maxLng}`
     );
     await page.waitForLoadState("domcontentloaded");
 
@@ -89,12 +101,14 @@ test.describe("Search Visual Regression", () => {
     await page.setViewportSize({ width: 1440, height: 900 });
 
     await page.goto(
-      `/search?minLat=${SF_BOUNDS.minLat}&maxLat=${SF_BOUNDS.maxLat}&minLng=${SF_BOUNDS.minLng}&maxLng=${SF_BOUNDS.maxLng}`,
+      `/search?minLat=${SF_BOUNDS.minLat}&maxLat=${SF_BOUNDS.maxLat}&minLng=${SF_BOUNDS.minLng}&maxLng=${SF_BOUNDS.maxLng}`
     );
     await page.waitForLoadState("domcontentloaded");
 
     // Wait for listing cards to load
-    const listingCards = searchResultsContainer(page).locator('a[href^="/listings/"]');
+    const listingCards = searchResultsContainer(page).locator(
+      'a[href^="/listings/"]'
+    );
     await expect(listingCards.first()).toBeVisible({ timeout: 30000 });
 
     // Wait for images to load

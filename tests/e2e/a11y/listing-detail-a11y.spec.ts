@@ -10,12 +10,16 @@
  * - Keyboard navigation through page sections
  */
 
-import { test, expect } from '@playwright/test';
-import AxeBuilder from '@axe-core/playwright';
-import { A11Y_CONFIG, selectors } from '../helpers/test-utils';
+import { test, expect } from "@playwright/test";
+import AxeBuilder from "@axe-core/playwright";
+import { A11Y_CONFIG, selectors } from "../helpers/test-utils";
 
 /** Helper: run axe scan with shared config */
-async function runAxeScan(page: import('@playwright/test').Page, extraExcludes: string[] = [], disabledRules: string[] = []) {
+async function runAxeScan(
+  page: import("@playwright/test").Page,
+  extraExcludes: string[] = [],
+  disabledRules: string[] = []
+) {
   let builder = new AxeBuilder({ page }).withTags([...A11Y_CONFIG.tags]);
 
   for (const selector of [...A11Y_CONFIG.globalExcludes, ...extraExcludes]) {
@@ -34,114 +38,131 @@ function logViolations(label: string, violations: any[]) {
   if (violations.length > 0) {
     console.log(`[axe-listing] ${label}: ${violations.length} violation(s)`);
     violations.forEach((v) => {
-      console.log(`  - ${v.id} (${v.impact}): ${v.description} [${v.nodes.length} node(s)]`);
+      console.log(
+        `  - ${v.id} (${v.impact}): ${v.description} [${v.nodes.length} node(s)]`
+      );
     });
   }
 }
 
 /** Navigate to the first available listing detail page */
-async function navigateToListing(page: import('@playwright/test').Page): Promise<boolean> {
-  await page.goto('/search');
-  await page.waitForLoadState('domcontentloaded');
+async function navigateToListing(
+  page: import("@playwright/test").Page
+): Promise<boolean> {
+  await page.goto("/search");
+  await page.waitForLoadState("domcontentloaded");
 
   const firstCard = page.locator(selectors.listingCard).first();
-  const listingId = await firstCard.getAttribute('data-listing-id').catch(() => null);
+  const listingId = await firstCard
+    .getAttribute("data-listing-id")
+    .catch(() => null);
 
   if (!listingId) return false;
 
   await page.goto(`/listings/${listingId}`);
-  await page.waitForLoadState('domcontentloaded');
+  await page.waitForLoadState("domcontentloaded");
   return true;
 }
 
-test.describe('Listing Detail — Accessibility Deep-Dive', () => {
-  test.beforeEach(async () => { test.slow(); });
+test.describe("Listing Detail — Accessibility Deep-Dive", () => {
+  test.beforeEach(async () => {
+    test.slow();
+  });
 
-  test.describe('axe-core scans', () => {
-    test('Full page passes WCAG 2.1 AA', async ({ page }) => {
+  test.describe("axe-core scans", () => {
+    test("Full page passes WCAG 2.1 AA", async ({ page }) => {
       const found = await navigateToListing(page);
-      test.skip(!found, 'No listings available');
+      test.skip(!found, "No listings available");
 
       const results = await runAxeScan(page);
       const violations = results.violations.filter(
-        (v) => !A11Y_CONFIG.knownExclusions.includes(v.id as typeof A11Y_CONFIG.knownExclusions[number]),
+        (v) =>
+          !A11Y_CONFIG.knownExclusions.includes(
+            v.id as (typeof A11Y_CONFIG.knownExclusions)[number]
+          )
       );
 
-      logViolations('Listing Detail Full Page', violations);
+      logViolations("Listing Detail Full Page", violations);
       expect(violations).toHaveLength(0);
     });
 
-    test('Page in dark mode passes WCAG 2.1 AA', async ({ page }) => {
-      await page.emulateMedia({ colorScheme: 'dark' });
+    test("Page in dark mode passes WCAG 2.1 AA", async ({ page }) => {
+      await page.emulateMedia({ colorScheme: "dark" });
       const found = await navigateToListing(page);
-      test.skip(!found, 'No listings available');
+      test.skip(!found, "No listings available");
 
       const results = await runAxeScan(page);
       const violations = results.violations.filter(
-        (v) => !A11Y_CONFIG.knownExclusions.includes(v.id as typeof A11Y_CONFIG.knownExclusions[number]),
+        (v) =>
+          !A11Y_CONFIG.knownExclusions.includes(
+            v.id as (typeof A11Y_CONFIG.knownExclusions)[number]
+          )
       );
 
-      logViolations('Listing Detail Dark Mode', violations);
+      logViolations("Listing Detail Dark Mode", violations);
       expect(violations).toHaveLength(0);
     });
 
-    test('Mobile viewport passes WCAG 2.1 AA', async ({ page }) => {
+    test("Mobile viewport passes WCAG 2.1 AA", async ({ page }) => {
       await page.setViewportSize({ width: 375, height: 667 });
       const found = await navigateToListing(page);
-      test.skip(!found, 'No listings available');
+      test.skip(!found, "No listings available");
 
       const results = await runAxeScan(page);
       const violations = results.violations.filter(
-        (v) => !A11Y_CONFIG.knownExclusions.includes(v.id as typeof A11Y_CONFIG.knownExclusions[number]),
+        (v) =>
+          !A11Y_CONFIG.knownExclusions.includes(
+            v.id as (typeof A11Y_CONFIG.knownExclusions)[number]
+          )
       );
 
-      logViolations('Listing Detail Mobile', violations);
+      logViolations("Listing Detail Mobile", violations);
       expect(violations).toHaveLength(0);
     });
   });
 
-  test.describe('Image carousel accessibility', () => {
-    test('All listing images have alt text', async ({ page }) => {
+  test.describe("Image carousel accessibility", () => {
+    test("All listing images have alt text", async ({ page }) => {
       const found = await navigateToListing(page);
-      test.skip(!found, 'No listings available');
+      test.skip(!found, "No listings available");
 
       // Wait for the page to finish loading so images are in the DOM
-      await page.waitForLoadState('domcontentloaded');
+      await page.waitForLoadState("domcontentloaded");
 
       // Collect all image attributes in a single evaluate call to avoid
       // per-element CDP round-trips that can individually timeout.
       const missingAlt = await page.evaluate(() => {
-        const imgs = Array.from(document.querySelectorAll('img'));
+        const imgs = Array.from(document.querySelectorAll("img"));
         const missing: string[] = [];
         for (const img of imgs) {
           const rect = img.getBoundingClientRect();
           const isVisible = rect.width > 0 && rect.height > 0;
           if (
             isVisible &&
-            img.getAttribute('alt') === null &&
-            img.getAttribute('role') !== 'presentation' &&
-            !img.getAttribute('aria-label')
+            img.getAttribute("alt") === null &&
+            img.getAttribute("role") !== "presentation" &&
+            !img.getAttribute("aria-label")
           ) {
-            missing.push((img.getAttribute('src') || 'unknown').slice(0, 80));
+            missing.push((img.getAttribute("src") || "unknown").slice(0, 80));
           }
         }
         return missing;
       });
 
       if (missingAlt.length > 0) {
-        console.log(`[img] Missing alt: ${missingAlt.join(', ')}`);
+        console.log(`[img] Missing alt: ${missingAlt.join(", ")}`);
       }
       expect(missingAlt).toHaveLength(0);
     });
 
-    test('Carousel controls are keyboard accessible', async ({ page }) => {
+    test("Carousel controls are keyboard accessible", async ({ page }) => {
       const found = await navigateToListing(page);
-      test.skip(!found, 'No listings available');
+      test.skip(!found, "No listings available");
 
       // Find carousel prev/next buttons
       const carouselControls = page.locator(
         'button[aria-label*="previous" i], button[aria-label*="next" i], ' +
-        'button[aria-label*="prev" i], [data-testid*="carousel"] button',
+          'button[aria-label*="prev" i], [data-testid*="carousel"] button'
       );
       const controlCount = await carouselControls.count();
 
@@ -151,7 +172,7 @@ test.describe('Listing Detail — Accessibility Deep-Dive', () => {
           const control = carouselControls.nth(i);
           const isVisible = await control.isVisible().catch(() => false);
           if (isVisible) {
-            const ariaLabel = await control.getAttribute('aria-label');
+            const ariaLabel = await control.getAttribute("aria-label");
             expect(ariaLabel).toBeTruthy();
           }
         }
@@ -159,16 +180,16 @@ test.describe('Listing Detail — Accessibility Deep-Dive', () => {
     });
   });
 
-  test.describe('Page structure', () => {
-    test('Has valid heading hierarchy', async ({ page }) => {
+  test.describe("Page structure", () => {
+    test("Has valid heading hierarchy", async ({ page }) => {
       const found = await navigateToListing(page);
-      test.skip(!found, 'No listings available');
+      test.skip(!found, "No listings available");
 
       const headings = await page.evaluate(() => {
-        const hs = document.querySelectorAll('h1, h2, h3, h4, h5, h6');
+        const hs = document.querySelectorAll("h1, h2, h3, h4, h5, h6");
         return Array.from(hs).map((h) => ({
           level: parseInt(h.tagName[1]),
-          text: h.textContent?.trim().slice(0, 60) || '',
+          text: h.textContent?.trim().slice(0, 60) || "",
         }));
       });
 
@@ -187,15 +208,15 @@ test.describe('Listing Detail — Accessibility Deep-Dive', () => {
       }
 
       if (skips.length > 0) {
-        console.log(`[heading] Listing detail skips: ${skips.join(', ')}`);
+        console.log(`[heading] Listing detail skips: ${skips.join(", ")}`);
       }
       // Allow some skips for listing layouts (h1 → h3 for section subheads is common)
       expect(skips.length).toBeLessThan(5);
     });
 
-    test('Has required landmark regions', async ({ page }) => {
+    test("Has required landmark regions", async ({ page }) => {
       const found = await navigateToListing(page);
-      test.skip(!found, 'No listings available');
+      test.skip(!found, "No listings available");
 
       const landmarks = await page.evaluate(() => ({
         main: !!document.querySelector('main, [role="main"]'),
@@ -207,19 +228,21 @@ test.describe('Listing Detail — Accessibility Deep-Dive', () => {
     });
   });
 
-  test.describe('Keyboard navigation', () => {
-    test('Can tab through main interactive elements', async ({ page }) => {
+  test.describe("Keyboard navigation", () => {
+    test("Can tab through main interactive elements", async ({ page }) => {
       const found = await navigateToListing(page);
-      test.skip(!found, 'No listings available');
+      test.skip(!found, "No listings available");
 
       // Tab through elements and verify they receive focus
       const focusedElements: string[] = [];
       for (let i = 0; i < 15; i++) {
-        await page.keyboard.press('Tab');
+        await page.keyboard.press("Tab");
 
         const tagName = await page.evaluate(() => {
           const el = document.activeElement;
-          return el ? `${el.tagName.toLowerCase()}${el.getAttribute('aria-label') ? `[${el.getAttribute('aria-label')}]` : ''}` : 'none';
+          return el
+            ? `${el.tagName.toLowerCase()}${el.getAttribute("aria-label") ? `[${el.getAttribute("aria-label")}]` : ""}`
+            : "none";
         });
         focusedElements.push(tagName);
       }
@@ -234,7 +257,7 @@ test.describe('Listing Detail — Accessibility Deep-Dive', () => {
         if (!el) return { visible: false };
         const style = window.getComputedStyle(el);
         return {
-          visible: style.outlineStyle !== 'none' || style.boxShadow !== 'none',
+          visible: style.outlineStyle !== "none" || style.boxShadow !== "none",
         };
       });
 
@@ -243,18 +266,26 @@ test.describe('Listing Detail — Accessibility Deep-Dive', () => {
     });
   });
 
-  test.describe('Dynamic content sections', () => {
-    test('Amenities section has accessible labeling', async ({ page }) => {
+  test.describe("Dynamic content sections", () => {
+    test("Amenities section has accessible labeling", async ({ page }) => {
       const found = await navigateToListing(page);
-      test.skip(!found, 'No listings available');
+      test.skip(!found, "No listings available");
 
       // Check if amenities section exists
-      const amenitiesSection = page.locator('[data-testid="amenities"], h2:text-is("Amenities"), h3:text-is("Amenities")').first();
-      const hasAmenities = await amenitiesSection.isVisible({ timeout: 3000 }).catch(() => false);
+      const amenitiesSection = page
+        .locator(
+          '[data-testid="amenities"], h2:text-is("Amenities"), h3:text-is("Amenities")'
+        )
+        .first();
+      const hasAmenities = await amenitiesSection
+        .isVisible({ timeout: 3000 })
+        .catch(() => false);
 
       if (hasAmenities) {
         // Amenity items should have text labels (not just icons)
-        const amenityItems = page.locator('[data-testid="amenity-item"], [data-testid="amenities"] li');
+        const amenityItems = page.locator(
+          '[data-testid="amenity-item"], [data-testid="amenities"] li'
+        );
         const count = await amenityItems.count();
 
         for (let i = 0; i < Math.min(count, 10); i++) {
@@ -266,13 +297,19 @@ test.describe('Listing Detail — Accessibility Deep-Dive', () => {
       }
     });
 
-    test('Price information is programmatically associated', async ({ page }) => {
+    test("Price information is programmatically associated", async ({
+      page,
+    }) => {
       const found = await navigateToListing(page);
-      test.skip(!found, 'No listings available');
+      test.skip(!found, "No listings available");
 
       // Price should be marked up semantically
-      const priceElement = page.locator('[data-testid="listing-price"], [class*="price"]').first();
-      const isVisible = await priceElement.isVisible({ timeout: 3000 }).catch(() => false);
+      const priceElement = page
+        .locator('[data-testid="listing-price"], [class*="price"]')
+        .first();
+      const isVisible = await priceElement
+        .isVisible({ timeout: 3000 })
+        .catch(() => false);
 
       if (isVisible) {
         const priceText = await priceElement.textContent();
@@ -282,20 +319,24 @@ test.describe('Listing Detail — Accessibility Deep-Dive', () => {
     });
   });
 
-  test.describe('Apply/contact section (authenticated)', () => {
-    test.use({ storageState: 'playwright/.auth/user.json' });
+  test.describe("Apply/contact section (authenticated)", () => {
+    test.use({ storageState: "playwright/.auth/user.json" });
 
-    test('Apply button is accessible', async ({ page }) => {
+    test("Apply button is accessible", async ({ page }) => {
       const found = await navigateToListing(page);
-      test.skip(!found, 'No listings available');
+      test.skip(!found, "No listings available");
 
       // Look for apply/contact button
-      const applyButton = page.getByRole('button', { name: /apply|contact|message|book/i });
-      const isVisible = await applyButton.isVisible({ timeout: 5000 }).catch(() => false);
+      const applyButton = page.getByRole("button", {
+        name: /apply|contact|message|book/i,
+      });
+      const isVisible = await applyButton
+        .isVisible({ timeout: 5000 })
+        .catch(() => false);
 
       if (isVisible) {
         // Button should have accessible name
-        const ariaLabel = await applyButton.getAttribute('aria-label');
+        const ariaLabel = await applyButton.getAttribute("aria-label");
         const text = await applyButton.textContent();
         expect(ariaLabel || text?.trim()).toBeTruthy();
 

@@ -1,35 +1,40 @@
 /**
  * Comprehensive tests for SearchForm component
  */
-import { render, screen, fireEvent, waitFor } from '@testing-library/react'
-import userEvent from '@testing-library/user-event'
+import { render, screen, fireEvent, waitFor } from "@testing-library/react";
+import userEvent from "@testing-library/user-event";
 
 // Mock useSearchParams and useRouter
-const mockPush = jest.fn()
-const mockReplace = jest.fn()
-const mockSearchParams = new URLSearchParams()
+const mockPush = jest.fn();
+const mockReplace = jest.fn();
+const mockSearchParams = new URLSearchParams();
 
-jest.mock('next/navigation', () => ({
+jest.mock("next/navigation", () => ({
   useRouter: () => ({
     push: mockPush,
     replace: mockReplace,
     refresh: jest.fn(),
   }),
   useSearchParams: () => mockSearchParams,
-}))
+}));
 
 // Mock LocationSearchInput
-jest.mock('@/components/LocationSearchInput', () => {
+jest.mock("@/components/LocationSearchInput", () => {
   return function MockLocationSearchInput({
     value,
     onChange,
     onLocationSelect,
     placeholder,
   }: {
-    value: string
-    onChange: (value: string) => void
-    onLocationSelect?: (location: { name: string; lat: number; lng: number; bbox?: [number, number, number, number] }) => void
-    placeholder?: string
+    value: string;
+    onChange: (value: string) => void;
+    onLocationSelect?: (location: {
+      name: string;
+      lat: number;
+      lng: number;
+      bbox?: [number, number, number, number];
+    }) => void;
+    placeholder?: string;
   }) {
     return (
       <div>
@@ -41,18 +46,32 @@ jest.mock('@/components/LocationSearchInput', () => {
         />
         <button
           data-testid="select-location"
-          onClick={() => onLocationSelect?.({ name: 'San Francisco', lat: 37.7749, lng: -122.4194 })}
+          onClick={() =>
+            onLocationSelect?.({
+              name: "San Francisco",
+              lat: 37.7749,
+              lng: -122.4194,
+            })
+          }
         >
           Select SF
         </button>
       </div>
-    )
-  }
-})
+    );
+  };
+});
 
 // Mock DatePicker
-jest.mock('@/components/ui/date-picker', () => ({
-  DatePicker: ({ value, onChange, placeholder }: { value: string; onChange: (value: string) => void; placeholder?: string }) => (
+jest.mock("@/components/ui/date-picker", () => ({
+  DatePicker: ({
+    value,
+    onChange,
+    placeholder,
+  }: {
+    value: string;
+    onChange: (value: string) => void;
+    placeholder?: string;
+  }) => (
     <input
       data-testid="date-picker"
       type="date"
@@ -61,845 +80,938 @@ jest.mock('@/components/ui/date-picker', () => ({
       placeholder={placeholder}
     />
   ),
-}))
+}));
 
 // Mock Select components
-jest.mock('@/components/ui/select', () => ({
-  Select: ({ children, value }: { children: React.ReactNode; value?: string; onValueChange?: (value: string) => void }) => (
+jest.mock("@/components/ui/select", () => ({
+  Select: ({
+    children,
+    value,
+  }: {
+    children: React.ReactNode;
+    value?: string;
+    onValueChange?: (value: string) => void;
+  }) => (
     <div data-testid="select-root" data-value={value}>
       {children}
     </div>
   ),
-  SelectTrigger: ({ children, id }: { children: React.ReactNode; id?: string }) => (
+  SelectTrigger: ({
+    children,
+    id,
+  }: {
+    children: React.ReactNode;
+    id?: string;
+  }) => (
     <button data-testid={`select-trigger-${id}`} id={id}>
       {children}
     </button>
   ),
-  SelectContent: ({ children }: { children: React.ReactNode }) => <div>{children}</div>,
-  SelectItem: ({ children, value }: { children: React.ReactNode; value: string }) => (
-    <div data-testid={`select-item-${value}`} data-value={value}>{children}</div>
+  SelectContent: ({ children }: { children: React.ReactNode }) => (
+    <div>{children}</div>
   ),
-  SelectValue: ({ placeholder }: { placeholder?: string }) => <span>{placeholder}</span>,
-}))
+  SelectItem: ({
+    children,
+    value,
+  }: {
+    children: React.ReactNode;
+    value: string;
+  }) => (
+    <div data-testid={`select-item-${value}`} data-value={value}>
+      {children}
+    </div>
+  ),
+  SelectValue: ({ placeholder }: { placeholder?: string }) => (
+    <span>{placeholder}</span>
+  ),
+}));
 
 // Mock sonner toast
-const mockToastError = jest.fn()
-jest.mock('sonner', () => ({
-  toast: { error: (...args: unknown[]) => mockToastError(...args), success: jest.fn(), info: jest.fn() },
-}))
+const mockToastError = jest.fn();
+jest.mock("sonner", () => ({
+  toast: {
+    error: (...args: unknown[]) => mockToastError(...args),
+    success: jest.fn(),
+    info: jest.fn(),
+  },
+}));
 
-import SearchForm from '@/components/SearchForm'
-import { MAP_FLY_TO_EVENT } from '@/components/SearchForm'
+import SearchForm from "@/components/SearchForm";
+import { MAP_FLY_TO_EVENT } from "@/components/SearchForm";
 
 // Polyfill requestSubmit for JSDOM
 beforeAll(() => {
   if (!HTMLFormElement.prototype.requestSubmit) {
     HTMLFormElement.prototype.requestSubmit = function () {
-      this.dispatchEvent(new Event('submit', { cancelable: true, bubbles: true }));
+      this.dispatchEvent(
+        new Event("submit", { cancelable: true, bubbles: true })
+      );
     };
   }
 });
 
-describe('SearchForm', () => {
-  const user = userEvent.setup({ delay: null })
+describe("SearchForm", () => {
+  const user = userEvent.setup({ delay: null });
 
   beforeEach(() => {
-    jest.clearAllMocks()
-    jest.useFakeTimers()
+    jest.clearAllMocks();
+    jest.useFakeTimers();
     // Reset search params
-    mockSearchParams.delete('q')
-    mockSearchParams.delete('minPrice')
-    mockSearchParams.delete('maxPrice')
-    mockSearchParams.delete('moveInDate')
-    mockSearchParams.delete('leaseDuration')
-    mockSearchParams.delete('roomType')
-    mockSearchParams.delete('lat')
-    mockSearchParams.delete('lng')
-    mockSearchParams.delete('genderPreference')
-    mockSearchParams.delete('householdGender')
-    mockSearchParams.delete('amenities')
-    mockSearchParams.delete('houseRules')
-    mockSearchParams.delete('languages')
-  })
+    mockSearchParams.delete("q");
+    mockSearchParams.delete("minPrice");
+    mockSearchParams.delete("maxPrice");
+    mockSearchParams.delete("moveInDate");
+    mockSearchParams.delete("leaseDuration");
+    mockSearchParams.delete("roomType");
+    mockSearchParams.delete("lat");
+    mockSearchParams.delete("lng");
+    mockSearchParams.delete("genderPreference");
+    mockSearchParams.delete("householdGender");
+    mockSearchParams.delete("amenities");
+    mockSearchParams.delete("houseRules");
+    mockSearchParams.delete("languages");
+  });
 
   afterEach(() => {
-    jest.useRealTimers()
-  })
+    jest.useRealTimers();
+  });
 
   // ============================================
   // Rendering Tests - Default Variant
   // ============================================
 
-  describe('rendering - default variant', () => {
+  describe("rendering - default variant", () => {
     it('renders search form with role="search"', () => {
-      render(<SearchForm />)
-      expect(screen.getByRole('search')).toBeInTheDocument()
-    })
+      render(<SearchForm />);
+      expect(screen.getByRole("search")).toBeInTheDocument();
+    });
 
     it('renders "Where" label', () => {
-      render(<SearchForm />)
-      expect(screen.getByText('Where')).toBeInTheDocument()
-    })
+      render(<SearchForm />);
+      expect(screen.getByText("Where")).toBeInTheDocument();
+    });
 
     it('renders "Budget" label', () => {
-      render(<SearchForm />)
-      expect(screen.getByText('Budget')).toBeInTheDocument()
-    })
+      render(<SearchForm />);
+      expect(screen.getByText("Budget")).toBeInTheDocument();
+    });
 
-    it('renders location input', () => {
-      render(<SearchForm />)
-      expect(screen.getByTestId('location-input')).toBeInTheDocument()
-    })
+    it("renders location input", () => {
+      render(<SearchForm />);
+      expect(screen.getByTestId("location-input")).toBeInTheDocument();
+    });
 
-    it('renders min/max price inputs', () => {
-      render(<SearchForm />)
-      expect(screen.getByLabelText(/minimum budget/i)).toBeInTheDocument()
-      expect(screen.getByLabelText(/maximum budget/i)).toBeInTheDocument()
-    })
+    it("renders min/max price inputs", () => {
+      render(<SearchForm />);
+      expect(screen.getByLabelText(/minimum budget/i)).toBeInTheDocument();
+      expect(screen.getByLabelText(/maximum budget/i)).toBeInTheDocument();
+    });
 
-    it('renders Filters toggle button', () => {
-      render(<SearchForm />)
-      expect(screen.getByRole('button', { name: /filters/i })).toBeInTheDocument()
-    })
+    it("renders Filters toggle button", () => {
+      render(<SearchForm />);
+      expect(
+        screen.getByRole("button", { name: /filters/i })
+      ).toBeInTheDocument();
+    });
 
-    it('renders search button', () => {
-      render(<SearchForm />)
-      expect(screen.getByRole('button', { name: /search/i })).toBeInTheDocument()
-    })
-  })
+    it("renders search button", () => {
+      render(<SearchForm />);
+      expect(
+        screen.getByRole("button", { name: /search/i })
+      ).toBeInTheDocument();
+    });
+  });
 
   // ============================================
   // Rendering Tests - Compact Variant
   // ============================================
 
-  describe('rendering - compact variant', () => {
+  describe("rendering - compact variant", () => {
     it('does not render "Where" label', () => {
-      render(<SearchForm variant="compact" />)
-      expect(screen.queryByText('Where')).not.toBeInTheDocument()
-    })
+      render(<SearchForm variant="compact" />);
+      expect(screen.queryByText("Where")).not.toBeInTheDocument();
+    });
 
     it('does not render "Budget" label', () => {
-      render(<SearchForm variant="compact" />)
-      expect(screen.queryByText('Budget')).not.toBeInTheDocument()
-    })
+      render(<SearchForm variant="compact" />);
+      expect(screen.queryByText("Budget")).not.toBeInTheDocument();
+    });
 
-    it('does not render Filters toggle button', () => {
-      render(<SearchForm variant="compact" />)
-      expect(screen.queryByRole('button', { name: /filters/i })).not.toBeInTheDocument()
-    })
+    it("does not render Filters toggle button", () => {
+      render(<SearchForm variant="compact" />);
+      expect(
+        screen.queryByRole("button", { name: /filters/i })
+      ).not.toBeInTheDocument();
+    });
 
-    it('renders search button with smaller size', () => {
-      render(<SearchForm variant="compact" />)
-      const searchButton = screen.getByRole('button', { name: /search/i })
-      expect(searchButton).toBeInTheDocument()
-    })
-  })
+    it("renders search button with smaller size", () => {
+      render(<SearchForm variant="compact" />);
+      const searchButton = screen.getByRole("button", { name: /search/i });
+      expect(searchButton).toBeInTheDocument();
+    });
+  });
 
   // ============================================
   // URL Parameter Initialization Tests
   // ============================================
 
-  describe('URL parameter initialization', () => {
-    it('initializes location from q param', () => {
-      mockSearchParams.set('q', 'downtown')
-      render(<SearchForm />)
-      expect(screen.getByTestId('location-input')).toHaveValue('downtown')
-    })
+  describe("URL parameter initialization", () => {
+    it("initializes location from q param", () => {
+      mockSearchParams.set("q", "downtown");
+      render(<SearchForm />);
+      expect(screen.getByTestId("location-input")).toHaveValue("downtown");
+    });
 
-    it('initializes minPrice from URL', () => {
-      mockSearchParams.set('minPrice', '500')
-      render(<SearchForm />)
-      expect(screen.getByLabelText(/minimum budget/i)).toHaveValue(500)
-    })
+    it("initializes minPrice from URL", () => {
+      mockSearchParams.set("minPrice", "500");
+      render(<SearchForm />);
+      expect(screen.getByLabelText(/minimum budget/i)).toHaveValue(500);
+    });
 
-    it('initializes maxPrice from URL', () => {
-      mockSearchParams.set('maxPrice', '1500')
-      render(<SearchForm />)
-      expect(screen.getByLabelText(/maximum budget/i)).toHaveValue(1500)
-    })
+    it("initializes maxPrice from URL", () => {
+      mockSearchParams.set("maxPrice", "1500");
+      render(<SearchForm />);
+      expect(screen.getByLabelText(/maximum budget/i)).toHaveValue(1500);
+    });
 
-    it('initializes coordinates from URL', () => {
-      mockSearchParams.set('lat', '37.7749')
-      mockSearchParams.set('lng', '-122.4194')
-      render(<SearchForm />)
+    it("initializes coordinates from URL", () => {
+      mockSearchParams.set("lat", "37.7749");
+      mockSearchParams.set("lng", "-122.4194");
+      render(<SearchForm />);
       // The component should have coords initialized
       // This is verified indirectly through the form submission behavior
-      expect(screen.getByTestId('location-input')).toBeInTheDocument()
-    })
-  })
+      expect(screen.getByTestId("location-input")).toBeInTheDocument();
+    });
+  });
 
   // ============================================
   // Filter Panel Tests
   // ============================================
 
-  describe('filter panel', () => {
-    it('filters panel is hidden by default', () => {
-      render(<SearchForm />)
-      expect(screen.queryByText('Move-in Date')).not.toBeInTheDocument()
-    })
+  describe("filter panel", () => {
+    it("filters panel is hidden by default", () => {
+      render(<SearchForm />);
+      expect(screen.queryByText("Move-in Date")).not.toBeInTheDocument();
+    });
 
-    it('clicking Filters button toggles panel', async () => {
-      render(<SearchForm />)
-      const filtersButton = screen.getByRole('button', { name: /filters/i })
+    it("clicking Filters button toggles panel", async () => {
+      render(<SearchForm />);
+      const filtersButton = screen.getByRole("button", { name: /filters/i });
 
-      await user.click(filtersButton)
-      jest.runAllTimers()
+      await user.click(filtersButton);
+      jest.runAllTimers();
 
-      expect(screen.getByText('Move-in Date')).toBeInTheDocument()
-      expect(screen.getByText('Lease Duration')).toBeInTheDocument()
-      expect(screen.getByText('Room Type')).toBeInTheDocument()
-    })
+      expect(screen.getByText("Move-in Date")).toBeInTheDocument();
+      expect(screen.getByText("Lease Duration")).toBeInTheDocument();
+      expect(screen.getByText("Room Type")).toBeInTheDocument();
+    });
 
-    it('panel shows amenities buttons', async () => {
-      render(<SearchForm />)
-      await user.click(screen.getByRole('button', { name: /filters/i }))
-      jest.runAllTimers()
+    it("panel shows amenities buttons", async () => {
+      render(<SearchForm />);
+      await user.click(screen.getByRole("button", { name: /filters/i }));
+      jest.runAllTimers();
 
-      expect(screen.getByRole('button', { name: 'Wifi' })).toBeInTheDocument()
-      expect(screen.getByRole('button', { name: 'AC' })).toBeInTheDocument()
-      expect(screen.getByRole('button', { name: 'Parking' })).toBeInTheDocument()
-    })
+      expect(screen.getByRole("button", { name: "Wifi" })).toBeInTheDocument();
+      expect(screen.getByRole("button", { name: "AC" })).toBeInTheDocument();
+      expect(
+        screen.getByRole("button", { name: "Parking" })
+      ).toBeInTheDocument();
+    });
 
-    it('panel shows house rules buttons', async () => {
-      render(<SearchForm />)
-      await user.click(screen.getByRole('button', { name: /filters/i }))
-      jest.runAllTimers()
+    it("panel shows house rules buttons", async () => {
+      render(<SearchForm />);
+      await user.click(screen.getByRole("button", { name: /filters/i }));
+      jest.runAllTimers();
 
-      expect(screen.getByRole('button', { name: 'Pets allowed' })).toBeInTheDocument()
-      expect(screen.getByRole('button', { name: 'Smoking allowed' })).toBeInTheDocument()
-    })
+      expect(
+        screen.getByRole("button", { name: "Pets allowed" })
+      ).toBeInTheDocument();
+      expect(
+        screen.getByRole("button", { name: "Smoking allowed" })
+      ).toBeInTheDocument();
+    });
 
-    it('panel shows languages buttons', async () => {
-      render(<SearchForm />)
-      await user.click(screen.getByRole('button', { name: /filters/i }))
-      jest.runAllTimers()
+    it("panel shows languages buttons", async () => {
+      render(<SearchForm />);
+      await user.click(screen.getByRole("button", { name: /filters/i }));
+      jest.runAllTimers();
 
-      expect(screen.getByRole('button', { name: 'English' })).toBeInTheDocument()
-      expect(screen.getByRole('button', { name: 'Spanish' })).toBeInTheDocument()
-    })
-  })
+      expect(
+        screen.getByRole("button", { name: "English" })
+      ).toBeInTheDocument();
+      expect(
+        screen.getByRole("button", { name: "Spanish" })
+      ).toBeInTheDocument();
+    });
+  });
 
   // ============================================
   // Amenity Toggle Tests
   // ============================================
 
-  describe('amenity toggle', () => {
-    it('toggleAmenity adds amenity when clicked', async () => {
-      render(<SearchForm />)
-      await user.click(screen.getByRole('button', { name: /filters/i }))
-      jest.runAllTimers()
+  describe("amenity toggle", () => {
+    it("toggleAmenity adds amenity when clicked", async () => {
+      render(<SearchForm />);
+      await user.click(screen.getByRole("button", { name: /filters/i }));
+      jest.runAllTimers();
 
-      const wifiButton = screen.getByRole('button', { name: 'Wifi' })
-      expect(wifiButton).toHaveAttribute('aria-pressed', 'false')
+      const wifiButton = screen.getByRole("button", { name: "Wifi" });
+      expect(wifiButton).toHaveAttribute("aria-pressed", "false");
 
-      await user.click(wifiButton)
-      expect(wifiButton).toHaveAttribute('aria-pressed', 'true')
-    })
+      await user.click(wifiButton);
+      expect(wifiButton).toHaveAttribute("aria-pressed", "true");
+    });
 
-    it('toggleAmenity removes amenity when already selected', async () => {
-      render(<SearchForm />)
-      await user.click(screen.getByRole('button', { name: /filters/i }))
-      jest.runAllTimers()
+    it("toggleAmenity removes amenity when already selected", async () => {
+      render(<SearchForm />);
+      await user.click(screen.getByRole("button", { name: /filters/i }));
+      jest.runAllTimers();
 
-      const wifiButton = screen.getByRole('button', { name: 'Wifi' })
+      const wifiButton = screen.getByRole("button", { name: "Wifi" });
 
       // Click to add
-      await user.click(wifiButton)
-      expect(wifiButton).toHaveAttribute('aria-pressed', 'true')
+      await user.click(wifiButton);
+      expect(wifiButton).toHaveAttribute("aria-pressed", "true");
 
       // Click to remove
-      await user.click(wifiButton)
-      expect(wifiButton).toHaveAttribute('aria-pressed', 'false')
-    })
+      await user.click(wifiButton);
+      expect(wifiButton).toHaveAttribute("aria-pressed", "false");
+    });
 
-    it('multiple amenities can be selected', async () => {
-      render(<SearchForm />)
-      await user.click(screen.getByRole('button', { name: /filters/i }))
-      jest.runAllTimers()
+    it("multiple amenities can be selected", async () => {
+      render(<SearchForm />);
+      await user.click(screen.getByRole("button", { name: /filters/i }));
+      jest.runAllTimers();
 
-      const wifiButton = screen.getByRole('button', { name: 'Wifi' })
-      const parkingButton = screen.getByRole('button', { name: 'Parking' })
+      const wifiButton = screen.getByRole("button", { name: "Wifi" });
+      const parkingButton = screen.getByRole("button", { name: "Parking" });
 
-      await user.click(wifiButton)
-      await user.click(parkingButton)
+      await user.click(wifiButton);
+      await user.click(parkingButton);
 
-      expect(wifiButton).toHaveAttribute('aria-pressed', 'true')
-      expect(parkingButton).toHaveAttribute('aria-pressed', 'true')
-    })
-  })
+      expect(wifiButton).toHaveAttribute("aria-pressed", "true");
+      expect(parkingButton).toHaveAttribute("aria-pressed", "true");
+    });
+  });
 
   // ============================================
   // House Rules Toggle Tests
   // ============================================
 
-  describe('house rules toggle', () => {
-    it('toggleHouseRule adds rule when clicked', async () => {
-      render(<SearchForm />)
-      await user.click(screen.getByRole('button', { name: /filters/i }))
-      jest.runAllTimers()
+  describe("house rules toggle", () => {
+    it("toggleHouseRule adds rule when clicked", async () => {
+      render(<SearchForm />);
+      await user.click(screen.getByRole("button", { name: /filters/i }));
+      jest.runAllTimers();
 
-      const petsButton = screen.getByRole('button', { name: 'Pets allowed' })
-      expect(petsButton).toHaveAttribute('aria-pressed', 'false')
+      const petsButton = screen.getByRole("button", { name: "Pets allowed" });
+      expect(petsButton).toHaveAttribute("aria-pressed", "false");
 
-      await user.click(petsButton)
-      expect(petsButton).toHaveAttribute('aria-pressed', 'true')
-    })
+      await user.click(petsButton);
+      expect(petsButton).toHaveAttribute("aria-pressed", "true");
+    });
 
-    it('toggleHouseRule removes rule when already selected', async () => {
-      render(<SearchForm />)
-      await user.click(screen.getByRole('button', { name: /filters/i }))
-      jest.runAllTimers()
+    it("toggleHouseRule removes rule when already selected", async () => {
+      render(<SearchForm />);
+      await user.click(screen.getByRole("button", { name: /filters/i }));
+      jest.runAllTimers();
 
-      const petsButton = screen.getByRole('button', { name: 'Pets allowed' })
+      const petsButton = screen.getByRole("button", { name: "Pets allowed" });
 
-      await user.click(petsButton)
-      expect(petsButton).toHaveAttribute('aria-pressed', 'true')
+      await user.click(petsButton);
+      expect(petsButton).toHaveAttribute("aria-pressed", "true");
 
-      await user.click(petsButton)
-      expect(petsButton).toHaveAttribute('aria-pressed', 'false')
-    })
-  })
+      await user.click(petsButton);
+      expect(petsButton).toHaveAttribute("aria-pressed", "false");
+    });
+  });
 
   // ============================================
   // Language Toggle Tests
   // ============================================
 
-  describe('language toggle', () => {
-    it('toggleLanguage adds language when clicked', async () => {
-      render(<SearchForm />)
-      await user.click(screen.getByRole('button', { name: /filters/i }))
-      jest.runAllTimers()
+  describe("language toggle", () => {
+    it("toggleLanguage adds language when clicked", async () => {
+      render(<SearchForm />);
+      await user.click(screen.getByRole("button", { name: /filters/i }));
+      jest.runAllTimers();
 
       // Initially, English is in "Available languages" with aria-pressed="false"
-      const englishButton = screen.getByRole('button', { name: 'English' })
-      expect(englishButton).toHaveAttribute('aria-pressed', 'false')
+      const englishButton = screen.getByRole("button", { name: "English" });
+      expect(englishButton).toHaveAttribute("aria-pressed", "false");
 
-      await user.click(englishButton)
+      await user.click(englishButton);
 
       // After clicking, the button moves to "Selected languages" section with aria-pressed="true"
       // We need to re-query since it's a different DOM element now
-      const selectedEnglishButton = screen.getByRole('button', { name: /English/i })
-      expect(selectedEnglishButton).toHaveAttribute('aria-pressed', 'true')
-    })
+      const selectedEnglishButton = screen.getByRole("button", {
+        name: /English/i,
+      });
+      expect(selectedEnglishButton).toHaveAttribute("aria-pressed", "true");
+    });
 
-    it('toggleLanguage removes language when already selected', async () => {
-      render(<SearchForm />)
-      await user.click(screen.getByRole('button', { name: /filters/i }))
-      jest.runAllTimers()
+    it("toggleLanguage removes language when already selected", async () => {
+      render(<SearchForm />);
+      await user.click(screen.getByRole("button", { name: /filters/i }));
+      jest.runAllTimers();
 
       // Click to select English - it moves to "Selected languages" section
-      const englishButton = screen.getByRole('button', { name: 'English' })
-      await user.click(englishButton)
+      const englishButton = screen.getByRole("button", { name: "English" });
+      await user.click(englishButton);
 
       // Re-query: button is now in "Selected languages" with aria-pressed="true"
-      const selectedEnglishButton = screen.getByRole('button', { name: /English/i })
-      expect(selectedEnglishButton).toHaveAttribute('aria-pressed', 'true')
+      const selectedEnglishButton = screen.getByRole("button", {
+        name: /English/i,
+      });
+      expect(selectedEnglishButton).toHaveAttribute("aria-pressed", "true");
 
       // Click to deselect - it moves back to "Available languages" section
-      await user.click(selectedEnglishButton)
+      await user.click(selectedEnglishButton);
 
       // Re-query: button is back in "Available languages" with aria-pressed="false"
-      const availableEnglishButton = screen.getByRole('button', { name: 'English' })
-      expect(availableEnglishButton).toHaveAttribute('aria-pressed', 'false')
-    })
-  })
+      const availableEnglishButton = screen.getByRole("button", {
+        name: "English",
+      });
+      expect(availableEnglishButton).toHaveAttribute("aria-pressed", "false");
+    });
+  });
 
   // ============================================
   // Price Input Tests
   // ============================================
 
-  describe('price inputs', () => {
-    it('accepts positive numbers', async () => {
-      render(<SearchForm />)
-      const minInput = screen.getByLabelText(/minimum budget/i)
+  describe("price inputs", () => {
+    it("accepts positive numbers", async () => {
+      render(<SearchForm />);
+      const minInput = screen.getByLabelText(/minimum budget/i);
 
-      await user.clear(minInput)
-      await user.type(minInput, '500')
+      await user.clear(minInput);
+      await user.type(minInput, "500");
 
-      expect(minInput).toHaveValue(500)
-    })
+      expect(minInput).toHaveValue(500);
+    });
 
-    it('handles decimal values', async () => {
-      render(<SearchForm />)
-      const minInput = screen.getByLabelText(/minimum budget/i)
+    it("handles decimal values", async () => {
+      render(<SearchForm />);
+      const minInput = screen.getByLabelText(/minimum budget/i);
 
-      await user.clear(minInput)
-      await user.type(minInput, '500.50')
+      await user.clear(minInput);
+      await user.type(minInput, "500.50");
 
-      expect(minInput).toHaveValue(500.5)
-    })
+      expect(minInput).toHaveValue(500.5);
+    });
 
-    it('handles empty values', async () => {
-      render(<SearchForm />)
-      const minInput = screen.getByLabelText(/minimum budget/i)
+    it("handles empty values", async () => {
+      render(<SearchForm />);
+      const minInput = screen.getByLabelText(/minimum budget/i);
 
-      await user.clear(minInput)
+      await user.clear(minInput);
 
-      expect(minInput).toHaveValue(null)
-    })
-  })
+      expect(minInput).toHaveValue(null);
+    });
+  });
 
   // ============================================
   // Location Handling Tests
   // ============================================
 
-  describe('location handling', () => {
-    it('clears coordinates when user types in location', async () => {
-      mockSearchParams.set('lat', '37.7749')
-      mockSearchParams.set('lng', '-122.4194')
-      render(<SearchForm />)
+  describe("location handling", () => {
+    it("clears coordinates when user types in location", async () => {
+      mockSearchParams.set("lat", "37.7749");
+      mockSearchParams.set("lng", "-122.4194");
+      render(<SearchForm />);
 
-      const locationInput = screen.getByTestId('location-input')
-      await user.type(locationInput, 'new location')
+      const locationInput = screen.getByTestId("location-input");
+      await user.type(locationInput, "new location");
 
       // After typing, the internal coords should be cleared
       // This is verified by the form submission not including lat/lng
-    })
+    });
 
-    it('sets coordinates when location selected from dropdown', async () => {
-      render(<SearchForm />)
+    it("sets coordinates when location selected from dropdown", async () => {
+      render(<SearchForm />);
 
-      const selectButton = screen.getByTestId('select-location')
-      await user.click(selectButton)
+      const selectButton = screen.getByTestId("select-location");
+      await user.click(selectButton);
 
       // Verify the selection happened - coords are now set internally
-    })
+    });
 
-    it('dispatches MAP_FLY_TO_EVENT on location select', async () => {
-      render(<SearchForm />)
+    it("dispatches MAP_FLY_TO_EVENT on location select", async () => {
+      render(<SearchForm />);
 
-      const eventListener = jest.fn()
-      window.addEventListener(MAP_FLY_TO_EVENT, eventListener)
+      const eventListener = jest.fn();
+      window.addEventListener(MAP_FLY_TO_EVENT, eventListener);
 
-      const selectButton = screen.getByTestId('select-location')
-      await user.click(selectButton)
+      const selectButton = screen.getByTestId("select-location");
+      await user.click(selectButton);
 
-      expect(eventListener).toHaveBeenCalled()
+      expect(eventListener).toHaveBeenCalled();
 
-      window.removeEventListener(MAP_FLY_TO_EVENT, eventListener)
-    })
+      window.removeEventListener(MAP_FLY_TO_EVENT, eventListener);
+    });
 
-    it('shows warning when location typed but not selected', async () => {
-      render(<SearchForm />)
+    it("shows warning when location typed but not selected", async () => {
+      render(<SearchForm />);
 
-      const locationInput = screen.getByTestId('location-input')
-      await user.type(locationInput, 'San Francisco')
+      const locationInput = screen.getByTestId("location-input");
+      await user.type(locationInput, "San Francisco");
 
-      expect(screen.getByText(/select a location from the dropdown/i)).toBeInTheDocument()
-    })
+      expect(
+        screen.getByText(/select a location from the dropdown/i)
+      ).toBeInTheDocument();
+    });
 
-    it('hides warning in compact mode', async () => {
-      render(<SearchForm variant="compact" />)
+    it("hides warning in compact mode", async () => {
+      render(<SearchForm variant="compact" />);
 
-      const locationInput = screen.getByTestId('location-input')
-      await user.type(locationInput, 'San Francisco')
+      const locationInput = screen.getByTestId("location-input");
+      await user.type(locationInput, "San Francisco");
 
-      expect(screen.queryByText(/select a location from the dropdown/i)).not.toBeInTheDocument()
-    })
-  })
+      expect(
+        screen.queryByText(/select a location from the dropdown/i)
+      ).not.toBeInTheDocument();
+    });
+  });
 
   // ============================================
   // Clear All Filters Tests
   // ============================================
 
-  describe('clear all filters', () => {
-    it('clear button does not show when no filters active', async () => {
-      render(<SearchForm />)
-      await user.click(screen.getByRole('button', { name: /filters/i }))
-      jest.runAllTimers()
+  describe("clear all filters", () => {
+    it("clear button does not show when no filters active", async () => {
+      render(<SearchForm />);
+      await user.click(screen.getByRole("button", { name: /filters/i }));
+      jest.runAllTimers();
 
-      expect(screen.queryByText('Clear all')).not.toBeInTheDocument()
-    })
+      expect(screen.queryByText("Clear all")).not.toBeInTheDocument();
+    });
 
-    it('clear button shows when committed filters are active', async () => {
-      mockSearchParams.set('amenities', 'Wifi')
-      render(<SearchForm />)
-      await user.click(screen.getByRole('button', { name: /filters/i }))
-      jest.runAllTimers()
+    it("clear button shows when committed filters are active", async () => {
+      mockSearchParams.set("amenities", "Wifi");
+      render(<SearchForm />);
+      await user.click(screen.getByRole("button", { name: /filters/i }));
+      jest.runAllTimers();
 
-      expect(screen.getByText('Clear all')).toBeInTheDocument()
-    })
+      expect(screen.getByText("Clear all")).toBeInTheDocument();
+    });
 
-    it('clear button resets all filter states', async () => {
-      mockSearchParams.set('amenities', 'Wifi')
-      render(<SearchForm />)
-      await user.click(screen.getByRole('button', { name: /filters/i }))
-      jest.runAllTimers()
+    it("clear button resets all filter states", async () => {
+      mockSearchParams.set("amenities", "Wifi");
+      render(<SearchForm />);
+      await user.click(screen.getByRole("button", { name: /filters/i }));
+      jest.runAllTimers();
 
       // Clear all
-      await user.click(screen.getByText('Clear all'))
-      jest.runAllTimers()
+      await user.click(screen.getByText("Clear all"));
+      jest.runAllTimers();
 
       // Should navigate to clean search
-      expect(mockPush).toHaveBeenCalledWith('/search')
-    })
-  })
+      expect(mockPush).toHaveBeenCalledWith("/search");
+    });
+  });
 
   // ============================================
   // Form Submission Tests
   // ============================================
 
-  describe('form submission', () => {
-    it('submits form and calls router.push', async () => {
-      render(<SearchForm />)
+  describe("form submission", () => {
+    it("submits form and calls router.push", async () => {
+      render(<SearchForm />);
 
-      const locationInput = screen.getByTestId('location-input')
-      await user.type(locationInput, 'downtown')
+      const locationInput = screen.getByTestId("location-input");
+      await user.type(locationInput, "downtown");
 
       // Select location to set coords — handleLocationSelect calls requestSubmit() automatically
-      await user.click(screen.getByTestId('select-location'))
+      await user.click(screen.getByTestId("select-location"));
 
-      jest.advanceTimersByTime(500)
+      jest.advanceTimersByTime(500);
 
-      expect(mockPush).toHaveBeenCalled()
-    })
+      expect(mockPush).toHaveBeenCalled();
+    });
 
-    it('trims location input', async () => {
-      render(<SearchForm />)
+    it("trims location input", async () => {
+      render(<SearchForm />);
 
-      const locationInput = screen.getByTestId('location-input')
-      await user.type(locationInput, '  downtown  ')
+      const locationInput = screen.getByTestId("location-input");
+      await user.type(locationInput, "  downtown  ");
 
       // Select location — handleLocationSelect calls requestSubmit() automatically
-      await user.click(screen.getByTestId('select-location'))
+      await user.click(screen.getByTestId("select-location"));
 
-      jest.advanceTimersByTime(500)
+      jest.advanceTimersByTime(500);
 
-      const pushCall = mockPush.mock.calls[0][0]
-      expect(pushCall).toContain('q=downtown')
-    })
+      const pushCall = mockPush.mock.calls[0][0];
+      expect(pushCall).toContain("q=downtown");
+    });
 
-    it('only includes q param if 2+ chars', async () => {
-      render(<SearchForm />)
+    it("only includes q param if 2+ chars", async () => {
+      render(<SearchForm />);
 
-      const locationInput = screen.getByTestId('location-input')
-      await user.type(locationInput, 'a')
+      const locationInput = screen.getByTestId("location-input");
+      await user.type(locationInput, "a");
 
-      const form = screen.getByRole('search')
-      fireEvent.submit(form)
+      const form = screen.getByRole("search");
+      fireEvent.submit(form);
 
-      jest.advanceTimersByTime(500)
+      jest.advanceTimersByTime(500);
 
-      const pushCall = mockPush.mock.calls[0][0]
-      expect(pushCall).not.toContain('q=')
-    })
+      const pushCall = mockPush.mock.calls[0][0];
+      expect(pushCall).not.toContain("q=");
+    });
 
-    it('shows loading state during search', async () => {
-      render(<SearchForm />)
+    it("shows loading state during search", async () => {
+      render(<SearchForm />);
 
-      const form = screen.getByRole('search')
-      fireEvent.submit(form)
+      const form = screen.getByRole("search");
+      fireEvent.submit(form);
 
-      const searchButton = screen.getByRole('button', { name: /searching/i })
-      expect(searchButton).toBeDisabled()
-    })
+      const searchButton = screen.getByRole("button", { name: /searching/i });
+      expect(searchButton).toBeDisabled();
+    });
 
-    it('disables button during search', async () => {
-      render(<SearchForm />)
+    it("disables button during search", async () => {
+      render(<SearchForm />);
 
-      const form = screen.getByRole('search')
-      fireEvent.submit(form)
+      const form = screen.getByRole("search");
+      fireEvent.submit(form);
 
-      const searchButton = screen.getByRole('button', { name: /searching/i })
-      expect(searchButton).toBeDisabled()
-    })
-  })
+      const searchButton = screen.getByRole("button", { name: /searching/i });
+      expect(searchButton).toBeDisabled();
+    });
+  });
 
   // ============================================
   // Accessibility Tests
   // ============================================
 
-  describe('accessibility', () => {
-    it('has search landmark role', () => {
-      render(<SearchForm />)
-      expect(screen.getByRole('search')).toBeInTheDocument()
-    })
+  describe("accessibility", () => {
+    it("has search landmark role", () => {
+      render(<SearchForm />);
+      expect(screen.getByRole("search")).toBeInTheDocument();
+    });
 
-    it('price inputs have aria-labels', () => {
-      render(<SearchForm />)
-      expect(screen.getByLabelText(/minimum budget/i)).toBeInTheDocument()
-      expect(screen.getByLabelText(/maximum budget/i)).toBeInTheDocument()
-    })
+    it("price inputs have aria-labels", () => {
+      render(<SearchForm />);
+      expect(screen.getByLabelText(/minimum budget/i)).toBeInTheDocument();
+      expect(screen.getByLabelText(/maximum budget/i)).toBeInTheDocument();
+    });
 
-    it('amenity buttons have aria-pressed', async () => {
-      render(<SearchForm />)
-      await user.click(screen.getByRole('button', { name: /filters/i }))
-      jest.runAllTimers()
+    it("amenity buttons have aria-pressed", async () => {
+      render(<SearchForm />);
+      await user.click(screen.getByRole("button", { name: /filters/i }));
+      jest.runAllTimers();
 
-      const wifiButton = screen.getByRole('button', { name: 'Wifi' })
-      expect(wifiButton).toHaveAttribute('aria-pressed')
-    })
+      const wifiButton = screen.getByRole("button", { name: "Wifi" });
+      expect(wifiButton).toHaveAttribute("aria-pressed");
+    });
 
-    it('house rule buttons have aria-pressed', async () => {
-      render(<SearchForm />)
-      await user.click(screen.getByRole('button', { name: /filters/i }))
-      jest.runAllTimers()
+    it("house rule buttons have aria-pressed", async () => {
+      render(<SearchForm />);
+      await user.click(screen.getByRole("button", { name: /filters/i }));
+      jest.runAllTimers();
 
-      const petsButton = screen.getByRole('button', { name: 'Pets allowed' })
-      expect(petsButton).toHaveAttribute('aria-pressed')
-    })
+      const petsButton = screen.getByRole("button", { name: "Pets allowed" });
+      expect(petsButton).toHaveAttribute("aria-pressed");
+    });
 
-    it('language buttons have aria-pressed', async () => {
-      render(<SearchForm />)
-      await user.click(screen.getByRole('button', { name: /filters/i }))
-      jest.runAllTimers()
+    it("language buttons have aria-pressed", async () => {
+      render(<SearchForm />);
+      await user.click(screen.getByRole("button", { name: /filters/i }));
+      jest.runAllTimers();
 
-      const englishButton = screen.getByRole('button', { name: 'English' })
-      expect(englishButton).toHaveAttribute('aria-pressed')
-    })
+      const englishButton = screen.getByRole("button", { name: "English" });
+      expect(englishButton).toHaveAttribute("aria-pressed");
+    });
 
-    it('search button has aria-busy when searching', async () => {
-      render(<SearchForm />)
+    it("search button has aria-busy when searching", async () => {
+      render(<SearchForm />);
 
-      const form = screen.getByRole('search')
-      fireEvent.submit(form)
+      const form = screen.getByRole("search");
+      fireEvent.submit(form);
 
-      const searchButton = screen.getByRole('button', { name: /searching/i })
-      expect(searchButton).toHaveAttribute('aria-busy', 'true')
-    })
+      const searchButton = screen.getByRole("button", { name: /searching/i });
+      expect(searchButton).toHaveAttribute("aria-busy", "true");
+    });
 
-    it('filter panel has aria-controls/aria-expanded', async () => {
-      render(<SearchForm />)
+    it("filter panel has aria-controls/aria-expanded", async () => {
+      render(<SearchForm />);
 
-      const filtersButton = screen.getByRole('button', { name: /filters/i })
-      expect(filtersButton).toHaveAttribute('aria-expanded', 'false')
+      const filtersButton = screen.getByRole("button", { name: /filters/i });
+      expect(filtersButton).toHaveAttribute("aria-expanded", "false");
       // aria-controls is only set when the modal is open (valid ARIA pattern)
-      expect(filtersButton).not.toHaveAttribute('aria-controls')
+      expect(filtersButton).not.toHaveAttribute("aria-controls");
 
       // Open the filter modal — aria-controls should now be set
-      await user.click(filtersButton)
-      jest.runAllTimers()
-      expect(filtersButton).toHaveAttribute('aria-expanded', 'true')
-      expect(filtersButton).toHaveAttribute('aria-controls', 'search-filters')
-    })
-  })
+      await user.click(filtersButton);
+      jest.runAllTimers();
+      expect(filtersButton).toHaveAttribute("aria-expanded", "true");
+      expect(filtersButton).toHaveAttribute("aria-controls", "search-filters");
+    });
+  });
 
   // ============================================
   // Debounce Tests
   // ============================================
 
-  describe('debouncing', () => {
-    it('debounces rapid submissions', async () => {
-      render(<SearchForm />)
+  describe("debouncing", () => {
+    it("debounces rapid submissions", async () => {
+      render(<SearchForm />);
 
-      const form = screen.getByRole('search')
+      const form = screen.getByRole("search");
 
       // Submit form once
-      fireEvent.submit(form)
+      fireEvent.submit(form);
 
       // Advance past the 300ms debounce
-      jest.advanceTimersByTime(400)
+      jest.advanceTimersByTime(400);
 
       // Should have called push after debounce
-      expect(mockPush).toHaveBeenCalled()
-    })
-  })
+      expect(mockPush).toHaveBeenCalled();
+    });
+  });
 
   // ============================================
   // Stale URL Parameter Cleanup Tests
   // ============================================
 
-  describe('stale URL parameter cleanup', () => {
-    describe('clearing single-value filters removes them from URL', () => {
-      it('removes moveInDate from URL when value is invalid (past date)', async () => {
+  describe("stale URL parameter cleanup", () => {
+    describe("clearing single-value filters removes them from URL", () => {
+      it("removes moveInDate from URL when value is invalid (past date)", async () => {
         // Past dates are rejected by validation, so stale past date should not persist
-        mockSearchParams.set('moveInDate', '2024-06-01')
-        mockSearchParams.set('lat', '37.7749')
-        mockSearchParams.set('lng', '-122.4194')
-        render(<SearchForm />)
+        mockSearchParams.set("moveInDate", "2024-06-01");
+        mockSearchParams.set("lat", "37.7749");
+        mockSearchParams.set("lng", "-122.4194");
+        render(<SearchForm />);
 
-        const form = screen.getByRole('search')
-        fireEvent.submit(form)
-        jest.advanceTimersByTime(500)
+        const form = screen.getByRole("search");
+        fireEvent.submit(form);
+        jest.advanceTimersByTime(500);
 
-        const pushCall = mockPush.mock.calls[0]?.[0] ?? ''
-        expect(pushCall).not.toContain('moveInDate')
-      })
+        const pushCall = mockPush.mock.calls[0]?.[0] ?? "";
+        expect(pushCall).not.toContain("moveInDate");
+      });
 
-      it('removes roomType from URL when value is invalid', async () => {
+      it("removes roomType from URL when value is invalid", async () => {
         // Invalid roomType values should be rejected and not persist
-        mockSearchParams.set('roomType', 'InvalidRoomType')
-        mockSearchParams.set('lat', '37.7749')
-        mockSearchParams.set('lng', '-122.4194')
-        render(<SearchForm />)
+        mockSearchParams.set("roomType", "InvalidRoomType");
+        mockSearchParams.set("lat", "37.7749");
+        mockSearchParams.set("lng", "-122.4194");
+        render(<SearchForm />);
 
-        const form = screen.getByRole('search')
-        fireEvent.submit(form)
-        jest.advanceTimersByTime(500)
+        const form = screen.getByRole("search");
+        fireEvent.submit(form);
+        jest.advanceTimersByTime(500);
 
-        const pushCall = mockPush.mock.calls[0]?.[0] ?? ''
-        expect(pushCall).not.toContain('roomType')
-      })
+        const pushCall = mockPush.mock.calls[0]?.[0] ?? "";
+        expect(pushCall).not.toContain("roomType");
+      });
 
-      it('removes genderPreference from URL when value is invalid', async () => {
+      it("removes genderPreference from URL when value is invalid", async () => {
         // Invalid genderPreference values should be rejected and not persist
-        mockSearchParams.set('genderPreference', 'INVALID_VALUE')
-        mockSearchParams.set('lat', '37.7749')
-        mockSearchParams.set('lng', '-122.4194')
-        render(<SearchForm />)
+        mockSearchParams.set("genderPreference", "INVALID_VALUE");
+        mockSearchParams.set("lat", "37.7749");
+        mockSearchParams.set("lng", "-122.4194");
+        render(<SearchForm />);
 
-        const form = screen.getByRole('search')
-        fireEvent.submit(form)
-        jest.advanceTimersByTime(500)
+        const form = screen.getByRole("search");
+        fireEvent.submit(form);
+        jest.advanceTimersByTime(500);
 
-        const pushCall = mockPush.mock.calls[0]?.[0] ?? ''
-        expect(pushCall).not.toContain('genderPreference')
-      })
-    })
+        const pushCall = mockPush.mock.calls[0]?.[0] ?? "";
+        expect(pushCall).not.toContain("genderPreference");
+      });
+    });
 
-    describe('location change clears old location params', () => {
-      it('removes old q/lat/lng when location is cleared', async () => {
-        mockSearchParams.set('q', 'San Francisco')
-        mockSearchParams.set('lat', '37.7749')
-        mockSearchParams.set('lng', '-122.4194')
-        render(<SearchForm />)
+    describe("location change clears old location params", () => {
+      it("removes old q/lat/lng when location is cleared", async () => {
+        mockSearchParams.set("q", "San Francisco");
+        mockSearchParams.set("lat", "37.7749");
+        mockSearchParams.set("lng", "-122.4194");
+        render(<SearchForm />);
 
-        const locationInput = screen.getByTestId('location-input')
-        await user.clear(locationInput)
+        const locationInput = screen.getByTestId("location-input");
+        await user.clear(locationInput);
 
-        const form = screen.getByRole('search')
-        fireEvent.submit(form)
-        jest.advanceTimersByTime(500)
+        const form = screen.getByRole("search");
+        fireEvent.submit(form);
+        jest.advanceTimersByTime(500);
 
-        const pushCall = mockPush.mock.calls[0]?.[0] ?? ''
-        expect(pushCall).not.toContain('q=San')
-        expect(pushCall).not.toContain('lat=')
-        expect(pushCall).not.toContain('lng=')
-      })
-    })
+        const pushCall = mockPush.mock.calls[0]?.[0] ?? "";
+        expect(pushCall).not.toContain("q=San");
+        expect(pushCall).not.toContain("lat=");
+        expect(pushCall).not.toContain("lng=");
+      });
+    });
 
-    describe('array filters do not accumulate', () => {
-      it('does not duplicate amenities on repeated searches', async () => {
-        mockSearchParams.set('amenities', 'Wifi')
-        mockSearchParams.append('amenities', 'AC')
-        mockSearchParams.set('lat', '37.7749')
-        mockSearchParams.set('lng', '-122.4194')
-        render(<SearchForm />)
+    describe("array filters do not accumulate", () => {
+      it("does not duplicate amenities on repeated searches", async () => {
+        mockSearchParams.set("amenities", "Wifi");
+        mockSearchParams.append("amenities", "AC");
+        mockSearchParams.set("lat", "37.7749");
+        mockSearchParams.set("lng", "-122.4194");
+        render(<SearchForm />);
 
-        const form = screen.getByRole('search')
-        fireEvent.submit(form)
-        jest.advanceTimersByTime(500)
+        const form = screen.getByRole("search");
+        fireEvent.submit(form);
+        jest.advanceTimersByTime(500);
 
-        const pushCall = mockPush.mock.calls[0]?.[0] ?? ''
-        const wifiMatches = (pushCall.match(/amenities=Wifi/g) || []).length
-        expect(wifiMatches).toBeLessThanOrEqual(1)
-      })
+        const pushCall = mockPush.mock.calls[0]?.[0] ?? "";
+        const wifiMatches = (pushCall.match(/amenities=Wifi/g) || []).length;
+        expect(wifiMatches).toBeLessThanOrEqual(1);
+      });
 
-      it('clears invalid amenities from URL', async () => {
+      it("clears invalid amenities from URL", async () => {
         // Invalid amenity values should not persist
-        mockSearchParams.set('amenities', 'InvalidAmenity')
-        mockSearchParams.set('lat', '37.7749')
-        mockSearchParams.set('lng', '-122.4194')
-        render(<SearchForm />)
+        mockSearchParams.set("amenities", "InvalidAmenity");
+        mockSearchParams.set("lat", "37.7749");
+        mockSearchParams.set("lng", "-122.4194");
+        render(<SearchForm />);
 
-        const form = screen.getByRole('search')
-        fireEvent.submit(form)
-        jest.advanceTimersByTime(500)
+        const form = screen.getByRole("search");
+        fireEvent.submit(form);
+        jest.advanceTimersByTime(500);
 
-        const pushCall = mockPush.mock.calls[0]?.[0] ?? ''
-        expect(pushCall).not.toContain('InvalidAmenity')
-      })
-    })
+        const pushCall = mockPush.mock.calls[0]?.[0] ?? "";
+        expect(pushCall).not.toContain("InvalidAmenity");
+      });
+    });
 
-    describe('Use My Location', () => {
-      const mockGetCurrentPosition = jest.fn()
+    describe("Use My Location", () => {
+      const mockGetCurrentPosition = jest.fn();
 
       beforeEach(() => {
-        mockToastError.mockClear()
-        Object.defineProperty(navigator, 'geolocation', {
+        mockToastError.mockClear();
+        Object.defineProperty(navigator, "geolocation", {
           value: { getCurrentPosition: mockGetCurrentPosition },
           writable: true,
           configurable: true,
-        })
-        mockGetCurrentPosition.mockReset()
-      })
+        });
+        mockGetCurrentPosition.mockReset();
+      });
 
-      it('sets lat/lng params on success without q param', async () => {
-        mockGetCurrentPosition.mockImplementation((success: PositionCallback) => {
-          success({ coords: { latitude: 40.7128, longitude: -74.006 } } as GeolocationPosition)
-        })
-        render(<SearchForm />)
+      it("sets lat/lng params on success without q param", async () => {
+        mockGetCurrentPosition.mockImplementation(
+          (success: PositionCallback) => {
+            success({
+              coords: { latitude: 40.7128, longitude: -74.006 },
+            } as GeolocationPosition);
+          }
+        );
+        render(<SearchForm />);
 
-        const btn = screen.getByRole('button', { name: /use my current location/i })
-        fireEvent.click(btn)
-        jest.advanceTimersByTime(500)
+        const btn = screen.getByRole("button", {
+          name: /use my current location/i,
+        });
+        fireEvent.click(btn);
+        jest.advanceTimersByTime(500);
 
         await waitFor(() => {
-          expect(mockPush).toHaveBeenCalled()
-        })
-        const pushCall = mockPush.mock.calls[0]?.[0] ?? ''
-        expect(pushCall).toContain('lat=40.7128')
-        expect(pushCall).toContain('lng=-74.006')
-        expect(pushCall).not.toContain('q=')
-      })
+          expect(mockPush).toHaveBeenCalled();
+        });
+        const pushCall = mockPush.mock.calls[0]?.[0] ?? "";
+        expect(pushCall).toContain("lat=40.7128");
+        expect(pushCall).toContain("lng=-74.006");
+        expect(pushCall).not.toContain("q=");
+      });
 
-      it('shows toast on permission denied', () => {
-        mockGetCurrentPosition.mockImplementation((_s: PositionCallback, error: PositionErrorCallback) => {
-          error({ code: 1, message: 'denied', PERMISSION_DENIED: 1, POSITION_UNAVAILABLE: 2, TIMEOUT: 3 } as GeolocationPositionError)
-        })
-        render(<SearchForm />)
+      it("shows toast on permission denied", () => {
+        mockGetCurrentPosition.mockImplementation(
+          (_s: PositionCallback, error: PositionErrorCallback) => {
+            error({
+              code: 1,
+              message: "denied",
+              PERMISSION_DENIED: 1,
+              POSITION_UNAVAILABLE: 2,
+              TIMEOUT: 3,
+            } as GeolocationPositionError);
+          }
+        );
+        render(<SearchForm />);
 
-        fireEvent.click(screen.getByRole('button', { name: /use my current location/i }))
+        fireEvent.click(
+          screen.getByRole("button", { name: /use my current location/i })
+        );
 
-        expect(mockToastError).toHaveBeenCalledWith(expect.stringContaining('permission denied'))
-      })
+        expect(mockToastError).toHaveBeenCalledWith(
+          expect.stringContaining("permission denied")
+        );
+      });
 
-      it('shows toast on timeout', () => {
-        mockGetCurrentPosition.mockImplementation((_s: PositionCallback, error: PositionErrorCallback) => {
-          error({ code: 3, message: 'timeout', PERMISSION_DENIED: 1, POSITION_UNAVAILABLE: 2, TIMEOUT: 3 } as GeolocationPositionError)
-        })
-        render(<SearchForm />)
+      it("shows toast on timeout", () => {
+        mockGetCurrentPosition.mockImplementation(
+          (_s: PositionCallback, error: PositionErrorCallback) => {
+            error({
+              code: 3,
+              message: "timeout",
+              PERMISSION_DENIED: 1,
+              POSITION_UNAVAILABLE: 2,
+              TIMEOUT: 3,
+            } as GeolocationPositionError);
+          }
+        );
+        render(<SearchForm />);
 
-        fireEvent.click(screen.getByRole('button', { name: /use my current location/i }))
+        fireEvent.click(
+          screen.getByRole("button", { name: /use my current location/i })
+        );
 
-        expect(mockToastError).toHaveBeenCalledWith(expect.stringContaining('timed out'))
-      })
+        expect(mockToastError).toHaveBeenCalledWith(
+          expect.stringContaining("timed out")
+        );
+      });
 
-      it('shows toast when geolocation not supported', () => {
-        Object.defineProperty(navigator, 'geolocation', {
+      it("shows toast when geolocation not supported", () => {
+        Object.defineProperty(navigator, "geolocation", {
           value: undefined,
           writable: true,
           configurable: true,
-        })
-        render(<SearchForm />)
+        });
+        render(<SearchForm />);
 
-        fireEvent.click(screen.getByRole('button', { name: /use my current location/i }))
+        fireEvent.click(
+          screen.getByRole("button", { name: /use my current location/i })
+        );
 
-        expect(mockToastError).toHaveBeenCalledWith(expect.stringContaining('not supported'))
-      })
+        expect(mockToastError).toHaveBeenCalledWith(
+          expect.stringContaining("not supported")
+        );
+      });
 
-      it('ignores rapid double-tap', () => {
+      it("ignores rapid double-tap", () => {
         // First call never resolves (simulates pending geolocation)
-        mockGetCurrentPosition.mockImplementation(() => {})
-        render(<SearchForm />)
+        mockGetCurrentPosition.mockImplementation(() => {});
+        render(<SearchForm />);
 
-        const btn = screen.getByRole('button', { name: /use my current location/i })
-        fireEvent.click(btn)
-        fireEvent.click(btn)
+        const btn = screen.getByRole("button", {
+          name: /use my current location/i,
+        });
+        fireEvent.click(btn);
+        fireEvent.click(btn);
 
-        expect(mockGetCurrentPosition).toHaveBeenCalledTimes(1)
-      })
-    })
+        expect(mockGetCurrentPosition).toHaveBeenCalledTimes(1);
+      });
+    });
 
-    describe('preserves map-related params', () => {
-      it('preserves bounds and sort across filter changes', async () => {
-        mockSearchParams.set('minLat', '37.5')
-        mockSearchParams.set('maxLat', '38.0')
-        mockSearchParams.set('minLng', '-123.0')
-        mockSearchParams.set('maxLng', '-122.0')
-        mockSearchParams.set('sort', 'price_asc')
-        mockSearchParams.set('nearMatches', '1')
-        render(<SearchForm />)
+    describe("preserves map-related params", () => {
+      it("preserves bounds and sort across filter changes", async () => {
+        mockSearchParams.set("minLat", "37.5");
+        mockSearchParams.set("maxLat", "38.0");
+        mockSearchParams.set("minLng", "-123.0");
+        mockSearchParams.set("maxLng", "-122.0");
+        mockSearchParams.set("sort", "price_asc");
+        mockSearchParams.set("nearMatches", "1");
+        render(<SearchForm />);
 
-        const form = screen.getByRole('search')
-        fireEvent.submit(form)
-        jest.advanceTimersByTime(500)
+        const form = screen.getByRole("search");
+        fireEvent.submit(form);
+        jest.advanceTimersByTime(500);
 
-        const pushCall = mockPush.mock.calls[0]?.[0] ?? ''
-        expect(pushCall).toContain('minLat=')
-        expect(pushCall).toContain('sort=price_asc')
-        expect(pushCall).toContain('nearMatches=1')
-      })
-    })
-  })
-})
+        const pushCall = mockPush.mock.calls[0]?.[0] ?? "";
+        expect(pushCall).toContain("minLat=");
+        expect(pushCall).toContain("sort=price_asc");
+        expect(pushCall).toContain("nearMatches=1");
+      });
+    });
+  });
+});

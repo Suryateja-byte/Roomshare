@@ -12,7 +12,14 @@
  *   pnpm playwright test tests/e2e/map-features.anon.spec.ts --project=chromium-anon --headed
  */
 
-import { test, expect, SF_BOUNDS, selectors, searchResultsContainer, waitForMapReady } from "./helpers/test-utils";
+import {
+  test,
+  expect,
+  SF_BOUNDS,
+  selectors,
+  searchResultsContainer,
+  waitForMapReady,
+} from "./helpers/test-utils";
 
 const boundsQS = `minLat=${SF_BOUNDS.minLat}&maxLat=${SF_BOUNDS.maxLat}&minLng=${SF_BOUNDS.minLng}&maxLng=${SF_BOUNDS.maxLng}`;
 const SEARCH_URL = `/search?${boundsQS}`;
@@ -30,18 +37,23 @@ async function mapControlsAvailable(page: import("@playwright/test").Page) {
   // Map controls only render when isMapLoaded=true (requires WebGL)
   // First check if map canvas is actually visible (WebGL working)
   try {
-    const canvas = page.locator('.maplibregl-canvas, .maplibregl-canvas');
-    const canvasVisible = await canvas.first().isVisible().catch(() => false);
+    const canvas = page.locator(".maplibregl-canvas, .maplibregl-canvas");
+    const canvasVisible = await canvas
+      .first()
+      .isVisible()
+      .catch(() => false);
     if (!canvasVisible) return false;
   } catch {
     return false;
   }
-  const dropPin = page.locator('button').filter({ hasText: /Drop pin/i });
+  const dropPin = page.locator("button").filter({ hasText: /Drop pin/i });
   return (await dropPin.count()) > 0;
 }
 
 // Map tests need extra time for WebGL rendering and tile loading in CI
-test.beforeEach(async () => { test.slow(); });
+test.beforeEach(async () => {
+  test.slow();
+});
 
 // ---------------------------------------------------------------------------
 // Smoke: Search page loads without JS crashes
@@ -86,7 +98,7 @@ test.describe("Map smoke test", () => {
         !e.includes("FetchTimeoutError") &&
         !e.includes("timed out") &&
         !e.includes("photon.komoot") &&
-        !e.includes("TimeoutError"),
+        !e.includes("TimeoutError")
     );
     expect(realErrors).toHaveLength(0);
   });
@@ -141,7 +153,9 @@ test.describe("1.3: Synchronized highlighting", () => {
 // 1.5: Boundary polygons — named area query
 // ---------------------------------------------------------------------------
 test.describe("1.5: Boundary polygons", () => {
-  test("search with named area query loads without JS errors", async ({ page }) => {
+  test("search with named area query loads without JS errors", async ({
+    page,
+  }) => {
     const consoleErrors: string[] = [];
     page.on("console", (msg) => {
       if (msg.type() === "error") consoleErrors.push(msg.text());
@@ -181,7 +195,7 @@ test.describe("1.5: Boundary polygons", () => {
         !e.includes("FetchTimeoutError") &&
         !e.includes("timed out") &&
         !e.includes("photon.komoot") &&
-        !e.includes("TimeoutError"),
+        !e.includes("TimeoutError")
     );
     expect(realErrors).toHaveLength(0);
   });
@@ -194,35 +208,62 @@ test.describe("Map controls (requires WebGL)", () => {
   test.beforeEach(async ({ page }) => {
     await waitForSearchPage(page);
     if (!(await mapControlsAvailable(page))) {
-      test.skip(true, "Map controls not rendered (WebGL unavailable in headless mode)");
+      test.skip(
+        true,
+        "Map controls not rendered (WebGL unavailable in headless mode)"
+      );
     }
   });
 
   // 1.6: Drop-a-Pin
   test("drop pin button toggles to cancel state", async ({ page }) => {
-    const dropPinBtn = page.locator('button').filter({ hasText: /Drop pin/i }).first();
+    const dropPinBtn = page
+      .locator("button")
+      .filter({ hasText: /Drop pin/i })
+      .first();
     await dropPinBtn.click();
-    await page.locator('button').filter({ hasText: /Cancel/i }).first().waitFor({ timeout: 5_000 });
+    await page
+      .locator("button")
+      .filter({ hasText: /Cancel/i })
+      .first()
+      .waitFor({ timeout: 5_000 });
 
-    const cancelBtn = page.locator('button').filter({ hasText: /Cancel/i });
+    const cancelBtn = page.locator("button").filter({ hasText: /Cancel/i });
     expect(await cancelBtn.count()).toBeGreaterThanOrEqual(1);
 
     await cancelBtn.first().click();
-    await page.locator('button').filter({ hasText: /Drop pin/i }).first().waitFor({ timeout: 5_000 });
-    expect(await page.locator('button').filter({ hasText: /Drop pin/i }).count()).toBeGreaterThanOrEqual(1);
+    await page
+      .locator("button")
+      .filter({ hasText: /Drop pin/i })
+      .first()
+      .waitFor({ timeout: 5_000 });
+    expect(
+      await page
+        .locator("button")
+        .filter({ hasText: /Drop pin/i })
+        .count()
+    ).toBeGreaterThanOrEqual(1);
   });
 
   // 1.7: POI toggles
   test("POI toggle buttons are present and functional", async ({ page }) => {
-    const poiBtn = page.locator('button').filter({ hasText: /^POIs$/i });
+    const poiBtn = page.locator("button").filter({ hasText: /^POIs$/i });
     expect(await poiBtn.count()).toBeGreaterThanOrEqual(1);
 
-    const transitBtn = page.locator('button[aria-pressed]').filter({ hasText: /Transit/i }).first();
+    const transitBtn = page
+      .locator("button[aria-pressed]")
+      .filter({ hasText: /Transit/i })
+      .first();
     if ((await transitBtn.count()) === 0) return;
 
-    const poiVisible = await transitBtn.isVisible({ timeout: 5_000 }).catch(() => false);
+    const poiVisible = await transitBtn
+      .isVisible({ timeout: 5_000 })
+      .catch(() => false);
     if (!poiVisible) {
-      test.skip(true, 'POI buttons not visible (map panel may not be rendered in headless CI)');
+      test.skip(
+        true,
+        "POI buttons not visible (map panel may not be rendered in headless CI)"
+      );
       return;
     }
 
@@ -231,10 +272,18 @@ test.describe("Map controls (requires WebGL)", () => {
     await transitBtn.click();
     // After click, state should have toggled
     const expectedAfterClick = initialState === "true" ? "false" : "true";
-    await expect(transitBtn).toHaveAttribute("aria-pressed", expectedAfterClick, { timeout: 10_000 });
+    await expect(transitBtn).toHaveAttribute(
+      "aria-pressed",
+      expectedAfterClick,
+      { timeout: 10_000 }
+    );
     await transitBtn.click();
     // After second click, state should be back to initial
-    await expect(transitBtn).toHaveAttribute("aria-pressed", initialState ?? "false", { timeout: 10_000 });
+    await expect(transitBtn).toHaveAttribute(
+      "aria-pressed",
+      initialState ?? "false",
+      { timeout: 10_000 }
+    );
   });
 
   test("POIs master toggle activates all categories", async ({ page }) => {
@@ -244,9 +293,14 @@ test.describe("Map controls (requires WebGL)", () => {
       return;
     }
 
-    const poiVisible = await poiMasterBtn.isVisible({ timeout: 5_000 }).catch(() => false);
+    const poiVisible = await poiMasterBtn
+      .isVisible({ timeout: 5_000 })
+      .catch(() => false);
     if (!poiVisible) {
-      test.skip(true, 'POI buttons not visible (map panel may not be rendered in headless CI)');
+      test.skip(
+        true,
+        "POI buttons not visible (map panel may not be rendered in headless CI)"
+      );
       return;
     }
 
@@ -256,16 +310,31 @@ test.describe("Map controls (requires WebGL)", () => {
     await page.waitForTimeout(1_000);
 
     // Use broad locator for category controls — may be buttons or checkboxes
-    const categories = page.locator('[data-testid="poi-category"]').or(page.locator('button[aria-pressed]').filter({ hasText: /Transit|Parks|Grocery|Schools/i }));
+    const categories = page
+      .locator('[data-testid="poi-category"]')
+      .or(
+        page
+          .locator("button[aria-pressed]")
+          .filter({ hasText: /Transit|Parks|Grocery|Schools/i })
+      );
     const catCount = await categories.count();
     if (catCount === 0) {
-      test.skip(true, 'No POI category buttons found — WebGL not available in headless CI');
+      test.skip(
+        true,
+        "No POI category buttons found — WebGL not available in headless CI"
+      );
       return;
     }
 
     // After clicking master toggle, category buttons should be pressed
-    const transitBtn = page.locator('button[aria-pressed]').filter({ hasText: /Transit/i }).first();
-    const parksBtn = page.locator('button[aria-pressed]').filter({ hasText: /Parks/i }).first();
+    const transitBtn = page
+      .locator("button[aria-pressed]")
+      .filter({ hasText: /Transit/i })
+      .first();
+    const parksBtn = page
+      .locator("button[aria-pressed]")
+      .filter({ hasText: /Parks/i })
+      .first();
 
     const hasTransit = (await transitBtn.count()) > 0;
     const hasParks = (await parksBtn.count()) > 0;
@@ -276,16 +345,26 @@ test.describe("Map controls (requires WebGL)", () => {
     }
 
     if (hasTransit) {
-      const transitPressed = await transitBtn.getAttribute("aria-pressed").catch(() => "false");
+      const transitPressed = await transitBtn
+        .getAttribute("aria-pressed")
+        .catch(() => "false");
       if (transitPressed !== "true") {
-        test.skip(true, "POI master toggle did not activate categories — map not fully loaded in headless CI");
+        test.skip(
+          true,
+          "POI master toggle did not activate categories — map not fully loaded in headless CI"
+        );
         return;
       }
     }
     if (hasParks) {
-      const parksPressed = await parksBtn.getAttribute("aria-pressed").catch(() => "false");
+      const parksPressed = await parksBtn
+        .getAttribute("aria-pressed")
+        .catch(() => "false");
       if (parksPressed !== "true") {
-        test.skip(true, "POI master toggle did not activate categories — map not fully loaded in headless CI");
+        test.skip(
+          true,
+          "POI master toggle did not activate categories — map not fully loaded in headless CI"
+        );
         return;
       }
     }
@@ -295,22 +374,37 @@ test.describe("Map controls (requires WebGL)", () => {
 
   // Keyboard accessibility
   test("map controls are keyboard accessible", async ({ page }) => {
-    const dropPinBtn = page.locator('button').filter({ hasText: /Drop pin/i }).first();
+    const dropPinBtn = page
+      .locator("button")
+      .filter({ hasText: /Drop pin/i })
+      .first();
     await dropPinBtn.focus();
     await page.keyboard.press("Enter");
-    await page.locator('button').filter({ hasText: /Cancel/i }).first().waitFor({ timeout: 5_000 });
+    await page
+      .locator("button")
+      .filter({ hasText: /Cancel/i })
+      .first()
+      .waitFor({ timeout: 5_000 });
 
-    const cancelBtn = page.locator('button').filter({ hasText: /Cancel/i });
+    const cancelBtn = page.locator("button").filter({ hasText: /Cancel/i });
     expect(await cancelBtn.count()).toBeGreaterThanOrEqual(1);
     await cancelBtn.first().click();
 
-    const transitBtn = page.locator('button[aria-pressed]').filter({ hasText: /Transit/i }).first();
-    if ((await transitBtn.count()) > 0 && await transitBtn.isVisible().catch(() => false)) {
+    const transitBtn = page
+      .locator("button[aria-pressed]")
+      .filter({ hasText: /Transit/i })
+      .first();
+    if (
+      (await transitBtn.count()) > 0 &&
+      (await transitBtn.isVisible().catch(() => false))
+    ) {
       const prevState = await transitBtn.getAttribute("aria-pressed");
       await transitBtn.focus();
       await page.keyboard.press("Enter");
       const expectedState = prevState === "true" ? "false" : "true";
-      await expect(transitBtn).toHaveAttribute("aria-pressed", expectedState, { timeout: 10_000 });
+      await expect(transitBtn).toHaveAttribute("aria-pressed", expectedState, {
+        timeout: 10_000,
+      });
     }
   });
 });

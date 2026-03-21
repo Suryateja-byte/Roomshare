@@ -6,7 +6,14 @@
  * J27: Empty messages inbox
  */
 
-import { test, expect, selectors, timeouts, SF_BOUNDS, searchResultsContainer } from "../helpers";
+import {
+  test,
+  expect,
+  selectors,
+  timeouts,
+  SF_BOUNDS,
+  searchResultsContainer,
+} from "../helpers";
 
 test.beforeEach(async () => {
   test.slow();
@@ -21,7 +28,7 @@ test.describe("J25: Send Message in Conversation", () => {
     // Skip on mobile viewports — messaging UI layout differs significantly on mobile
     const viewport = page.viewportSize();
     if (viewport && viewport.width < 768) {
-      test.skip(true, 'Test designed for desktop viewport');
+      test.skip(true, "Test designed for desktop viewport");
       return;
     }
 
@@ -30,8 +37,12 @@ test.describe("J25: Send Message in Conversation", () => {
 
     // Check we weren't redirected to login or signup
     const messagesUrl = page.url();
-    if (messagesUrl.includes('/login') || messagesUrl.includes('/signin') || messagesUrl.includes('/signup')) {
-      test.skip(true, 'Auth redirect — session not available in CI');
+    if (
+      messagesUrl.includes("/login") ||
+      messagesUrl.includes("/signin") ||
+      messagesUrl.includes("/signup")
+    ) {
+      test.skip(true, "Auth redirect — session not available in CI");
       return;
     }
 
@@ -57,7 +68,10 @@ test.describe("J25: Send Message in Conversation", () => {
       .or(page.locator('textarea[name*="message"]'))
       .or(page.locator('[data-testid="message-input"]'));
 
-    const canType = await msgInput.first().isVisible().catch(() => false);
+    const canType = await msgInput
+      .first()
+      .isVisible()
+      .catch(() => false);
     test.skip(!canType, "No message input found — skipping");
 
     const testMsg = `E2E test message ${Date.now()}`;
@@ -90,14 +104,19 @@ test.describe("J26: Start Conversation from Listing", () => {
     await page.waitForTimeout(2000);
 
     const cards = searchResultsContainer(page).locator(selectors.listingCard);
-    test.skip((await cards.count()) === 0, "Reviewer listing not found — skipping");
+    test.skip(
+      (await cards.count()) === 0,
+      "Reviewer listing not found — skipping"
+    );
 
     // Step 2: Go to listing detail
     await nav.clickListingCard(0);
-    await expect.poll(
-      () => new URL(page.url()).pathname.includes('/listings/'),
-      { timeout: timeouts.navigation, message: 'Expected to navigate to listing detail page' }
-    ).toBe(true);
+    await expect
+      .poll(() => new URL(page.url()).pathname.includes("/listings/"), {
+        timeout: timeouts.navigation,
+        message: "Expected to navigate to listing detail page",
+      })
+      .toBe(true);
 
     // Step 3: Click contact / message host button
     const contactBtn = page
@@ -106,7 +125,10 @@ test.describe("J26: Start Conversation from Listing", () => {
       .or(page.locator('main a[href*="messages"]'))
       .or(page.locator('main [data-testid="contact-host"]'));
 
-    const canContact = await contactBtn.first().isVisible().catch(() => false);
+    const canContact = await contactBtn
+      .first()
+      .isVisible()
+      .catch(() => false);
     test.skip(!canContact, "No contact host button — skipping");
 
     await contactBtn.first().click();
@@ -118,7 +140,10 @@ test.describe("J26: Start Conversation from Listing", () => {
       .or(page.locator("textarea"))
       .or(page.locator('[data-testid="message-input"]'));
 
-    const canType = await msgInput.first().isVisible().catch(() => false);
+    const canType = await msgInput
+      .first()
+      .isVisible()
+      .catch(() => false);
     if (canType) {
       const testMsg = `Interested in this listing! ${Date.now()}`;
       await msgInput.first().fill(testMsg);
@@ -126,7 +151,12 @@ test.describe("J26: Start Conversation from Listing", () => {
       const sendBtn = page
         .getByRole("button", { name: /send|submit/i })
         .or(page.locator('button[type="submit"]'));
-      if (await sendBtn.first().isVisible().catch(() => false)) {
+      if (
+        await sendBtn
+          .first()
+          .isVisible()
+          .catch(() => false)
+      ) {
         await sendBtn.first().click();
         await page.waitForTimeout(2000);
       }
@@ -134,7 +164,10 @@ test.describe("J26: Start Conversation from Listing", () => {
 
     // Step 5: Verify we're on messages page or got confirmation
     const onMessages = page.url().includes("/messages");
-    const hasToast = await page.locator(selectors.toast).isVisible().catch(() => false);
+    const hasToast = await page
+      .locator(selectors.toast)
+      .isVisible()
+      .catch(() => false);
     expect(onMessages || hasToast || canType).toBeTruthy();
   });
 });
@@ -149,8 +182,8 @@ test.describe("J27: Empty Messages Inbox", () => {
     await nav.goToMessages();
 
     // Check we weren't redirected to login
-    if (page.url().includes('/login') || page.url().includes('/signin')) {
-      test.skip(true, 'Auth session expired - redirected to login');
+    if (page.url().includes("/login") || page.url().includes("/signin")) {
+      test.skip(true, "Auth session expired - redirected to login");
       return;
     }
 
@@ -170,7 +203,10 @@ test.describe("J27: Empty Messages Inbox", () => {
       .or(page.getByText(/no messages|no conversations|inbox is empty/i));
 
     const hasConversations = (await conversations.count()) > 0;
-    const hasEmpty = await emptyState.first().isVisible().catch(() => false);
+    const hasEmpty = await emptyState
+      .first()
+      .isVisible()
+      .catch(() => false);
 
     // Should have one or the other
     expect(hasConversations || hasEmpty).toBeTruthy();

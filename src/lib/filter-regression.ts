@@ -10,7 +10,7 @@
  * 3. Run regression tests to verify behavior matches expected outcomes
  */
 
-import { normalizeFilters, type FilterParams, type NormalizedFilters } from './filter-schema';
+import { normalizeFilters, type NormalizedFilters } from "./filter-schema";
 
 // ============================================
 // Types
@@ -31,7 +31,7 @@ export interface FilterScenario {
 export interface RegressionReport {
   scenarioId: string;
   timestamp: string;
-  status: 'pass' | 'fail' | 'warning';
+  status: "pass" | "fail" | "warning";
   message: string;
   expected: Partial<FilterScenario>;
   actual: Partial<FilterScenario>;
@@ -202,23 +202,23 @@ export async function runScenario(
     }
 
     // Determine status
-    let status: 'pass' | 'fail' | 'warning' = 'pass';
-    let message = 'Scenario passed';
+    let status: "pass" | "fail" | "warning" = "pass";
+    let message = "Scenario passed";
 
     if (!normalizationMatch || !hashMatch) {
-      status = 'fail';
-      message = 'Behavioral regression detected';
+      status = "fail";
+      message = "Behavioral regression detected";
     } else if (!countMatch) {
       // Count changes without hash change might be data-dependent
-      status = 'warning';
-      message = 'Result count changed (may be data-dependent)';
+      status = "warning";
+      message = "Result count changed (may be data-dependent)";
     }
 
     // Performance regression check
     if (executionTime > scenario.executionTimeMs * 2) {
-      if (status === 'pass') {
-        status = 'warning';
-        message = 'Performance regression detected';
+      if (status === "pass") {
+        status = "warning";
+        message = "Performance regression detected";
       }
       diff.executionTimeMs = {
         expected: scenario.executionTimeMs,
@@ -247,8 +247,8 @@ export async function runScenario(
     return {
       scenarioId: scenario.id,
       timestamp: new Date().toISOString(),
-      status: 'fail',
-      message: `Execution error: ${error instanceof Error ? error.message : 'Unknown error'}`,
+      status: "fail",
+      message: `Execution error: ${error instanceof Error ? error.message : "Unknown error"}`,
       expected: { normalizedFilters: scenario.normalizedFilters },
       actual: {},
     };
@@ -271,9 +271,9 @@ export async function runRegressionSuite(
 
   return {
     totalScenarios: scenarios.length,
-    passed: reports.filter((r) => r.status === 'pass').length,
-    failed: reports.filter((r) => r.status === 'fail').length,
-    warnings: reports.filter((r) => r.status === 'warning').length,
+    passed: reports.filter((r) => r.status === "pass").length,
+    failed: reports.filter((r) => r.status === "fail").length,
+    warnings: reports.filter((r) => r.status === "warning").length,
     reports,
   };
 }
@@ -302,18 +302,20 @@ export class ScenarioSampler {
   private getBucketKey(filters: NormalizedFilters): string {
     const parts: string[] = [];
 
-    if (filters.query) parts.push('q');
-    if (filters.minPrice !== undefined || filters.maxPrice !== undefined) parts.push('price');
-    if (filters.roomType) parts.push('room');
-    if (filters.amenities && filters.amenities.length > 0) parts.push('amen');
-    if (filters.houseRules && filters.houseRules.length > 0) parts.push('rules');
-    if (filters.languages && filters.languages.length > 0) parts.push('lang');
-    if (filters.bounds) parts.push('geo');
-    if (filters.genderPreference) parts.push('gender');
-    if (filters.leaseDuration) parts.push('lease');
-    if (filters.moveInDate) parts.push('date');
+    if (filters.query) parts.push("q");
+    if (filters.minPrice !== undefined || filters.maxPrice !== undefined)
+      parts.push("price");
+    if (filters.roomType) parts.push("room");
+    if (filters.amenities && filters.amenities.length > 0) parts.push("amen");
+    if (filters.houseRules && filters.houseRules.length > 0)
+      parts.push("rules");
+    if (filters.languages && filters.languages.length > 0) parts.push("lang");
+    if (filters.bounds) parts.push("geo");
+    if (filters.genderPreference) parts.push("gender");
+    if (filters.leaseDuration) parts.push("lease");
+    if (filters.moveInDate) parts.push("date");
 
-    return parts.sort().join('-') || 'empty';
+    return parts.sort().join("-") || "empty";
   }
 
   /**
@@ -409,9 +411,10 @@ export function createGoldenScenario(
 /**
  * Validates a golden scenario against current implementation.
  */
-export function validateGoldenScenario(
-  golden: GoldenScenario
-): { valid: boolean; errors: string[] } {
+export function validateGoldenScenario(golden: GoldenScenario): {
+  valid: boolean;
+  errors: string[];
+} {
   const errors: string[] = [];
 
   try {
@@ -429,7 +432,7 @@ export function validateGoldenScenario(
     }
   } catch (error) {
     errors.push(
-      `Normalization error: ${error instanceof Error ? error.message : 'Unknown'}`
+      `Normalization error: ${error instanceof Error ? error.message : "Unknown"}`
     );
   }
 
@@ -445,45 +448,36 @@ export function validateGoldenScenario(
 
 export const CRITICAL_SCENARIOS: GoldenScenario[] = [
   createGoldenScenario(
-    'empty-filters',
-    'Empty filter object should normalize cleanly',
+    "empty-filters",
+    "Empty filter object should normalize cleanly",
     {}
   ),
-  createGoldenScenario(
-    'basic-price-filter',
-    'Simple price range filter',
-    { minPrice: 500, maxPrice: 2000 }
-  ),
+  createGoldenScenario("basic-price-filter", "Simple price range filter", {
+    minPrice: 500,
+    maxPrice: 2000,
+  }),
   // P1-13: Inverted price range now throws an error instead of swapping
   // This scenario is replaced with a test that validates the error behavior
   // See filter-properties.test.ts "throws for inverted price ranges" test
+  createGoldenScenario("complex-filter-combo", "Multiple filters combined", {
+    minPrice: 800,
+    maxPrice: 2500,
+    roomType: "Private Room",
+    amenities: ["Wifi", "AC"],
+    languages: ["en", "es"],
+    sort: "price_asc",
+  }),
+  createGoldenScenario("geographic-bounds", "Geographic bounds filter", {
+    bounds: {
+      minLat: 37.7,
+      maxLat: 37.85,
+      minLng: -122.5,
+      maxLng: -122.35,
+    },
+  }),
   createGoldenScenario(
-    'complex-filter-combo',
-    'Multiple filters combined',
-    {
-      minPrice: 800,
-      maxPrice: 2500,
-      roomType: 'Private Room',
-      amenities: ['Wifi', 'AC'],
-      languages: ['en', 'es'],
-      sort: 'price_asc',
-    }
-  ),
-  createGoldenScenario(
-    'geographic-bounds',
-    'Geographic bounds filter',
-    {
-      bounds: {
-        minLat: 37.7,
-        maxLat: 37.85,
-        minLng: -122.5,
-        maxLng: -122.35,
-      },
-    }
-  ),
-  createGoldenScenario(
-    'antimeridian-crossing',
-    'Bounds crossing antimeridian should NOT swap longitude',
+    "antimeridian-crossing",
+    "Bounds crossing antimeridian should NOT swap longitude",
     {
       bounds: {
         minLat: 30,
@@ -494,38 +488,33 @@ export const CRITICAL_SCENARIOS: GoldenScenario[] = [
     }
   ),
   createGoldenScenario(
-    'case-insensitive-enum',
-    'Enum values should be case-insensitive',
-    { roomType: 'private room', sort: 'PRICE_ASC' }
+    "case-insensitive-enum",
+    "Enum values should be case-insensitive",
+    { roomType: "private room", sort: "PRICE_ASC" }
   ),
   createGoldenScenario(
-    'array-deduplication',
-    'Duplicate array values should be deduplicated',
-    { amenities: ['Wifi', 'wifi', 'WIFI', 'AC', 'ac'] }
+    "array-deduplication",
+    "Duplicate array values should be deduplicated",
+    { amenities: ["Wifi", "wifi", "WIFI", "AC", "ac"] }
+  ),
+  createGoldenScenario("malformed-input", "Malformed input should not crash", {
+    minPrice: "not-a-number",
+    amenities: "not-an-array",
+  }),
+  createGoldenScenario("extreme-values", "Extreme values should be clamped", {
+    minPrice: -1000,
+    maxPrice: 99999999,
+    bounds: { minLat: -200, maxLat: 200, minLng: -400, maxLng: 400 },
+  }),
+  createGoldenScenario(
+    "gender-preference-filter",
+    "Gender preference filter normalization",
+    { genderPreference: "female-only", leaseDuration: "long-term" }
   ),
   createGoldenScenario(
-    'malformed-input',
-    'Malformed input should not crash',
-    { minPrice: 'not-a-number', amenities: 'not-an-array' }
-  ),
-  createGoldenScenario(
-    'extreme-values',
-    'Extreme values should be clamped',
-    {
-      minPrice: -1000,
-      maxPrice: 99999999,
-      bounds: { minLat: -200, maxLat: 200, minLng: -400, maxLng: 400 },
-    }
-  ),
-  createGoldenScenario(
-    'gender-preference-filter',
-    'Gender preference filter normalization',
-    { genderPreference: 'female-only', leaseDuration: 'long-term' }
-  ),
-  createGoldenScenario(
-    'whitespace-trimming',
-    'Whitespace in string values should be trimmed',
-    { roomType: '  Private Room  ', amenities: [' Wifi ', 'AC'] }
+    "whitespace-trimming",
+    "Whitespace in string values should be trimmed",
+    { roomType: "  Private Room  ", amenities: [" Wifi ", "AC"] }
   ),
 ];
 

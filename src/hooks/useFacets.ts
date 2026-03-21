@@ -47,7 +47,7 @@ export interface UseFacetsReturn {
  */
 function generateFacetsCacheKey(
   pending: BatchedFilterValues,
-  searchParams: URLSearchParams,
+  searchParams: URLSearchParams
 ): string {
   const parts = [
     // Exclude minPrice/maxPrice intentionally
@@ -74,7 +74,7 @@ function generateFacetsCacheKey(
 
 function buildFacetsUrl(
   pending: BatchedFilterValues,
-  searchParams: URLSearchParams,
+  searchParams: URLSearchParams
 ): string {
   const params = new URLSearchParams();
 
@@ -104,7 +104,15 @@ function buildFacetsUrl(
     params.set("minSlots", pending.minSlots);
   }
 
-  const locationParams = ["q", "lat", "lng", "minLat", "maxLat", "minLng", "maxLng"];
+  const locationParams = [
+    "q",
+    "lat",
+    "lng",
+    "minLat",
+    "maxLat",
+    "minLng",
+    "maxLng",
+  ];
   for (const key of locationParams) {
     const value = searchParams.get(key);
     if (value) params.set(key, value);
@@ -128,7 +136,7 @@ export function useFacets({
   // Cache key excludes price so price changes don't invalidate
   const cacheKey = useMemo(
     () => generateFacetsCacheKey(pending, searchParams),
-    [pending, searchParams],
+    [pending, searchParams]
   );
 
   const fetchFacets = useCallback(async () => {
@@ -194,7 +202,9 @@ export function useFacets({
 
         // Graceful degradation for unexpected status codes (404, 403, etc.)
         // Facets are supplementary — never block the filter UI.
-        console.warn(`[useFacets] Unexpected status ${response.status}, returning empty facets`);
+        console.warn(
+          `[useFacets] Unexpected status ${response.status}, returning empty facets`
+        );
         facetsCache.set(cacheKey, EMPTY_FACETS, ERROR_FALLBACK_TTL_MS);
         if (!abortController.signal.aborted) {
           setFacets((prev) => prev ?? EMPTY_FACETS);

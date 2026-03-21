@@ -62,7 +62,7 @@ export function FilterChip({
         "transition-colors duration-150",
         "group/chip",
         isRemoving && "opacity-50",
-        className,
+        className
       )}
       onMouseEnter={onHoverStart}
       onMouseLeave={onHoverEnd}
@@ -79,12 +79,14 @@ export function FilterChip({
             "rounded-full",
             "bg-emerald-100 dark:bg-emerald-900/50",
             "text-emerald-700 dark:text-emerald-300",
-            impactDelta ? "opacity-100" : "opacity-0 group-hover/chip:opacity-100",
-            "transition-opacity duration-150",
+            impactDelta
+              ? "opacity-100"
+              : "opacity-0 group-hover/chip:opacity-100",
+            "transition-opacity duration-150"
           )}
           title={
             impactDelta
-              ? `${impactDelta.replace('+', '')} more results without this filter`
+              ? `${impactDelta.replace("+", "")} more results without this filter`
               : undefined
           }
           aria-label={
@@ -117,7 +119,7 @@ export function FilterChip({
           "transition-colors duration-150",
           "disabled:opacity-60 disabled:cursor-not-allowed",
           // WCAG: 44x44px minimum touch target via pseudo-element (16px + 14px*2 = 44px)
-          "before:absolute before:inset-0 before:-m-[14px] before:content-['']",
+          "before:absolute before:inset-0 before:-m-[14px] before:content-['']"
         )}
         aria-label={`Remove filter: ${label}`}
       >

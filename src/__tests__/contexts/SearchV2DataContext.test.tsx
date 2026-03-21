@@ -55,7 +55,7 @@ describe("SearchV2DataContext", () => {
     jest.clearAllMocks();
     // Reset search params between tests
     Array.from(mockSearchParams.keys()).forEach((key) =>
-      mockSearchParams.delete(key),
+      mockSearchParams.delete(key)
     );
   });
 
@@ -88,7 +88,7 @@ describe("SearchV2DataContext", () => {
           data: useV2MapData(),
           full: useSearchV2Data(),
         }),
-        { wrapper },
+        { wrapper }
       );
 
       const testData = makeMapData();
@@ -147,7 +147,7 @@ describe("SearchV2DataContext", () => {
           setter: useV2MapDataSetter(),
           data: useV2MapData(),
         }),
-        { wrapper },
+        { wrapper }
       );
 
       const testData = makeMapData({ mode: "pins" });
@@ -167,7 +167,7 @@ describe("SearchV2DataContext", () => {
           full: useSearchV2Data(),
           data: useV2MapData(),
         }),
-        { wrapper },
+        { wrapper }
       );
 
       const testData = makeMapData();
@@ -185,7 +185,7 @@ describe("SearchV2DataContext", () => {
           full: useSearchV2Data(),
           data: useV2MapData(),
         }),
-        { wrapper },
+        { wrapper }
       );
 
       const testData = makeMapData();
@@ -204,7 +204,7 @@ describe("SearchV2DataContext", () => {
           full: useSearchV2Data(),
           data: useV2MapData(),
         }),
-        { wrapper },
+        { wrapper }
       );
 
       const staleData = makeMapData({ mode: "pins" });
@@ -226,7 +226,7 @@ describe("SearchV2DataContext", () => {
           full: useSearchV2Data(),
           data: useV2MapData(),
         }),
-        { wrapper },
+        { wrapper }
       );
 
       const testData = makeMapData();

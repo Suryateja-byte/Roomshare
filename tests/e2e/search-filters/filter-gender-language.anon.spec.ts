@@ -53,13 +53,19 @@ test.describe("Gender & Language Filters", () => {
   });
 
   // 8.1: Select gender preference -> URL has genderPreference=FEMALE_ONLY
-  test(`${tags.core} - selecting gender preference and applying updates URL`, async ({ page }) => {
+  test(`${tags.core} - selecting gender preference and applying updates URL`, async ({
+    page,
+  }) => {
     await waitForSearchReady(page);
     await waitForUrlStable(page, 1500);
     const dialog = await openFilterModal(page);
 
     // Select "Female Identifying Only" from the gender preference dropdown
-    await selectDropdownOption(page, "#filter-gender-pref", /female identifying only/i);
+    await selectDropdownOption(
+      page,
+      "#filter-gender-pref",
+      /female identifying only/i
+    );
 
     // Wait for React to re-render the Apply button after dropdown selection
     // Radix Select can cause layout shifts that temporarily detach the button
@@ -71,16 +77,26 @@ test.describe("Gender & Language Filters", () => {
     await applyFilters(page);
 
     // Verify URL contains genderPreference=FEMALE_ONLY
-    await expect.poll(
-      () => new URL(page.url(), "http://localhost").searchParams.get("genderPreference"),
-      { timeout: 30_000, message: 'URL param "genderPreference" to be "FEMALE_ONLY"' },
-    ).toBe("FEMALE_ONLY");
+    await expect
+      .poll(
+        () =>
+          new URL(page.url(), "http://localhost").searchParams.get(
+            "genderPreference"
+          ),
+        {
+          timeout: 30_000,
+          message: 'URL param "genderPreference" to be "FEMALE_ONLY"',
+        }
+      )
+      .toBe("FEMALE_ONLY");
 
     expect(getUrlParam(page, "genderPreference")).toBe("FEMALE_ONLY");
   });
 
   // 8.2: Select household gender -> URL has householdGender=MIXED
-  test(`${tags.core} - selecting household gender and applying updates URL`, async ({ page }) => {
+  test(`${tags.core} - selecting household gender and applying updates URL`, async ({
+    page,
+  }) => {
     await waitForSearchReady(page);
     const dialog = await openFilterModal(page);
 
@@ -91,21 +107,33 @@ test.describe("Gender & Language Filters", () => {
     await applyFilters(page);
 
     // Verify URL contains householdGender=MIXED
-    await expect.poll(
-      () => new URL(page.url(), "http://localhost").searchParams.get("householdGender"),
-      { timeout: 30_000, message: 'URL param "householdGender" to be "MIXED"' },
-    ).toBe("MIXED");
+    await expect
+      .poll(
+        () =>
+          new URL(page.url(), "http://localhost").searchParams.get(
+            "householdGender"
+          ),
+        {
+          timeout: 30_000,
+          message: 'URL param "householdGender" to be "MIXED"',
+        }
+      )
+      .toBe("MIXED");
 
     expect(getUrlParam(page, "householdGender")).toBe("MIXED");
   });
 
   // 8.3: Language multi-select with search -> select Spanish and French, URL has language codes
-  test(`${tags.core} - searching and selecting multiple languages updates URL`, async ({ page }) => {
+  test(`${tags.core} - searching and selecting multiple languages updates URL`, async ({
+    page,
+  }) => {
     await waitForSearchReady(page);
     const dialog = await openFilterModal(page);
 
     // Scroll to the language section
-    const languageSearch = dialog.locator('input[placeholder="Search languages..."]');
+    const languageSearch = dialog.locator(
+      'input[placeholder="Search languages..."]'
+    );
     await languageSearch.scrollIntoViewIfNeeded();
     await expect(languageSearch).toBeVisible({ timeout: 5_000 });
 
@@ -122,7 +150,9 @@ test.describe("Gender & Language Filters", () => {
     // Spanish should now appear in the "Selected languages" group
     const selectedGroup = dialog.locator('[aria-label="Selected languages"]');
     await expect(selectedGroup).toBeVisible({ timeout: 3_000 });
-    const selectedSpanish = selectedGroup.getByRole("button", { name: /spanish/i });
+    const selectedSpanish = selectedGroup.getByRole("button", {
+      name: /spanish/i,
+    });
     await expect(selectedSpanish).toHaveAttribute("aria-pressed", "true");
 
     // Clear search and search for "Fre" to find French
@@ -136,7 +166,9 @@ test.describe("Gender & Language Filters", () => {
     await page.waitForTimeout(300);
 
     // Both should be in the selected group
-    const selectedFrench = selectedGroup.getByRole("button", { name: /french/i });
+    const selectedFrench = selectedGroup.getByRole("button", {
+      name: /french/i,
+    });
     await expect(selectedFrench).toHaveAttribute("aria-pressed", "true");
 
     // Apply
@@ -144,13 +176,25 @@ test.describe("Gender & Language Filters", () => {
     await applyFilters(page);
 
     // Verify URL contains language codes (es for Spanish, fr for French)
-    await expect.poll(
-      () => {
-        const languages = new URL(page.url(), "http://localhost").searchParams.get("languages");
-        return languages !== null && languages.includes("es") && languages.includes("fr");
-      },
-      { timeout: 30_000, message: 'URL param "languages" to contain "es" and "fr"' },
-    ).toBe(true);
+    await expect
+      .poll(
+        () => {
+          const languages = new URL(
+            page.url(),
+            "http://localhost"
+          ).searchParams.get("languages");
+          return (
+            languages !== null &&
+            languages.includes("es") &&
+            languages.includes("fr")
+          );
+        },
+        {
+          timeout: 30_000,
+          message: 'URL param "languages" to contain "es" and "fr"',
+        }
+      )
+      .toBe(true);
 
     const languages = getUrlParam(page, "languages") ?? "";
     expect(languages).toContain("es");
@@ -158,7 +202,9 @@ test.describe("Gender & Language Filters", () => {
   });
 
   // 8.4: Deselect language -> click selected language to remove, URL updates
-  test(`${tags.core} - deselecting a language removes it from URL`, async ({ page }) => {
+  test(`${tags.core} - deselecting a language removes it from URL`, async ({
+    page,
+  }) => {
     // Start with Spanish and French applied
     await page.goto(`${SEARCH_URL}&languages=es,fr`);
     await page.waitForLoadState("domcontentloaded");
@@ -167,7 +213,9 @@ test.describe("Gender & Language Filters", () => {
     const dialog = await openFilterModal(page);
 
     // Scroll to language section
-    const languageSearch = dialog.locator('input[placeholder="Search languages..."]');
+    const languageSearch = dialog.locator(
+      'input[placeholder="Search languages..."]'
+    );
     await languageSearch.scrollIntoViewIfNeeded();
 
     // Spanish should be in the "Selected languages" group
@@ -175,7 +223,9 @@ test.describe("Gender & Language Filters", () => {
     await expect(selectedGroup).toBeVisible({ timeout: 5_000 });
 
     // Click Spanish to deselect it
-    const selectedSpanish = selectedGroup.getByRole("button", { name: /spanish/i });
+    const selectedSpanish = selectedGroup.getByRole("button", {
+      name: /spanish/i,
+    });
     await expect(selectedSpanish).toBeVisible({ timeout: 3_000 });
     await selectedSpanish.click();
     await page.waitForTimeout(300);
@@ -184,13 +234,21 @@ test.describe("Gender & Language Filters", () => {
     await applyFilters(page);
 
     // URL should now have only French (fr), not Spanish (es)
-    await expect.poll(
-      () => {
-        const languages = new URL(page.url(), "http://localhost").searchParams.get("languages") ?? "";
-        return !languages.includes("es");
-      },
-      { timeout: 30_000, message: 'URL param "languages" to not contain "es"' },
-    ).toBe(true);
+    await expect
+      .poll(
+        () => {
+          const languages =
+            new URL(page.url(), "http://localhost").searchParams.get(
+              "languages"
+            ) ?? "";
+          return !languages.includes("es");
+        },
+        {
+          timeout: 30_000,
+          message: 'URL param "languages" to not contain "es"',
+        }
+      )
+      .toBe(true);
 
     const languages = getUrlParam(page, "languages") ?? "";
     expect(languages).not.toContain("es");
@@ -199,12 +257,16 @@ test.describe("Gender & Language Filters", () => {
   });
 
   // 8.5: "No languages found" shown when search has no matches
-  test(`${tags.core} - shows "No languages found" for unmatched search`, async ({ page }) => {
+  test(`${tags.core} - shows "No languages found" for unmatched search`, async ({
+    page,
+  }) => {
     await waitForSearchReady(page);
     const dialog = await openFilterModal(page);
 
     // Scroll to language section
-    const languageSearch = dialog.locator('input[placeholder="Search languages..."]');
+    const languageSearch = dialog.locator(
+      'input[placeholder="Search languages..."]'
+    );
     await languageSearch.scrollIntoViewIfNeeded();
     await expect(languageSearch).toBeVisible({ timeout: 5_000 });
 
@@ -218,18 +280,68 @@ test.describe("Gender & Language Filters", () => {
   });
 
   // 8.6: "All languages selected" shown when all picked
-  test(`${tags.core} - shows "All languages selected" when every language is selected`, async ({ page }) => {
+  test(`${tags.core} - shows "All languages selected" when every language is selected`, async ({
+    page,
+  }) => {
     // Build a URL with all supported language codes selected
     // The SUPPORTED_LANGUAGES object has ~47 languages; we need all their codes.
     // Rather than hardcoding all codes, we navigate with a large set of known codes
     // and verify the "All languages selected" message appears when search is empty.
     const allLanguageCodes = [
-      "en", "es", "zh", "hi", "ar", "pt", "ru", "ja", "de", "fr",
-      "ko", "vi", "it", "nl", "pl", "tr", "th", "te", "ta", "bn",
-      "pa", "gu", "mr", "kn", "ml", "ur", "ne", "si", "yue", "tl",
-      "id", "ms", "my", "km", "fa", "he", "sw", "am", "yo", "ha",
-      "ig", "uk", "cs", "ro", "el", "hu", "sv", "da", "no", "fi",
-      "sk", "bg", "sr", "hr",
+      "en",
+      "es",
+      "zh",
+      "hi",
+      "ar",
+      "pt",
+      "ru",
+      "ja",
+      "de",
+      "fr",
+      "ko",
+      "vi",
+      "it",
+      "nl",
+      "pl",
+      "tr",
+      "th",
+      "te",
+      "ta",
+      "bn",
+      "pa",
+      "gu",
+      "mr",
+      "kn",
+      "ml",
+      "ur",
+      "ne",
+      "si",
+      "yue",
+      "tl",
+      "id",
+      "ms",
+      "my",
+      "km",
+      "fa",
+      "he",
+      "sw",
+      "am",
+      "yo",
+      "ha",
+      "ig",
+      "uk",
+      "cs",
+      "ro",
+      "el",
+      "hu",
+      "sv",
+      "da",
+      "no",
+      "fi",
+      "sk",
+      "bg",
+      "sr",
+      "hr",
     ];
     const languagesParam = allLanguageCodes.join(",");
 
@@ -240,7 +352,9 @@ test.describe("Gender & Language Filters", () => {
     const dialog = await openFilterModal(page);
 
     // Scroll to language section
-    const languageSearch = dialog.locator('input[placeholder="Search languages..."]');
+    const languageSearch = dialog.locator(
+      'input[placeholder="Search languages..."]'
+    );
     await languageSearch.scrollIntoViewIfNeeded();
 
     // With all languages selected and no search term, the available languages area

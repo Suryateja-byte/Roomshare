@@ -24,7 +24,13 @@
  * J20: Error handling & 404
  */
 
-import { test, expect, selectors, SF_BOUNDS, searchResultsContainer } from "../helpers";
+import {
+  test,
+  expect,
+  selectors,
+  SF_BOUNDS,
+  searchResultsContainer,
+} from "../helpers";
 
 test.beforeEach(async () => {
   test.slow();
@@ -47,10 +53,12 @@ test.describe("J1: Home Page Load & Hero CTA", () => {
     await expect(heading).toBeVisible({ timeout: 30000 });
 
     // Should have navigation
-    await expect(page.locator(selectors.navbar).first()).toBeVisible({ timeout: 10000 });
+    await expect(page.locator(selectors.navbar).first()).toBeVisible({
+      timeout: 10000,
+    });
 
     // Should have a CTA or search entry point
-    const main = page.locator('main');
+    const main = page.locator("main");
     const searchEntry = main
       .getByRole("link", { name: /search|find|browse|explore/i })
       .or(main.getByRole("button", { name: /search|find|browse|explore/i }))
@@ -61,9 +69,12 @@ test.describe("J1: Home Page Load & Hero CTA", () => {
     // On mobile viewports, the hero CTA may be hidden or different — skip if not visible
     const viewport = page.viewportSize();
     if (viewport && viewport.width < 768) {
-      const ctaVisible = await searchEntry.first().isVisible({ timeout: 5000 }).catch(() => false);
+      const ctaVisible = await searchEntry
+        .first()
+        .isVisible({ timeout: 5000 })
+        .catch(() => false);
       if (!ctaVisible) {
-        test.skip(true, 'Hero CTA not visible on mobile viewport');
+        test.skip(true, "Hero CTA not visible on mobile viewport");
         return;
       }
     }
@@ -73,7 +84,7 @@ test.describe("J1: Home Page Load & Hero CTA", () => {
     // Click CTA to navigate to search
     await searchEntry.first().click();
     // Should navigate away from home or open search
-    await page.waitForLoadState('domcontentloaded');
+    await page.waitForLoadState("domcontentloaded");
   });
 });
 
@@ -86,10 +97,12 @@ test.describe("J2: Search With Text Query", () => {
     await nav.goToSearch({ location: "San Francisco" });
 
     // Wait for results to load — location-based search may take longer in CI
-    await page.waitForLoadState('domcontentloaded');
+    await page.waitForLoadState("domcontentloaded");
 
     // Poll for either listings or empty state (page may still be loading in CI)
-    const listings = searchResultsContainer(page).locator(selectors.listingCard);
+    const listings = searchResultsContainer(page).locator(
+      selectors.listingCard
+    );
     const emptyState = page.locator(selectors.emptyState);
     let hasListings = false;
     let hasEmpty = false;
@@ -99,14 +112,23 @@ test.describe("J2: Search With Text Query", () => {
       hasEmpty = await emptyState.isVisible().catch(() => false);
       if (hasListings || hasEmpty) break;
       // Also check for "select a location" prompt (no bounds = browse mode)
-      const browseMode = await page.getByText(/select a location|showing top listings/i).isVisible().catch(() => false);
-      if (browseMode) { hasListings = true; break; }
+      const browseMode = await page
+        .getByText(/select a location|showing top listings/i)
+        .isVisible()
+        .catch(() => false);
+      if (browseMode) {
+        hasListings = true;
+        break;
+      }
       await page.waitForTimeout(500);
     }
 
     // If still neither, the page may be in browse mode without explicit empty state — pass gracefully
     if (!hasListings && !hasEmpty) {
-      test.skip(true, 'Neither listings nor empty state rendered (location search may not resolve in CI)');
+      test.skip(
+        true,
+        "Neither listings nor empty state rendered (location search may not resolve in CI)"
+      );
       return;
     }
     expect(hasListings || hasEmpty).toBeTruthy();
@@ -121,17 +143,14 @@ test.describe("J2: Search With Text Query", () => {
 
 // ─── J3: Search Filters ──────────────────────────────────────────────────────
 test.describe("J3: Search Filters (Price, Room Type, Amenities)", () => {
-  test("applies price filter and results update", async ({
-    page,
-    nav,
-  }) => {
+  test("applies price filter and results update", async ({ page, nav }) => {
     await nav.goToSearch({
       minPrice: 500,
       maxPrice: 2000,
       bounds: SF_BOUNDS,
     });
 
-    await page.waitForLoadState('domcontentloaded');
+    await page.waitForLoadState("domcontentloaded");
 
     // Check URL reflects filter params
     const url = page.url();
@@ -145,7 +164,7 @@ test.describe("J3: Search Filters (Price, Room Type, Amenities)", () => {
   test("applies room type filter via URL", async ({ page, nav }) => {
     await nav.goToSearch({ roomType: "private", bounds: SF_BOUNDS });
 
-    await page.waitForLoadState('domcontentloaded');
+    await page.waitForLoadState("domcontentloaded");
     const url = page.url();
     expect(url).toContain("roomType");
     await expect(page.locator("body")).toBeVisible();
@@ -161,7 +180,7 @@ test.describe("J4: Map & Listing Sync", () => {
   }) => {
     await nav.goToSearch({ bounds: SF_BOUNDS });
 
-    await page.waitForLoadState('domcontentloaded');
+    await page.waitForLoadState("domcontentloaded");
 
     // Map may not render in test env (no Mapbox token), but container should exist
     // or search results should show
@@ -180,9 +199,11 @@ test.describe("J5: Listing Detail Page", () => {
   }) => {
     // Go to search first
     await nav.goToSearch({ bounds: SF_BOUNDS });
-    await page.waitForLoadState('domcontentloaded');
+    await page.waitForLoadState("domcontentloaded");
 
-    const listings = searchResultsContainer(page).locator(selectors.listingCard);
+    const listings = searchResultsContainer(page).locator(
+      selectors.listingCard
+    );
     const count = await listings.count();
 
     if (count === 0) {
@@ -220,9 +241,11 @@ test.describe("J6: Image Carousel on Listing", () => {
     nav,
   }) => {
     await nav.goToSearch({ bounds: SF_BOUNDS });
-    await page.waitForLoadState('domcontentloaded');
+    await page.waitForLoadState("domcontentloaded");
 
-    const listings = searchResultsContainer(page).locator(selectors.listingCard);
+    const listings = searchResultsContainer(page).locator(
+      selectors.listingCard
+    );
     if ((await listings.count()) === 0) {
       test.skip();
       return;
@@ -232,7 +255,9 @@ test.describe("J6: Image Carousel on Listing", () => {
     await expect(page).toHaveURL(/\/listings\//);
 
     // Should have images
-    const images = page.locator("img").filter({ hasNot: page.locator('[role="presentation"]') });
+    const images = page
+      .locator("img")
+      .filter({ hasNot: page.locator('[role="presentation"]') });
     await expect(images.first()).toBeVisible({ timeout: 10000 });
 
     // Just verify page doesn't crash
@@ -255,7 +280,7 @@ test.describe("J7: Auth — Login Redirect (Authenticated)", () => {
     // In CI, the session may have expired so the user stays on /login
     const url = page.url();
     const wasRedirected = !url.match(/\/login$/);
-    const stayedOnLogin = url.includes('/login');
+    const stayedOnLogin = url.includes("/login");
     // Either redirect happened (session valid) or stayed on login (session expired)
     expect(wasRedirected || stayedOnLogin).toBeTruthy();
   });
@@ -275,7 +300,7 @@ test.describe("J8: Auth — Signup Redirect (Authenticated)", () => {
     // In CI, the session may have expired so the user stays on /signup
     const url = page.url();
     const wasRedirected = !url.match(/\/signup$/);
-    const stayedOnSignup = url.includes('/signup');
+    const stayedOnSignup = url.includes("/signup");
     expect(wasRedirected || stayedOnSignup).toBeTruthy();
   });
 });
@@ -301,9 +326,11 @@ test.describe("J10: Booking Request Flow", () => {
     assert,
   }) => {
     await nav.goToSearch({ bounds: SF_BOUNDS });
-    await page.waitForLoadState('domcontentloaded');
+    await page.waitForLoadState("domcontentloaded");
 
-    const listings = searchResultsContainer(page).locator(selectors.listingCard);
+    const listings = searchResultsContainer(page).locator(
+      selectors.listingCard
+    );
     if ((await listings.count()) === 0) {
       test.skip();
       return;
@@ -329,8 +356,8 @@ test.describe("J11: Messaging — Conversation List", () => {
     await nav.goToMessages();
 
     // Check we weren't redirected to login
-    if (page.url().includes('/login') || page.url().includes('/signin')) {
-      test.skip(true, 'Auth session expired - redirected to login');
+    if (page.url().includes("/login") || page.url().includes("/signin")) {
+      test.skip(true, "Auth session expired - redirected to login");
       return;
     }
 
@@ -342,7 +369,11 @@ test.describe("J11: Messaging — Conversation List", () => {
       .or(main.locator('[data-testid="messages-page"]'))
       .or(main.locator('[data-testid="conversation-list"]'))
       .or(main.locator('[data-testid="conversation-item"]'))
-      .or(main.getByText(/no.*message|no.*conversation|inbox|start a conversation/i));
+      .or(
+        main.getByText(
+          /no.*message|no.*conversation|inbox|start a conversation/i
+        )
+      );
 
     await expect(messagesUI.first()).toBeVisible({ timeout: 30000 });
     // pageLoaded may fail on mobile if page structure differs — skip assertion
@@ -360,8 +391,8 @@ test.describe("J12: Profile View & Edit", () => {
     await nav.goToProfile();
 
     // Check we weren't redirected to login
-    if (page.url().includes('/login') || page.url().includes('/signin')) {
-      test.skip(true, 'Auth session expired - redirected to login');
+    if (page.url().includes("/login") || page.url().includes("/signin")) {
+      test.skip(true, "Auth session expired - redirected to login");
       return;
     }
 
@@ -385,8 +416,8 @@ test.describe("J12: Profile View & Edit", () => {
     await page.waitForLoadState("domcontentloaded");
 
     // Check we weren't redirected to login
-    if (page.url().includes('/login') || page.url().includes('/signin')) {
-      test.skip(true, 'Auth session expired - redirected to login');
+    if (page.url().includes("/login") || page.url().includes("/signin")) {
+      test.skip(true, "Auth session expired - redirected to login");
       return;
     }
 
@@ -412,8 +443,8 @@ test.describe("J13: Settings Page", () => {
     await nav.goToSettings();
 
     // Check we weren't redirected to login
-    if (page.url().includes('/login') || page.url().includes('/signin')) {
-      test.skip(true, 'Auth session expired - redirected to login');
+    if (page.url().includes("/login") || page.url().includes("/signin")) {
+      test.skip(true, "Auth session expired - redirected to login");
       return;
     }
 
@@ -437,8 +468,8 @@ test.describe("J14: Favorites — Save & View", () => {
     await nav.goToSaved();
 
     // Check we weren't redirected to login
-    if (page.url().includes('/login') || page.url().includes('/signin')) {
-      test.skip(true, 'Auth session expired - redirected to login');
+    if (page.url().includes("/login") || page.url().includes("/signin")) {
+      test.skip(true, "Auth session expired - redirected to login");
       return;
     }
 
@@ -458,9 +489,11 @@ test.describe("J14: Favorites — Save & View", () => {
     nav,
   }) => {
     await nav.goToSearch({ bounds: SF_BOUNDS });
-    await page.waitForLoadState('domcontentloaded');
+    await page.waitForLoadState("domcontentloaded");
 
-    const listings = searchResultsContainer(page).locator(selectors.listingCard);
+    const listings = searchResultsContainer(page).locator(
+      selectors.listingCard
+    );
     if ((await listings.count()) === 0) {
       test.skip();
       return;
@@ -481,8 +514,8 @@ test.describe("J15: Saved Searches", () => {
     await nav.goToSavedSearches();
 
     // Check we weren't redirected to login
-    if (page.url().includes('/login') || page.url().includes('/signin')) {
-      test.skip(true, 'Auth session expired - redirected to login');
+    if (page.url().includes("/login") || page.url().includes("/signin")) {
+      test.skip(true, "Auth session expired - redirected to login");
       return;
     }
 
@@ -507,8 +540,8 @@ test.describe("J16: Notifications Page", () => {
     await nav.goToNotifications();
 
     // Check we weren't redirected to login
-    if (page.url().includes('/login') || page.url().includes('/signin')) {
-      test.skip(true, 'Auth session expired - redirected to login');
+    if (page.url().includes("/login") || page.url().includes("/signin")) {
+      test.skip(true, "Auth session expired - redirected to login");
       return;
     }
 
@@ -525,14 +558,13 @@ test.describe("J16: Notifications Page", () => {
 
 // ─── J17: Reviews on Listing ─────────────────────────────────────────────────
 test.describe("J17: Reviews on Listing", () => {
-  test("listing detail page has reviews section", async ({
-    page,
-    nav,
-  }) => {
+  test("listing detail page has reviews section", async ({ page, nav }) => {
     await nav.goToSearch({ bounds: SF_BOUNDS });
-    await page.waitForLoadState('domcontentloaded');
+    await page.waitForLoadState("domcontentloaded");
 
-    const listings = searchResultsContainer(page).locator(selectors.listingCard);
+    const listings = searchResultsContainer(page).locator(
+      selectors.listingCard
+    );
     if ((await listings.count()) === 0) {
       test.skip();
       return;
@@ -558,8 +590,8 @@ test.describe("J18: Create Listing Flow", () => {
     await nav.goToCreateListing();
 
     // Check we weren't redirected to login
-    if (page.url().includes('/login') || page.url().includes('/signin')) {
-      test.skip(true, 'Auth session expired - redirected to login');
+    if (page.url().includes("/login") || page.url().includes("/signin")) {
+      test.skip(true, "Auth session expired - redirected to login");
       return;
     }
 
@@ -585,7 +617,7 @@ test.describe("J19: Mobile Responsive Navigation", () => {
     await page.setViewportSize({ width: 375, height: 812 });
 
     await nav.goHome();
-    await page.waitForLoadState('domcontentloaded');
+    await page.waitForLoadState("domcontentloaded");
 
     // Mobile menu may be present depending on viewport
 
@@ -594,7 +626,7 @@ test.describe("J19: Mobile Responsive Navigation", () => {
 
     // Navigate to search on mobile
     await nav.goToSearch({ bounds: SF_BOUNDS });
-    await page.waitForLoadState('domcontentloaded');
+    await page.waitForLoadState("domcontentloaded");
 
     // Page should render without horizontal overflow
     const bodyWidth = await page.evaluate(() => document.body.scrollWidth);
@@ -615,7 +647,7 @@ test.describe("J20: Error Handling & 404", () => {
 
     // Should show some error UI
     const errorUI = page
-      .getByText(/not found|404|doesn.?t exist|page not found|couldn.?t find/i)
+      .getByText(/not found|404|doesn.?t exist|page not found|couldn.?t find|packed up|moved out/i)
       .or(page.locator('[data-testid="not-found"]'));
 
     const hasErrorUI = (await errorUI.count()) > 0;
@@ -627,7 +659,7 @@ test.describe("J20: Error Handling & 404", () => {
   test("non-existent listing shows error or 404", async ({ page }) => {
     await page.goto("/listings/non-existent-listing-id-xyz-000");
     await page.waitForLoadState("domcontentloaded");
-    await page.waitForLoadState('domcontentloaded');
+    await page.waitForLoadState("domcontentloaded");
 
     // Page should at least render something (not blank white screen)
     await expect(page.locator("body")).toBeVisible();
@@ -660,7 +692,9 @@ test.describe("J20: Error Handling & 404", () => {
     await page.waitForLoadState("domcontentloaded");
     const heading = page
       .getByRole("heading", { name: /terms/i })
-      .or(page.getByText(/terms of service|terms of use|terms and conditions/i));
+      .or(
+        page.getByText(/terms of service|terms of use|terms and conditions/i)
+      );
     await expect(heading.first()).toBeVisible({ timeout: 30000 });
   });
 

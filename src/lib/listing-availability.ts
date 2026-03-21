@@ -1,4 +1,6 @@
-import { prisma } from '@/lib/prisma';
+import "server-only";
+
+import { prisma } from "@/lib/prisma";
 
 export interface ListingAvailability {
   availableSlots: number;
@@ -13,12 +15,16 @@ export interface ListingAvailability {
  * - effectiveAvailable: availableSlots + ghost holds that will be restored on next sweep
  * - ghostHolds: count of slots held by expired holds awaiting sweeper cleanup
  */
-export async function getListingAvailability(listingId: string): Promise<ListingAvailability | null> {
-  const [result] = await prisma.$queryRaw<Array<{
-    availableSlots: number;
-    effectiveAvailable: number;
-    ghostHolds: number;
-  }>>`
+export async function getListingAvailability(
+  listingId: string
+): Promise<ListingAvailability | null> {
+  const [result] = await prisma.$queryRaw<
+    Array<{
+      availableSlots: number;
+      effectiveAvailable: number;
+      ghostHolds: number;
+    }>
+  >`
     SELECT
       l."availableSlots"::int AS "availableSlots",
       (l."availableSlots" + COALESCE(gh.ghost_slots, 0))::int AS "effectiveAvailable",

@@ -1,12 +1,16 @@
-'use server';
+"use server";
 
-import { prisma } from '@/lib/prisma';
-import { auth } from '@/auth';
-import { logger } from '@/lib/logger';
-import { crossesAntimeridian } from '@/lib/data';
-import { checkRateLimit, getClientIPFromHeaders, RATE_LIMITS } from '@/lib/rate-limit';
-import { headers } from 'next/headers';
-import { z } from 'zod';
+import { prisma } from "@/lib/prisma";
+import { auth } from "@/auth";
+import { logger } from "@/lib/logger";
+import { crossesAntimeridian } from "@/lib/data";
+import {
+  checkRateLimit,
+  getClientIPFromHeaders,
+  RATE_LIMITS,
+} from "@/lib/rate-limit";
+import { headers } from "next/headers";
+import { z } from "zod";
 
 const boundsSchema = z.object({
   ne_lat: z.number().min(-90).max(90),
@@ -34,7 +38,9 @@ export interface MapListing {
   images: string[];
 }
 
-export async function getListingsInBounds(bounds: Bounds): Promise<MapListing[]> {
+export async function getListingsInBounds(
+  bounds: Bounds
+): Promise<MapListing[]> {
   const session = await auth();
   if (!session?.user?.id) return [];
 
@@ -47,7 +53,11 @@ export async function getListingsInBounds(bounds: Bounds): Promise<MapListing[]>
   // Rate limiting
   const headersList = await headers();
   const ip = getClientIPFromHeaders(headersList);
-  const rl = await checkRateLimit(ip, 'getListingsInBounds', RATE_LIMITS.getListingsInBounds);
+  const rl = await checkRateLimit(
+    ip,
+    "getListingsInBounds",
+    RATE_LIMITS.getListingsInBounds
+  );
   if (!rl.success) return [];
 
   try {
@@ -114,10 +124,10 @@ export async function getListingsInBounds(bounds: Bounds): Promise<MapListing[]>
 
     return listings;
   } catch (error: unknown) {
-    logger.sync.error('Failed to fetch listings in bounds', {
-      action: 'getListingsInBounds',
+    logger.sync.error("Failed to fetch listings in bounds", {
+      action: "getListingsInBounds",
       bounds: { ne_lat, ne_lng, sw_lat, sw_lng },
-      error: error instanceof Error ? error.message : 'Unknown error',
+      error: error instanceof Error ? error.message : "Unknown error",
     });
     return [];
   }

@@ -36,14 +36,14 @@ export const mobileSelectors = {
   /** Map container */
   mapContainer: '[data-testid="map"], .maplibregl-map',
   /** Map markers */
-  mapMarker: ".maplibregl-marker, [data-testid=\"map-marker\"]",
+  mapMarker: '.maplibregl-marker, [data-testid="map-marker"]',
   /** Floating toggle button (map/list) */
   floatingToggle:
     'button[aria-label="Show map"], button[aria-label="Show list"]',
   /** Mobile sort button */
   sortButton: 'button[aria-label^="Sort:"]',
   /** Sort sheet heading */
-  sortSheetHeading: "h3:has-text(\"Sort by\")",
+  sortSheetHeading: 'h3:has-text("Sort by")',
   /** Mobile filter button in collapsed search bar */
   mobileFilterButton: '[data-testid="mobile-filter-button"]',
   /** Filters button in the search form */
@@ -96,7 +96,7 @@ export async function getSheetHeightFraction(page: Page): Promise<number> {
         return h > 0 && h <= window.innerHeight * 1.05;
       },
       sel,
-      { timeout: 5000 },
+      { timeout: 5000 }
     )
     .catch(() => {
       /* assertion will catch bad values */
@@ -115,7 +115,7 @@ export async function getSheetHeightFraction(page: Page): Promise<number> {
  */
 export async function setSheetSnap(
   page: Page,
-  targetSnap: 0 | 1 | 2,
+  targetSnap: 0 | 1 | 2
 ): Promise<void> {
   const currentSnap = await getSheetSnapIndex(page);
   if (currentSnap === targetSnap) return;
@@ -137,11 +137,14 @@ export async function setSheetSnap(
           ({ sel, prev }: { sel: string; prev: number }) => {
             const el = document.querySelector(sel);
             if (!el) return true;
-            const curr = parseInt(el.getAttribute("data-snap-current") ?? "-1", 10);
+            const curr = parseInt(
+              el.getAttribute("data-snap-current") ?? "-1",
+              10
+            );
             return curr !== prev;
           },
           { sel: mobileSelectors.snapContent, prev: prevSnap },
-          { timeout: 3000 },
+          { timeout: 3000 }
         )
         .catch(() => {});
     }
@@ -171,7 +174,7 @@ export async function waitForSheetAnimation(page: Page): Promise<void> {
         return Math.abs(curr - prev) < 2; // settled when delta < 2px
       },
       sel,
-      { timeout: 5000, polling: 100 },
+      { timeout: 5000, polling: 100 }
     );
   } catch {
     // If polling times out, the animation is likely done anyway
@@ -211,7 +214,7 @@ export async function waitForLayoutStable(page: Page): Promise<void> {
         return curr === prev && curr !== "";
       },
       undefined,
-      { timeout: 5000, polling: 150 },
+      { timeout: 5000, polling: 150 }
     )
     .catch(() => {
       /* Layout may not use --header-height; continue anyway */
@@ -226,7 +229,7 @@ export async function waitForLayoutStable(page: Page): Promise<void> {
  */
 export async function waitForMobileSheet(
   page: Page,
-  options?: { timeout?: number },
+  options?: { timeout?: number }
 ): Promise<boolean> {
   const timeout = options?.timeout ?? 30_000;
 
@@ -241,9 +244,7 @@ export async function waitForMobileSheet(
 
   // Check if bottom sheet is visible
   const sheet = page.locator(mobileSelectors.bottomSheet);
-  return sheet
-    .isVisible({ timeout: 5000 })
-    .catch(() => false);
+  return sheet.isVisible({ timeout: 5000 }).catch(() => false);
 }
 
 /**
@@ -252,7 +253,7 @@ export async function waitForMobileSheet(
  */
 export async function navigateToMobileSearch(
   page: Page,
-  extraParams?: string,
+  extraParams?: string
 ): Promise<boolean> {
   const SF_BOUNDS = {
     minLat: 37.7,

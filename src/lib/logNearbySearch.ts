@@ -14,11 +14,11 @@ export interface ClientMetricsParams {
   /** Listing ID (will be HMAC'd server-side) */
   listingId: string;
   /** Route that triggered the metric */
-  route: 'nearby' | 'llm';
+  route: "nearby" | "llm";
   /** Whether the request was blocked by policy */
   isBlocked: boolean;
   /** Search type (only for allowed requests) */
-  searchType?: 'type' | 'text';
+  searchType?: "type" | "text";
   /** Included place types (only for allowed requests) */
   includedTypes?: string[];
   /** Result count (only for allowed requests) */
@@ -30,11 +30,11 @@ export interface ClientMetricsParams {
  * Stored in sessionStorage for the duration of the browser session.
  */
 export function getOrCreateSessionId(): string {
-  if (typeof window === 'undefined') {
-    return 'server';
+  if (typeof window === "undefined") {
+    return "server";
   }
 
-  const STORAGE_KEY = 'session-random';
+  const STORAGE_KEY = "session-random";
 
   try {
     let sessionId = sessionStorage.getItem(STORAGE_KEY);
@@ -62,8 +62,17 @@ export function getOrCreateSessionId(): string {
  *
  * @param params - The metrics parameters to log
  */
-export async function logSafeMetrics(params: ClientMetricsParams): Promise<void> {
-  const { listingId, route, isBlocked, searchType, includedTypes, resultCount } = params;
+export async function logSafeMetrics(
+  params: ClientMetricsParams
+): Promise<void> {
+  const {
+    listingId,
+    route,
+    isBlocked,
+    searchType,
+    includedTypes,
+    resultCount,
+  } = params;
 
   const payload = {
     listingId, // Server will HMAC this, then discard
@@ -78,9 +87,9 @@ export async function logSafeMetrics(params: ClientMetricsParams): Promise<void>
 
   // Fire-and-forget
   try {
-    fetch('/api/metrics', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
+    fetch("/api/metrics", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
       body: JSON.stringify(payload),
     }).catch(() => {
       // Silently ignore failures
@@ -99,7 +108,7 @@ export async function logSafeMetrics(params: ClientMetricsParams): Promise<void>
  */
 export async function logBlockedRequest(
   listingId: string,
-  route: 'nearby' | 'llm'
+  route: "nearby" | "llm"
 ): Promise<void> {
   await logSafeMetrics({
     listingId,
@@ -118,13 +127,13 @@ export async function logBlockedRequest(
  */
 export async function logAllowedSearch(
   listingId: string,
-  searchType: 'type' | 'text',
+  searchType: "type" | "text",
   includedTypes?: string[],
   resultCount?: number
 ): Promise<void> {
   await logSafeMetrics({
     listingId,
-    route: 'nearby',
+    route: "nearby",
     isBlocked: false,
     searchType,
     includedTypes,
@@ -144,7 +153,7 @@ export async function logLLMInteraction(
 ): Promise<void> {
   await logSafeMetrics({
     listingId,
-    route: 'llm',
+    route: "llm",
     isBlocked,
   });
 }

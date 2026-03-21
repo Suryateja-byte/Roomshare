@@ -1,26 +1,26 @@
-import { defineConfig, devices } from '@playwright/test';
-import dns from 'node:dns';
-import dotenv from 'dotenv';
-import path from 'path';
+import { defineConfig, devices } from "@playwright/test";
+import dns from "node:dns";
+import dotenv from "dotenv";
+import path from "path";
 
 // Node.js >=17 defaults to IPv6-first DNS resolution.
 // GitHub Actions runners resolve "localhost" to ::1 (IPv6) but Next.js
 // binds to 127.0.0.1 (IPv4). Force IPv4-first to prevent ECONNREFUSED.
-dns.setDefaultResultOrder('ipv4first');
+dns.setDefaultResultOrder("ipv4first");
 
 // Load environment variables
-dotenv.config({ path: path.resolve(__dirname, '.env.local') });
-dotenv.config({ path: path.resolve(__dirname, '.env') });
+dotenv.config({ path: path.resolve(__dirname, ".env.local") });
+dotenv.config({ path: path.resolve(__dirname, ".env") });
 
 /**
  * Playwright configuration for RoomShare E2E tests
  * @see https://playwright.dev/docs/test-configuration
  */
 export default defineConfig({
-  testDir: './tests/e2e',
+  testDir: "./tests/e2e",
 
   /* Seed E2E test data before running tests */
-  globalSetup: './tests/e2e/global-setup.ts',
+  globalSetup: "./tests/e2e/global-setup.ts",
 
   /* Run tests in files in parallel */
   fullyParallel: true,
@@ -36,24 +36,24 @@ export default defineConfig({
 
   /* Reporter to use */
   reporter: [
-    ['list'],
-    ['html', { outputFolder: 'playwright-report', open: 'never' }],
-    ['json', { outputFile: 'test-results/results.json' }],
+    ["list"],
+    ["html", { outputFolder: "playwright-report", open: "never" }],
+    ["json", { outputFile: "test-results/results.json" }],
   ],
 
   /* Shared settings for all the projects below */
   use: {
     /* Base URL from environment variable */
-    baseURL: process.env.E2E_BASE_URL || 'http://localhost:3000',
+    baseURL: process.env.E2E_BASE_URL || "http://localhost:3000",
 
     /* Collect trace when retrying the failed test */
-    trace: 'on-first-retry',
+    trace: "on-first-retry",
 
     /* Capture screenshot on failure */
-    screenshot: 'only-on-failure',
+    screenshot: "only-on-failure",
 
     /* Record video on first retry */
-    video: 'on-first-retry',
+    video: "on-first-retry",
 
     /* Default timeout for actions */
     actionTimeout: 15000,
@@ -74,113 +74,117 @@ export default defineConfig({
   projects: [
     /* Setup project for authentication */
     {
-      name: 'setup',
+      name: "setup",
       testMatch: /.*\.setup\.ts/,
     },
 
     {
-      name: 'chromium',
+      name: "chromium",
       testIgnore: /\.(anon|admin)\.spec\.ts/,
       use: {
-        ...devices['Desktop Chrome'],
-        storageState: 'playwright/.auth/user.json',
+        ...devices["Desktop Chrome"],
+        storageState: "playwright/.auth/user.json",
       },
-      dependencies: ['setup'],
+      dependencies: ["setup"],
     },
 
     {
-      name: 'firefox',
+      name: "firefox",
       testIgnore: /\.(anon|admin)\.spec\.ts/,
       use: {
-        ...devices['Desktop Firefox'],
-        storageState: 'playwright/.auth/user.json',
+        ...devices["Desktop Firefox"],
+        storageState: "playwright/.auth/user.json",
       },
-      dependencies: ['setup'],
+      dependencies: ["setup"],
     },
 
     {
-      name: 'webkit',
+      name: "webkit",
       testIgnore: /\.(anon|admin)\.spec\.ts/,
       use: {
-        ...devices['Desktop Safari'],
-        storageState: 'playwright/.auth/user.json',
+        ...devices["Desktop Safari"],
+        storageState: "playwright/.auth/user.json",
       },
-      dependencies: ['setup'],
+      dependencies: ["setup"],
     },
 
     /* Mobile viewports */
     {
-      name: 'Mobile Chrome',
+      name: "Mobile Chrome",
       testIgnore: /\.(anon|admin)\.spec\.ts/,
       use: {
-        ...devices['Pixel 5'],
-        storageState: 'playwright/.auth/user.json',
+        ...devices["Pixel 7"],
+        storageState: "playwright/.auth/user.json",
       },
-      dependencies: ['setup'],
+      dependencies: ["setup"],
     },
 
     {
-      name: 'Mobile Safari',
+      name: "Mobile Safari",
       testIgnore: /\.(anon|admin)\.spec\.ts/,
       use: {
-        ...devices['iPhone 12'],
-        storageState: 'playwright/.auth/user.json',
+        ...devices["iPhone 14"],
+        storageState: "playwright/.auth/user.json",
       },
-      dependencies: ['setup'],
+      dependencies: ["setup"],
     },
 
     /* Admin tests — requires admin authentication */
     {
-      name: 'chromium-admin',
+      name: "chromium-admin",
       testMatch: /\.admin\.spec\.ts/,
       use: {
-        ...devices['Desktop Chrome'],
-        storageState: 'playwright/.auth/admin.json',
+        ...devices["Desktop Chrome"],
+        storageState: "playwright/.auth/admin.json",
       },
-      dependencies: ['setup'],
+      dependencies: ["setup"],
     },
 
     /* Anonymous user tests (no auth required) */
     {
-      name: 'chromium-anon',
+      name: "chromium-anon",
       testMatch: /.*\.anon\.spec\.ts/,
       use: {
-        ...devices['Desktop Chrome'],
+        ...devices["Desktop Chrome"],
       },
     },
 
     /* Cross-browser anon tests — critical 8 specs only */
     {
-      name: 'firefox-anon',
-      testMatch: /search-p0-smoke\.anon|filter-modal\.anon|filter-price\.anon|filter-reset\.anon|search-sort-ordering\.anon|search-a11y\.anon|mobile-ux\.anon|mobile-toggle\.anon/,
+      name: "firefox-anon",
+      testMatch:
+        /search-p0-smoke\.anon|filter-modal\.anon|filter-price\.anon|filter-reset\.anon|search-sort-ordering\.anon|search-a11y\.anon|mobile-ux\.anon|mobile-toggle\.anon/,
       use: {
-        ...devices['Desktop Firefox'],
+        ...devices["Desktop Firefox"],
       },
     },
     {
-      name: 'webkit-anon',
-      testMatch: /search-p0-smoke\.anon|filter-modal\.anon|filter-price\.anon|filter-reset\.anon|search-sort-ordering\.anon|search-a11y\.anon|mobile-ux\.anon|mobile-toggle\.anon/,
+      name: "webkit-anon",
+      testMatch:
+        /search-p0-smoke\.anon|filter-modal\.anon|filter-price\.anon|filter-reset\.anon|search-sort-ordering\.anon|search-a11y\.anon|mobile-ux\.anon|mobile-toggle\.anon/,
       use: {
-        ...devices['Desktop Safari'],
+        ...devices["Desktop Safari"],
       },
     },
   ],
 
   /* Start dev server locally; skip in CI where server is started manually */
   webServer: process.env.E2E_BASE_URL
-    ? undefined  // CI: server already running (started by workflow before tests)
+    ? undefined // CI: server already running (started by workflow before tests)
     : {
-        command: 'pnpm run dev',
-        url: 'http://localhost:3000/api/health/ready',
+        command: "pnpm run dev",
+        url: "http://localhost:3000/api/health/ready",
         reuseExistingServer: true,
         timeout: 180000,
-        stdout: 'pipe',
-        stderr: 'pipe',
+        stdout: "pipe",
+        stderr: "pipe",
         env: Object.fromEntries(
-          Object.entries(process.env).filter((entry): entry is [string, string] => entry[1] != null),
+          Object.entries(process.env).filter(
+            (entry): entry is [string, string] => entry[1] != null
+          )
         ),
       },
 
   /* Output folder for test artifacts */
-  outputDir: 'test-results/',
+  outputDir: "test-results/",
 });

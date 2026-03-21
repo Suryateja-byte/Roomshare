@@ -2,27 +2,27 @@
 
 // Prisma mock type definition
 type PrismaMockType = {
-  user: Record<string, jest.Mock>
-  listing: Record<string, jest.Mock>
-  location: Record<string, jest.Mock>
-  booking: Record<string, jest.Mock>
-  conversation: Record<string, jest.Mock>
-  message: Record<string, jest.Mock>
-  review: Record<string, jest.Mock>
-  reviewResponse: Record<string, jest.Mock>
-  savedListing: Record<string, jest.Mock>
-  savedSearch: Record<string, jest.Mock>
-  notification: Record<string, jest.Mock>
-  verificationRequest: Record<string, jest.Mock>
-  report: Record<string, jest.Mock>
-  recentlyViewed: Record<string, jest.Mock>
-  blockedUser: Record<string, jest.Mock>
-  rateLimitEntry: Record<string, jest.Mock>
-  auditLog: Record<string, jest.Mock>
-  $queryRaw: jest.Mock
-  $queryRawUnsafe: jest.Mock
-  $transaction: jest.Mock
-}
+  user: Record<string, jest.Mock>;
+  listing: Record<string, jest.Mock>;
+  location: Record<string, jest.Mock>;
+  booking: Record<string, jest.Mock>;
+  conversation: Record<string, jest.Mock>;
+  message: Record<string, jest.Mock>;
+  review: Record<string, jest.Mock>;
+  reviewResponse: Record<string, jest.Mock>;
+  savedListing: Record<string, jest.Mock>;
+  savedSearch: Record<string, jest.Mock>;
+  notification: Record<string, jest.Mock>;
+  verificationRequest: Record<string, jest.Mock>;
+  report: Record<string, jest.Mock>;
+  recentlyViewed: Record<string, jest.Mock>;
+  blockedUser: Record<string, jest.Mock>;
+  rateLimitEntry: Record<string, jest.Mock>;
+  auditLog: Record<string, jest.Mock>;
+  $queryRaw: jest.Mock;
+  $queryRawUnsafe: jest.Mock;
+  $transaction: jest.Mock;
+};
 
 // Prisma mock
 export const prismaMock: PrismaMockType = {
@@ -130,22 +130,22 @@ export const prismaMock: PrismaMockType = {
   $queryRaw: jest.fn(),
   $queryRawUnsafe: jest.fn(),
   $transaction: jest.fn((fn) => fn(prismaMock)),
-}
+};
 
 // Auth mock
-export const mockAuth = jest.fn()
+export const mockAuth = jest.fn();
 
 // Mock session helper
 export const createMockSession = (overrides = {}) => ({
   user: {
-    id: 'user-123',
-    name: 'Test User',
-    email: 'test@example.com',
-    image: '/avatar.jpg',
+    id: "user-123",
+    name: "Test User",
+    email: "test@example.com",
+    image: "/avatar.jpg",
     ...overrides,
   },
   expires: new Date(Date.now() + 24 * 60 * 60 * 1000).toISOString(),
-})
+});
 
 // Mock fetch for API tests
 export const createMockFetch = (response: any, ok = true) => {
@@ -153,8 +153,8 @@ export const createMockFetch = (response: any, ok = true) => {
     ok,
     json: jest.fn().mockResolvedValue(response),
     text: jest.fn().mockResolvedValue(JSON.stringify(response)),
-  })
-}
+  });
+};
 
 // Mock router
 export const mockRouter = {
@@ -164,21 +164,23 @@ export const mockRouter = {
   back: jest.fn(),
   forward: jest.fn(),
   refresh: jest.fn(),
-}
+};
 
 // Mock useSearchParams
-export const mockSearchParams = new URLSearchParams()
+export const mockSearchParams = new URLSearchParams();
 
 // Reset all mocks helper
 export const resetAllMocks = () => {
-  jest.clearAllMocks()
+  jest.clearAllMocks();
   Object.values(prismaMock).forEach((model: unknown) => {
-    if (typeof model === 'object' && model !== null) {
-      Object.values(model as Record<string, unknown>).forEach((method: unknown) => {
-        if (typeof method === 'function' && 'mockClear' in method) {
-          (method as jest.Mock).mockClear()
+    if (typeof model === "object" && model !== null) {
+      Object.values(model as Record<string, unknown>).forEach(
+        (method: unknown) => {
+          if (typeof method === "function" && "mockClear" in method) {
+            (method as jest.Mock).mockClear();
+          }
         }
-      })
+      );
     }
-  })
-}
+  });
+};

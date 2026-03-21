@@ -23,7 +23,12 @@
  * Run: pnpm playwright test tests/e2e/pagination/pagination-core.spec.ts --project=chromium
  */
 
-import { test, expect, SF_BOUNDS, searchResultsContainer } from "../helpers/test-utils";
+import {
+  test,
+  expect,
+  SF_BOUNDS,
+  searchResultsContainer,
+} from "../helpers/test-utils";
 import { setupPaginationMock } from "../helpers/pagination-mock-factory";
 
 const boundsQS = `minLat=${SF_BOUNDS.minLat}&maxLat=${SF_BOUNDS.maxLat}&minLng=${SF_BOUNDS.minLng}&maxLng=${SF_BOUNDS.maxLng}`;
@@ -118,7 +123,7 @@ test.describe("Pagination Core", () => {
 
     // Extract all listing IDs
     const allIds = await cards.evaluateAll((elements) =>
-      elements.map((el) => el.getAttribute("data-listing-id")),
+      elements.map((el) => el.getAttribute("data-listing-id"))
     );
 
     // All IDs should be non-null
@@ -412,7 +417,7 @@ test.describe("Pagination Core", () => {
 
     // Wait for the page to render -- either listing cards or zero-results UI
     const feedOrZero = container.locator(
-      `${sel.feed}, h2:has-text("No matches found")`,
+      `${sel.feed}, h2:has-text("No matches found")`
     );
     await expect(feedOrZero.first()).toBeVisible({ timeout: 30_000 });
 
@@ -425,9 +430,7 @@ test.describe("Pagination Core", () => {
   // -------------------------------------------------------------------------
   // 2.3 No duplicate IDs across 3+ load-more clicks [P1]
   // -------------------------------------------------------------------------
-  test("2.3 no duplicate IDs across 3+ load-more clicks", async ({
-    page,
-  }) => {
+  test("2.3 no duplicate IDs across 3+ load-more clicks", async ({ page }) => {
     test.slow();
 
     // 36 mock items for three load-more pages (12 * 3)
@@ -452,7 +455,7 @@ test.describe("Pagination Core", () => {
 
     // Extract all listing IDs
     const allIds = await cards.evaluateAll((elements) =>
-      elements.map((el) => el.getAttribute("data-listing-id")),
+      elements.map((el) => el.getAttribute("data-listing-id"))
     );
 
     // All IDs should be non-null
@@ -496,15 +499,13 @@ test.describe("Pagination Core", () => {
     expect(capText).toMatch(/Showing 60 results.*Refine/);
 
     // Verify the cap message is centered and has muted styling via computed styles
-    const textAlign = await capMsg.evaluate((el) =>
-      getComputedStyle(el).textAlign,
+    const textAlign = await capMsg.evaluate(
+      (el) => getComputedStyle(el).textAlign
     );
     expect(textAlign).toBe("center");
 
     // Verify muted text color (should not be pure black or white)
-    const color = await capMsg.evaluate((el) =>
-      getComputedStyle(el).color,
-    );
+    const color = await capMsg.evaluate((el) => getComputedStyle(el).color);
     expect(color).toBeTruthy();
 
     // No "Show more places" button should remain
@@ -584,7 +585,7 @@ test.describe("Pagination Core", () => {
 
     // Wait for the page to render
     const feedOrZero = container.locator(
-      `${sel.feed}, h2:has-text("No matches found")`,
+      `${sel.feed}, h2:has-text("No matches found")`
     );
     await expect(feedOrZero.first()).toBeVisible({ timeout: 30_000 });
 
@@ -627,7 +628,7 @@ test.describe("Pagination Core", () => {
 
     // Wait for the page to render
     const feedOrZero = container.locator(
-      `${sel.feed}, h2:has-text("No matches found")`,
+      `${sel.feed}, h2:has-text("No matches found")`
     );
     await expect(feedOrZero.first()).toBeVisible({ timeout: 30_000 });
 

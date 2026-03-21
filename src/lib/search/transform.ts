@@ -94,7 +94,7 @@ export function transformToListItem(listing: ListingData): SearchV2ListItem {
  * @returns Array of formatted list items
  */
 export function transformToListItems(
-  listings: ListingData[],
+  listings: ListingData[]
 ): SearchV2ListItem[] {
   return listings.map(transformToListItem);
 }
@@ -111,7 +111,7 @@ export function transformToListItems(
  * @returns GeoJSON FeatureCollection with Point features
  */
 export function transformToGeoJSON(
-  listings: MapListingData[],
+  listings: MapListingData[]
 ): SearchV2GeoJSON {
   const features = listings.map((listing) => ({
     type: "Feature" as const,
@@ -169,7 +169,7 @@ function adaptToMarkerListing(listing: MapListingData): MapMarkerListing {
  */
 export function transformToPins(
   listings: MapListingData[],
-  scoreMap?: Map<string, number>,
+  scoreMap?: Map<string, number>
 ): SearchV2Pin[] {
   if (listings.length === 0) {
     return [];
@@ -231,7 +231,7 @@ export interface TransformMapOptions {
  */
 export function transformToMapResponse(
   listings: MapListingData[],
-  options?: TransformMapOptions | Map<string, number>,
+  options?: TransformMapOptions | Map<string, number>
 ): {
   geojson: SearchV2GeoJSON;
   pins?: SearchV2Pin[];
@@ -239,9 +239,8 @@ export function transformToMapResponse(
   totalCandidates?: number;
 } {
   // Support legacy signature: transformToMapResponse(listings, scoreMap)
-  const opts: TransformMapOptions = options instanceof Map
-    ? { scoreMap: options }
-    : options ?? {};
+  const opts: TransformMapOptions =
+    options instanceof Map ? { scoreMap: options } : (options ?? {});
 
   const { scoreMap, truncated, totalCandidates } = opts;
   const geojson = transformToGeoJSON(listings);

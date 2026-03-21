@@ -35,9 +35,7 @@ describe("applySecurityHeaders", () => {
 
     it("sets CSP on request headers with nonce", () => {
       jest.resetModules();
-      const {
-        applySecurityHeaders,
-      } = require("@/lib/csp-middleware");
+      const { applySecurityHeaders } = require("@/lib/csp-middleware");
       const request = createMockRequest();
       const { requestHeaders, nonce } = applySecurityHeaders(request);
 
@@ -49,9 +47,7 @@ describe("applySecurityHeaders", () => {
 
     it("sets CSP on response headers", () => {
       jest.resetModules();
-      const {
-        applySecurityHeaders,
-      } = require("@/lib/csp-middleware");
+      const { applySecurityHeaders } = require("@/lib/csp-middleware");
       const request = createMockRequest();
       const { responseHeaders } = applySecurityHeaders(request);
 
@@ -60,9 +56,7 @@ describe("applySecurityHeaders", () => {
 
     it("does not include unsafe-inline in script-src", () => {
       jest.resetModules();
-      const {
-        applySecurityHeaders,
-      } = require("@/lib/csp-middleware");
+      const { applySecurityHeaders } = require("@/lib/csp-middleware");
       const request = createMockRequest();
       const { responseHeaders } = applySecurityHeaders(request);
 
@@ -75,9 +69,7 @@ describe("applySecurityHeaders", () => {
 
     it("generates unique nonce per call", () => {
       jest.resetModules();
-      const {
-        applySecurityHeaders,
-      } = require("@/lib/csp-middleware");
+      const { applySecurityHeaders } = require("@/lib/csp-middleware");
       const req1 = createMockRequest();
       const req2 = createMockRequest();
       const { nonce: nonce1 } = applySecurityHeaders(req1);
@@ -88,19 +80,21 @@ describe("applySecurityHeaders", () => {
 
     it("includes security headers", () => {
       jest.resetModules();
-      const {
-        applySecurityHeaders,
-      } = require("@/lib/csp-middleware");
+      const { applySecurityHeaders } = require("@/lib/csp-middleware");
       const request = createMockRequest();
       const { responseHeaders } = applySecurityHeaders(request);
 
       expect(responseHeaders.get("X-Frame-Options")).toBe("DENY");
       expect(responseHeaders.get("X-Content-Type-Options")).toBe("nosniff");
       expect(responseHeaders.get("Referrer-Policy")).toBe(
-        "origin-when-cross-origin",
+        "strict-origin-when-cross-origin"
       );
-      expect(responseHeaders.get("Cross-Origin-Resource-Policy")).toBe("same-origin");
-      expect(responseHeaders.get("Cross-Origin-Opener-Policy")).toBe("same-origin");
+      expect(responseHeaders.get("Cross-Origin-Resource-Policy")).toBe(
+        "same-origin"
+      );
+      expect(responseHeaders.get("Cross-Origin-Opener-Policy")).toBe(
+        "same-origin"
+      );
     });
   });
 
@@ -115,9 +109,7 @@ describe("applySecurityHeaders", () => {
 
     it("uses unsafe-inline in development (no nonce)", () => {
       jest.resetModules();
-      const {
-        applySecurityHeaders,
-      } = require("@/lib/csp-middleware");
+      const { applySecurityHeaders } = require("@/lib/csp-middleware");
       const request = createMockRequest();
       const { nonce, responseHeaders } = applySecurityHeaders(request);
 

@@ -219,7 +219,7 @@ Secrets:
 - Always handle empty/error/loading states.
 - A11y basics: labels, focus management, aria where needed, contrast, tab order.
 - Map "Search as I move" defaults ON per session (no cross-session localStorage persistence).
-- Area count requests on map move: 600ms debounce, AbortController cancel, 30s client cache, max 1 in-flight request.
+- Area count requests on map move: 50ms debounce + 800ms minimum interval (throttle), AbortController cancel, 30s client cache, max 1 in-flight request.
 
 ### Search pagination invariants
 

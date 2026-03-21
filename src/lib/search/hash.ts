@@ -153,7 +153,10 @@ export function decodeCursor(cursor: string): number | null {
 
       const provided = Buffer.from(parsedEnvelope.s);
       const expected = Buffer.from(expectedSignature);
-      if (provided.length !== expected.length || !timingSafeEqual(provided, expected)) {
+      if (
+        provided.length !== expected.length ||
+        !timingSafeEqual(provided, expected)
+      ) {
         return null;
       }
 

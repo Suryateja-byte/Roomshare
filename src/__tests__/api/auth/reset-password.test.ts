@@ -78,12 +78,14 @@ describe("Reset Password API", () => {
       const mockUser = { id: "user-123", email: "test@example.com" };
 
       (prisma.passwordResetToken.findUnique as jest.Mock).mockResolvedValue(
-        validToken,
+        validToken
       );
       (prisma.user.findUnique as jest.Mock).mockResolvedValue(mockUser);
       (prisma.user.update as jest.Mock).mockResolvedValue({});
       // P0-2: Transaction now uses deleteMany (returns count for race detection)
-      (prisma.passwordResetToken.deleteMany as jest.Mock).mockResolvedValue({ count: 1 });
+      (prisma.passwordResetToken.deleteMany as jest.Mock).mockResolvedValue({
+        count: 1,
+      });
 
       const request = createRequest({
         token: VALID_TOKEN,
@@ -157,7 +159,7 @@ describe("Reset Password API", () => {
       };
 
       (prisma.passwordResetToken.findUnique as jest.Mock).mockResolvedValue(
-        expiredToken,
+        expiredToken
       );
       (prisma.passwordResetToken.delete as jest.Mock).mockResolvedValue({});
 
@@ -170,7 +172,7 @@ describe("Reset Password API", () => {
 
       expect(response.status).toBe(400);
       expect(data.error).toBe(
-        "Reset link has expired. Please request a new one.",
+        "Reset link has expired. Please request a new one."
       );
       expect(prisma.passwordResetToken.delete).toHaveBeenCalled();
     });
@@ -184,7 +186,7 @@ describe("Reset Password API", () => {
       };
 
       (prisma.passwordResetToken.findUnique as jest.Mock).mockResolvedValue(
-        validToken,
+        validToken
       );
       (prisma.user.findUnique as jest.Mock).mockResolvedValue(null);
 
@@ -201,7 +203,7 @@ describe("Reset Password API", () => {
 
     it("handles database errors gracefully", async () => {
       (prisma.passwordResetToken.findUnique as jest.Mock).mockRejectedValue(
-        new Error("DB Error"),
+        new Error("DB Error")
       );
 
       const request = createRequest({
@@ -225,12 +227,14 @@ describe("Reset Password API", () => {
       const mockUser = { id: "user-123", email: "test@example.com" };
 
       (prisma.passwordResetToken.findUnique as jest.Mock).mockResolvedValue(
-        validToken,
+        validToken
       );
       (prisma.user.findUnique as jest.Mock).mockResolvedValue(mockUser);
       (prisma.user.update as jest.Mock).mockResolvedValue({});
       // P0-2: Transaction now uses deleteMany for race detection
-      (prisma.passwordResetToken.deleteMany as jest.Mock).mockResolvedValue({ count: 1 });
+      (prisma.passwordResetToken.deleteMany as jest.Mock).mockResolvedValue({
+        count: 1,
+      });
 
       const request = createRequest({
         token: VALID_TOKEN,
@@ -260,7 +264,7 @@ describe("Reset Password API", () => {
       };
 
       (prisma.passwordResetToken.findUnique as jest.Mock).mockResolvedValue(
-        validToken,
+        validToken
       );
 
       const request = createRequest(VALID_TOKEN);
@@ -302,7 +306,7 @@ describe("Reset Password API", () => {
       };
 
       (prisma.passwordResetToken.findUnique as jest.Mock).mockResolvedValue(
-        expiredToken,
+        expiredToken
       );
 
       const request = createRequest(EXPIRED_TOKEN);

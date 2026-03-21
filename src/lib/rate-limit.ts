@@ -1,3 +1,5 @@
+import "server-only";
+
 import { prisma } from "@/lib/prisma";
 import { logger } from "@/lib/logger";
 
@@ -16,7 +18,7 @@ const DEGRADED_MODE_MAX_ENTRIES = 10_000;
 
 function setDegradedModeEntry(
   key: string,
-  value: { count: number; windowStart: number },
+  value: { count: number; windowStart: number }
 ): void {
   if (!degradedModeCache.has(key)) {
     while (degradedModeCache.size >= DEGRADED_MODE_MAX_ENTRIES) {
@@ -84,15 +86,28 @@ interface RateLimitConfig {
 export async function checkRateLimit(
   identifier: string,
   endpoint: string,
-  config: RateLimitConfig,
+  config: RateLimitConfig
 ): Promise<RateLimitResult> {
   // E2E bypass — matches with-rate-limit.ts behavior to prevent cross-shard
   // rate limit accumulation in CI (auth.ts calls this directly, not via middleware)
-  if (process.env.E2E_DISABLE_RATE_LIMIT === 'true') {
-    return { success: true, remaining: 999, resetAt: new Date(Date.now() + config.windowMs) };
+  if (process.env.E2E_DISABLE_RATE_LIMIT === "true" && process.env.NODE_ENV !== "production") {
+    return {
+      success: true,
+      remaining: 999,
+      resetAt: new Date(Date.now() + config.windowMs),
+    };
   }
 
-  const { limit, windowMs } = config;
+  // In development, apply 10x relaxed limits so normal dev workflows are never
+  // blocked, while still exercising the full rate-limiting code path.
+  // Set DISABLE_RATE_LIMIT_DEV_MULTIPLIER=true to use production limits locally.
+  const isDev =
+    process.env.NODE_ENV !== "production" && process.env.NODE_ENV !== "test";
+  const devMultiplier =
+    isDev && process.env.DISABLE_RATE_LIMIT_DEV_MULTIPLIER !== "true" ? 10 : 1;
+
+  const { windowMs } = config;
+  const limit = config.limit * devMultiplier;
   const now = new Date();
   const windowStart = new Date(now.getTime() - windowMs);
   const expiresAt = new Date(now.getTime() + windowMs);
@@ -142,9 +157,7 @@ export async function checkRateLimit(
     if (existing && existing.windowStart > windowStart) {
       // (b) Entry exists, valid window, but count >= limit → DENY
       const resetAt = new Date(existing.windowStart.getTime() + windowMs);
-      const retryAfter = Math.ceil(
-        (resetAt.getTime() - now.getTime()) / 1000,
-      );
+      const retryAfter = Math.ceil((resetAt.getTime() - now.getTime()) / 1000);
       return {
         success: false,
         remaining: 0,
@@ -210,8 +223,8 @@ export async function checkRateLimit(
 // Predefined rate limit configurations
 export const RATE_LIMITS = {
   // P0-1 FIX: Rate limit credential login (per-email and per-IP)
-  login: { limit: 10, windowMs: 15 * 60 * 1000 },       // 10 per 15 min (per email)
-  loginByIp: { limit: 30, windowMs: 15 * 60 * 1000 },   // 30 per 15 min (per IP)
+  login: { limit: 10, windowMs: 15 * 60 * 1000 }, // 10 per 15 min (per email)
+  loginByIp: { limit: 30, windowMs: 15 * 60 * 1000 }, // 30 per 15 min (per IP)
   register: { limit: 5, windowMs: 60 * 60 * 1000 }, // 5 per hour
   forgotPassword: { limit: 3, windowMs: 60 * 60 * 1000 }, // 3 per hour
   resendVerification: { limit: 3, windowMs: 60 * 60 * 1000 }, // 3 per hour
@@ -262,12 +275,17 @@ export const RATE_LIMITS = {
   canDeleteCheck: { limit: 30, windowMs: 60 * 60 * 1000 }, // 30 per hour
   bookingStatus: { limit: 30, windowMs: 60 * 1000 }, // 30 per minute
   // Phase 2: Rate limit booking creation (C4 fix — was unprotected)
-  createBooking: { limit: 10, windowMs: 60 * 60 * 1000 },       // 10 per hour (per user)
-  createBookingByIp: { limit: 30, windowMs: 60 * 60 * 1000 },   // 30 per hour (per IP — higher for shared NAT)
+  createBooking: { limit: 10, windowMs: 60 * 60 * 1000 }, // 10 per hour (per user)
+  createBookingByIp: { limit: 30, windowMs: 60 * 60 * 1000 }, // 30 per hour (per IP — higher for shared NAT)
   // Phase 4: Rate limit hold creation
-  createHold: { limit: 10, windowMs: 60 * 60 * 1000 },          // 10 holds/hour per user
-  createHoldByIp: { limit: 30, windowMs: 60 * 60 * 1000 },      // 30 holds/hour per IP
+  createHold: { limit: 10, windowMs: 60 * 60 * 1000 }, // 10 holds/hour per user
+  createHoldByIp: { limit: 30, windowMs: 60 * 60 * 1000 }, // 30 holds/hour per IP
   createHoldPerListing: { limit: 3, windowMs: 60 * 60 * 1000 }, // 3 holds/hour per user+listing (anti-cycling)
+  // Pre-auth IP-based rate limit (prevents unauthenticated session-lookup flood)
+  messagesPreAuth: { limit: 300, windowMs: 3_600_000 }, // 300 per hour per IP
+  // Admin action rate limits
+  adminWrite: { limit: 20, windowMs: 60_000 }, // 20 per minute (toggle admin, suspend, update status, resolve report)
+  adminDelete: { limit: 5, windowMs: 3_600_000 }, // 5 per hour (delete listing, resolve+remove listing)
 } as const;
 
 function getFirstForwardedIp(forwardedFor: string | null): string | null {
@@ -332,8 +350,8 @@ export function getClientIP(request: Request): string {
   // Proxy fallback for non-Vercel environments.
   const forwarded = getFirstForwardedIp(request.headers.get("x-forwarded-for"));
   const shouldTrustForwarded =
-    process.env.NODE_ENV === "development"
-    || process.env.TRUST_PROXY === "true";
+    process.env.NODE_ENV === "development" ||
+    process.env.TRUST_PROXY === "true";
 
   if (forwarded && shouldTrustForwarded) {
     return forwarded;
@@ -373,8 +391,8 @@ export function getClientIPFromHeaders(headersList: Headers): string {
 
   const forwarded = getFirstForwardedIp(headersList.get("x-forwarded-for"));
   const shouldTrustForwarded =
-    process.env.NODE_ENV === "development"
-    || process.env.TRUST_PROXY === "true";
+    process.env.NODE_ENV === "development" ||
+    process.env.TRUST_PROXY === "true";
 
   if (forwarded && shouldTrustForwarded) {
     return forwarded;

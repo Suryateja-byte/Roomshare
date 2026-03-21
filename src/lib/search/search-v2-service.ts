@@ -43,10 +43,12 @@ import {
   type RankableListing,
 } from "@/lib/search/ranking";
 import type { SearchV2Response } from "@/lib/search/types";
-import type { PaginatedResultHybrid, ListingData, MapListingData } from "@/lib/data";
-import {
-  clampBoundsToMaxSpan,
-} from "@/lib/validation";
+import type {
+  PaginatedResultHybrid,
+  ListingData,
+  MapListingData,
+} from "@/lib/data";
+import { clampBoundsToMaxSpan } from "@/lib/validation";
 import {
   DEFAULT_PAGE_SIZE,
   MAP_FETCH_MAX_LAT_SPAN,
@@ -60,7 +62,7 @@ import { withTimeout, DEFAULT_TIMEOUTS } from "@/lib/timeout-wrapper";
  * Used for single-value params like cursor, searchDoc, ranker, debugRank.
  */
 function getFirstValue(
-  value: string | string[] | undefined,
+  value: string | string[] | undefined
 ): string | undefined {
   if (Array.isArray(value)) {
     return value[0];
@@ -104,7 +106,7 @@ export interface SearchV2Result {
  * @returns SearchV2Result with response or error
  */
 export async function executeSearchV2(
-  params: SearchV2Params,
+  params: SearchV2Params
 ): Promise<SearchV2Result> {
   try {
     const searchStartTime = performance.now();
@@ -124,7 +126,7 @@ export async function executeSearchV2(
 
     // Check if features are enabled
     const useSearchDoc = isSearchDocEnabled(
-      getFirstValue(params.rawParams.searchDoc),
+      getFirstValue(params.rawParams.searchDoc)
     );
     const useKeyset = features.searchKeyset && useSearchDoc;
 
@@ -177,11 +179,17 @@ export async function executeSearchV2(
       ) {
         const pageSize = filterParams.limit || DEFAULT_PAGE_SIZE;
         const offset = (page - 1) * pageSize;
-        const semanticRows = await semanticSearchQuery(filterParams, pageSize + 1, offset);
+        const semanticRows = await semanticSearchQuery(
+          filterParams,
+          pageSize + 1,
+          offset
+        );
 
         if (semanticRows && semanticRows.length > 0) {
           const hasNextPage = semanticRows.length > pageSize;
-          const items = mapSemanticRowsToListingData(semanticRows.slice(0, pageSize));
+          const items = mapSemanticRowsToListingData(
+            semanticRows.slice(0, pageSize)
+          );
           const semanticResult: PaginatedResultHybrid<ListingData> = {
             items,
             total: null,
@@ -191,7 +199,10 @@ export async function executeSearchV2(
             hasNextPage,
             nextCursor: hasNextPage ? encodeCursor(page + 1) : null,
           };
-          return { listResult: semanticResult, nextCursor: semanticResult.nextCursor ?? null };
+          return {
+            listResult: semanticResult,
+            nextCursor: semanticResult.nextCursor ?? null,
+          };
         }
         // Fall through to existing FTS/keyword search if semantic returns null
       }
@@ -202,9 +213,12 @@ export async function executeSearchV2(
           // Use keyset cursor for stable pagination
           const keysetResult = await getSearchDocListingsWithKeyset(
             filterParams,
-            keysetCursor,
+            keysetCursor
           );
-          return { listResult: keysetResult, nextCursor: keysetResult.nextCursor };
+          return {
+            listResult: keysetResult,
+            nextCursor: keysetResult.nextCursor,
+          };
         } else if (page > 1) {
           // Legacy cursor with page offset (e.g., semantic→FTS fallback with {p:N} cursor).
           // Route to offset-based pagination so the page number is respected,
@@ -218,7 +232,10 @@ export async function executeSearchV2(
           // First page - get first page with keyset cursor
           const firstPageResult =
             await getSearchDocListingsFirstPage(filterParams);
-          return { listResult: firstPageResult, nextCursor: firstPageResult.nextCursor };
+          return {
+            listResult: firstPageResult,
+            nextCursor: firstPageResult.nextCursor,
+          };
         }
       } else {
         // Offset pagination path (legacy or SearchDoc disabled)
@@ -247,7 +264,11 @@ export async function executeSearchV2(
 
     // Map query uses bounds clamped to 60°/130° (wider than list needs, covers full viewport)
     const mapBounds = parsed.filterParams.bounds
-      ? clampBoundsToMaxSpan(parsed.filterParams.bounds, MAP_FETCH_MAX_LAT_SPAN, MAP_FETCH_MAX_LNG_SPAN)
+      ? clampBoundsToMaxSpan(
+          parsed.filterParams.bounds,
+          MAP_FETCH_MAX_LAT_SPAN,
+          MAP_FETCH_MAX_LNG_SPAN
+        )
       : null;
     // When semantic search is active, strip the text query from map params.
     // The list uses vector similarity (matches natural language), but the map uses FTS
@@ -265,19 +286,24 @@ export async function executeSearchV2(
     };
 
     const shouldIncludeMap = params.includeMap !== false;
-    const mapPromise: Promise<MapListingsResult | MapListingData[]> | null = shouldIncludeMap
-      ? (
-          useSearchDoc
-            ? getSearchDocMapListings(mapFilterParams)
-            : getMapListings(mapFilterParams)
-        )
-      : null;
+    const mapPromise: Promise<MapListingsResult | MapListingData[]> | null =
+      shouldIncludeMap
+        ? useSearchDoc
+          ? getSearchDocMapListings(mapFilterParams)
+          : getMapListings(mapFilterParams)
+        : null;
 
     // Execute list query and, when requested, map query with partial failure tolerance.
     const settledResults = await Promise.allSettled([
       withTimeout(listPromise, DEFAULT_TIMEOUTS.DATABASE, "search-list-query"),
       ...(mapPromise
-        ? [withTimeout(mapPromise, DEFAULT_TIMEOUTS.DATABASE, "search-map-query")]
+        ? [
+            withTimeout(
+              mapPromise,
+              DEFAULT_TIMEOUTS.DATABASE,
+              "search-map-query"
+            ),
+          ]
         : []),
     ]);
     const [listSettled, mapSettled] = settledResults;
@@ -294,7 +320,10 @@ export async function executeSearchV2(
       ({ listResult, nextCursor } = listSettled.value);
     } else {
       logger.sync.error("[SearchV2] List query failed", {
-        error: listSettled.reason instanceof Error ? listSettled.reason.message : "Unknown",
+        error:
+          listSettled.reason instanceof Error
+            ? listSettled.reason.message
+            : "Unknown",
       });
       return {
         response: null,
@@ -317,7 +346,10 @@ export async function executeSearchV2(
       }
     } else if (mapSettled?.status === "rejected") {
       logger.sync.error("[SearchV2] Map query failed", {
-        error: mapSettled.reason instanceof Error ? mapSettled.reason.message : "Unknown",
+        error:
+          mapSettled.reason instanceof Error
+            ? mapSettled.reason.message
+            : "Unknown",
       });
       mapListings = [];
       warnings.push("MAP_QUERY_FAILED");
@@ -348,7 +380,7 @@ export async function executeSearchV2(
 
     // Check if ranking is enabled (URL override or env flag)
     const rankerEnabled = isRankingEnabled(
-      getFirstValue(params.rawParams.ranker),
+      getFirstValue(params.rawParams.ranker)
     );
     // Debug output only allowed when searchDebugRanking feature flag is enabled.
     // In production, features.searchDebugRanking is false, so the ?debugRank=1
@@ -386,7 +418,7 @@ export async function executeSearchV2(
           reviewCount: (listing as { reviewCount?: number | null }).reviewCount,
           createdAt: (listing as { createdAt?: Date | string | null })
             .createdAt,
-        }),
+        })
       );
 
       // Build ranking context from map candidates

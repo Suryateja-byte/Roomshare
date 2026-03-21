@@ -141,8 +141,12 @@ describe("MapBoundsContext", () => {
   describe("banner visibility logic", () => {
     it("should NOT show banner after programmatic move", () => {
       const wrapper = createWrapper();
-      const { result: boundsResult } = renderHook(() => useMapBounds(), { wrapper });
-      const { result: bannerResult } = renderHook(() => useMapMovedBanner(), { wrapper });
+      const { result: boundsResult } = renderHook(() => useMapBounds(), {
+        wrapper,
+      });
+      const { result: bannerResult } = renderHook(() => useMapMovedBanner(), {
+        wrapper,
+      });
 
       // Simulate programmatic move
       act(() => {
@@ -181,8 +185,12 @@ describe("MapBoundsContext", () => {
 
     it("should NOT show banner when searchAsMove is enabled", () => {
       const wrapper = createWrapper();
-      const { result: boundsResult } = renderHook(() => useMapBounds(), { wrapper });
-      const { result: bannerResult } = renderHook(() => useMapMovedBanner(), { wrapper });
+      const { result: boundsResult } = renderHook(() => useMapBounds(), {
+        wrapper,
+      });
+      const { result: bannerResult } = renderHook(() => useMapMovedBanner(), {
+        wrapper,
+      });
 
       // Simulate user move with searchAsMove enabled
       act(() => {
@@ -197,8 +205,12 @@ describe("MapBoundsContext", () => {
 
     it("should NOT show banner when bounds are not dirty", () => {
       const wrapper = createWrapper();
-      const { result: boundsResult } = renderHook(() => useMapBounds(), { wrapper });
-      const { result: bannerResult } = renderHook(() => useMapMovedBanner(), { wrapper });
+      const { result: boundsResult } = renderHook(() => useMapBounds(), {
+        wrapper,
+      });
+      const { result: bannerResult } = renderHook(() => useMapMovedBanner(), {
+        wrapper,
+      });
 
       // Simulate user move without dirty bounds
       act(() => {
@@ -233,12 +245,19 @@ describe("MapBoundsContext", () => {
   describe("location conflict detection", () => {
     it("should NOT show location conflict after programmatic move outside search area", () => {
       const wrapper = createWrapper();
-      const { result: boundsResult } = renderHook(() => useMapBounds(), { wrapper });
-      const { result: bannerResult } = renderHook(() => useMapMovedBanner(), { wrapper });
+      const { result: boundsResult } = renderHook(() => useMapBounds(), {
+        wrapper,
+      });
+      const { result: bannerResult } = renderHook(() => useMapMovedBanner(), {
+        wrapper,
+      });
 
       // Set a search location
       act(() => {
-        boundsResult.current.setSearchLocation("San Francisco", { lat: 37.7749, lng: -122.4194 });
+        boundsResult.current.setSearchLocation("San Francisco", {
+          lat: 37.7749,
+          lng: -122.4194,
+        });
       });
 
       // Simulate programmatic move to bounds that don't contain search location
@@ -268,7 +287,10 @@ describe("MapBoundsContext", () => {
 
       // Set a search location
       act(() => {
-        result.current.bounds.setSearchLocation("San Francisco", { lat: 37.7749, lng: -122.4194 });
+        result.current.bounds.setSearchLocation("San Francisco", {
+          lat: 37.7749,
+          lng: -122.4194,
+        });
       });
 
       // Disable searchAsMove (defaults to true) so conflict can show

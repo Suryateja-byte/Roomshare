@@ -86,7 +86,7 @@ interface ListingWithData {
  */
 async function fetchListingsWithData(
   offset: number,
-  limit: number,
+  limit: number
 ): Promise<ListingWithData[]> {
   const results = await prisma.$queryRaw<ListingWithData[]>`
     SELECT
@@ -165,7 +165,7 @@ function computeRecommendedScore(
   avgRating: number,
   viewCount: number,
   reviewCount: number,
-  createdAt: Date,
+  createdAt: Date
 ): number {
   // Base scores
   const ratingScore = avgRating * 20;
@@ -181,9 +181,8 @@ function computeRecommendedScore(
   const viewScore = Math.log(1 + viewCount) * 10 * decayFactor;
 
   // Freshness boost for new listings (first 7 days)
-  const freshnessBoost = daysSinceCreation <= 7
-    ? 15 * (1 - daysSinceCreation / 7)
-    : 0;
+  const freshnessBoost =
+    daysSinceCreation <= 7 ? 15 * (1 - daysSinceCreation / 7) : 0;
 
   return ratingScore + viewScore + reviewScore + freshnessBoost;
 }
@@ -193,7 +192,7 @@ function computeRecommendedScore(
  */
 async function upsertSearchDocsBatch(
   listings: ListingWithData[],
-  dryRun: boolean,
+  dryRun: boolean
 ): Promise<{ created: number; updated: number }> {
   if (dryRun) {
     return { created: listings.length, updated: 0 };
@@ -207,14 +206,14 @@ async function upsertSearchDocsBatch(
       listing.avgRating,
       listing.viewCount,
       listing.reviewCount,
-      listing.createdAt,
+      listing.createdAt
     );
 
     // Compute lowercase arrays for case-insensitive filtering
     const amenitiesLower = listing.amenities.map((a) => a.toLowerCase());
     const houseRulesLower = listing.houseRules.map((r) => r.toLowerCase());
     const householdLanguagesLower = listing.householdLanguages.map((l) =>
-      l.toLowerCase(),
+      l.toLowerCase()
     );
 
     // Use raw SQL for upsert with geography type
@@ -319,7 +318,7 @@ async function runBackfill(dryRun: boolean, batchSize: number): Promise<void> {
 
       const { created, updated } = await upsertSearchDocsBatch(
         listings,
-        dryRun,
+        dryRun
       );
 
       stats.listingsProcessed += listings.length;
@@ -353,7 +352,7 @@ async function main(): Promise<void> {
   // Parse batch size
   let batchSize = DEFAULT_BATCH_SIZE;
   const batchSizeArg = process.argv.find((arg) =>
-    arg.startsWith("--batch-size"),
+    arg.startsWith("--batch-size")
   );
   if (batchSizeArg) {
     const idx = process.argv.indexOf(batchSizeArg);
@@ -368,11 +367,11 @@ async function main(): Promise<void> {
   }
 
   console.log(
-    "═══════════════════════════════════════════════════════════════",
+    "═══════════════════════════════════════════════════════════════"
   );
   console.log(" SearchDoc: Backfill listing_search_docs");
   console.log(
-    "═══════════════════════════════════════════════════════════════",
+    "═══════════════════════════════════════════════════════════════"
   );
   console.log();
 
@@ -380,10 +379,10 @@ async function main(): Promise<void> {
     console.error("❌ ERROR: This script modifies the database.");
     console.error("");
     console.error(
-      "  To preview changes:  npx ts-node src/scripts/backfill-search-docs.ts --dry-run",
+      "  To preview changes:  npx ts-node src/scripts/backfill-search-docs.ts --dry-run"
     );
     console.error(
-      "  To run for real:     npx ts-node src/scripts/backfill-search-docs.ts --i-understand",
+      "  To run for real:     npx ts-node src/scripts/backfill-search-docs.ts --i-understand"
     );
     console.error("");
     process.exit(1);
@@ -404,11 +403,11 @@ async function main(): Promise<void> {
   // Summary
   console.log();
   console.log(
-    "═══════════════════════════════════════════════════════════════",
+    "═══════════════════════════════════════════════════════════════"
   );
   console.log(" SUMMARY");
   console.log(
-    "═══════════════════════════════════════════════════════════════",
+    "═══════════════════════════════════════════════════════════════"
   );
   console.log(`  Mode: ${dryRun ? "DRY-RUN" : "LIVE"}`);
   console.log(`  Listings processed: ${stats.listingsProcessed}`);
@@ -428,7 +427,7 @@ async function main(): Promise<void> {
   console.log();
   if (dryRun) {
     console.log(
-      "✅ DRY-RUN COMPLETE - Run with --i-understand to apply changes",
+      "✅ DRY-RUN COMPLETE - Run with --i-understand to apply changes"
     );
   } else {
     console.log("✅ BACKFILL COMPLETE");

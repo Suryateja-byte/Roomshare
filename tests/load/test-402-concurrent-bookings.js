@@ -46,7 +46,10 @@ export default function () {
   });
 
   const params = {
-    headers: { 'Content-Type': 'application/json' },
+    headers: {
+      'Content-Type': 'application/json',
+      'Authorization': `Bearer ${__ENV.E2E_TEST_SECRET}`,
+    },
   };
 
   const res = http.post(`${BASE_URL}/api/test-helpers`, payload, params);

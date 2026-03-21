@@ -1,6 +1,12 @@
 "use client";
 
-import { useEffect, useRef, useCallback, useState, type ReactNode } from "react";
+import {
+  useEffect,
+  useRef,
+  useCallback,
+  useState,
+  type ReactNode,
+} from "react";
 
 interface InfiniteScrollProps {
   children: ReactNode;
@@ -129,7 +135,9 @@ export function useInfiniteScroll<T>(
       setHasMore(result.hasMore);
       setPage((prev) => prev + 1);
     } catch (err) {
-      setError(err instanceof Error ? err : new Error("Failed to load more items"));
+      setError(
+        err instanceof Error ? err : new Error("Failed to load more items")
+      );
     } finally {
       setIsLoading(false);
     }

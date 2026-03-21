@@ -61,7 +61,9 @@ async function waitForCards(page: Page) {
 async function waitForResults(page: Page) {
   const container = page.locator(DESKTOP);
   const cards = container.locator(CARDS);
-  const zeroResults = container.locator('h2:has-text("No matches found"), h3:has-text("No exact matches")');
+  const zeroResults = container.locator(
+    'h2:has-text("No matches found"), h3:has-text("No exact matches")'
+  );
   await expect(cards.or(zeroResults).first()).toBeAttached({ timeout: 30_000 });
   return { cards, zeroResults };
 }
@@ -93,7 +95,9 @@ async function waitForMobileCards(page: Page) {
 async function waitForMobileResults(page: Page) {
   const container = page.locator(MOBILE);
   const cards = container.locator(CARDS);
-  const zeroResults = container.locator('h2:has-text("No matches found"), h3:has-text("No exact matches")');
+  const zeroResults = container.locator(
+    'h2:has-text("No matches found"), h3:has-text("No exact matches")'
+  );
   await expect(cards.or(zeroResults).first()).toBeAttached({ timeout: 30_000 });
   return { cards, zeroResults };
 }
@@ -110,9 +114,7 @@ async function waitForMobileResults(page: Page) {
  * viewport changes, so we use a generous timeout.
  */
 async function waitForMobileSortButton(page: Page): Promise<Locator> {
-  const sortBtn = page
-    .locator(MOBILE)
-    .locator('button[aria-label^="Sort:"]');
+  const sortBtn = page.locator(MOBILE).locator('button[aria-label^="Sort:"]');
   await expect(sortBtn).toBeAttached({ timeout: 30_000 });
   await sortBtn.scrollIntoViewIfNeeded();
   await expect(sortBtn).toBeVisible({ timeout: 10_000 });
@@ -132,7 +134,7 @@ async function waitForMobileSortButton(page: Page): Promise<Locator> {
 async function mobileNavigate(
   page: Page,
   url: string,
-  browserName: string,
+  browserName: string
 ): Promise<void> {
   // Belt-and-suspenders: explicitly set mobile viewport before navigation.
   // test.use({ viewport }) should handle this, but WebKit can be unreliable
@@ -188,22 +190,29 @@ async function pickDesktopSortOption(page: Page, label: string) {
 async function selectDesktopSort(
   page: Page,
   label: string,
-  expectedUrlParam: string | null,
+  expectedUrlParam: string | null
 ) {
   await openDesktopSort(page);
   await pickDesktopSortOption(page, label);
 
   if (expectedUrlParam) {
-    await expect.poll(
-      () => new URL(page.url(), "http://localhost").searchParams.get("sort"),
-      { timeout: 30_000, message: `URL param "sort" to be "${expectedUrlParam}"` },
-    ).toBe(expectedUrlParam);
+    await expect
+      .poll(
+        () => new URL(page.url(), "http://localhost").searchParams.get("sort"),
+        {
+          timeout: 30_000,
+          message: `URL param "sort" to be "${expectedUrlParam}"`,
+        }
+      )
+      .toBe(expectedUrlParam);
   } else {
     // "Recommended" removes the sort param entirely.
-    await expect.poll(
-      () => new URL(page.url(), "http://localhost").searchParams.get("sort"),
-      { timeout: 30_000, message: 'URL param "sort" to be absent' },
-    ).toBeNull();
+    await expect
+      .poll(
+        () => new URL(page.url(), "http://localhost").searchParams.get("sort"),
+        { timeout: 30_000, message: 'URL param "sort" to be absent' }
+      )
+      .toBeNull();
   }
 }
 
@@ -221,7 +230,7 @@ test.describe("Group 1: Desktop Sort Interaction", () => {
     test.skip(isMobileViewport, "Desktop sort requires >= 768px viewport");
     test.skip(
       browserName === "webkit",
-      "Radix Select hydration issue on webkit",
+      "Radix Select hydration issue on webkit"
     );
   });
 
@@ -345,7 +354,7 @@ test.describe("Group 1: Desktop Sort Interaction", () => {
               .locator('[role="option"][data-highlighted]')
               .textContent()
               .catch(() => null),
-          { timeout: 3_000, message: "ArrowDown to move highlight" },
+          { timeout: 3_000, message: "ArrowDown to move highlight" }
         )
         .not.toBe(hlBefore);
     } else {
@@ -371,9 +380,7 @@ test.describe("Group 1: Desktop Sort Interaction", () => {
 // ===========================================================================
 
 test.describe("Group 2: Price Sort Verification", () => {
-  test("2.1 sort by price_asc: prices are non-decreasing", async ({
-    page,
-  }) => {
+  test("2.1 sort by price_asc: prices are non-decreasing", async ({ page }) => {
     await page.goto(`/search?sort=price_asc&${boundsQS}`);
     await waitForCards(page);
 
@@ -478,7 +485,7 @@ test.describe("Group 3: Sort + Pagination", () => {
     test.skip(isMobileViewport, "Desktop sort requires >= 768px viewport");
     test.skip(
       browserName === "webkit",
-      "Radix Select hydration issue on webkit",
+      "Radix Select hydration issue on webkit"
     );
 
     await page.goto(SEARCH_URL);
@@ -502,10 +509,7 @@ test.describe("Group 3: Sort + Pagination", () => {
       await selectDesktopSort(page, "Price: Low to High", "price_asc");
       await waitForCards(page);
 
-      const countAfterSort = await page
-        .locator(DESKTOP)
-        .locator(CARDS)
-        .count();
+      const countAfterSort = await page.locator(DESKTOP).locator(CARDS).count();
       expect(countAfterSort).toBeLessThanOrEqual(countBeforeSort);
       expect(countAfterSort).toBeGreaterThanOrEqual(1);
     } else {
@@ -523,7 +527,7 @@ test.describe("Group 3: Sort + Pagination", () => {
     test.skip(isMobileViewport, "Desktop sort requires >= 768px viewport");
     test.skip(
       browserName === "webkit",
-      "Radix Select hydration issue on webkit",
+      "Radix Select hydration issue on webkit"
     );
     await page.goto(`/search?sort=price_asc&page=2&cursor=abc&${boundsQS}`);
     await waitForResults(page);
@@ -563,7 +567,7 @@ test.describe("Group 3: Sort + Pagination", () => {
             return el.querySelectorAll(args.cards).length > args.prevCount;
           },
           { container: DESKTOP, cards: CARDS, prevCount: pricesBefore.length },
-          { timeout: 30_000 },
+          { timeout: 30_000 }
         )
         .catch(() => {
           /* load-more may not produce new results */
@@ -605,7 +609,7 @@ test.describe("Group 3: Sort + Pagination", () => {
             cards: CARDS,
             prevCount: initialPrices.length,
           },
-          { timeout: 30_000 },
+          { timeout: 30_000 }
         )
         .catch(() => {});
 
@@ -631,8 +635,11 @@ test.describe("Group 4: Mobile Sort", () => {
   });
 
   test.beforeEach(async ({ browserName }) => {
-    if (browserName === 'webkit') {
-      test.skip(true, 'webkit-anon uses Desktop Safari viewport — mobile sort tests invalid');
+    if (browserName === "webkit") {
+      test.skip(
+        true,
+        "webkit-anon uses Desktop Safari viewport — mobile sort tests invalid"
+      );
     }
   });
 
@@ -741,7 +748,11 @@ test.describe("Group 4: Mobile Sort", () => {
     page,
     browserName,
   }) => {
-    await mobileNavigate(page, `/search?sort=price_desc&${boundsQS}`, browserName);
+    await mobileNavigate(
+      page,
+      `/search?sort=price_desc&${boundsQS}`,
+      browserName
+    );
 
     try {
       await assertMobileLayout(page);
@@ -754,7 +765,7 @@ test.describe("Group 4: Mobile Sort", () => {
 
     await expect(sortBtn).toHaveAttribute(
       "aria-label",
-      "Sort: Price: High to Low",
+      "Sort: Price: High to Low"
     );
   });
 
@@ -782,7 +793,7 @@ test.describe("Group 4: Mobile Sort", () => {
     // child of the fixed overlay container (SortSelect.tsx:107-111).
     await page.evaluate(() => {
       const backdrop = document.querySelector(
-        '.fixed.inset-0.z-50 > div[aria-hidden="true"]',
+        '.fixed.inset-0.z-50 > div[aria-hidden="true"]'
       ) as HTMLElement | null;
       if (backdrop) backdrop.click();
     });
@@ -807,7 +818,7 @@ test.describe("Group 5: Sort + URL Integration", () => {
     test.skip(isMobileViewport, "Desktop sort requires >= 768px viewport");
     test.skip(
       browserName === "webkit",
-      "Radix Select hydration issue on webkit",
+      "Radix Select hydration issue on webkit"
     );
     await page.goto(`/search?sort=price_desc&${boundsQS}`);
     await waitForCards(page);
@@ -824,7 +835,7 @@ test.describe("Group 5: Sort + URL Integration", () => {
     test.skip(isMobileViewport, "Desktop sort requires >= 768px viewport");
     test.skip(
       browserName === "webkit",
-      "Radix Select hydration issue on webkit",
+      "Radix Select hydration issue on webkit"
     );
     await page.goto(SEARCH_URL);
     await waitForCards(page);
@@ -848,7 +859,7 @@ test.describe("Group 5: Sort + URL Integration", () => {
     test.skip(isMobileViewport, "Desktop sort requires >= 768px viewport");
     test.skip(
       browserName === "webkit",
-      "Radix Select hydration issue on webkit",
+      "Radix Select hydration issue on webkit"
     );
     await page.goto(`/search?sort=invalid_value&${boundsQS}`);
     await waitForCards(page);
@@ -884,7 +895,7 @@ test.describe("Group 6: Sort Edge Cases", () => {
     test.skip(isMobileViewport, "Desktop sort requires >= 768px viewport");
     test.skip(
       browserName === "webkit",
-      "Radix Select hydration issue on webkit",
+      "Radix Select hydration issue on webkit"
     );
 
     await page.goto(SEARCH_URL);
@@ -938,7 +949,7 @@ test.describe("Group 6: Sort Edge Cases", () => {
 
   test("6.3 sort with single result does not crash", async ({ page }) => {
     await page.goto(
-      `/search?q=Hayes+Valley+Private+Suite&sort=price_asc&${boundsQS}`,
+      `/search?q=Hayes+Valley+Private+Suite&sort=price_asc&${boundsQS}`
     );
     await waitForResults(page);
 
@@ -954,7 +965,7 @@ test.describe("Group 6: Sort Edge Cases", () => {
     test.skip(isMobileViewport, "Desktop sort requires >= 768px viewport");
     test.skip(
       browserName === "webkit",
-      "Radix Select hydration issue on webkit",
+      "Radix Select hydration issue on webkit"
     );
     await page.goto(SEARCH_URL);
     await waitForCards(page);
@@ -973,7 +984,7 @@ test.describe("Group 6: Sort Edge Cases", () => {
     test.skip(isMobileViewport, "Desktop sort requires >= 768px viewport");
     test.skip(
       browserName === "webkit",
-      "Radix Select hydration issue on webkit",
+      "Radix Select hydration issue on webkit"
     );
     await page.goto(SEARCH_URL);
     await waitForCards(page);
@@ -1006,7 +1017,7 @@ test.describe("Group 7: Sort Accessibility", () => {
     test.skip(isMobileViewport, "Desktop sort requires >= 768px viewport");
     test.skip(
       browserName === "webkit",
-      "Radix Select hydration issue on webkit",
+      "Radix Select hydration issue on webkit"
     );
   });
 
@@ -1053,14 +1064,12 @@ test.describe("Group 7: Sort Accessibility", () => {
 
     await openDesktopSort(page);
 
-    const checkedOption = page.locator(
-      '[role="option"][data-state="checked"]',
-    );
+    const checkedOption = page.locator('[role="option"][data-state="checked"]');
     await expect(checkedOption).toBeVisible();
     await expect(checkedOption).toHaveText(/Price: Low to High/);
 
     const uncheckedOptions = page.locator(
-      '[role="option"][data-state="unchecked"]',
+      '[role="option"][data-state="unchecked"]'
     );
     const uncheckedCount = await uncheckedOptions.count();
     expect(uncheckedCount).toBe(4);

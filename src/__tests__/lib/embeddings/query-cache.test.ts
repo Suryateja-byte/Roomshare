@@ -14,7 +14,8 @@ const mocks = {
 };
 
 jest.mock("@/lib/embeddings/gemini", () => ({
-  generateQueryEmbedding: (...args: unknown[]) => mocks.generateQueryEmbedding(...args),
+  generateQueryEmbedding: (...args: unknown[]) =>
+    mocks.generateQueryEmbedding(...args),
   generateEmbedding: jest.fn(),
   generateBatchEmbeddings: jest.fn(),
   EMBEDDING_MODEL: "gemini-embedding-2-preview",
@@ -38,7 +39,9 @@ describe("Query Embedding Cache", () => {
   it("calls generateQueryEmbedding on cache miss", async () => {
     const result = await getCachedQueryEmbedding("sunny room downtown");
     expect(mocks.generateQueryEmbedding).toHaveBeenCalledTimes(1);
-    expect(mocks.generateQueryEmbedding).toHaveBeenCalledWith("sunny room downtown");
+    expect(mocks.generateQueryEmbedding).toHaveBeenCalledWith(
+      "sunny room downtown"
+    );
     expect(result).toBe(FAKE_EMBEDDING);
   });
 

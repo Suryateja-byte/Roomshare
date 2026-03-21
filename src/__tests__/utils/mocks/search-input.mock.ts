@@ -5,7 +5,7 @@
  * Covers input normalization, Unicode, XSS payloads, and special characters.
  */
 
-import type { NearbyPlace } from '@/types/nearby';
+import type { NearbyPlace } from "@/types/nearby";
 
 // ============================================================================
 // Input Normalization Test Data
@@ -15,43 +15,43 @@ import type { NearbyPlace } from '@/types/nearby';
  * Whitespace test cases
  */
 export const WHITESPACE_INPUTS = {
-  empty: '',
-  singleSpace: ' ',
-  multipleSpaces: '   ',
-  leadingSpaces: '  coffee',
-  trailingSpaces: 'coffee  ',
-  leadingAndTrailing: '  coffee  ',
-  internalMultipleSpaces: 'coffee   shop',
-  tab: '\tcoffee',
-  newline: 'coffee\n',
-  carriageReturn: 'coffee\r',
-  mixedWhitespace: ' \t coffee \n shop \r ',
+  empty: "",
+  singleSpace: " ",
+  multipleSpaces: "   ",
+  leadingSpaces: "  coffee",
+  trailingSpaces: "coffee  ",
+  leadingAndTrailing: "  coffee  ",
+  internalMultipleSpaces: "coffee   shop",
+  tab: "\tcoffee",
+  newline: "coffee\n",
+  carriageReturn: "coffee\r",
+  mixedWhitespace: " \t coffee \n shop \r ",
 } as const;
 
 /**
  * Length boundary test cases
  */
 export const LENGTH_INPUTS = {
-  empty: '',
-  oneChar: 'a',
-  twoChars: 'ab', // Minimum to trigger search
-  threeChars: 'abc',
-  nearMax: 'a'.repeat(99),
-  atMax: 'a'.repeat(100),
-  overMax: 'a'.repeat(101),
-  wayOverMax: 'a'.repeat(200),
+  empty: "",
+  oneChar: "a",
+  twoChars: "ab", // Minimum to trigger search
+  threeChars: "abc",
+  nearMax: "a".repeat(99),
+  atMax: "a".repeat(100),
+  overMax: "a".repeat(101),
+  wayOverMax: "a".repeat(200),
 } as const;
 
 /**
  * Case sensitivity test cases
  */
 export const CASE_INPUTS = {
-  lowercase: 'indian grocery',
-  uppercase: 'INDIAN GROCERY',
-  mixedCase: 'InDiAn GrOcErY',
-  titleCase: 'Indian Grocery',
-  allCapsAbbrev: 'ATM',
-  mixedAbbrev: 'Atm',
+  lowercase: "indian grocery",
+  uppercase: "INDIAN GROCERY",
+  mixedCase: "InDiAn GrOcErY",
+  titleCase: "Indian Grocery",
+  allCapsAbbrev: "ATM",
+  mixedAbbrev: "Atm",
 } as const;
 
 // ============================================================================
@@ -63,44 +63,44 @@ export const CASE_INPUTS = {
  */
 export const UNICODE_INPUTS = {
   // Diacritics
-  diacriticsFrench: 'café',
-  diacriticsSpanish: 'jalapeño',
-  diacriticsGerman: 'Müller',
-  diacriticsPortuguese: 'açaí',
+  diacriticsFrench: "café",
+  diacriticsSpanish: "jalapeño",
+  diacriticsGerman: "Müller",
+  diacriticsPortuguese: "açaí",
 
   // Non-Latin scripts
-  hindi: 'किराना',
-  arabic: 'بقالة',
-  chinese: '杂货店',
-  japanese: 'スーパー',
-  korean: '식료품점',
-  russian: 'магазин',
-  greek: 'μανάβικο',
-  hebrew: 'מכולת',
-  thai: 'ร้านขายของชำ',
+  hindi: "किराना",
+  arabic: "بقالة",
+  chinese: "杂货店",
+  japanese: "スーパー",
+  korean: "식료품점",
+  russian: "магазин",
+  greek: "μανάβικο",
+  hebrew: "מכולת",
+  thai: "ร้านขายของชำ",
 
   // Mixed scripts
-  mixedLatinHindi: 'Indian किराना',
-  mixedLatinChinese: 'Asian 杂货店',
-  mixedLatinArabic: 'Halal بقالة',
+  mixedLatinHindi: "Indian किराना",
+  mixedLatinChinese: "Asian 杂货店",
+  mixedLatinArabic: "Halal بقالة",
 
   // RTL text
-  rtlArabic: 'محل البقالة',
-  rtlHebrew: 'חנות מכולת',
+  rtlArabic: "محل البقالة",
+  rtlHebrew: "חנות מכולת",
 } as const;
 
 /**
  * Emoji test cases
  */
 export const EMOJI_INPUTS = {
-  singleEmoji: '🍕',
-  emojiWithText: 'pizza 🍕',
-  textWithEmoji: '🛒 grocery',
-  multipleEmojis: '🍕🍔🌮',
-  emojiSequence: '👨‍👩‍👧‍👦',
-  emojiWithFlag: '🇺🇸 store',
-  emojiVariation: '☕️',
-  emojiZWJ: '👨‍🍳 restaurant',
+  singleEmoji: "🍕",
+  emojiWithText: "pizza 🍕",
+  textWithEmoji: "🛒 grocery",
+  multipleEmojis: "🍕🍔🌮",
+  emojiSequence: "👨‍👩‍👧‍👦",
+  emojiWithFlag: "🇺🇸 store",
+  emojiVariation: "☕️",
+  emojiZWJ: "👨‍🍳 restaurant",
 } as const;
 
 // ============================================================================
@@ -111,40 +111,40 @@ export const EMOJI_INPUTS = {
  * Punctuation test cases
  */
 export const PUNCTUATION_INPUTS = {
-  hyphen: 'gas-station',
-  underscore: 'coffee_shop',
+  hyphen: "gas-station",
+  underscore: "coffee_shop",
   apostrophe: "McDonald's",
   quoteSingle: "'coffee'",
   quoteDouble: '"coffee"',
-  questionMark: 'where is coffee?',
-  exclamation: 'coffee!',
-  comma: 'coffee, tea',
-  period: 'Dr. Pepper',
-  semicolon: 'coffee; tea',
-  colon: 'time: 9am',
-  ellipsis: 'coffee...',
-  parentheses: '(coffee)',
-  brackets: '[coffee]',
-  braces: '{coffee}',
+  questionMark: "where is coffee?",
+  exclamation: "coffee!",
+  comma: "coffee, tea",
+  period: "Dr. Pepper",
+  semicolon: "coffee; tea",
+  colon: "time: 9am",
+  ellipsis: "coffee...",
+  parentheses: "(coffee)",
+  brackets: "[coffee]",
+  braces: "{coffee}",
 } as const;
 
 /**
  * URL-sensitive characters (need proper encoding)
  */
 export const URL_SENSITIVE_INPUTS = {
-  ampersand: 'AT&T',
-  hash: '#1 coffee',
-  questionMark: 'coffee?type=best',
-  percent: '100% organic',
-  slash: '7/11',
-  backslash: 'path\\to',
-  equals: 'coffee=best',
-  plus: 'coffee+tea',
-  atSign: 'user@store',
-  dollar: '$5 coffee',
-  space: 'coffee shop',
-  doubleAmpersand: 'coffee && tea',
-  multipleSpecial: 'AT&T #1 100%',
+  ampersand: "AT&T",
+  hash: "#1 coffee",
+  questionMark: "coffee?type=best",
+  percent: "100% organic",
+  slash: "7/11",
+  backslash: "path\\to",
+  equals: "coffee=best",
+  plus: "coffee+tea",
+  atSign: "user@store",
+  dollar: "$5 coffee",
+  space: "coffee shop",
+  doubleAmpersand: "coffee && tea",
+  multipleSpecial: "AT&T #1 100%",
 } as const;
 
 // ============================================================================
@@ -160,13 +160,13 @@ export const XSS_PAYLOADS = {
   svgOnload: '<svg onload=alert("xss")>',
   iframeTag: '<iframe src="javascript:alert(1)">',
   eventHandler: '<div onclick="alert(1)">click</div>',
-  encodedScript: '&lt;script&gt;alert(1)&lt;/script&gt;',
-  unicodeEscape: '\u003cscript\u003ealert(1)\u003c/script\u003e',
-  jsProtocol: 'javascript:alert(1)',
-  dataUri: 'data:text/html,<script>alert(1)</script>',
-  entityEncoded: '&#60;script&#62;alert(1)&#60;/script&#62;',
-  mixedEncoding: '<scr<script>ipt>alert(1)</script>',
-  nullByte: 'coffee\x00<script>alert(1)</script>',
+  encodedScript: "&lt;script&gt;alert(1)&lt;/script&gt;",
+  unicodeEscape: "\u003cscript\u003ealert(1)\u003c/script\u003e",
+  jsProtocol: "javascript:alert(1)",
+  dataUri: "data:text/html,<script>alert(1)</script>",
+  entityEncoded: "&#60;script&#62;alert(1)&#60;/script&#62;",
+  mixedEncoding: "<scr<script>ipt>alert(1)</script>",
+  nullByte: "coffee\x00<script>alert(1)</script>",
 } as const;
 
 /**
@@ -185,12 +185,12 @@ export const SQL_PAYLOADS = {
  * Control characters - should be stripped/sanitized
  */
 export const CONTROL_CHAR_INPUTS = {
-  nullChar: 'coffee\x00shop',
-  bellChar: 'coffee\x07shop',
-  backspace: 'coffee\x08shop',
-  formFeed: 'coffee\x0Cshop',
-  escapeChar: 'coffee\x1Bshop',
-  deleteChar: 'coffee\x7Fshop',
+  nullChar: "coffee\x00shop",
+  bellChar: "coffee\x07shop",
+  backspace: "coffee\x08shop",
+  formFeed: "coffee\x0Cshop",
+  escapeChar: "coffee\x1Bshop",
+  deleteChar: "coffee\x7Fshop",
 } as const;
 
 // ============================================================================
@@ -201,35 +201,35 @@ export const CONTROL_CHAR_INPUTS = {
  * Brand name queries
  */
 export const BRAND_QUERIES = {
-  walmart: 'Walmart',
-  costco: 'Costco',
-  target: 'Target',
+  walmart: "Walmart",
+  costco: "Costco",
+  target: "Target",
   mcdonalds: "McDonald's",
-  starbucks: 'Starbucks',
-  cvs: 'CVS',
-  walgreens: 'Walgreens',
+  starbucks: "Starbucks",
+  cvs: "CVS",
+  walgreens: "Walgreens",
 } as const;
 
 /**
  * Common typo test cases
  */
 export const TYPO_QUERIES = {
-  coffeeTypo: 'coffe',
-  pharmacyTypo: 'phamacy',
-  restaurantTypo: 'resturant',
-  groceryTypo: 'groery',
+  coffeeTypo: "coffe",
+  pharmacyTypo: "phamacy",
+  restaurantTypo: "resturant",
+  groceryTypo: "groery",
 } as const;
 
 /**
  * Plural vs singular test cases
  */
 export const PLURAL_QUERIES = {
-  gymSingular: 'gym',
-  gymPlural: 'gyms',
-  storeSingular: 'store',
-  storePlural: 'stores',
-  restaurantSingular: 'restaurant',
-  restaurantPlural: 'restaurants',
+  gymSingular: "gym",
+  gymPlural: "gyms",
+  storeSingular: "store",
+  storePlural: "stores",
+  restaurantSingular: "restaurant",
+  restaurantPlural: "restaurants",
 } as const;
 
 // ============================================================================
@@ -239,12 +239,15 @@ export const PLURAL_QUERIES = {
 /**
  * Create a mock NearbyPlace with custom overrides
  */
-export function createMockPlace(id: string, overrides: Partial<NearbyPlace> = {}): NearbyPlace {
+export function createMockPlace(
+  id: string,
+  overrides: Partial<NearbyPlace> = {}
+): NearbyPlace {
   return {
     id,
     name: `Place ${id}`,
-    address: '123 Test St, City, ST 12345',
-    category: 'food-grocery',
+    address: "123 Test St, City, ST 12345",
+    category: "food-grocery",
     location: { lat: 37.7749, lng: -122.4194 },
     distanceMiles: 0.5,
     ...overrides,
@@ -254,7 +257,7 @@ export function createMockPlace(id: string, overrides: Partial<NearbyPlace> = {}
 /**
  * Create mock response with multiple places
  */
-export function createMockPlacesResponse(count: number, queryPrefix = 'place') {
+export function createMockPlacesResponse(count: number, queryPrefix = "place") {
   const places = Array.from({ length: count }, (_, i) =>
     createMockPlace(`${queryPrefix}-${i + 1}`, {
       distanceMiles: (i + 1) * 0.1,
@@ -279,7 +282,11 @@ export function createEmptyResponse() {
 /**
  * Create error response
  */
-export function createErrorResponse(error: string, details?: string, status = 400) {
+export function createErrorResponse(
+  error: string,
+  details?: string,
+  status = 400
+) {
   return {
     ok: false,
     status,
@@ -294,7 +301,7 @@ export function createErrorResponse(error: string, details?: string, status = 40
 /**
  * Generate a string of specified length with a pattern
  */
-export function generateString(length: number, pattern = 'a'): string {
+export function generateString(length: number, pattern = "a"): string {
   return pattern.repeat(Math.ceil(length / pattern.length)).slice(0, length);
 }
 

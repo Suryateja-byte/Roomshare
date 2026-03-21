@@ -8,7 +8,7 @@
  * - HALF_OPEN: Testing if service has recovered
  */
 
-export type CircuitState = 'CLOSED' | 'OPEN' | 'HALF_OPEN';
+export type CircuitState = "CLOSED" | "OPEN" | "HALF_OPEN";
 
 export interface CircuitBreakerOptions {
   /** Number of failures before opening the circuit (default: 5) */
@@ -35,12 +35,12 @@ export interface CircuitBreakerStats {
  * Error thrown when circuit is open and requests are being rejected
  */
 export class CircuitOpenError extends Error {
-  public readonly code = 'CIRCUIT_OPEN';
+  public readonly code = "CIRCUIT_OPEN";
   public readonly circuitName: string;
 
   constructor(name: string) {
     super(`Circuit breaker '${name}' is open - service unavailable`);
-    this.name = 'CircuitOpenError';
+    this.name = "CircuitOpenError";
     this.circuitName = name;
   }
 }
@@ -71,7 +71,7 @@ export function isCircuitOpenError(error: unknown): error is CircuitOpenError {
  * ```
  */
 export class CircuitBreaker {
-  private state: CircuitState = 'CLOSED';
+  private state: CircuitState = "CLOSED";
   private failures: number = 0;
   private successes: number = 0;
   private lastFailure: number | null = null;
@@ -88,7 +88,7 @@ export class CircuitBreaker {
     this.failureThreshold = options.failureThreshold ?? 5;
     this.resetTimeout = options.resetTimeout ?? 30000;
     this.successThreshold = options.successThreshold ?? 2;
-    this.name = options.name ?? 'default';
+    this.name = options.name ?? "default";
   }
 
   /**
@@ -98,9 +98,9 @@ export class CircuitBreaker {
     this.totalRequests++;
 
     // Check if circuit should move from OPEN to HALF_OPEN
-    if (this.state === 'OPEN') {
+    if (this.state === "OPEN") {
       if (this.shouldAttemptReset()) {
-        this.state = 'HALF_OPEN';
+        this.state = "HALF_OPEN";
         this.successes = 0;
       } else {
         throw new CircuitOpenError(this.name);
@@ -132,10 +132,10 @@ export class CircuitBreaker {
     this.lastSuccess = Date.now();
     this.failures = 0;
 
-    if (this.state === 'HALF_OPEN') {
+    if (this.state === "HALF_OPEN") {
       this.successes++;
       if (this.successes >= this.successThreshold) {
-        this.state = 'CLOSED';
+        this.state = "CLOSED";
         this.successes = 0;
       }
     }
@@ -149,12 +149,15 @@ export class CircuitBreaker {
     this.totalFailures++;
     this.lastFailure = Date.now();
 
-    if (this.state === 'HALF_OPEN') {
+    if (this.state === "HALF_OPEN") {
       // Any failure in half-open state reopens the circuit
-      this.state = 'OPEN';
+      this.state = "OPEN";
       this.successes = 0;
-    } else if (this.state === 'CLOSED' && this.failures >= this.failureThreshold) {
-      this.state = 'OPEN';
+    } else if (
+      this.state === "CLOSED" &&
+      this.failures >= this.failureThreshold
+    ) {
+      this.state = "OPEN";
     }
   }
 
@@ -163,8 +166,8 @@ export class CircuitBreaker {
    */
   getState(): CircuitState {
     // Check for automatic transition from OPEN to HALF_OPEN
-    if (this.state === 'OPEN' && this.shouldAttemptReset()) {
-      return 'HALF_OPEN';
+    if (this.state === "OPEN" && this.shouldAttemptReset()) {
+      return "HALF_OPEN";
     }
     return this.state;
   }
@@ -189,7 +192,7 @@ export class CircuitBreaker {
    * Use with caution - typically for admin/maintenance operations
    */
   reset(): void {
-    this.state = 'CLOSED';
+    this.state = "CLOSED";
     this.failures = 0;
     this.successes = 0;
   }
@@ -199,7 +202,7 @@ export class CircuitBreaker {
    */
   isAllowingRequests(): boolean {
     const currentState = this.getState();
-    return currentState === 'CLOSED' || currentState === 'HALF_OPEN';
+    return currentState === "CLOSED" || currentState === "HALF_OPEN";
   }
 }
 
@@ -208,42 +211,42 @@ export class CircuitBreaker {
  */
 export const circuitBreakers = {
   redis: new CircuitBreaker({
-    name: 'redis',
+    name: "redis",
     failureThreshold: 3,
     resetTimeout: 10000, // 10 seconds
     successThreshold: 2,
   }),
 
   radar: new CircuitBreaker({
-    name: 'radar',
+    name: "radar",
     failureThreshold: 5,
     resetTimeout: 30000, // 30 seconds
     successThreshold: 2,
   }),
 
   email: new CircuitBreaker({
-    name: 'email',
+    name: "email",
     failureThreshold: 5,
     resetTimeout: 60000, // 1 minute
     successThreshold: 3,
   }),
 
   nominatimGeocode: new CircuitBreaker({
-    name: 'nominatim-geocode',
+    name: "nominatim-geocode",
     failureThreshold: 5,
     resetTimeout: 30000, // 30 seconds
     successThreshold: 2,
   }),
 
   postgis: new CircuitBreaker({
-    name: 'postgis',
+    name: "postgis",
     failureThreshold: 3,
     resetTimeout: 15000, // 15 seconds
     successThreshold: 2,
   }),
 
   supabaseStorage: new CircuitBreaker({
-    name: 'supabase-storage',
+    name: "supabase-storage",
     failureThreshold: 5,
     resetTimeout: 30000, // 30 seconds
     successThreshold: 2,

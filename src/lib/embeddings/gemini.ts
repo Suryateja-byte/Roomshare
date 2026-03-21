@@ -71,7 +71,9 @@ export async function generateEmbedding(
       data: { textLength: truncated.length, taskType },
       level: "info",
     });
-  } catch { /* Sentry unavailable in test */ }
+  } catch {
+    /* Sentry unavailable in test */
+  }
   const res = await withRetry(() =>
     getClient().models.embedContent({
       model: MODEL,
@@ -90,14 +92,14 @@ export async function generateEmbedding(
       data: { dimensions: values.length, taskType },
       level: "info",
     });
-  } catch { /* Sentry unavailable in test */ }
+  } catch {
+    /* Sentry unavailable in test */
+  }
   return normalizeL2(values);
 }
 
 /** Generate embedding optimized for search queries */
-export async function generateQueryEmbedding(
-  query: string
-): Promise<number[]> {
+export async function generateQueryEmbedding(query: string): Promise<number[]> {
   return generateEmbedding(query, "RETRIEVAL_QUERY");
 }
 
@@ -122,10 +124,16 @@ export async function generateMultimodalEmbedding(
     Sentry.addBreadcrumb({
       category: "embedding",
       message: `Generating multimodal embedding (${taskType})`,
-      data: { textLength: truncated.length, imageCount: images.length, taskType },
+      data: {
+        textLength: truncated.length,
+        imageCount: images.length,
+        taskType,
+      },
       level: "info",
     });
-  } catch { /* Sentry unavailable in test */ }
+  } catch {
+    /* Sentry unavailable in test */
+  }
 
   const res = await withRetry(() =>
     getClient().models.embedContent({

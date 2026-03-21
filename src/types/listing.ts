@@ -108,13 +108,13 @@ export function assertPublicListing(listing: unknown): PublicListing {
     // Handle null/undefined/non-object cases
     if (!listing || typeof listing !== "object" || Array.isArray(listing)) {
       throw new Error(
-        `Cache safety violation: expected listing object, got ${listing === null ? "null" : Array.isArray(listing) ? "array" : typeof listing}`,
+        `Cache safety violation: expected listing object, got ${listing === null ? "null" : Array.isArray(listing) ? "array" : typeof listing}`
       );
     }
     const record = listing as Record<string, unknown>;
     const foundFields = USER_SPECIFIC_FIELDS.filter((f) => f in record);
     throw new Error(
-      `Cache safety violation: user-specific fields detected in cached listing: ${foundFields.join(", ")}`,
+      `Cache safety violation: user-specific fields detected in cached listing: ${foundFields.join(", ")}`
     );
   }
   return listing as PublicListing;
@@ -133,7 +133,7 @@ export function assertPublicListings(listings: unknown[]): PublicListing[] {
       return assertPublicListing(listing);
     } catch (error) {
       throw new Error(
-        `Cache safety violation at index ${index}: ${(error as Error).message}`,
+        `Cache safety violation at index ${index}: ${(error as Error).message}`
       );
     }
   });

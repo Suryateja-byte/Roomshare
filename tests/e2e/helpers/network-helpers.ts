@@ -1,29 +1,38 @@
-import { Page, BrowserContext, Route, Request } from '@playwright/test';
+import { Page, BrowserContext, Route, Request } from "@playwright/test";
 
 /**
  * Network condition presets
  */
 export type NetworkCondition =
-  | 'fast'
-  | 'slow-3g'
-  | 'slow-4g'
-  | 'offline'
-  | 'flaky'
-  | 'high-latency';
+  | "fast"
+  | "slow-3g"
+  | "slow-4g"
+  | "offline"
+  | "flaky"
+  | "high-latency";
 
 /**
  * Network condition configurations
  */
 const networkConfigs: Record<
   NetworkCondition,
-  { downloadSpeed?: number; uploadSpeed?: number; latency?: number; offline?: boolean }
+  {
+    downloadSpeed?: number;
+    uploadSpeed?: number;
+    latency?: number;
+    offline?: boolean;
+  }
 > = {
   fast: { downloadSpeed: 10000000, uploadSpeed: 5000000, latency: 20 },
-  'slow-3g': { downloadSpeed: 400000, uploadSpeed: 200000, latency: 400 },
-  'slow-4g': { downloadSpeed: 2000000, uploadSpeed: 1000000, latency: 100 },
+  "slow-3g": { downloadSpeed: 400000, uploadSpeed: 200000, latency: 400 },
+  "slow-4g": { downloadSpeed: 2000000, uploadSpeed: 1000000, latency: 100 },
   offline: { offline: true },
   flaky: { downloadSpeed: 500000, uploadSpeed: 250000, latency: 500 },
-  'high-latency': { downloadSpeed: 5000000, uploadSpeed: 2500000, latency: 1000 },
+  "high-latency": {
+    downloadSpeed: 5000000,
+    uploadSpeed: 2500000,
+    latency: 1000,
+  },
 };
 
 /**
@@ -49,7 +58,7 @@ export function networkHelpers(page: Page, context: BrowserContext) {
 
         // CDP throttling only works in Chromium
         const cdp = await context.newCDPSession(page);
-        await cdp.send('Network.emulateNetworkConditions', {
+        await cdp.send("Network.emulateNetworkConditions", {
           offline: false,
           downloadThroughput: (config.downloadSpeed || 5000000) / 8,
           uploadThroughput: (config.uploadSpeed || 2500000) / 8,
@@ -67,7 +76,7 @@ export function networkHelpers(page: Page, context: BrowserContext) {
 
       try {
         const cdp = await context.newCDPSession(page);
-        await cdp.send('Network.emulateNetworkConditions', {
+        await cdp.send("Network.emulateNetworkConditions", {
           offline: false,
           downloadThroughput: -1,
           uploadThroughput: -1,
@@ -105,9 +114,9 @@ export function networkHelpers(page: Page, context: BrowserContext) {
      * Simulate flaky connection (random failures)
      */
     async simulateFlaky(failureRate = 0.3) {
-      await page.route('**/*', async (route: Route) => {
+      await page.route("**/*", async (route: Route) => {
         if (Math.random() < failureRate) {
-          await route.abort('failed');
+          await route.abort("failed");
           abortedRequests.push(route.request().url());
         } else {
           await route.continue();
@@ -119,7 +128,7 @@ export function networkHelpers(page: Page, context: BrowserContext) {
      * Add latency to all requests
      */
     async addLatency(ms: number) {
-      await page.route('**/*', async (route: Route) => {
+      await page.route("**/*", async (route: Route) => {
         await new Promise((resolve) => setTimeout(resolve, ms));
         await route.continue();
       });
@@ -130,7 +139,9 @@ export function networkHelpers(page: Page, context: BrowserContext) {
      */
     async blockUrls(patterns: (string | RegExp)[]) {
       for (const pattern of patterns) {
-        await page.route(pattern, (route: Route) => route.abort('blockedbyclient'));
+        await page.route(pattern, (route: Route) =>
+          route.abort("blockedbyclient")
+        );
       }
     },
 
@@ -138,8 +149,8 @@ export function networkHelpers(page: Page, context: BrowserContext) {
      * Block all images
      */
     async blockImages() {
-      await page.route('**/*.{png,jpg,jpeg,gif,webp,svg}', (route: Route) =>
-        route.abort('blockedbyclient')
+      await page.route("**/*.{png,jpg,jpeg,gif,webp,svg}", (route: Route) =>
+        route.abort("blockedbyclient")
       );
     },
 
@@ -147,7 +158,9 @@ export function networkHelpers(page: Page, context: BrowserContext) {
      * Block all API calls
      */
     async blockApi() {
-      await page.route('**/api/**', (route: Route) => route.abort('blockedbyclient'));
+      await page.route("**/api/**", (route: Route) =>
+        route.abort("blockedbyclient")
+      );
     },
 
     /**
@@ -164,9 +177,9 @@ export function networkHelpers(page: Page, context: BrowserContext) {
       await page.route(urlPattern, async (route: Route) => {
         await route.fulfill({
           status: response.status || 200,
-          contentType: response.contentType || 'application/json',
+          contentType: response.contentType || "application/json",
           body:
-            typeof response.body === 'string'
+            typeof response.body === "string"
               ? response.body
               : JSON.stringify(response.body),
         });
@@ -190,8 +203,8 @@ export function networkHelpers(page: Page, context: BrowserContext) {
       await page.route(urlPattern, async (route: Route) => {
         await route.fulfill({
           status: statusCode,
-          contentType: 'application/json',
-          body: JSON.stringify({ error: 'Simulated error' }),
+          contentType: "application/json",
+          body: JSON.stringify({ error: "Simulated error" }),
         });
       });
     },
@@ -199,15 +212,25 @@ export function networkHelpers(page: Page, context: BrowserContext) {
     /**
      * Wait for a specific API request
      */
-    async waitForRequest(urlPattern: string | RegExp, options?: { timeout?: number }) {
-      return page.waitForRequest(urlPattern, { timeout: options?.timeout || 30000 });
+    async waitForRequest(
+      urlPattern: string | RegExp,
+      options?: { timeout?: number }
+    ) {
+      return page.waitForRequest(urlPattern, {
+        timeout: options?.timeout || 30000,
+      });
     },
 
     /**
      * Wait for a specific API response
      */
-    async waitForResponse(urlPattern: string | RegExp, options?: { timeout?: number }) {
-      return page.waitForResponse(urlPattern, { timeout: options?.timeout || 30000 });
+    async waitForResponse(
+      urlPattern: string | RegExp,
+      options?: { timeout?: number }
+    ) {
+      return page.waitForResponse(urlPattern, {
+        timeout: options?.timeout || 30000,
+      });
     },
 
     /**
@@ -230,7 +253,7 @@ export function networkHelpers(page: Page, context: BrowserContext) {
      */
     async captureRequests(): Promise<Request[]> {
       const requests: Request[] = [];
-      page.on('request', (request) => requests.push(request));
+      page.on("request", (request) => requests.push(request));
       return requests;
     },
 
@@ -238,7 +261,7 @@ export function networkHelpers(page: Page, context: BrowserContext) {
      * Wait for network idle
      */
     async waitForIdle(timeout = 30000) {
-      await page.waitForLoadState('domcontentloaded', { timeout });
+      await page.waitForLoadState("domcontentloaded", { timeout });
     },
   };
 }

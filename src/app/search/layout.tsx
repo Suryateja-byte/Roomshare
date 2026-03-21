@@ -44,7 +44,10 @@ export default function SearchLayout({
             <SkipLink href="#search-results">Skip to search results</SkipLink>
             {/* Search Header - Persistent across navigations, fixed position */}
             <header className="fixed top-0 left-0 right-0 w-full bg-white/95 dark:bg-zinc-900/95 backdrop-blur-md border-b border-zinc-100 dark:border-zinc-800 z-[1100] pointer-events-none">
-              <nav aria-label="Search navigation" className="pointer-events-auto">
+              <nav
+                aria-label="Search navigation"
+                className="pointer-events-auto"
+              >
                 <SearchHeaderWrapper />
               </nav>
             </header>
@@ -52,7 +55,10 @@ export default function SearchLayout({
             {/* Main content with top padding to account for fixed header.
                 Uses --header-height CSS variable updated dynamically by SearchHeaderWrapper to
                 perfectly flush clear the search bar regardless of responsive wrapping. */}
-            <div className="flex-1 flex flex-col pt-[var(--header-height)] overflow-hidden" style={{ transition: 'padding-top 0.3s ease-out' }}>
+            <div
+              className="flex-1 flex flex-col pt-[var(--header-height)] overflow-hidden"
+              style={{ transition: "padding-top 0.3s ease-out" }}
+            >
               {/* Split view: List (from page) + Map (managed by SearchLayoutView) */}
               <MapBoundsProvider>
                 <ListingFocusProvider>

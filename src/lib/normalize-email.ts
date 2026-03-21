@@ -6,5 +6,5 @@
  * dependency chain in routes that only need email normalization.
  */
 export function normalizeEmail(email: string): string {
-    return email.toLowerCase().trim();
+  return email.toLowerCase().trim();
 }

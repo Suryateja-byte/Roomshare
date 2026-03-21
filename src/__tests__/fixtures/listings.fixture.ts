@@ -11,7 +11,12 @@
  * - Realistic data distribution
  */
 
-import type { Amenity, HouseRule, RoomType, SortOption } from '@/lib/filter-schema';
+import type {
+  Amenity,
+  HouseRule,
+  RoomType,
+  SortOption,
+} from "@/lib/filter-schema";
 
 // ============================================
 // Types
@@ -37,7 +42,7 @@ export interface TestListing {
     lng: number;
   };
   availableSlots: number;
-  status: 'ACTIVE' | 'INACTIVE';
+  status: "ACTIVE" | "INACTIVE";
   avgRating: number | null;
   reviewCount: number;
   viewCount: number;
@@ -83,51 +88,84 @@ function randomSubset<T>(arr: readonly T[], min = 0, max?: number): T[] {
 // Test Data Constants
 // ============================================
 
-const AMENITIES: Amenity[] = ['Wifi', 'AC', 'Parking', 'Washer', 'Dryer', 'Kitchen', 'Gym', 'Pool'];
-
-const HOUSE_RULES: HouseRule[] = [
-  'Pets allowed',
-  'Smoking allowed',
-  'Couples allowed',
-  'Guests allowed',
+const AMENITIES: Amenity[] = [
+  "Wifi",
+  "AC",
+  "Parking",
+  "Washer",
+  "Dryer",
+  "Kitchen",
+  "Gym",
+  "Pool",
 ];
 
-const ROOM_TYPES: RoomType[] = ['Private Room', 'Shared Room', 'Entire Place'];
+const HOUSE_RULES: HouseRule[] = [
+  "Pets allowed",
+  "Smoking allowed",
+  "Couples allowed",
+  "Guests allowed",
+];
 
-const LEASE_DURATIONS = ['Month-to-month', '3 months', '6 months', '12 months', 'Flexible'];
+const ROOM_TYPES: RoomType[] = ["Private Room", "Shared Room", "Entire Place"];
 
-const GENDER_PREFERENCES = ['MALE_ONLY', 'FEMALE_ONLY', 'NO_PREFERENCE'];
+const LEASE_DURATIONS = [
+  "Month-to-month",
+  "3 months",
+  "6 months",
+  "12 months",
+  "Flexible",
+];
 
-const HOUSEHOLD_GENDERS = ['ALL_MALE', 'ALL_FEMALE', 'MIXED'];
+const GENDER_PREFERENCES = ["MALE_ONLY", "FEMALE_ONLY", "NO_PREFERENCE"];
+
+const HOUSEHOLD_GENDERS = ["ALL_MALE", "ALL_FEMALE", "MIXED"];
 
 const LANGUAGES = [
-  'en', 'es', 'zh', 'fr', 'de', 'ja', 'ko', 'pt', 'ru', 'ar',
-  'hi', 'it', 'nl', 'pl', 'tr', 'vi', 'th', 'id', 'ms', 'tl',
+  "en",
+  "es",
+  "zh",
+  "fr",
+  "de",
+  "ja",
+  "ko",
+  "pt",
+  "ru",
+  "ar",
+  "hi",
+  "it",
+  "nl",
+  "pl",
+  "tr",
+  "vi",
+  "th",
+  "id",
+  "ms",
+  "tl",
 ];
 
 const CITIES = [
   // US West Coast
-  { city: 'San Francisco', state: 'CA', lat: 37.7749, lng: -122.4194 },
-  { city: 'Los Angeles', state: 'CA', lat: 34.0522, lng: -118.2437 },
-  { city: 'San Diego', state: 'CA', lat: 32.7157, lng: -117.1611 },
-  { city: 'Seattle', state: 'WA', lat: 47.6062, lng: -122.3321 },
-  { city: 'Portland', state: 'OR', lat: 45.5152, lng: -122.6784 },
+  { city: "San Francisco", state: "CA", lat: 37.7749, lng: -122.4194 },
+  { city: "Los Angeles", state: "CA", lat: 34.0522, lng: -118.2437 },
+  { city: "San Diego", state: "CA", lat: 32.7157, lng: -117.1611 },
+  { city: "Seattle", state: "WA", lat: 47.6062, lng: -122.3321 },
+  { city: "Portland", state: "OR", lat: 45.5152, lng: -122.6784 },
   // US East Coast
-  { city: 'New York', state: 'NY', lat: 40.7128, lng: -74.006 },
-  { city: 'Boston', state: 'MA', lat: 42.3601, lng: -71.0589 },
-  { city: 'Miami', state: 'FL', lat: 25.7617, lng: -80.1918 },
-  { city: 'Washington', state: 'DC', lat: 38.9072, lng: -77.0369 },
-  { city: 'Philadelphia', state: 'PA', lat: 39.9526, lng: -75.1652 },
+  { city: "New York", state: "NY", lat: 40.7128, lng: -74.006 },
+  { city: "Boston", state: "MA", lat: 42.3601, lng: -71.0589 },
+  { city: "Miami", state: "FL", lat: 25.7617, lng: -80.1918 },
+  { city: "Washington", state: "DC", lat: 38.9072, lng: -77.0369 },
+  { city: "Philadelphia", state: "PA", lat: 39.9526, lng: -75.1652 },
   // Other US
-  { city: 'Austin', state: 'TX', lat: 30.2672, lng: -97.7431 },
-  { city: 'Denver', state: 'CO', lat: 39.7392, lng: -104.9903 },
-  { city: 'Chicago', state: 'IL', lat: 41.8781, lng: -87.6298 },
+  { city: "Austin", state: "TX", lat: 30.2672, lng: -97.7431 },
+  { city: "Denver", state: "CO", lat: 39.7392, lng: -104.9903 },
+  { city: "Chicago", state: "IL", lat: 41.8781, lng: -87.6298 },
   // International (for antimeridian tests)
-  { city: 'Tokyo', state: 'JP', lat: 35.6762, lng: 139.6503 },
-  { city: 'Sydney', state: 'AU', lat: -33.8688, lng: 151.2093 },
+  { city: "Tokyo", state: "JP", lat: 35.6762, lng: 139.6503 },
+  { city: "Sydney", state: "AU", lat: -33.8688, lng: 151.2093 },
   // Near antimeridian
-  { city: 'Auckland', state: 'NZ', lat: -36.8509, lng: 174.7645 },
-  { city: 'Fiji', state: 'FJ', lat: -17.7134, lng: 178.065 },
+  { city: "Auckland", state: "NZ", lat: -36.8509, lng: 174.7645 },
+  { city: "Fiji", state: "FJ", lat: -17.7134, lng: 178.065 },
 ];
 
 const PRICE_RANGES = [
@@ -140,25 +178,25 @@ const PRICE_RANGES = [
 ];
 
 const TITLE_TEMPLATES = [
-  'Cozy {roomType} in {city}',
-  'Modern {roomType} near downtown',
-  'Spacious {roomType} with great views',
-  'Budget-friendly {roomType}',
-  'Luxury {roomType} in {city}',
-  'Student-friendly {roomType}',
-  'Professional {roomType} in prime location',
-  'Quiet {roomType} with parking',
+  "Cozy {roomType} in {city}",
+  "Modern {roomType} near downtown",
+  "Spacious {roomType} with great views",
+  "Budget-friendly {roomType}",
+  "Luxury {roomType} in {city}",
+  "Student-friendly {roomType}",
+  "Professional {roomType} in prime location",
+  "Quiet {roomType} with parking",
 ];
 
 const DESCRIPTION_SNIPPETS = [
-  'Walking distance to public transit.',
-  'Recently renovated kitchen and bathroom.',
-  'Quiet neighborhood, perfect for remote work.',
-  'Close to restaurants and shopping.',
-  'Pet-friendly building.',
-  'Utilities included in rent.',
-  'Fully furnished with modern appliances.',
-  'Laundry on-site.',
+  "Walking distance to public transit.",
+  "Recently renovated kitchen and bathroom.",
+  "Quiet neighborhood, perfect for remote work.",
+  "Close to restaurants and shopping.",
+  "Pet-friendly building.",
+  "Utilities included in rent.",
+  "Fully furnished with modern appliances.",
+  "Laundry on-site.",
 ];
 
 // ============================================
@@ -168,7 +206,7 @@ const DESCRIPTION_SNIPPETS = [
 function generateDate(daysFromNow: number): string {
   const date = new Date();
   date.setDate(date.getDate() + daysFromNow);
-  return date.toISOString().split('T')[0];
+  return date.toISOString().split("T")[0];
 }
 
 function generateListing(index: number): TestListing {
@@ -180,12 +218,12 @@ function generateListing(index: number): TestListing {
   // Generate title
   const titleTemplate = randomChoice(TITLE_TEMPLATES);
   const title = titleTemplate
-    .replace('{roomType}', roomType)
-    .replace('{city}', location.city);
+    .replace("{roomType}", roomType)
+    .replace("{city}", location.city);
 
   // Generate description
   const snippets = randomSubset(DESCRIPTION_SNIPPETS, 1, 3);
-  const description = snippets.join(' ');
+  const description = snippets.join(" ");
 
   // Add slight location variance (within ~10km)
   const latVariance = (random() - 0.5) * 0.1;
@@ -210,7 +248,7 @@ function generateListing(index: number): TestListing {
   const reviewCount = hasRatings ? randomInt(1, 50) : 0;
 
   // Generate status (most active)
-  const status = random() > 0.1 ? 'ACTIVE' : 'INACTIVE';
+  const status = random() > 0.1 ? "ACTIVE" : "INACTIVE";
 
   // Generate created date (within last 180 days)
   const createdDaysAgo = randomInt(0, 180);
@@ -218,7 +256,7 @@ function generateListing(index: number): TestListing {
   createdAt.setDate(createdAt.getDate() - createdDaysAgo);
 
   return {
-    id: `listing-${String(index).padStart(4, '0')}`,
+    id: `listing-${String(index).padStart(4, "0")}`,
     title,
     description,
     price,
@@ -237,12 +275,12 @@ function generateListing(index: number): TestListing {
       lng: Number((location.lng + lngVariance).toFixed(6)),
     },
     availableSlots: randomInt(1, 5),
-    status: status as 'ACTIVE' | 'INACTIVE',
+    status: status as "ACTIVE" | "INACTIVE",
     avgRating,
     reviewCount,
     viewCount: randomInt(10, 1000),
     createdAt,
-    hostId: `host-${randomInt(1, 20).toString().padStart(3, '0')}`,
+    hostId: `host-${randomInt(1, 20).toString().padStart(3, "0")}`,
   };
 }
 
@@ -269,7 +307,9 @@ export const TEST_LISTINGS: TestListing[] = generateDataset(100);
 /**
  * Active listings only (for most tests)
  */
-export const ACTIVE_LISTINGS = TEST_LISTINGS.filter((l) => l.status === 'ACTIVE');
+export const ACTIVE_LISTINGS = TEST_LISTINGS.filter(
+  (l) => l.status === "ACTIVE"
+);
 
 // ============================================
 // Coverage Verification
@@ -351,10 +391,10 @@ export function verifyCoverage(listings: TestListing[]): {
 
   // Price ranges
   const priceRanges = [
-    { label: '$0-500', min: 0, max: 500 },
-    { label: '$500-1000', min: 500, max: 1000 },
-    { label: '$1000-2000', min: 1000, max: 2000 },
-    { label: '$2000-5000', min: 2000, max: 5000 },
+    { label: "$0-500", min: 0, max: 500 },
+    { label: "$500-1000", min: 500, max: 1000 },
+    { label: "$1000-2000", min: 1000, max: 2000 },
+    { label: "$2000-5000", min: 2000, max: 5000 },
   ];
   for (const range of priceRanges) {
     if (listings.some((l) => l.price >= range.min && l.price <= range.max)) {
@@ -376,14 +416,14 @@ export function verifyCoverage(listings: TestListing[]): {
 
   // Ratings
   if (listings.some((l) => l.avgRating !== null)) {
-    covered.push('hasRating');
+    covered.push("hasRating");
   } else {
-    missing.push('hasRating');
+    missing.push("hasRating");
   }
   if (listings.some((l) => l.avgRating === null)) {
-    covered.push('noRating');
+    covered.push("noRating");
   } else {
-    missing.push('noRating');
+    missing.push("noRating");
   }
 
   return { covered, missing };
@@ -476,7 +516,9 @@ export function applyFilters(
     bounds?: { minLat: number; maxLat: number; minLng: number; maxLng: number };
   }
 ): TestListing[] {
-  let result = listings.filter((l) => l.status === 'ACTIVE' && l.availableSlots > 0);
+  let result = listings.filter(
+    (l) => l.status === "ACTIVE" && l.availableSlots > 0
+  );
 
   // Query (text search)
   if (filters.query) {
@@ -499,7 +541,7 @@ export function applyFilters(
   }
 
   // Room type
-  if (filters.roomType && filters.roomType !== 'any') {
+  if (filters.roomType && filters.roomType !== "any") {
     result = result.filter(
       (l) => l.roomType.toLowerCase() === filters.roomType!.toLowerCase()
     );
@@ -526,28 +568,35 @@ export function applyFilters(
   // Languages (OR logic)
   if (filters.languages?.length) {
     result = result.filter((l) =>
-      filters.languages!.some((lang) => l.languages.includes(lang.toLowerCase()))
+      filters.languages!.some((lang) =>
+        l.languages.includes(lang.toLowerCase())
+      )
     );
   }
 
   // Lease duration
-  if (filters.leaseDuration && filters.leaseDuration !== 'any') {
+  if (filters.leaseDuration && filters.leaseDuration !== "any") {
     result = result.filter(
-      (l) => l.leaseDuration.toLowerCase() === filters.leaseDuration!.toLowerCase()
+      (l) =>
+        l.leaseDuration.toLowerCase() === filters.leaseDuration!.toLowerCase()
     );
   }
 
   // Gender preference
-  if (filters.genderPreference && filters.genderPreference !== 'any') {
+  if (filters.genderPreference && filters.genderPreference !== "any") {
     result = result.filter(
-      (l) => l.genderPreference.toLowerCase() === filters.genderPreference!.toLowerCase()
+      (l) =>
+        l.genderPreference.toLowerCase() ===
+        filters.genderPreference!.toLowerCase()
     );
   }
 
   // Household gender
-  if (filters.householdGender && filters.householdGender !== 'any') {
+  if (filters.householdGender && filters.householdGender !== "any") {
     result = result.filter(
-      (l) => l.householdGender.toLowerCase() === filters.householdGender!.toLowerCase()
+      (l) =>
+        l.householdGender.toLowerCase() ===
+        filters.householdGender!.toLowerCase()
     );
   }
 
@@ -577,44 +626,47 @@ export function applyFilters(
  */
 export function sortListings(
   listings: TestListing[],
-  sort: SortOption = 'recommended'
+  sort: SortOption = "recommended"
 ): TestListing[] {
   const sorted = [...listings];
 
   switch (sort) {
-    case 'price_asc':
+    case "price_asc":
       return sorted.sort((a, b) => {
         if (a.price !== b.price) return a.price - b.price;
         return b.createdAt.getTime() - a.createdAt.getTime();
       });
 
-    case 'price_desc':
+    case "price_desc":
       return sorted.sort((a, b) => {
         if (a.price !== b.price) return b.price - a.price;
         return b.createdAt.getTime() - a.createdAt.getTime();
       });
 
-    case 'newest':
+    case "newest":
       return sorted.sort((a, b) => {
         const timeDiff = b.createdAt.getTime() - a.createdAt.getTime();
         if (timeDiff !== 0) return timeDiff;
         return a.id.localeCompare(b.id);
       });
 
-    case 'rating':
+    case "rating":
       return sorted.sort((a, b) => {
         const ratingA = a.avgRating ?? 0;
         const ratingB = b.avgRating ?? 0;
         if (ratingA !== ratingB) return ratingB - ratingA;
-        if (a.reviewCount !== b.reviewCount) return b.reviewCount - a.reviewCount;
+        if (a.reviewCount !== b.reviewCount)
+          return b.reviewCount - a.reviewCount;
         return b.createdAt.getTime() - a.createdAt.getTime();
       });
 
-    case 'recommended':
+    case "recommended":
     default:
       return sorted.sort((a, b) => {
-        const scoreA = (a.avgRating ?? 0) * 20 + a.viewCount * 0.1 + a.reviewCount * 5;
-        const scoreB = (b.avgRating ?? 0) * 20 + b.viewCount * 0.1 + b.reviewCount * 5;
+        const scoreA =
+          (a.avgRating ?? 0) * 20 + a.viewCount * 0.1 + a.reviewCount * 5;
+        const scoreB =
+          (b.avgRating ?? 0) * 20 + b.viewCount * 0.1 + b.reviewCount * 5;
         if (scoreA !== scoreB) return scoreB - scoreA;
         return b.createdAt.getTime() - a.createdAt.getTime();
       });

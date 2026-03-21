@@ -3,7 +3,11 @@ import { ListingCardSkeleton } from "./ListingCardSkeleton";
 
 export function PageSkeleton() {
   return (
-    <div className="min-h-screen bg-zinc-50 dark:bg-zinc-900" aria-busy="true" aria-label="Loading page content">
+    <div
+      className="min-h-screen bg-zinc-50 dark:bg-zinc-900"
+      aria-busy="true"
+      aria-label="Loading page content"
+    >
       {/* Header skeleton */}
       <header className="border-b border-zinc-200 dark:border-zinc-700 bg-white dark:bg-zinc-800 px-4 py-3">
         <div className="mx-auto flex max-w-7xl items-center justify-between">
@@ -37,7 +41,11 @@ export function PageSkeleton() {
 
 export function DashboardSkeleton() {
   return (
-    <div className="min-h-screen bg-zinc-50 dark:bg-zinc-900" aria-busy="true" aria-label="Loading dashboard">
+    <div
+      className="min-h-screen bg-zinc-50 dark:bg-zinc-900"
+      aria-busy="true"
+      aria-label="Loading dashboard"
+    >
       {/* Sidebar skeleton */}
       <aside className="fixed left-0 top-0 hidden h-full w-64 border-r border-zinc-200 dark:border-zinc-700 bg-white dark:bg-zinc-800 p-4 lg:block">
         <Skeleton variant="rounded" width={140} height={32} className="mb-8" />
@@ -68,7 +76,12 @@ export function DashboardSkeleton() {
               key={i}
               className="rounded-lg border border-zinc-200 dark:border-zinc-700 bg-white dark:bg-zinc-800 p-4"
             >
-              <Skeleton variant="text" width={80} height={14} className="mb-2" />
+              <Skeleton
+                variant="text"
+                width={80}
+                height={14}
+                className="mb-2"
+              />
               <Skeleton variant="text" width={120} height={32} />
             </div>
           ))}
@@ -90,7 +103,11 @@ export function DashboardSkeleton() {
 
 export function ProfileSkeleton() {
   return (
-    <div className="mx-auto max-w-2xl p-6" aria-busy="true" aria-label="Loading profile">
+    <div
+      className="mx-auto max-w-2xl p-6"
+      aria-busy="true"
+      aria-label="Loading profile"
+    >
       {/* Profile header */}
       <div className="mb-8 flex items-center gap-6">
         <Skeleton variant="circular" width={96} height={96} />
@@ -104,7 +121,10 @@ export function ProfileSkeleton() {
       {/* Profile sections */}
       <div className="space-y-6">
         {Array.from({ length: 3 }).map((_, i) => (
-          <section key={i} className="rounded-lg border border-zinc-200 dark:border-zinc-700 bg-white dark:bg-zinc-800 p-4">
+          <section
+            key={i}
+            className="rounded-lg border border-zinc-200 dark:border-zinc-700 bg-white dark:bg-zinc-800 p-4"
+          >
             <Skeleton variant="text" width={120} height={20} className="mb-4" />
             <TextSkeleton lines={4} />
           </section>
@@ -116,7 +136,11 @@ export function ProfileSkeleton() {
 
 export function FormSkeleton() {
   return (
-    <div className="mx-auto max-w-md p-6" aria-busy="true" aria-label="Loading form">
+    <div
+      className="mx-auto max-w-md p-6"
+      aria-busy="true"
+      aria-label="Loading form"
+    >
       <Skeleton variant="text" width={200} height={28} className="mb-6" />
 
       <div className="space-y-4">
@@ -151,7 +175,11 @@ export function ListingSkeleton() {
 
 export function ListingGridSkeleton({ count = 6 }: { count?: number }) {
   return (
-    <div className="min-h-screen bg-zinc-50 dark:bg-zinc-900" aria-busy="true" aria-label="Loading listings">
+    <div
+      className="min-h-screen bg-zinc-50 dark:bg-zinc-900"
+      aria-busy="true"
+      aria-label="Loading listings"
+    >
       <div className="mx-auto max-w-7xl px-4 py-8">
         <div className="mb-8">
           <Skeleton variant="text" width={250} height={32} className="mb-2" />
@@ -169,11 +197,20 @@ export function ListingGridSkeleton({ count = 6 }: { count?: number }) {
 
 export function SearchResultsSkeleton({ count = 6 }: { count?: number }) {
   return (
-    <div className="h-screen flex flex-col bg-white dark:bg-zinc-950 overflow-hidden pt-[80px] sm:pt-[96px]" role="status" aria-busy="true" aria-label="Loading search results">
+    <div
+      className="h-screen flex flex-col bg-white dark:bg-zinc-950 overflow-hidden pt-[80px] sm:pt-[96px]"
+      role="status"
+      aria-busy="true"
+      aria-label="Loading search results"
+    >
       {/* Search Header Skeleton */}
       <header className="w-full bg-white/80 dark:bg-zinc-900/80 backdrop-blur-xl border-b border-zinc-100 dark:border-zinc-800">
         <div className="w-full max-w-[1920px] mx-auto px-3 sm:px-4 md:px-6 py-3 sm:py-4">
-          <Skeleton variant="rounded" height={56} className="w-full max-w-2xl mx-auto" />
+          <Skeleton
+            variant="rounded"
+            height={56}
+            className="w-full max-w-2xl mx-auto"
+          />
         </div>
       </header>
 
@@ -190,7 +227,12 @@ export function SearchResultsSkeleton({ count = 6 }: { count?: number }) {
             <div className="h-8 w-px bg-zinc-200 dark:bg-zinc-700 hidden sm:block" />
             <div className="flex-1" />
             {/* More filters button */}
-            <Skeleton variant="rounded" width={110} height={36} className="rounded-full" />
+            <Skeleton
+              variant="rounded"
+              width={110}
+              height={36}
+              className="rounded-full"
+            />
           </div>
         </div>
       </div>
@@ -201,7 +243,12 @@ export function SearchResultsSkeleton({ count = 6 }: { count?: number }) {
           {/* Header */}
           <div className="flex flex-col sm:flex-row sm:items-end justify-between gap-4 mb-6">
             <div>
-              <Skeleton variant="text" width={180} height={24} className="mb-2" />
+              <Skeleton
+                variant="text"
+                width={180}
+                height={24}
+                className="mb-2"
+              />
               <Skeleton variant="text" width={220} height={16} />
             </div>
             <div className="flex items-center gap-2 sm:gap-3">
@@ -223,14 +270,21 @@ export function SearchResultsSkeleton({ count = 6 }: { count?: number }) {
 
 export function MessageListSkeleton() {
   return (
-    <div className="min-h-screen bg-zinc-50 dark:bg-zinc-900" aria-busy="true" aria-label="Loading messages">
+    <div
+      className="min-h-screen bg-zinc-50 dark:bg-zinc-900"
+      aria-busy="true"
+      aria-label="Loading messages"
+    >
       <div className="mx-auto max-w-4xl px-4 py-8">
         <div className="mb-6">
           <Skeleton variant="text" width={200} height={32} className="mb-2" />
         </div>
         <div className="space-y-3">
           {Array.from({ length: 8 }).map((_, i) => (
-            <div key={i} className="flex items-center gap-4 p-4 bg-white dark:bg-zinc-800 rounded-lg border border-zinc-200 dark:border-zinc-700">
+            <div
+              key={i}
+              className="flex items-center gap-4 p-4 bg-white dark:bg-zinc-800 rounded-lg border border-zinc-200 dark:border-zinc-700"
+            >
               <Skeleton variant="circular" width={48} height={48} />
               <div className="flex-1 space-y-2">
                 <Skeleton variant="text" width="40%" height={18} />
@@ -247,7 +301,11 @@ export function MessageListSkeleton() {
 
 export function ChatSkeleton() {
   return (
-    <div className="min-h-screen bg-zinc-50 dark:bg-zinc-900" aria-busy="true" aria-label="Loading chat">
+    <div
+      className="min-h-screen bg-zinc-50 dark:bg-zinc-900"
+      aria-busy="true"
+      aria-label="Loading chat"
+    >
       <div className="mx-auto max-w-4xl px-4 py-8">
         <div className="bg-white dark:bg-zinc-800 rounded-lg border border-zinc-200 dark:border-zinc-700 overflow-hidden">
           {/* Chat header */}
@@ -261,8 +319,15 @@ export function ChatSkeleton() {
           {/* Messages */}
           <div className="p-4 space-y-4 h-96">
             {Array.from({ length: 5 }).map((_, i) => (
-              <div key={i} className={`flex ${i % 2 === 0 ? 'justify-start' : 'justify-end'}`}>
-                <Skeleton variant="rounded" width={200 + (i % 3) * 50} height={40} />
+              <div
+                key={i}
+                className={`flex ${i % 2 === 0 ? "justify-start" : "justify-end"}`}
+              >
+                <Skeleton
+                  variant="rounded"
+                  width={200 + (i % 3) * 50}
+                  height={40}
+                />
               </div>
             ))}
           </div>
@@ -278,7 +343,11 @@ export function ChatSkeleton() {
 
 export function AdminTableSkeleton() {
   return (
-    <div className="min-h-screen bg-zinc-50 dark:bg-zinc-900" aria-busy="true" aria-label="Loading admin data">
+    <div
+      className="min-h-screen bg-zinc-50 dark:bg-zinc-900"
+      aria-busy="true"
+      aria-label="Loading admin data"
+    >
       <div className="mx-auto max-w-7xl px-4 py-8">
         <div className="mb-6 flex items-center justify-between">
           <Skeleton variant="text" width={200} height={32} />
@@ -293,9 +362,17 @@ export function AdminTableSkeleton() {
           </div>
           {/* Table rows */}
           {Array.from({ length: 10 }).map((_, i) => (
-            <div key={i} className="grid grid-cols-5 gap-4 p-4 border-b border-zinc-100 dark:border-zinc-800">
+            <div
+              key={i}
+              className="grid grid-cols-5 gap-4 p-4 border-b border-zinc-100 dark:border-zinc-800"
+            >
               {Array.from({ length: 5 }).map((_, j) => (
-                <Skeleton key={j} variant="text" width={`${60 + (j * 10)}%`} height={16} />
+                <Skeleton
+                  key={j}
+                  variant="text"
+                  width={`${60 + j * 10}%`}
+                  height={16}
+                />
               ))}
             </div>
           ))}
@@ -307,14 +384,21 @@ export function AdminTableSkeleton() {
 
 export function BookingsSkeleton() {
   return (
-    <div className="min-h-screen bg-zinc-50 dark:bg-zinc-900" aria-busy="true" aria-label="Loading bookings">
+    <div
+      className="min-h-screen bg-zinc-50 dark:bg-zinc-900"
+      aria-busy="true"
+      aria-label="Loading bookings"
+    >
       <div className="mx-auto max-w-4xl px-4 py-8">
         <div className="mb-6">
           <Skeleton variant="text" width={180} height={32} className="mb-2" />
         </div>
         <div className="space-y-4">
           {Array.from({ length: 5 }).map((_, i) => (
-            <div key={i} className="flex gap-4 p-4 bg-white dark:bg-zinc-800 rounded-lg border border-zinc-200 dark:border-zinc-700">
+            <div
+              key={i}
+              className="flex gap-4 p-4 bg-white dark:bg-zinc-800 rounded-lg border border-zinc-200 dark:border-zinc-700"
+            >
               <Skeleton variant="rounded" width={120} height={80} />
               <div className="flex-1 space-y-2">
                 <Skeleton variant="text" width="60%" height={20} />
@@ -335,15 +419,27 @@ export function BookingsSkeleton() {
 
 export function SettingsSkeleton() {
   return (
-    <div className="min-h-screen bg-zinc-50 dark:bg-zinc-900" aria-busy="true" aria-label="Loading settings">
+    <div
+      className="min-h-screen bg-zinc-50 dark:bg-zinc-900"
+      aria-busy="true"
+      aria-label="Loading settings"
+    >
       <div className="mx-auto max-w-2xl px-4 py-8">
         <div className="mb-8">
           <Skeleton variant="text" width={150} height={32} />
         </div>
         <div className="space-y-6">
           {Array.from({ length: 4 }).map((_, i) => (
-            <section key={i} className="bg-white dark:bg-zinc-800 rounded-lg border border-zinc-200 dark:border-zinc-700 p-6">
-              <Skeleton variant="text" width={140} height={20} className="mb-4" />
+            <section
+              key={i}
+              className="bg-white dark:bg-zinc-800 rounded-lg border border-zinc-200 dark:border-zinc-700 p-6"
+            >
+              <Skeleton
+                variant="text"
+                width={140}
+                height={20}
+                className="mb-4"
+              />
               <div className="space-y-4">
                 {Array.from({ length: 3 }).map((_, j) => (
                   <div key={j} className="flex items-center justify-between">
@@ -365,14 +461,21 @@ export function SettingsSkeleton() {
 
 export function SavedSearchesSkeleton() {
   return (
-    <div className="min-h-screen bg-zinc-50 dark:bg-zinc-900" aria-busy="true" aria-label="Loading saved searches">
+    <div
+      className="min-h-screen bg-zinc-50 dark:bg-zinc-900"
+      aria-busy="true"
+      aria-label="Loading saved searches"
+    >
       <div className="mx-auto max-w-4xl px-4 py-8">
         <div className="mb-6">
           <Skeleton variant="text" width={200} height={32} className="mb-2" />
         </div>
         <div className="space-y-3">
           {Array.from({ length: 6 }).map((_, i) => (
-            <div key={i} className="flex items-center justify-between p-4 bg-white dark:bg-zinc-800 rounded-lg border border-zinc-200 dark:border-zinc-700">
+            <div
+              key={i}
+              className="flex items-center justify-between p-4 bg-white dark:bg-zinc-800 rounded-lg border border-zinc-200 dark:border-zinc-700"
+            >
               <div className="space-y-2">
                 <Skeleton variant="text" width={180} height={18} />
                 <Skeleton variant="text" width={250} height={14} />
@@ -391,14 +494,21 @@ export function SavedSearchesSkeleton() {
 
 export function NotificationsSkeleton() {
   return (
-    <div className="min-h-screen bg-zinc-50 dark:bg-zinc-900" aria-busy="true" aria-label="Loading notifications">
+    <div
+      className="min-h-screen bg-zinc-50 dark:bg-zinc-900"
+      aria-busy="true"
+      aria-label="Loading notifications"
+    >
       <div className="mx-auto max-w-2xl px-4 py-8">
         <div className="mb-6">
           <Skeleton variant="text" width={180} height={32} />
         </div>
         <div className="space-y-2">
           {Array.from({ length: 10 }).map((_, i) => (
-            <div key={i} className="flex items-start gap-3 p-4 bg-white dark:bg-zinc-800 rounded-lg border border-zinc-200 dark:border-zinc-700">
+            <div
+              key={i}
+              className="flex items-start gap-3 p-4 bg-white dark:bg-zinc-800 rounded-lg border border-zinc-200 dark:border-zinc-700"
+            >
               <Skeleton variant="circular" width={40} height={40} />
               <div className="flex-1 space-y-2">
                 <Skeleton variant="text" width="80%" height={16} />

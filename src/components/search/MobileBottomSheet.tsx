@@ -77,14 +77,15 @@ export default function MobileBottomSheet({
   const snapIndex = controlledSnap ?? internalSnap;
   const setSnapIndex = useCallback(
     (valOrFn: number | ((prev: number) => number)) => {
-      const newVal = typeof valOrFn === "function" ? valOrFn(snapIndex) : valOrFn;
+      const newVal =
+        typeof valOrFn === "function" ? valOrFn(snapIndex) : valOrFn;
       if (onSnapChange) {
         onSnapChange(newVal);
       } else {
         setInternalSnap(newVal);
       }
     },
-    [snapIndex, onSnapChange],
+    [snapIndex, onSnapChange]
   );
   const [dragOffset, setDragOffset] = useState(0);
   const [isDragging, setIsDragging] = useState(false);
@@ -118,18 +119,20 @@ export default function MobileBottomSheet({
       if (proposedPx > maxPx) {
         // Dragging above expanded — rubber-band
         const excess = proposedPx - maxPx;
-        const dampened = MAX_OVERSCROLL * (1 - Math.exp(-excess / MAX_OVERSCROLL));
+        const dampened =
+          MAX_OVERSCROLL * (1 - Math.exp(-excess / MAX_OVERSCROLL));
         return heightPx - (maxPx + dampened);
       }
       if (proposedPx < minPx) {
         // Dragging below collapsed — rubber-band
         const excess = minPx - proposedPx;
-        const dampened = MAX_OVERSCROLL * (1 - Math.exp(-excess / MAX_OVERSCROLL));
+        const dampened =
+          MAX_OVERSCROLL * (1 - Math.exp(-excess / MAX_OVERSCROLL));
         return heightPx - (minPx - dampened);
       }
       return rawOffset;
     },
-    [currentSnap, viewportHeight],
+    [currentSnap, viewportHeight]
   );
 
   const displayOffset = isDragging ? getRubberbandOffset(dragOffset) : 0;
@@ -163,7 +166,7 @@ export default function MobileBottomSheet({
       }
       return nearest;
     },
-    [snapIndex],
+    [snapIndex]
   );
 
   // Touch handlers for the drag handle
@@ -182,7 +185,7 @@ export default function MobileBottomSheet({
       setIsDragging(true);
       setDragOffset(0);
     },
-    [snapIndex],
+    [snapIndex]
   );
 
   const handleTouchMove = useCallback((e: React.TouchEvent) => {
@@ -221,7 +224,10 @@ export default function MobileBottomSheet({
     const elapsed = Math.max(rawElapsed, 16); // Minimum 16ms (~1 frame)
     const velocity = currentDragOffset / elapsed; // px/ms, positive = downward
 
-    if (Math.abs(currentDragOffset) < DRAG_THRESHOLD && Math.abs(velocity) < FLICK_VELOCITY) {
+    if (
+      Math.abs(currentDragOffset) < DRAG_THRESHOLD &&
+      Math.abs(velocity) < FLICK_VELOCITY
+    ) {
       // Too small a drag — stay put
       setDragOffset(0);
       dragOffsetRef.current = 0;
@@ -230,7 +236,8 @@ export default function MobileBottomSheet({
 
     // P2-FIX (#78): Use cached viewport height from drag start
     const currentFraction =
-      dragStartSnap.current - currentDragOffset / (currentViewportHeight || window.innerHeight);
+      dragStartSnap.current -
+      currentDragOffset / (currentViewportHeight || window.innerHeight);
     const newIndex = findNearestSnap(currentFraction, velocity);
 
     setSnapIndex(newIndex);
@@ -277,7 +284,9 @@ export default function MobileBottomSheet({
       // This prevents buttons, links, and inputs from being blocked by drag gestures
       const target = e.target as HTMLElement;
       // L5-MAP FIX: Include all form controls to prevent drag gestures from blocking interaction
-      const isInteractive = target.closest('button, a, input, select, textarea, [role="button"], [role="listbox"], [role="slider"], [data-interactive]');
+      const isInteractive = target.closest(
+        'button, a, input, select, textarea, [role="button"], [role="listbox"], [role="slider"], [data-interactive]'
+      );
       if (isInteractive) return;
 
       const content = contentRef.current;
@@ -286,7 +295,7 @@ export default function MobileBottomSheet({
         handleTouchStart(e);
       }
     },
-    [snapIndex, handleTouchStart],
+    [snapIndex, handleTouchStart]
   );
 
   // Escape key collapses to half (only when sheet is visible and no higher-priority handlers)
@@ -294,7 +303,11 @@ export default function MobileBottomSheet({
     const handleKeyDown = (e: KeyboardEvent) => {
       if (e.key === "Escape" && snapIndex !== 0) {
         // Don't handle Escape if a dialog/modal or focus trap is already handling it
-        if (document.querySelector('[role="dialog"][aria-modal="true"]') || document.querySelector('[data-focus-trap]')) return;
+        if (
+          document.querySelector('[role="dialog"][aria-modal="true"]') ||
+          document.querySelector("[data-focus-trap]")
+        )
+          return;
         // Only handle if sheet is not collapsed (map popup has priority via stopImmediatePropagation)
         setSnapIndex(1);
       }
@@ -353,30 +366,34 @@ export default function MobileBottomSheet({
             ? { height: displayHeightPx }
             : { height: `${displayHeightVh}dvh` }
         }
-        transition={isDragging ? { duration: 0 } : { type: "spring", ...SPRING_CONFIG }}
-        style={{
-          willChange: isDragging ? "height" : "auto",
-          // P0-FIX (#82, #73): Allow map touches to pass through when collapsed.
-          // Only capture pointer events on the visible handle/content areas.
-          // touchAction moved to drag handle only to allow map pan gestures.
-          pointerEvents: isCollapsed ? "none" : "auto",
-          // P2-FIX (#105): Cross-platform GPU acceleration for smooth animations
-          // translateZ(0) promotes to GPU layer on both iOS and Android
-          WebkitTransform: "translateZ(0)",
-          transform: "translateZ(0)",
-          // Prevent flickering during animations on iOS
-          WebkitBackfaceVisibility: "hidden",
-          backfaceVisibility: "hidden",
-          overscrollBehavior: "contain",
-          // P2-FIX (#128): CSS custom properties for snap points.
-          // Exposed as CSS variables so child components or global styles can use them.
-          // Example usage: .listing-card { scroll-snap-align: start; }
-          "--snap-collapsed": `${SNAP_COLLAPSED * 100}dvh`,
-          "--snap-half": `${SNAP_HALF * 100}dvh`,
-          "--snap-expanded": `${SNAP_EXPANDED * 100}dvh`,
-          "--snap-current-index": snapIndex,
-          "--snap-current-height": `${SNAP_POINTS[snapIndex] * 100}dvh`,
-        } as React.CSSProperties}
+        transition={
+          isDragging ? { duration: 0 } : { type: "spring", ...SPRING_CONFIG }
+        }
+        style={
+          {
+            willChange: isDragging ? "height" : "auto",
+            // P0-FIX (#82, #73): Allow map touches to pass through when collapsed.
+            // Only capture pointer events on the visible handle/content areas.
+            // touchAction moved to drag handle only to allow map pan gestures.
+            pointerEvents: isCollapsed ? "none" : "auto",
+            // P2-FIX (#105): Cross-platform GPU acceleration for smooth animations
+            // translateZ(0) promotes to GPU layer on both iOS and Android
+            WebkitTransform: "translateZ(0)",
+            transform: "translateZ(0)",
+            // Prevent flickering during animations on iOS
+            WebkitBackfaceVisibility: "hidden",
+            backfaceVisibility: "hidden",
+            overscrollBehavior: "contain",
+            // P2-FIX (#128): CSS custom properties for snap points.
+            // Exposed as CSS variables so child components or global styles can use them.
+            // Example usage: .listing-card { scroll-snap-align: start; }
+            "--snap-collapsed": `${SNAP_COLLAPSED * 100}dvh`,
+            "--snap-half": `${SNAP_HALF * 100}dvh`,
+            "--snap-expanded": `${SNAP_EXPANDED * 100}dvh`,
+            "--snap-current-index": snapIndex,
+            "--snap-current-height": `${SNAP_POINTS[snapIndex] * 100}dvh`,
+          } as React.CSSProperties
+        }
       >
         {/* Drag handle area */}
         <div
@@ -407,21 +424,27 @@ export default function MobileBottomSheet({
             aria-valuemin={0}
             aria-valuemax={2}
             aria-valuenow={snapIndex}
-            aria-valuetext={snapIndex === 0 ? "collapsed" : snapIndex === 1 ? "half screen" : "expanded"}
+            aria-valuetext={
+              snapIndex === 0
+                ? "collapsed"
+                : snapIndex === 1
+                  ? "half screen"
+                  : "expanded"
+            }
             onKeyDown={(e) => {
-              if (e.key === 'Enter' || e.key === ' ') {
+              if (e.key === "Enter" || e.key === " ") {
                 e.preventDefault();
                 setSnapIndex(snapIndex === 2 ? 1 : 2);
-              } else if (e.key === 'ArrowUp' || e.key === 'ArrowRight') {
+              } else if (e.key === "ArrowUp" || e.key === "ArrowRight") {
                 e.preventDefault();
                 if (snapIndex < 2) setSnapIndex(snapIndex + 1);
-              } else if (e.key === 'ArrowDown' || e.key === 'ArrowLeft') {
+              } else if (e.key === "ArrowDown" || e.key === "ArrowLeft") {
                 e.preventDefault();
                 if (snapIndex > 0) setSnapIndex(snapIndex - 1);
-              } else if (e.key === 'Home') {
+              } else if (e.key === "Home") {
                 e.preventDefault();
                 setSnapIndex(0);
-              } else if (e.key === 'End') {
+              } else if (e.key === "End") {
                 e.preventDefault();
                 setSnapIndex(2);
               }
@@ -431,7 +454,10 @@ export default function MobileBottomSheet({
 
           {/* Header content */}
           <div className="flex items-center justify-between">
-            <span data-testid="sheet-header-text" className="text-sm font-semibold text-zinc-900 dark:text-white">
+            <span
+              data-testid="sheet-header-text"
+              className="text-sm font-semibold text-zinc-900 dark:text-white"
+            >
               {headerText || "Search results"}
             </span>
             {isCollapsed && (
@@ -442,9 +468,7 @@ export default function MobileBottomSheet({
             {!isCollapsed && (
               <div className="flex items-center gap-1">
                 <button
-                  onClick={() =>
-                    setSnapIndex((prev) => (prev === 2 ? 1 : 2))
-                  }
+                  onClick={() => setSnapIndex((prev) => (prev === 2 ? 1 : 2))}
                   className="text-xs text-zinc-500 dark:text-zinc-400 hover:text-zinc-700 dark:hover:text-zinc-200 px-2 py-1 rounded transition-colors focus:outline-none focus-visible:ring-2 focus-visible:ring-zinc-900/30 dark:focus-visible:ring-zinc-400/40"
                   aria-label={
                     isExpanded ? "Collapse results" : "Expand results"
@@ -506,7 +530,11 @@ export default function MobileBottomSheet({
           {/* P2-FIX (#162): Pass contentRef as scrollContainerRef so PullToRefresh
               checks scrollTop on the actual scrollable element, not its wrapper. */}
           {onRefresh ? (
-            <PullToRefresh onRefresh={onRefresh} enabled={isExpanded} scrollContainerRef={contentRef}>
+            <PullToRefresh
+              onRefresh={onRefresh}
+              enabled={isExpanded}
+              scrollContainerRef={contentRef}
+            >
               {children}
             </PullToRefresh>
           ) : (

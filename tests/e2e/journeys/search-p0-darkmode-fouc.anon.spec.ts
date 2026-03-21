@@ -100,5 +100,4 @@ test.describe("P0-2: Dark Mode FOUC Prevention", () => {
     );
     expect(htmlClass).not.toContain("dark");
   });
-
 });

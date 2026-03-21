@@ -16,6 +16,8 @@
  * so the client can retry with the same key.
  */
 
+import "server-only";
+
 import crypto from "crypto";
 import { Prisma } from "@prisma/client";
 import { prisma } from "@/lib/prisma";
@@ -113,7 +115,7 @@ export async function withIdempotency<T>(
   userId: string,
   endpoint: string,
   requestBody: unknown,
-  operation: (tx: TransactionClient) => Promise<T>,
+  operation: (tx: TransactionClient) => Promise<T>
 ): Promise<IdempotencyResult<T>> {
   const requestHash = computeRequestHash(requestBody);
 
@@ -196,7 +198,11 @@ export async function withIdempotency<T>(
           // ─────────────────────────────────────────────────────────────
           if (row.status === "completed") {
             if (row.resultData == null) {
-              return { success: false, status: 500, error: 'Cached result data missing' };
+              return {
+                success: false,
+                status: 500,
+                error: "Cached result data missing",
+              };
             }
             return {
               success: true,
@@ -233,7 +239,7 @@ export async function withIdempotency<T>(
         {
           isolationLevel: Prisma.TransactionIsolationLevel.Serializable,
           timeout: 30000, // 30s timeout for complex operations
-        },
+        }
       );
     } catch (error) {
       // Retry on serialization failure with exponential backoff
@@ -245,7 +251,7 @@ export async function withIdempotency<T>(
               key,
               userId,
               endpoint,
-            },
+            }
           );
           throw error;
         }

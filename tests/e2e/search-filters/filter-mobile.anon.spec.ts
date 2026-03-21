@@ -31,264 +31,268 @@ test.describe("Mobile Filter Experience", () => {
     test.slow();
   });
 
-  test(
-    `${tags.filter}${tags.mobile} filter modal opens correctly on mobile (P0)`,
-    async ({ page }) => {
-      // Navigate to mobile search and skip if bottom sheet doesn't appear
-      const sheetVisible = await navigateToMobileSearch(page);
-      test.skip(!sheetVisible, "Bottom sheet not visible on mobile");
+  test(`${tags.filter}${tags.mobile} filter modal opens correctly on mobile (P0)`, async ({
+    page,
+  }) => {
+    // Navigate to mobile search and skip if bottom sheet doesn't appear
+    const sheetVisible = await navigateToMobileSearch(page);
+    test.skip(!sheetVisible, "Bottom sheet not visible on mobile");
 
-      // Open filter modal
-      await openFilterModal(page);
-      // Wait for hydration after modal opens
-      await page.waitForTimeout(1_000);
+    // Open filter modal
+    await openFilterModal(page);
+    // Wait for hydration after modal opens
+    await page.waitForTimeout(1_000);
 
-      // Verify dialog is visible
-      const dialog = filterDialog(page);
-      await expect(dialog).toBeVisible();
+    // Verify dialog is visible
+    const dialog = filterDialog(page);
+    await expect(dialog).toBeVisible();
 
-      // Verify dialog takes full width (close to 375px viewport)
-      const box = await dialog.boundingBox();
-      expect(box).not.toBeNull();
-      expect(box!.width).toBeGreaterThan(350); // Should be close to 375px
+    // Verify dialog takes full width (close to 375px viewport)
+    const box = await dialog.boundingBox();
+    expect(box).not.toBeNull();
+    expect(box!.width).toBeGreaterThan(350); // Should be close to 375px
 
-      // Verify backdrop/overlay exists and body scroll is locked
-      const bodyOverflow = await page.evaluate(() =>
-        getComputedStyle(document.body).overflow
-      );
-      expect(bodyOverflow).toBe("hidden");
+    // Verify backdrop/overlay exists and body scroll is locked
+    const bodyOverflow = await page.evaluate(
+      () => getComputedStyle(document.body).overflow
+    );
+    expect(bodyOverflow).toBe("hidden");
 
-      // Verify overlay element exists
-      const overlay = page.locator(
-        '[data-testid="modal-overlay"], [class*="overlay"], [class*="backdrop"]'
-      );
-      await expect(overlay.first()).toBeVisible();
+    // Verify overlay element exists
+    const overlay = page.locator(
+      '[data-testid="modal-overlay"], [class*="overlay"], [class*="backdrop"]'
+    );
+    await expect(overlay.first()).toBeVisible();
 
-      // Close modal and verify it's gone
-      await closeFilterModal(page);
-      await expect(dialog).not.toBeVisible();
-    }
-  );
+    // Close modal and verify it's gone
+    await closeFilterModal(page);
+    await expect(dialog).not.toBeVisible();
+  });
 
-  test(
-    `${tags.filter}${tags.mobile} apply filters closes modal, bottom sheet remains (P0)`,
-    async ({ page }) => {
-      // Navigate to mobile search and skip if bottom sheet doesn't appear
-      const sheetVisible = await navigateToMobileSearch(page);
-      test.skip(!sheetVisible, "Bottom sheet not visible on mobile");
+  test(`${tags.filter}${tags.mobile} apply filters closes modal, bottom sheet remains (P0)`, async ({
+    page,
+  }) => {
+    // Navigate to mobile search and skip if bottom sheet doesn't appear
+    const sheetVisible = await navigateToMobileSearch(page);
+    test.skip(!sheetVisible, "Bottom sheet not visible on mobile");
 
-      // Get initial snap index
-      const initialSnap = await getSheetSnapIndex(page);
-      expect(initialSnap).toBeGreaterThanOrEqual(0);
+    // Get initial snap index
+    const initialSnap = await getSheetSnapIndex(page);
+    expect(initialSnap).toBeGreaterThanOrEqual(0);
 
-      // Open filter modal
-      await openFilterModal(page);
-      // Wait for hydration after modal opens
-      await page.waitForTimeout(1_000);
+    // Open filter modal
+    await openFilterModal(page);
+    // Wait for hydration after modal opens
+    await page.waitForTimeout(1_000);
 
-      // Toggle Wifi amenity
-      await toggleAmenity(page, "Wifi");
+    // Toggle Wifi amenity
+    await toggleAmenity(page, "Wifi");
 
-      // Apply filters
-      await applyFilters(page);
+    // Apply filters
+    await applyFilters(page);
 
-      // Wait for modal to close
-      const dialog = filterDialog(page);
-      await expect(dialog).not.toBeVisible({ timeout: 30_000 });
+    // Wait for modal to close
+    const dialog = filterDialog(page);
+    await expect(dialog).not.toBeVisible({ timeout: 30_000 });
 
-      // Verify bottom sheet is still visible
-      const bottomSheet = page.locator(mobileSelectors.bottomSheet);
-      await expect(bottomSheet).toBeVisible();
+    // Verify bottom sheet is still visible
+    const bottomSheet = page.locator(mobileSelectors.bottomSheet);
+    await expect(bottomSheet).toBeVisible();
 
-      // Verify URL has amenities parameter
-      await expect.poll(
-        () => new URL(page.url(), "http://localhost").searchParams.get("amenities"),
-        { timeout: 30_000, message: 'URL param "amenities" to be "Wifi"' },
-      ).toBe("Wifi");
+    // Verify URL has amenities parameter
+    await expect
+      .poll(
+        () =>
+          new URL(page.url(), "http://localhost").searchParams.get("amenities"),
+        { timeout: 30_000, message: 'URL param "amenities" to be "Wifi"' }
+      )
+      .toBe("Wifi");
 
-      // Verify snap position is reasonable (not broken)
-      const snap = await getSheetSnapIndex(page);
-      expect(snap).toBeGreaterThanOrEqual(0);
-      expect(snap).toBeLessThanOrEqual(2); // Valid snap indices: 0, 1, 2
-    }
-  );
+    // Verify snap position is reasonable (not broken)
+    const snap = await getSheetSnapIndex(page);
+    expect(snap).toBeGreaterThanOrEqual(0);
+    expect(snap).toBeLessThanOrEqual(2); // Valid snap indices: 0, 1, 2
+  });
 
-  test(
-    `${tags.filter}${tags.mobile} all filter sections scrollable on small viewport (P1)`,
-    async ({ page }) => {
-      // Navigate to mobile search and skip if bottom sheet doesn't appear
-      const sheetVisible = await navigateToMobileSearch(page);
-      test.skip(!sheetVisible, "Bottom sheet not visible on mobile");
+  test(`${tags.filter}${tags.mobile} all filter sections scrollable on small viewport (P1)`, async ({
+    page,
+  }) => {
+    // Navigate to mobile search and skip if bottom sheet doesn't appear
+    const sheetVisible = await navigateToMobileSearch(page);
+    test.skip(!sheetVisible, "Bottom sheet not visible on mobile");
 
-      // Open filter modal
-      await openFilterModal(page);
-      // Wait for hydration after modal opens
-      await page.waitForTimeout(1_000);
+    // Open filter modal
+    await openFilterModal(page);
+    // Wait for hydration after modal opens
+    await page.waitForTimeout(1_000);
 
-      const dialog = filterDialog(page);
-      await expect(dialog).toBeVisible();
+    const dialog = filterDialog(page);
+    await expect(dialog).toBeVisible();
 
-      // Check that the dialog content is scrollable
-      const scrollInfo = await dialog.evaluate((el) => {
-        const scrollEl =
-          el.querySelector('[class*="overflow-y"]') ||
-          el.querySelector('.overflow-y-auto') ||
-          el.querySelector('[class*="scroll"]') ||
-          el;
-        return {
-          scrollHeight: scrollEl.scrollHeight,
-          clientHeight: scrollEl.clientHeight,
-          isScrollable: scrollEl.scrollHeight > scrollEl.clientHeight,
-        };
-      });
+    // Check that the dialog content is scrollable
+    const scrollInfo = await dialog.evaluate((el) => {
+      const scrollEl =
+        el.querySelector('[class*="overflow-y"]') ||
+        el.querySelector(".overflow-y-auto") ||
+        el.querySelector('[class*="scroll"]') ||
+        el;
+      return {
+        scrollHeight: scrollEl.scrollHeight,
+        clientHeight: scrollEl.clientHeight,
+        isScrollable: scrollEl.scrollHeight > scrollEl.clientHeight,
+      };
+    });
 
-      // Content should be scrollable on small viewport
-      expect(scrollInfo.isScrollable).toBe(true);
-      expect(scrollInfo.scrollHeight).toBeGreaterThan(scrollInfo.clientHeight);
+    // Content should be scrollable on small viewport
+    expect(scrollInfo.isScrollable).toBe(true);
+    expect(scrollInfo.scrollHeight).toBeGreaterThan(scrollInfo.clientHeight);
 
-      // Scroll to the bottom to verify house rules section is reachable
-      await dialog.evaluate((el) => {
-        const scrollEl =
-          el.querySelector('[class*="overflow-y"]') ||
-          el.querySelector('.overflow-y-auto') ||
-          el.querySelector('[class*="scroll"]') ||
-          el;
-        scrollEl.scrollTop = scrollEl.scrollHeight;
-      });
+    // Scroll to the bottom to verify house rules section is reachable
+    await dialog.evaluate((el) => {
+      const scrollEl =
+        el.querySelector('[class*="overflow-y"]') ||
+        el.querySelector(".overflow-y-auto") ||
+        el.querySelector('[class*="scroll"]') ||
+        el;
+      scrollEl.scrollTop = scrollEl.scrollHeight;
+    });
 
-      // Wait for scroll to complete
-      await page.waitForTimeout(300);
+    // Wait for scroll to complete
+    await page.waitForTimeout(300);
 
-      // Look for house rules group (should be visible after scrolling)
-      const houseRules = page.locator('[aria-label="Select house rules"]');
-      await expect(houseRules).toBeVisible({ timeout: 3000 });
+    // Look for house rules group (should be visible after scrolling)
+    const houseRules = page.locator('[aria-label="Select house rules"]');
+    await expect(houseRules).toBeVisible({ timeout: 3000 });
 
-      // Close modal
-      await closeFilterModal(page);
-      await expect(dialog).not.toBeVisible();
-    }
-  );
+    // Close modal
+    await closeFilterModal(page);
+    await expect(dialog).not.toBeVisible();
+  });
 
-  test(
-    `${tags.filter}${tags.mobile} mobile sort interaction (P1)`,
-    async ({ page }) => {
-      // Navigate to mobile search and skip if bottom sheet doesn't appear
-      const sheetVisible = await navigateToMobileSearch(page);
-      test.skip(!sheetVisible, "Bottom sheet not visible on mobile");
+  test(`${tags.filter}${tags.mobile} mobile sort interaction (P1)`, async ({
+    page,
+  }) => {
+    // Navigate to mobile search and skip if bottom sheet doesn't appear
+    const sheetVisible = await navigateToMobileSearch(page);
+    test.skip(!sheetVisible, "Bottom sheet not visible on mobile");
 
-      // Look for sort button
-      const sortButton = page.locator('button[aria-label^="Sort"]');
-      const sortButtonVisible = await sortButton.isVisible().catch(() => false);
+    // Look for sort button
+    const sortButton = page.locator('button[aria-label^="Sort"]');
+    const sortButtonVisible = await sortButton.isVisible().catch(() => false);
 
-      test.skip(!sortButtonVisible, "Sort button not visible on mobile");
+    test.skip(!sortButtonVisible, "Sort button not visible on mobile");
 
-      // Click sort button
-      await sortButton.click();
+    // Click sort button
+    await sortButton.click();
 
-      // The mobile sort sheet is a role="dialog" with "Sort by" heading and
-      // plain <button> elements for each option (not role="option").
-      // Wait for the sort sheet to appear.
-      const sortDialog = page.getByRole("dialog", { name: /sort by/i });
-      await sortDialog.waitFor({ state: "visible", timeout: 5000 });
+    // The mobile sort sheet is a role="dialog" with "Sort by" heading and
+    // plain <button> elements for each option (not role="option").
+    // Wait for the sort sheet to appear.
+    const sortDialog = page.getByRole("dialog", { name: /sort by/i });
+    await sortDialog.waitFor({ state: "visible", timeout: 5000 });
 
-      // Click "Price: Low to High" — this sets sort=price_asc in the URL,
-      // which is a non-default value so the sort param will always be present.
-      const lowToHighOption = sortDialog.getByRole("button", {
-        name: /price.*low to high/i,
-      });
-      await lowToHighOption.click();
+    // Click "Price: Low to High" — this sets sort=price_asc in the URL,
+    // which is a non-default value so the sort param will always be present.
+    const lowToHighOption = sortDialog.getByRole("button", {
+      name: /price.*low to high/i,
+    });
+    await lowToHighOption.click();
 
-      // Wait for URL to update with sort param
-      await expect.poll(
+    // Wait for URL to update with sort param
+    await expect
+      .poll(
         () => new URL(page.url(), "http://localhost").searchParams.get("sort"),
-        { timeout: 30_000, message: 'URL param "sort" to be present' },
-      ).not.toBeNull();
+        { timeout: 30_000, message: 'URL param "sort" to be present' }
+      )
+      .not.toBeNull();
 
-      // Verify sort param is present
-      const sortParam = getUrlParam(page, "sort");
-      expect(sortParam).not.toBeNull();
-      expect(sortParam).toBeTruthy();
-    }
-  );
+    // Verify sort param is present
+    const sortParam = getUrlParam(page, "sort");
+    expect(sortParam).not.toBeNull();
+    expect(sortParam).toBeTruthy();
+  });
 
-  test(
-    `${tags.filter}${tags.mobile} touch scroll in filter modal doesn't leak to map (P1)`,
-    async ({ page }) => {
-      // Navigate to mobile search and skip if bottom sheet doesn't appear
-      const sheetVisible = await navigateToMobileSearch(page);
-      test.skip(!sheetVisible, "Bottom sheet not visible on mobile");
+  test(`${tags.filter}${tags.mobile} touch scroll in filter modal doesn't leak to map (P1)`, async ({
+    page,
+  }) => {
+    // Navigate to mobile search and skip if bottom sheet doesn't appear
+    const sheetVisible = await navigateToMobileSearch(page);
+    test.skip(!sheetVisible, "Bottom sheet not visible on mobile");
 
-      // Get initial map position (if visible)
-      const mapContainer = page.locator(mobileSelectors.mapContainer).first();
-      const mapVisibleBefore = await mapContainer.isVisible().catch(() => false);
+    // Get initial map position (if visible)
+    const mapContainer = page.locator(mobileSelectors.mapContainer).first();
+    const mapVisibleBefore = await mapContainer.isVisible().catch(() => false);
 
-      // Open filter modal
-      await openFilterModal(page);
-      // Wait for hydration after modal opens
-      await page.waitForTimeout(1_000);
+    // Open filter modal
+    await openFilterModal(page);
+    // Wait for hydration after modal opens
+    await page.waitForTimeout(1_000);
 
-      const dialog = filterDialog(page);
-      await expect(dialog).toBeVisible();
+    const dialog = filterDialog(page);
+    await expect(dialog).toBeVisible();
 
-      // Verify body scroll is locked
-      const bodyOverflow = await page.evaluate(() =>
-        getComputedStyle(document.body).overflow
-      );
-      expect(bodyOverflow).toBe("hidden");
+    // Verify body scroll is locked
+    const bodyOverflow = await page.evaluate(
+      () => getComputedStyle(document.body).overflow
+    );
+    expect(bodyOverflow).toBe("hidden");
 
-      // Scroll within the dialog
-      const scrollResult = await dialog.evaluate((el) => {
-        const scrollEl =
-          el.querySelector('[class*="overflow-y"]') ||
-          el.querySelector('.overflow-y-auto') ||
-          el.querySelector('[class*="scroll"]') ||
-          el;
-        const beforeScroll = scrollEl.scrollTop;
-        scrollEl.scrollTop = 100;
-        const afterScroll = scrollEl.scrollTop;
-        return {
-          beforeScroll,
-          afterScroll,
-          scrolled: afterScroll > beforeScroll,
-        };
+    // Scroll within the dialog
+    const scrollResult = await dialog.evaluate((el) => {
+      const scrollEl =
+        el.querySelector('[class*="overflow-y"]') ||
+        el.querySelector(".overflow-y-auto") ||
+        el.querySelector('[class*="scroll"]') ||
+        el;
+      const beforeScroll = scrollEl.scrollTop;
+      scrollEl.scrollTop = 100;
+      const afterScroll = scrollEl.scrollTop;
+      return {
+        beforeScroll,
+        afterScroll,
+        scrolled: afterScroll > beforeScroll,
+      };
+    });
+
+    // Verify the dialog scrolled
+    expect(scrollResult.scrolled).toBe(true);
+    expect(scrollResult.afterScroll).toBeGreaterThan(scrollResult.beforeScroll);
+
+    // Verify the map is still in place (either hidden behind modal or position unchanged)
+    // The modal should prevent any interaction with the map
+    if (mapVisibleBefore) {
+      const mapStillExists = await mapContainer.count();
+      expect(mapStillExists).toBeGreaterThan(0);
+    } else {
+      test.info().annotations.push({
+        type: "skip-reason",
+        description:
+          "map was not visible before modal — skipping persistence check",
       });
-
-      // Verify the dialog scrolled
-      expect(scrollResult.scrolled).toBe(true);
-      expect(scrollResult.afterScroll).toBeGreaterThan(scrollResult.beforeScroll);
-
-      // Verify the map is still in place (either hidden behind modal or position unchanged)
-      // The modal should prevent any interaction with the map
-      if (mapVisibleBefore) {
-        const mapStillExists = await mapContainer.count();
-        expect(mapStillExists).toBeGreaterThan(0);
-      } else {
-        test.info().annotations.push({ type: 'skip-reason', description: 'map was not visible before modal — skipping persistence check' });
-      }
-
-      // Close modal
-      await closeFilterModal(page);
-      await expect(dialog).not.toBeVisible();
-
-      // Verify map is still visible if it was visible before
-      if (mapVisibleBefore) {
-        await expect(mapContainer).toBeVisible();
-      }
-
-      // Verify body scroll is unlocked (or still locked by MobileBottomSheet)
-      const bodyOverflowAfter = await page.evaluate(() =>
-        getComputedStyle(document.body).overflow
-      );
-      // On mobile, MobileBottomSheet may keep body overflow hidden independently
-      // The important assertion is that the modal is closed (verified above)
-      // and the map is intact. Only assert overflow restored if no bottom sheet.
-      const bottomSheetVisible = await page
-        .locator('[role="region"][aria-label="Search results"]')
-        .isVisible()
-        .catch(() => false);
-      if (!bottomSheetVisible) {
-        expect(bodyOverflowAfter).not.toBe("hidden");
-      }
     }
-  );
+
+    // Close modal
+    await closeFilterModal(page);
+    await expect(dialog).not.toBeVisible();
+
+    // Verify map is still visible if it was visible before
+    if (mapVisibleBefore) {
+      await expect(mapContainer).toBeVisible();
+    }
+
+    // Verify body scroll is unlocked (or still locked by MobileBottomSheet)
+    const bodyOverflowAfter = await page.evaluate(
+      () => getComputedStyle(document.body).overflow
+    );
+    // On mobile, MobileBottomSheet may keep body overflow hidden independently
+    // The important assertion is that the modal is closed (verified above)
+    // and the map is intact. Only assert overflow restored if no bottom sheet.
+    const bottomSheetVisible = await page
+      .locator('[role="region"][aria-label="Search results"]')
+      .isVisible()
+      .catch(() => false);
+    if (!bottomSheetVisible) {
+      expect(bodyOverflowAfter).not.toBe("hidden");
+    }
+  });
 });

@@ -1,4 +1,4 @@
-'use client';
+"use client";
 
 /**
  * ProUpgradeCTA - Upgrade prompt for Free users
@@ -10,8 +10,8 @@
  * - Walkability rings visualization
  */
 
-import { Button } from '@/components/ui/button';
-import { Card, CardContent } from '@/components/ui/card';
+import { Button } from "@/components/ui/button";
+import { Card, CardContent } from "@/components/ui/card";
 
 interface ProUpgradeCTAProps {
   /** Number of places found (shown in the CTA) */
@@ -25,14 +25,14 @@ interface ProUpgradeCTAProps {
 export function ProUpgradeCTA({
   placeCount = 0,
   onUpgradeClick,
-  className = '',
+  className = "",
 }: ProUpgradeCTAProps) {
   const handleUpgradeClick = () => {
     if (onUpgradeClick) {
       onUpgradeClick();
     } else {
       // Default: navigate to upgrade page
-      window.location.href = '/settings?tab=subscription';
+      window.location.href = "/settings?tab=subscription";
     }
   };
 
@@ -102,11 +102,13 @@ export function ProUpgradeCTA({
               </div>
 
               <p className="text-sm text-muted-foreground mb-3">
-                Unlock the interactive map with{' '}
+                Unlock the interactive map with{" "}
                 {placeCount > 0 ? (
-                  <span className="font-medium text-foreground">{placeCount} nearby places</span>
+                  <span className="font-medium text-foreground">
+                    {placeCount} nearby places
+                  </span>
                 ) : (
-                  'nearby places'
+                  "nearby places"
                 )}
                 , exact walking distances, and walkability rings.
               </p>
@@ -126,11 +128,7 @@ export function ProUpgradeCTA({
                 </div>
               </div>
 
-              <Button
-                onClick={handleUpgradeClick}
-                className="w-full"
-                size="sm"
-              >
+              <Button onClick={handleUpgradeClick} className="w-full" size="sm">
                 Upgrade to Pro
               </Button>
             </div>

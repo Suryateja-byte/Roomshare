@@ -11,13 +11,13 @@ export function computeRecommendedScore(
   avgRating: number,
   viewCount: number,
   reviewCount: number,
-  createdAt: Date,
+  createdAt: Date
 ): number {
   const ratingScore = avgRating * 20;
   const reviewScore = reviewCount * 5;
 
   const daysSinceCreation = Math.floor(
-    (Date.now() - createdAt.getTime()) / (1000 * 60 * 60 * 24),
+    (Date.now() - createdAt.getTime()) / (1000 * 60 * 60 * 24)
   );
 
   // Views from older listings contribute less (30-day half-life, min 10%).

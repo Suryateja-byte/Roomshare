@@ -19,8 +19,8 @@ test.use({
 });
 
 test.beforeEach(async ({}, testInfo) => {
-  if (testInfo.project.name.includes('webkit')) {
-    test.skip(true, 'Radix UI hydration issues on webkit');
+  if (testInfo.project.name.includes("webkit")) {
+    test.skip(true, "Radix UI hydration issues on webkit");
   }
   test.slow();
 });
@@ -51,7 +51,7 @@ test.describe("Mobile UX — Page Load", () => {
         !e.includes("favicon") &&
         !e.includes("ResizeObserver") &&
         !e.includes("Failed to load resource") &&
-        !e.includes("net::ERR"),
+        !e.includes("net::ERR")
     );
     expect(realErrors).toHaveLength(0);
   });
@@ -62,12 +62,16 @@ test.describe("Mobile UX — Bottom Sheet (4.1)", () => {
     await page.goto(`/search?${boundsQS}`);
 
     // Wait for listings to load first
-    await expect(page.locator('a[href^="/listings/"]').first()).toBeAttached({ timeout: 30_000 });
+    await expect(page.locator('a[href^="/listings/"]').first()).toBeAttached({
+      timeout: 30_000,
+    });
 
     // The bottom sheet should render with role="region"
     const sheet = page.locator('[role="region"][aria-label="Search results"]');
     // If the sheet is visible, verify it
-    const sheetVisible = await sheet.isVisible({ timeout: 5000 }).catch(() => false);
+    const sheetVisible = await sheet
+      .isVisible({ timeout: 5000 })
+      .catch(() => false);
 
     if (sheetVisible) {
       // Sheet should have proper ARIA
@@ -84,15 +88,22 @@ test.describe("Mobile UX — Bottom Sheet (4.1)", () => {
     } else {
       // On mobile with isMobile: true, the md:hidden parent shows the sheet.
       // If we reach here, check the mobile results container exists
-      const mobileContainer = page.locator('[data-testid="mobile-search-results-container"]');
-      const containerExists = await mobileContainer.count().then((c) => c > 0).catch(() => false);
+      const mobileContainer = page.locator(
+        '[data-testid="mobile-search-results-container"]'
+      );
+      const containerExists = await mobileContainer
+        .count()
+        .then((c) => c > 0)
+        .catch(() => false);
       expect(containerExists).toBeTruthy();
     }
   });
 
   test("expand/collapse toggles sheet height", async ({ page }) => {
     await page.goto(`/search?${boundsQS}`);
-    await expect(page.locator('a[href^="/listings/"]').first()).toBeAttached({ timeout: 30_000 });
+    await expect(page.locator('a[href^="/listings/"]').first()).toBeAttached({
+      timeout: 30_000,
+    });
 
     const sheet = page.locator('[role="region"][aria-label="Search results"]');
     if (!(await sheet.isVisible({ timeout: 5000 }).catch(() => false))) {
@@ -108,7 +119,7 @@ test.describe("Mobile UX — Bottom Sheet (4.1)", () => {
     if (await expandBtn.isVisible({ timeout: 5000 }).catch(() => false)) {
       const beforeBox = await sheet.boundingBox();
       const beforeHeight = beforeBox?.height ?? 0;
-      await expandBtn.evaluate(el => (el as HTMLElement).click());
+      await expandBtn.evaluate((el) => (el as HTMLElement).click());
       await waitForSheetAnimation(page);
 
       const afterBox = await sheet.boundingBox();
@@ -118,9 +129,11 @@ test.describe("Mobile UX — Bottom Sheet (4.1)", () => {
       expect(afterHeight).toBeGreaterThanOrEqual(beforeHeight);
 
       // Collapse
-      const collapseBtn = sheet.locator('button[aria-label="Collapse results"]');
+      const collapseBtn = sheet.locator(
+        'button[aria-label="Collapse results"]'
+      );
       if (await collapseBtn.isVisible({ timeout: 3000 }).catch(() => false)) {
-        await collapseBtn.evaluate(el => (el as HTMLElement).click());
+        await collapseBtn.evaluate((el) => (el as HTMLElement).click());
         await waitForSheetAnimation(page);
 
         const collapsedBox = await sheet.boundingBox();
@@ -137,7 +150,9 @@ test.describe("Mobile UX — Bottom Sheet (4.1)", () => {
 
   test("escape key collapses expanded sheet", async ({ page }) => {
     await page.goto(`/search?${boundsQS}`);
-    await expect(page.locator('a[href^="/listings/"]').first()).toBeAttached({ timeout: 30_000 });
+    await expect(page.locator('a[href^="/listings/"]').first()).toBeAttached({
+      timeout: 30_000,
+    });
 
     const sheet = page.locator('[role="region"][aria-label="Search results"]');
     if (!(await sheet.isVisible({ timeout: 5000 }).catch(() => false))) {
@@ -166,16 +181,22 @@ test.describe("Mobile UX — Bottom Sheet (4.1)", () => {
 test.describe("Mobile UX — Floating Map Button (4.2)", () => {
   test("floating toggle button is visible", async ({ page }) => {
     await page.goto(`/search?${boundsQS}`);
-    await expect(page.locator('a[href^="/listings/"]').first()).toBeAttached({ timeout: 30_000 });
+    await expect(page.locator('a[href^="/listings/"]').first()).toBeAttached({
+      timeout: 30_000,
+    });
 
     // The floating map/list toggle button is visible on mobile
-    const btn = page.locator('button[aria-label*="map" i], button[aria-label*="list" i]').filter({ hasNotText: "Save" });
+    const btn = page
+      .locator('button[aria-label*="map" i], button[aria-label*="list" i]')
+      .filter({ hasNotText: "Save" });
     await expect(btn.first()).toBeVisible({ timeout: 10_000 });
   });
 
   test("floating button toggles between map and list", async ({ page }) => {
     await page.goto(`/search?${boundsQS}`);
-    await expect(page.locator('a[href^="/listings/"]').first()).toBeAttached({ timeout: 30_000 });
+    await expect(page.locator('a[href^="/listings/"]').first()).toBeAttached({
+      timeout: 30_000,
+    });
 
     await page.waitForTimeout(1000);
     const mapBtn = page.locator('button[aria-label="Show map"]');
@@ -185,7 +206,10 @@ test.describe("Mobile UX — Floating Map Button (4.2)", () => {
 
       // After clicking "Show map", should now show "Show list"
       const listBtn = page.locator('button[aria-label="Show list"]');
-      const listVisible = await listBtn.waitFor({ state: "visible", timeout: 5000 }).then(() => true).catch(() => false);
+      const listVisible = await listBtn
+        .waitFor({ state: "visible", timeout: 5000 })
+        .then(() => true)
+        .catch(() => false);
       expect(listVisible).toBeTruthy();
 
       // Click back
@@ -202,11 +226,15 @@ test.describe("Mobile UX — Floating Map Button (4.2)", () => {
 
   test("floating button has correct positioning classes", async ({ page }) => {
     await page.goto(`/search?${boundsQS}`);
-    await expect(page.locator('a[href^="/listings/"]').first()).toBeAttached({ timeout: 30_000 });
+    await expect(page.locator('a[href^="/listings/"]').first()).toBeAttached({
+      timeout: 30_000,
+    });
 
-    const btn = page.locator('button[aria-label="Show map"], button[aria-label="Show list"]').first();
+    const btn = page
+      .locator('button[aria-label="Show map"], button[aria-label="Show list"]')
+      .first();
     if (await btn.isVisible().catch(() => false)) {
-      const cls = await btn.getAttribute("class") || "";
+      const cls = (await btn.getAttribute("class")) || "";
       expect(cls).toContain("fixed");
       expect(cls).toContain("rounded-full");
       expect(cls).toContain("z-50");
@@ -217,11 +245,15 @@ test.describe("Mobile UX — Floating Map Button (4.2)", () => {
 test.describe("Mobile UX — Haptic Feedback (4.7)", () => {
   test("floating button has active scale class", async ({ page }) => {
     await page.goto(`/search?${boundsQS}`);
-    await expect(page.locator('a[href^="/listings/"]').first()).toBeAttached({ timeout: 30_000 });
+    await expect(page.locator('a[href^="/listings/"]').first()).toBeAttached({
+      timeout: 30_000,
+    });
 
-    const btn = page.locator('button[aria-label="Show map"], button[aria-label="Show list"]').first();
+    const btn = page
+      .locator('button[aria-label="Show map"], button[aria-label="Show list"]')
+      .first();
     if (await btn.isVisible().catch(() => false)) {
-      const cls = await btn.getAttribute("class") || "";
+      const cls = (await btn.getAttribute("class")) || "";
       expect(cls).toContain("active:scale-95");
     }
   });
@@ -230,10 +262,14 @@ test.describe("Mobile UX — Haptic Feedback (4.7)", () => {
 test.describe("Mobile UX — Accessibility", () => {
   test("interactive elements have proper ARIA labels", async ({ page }) => {
     await page.goto(`/search?${boundsQS}`);
-    await expect(page.locator('a[href^="/listings/"]').first()).toBeAttached({ timeout: 30_000 });
+    await expect(page.locator('a[href^="/listings/"]').first()).toBeAttached({
+      timeout: 30_000,
+    });
 
     // Floating button should have aria-label
-    const toggleBtn = page.locator('button[aria-label="Show map"], button[aria-label="Show list"]');
+    const toggleBtn = page.locator(
+      'button[aria-label="Show map"], button[aria-label="Show list"]'
+    );
     const toggleCount = await toggleBtn.count();
     expect(toggleCount).toBeGreaterThanOrEqual(1);
 

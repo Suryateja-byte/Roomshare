@@ -3,7 +3,7 @@
  */
 
 // Mock dependencies before imports
-jest.mock('@/lib/prisma', () => ({
+jest.mock("@/lib/prisma", () => ({
   prisma: {
     savedListing: {
       findUnique: jest.fn(),
@@ -16,212 +16,236 @@ jest.mock('@/lib/prisma', () => ({
       findUnique: jest.fn(),
     },
   },
-}))
+}));
 
-jest.mock('@/auth', () => ({
+jest.mock("@/auth", () => ({
   auth: jest.fn(),
-}))
+}));
 
-jest.mock('next/cache', () => ({
+jest.mock("next/cache", () => ({
   revalidatePath: jest.fn(),
-}))
+}));
 
 // Mock rate limiting to allow all requests
-jest.mock('@/lib/rate-limit', () => ({
-  checkRateLimit: jest.fn().mockResolvedValue({ success: true, remaining: 10, resetAt: new Date() }),
-  getClientIPFromHeaders: jest.fn().mockReturnValue('127.0.0.1'),
+jest.mock("@/lib/rate-limit", () => ({
+  checkRateLimit: jest
+    .fn()
+    .mockResolvedValue({ success: true, remaining: 10, resetAt: new Date() }),
+  getClientIPFromHeaders: jest.fn().mockReturnValue("127.0.0.1"),
   RATE_LIMITS: { savedListings: { limit: 60, windowMs: 3600000 } },
-}))
+}));
 
 // Mock next/headers
-jest.mock('next/headers', () => ({
+jest.mock("next/headers", () => ({
   headers: jest.fn().mockResolvedValue(new Headers()),
-}))
+}));
 
 // Mock logger
-jest.mock('@/lib/logger', () => ({
+jest.mock("@/lib/logger", () => ({
   logger: { sync: { error: jest.fn(), warn: jest.fn(), info: jest.fn() } },
-}))
+}));
 
 import {
   toggleSaveListing,
   isListingSaved,
   getSavedListings,
   removeSavedListing,
-} from '@/app/actions/saved-listings'
-import { prisma } from '@/lib/prisma'
-import { auth } from '@/auth'
-import { revalidatePath } from 'next/cache'
+} from "@/app/actions/saved-listings";
+import { prisma } from "@/lib/prisma";
+import { auth } from "@/auth";
+import { revalidatePath } from "next/cache";
 
-describe('saved-listings actions', () => {
+describe("saved-listings actions", () => {
   const mockSession = {
     user: {
-      id: 'user-123',
-      name: 'Test User',
-      email: 'test@example.com',
+      id: "user-123",
+      name: "Test User",
+      email: "test@example.com",
     },
-  }
+  };
 
   const mockSavedListing = {
-    id: 'saved-123',
-    userId: 'user-123',
-    listingId: 'listing-456',
-    createdAt: new Date('2025-01-01'),
-  }
+    id: "saved-123",
+    userId: "user-123",
+    listingId: "listing-456",
+    createdAt: new Date("2025-01-01"),
+  };
 
   const mockListing = {
-    id: 'listing-456',
-    title: 'Cozy Room',
+    id: "listing-456",
+    title: "Cozy Room",
     price: 800,
-    location: { city: 'NYC', state: 'NY' },
-    owner: { id: 'owner-123', name: 'Owner', image: null },
-  }
+    location: { city: "NYC", state: "NY" },
+    owner: { id: "owner-123", name: "Owner", image: null },
+  };
 
   beforeEach(() => {
-    jest.clearAllMocks()
-    ;(auth as jest.Mock).mockResolvedValue(mockSession)
+    jest.clearAllMocks();
+    (auth as jest.Mock).mockResolvedValue(mockSession);
     // Mock user.findUnique for suspension check
-    ;(prisma.user.findUnique as jest.Mock).mockResolvedValue({
-      id: 'user-123',
+    (prisma.user.findUnique as jest.Mock).mockResolvedValue({
+      id: "user-123",
       isSuspended: false,
-    })
-  })
+    });
+  });
 
-  describe('toggleSaveListing', () => {
-    describe('authentication', () => {
-      it('returns error when not logged in', async () => {
-        ;(auth as jest.Mock).mockResolvedValue(null)
+  describe("toggleSaveListing", () => {
+    describe("authentication", () => {
+      it("returns error when not logged in", async () => {
+        (auth as jest.Mock).mockResolvedValue(null);
 
-        const result = await toggleSaveListing('listing-456')
+        const result = await toggleSaveListing("listing-456");
 
-        expect(result.error).toBe('You must be logged in to save listings')
-        expect(result.saved).toBe(false)
-      })
-    })
+        expect(result.error).toBe("You must be logged in to save listings");
+        expect(result.saved).toBe(false);
+      });
+    });
 
-    describe('toggle behavior', () => {
-      it('unsaves listing when already saved', async () => {
+    describe("toggle behavior", () => {
+      it("unsaves listing when already saved", async () => {
         // deleteMany returns count > 0 → listing existed → now removed
-        ;(prisma.savedListing.deleteMany as jest.Mock).mockResolvedValue({ count: 1 })
+        (prisma.savedListing.deleteMany as jest.Mock).mockResolvedValue({
+          count: 1,
+        });
 
-        const result = await toggleSaveListing('listing-456')
+        const result = await toggleSaveListing("listing-456");
 
-        expect(result.saved).toBe(false)
+        expect(result.saved).toBe(false);
         expect(prisma.savedListing.deleteMany).toHaveBeenCalledWith({
-          where: { userId: 'user-123', listingId: 'listing-456' },
-        })
-      })
+          where: { userId: "user-123", listingId: "listing-456" },
+        });
+      });
 
-      it('saves listing when not saved', async () => {
+      it("saves listing when not saved", async () => {
         // deleteMany returns count 0 → listing didn't exist → create it
-        ;(prisma.savedListing.deleteMany as jest.Mock).mockResolvedValue({ count: 0 })
-        ;(prisma.savedListing.create as jest.Mock).mockResolvedValue(mockSavedListing)
+        (prisma.savedListing.deleteMany as jest.Mock).mockResolvedValue({
+          count: 0,
+        });
+        (prisma.savedListing.create as jest.Mock).mockResolvedValue(
+          mockSavedListing
+        );
 
-        const result = await toggleSaveListing('listing-456')
+        const result = await toggleSaveListing("listing-456");
 
-        expect(result.saved).toBe(true)
+        expect(result.saved).toBe(true);
         expect(prisma.savedListing.create).toHaveBeenCalledWith({
-          data: { userId: 'user-123', listingId: 'listing-456' },
-        })
-      })
+          data: { userId: "user-123", listingId: "listing-456" },
+        });
+      });
 
-      it('revalidates listing path when saving', async () => {
-        ;(prisma.savedListing.deleteMany as jest.Mock).mockResolvedValue({ count: 0 })
-        ;(prisma.savedListing.create as jest.Mock).mockResolvedValue(mockSavedListing)
+      it("revalidates listing path when saving", async () => {
+        (prisma.savedListing.deleteMany as jest.Mock).mockResolvedValue({
+          count: 0,
+        });
+        (prisma.savedListing.create as jest.Mock).mockResolvedValue(
+          mockSavedListing
+        );
 
-        await toggleSaveListing('listing-456')
+        await toggleSaveListing("listing-456");
 
-        expect(revalidatePath).toHaveBeenCalledWith('/listings/listing-456')
-        expect(revalidatePath).toHaveBeenCalledWith('/saved')
-      })
+        expect(revalidatePath).toHaveBeenCalledWith("/listings/listing-456");
+        expect(revalidatePath).toHaveBeenCalledWith("/saved");
+      });
 
-      it('revalidates paths when unsaving', async () => {
-        ;(prisma.savedListing.deleteMany as jest.Mock).mockResolvedValue({ count: 1 })
+      it("revalidates paths when unsaving", async () => {
+        (prisma.savedListing.deleteMany as jest.Mock).mockResolvedValue({
+          count: 1,
+        });
 
-        await toggleSaveListing('listing-456')
+        await toggleSaveListing("listing-456");
 
-        expect(revalidatePath).toHaveBeenCalledWith('/listings/listing-456')
-        expect(revalidatePath).toHaveBeenCalledWith('/saved')
-      })
-    })
+        expect(revalidatePath).toHaveBeenCalledWith("/listings/listing-456");
+        expect(revalidatePath).toHaveBeenCalledWith("/saved");
+      });
+    });
 
-    describe('error handling', () => {
-      it('returns error on database failure', async () => {
-        ;(prisma.savedListing.deleteMany as jest.Mock).mockRejectedValue(new Error('DB Error'))
+    describe("error handling", () => {
+      it("returns error on database failure", async () => {
+        (prisma.savedListing.deleteMany as jest.Mock).mockRejectedValue(
+          new Error("DB Error")
+        );
 
-        const result = await toggleSaveListing('listing-456')
+        const result = await toggleSaveListing("listing-456");
 
-        expect(result.error).toBe('Failed to save listing')
-        expect(result.saved).toBe(false)
-      })
-    })
-  })
+        expect(result.error).toBe("Failed to save listing");
+        expect(result.saved).toBe(false);
+      });
+    });
+  });
 
-  describe('isListingSaved', () => {
-    it('returns saved: false when not logged in', async () => {
-      ;(auth as jest.Mock).mockResolvedValue(null)
+  describe("isListingSaved", () => {
+    it("returns saved: false when not logged in", async () => {
+      (auth as jest.Mock).mockResolvedValue(null);
 
-      const result = await isListingSaved('listing-456')
+      const result = await isListingSaved("listing-456");
 
-      expect(result.saved).toBe(false)
-    })
+      expect(result.saved).toBe(false);
+    });
 
-    it('returns saved: true when listing is saved', async () => {
-      ;(prisma.savedListing.findUnique as jest.Mock).mockResolvedValue(mockSavedListing)
+    it("returns saved: true when listing is saved", async () => {
+      (prisma.savedListing.findUnique as jest.Mock).mockResolvedValue(
+        mockSavedListing
+      );
 
-      const result = await isListingSaved('listing-456')
+      const result = await isListingSaved("listing-456");
 
-      expect(result.saved).toBe(true)
-    })
+      expect(result.saved).toBe(true);
+    });
 
-    it('returns saved: false when listing is not saved', async () => {
-      ;(prisma.savedListing.findUnique as jest.Mock).mockResolvedValue(null)
+    it("returns saved: false when listing is not saved", async () => {
+      (prisma.savedListing.findUnique as jest.Mock).mockResolvedValue(null);
 
-      const result = await isListingSaved('listing-456')
+      const result = await isListingSaved("listing-456");
 
-      expect(result.saved).toBe(false)
-    })
+      expect(result.saved).toBe(false);
+    });
 
-    it('returns saved: false on error', async () => {
-      ;(prisma.savedListing.findUnique as jest.Mock).mockRejectedValue(new Error('DB Error'))
+    it("returns saved: false on error", async () => {
+      (prisma.savedListing.findUnique as jest.Mock).mockRejectedValue(
+        new Error("DB Error")
+      );
 
-      const result = await isListingSaved('listing-456')
+      const result = await isListingSaved("listing-456");
 
-      expect(result.saved).toBe(false)
-    })
-  })
+      expect(result.saved).toBe(false);
+    });
+  });
 
-  describe('getSavedListings', () => {
-    it('returns empty array when not logged in', async () => {
-      ;(auth as jest.Mock).mockResolvedValue(null)
+  describe("getSavedListings", () => {
+    it("returns empty array when not logged in", async () => {
+      (auth as jest.Mock).mockResolvedValue(null);
 
-      const result = await getSavedListings()
+      const result = await getSavedListings();
 
-      expect(result).toEqual([])
-    })
+      expect(result).toEqual([]);
+    });
 
-    it('returns saved listings with data', async () => {
+    it("returns saved listings with data", async () => {
       const mockSavedWithListing = {
         ...mockSavedListing,
         listing: mockListing,
-      }
-      ;(prisma.savedListing.findMany as jest.Mock).mockResolvedValue([mockSavedWithListing])
+      };
+      (prisma.savedListing.findMany as jest.Mock).mockResolvedValue([
+        mockSavedWithListing,
+      ]);
 
-      const result = await getSavedListings()
+      const result = await getSavedListings();
 
-      expect(result).toHaveLength(1)
-      expect(result[0].title).toBe('Cozy Room')
-      expect(result[0].savedAt).toEqual(mockSavedListing.createdAt)
-    })
+      expect(result).toHaveLength(1);
+      expect(result[0].title).toBe("Cozy Room");
+      expect(result[0].savedAt).toEqual(mockSavedListing.createdAt);
+    });
 
-    it('includes location and owner data', async () => {
+    it("includes location and owner data", async () => {
       const mockSavedWithListing = {
         ...mockSavedListing,
         listing: mockListing,
-      }
-      ;(prisma.savedListing.findMany as jest.Mock).mockResolvedValue([mockSavedWithListing])
+      };
+      (prisma.savedListing.findMany as jest.Mock).mockResolvedValue([
+        mockSavedWithListing,
+      ]);
 
-      await getSavedListings()
+      await getSavedListings();
 
       expect(prisma.savedListing.findMany).toHaveBeenCalledWith(
         expect.objectContaining({
@@ -235,85 +259,95 @@ describe('saved-listings actions', () => {
                 price: true,
                 images: true,
                 location: {
-                  select: { city: true, state: true }
+                  select: { city: true, state: true },
                 },
                 owner: {
-                  select: { id: true, name: true, image: true }
-                }
-              }
-            }
+                  select: { id: true, name: true, image: true },
+                },
+              },
+            },
           },
         })
-      )
-    })
+      );
+    });
 
-    it('orders by createdAt descending', async () => {
-      ;(prisma.savedListing.findMany as jest.Mock).mockResolvedValue([])
+    it("orders by createdAt descending", async () => {
+      (prisma.savedListing.findMany as jest.Mock).mockResolvedValue([]);
 
-      await getSavedListings()
+      await getSavedListings();
 
       expect(prisma.savedListing.findMany).toHaveBeenCalledWith(
         expect.objectContaining({
-          orderBy: { createdAt: 'desc' },
+          orderBy: { createdAt: "desc" },
         })
-      )
-    })
+      );
+    });
 
-    it('returns empty array on error', async () => {
-      ;(prisma.savedListing.findMany as jest.Mock).mockRejectedValue(new Error('DB Error'))
+    it("returns empty array on error", async () => {
+      (prisma.savedListing.findMany as jest.Mock).mockRejectedValue(
+        new Error("DB Error")
+      );
 
-      const result = await getSavedListings()
+      const result = await getSavedListings();
 
-      expect(result).toEqual([])
-    })
-  })
+      expect(result).toEqual([]);
+    });
+  });
 
-  describe('removeSavedListing', () => {
-    it('returns error when not logged in', async () => {
-      ;(auth as jest.Mock).mockResolvedValue(null)
+  describe("removeSavedListing", () => {
+    it("returns error when not logged in", async () => {
+      (auth as jest.Mock).mockResolvedValue(null);
 
-      const result = await removeSavedListing('listing-456')
+      const result = await removeSavedListing("listing-456");
 
-      expect(result.error).toBe('Unauthorized')
-    })
+      expect(result.error).toBe("Unauthorized");
+    });
 
-    it('deletes saved listing', async () => {
-      ;(prisma.savedListing.delete as jest.Mock).mockResolvedValue(mockSavedListing)
+    it("deletes saved listing", async () => {
+      (prisma.savedListing.delete as jest.Mock).mockResolvedValue(
+        mockSavedListing
+      );
 
-      await removeSavedListing('listing-456')
+      await removeSavedListing("listing-456");
 
       expect(prisma.savedListing.delete).toHaveBeenCalledWith({
         where: {
           userId_listingId: {
-            userId: 'user-123',
-            listingId: 'listing-456',
+            userId: "user-123",
+            listingId: "listing-456",
           },
         },
-      })
-    })
+      });
+    });
 
-    it('revalidates /saved path', async () => {
-      ;(prisma.savedListing.delete as jest.Mock).mockResolvedValue(mockSavedListing)
+    it("revalidates /saved path", async () => {
+      (prisma.savedListing.delete as jest.Mock).mockResolvedValue(
+        mockSavedListing
+      );
 
-      await removeSavedListing('listing-456')
+      await removeSavedListing("listing-456");
 
-      expect(revalidatePath).toHaveBeenCalledWith('/saved')
-    })
+      expect(revalidatePath).toHaveBeenCalledWith("/saved");
+    });
 
-    it('returns success: true on successful removal', async () => {
-      ;(prisma.savedListing.delete as jest.Mock).mockResolvedValue(mockSavedListing)
+    it("returns success: true on successful removal", async () => {
+      (prisma.savedListing.delete as jest.Mock).mockResolvedValue(
+        mockSavedListing
+      );
 
-      const result = await removeSavedListing('listing-456')
+      const result = await removeSavedListing("listing-456");
 
-      expect(result.success).toBe(true)
-    })
+      expect(result.success).toBe(true);
+    });
 
-    it('returns error on database failure', async () => {
-      ;(prisma.savedListing.delete as jest.Mock).mockRejectedValue(new Error('DB Error'))
+    it("returns error on database failure", async () => {
+      (prisma.savedListing.delete as jest.Mock).mockRejectedValue(
+        new Error("DB Error")
+      );
 
-      const result = await removeSavedListing('listing-456')
+      const result = await removeSavedListing("listing-456");
 
-      expect(result.error).toBe('Failed to remove listing')
-    })
-  })
-})
+      expect(result.error).toBe("Failed to remove listing");
+    });
+  });
+});

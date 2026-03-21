@@ -1,4 +1,10 @@
-import { test as base, expect, Page, Locator, BrowserContext } from "@playwright/test";
+import {
+  test as base,
+  expect,
+  Page,
+  Locator,
+  BrowserContext,
+} from "@playwright/test";
 import { authHelpers } from "./auth-helpers";
 import { navigationHelpers } from "./navigation-helpers";
 import { networkHelpers, NetworkCondition } from "./network-helpers";
@@ -21,11 +27,12 @@ export const test = base.extend<{
   // Disable CSS transitions and framer-motion animations for stable clicks in CI.
   // prefers-reduced-motion: reduce makes framer-motion skip all animations;
   // the injected stylesheet forces CSS transitions/animations to 0s as a safety net.
-  _disableAnimations: [async ({ page }, use) => {
-    await page.emulateMedia({ reducedMotion: 'reduce' });
-    await page.addInitScript(() => {
-      const style = document.createElement('style');
-      style.textContent = `
+  _disableAnimations: [
+    async ({ page }, use) => {
+      await page.emulateMedia({ reducedMotion: "reduce" });
+      await page.addInitScript(() => {
+        const style = document.createElement("style");
+        style.textContent = `
         *, *::before, *::after {
           animation-duration: 0s !important;
           animation-delay: 0s !important;
@@ -33,22 +40,29 @@ export const test = base.extend<{
           transition-delay: 0s !important;
         }
       `;
-      if (document.head) {
-        document.head.appendChild(style);
-      } else {
-        document.addEventListener('DOMContentLoaded', () => document.head.appendChild(style));
-      }
-    });
-    await use();
-  }, { auto: true }],
+        if (document.head) {
+          document.head.appendChild(style);
+        } else {
+          document.addEventListener("DOMContentLoaded", () =>
+            document.head.appendChild(style)
+          );
+        }
+      });
+      await use();
+    },
+    { auto: true },
+  ],
 
   // Auto-mock all external map tile/style/geocoding requests.
   // Runs before every test; only intercepts external domains so
   // non-map tests are unaffected (routes simply never match).
-  _mockMapTiles: [async ({ page }, use) => {
-    await mockMapTileRequests(page);
-    await use();
-  }, { auto: true }],
+  _mockMapTiles: [
+    async ({ page }, use) => {
+      await mockMapTileRequests(page);
+      await use();
+    },
+    { auto: true },
+  ],
 
   auth: async ({}, use) => {
     await use(authHelpers);
@@ -97,12 +111,16 @@ export const tags = {
  * Centralized config for axe-core scans across all a11y specs.
  */
 export const A11Y_CONFIG = {
-  standard: 'WCAG 2.1 AA' as const,
-  tags: ['wcag2a', 'wcag2aa', 'wcag21a', 'wcag21aa'] as const,
+  standard: "WCAG 2.1 AA" as const,
+  tags: ["wcag2a", "wcag2aa", "wcag21a", "wcag21aa"] as const,
   /** Elements to always exclude from axe scans (map canvases are third-party) */
-  globalExcludes: ['.maplibregl-canvas', '.maplibregl-canvas', '.maplibregl-ctrl-group'] as const,
+  globalExcludes: [
+    ".maplibregl-canvas",
+    ".maplibregl-canvas",
+    ".maplibregl-ctrl-group",
+  ] as const,
   /** Rules with known acceptable violations */
-  knownExclusions: ['color-contrast', 'aria-prohibited-attr'] as const,
+  knownExclusions: ["color-contrast", "aria-prohibited-attr"] as const,
 } as const;
 
 /**
@@ -121,7 +139,7 @@ export const SF_BOUNDS = {
  */
 export async function waitForMapMarkers(
   page: Page,
-  options?: { timeout?: number; minCount?: number },
+  options?: { timeout?: number; minCount?: number }
 ): Promise<number> {
   const timeout = options?.timeout ?? timeouts.action;
   const minCount = options?.minCount ?? 1;
@@ -135,7 +153,7 @@ export async function waitForMapMarkers(
       return markers.length >= min;
     },
     { selector: selectors.mapMarker, min: minCount },
-    { timeout },
+    { timeout }
   );
 
   const markers = page.locator(selectors.mapMarker);
@@ -192,7 +210,8 @@ export const selectors = {
   prevPage: '[aria-label*="previous" i], [data-testid="prev-page"]',
 
   // Empty states
-  emptyState: '[data-testid="empty-state"], [class*="empty-state"], :text-matches("No matches found", "i")',
+  emptyState:
+    '[data-testid="empty-state"], [class*="empty-state"], :text-matches("No matches found", "i")',
 
   // Map
   map: '[data-testid="map"], [class*="maplibregl"], .maplibregl-map',
@@ -206,9 +225,11 @@ export const selectors = {
  */
 export async function waitForStable(
   page: Page,
-  options?: { timeout?: number },
+  options?: { timeout?: number }
 ) {
-  await page.waitForLoadState("domcontentloaded", { timeout: options?.timeout });
+  await page.waitForLoadState("domcontentloaded", {
+    timeout: options?.timeout,
+  });
 }
 
 // ---------------------------------------------------------------------------
@@ -226,24 +247,33 @@ export async function waitForStable(
  */
 export async function waitForMapReady(
   page: Page,
-  timeout = 15_000,
+  timeout = 15_000
 ): Promise<void> {
   // Phase 1: Try the E2E map ref (fast path when WebGL works)
-  const mapRefReady = await page.waitForFunction(
-    () => {
-      const map = (window as any).__e2eMapRef;
-      if (!map) return false;
-      return map.loaded() && !map.isMoving() && !map.isZooming() && !map.isRotating();
-    },
-    { timeout: Math.min(timeout, 10_000) },
-  ).then(() => true).catch(() => false);
+  const mapRefReady = await page
+    .waitForFunction(
+      () => {
+        const map = (window as any).__e2eMapRef;
+        if (!map) return false;
+        return (
+          map.loaded() &&
+          !map.isMoving() &&
+          !map.isZooming() &&
+          !map.isRotating()
+        );
+      },
+      { timeout: Math.min(timeout, 10_000) }
+    )
+    .then(() => true)
+    .catch(() => false);
 
   if (mapRefReady) return;
 
   // Phase 2: Fall back to waiting for map container or canvas in DOM
-  await page.locator('.maplibregl-map, .maplibregl-canvas, [data-testid="map"]')
+  await page
+    .locator('.maplibregl-map, .maplibregl-canvas, [data-testid="map"]')
     .first()
-    .waitFor({ state: 'attached', timeout: Math.min(timeout, 5_000) })
+    .waitFor({ state: "attached", timeout: Math.min(timeout, 5_000) })
     .catch(() => {
       // Map may not render at all in headless without WebGL -- callers
       // should use isMapAvailable() guards before map-dependent assertions.
@@ -261,7 +291,7 @@ export async function waitForDebounceAndResponse(
     debounceMs?: number;
     responsePattern: string | RegExp;
     timeout?: number;
-  },
+  }
 ): Promise<void> {
   const debounceMs = opts.debounceMs ?? timeouts.debounce;
   const timeout = opts.timeout ?? timeouts.action;
@@ -272,7 +302,7 @@ export async function waitForDebounceAndResponse(
         ? url.includes(opts.responsePattern)
         : opts.responsePattern.test(url);
     },
-    { timeout },
+    { timeout }
   );
   // Minimal wait for debounce to fire, then gate on actual response
   await page.waitForTimeout(debounceMs + 100);
@@ -285,7 +315,7 @@ export async function waitForDebounceAndResponse(
 export async function takeScreenshot(
   page: Page,
   name: string,
-  options?: { fullPage?: boolean },
+  options?: { fullPage?: boolean }
 ) {
   const timestamp = new Date().toISOString().replace(/[:.]/g, "-");
   await page.screenshot({

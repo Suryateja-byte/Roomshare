@@ -7,7 +7,13 @@
  * Run: pnpm playwright test tests/e2e/search-smoke.spec.ts
  */
 
-import { test, expect, SF_BOUNDS, selectors, searchResultsContainer } from "./helpers/test-utils";
+import {
+  test,
+  expect,
+  SF_BOUNDS,
+  selectors,
+  searchResultsContainer,
+} from "./helpers/test-utils";
 
 const boundsQS = `minLat=${SF_BOUNDS.minLat}&maxLat=${SF_BOUNDS.maxLat}&minLng=${SF_BOUNDS.minLng}&maxLng=${SF_BOUNDS.maxLng}`;
 
@@ -28,7 +34,7 @@ test.describe("REG-001: Search page loads", () => {
 
     // Wait for listing heading text to appear (more reliable than link visibility
     // since listing cards may be in a scrollable container initially offscreen)
-    const headings = page.locator('h3').filter({ hasText: /.+/ });
+    const headings = page.locator("h3").filter({ hasText: /.+/ });
     await expect(headings.first()).toBeAttached({ timeout: 30_000 });
 
     // Verify listing links are present in the DOM — scope to visible container.
@@ -59,7 +65,7 @@ test.describe("REG-001: Search page loads", () => {
         !e.includes("FetchTimeoutError") &&
         !e.includes("timed out") &&
         !e.includes("photon.komoot") &&
-        !e.includes("TimeoutError"),
+        !e.includes("TimeoutError")
     );
     expect(realErrors).toHaveLength(0);
   });
@@ -73,7 +79,7 @@ test.describe("REG-001: Search page loads", () => {
 test.describe("REG-002: XSS via query parameter", () => {
   const xssPayloads = [
     { label: "script tag", q: "<script>alert('xss')</script>" },
-    { label: "img onerror", q: '<img src=x onerror=alert(1)>' },
+    { label: "img onerror", q: "<img src=x onerror=alert(1)>" },
     { label: "javascript URI", q: "javascript:alert(1)" },
   ];
 
@@ -100,9 +106,7 @@ test.describe("REG-002: XSS via query parameter", () => {
         .count();
       expect(injectedScripts).toBe(0);
 
-      const injectedImgs = await page
-        .locator("img[onerror]")
-        .count();
+      const injectedImgs = await page.locator("img[onerror]").count();
       expect(injectedImgs).toBe(0);
     });
   }
@@ -166,12 +170,10 @@ test.describe("REG-003: Whitespace query bypass protection", () => {
 // Expected: Intersection of page 1 and page 2 ID sets = empty set
 // ---------------------------------------------------------------------------
 test.describe("REG-004: Keyset cursor stability", () => {
-  test("page 2 contains no duplicate IDs from page 1", async ({
-    request,
-  }) => {
+  test("page 2 contains no duplicate IDs from page 1", async ({ request }) => {
     // Fetch page 1
     const page1Resp = await request.get(
-      `/api/search/v2?sort=newest&${boundsQS}`,
+      `/api/search/v2?sort=newest&${boundsQS}`
     );
     if (page1Resp.status() === 404) {
       test.skip(true, "Search V2 not enabled");
@@ -188,7 +190,7 @@ test.describe("REG-004: Keyset cursor stability", () => {
     }
 
     const page1Ids = new Set(
-      page1Body.list.items.map((item: { id: string }) => item.id),
+      page1Body.list.items.map((item: { id: string }) => item.id)
     );
     const nextCursor = page1Body.list.nextCursor;
 
@@ -199,13 +201,13 @@ test.describe("REG-004: Keyset cursor stability", () => {
 
     // Fetch page 2 using cursor
     const page2Resp = await request.get(
-      `/api/search/v2?sort=newest&cursor=${encodeURIComponent(nextCursor)}&${boundsQS}`,
+      `/api/search/v2?sort=newest&cursor=${encodeURIComponent(nextCursor)}&${boundsQS}`
     );
     expect(page2Resp.status()).toBe(200);
 
     const page2Body = await page2Resp.json();
     const page2Ids = (page2Body.list?.items ?? []).map(
-      (item: { id: string }) => item.id,
+      (item: { id: string }) => item.id
     );
 
     // No duplicates between page 1 and page 2
@@ -235,7 +237,7 @@ test.describe("REG-005: Invalid cursor fallback", () => {
   for (const { label, cursor } of invalidCursors) {
     test(`handles ${label} gracefully`, async ({ request }) => {
       const resp = await request.get(
-        `/api/search/v2?cursor=${cursor}&${boundsQS}`,
+        `/api/search/v2?cursor=${cursor}&${boundsQS}`
       );
 
       // Must not crash — accept 200 or 404 (v2 disabled), never 500
@@ -268,7 +270,7 @@ test.describe("REG-006: Rate limiting enforcement", () => {
 
     // Fire requests in rapid batches
     const responses = await Promise.all(
-      Array.from({ length: BURST_COUNT }, () => request.get(url)),
+      Array.from({ length: BURST_COUNT }, () => request.get(url))
     );
 
     const statuses = responses.map((r) => r.status());
@@ -290,7 +292,7 @@ test.describe("REG-006: Rate limiting enforcement", () => {
     if (!got429) {
       console.warn(
         "WARN: Rate limiter did not trigger after 100 concurrent requests. " +
-        "Verify UPSTASH_REDIS_REST_URL is set and rate limiting is active.",
+          "Verify UPSTASH_REDIS_REST_URL is set and rate limiting is active."
       );
     }
     // Soft assertion: at minimum, no 500s occurred
@@ -339,7 +341,10 @@ test.describe("REG-008: V2 API response contract", () => {
 
     // Rate limit window is 60s — if REG-006 burst test ran first, skip gracefully
     if (resp.status() === 429) {
-      test.skip(true, "Rate limited from REG-006 burst test — shape validated in isolation");
+      test.skip(
+        true,
+        "Rate limited from REG-006 burst test — shape validated in isolation"
+      );
       return;
     }
 

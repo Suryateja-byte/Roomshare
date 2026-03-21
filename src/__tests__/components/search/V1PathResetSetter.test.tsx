@@ -1,7 +1,10 @@
-import { render, waitFor } from '@testing-library/react';
-import { V1PathResetSetter } from '@/components/search/V1PathResetSetter';
-import { SearchV2DataProvider, useSearchV2Data } from '@/contexts/SearchV2DataContext';
-import { useEffect, useState } from 'react';
+import { render, waitFor } from "@testing-library/react";
+import { V1PathResetSetter } from "@/components/search/V1PathResetSetter";
+import {
+  SearchV2DataProvider,
+  useSearchV2Data,
+} from "@/contexts/SearchV2DataContext";
+import { useEffect, useState } from "react";
 
 // Test wrapper that exposes context state for assertions
 function TestWrapper({
@@ -23,7 +26,11 @@ function TestWrapper({
 }
 
 // Component to set initial state for testing
-function StateInitializer({ initialIsV2Enabled }: { initialIsV2Enabled: boolean }) {
+function StateInitializer({
+  initialIsV2Enabled,
+}: {
+  initialIsV2Enabled: boolean;
+}) {
   const { setIsV2Enabled, setV2MapData } = useSearchV2Data();
   const [initialized, setInitialized] = useState(false);
 
@@ -41,9 +48,9 @@ function StateInitializer({ initialIsV2Enabled }: { initialIsV2Enabled: boolean 
 
 // Component to observe state changes
 function StateObserver({
-  onStateChange
+  onStateChange,
 }: {
-  onStateChange?: (state: { isV2Enabled: boolean; v2MapData: unknown }) => void
+  onStateChange?: (state: { isV2Enabled: boolean; v2MapData: unknown }) => void;
 }) {
   const { isV2Enabled, v2MapData } = useSearchV2Data();
 
@@ -54,9 +61,10 @@ function StateObserver({
   return null;
 }
 
-describe('V1PathResetSetter', () => {
-  it('should set isV2Enabled to false on mount', async () => {
-    const stateChanges: Array<{ isV2Enabled: boolean; v2MapData: unknown }> = [];
+describe("V1PathResetSetter", () => {
+  it("should set isV2Enabled to false on mount", async () => {
+    const stateChanges: Array<{ isV2Enabled: boolean; v2MapData: unknown }> =
+      [];
 
     render(
       <TestWrapper
@@ -68,14 +76,18 @@ describe('V1PathResetSetter', () => {
     );
 
     // Wait for effects to settle
-    await waitFor(() => {
-      const lastState = stateChanges[stateChanges.length - 1];
-      expect(lastState?.isV2Enabled).toBe(false);
-    }, { timeout: 1000 });
+    await waitFor(
+      () => {
+        const lastState = stateChanges[stateChanges.length - 1];
+        expect(lastState?.isV2Enabled).toBe(false);
+      },
+      { timeout: 1000 }
+    );
   });
 
-  it('should set v2MapData to null on mount', async () => {
-    const stateChanges: Array<{ isV2Enabled: boolean; v2MapData: unknown }> = [];
+  it("should set v2MapData to null on mount", async () => {
+    const stateChanges: Array<{ isV2Enabled: boolean; v2MapData: unknown }> =
+      [];
 
     render(
       <TestWrapper
@@ -86,13 +98,16 @@ describe('V1PathResetSetter', () => {
       </TestWrapper>
     );
 
-    await waitFor(() => {
-      const lastState = stateChanges[stateChanges.length - 1];
-      expect(lastState?.v2MapData).toBeNull();
-    }, { timeout: 1000 });
+    await waitFor(
+      () => {
+        const lastState = stateChanges[stateChanges.length - 1];
+        expect(lastState?.v2MapData).toBeNull();
+      },
+      { timeout: 1000 }
+    );
   });
 
-  it('should not cause re-render loop', async () => {
+  it("should not cause re-render loop", async () => {
     let renderCount = 0;
 
     function RenderCounter() {
@@ -116,14 +131,15 @@ describe('V1PathResetSetter', () => {
     const initialRenderCount = renderCount;
 
     // Wait a bit to ensure no infinite loop
-    await new Promise(resolve => setTimeout(resolve, 300));
+    await new Promise((resolve) => setTimeout(resolve, 300));
 
     // Should have stabilized (max a few renders for state updates, not infinite)
     expect(renderCount).toBeLessThan(initialRenderCount + 10);
   });
 
-  it('should handle rapid mount/unmount gracefully', async () => {
-    const stateChanges: Array<{ isV2Enabled: boolean; v2MapData: unknown }> = [];
+  it("should handle rapid mount/unmount gracefully", async () => {
+    const stateChanges: Array<{ isV2Enabled: boolean; v2MapData: unknown }> =
+      [];
 
     const { unmount, rerender } = render(
       <TestWrapper
@@ -148,13 +164,16 @@ describe('V1PathResetSetter', () => {
     );
 
     // Should not throw and should eventually settle to false
-    await waitFor(() => {
-      const lastState = stateChanges[stateChanges.length - 1];
-      expect(lastState?.isV2Enabled).toBe(false);
-    }, { timeout: 1000 });
+    await waitFor(
+      () => {
+        const lastState = stateChanges[stateChanges.length - 1];
+        expect(lastState?.isV2Enabled).toBe(false);
+      },
+      { timeout: 1000 }
+    );
   });
 
-  it('should render null (no DOM output)', () => {
+  it("should render null (no DOM output)", () => {
     const { container } = render(
       <TestWrapper initialIsV2Enabled={true}>
         <V1PathResetSetter />
@@ -163,12 +182,15 @@ describe('V1PathResetSetter', () => {
 
     // V1PathResetSetter should return null, so only the test wrapper elements exist
     // The component itself should not add any DOM nodes
-    const v1ResetterElements = container.querySelectorAll('[data-testid="v1-path-reset-setter"]');
+    const v1ResetterElements = container.querySelectorAll(
+      '[data-testid="v1-path-reset-setter"]'
+    );
     expect(v1ResetterElements.length).toBe(0);
   });
 
-  it('should work when isV2Enabled is already false', async () => {
-    const stateChanges: Array<{ isV2Enabled: boolean; v2MapData: unknown }> = [];
+  it("should work when isV2Enabled is already false", async () => {
+    const stateChanges: Array<{ isV2Enabled: boolean; v2MapData: unknown }> =
+      [];
 
     render(
       <TestWrapper
@@ -179,10 +201,13 @@ describe('V1PathResetSetter', () => {
       </TestWrapper>
     );
 
-    await waitFor(() => {
-      const lastState = stateChanges[stateChanges.length - 1];
-      // Should still be false (no change needed, but no error either)
-      expect(lastState?.isV2Enabled).toBe(false);
-    }, { timeout: 1000 });
+    await waitFor(
+      () => {
+        const lastState = stateChanges[stateChanges.length - 1];
+        // Should still be false (no change needed, but no error either)
+        expect(lastState?.isV2Enabled).toBe(false);
+      },
+      { timeout: 1000 }
+    );
   });
 });

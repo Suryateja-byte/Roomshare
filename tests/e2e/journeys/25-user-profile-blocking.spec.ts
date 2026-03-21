@@ -6,7 +6,14 @@
  * J37: Edit profile fields
  */
 
-import { test, expect, selectors, timeouts, SF_BOUNDS, searchResultsContainer } from "../helpers";
+import {
+  test,
+  expect,
+  selectors,
+  timeouts,
+  SF_BOUNDS,
+  searchResultsContainer,
+} from "../helpers";
 
 test.beforeEach(async () => {
   test.slow();
@@ -20,23 +27,33 @@ test.describe("J35: View Public User Profile", () => {
   }) => {
     // Step 1: Go to a listing
     await nav.goToSearch({ bounds: SF_BOUNDS });
-    await page.waitForLoadState('domcontentloaded');
+    await page.waitForLoadState("domcontentloaded");
 
     const container = searchResultsContainer(page);
     const cards = container.locator(selectors.listingCard);
     test.skip((await cards.count()) === 0, "No listings — skipping");
 
     await nav.clickListingCard(0);
-    await page.waitForURL(/\/listings\//, { timeout: timeouts.navigation, waitUntil: "commit" });
-    await page.waitForLoadState('domcontentloaded');
+    await page.waitForURL(/\/listings\//, {
+      timeout: timeouts.navigation,
+      waitUntil: "commit",
+    });
+    await page.waitForLoadState("domcontentloaded");
 
     // Step 2: Find and click host name/link
     const hostLink = page
       .locator('main a[href*="/users/"]')
       .or(page.locator('main a[href*="/profile/"]'))
-      .or(page.locator("main").getByRole("link", { name: /host|owner|posted by/i }));
+      .or(
+        page
+          .locator("main")
+          .getByRole("link", { name: /host|owner|posted by/i })
+      );
 
-    const hasHostLink = await hostLink.first().isVisible().catch(() => false);
+    const hasHostLink = await hostLink
+      .first()
+      .isVisible()
+      .catch(() => false);
     test.skip(!hasHostLink, "No host profile link — skipping");
 
     await hostLink.first().click();
@@ -46,11 +63,12 @@ test.describe("J35: View Public User Profile", () => {
       await page.waitForURL(/\/users\//, { timeout: 10000 });
     } catch {
       // May already be on user page or redirected
-      await page.waitForLoadState('domcontentloaded');
+      await page.waitForLoadState("domcontentloaded");
     }
 
     // Step 3: Verify profile page
-    const onProfile = page.url().includes("/users/") || page.url().includes("/profile/");
+    const onProfile =
+      page.url().includes("/users/") || page.url().includes("/profile/");
     expect(onProfile).toBeTruthy();
 
     // Step 4: Verify name is visible
@@ -58,7 +76,9 @@ test.describe("J35: View Public User Profile", () => {
     await expect(heading).toBeVisible({ timeout: 10000 });
 
     // Step 5: Verify no private data exposed
-    const privateData = page.getByText(/password|ssn|social security|credit card/i);
+    const privateData = page.getByText(
+      /password|ssn|social security|credit card/i
+    );
     const hasPrivate = await privateData.isVisible().catch(() => false);
     expect(hasPrivate).toBeFalsy();
   });
@@ -66,10 +86,7 @@ test.describe("J35: View Public User Profile", () => {
 
 // ─── J36: Block a User ────────────────────────────────────────────────────────
 test.describe("J36: Block a User", () => {
-  test("user profile → block → confirm → verify", async ({
-    page,
-    nav,
-  }) => {
+  test("user profile → block → confirm → verify", async ({ page, nav }) => {
     // Step 1: Navigate to a NON-OWNED listing to find the reviewer's profile
     await nav.goToSearch({ q: "Reviewer Nob Hill", bounds: SF_BOUNDS });
 
@@ -91,22 +108,32 @@ test.describe("J36: Block a User", () => {
     }
 
     await nav.clickListingCard(0);
-    await page.waitForURL(/\/listings\//, { timeout: timeouts.navigation, waitUntil: "commit" });
-    await page.waitForLoadState('domcontentloaded');
+    await page.waitForURL(/\/listings\//, {
+      timeout: timeouts.navigation,
+      waitUntil: "commit",
+    });
+    await page.waitForLoadState("domcontentloaded");
 
     // Step 2: Navigate to user profile — find host link
     const hostLink = page
       .locator('main a[href*="/users/"]')
-      .or(page.locator("main").getByRole("link", { name: /host|owner|posted by|hosted by/i }));
+      .or(
+        page
+          .locator("main")
+          .getByRole("link", { name: /host|owner|posted by|hosted by/i })
+      );
 
-    const hasHostLink = await hostLink.first().isVisible().catch(() => false);
+    const hasHostLink = await hostLink
+      .first()
+      .isVisible()
+      .catch(() => false);
     test.skip(!hasHostLink, "No host profile link — skipping");
 
     await hostLink.first().click();
     try {
       await page.waitForURL(/\/users\//, { timeout: 10000 });
     } catch {
-      await page.waitForLoadState('domcontentloaded');
+      await page.waitForLoadState("domcontentloaded");
     }
 
     // Step 3: Look for block button
@@ -114,35 +141,59 @@ test.describe("J36: Block a User", () => {
       .getByRole("button", { name: /block/i })
       .or(page.locator('[data-testid="block-user"]'));
 
-    const canBlock = await blockBtn.first().isVisible().catch(() => false);
+    const canBlock = await blockBtn
+      .first()
+      .isVisible()
+      .catch(() => false);
     test.skip(!canBlock, "No block button — skipping");
 
     await blockBtn.first().click();
-    await page.locator('[role="dialog"], [role="alertdialog"]').first().waitFor({ state: 'visible', timeout: 5000 }).catch(() => {});
+    await page
+      .locator('[role="dialog"], [role="alertdialog"]')
+      .first()
+      .waitFor({ state: "visible", timeout: 5000 })
+      .catch(() => {});
 
     // Step 4: Confirm block — modal has "Block User" button
-    const confirmBtn = page.getByRole("button", { name: /block user/i })
+    const confirmBtn = page
+      .getByRole("button", { name: /block user/i })
       .or(page.locator('[role="dialog"] button').filter({ hasText: /block/i }));
-    if (await confirmBtn.first().isVisible().catch(() => false)) {
+    if (
+      await confirmBtn
+        .first()
+        .isVisible()
+        .catch(() => false)
+    ) {
       await confirmBtn.first().click();
-      await page.waitForLoadState('domcontentloaded');
+      await page.waitForLoadState("domcontentloaded");
     }
 
     // Step 5: Verify block happened — toast or unblock button should appear
     // Allow extra time for mobile where UI feedback may be delayed
     const unblockBtn = page.getByRole("button", { name: /unblock/i });
-    const isBlocked = await unblockBtn.waitFor({ state: 'visible', timeout: 5000 }).then(() => true).catch(() => false);
-    const hasToast = isBlocked ? false : await page.locator(selectors.toast).waitFor({ state: 'visible', timeout: 5000 }).then(() => true).catch(() => false);
+    const isBlocked = await unblockBtn
+      .waitFor({ state: "visible", timeout: 5000 })
+      .then(() => true)
+      .catch(() => false);
+    const hasToast = isBlocked
+      ? false
+      : await page
+          .locator(selectors.toast)
+          .waitFor({ state: "visible", timeout: 5000 })
+          .then(() => true)
+          .catch(() => false);
     expect(hasToast || isBlocked).toBeTruthy();
 
     // Clean up: unblock
     if (isBlocked) {
       await unblockBtn.click();
-      await page.waitForLoadState('domcontentloaded');
-      const confirmUnblock = page.getByRole("button", { name: /confirm|yes|unblock/i }).first();
+      await page.waitForLoadState("domcontentloaded");
+      const confirmUnblock = page
+        .getByRole("button", { name: /confirm|yes|unblock/i })
+        .first();
       if (await confirmUnblock.isVisible().catch(() => false)) {
         await confirmUnblock.click();
-        await page.waitForLoadState('domcontentloaded');
+        await page.waitForLoadState("domcontentloaded");
       }
     }
   });
@@ -156,7 +207,7 @@ test.describe("J37: Edit Profile Fields", () => {
   }) => {
     // Step 1: Go to profile
     await nav.goToProfile();
-    await page.waitForLoadState('domcontentloaded');
+    await page.waitForLoadState("domcontentloaded");
 
     // Step 2: Click edit button or navigate to edit page directly
     const editBtn = page
@@ -165,21 +216,24 @@ test.describe("J37: Edit Profile Fields", () => {
       .or(page.locator('a[href*="/profile/edit"]'))
       .or(page.locator('a[href*="/settings"]'));
 
-    const canEdit = await editBtn.first().isVisible().catch(() => false);
+    const canEdit = await editBtn
+      .first()
+      .isVisible()
+      .catch(() => false);
     if (canEdit) {
       await editBtn.first().click();
-      await page.waitForLoadState('domcontentloaded');
+      await page.waitForLoadState("domcontentloaded");
     } else {
       // Fallback: navigate directly to edit page
       await page.goto("/profile/edit");
-      await page.waitForLoadState('domcontentloaded');
+      await page.waitForLoadState("domcontentloaded");
     }
 
     // Step 3: Fill bio field
     const bioField = page
       .getByLabel(/bio/i)
       .or(page.locator('textarea[name="bio"]'))
-      .or(page.locator('textarea'))
+      .or(page.locator("textarea"))
       .first();
 
     const canEditBio = await bioField.isVisible().catch(() => false);
@@ -193,21 +247,34 @@ test.describe("J37: Edit Profile Fields", () => {
     const saveBtn = page
       .getByRole("button", { name: /save|update|submit/i })
       .or(page.locator('button[type="submit"]'));
-    if (await saveBtn.first().isVisible().catch(() => false)) {
+    if (
+      await saveBtn
+        .first()
+        .isVisible()
+        .catch(() => false)
+    ) {
       await saveBtn.first().click();
-      await page.waitForLoadState('domcontentloaded');
+      await page.waitForLoadState("domcontentloaded");
     }
 
     // Step 5: Verify changes persisted (toast OR bio text OR redirect to profile)
-    const hasToast = await page.locator(selectors.toast).isVisible({ timeout: 5000 }).catch(() => false);
+    const hasToast = await page
+      .locator(selectors.toast)
+      .isVisible({ timeout: 5000 })
+      .catch(() => false);
     const bioText = page.getByText(testBio);
-    const hasBio = await bioText.isVisible({ timeout: 3000 }).catch(() => false);
+    const hasBio = await bioText
+      .isVisible({ timeout: 3000 })
+      .catch(() => false);
     // On mobile, success may redirect to /profile without toast — wait briefly for redirect
-    await page.waitForLoadState('domcontentloaded').catch(() => {});
-    const redirectedToProfile = !page.url().includes('/edit');
+    await page.waitForLoadState("domcontentloaded").catch(() => {});
+    const redirectedToProfile = !page.url().includes("/edit");
     // Accept any of: toast, bio visible, or redirect away from edit page
     if (!hasToast && !hasBio && !redirectedToProfile) {
-      test.skip(true, 'No visible save confirmation — skipping (mobile may handle save differently)');
+      test.skip(
+        true,
+        "No visible save confirmation — skipping (mobile may handle save differently)"
+      );
     }
   });
 });

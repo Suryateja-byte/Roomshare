@@ -4,18 +4,24 @@
  * Prevents invalid transitions like CANCELLED → ACCEPTED.
  */
 
-export type BookingStatus = 'PENDING' | 'ACCEPTED' | 'REJECTED' | 'CANCELLED' | 'HELD' | 'EXPIRED';
+export type BookingStatus =
+  | "PENDING"
+  | "ACCEPTED"
+  | "REJECTED"
+  | "CANCELLED"
+  | "HELD"
+  | "EXPIRED";
 
 /**
  * Valid state transitions for bookings.
  * Each key maps to an array of states it can transition TO.
  */
 export const VALID_TRANSITIONS: Record<BookingStatus, BookingStatus[]> = {
-  PENDING: ['ACCEPTED', 'REJECTED', 'CANCELLED'],
-  ACCEPTED: ['CANCELLED'],
+  PENDING: ["ACCEPTED", "REJECTED", "CANCELLED"],
+  ACCEPTED: ["CANCELLED"],
   REJECTED: [],
   CANCELLED: [],
-  HELD: ['ACCEPTED', 'REJECTED', 'CANCELLED', 'EXPIRED'],
+  HELD: ["ACCEPTED", "REJECTED", "CANCELLED", "EXPIRED"],
   EXPIRED: [],
 };
 
@@ -31,7 +37,10 @@ export function canTransition(from: BookingStatus, to: BookingStatus): boolean {
  * Validate a state transition and throw if invalid
  * @throws InvalidStateTransitionError if transition is not allowed
  */
-export function validateTransition(from: BookingStatus, to: BookingStatus): void {
+export function validateTransition(
+  from: BookingStatus,
+  to: BookingStatus
+): void {
   if (!canTransition(from, to)) {
     throw new InvalidStateTransitionError(from, to);
   }
@@ -55,23 +64,24 @@ export function isTerminalStatus(status: BookingStatus): boolean {
  * Custom error for invalid state transitions
  */
 export class InvalidStateTransitionError extends Error {
-  public readonly code = 'INVALID_STATE_TRANSITION';
+  public readonly code = "INVALID_STATE_TRANSITION";
   public readonly statusCode = 400;
   public readonly from: BookingStatus;
   public readonly to: BookingStatus;
 
   constructor(from: BookingStatus, to: BookingStatus) {
     const allowedTransitions = VALID_TRANSITIONS[from];
-    const allowedStr = allowedTransitions.length > 0
-      ? allowedTransitions.join(', ')
-      : 'none (terminal state)';
+    const allowedStr =
+      allowedTransitions.length > 0
+        ? allowedTransitions.join(", ")
+        : "none (terminal state)";
 
     super(
       `Invalid booking state transition: ${from} → ${to}. ` +
-      `Allowed transitions from ${from}: ${allowedStr}`
+        `Allowed transitions from ${from}: ${allowedStr}`
     );
 
-    this.name = 'InvalidStateTransitionError';
+    this.name = "InvalidStateTransitionError";
     this.from = from;
     this.to = to;
   }

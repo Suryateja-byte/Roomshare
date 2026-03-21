@@ -8,15 +8,19 @@
  * For full browser E2E tests, these could be ported to Playwright.
  */
 
-import type { POI, SearchMeta, NeighborhoodSearchResult } from '@/lib/places/types';
-import { isProUser, getNeighborhoodProFeatures } from '@/lib/subscription';
+import type {
+  POI,
+  SearchMeta,
+  NeighborhoodSearchResult,
+} from "@/lib/places/types";
+import { isProUser, getNeighborhoodProFeatures } from "@/lib/subscription";
 import {
   haversineMiles,
   formatDistance,
   estimateWalkMins,
   formatWalkTime,
   getWalkabilityRings,
-} from '@/lib/geo/distance';
+} from "@/lib/geo/distance";
 
 // ============================================
 // Test Data
@@ -26,63 +30,71 @@ const LISTING_COORDS = { lat: 37.7749, lng: -122.4194 }; // San Francisco
 
 const MOCK_POIS: POI[] = [
   {
-    placeId: 'ChIJ-SB-CAFE123',
-    name: 'Starbucks',
+    placeId: "ChIJ-SB-CAFE123",
+    name: "Starbucks",
     lat: 37.7759,
     lng: -122.4184,
     rating: 4.2,
-    primaryType: 'coffee_shop',
+    primaryType: "coffee_shop",
     openNow: true,
-    address: '123 Market St',
+    address: "123 Market St",
   },
   {
-    placeId: 'ChIJ-SB-CAFE456',
-    name: 'Blue Bottle Coffee',
+    placeId: "ChIJ-SB-CAFE456",
+    name: "Blue Bottle Coffee",
     lat: 37.7769,
     lng: -122.4174,
     rating: 4.5,
-    primaryType: 'coffee_shop',
+    primaryType: "coffee_shop",
     openNow: true,
-    address: '456 Market St',
+    address: "456 Market St",
   },
   {
-    placeId: 'ChIJ-SB-CAFE789',
-    name: 'Philz Coffee',
+    placeId: "ChIJ-SB-CAFE789",
+    name: "Philz Coffee",
     lat: 37.7779,
     lng: -122.4164,
     rating: 4.7,
-    primaryType: 'coffee_shop',
+    primaryType: "coffee_shop",
     openNow: false,
-    address: '789 Market St',
+    address: "789 Market St",
   },
   {
-    placeId: 'ChIJ-SB-GYM001',
+    placeId: "ChIJ-SB-GYM001",
     name: "Barry's Fitness",
     lat: 37.7799,
     lng: -122.4144,
     rating: 4.3,
-    primaryType: 'gym',
+    primaryType: "gym",
     openNow: true,
-    address: '1000 Fitness Way',
+    address: "1000 Fitness Way",
   },
   {
-    placeId: 'ChIJ-SB-REST001',
-    name: 'Panda Express',
+    placeId: "ChIJ-SB-REST001",
+    name: "Panda Express",
     lat: 37.7789,
     lng: -122.4154,
     rating: 3.8,
-    primaryType: 'restaurant',
+    primaryType: "restaurant",
     openNow: true,
-    address: '500 Food Court',
+    address: "500 Food Court",
   },
 ];
 
 /**
  * Simulates the distance computation that happens client-side
  */
-function computeDistances(pois: POI[], center: { lat: number; lng: number }): POI[] {
+function computeDistances(
+  pois: POI[],
+  center: { lat: number; lng: number }
+): POI[] {
   return pois.map((poi) => {
-    const distanceMiles = haversineMiles(center.lat, center.lng, poi.lat, poi.lng);
+    const distanceMiles = haversineMiles(
+      center.lat,
+      center.lng,
+      poi.lat,
+      poi.lng
+    );
     const walkMins = estimateWalkMins(distanceMiles);
     return { ...poi, distanceMiles, walkMins };
   });
@@ -92,7 +104,9 @@ function computeDistances(pois: POI[], center: { lat: number; lng: number }): PO
  * Simulates sorting by distance
  */
 function sortByDistance(pois: POI[]): POI[] {
-  return [...pois].sort((a, b) => (a.distanceMiles ?? 0) - (b.distanceMiles ?? 0));
+  return [...pois].sort(
+    (a, b) => (a.distanceMiles ?? 0) - (b.distanceMiles ?? 0)
+  );
 }
 
 /**
@@ -106,7 +120,7 @@ function buildSearchMeta(pois: POI[], radiusMeters: number): SearchMeta {
     resultCount: pois.length,
     closestMiles: sortedPois[0]?.distanceMiles ?? 0,
     farthestMiles: sortedPois[sortedPois.length - 1]?.distanceMiles ?? 0,
-    searchMode: 'type',
+    searchMode: "type",
     timestamp: Date.now(),
   };
 }
@@ -115,23 +129,23 @@ function buildSearchMeta(pois: POI[], radiusMeters: number): SearchMeta {
 // User Journey: Free User searches for coffee shops
 // ============================================
 
-describe('Journey: Free User searches for coffee shops', () => {
-  const subscriptionTier = 'free';
+describe("Journey: Free User searches for coffee shops", () => {
+  const subscriptionTier = "free";
 
   beforeEach(() => {
     // Verify subscription detection
     expect(isProUser(subscriptionTier)).toBe(false);
   });
 
-  it('Step 1: User opens neighborhood module and submits query', () => {
-    const query = 'coffee shops';
+  it("Step 1: User opens neighborhood module and submits query", () => {
+    const query = "coffee shops";
 
     // Simulating what happens when user submits query
     // In real app, this would go through the chat flow
-    expect(query.toLowerCase()).toContain('coffee');
+    expect(query.toLowerCase()).toContain("coffee");
   });
 
-  it('Step 2: System computes distances for all POIs', () => {
+  it("Step 2: System computes distances for all POIs", () => {
     const poisWithDistances = computeDistances(MOCK_POIS, LISTING_COORDS);
 
     // All POIs should have distances computed
@@ -143,7 +157,7 @@ describe('Journey: Free User searches for coffee shops', () => {
     });
   });
 
-  it('Step 3: System sorts results by distance', () => {
+  it("Step 3: System sorts results by distance", () => {
     const poisWithDistances = computeDistances(MOCK_POIS, LISTING_COORDS);
     const sorted = sortByDistance(poisWithDistances);
 
@@ -155,7 +169,7 @@ describe('Journey: Free User searches for coffee shops', () => {
     }
   });
 
-  it('Step 4: ContextBar displays correct metadata', () => {
+  it("Step 4: ContextBar displays correct metadata", () => {
     const poisWithDistances = computeDistances(MOCK_POIS, LISTING_COORDS);
     const sorted = sortByDistance(poisWithDistances);
     const meta = buildSearchMeta(sorted, 1600);
@@ -164,10 +178,10 @@ describe('Journey: Free User searches for coffee shops', () => {
     expect(meta.resultCount).toBe(5);
     expect(meta.radiusUsed).toBe(1600);
     expect(meta.closestMiles).toBeLessThan(meta.farthestMiles);
-    expect(meta.searchMode).toBe('type');
+    expect(meta.searchMode).toBe("type");
   });
 
-  it('Step 5: Free user sees Google UI Kit cards (not custom list)', () => {
+  it("Step 5: Free user sees Google UI Kit cards (not custom list)", () => {
     const features = getNeighborhoodProFeatures(subscriptionTier);
 
     expect(features.showCustomPlaceList).toBe(false);
@@ -175,7 +189,7 @@ describe('Journey: Free User searches for coffee shops', () => {
     expect(features.showPerItemDistance).toBe(false);
   });
 
-  it('Step 6: Free user sees upgrade CTA', () => {
+  it("Step 6: Free user sees upgrade CTA", () => {
     const features = getNeighborhoodProFeatures(subscriptionTier);
 
     // Free user should NOT have Pro features
@@ -188,14 +202,14 @@ describe('Journey: Free User searches for coffee shops', () => {
 // User Journey: Pro User searches for gyms
 // ============================================
 
-describe('Journey: Pro User searches for gyms', () => {
-  const subscriptionTier = 'pro';
+describe("Journey: Pro User searches for gyms", () => {
+  const subscriptionTier = "pro";
 
   beforeEach(() => {
     expect(isProUser(subscriptionTier)).toBe(true);
   });
 
-  it('Step 1: Pro user has all enhanced features enabled', () => {
+  it("Step 1: Pro user has all enhanced features enabled", () => {
     const features = getNeighborhoodProFeatures(subscriptionTier);
 
     expect(features.showInteractiveMap).toBe(true);
@@ -206,7 +220,7 @@ describe('Journey: Pro User searches for gyms', () => {
     expect(features.showPlaceDetailsPanel).toBe(true);
   });
 
-  it('Step 2: Pro user sees distance on every list item', () => {
+  it("Step 2: Pro user sees distance on every list item", () => {
     const poisWithDistances = computeDistances(MOCK_POIS, LISTING_COORDS);
 
     // Each POI should have formatted distance and walk time
@@ -219,7 +233,7 @@ describe('Journey: Pro User searches for gyms', () => {
     });
   });
 
-  it('Step 3: Pro user sees walkability rings on map', () => {
+  it("Step 3: Pro user sees walkability rings on map", () => {
     const rings = getWalkabilityRings();
 
     expect(rings).toHaveLength(3);
@@ -232,7 +246,7 @@ describe('Journey: Pro User searches for gyms', () => {
     expect(rings[0].meters).toBeLessThan(410);
   });
 
-  it('Step 4: List and map sync on hover/click', () => {
+  it("Step 4: List and map sync on hover/click", () => {
     const features = getNeighborhoodProFeatures(subscriptionTier);
 
     expect(features.enableListMapSync).toBe(true);
@@ -242,8 +256,8 @@ describe('Journey: Pro User searches for gyms', () => {
     const hoveredPoiId = MOCK_POIS[1].placeId;
 
     // In real component, this would update state
-    expect(selectedPoiId).toBe('ChIJ-SB-CAFE123');
-    expect(hoveredPoiId).toBe('ChIJ-SB-CAFE456');
+    expect(selectedPoiId).toBe("ChIJ-SB-CAFE123");
+    expect(hoveredPoiId).toBe("ChIJ-SB-CAFE456");
   });
 });
 
@@ -251,8 +265,8 @@ describe('Journey: Pro User searches for gyms', () => {
 // Distance Calculation Integration
 // ============================================
 
-describe('Distance Calculation Integration', () => {
-  it('calculates realistic distances for SF locations', () => {
+describe("Distance Calculation Integration", () => {
+  it("calculates realistic distances for SF locations", () => {
     // Starbucks is about 0.1 miles from listing center
     const starbucks = MOCK_POIS[0];
     const distance = haversineMiles(
@@ -267,7 +281,7 @@ describe('Distance Calculation Integration', () => {
     expect(distance).toBeGreaterThan(0);
   });
 
-  it('walk time estimates are reasonable', () => {
+  it("walk time estimates are reasonable", () => {
     const distance = 0.5; // Half mile
     const walkMins = estimateWalkMins(distance);
 
@@ -275,12 +289,12 @@ describe('Distance Calculation Integration', () => {
     expect(walkMins).toBe(10);
   });
 
-  it('formats short distances in feet', () => {
+  it("formats short distances in feet", () => {
     expect(formatDistance(0.05)).toMatch(/ft$/);
     expect(formatDistance(0.01)).toMatch(/ft$/);
   });
 
-  it('formats longer distances in miles', () => {
+  it("formats longer distances in miles", () => {
     expect(formatDistance(0.5)).toMatch(/mi$/);
     expect(formatDistance(1.0)).toMatch(/mi$/);
   });
@@ -290,38 +304,38 @@ describe('Distance Calculation Integration', () => {
 // Search Result Caching Integration
 // ============================================
 
-describe('Search Result Caching Integration', () => {
-  it('generates consistent cache keys for same query', () => {
+describe("Search Result Caching Integration", () => {
+  it("generates consistent cache keys for same query", () => {
     const cacheKey1 = {
-      listingId: 'listing-123',
-      normalizedQuery: 'coffee_shop',
+      listingId: "listing-123",
+      normalizedQuery: "coffee_shop",
       radiusMeters: 1600,
-      searchMode: 'type' as const,
+      searchMode: "type" as const,
     };
 
     const cacheKey2 = {
-      listingId: 'listing-123',
-      normalizedQuery: 'coffee_shop',
+      listingId: "listing-123",
+      normalizedQuery: "coffee_shop",
       radiusMeters: 1600,
-      searchMode: 'type' as const,
+      searchMode: "type" as const,
     };
 
     expect(JSON.stringify(cacheKey1)).toBe(JSON.stringify(cacheKey2));
   });
 
-  it('generates different cache keys for different radius', () => {
+  it("generates different cache keys for different radius", () => {
     const cacheKey1 = {
-      listingId: 'listing-123',
-      normalizedQuery: 'coffee_shop',
+      listingId: "listing-123",
+      normalizedQuery: "coffee_shop",
       radiusMeters: 1600,
-      searchMode: 'type' as const,
+      searchMode: "type" as const,
     };
 
     const cacheKey2 = {
-      listingId: 'listing-123',
-      normalizedQuery: 'coffee_shop',
+      listingId: "listing-123",
+      normalizedQuery: "coffee_shop",
       radiusMeters: 5000, // Different radius
-      searchMode: 'type' as const,
+      searchMode: "type" as const,
     };
 
     expect(JSON.stringify(cacheKey1)).not.toBe(JSON.stringify(cacheKey2));
@@ -332,24 +346,24 @@ describe('Search Result Caching Integration', () => {
 // Subscription Tier Gating Integration
 // ============================================
 
-describe('Subscription Tier Gating Integration', () => {
-  it('free tier has no Pro features', () => {
-    const features = getNeighborhoodProFeatures('free');
+describe("Subscription Tier Gating Integration", () => {
+  it("free tier has no Pro features", () => {
+    const features = getNeighborhoodProFeatures("free");
 
     Object.values(features).forEach((value) => {
       expect(value).toBe(false);
     });
   });
 
-  it('pro tier has all Pro features', () => {
-    const features = getNeighborhoodProFeatures('pro');
+  it("pro tier has all Pro features", () => {
+    const features = getNeighborhoodProFeatures("pro");
 
     Object.values(features).forEach((value) => {
       expect(value).toBe(true);
     });
   });
 
-  it('undefined tier defaults to free', () => {
+  it("undefined tier defaults to free", () => {
     const features = getNeighborhoodProFeatures(undefined);
 
     Object.values(features).forEach((value) => {
@@ -357,7 +371,7 @@ describe('Subscription Tier Gating Integration', () => {
     });
   });
 
-  it('null tier defaults to free', () => {
+  it("null tier defaults to free", () => {
     const features = getNeighborhoodProFeatures(null);
 
     Object.values(features).forEach((value) => {
@@ -370,8 +384,8 @@ describe('Subscription Tier Gating Integration', () => {
 // Error Handling Integration
 // ============================================
 
-describe('Error Handling Integration', () => {
-  it('handles empty POI results', () => {
+describe("Error Handling Integration", () => {
+  it("handles empty POI results", () => {
     const emptyPois: POI[] = [];
     const poisWithDistances = computeDistances(emptyPois, LISTING_COORDS);
     const sorted = sortByDistance(poisWithDistances);
@@ -382,7 +396,7 @@ describe('Error Handling Integration', () => {
     expect(meta.farthestMiles).toBe(0);
   });
 
-  it('handles single POI result', () => {
+  it("handles single POI result", () => {
     const singlePoi = [MOCK_POIS[0]];
     const poisWithDistances = computeDistances(singlePoi, LISTING_COORDS);
     const sorted = sortByDistance(poisWithDistances);
@@ -392,10 +406,10 @@ describe('Error Handling Integration', () => {
     expect(meta.closestMiles).toBe(meta.farthestMiles);
   });
 
-  it('handles POIs at same location (distance = 0)', () => {
+  it("handles POIs at same location (distance = 0)", () => {
     const sameLocationPoi: POI = {
-      placeId: 'same-location',
-      name: 'Same Location Place',
+      placeId: "same-location",
+      name: "Same Location Place",
       lat: LISTING_COORDS.lat,
       lng: LISTING_COORDS.lng,
     };
@@ -415,8 +429,8 @@ describe('Error Handling Integration', () => {
 // Performance Smoke Tests
 // ============================================
 
-describe('Neighborhood Performance Smoke Tests', () => {
-  it('computes distances for 100 POIs quickly', () => {
+describe("Neighborhood Performance Smoke Tests", () => {
+  it("computes distances for 100 POIs quickly", () => {
     // Generate 100 POIs
     const manyPois: POI[] = Array.from({ length: 100 }, (_, i) => ({
       placeId: `poi-${i}`,
@@ -437,7 +451,7 @@ describe('Neighborhood Performance Smoke Tests', () => {
     expect(elapsed).toBeLessThan(100);
   });
 
-  it('sorts 100 POIs by distance quickly', () => {
+  it("sorts 100 POIs by distance quickly", () => {
     const manyPois: POI[] = Array.from({ length: 100 }, (_, i) => ({
       placeId: `poi-${i}`,
       name: `Place ${i}`,

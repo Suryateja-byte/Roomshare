@@ -21,7 +21,12 @@
  * Run: pnpm playwright test tests/e2e/pagination/pagination-state.spec.ts --project=chromium
  */
 
-import { test, expect, SF_BOUNDS, searchResultsContainer } from "../helpers/test-utils";
+import {
+  test,
+  expect,
+  SF_BOUNDS,
+  searchResultsContainer,
+} from "../helpers/test-utils";
 import { setupPaginationMock } from "../helpers/pagination-mock-factory";
 
 const boundsQS = `minLat=${SF_BOUNDS.minLat}&maxLat=${SF_BOUNDS.maxLat}&minLng=${SF_BOUNDS.minLng}&maxLng=${SF_BOUNDS.maxLng}`;
@@ -144,7 +149,10 @@ test.describe("Pagination URL State", () => {
 
       // Navigate directly to the listing detail page
       await page.goto(href!);
-      await page.waitForURL(/\/listings\//, { timeout: 30_000, waitUntil: "commit" });
+      await page.waitForURL(/\/listings\//, {
+        timeout: 30_000,
+        waitUntil: "commit",
+      });
 
       // Go back to search results
       await page.goBack();
@@ -160,7 +168,7 @@ test.describe("Pagination URL State", () => {
       // No clickable link found in card - skip this portion
       console.warn(
         "[pagination-state] Could not find a clickable link in listing card. " +
-          "Skipping back-navigation assertion.",
+          "Skipping back-navigation assertion."
       );
     }
   });
@@ -190,9 +198,14 @@ test.describe("Pagination URL State", () => {
 
     // Click load more
     const loadMoreBtn = container.locator(sel.loadMoreBtn);
-    const hasLoadMore = await loadMoreBtn.isVisible({ timeout: 30_000 }).catch(() => false);
+    const hasLoadMore = await loadMoreBtn
+      .isVisible({ timeout: 30_000 })
+      .catch(() => false);
     if (!hasLoadMore) {
-      test.skip(true, 'Load more button not available (fewer results than page size)');
+      test.skip(
+        true,
+        "Load more button not available (fewer results than page size)"
+      );
       return;
     }
     const countBefore = await cards.count();
@@ -308,7 +321,7 @@ test.describe("Pagination URL State", () => {
     // Scope to the visible container to avoid strict mode violation
     // (desktop + mobile containers both have aria-live regions).
     const liveRegion = container.locator(
-      '[aria-live="polite"][aria-atomic="true"]',
+      '[role="status"][aria-live="polite"][aria-atomic="true"]'
     );
     await expect(liveRegion).toBeAttached({ timeout: 30_000 });
 

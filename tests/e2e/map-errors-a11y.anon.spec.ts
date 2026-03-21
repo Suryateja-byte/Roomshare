@@ -9,7 +9,14 @@
  * The viewport validation test (10.4) works in both v1 and v2 modes.
  */
 
-import { test, expect, tags, timeouts, SF_BOUNDS, searchResultsContainer } from "./helpers/test-utils";
+import {
+  test,
+  expect,
+  tags,
+  timeouts,
+  SF_BOUNDS,
+  searchResultsContainer,
+} from "./helpers/test-utils";
 import { waitForMapReady, pollForMarkers } from "./helpers";
 
 const boundsQS = `minLat=${SF_BOUNDS.minLat}&maxLat=${SF_BOUNDS.maxLat}&minLng=${SF_BOUNDS.minLng}&maxLng=${SF_BOUNDS.maxLng}`;
@@ -43,7 +50,10 @@ test.describe("Map Error States and Accessibility", () => {
     test.slow(); // Map tests need extra time for WebGL rendering in CI
     const projectName = testInfo.project.name;
     if (projectName.includes("Mobile")) {
-      test.skip(true, "Map tests require desktop viewport - skipping on mobile");
+      test.skip(
+        true,
+        "Map tests require desktop viewport - skipping on mobile"
+      );
     }
     if (projectName === "webkit") {
       test.skip(true, "Map tests have timing issues on webkit - skipping");
@@ -72,7 +82,9 @@ test.describe("Map Error States and Accessibility", () => {
     }
 
     // Look for error banner with role="alert"
-    const alertBanner = page.getByRole("alert").filter({ hasText: errorPattern });
+    const alertBanner = page
+      .getByRole("alert")
+      .filter({ hasText: errorPattern });
     await expect(alertBanner).toBeVisible({ timeout });
   }
 
@@ -80,7 +92,9 @@ test.describe("Map Error States and Accessibility", () => {
   // 10.x: Error States
   // ---------------------------------------------------------------------------
   test.describe("10.x: Error States", () => {
-    test(`${tags.anon} 10.1 - No results state shows empty state message`, async ({ page }) => {
+    test(`${tags.anon} 10.1 - No results state shows empty state message`, async ({
+      page,
+    }) => {
       // Search with a query that will return no results
       await page.goto(`/search?q=xyznonexistentlisting123456789&${boundsQS}`);
       await page.waitForLoadState("domcontentloaded");
@@ -88,26 +102,42 @@ test.describe("Map Error States and Accessibility", () => {
       // Should show empty state or "no results" message
       // Scope to visible search container to avoid matching CSS-hidden mobile/desktop duplicate
       const container = searchResultsContainer(page);
-      const emptyStateVisible = container.locator('[data-testid="empty-state"]');
-      const noMatchesHeading = container.getByRole("heading", { name: /no matches/i });
-      const noListingsText = container.getByText(/no listings found|couldn.*find any listings/i);
+      const emptyStateVisible = container.locator(
+        '[data-testid="empty-state"]'
+      );
+      const noMatchesHeading = container.getByRole("heading", {
+        name: /no matches/i,
+      });
+      const noListingsText = container.getByText(
+        /no listings found|couldn.*find any listings/i
+      );
 
       // Either the empty state container, "No matches found" heading, or "no listings" text
       // Wait longer because SSR may initially render with stale data before client takes over
-      const emptyIndicator = emptyStateVisible.or(noMatchesHeading).or(noListingsText).first();
-      const emptyVisible = await emptyIndicator.isVisible({ timeout: 20_000 }).catch(() => false);
+      const emptyIndicator = emptyStateVisible
+        .or(noMatchesHeading)
+        .or(noListingsText)
+        .first();
+      const emptyVisible = await emptyIndicator
+        .isVisible({ timeout: 20_000 })
+        .catch(() => false);
       if (!emptyVisible) {
         // The query might have returned results from seed data or the empty state uses
         // a different pattern. Check if there are listing cards instead.
-        const hasCards = await container.locator('[data-testid="listing-card"]').count() > 0;
+        const hasCards =
+          (await container.locator('[data-testid="listing-card"]').count()) > 0;
         if (hasCards) {
-          test.skip(true, "Query returned results from seed data — cannot test empty state");
+          test.skip(
+            true,
+            "Query returned results from seed data — cannot test empty state"
+          );
           return;
         }
         // If no cards and no empty state, just annotate
         test.info().annotations.push({
           type: "info",
-          description: "Neither empty state nor listing cards visible — page may still be loading",
+          description:
+            "Neither empty state nor listing cards visible — page may still be loading",
         });
       }
       await expect(emptyIndicator).toBeVisible({ timeout: 25_000 });
@@ -194,7 +224,9 @@ test.describe("Map Error States and Accessibility", () => {
       // Check for error/info message about zooming in or clamped bounds
       const zoomMessage = page.getByText(/Zoom in|Zoomed in to show results/i);
       const alertBanner = page.getByRole("alert").filter({ hasText: /Zoom/i });
-      const statusBanner = page.getByRole("status").filter({ hasText: /Zoom/i });
+      const statusBanner = page
+        .getByRole("status")
+        .filter({ hasText: /Zoom/i });
 
       // Check each locator sequentially (compatible with older TS targets)
       let messageVisible = false;
@@ -209,12 +241,16 @@ test.describe("Map Error States and Accessibility", () => {
       // Either shows message or map still renders (graceful degradation with clamped bounds)
       if (!messageVisible) {
         // If no message, verify map is still functional
-        const mapContainer = page.locator('[role="region"][aria-label*="map" i]');
+        const mapContainer = page.locator(
+          '[role="region"][aria-label*="map" i]'
+        );
         await expect(mapContainer.first()).toBeVisible();
       }
     });
 
-    test(`${tags.anon} 10.5 - Map remains interactive during error state`, async ({ page }) => {
+    test(`${tags.anon} 10.5 - Map remains interactive during error state`, async ({
+      page,
+    }) => {
       // Navigate to search page
       await page.goto(SEARCH_URL);
       await waitForMapReady(page);
@@ -282,7 +318,9 @@ test.describe("Map Error States and Accessibility", () => {
   // 11.x: Accessibility
   // ---------------------------------------------------------------------------
   test.describe("11.x: Accessibility", () => {
-    test(`${tags.anon} ${tags.a11y} 11.1 - Map container has accessible name`, async ({ page }) => {
+    test(`${tags.anon} ${tags.a11y} 11.1 - Map container has accessible name`, async ({
+      page,
+    }) => {
       await page.goto(SEARCH_URL);
       await waitForMapReady(page);
 
@@ -295,8 +333,10 @@ test.describe("Map Error States and Accessibility", () => {
       await waitForMapReady(page);
 
       // Check if map container with proper ARIA exists
-      const mapContainer = page.locator('.maplibregl-map').first();
-      const mapContainerVisible = await mapContainer.isVisible({ timeout: 5000 }).catch(() => false);
+      const mapContainer = page.locator(".maplibregl-map").first();
+      const mapContainerVisible = await mapContainer
+        .isVisible({ timeout: 5000 })
+        .catch(() => false);
 
       if (mapContainerVisible) {
         // Check parent region for accessibility
@@ -310,7 +350,9 @@ test.describe("Map Error States and Accessibility", () => {
           );
         } else {
           // Alternative: check for any map-related region
-          const anyMapRegion = page.locator('[role="region"][aria-label*="map" i]');
+          const anyMapRegion = page.locator(
+            '[role="region"][aria-label*="map" i]'
+          );
           await expect(anyMapRegion.first()).toBeVisible();
         }
       } else {
@@ -329,21 +371,27 @@ test.describe("Map Error States and Accessibility", () => {
       await pollForMarkers(page, 1).catch(() => {});
 
       // Check for screen reader announcement div (sr-only with role="status")
-      const srAnnouncement = page.locator('.sr-only[role="status"][aria-live="polite"]');
+      const srAnnouncement = page.locator(
+        '.sr-only[role="status"][aria-live="polite"]'
+      );
       const announcementCount = await srAnnouncement.count();
 
       // Map component should have screen reader announcements for marker selection
       expect(announcementCount).toBeGreaterThan(0);
 
       // Also check for keyboard navigation instructions
-      const keyboardInstructions = page.locator("#map-marker-instructions.sr-only");
+      const keyboardInstructions = page.locator(
+        "#map-marker-instructions.sr-only"
+      );
       if ((await keyboardInstructions.count()) > 0) {
         const instructionsText = await keyboardInstructions.textContent();
         expect(instructionsText).toContain("arrow keys");
       }
     });
 
-    test(`${tags.anon} ${tags.a11y} 11.3 - Popup is keyboard navigable`, async ({ page }) => {
+    test(`${tags.anon} ${tags.a11y} 11.3 - Popup is keyboard navigable`, async ({
+      page,
+    }) => {
       await page.goto(SEARCH_URL);
       await waitForMapReady(page);
 
@@ -360,7 +408,10 @@ test.describe("Map Error States and Accessibility", () => {
       }
 
       // Try to focus on a marker
-      const firstMarkerInner = markers.first().locator('[role="button"], [tabindex="0"]').first();
+      const firstMarkerInner = markers
+        .first()
+        .locator('[role="button"], [tabindex="0"]')
+        .first();
       await firstMarkerInner.focus();
 
       // Press Enter or Space to activate
@@ -383,7 +434,9 @@ test.describe("Map Error States and Accessibility", () => {
       }
     });
 
-    test(`${tags.anon} ${tags.a11y} 11.4 - Focus management on popup open`, async ({ page }) => {
+    test(`${tags.anon} ${tags.a11y} 11.4 - Focus management on popup open`, async ({
+      page,
+    }) => {
       await page.goto(SEARCH_URL);
       await waitForMapReady(page);
 
@@ -406,13 +459,17 @@ test.describe("Map Error States and Accessibility", () => {
       const popup = page.locator(".maplibregl-popup");
       if (await popup.isVisible({ timeout: 2000 }).catch(() => false)) {
         // Screen reader announcement should update with selected listing info
-        const srAnnouncement = page.locator('.sr-only[role="status"][aria-live="polite"]').first();
+        const srAnnouncement = page
+          .locator('.sr-only[role="status"][aria-live="polite"]')
+          .first();
         const announcementText = await srAnnouncement.textContent();
 
         // Announcement should contain listing info when a marker is selected
         // (may be empty initially, populated after selection)
         if (announcementText && announcementText.trim()) {
-          expect(announcementText.toLowerCase()).toMatch(/selected|listing|\$/i);
+          expect(announcementText.toLowerCase()).toMatch(
+            /selected|listing|\$/i
+          );
         }
       }
     });
@@ -434,26 +491,46 @@ test.describe("Map Error States and Accessibility", () => {
         await expect(listings.first()).toBeAttached({ timeout: 30000 });
 
         // Check for bottom sheet with proper ARIA
-        const bottomSheet = page.locator('[role="region"][aria-label="Search results"]');
+        const bottomSheet = page.locator(
+          '[role="region"][aria-label="Search results"]'
+        );
 
         // Mobile view should show the bottom sheet
-        const sheetVisible = await bottomSheet.isVisible({ timeout: 5000 }).catch(() => false);
+        const sheetVisible = await bottomSheet
+          .isVisible({ timeout: 5000 })
+          .catch(() => false);
 
         if (sheetVisible) {
           await expect(bottomSheet).toHaveAttribute("role", "region");
-          await expect(bottomSheet).toHaveAttribute("aria-label", "Search results");
+          await expect(bottomSheet).toHaveAttribute(
+            "aria-label",
+            "Search results"
+          );
 
           // Check for drag handle with slider role
           const dragHandle = bottomSheet.locator('[role="slider"]');
           if ((await dragHandle.count()) > 0) {
-            await expect(dragHandle.first()).toHaveAttribute("aria-label", "Results panel size");
-            await expect(dragHandle.first()).toHaveAttribute("aria-valuemin", "0");
-            await expect(dragHandle.first()).toHaveAttribute("aria-valuemax", "2");
+            await expect(dragHandle.first()).toHaveAttribute(
+              "aria-label",
+              "Results panel size"
+            );
+            await expect(dragHandle.first()).toHaveAttribute(
+              "aria-valuemin",
+              "0"
+            );
+            await expect(dragHandle.first()).toHaveAttribute(
+              "aria-valuemax",
+              "2"
+            );
           }
         } else {
           // Check if mobile container exists as fallback
-          const mobileContainer = page.locator('[data-testid="mobile-search-results-container"]');
-          const containerExists = await mobileContainer.count().then((c) => c > 0);
+          const mobileContainer = page.locator(
+            '[data-testid="mobile-search-results-container"]'
+          );
+          const containerExists = await mobileContainer
+            .count()
+            .then((c) => c > 0);
           expect(containerExists || sheetVisible).toBeTruthy();
         }
       });
@@ -468,8 +545,12 @@ test.describe("Map Error States and Accessibility", () => {
         const listings = page.locator('a[href^="/listings/"]');
         await expect(listings.first()).toBeAttached({ timeout: 30000 });
 
-        const bottomSheet = page.locator('[role="region"][aria-label="Search results"]');
-        const sheetVisible = await bottomSheet.isVisible({ timeout: 5000 }).catch(() => false);
+        const bottomSheet = page.locator(
+          '[role="region"][aria-label="Search results"]'
+        );
+        const sheetVisible = await bottomSheet
+          .isVisible({ timeout: 5000 })
+          .catch(() => false);
 
         if (!sheetVisible) {
           test.skip(true, "Bottom sheet not visible in this viewport");
@@ -487,7 +568,9 @@ test.describe("Map Error States and Accessibility", () => {
         await dragHandle.first().focus();
 
         // Test arrow key navigation
-        const initialValue = await dragHandle.first().getAttribute("aria-valuenow");
+        const initialValue = await dragHandle
+          .first()
+          .getAttribute("aria-valuenow");
         const initialNum = parseInt(initialValue || "1", 10);
 
         // Press ArrowUp to expand
@@ -495,16 +578,22 @@ test.describe("Map Error States and Accessibility", () => {
 
         // Wait for the value to update after ArrowUp
         if (initialNum < 2) {
-          await expect.poll(
-            async () => {
-              const val = await dragHandle.first().getAttribute("aria-valuenow");
-              return parseInt(val || "1", 10);
-            },
-            { timeout: 2000 }
-          ).toBeGreaterThan(initialNum);
+          await expect
+            .poll(
+              async () => {
+                const val = await dragHandle
+                  .first()
+                  .getAttribute("aria-valuenow");
+                return parseInt(val || "1", 10);
+              },
+              { timeout: 2000 }
+            )
+            .toBeGreaterThan(initialNum);
         }
 
-        const afterUpValue = await dragHandle.first().getAttribute("aria-valuenow");
+        const afterUpValue = await dragHandle
+          .first()
+          .getAttribute("aria-valuenow");
         const afterUpNum = parseInt(afterUpValue || "1", 10);
 
         if (initialNum < 2) {
@@ -515,13 +604,17 @@ test.describe("Map Error States and Accessibility", () => {
         await page.keyboard.press("Escape");
 
         // Wait for value to settle after collapse
-        await expect.poll(
-          async () => {
-            const val = await dragHandle.first().getAttribute("aria-valuenow");
-            return parseInt(val || "1", 10);
-          },
-          { timeout: 2000 }
-        ).toBeLessThanOrEqual(afterUpNum);
+        await expect
+          .poll(
+            async () => {
+              const val = await dragHandle
+                .first()
+                .getAttribute("aria-valuenow");
+              return parseInt(val || "1", 10);
+            },
+            { timeout: 2000 }
+          )
+          .toBeLessThanOrEqual(afterUpNum);
       });
     });
   });

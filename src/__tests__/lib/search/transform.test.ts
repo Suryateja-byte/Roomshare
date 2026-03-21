@@ -59,7 +59,7 @@ describe("search/transform", () => {
 
   describe("transformToListItem", () => {
     const createListingData = (
-      overrides: Partial<ListingData> = {},
+      overrides: Partial<ListingData> = {}
     ): ListingData => ({
       id: "test-id",
       title: "Test Listing",
@@ -137,7 +137,7 @@ describe("search/transform", () => {
   describe("transformToListItems", () => {
     const createListingData = (
       id: string,
-      title: string = "Test",
+      title: string = "Test"
     ): ListingData => ({
       id,
       title,
@@ -183,7 +183,7 @@ describe("search/transform", () => {
     const createMapListingData = (
       id: string,
       lat: number,
-      lng: number,
+      lng: number
     ): MapListingData => ({
       id,
       title: `Listing ${id}`,
@@ -191,7 +191,6 @@ describe("search/transform", () => {
       images: ["img.jpg"],
       location: { lat, lng },
       availableSlots: 1,
-
     });
 
     it("should return valid FeatureCollection", () => {
@@ -235,7 +234,6 @@ describe("search/transform", () => {
           images: ["first.jpg", "second.jpg"],
           location: { lat: 37.7749, lng: -122.4194 },
           availableSlots: 1,
-
         },
       ];
 
@@ -257,7 +255,6 @@ describe("search/transform", () => {
           images: [],
           location: { lat: 37.7749, lng: -122.4194 },
           availableSlots: 1,
-
         },
       ];
 
@@ -278,7 +275,7 @@ describe("search/transform", () => {
       id: string,
       lat: number = 37.7749,
       lng: number = -122.4194,
-      price: number = 1000,
+      price: number = 1000
     ): MapListingData => ({
       id,
       title: `Listing ${id}`,
@@ -286,7 +283,6 @@ describe("search/transform", () => {
       images: ["img.jpg"],
       location: { lat, lng },
       availableSlots: 1,
-
     });
 
     it("should return empty array for empty input", () => {
@@ -352,8 +348,8 @@ describe("search/transform", () => {
         createMapListingData(
           `${i}`,
           37.7749 + i * 0.01, // Different coordinates
-          -122.4194,
-        ),
+          -122.4194
+        )
       );
 
       const pins = transformToPins(listings);
@@ -371,7 +367,7 @@ describe("search/transform", () => {
     const createMapListingData = (
       id: string,
       lat: number = 37.7749,
-      lng: number = -122.4194,
+      lng: number = -122.4194
     ): MapListingData => ({
       id,
       title: `Listing ${id}`,
@@ -379,7 +375,6 @@ describe("search/transform", () => {
       images: ["img.jpg"],
       location: { lat, lng },
       availableSlots: 1,
-
     });
 
     it("should always include geojson", () => {
@@ -390,7 +385,7 @@ describe("search/transform", () => {
 
       // Even with many listings
       const manyListings = Array.from({ length: 100 }, (_, i) =>
-        createMapListingData(`${i}`),
+        createMapListingData(`${i}`)
       );
       const denseResponse = transformToMapResponse(manyListings);
       expect(denseResponse.geojson).toBeDefined();
@@ -398,7 +393,7 @@ describe("search/transform", () => {
 
     it("should include pins when sparse (<50 listings)", () => {
       const listings = Array.from({ length: 30 }, (_, i) =>
-        createMapListingData(`${i}`, 37.7749 + i * 0.01, -122.4194),
+        createMapListingData(`${i}`, 37.7749 + i * 0.01, -122.4194)
       );
 
       const response = transformToMapResponse(listings);
@@ -409,7 +404,7 @@ describe("search/transform", () => {
 
     it("should NOT include pins when dense (>=50 listings)", () => {
       const listings = Array.from({ length: 50 }, (_, i) =>
-        createMapListingData(`${i}`),
+        createMapListingData(`${i}`)
       );
 
       const response = transformToMapResponse(listings);
@@ -427,7 +422,7 @@ describe("search/transform", () => {
 
     it("should include pins at threshold boundary (49 listings)", () => {
       const listings = Array.from({ length: 49 }, (_, i) =>
-        createMapListingData(`${i}`, 37.7749 + i * 0.01, -122.4194),
+        createMapListingData(`${i}`, 37.7749 + i * 0.01, -122.4194)
       );
 
       const response = transformToMapResponse(listings);
@@ -436,7 +431,7 @@ describe("search/transform", () => {
 
     it("should exclude pins at threshold (50 listings)", () => {
       const listings = Array.from({ length: 50 }, (_, i) =>
-        createMapListingData(`${i}`, 37.7749 + i * 0.01, -122.4194),
+        createMapListingData(`${i}`, 37.7749 + i * 0.01, -122.4194)
       );
 
       const response = transformToMapResponse(listings);

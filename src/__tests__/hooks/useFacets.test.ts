@@ -33,10 +33,8 @@ jest.mock("next/navigation", () => ({
 // rateLimitedFetch is the wrapper the hook uses; we forward calls to global.fetch.
 jest.mock("@/lib/rate-limit-client", () => ({
   rateLimitedFetch: jest.fn(
-    (
-      url: string,
-      init?: RequestInit,
-    ): Promise<Response> => global.fetch(url, init),
+    (url: string, init?: RequestInit): Promise<Response> =>
+      global.fetch(url, init)
   ),
   RateLimitError: class RateLimitError extends Error {
     retryAfterMs: number;
@@ -92,7 +90,9 @@ const defaultPending = {
   minSlots: "",
 };
 
-function makeSearchParams(overrides: Record<string, string> = {}): URLSearchParams {
+function makeSearchParams(
+  overrides: Record<string, string> = {}
+): URLSearchParams {
   const p = new URLSearchParams();
   for (const [k, v] of Object.entries(overrides)) {
     p.set(k, v);
@@ -142,7 +142,7 @@ describe("useFacets", () => {
 
   it("1. returns null facets initially when drawer is closed", () => {
     const { result } = renderHook(() =>
-      useFacets({ pending: defaultPending, isDrawerOpen: false }),
+      useFacets({ pending: defaultPending, isDrawerOpen: false })
     );
 
     expect(result.current.facets).toBeNull();
@@ -155,7 +155,7 @@ describe("useFacets", () => {
 
   it("2. does not fetch when drawer is closed, even after debounce elapses", () => {
     renderHook(() =>
-      useFacets({ pending: defaultPending, isDrawerOpen: false }),
+      useFacets({ pending: defaultPending, isDrawerOpen: false })
     );
 
     act(() => {
@@ -170,12 +170,12 @@ describe("useFacets", () => {
   it("3. returns fetched facets after successful response when drawer opens", async () => {
     // Use unique searchParams so this test gets its own cache key
     (useSearchParams as jest.Mock).mockReturnValue(
-      makeSearchParams({ lat: "37.1", lng: "-122.1" }),
+      makeSearchParams({ lat: "37.1", lng: "-122.1" })
     );
     mockFetch.mockResolvedValueOnce(mockOkResponse(SAMPLE_FACETS));
 
     const { result } = renderHook(() =>
-      useFacets({ pending: defaultPending, isDrawerOpen: true }),
+      useFacets({ pending: defaultPending, isDrawerOpen: true })
     );
 
     // After rendering, isLoading should be true while the debounce is running
@@ -198,14 +198,14 @@ describe("useFacets", () => {
 
   it("4. does not refetch on re-render when cache key is unchanged", async () => {
     (useSearchParams as jest.Mock).mockReturnValue(
-      makeSearchParams({ lat: "37.2", lng: "-122.2" }),
+      makeSearchParams({ lat: "37.2", lng: "-122.2" })
     );
     mockFetch.mockResolvedValueOnce(mockOkResponse(SAMPLE_FACETS));
 
     const { result, rerender } = renderHook(
       ({ open }: { open: boolean }) =>
         useFacets({ pending: defaultPending, isDrawerOpen: open }),
-      { initialProps: { open: true } },
+      { initialProps: { open: true } }
     );
 
     act(() => {
@@ -233,7 +233,7 @@ describe("useFacets", () => {
 
   it("5. price-only change does not trigger a new fetch (price excluded from cache key)", async () => {
     (useSearchParams as jest.Mock).mockReturnValue(
-      makeSearchParams({ lat: "37.3", lng: "-122.3" }),
+      makeSearchParams({ lat: "37.3", lng: "-122.3" })
     );
     mockFetch.mockResolvedValueOnce(mockOkResponse(SAMPLE_FACETS));
 
@@ -242,7 +242,7 @@ describe("useFacets", () => {
     const { result, rerender } = renderHook(
       ({ pending }: { pending: typeof defaultPending }) =>
         useFacets({ pending, isDrawerOpen: true }),
-      { initialProps: { pending: pendingWithoutPrice } },
+      { initialProps: { pending: pendingWithoutPrice } }
     );
 
     act(() => {
@@ -254,7 +254,9 @@ describe("useFacets", () => {
     });
 
     // Change only price — cache key must stay the same
-    rerender({ pending: { ...defaultPending, minPrice: "500", maxPrice: "1500" } });
+    rerender({
+      pending: { ...defaultPending, minPrice: "500", maxPrice: "1500" },
+    });
 
     act(() => {
       jest.advanceTimersByTime(350);
@@ -268,9 +270,12 @@ describe("useFacets", () => {
 
   it("6. non-price filter change (roomType) invalidates cache and triggers refetch", async () => {
     (useSearchParams as jest.Mock).mockReturnValue(
-      makeSearchParams({ lat: "37.4", lng: "-122.4" }),
+      makeSearchParams({ lat: "37.4", lng: "-122.4" })
     );
-    const updatedFacets = { ...SAMPLE_FACETS, roomTypes: { "Entire place": 8 } };
+    const updatedFacets = {
+      ...SAMPLE_FACETS,
+      roomTypes: { "Entire place": 8 },
+    };
     mockFetch
       .mockResolvedValueOnce(mockOkResponse(SAMPLE_FACETS))
       .mockResolvedValueOnce(mockOkResponse(updatedFacets));
@@ -278,7 +283,7 @@ describe("useFacets", () => {
     const { result, rerender } = renderHook(
       ({ pending }: { pending: typeof defaultPending }) =>
         useFacets({ pending, isDrawerOpen: true }),
-      { initialProps: { pending: defaultPending } },
+      { initialProps: { pending: defaultPending } }
     );
 
     act(() => {
@@ -307,14 +312,14 @@ describe("useFacets", () => {
 
   it("7. 400 + boundsRequired:true returns EMPTY_FACETS gracefully without throwing", async () => {
     (useSearchParams as jest.Mock).mockReturnValue(
-      makeSearchParams({ lat: "37.5", lng: "-122.5" }),
+      makeSearchParams({ lat: "37.5", lng: "-122.5" })
     );
     mockFetch.mockResolvedValueOnce(
-      mockErrorResponse(400, { boundsRequired: true }),
+      mockErrorResponse(400, { boundsRequired: true })
     );
 
     const { result } = renderHook(() =>
-      useFacets({ pending: defaultPending, isDrawerOpen: true }),
+      useFacets({ pending: defaultPending, isDrawerOpen: true })
     );
 
     act(() => {
@@ -333,12 +338,12 @@ describe("useFacets", () => {
 
   it("8. 500 server error returns EMPTY_FACETS and does not set error state", async () => {
     (useSearchParams as jest.Mock).mockReturnValue(
-      makeSearchParams({ lat: "37.6", lng: "-122.6" }),
+      makeSearchParams({ lat: "37.6", lng: "-122.6" })
     );
     mockFetch.mockResolvedValueOnce(mockErrorResponse(500));
 
     const { result } = renderHook(() =>
-      useFacets({ pending: defaultPending, isDrawerOpen: true }),
+      useFacets({ pending: defaultPending, isDrawerOpen: true })
     );
 
     act(() => {
@@ -357,7 +362,7 @@ describe("useFacets", () => {
 
   it("9. aborts the in-flight request when filters change before debounce fires", async () => {
     (useSearchParams as jest.Mock).mockReturnValue(
-      makeSearchParams({ lat: "37.7", lng: "-122.7" }),
+      makeSearchParams({ lat: "37.7", lng: "-122.7" })
     );
 
     // Track abort signals
@@ -392,7 +397,7 @@ describe("useFacets", () => {
     const { rerender } = renderHook(
       ({ pending }: { pending: typeof defaultPending }) =>
         useFacets({ pending, isDrawerOpen: true }),
-      { initialProps: { pending: defaultPending } },
+      { initialProps: { pending: defaultPending } }
     );
 
     // First debounce fires and starts a fetch
@@ -416,12 +421,12 @@ describe("useFacets", () => {
 
   it("10. does not fetch before the 300ms debounce window elapses", () => {
     (useSearchParams as jest.Mock).mockReturnValue(
-      makeSearchParams({ lat: "37.8", lng: "-122.8" }),
+      makeSearchParams({ lat: "37.8", lng: "-122.8" })
     );
     mockFetch.mockResolvedValueOnce(mockOkResponse(SAMPLE_FACETS));
 
     renderHook(() =>
-      useFacets({ pending: defaultPending, isDrawerOpen: true }),
+      useFacets({ pending: defaultPending, isDrawerOpen: true })
     );
 
     // Advance only 200ms — well before the 300ms debounce
@@ -436,12 +441,12 @@ describe("useFacets", () => {
 
   it("11. fetch fires after 300ms debounce elapses", async () => {
     (useSearchParams as jest.Mock).mockReturnValue(
-      makeSearchParams({ lat: "37.9", lng: "-122.9" }),
+      makeSearchParams({ lat: "37.9", lng: "-122.9" })
     );
     mockFetch.mockResolvedValueOnce(mockOkResponse(SAMPLE_FACETS));
 
     const { result } = renderHook(() =>
-      useFacets({ pending: defaultPending, isDrawerOpen: true }),
+      useFacets({ pending: defaultPending, isDrawerOpen: true })
     );
 
     // Fire the debounce timer
@@ -460,7 +465,7 @@ describe("useFacets", () => {
 
   it("12. unmounting during a pending fetch aborts the in-flight request", async () => {
     (useSearchParams as jest.Mock).mockReturnValue(
-      makeSearchParams({ lat: "38.0", lng: "-123.0" }),
+      makeSearchParams({ lat: "38.0", lng: "-123.0" })
     );
 
     let capturedSignal: AbortSignal | undefined;
@@ -471,7 +476,7 @@ describe("useFacets", () => {
     });
 
     const { unmount } = renderHook(() =>
-      useFacets({ pending: defaultPending, isDrawerOpen: true }),
+      useFacets({ pending: defaultPending, isDrawerOpen: true })
     );
 
     act(() => {
@@ -494,12 +499,12 @@ describe("useFacets", () => {
 
   it("13. sets isLoading to true immediately when drawer opens (before debounce fires)", () => {
     (useSearchParams as jest.Mock).mockReturnValue(
-      makeSearchParams({ lat: "38.1", lng: "-123.1" }),
+      makeSearchParams({ lat: "38.1", lng: "-123.1" })
     );
     mockFetch.mockResolvedValueOnce(mockOkResponse(SAMPLE_FACETS));
 
     const { result } = renderHook(() =>
-      useFacets({ pending: defaultPending, isDrawerOpen: true }),
+      useFacets({ pending: defaultPending, isDrawerOpen: true })
     );
 
     // Debounce has not fired yet — but hook sets isLoading optimistically
@@ -511,12 +516,12 @@ describe("useFacets", () => {
 
   it("14. clears isLoading after successful fetch completes", async () => {
     (useSearchParams as jest.Mock).mockReturnValue(
-      makeSearchParams({ lat: "38.2", lng: "-123.2" }),
+      makeSearchParams({ lat: "38.2", lng: "-123.2" })
     );
     mockFetch.mockResolvedValueOnce(mockOkResponse(SAMPLE_FACETS));
 
     const { result } = renderHook(() =>
-      useFacets({ pending: defaultPending, isDrawerOpen: true }),
+      useFacets({ pending: defaultPending, isDrawerOpen: true })
     );
 
     expect(result.current.isLoading).toBe(true);
@@ -536,12 +541,12 @@ describe("useFacets", () => {
 
   it("15. unexpected 403 response returns EMPTY_FACETS gracefully", async () => {
     (useSearchParams as jest.Mock).mockReturnValue(
-      makeSearchParams({ lat: "38.3", lng: "-123.3" }),
+      makeSearchParams({ lat: "38.3", lng: "-123.3" })
     );
     mockFetch.mockResolvedValueOnce(mockErrorResponse(403));
 
     const { result } = renderHook(() =>
-      useFacets({ pending: defaultPending, isDrawerOpen: true }),
+      useFacets({ pending: defaultPending, isDrawerOpen: true })
     );
 
     act(() => {

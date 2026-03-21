@@ -1,5 +1,5 @@
-import { Page, expect, Locator } from '@playwright/test';
-import { selectors, timeouts, searchResultsContainer } from './test-utils';
+import { Page, expect, Locator } from "@playwright/test";
+import { selectors, timeouts, searchResultsContainer } from "./test-utils";
 
 /**
  * Custom assertion helpers
@@ -25,22 +25,27 @@ export function assertionHelpers(page: Page) {
       // Wait for loading spinners to disappear
       const spinner = page.locator(selectors.loadingSpinner);
       if (await spinner.isVisible().catch(() => false)) {
-        await spinner.waitFor({ state: 'hidden', timeout: timeouts.navigation });
+        await spinner.waitFor({
+          state: "hidden",
+          timeout: timeouts.navigation,
+        });
       }
     },
 
     /**
      * Assert toast notification appeared
      */
-    async toastAppeared(type: 'success' | 'error' | 'any' = 'any') {
+    async toastAppeared(type: "success" | "error" | "any" = "any") {
       const selector =
-        type === 'success'
+        type === "success"
           ? selectors.toastSuccess
-          : type === 'error'
+          : type === "error"
             ? selectors.toastError
             : selectors.toast;
 
-      await expect(page.locator(selector).first()).toBeVisible({ timeout: 5000 });
+      await expect(page.locator(selector).first()).toBeVisible({
+        timeout: 5000,
+      });
     },
 
     /**
@@ -48,7 +53,9 @@ export function assertionHelpers(page: Page) {
      */
     async toastWithMessage(message: string | RegExp) {
       const toast = page.locator(selectors.toast);
-      await expect(toast.filter({ hasText: message })).toBeVisible({ timeout: 5000 });
+      await expect(toast.filter({ hasText: message })).toBeVisible({
+        timeout: 5000,
+      });
     },
 
     /**
@@ -88,8 +95,8 @@ export function assertionHelpers(page: Page) {
      * Assert form field has error
      */
     async fieldHasError(fieldName: string) {
-      const field = page.getByLabel(new RegExp(fieldName, 'i'));
-      await expect(field).toHaveAttribute('aria-invalid', 'true');
+      const field = page.getByLabel(new RegExp(fieldName, "i"));
+      await expect(field).toHaveAttribute("aria-invalid", "true");
     },
 
     /**
@@ -107,7 +114,7 @@ export function assertionHelpers(page: Page) {
      */
     async isLoggedIn() {
       const userMenu = page
-        .getByRole('button', { name: /menu|profile|account/i })
+        .getByRole("button", { name: /menu|profile|account/i })
         .or(page.locator('[data-testid="user-menu"]'))
         .or(page.locator('[aria-label*="user"]'));
 
@@ -127,7 +134,7 @@ export function assertionHelpers(page: Page) {
      */
     async isLoggedOut() {
       const loginButton = page
-        .getByRole('link', { name: /log ?in|sign ?in/i })
+        .getByRole("link", { name: /log ?in|sign ?in/i })
         .or(page.locator('a[href*="/login"]'));
 
       await expect(loginButton.first()).toBeVisible({ timeout: 30000 });
@@ -164,7 +171,7 @@ export function assertionHelpers(page: Page) {
     async headingVisible(text: string | RegExp, level?: 1 | 2 | 3 | 4 | 5 | 6) {
       const heading = level
         ? page.locator(`h${level}`).filter({ hasText: text })
-        : page.getByRole('heading', { name: text });
+        : page.getByRole("heading", { name: text });
       await expect(heading).toBeVisible();
     },
 
@@ -172,7 +179,7 @@ export function assertionHelpers(page: Page) {
      * Assert button is disabled
      */
     async buttonDisabled(name: string | RegExp) {
-      const button = page.getByRole('button', { name });
+      const button = page.getByRole("button", { name });
       await expect(button).toBeDisabled();
     },
 
@@ -180,7 +187,7 @@ export function assertionHelpers(page: Page) {
      * Assert button is enabled
      */
     async buttonEnabled(name: string | RegExp) {
-      const button = page.getByRole('button', { name });
+      const button = page.getByRole("button", { name });
       await expect(button).toBeEnabled();
     },
 
@@ -188,7 +195,7 @@ export function assertionHelpers(page: Page) {
      * Assert link exists
      */
     async linkExists(name: string | RegExp) {
-      const link = page.getByRole('link', { name });
+      const link = page.getByRole("link", { name });
       await expect(link).toBeVisible();
     },
 
@@ -196,7 +203,8 @@ export function assertionHelpers(page: Page) {
      * Assert element count
      */
     async elementCount(locator: Locator | string, expectedCount: number) {
-      const element = typeof locator === 'string' ? page.locator(locator) : locator;
+      const element =
+        typeof locator === "string" ? page.locator(locator) : locator;
       await expect(element).toHaveCount(expectedCount);
     },
 
@@ -219,7 +227,7 @@ export function assertionHelpers(page: Page) {
      */
     async loadingComplete() {
       const spinner = page.locator(selectors.loadingSpinner);
-      await spinner.waitFor({ state: 'hidden', timeout: timeouts.navigation });
+      await spinner.waitFor({ state: "hidden", timeout: timeouts.navigation });
     },
 
     /**
@@ -231,19 +239,19 @@ export function assertionHelpers(page: Page) {
       await expect(main).toBeVisible();
 
       // Check for page heading
-      const h1 = page.locator('h1');
+      const h1 = page.locator("h1");
       const headingCount = await h1.count();
       expect(headingCount).toBeGreaterThanOrEqual(1);
 
       // Check all images have alt text
-      const images = page.locator('img:visible');
+      const images = page.locator("img:visible");
       const imageCount = await images.count();
       for (let i = 0; i < imageCount; i++) {
         const img = images.nth(i);
-        const alt = await img.getAttribute('alt');
-        const role = await img.getAttribute('role');
+        const alt = await img.getAttribute("alt");
+        const role = await img.getAttribute("role");
         // Images should have alt or role="presentation"
-        expect(alt !== null || role === 'presentation').toBeTruthy();
+        expect(alt !== null || role === "presentation").toBeTruthy();
       }
 
       // Check all form fields have labels
@@ -253,10 +261,10 @@ export function assertionHelpers(page: Page) {
       const inputCount = await inputs.count();
       for (let i = 0; i < inputCount; i++) {
         const input = inputs.nth(i);
-        const id = await input.getAttribute('id');
-        const ariaLabel = await input.getAttribute('aria-label');
-        const ariaLabelledBy = await input.getAttribute('aria-labelledby');
-        const placeholder = await input.getAttribute('placeholder');
+        const id = await input.getAttribute("id");
+        const ariaLabel = await input.getAttribute("aria-label");
+        const ariaLabelledBy = await input.getAttribute("aria-labelledby");
+        const placeholder = await input.getAttribute("placeholder");
 
         const hasLabel =
           ariaLabel ||
@@ -287,7 +295,7 @@ export function assertionHelpers(page: Page) {
 
       for (let i = 0; i < elements.length; i++) {
         if (useTab && i > 0) {
-          await page.keyboard.press('Tab');
+          await page.keyboard.press("Tab");
         }
         await expect(elements[i]).toBeFocused();
       }
@@ -319,9 +327,9 @@ export function assertionHelpers(page: Page) {
     /**
      * Assert date format is correct
      */
-    async dateFormat(locator: Locator, format: 'short' | 'long' = 'short') {
+    async dateFormat(locator: Locator, format: "short" | "long" = "short") {
       const text = await locator.textContent();
-      if (format === 'short') {
+      if (format === "short") {
         // MM/DD/YYYY or similar
         expect(text).toMatch(/\d{1,2}[\/\-]\d{1,2}[\/\-]\d{2,4}/);
       } else {

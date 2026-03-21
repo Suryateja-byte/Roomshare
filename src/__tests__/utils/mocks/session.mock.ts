@@ -46,8 +46,8 @@ export function createSlowSessionMock(delay: number) {
     auth: jest.fn(
       () =>
         new Promise<Session>((resolve) =>
-          setTimeout(() => resolve(mockSession), delay),
-        ),
+          setTimeout(() => resolve(mockSession), delay)
+        )
     ),
   };
 }
@@ -73,7 +73,7 @@ export function createExpiringSessionMock() {
  * Create a mock that throws an error (simulates auth system failure)
  */
 export function createFailingSessionMock(
-  errorMessage: string = "Auth system unavailable",
+  errorMessage: string = "Auth system unavailable"
 ) {
   return {
     auth: jest.fn(() => Promise.reject(new Error(errorMessage))),
@@ -90,7 +90,7 @@ export function createAccountSwitchMock() {
       Promise.resolve({
         ...mockSession,
         user: { ...mockSession.user, id: currentUser },
-      }),
+      })
     ),
     switchTo: (userId: string) => {
       currentUser = userId;

@@ -8,9 +8,9 @@
  * Pro Users: ContextBar + Custom list + Interactive Mapbox map + Details panel
  */
 
-export { ContextBar } from './ContextBar';
-export { NeighborhoodPlaceList } from './NeighborhoodPlaceList';
-export { NeighborhoodMap } from './NeighborhoodMap';
-export { PlaceDetailsPanel } from './PlaceDetailsPanel';
-export { ProUpgradeCTA } from './ProUpgradeCTA';
-export { NeighborhoodModule } from './NeighborhoodModule';
+export { ContextBar } from "./ContextBar";
+export { NeighborhoodPlaceList } from "./NeighborhoodPlaceList";
+export { NeighborhoodMap } from "./NeighborhoodMap";
+export { PlaceDetailsPanel } from "./PlaceDetailsPanel";
+export { ProUpgradeCTA } from "./ProUpgradeCTA";
+export { NeighborhoodModule } from "./NeighborhoodModule";

@@ -53,7 +53,7 @@ export interface NearMatchExpansion {
  * @returns Expanded filter params with metadata about what was expanded
  */
 export function expandFiltersForNearMatches(
-  params: FilterParams,
+  params: FilterParams
 ): NearMatchExpansion {
   // Check if price filters can be expanded
   if (params.minPrice !== undefined || params.maxPrice !== undefined) {
@@ -150,7 +150,7 @@ export function expandFiltersForNearMatches(
 export function isNearMatch(
   listing: { price: number; available_from?: string | null },
   originalParams: FilterParams,
-  expandedDimension: "price" | "date" | null,
+  expandedDimension: "price" | "date" | null
 ): boolean {
   if (expandedDimension === null) {
     return false;
@@ -208,7 +208,7 @@ export interface FilterSuggestion {
 
 export function generateFilterSuggestions(
   params: FilterParams,
-  _resultCount: number,
+  _resultCount: number
 ): FilterSuggestion[] {
   const suggestions: FilterSuggestion[] = [];
 

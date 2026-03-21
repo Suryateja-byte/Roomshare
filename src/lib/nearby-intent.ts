@@ -12,7 +12,7 @@ export interface NearbyIntentResult {
   /** Whether this is a nearby places query */
   isNearbyQuery: boolean;
   /** Type of search to perform */
-  searchType: 'type' | 'text';
+  searchType: "type" | "text";
   /** Valid Google place types for Nearby Search */
   includedTypes?: string[];
   /** Text query for Text Search */
@@ -33,90 +33,90 @@ export interface NearbyIntentResult {
  */
 const PLACE_TYPE_MAP: Record<string, string[]> = {
   // Fitness
-  gym: ['gym'],
-  fitness: ['gym'],
-  'fitness center': ['gym'],
-  workout: ['gym'],
+  gym: ["gym"],
+  fitness: ["gym"],
+  "fitness center": ["gym"],
+  workout: ["gym"],
 
   // Food & Drink
-  restaurant: ['restaurant'],
-  restaurants: ['restaurant'],
-  cafe: ['cafe'],
-  coffee: ['cafe'],
-  'coffee shop': ['cafe'],
-  bakery: ['bakery'],
-  bar: ['bar'],
+  restaurant: ["restaurant"],
+  restaurants: ["restaurant"],
+  cafe: ["cafe"],
+  coffee: ["cafe"],
+  "coffee shop": ["cafe"],
+  bakery: ["bakery"],
+  bar: ["bar"],
 
   // Shopping
-  grocery: ['supermarket'],
-  groceries: ['supermarket'],
-  supermarket: ['supermarket'],
-  'grocery store': ['supermarket'],
+  grocery: ["supermarket"],
+  groceries: ["supermarket"],
+  supermarket: ["supermarket"],
+  "grocery store": ["supermarket"],
 
   // Health
-  pharmacy: ['pharmacy'],
-  drugstore: ['pharmacy'],
-  hospital: ['hospital'],
-  doctor: ['doctor'],
-  dentist: ['dentist'],
-  clinic: ['hospital'],
+  pharmacy: ["pharmacy"],
+  drugstore: ["pharmacy"],
+  hospital: ["hospital"],
+  doctor: ["doctor"],
+  dentist: ["dentist"],
+  clinic: ["hospital"],
 
   // Transit
-  transit: ['transit_station'],
-  'transit station': ['transit_station'],
-  'bus stop': ['bus_station'],
-  'bus station': ['bus_station'],
-  subway: ['subway_station'],
-  'subway station': ['subway_station'],
-  train: ['train_station'],
-  'train station': ['train_station'],
-  metro: ['subway_station'],
+  transit: ["transit_station"],
+  "transit station": ["transit_station"],
+  "bus stop": ["bus_station"],
+  "bus station": ["bus_station"],
+  subway: ["subway_station"],
+  "subway station": ["subway_station"],
+  train: ["train_station"],
+  "train station": ["train_station"],
+  metro: ["subway_station"],
 
   // Recreation
-  park: ['park'],
-  parks: ['park'],
-  library: ['library'],
-  museum: ['museum'],
-  movie: ['movie_theater'],
-  cinema: ['movie_theater'],
-  theater: ['movie_theater'],
+  park: ["park"],
+  parks: ["park"],
+  library: ["library"],
+  museum: ["museum"],
+  movie: ["movie_theater"],
+  cinema: ["movie_theater"],
+  theater: ["movie_theater"],
 
   // Services
-  bank: ['bank'],
-  atm: ['atm'],
-  laundry: ['laundry'],
-  laundromat: ['laundry'],
-  'dry cleaner': ['laundry'],
-  'post office': ['post_office'],
-  gas: ['gas_station'],
-  'gas station': ['gas_station'],
+  bank: ["bank"],
+  atm: ["atm"],
+  laundry: ["laundry"],
+  laundromat: ["laundry"],
+  "dry cleaner": ["laundry"],
+  "post office": ["post_office"],
+  gas: ["gas_station"],
+  "gas station": ["gas_station"],
 
   // Convenience
-  convenience: ['convenience_store'],
-  'convenience store': ['convenience_store'],
-  liquor: ['liquor_store'],
-  'liquor store': ['liquor_store'],
+  convenience: ["convenience_store"],
+  "convenience store": ["convenience_store"],
+  liquor: ["liquor_store"],
+  "liquor store": ["liquor_store"],
 
   // C6 FIX: Parking
-  parking: ['parking'],
-  'parking lot': ['parking'],
-  'parking garage': ['parking'],
+  parking: ["parking"],
+  "parking lot": ["parking"],
+  "parking garage": ["parking"],
 
   // B14 FIX: Emergency services
-  police: ['police'],
-  'police station': ['police'],
-  fire: ['fire_station'],
-  'fire station': ['fire_station'],
+  police: ["police"],
+  "police station": ["police"],
+  fire: ["fire_station"],
+  "fire station": ["fire_station"],
 
   // B14 FIX: Education
-  school: ['school'],
-  schools: ['school'],
-  'elementary school': ['primary_school'],
-  'primary school': ['primary_school'],
-  'high school': ['secondary_school'],
-  'secondary school': ['secondary_school'],
-  university: ['university'],
-  college: ['university'],
+  school: ["school"],
+  schools: ["school"],
+  "elementary school": ["primary_school"],
+  "primary school": ["primary_school"],
+  "high school": ["secondary_school"],
+  "secondary school": ["secondary_school"],
+  university: ["university"],
+  college: ["university"],
 };
 
 /**
@@ -125,52 +125,52 @@ const PLACE_TYPE_MAP: Record<string, string[]> = {
  */
 const I18N_KEYWORDS: Record<string, string> = {
   // Japanese (Romanized)
-  jimu: 'gym',
-  suupaa: 'supermarket',
-  resutoran: 'restaurant',
-  kouen: 'park',
-  eki: 'transit station',
-  byouin: 'hospital',
-  kusuriya: 'pharmacy',
-  ginkō: 'bank',
-  toshokan: 'library',
+  jimu: "gym",
+  suupaa: "supermarket",
+  resutoran: "restaurant",
+  kouen: "park",
+  eki: "transit station",
+  byouin: "hospital",
+  kusuriya: "pharmacy",
+  ginkō: "bank",
+  toshokan: "library",
 
   // Spanish
-  gimnasio: 'gym',
-  supermercado: 'supermarket',
-  restaurante: 'restaurant',
-  parque: 'park',
-  estación: 'transit station',
-  estacion: 'transit station',
-  farmacia: 'pharmacy',
-  banco: 'bank',
-  biblioteca: 'library',
-  cafetería: 'cafe',
-  cafeteria: 'cafe',
-  panadería: 'bakery',
-  panaderia: 'bakery',
-  tienda: 'convenience store',
-  escuela: 'school',
-  universidad: 'university',
-  policía: 'police',
-  policia: 'police',
-  bomberos: 'fire station',
+  gimnasio: "gym",
+  supermercado: "supermarket",
+  restaurante: "restaurant",
+  parque: "park",
+  estación: "transit station",
+  estacion: "transit station",
+  farmacia: "pharmacy",
+  banco: "bank",
+  biblioteca: "library",
+  cafetería: "cafe",
+  cafeteria: "cafe",
+  panadería: "bakery",
+  panaderia: "bakery",
+  tienda: "convenience store",
+  escuela: "school",
+  universidad: "university",
+  policía: "police",
+  policia: "police",
+  bomberos: "fire station",
 
   // Chinese (Pinyin)
-  jianshenfa: 'gym',
-  chaoshi: 'supermarket',
-  canting: 'restaurant',
-  gongyuan: 'park',
-  chezhan: 'transit station',
-  yiyuan: 'hospital',
-  yaodian: 'pharmacy',
-  yinhang: 'bank',
-  tushuguan: 'library',
-  kafei: 'cafe',
-  xuexiao: 'school',
-  daxue: 'university',
-  jingcha: 'police',
-  xiaofang: 'fire station',
+  jianshenfa: "gym",
+  chaoshi: "supermarket",
+  canting: "restaurant",
+  gongyuan: "park",
+  chezhan: "transit station",
+  yiyuan: "hospital",
+  yaodian: "pharmacy",
+  yinhang: "bank",
+  tushuguan: "library",
+  kafei: "cafe",
+  xuexiao: "school",
+  daxue: "university",
+  jingcha: "police",
+  xiaofang: "fire station",
 };
 
 /**
@@ -179,119 +179,119 @@ const I18N_KEYWORDS: Record<string, string> = {
  */
 const UNICODE_KEYWORDS: Record<string, string> = {
   // Chinese (Simplified)
-  '咖啡': 'cafe',
-  '咖啡厅': 'cafe',
-  '咖啡馆': 'cafe',
-  '餐厅': 'restaurant',
-  '餐馆': 'restaurant',
-  '饭店': 'restaurant',
-  '超市': 'supermarket',
-  '超级市场': 'supermarket',
-  '健身房': 'gym',
-  '健身中心': 'gym',
-  '公园': 'park',
-  '地铁': 'subway',
-  '地铁站': 'subway station',
-  '火车站': 'train station',
-  '医院': 'hospital',
-  '药店': 'pharmacy',
-  '药房': 'pharmacy',
-  '银行': 'bank',
-  '图书馆': 'library',
-  '学校': 'school',
-  '大学': 'university',
-  '警察局': 'police',
-  '消防站': 'fire station',
-  '停车场': 'parking',
-  '洗衣店': 'laundry',
-  '便利店': 'convenience store',
-  '酒吧': 'bar',
-  '面包店': 'bakery',
+  咖啡: "cafe",
+  咖啡厅: "cafe",
+  咖啡馆: "cafe",
+  餐厅: "restaurant",
+  餐馆: "restaurant",
+  饭店: "restaurant",
+  超市: "supermarket",
+  超级市场: "supermarket",
+  健身房: "gym",
+  健身中心: "gym",
+  公园: "park",
+  地铁: "subway",
+  地铁站: "subway station",
+  火车站: "train station",
+  医院: "hospital",
+  药店: "pharmacy",
+  药房: "pharmacy",
+  银行: "bank",
+  图书馆: "library",
+  学校: "school",
+  大学: "university",
+  警察局: "police",
+  消防站: "fire station",
+  停车场: "parking",
+  洗衣店: "laundry",
+  便利店: "convenience store",
+  酒吧: "bar",
+  面包店: "bakery",
 
   // Chinese (Traditional) - only add unique characters
-  '咖啡廳': 'cafe',
-  '餐廳': 'restaurant',
-  '超級市場': 'supermarket',
+  咖啡廳: "cafe",
+  餐廳: "restaurant",
+  超級市場: "supermarket",
   // Note: '健身中心' removed - identical to simplified form (already at line 191)
-  '地鐵站': 'subway station',
-  '醫院': 'hospital',
-  '藥店': 'pharmacy',
-  '圖書館': 'library',
-  '學校': 'school',
-  '大學': 'university',
+  地鐵站: "subway station",
+  醫院: "hospital",
+  藥店: "pharmacy",
+  圖書館: "library",
+  學校: "school",
+  大學: "university",
 
   // Japanese (Hiragana/Katakana) - only unique entries
-  'ジム': 'gym',
-  'カフェ': 'cafe',
-  'コーヒー': 'cafe',
-  'レストラン': 'restaurant',
-  'スーパー': 'supermarket',
-  'コンビニ': 'convenience store',
-  'えき': 'transit station',
-  '駅': 'transit station',
-  'びょういん': 'hospital',
-  'くすりや': 'pharmacy',
-  '薬局': 'pharmacy',
-  'ぎんこう': 'bank',
-  'としょかん': 'library',
-  '図書館': 'library',
-  'こうえん': 'park',
+  ジム: "gym",
+  カフェ: "cafe",
+  コーヒー: "cafe",
+  レストラン: "restaurant",
+  スーパー: "supermarket",
+  コンビニ: "convenience store",
+  えき: "transit station",
+  駅: "transit station",
+  びょういん: "hospital",
+  くすりや: "pharmacy",
+  薬局: "pharmacy",
+  ぎんこう: "bank",
+  としょかん: "library",
+  図書館: "library",
+  こうえん: "park",
 
   // Korean
-  '카페': 'cafe',
-  '커피숍': 'cafe',
-  '식당': 'restaurant',
-  '레스토랑': 'restaurant',
-  '슈퍼마켓': 'supermarket',
-  '마트': 'supermarket',
-  '헬스장': 'gym',
-  '체육관': 'gym',
-  '공원': 'park',
-  '지하철역': 'subway station',
-  '역': 'transit station',
-  '병원': 'hospital',
-  '약국': 'pharmacy',
-  '은행': 'bank',
-  '도서관': 'library',
-  '학교': 'school',
-  '대학교': 'university',
-  '경찰서': 'police',
-  '주차장': 'parking',
-  '세탁소': 'laundry',
-  '편의점': 'convenience store',
+  카페: "cafe",
+  커피숍: "cafe",
+  식당: "restaurant",
+  레스토랑: "restaurant",
+  슈퍼마켓: "supermarket",
+  마트: "supermarket",
+  헬스장: "gym",
+  체육관: "gym",
+  공원: "park",
+  지하철역: "subway station",
+  역: "transit station",
+  병원: "hospital",
+  약국: "pharmacy",
+  은행: "bank",
+  도서관: "library",
+  학교: "school",
+  대학교: "university",
+  경찰서: "police",
+  주차장: "parking",
+  세탁소: "laundry",
+  편의점: "convenience store",
 
   // Arabic
-  'مقهى': 'cafe',
-  'مطعم': 'restaurant',
-  'سوبرماركت': 'supermarket',
-  'صالة رياضية': 'gym',
-  'حديقة': 'park',
-  'محطة': 'transit station',
-  'مستشفى': 'hospital',
-  'صيدلية': 'pharmacy',
-  'بنك': 'bank',
-  'مكتبة': 'library',
+  مقهى: "cafe",
+  مطعم: "restaurant",
+  سوبرماركت: "supermarket",
+  "صالة رياضية": "gym",
+  حديقة: "park",
+  محطة: "transit station",
+  مستشفى: "hospital",
+  صيدلية: "pharmacy",
+  بنك: "bank",
+  مكتبة: "library",
 };
 
 /**
  * Keywords that indicate a nearby/location query.
  */
 const LOCATION_KEYWORDS = [
-  'nearby',
-  'near',
-  'close',
-  'closest',
-  'nearest',
-  'around',
-  'find',
-  'where',
-  'looking for',
-  'any',
-  'is there',
-  'are there',
-  'walking distance',
-  'minutes away',
-  'minutes walk',
+  "nearby",
+  "near",
+  "close",
+  "closest",
+  "nearest",
+  "around",
+  "find",
+  "where",
+  "looking for",
+  "any",
+  "is there",
+  "are there",
+  "walking distance",
+  "minutes away",
+  "minutes walk",
 ];
 
 /**
@@ -384,37 +384,37 @@ function hasMixedIntentQuery(query: string): boolean {
  * Words to remove from queries for cleaner matching.
  */
 const FILLER_WORDS = [
-  'the',
-  'a',
-  'an',
-  'any',
-  'some',
-  'good',
-  'best',
-  'great',
-  'nice',
-  'nearby',
-  'near',
-  'here',
-  'close',
-  'closest',
-  'nearest',
-  'around',
-  'find',
-  'me',
-  'please',
-  'can',
-  'you',
-  'is',
-  'are',
-  'there',
-  'where',
-  'i',
-  'want',
-  'need',
-  'looking',
-  'for',
-  'to',
+  "the",
+  "a",
+  "an",
+  "any",
+  "some",
+  "good",
+  "best",
+  "great",
+  "nice",
+  "nearby",
+  "near",
+  "here",
+  "close",
+  "closest",
+  "nearest",
+  "around",
+  "find",
+  "me",
+  "please",
+  "can",
+  "you",
+  "is",
+  "are",
+  "there",
+  "where",
+  "i",
+  "want",
+  "need",
+  "looking",
+  "for",
+  "to",
 ];
 
 /**
@@ -449,7 +449,8 @@ const TEXT_SEARCH_PATTERNS = [
  * These queries ask for multiple specific brands (e.g., "Starbucks or Dunkin")
  * and may not work well with single text search.
  */
-const MULTI_BRAND_PATTERN = /\b(starbucks|dunkin|mcdonald|chipotle|panera|subway|whole\s*foods|trader\s*joe|target|walmart|costco|cvs|walgreens|planet\s*fitness|equinox|orangetheory)\b.*\b(or|and|vs|versus)\b.*\b(starbucks|dunkin|mcdonald|chipotle|panera|subway|whole\s*foods|trader\s*joe|target|walmart|costco|cvs|walgreens|planet\s*fitness|equinox|orangetheory)\b/i;
+const MULTI_BRAND_PATTERN =
+  /\b(starbucks|dunkin|mcdonald|chipotle|panera|subway|whole\s*foods|trader\s*joe|target|walmart|costco|cvs|walgreens|planet\s*fitness|equinox|orangetheory)\b.*\b(or|and|vs|versus)\b.*\b(starbucks|dunkin|mcdonald|chipotle|panera|subway|whole\s*foods|trader\s*joe|target|walmart|costco|cvs|walgreens|planet\s*fitness|equinox|orangetheory)\b/i;
 
 /**
  * C3 FIX: Checks if query contains multiple brand names.
@@ -465,76 +466,76 @@ function hasMultipleBrands(query: string): boolean {
  */
 const TYPO_CORRECTIONS: Record<string, string> = {
   // Brand names
-  chipolte: 'chipotle',
-  chipoltle: 'chipotle',
+  chipolte: "chipotle",
+  chipoltle: "chipotle",
   mcdonlds: "mcdonald's",
   mcdonalds: "mcdonald's",
-  starbuks: 'starbucks',
-  starbux: 'starbucks',
+  starbuks: "starbucks",
+  starbux: "starbucks",
   wendys: "wendy's",
-  chikfila: 'chick-fil-a',
-  'chick fil a': 'chick-fil-a',
-  'chickfila': 'chick-fil-a',
+  chikfila: "chick-fil-a",
+  "chick fil a": "chick-fil-a",
+  chickfila: "chick-fil-a",
   dunkins: "dunkin'",
-  'dunkin donuts': "dunkin'",
-  panara: 'panera',
-  subways: 'subway',
+  "dunkin donuts": "dunkin'",
+  panara: "panera",
+  subways: "subway",
   traderjoes: "trader joe's",
-  'trader joes': "trader joe's",
-  wholefoods: 'whole foods',
+  "trader joes": "trader joe's",
+  wholefoods: "whole foods",
 
   // Restaurant typos
-  resteraunt: 'restaurant',
-  restaraunt: 'restaurant',
-  resturant: 'restaurant',
-  restraunt: 'restaurant',
-  restuarant: 'restaurant',
-  restrant: 'restaurant',
-  restauraunt: 'restaurant',
+  resteraunt: "restaurant",
+  restaraunt: "restaurant",
+  resturant: "restaurant",
+  restraunt: "restaurant",
+  restuarant: "restaurant",
+  restrant: "restaurant",
+  restauraunt: "restaurant",
 
   // Grocery typos
-  grocey: 'grocery',
-  groecry: 'grocery',
-  grocry: 'grocery',
-  groccery: 'grocery',
+  grocey: "grocery",
+  groecry: "grocery",
+  grocry: "grocery",
+  groccery: "grocery",
 
   // Pharmacy typos
-  pharmcy: 'pharmacy',
-  pharmasy: 'pharmacy',
-  farmacy: 'pharmacy',
-  pharamcy: 'pharmacy',
+  pharmcy: "pharmacy",
+  pharmasy: "pharmacy",
+  farmacy: "pharmacy",
+  pharamcy: "pharmacy",
 
   // Laundromat typos
-  laundramat: 'laundromat',
-  laundrmat: 'laundromat',
-  laundrymat: 'laundromat',
-  laudromat: 'laundromat',
+  laundramat: "laundromat",
+  laundrmat: "laundromat",
+  laundrymat: "laundromat",
+  laudromat: "laundromat",
 
   // Coffee typos
-  coffe: 'coffee',
-  coffie: 'coffee',
-  cofee: 'coffee',
-  coffea: 'coffee',
+  coffe: "coffee",
+  coffie: "coffee",
+  cofee: "coffee",
+  coffea: "coffee",
 
   // C14 FIX: Additional common typos
-  convience: 'convenience',
-  conveience: 'convenience',
-  conveniance: 'convenience',
-  libary: 'library',
-  libray: 'library',
-  hosptal: 'hospital',
-  hosptial: 'hospital',
-  transporation: 'transportation',
-  trasit: 'transit',
-  tranist: 'transit',
-  bakrey: 'bakery',
-  bakry: 'bakery',
-  bkaery: 'bakery',
-  dentis: 'dentist',
-  docter: 'doctor',
-  doctr: 'doctor',
-  supermaket: 'supermarket',
-  supermakret: 'supermarket',
+  convience: "convenience",
+  conveience: "convenience",
+  conveniance: "convenience",
+  libary: "library",
+  libray: "library",
+  hosptal: "hospital",
+  hosptial: "hospital",
+  transporation: "transportation",
+  trasit: "transit",
+  tranist: "transit",
+  bakrey: "bakery",
+  bakry: "bakery",
+  bkaery: "bakery",
+  dentis: "dentist",
+  docter: "doctor",
+  doctr: "doctor",
+  supermaket: "supermarket",
+  supermakret: "supermarket",
 };
 
 /**
@@ -554,22 +555,25 @@ function cleanQuery(query: string): string {
 
   // B5 FIX: Apply i18n translations (romanized non-English)
   for (const [i18nWord, englishWord] of Object.entries(I18N_KEYWORDS)) {
-    cleaned = cleaned.replace(new RegExp(`\\b${i18nWord}\\b`, 'gi'), englishWord);
+    cleaned = cleaned.replace(
+      new RegExp(`\\b${i18nWord}\\b`, "gi"),
+      englishWord
+    );
   }
 
   // Apply typo corrections
   for (const [typo, correction] of Object.entries(TYPO_CORRECTIONS)) {
-    cleaned = cleaned.replace(new RegExp(`\\b${typo}\\b`, 'gi'), correction);
+    cleaned = cleaned.replace(new RegExp(`\\b${typo}\\b`, "gi"), correction);
   }
 
   // Remove punctuation
-  cleaned = cleaned.replace(/[?!.,;:'"]/g, '');
+  cleaned = cleaned.replace(/[?!.,;:'"]/g, "");
 
   // Remove filler words
   const words = cleaned.split(/\s+/);
   const filtered = words.filter((word) => !FILLER_WORDS.includes(word));
 
-  return filtered.join(' ').trim();
+  return filtered.join(" ").trim();
 }
 
 /**
@@ -618,7 +622,11 @@ function hasLocationIntent(query: string): boolean {
   }
 
   // Check for question patterns about places
-  if (/\b(gym|restaurant|cafe|park|hospital|pharmacy|grocery|store|station)\b/i.test(query)) {
+  if (
+    /\b(gym|restaurant|cafe|park|hospital|pharmacy|grocery|store|station)\b/i.test(
+      query
+    )
+  ) {
     return true;
   }
 
@@ -672,7 +680,10 @@ function containsCodeBlock(message: string): boolean {
   // Inline code (`code`)
   if (/`[^`]+`/.test(message)) return true;
   // Common code patterns
-  if (/\b(function|const|let|var|import|export|class|return)\s+\w+/.test(message)) return true;
+  if (
+    /\b(function|const|let|var|import|export|class|return)\s+\w+/.test(message)
+  )
+    return true;
   // JSON-like patterns
   if (/\{\s*["']?\w+["']?\s*:/.test(message)) return true;
   return false;
@@ -685,11 +696,11 @@ function containsCodeBlock(message: string): boolean {
  * @returns NearbyIntentResult with detection results
  */
 export function detectNearbyIntent(message: string): NearbyIntentResult {
-  if (!message || typeof message !== 'string') {
+  if (!message || typeof message !== "string") {
     return {
       isNearbyQuery: false,
-      searchType: 'text',
-      normalizedQuery: '',
+      searchType: "text",
+      normalizedQuery: "",
     };
   }
 
@@ -697,8 +708,8 @@ export function detectNearbyIntent(message: string): NearbyIntentResult {
   if (containsCodeBlock(message)) {
     return {
       isNearbyQuery: false,
-      searchType: 'text',
-      normalizedQuery: '',
+      searchType: "text",
+      normalizedQuery: "",
     };
   }
 
@@ -712,7 +723,7 @@ export function detectNearbyIntent(message: string): NearbyIntentResult {
   if (!hasLocationIntent(message)) {
     return {
       isNearbyQuery: false,
-      searchType: 'text',
+      searchType: "text",
       normalizedQuery,
       // C7 FIX: Include mixed intent flag
       hasMixedIntent,
@@ -727,7 +738,7 @@ export function detectNearbyIntent(message: string): NearbyIntentResult {
   if (hasMixedIntent) {
     return {
       isNearbyQuery: false,
-      searchType: 'text',
+      searchType: "text",
       normalizedQuery,
       hasMixedIntent,
       multiBrandDetected,
@@ -738,8 +749,8 @@ export function detectNearbyIntent(message: string): NearbyIntentResult {
   if (shouldUseTextSearch(message)) {
     return {
       isNearbyQuery: true,
-      searchType: 'text',
-      textQuery: normalizedQuery || message.replace(/[?!.,]/g, '').trim(),
+      searchType: "text",
+      textQuery: normalizedQuery || message.replace(/[?!.,]/g, "").trim(),
       normalizedQuery,
       // C3 FIX: Include multi-brand flag for UI to handle
       multiBrandDetected,
@@ -753,7 +764,7 @@ export function detectNearbyIntent(message: string): NearbyIntentResult {
   if (placeTypes) {
     return {
       isNearbyQuery: true,
-      searchType: 'type',
+      searchType: "type",
       includedTypes: placeTypes,
       normalizedQuery,
       hasMixedIntent,
@@ -763,8 +774,8 @@ export function detectNearbyIntent(message: string): NearbyIntentResult {
   // Fallback to text search for unrecognized place queries
   return {
     isNearbyQuery: true,
-    searchType: 'text',
-    textQuery: normalizedQuery || message.replace(/[?!.,]/g, '').trim(),
+    searchType: "text",
+    textQuery: normalizedQuery || message.replace(/[?!.,]/g, "").trim(),
     normalizedQuery,
     hasMixedIntent,
   };

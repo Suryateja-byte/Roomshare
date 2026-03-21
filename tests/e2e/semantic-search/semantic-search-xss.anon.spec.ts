@@ -30,7 +30,9 @@ test.describe("Semantic Search - XSS Sanitization", () => {
     test.slow();
   });
 
-  test(`SS-60: HTML/script tags in search query are sanitized`, async ({ page }) => {
+  test(`SS-60: HTML/script tags in search query are sanitized`, async ({
+    page,
+  }) => {
     // Track if any injected script executes
     let scriptExecuted = false;
     await page.exposeFunction("__xssDetected", () => {
@@ -47,7 +49,7 @@ test.describe("Semantic Search - XSS Sanitization", () => {
 
     // Search with XSS payload
     const xssPayload = encodeURIComponent(
-      '<script>alert(1)</script> cozy room'
+      "<script>alert(1)</script> cozy room"
     );
     await page.goto(`/search?q=${xssPayload}&${boundsQS}`);
     await page.waitForLoadState("domcontentloaded");
@@ -67,9 +69,9 @@ test.describe("Semantic Search - XSS Sanitization", () => {
     // Page should still function (not crashed by the input)
     const container = searchResultsContainer(page);
     const cards = container.locator('[data-testid="listing-card"]');
-    const cardOrEmpty = cards.first().or(
-      container.getByText(/no (matches|results|listings)/i).first()
-    );
+    const cardOrEmpty = cards
+      .first()
+      .or(container.getByText(/no (matches|results|listings)/i).first());
     await expect(cardOrEmpty).toBeVisible({ timeout: 30_000 });
   });
 });

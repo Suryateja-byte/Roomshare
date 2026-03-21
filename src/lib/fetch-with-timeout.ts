@@ -9,7 +9,7 @@ export class FetchTimeoutError extends Error {
     public readonly timeout: number
   ) {
     super(`Request to ${url} timed out after ${timeout}ms`);
-    this.name = 'FetchTimeoutError';
+    this.name = "FetchTimeoutError";
   }
 }
 
@@ -53,8 +53,8 @@ export async function fetchWithTimeout(
   if (existingSignal) {
     if (existingSignal.aborted) {
       controller.abort();
-    } else if (typeof existingSignal.addEventListener === 'function') {
-      existingSignal.addEventListener('abort', () => controller.abort());
+    } else if (typeof existingSignal.addEventListener === "function") {
+      existingSignal.addEventListener("abort", () => controller.abort());
     }
   }
 
@@ -66,7 +66,7 @@ export async function fetchWithTimeout(
     return response;
   } catch (error) {
     // Check if this was a timeout abort
-    if (error instanceof Error && error.name === 'AbortError') {
+    if (error instanceof Error && error.name === "AbortError") {
       throw new FetchTimeoutError(url, timeout);
     }
     throw error;
@@ -89,13 +89,13 @@ export async function fetchJsonWithTimeout<T = unknown>(
   const response = await fetchWithTimeout(url, {
     ...options,
     headers: {
-      'Content-Type': 'application/json',
+      "Content-Type": "application/json",
       ...options.headers,
     },
   });
 
   if (!response.ok) {
-    const text = await response.text().catch(() => 'Unknown error');
+    const text = await response.text().catch(() => "Unknown error");
     throw new Error(`HTTP ${response.status}: ${text}`);
   }
 

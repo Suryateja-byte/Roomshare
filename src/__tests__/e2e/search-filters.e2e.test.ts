@@ -5,25 +5,31 @@
  * Validates critical user journeys and filter combinations that must always work.
  */
 
-import { TEST_LISTINGS, ACTIVE_LISTINGS, applyFilters, sortListings, paginateListings } from '../fixtures/listings.fixture';
-import type { TestListing } from '../fixtures/listings.fixture';
-import { normalizeFilters } from '@/lib/filter-schema';
+import {
+  TEST_LISTINGS,
+  ACTIVE_LISTINGS,
+  applyFilters,
+  sortListings,
+  paginateListings,
+} from "../fixtures/listings.fixture";
+import type { TestListing } from "../fixtures/listings.fixture";
+import { normalizeFilters } from "@/lib/filter-schema";
 import {
   sanitizeSearchQuery,
   isValidQuery,
   crossesAntimeridian,
-} from '@/lib/data';
+} from "@/lib/data";
 
 // ============================================
 // Critical User Journeys
 // ============================================
 
-describe('Critical User Journeys', () => {
-  describe('Journey: Budget-conscious student searching for affordable rooms', () => {
-    it('finds rooms under $1000 with shared room type', () => {
+describe("Critical User Journeys", () => {
+  describe("Journey: Budget-conscious student searching for affordable rooms", () => {
+    it("finds rooms under $1000 with shared room type", () => {
       const filters = normalizeFilters({
         maxPrice: 1000,
-        roomType: 'Shared Room', // Fixture uses 'Shared Room'
+        roomType: "Shared Room", // Fixture uses 'Shared Room'
       });
 
       const results = applyFilters(ACTIVE_LISTINGS, filters);
@@ -31,17 +37,17 @@ describe('Critical User Journeys', () => {
       // All results must match criteria
       results.forEach((listing) => {
         expect(listing.price).toBeLessThanOrEqual(1000);
-        expect(listing.roomType?.toLowerCase()).toContain('shared');
+        expect(listing.roomType?.toLowerCase()).toContain("shared");
       });
 
       // Should find at least some results in our test data
       expect(results.length).toBeGreaterThan(0);
     });
 
-    it('sorts by price ascending to find cheapest first', () => {
+    it("sorts by price ascending to find cheapest first", () => {
       const filters = normalizeFilters({
         maxPrice: 1500,
-        sort: 'price_asc',
+        sort: "price_asc",
       });
 
       const filtered = applyFilters(ACTIVE_LISTINGS, filters);
@@ -53,7 +59,7 @@ describe('Critical User Journeys', () => {
       }
     });
 
-    it('paginates results correctly for browsing', () => {
+    it("paginates results correctly for browsing", () => {
       const filters = normalizeFilters({
         maxPrice: 2000,
         page: 1,
@@ -76,11 +82,11 @@ describe('Critical User Journeys', () => {
     });
   });
 
-  describe('Journey: International student seeking language-compatible housing', () => {
-    it('finds rooms where Spanish is spoken', () => {
+  describe("Journey: International student seeking language-compatible housing", () => {
+    it("finds rooms where Spanish is spoken", () => {
       // Fixture uses ISO codes: 'es' for Spanish
       const filters = normalizeFilters({
-        languages: ['es'],
+        languages: ["es"],
       });
 
       const results = applyFilters(ACTIVE_LISTINGS, filters);
@@ -88,16 +94,16 @@ describe('Critical User Journeys', () => {
       // All results must have Spanish speakers (OR logic)
       results.forEach((listing) => {
         const hasSpanish = listing.languages.some(
-          (lang) => lang.toLowerCase() === 'es'
+          (lang) => lang.toLowerCase() === "es"
         );
         expect(hasSpanish).toBe(true);
       });
     });
 
-    it('finds rooms where either Spanish OR Mandarin is spoken', () => {
+    it("finds rooms where either Spanish OR Mandarin is spoken", () => {
       // Fixture uses ISO codes: 'es' for Spanish, 'zh' for Mandarin/Chinese
       const filters = normalizeFilters({
-        languages: ['es', 'zh'],
+        languages: ["es", "zh"],
       });
 
       const results = applyFilters(ACTIVE_LISTINGS, filters);
@@ -105,16 +111,16 @@ describe('Critical User Journeys', () => {
       // All results must have at least one of the languages (OR logic)
       results.forEach((listing) => {
         const hasLanguage = listing.languages.some(
-          (lang) => lang.toLowerCase() === 'es' || lang.toLowerCase() === 'zh'
+          (lang) => lang.toLowerCase() === "es" || lang.toLowerCase() === "zh"
         );
         expect(hasLanguage).toBe(true);
       });
     });
 
-    it('combines language preference with price filter', () => {
+    it("combines language preference with price filter", () => {
       // Fixture uses ISO codes: 'en' for English
       const filters = normalizeFilters({
-        languages: ['en'],
+        languages: ["en"],
         maxPrice: 1500,
       });
 
@@ -123,40 +129,36 @@ describe('Critical User Journeys', () => {
       results.forEach((listing) => {
         expect(listing.price).toBeLessThanOrEqual(1500);
         const hasEnglish = listing.languages.some(
-          (lang) => lang.toLowerCase() === 'en'
+          (lang) => lang.toLowerCase() === "en"
         );
         expect(hasEnglish).toBe(true);
       });
     });
   });
 
-  describe('Journey: Professional seeking private room with specific amenities', () => {
-    it('finds private rooms with Wifi and AC', () => {
+  describe("Journey: Professional seeking private room with specific amenities", () => {
+    it("finds private rooms with Wifi and AC", () => {
       // Fixture uses 'Private Room' and 'Wifi' (not 'WiFi')
       const filters = normalizeFilters({
-        roomType: 'Private Room',
-        amenities: ['Wifi', 'AC'],
+        roomType: "Private Room",
+        amenities: ["Wifi", "AC"],
       });
 
       const results = applyFilters(ACTIVE_LISTINGS, filters);
 
       // All results must have BOTH amenities (AND logic) and be PRIVATE
       results.forEach((listing) => {
-        expect(listing.roomType?.toLowerCase()).toContain('private');
+        expect(listing.roomType?.toLowerCase()).toContain("private");
         const amenitiesLower = listing.amenities.map((a) => a.toLowerCase());
-        expect(
-          amenitiesLower.some((a) => a.includes('wifi'))
-        ).toBe(true);
-        expect(
-          amenitiesLower.some((a) => a.includes('ac'))
-        ).toBe(true);
+        expect(amenitiesLower.some((a) => a.includes("wifi"))).toBe(true);
+        expect(amenitiesLower.some((a) => a.includes("ac"))).toBe(true);
       });
     });
 
-    it('filters by multiple amenities using AND logic', () => {
+    it("filters by multiple amenities using AND logic", () => {
       // Fixture uses 'Wifi', 'Parking', 'Washer' (not 'Laundry')
       const filters = normalizeFilters({
-        amenities: ['Wifi', 'Parking'],
+        amenities: ["Wifi", "Parking"],
       });
 
       const results = applyFilters(ACTIVE_LISTINGS, filters);
@@ -164,58 +166,60 @@ describe('Critical User Journeys', () => {
       // Must have ALL amenities
       results.forEach((listing) => {
         const amenitiesLower = listing.amenities.map((a) => a.toLowerCase());
-        expect(amenitiesLower.some((a) => a.includes('wifi'))).toBe(true);
-        expect(amenitiesLower.some((a) => a.includes('parking'))).toBe(true);
+        expect(amenitiesLower.some((a) => a.includes("wifi"))).toBe(true);
+        expect(amenitiesLower.some((a) => a.includes("parking"))).toBe(true);
       });
     });
   });
 
-  describe('Journey: User with specific housing requirements', () => {
-    it('finds female-only housing', () => {
+  describe("Journey: User with specific housing requirements", () => {
+    it("finds female-only housing", () => {
       // Fixture uses 'FEMALE_ONLY' for genderPreference
       const filters = normalizeFilters({
-        genderPreference: 'FEMALE_ONLY',
+        genderPreference: "FEMALE_ONLY",
       });
 
       const results = applyFilters(ACTIVE_LISTINGS, filters);
 
       results.forEach((listing) => {
-        expect(listing.genderPreference?.toUpperCase()).toBe('FEMALE_ONLY');
+        expect(listing.genderPreference?.toUpperCase()).toBe("FEMALE_ONLY");
       });
     });
 
-    it('finds listings with pets allowed', () => {
+    it("finds listings with pets allowed", () => {
       // Fixture uses 'Pets allowed' as a house rule
       const filters = normalizeFilters({
-        houseRules: ['Pets allowed'],
+        houseRules: ["Pets allowed"],
       });
 
       const results = applyFilters(ACTIVE_LISTINGS, filters);
 
       results.forEach((listing) => {
         const hasPetsAllowed = listing.houseRules.some(
-          (rule) => rule.toLowerCase() === 'pets allowed'
+          (rule) => rule.toLowerCase() === "pets allowed"
         );
         expect(hasPetsAllowed).toBe(true);
       });
     });
 
-    it('finds flexible leases with specific move-in date', () => {
+    it("finds flexible leases with specific move-in date", () => {
       // Use a far future date to ensure we get results with any move-in dates
-      const moveInDate = '2027-12-31';
+      const moveInDate = "2027-12-31";
       // Fixture uses 'Flexible', 'Month-to-month', '3 months', '6 months', '12 months'
       const filters = normalizeFilters({
-        leaseDuration: 'Flexible',
+        leaseDuration: "Flexible",
         moveInDate,
       });
 
       const results = applyFilters(ACTIVE_LISTINGS, filters);
 
       results.forEach((listing) => {
-        expect(listing.leaseDuration?.toLowerCase()).toBe('flexible');
+        expect(listing.leaseDuration?.toLowerCase()).toBe("flexible");
         if (listing.moveInDate) {
           // Listing must be available by our target move-in date
-          expect(new Date(listing.moveInDate) <= new Date(moveInDate)).toBe(true);
+          expect(new Date(listing.moveInDate) <= new Date(moveInDate)).toBe(
+            true
+          );
         }
       });
     });
@@ -226,8 +230,8 @@ describe('Critical User Journeys', () => {
 // Geographic Search E2E
 // ============================================
 
-describe('Geographic Search E2E', () => {
-  describe('San Francisco Bay Area search', () => {
+describe("Geographic Search E2E", () => {
+  describe("San Francisco Bay Area search", () => {
     const SF_BOUNDS = {
       minLat: 37.7,
       maxLat: 37.85,
@@ -235,7 +239,7 @@ describe('Geographic Search E2E', () => {
       maxLng: -122.35,
     };
 
-    it('finds listings within SF bounds', () => {
+    it("finds listings within SF bounds", () => {
       const filters = normalizeFilters({ bounds: SF_BOUNDS });
       const results = applyFilters(ACTIVE_LISTINGS, filters);
 
@@ -247,7 +251,7 @@ describe('Geographic Search E2E', () => {
       });
     });
 
-    it('combines bounds with price filter', () => {
+    it("combines bounds with price filter", () => {
       const filters = normalizeFilters({
         bounds: SF_BOUNDS,
         minPrice: 1000,
@@ -267,7 +271,7 @@ describe('Geographic Search E2E', () => {
     });
   });
 
-  describe('Antimeridian crossing (Pacific region)', () => {
+  describe("Antimeridian crossing (Pacific region)", () => {
     // Bounds that cross the international date line (e.g., Alaska to Japan)
     const ANTIMERIDIAN_BOUNDS = {
       minLat: 30,
@@ -276,12 +280,12 @@ describe('Geographic Search E2E', () => {
       maxLng: -150, // East side (Alaska) - note: minLng > maxLng
     };
 
-    it('correctly identifies antimeridian crossing', () => {
+    it("correctly identifies antimeridian crossing", () => {
       expect(crossesAntimeridian(170, -150)).toBe(true);
       expect(crossesAntimeridian(-122.5, -122.35)).toBe(false);
     });
 
-    it('normalizeFilters preserves antimeridian bounds (does not swap)', () => {
+    it("normalizeFilters preserves antimeridian bounds (does not swap)", () => {
       const filters = normalizeFilters({ bounds: ANTIMERIDIAN_BOUNDS });
 
       // Longitude should NOT be swapped for antimeridian crossing
@@ -295,45 +299,48 @@ describe('Geographic Search E2E', () => {
 // Query Search E2E
 // ============================================
 
-describe('Query Search E2E', () => {
-  describe('Text search functionality', () => {
-    it('sanitizes search query safely', () => {
+describe("Query Search E2E", () => {
+  describe("Text search functionality", () => {
+    it("sanitizes search query safely", () => {
       // SQL injection attempts should be sanitized
       expect(sanitizeSearchQuery("'; DROP TABLE users; --")).not.toContain("'");
-      expect(sanitizeSearchQuery("'; DROP TABLE users; --")).not.toContain(';');
-      expect(sanitizeSearchQuery("'; DROP TABLE users; --")).not.toContain('--');
+      expect(sanitizeSearchQuery("'; DROP TABLE users; --")).not.toContain(";");
+      expect(sanitizeSearchQuery("'; DROP TABLE users; --")).not.toContain(
+        "--"
+      );
 
-      // XSS attempts should be escaped
-      expect(sanitizeSearchQuery('<script>alert(1)</script>')).not.toContain('<');
-      expect(sanitizeSearchQuery('<script>alert(1)</script>')).not.toContain('>');
+      // Angle brackets are preserved for FTS compatibility
+      // XSS is handled at the rendering layer (React auto-escapes JSX output)
+      expect(sanitizeSearchQuery("<script>alert(1)</script>")).toContain("<");
+      expect(sanitizeSearchQuery("<script>alert(1)</script>")).toContain(">");
 
       // Valid queries should work
-      expect(sanitizeSearchQuery('San Francisco')).toBe('San Francisco');
-      expect(sanitizeSearchQuery('  trimmed  ')).toBe('trimmed');
+      expect(sanitizeSearchQuery("San Francisco")).toBe("San Francisco");
+      expect(sanitizeSearchQuery("  trimmed  ")).toBe("trimmed");
     });
 
-    it('validates minimum query length', () => {
-      expect(isValidQuery('ab')).toBe(true);
-      expect(isValidQuery('a')).toBe(false);
-      expect(isValidQuery('')).toBe(false);
-      expect(isValidQuery('   ')).toBe(false);
+    it("validates minimum query length", () => {
+      expect(isValidQuery("ab")).toBe(true);
+      expect(isValidQuery("a")).toBe(false);
+      expect(isValidQuery("")).toBe(false);
+      expect(isValidQuery("   ")).toBe(false);
     });
 
-    it('combines query with other filters', () => {
+    it("combines query with other filters", () => {
       // Use 'San' which appears in 'San Francisco', 'San Diego' city names
       const filters = normalizeFilters({
-        query: 'San',
+        query: "San",
         maxPrice: 2000,
-        roomType: 'Private Room',
+        roomType: "Private Room",
       });
 
       const results = applyFilters(ACTIVE_LISTINGS, filters);
 
       results.forEach((listing) => {
         expect(listing.price).toBeLessThanOrEqual(2000);
-        expect(listing.roomType?.toLowerCase()).toContain('private');
+        expect(listing.roomType?.toLowerCase()).toContain("private");
         // Query matches title, description, city, or state
-        const queryLower = 'san';
+        const queryLower = "san";
         const matches =
           listing.title.toLowerCase().includes(queryLower) ||
           listing.description.toLowerCase().includes(queryLower) ||
@@ -349,8 +356,11 @@ describe('Query Search E2E', () => {
 // Sorting E2E
 // ============================================
 
-describe('Sorting E2E', () => {
-  const testSorting = (sortOption: string, compareFn: (a: TestListing, b: TestListing) => boolean) => {
+describe("Sorting E2E", () => {
+  const testSorting = (
+    sortOption: string,
+    compareFn: (a: TestListing, b: TestListing) => boolean
+  ) => {
     const filters = normalizeFilters({ sort: sortOption });
     const sorted = sortListings(ACTIVE_LISTINGS, filters.sort);
 
@@ -359,26 +369,28 @@ describe('Sorting E2E', () => {
     }
   };
 
-  it('sorts by price ascending correctly', () => {
-    testSorting('price_asc', (a, b) => a.price <= b.price);
+  it("sorts by price ascending correctly", () => {
+    testSorting("price_asc", (a, b) => a.price <= b.price);
   });
 
-  it('sorts by price descending correctly', () => {
-    testSorting('price_desc', (a, b) => a.price >= b.price);
+  it("sorts by price descending correctly", () => {
+    testSorting("price_desc", (a, b) => a.price >= b.price);
   });
 
-  it('sorts by newest correctly', () => {
-    testSorting('newest', (a, b) =>
-      new Date(a.createdAt).getTime() >= new Date(b.createdAt).getTime()
+  it("sorts by newest correctly", () => {
+    testSorting(
+      "newest",
+      (a, b) =>
+        new Date(a.createdAt).getTime() >= new Date(b.createdAt).getTime()
     );
   });
 
-  it('sorts by rating correctly', () => {
-    testSorting('rating', (a, b) => (a.avgRating ?? 0) >= (b.avgRating ?? 0));
+  it("sorts by rating correctly", () => {
+    testSorting("rating", (a, b) => (a.avgRating ?? 0) >= (b.avgRating ?? 0));
   });
 
-  it('maintains sort order through pagination', () => {
-    const filters = normalizeFilters({ sort: 'price_asc', limit: 5 });
+  it("maintains sort order through pagination", () => {
+    const filters = normalizeFilters({ sort: "price_asc", limit: 5 });
     const sorted = sortListings(ACTIVE_LISTINGS, filters.sort);
 
     const page1 = paginateListings(sorted, 1, 5);
@@ -397,8 +409,8 @@ describe('Sorting E2E', () => {
 // Pagination E2E
 // ============================================
 
-describe('Pagination E2E', () => {
-  it('returns correct page metadata', () => {
+describe("Pagination E2E", () => {
+  it("returns correct page metadata", () => {
     const pageSize = 10;
     const totalItems = ACTIVE_LISTINGS.length;
     const expectedPages = Math.ceil(totalItems / pageSize);
@@ -411,7 +423,7 @@ describe('Pagination E2E', () => {
     expect(page1.items.length).toBeLessThanOrEqual(pageSize);
   });
 
-  it('handles edge cases for pagination', () => {
+  it("handles edge cases for pagination", () => {
     // Very large page number returns empty items
     const pageLarge = paginateListings(ACTIVE_LISTINGS, 9999, 10);
     expect(pageLarge.items.length).toBe(0);
@@ -423,7 +435,7 @@ describe('Pagination E2E', () => {
     expect(page0.total).toBe(ACTIVE_LISTINGS.length);
   });
 
-  it('ensures complete coverage across all pages', () => {
+  it("ensures complete coverage across all pages", () => {
     const pageSize = 7; // Odd number to test edge cases
     const allIds = new Set<string>();
     const expectedTotal = ACTIVE_LISTINGS.length;
@@ -450,27 +462,27 @@ describe('Pagination E2E', () => {
 // Filter Combination E2E
 // ============================================
 
-describe('Complex Filter Combinations E2E', () => {
-  it('handles maximum filter complexity (all filters applied)', () => {
+describe("Complex Filter Combinations E2E", () => {
+  it("handles maximum filter complexity (all filters applied)", () => {
     // Use fixture-compatible values
     const filters = normalizeFilters({
-      query: 'room',
+      query: "room",
       minPrice: 500,
       maxPrice: 3000,
-      roomType: 'Private Room',
-      amenities: ['Wifi'],
-      houseRules: ['Pets allowed'],
-      languages: ['en'],
-      genderPreference: 'NO_PREFERENCE',
-      leaseDuration: 'Flexible',
-      moveInDate: '2025-06-01',
+      roomType: "Private Room",
+      amenities: ["Wifi"],
+      houseRules: ["Pets allowed"],
+      languages: ["en"],
+      genderPreference: "NO_PREFERENCE",
+      leaseDuration: "Flexible",
+      moveInDate: "2025-06-01",
       bounds: {
         minLat: 30,
         maxLat: 50,
         minLng: -130,
         maxLng: -70,
       },
-      sort: 'price_asc',
+      sort: "price_asc",
       page: 1,
       limit: 20,
     });
@@ -487,7 +499,7 @@ describe('Complex Filter Combinations E2E', () => {
     });
   });
 
-  it('handles empty results gracefully', () => {
+  it("handles empty results gracefully", () => {
     // Impossible combination - very restrictive
     const filters = normalizeFilters({
       minPrice: 9999999,
@@ -500,17 +512,17 @@ describe('Complex Filter Combinations E2E', () => {
     expect(results.length).toBe(0);
   });
 
-  it('filter application order does not affect results', () => {
+  it("filter application order does not affect results", () => {
     const filterSet1 = normalizeFilters({
       maxPrice: 2000,
-      roomType: 'PRIVATE',
-      amenities: ['WiFi'],
+      roomType: "PRIVATE",
+      amenities: ["WiFi"],
     });
 
     const filterSet2 = normalizeFilters({
-      amenities: ['WiFi'],
+      amenities: ["WiFi"],
       maxPrice: 2000,
-      roomType: 'PRIVATE',
+      roomType: "PRIVATE",
     });
 
     const results1 = applyFilters(ACTIVE_LISTINGS, filterSet1);
@@ -526,8 +538,8 @@ describe('Complex Filter Combinations E2E', () => {
 // Edge Cases and Error Handling
 // ============================================
 
-describe('Edge Cases and Error Handling', () => {
-  it('handles undefined/null filter values gracefully', () => {
+describe("Edge Cases and Error Handling", () => {
+  it("handles undefined/null filter values gracefully", () => {
     const filters = normalizeFilters({
       query: undefined,
       minPrice: null as unknown as number,
@@ -539,7 +551,7 @@ describe('Edge Cases and Error Handling', () => {
     expect(() => applyFilters(ACTIVE_LISTINGS, filters)).not.toThrow();
   });
 
-  it('handles empty arrays in filters', () => {
+  it("handles empty arrays in filters", () => {
     const filters = normalizeFilters({
       amenities: [],
       houseRules: [],
@@ -552,27 +564,31 @@ describe('Edge Cases and Error Handling', () => {
     expect(results.length).toBe(ACTIVE_LISTINGS.length);
   });
 
-  it('handles inverted price range (throws validation error)', () => {
+  it("handles inverted price range (throws validation error)", () => {
     // P1-13: Inverted price ranges now throw error instead of silently swapping
-    expect(() => normalizeFilters({
-      minPrice: 2000,
-      maxPrice: 1000, // Inverted - should throw error
-    })).toThrow('minPrice cannot exceed maxPrice');
+    expect(() =>
+      normalizeFilters({
+        minPrice: 2000,
+        maxPrice: 1000, // Inverted - should throw error
+      })
+    ).toThrow("minPrice cannot exceed maxPrice");
   });
 
-  it('handles inverted latitude bounds (throws validation error)', () => {
+  it("handles inverted latitude bounds (throws validation error)", () => {
     // P1-13: Inverted latitude now throws error instead of silently swapping
-    expect(() => normalizeFilters({
-      bounds: {
-        minLat: 40,
-        maxLat: 30, // Inverted
-        minLng: -122,
-        maxLng: -120,
-      },
-    })).toThrow('minLat cannot exceed maxLat');
+    expect(() =>
+      normalizeFilters({
+        bounds: {
+          minLat: 40,
+          maxLat: 30, // Inverted
+          minLng: -122,
+          maxLng: -120,
+        },
+      })
+    ).toThrow("minLat cannot exceed maxLat");
   });
 
-  it('clamps extreme values to safe ranges', () => {
+  it("clamps extreme values to safe ranges", () => {
     const filters = normalizeFilters({
       minPrice: -1000, // Negative price
       maxPrice: 999999999, // Extremely high
@@ -599,14 +615,14 @@ describe('Edge Cases and Error Handling', () => {
 // Performance Smoke Tests
 // ============================================
 
-describe('Performance Smoke Tests', () => {
-  it('processes 100 listings with all filters in reasonable time', () => {
+describe("Performance Smoke Tests", () => {
+  it("processes 100 listings with all filters in reasonable time", () => {
     const filters = normalizeFilters({
       minPrice: 500,
       maxPrice: 3000,
-      roomType: 'PRIVATE',
-      amenities: ['WiFi', 'Parking'],
-      sort: 'price_asc',
+      roomType: "PRIVATE",
+      amenities: ["WiFi", "Parking"],
+      sort: "price_asc",
     });
 
     const start = performance.now();
@@ -622,13 +638,13 @@ describe('Performance Smoke Tests', () => {
     expect(elapsed).toBeLessThan(1000);
   });
 
-  it('normalizeFilters is fast for repeated calls', () => {
+  it("normalizeFilters is fast for repeated calls", () => {
     const rawFilters = {
       minPrice: 500,
       maxPrice: 3000,
-      amenities: ['WiFi', 'Parking', 'Laundry'],
-      roomType: 'PRIVATE',
-      sort: 'price_asc',
+      amenities: ["WiFi", "Parking", "Laundry"],
+      roomType: "PRIVATE",
+      sort: "price_asc",
     };
 
     const start = performance.now();

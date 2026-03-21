@@ -6,19 +6,38 @@
  * (e.g., creating an already-expired hold for expiry tests).
  */
 
-import { NextRequest, NextResponse } from 'next/server';
-import { prisma } from '@/lib/prisma';
+import crypto from "crypto";
+import { NextRequest, NextResponse } from "next/server";
+import { prisma } from "@/lib/prisma";
 
 function isEnabled(): boolean {
   return (
-    process.env.E2E_TEST_HELPERS === 'true' &&
-    process.env.NODE_ENV !== 'production'
+    process.env.E2E_TEST_HELPERS === "true" &&
+    process.env.NODE_ENV !== "production"
   );
+}
+
+function isAuthorized(request: NextRequest): boolean {
+  const secret = process.env.E2E_TEST_SECRET;
+  if (!secret || secret.length < 16) return false;
+  const authHeader = request.headers.get("authorization");
+  if (!authHeader?.startsWith("Bearer ")) return false;
+  const token = authHeader.slice(7);
+  if (token.length !== secret.length) return false;
+  try {
+    return crypto.timingSafeEqual(Buffer.from(token), Buffer.from(secret));
+  } catch {
+    return false;
+  }
 }
 
 export async function POST(request: NextRequest) {
   if (!isEnabled()) {
-    return NextResponse.json({ error: 'Not found' }, { status: 404 });
+    return NextResponse.json({ error: "Not found" }, { status: 404 });
+  }
+
+  if (!isAuthorized(request)) {
+    return NextResponse.json({ error: "Not found" }, { status: 404 });
   }
 
   try {
@@ -26,7 +45,7 @@ export async function POST(request: NextRequest) {
     const { action, params } = body;
 
     switch (action) {
-      case 'getListingSlots': {
+      case "getListingSlots": {
         const listing = await prisma.listing.findUnique({
           where: { id: params.listingId },
           select: {
@@ -38,21 +57,29 @@ export async function POST(request: NextRequest) {
             ownerId: true,
           },
         });
-        if (!listing) return NextResponse.json({ error: 'Listing not found' }, { status: 404 });
+        if (!listing)
+          return NextResponse.json(
+            { error: "Listing not found" },
+            { status: 404 }
+          );
         return NextResponse.json(listing);
       }
 
-      case 'findTestListing': {
+      case "findTestListing": {
         const owner = await prisma.user.findUnique({
           where: { email: params.ownerEmail },
           select: { id: true },
         });
-        if (!owner) return NextResponse.json({ error: 'Owner not found' }, { status: 404 });
+        if (!owner)
+          return NextResponse.json(
+            { error: "Owner not found" },
+            { status: 404 }
+          );
 
         const listing = await prisma.listing.findFirst({
           where: {
             ownerId: owner.id,
-            status: 'ACTIVE',
+            status: "ACTIVE",
             totalSlots: { gte: params.minSlots || 1 },
           },
           select: {
@@ -63,13 +90,17 @@ export async function POST(request: NextRequest) {
             bookingMode: true,
             price: true,
           },
-          orderBy: { totalSlots: 'desc' },
+          orderBy: { totalSlots: "desc" },
         });
-        if (!listing) return NextResponse.json({ error: 'No suitable listing found' }, { status: 404 });
+        if (!listing)
+          return NextResponse.json(
+            { error: "No suitable listing found" },
+            { status: 404 }
+          );
         return NextResponse.json({ ...listing, price: Number(listing.price) });
       }
 
-      case 'getBooking': {
+      case "getBooking": {
         const booking = await prisma.booking.findUnique({
           where: { id: params.bookingId },
           select: {
@@ -82,22 +113,39 @@ export async function POST(request: NextRequest) {
             tenantId: true,
           },
         });
-        if (!booking) return NextResponse.json({ error: 'Booking not found' }, { status: 404 });
+        if (!booking)
+          return NextResponse.json(
+            { error: "Booking not found" },
+            { status: 404 }
+          );
         return NextResponse.json(booking);
       }
 
-      case 'createExpiredHold': {
+      case "createExpiredHold": {
         const tenant = await prisma.user.findUnique({
           where: { email: params.tenantEmail },
           select: { id: true },
         });
-        if (!tenant) return NextResponse.json({ error: 'Tenant not found' }, { status: 404 });
+        if (!tenant)
+          return NextResponse.json(
+            { error: "Tenant not found" },
+            { status: 404 }
+          );
 
         const listing = await prisma.listing.findUnique({
           where: { id: params.listingId },
-          select: { id: true, totalSlots: true, availableSlots: true, price: true },
+          select: {
+            id: true,
+            totalSlots: true,
+            availableSlots: true,
+            price: true,
+          },
         });
-        if (!listing) return NextResponse.json({ error: 'Listing not found' }, { status: 404 });
+        if (!listing)
+          return NextResponse.json(
+            { error: "Listing not found" },
+            { status: 404 }
+          );
 
         const slotsRequested = params.slotsRequested || 1;
         const minutesAgo = params.minutesAgo || 5;
@@ -119,7 +167,7 @@ export async function POST(request: NextRequest) {
               startDate,
               endDate,
               totalPrice: Number(listing.price) * 2,
-              status: 'HELD',
+              status: "HELD",
               slotsRequested,
               heldUntil,
               heldAt: new Date(heldUntil.getTime() - 15 * 60 * 1000),
@@ -134,7 +182,7 @@ export async function POST(request: NextRequest) {
         });
       }
 
-      case 'cleanupTestBookings': {
+      case "cleanupTestBookings": {
         const where: Record<string, unknown> = {};
         if (params.listingId) where.listingId = params.listingId;
         if (params.bookingIds) {
@@ -162,7 +210,7 @@ export async function POST(request: NextRequest) {
         return NextResponse.json({ deleted: result.count });
       }
 
-      case 'getGroundTruthSlots': {
+      case "getGroundTruthSlots": {
         const [result] = await prisma.$queryRaw<[{ expected: number }]>`
           SELECT
             l."totalSlots" - COALESCE(SUM(b."slotsRequested") FILTER (
@@ -177,12 +225,16 @@ export async function POST(request: NextRequest) {
         return NextResponse.json({ expected: Number(result.expected) });
       }
 
-      case 'updateListingPrice': {
+      case "updateListingPrice": {
         const listing = await prisma.listing.findUnique({
           where: { id: params.listingId },
           select: { price: true },
         });
-        if (!listing) return NextResponse.json({ error: 'Listing not found' }, { status: 404 });
+        if (!listing)
+          return NextResponse.json(
+            { error: "Listing not found" },
+            { status: 404 }
+          );
         const oldPrice = Number(listing.price);
         await prisma.listing.update({
           where: { id: params.listingId },
@@ -191,19 +243,31 @@ export async function POST(request: NextRequest) {
         return NextResponse.json({ oldPrice, newPrice: params.newPrice });
       }
 
-      case 'createPendingBooking': {
+      case "createPendingBooking": {
         const tenant = await prisma.user.findUnique({
           where: { email: params.tenantEmail },
           select: { id: true },
         });
-        if (!tenant) return NextResponse.json({ error: 'Tenant not found' }, { status: 404 });
+        if (!tenant)
+          return NextResponse.json(
+            { error: "Tenant not found" },
+            { status: 404 }
+          );
         const listing = await prisma.listing.findUnique({
           where: { id: params.listingId },
           select: { price: true },
         });
-        if (!listing) return NextResponse.json({ error: 'Listing not found' }, { status: 404 });
-        const startDate = params.startDate ? new Date(params.startDate) : new Date(Date.now() + 90 * 24 * 60 * 60 * 1000);
-        const endDate = params.endDate ? new Date(params.endDate) : new Date(Date.now() + 150 * 24 * 60 * 60 * 1000);
+        if (!listing)
+          return NextResponse.json(
+            { error: "Listing not found" },
+            { status: 404 }
+          );
+        const startDate = params.startDate
+          ? new Date(params.startDate)
+          : new Date(Date.now() + 90 * 24 * 60 * 60 * 1000);
+        const endDate = params.endDate
+          ? new Date(params.endDate)
+          : new Date(Date.now() + 150 * 24 * 60 * 60 * 1000);
         const booking = await prisma.booking.create({
           data: {
             listingId: params.listingId,
@@ -211,27 +275,39 @@ export async function POST(request: NextRequest) {
             startDate,
             endDate,
             totalPrice: Number(listing.price) * 2,
-            status: 'PENDING',
+            status: "PENDING",
             slotsRequested: params.slotsRequested || 1,
           },
         });
         return NextResponse.json({ bookingId: booking.id });
       }
 
-      case 'createAcceptedBooking': {
+      case "createAcceptedBooking": {
         const tenant = await prisma.user.findUnique({
           where: { email: params.tenantEmail },
           select: { id: true },
         });
-        if (!tenant) return NextResponse.json({ error: 'Tenant not found' }, { status: 404 });
+        if (!tenant)
+          return NextResponse.json(
+            { error: "Tenant not found" },
+            { status: 404 }
+          );
         const listing = await prisma.listing.findUnique({
           where: { id: params.listingId },
           select: { price: true, availableSlots: true },
         });
-        if (!listing) return NextResponse.json({ error: 'Listing not found' }, { status: 404 });
+        if (!listing)
+          return NextResponse.json(
+            { error: "Listing not found" },
+            { status: 404 }
+          );
         const slotsRequested = params.slotsRequested || 1;
-        const startDate = params.startDate ? new Date(params.startDate) : new Date(Date.now() + 90 * 24 * 60 * 60 * 1000);
-        const endDate = params.endDate ? new Date(params.endDate) : new Date(Date.now() + 150 * 24 * 60 * 60 * 1000);
+        const startDate = params.startDate
+          ? new Date(params.startDate)
+          : new Date(Date.now() + 90 * 24 * 60 * 60 * 1000);
+        const endDate = params.endDate
+          ? new Date(params.endDate)
+          : new Date(Date.now() + 150 * 24 * 60 * 60 * 1000);
         const booking = await prisma.$transaction(async (tx) => {
           await tx.$executeRaw`
             UPDATE "Listing"
@@ -245,7 +321,7 @@ export async function POST(request: NextRequest) {
               startDate,
               endDate,
               totalPrice: Number(listing.price) * 2,
-              status: 'ACCEPTED',
+              status: "ACCEPTED",
               slotsRequested,
             },
           });
@@ -253,7 +329,7 @@ export async function POST(request: NextRequest) {
         return NextResponse.json({ bookingId: booking.id, slotsRequested });
       }
 
-      case 'setListingBookingMode': {
+      case "setListingBookingMode": {
         await prisma.listing.update({
           where: { id: params.listingId },
           data: { bookingMode: params.mode },
@@ -261,18 +337,26 @@ export async function POST(request: NextRequest) {
         return NextResponse.json({ success: true, mode: params.mode });
       }
 
-      case 'createHeldBooking': {
+      case "createHeldBooking": {
         // Create a HELD booking with a FUTURE heldUntil (for HoldCountdown tests)
         const tenant = await prisma.user.findUnique({
           where: { email: params.tenantEmail },
           select: { id: true },
         });
-        if (!tenant) return NextResponse.json({ error: 'Tenant not found' }, { status: 404 });
+        if (!tenant)
+          return NextResponse.json(
+            { error: "Tenant not found" },
+            { status: 404 }
+          );
         const listing = await prisma.listing.findUnique({
           where: { id: params.listingId },
           select: { price: true },
         });
-        if (!listing) return NextResponse.json({ error: 'Listing not found' }, { status: 404 });
+        if (!listing)
+          return NextResponse.json(
+            { error: "Listing not found" },
+            { status: 404 }
+          );
         const ttlMinutes = params.ttlMinutes || 15;
         const heldUntil = new Date(Date.now() + ttlMinutes * 60 * 1000);
         const startDate = new Date(Date.now() + 90 * 24 * 60 * 60 * 1000);
@@ -291,7 +375,7 @@ export async function POST(request: NextRequest) {
               startDate,
               endDate,
               totalPrice: Number(listing.price) * 2,
-              status: 'HELD',
+              status: "HELD",
               slotsRequested,
               heldUntil,
               heldAt: new Date(),
@@ -306,11 +390,14 @@ export async function POST(request: NextRequest) {
       }
 
       default:
-        return NextResponse.json({ error: `Unknown action: ${action}` }, { status: 400 });
+        return NextResponse.json(
+          { error: `Unknown action: ${action}` },
+          { status: 400 }
+        );
     }
   } catch (error) {
     return NextResponse.json(
-      { error: error instanceof Error ? error.message : 'Unknown error' },
+      { error: error instanceof Error ? error.message : "Unknown error" },
       { status: 500 }
     );
   }

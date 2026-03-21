@@ -1,52 +1,76 @@
-import { auth } from '@/auth';
-import ChatWindow from './ChatWindow';
-import { prisma } from '@/lib/prisma';
-import { listConversationMessages } from '@/lib/messages';
-import { redirect } from 'next/navigation';
+import type { Metadata } from "next";
+import { auth } from "@/auth";
+import ChatWindow from "./ChatWindow";
+import { prisma } from "@/lib/prisma";
+import { listConversationMessages } from "@/lib/messages";
+import { redirect } from "next/navigation";
 
-export default async function ChatPage({ params }: { params: Promise<{ id: string }> }) {
-    const { id } = await params;
-    const session = await auth();
+export const metadata: Metadata = {
+  title: "Conversation | RoomShare",
+  description: "Chat with your roommate or host on RoomShare.",
+  robots: { index: false, follow: false },
+};
 
-    if (!session?.user?.id) {
-        redirect('/login');
-    }
+export default async function ChatPage({
+  params,
+}: {
+  params: Promise<{ id: string }>;
+}) {
+  const { id } = await params;
+  const session = await auth();
 
-    const userId = session.user.id;
+  if (!session?.user?.id) {
+    redirect("/login");
+  }
 
-    // Fetch conversation to verify access and get other participant info (check admin + per-user delete)
-    const conversation = await prisma.conversation.findUnique({
-        where: { id },
-        include: {
-            participants: {
-                select: { id: true, name: true, image: true }
-            },
-            deletions: { where: { userId }, select: { id: true } },
-        }
-    });
+  const userId = session.user.id;
 
-    if (!conversation || conversation.deletedAt || conversation.deletions.length > 0 || !conversation.participants.some(p => p.id === userId)) {
-        // Handle unauthorized or not found
-        return (
-            <div className="flex items-center justify-center h-full">
-                <p className="text-gray-500">Conversation not found or access denied.</p>
-            </div>
-        );
-    }
+  // Fetch conversation and messages in parallel — messages only needs `id`, not conversation result
+  const [conversation, messages] = await Promise.all([
+    prisma.conversation.findUnique({
+      where: { id },
+      include: {
+        participants: {
+          select: { id: true, name: true, image: true },
+        },
+        deletions: { where: { userId }, select: { id: true } },
+      },
+    }),
+    listConversationMessages(id),
+  ]);
 
-    const otherParticipant = conversation.participants.find(p => p.id !== userId);
-    const currentParticipant = conversation.participants.find(p => p.id === userId);
-    const messages = await listConversationMessages(id);
-
+  if (
+    !conversation ||
+    conversation.deletedAt ||
+    conversation.deletions.length > 0 ||
+    !conversation.participants.some((p) => p.id === userId)
+  ) {
+    // Handle unauthorized or not found
     return (
-        <ChatWindow
-            initialMessages={messages}
-            conversationId={id}
-            currentUserId={userId}
-            currentUserName={currentParticipant?.name || session.user.name || 'User'}
-            otherUserId={otherParticipant?.id || ''}
-            otherUserName={otherParticipant?.name || 'User'}
-            otherUserImage={otherParticipant?.image}
-        />
+      <div className="flex items-center justify-center h-full">
+        <p className="text-gray-500">
+          Conversation not found or access denied.
+        </p>
+      </div>
     );
+  }
+
+  const otherParticipant = conversation.participants.find(
+    (p) => p.id !== userId
+  );
+  const currentParticipant = conversation.participants.find(
+    (p) => p.id === userId
+  );
+
+  return (
+    <ChatWindow
+      initialMessages={messages}
+      conversationId={id}
+      currentUserId={userId}
+      currentUserName={currentParticipant?.name || session.user.name || "User"}
+      otherUserId={otherParticipant?.id || ""}
+      otherUserName={otherParticipant?.name || "User"}
+      otherUserImage={otherParticipant?.image}
+    />
+  );
 }

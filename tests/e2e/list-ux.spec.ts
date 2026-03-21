@@ -6,12 +6,19 @@
  */
 
 import type { Page } from "@playwright/test";
-import { test, expect, SF_BOUNDS, searchResultsContainer } from "./helpers/test-utils";
+import {
+  test,
+  expect,
+  SF_BOUNDS,
+  searchResultsContainer,
+} from "./helpers/test-utils";
 
 const boundsQS = `minLat=${SF_BOUNDS.minLat}&maxLat=${SF_BOUNDS.maxLat}&minLng=${SF_BOUNDS.minLng}&maxLng=${SF_BOUNDS.maxLng}`;
 
 async function waitForVisibleListingCards(page: Page) {
-  const cards = searchResultsContainer(page).locator('[data-testid="listing-card"]');
+  const cards = searchResultsContainer(page).locator(
+    '[data-testid="listing-card"]'
+  );
   await expect
     .poll(async () => cards.count(), {
       timeout: 30_000,
@@ -30,14 +37,16 @@ test.beforeEach(async () => {
 // ---------------------------------------------------------------------------
 test.describe("2.1: Image carousel enhancements", () => {
   test("carousel dots are capped at 5 max", async ({ page }) => {
-    await page.goto(`/search?${boundsQS}`, { waitUntil: 'domcontentloaded' });
+    await page.goto(`/search?${boundsQS}`, { waitUntil: "domcontentloaded" });
     await waitForVisibleListingCards(page);
 
     // Scope to visible search results container (dual-container layout)
     const container = searchResultsContainer(page);
 
     // Find a carousel with dots
-    const dotContainers = container.locator('[role="tablist"][aria-label="Image navigation"]');
+    const dotContainers = container.locator(
+      '[role="tablist"][aria-label="Image navigation"]'
+    );
     const count = await dotContainers.count();
 
     if (count === 0) {
@@ -54,7 +63,7 @@ test.describe("2.1: Image carousel enhancements", () => {
   });
 
   test("carousel arrow buttons exist and are accessible", async ({ page }) => {
-    await page.goto(`/search?${boundsQS}`, { waitUntil: 'domcontentloaded' });
+    await page.goto(`/search?${boundsQS}`, { waitUntil: "domcontentloaded" });
     await waitForVisibleListingCards(page);
 
     // Scope to visible search results container (dual-container layout)
@@ -82,7 +91,7 @@ test.describe("2.1: Image carousel enhancements", () => {
 // ---------------------------------------------------------------------------
 test.describe("2.2: Trust badges", () => {
   test("Guest Favorite badge renders when present", async ({ page }) => {
-    await page.goto(`/search?${boundsQS}`, { waitUntil: 'domcontentloaded' });
+    await page.goto(`/search?${boundsQS}`, { waitUntil: "domcontentloaded" });
     await waitForVisibleListingCards(page);
 
     // Scope to visible search results container (dual-container layout)
@@ -98,7 +107,9 @@ test.describe("2.2: Trust badges", () => {
     // If badges exist, verify they're inside listing cards
     if (badgeCount > 0) {
       const firstBadge = badges.first();
-      const card = firstBadge.locator('xpath=ancestor::*[@data-testid="listing-card"]');
+      const card = firstBadge.locator(
+        'xpath=ancestor::*[@data-testid="listing-card"]'
+      );
       await expect(card).toBeAttached();
     }
   });
@@ -108,8 +119,11 @@ test.describe("2.2: Trust badges", () => {
 // 2.3: Total price toggle — switch exists and toggles label
 // ---------------------------------------------------------------------------
 test.describe("2.3: Total price toggle", () => {
-  test("toggle switch is present and functional", async ({ page, browserName }) => {
-    await page.goto(`/search?${boundsQS}`, { waitUntil: 'domcontentloaded' });
+  test("toggle switch is present and functional", async ({
+    page,
+    browserName,
+  }) => {
+    await page.goto(`/search?${boundsQS}`, { waitUntil: "domcontentloaded" });
     await waitForVisibleListingCards(page);
 
     // Find the toggle
@@ -139,7 +153,7 @@ test.describe("2.3: Total price toggle", () => {
   });
 
   test("toggle label text is visible", async ({ page }) => {
-    await page.goto(`/search?${boundsQS}`, { waitUntil: 'domcontentloaded' });
+    await page.goto(`/search?${boundsQS}`, { waitUntil: "domcontentloaded" });
     await waitForVisibleListingCards(page);
 
     const label = page.getByText("Show total price");
@@ -153,10 +167,16 @@ test.describe("2.3: Total price toggle", () => {
 // 2.4: Skeleton loading — verify shimmer animation class exists in CSS
 // ---------------------------------------------------------------------------
 test.describe("2.4: Skeleton loading states", () => {
-  test("shimmer animation keyframe exists in styles", async ({ page, browserName }) => {
+  test("shimmer animation keyframe exists in styles", async ({
+    page,
+    browserName,
+  }) => {
     // WebKit restricts CSSKeyframesRule access in some configurations
-    test.skip(browserName === "webkit", "WebKit CSSKeyframesRule access limited");
-    await page.goto(`/search?${boundsQS}`, { waitUntil: 'domcontentloaded' });
+    test.skip(
+      browserName === "webkit",
+      "WebKit CSSKeyframesRule access limited"
+    );
+    await page.goto(`/search?${boundsQS}`, { waitUntil: "domcontentloaded" });
 
     // Check that the shimmer keyframe is defined in stylesheets
     const hasShimmer = await page.evaluate(() => {
@@ -188,7 +208,7 @@ test.describe("2.4: Skeleton loading states", () => {
 // ---------------------------------------------------------------------------
 test.describe("2.5: Pagination progress indicator", () => {
   test("result count header is displayed", async ({ page }) => {
-    await page.goto(`/search?${boundsQS}`, { waitUntil: 'domcontentloaded' });
+    await page.goto(`/search?${boundsQS}`, { waitUntil: "domcontentloaded" });
     await waitForVisibleListingCards(page);
 
     // Look for "X places" or "100+ places" text
@@ -197,7 +217,7 @@ test.describe("2.5: Pagination progress indicator", () => {
   });
 
   test("contextual footer shows stay count", async ({ page }) => {
-    await page.goto(`/search?${boundsQS}`, { waitUntil: 'domcontentloaded' });
+    await page.goto(`/search?${boundsQS}`, { waitUntil: "domcontentloaded" });
     await waitForVisibleListingCards(page);
 
     // Look for "X+ stays" footer text — scroll to bottom to trigger render
@@ -210,7 +230,7 @@ test.describe("2.5: Pagination progress indicator", () => {
   });
 
   test("load more button shows progress text", async ({ page }) => {
-    await page.goto(`/search?${boundsQS}`, { waitUntil: 'domcontentloaded' });
+    await page.goto(`/search?${boundsQS}`, { waitUntil: "domcontentloaded" });
     await waitForVisibleListingCards(page);
 
     // Look for "Show more places" button
@@ -233,19 +253,24 @@ test.describe("2.5: Pagination progress indicator", () => {
 // ---------------------------------------------------------------------------
 test.describe("2.6: Wishlist heart button", () => {
   test("favorite buttons have correct ARIA attributes", async ({ page }) => {
-    await page.goto(`/search?${boundsQS}`, { waitUntil: 'domcontentloaded' });
+    await page.goto(`/search?${boundsQS}`, { waitUntil: "domcontentloaded" });
     await waitForVisibleListingCards(page);
 
     // Scope to visible search results container (dual-container layout)
     const container = searchResultsContainer(page);
 
-    const heartButtons = container.locator('[aria-label="Save listing"], [aria-label="Remove from saved"]');
+    const heartButtons = container.locator(
+      '[aria-label="Save listing"], [aria-label="Remove from saved"]'
+    );
     // Wait a moment for hydration to render save buttons (they may be client-only)
     const heartCount = await heartButtons.count();
 
     if (heartCount === 0) {
       // Save buttons may not render for anonymous users or if auth redirect hides them
-      test.skip(true, "No save/heart buttons found — may require auth or not rendered yet");
+      test.skip(
+        true,
+        "No save/heart buttons found — may require auth or not rendered yet"
+      );
       return;
     }
 
@@ -257,8 +282,10 @@ test.describe("2.6: Wishlist heart button", () => {
     expect(["true", "false"]).toContain(pressed);
   });
 
-  test("heart save button can be toggled via hover and click", async ({ page }) => {
-    await page.goto(`/search?${boundsQS}`, { waitUntil: 'domcontentloaded' });
+  test("heart save button can be toggled via hover and click", async ({
+    page,
+  }) => {
+    await page.goto(`/search?${boundsQS}`, { waitUntil: "domcontentloaded" });
     await waitForVisibleListingCards(page);
 
     const container = searchResultsContainer(page);
@@ -272,7 +299,7 @@ test.describe("2.6: Wishlist heart button", () => {
     }
 
     // Verify the heart button exists and has an SVG icon
-    const heartSvg = heartBtn.locator('svg');
+    const heartSvg = heartBtn.locator("svg");
     await expect(heartSvg).toBeAttached();
   });
 });
@@ -282,7 +309,7 @@ test.describe("2.6: Wishlist heart button", () => {
 // ---------------------------------------------------------------------------
 test.describe("General: Listing cards integrity", () => {
   test("all cards have prices and titles", async ({ page }) => {
-    await page.goto(`/search?${boundsQS}`, { waitUntil: 'domcontentloaded' });
+    await page.goto(`/search?${boundsQS}`, { waitUntil: "domcontentloaded" });
     const cards = await waitForVisibleListingCards(page);
     const cardCount = await cards.count();
     expect(cardCount).toBeGreaterThanOrEqual(1);
@@ -306,11 +333,13 @@ test.describe("General: Listing cards integrity", () => {
   });
 
   test("listing cards have article role with aria-label", async ({ page }) => {
-    await page.goto(`/search?${boundsQS}`, { waitUntil: 'domcontentloaded' });
+    await page.goto(`/search?${boundsQS}`, { waitUntil: "domcontentloaded" });
     await waitForVisibleListingCards(page);
 
     const container = searchResultsContainer(page);
-    const articles = container.locator('[data-testid="listing-card"][role="article"]');
+    const articles = container.locator(
+      '[data-testid="listing-card"][role="article"]'
+    );
     const count = await articles.count();
 
     if (count === 0) {
@@ -331,7 +360,7 @@ test.describe("General: Listing cards integrity", () => {
       if (msg.type() === "error") errors.push(msg.text());
     });
 
-    await page.goto(`/search?${boundsQS}`, { waitUntil: 'domcontentloaded' });
+    await page.goto(`/search?${boundsQS}`, { waitUntil: "domcontentloaded" });
     await waitForVisibleListingCards(page);
 
     const realErrors = errors.filter(
@@ -356,7 +385,7 @@ test.describe("General: Listing cards integrity", () => {
         !e.includes("FetchTimeoutError") &&
         !e.includes("timed out") &&
         !e.includes("photon.komoot") &&
-        !e.includes("TimeoutError"),
+        !e.includes("TimeoutError")
     );
 
     expect(realErrors).toHaveLength(0);

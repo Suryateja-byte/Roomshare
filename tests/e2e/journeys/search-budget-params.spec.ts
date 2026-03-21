@@ -11,7 +11,13 @@
  * DB stores price as Float (dollars, not cents) - no conversion needed.
  */
 
-import { test, expect, tags, searchResultsContainer, boundsQS } from "../helpers";
+import {
+  test,
+  expect,
+  tags,
+  searchResultsContainer,
+  boundsQS,
+} from "../helpers";
 
 test.describe("Budget URL Param Aliases", () => {
   // Filter tests run as anonymous user
@@ -29,16 +35,26 @@ test.describe("Budget URL Param Aliases", () => {
       const maxBudget = 1500;
 
       // Navigate with budget aliases
-      await page.goto(`/search?${boundsQS}&minBudget=${minBudget}&maxBudget=${maxBudget}`);
+      await page.goto(
+        `/search?${boundsQS}&minBudget=${minBudget}&maxBudget=${maxBudget}`
+      );
       await page.waitForLoadState("domcontentloaded");
 
       // Wait for listing cards to load (or zero results)
-      const listingCards = searchResultsContainer(page).locator('[data-testid="listing-card"]');
-      const zeroResults = searchResultsContainer(page).getByText(/no\s+matches/i);
-      await listingCards.or(zeroResults).first().waitFor({ state: "visible", timeout: 30000 });
+      const listingCards = searchResultsContainer(page).locator(
+        '[data-testid="listing-card"]'
+      );
+      const zeroResults =
+        searchResultsContainer(page).getByText(/no\s+matches/i);
+      await listingCards
+        .or(zeroResults)
+        .first()
+        .waitFor({ state: "visible", timeout: 30000 });
 
       // Get all visible listing prices
-      const priceElements = searchResultsContainer(page).locator('[data-testid="listing-price"]');
+      const priceElements = searchResultsContainer(page).locator(
+        '[data-testid="listing-price"]'
+      );
       const priceCount = await priceElements.count();
 
       // CRITICAL ASSERTION: All visible listing prices must be within range
@@ -62,16 +78,26 @@ test.describe("Budget URL Param Aliases", () => {
       const maxPrice = 1200;
 
       // Navigate with canonical params
-      await page.goto(`/search?${boundsQS}&minPrice=${minPrice}&maxPrice=${maxPrice}`);
+      await page.goto(
+        `/search?${boundsQS}&minPrice=${minPrice}&maxPrice=${maxPrice}`
+      );
       await page.waitForLoadState("domcontentloaded");
 
       // Wait for listing cards (or zero results)
-      const listingCards = searchResultsContainer(page).locator('[data-testid="listing-card"]');
-      const zeroResults = searchResultsContainer(page).getByText(/no\s+matches/i);
-      await listingCards.or(zeroResults).first().waitFor({ state: "visible", timeout: 30000 });
+      const listingCards = searchResultsContainer(page).locator(
+        '[data-testid="listing-card"]'
+      );
+      const zeroResults =
+        searchResultsContainer(page).getByText(/no\s+matches/i);
+      await listingCards
+        .or(zeroResults)
+        .first()
+        .waitFor({ state: "visible", timeout: 30000 });
 
       // Verify prices are within range
-      const priceElements = searchResultsContainer(page).locator('[data-testid="listing-price"]');
+      const priceElements = searchResultsContainer(page).locator(
+        '[data-testid="listing-price"]'
+      );
       const priceCount = await priceElements.count();
 
       for (let i = 0; i < priceCount; i++) {
@@ -94,18 +120,33 @@ test.describe("Budget URL Param Aliases", () => {
       await page.waitForLoadState("domcontentloaded");
 
       // Try aria-label based selector first, fall back to id-based
-      const minPriceInput = page.getByLabel(/minimum budget/i)
-        .or(page.locator('#search-budget-min'));
-      const maxPriceInput = page.getByLabel(/maximum budget/i)
-        .or(page.locator('#search-budget-max'));
+      const minPriceInput = page
+        .getByLabel(/minimum budget/i)
+        .or(page.locator("#search-budget-min"));
+      const maxPriceInput = page
+        .getByLabel(/maximum budget/i)
+        .or(page.locator("#search-budget-max"));
 
       // Check if inputs are present at all before asserting values
-      const minVisible = await minPriceInput.first().isVisible({ timeout: 5000 }).catch(() => false);
-      const maxVisible = await maxPriceInput.first().isVisible({ timeout: 5000 }).catch(() => false);
-      test.skip(!minVisible || !maxVisible, "Budget inputs not visible — SearchForm may be collapsed");
+      const minVisible = await minPriceInput
+        .first()
+        .isVisible({ timeout: 5000 })
+        .catch(() => false);
+      const maxVisible = await maxPriceInput
+        .first()
+        .isVisible({ timeout: 5000 })
+        .catch(() => false);
+      test.skip(
+        !minVisible || !maxVisible,
+        "Budget inputs not visible — SearchForm may be collapsed"
+      );
 
-      await expect(minPriceInput.first()).toHaveValue("500", { timeout: 30000 });
-      await expect(maxPriceInput.first()).toHaveValue("1500", { timeout: 30000 });
+      await expect(minPriceInput.first()).toHaveValue("500", {
+        timeout: 30000,
+      });
+      await expect(maxPriceInput.first()).toHaveValue("1500", {
+        timeout: 30000,
+      });
     });
 
     test(`${tags.anon} - Budget inputs prefill from canonical params`, async ({
@@ -115,18 +156,33 @@ test.describe("Budget URL Param Aliases", () => {
       await page.waitForLoadState("domcontentloaded");
 
       // Try aria-label based selector first, fall back to id-based
-      const minPriceInput = page.getByLabel(/minimum budget/i)
-        .or(page.locator('#search-budget-min'));
-      const maxPriceInput = page.getByLabel(/maximum budget/i)
-        .or(page.locator('#search-budget-max'));
+      const minPriceInput = page
+        .getByLabel(/minimum budget/i)
+        .or(page.locator("#search-budget-min"));
+      const maxPriceInput = page
+        .getByLabel(/maximum budget/i)
+        .or(page.locator("#search-budget-max"));
 
       // Check if inputs are present at all before asserting values
-      const minVisible = await minPriceInput.first().isVisible({ timeout: 5000 }).catch(() => false);
-      const maxVisible = await maxPriceInput.first().isVisible({ timeout: 5000 }).catch(() => false);
-      test.skip(!minVisible || !maxVisible, "Budget inputs not visible — SearchForm may be collapsed");
+      const minVisible = await minPriceInput
+        .first()
+        .isVisible({ timeout: 5000 })
+        .catch(() => false);
+      const maxVisible = await maxPriceInput
+        .first()
+        .isVisible({ timeout: 5000 })
+        .catch(() => false);
+      test.skip(
+        !minVisible || !maxVisible,
+        "Budget inputs not visible — SearchForm may be collapsed"
+      );
 
-      await expect(minPriceInput.first()).toHaveValue("800", { timeout: 30000 });
-      await expect(maxPriceInput.first()).toHaveValue("2000", { timeout: 30000 });
+      await expect(minPriceInput.first()).toHaveValue("800", {
+        timeout: 30000,
+      });
+      await expect(maxPriceInput.first()).toHaveValue("2000", {
+        timeout: 30000,
+      });
     });
   });
 
@@ -135,7 +191,9 @@ test.describe("Budget URL Param Aliases", () => {
       page,
     }) => {
       // Both params present - canonical should win
-      await page.goto(`/search?${boundsQS}&minPrice=700&minBudget=500&maxPrice=1500`);
+      await page.goto(
+        `/search?${boundsQS}&minPrice=700&minBudget=500&maxPrice=1500`
+      );
       await page.waitForLoadState("domcontentloaded");
 
       // Input should show canonical value (700), not alias (500)
@@ -143,12 +201,20 @@ test.describe("Budget URL Param Aliases", () => {
       await expect(minPriceInput).toHaveValue("700", { timeout: 30000 });
 
       // Wait for listing cards (or zero results)
-      const listingCards = searchResultsContainer(page).locator('[data-testid="listing-card"]');
-      const zeroResults = searchResultsContainer(page).getByText(/no\s+matches/i);
-      await listingCards.or(zeroResults).first().waitFor({ state: "visible", timeout: 30000 });
+      const listingCards = searchResultsContainer(page).locator(
+        '[data-testid="listing-card"]'
+      );
+      const zeroResults =
+        searchResultsContainer(page).getByText(/no\s+matches/i);
+      await listingCards
+        .or(zeroResults)
+        .first()
+        .waitFor({ state: "visible", timeout: 30000 });
 
       // Verify prices respect canonical minPrice=700, not alias minBudget=500
-      const priceElements = searchResultsContainer(page).locator('[data-testid="listing-price"]');
+      const priceElements = searchResultsContainer(page).locator(
+        '[data-testid="listing-price"]'
+      );
       const priceCount = await priceElements.count();
 
       for (let i = 0; i < priceCount; i++) {
@@ -167,7 +233,9 @@ test.describe("Budget URL Param Aliases", () => {
       page,
     }) => {
       // Both params present - canonical should win
-      await page.goto(`/search?${boundsQS}&minPrice=500&maxPrice=1200&maxBudget=2000`);
+      await page.goto(
+        `/search?${boundsQS}&minPrice=500&maxPrice=1200&maxBudget=2000`
+      );
       await page.waitForLoadState("domcontentloaded");
 
       // Input should show canonical value (1200), not alias (2000)
@@ -175,12 +243,20 @@ test.describe("Budget URL Param Aliases", () => {
       await expect(maxPriceInput).toHaveValue("1200", { timeout: 30000 });
 
       // Wait for listing cards (or zero results)
-      const listingCards = searchResultsContainer(page).locator('[data-testid="listing-card"]');
-      const zeroResults = searchResultsContainer(page).getByText(/no\s+matches/i);
-      await listingCards.or(zeroResults).first().waitFor({ state: "visible", timeout: 30000 });
+      const listingCards = searchResultsContainer(page).locator(
+        '[data-testid="listing-card"]'
+      );
+      const zeroResults =
+        searchResultsContainer(page).getByText(/no\s+matches/i);
+      await listingCards
+        .or(zeroResults)
+        .first()
+        .waitFor({ state: "visible", timeout: 30000 });
 
       // Verify prices respect canonical maxPrice=1200
-      const priceElements = searchResultsContainer(page).locator('[data-testid="listing-price"]');
+      const priceElements = searchResultsContainer(page).locator(
+        '[data-testid="listing-price"]'
+      );
       const priceCount = await priceElements.count();
 
       for (let i = 0; i < priceCount; i++) {
@@ -210,12 +286,20 @@ test.describe("Budget URL Param Aliases", () => {
       await expect(maxPriceInput).toHaveValue("1500", { timeout: 30000 });
 
       // Wait for listing cards (or zero results)
-      const listingCards = searchResultsContainer(page).locator('[data-testid="listing-card"]');
-      const zeroResults = searchResultsContainer(page).getByText(/no\s+matches/i);
-      await listingCards.or(zeroResults).first().waitFor({ state: "visible", timeout: 30000 });
+      const listingCards = searchResultsContainer(page).locator(
+        '[data-testid="listing-card"]'
+      );
+      const zeroResults =
+        searchResultsContainer(page).getByText(/no\s+matches/i);
+      await listingCards
+        .or(zeroResults)
+        .first()
+        .waitFor({ state: "visible", timeout: 30000 });
 
       // Verify prices are in range
-      const priceElements = searchResultsContainer(page).locator('[data-testid="listing-price"]');
+      const priceElements = searchResultsContainer(page).locator(
+        '[data-testid="listing-price"]'
+      );
       const priceCount = await priceElements.count();
 
       for (let i = 0; i < priceCount; i++) {
@@ -242,12 +326,20 @@ test.describe("Budget URL Param Aliases", () => {
       await expect(maxPriceInput).toHaveValue("1800", { timeout: 30000 });
 
       // Wait for listing cards (or zero results)
-      const listingCards = searchResultsContainer(page).locator('[data-testid="listing-card"]');
-      const zeroResults = searchResultsContainer(page).getByText(/no\s+matches/i);
-      await listingCards.or(zeroResults).first().waitFor({ state: "visible", timeout: 30000 });
+      const listingCards = searchResultsContainer(page).locator(
+        '[data-testid="listing-card"]'
+      );
+      const zeroResults =
+        searchResultsContainer(page).getByText(/no\s+matches/i);
+      await listingCards
+        .or(zeroResults)
+        .first()
+        .waitFor({ state: "visible", timeout: 30000 });
 
       // Verify prices are in range
-      const priceElements = searchResultsContainer(page).locator('[data-testid="listing-price"]');
+      const priceElements = searchResultsContainer(page).locator(
+        '[data-testid="listing-price"]'
+      );
       const priceCount = await priceElements.count();
 
       for (let i = 0; i < priceCount; i++) {
@@ -266,7 +358,7 @@ test.describe("Budget URL Param Aliases", () => {
     // Skip webkit - chips region rendering differs; core budget logic tested elsewhere
     test.skip(
       ({ browserName }) => browserName === "webkit",
-      "Chips tests skip webkit",
+      "Chips tests skip webkit"
     );
 
     test(`${tags.anon} - Price chip shows for budget alias params`, async ({
@@ -307,18 +399,23 @@ test.describe("Budget URL Param Aliases", () => {
       await removeButton.click();
 
       // Wait for URL to update - should have no price params
-      await expect.poll(
-        () => {
-          const search = page.url();
-          return (
-            !search.includes("minPrice") &&
-            !search.includes("maxPrice") &&
-            !search.includes("minBudget") &&
-            !search.includes("maxBudget")
-          );
-        },
-        { timeout: 30000, message: "URL to have no price/budget params after chip removal" },
-      ).toBe(true);
+      await expect
+        .poll(
+          () => {
+            const search = page.url();
+            return (
+              !search.includes("minPrice") &&
+              !search.includes("maxPrice") &&
+              !search.includes("minBudget") &&
+              !search.includes("maxBudget")
+            );
+          },
+          {
+            timeout: 30000,
+            message: "URL to have no price/budget params after chip removal",
+          }
+        )
+        .toBe(true);
 
       // Chips region should be hidden (no more filters)
       await expect(chipsRegion).not.toBeVisible();

@@ -5,7 +5,10 @@
  * params that would be used in getSearchDocMapListingsInternal when
  * nearMatches=true is set.
  */
-import { expandFiltersForNearMatches, NEAR_MATCH_RULES } from "@/lib/near-matches";
+import {
+  expandFiltersForNearMatches,
+  NEAR_MATCH_RULES,
+} from "@/lib/near-matches";
 import type { FilterParams } from "@/lib/search-params";
 
 describe("expandFiltersForNearMatches for map listings", () => {
@@ -20,7 +23,9 @@ describe("expandFiltersForNearMatches for map listings", () => {
 
     expect(expandedDimension).toBe("price");
     // maxPrice should be expanded by +10%: 1000 * 1.1 = 1100
-    expect(expanded.maxPrice).toBe(Math.ceil(1000 * (1 + NEAR_MATCH_RULES.price.expandPercent / 100)));
+    expect(expanded.maxPrice).toBe(
+      Math.ceil(1000 * (1 + NEAR_MATCH_RULES.price.expandPercent / 100))
+    );
     expect(expanded.maxPrice).toBe(1100);
     // Bounds should be preserved
     expect(expanded.bounds).toEqual(params.bounds);
@@ -37,7 +42,9 @@ describe("expandFiltersForNearMatches for map listings", () => {
     const { expanded } = expandFiltersForNearMatches(params);
 
     // minPrice should be expanded by -10%: 500 * 0.9 = 450
-    expect(expanded.minPrice).toBe(Math.floor(500 * (1 - NEAR_MATCH_RULES.price.expandPercent / 100)));
+    expect(expanded.minPrice).toBe(
+      Math.floor(500 * (1 - NEAR_MATCH_RULES.price.expandPercent / 100))
+    );
     expect(expanded.minPrice).toBe(450);
     expect(expanded.maxPrice).toBe(1100);
   });

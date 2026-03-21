@@ -3,26 +3,28 @@
  * Pure functions for auth validation, easily testable
  */
 
-import { NextRequest, NextResponse } from 'next/server';
-import { getToken } from 'next-auth/jwt';
-import { prisma } from '@/lib/prisma';
+import "server-only";
+
+import { NextRequest, NextResponse } from "next/server";
+import { getToken } from "next-auth/jwt";
+import { prisma } from "@/lib/prisma";
 
 // Re-export from standalone module for backward compatibility (auth.ts imports from here)
-export { normalizeEmail } from './normalize-email';
+export { normalizeEmail } from "./normalize-email";
 
 /**
  * Public routes that don't require authentication or suspension check.
  * Suspended users can still access these routes.
  */
 const PUBLIC_PATHS = [
-  '/',
-  '/login',
-  '/signup',
-  '/listings',
-  '/search',
-  '/api/auth',
-  '/_next',
-  '/favicon.ico',
+  "/",
+  "/login",
+  "/signup",
+  "/listings",
+  "/search",
+  "/api/auth",
+  "/_next",
+  "/favicon.ico",
 ];
 
 /**
@@ -30,27 +32,22 @@ const PUBLIC_PATHS = [
  * Write operations on these paths are blocked for suspended users.
  */
 const PROTECTED_API_PATHS = [
-  '/api/listings',
-  '/api/bookings',
-  '/api/messages',
-  '/api/reviews',
+  "/api/listings",
+  "/api/bookings",
+  "/api/messages",
+  "/api/reviews",
 ];
 
 /**
  * Protected page paths that require suspension check.
  */
-const PROTECTED_PAGE_PATHS = [
-  '/dashboard',
-  '/listings/create',
-];
+const PROTECTED_PAGE_PATHS = ["/dashboard", "/listings/create"];
 
 /**
  * Read-only public API endpoints.
  * GET requests to these endpoints are allowed for suspended users.
  */
-const READ_ONLY_PUBLIC_ENDPOINTS = [
-  '/api/listings',
-];
+const READ_ONLY_PUBLIC_ENDPOINTS = ["/api/listings"];
 
 /**
  * Check if a pathname is a public route that doesn't need suspension check.
@@ -62,14 +59,14 @@ const READ_ONLY_PUBLIC_ENDPOINTS = [
 export function isPublicRoute(pathname: string): boolean {
   // Protected paths take precedence over public paths
   // e.g., /listings/create is protected even though /listings is public
-  const isProtected = PROTECTED_PAGE_PATHS.some(path => {
+  const isProtected = PROTECTED_PAGE_PATHS.some((path) => {
     return pathname === path || pathname.startsWith(`${path}/`);
   });
   if (isProtected) return false;
 
-  return PUBLIC_PATHS.some(path => {
+  return PUBLIC_PATHS.some((path) => {
     // Exact match for root
-    if (path === '/') return pathname === '/';
+    if (path === "/") return pathname === "/";
     // Prefix match for other paths
     return pathname === path || pathname.startsWith(`${path}/`);
   });
@@ -79,10 +76,13 @@ export function isPublicRoute(pathname: string): boolean {
  * Check if an endpoint is read-only and publicly accessible.
  * Suspended users can still read public data via GET requests.
  */
-export function isReadOnlyPublicEndpoint(pathname: string, method: string): boolean {
-  if (method !== 'GET') return false;
+export function isReadOnlyPublicEndpoint(
+  pathname: string,
+  method: string
+): boolean {
+  if (method !== "GET") return false;
 
-  return READ_ONLY_PUBLIC_ENDPOINTS.some(path => {
+  return READ_ONLY_PUBLIC_ENDPOINTS.some((path) => {
     return pathname === path || pathname.startsWith(`${path}/`);
   });
 }
@@ -92,12 +92,12 @@ export function isReadOnlyPublicEndpoint(pathname: string, method: string): bool
  */
 function isProtectedRoute(pathname: string): boolean {
   // Check protected API paths
-  const isProtectedApi = PROTECTED_API_PATHS.some(path => {
+  const isProtectedApi = PROTECTED_API_PATHS.some((path) => {
     return pathname === path || pathname.startsWith(`${path}/`);
   });
 
   // Check protected page paths
-  const isProtectedPage = PROTECTED_PAGE_PATHS.some(path => {
+  const isProtectedPage = PROTECTED_PAGE_PATHS.some((path) => {
     return pathname === path || pathname.startsWith(`${path}/`);
   });
 
@@ -107,13 +107,13 @@ function isProtectedRoute(pathname: string): boolean {
 function buildSuspensionBlockedResponse(): NextResponse {
   return NextResponse.json(
     {
-      error: 'Account suspended',
-      code: 'ACCOUNT_SUSPENDED',
+      error: "Account suspended",
+      code: "ACCOUNT_SUSPENDED",
     },
     {
       status: 403,
       headers: {
-        'Content-Type': 'application/json',
+        "Content-Type": "application/json",
       },
     }
   );
@@ -134,7 +134,10 @@ function buildSuspensionBlockedResponse(): NextResponse {
 // In Edge Runtime this cache is per-invocation (no benefit); in Node.js Runtime
 // it persists across warm invocations within the same function instance.
 /** @internal Exported for test cleanup only */
-export const _suspensionCache = new Map<string, { value: boolean | undefined; expiresAt: number }>();
+export const _suspensionCache = new Map<
+  string,
+  { value: boolean | undefined; expiresAt: number }
+>();
 const SUSPENSION_CACHE_TTL = 5 * 60 * 1000; // 5 minutes
 
 async function getLiveSuspensionStatus(
@@ -152,7 +155,10 @@ async function getLiveSuspensionStatus(
     });
 
     const value = user?.isSuspended === true;
-    _suspensionCache.set(userId, { value, expiresAt: Date.now() + SUSPENSION_CACHE_TTL });
+    _suspensionCache.set(userId, {
+      value,
+      expiresAt: Date.now() + SUSPENSION_CACHE_TTL,
+    });
 
     // Prevent unbounded cache growth
     if (_suspensionCache.size > 1000) {
@@ -173,7 +179,9 @@ async function getLiveSuspensionStatus(
  *
  * @returns NextResponse with 403 if blocked, null if allowed to proceed
  */
-export async function checkSuspension(request: NextRequest): Promise<NextResponse | null> {
+export async function checkSuspension(
+  request: NextRequest
+): Promise<NextResponse | null> {
   const pathname = request.nextUrl.pathname;
   const method = request.method;
 
@@ -208,7 +216,7 @@ export async function checkSuspension(request: NextRequest): Promise<NextRespons
   }
 
   // Live check: catch newly suspended users before token refresh.
-  const userId = typeof token.sub === 'string' ? token.sub : undefined;
+  const userId = typeof token.sub === "string" ? token.sub : undefined;
   if (!userId) {
     return null;
   }
@@ -229,12 +237,12 @@ export async function checkSuspension(request: NextRequest): Promise<NextRespons
  * email_verified is not exactly true (false, undefined, or truthy non-boolean).
  */
 export function isGoogleEmailVerified(
-    profile: { email_verified?: boolean } | undefined
+  profile: { email_verified?: boolean } | undefined
 ): boolean {
-    return profile?.email_verified === true;
+  return profile?.email_verified === true;
 }
 
 /** Auth route paths - must match auth.ts pages config */
 export const AUTH_ROUTES = {
-    signIn: '/login',
+  signIn: "/login",
 } as const;

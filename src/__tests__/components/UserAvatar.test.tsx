@@ -1,196 +1,200 @@
-import { render, screen } from '@testing-library/react'
-import UserAvatar from '@/components/UserAvatar'
+import { render, screen } from "@testing-library/react";
+import UserAvatar from "@/components/UserAvatar";
 
-describe('UserAvatar', () => {
-  describe('with image', () => {
-    it('renders image when provided', () => {
-      render(<UserAvatar image="/avatar.jpg" name="John Doe" />)
-      const img = screen.getByRole('img')
-      expect(img).toHaveAttribute('src', '/avatar.jpg')
-      expect(img).toHaveAttribute('alt', 'John Doe')
-    })
+describe("UserAvatar", () => {
+  describe("with image", () => {
+    it("renders image when provided", () => {
+      render(<UserAvatar image="/avatar.jpg" name="John Doe" />);
+      const img = screen.getByRole("img");
+      expect(img).toHaveAttribute("src", "/avatar.jpg");
+      expect(img).toHaveAttribute("alt", "John Doe");
+    });
 
     it('uses "User" as alt when name is not provided', () => {
-      render(<UserAvatar image="/avatar.jpg" />)
-      const img = screen.getByRole('img')
-      expect(img).toHaveAttribute('alt', 'User')
-    })
+      render(<UserAvatar image="/avatar.jpg" />);
+      const img = screen.getByRole("img");
+      expect(img).toHaveAttribute("alt", "User");
+    });
 
-    it('handles null name', () => {
-      render(<UserAvatar image="/avatar.jpg" name={null} />)
-      const img = screen.getByRole('img')
-      expect(img).toHaveAttribute('alt', 'User')
-    })
-  })
+    it("handles null name", () => {
+      render(<UserAvatar image="/avatar.jpg" name={null} />);
+      const img = screen.getByRole("img");
+      expect(img).toHaveAttribute("alt", "User");
+    });
+  });
 
-  describe('without image', () => {
-    it('renders default SVG avatar', () => {
-      const { container } = render(<UserAvatar />)
-      const svg = container.querySelector('svg')
-      expect(svg).toBeInTheDocument()
-    })
+  describe("without image", () => {
+    it("renders default SVG avatar", () => {
+      const { container } = render(<UserAvatar />);
+      const svg = container.querySelector("svg");
+      expect(svg).toBeInTheDocument();
+    });
 
-    it('renders SVG when image is null', () => {
-      const { container } = render(<UserAvatar image={null} />)
-      const svg = container.querySelector('svg')
-      expect(svg).toBeInTheDocument()
-    })
+    it("renders SVG when image is null", () => {
+      const { container } = render(<UserAvatar image={null} />);
+      const svg = container.querySelector("svg");
+      expect(svg).toBeInTheDocument();
+    });
 
-    it('renders SVG when image is undefined', () => {
-      const { container } = render(<UserAvatar image={undefined} />)
-      const svg = container.querySelector('svg')
-      expect(svg).toBeInTheDocument()
-    })
+    it("renders SVG when image is undefined", () => {
+      const { container } = render(<UserAvatar image={undefined} />);
+      const svg = container.querySelector("svg");
+      expect(svg).toBeInTheDocument();
+    });
 
-    it('does not render img element', () => {
-      render(<UserAvatar />)
-      expect(screen.queryByRole('img')).not.toBeInTheDocument()
-    })
+    it("does not render img element", () => {
+      render(<UserAvatar />);
+      expect(screen.queryByRole("img")).not.toBeInTheDocument();
+    });
 
-    it('renders SVG when image is empty string', () => {
-      const { container } = render(<UserAvatar image="" />)
-      const svg = container.querySelector('svg')
-      expect(svg).toBeInTheDocument()
-    })
+    it("renders SVG when image is empty string", () => {
+      const { container } = render(<UserAvatar image="" />);
+      const svg = container.querySelector("svg");
+      expect(svg).toBeInTheDocument();
+    });
 
-    it('renders SVG when image is whitespace only', () => {
-      const { container } = render(<UserAvatar image="   " />)
-      const svg = container.querySelector('svg')
-      expect(svg).toBeInTheDocument()
-    })
+    it("renders SVG when image is whitespace only", () => {
+      const { container } = render(<UserAvatar image="   " />);
+      const svg = container.querySelector("svg");
+      expect(svg).toBeInTheDocument();
+    });
 
-    it('renders initials when image is empty string but name is provided', () => {
-      const { container } = render(<UserAvatar image="" name="John Doe" />)
-      const svg = container.querySelector('svg')
-      expect(svg).not.toBeInTheDocument()
-      expect(container.textContent).toBe('J')
-    })
+    it("renders initials when image is empty string but name is provided", () => {
+      const { container } = render(<UserAvatar image="" name="John Doe" />);
+      const svg = container.querySelector("svg");
+      expect(svg).not.toBeInTheDocument();
+      expect(container.textContent).toBe("J");
+    });
 
-    it('renders initials when image is invalid URL but name is provided', () => {
-      const { container } = render(<UserAvatar image="not-a-valid-url" name="Jane" />)
-      const svg = container.querySelector('svg')
-      expect(svg).not.toBeInTheDocument()
-      expect(container.textContent).toBe('J')
-    })
-  })
+    it("renders initials when image is invalid URL but name is provided", () => {
+      const { container } = render(
+        <UserAvatar image="not-a-valid-url" name="Jane" />
+      );
+      const svg = container.querySelector("svg");
+      expect(svg).not.toBeInTheDocument();
+      expect(container.textContent).toBe("J");
+    });
+  });
 
-  describe('sizes', () => {
-    it('renders sm size', () => {
-      const { container } = render(<UserAvatar size="sm" />)
-      const wrapper = container.firstChild
-      expect(wrapper).toHaveClass('w-8', 'h-8')
-    })
+  describe("sizes", () => {
+    it("renders sm size", () => {
+      const { container } = render(<UserAvatar size="sm" />);
+      const wrapper = container.firstChild;
+      expect(wrapper).toHaveClass("w-8", "h-8");
+    });
 
-    it('renders md size by default', () => {
-      const { container } = render(<UserAvatar />)
-      const wrapper = container.firstChild
-      expect(wrapper).toHaveClass('w-10', 'h-10')
-    })
+    it("renders md size by default", () => {
+      const { container } = render(<UserAvatar />);
+      const wrapper = container.firstChild;
+      expect(wrapper).toHaveClass("w-10", "h-10");
+    });
 
-    it('renders lg size', () => {
-      const { container } = render(<UserAvatar size="lg" />)
-      const wrapper = container.firstChild
-      expect(wrapper).toHaveClass('w-12', 'h-12')
-    })
+    it("renders lg size", () => {
+      const { container } = render(<UserAvatar size="lg" />);
+      const wrapper = container.firstChild;
+      expect(wrapper).toHaveClass("w-12", "h-12");
+    });
 
-    it('renders xl size', () => {
-      const { container } = render(<UserAvatar size="xl" />)
-      const wrapper = container.firstChild
-      expect(wrapper).toHaveClass('w-16', 'h-16')
-    })
-  })
+    it("renders xl size", () => {
+      const { container } = render(<UserAvatar size="xl" />);
+      const wrapper = container.firstChild;
+      expect(wrapper).toHaveClass("w-16", "h-16");
+    });
+  });
 
-  describe('with image and sizes', () => {
-    it('renders sm size with image', () => {
-      const { container } = render(<UserAvatar image="/avatar.jpg" size="sm" />)
-      const wrapper = container.firstChild
-      expect(wrapper).toHaveClass('w-8', 'h-8')
-      expect(screen.getByRole('img')).toBeInTheDocument()
-    })
+  describe("with image and sizes", () => {
+    it("renders sm size with image", () => {
+      const { container } = render(
+        <UserAvatar image="/avatar.jpg" size="sm" />
+      );
+      const wrapper = container.firstChild;
+      expect(wrapper).toHaveClass("w-8", "h-8");
+      expect(screen.getByRole("img")).toBeInTheDocument();
+    });
 
-    it('renders lg size with image', () => {
-      const { container } = render(<UserAvatar image="/avatar.jpg" size="lg" />)
-      const wrapper = container.firstChild
-      expect(wrapper).toHaveClass('w-12', 'h-12')
-    })
-  })
+    it("renders lg size with image", () => {
+      const { container } = render(
+        <UserAvatar image="/avatar.jpg" size="lg" />
+      );
+      const wrapper = container.firstChild;
+      expect(wrapper).toHaveClass("w-12", "h-12");
+    });
+  });
 
-  describe('className prop', () => {
-    it('applies custom className with image', () => {
+  describe("className prop", () => {
+    it("applies custom className with image", () => {
       const { container } = render(
         <UserAvatar image="/avatar.jpg" className="custom-class" />
-      )
-      expect(container.firstChild).toHaveClass('custom-class')
-    })
+      );
+      expect(container.firstChild).toHaveClass("custom-class");
+    });
 
-    it('applies custom className without image', () => {
-      const { container } = render(
-        <UserAvatar className="custom-class" />
-      )
-      expect(container.firstChild).toHaveClass('custom-class')
-    })
+    it("applies custom className without image", () => {
+      const { container } = render(<UserAvatar className="custom-class" />);
+      expect(container.firstChild).toHaveClass("custom-class");
+    });
 
-    it('merges custom className with size classes', () => {
+    it("merges custom className with size classes", () => {
       const { container } = render(
         <UserAvatar size="lg" className="border-2" />
-      )
-      const wrapper = container.firstChild
-      expect(wrapper).toHaveClass('w-12', 'h-12', 'border-2')
-    })
-  })
+      );
+      const wrapper = container.firstChild;
+      expect(wrapper).toHaveClass("w-12", "h-12", "border-2");
+    });
+  });
 
-  describe('styling', () => {
-    it('has rounded-full class with image', () => {
-      const { container } = render(<UserAvatar image="/avatar.jpg" />)
-      expect(container.firstChild).toHaveClass('rounded-full')
-    })
+  describe("styling", () => {
+    it("has rounded-full class with image", () => {
+      const { container } = render(<UserAvatar image="/avatar.jpg" />);
+      expect(container.firstChild).toHaveClass("rounded-full");
+    });
 
-    it('has rounded-full class without image', () => {
-      const { container } = render(<UserAvatar />)
-      expect(container.firstChild).toHaveClass('rounded-full')
-    })
+    it("has rounded-full class without image", () => {
+      const { container } = render(<UserAvatar />);
+      expect(container.firstChild).toHaveClass("rounded-full");
+    });
 
-    it('has overflow-hidden with image', () => {
-      const { container } = render(<UserAvatar image="/avatar.jpg" />)
-      expect(container.firstChild).toHaveClass('overflow-hidden')
-    })
+    it("has overflow-hidden with image", () => {
+      const { container } = render(<UserAvatar image="/avatar.jpg" />);
+      expect(container.firstChild).toHaveClass("overflow-hidden");
+    });
 
-    it('has flex and center classes without image', () => {
-      const { container } = render(<UserAvatar />)
-      const wrapper = container.firstChild
-      expect(wrapper).toHaveClass('flex', 'items-center', 'justify-center')
-    })
-  })
+    it("has flex and center classes without image", () => {
+      const { container } = render(<UserAvatar />);
+      const wrapper = container.firstChild;
+      expect(wrapper).toHaveClass("flex", "items-center", "justify-center");
+    });
+  });
 
-  describe('image styling', () => {
-    it('image has correct classes', () => {
-      render(<UserAvatar image="/avatar.jpg" />)
-      const img = screen.getByRole('img')
+  describe("image styling", () => {
+    it("image has correct classes", () => {
+      render(<UserAvatar image="/avatar.jpg" />);
+      const img = screen.getByRole("img");
       // P1-18: Next.js Image uses fill prop so only object-cover is needed
-      expect(img).toHaveClass('object-cover')
-    })
-  })
+      expect(img).toHaveClass("object-cover");
+    });
+  });
 
-  describe('SVG avatar', () => {
-    it('SVG has correct viewBox', () => {
-      const { container } = render(<UserAvatar />)
-      const svg = container.querySelector('svg')
-      expect(svg).toHaveAttribute('viewBox', '0 0 24 24')
-    })
+  describe("SVG avatar", () => {
+    it("SVG has correct viewBox", () => {
+      const { container } = render(<UserAvatar />);
+      const svg = container.querySelector("svg");
+      expect(svg).toHaveAttribute("viewBox", "0 0 24 24");
+    });
 
-    it('SVG has correct sizing classes', () => {
-      const { container } = render(<UserAvatar />)
-      const svg = container.querySelector('svg')
+    it("SVG has correct sizing classes", () => {
+      const { container } = render(<UserAvatar />);
+      const svg = container.querySelector("svg");
       // lucide-react uses CSS classes for sizing
-      expect(svg).toHaveClass('w-[60%]', 'h-[60%]')
-    })
+      expect(svg).toHaveClass("w-[60%]", "h-[60%]");
+    });
 
-    it('SVG contains circle and path elements', () => {
-      const { container } = render(<UserAvatar />)
-      const circle = container.querySelector('circle')
-      const path = container.querySelector('path')
-      expect(circle).toBeInTheDocument()
-      expect(path).toBeInTheDocument()
-    })
-  })
-})
+    it("SVG contains circle and path elements", () => {
+      const { container } = render(<UserAvatar />);
+      const circle = container.querySelector("circle");
+      const path = container.querySelector("path");
+      expect(circle).toBeInTheDocument();
+      expect(path).toBeInTheDocument();
+    });
+  });
+});

@@ -24,7 +24,7 @@ describe("marker-utils", () => {
       id: string,
       lat: number,
       lng: number,
-      price: number = 1000,
+      price: number = 1000
     ): MapMarkerListing => ({
       id,
       title: `Listing ${id}`,

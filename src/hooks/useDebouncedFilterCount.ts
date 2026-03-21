@@ -73,7 +73,7 @@ export interface UseDebouncedFilterCountReturn {
  */
 function generateCacheKey(
   pending: BatchedFilterValues,
-  searchParams: URLSearchParams,
+  searchParams: URLSearchParams
 ): string {
   // Build key from pending filters
   const filterParts = [
@@ -109,7 +109,7 @@ function generateCacheKey(
  */
 function buildCountUrl(
   pending: BatchedFilterValues,
-  searchParams: URLSearchParams,
+  searchParams: URLSearchParams
 ): string {
   const params = new URLSearchParams();
 
@@ -163,7 +163,7 @@ function getCachedEntry(cacheKey: string): CachedCount | undefined {
 function setCachedEntry(
   cacheKey: string,
   count: number | null,
-  boundsRequired: boolean,
+  boundsRequired: boolean
 ): void {
   countCache.set(cacheKey, { count, boundsRequired }, CACHE_TTL_MS);
 }
@@ -192,7 +192,7 @@ export function useDebouncedFilterCount({
   // Generate cache key for current state
   const cacheKey = useMemo(
     () => generateCacheKey(pending, searchParams),
-    [pending, searchParams],
+    [pending, searchParams]
   );
 
   // Fetch count function
@@ -240,8 +240,7 @@ export function useDebouncedFilterCount({
       if (typeof data !== "object" || data === null) {
         throw new Error("Invalid count response: expected object");
       }
-      const newCount =
-        typeof data.count === "number" ? data.count : null;
+      const newCount = typeof data.count === "number" ? data.count : null;
       // P3b: Parse boundsRequired from API response
       const newBoundsRequired = data.boundsRequired === true;
 

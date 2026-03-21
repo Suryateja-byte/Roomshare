@@ -72,7 +72,7 @@ describe("Category H: Bookings Workflow Edge Cases", () => {
         userId: string,
         listingId: string,
         startDate: Date,
-        endDate: Date,
+        endDate: Date
       ): string => {
         return `${userId}:${listingId}:${startDate.toISOString()}:${endDate.toISOString()}`;
       };
@@ -81,14 +81,14 @@ describe("Category H: Bookings Workflow Edge Cases", () => {
         "user-1",
         "listing-1",
         new Date("2024-02-01"),
-        new Date("2024-05-01"),
+        new Date("2024-05-01")
       );
 
       const key2 = generateIdempotencyKey(
         "user-1",
         "listing-1",
         new Date("2024-02-01"),
-        new Date("2024-06-01"), // Different end date
+        new Date("2024-06-01") // Different end date
       );
 
       expect(key1).not.toBe(key2);
@@ -111,7 +111,7 @@ describe("Category H: Bookings Workflow Edge Cases", () => {
       const bookings: string[] = [];
 
       const createWithIdempotency = async (
-        key: string,
+        key: string
       ): Promise<{ bookingId: string; isNew: boolean }> => {
         if (processedKeys.has(key)) {
           return { bookingId: "existing-booking", isNew: false };
@@ -230,7 +230,7 @@ describe("Category H: Bookings Workflow Edge Cases", () => {
         start1: Date,
         end1: Date,
         start2: Date,
-        end2: Date,
+        end2: Date
       ): boolean => {
         return start1 < end2 && start2 < end1;
       };
@@ -241,8 +241,8 @@ describe("Category H: Bookings Workflow Edge Cases", () => {
           new Date("2024-01-01"),
           new Date("2024-03-01"),
           new Date("2024-02-01"),
-          new Date("2024-04-01"),
-        ),
+          new Date("2024-04-01")
+        )
       ).toBe(true);
 
       // Non-overlapping (sequential)
@@ -251,8 +251,8 @@ describe("Category H: Bookings Workflow Edge Cases", () => {
           new Date("2024-01-01"),
           new Date("2024-02-01"),
           new Date("2024-02-01"),
-          new Date("2024-03-01"),
-        ),
+          new Date("2024-03-01")
+        )
       ).toBe(false);
 
       // Non-overlapping (gap)
@@ -261,8 +261,8 @@ describe("Category H: Bookings Workflow Edge Cases", () => {
           new Date("2024-01-01"),
           new Date("2024-02-01"),
           new Date("2024-03-01"),
-          new Date("2024-04-01"),
-        ),
+          new Date("2024-04-01")
+        )
       ).toBe(false);
     });
 
@@ -271,7 +271,7 @@ describe("Category H: Bookings Workflow Edge Cases", () => {
         start1: Date,
         end1: Date,
         start2: Date,
-        end2: Date,
+        end2: Date
       ): boolean => {
         return start1 < end2 && start2 < end1;
       };
@@ -301,7 +301,7 @@ describe("Category H: Bookings Workflow Edge Cases", () => {
         start1: Date,
         end1: Date,
         start2: Date,
-        end2: Date,
+        end2: Date
       ): boolean => {
         return start1 < end2 && start2 < end1;
       };
@@ -311,8 +311,8 @@ describe("Category H: Bookings Workflow Edge Cases", () => {
           b.startDate,
           b.endDate,
           newBooking.startDate,
-          newBooking.endDate,
-        ),
+          newBooking.endDate
+        )
       ).length;
 
       expect(overlappingCount).toBe(2);
@@ -341,7 +341,7 @@ describe("Category H: Bookings Workflow Edge Cases", () => {
     it("should allow valid status transitions", () => {
       const canTransition = (
         from: BookingStatus,
-        to: BookingStatus,
+        to: BookingStatus
       ): boolean => {
         return validTransitions[from].includes(to);
       };
@@ -356,7 +356,7 @@ describe("Category H: Bookings Workflow Edge Cases", () => {
     it("should reject invalid status transitions", () => {
       const canTransition = (
         from: BookingStatus,
-        to: BookingStatus,
+        to: BookingStatus
       ): boolean => {
         return validTransitions[from].includes(to);
       };
@@ -372,7 +372,7 @@ describe("Category H: Bookings Workflow Edge Cases", () => {
 
       const attemptTransition = (
         b: typeof booking,
-        newStatus: BookingStatus,
+        newStatus: BookingStatus
       ): { success: boolean; error?: string } => {
         if (!validTransitions[b.status].includes(newStatus)) {
           return {
@@ -401,7 +401,7 @@ describe("Category H: Bookings Workflow Edge Cases", () => {
 
       const canOwnerAction = (
         userId: string,
-        action: "ACCEPT" | "REJECT",
+        action: "ACCEPT" | "REJECT"
       ): boolean => {
         return (
           userId === booking.listingOwnerId &&
@@ -448,7 +448,7 @@ describe("Category H: Bookings Workflow Edge Cases", () => {
       const calculateTotalPrice = (
         monthlyRent: number,
         startDate: Date,
-        endDate: Date,
+        endDate: Date
       ): number => {
         const months =
           (endDate.getTime() - startDate.getTime()) /
@@ -460,7 +460,7 @@ describe("Category H: Bookings Workflow Edge Cases", () => {
       const total = calculateTotalPrice(
         800,
         new Date("2024-01-01"),
-        new Date("2024-04-01"),
+        new Date("2024-04-01")
       );
 
       expect(total).toBeCloseTo(2400, -2);
@@ -470,7 +470,7 @@ describe("Category H: Bookings Workflow Edge Cases", () => {
       const calculateTotalPrice = (
         monthlyRent: number,
         startDate: Date,
-        endDate: Date,
+        endDate: Date
       ): number => {
         const days =
           (endDate.getTime() - startDate.getTime()) / (24 * 60 * 60 * 1000);
@@ -482,7 +482,7 @@ describe("Category H: Bookings Workflow Edge Cases", () => {
       const total = calculateTotalPrice(
         800,
         new Date("2024-01-01"),
-        new Date("2024-02-15"),
+        new Date("2024-02-15")
       );
 
       expect(total).toBeCloseTo(1200, -2);
@@ -548,13 +548,13 @@ describe("Category H: Bookings Workflow Edge Cases", () => {
       };
 
       expect(
-        isValidDateRange(new Date("2024-01-01"), new Date("2024-02-01")),
+        isValidDateRange(new Date("2024-01-01"), new Date("2024-02-01"))
       ).toBe(true);
       expect(
-        isValidDateRange(new Date("2024-02-01"), new Date("2024-01-01")),
+        isValidDateRange(new Date("2024-02-01"), new Date("2024-01-01"))
       ).toBe(false);
       expect(
-        isValidDateRange(new Date("2024-01-01"), new Date("2024-01-01")),
+        isValidDateRange(new Date("2024-01-01"), new Date("2024-01-01"))
       ).toBe(false);
     });
   });
@@ -566,7 +566,7 @@ describe("Category H: Bookings Workflow Edge Cases", () => {
     it("should check capacity before accepting", () => {
       const checkCapacity = (
         totalSlots: number,
-        overlappingAcceptedCount: number,
+        overlappingAcceptedCount: number
       ): boolean => {
         return overlappingAcceptedCount < totalSlots;
       };
@@ -653,7 +653,7 @@ describe("Category H: Bookings Workflow Edge Cases", () => {
               attempts < MAX_RETRIES
             ) {
               await new Promise((resolve) =>
-                setTimeout(resolve, 100 * attempts),
+                setTimeout(resolve, 100 * attempts)
               );
               continue;
             }
@@ -682,7 +682,7 @@ describe("Category H: Bookings Workflow Edge Cases", () => {
 
       const getNotificationType = (
         status: string,
-        isNewBooking: boolean,
+        isNewBooking: boolean
       ): NotificationType => {
         if (isNewBooking) return "BOOKING_REQUEST";
         switch (status) {
@@ -708,7 +708,7 @@ describe("Category H: Bookings Workflow Edge Cases", () => {
         status: string,
         isNewBooking: boolean,
         ownerId: string,
-        tenantId: string,
+        tenantId: string
       ): string => {
         if (isNewBooking) return ownerId; // New booking → notify owner
         if (status === "CANCELLED") return ownerId; // Cancellation → notify owner
@@ -740,7 +740,7 @@ describe("Category H: Bookings Workflow Edge Cases", () => {
     it("should auto-deactivate listing when all slots filled", () => {
       const shouldDeactivate = (
         availableSlots: number,
-        totalSlots: number,
+        totalSlots: number
       ): boolean => {
         return availableSlots === 0 && totalSlots > 0;
       };
@@ -766,7 +766,7 @@ describe("Category H: Bookings Workflow Edge Cases", () => {
 
       const sentBookings = bookings.filter((b) => b.tenantId === userId);
       const receivedBookings = bookings.filter(
-        (b) => b.listingOwnerId === userId,
+        (b) => b.listingOwnerId === userId
       );
 
       expect(sentBookings.length).toBe(2);
@@ -781,7 +781,7 @@ describe("Category H: Bookings Workflow Edge Cases", () => {
       ];
 
       const sorted = [...bookings].sort(
-        (a, b) => b.createdAt.getTime() - a.createdAt.getTime(),
+        (a, b) => b.createdAt.getTime() - a.createdAt.getTime()
       );
 
       expect(sorted.map((b) => b.id)).toEqual(["b3", "b1", "b2"]);
@@ -827,7 +827,7 @@ describe("Category H: Bookings Workflow Edge Cases", () => {
 
       const updateWithVersion = (
         listing: Listing,
-        expectedVersion: number,
+        expectedVersion: number
       ): { success: boolean; listing?: Listing } => {
         if (listing.version !== expectedVersion) {
           return { success: false }; // Concurrent modification detected
@@ -890,7 +890,7 @@ describe("Category H: Bookings Workflow Edge Cases", () => {
 
       const rejectBooking = (
         bookingId: string,
-        reason?: string,
+        reason?: string
       ): BookingRejection => {
         return {
           bookingId,

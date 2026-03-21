@@ -36,7 +36,7 @@ jest.mock("@/lib/rate-limit-client", () => ({
 // Returns a unique query string per chip.id to isolate cache keys across tests.
 jest.mock("@/components/filters/filter-chip-utils", () => ({
   removeFilterFromUrl: jest.fn(
-    (_params: URLSearchParams, chip: { id: string }) => `filter=${chip.id}`,
+    (_params: URLSearchParams, chip: { id: string }) => `filter=${chip.id}`
   ),
 }));
 
@@ -99,7 +99,7 @@ describe("useFilterImpactCount", () => {
         chip,
         isHovering: false,
         currentCount: 45,
-      }),
+      })
     );
 
     expect(result.current.impactDelta).toBeNull();
@@ -120,7 +120,7 @@ describe("useFilterImpactCount", () => {
         chip,
         isHovering: true,
         currentCount: 45,
-      }),
+      })
     );
 
     // Before debounce fires — no fetch yet
@@ -150,7 +150,7 @@ describe("useFilterImpactCount", () => {
         chip,
         isHovering: true,
         currentCount: 45,
-      }),
+      })
     );
 
     act(() => {
@@ -177,7 +177,7 @@ describe("useFilterImpactCount", () => {
         chip,
         isHovering: true,
         currentCount: 45,
-      }),
+      })
     );
 
     act(() => {
@@ -208,7 +208,7 @@ describe("useFilterImpactCount", () => {
           isHovering: true,
           currentCount: 45,
         },
-      },
+      }
     );
 
     // First hover — fetch fires
@@ -247,7 +247,7 @@ describe("useFilterImpactCount", () => {
         chip,
         isHovering: false,
         currentCount: 45,
-      }),
+      })
     );
 
     act(() => {
@@ -275,7 +275,7 @@ describe("useFilterImpactCount", () => {
           isHovering: true,
           currentCount: 45,
         },
-      },
+      }
     );
 
     act(() => {
@@ -287,7 +287,12 @@ describe("useFilterImpactCount", () => {
     });
 
     // Switch to a different chip — should reset state immediately
-    rerender({ searchParams, chip: chip2, isHovering: false, currentCount: 45 });
+    rerender({
+      searchParams,
+      chip: chip2,
+      isHovering: false,
+      currentCount: 45,
+    });
 
     expect(result.current.impactDelta).toBeNull();
     expect(result.current.formattedDelta).toBeNull();
@@ -306,7 +311,7 @@ describe("useFilterImpactCount", () => {
         chip,
         isHovering: true,
         currentCount: null,
-      }),
+      })
     );
 
     act(() => {
@@ -337,11 +342,13 @@ describe("useFilterImpactCount", () => {
           isHovering: true,
           currentCount: 45,
         },
-      },
+      }
     );
 
     // Advance 50 ms — within the debounce window, no fetch yet
-    act(() => { jest.advanceTimersByTime(50); });
+    act(() => {
+      jest.advanceTimersByTime(50);
+    });
     expect(mockRateLimitedFetch).not.toHaveBeenCalled();
 
     // Toggle off then back on — debounce resets
@@ -349,11 +356,15 @@ describe("useFilterImpactCount", () => {
     rerender({ searchParams, chip, isHovering: true, currentCount: 45 });
 
     // Another 50 ms — still within new debounce window
-    act(() => { jest.advanceTimersByTime(50); });
+    act(() => {
+      jest.advanceTimersByTime(50);
+    });
     expect(mockRateLimitedFetch).not.toHaveBeenCalled();
 
     // Advance past full debounce window — exactly one fetch should fire
-    act(() => { jest.advanceTimersByTime(DEBOUNCE_MS); });
+    act(() => {
+      jest.advanceTimersByTime(DEBOUNCE_MS);
+    });
 
     await waitFor(() => {
       expect(result.current.isLoading).toBe(false);
@@ -384,14 +395,21 @@ describe("useFilterImpactCount", () => {
           isHovering: true,
           currentCount: 45,
         },
-      },
+      }
     );
 
     // Trigger the debounce — fetch starts for chip1
-    act(() => { jest.advanceTimersByTime(DEBOUNCE_MS); });
+    act(() => {
+      jest.advanceTimersByTime(DEBOUNCE_MS);
+    });
 
     // Change chip before first fetch resolves — state resets
-    rerender({ searchParams, chip: chip2, isHovering: false, currentCount: 45 });
+    rerender({
+      searchParams,
+      chip: chip2,
+      isHovering: false,
+      currentCount: 45,
+    });
 
     // Resolve the first fetch for chip1 — should be ignored (aborted)
     act(() => {
@@ -419,10 +437,12 @@ describe("useFilterImpactCount", () => {
         chip,
         isHovering: true,
         currentCount: 45,
-      }),
+      })
     );
 
-    act(() => { jest.advanceTimersByTime(DEBOUNCE_MS); });
+    act(() => {
+      jest.advanceTimersByTime(DEBOUNCE_MS);
+    });
 
     // No fetch should have been made while offline
     expect(mockRateLimitedFetch).not.toHaveBeenCalled();
@@ -440,10 +460,12 @@ describe("useFilterImpactCount", () => {
         chip,
         isHovering: true,
         currentCount: 45,
-      }),
+      })
     );
 
-    act(() => { jest.advanceTimersByTime(DEBOUNCE_MS); });
+    act(() => {
+      jest.advanceTimersByTime(DEBOUNCE_MS);
+    });
 
     await waitFor(() => {
       expect(result.current.error).not.toBeNull();
@@ -468,10 +490,12 @@ describe("useFilterImpactCount", () => {
         chip,
         isHovering: true,
         currentCount: 45,
-      }),
+      })
     );
 
-    act(() => { jest.advanceTimersByTime(DEBOUNCE_MS); });
+    act(() => {
+      jest.advanceTimersByTime(DEBOUNCE_MS);
+    });
 
     await waitFor(() => {
       expect(result.current.isLoading).toBe(false);
@@ -495,10 +519,12 @@ describe("useFilterImpactCount", () => {
         chip,
         isHovering: true,
         currentCount: 45,
-      }),
+      })
     );
 
-    act(() => { jest.advanceTimersByTime(DEBOUNCE_MS); });
+    act(() => {
+      jest.advanceTimersByTime(DEBOUNCE_MS);
+    });
 
     await waitFor(() => {
       expect(result.current.isLoading).toBe(false);

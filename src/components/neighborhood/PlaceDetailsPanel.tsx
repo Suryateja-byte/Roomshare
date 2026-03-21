@@ -1,4 +1,4 @@
-'use client';
+"use client";
 
 /**
  * PlaceDetailsPanel - Slide-in panel showing place details
@@ -9,12 +9,12 @@
  * This component is used for Pro users to get detailed POI information.
  */
 
-import { useEffect, useRef, useState } from 'react';
-import { X, ExternalLink, Navigation } from 'lucide-react';
-import { Button } from '@/components/ui/button';
-import { formatDistance } from '@/lib/geo/distance';
-import type { POI } from '@/lib/places/types';
-import { loadPlacesUiKit } from '@/lib/googleMapsUiKitLoader';
+import { useEffect, useRef, useState } from "react";
+import { X, ExternalLink, Navigation } from "lucide-react";
+import { Button } from "@/components/ui/button";
+import { formatDistance } from "@/lib/geo/distance";
+import type { POI } from "@/lib/places/types";
+import { loadPlacesUiKit } from "@/lib/googleMapsUiKitLoader";
 
 interface PlaceDetailsPanelProps {
   /** The POI to display details for */
@@ -28,7 +28,7 @@ interface PlaceDetailsPanelProps {
 export function PlaceDetailsPanel({
   poi,
   onClose,
-  className = '',
+  className = "",
 }: PlaceDetailsPanelProps) {
   const panelRef = useRef<HTMLDivElement>(null);
   const detailsContainerRef = useRef<HTMLDivElement>(null);
@@ -50,15 +50,17 @@ export function PlaceDetailsPanel({
         if (!mounted || !detailsContainerRef.current) return;
 
         // Clear previous content
-        detailsContainerRef.current.innerHTML = '';
+        detailsContainerRef.current.innerHTML = "";
 
         // Create the place details compact element
-        const detailsElement = document.createElement('gmp-place-details-compact');
-        detailsElement.setAttribute('place', poi.placeId);
+        const detailsElement = document.createElement(
+          "gmp-place-details-compact"
+        );
+        detailsElement.setAttribute("place", poi.placeId);
 
         // Style the web component container
-        detailsElement.style.display = 'block';
-        detailsElement.style.width = '100%';
+        detailsElement.style.display = "block";
+        detailsElement.style.width = "100%";
 
         detailsContainerRef.current.appendChild(detailsElement);
 
@@ -67,9 +69,9 @@ export function PlaceDetailsPanel({
 
         setIsLoading(false);
       } catch (error) {
-        console.error('Failed to load place details:', error);
+        console.error("Failed to load place details:", error);
         if (mounted) {
-          setLoadError('Failed to load place details');
+          setLoadError("Failed to load place details");
           setIsLoading(false);
         }
       }
@@ -85,16 +87,17 @@ export function PlaceDetailsPanel({
   // Handle keyboard navigation and focus trap
   useEffect(() => {
     const handleKeyDown = (e: KeyboardEvent) => {
-      if (e.key === 'Escape') {
+      if (e.key === "Escape") {
         onClose();
         return;
       }
 
       // Focus trap: keep Tab cycling within the panel
-      if (e.key === 'Tab' && panelRef.current) {
-        const focusableElements = panelRef.current.querySelectorAll<HTMLElement>(
-          'button, [href], input, select, textarea, [tabindex]:not([tabindex="-1"])'
-        );
+      if (e.key === "Tab" && panelRef.current) {
+        const focusableElements =
+          panelRef.current.querySelectorAll<HTMLElement>(
+            'button, [href], input, select, textarea, [tabindex]:not([tabindex="-1"])'
+          );
         const firstElement = focusableElements[0];
         const lastElement = focusableElements[focusableElements.length - 1];
 
@@ -115,14 +118,15 @@ export function PlaceDetailsPanel({
     };
 
     if (poi) {
-      document.addEventListener('keydown', handleKeyDown);
+      document.addEventListener("keydown", handleKeyDown);
       // Focus the close button on open
-      const firstFocusable = panelRef.current?.querySelector<HTMLElement>('button');
+      const firstFocusable =
+        panelRef.current?.querySelector<HTMLElement>("button");
       firstFocusable?.focus();
     }
 
     return () => {
-      document.removeEventListener('keydown', handleKeyDown);
+      document.removeEventListener("keydown", handleKeyDown);
     };
   }, [poi, onClose]);
 
@@ -131,7 +135,9 @@ export function PlaceDetailsPanel({
     return null;
   }
 
-  const googleMapsUrl = poi.googleMapsURI || `https://www.google.com/maps/place/?q=place_id:${poi.placeId}`;
+  const googleMapsUrl =
+    poi.googleMapsURI ||
+    `https://www.google.com/maps/place/?q=place_id:${poi.placeId}`;
   const directionsUrl = `https://www.google.com/maps/dir/?api=1&destination_place_id=${poi.placeId}`;
 
   return (
@@ -213,7 +219,7 @@ export function PlaceDetailsPanel({
           {/* Google Places UI Kit details container */}
           <div
             ref={detailsContainerRef}
-            className={isLoading || loadError ? 'hidden' : ''}
+            className={isLoading || loadError ? "hidden" : ""}
           />
 
           {/* Attribution - required by Google ToS */}
@@ -228,7 +234,7 @@ export function PlaceDetailsPanel({
             <Button
               variant="outline"
               className="flex-1"
-              onClick={() => window.open(directionsUrl, '_blank')}
+              onClick={() => window.open(directionsUrl, "_blank")}
               aria-label="Get directions (opens in new tab)"
             >
               <Navigation className="h-4 w-4 mr-2" aria-hidden="true" />
@@ -238,7 +244,7 @@ export function PlaceDetailsPanel({
             <Button
               variant="primary"
               className="flex-1"
-              onClick={() => window.open(googleMapsUrl, '_blank')}
+              onClick={() => window.open(googleMapsUrl, "_blank")}
               aria-label="Open in Google Maps (opens in new tab)"
             >
               <ExternalLink className="h-4 w-4 mr-2" aria-hidden="true" />
@@ -254,13 +260,14 @@ export function PlaceDetailsPanel({
 
 // Declare the custom elements for TypeScript
 declare global {
+  // eslint-disable-next-line @typescript-eslint/no-namespace -- required for custom element type declaration
   namespace JSX {
     interface IntrinsicElements {
-      'gmp-place-details-compact': React.DetailedHTMLProps<
+      "gmp-place-details-compact": React.DetailedHTMLProps<
         React.HTMLAttributes<HTMLElement> & { place?: string },
         HTMLElement
       >;
-      'gmp-place-attribution': React.DetailedHTMLProps<
+      "gmp-place-attribution": React.DetailedHTMLProps<
         React.HTMLAttributes<HTMLElement>,
         HTMLElement
       >;

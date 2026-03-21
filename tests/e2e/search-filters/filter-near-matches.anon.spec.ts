@@ -53,7 +53,7 @@ test.describe("Near Matches & Low Results Guidance", () => {
 
     // Should have 1-4 results — verify guidance panel is visible
     const guidancePanel = searchResultsContainer(page).locator(
-      'text=/Only.*listing.*found/i'
+      "text=/Only.*listing.*found/i"
     );
     await expect(guidancePanel).toBeVisible({ timeout: 10_000 });
 
@@ -82,7 +82,7 @@ test.describe("Near Matches & Low Results Guidance", () => {
 
     // Check if guidance panel is visible (need 1-4 results)
     const guidancePanel = searchResultsContainer(page).locator(
-      'text=/Only.*listing.*found/i'
+      "text=/Only.*listing.*found/i"
     );
     const isGuidanceVisible = await guidancePanel.isVisible();
 
@@ -101,10 +101,15 @@ test.describe("Near Matches & Low Results Guidance", () => {
     await includeNearMatchesBtn.click();
 
     // Wait for URL to contain nearMatches=1 via soft navigation
-    await expect.poll(
-      () => new URL(page.url(), "http://localhost").searchParams.get("nearMatches"),
-      { timeout: 30_000, message: 'URL param "nearMatches" to be "1"' },
-    ).toBe("1");
+    await expect
+      .poll(
+        () =>
+          new URL(page.url(), "http://localhost").searchParams.get(
+            "nearMatches"
+          ),
+        { timeout: 30_000, message: 'URL param "nearMatches" to be "1"' }
+      )
+      .toBe("1");
 
     // Verify URL has nearMatches=1
     const currentUrl = new URL(page.url());
@@ -143,7 +148,7 @@ test.describe("Near Matches & Low Results Guidance", () => {
       expect(ariaLabel).toMatch(/\d+\s+near\s+match/i);
 
       // Verify it contains text about near matches
-      const separatorText = separator.locator('text=/near match/i');
+      const separatorText = separator.locator("text=/near match/i");
       await expect(separatorText).toBeVisible();
     } else {
       // This is acceptable — may need specific data to trigger near matches
@@ -170,7 +175,7 @@ test.describe("Near Matches & Low Results Guidance", () => {
 
     // Check if guidance panel is visible
     const guidancePanel = searchResultsContainer(page).locator(
-      'text=/Only.*listing.*found/i'
+      "text=/Only.*listing.*found/i"
     );
     const isGuidanceVisible = await guidancePanel.isVisible();
 
@@ -196,10 +201,7 @@ test.describe("Near Matches & Low Results Guidance", () => {
 
     if (buttonCount === 0) {
       // Try a more general approach — look for any button near the guidance text
-      const anyButton = guidancePanel
-        .locator("..")
-        .locator("button")
-        .first();
+      const anyButton = guidancePanel.locator("..").locator("button").first();
       const hasAnyButton = await anyButton.isVisible();
 
       if (!hasAnyButton) {
@@ -214,10 +216,12 @@ test.describe("Near Matches & Low Results Guidance", () => {
     }
 
     // Wait for URL to change via soft navigation
-    await expect.poll(
-      () => page.url(),
-      { timeout: 10_000, message: "URL to change after suggestion click" },
-    ).not.toBe(initialUrl.href);
+    await expect
+      .poll(() => page.url(), {
+        timeout: 10_000,
+        message: "URL to change after suggestion click",
+      })
+      .not.toBe(initialUrl.href);
 
     // Verify that at least one filter param was removed from the URL
     const newUrl = new URL(page.url());
@@ -250,7 +254,7 @@ test.describe("Near Matches & Low Results Guidance", () => {
       if (cardCount >= 5) {
         // Verify guidance is NOT visible
         const guidancePanel = searchResultsContainer(page).locator(
-          'text=/Only.*listing.*found/i'
+          "text=/Only.*listing.*found/i"
         );
         await expect(guidancePanel).not.toBeVisible();
 
@@ -279,7 +283,8 @@ test.describe("Near Matches & Low Results Guidance", () => {
       await page.waitForLoadState("domcontentloaded");
       // Wait for either listing cards or the zero-results heading to appear
       await page
-        .locator('text=/No.*match|No listing/i').or(page.locator('a[href^="/listings/"]'))
+        .locator("text=/No.*match|No listing/i")
+        .or(page.locator('a[href^="/listings/"]'))
         .first()
         .waitFor({ state: "attached", timeout: 30_000 });
       await page.waitForLoadState("domcontentloaded").catch(() => {});
@@ -289,15 +294,17 @@ test.describe("Near Matches & Low Results Guidance", () => {
       if (cardCount === 0) {
         // "Only N listings found" should NOT be visible
         const guidancePanel = searchResultsContainer(page).locator(
-          'text=/Only.*listing.*found/i'
+          "text=/Only.*listing.*found/i"
         );
         await expect(guidancePanel).not.toBeVisible();
 
         // Instead, "No matches found" or "No exact matches" heading should be visible
         // (from ZeroResultsSuggestions component)
-        const zeroResultsHeading = searchResultsContainer(page).locator(
-          'h2:has-text("No matches found"), h3:has-text("No listings found"), h3:has-text("No exact matches")'
-        ).first();
+        const zeroResultsHeading = searchResultsContainer(page)
+          .locator(
+            'h2:has-text("No matches found"), h3:has-text("No listings found"), h3:has-text("No exact matches")'
+          )
+          .first();
         await expect(zeroResultsHeading).toBeVisible({ timeout: 10_000 });
       } else {
         console.log(
@@ -321,7 +328,7 @@ test.describe("Near Matches & Low Results Guidance", () => {
 
     // The guidance panel should NOT be visible (nearMatchesEnabled=true returns null)
     const guidancePanel = searchResultsContainer(page).locator(
-      'text=/Only.*listing.*found/i'
+      "text=/Only.*listing.*found/i"
     );
     await expect(guidancePanel).not.toBeVisible();
 

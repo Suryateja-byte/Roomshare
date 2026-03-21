@@ -34,7 +34,7 @@ import { logger } from "@/lib/logger";
 describe("search-doc-dirty", () => {
   beforeEach(() => {
     jest.clearAllMocks();
-    process.env.ENABLE_SEARCH_DOC = 'true';
+    process.env.ENABLE_SEARCH_DOC = "true";
   });
 
   afterEach(() => {
@@ -58,7 +58,7 @@ describe("search-doc-dirty", () => {
 
       // Should not throw
       await expect(
-        markListingDirty("listing-123", "listing_updated"),
+        markListingDirty("listing-123", "listing_updated")
       ).resolves.toBeUndefined();
 
       // Should log the error via structured logger
@@ -68,7 +68,7 @@ describe("search-doc-dirty", () => {
           listingId: "listing-...",
           reason: "listing_updated",
           error: "Connection failed",
-        }),
+        })
       );
     });
 
@@ -97,7 +97,7 @@ describe("search-doc-dirty", () => {
 
       await markListingsDirty(
         ["listing-1", "listing-2", "listing-3"],
-        "status_changed",
+        "status_changed"
       );
 
       expect(prisma.$executeRaw).toHaveBeenCalledTimes(1);
@@ -114,7 +114,7 @@ describe("search-doc-dirty", () => {
       (prisma.$executeRaw as jest.Mock).mockRejectedValue(dbError);
 
       await expect(
-        markListingsDirty(["listing-1", "listing-2"], "review_changed"),
+        markListingsDirty(["listing-1", "listing-2"], "review_changed")
       ).resolves.toBeUndefined();
 
       expect(logger.sync.error).toHaveBeenCalledWith(
@@ -123,7 +123,7 @@ describe("search-doc-dirty", () => {
           count: 2,
           reason: "review_changed",
           error: "Batch insert failed",
-        }),
+        })
       );
     });
 

@@ -33,9 +33,7 @@ test.describe("Session Expiry: Messaging", () => {
 
     // Click first conversation if available
     const firstConvo = page.locator('a[href^="/messages/"]').first();
-    if (
-      !(await firstConvo.isVisible({ timeout: 10000 }).catch(() => false))
-    ) {
+    if (!(await firstConvo.isVisible({ timeout: 10000 }).catch(() => false))) {
       test.skip(true, "No conversations available for test");
       return;
     }
@@ -58,7 +56,9 @@ test.describe("Session Expiry: Messaging", () => {
 
     // 5. Verify toast notification about session expiry
     await expect(
-      page.locator("[data-sonner-toast]").filter({ hasText: /session.*expired/i }),
+      page
+        .locator("[data-sonner-toast]")
+        .filter({ hasText: /session.*expired/i })
     ).toBeVisible({ timeout: 10000 });
 
     // 6. Verify redirect to login with callbackUrl
@@ -75,9 +75,7 @@ test.describe("Session Expiry: Messaging", () => {
     await page.waitForLoadState("domcontentloaded");
 
     const firstConvo = page.locator('a[href^="/messages/"]').first();
-    if (
-      !(await firstConvo.isVisible({ timeout: 10000 }).catch(() => false))
-    ) {
+    if (!(await firstConvo.isVisible({ timeout: 10000 }).catch(() => false))) {
       test.skip(true, "No conversations available");
       return;
     }
@@ -91,7 +89,7 @@ test.describe("Session Expiry: Messaging", () => {
       ({ id, draft }) => {
         sessionStorage.setItem(`chat_draft_${id}`, draft);
       },
-      { id: conversationId, draft: testDraft },
+      { id: conversationId, draft: testDraft }
     );
 
     // Reload to trigger the useEffect draft restoration
@@ -104,7 +102,9 @@ test.describe("Session Expiry: Messaging", () => {
 
     // Verify restoration toast appeared
     await expect(
-      page.locator("[data-sonner-toast]").filter({ hasText: /draft.*restored/i }),
+      page
+        .locator("[data-sonner-toast]")
+        .filter({ hasText: /draft.*restored/i })
     ).toBeVisible({ timeout: 10000 });
   });
 
@@ -114,7 +114,11 @@ test.describe("Session Expiry: Messaging", () => {
     // Clear auth cookies to simulate expired session.
     // Don't use expireSession() — its route mock for /api/auth/session is
     // irrelevant for server-side redirects and can interfere with navigation.
-    for (const cookie of ["authjs.session-token", "authjs.csrf-token", "authjs.callback-url"]) {
+    for (const cookie of [
+      "authjs.session-token",
+      "authjs.csrf-token",
+      "authjs.callback-url",
+    ]) {
       await page.context().clearCookies({ name: cookie });
     }
 
@@ -123,8 +127,8 @@ test.describe("Session Expiry: Messaging", () => {
     // NOT an HTTP 302. We must wait for the client-side router to process it.
     await page.goto("/messages");
     await page.waitForFunction(
-      () => !window.location.pathname.startsWith('/messages'),
-      { timeout: 15_000 },
+      () => !window.location.pathname.startsWith("/messages"),
+      { timeout: 15_000 }
     );
   });
 });

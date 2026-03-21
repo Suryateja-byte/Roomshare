@@ -69,7 +69,10 @@ async function step1_semanticSearch() {
   console.log(`  Map pins: ${mapData?.features?.length || 0}\n`);
 
   // Verify result count
-  assert(listings.length === 12, `First page has ${listings.length} items (expected 12)`);
+  assert(
+    listings.length === 12,
+    `First page has ${listings.length} items (expected 12)`
+  );
   assert(!!nextCursor, "Next cursor exists for pagination");
 
   // Verify top result is the most relevant
@@ -82,8 +85,13 @@ async function step1_semanticSearch() {
   }
 
   // Check if "Sunny Mission Room" is in top 5 (it should be — it matches all query terms)
-  const sunnyInTop5 = listings.slice(0, 5).some((l) => l.title.includes("Sunny"));
-  assert(sunnyInTop5, `"Sunny Mission Room" is in top 5 (matches all query terms)`);
+  const sunnyInTop5 = listings
+    .slice(0, 5)
+    .some((l) => l.title.includes("Sunny"));
+  assert(
+    sunnyInTop5,
+    `"Sunny Mission Room" is in top 5 (matches all query terms)`
+  );
 
   // Verify map has data
   const mapPinCount = mapData?.features?.length || 0;
@@ -91,7 +99,10 @@ async function step1_semanticSearch() {
 
   // Track IDs for dedup verification
   const page1Ids = new Set(listings.map((l) => l.id));
-  assert(page1Ids.size === listings.length, `No duplicates in page 1 (${page1Ids.size} unique)`);
+  assert(
+    page1Ids.size === listings.length,
+    `No duplicates in page 1 (${page1Ids.size} unique)`
+  );
 
   return { nextCursor, page1Ids, listings, mapPinCount };
 }
@@ -130,10 +141,15 @@ async function step2_pagination(cursor: string, seenIds: Set<string>) {
   // Check for duplicates with page 1
   const page2Ids = new Set(listings.map((l) => l.id));
   const duplicates = listings.filter((l) => seenIds.has(l.id));
-  assert(duplicates.length === 0, `No duplicates between page 1 and page 2 (found ${duplicates.length})`);
+  assert(
+    duplicates.length === 0,
+    `No duplicates between page 1 and page 2 (found ${duplicates.length})`
+  );
 
   if (duplicates.length > 0) {
-    console.log(`  Duplicate IDs: ${duplicates.map((l) => l.title).join(", ")}`);
+    console.log(
+      `  Duplicate IDs: ${duplicates.map((l) => l.title).join(", ")}`
+    );
   }
 
   // Merge IDs
@@ -144,7 +160,9 @@ async function step2_pagination(cursor: string, seenIds: Set<string>) {
   // Show page 2 top results
   console.log(`  Page 2 top 3:`);
   for (let i = 0; i < Math.min(3, listings.length); i++) {
-    console.log(`    #${i + 1}: ${listings[i].title} — $${listings[i].price}/mo`);
+    console.log(
+      `    #${i + 1}: ${listings[i].title} — $${listings[i].price}/mo`
+    );
   }
 
   return { nextCursor, allIds };
@@ -191,7 +209,10 @@ async function step3_applyFilter() {
     }
   }
   assert(allPetFriendly, "All results have 'Pets allowed' house rule");
-  assert(listings.length < 12 || listings.length === 12, `Filtered results ≤ 12 (got ${listings.length})`);
+  assert(
+    listings.length < 12 || listings.length === 12,
+    `Filtered results ≤ 12 (got ${listings.length})`
+  );
 
   // Verify map still has data
   const mapPins = mapData?.features?.length || 0;
@@ -199,13 +220,18 @@ async function step3_applyFilter() {
 
   // Check IDs are fresh (no contamination from previous pages)
   const filterIds = new Set(listings.map((l) => l.id));
-  assert(filterIds.size === listings.length, `No duplicates in filtered results`);
+  assert(
+    filterIds.size === listings.length,
+    `No duplicates in filtered results`
+  );
 
   console.log(`\n  Top 3 filtered results:`);
   for (let i = 0; i < Math.min(3, listings.length); i++) {
     const l = listings[i];
     const rules = (l as any).houseRules || [];
-    console.log(`    #${i + 1}: ${l.title} — $${l.price}/mo — Rules: ${rules.join(", ")}`);
+    console.log(
+      `    #${i + 1}: ${l.title} — $${l.price}/mo — Rules: ${rules.join(", ")}`
+    );
   }
 
   return { nextCursor, filterIds };
@@ -214,11 +240,16 @@ async function step3_applyFilter() {
 // ============================================================
 // STEP 4: Paginate after filter
 // ============================================================
-async function step4_paginateAfterFilter(cursor: string | null, filterIds: Set<string>) {
+async function step4_paginateAfterFilter(
+  cursor: string | null,
+  filterIds: Set<string>
+) {
   section("STEP 4: Paginate After Filter");
 
   if (!cursor) {
-    console.log(`  ${WARN}: No cursor available — fewer results than page size after filter`);
+    console.log(
+      `  ${WARN}: No cursor available — fewer results than page size after filter`
+    );
     console.log(`  This is expected when filter narrows results below 12`);
     return;
   }
@@ -246,7 +277,10 @@ async function step4_paginateAfterFilter(cursor: string | null, filterIds: Set<s
 
   // Check no duplicates with filtered page 1
   const duplicates = listings.filter((l) => filterIds.has(l.id));
-  assert(duplicates.length === 0, `No duplicates between filtered pages (found ${duplicates.length})`);
+  assert(
+    duplicates.length === 0,
+    `No duplicates between filtered pages (found ${duplicates.length})`
+  );
 }
 
 // ============================================================
@@ -278,11 +312,17 @@ async function step5_removeFilter() {
   console.log(`  Results after filter removal: ${listings.length} items`);
   console.log(`  Map pins: ${mapData?.features?.length || 0}\n`);
 
-  assert(listings.length === 12, `Full page of results restored (${listings.length})`);
+  assert(
+    listings.length === 12,
+    `Full page of results restored (${listings.length})`
+  );
 
   // Verify "Sunny Mission Room" is still #1 (semantic ranking preserved)
   const sunnyTop = listings[0]?.title?.includes("Sunny") || false;
-  assert(sunnyTop, `"Sunny Mission Room" is still #1 after filter removal (got: "${listings[0]?.title}")`);
+  assert(
+    sunnyTop,
+    `"Sunny Mission Room" is still #1 after filter removal (got: "${listings[0]?.title}")`
+  );
 
   const mapPins = mapData?.features?.length || 0;
   assert(mapPins > 0, `Map pins restored (${mapPins})`);
@@ -314,7 +354,9 @@ async function step6_verifyRelevance() {
     const r = results[i];
     const sim = (r.similarity * 100).toFixed(1);
     const bar = "█".repeat(Math.round(r.similarity * 20));
-    const hasParking = r.amenities?.some((a: string) => a.toLowerCase().includes("parking"));
+    const hasParking = r.amenities?.some((a: string) =>
+      a.toLowerCase().includes("parking")
+    );
     const hasSunny = r.title?.toLowerCase().includes("sunny");
 
     let tag = "";
@@ -323,19 +365,31 @@ async function step6_verifyRelevance() {
     else if (hasSunny) tag = " ← has sunny";
 
     if (r.similarity >= 0.35) relevantCount++;
-    console.log(`    #${String(i + 1).padStart(2)}: ${bar} ${sim}% │ ${r.title}${tag}`);
+    console.log(
+      `    #${String(i + 1).padStart(2)}: ${bar} ${sim}% │ ${r.title}${tag}`
+    );
   }
 
   console.log();
-  assert(relevantCount >= 10, `${relevantCount}/12 results above 35% similarity threshold`);
-  assert(results[0].similarity >= 0.45, `Top result has ≥45% similarity (${(results[0].similarity * 100).toFixed(1)}%)`);
+  assert(
+    relevantCount >= 10,
+    `${relevantCount}/12 results above 35% similarity threshold`
+  );
+  assert(
+    results[0].similarity >= 0.45,
+    `Top result has ≥45% similarity (${(results[0].similarity * 100).toFixed(1)}%)`
+  );
 
   // Verify the best match has highest combined score
   const bestMatch = results.find(
-    (r: any) => r.title?.includes("Sunny") && r.amenities?.some((a: string) => a.toLowerCase().includes("parking"))
+    (r: any) =>
+      r.title?.includes("Sunny") &&
+      r.amenities?.some((a: string) => a.toLowerCase().includes("parking"))
   );
   if (bestMatch) {
-    console.log(`  Best semantic+keyword match: "${bestMatch.title}" at ${(bestMatch.similarity * 100).toFixed(1)}%`);
+    console.log(
+      `  Best semantic+keyword match: "${bestMatch.title}" at ${(bestMatch.similarity * 100).toFixed(1)}%`
+    );
     assert(true, "Best match (sunny + parking) found in top 12");
   } else {
     assert(false, "Best match (sunny + parking) NOT found in top 12");
@@ -348,7 +402,9 @@ async function step6_verifyRelevance() {
 async function main() {
   console.log("\n" + "═".repeat(70));
   console.log("  CRITICAL USER FLOW 1: Full Simulation");
-  console.log("  Semantic Search → Pagination → Filter → Relevance Verification");
+  console.log(
+    "  Semantic Search → Pagination → Filter → Relevance Verification"
+  );
   console.log("═".repeat(70));
 
   let passed = 0;
@@ -357,15 +413,24 @@ async function main() {
   try {
     // Step 1: Semantic search
     const s1 = await step1_semanticSearch();
-    if (!s1) { failed++; return; }
+    if (!s1) {
+      failed++;
+      return;
+    }
 
     // Step 2: Pagination
     const s2 = await step2_pagination(s1.nextCursor!, s1.page1Ids);
-    if (!s2) { failed++; return; }
+    if (!s2) {
+      failed++;
+      return;
+    }
 
     // Step 3: Apply filter
     const s3 = await step3_applyFilter();
-    if (!s3) { failed++; return; }
+    if (!s3) {
+      failed++;
+      return;
+    }
 
     // Step 4: Paginate after filter
     await step4_paginateAfterFilter(s3.nextCursor || null, s3.filterIds);
@@ -375,9 +440,10 @@ async function main() {
 
     // Step 6: Verify relevance
     await step6_verifyRelevance();
-
   } catch (err) {
-    console.log(`\n  ${FAIL}: Unhandled error: ${err instanceof Error ? err.message : err}`);
+    console.log(
+      `\n  ${FAIL}: Unhandled error: ${err instanceof Error ? err.message : err}`
+    );
     failed++;
   }
 

@@ -28,7 +28,7 @@ test.beforeEach(async () => {
 async function goToListing(
   page: import("@playwright/test").Page,
   nav: ReturnType<typeof import("../helpers").navigationHelpers>,
-  query: string,
+  query: string
 ) {
   await nav.goToSearch({ q: query, bounds: SF_BOUNDS });
   await expect(searchResultsContainer(page)).toBeAttached({
@@ -59,7 +59,9 @@ test.describe("LD: Page Load & Content (Visitor)", () => {
     const found = await goToListing(page, nav, "Reviewer Nob Hill");
     test.skip(!found, "Listing not found in search");
 
-    await expect(page.locator("h1")).toContainText("Reviewer Nob Hill Apartment");
+    await expect(page.locator("h1")).toContainText(
+      "Reviewer Nob Hill Apartment"
+    );
     // City name visible (in breadcrumb or stats bar)
     await expect(page.getByText("San Francisco").first()).toBeVisible();
   });
@@ -81,7 +83,7 @@ test.describe("LD: Page Load & Content (Visitor)", () => {
     test.skip(!found, "Listing not found");
 
     await expect(
-      page.getByRole("heading", { name: /About this place/ }),
+      page.getByRole("heading", { name: /About this place/ })
     ).toBeVisible();
     await expect(page.getByText(/Cozy apartment on Nob Hill/)).toBeVisible();
   });
@@ -91,7 +93,7 @@ test.describe("LD: Page Load & Content (Visitor)", () => {
     test.skip(!found, "Listing not found");
 
     await expect(
-      page.getByRole("heading", { name: /What this place offers/ }),
+      page.getByRole("heading", { name: /What this place offers/ })
     ).toBeVisible();
     await expect(page.getByText("WiFi")).toBeVisible();
   });
@@ -108,7 +110,7 @@ test.describe("LD: Page Load & Content (Visitor)", () => {
     // Contact Host button is only rendered after session hydration (viewerReady).
     // On Mobile Chrome this can be slower — use a generous explicit timeout.
     await expect(
-      page.getByRole("button", { name: /Contact Host/i }),
+      page.getByRole("button", { name: /Contact Host/i })
     ).toBeVisible({ timeout: 45_000 });
     await expect(page.getByText("Identity verified")).toBeVisible();
   });
@@ -121,7 +123,7 @@ test.describe("LD: Page Load & Content (Visitor)", () => {
     await expect(page.getByText(/\$1,?500/).first()).toBeVisible();
     await expect(page.getByText(/\/ month|\/mo/).first()).toBeVisible();
     await expect(
-      page.getByRole("button", { name: /Request to Book/i }),
+      page.getByRole("button", { name: /Request to Book/i })
     ).toBeVisible();
   });
 
@@ -129,9 +131,7 @@ test.describe("LD: Page Load & Content (Visitor)", () => {
     const found = await goToListing(page, nav, "Reviewer Nob Hill");
     test.skip(!found, "Listing not found");
 
-    await expect(
-      page.getByRole("heading", { name: /Reviews/ }),
-    ).toBeVisible();
+    await expect(page.getByRole("heading", { name: /Reviews/ })).toBeVisible();
     // Count in parentheses — could be (0) or higher
     await expect(page.getByText(/\(\d+\)/)).toBeVisible();
   });
@@ -141,10 +141,7 @@ test.describe("LD: Page Load & Content (Visitor)", () => {
 // Block 2: Visitor Action Buttons ("Reviewer Nob Hill Apartment")
 // ═══════════════════════════════════════════════════════════════════════════
 test.describe("LD: Visitor Action Buttons", () => {
-  test("LD-08  share button opens fallback dropdown", async ({
-    page,
-    nav,
-  }) => {
+  test("LD-08  share button opens fallback dropdown", async ({ page, nav }) => {
     const found = await goToListing(page, nav, "Reviewer Nob Hill");
     test.skip(!found, "Listing not found");
 
@@ -177,21 +174,21 @@ test.describe("LD: Visitor Action Buttons", () => {
 
     if (initialLabel?.includes("Save")) {
       await expect(
-        page.getByRole("button", { name: /Remove from saved/i }),
+        page.getByRole("button", { name: /Remove from saved/i })
       ).toBeVisible({ timeout: 5_000 });
       // Toggle back to clean up
       await page.getByRole("button", { name: /Remove from saved/i }).click();
       await expect(
-        page.getByRole("button", { name: /Save listing/i }),
+        page.getByRole("button", { name: /Save listing/i })
       ).toBeVisible({ timeout: 5_000 });
     } else {
       await expect(
-        page.getByRole("button", { name: /Save listing/i }),
+        page.getByRole("button", { name: /Save listing/i })
       ).toBeVisible({ timeout: 5_000 });
       // Toggle back
       await page.getByRole("button", { name: /Save listing/i }).click();
       await expect(
-        page.getByRole("button", { name: /Remove from saved/i }),
+        page.getByRole("button", { name: /Remove from saved/i })
       ).toBeVisible({ timeout: 5_000 });
     }
   });
@@ -203,7 +200,7 @@ test.describe("LD: Visitor Action Buttons", () => {
     // ReportButton has a hydration guard (mounted state) — wait for Radix
     // DialogTrigger to hydrate by checking for data-state attribute
     const reportBtn = page.locator(
-      'button:has-text("Report this listing")[data-state]',
+      'button:has-text("Report this listing")[data-state]'
     );
     const hydrated = await reportBtn
       .waitFor({ state: "attached", timeout: 10_000 })
@@ -252,7 +249,7 @@ test.describe("LD: Image Gallery", () => {
   }, testInfo) => {
     test.skip(
       testInfo.project.name.includes("Mobile"),
-      "Desktop-only keyboard test",
+      "Desktop-only keyboard test"
     );
 
     const found = await goToListing(page, nav, "Sunny Mission Room");
@@ -271,7 +268,10 @@ test.describe("LD: Image Gallery", () => {
       .waitFor({ state: "visible", timeout: 5_000 })
       .then(() => true)
       .catch(() => false);
-    test.skip(!lightboxOpen, "Lightbox did not open (images may not be available)");
+    test.skip(
+      !lightboxOpen,
+      "Lightbox did not open (images may not be available)"
+    );
 
     // Lightbox counter
     await expect(page.getByText("1 / 2")).toBeVisible({ timeout: 5_000 });
@@ -296,13 +296,10 @@ test.describe("LD: Image Gallery", () => {
     await expect(page.getByText("1 / 2")).not.toBeVisible({ timeout: 3_000 });
   });
 
-  test("LD-13  zoom toggle in lightbox", async ({
-    page,
-    nav,
-  }, testInfo) => {
+  test("LD-13  zoom toggle in lightbox", async ({ page, nav }, testInfo) => {
     test.skip(
       testInfo.project.name.includes("Mobile"),
-      "Desktop-only lightbox test",
+      "Desktop-only lightbox test"
     );
 
     const found = await goToListing(page, nav, "Sunny Mission Room");
@@ -321,7 +318,10 @@ test.describe("LD: Image Gallery", () => {
       .waitFor({ state: "visible", timeout: 5_000 })
       .then(() => true)
       .catch(() => false);
-    test.skip(!lightboxOpen, "Lightbox did not open (images may not be available)");
+    test.skip(
+      !lightboxOpen,
+      "Lightbox did not open (images may not be available)"
+    );
 
     await expect(page.getByText("1 / 2")).toBeVisible({ timeout: 5_000 });
 
@@ -355,19 +355,17 @@ test.describe("LD: Owner View", () => {
     await expect(page.getByText("Manage Listing")).toBeVisible();
     await expect(page.getByText("Edit Listing")).toBeVisible();
     // Delete button
-    await expect(
-      page.getByRole("button", { name: /Delete/i }),
-    ).toBeVisible();
+    await expect(page.getByRole("button", { name: /Delete/i })).toBeVisible();
     // "View listing as guest" link
     await expect(page.getByText("View listing as guest")).toBeVisible();
 
     // Booking form must NOT be visible
     await expect(
-      page.getByRole("button", { name: /Request to Book/i }),
+      page.getByRole("button", { name: /Request to Book/i })
     ).not.toBeVisible({ timeout: 3_000 });
     // Save button must NOT be visible for owner
     await expect(
-      page.getByRole("button", { name: /Save listing/i }),
+      page.getByRole("button", { name: /Save listing/i })
     ).not.toBeVisible({ timeout: 3_000 });
   });
 
@@ -383,7 +381,9 @@ test.describe("LD: Owner View", () => {
 
     // Dropdown options (labels or descriptions)
     await expect(
-      page.getByText(/Visible to everyone|Hidden from search|Marked as rented/).first(),
+      page
+        .getByText(/Visible to everyone|Hidden from search|Marked as rented/)
+        .first()
     ).toBeVisible({ timeout: 5_000 });
 
     // Close by pressing Escape — do NOT change status
@@ -429,7 +429,7 @@ test.describe("LD: Booking Form", () => {
   }, testInfo) => {
     test.skip(
       testInfo.project.name.includes("Mobile"),
-      "Desktop-only DatePicker test",
+      "Desktop-only DatePicker test"
     );
 
     const found = await goToListing(page, nav, "Reviewer Nob Hill");
@@ -443,12 +443,11 @@ test.describe("LD: Booking Form", () => {
     // Click opens calendar popover
     await page.locator("#booking-start-date").click();
     await expect(
-      page.getByRole("button", { name: /next month/i }).or(
-        page.locator("[aria-label='Go to next month']"),
-      ),
+      page
+        .getByRole("button", { name: /next month/i })
+        .or(page.locator("[aria-label='Go to next month']"))
     ).toBeVisible({ timeout: 5_000 });
   });
-
 });
 
 // ═══════════════════════════════════════════════════════════════════════════
@@ -465,9 +464,7 @@ test.describe("LD: Unauthenticated", () => {
     test.skip(!found, "Listing not found");
 
     // Should see login prompt instead of booking form
-    const signInCta = page
-      .getByText(/Sign in to book this room/i)
-      .first();
+    const signInCta = page.getByText(/Sign in to book this room/i).first();
     await expect(signInCta).toBeVisible({ timeout: 10000 });
   });
 });
@@ -484,40 +481,52 @@ test.describe("LD: Reviews", () => {
     test.skip(!found, "Listing not found");
 
     // Check if any reviews section exists on the page
-    const reviewsSection = page.locator('[data-testid="reviews"], [data-testid="review"], section').filter({ hasText: /review/i });
-    const hasReviewsSection = await reviewsSection.first().isVisible({ timeout: 5000 }).catch(() => false);
+    const reviewsSection = page
+      .locator('[data-testid="reviews"], [data-testid="review"], section')
+      .filter({ hasText: /review/i });
+    const hasReviewsSection = await reviewsSection
+      .first()
+      .isVisible({ timeout: 5000 })
+      .catch(() => false);
     if (!hasReviewsSection) {
-      test.skip(true, "No reviews section visible — seed data may not have reviews for this listing");
+      test.skip(
+        true,
+        "No reviews section visible — seed data may not have reviews for this listing"
+      );
       return;
     }
 
     // Review count — soft assertion since seed data may vary
     const reviewCount = page.getByText(/\(\d+\)/).first();
-    const hasCount = await reviewCount.isVisible({ timeout: 5000 }).catch(() => false);
+    const hasCount = await reviewCount
+      .isVisible({ timeout: 5000 })
+      .catch(() => false);
     if (hasCount) {
       await expect(reviewCount).toBeVisible();
     }
 
     // Reviewer name — skip if not present (seed data may vary)
     const reviewerName = page.getByText("E2E Reviewer");
-    const hasReviewer = await reviewerName.isVisible({ timeout: 5000 }).catch(() => false);
-    test.skip(!hasReviewer, "E2E Reviewer not found — seed data may not include this reviewer");
+    const hasReviewer = await reviewerName
+      .isVisible({ timeout: 5000 })
+      .catch(() => false);
+    test.skip(
+      !hasReviewer,
+      "E2E Reviewer not found — seed data may not include this reviewer"
+    );
 
     // Review comment text (seed: "Great place! Clean, well-maintained...")
     await expect(
-      page.getByText(/Great place/).or(page.getByText(/well-maintained/i)),
+      page.getByText(/Great place/).or(page.getByText(/well-maintained/i))
     ).toBeVisible();
 
     // At least one filled star icon
     await expect(
-      page.locator(".fill-yellow-400, .text-yellow-400").first(),
+      page.locator(".fill-yellow-400, .text-yellow-400").first()
     ).toBeAttached();
   });
 
-  test("LD-22  owner sees Respond button on reviews", async ({
-    page,
-    nav,
-  }) => {
+  test("LD-22  owner sees Respond button on reviews", async ({ page, nav }) => {
     const found = await goToListing(page, nav, "Sunny Mission Room");
     test.skip(!found, "Listing not found");
 
@@ -527,7 +536,10 @@ test.describe("LD: Reviews", () => {
       .first();
 
     const canRespond = await respondBtn.isVisible().catch(() => false);
-    test.skip(!canRespond, "No respond button — review may already have response");
+    test.skip(
+      !canRespond,
+      "No respond button — review may already have response"
+    );
 
     await expect(respondBtn).toBeVisible();
   });

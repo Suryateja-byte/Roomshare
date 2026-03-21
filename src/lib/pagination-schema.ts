@@ -7,7 +7,7 @@
  * - Cursor validation (alphanumeric + hyphens only)
  */
 
-import { z } from 'zod';
+import { z } from "zod";
 
 // Cursor must be alphanumeric with hyphens only (no special characters/XSS)
 const cursorPattern = /^[a-zA-Z0-9-]+$/;
@@ -16,10 +16,9 @@ export const paginationSchema = z.object({
   cursor: z
     .string()
     .optional()
-    .refine(
-      (val) => !val || cursorPattern.test(val),
-      { message: 'Invalid cursor format' }
-    ),
+    .refine((val) => !val || cursorPattern.test(val), {
+      message: "Invalid cursor format",
+    }),
   limit: z
     .string()
     .optional()
@@ -29,14 +28,10 @@ export const paginationSchema = z.object({
       if (isNaN(num)) return null; // Will fail validation
       return num;
     })
-    .refine(
-      (val) => val !== null,
-      { message: 'limit must be a valid number' }
-    )
-    .refine(
-      (val) => val === null || val >= 1,
-      { message: 'limit must be at least 1' }
-    )
+    .refine((val) => val !== null, { message: "limit must be a valid number" })
+    .refine((val) => val === null || val >= 1, {
+      message: "limit must be at least 1",
+    })
     .transform((val) => Math.min(val as number, 100)), // Cap at 100
 });
 
@@ -48,15 +43,17 @@ export type PaginationParams = {
 /**
  * Parse and validate pagination parameters from URL search params
  */
-export function parsePaginationParams(searchParams: URLSearchParams): {
-  success: true;
-  data: PaginationParams;
-} | {
-  success: false;
-  error: string;
-} {
-  const cursor = searchParams.get('cursor') || undefined;
-  const limit = searchParams.get('limit') || undefined;
+export function parsePaginationParams(searchParams: URLSearchParams):
+  | {
+      success: true;
+      data: PaginationParams;
+    }
+  | {
+      success: false;
+      error: string;
+    } {
+  const cursor = searchParams.get("cursor") || undefined;
+  const limit = searchParams.get("limit") || undefined;
 
   const result = paginationSchema.safeParse({ cursor, limit });
 
@@ -64,7 +61,7 @@ export function parsePaginationParams(searchParams: URLSearchParams): {
     const firstError = result.error.issues[0];
     return {
       success: false,
-      error: firstError?.message || 'Invalid pagination parameters',
+      error: firstError?.message || "Invalid pagination parameters",
     };
   }
 
@@ -95,9 +92,10 @@ export function buildPaginationResponse<T extends { id: string }>(
   // We fetch limit + 1 to check if there are more items
   const hasMore = items.length > limit;
   const returnedItems = hasMore ? items.slice(0, limit) : items;
-  const nextCursor = hasMore && returnedItems.length > 0
-    ? returnedItems[returnedItems.length - 1].id
-    : null;
+  const nextCursor =
+    hasMore && returnedItems.length > 0
+      ? returnedItems[returnedItems.length - 1].id
+      : null;
 
   return {
     items: returnedItems,

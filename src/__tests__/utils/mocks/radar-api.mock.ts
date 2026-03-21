@@ -615,14 +615,14 @@ export function createMockFetchResponse(data: unknown, status = 200): Response {
 
 export function createMockFetchError(
   status: number,
-  message: string,
+  message: string
 ): Response {
   return createMockFetchResponse({ meta: { code: status, message } }, status);
 }
 
 export function setupFetchMock(response: Response | (() => Response)) {
   const mockFetch = jest.fn(() =>
-    Promise.resolve(typeof response === "function" ? response() : response),
+    Promise.resolve(typeof response === "function" ? response() : response)
   );
   global.fetch = mockFetch;
   return mockFetch;

@@ -30,7 +30,7 @@ interface MobileSearchContextValue {
 }
 
 const MobileSearchContext = createContext<MobileSearchContextValue | null>(
-  null,
+  null
 );
 
 // Module-level stable fallback (created once, never changes)
@@ -83,7 +83,7 @@ export function MobileSearchProvider({
       openFilters,
       registerOpenFilters,
     }),
-    [isExpanded, expand, collapse, openFilters, registerOpenFilters],
+    [isExpanded, expand, collapse, openFilters, registerOpenFilters]
   );
 
   return (

@@ -37,7 +37,7 @@ interface MapMarkerListing {
  */
 export async function extractListingIdsFromCards(
   page: Page,
-  count: number = 2,
+  count: number = 2
 ): Promise<string[]> {
   const cards = page.locator("[data-listing-id]");
   const cardCount = await cards.count();
@@ -104,7 +104,7 @@ export async function setupStackedMarkerMock(page: Page): Promise<{
   page.on("response", (response) => {
     if (response.url().includes("map-listings")) {
       console.log(
-        `[RESPONSE] ${response.status()} ${response.url()} (from: ${response.request().resourceType()})`,
+        `[RESPONSE] ${response.status()} ${response.url()} (from: ${response.request().resourceType()})`
       );
     }
   });
@@ -114,10 +114,10 @@ export async function setupStackedMarkerMock(page: Page): Promise<{
   const context = page.context();
   await context.route("**/api/map-listings**", async (route) => {
     console.log(
-      `[setupStackedMarkerMock] Intercepting: ${route.request().url()}`,
+      `[setupStackedMarkerMock] Intercepting: ${route.request().url()}`
     );
     console.log(
-      `[setupStackedMarkerMock] Returning ${mockListings.length} mock listings`,
+      `[setupStackedMarkerMock] Returning ${mockListings.length} mock listings`
     );
     await route.fulfill({
       status: 200,
@@ -143,29 +143,25 @@ export async function setupStackedMarkerMock(page: Page): Promise<{
 
       // Wait for map E2E hook to be available, then zoom in to uncluster markers
       try {
-        await page.waitForFunction(
-          () => !!(window as any).__e2eMapRef,
-          { timeout: 30000 }
-        );
+        await page.waitForFunction(() => !!(window as any).__e2eMapRef, {
+          timeout: 30000,
+        });
         // Zoom in programmatically to the stacked coords and wait for idle
-        await page.evaluate(
-          (coords) => {
-            return new Promise<void>((resolve) => {
-              const map = (window as any).__e2eMapRef;
-              const setProgrammatic = (window as any).__e2eSetProgrammaticMove;
-              if (map && setProgrammatic) {
-                setProgrammatic(true);
-                map.once("idle", () => resolve());
-                map.jumpTo({ center: [coords.lng, coords.lat], zoom: 16 });
-                // Safety timeout
-                setTimeout(() => resolve(), 8000);
-              } else {
-                resolve();
-              }
-            });
-          },
-          STACKED_COORDS
-        );
+        await page.evaluate((coords) => {
+          return new Promise<void>((resolve) => {
+            const map = (window as any).__e2eMapRef;
+            const setProgrammatic = (window as any).__e2eSetProgrammaticMove;
+            if (map && setProgrammatic) {
+              setProgrammatic(true);
+              map.once("idle", () => resolve());
+              map.jumpTo({ center: [coords.lng, coords.lat], zoom: 16 });
+              // Safety timeout
+              setTimeout(() => resolve(), 8000);
+            } else {
+              resolve();
+            }
+          });
+        }, STACKED_COORDS);
         // Trigger marker update after tiles load
         await page.evaluate(() => {
           const updateMarkers = (window as any).__e2eUpdateMarkers;
@@ -189,14 +185,13 @@ export async function setupStackedMarkerMock(page: Page): Promise<{
  */
 export async function waitForStackedMarker(
   page: Page,
-  timeout: number = 15000,
+  timeout: number = 15000
 ): Promise<void> {
   // Wait for the E2E map hook to be available (map loaded)
   try {
-    await page.waitForFunction(
-      () => !!(window as any).__e2eMapRef,
-      { timeout: 10000 }
-    );
+    await page.waitForFunction(() => !!(window as any).__e2eMapRef, {
+      timeout: 10000,
+    });
   } catch {
     // Map not ready — fall through and let the marker wait fail with a clear error
   }

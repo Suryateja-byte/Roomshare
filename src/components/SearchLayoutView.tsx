@@ -34,13 +34,8 @@ interface SearchLayoutViewProps {
  * - Preferences persist via localStorage
  */
 export default function SearchLayoutView({ children }: SearchLayoutViewProps) {
-  const {
-    shouldShowMap,
-    shouldRenderMap,
-    toggleMap,
-    showMap,
-    isLoading,
-  } = useMapPreference();
+  const { shouldShowMap, shouldRenderMap, toggleMap, showMap, isLoading } =
+    useMapPreference();
 
   useKeyboardShortcuts([
     {
@@ -52,7 +47,14 @@ export default function SearchLayoutView({ children }: SearchLayoutViewProps) {
   ]);
 
   // Banner state for "search this area" / "reset" when user pans with search-as-move OFF
-  const { showBanner, showLocationConflict, onSearch, onReset, areaCount, isAreaCountLoading } = useMapMovedBanner();
+  const {
+    showBanner,
+    showLocationConflict,
+    onSearch,
+    onReset,
+    areaCount,
+    isAreaCountLoading,
+  } = useMapMovedBanner();
 
   // On mobile with bottom sheet, map stays visible — just trigger the search
   const handleSearch = () => {
@@ -65,7 +67,9 @@ export default function SearchLayoutView({ children }: SearchLayoutViewProps) {
       <ListScrollBridge />
 
       <SearchViewToggle
-        mapComponent={<PersistentMapWrapper shouldRenderMap={shouldRenderMap} />}
+        mapComponent={
+          <PersistentMapWrapper shouldRenderMap={shouldRenderMap} />
+        }
         shouldShowMap={shouldShowMap}
         onToggle={toggleMap}
         isLoading={isLoading}

@@ -37,21 +37,25 @@ test.describe("Filter Modal: Open / Close / Apply", () => {
   test.use({ storageState: { cookies: [], origins: [] } });
 
   test.beforeEach(async ({ page }, testInfo) => {
-    if (testInfo.project.name.includes('webkit')) {
-      test.skip(true, 'Radix UI hydration issues on webkit');
+    if (testInfo.project.name.includes("webkit")) {
+      test.skip(true, "Radix UI hydration issues on webkit");
     }
     test.slow();
     await waitForSearchReady(page);
   });
 
   // 1. Open filter modal via button click
-  test(`${tags.core} - opens filter modal via Filters button click`, async ({ page }) => {
+  test(`${tags.core} - opens filter modal via Filters button click`, async ({
+    page,
+  }) => {
     await clickFiltersButton(page);
     await expect(filterDialog(page)).toBeVisible();
   });
 
   // 2. Modal has correct ARIA attributes
-  test(`${tags.a11y} - modal has role=dialog and aria-modal=true`, async ({ page }) => {
+  test(`${tags.a11y} - modal has role=dialog and aria-modal=true`, async ({
+    page,
+  }) => {
     await clickFiltersButton(page);
 
     const dialog = filterDialog(page);
@@ -99,7 +103,9 @@ test.describe("Filter Modal: Open / Close / Apply", () => {
   });
 
   // 6. Apply filters updates URL and closes modal
-  test(`${tags.core} - apply button commits filters to URL and closes modal`, async ({ page }) => {
+  test(`${tags.core} - apply button commits filters to URL and closes modal`, async ({
+    page,
+  }) => {
     test.setTimeout(90_000);
     await clickFiltersButton(page);
     const dialog = filterDialog(page);
@@ -114,7 +120,9 @@ test.describe("Filter Modal: Open / Close / Apply", () => {
   });
 
   // 7. Cancel/close without applying doesn't change URL
-  test(`${tags.core} - closing without apply does not change URL`, async ({ page }) => {
+  test(`${tags.core} - closing without apply does not change URL`, async ({
+    page,
+  }) => {
     const urlBefore = page.url();
 
     await clickFiltersButton(page);
@@ -157,7 +165,9 @@ test.describe("Filter Modal: Open / Close / Apply", () => {
   });
 
   // 9. Filter state persists in modal when reopened
-  test(`${tags.core} - filter state persists when modal is reopened`, async ({ page }) => {
+  test(`${tags.core} - filter state persists when modal is reopened`, async ({
+    page,
+  }) => {
     test.slow(); // beforeEach nav + gotoSearchWithFilters on WSL2/NTFS
     // Navigate with a pre-applied filter so it shows in the modal
     await gotoSearchWithFilters(page, { roomType: "Private Room" });
@@ -186,7 +196,9 @@ test.describe("Filter Modal: Open / Close / Apply", () => {
   });
 
   // 10. aria-expanded toggles on the trigger button
-  test(`${tags.a11y} - Filters button has correct aria-expanded state`, async ({ page }) => {
+  test(`${tags.a11y} - Filters button has correct aria-expanded state`, async ({
+    page,
+  }) => {
     const btn = filtersButton(page);
     await expect(btn).toBeVisible({ timeout: 10_000 });
 
@@ -207,10 +219,15 @@ test.describe("Filter Modal: Open / Close / Apply", () => {
   });
 
   // 11. Active filter count badge shows in the header
-  test(`${tags.core} - active filter count badge displays in modal header`, async ({ page }) => {
+  test(`${tags.core} - active filter count badge displays in modal header`, async ({
+    page,
+  }) => {
     test.slow(); // beforeEach nav + gotoSearchWithFilters on WSL2/NTFS
     // Navigate with filters applied
-    await gotoSearchWithFilters(page, { roomType: "Private Room", amenities: "Wifi" });
+    await gotoSearchWithFilters(page, {
+      roomType: "Private Room",
+      amenities: "Wifi",
+    });
 
     // Button label changes to "Filters (N active)" when filters are present
     await clickFiltersButton(page);

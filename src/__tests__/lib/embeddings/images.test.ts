@@ -50,8 +50,7 @@ jest.mock("sharp", () => {
 
 // ── fetch ─────────────────────────────────────────────────────────────────────
 const fetchMocks = { fetch: jest.fn() };
-global.fetch = (...args: Parameters<typeof fetch>) =>
-  fetchMocks.fetch(...args);
+global.fetch = (...args: Parameters<typeof fetch>) => fetchMocks.fetch(...args);
 
 // ── Imports (after all mocks) ─────────────────────────────────────────────────
 import {
@@ -67,14 +66,14 @@ const VALID_URL =
 /** Build a minimal successful fetch response wrapping the given Buffer */
 function makeOkResponse(
   buffer: Buffer = Buffer.from("fake-image-bytes"),
-  extraHeaders: Record<string, string> = {},
+  extraHeaders: Record<string, string> = {}
 ) {
   return {
     ok: true,
     arrayBuffer: async () =>
       buffer.buffer.slice(
         buffer.byteOffset,
-        buffer.byteOffset + buffer.byteLength,
+        buffer.byteOffset + buffer.byteLength
       ),
     headers: {
       get: (key: string) => extraHeaders[key.toLowerCase()] ?? null,
@@ -130,7 +129,9 @@ describe("validateImageUrl", () => {
       jest.resetModules();
       delete process.env.NEXT_PUBLIC_SUPABASE_URL;
       // eslint-disable-next-line @typescript-eslint/no-var-requires
-      const { _validateImageUrl: validateNoEnv } = require("@/lib/embeddings/images");
+      const {
+        _validateImageUrl: validateNoEnv,
+      } = require("@/lib/embeddings/images");
       expect(validateNoEnv(VALID_URL)).toBe(false);
     } finally {
       process.env.NEXT_PUBLIC_SUPABASE_URL = saved;
@@ -144,10 +145,7 @@ describe("validateImageUrl", () => {
 // ─────────────────────────────────────────────────────────────────────────────
 describe("computeImageHash", () => {
   it("produces a consistent hash for the same URLs", () => {
-    const urls = [
-      VALID_URL,
-      VALID_URL.replace("photo.jpg", "photo2.jpg"),
-    ];
+    const urls = [VALID_URL, VALID_URL.replace("photo.jpg", "photo2.jpg")];
     expect(computeImageHash(urls)).toBe(computeImageHash(urls));
   });
 
@@ -192,7 +190,9 @@ describe("fetchAndProcessListingImages", () => {
     // Default sharp: toBuffer resolves with a small processed buffer
     sharpMocks.toBuffer.mockResolvedValue(processedBuffer);
     // Default fetch: returns a valid small image
-    fetchMocks.fetch.mockResolvedValue(makeOkResponse(Buffer.from("raw-image-bytes")));
+    fetchMocks.fetch.mockResolvedValue(
+      makeOkResponse(Buffer.from("raw-image-bytes"))
+    );
   });
 
   it("returns ImageParts for valid URLs (happy path)", async () => {
@@ -211,13 +211,15 @@ describe("fetchAndProcessListingImages", () => {
   });
 
   it("filters out invalid URLs before fetching", async () => {
-    const invalidUrl =
-      "https://evil.com/storage/v1/object/public/photo.jpg";
+    const invalidUrl = "https://evil.com/storage/v1/object/public/photo.jpg";
 
     const result = await fetchAndProcessListingImages([VALID_URL, invalidUrl]);
 
     expect(fetchMocks.fetch).toHaveBeenCalledTimes(1);
-    expect(fetchMocks.fetch).toHaveBeenCalledWith(VALID_URL, expect.any(Object));
+    expect(fetchMocks.fetch).toHaveBeenCalledWith(
+      VALID_URL,
+      expect.any(Object)
+    );
     expect(result).toHaveLength(1);
   });
 
@@ -225,7 +227,7 @@ describe("fetchAndProcessListingImages", () => {
     const urls = Array.from(
       { length: 10 },
       (_, i) =>
-        `https://test-project.supabase.co/storage/v1/object/public/images/listings/u/${i}.jpg`,
+        `https://test-project.supabase.co/storage/v1/object/public/images/listings/u/${i}.jpg`
     );
 
     const result = await fetchAndProcessListingImages(urls, 2);
@@ -302,8 +304,12 @@ describe("fetchAndProcessListingImages", () => {
   });
 
   it("skips images where sharp throws during processing", async () => {
-    fetchMocks.fetch.mockResolvedValue(makeOkResponse(Buffer.from("bad-image")));
-    sharpMocks.toBuffer.mockRejectedValue(new Error("Unsupported image format"));
+    fetchMocks.fetch.mockResolvedValue(
+      makeOkResponse(Buffer.from("bad-image"))
+    );
+    sharpMocks.toBuffer.mockRejectedValue(
+      new Error("Unsupported image format")
+    );
 
     const result = await fetchAndProcessListingImages([VALID_URL]);
 
@@ -368,7 +374,7 @@ describe("fetchAndPrepareImage (indirect via fetchAndProcessListingImages)", () 
       arrayBuffer: async () =>
         oversized.buffer.slice(
           oversized.byteOffset,
-          oversized.byteOffset + oversized.byteLength,
+          oversized.byteOffset + oversized.byteLength
         ),
       headers: { get: () => null },
     });
@@ -390,7 +396,7 @@ describe("fetchAndPrepareImage (indirect via fetchAndProcessListingImages)", () 
   it("returns null-equivalent when fetch aborts (AbortError / timeout)", async () => {
     const abortError = new DOMException(
       "The user aborted a request.",
-      "AbortError",
+      "AbortError"
     );
     fetchMocks.fetch.mockRejectedValue(abortError);
 
@@ -400,7 +406,9 @@ describe("fetchAndPrepareImage (indirect via fetchAndProcessListingImages)", () 
   });
 
   it("always outputs mimeType 'image/jpeg'", async () => {
-    fetchMocks.fetch.mockResolvedValue(makeOkResponse(Buffer.from("any-format")));
+    fetchMocks.fetch.mockResolvedValue(
+      makeOkResponse(Buffer.from("any-format"))
+    );
 
     const result = await fetchAndProcessListingImages([VALID_URL], 1);
 
@@ -415,7 +423,7 @@ describe("fetchAndPrepareImage (indirect via fetchAndProcessListingImages)", () 
 
     expect(loggerMocks.warn).toHaveBeenCalledWith(
       "[embedding] image fetch/process failed",
-      expect.objectContaining({ error: "connection refused" }),
+      expect.objectContaining({ error: "connection refused" })
     );
   });
 });

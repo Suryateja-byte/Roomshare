@@ -1,7 +1,7 @@
-'use client';
+"use client";
 
-import { useMemo } from 'react';
-import type { PriceHistogramBucket } from '@/app/api/search/facets/route';
+import { useMemo } from "react";
+import type { PriceHistogramBucket } from "@/app/api/search/facets/route";
 
 // Pre-computed skeleton heights to avoid Math.random() during render
 const SKELETON_HEIGHTS = [45, 72, 33, 58, 80, 25, 67, 41, 55, 38, 75, 50];
@@ -45,8 +45,8 @@ export function PriceHistogram({
                 marginLeft: barGap / 2,
                 marginRight: barGap / 2,
                 backgroundColor: inRange
-                  ? 'var(--color-zinc-900, #18181b)'
-                  : 'var(--color-zinc-200, #e4e4e7)',
+                  ? "var(--color-zinc-900, #18181b)"
+                  : "var(--color-zinc-200, #e4e4e7)",
               }}
             />
           );

@@ -30,27 +30,48 @@ export const SEARCH_URL = `/search?${boundsQS}`;
 
 /** Valid amenity values matching filter-schema.ts */
 export const VALID_AMENITIES = [
-  "Wifi", "AC", "Parking", "Washer", "Dryer", "Kitchen", "Gym", "Pool", "Furnished",
+  "Wifi",
+  "AC",
+  "Parking",
+  "Washer",
+  "Dryer",
+  "Kitchen",
+  "Gym",
+  "Pool",
+  "Furnished",
 ] as const;
 
 /** Valid house rule values */
 export const HOUSE_RULES = [
-  "Pets allowed", "Smoking allowed", "Couples allowed", "Guests allowed",
+  "Pets allowed",
+  "Smoking allowed",
+  "Couples allowed",
+  "Guests allowed",
 ] as const;
 
 /** Valid lease duration values */
 export const LEASE_DURATIONS = [
-  "Month-to-month", "3 months", "6 months", "12 months", "Flexible",
+  "Month-to-month",
+  "3 months",
+  "6 months",
+  "12 months",
+  "Flexible",
 ] as const;
 
 /** Valid room type values */
 export const ROOM_TYPES = [
-  "Private Room", "Shared Room", "Entire Place",
+  "Private Room",
+  "Shared Room",
+  "Entire Place",
 ] as const;
 
 /** Valid sort options */
 export const SORT_OPTIONS = [
-  "recommended", "price_asc", "price_desc", "newest", "rating",
+  "recommended",
+  "price_asc",
+  "price_desc",
+  "newest",
+  "rating",
 ] as const;
 
 // ---------------------------------------------------------------------------
@@ -87,18 +108,22 @@ export async function waitForUrlParam(
   page: Page,
   key: string,
   value?: string,
-  timeout = 30_000,
+  timeout = 30_000
 ): Promise<void> {
   if (value !== undefined) {
-    await expect.poll(
-      () => new URL(page.url(), "http://localhost").searchParams.get(key),
-      { timeout, message: `URL param "${key}" to be "${value}"` },
-    ).toBe(value);
+    await expect
+      .poll(
+        () => new URL(page.url(), "http://localhost").searchParams.get(key),
+        { timeout, message: `URL param "${key}" to be "${value}"` }
+      )
+      .toBe(value);
   } else {
-    await expect.poll(
-      () => new URL(page.url(), "http://localhost").searchParams.get(key),
-      { timeout, message: `URL param "${key}" to be present` },
-    ).not.toBeNull();
+    await expect
+      .poll(
+        () => new URL(page.url(), "http://localhost").searchParams.get(key),
+        { timeout, message: `URL param "${key}" to be present` }
+      )
+      .not.toBeNull();
   }
 }
 
@@ -109,12 +134,14 @@ export async function waitForUrlParam(
 export async function waitForNoUrlParam(
   page: Page,
   key: string,
-  timeout = 30_000,
+  timeout = 30_000
 ): Promise<void> {
-  await expect.poll(
-    () => new URL(page.url(), "http://localhost").searchParams.get(key),
-    { timeout, message: `URL param "${key}" to be absent` },
-  ).toBeNull();
+  await expect
+    .poll(() => new URL(page.url(), "http://localhost").searchParams.get(key), {
+      timeout,
+      message: `URL param "${key}" to be absent`,
+    })
+    .toBeNull();
 }
 
 /**
@@ -124,7 +151,7 @@ export async function expectUrlParam(
   page: Page,
   key: string,
   value: string,
-  timeout = 30_000,
+  timeout = 30_000
 ): Promise<void> {
   await waitForUrlParam(page, key, value, timeout);
   expect(getUrlParam(page, key)).toBe(value);
@@ -136,7 +163,7 @@ export async function expectUrlParam(
 export async function expectNoUrlParam(
   page: Page,
   key: string,
-  timeout = 30_000,
+  timeout = 30_000
 ): Promise<void> {
   await waitForNoUrlParam(page, key, timeout);
   expect(getUrlParam(page, key)).toBeNull();
@@ -153,7 +180,7 @@ export async function expectNoUrlParam(
  */
 export async function waitForSearchReady(
   page: Page,
-  extraParams?: string,
+  extraParams?: string
 ): Promise<void> {
   const url = extraParams ? `${SEARCH_URL}&${extraParams}` : SEARCH_URL;
   await page.goto(url);
@@ -172,7 +199,7 @@ export async function waitForSearchReady(
  */
 export async function gotoSearchWithFilters(
   page: Page,
-  params: Record<string, string>,
+  params: Record<string, string>
 ): Promise<void> {
   const url = buildSearchUrl(params);
   await page.goto(url);
@@ -280,7 +307,9 @@ export async function openFilterModal(page: Page): Promise<Locator> {
   // Wait for FilterModal content to fully render — the apply button
   // is always present and is a reliable signal the chunk loaded.
   await applyButton(page).waitFor({ state: "attached", timeout: 30_000 });
-  await applyButton(page).scrollIntoViewIfNeeded().catch(() => {});
+  await applyButton(page)
+    .scrollIntoViewIfNeeded()
+    .catch(() => {});
 
   return dialog;
 }
@@ -290,14 +319,20 @@ export async function openFilterModal(page: Page): Promise<Locator> {
  * Use this when the test interacts with amenity/house-rule buttons that can be
  * disabled by zero-count facets arriving after the 300ms debounce.
  */
-export async function openFilterModalAndWaitForFacets(page: Page): Promise<Locator> {
+export async function openFilterModalAndWaitForFacets(
+  page: Page
+): Promise<Locator> {
   const facetsPromise = page
-    .waitForResponse((r) => r.url().includes("/api/search/facets"), { timeout: 10_000 })
+    .waitForResponse((r) => r.url().includes("/api/search/facets"), {
+      timeout: 10_000,
+    })
     .catch(() => null);
   const dialog = await openFilterModal(page);
   await facetsPromise;
   // Wait for amenity buttons to update (disabled attr removed after facet render)
-  await page.locator('[aria-label="Select amenities"] button:not([disabled])').first()
+  await page
+    .locator('[aria-label="Select amenities"] button:not([disabled])')
+    .first()
     .waitFor({ state: "attached", timeout: 5_000 })
     .catch(() => {}); // Fallback: if all buttons are disabled, proceed anyway
   return dialog;
@@ -318,7 +353,7 @@ export async function closeFilterModal(page: Page): Promise<void> {
  */
 export async function applyFilters(
   page: Page,
-  opts?: { expectUrlChange?: boolean },
+  opts?: { expectUrlChange?: boolean }
 ): Promise<void> {
   const urlBefore = page.url();
 
@@ -342,10 +377,12 @@ export async function applyFilters(
 
   // Increased timeout for CI (soft navigation can be slow on GitHub Actions)
   if (opts?.expectUrlChange !== false) {
-    await expect.poll(
-      () => page.url(),
-      { timeout: 30_000, message: "URL to change after applying filters" },
-    ).not.toBe(urlBefore);
+    await expect
+      .poll(() => page.url(), {
+        timeout: 30_000,
+        message: "URL to change after applying filters",
+      })
+      .not.toBe(urlBefore);
   }
 }
 
@@ -362,7 +399,7 @@ export async function applyFilters(
 export async function applyFilter(
   page: Page,
   interactions: (dialog: Locator) => Promise<void>,
-  opts?: { expectUrlChange?: boolean },
+  opts?: { expectUrlChange?: boolean }
 ): Promise<void> {
   const dialog = await openFilterModal(page);
   await interactions(dialog);
@@ -410,7 +447,7 @@ export async function toggleAmenity(page: Page, name: string): Promise<void> {
   const btn = group.getByRole("button", { name: new RegExp(`^${name}`, "i") });
   // Wait for the button to exist — FilterModal is dynamically imported and may
   // not have rendered yet even if the dialog container is visible
-  await btn.waitFor({ state: 'attached', timeout: 30_000 });
+  await btn.waitFor({ state: "attached", timeout: 30_000 });
   await btn.click();
 }
 
@@ -420,14 +457,11 @@ export function houseRulesGroup(page: Page): Locator {
 }
 
 /** Toggle a house rule button by name */
-export async function toggleHouseRule(
-  page: Page,
-  name: string,
-): Promise<void> {
+export async function toggleHouseRule(page: Page, name: string): Promise<void> {
   const group = houseRulesGroup(page);
   await group.scrollIntoViewIfNeeded().catch(() => {});
   const btn = group.getByRole("button", { name: new RegExp(name, "i") });
-  await btn.waitFor({ state: 'attached', timeout: 30_000 });
+  await btn.waitFor({ state: "attached", timeout: 30_000 });
   await btn.click();
 }
 
@@ -438,7 +472,7 @@ export async function toggleHouseRule(
 export async function selectDropdownOption(
   page: Page,
   triggerId: string,
-  optionLabel: RegExp,
+  optionLabel: RegExp
 ): Promise<void> {
   const selector = triggerId.startsWith("#") ? triggerId : `#${triggerId}`;
   const trigger = page.locator(selector);
@@ -465,7 +499,7 @@ export async function selectDropdownOption(
 export async function waitForUrlStable(
   page: Page,
   settleMs = 500,
-  timeout = 30_000,
+  timeout = 30_000
 ): Promise<string> {
   const start = Date.now();
   let lastUrl = page.url();
@@ -492,7 +526,7 @@ export async function waitForUrlStable(
 export async function rapidClick(
   locator: Locator,
   count: number,
-  intervalMs = 50,
+  intervalMs = 50
 ): Promise<void> {
   for (let i = 0; i < count; i++) {
     await locator.click({ force: true });

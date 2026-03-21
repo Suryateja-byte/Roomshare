@@ -19,18 +19,18 @@ const mockSentry = {
   setTag: jest.fn(),
 };
 jest.mock("@sentry/nextjs", () => ({
-  withScope: (callback: (scope: { setExtra: jest.Mock; setTag: jest.Mock }) => void) => {
+  withScope: (
+    callback: (scope: { setExtra: jest.Mock; setTag: jest.Mock }) => void
+  ) => {
     callback({ setExtra: mockSentry.setExtra, setTag: mockSentry.setTag });
   },
-  captureException: (...args: unknown[]) => mockSentry.captureException(...args),
+  captureException: (...args: unknown[]) =>
+    mockSentry.captureException(...args),
 }));
 
 import React from "react";
 import { render, screen, fireEvent } from "@testing-library/react";
-import {
-  ErrorBoundary,
-  ErrorFallback,
-} from "@/components/error/ErrorBoundary";
+import { ErrorBoundary, ErrorFallback } from "@/components/error/ErrorBoundary";
 
 // Component that throws on demand
 function ThrowingComponent({ shouldThrow }: { shouldThrow: boolean }) {
@@ -73,7 +73,7 @@ describe("ErrorBoundary", () => {
       render(
         <ErrorBoundary>
           <ThrowingComponent shouldThrow={false} />
-        </ErrorBoundary>,
+        </ErrorBoundary>
       );
 
       expect(screen.getByTestId("child-content")).toBeInTheDocument();
@@ -86,7 +86,7 @@ describe("ErrorBoundary", () => {
       render(
         <ErrorBoundary>
           <ThrowingComponent shouldThrow={true} />
-        </ErrorBoundary>,
+        </ErrorBoundary>
       );
 
       // Child should not be rendered
@@ -95,7 +95,7 @@ describe("ErrorBoundary", () => {
       // Fallback should be visible
       expect(screen.getByText("Something went wrong")).toBeInTheDocument();
       expect(
-        screen.getByText("An unexpected error occurred. Please try again."),
+        screen.getByText("An unexpected error occurred. Please try again.")
       ).toBeInTheDocument();
     });
 
@@ -103,7 +103,7 @@ describe("ErrorBoundary", () => {
       render(
         <ErrorBoundary>
           <ThrowingComponent shouldThrow={true} />
-        </ErrorBoundary>,
+        </ErrorBoundary>
       );
 
       const alert = screen.getByRole("alert");
@@ -118,14 +118,14 @@ describe("ErrorBoundary", () => {
       render(
         <ErrorBoundary fallback={customFallback}>
           <ThrowingComponent shouldThrow={true} />
-        </ErrorBoundary>,
+        </ErrorBoundary>
       );
 
       expect(screen.getByTestId("custom-fallback")).toBeInTheDocument();
       expect(screen.getByText("Custom error UI")).toBeInTheDocument();
       // Default fallback should NOT be shown
       expect(
-        screen.queryByText("Something went wrong"),
+        screen.queryByText("Something went wrong")
       ).not.toBeInTheDocument();
     });
 
@@ -133,12 +133,12 @@ describe("ErrorBoundary", () => {
       render(
         <ErrorBoundary>
           <ThrowingComponent shouldThrow={true} />
-        </ErrorBoundary>,
+        </ErrorBoundary>
       );
 
       expect(mockSentry.captureException).toHaveBeenCalledTimes(1);
       expect(mockSentry.captureException).toHaveBeenCalledWith(
-        expect.objectContaining({ message: "Test error" }),
+        expect.objectContaining({ message: "Test error" })
       );
     });
 
@@ -146,12 +146,12 @@ describe("ErrorBoundary", () => {
       render(
         <ErrorBoundary>
           <ThrowingComponent shouldThrow={true} />
-        </ErrorBoundary>,
+        </ErrorBoundary>
       );
 
       expect(mockSentry.setExtra).toHaveBeenCalledWith(
         "componentStack",
-        expect.any(String),
+        expect.any(String)
       );
       expect(mockSentry.setTag).toHaveBeenCalledWith("errorBoundary", "custom");
     });
@@ -162,13 +162,13 @@ describe("ErrorBoundary", () => {
       render(
         <ErrorBoundary onError={onError}>
           <ThrowingComponent shouldThrow={true} />
-        </ErrorBoundary>,
+        </ErrorBoundary>
       );
 
       expect(onError).toHaveBeenCalledTimes(1);
       expect(onError).toHaveBeenCalledWith(
         expect.objectContaining({ message: "Test error" }),
-        expect.objectContaining({ componentStack: expect.any(String) }),
+        expect.objectContaining({ componentStack: expect.any(String) })
       );
     });
   });
@@ -188,7 +188,7 @@ describe("ErrorBoundary", () => {
       const { rerender } = render(
         <ErrorBoundary>
           <ConditionalThrower />
-        </ErrorBoundary>,
+        </ErrorBoundary>
       );
 
       // Should be in error state
@@ -210,7 +210,7 @@ describe("ErrorBoundary", () => {
       render(
         <ErrorBoundary>
           <ThrowingComponent shouldThrow={true} />
-        </ErrorBoundary>,
+        </ErrorBoundary>
       );
 
       const reloadBtn = screen.getByText("Reload page");
@@ -230,7 +230,7 @@ describe("ErrorFallback", () => {
 
     expect(screen.getByText("Something went wrong")).toBeInTheDocument();
     expect(
-      screen.getByText("An unexpected error occurred. Please try again."),
+      screen.getByText("An unexpected error occurred. Please try again.")
     ).toBeInTheDocument();
   });
 
@@ -240,7 +240,7 @@ describe("ErrorFallback", () => {
         error={null}
         title="Custom Title"
         description="Custom description text"
-      />,
+      />
     );
 
     expect(screen.getByText("Custom Title")).toBeInTheDocument();

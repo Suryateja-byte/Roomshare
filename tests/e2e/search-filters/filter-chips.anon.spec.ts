@@ -40,7 +40,9 @@ test.describe("Active Filter Chips", () => {
   });
 
   // 1. Active filters show as chips above results
-  test(`${tags.core} - active filters display as chips in applied filters region`, async ({ page }) => {
+  test(`${tags.core} - active filters display as chips in applied filters region`, async ({
+    page,
+  }) => {
     await page.goto(`${SEARCH_URL}&roomType=Private+Room&amenities=Wifi`);
     await page.waitForLoadState("domcontentloaded");
     await page.waitForLoadState("domcontentloaded").catch(() => {});
@@ -57,7 +59,9 @@ test.describe("Active Filter Chips", () => {
   });
 
   // 2. Clicking chip remove button removes that filter
-  test(`${tags.core} - clicking chip remove button removes the filter from URL`, async ({ page }) => {
+  test(`${tags.core} - clicking chip remove button removes the filter from URL`, async ({
+    page,
+  }) => {
     await page.goto(`${SEARCH_URL}&roomType=Private+Room&amenities=Wifi`);
     await page.waitForLoadState("domcontentloaded");
     await page.waitForLoadState("domcontentloaded").catch(() => {});
@@ -67,17 +71,24 @@ test.describe("Active Filter Chips", () => {
     test.skip(!regionVisible, "Applied filters region not visible");
 
     // Find and click the remove button for the roomType chip
-    const removeRoomType = region.getByRole("button", { name: /remove filter.*private room/i });
+    const removeRoomType = region.getByRole("button", {
+      name: /remove filter.*private room/i,
+    });
     const removeVisible = await removeRoomType.isVisible().catch(() => false);
 
     if (removeVisible) {
       await removeRoomType.click();
 
       // Wait for URL to update via soft navigation
-      await expect.poll(
-        () => new URL(page.url(), "http://localhost").searchParams.get("roomType"),
-        { timeout: 30_000, message: 'URL param "roomType" to be absent' },
-      ).toBeNull();
+      await expect
+        .poll(
+          () =>
+            new URL(page.url(), "http://localhost").searchParams.get(
+              "roomType"
+            ),
+          { timeout: 30_000, message: 'URL param "roomType" to be absent' }
+        )
+        .toBeNull();
 
       // roomType should be removed but amenities should remain
       expect(getUrlParam(page, "roomType")).toBeNull();
@@ -86,8 +97,12 @@ test.describe("Active Filter Chips", () => {
   });
 
   // 3. "Clear all" removes all filters
-  test(`${tags.core} - clear all button removes all filter params from URL`, async ({ page }) => {
-    await page.goto(`${SEARCH_URL}&roomType=Private+Room&amenities=Wifi,Parking&maxPrice=2000`);
+  test(`${tags.core} - clear all button removes all filter params from URL`, async ({
+    page,
+  }) => {
+    await page.goto(
+      `${SEARCH_URL}&roomType=Private+Room&amenities=Wifi,Parking&maxPrice=2000`
+    );
     await page.waitForLoadState("domcontentloaded");
     await page.waitForLoadState("domcontentloaded").catch(() => {});
 
@@ -101,13 +116,22 @@ test.describe("Active Filter Chips", () => {
     await clearAllBtn.click();
 
     // Wait for filters to be cleared from URL via soft navigation
-    await expect.poll(
-      () => {
-        const params = new URL(page.url(), "http://localhost").searchParams;
-        return !params.has("roomType") && !params.has("amenities") && !params.has("maxPrice");
-      },
-      { timeout: 30_000, message: "URL to have no filter params after clear all" },
-    ).toBe(true);
+    await expect
+      .poll(
+        () => {
+          const params = new URL(page.url(), "http://localhost").searchParams;
+          return (
+            !params.has("roomType") &&
+            !params.has("amenities") &&
+            !params.has("maxPrice")
+          );
+        },
+        {
+          timeout: 30_000,
+          message: "URL to have no filter params after clear all",
+        }
+      )
+      .toBe(true);
 
     // All filters removed
     expect(getUrlParam(page, "roomType")).toBeNull();
@@ -119,7 +143,9 @@ test.describe("Active Filter Chips", () => {
   });
 
   // 4. Chips update immediately when filters change (URL-driven)
-  test(`${tags.core} - chips update when navigating with different filters`, async ({ page }) => {
+  test(`${tags.core} - chips update when navigating with different filters`, async ({
+    page,
+  }) => {
     // Start with one filter
     await page.goto(`${SEARCH_URL}&roomType=Private+Room`);
     await page.waitForLoadState("domcontentloaded");
@@ -130,7 +156,9 @@ test.describe("Active Filter Chips", () => {
     test.skip(!regionVisible, "Applied filters region not visible");
 
     // Verify Private Room chip
-    await expect(region.locator("text=/Private Room/i").first()).toBeVisible({ timeout: 10_000 });
+    await expect(region.locator("text=/Private Room/i").first()).toBeVisible({
+      timeout: 10_000,
+    });
 
     // Navigate with a different filter
     await page.goto(`${SEARCH_URL}&amenities=Furnished`);
@@ -138,13 +166,21 @@ test.describe("Active Filter Chips", () => {
     await page.waitForLoadState("domcontentloaded").catch(() => {});
 
     // Private Room chip should be gone, Furnished should appear
-    await expect(region.locator("text=/Private Room/i").first()).not.toBeVisible({ timeout: 10_000 });
-    await expect(region.locator("text=/Furnished/i").first()).toBeVisible({ timeout: 10_000 });
+    await expect(
+      region.locator("text=/Private Room/i").first()
+    ).not.toBeVisible({ timeout: 10_000 });
+    await expect(region.locator("text=/Furnished/i").first()).toBeVisible({
+      timeout: 10_000,
+    });
   });
 
   // 5. Chips show correct filter labels (not raw param values)
-  test(`${tags.core} - chips display human-readable labels`, async ({ page }) => {
-    await page.goto(`${SEARCH_URL}&roomType=Private+Room&maxPrice=2000&amenities=Wifi,AC`);
+  test(`${tags.core} - chips display human-readable labels`, async ({
+    page,
+  }) => {
+    await page.goto(
+      `${SEARCH_URL}&roomType=Private+Room&maxPrice=2000&amenities=Wifi,AC`
+    );
     await page.waitForLoadState("domcontentloaded");
     await page.waitForLoadState("domcontentloaded").catch(() => {});
 
@@ -153,7 +189,9 @@ test.describe("Active Filter Chips", () => {
     test.skip(!regionVisible, "Applied filters region not visible");
 
     // Room type should display "Private Room" (not raw URL value)
-    await expect(region.locator("text=/Private Room/i").first()).toBeVisible({ timeout: 10_000 });
+    await expect(region.locator("text=/Private Room/i").first()).toBeVisible({
+      timeout: 10_000,
+    });
 
     // Price should display formatted (e.g., "Max $2,000" not "maxPrice=2000")
     const priceChip = region.locator("text=/\\$2,000|Max.*2000/i").first();
@@ -163,12 +201,18 @@ test.describe("Active Filter Chips", () => {
     }
 
     // Individual amenity chips
-    await expect(region.locator("text=/Wifi/i").first()).toBeVisible({ timeout: 10_000 });
-    await expect(region.locator("text=/AC/i").first()).toBeVisible({ timeout: 10_000 });
+    await expect(region.locator("text=/Wifi/i").first()).toBeVisible({
+      timeout: 10_000,
+    });
+    await expect(region.locator("text=/AC/i").first()).toBeVisible({
+      timeout: 10_000,
+    });
   });
 
   // 6. Each chip removal triggers new search (URL update)
-  test(`${tags.core} - removing a chip triggers URL navigation`, async ({ page }) => {
+  test(`${tags.core} - removing a chip triggers URL navigation`, async ({
+    page,
+  }) => {
     await page.goto(`${SEARCH_URL}&amenities=Wifi,Parking`);
     await page.waitForLoadState("domcontentloaded");
     await page.waitForLoadState("domcontentloaded").catch(() => {});
@@ -178,20 +222,30 @@ test.describe("Active Filter Chips", () => {
     test.skip(!regionVisible, "Applied filters region not visible");
 
     // Remove Wifi chip
-    const removeWifi = region.getByRole("button", { name: /remove filter.*wifi/i });
+    const removeWifi = region.getByRole("button", {
+      name: /remove filter.*wifi/i,
+    });
     const removeVisible = await removeWifi.isVisible().catch(() => false);
 
     if (removeVisible) {
       await removeWifi.click();
 
       // Wait for URL to lose Wifi via soft navigation
-      await expect.poll(
-        () => {
-          const amenities = new URL(page.url(), "http://localhost").searchParams.get("amenities") ?? "";
-          return !amenities.includes("Wifi");
-        },
-        { timeout: 30_000, message: 'URL param "amenities" to not contain "Wifi"' },
-      ).toBe(true);
+      await expect
+        .poll(
+          () => {
+            const amenities =
+              new URL(page.url(), "http://localhost").searchParams.get(
+                "amenities"
+              ) ?? "";
+            return !amenities.includes("Wifi");
+          },
+          {
+            timeout: 30_000,
+            message: 'URL param "amenities" to not contain "Wifi"',
+          }
+        )
+        .toBe(true);
 
       // Parking should remain
       const amenities = getUrlParam(page, "amenities") ?? "";
@@ -201,7 +255,9 @@ test.describe("Active Filter Chips", () => {
   });
 
   // 7. No chips displayed when no filters are active
-  test(`${tags.core} - no chips region when no filters are applied`, async ({ page }) => {
+  test(`${tags.core} - no chips region when no filters are applied`, async ({
+    page,
+  }) => {
     await page.goto(SEARCH_URL);
     await page.waitForLoadState("domcontentloaded");
     await page.waitForLoadState("domcontentloaded").catch(() => {});
@@ -213,7 +269,9 @@ test.describe("Active Filter Chips", () => {
   });
 
   // 8. Combined price chip (both min and max)
-  test(`${tags.core} - combined price shows as single chip when both min and max set`, async ({ page }) => {
+  test(`${tags.core} - combined price shows as single chip when both min and max set`, async ({
+    page,
+  }) => {
     await page.goto(`${SEARCH_URL}&minPrice=500&maxPrice=2000`);
     await page.waitForLoadState("domcontentloaded");
     await page.waitForLoadState("domcontentloaded").catch(() => {});
@@ -239,7 +297,9 @@ test.describe("Active Filter Chips", () => {
   });
 
   // 9. Removing combined price chip removes both minPrice and maxPrice
-  test(`${tags.core} - removing price chip clears both min and max from URL`, async ({ page }) => {
+  test(`${tags.core} - removing price chip clears both min and max from URL`, async ({
+    page,
+  }) => {
     await page.goto(`${SEARCH_URL}&minPrice=500&maxPrice=2000`);
     await page.waitForLoadState("domcontentloaded");
     await page.waitForLoadState("domcontentloaded").catch(() => {});
@@ -249,19 +309,26 @@ test.describe("Active Filter Chips", () => {
     test.skip(!regionVisible, "Applied filters region not visible");
 
     // Find the price chip's remove button
-    const removePrice = region.getByRole("button", { name: /remove filter.*\$/i }).first();
+    const removePrice = region
+      .getByRole("button", { name: /remove filter.*\$/i })
+      .first();
     const removeVisible = await removePrice.isVisible().catch(() => false);
 
     if (removeVisible) {
       await removePrice.click();
 
-      await expect.poll(
-        () => {
-          const params = new URL(page.url(), "http://localhost").searchParams;
-          return !params.has("minPrice") && !params.has("maxPrice");
-        },
-        { timeout: 30_000, message: "URL to have no price params after removing price chip" },
-      ).toBe(true);
+      await expect
+        .poll(
+          () => {
+            const params = new URL(page.url(), "http://localhost").searchParams;
+            return !params.has("minPrice") && !params.has("maxPrice");
+          },
+          {
+            timeout: 30_000,
+            message: "URL to have no price params after removing price chip",
+          }
+        )
+        .toBe(true);
 
       expect(getUrlParam(page, "minPrice")).toBeNull();
       expect(getUrlParam(page, "maxPrice")).toBeNull();
@@ -269,7 +336,9 @@ test.describe("Active Filter Chips", () => {
   });
 
   // 10. Clear all preserves bounds and sort
-  test(`${tags.core} - clear all preserves non-filter params (bounds, sort)`, async ({ page }) => {
+  test(`${tags.core} - clear all preserves non-filter params (bounds, sort)`, async ({
+    page,
+  }) => {
     await page.goto(`${SEARCH_URL}&roomType=Private+Room&sort=price_asc`);
     await page.waitForLoadState("domcontentloaded");
     await page.waitForLoadState("domcontentloaded").catch(() => {});
@@ -282,10 +351,16 @@ test.describe("Active Filter Chips", () => {
     await expect(clearAllBtn).toBeVisible({ timeout: 10_000 });
     await clearAllBtn.click();
 
-    await expect.poll(
-      () => new URL(page.url(), "http://localhost").searchParams.get("roomType"),
-      { timeout: 30_000, message: 'URL param "roomType" to be absent after clear all' },
-    ).toBeNull();
+    await expect
+      .poll(
+        () =>
+          new URL(page.url(), "http://localhost").searchParams.get("roomType"),
+        {
+          timeout: 30_000,
+          message: 'URL param "roomType" to be absent after clear all',
+        }
+      )
+      .toBeNull();
 
     // Bounds should be preserved
     expect(getUrlParam(page, "minLat")).toBeTruthy();

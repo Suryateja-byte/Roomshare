@@ -78,10 +78,36 @@ interface SearchV2DataContextValue {
 
 const SearchV2DataContext = createContext<SearchV2DataContextValue>({
   v2MapData: null,
-  setV2MapData: () => { },
+  setV2MapData: () => {},
   isV2Enabled: false,
-  setIsV2Enabled: () => { },
+  setIsV2Enabled: () => {},
   dataVersion: 0,
+});
+
+// ============================================================================
+// SPLIT CONTEXTS - Separate State (changes) from Setters (stable)
+// ============================================================================
+
+interface SearchV2DataStateValue {
+  v2MapData: V2MapData | null;
+  isV2Enabled: boolean;
+  dataVersion: number;
+}
+
+interface SearchV2DataSetterValue {
+  setV2MapData: (data: V2MapData | null, version?: number) => void;
+  setIsV2Enabled: (enabled: boolean) => void;
+}
+
+const SearchV2DataStateContext = createContext<SearchV2DataStateValue>({
+  v2MapData: null,
+  isV2Enabled: false,
+  dataVersion: 0,
+});
+
+const SearchV2DataSetterContext = createContext<SearchV2DataSetterValue>({
+  setV2MapData: () => {},
+  setIsV2Enabled: () => {},
 });
 
 /**
@@ -106,8 +132,7 @@ export function SearchV2DataProvider({ children }: { children: ReactNode }) {
       prevFilterParamsRef.current !== null &&
       prevFilterParamsRef.current !== currentParams;
     const boundsChanged =
-      prevBoundsRef.current !== null &&
-      prevBoundsRef.current !== currentBounds;
+      prevBoundsRef.current !== null && prevBoundsRef.current !== currentBounds;
 
     // We no longer setV2MapDataInternal(null) here!
     // Next.js searchParams ONLY update after the RSC transition commits.
@@ -126,31 +151,45 @@ export function SearchV2DataProvider({ children }: { children: ReactNode }) {
 
   // P1-FIX (#118): Wrap setV2MapData in useCallback to prevent breaking consumer dependency arrays.
   // Versioned setter that rejects stale data from out-of-order responses.
-  const setV2MapData = useCallback((data: V2MapData | null, version?: number) => {
-    // If version provided, only accept if it matches current version
-    // This prevents stale data from completing requests overwriting fresh data
-    if (version !== undefined && version !== dataVersionRef.current) {
-      return; // Reject stale data
-    }
-    setV2MapDataInternal(data);
-  }, []);
+  const setV2MapData = useCallback(
+    (data: V2MapData | null, version?: number) => {
+      // If version provided, only accept if it matches current version
+      // This prevents stale data from completing requests overwriting fresh data
+      if (version !== undefined && version !== dataVersionRef.current) {
+        return; // Reject stale data
+      }
+      setV2MapDataInternal(data);
+    },
+    []
+  );
+
+  // Memoize STATE value — changes when data changes
+  const stateValue = useMemo<SearchV2DataStateValue>(
+    () => ({ v2MapData, isV2Enabled, dataVersion }),
+    [v2MapData, isV2Enabled, dataVersion]
+  );
+
+  // Memoize SETTER value — stable callbacks, rarely changes
+  const setterValue = useMemo<SearchV2DataSetterValue>(
+    () => ({ setV2MapData, setIsV2Enabled }),
+    [setV2MapData, setIsV2Enabled]
+  );
 
   // P1-FIX (#113): Memoize context value to prevent cascade re-renders of all consumers
   // when provider re-renders but none of the actual values changed.
+  // Keep combined context for backward compat — spread from memoized parts.
   const contextValue = useMemo<SearchV2DataContextValue>(
-    () => ({
-      v2MapData,
-      setV2MapData,
-      isV2Enabled,
-      setIsV2Enabled,
-      dataVersion,
-    }),
-    [v2MapData, setV2MapData, isV2Enabled, setIsV2Enabled, dataVersion]
+    () => ({ ...stateValue, ...setterValue }),
+    [stateValue, setterValue]
   );
 
   return (
     <SearchV2DataContext.Provider value={contextValue}>
-      {children}
+      <SearchV2DataStateContext.Provider value={stateValue}>
+        <SearchV2DataSetterContext.Provider value={setterValue}>
+          {children}
+        </SearchV2DataSetterContext.Provider>
+      </SearchV2DataStateContext.Provider>
     </SearchV2DataContext.Provider>
   );
 }
@@ -169,27 +208,28 @@ export function useSearchV2Data() {
 
 // ============================================================================
 // SELECTOR HOOKS - Use these for fine-grained subscriptions to minimize re-renders
+// Each hook uses the appropriate split context to prevent unnecessary re-renders.
 // ============================================================================
 
 /**
- * Selector hook for v2MapData only.
+ * TRUE selector: Only re-renders when v2MapData changes.
  * Components using this will NOT re-render when isV2Enabled or dataVersion changes.
  */
 export function useV2MapData(): V2MapData | null {
-  const { v2MapData } = useContext(SearchV2DataContext);
+  const { v2MapData } = useContext(SearchV2DataStateContext);
   return v2MapData;
 }
 
 /**
- * Selector hook for v2MapData setter.
- * Returns a stable callback that rarely causes re-renders.
- * Use with dataVersion when setting data to prevent stale data overwrites.
+ * TRUE selector: Reads setter from setter context + dataVersion from state context.
+ * Re-renders only on dataVersion change (needed for version guard), not v2MapData/isV2Enabled.
  */
 export function useV2MapDataSetter(): {
   setV2MapData: (data: V2MapData | null, version?: number) => void;
   dataVersion: number;
 } {
-  const { setV2MapData, dataVersion } = useContext(SearchV2DataContext);
+  const { setV2MapData } = useContext(SearchV2DataSetterContext);
+  const { dataVersion } = useContext(SearchV2DataStateContext);
   return useMemo(
     () => ({ setV2MapData, dataVersion }),
     [setV2MapData, dataVersion]
@@ -197,14 +237,15 @@ export function useV2MapDataSetter(): {
 }
 
 /**
- * Selector hook for isV2Enabled state and setter.
- * Components using this will NOT re-render when v2MapData changes.
+ * TRUE selector: Only re-renders when isV2Enabled changes.
+ * Components using this will NOT re-render when v2MapData or dataVersion changes.
  */
 export function useIsV2Enabled(): {
   isV2Enabled: boolean;
   setIsV2Enabled: (enabled: boolean) => void;
 } {
-  const { isV2Enabled, setIsV2Enabled } = useContext(SearchV2DataContext);
+  const { isV2Enabled } = useContext(SearchV2DataStateContext);
+  const { setIsV2Enabled } = useContext(SearchV2DataSetterContext);
   return useMemo(
     () => ({ isV2Enabled, setIsV2Enabled }),
     [isV2Enabled, setIsV2Enabled]
@@ -212,10 +253,19 @@ export function useIsV2Enabled(): {
 }
 
 /**
- * Selector hook for dataVersion only.
+ * TRUE selector: Only re-renders when dataVersion changes.
  * Useful for components that need to track version changes without caring about data.
  */
 export function useDataVersion(): number {
-  const { dataVersion } = useContext(SearchV2DataContext);
+  const { dataVersion } = useContext(SearchV2DataStateContext);
   return dataVersion;
+}
+
+/**
+ * Pure setter hook — accesses only the setter context.
+ * Components using this will NEVER re-render due to state changes (v2MapData, isV2Enabled, dataVersion).
+ * Use for setter-only consumers like V2MapDataSetter.
+ */
+export function useSearchV2Setters(): SearchV2DataSetterValue {
+  return useContext(SearchV2DataSetterContext);
 }

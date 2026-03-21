@@ -1,11 +1,11 @@
-'use client';
+"use client";
 
-import { useRef, useState, useEffect, useCallback } from 'react';
-import { Map, MapPinOff } from 'lucide-react';
-import MobileBottomSheet from './search/MobileBottomSheet';
-import FloatingMapButton from './search/FloatingMapButton';
-import { useListingFocus } from '@/contexts/ListingFocusContext';
-import { useMediaQuery } from '@/hooks/useMediaQuery';
+import { useRef, useState, useEffect, useCallback } from "react";
+import { Map, MapPinOff } from "lucide-react";
+import MobileBottomSheet from "./search/MobileBottomSheet";
+import FloatingMapButton from "./search/FloatingMapButton";
+import { useListingFocus } from "@/contexts/ListingFocusContext";
+import { useMediaQuery } from "@/hooks/useMediaQuery";
 
 interface SearchViewToggleProps {
   children: React.ReactNode;
@@ -29,12 +29,14 @@ export default function SearchViewToggle({
   resultHeaderText,
 }: SearchViewToggleProps) {
   const mobileListRef = useRef<HTMLDivElement>(null);
-  const isDesktop = useMediaQuery('(min-width: 768px)');
+  const isDesktop = useMediaQuery("(min-width: 768px)");
   const [hasMounted, setHasMounted] = useState(false);
   const [mobileSnap, setMobileSnap] = useState(1); // 0=collapsed, 1=half, 2=expanded
   const { activeId } = useListingFocus();
 
-  useEffect(() => { setHasMounted(true); }, []);
+  useEffect(() => {
+    setHasMounted(true);
+  }, []);
 
   // When a map pin is tapped (activeId changes) on mobile, snap sheet to half
   useEffect(() => {
@@ -67,9 +69,7 @@ export default function SearchViewToggle({
       <div className="md:hidden flex-1 flex flex-col overflow-hidden relative">
         {/* Map fills the background */}
         {renderMapInMobile && (
-          <div className="absolute inset-0">
-            {mapComponent}
-          </div>
+          <div className="absolute inset-0">{mapComponent}</div>
         )}
 
         {/* Bottom sheet with list results */}
@@ -101,7 +101,7 @@ export default function SearchViewToggle({
         <div
           data-testid="search-results-container"
           className={`h-full overflow-y-auto scrollbar-hide transition-all duration-300 ${
-            shouldShowMap ? 'w-[55%]' : 'w-full'
+            shouldShowMap ? "w-[55%]" : "w-full"
           }`}
         >
           {showChildrenInDesktop && children}

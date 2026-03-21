@@ -4,7 +4,11 @@
  * Tests the feature flag logic and SearchDoc query structure.
  */
 
-import { isSearchDocEnabled, buildOrderByClause, buildSearchDocWhereConditions } from "@/lib/search/search-doc-queries";
+import {
+  isSearchDocEnabled,
+  buildOrderByClause,
+  buildSearchDocWhereConditions,
+} from "@/lib/search/search-doc-queries";
 
 describe("buildSearchDocWhereConditions", () => {
   it("excludes listings with null coordinates from map results (F1.1)", () => {
@@ -23,7 +27,7 @@ describe("buildSearchDocWhereConditions", () => {
     // PAUSED, DRAFT, ARCHIVED, etc. listings must never appear in search
     expect(conditions).toContain("d.status = 'ACTIVE'");
     // Verify no other status values are included
-    const statusConditions = conditions.filter(c => c.includes("d.status"));
+    const statusConditions = conditions.filter((c) => c.includes("d.status"));
     expect(statusConditions).toHaveLength(1);
   });
 
@@ -53,6 +57,182 @@ describe("buildSearchDocWhereConditions", () => {
     expect(result.params).toHaveLength(1);
     expect(result.paramIndex).toBe(2);
     expect(result.ftsQueryParamIndex).toBeNull();
+  });
+
+  describe("price filter conditions", () => {
+    it("adds minPrice condition with parameterized value", () => {
+      const result = buildSearchDocWhereConditions({ minPrice: 500 });
+
+      expect(result.conditions.some((c) => c.includes("d.price >="))).toBe(
+        true
+      );
+      expect(result.params).toContain(500);
+    });
+
+    it("adds maxPrice condition with parameterized value", () => {
+      const result = buildSearchDocWhereConditions({ maxPrice: 2000 });
+
+      expect(result.conditions.some((c) => c.includes("d.price <="))).toBe(
+        true
+      );
+      expect(result.params).toContain(2000);
+    });
+
+    it("adds both price conditions for range filter", () => {
+      const result = buildSearchDocWhereConditions({
+        minPrice: 500,
+        maxPrice: 2000,
+      });
+
+      const priceConditions = result.conditions.filter((c) =>
+        c.includes("d.price")
+      );
+      expect(priceConditions).toHaveLength(2);
+      expect(result.params).toContain(500);
+      expect(result.params).toContain(2000);
+    });
+
+    it("ignores null price values", () => {
+      const result = buildSearchDocWhereConditions({
+        minPrice: null as unknown as undefined,
+        maxPrice: null as unknown as undefined,
+      });
+
+      const priceConditions = result.conditions.filter((c) =>
+        c.includes("d.price")
+      );
+      expect(priceConditions).toHaveLength(0);
+    });
+  });
+
+  describe("room type and lease duration filters", () => {
+    it("adds case-insensitive room type condition", () => {
+      const result = buildSearchDocWhereConditions({ roomType: "Private" });
+
+      expect(
+        result.conditions.some((c) => c.includes("LOWER(d.room_type)"))
+      ).toBe(true);
+      expect(result.params).toContain("Private");
+    });
+
+    it("adds case-insensitive lease duration condition", () => {
+      const result = buildSearchDocWhereConditions({
+        leaseDuration: "6_months",
+      });
+
+      expect(
+        result.conditions.some((c) => c.includes("LOWER(d.lease_duration)"))
+      ).toBe(true);
+      expect(result.params).toContain("6_months");
+    });
+  });
+
+  describe("array filter conditions", () => {
+    it("adds languages filter with OR overlap operator", () => {
+      const result = buildSearchDocWhereConditions({
+        languages: ["English", "Spanish"],
+      });
+
+      expect(
+        result.conditions.some((c) =>
+          c.includes("household_languages_lower &&")
+        )
+      ).toBe(true);
+      // Values should be normalized to lowercase
+      expect(result.params).toContainEqual(["english", "spanish"]);
+    });
+
+    it("adds house rules filter with AND containment operator", () => {
+      const result = buildSearchDocWhereConditions({
+        houseRules: ["No Smoking"],
+      });
+
+      expect(
+        result.conditions.some((c) => c.includes("house_rules_lower @>"))
+      ).toBe(true);
+      expect(result.params).toContainEqual(["no smoking"]);
+    });
+
+    it("adds amenities filter with partial matching", () => {
+      const result = buildSearchDocWhereConditions({
+        amenities: ["Pool"],
+      });
+
+      expect(
+        result.conditions.some((c) => c.includes("amenities_lower"))
+      ).toBe(true);
+      expect(result.params).toContainEqual(["pool"]);
+    });
+
+    it("skips empty arrays", () => {
+      const result = buildSearchDocWhereConditions({
+        languages: [],
+        amenities: [],
+        houseRules: [],
+      });
+
+      const arrayConditions = result.conditions.filter(
+        (c) =>
+          c.includes("languages_lower") ||
+          c.includes("amenities_lower") ||
+          c.includes("rules_lower")
+      );
+      expect(arrayConditions).toHaveLength(0);
+    });
+
+    it("trims and filters empty strings from arrays", () => {
+      const result = buildSearchDocWhereConditions({
+        languages: ["  English  ", "", "  "],
+      });
+
+      // Only "english" should remain after trim + filter
+      expect(result.params).toContainEqual(["english"]);
+    });
+  });
+
+  describe("geographic bounds filter", () => {
+    it("adds normal bounding box condition", () => {
+      const result = buildSearchDocWhereConditions({
+        bounds: {
+          minLng: -122.5,
+          minLat: 37.7,
+          maxLng: -122.3,
+          maxLat: 37.8,
+        },
+      });
+
+      expect(
+        result.conditions.some((c) => c.includes("ST_MakeEnvelope"))
+      ).toBe(true);
+      expect(result.params).toContain(-122.5);
+      expect(result.params).toContain(37.7);
+      expect(result.params).toContain(-122.3);
+      expect(result.params).toContain(37.8);
+    });
+  });
+
+  describe("booking mode filter", () => {
+    it("adds booking mode condition when not 'any'", () => {
+      const result = buildSearchDocWhereConditions({
+        bookingMode: "instant",
+      });
+
+      expect(
+        result.conditions.some((c) => c.includes("booking_mode"))
+      ).toBe(true);
+      expect(result.params).toContain("instant");
+    });
+
+    it("skips booking mode condition when 'any'", () => {
+      const result = buildSearchDocWhereConditions({
+        bookingMode: "any",
+      });
+
+      const bmConditions = result.conditions.filter((c) =>
+        c.includes("booking_mode")
+      );
+      expect(bmConditions).toHaveLength(0);
+    });
   });
 });
 
@@ -89,7 +269,13 @@ describe("buildOrderByClause", () => {
   });
 
   it("works correctly for all sort options with keyset", () => {
-    const sorts = ["recommended", "newest", "price_asc", "price_desc", "rating"] as const;
+    const sorts = [
+      "recommended",
+      "newest",
+      "price_asc",
+      "price_desc",
+      "rating",
+    ] as const;
     for (const sort of sorts) {
       const result = buildOrderByClause(sort, 2, true);
       expect(result).not.toContain("ts_rank_cd");

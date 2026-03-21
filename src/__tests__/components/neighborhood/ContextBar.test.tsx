@@ -9,12 +9,12 @@
  * - Edge cases
  */
 
-import { render, screen } from '@testing-library/react';
-import { ContextBar } from '@/components/neighborhood/ContextBar';
-import type { SearchMeta } from '@/lib/places/types';
+import { render, screen } from "@testing-library/react";
+import { ContextBar } from "@/components/neighborhood/ContextBar";
+import type { SearchMeta } from "@/lib/places/types";
 
 // Mock distance utility to ensure consistent formatting
-jest.mock('@/lib/geo/distance', () => ({
+jest.mock("@/lib/geo/distance", () => ({
   formatDistance: (miles: number) => {
     if (miles < 0.1) {
       return `${Math.round(miles * 5280)} ft`;
@@ -29,49 +29,49 @@ const baseMeta: SearchMeta = {
   resultCount: 5,
   closestMiles: 0.2,
   farthestMiles: 1.5,
-  searchMode: 'type',
+  searchMode: "type",
   timestamp: Date.now(),
 };
 
-describe('ContextBar', () => {
-  describe('Result count display', () => {
+describe("ContextBar", () => {
+  describe("Result count display", () => {
     it('renders singular "place" for 1 result', () => {
       const meta: SearchMeta = { ...baseMeta, resultCount: 1 };
       render(<ContextBar meta={meta} />);
 
-      expect(screen.getByText('1 place found')).toBeInTheDocument();
+      expect(screen.getByText("1 place found")).toBeInTheDocument();
     });
 
     it('renders plural "places" for multiple results', () => {
       render(<ContextBar meta={baseMeta} />);
 
-      expect(screen.getByText('5 places found')).toBeInTheDocument();
+      expect(screen.getByText("5 places found")).toBeInTheDocument();
     });
 
     it('renders plural "places" for 0 results', () => {
       const meta: SearchMeta = { ...baseMeta, resultCount: 0 };
       render(<ContextBar meta={meta} />);
 
-      expect(screen.getByText('0 places found')).toBeInTheDocument();
+      expect(screen.getByText("0 places found")).toBeInTheDocument();
     });
   });
 
-  describe('Radius display', () => {
-    it('converts meters to miles for display', () => {
+  describe("Radius display", () => {
+    it("converts meters to miles for display", () => {
       // 1600 meters ≈ 1.0 miles
       render(<ContextBar meta={baseMeta} />);
 
       expect(screen.getByText(/Within 1\.0 mi/)).toBeInTheDocument();
     });
 
-    it('handles larger radius correctly', () => {
+    it("handles larger radius correctly", () => {
       const meta: SearchMeta = { ...baseMeta, radiusUsed: 8000 }; // ~5 miles
       render(<ContextBar meta={meta} />);
 
       expect(screen.getByText(/Within 5\.0 mi/)).toBeInTheDocument();
     });
 
-    it('handles small radius correctly', () => {
+    it("handles small radius correctly", () => {
       const meta: SearchMeta = { ...baseMeta, radiusUsed: 400 }; // ~0.25 miles
       render(<ContextBar meta={meta} />);
 
@@ -79,8 +79,8 @@ describe('ContextBar', () => {
     });
   });
 
-  describe('Distance range display', () => {
-    it('shows closest and farthest distances', () => {
+  describe("Distance range display", () => {
+    it("shows closest and farthest distances", () => {
       render(<ContextBar meta={baseMeta} />);
 
       // Should show range with formatted distances
@@ -88,7 +88,7 @@ describe('ContextBar', () => {
       expect(screen.getByText(/1\.5 mi/)).toBeInTheDocument();
     });
 
-    it('shows single distance for 1 result', () => {
+    it("shows single distance for 1 result", () => {
       const meta: SearchMeta = {
         ...baseMeta,
         resultCount: 1,
@@ -102,7 +102,7 @@ describe('ContextBar', () => {
       expect(distanceElements.length).toBe(1);
     });
 
-    it('formats short distances in feet', () => {
+    it("formats short distances in feet", () => {
       const meta: SearchMeta = {
         ...baseMeta,
         closestMiles: 0.05, // 264 feet
@@ -114,7 +114,7 @@ describe('ContextBar', () => {
       expect(screen.getByText(/422 ft/)).toBeInTheDocument();
     });
 
-    it('does not show distance range for 0 results', () => {
+    it("does not show distance range for 0 results", () => {
       const meta: SearchMeta = {
         ...baseMeta,
         resultCount: 0,
@@ -123,107 +123,113 @@ describe('ContextBar', () => {
       };
       render(<ContextBar meta={meta} />);
 
-      expect(screen.queryByText('Sorted by distance')).not.toBeInTheDocument();
+      expect(screen.queryByText("Sorted by distance")).not.toBeInTheDocument();
     });
   });
 
-  describe('Sort indicator', () => {
+  describe("Sort indicator", () => {
     it('shows "Sorted by distance" when results exist', () => {
       render(<ContextBar meta={baseMeta} />);
 
-      expect(screen.getByText('Sorted by distance')).toBeInTheDocument();
+      expect(screen.getByText("Sorted by distance")).toBeInTheDocument();
     });
 
-    it('does not show sort indicator for 0 results', () => {
+    it("does not show sort indicator for 0 results", () => {
       const meta: SearchMeta = { ...baseMeta, resultCount: 0 };
       render(<ContextBar meta={meta} />);
 
-      expect(screen.queryByText('Sorted by distance')).not.toBeInTheDocument();
+      expect(screen.queryByText("Sorted by distance")).not.toBeInTheDocument();
     });
   });
 
-  describe('Loading state', () => {
-    it('shows loading skeleton when isLoading is true', () => {
+  describe("Loading state", () => {
+    it("shows loading skeleton when isLoading is true", () => {
       render(<ContextBar meta={null} isLoading={true} />);
 
-      expect(screen.getByRole('status')).toBeInTheDocument();
-      expect(screen.getByLabelText('Loading search results')).toBeInTheDocument();
+      expect(screen.getByRole("status")).toBeInTheDocument();
+      expect(
+        screen.getByLabelText("Loading search results")
+      ).toBeInTheDocument();
     });
 
-    it('shows skeleton elements during loading', () => {
+    it("shows skeleton elements during loading", () => {
       const { container } = render(<ContextBar meta={null} isLoading={true} />);
 
       // Should have animated skeleton divs
-      const skeletons = container.querySelectorAll('.animate-pulse');
+      const skeletons = container.querySelectorAll(".animate-pulse");
       expect(skeletons.length).toBeGreaterThan(0);
     });
 
-    it('does not show meta data during loading', () => {
+    it("does not show meta data during loading", () => {
       render(<ContextBar meta={baseMeta} isLoading={true} />);
 
-      expect(screen.queryByText('5 places found')).not.toBeInTheDocument();
+      expect(screen.queryByText("5 places found")).not.toBeInTheDocument();
     });
   });
 
-  describe('Null meta state', () => {
-    it('returns null when meta is null and not loading', () => {
-      const { container } = render(<ContextBar meta={null} isLoading={false} />);
+  describe("Null meta state", () => {
+    it("returns null when meta is null and not loading", () => {
+      const { container } = render(
+        <ContextBar meta={null} isLoading={false} />
+      );
 
       expect(container.firstChild).toBeNull();
     });
   });
 
-  describe('Query text display', () => {
-    it('shows query text when provided', () => {
+  describe("Query text display", () => {
+    it("shows query text when provided", () => {
       render(<ContextBar meta={baseMeta} queryText="coffee shops" />);
 
       expect(screen.getByText('"coffee shops"')).toBeInTheDocument();
     });
 
-    it('does not show query text when not provided', () => {
+    it("does not show query text when not provided", () => {
       render(<ContextBar meta={baseMeta} />);
 
       expect(screen.queryByText(/"/)).not.toBeInTheDocument();
     });
   });
 
-  describe('Accessibility', () => {
-    it('has proper ARIA role for region', () => {
+  describe("Accessibility", () => {
+    it("has proper ARIA role for region", () => {
       render(<ContextBar meta={baseMeta} />);
 
-      expect(screen.getByRole('region')).toBeInTheDocument();
+      expect(screen.getByRole("region")).toBeInTheDocument();
     });
 
-    it('has proper aria-label for context', () => {
+    it("has proper aria-label for context", () => {
       render(<ContextBar meta={baseMeta} />);
 
-      expect(screen.getByLabelText('Search results summary')).toBeInTheDocument();
+      expect(
+        screen.getByLabelText("Search results summary")
+      ).toBeInTheDocument();
     });
 
-    it('has aria-live for dynamic updates', () => {
+    it("has aria-live for dynamic updates", () => {
       const { container } = render(<ContextBar meta={baseMeta} />);
 
       const region = container.querySelector('[aria-live="polite"]');
       expect(region).toBeInTheDocument();
     });
 
-    it('marks decorative separators as aria-hidden', () => {
+    it("marks decorative separators as aria-hidden", () => {
       const { container } = render(<ContextBar meta={baseMeta} />);
 
       const separators = container.querySelectorAll('[aria-hidden="true"]');
       expect(separators.length).toBeGreaterThan(0);
     });
 
-    it('has proper loading state accessibility', () => {
+    it("has proper loading state accessibility", () => {
       render(<ContextBar meta={null} isLoading={true} />);
 
-      const status = screen.getByRole('status');
-      expect(status).toHaveAttribute('aria-label', 'Loading search results');
+      const status = screen.getByRole("status");
+      expect(status).toHaveAttribute("aria-label", "Loading search results");
     });
   });
 
-  describe('Edge cases', () => {
-    it('handles same closest and farthest distance', () => {
+  describe("Edge cases", () => {
+    it("handles same closest and farthest distance", () => {
       const meta: SearchMeta = {
         ...baseMeta,
         resultCount: 2,
@@ -237,14 +243,14 @@ describe('ContextBar', () => {
       expect(rangeText).toBeInTheDocument();
     });
 
-    it('handles very large result count', () => {
+    it("handles very large result count", () => {
       const meta: SearchMeta = { ...baseMeta, resultCount: 999 };
       render(<ContextBar meta={meta} />);
 
-      expect(screen.getByText('999 places found')).toBeInTheDocument();
+      expect(screen.getByText("999 places found")).toBeInTheDocument();
     });
 
-    it('handles very small distances', () => {
+    it("handles very small distances", () => {
       const meta: SearchMeta = {
         ...baseMeta,
         closestMiles: 0.01, // ~53 feet
@@ -255,8 +261,8 @@ describe('ContextBar', () => {
       expect(screen.getByText(/53 ft/)).toBeInTheDocument();
     });
 
-    it('handles long query text with title attribute', () => {
-      const longQuery = 'coffee shops near downtown with outdoor seating';
+    it("handles long query text with title attribute", () => {
+      const longQuery = "coffee shops near downtown with outdoor seating";
       render(<ContextBar meta={baseMeta} queryText={longQuery} />);
 
       const queryElement = screen.getByTitle(`Search: ${longQuery}`);

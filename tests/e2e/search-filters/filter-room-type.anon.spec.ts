@@ -39,13 +39,17 @@ test.describe("Room Type Filter", () => {
   });
 
   // 1. Select room type via URL -> URL has roomType param
-  test(`${tags.core} - room type param in URL is reflected on page load`, async ({ page }) => {
+  test(`${tags.core} - room type param in URL is reflected on page load`, async ({
+    page,
+  }) => {
     await gotoSearchWithFilters(page, { roomType: "Private Room" });
 
     expect(getUrlParam(page, "roomType")).toBe("Private Room");
 
     // The inline "Private" tab should be pressed
-    const privateTab = page.locator('button[aria-pressed="true"]').filter({ hasText: /private/i });
+    const privateTab = page
+      .locator('button[aria-pressed="true"]')
+      .filter({ hasText: /private/i });
     const tabVisible = await privateTab.isVisible().catch(() => false);
     if (tabVisible) {
       await expect(privateTab).toHaveAttribute("aria-pressed", "true");
@@ -53,27 +57,41 @@ test.describe("Room Type Filter", () => {
   });
 
   // 2. Click inline room type tab -> URL updates
-  test(`${tags.core} - clicking inline room type tab updates URL`, async ({ page }) => {
+  test(`${tags.core} - clicking inline room type tab updates URL`, async ({
+    page,
+  }) => {
     await waitForSearchReady(page);
 
     // Find the "Private" room type tab (CategoryTabs renders button with text "Private" and aria-pressed)
-    const privateTab = page.locator('button[aria-pressed]').filter({ hasText: /Private/i });
+    const privateTab = page
+      .locator("button[aria-pressed]")
+      .filter({ hasText: /Private/i });
     const tabVisible = await privateTab.isVisible().catch(() => false);
 
     if (tabVisible) {
       // Wrap in retry: tab click may not trigger URL update immediately due to hydration
       await expect(async () => {
         await privateTab.click();
-        await expect.poll(
-          () => new URL(page.url(), "http://localhost").searchParams.get("roomType"),
-        ).not.toBeNull();
+        await expect
+          .poll(() =>
+            new URL(page.url(), "http://localhost").searchParams.get("roomType")
+          )
+          .not.toBeNull();
       }).toPass({ timeout: 15_000 });
 
       // Wait for URL to settle to correct value
-      await expect.poll(
-        () => new URL(page.url(), "http://localhost").searchParams.get("roomType"),
-        { timeout: 30_000, message: 'URL param "roomType" to be "Private Room"' },
-      ).toBe("Private Room");
+      await expect
+        .poll(
+          () =>
+            new URL(page.url(), "http://localhost").searchParams.get(
+              "roomType"
+            ),
+          {
+            timeout: 30_000,
+            message: 'URL param "roomType" to be "Private Room"',
+          }
+        )
+        .toBe("Private Room");
 
       expect(getUrlParam(page, "roomType")).toBe("Private Room");
     } else {
@@ -83,7 +101,9 @@ test.describe("Room Type Filter", () => {
   });
 
   // 3. Select "All" tab -> roomType param removed from URL
-  test(`${tags.core} - selecting All room type removes roomType from URL`, async ({ page }) => {
+  test(`${tags.core} - selecting All room type removes roomType from URL`, async ({
+    page,
+  }) => {
     // Start with a room type filter
     await gotoSearchWithFilters(page, { roomType: "Private Room" });
 
@@ -92,22 +112,33 @@ test.describe("Room Type Filter", () => {
     // Click the "All" tab (CategoryTabs renders button with text "All" and aria-pressed)
     // Wait for hydration — tabs may not be interactive immediately
     await page.waitForTimeout(2_000);
-    const allTab = page.locator('button[aria-pressed]').filter({ hasText: /^All$/i });
-    const tabVisible = await allTab.isVisible({ timeout: 10_000 }).catch(() => false);
+    const allTab = page
+      .locator("button[aria-pressed]")
+      .filter({ hasText: /^All$/i });
+    const tabVisible = await allTab
+      .isVisible({ timeout: 10_000 })
+      .catch(() => false);
 
     if (tabVisible) {
       // Wrap in retry: tab click may not trigger URL update immediately due to hydration
       await expect(async () => {
         await allTab.click();
-        await expect.poll(
-          () => new URL(page.url(), "http://localhost").searchParams.get("roomType"),
-        ).toBeNull();
+        await expect
+          .poll(() =>
+            new URL(page.url(), "http://localhost").searchParams.get("roomType")
+          )
+          .toBeNull();
       }).toPass({ timeout: 20_000 });
 
-      await expect.poll(
-        () => new URL(page.url(), "http://localhost").searchParams.get("roomType"),
-        { timeout: 30_000, message: 'URL param "roomType" to be absent' },
-      ).toBeNull();
+      await expect
+        .poll(
+          () =>
+            new URL(page.url(), "http://localhost").searchParams.get(
+              "roomType"
+            ),
+          { timeout: 30_000, message: 'URL param "roomType" to be absent' }
+        )
+        .toBeNull();
 
       expect(getUrlParam(page, "roomType")).toBeNull();
     } else {
@@ -116,7 +147,9 @@ test.describe("Room Type Filter", () => {
   });
 
   // 4. Room type filter narrows results
-  test(`${tags.core} - room type filter narrows visible results`, async ({ page }) => {
+  test(`${tags.core} - room type filter narrows visible results`, async ({
+    page,
+  }) => {
     test.slow(); // 2 navigations on WSL2/NTFS
     await waitForSearchReady(page);
     const container = searchResultsContainer(page);
@@ -126,8 +159,11 @@ test.describe("Room Type Filter", () => {
     // Navigate with room type filter
     await gotoSearchWithFilters(page, { roomType: "Private Room" });
 
-    const filteredCount = await container.locator(selectors.listingCard).count();
-    const hasEmptyState = await container.locator(selectors.emptyState).count() > 0;
+    const filteredCount = await container
+      .locator(selectors.listingCard)
+      .count();
+    const hasEmptyState =
+      (await container.locator(selectors.emptyState).count()) > 0;
 
     if (!hasEmptyState && initialCount > 0) {
       expect(filteredCount).toBeLessThanOrEqual(initialCount);
@@ -135,7 +171,9 @@ test.describe("Room Type Filter", () => {
   });
 
   // 5. Room type shown in filter chips
-  test(`${tags.core} - room type displays as applied filter chip`, async ({ page }) => {
+  test(`${tags.core} - room type displays as applied filter chip`, async ({
+    page,
+  }) => {
     await gotoSearchWithFilters(page, { roomType: "Private Room" });
 
     const container = searchResultsContainer(page);
@@ -143,7 +181,9 @@ test.describe("Room Type Filter", () => {
     const regionVisible = await filtersRegion.isVisible().catch(() => false);
 
     if (regionVisible) {
-      const roomTypeChip = filtersRegion.locator("text=/Private Room/i").first();
+      const roomTypeChip = filtersRegion
+        .locator("text=/Private Room/i")
+        .first();
       await expect(roomTypeChip).toBeVisible({ timeout: 10_000 });
     }
 
@@ -151,7 +191,9 @@ test.describe("Room Type Filter", () => {
   });
 
   // 6. Clear room type filter restores all results
-  test(`${tags.core} - clearing room type restores full results`, async ({ page }) => {
+  test(`${tags.core} - clearing room type restores full results`, async ({
+    page,
+  }) => {
     test.slow(); // 3 navigations on WSL2/NTFS
     await waitForSearchReady(page);
     const container = searchResultsContainer(page);
@@ -162,7 +204,9 @@ test.describe("Room Type Filter", () => {
     // Clear by navigating back without the filter
     await gotoSearchWithFilters(page, {});
 
-    const restoredCount = await container.locator(selectors.listingCard).count();
+    const restoredCount = await container
+      .locator(selectors.listingCard)
+      .count();
 
     // Should have at least as many results as the filtered set
     expect(restoredCount).toBeGreaterThanOrEqual(0);
@@ -170,7 +214,9 @@ test.describe("Room Type Filter", () => {
   });
 
   // 7. Room type filter via modal select
-  test(`${tags.core} - selecting room type in filter modal updates on apply`, async ({ page }) => {
+  test(`${tags.core} - selecting room type in filter modal updates on apply`, async ({
+    page,
+  }) => {
     await waitForSearchReady(page);
 
     // Open filter modal — use retry for hydration race
@@ -186,29 +232,44 @@ test.describe("Room Type Filter", () => {
     if (await roomTypeSelect.isVisible({ timeout: 5000 }).catch(() => false)) {
       await roomTypeSelect.click();
       // Wait for Radix Select dropdown to render
-      await page.getByRole("listbox").waitFor({ state: "visible", timeout: 5_000 }).catch(() => {});
+      await page
+        .getByRole("listbox")
+        .waitFor({ state: "visible", timeout: 5_000 })
+        .catch(() => {});
 
       // Select "Shared Room"
       const sharedOption = page.getByRole("option", { name: /shared room/i });
       if (await sharedOption.isVisible({ timeout: 5_000 }).catch(() => false)) {
         await sharedOption.click();
         // Radix Select trigger text may take a moment to update
-        await expect(roomTypeSelect).toContainText(/shared room/i, { timeout: 10_000 }).catch(() => {});
+        await expect(roomTypeSelect)
+          .toContainText(/shared room/i, { timeout: 10_000 })
+          .catch(() => {});
 
         // Apply — use resilient helper for hydration race
         await applyFilters(page);
 
         // URL should have roomType=Shared Room
-        await expect.poll(
-          () => new URL(page.url(), "http://localhost").searchParams.get("roomType"),
-          { timeout: 30_000, message: 'URL param "roomType" to be "Shared Room"' },
-        ).toBe("Shared Room");
+        await expect
+          .poll(
+            () =>
+              new URL(page.url(), "http://localhost").searchParams.get(
+                "roomType"
+              ),
+            {
+              timeout: 30_000,
+              message: 'URL param "roomType" to be "Shared Room"',
+            }
+          )
+          .toBe("Shared Room");
       }
     }
   });
 
   // 8. Room type alias resolves correctly via URL
-  test(`${tags.core} - room type alias in URL resolves to canonical value`, async ({ page }) => {
+  test(`${tags.core} - room type alias in URL resolves to canonical value`, async ({
+    page,
+  }) => {
     // Navigate with alias "private" instead of "Private Room"
     await gotoSearchWithFilters(page, { roomType: "private" });
 
@@ -216,7 +277,9 @@ test.describe("Room Type Filter", () => {
     expect(await page.title()).toBeTruthy();
 
     // The inline tab should reflect the resolved value
-    const privateTab = page.locator('button[aria-pressed="true"]').filter({ hasText: /private/i });
+    const privateTab = page
+      .locator('button[aria-pressed="true"]')
+      .filter({ hasText: /private/i });
     const tabVisible = await privateTab.isVisible().catch(() => false);
     if (tabVisible) {
       await expect(privateTab).toHaveAttribute("aria-pressed", "true");
@@ -224,11 +287,15 @@ test.describe("Room Type Filter", () => {
   });
 
   // 9. Each room type option can be selected
-  test(`${tags.core} - all room type options are selectable via tabs`, async ({ page }) => {
+  test(`${tags.core} - all room type options are selectable via tabs`, async ({
+    page,
+  }) => {
     await waitForSearchReady(page);
 
     // Disable "Search as I move" to prevent map-triggered URL changes
-    const searchAsIMove = page.getByRole("switch", { name: /search as i move/i });
+    const searchAsIMove = page.getByRole("switch", {
+      name: /search as i move/i,
+    });
     if (await searchAsIMove.isChecked()) {
       await searchAsIMove.click();
     }
@@ -240,7 +307,9 @@ test.describe("Room Type Filter", () => {
     ];
 
     for (const { text, param } of roomTypes) {
-      const tab = page.locator('button[aria-pressed]').filter({ hasText: text });
+      const tab = page
+        .locator("button[aria-pressed]")
+        .filter({ hasText: text });
       const tabVisible = await tab.isVisible().catch(() => false);
 
       if (!tabVisible) {
@@ -250,10 +319,15 @@ test.describe("Room Type Filter", () => {
 
       await tab.click();
 
-      await expect.poll(
-        () => new URL(page.url(), "http://localhost").searchParams.get("roomType"),
-        { timeout: 30_000, message: `URL param "roomType" to be "${param}"` },
-      ).toBe(param);
+      await expect
+        .poll(
+          () =>
+            new URL(page.url(), "http://localhost").searchParams.get(
+              "roomType"
+            ),
+          { timeout: 30_000, message: `URL param "roomType" to be "${param}"` }
+        )
+        .toBe(param);
 
       expect(getUrlParam(page, "roomType")).toBe(param);
     }

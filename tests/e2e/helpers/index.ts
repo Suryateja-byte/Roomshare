@@ -80,7 +80,10 @@ export { mockMapTileRequests } from "./map-mock-helpers";
 export { selectBookingDates, createBookingAsUser } from "./booking-helpers";
 
 // Mobile auth helpers for mobile authenticated tests
-export { setupMobileAuthViewport, navigateWithMobileNav } from "./mobile-auth-helpers";
+export {
+  setupMobileAuthViewport,
+  navigateWithMobileNav,
+} from "./mobile-auth-helpers";
 
 // Dark mode helpers for authenticated page dark mode tests
 export {

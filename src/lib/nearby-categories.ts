@@ -454,7 +454,7 @@ const STRONG_BLOCKLIST_TERMS = [
  */
 export function shouldIncludePlace(
   place: NearbyPlace,
-  requestedCategories: string[],
+  requestedCategories: string[]
 ): boolean {
   const nameLower = place.name.toLowerCase();
   const chainLower = place.chain?.toLowerCase() || "";
@@ -470,18 +470,18 @@ export function shouldIncludePlace(
     if (isKnownChain) return true;
 
     const nameMatchesAllowedChain = filter.allowedChains.some((chain) =>
-      nameLower.includes(chain),
+      nameLower.includes(chain)
     );
     if (nameMatchesAllowedChain) return true;
 
     const hasAllowedTerm = filter.allowedTerms.some((term) =>
-      nameLower.includes(term),
+      nameLower.includes(term)
     );
     const hasBlockedTerm = filter.blocklist.some((term) =>
-      nameLower.includes(term),
+      nameLower.includes(term)
     );
     const hasStrongBlockedTerm = STRONG_BLOCKLIST_TERMS.some((term) =>
-      nameLower.includes(term),
+      nameLower.includes(term)
     );
 
     if (hasStrongBlockedTerm) return false;

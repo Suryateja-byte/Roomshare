@@ -14,8 +14,22 @@
  * - pointer-events-none is on the overlay child, not the container itself
  */
 
-import { test, expect, tags, selectors, timeouts, SF_BOUNDS, searchResultsContainer } from "../helpers";
-import { openFilterModal, toggleAmenity, applyButton, filterDialog, waitForUrlParam } from "../helpers/filter-helpers";
+import {
+  test,
+  expect,
+  tags,
+  selectors,
+  timeouts,
+  SF_BOUNDS,
+  searchResultsContainer,
+} from "../helpers";
+import {
+  openFilterModal,
+  toggleAmenity,
+  applyButton,
+  filterDialog,
+  waitForUrlParam,
+} from "../helpers/filter-helpers";
 
 test.describe("Breathing Pending State (PR1)", () => {
   // Filter tests run as anonymous user
@@ -39,10 +53,10 @@ test.describe("Breathing Pending State (PR1)", () => {
       await expect(resultsContainer).toBeVisible({ timeout: 30000 });
 
       // The aria-busy wrapper is inside the results container (SearchResultsLoadingWrapper)
-      const ariaBusyWrapper = resultsContainer.locator('[aria-busy]').first();
+      const ariaBusyWrapper = resultsContainer.locator("[aria-busy]").first();
 
       // If the wrapper exists, verify it is NOT busy initially
-      if (await ariaBusyWrapper.count() > 0) {
+      if ((await ariaBusyWrapper.count()) > 0) {
         await expect(ariaBusyWrapper).toHaveAttribute("aria-busy", "false");
       }
 
@@ -78,17 +92,18 @@ test.describe("Breathing Pending State (PR1)", () => {
 
       // Wait for the search-count API response to settle so the Apply button's
       // disabled/enabled state is stable before we check visibility.
-      await page.waitForResponse(
-        (resp) => resp.url().includes('/api/search-count'),
-        { timeout: 10_000 }
-      ).catch(() => {}); // OK if already resolved or not fired
+      await page
+        .waitForResponse((resp) => resp.url().includes("/api/search-count"), {
+          timeout: 10_000,
+        })
+        .catch(() => {}); // OK if already resolved or not fired
 
       // Wait for Apply button spinner to disappear (DOM stability)
       const showButton = applyButton(page);
       await expect(showButton).toBeVisible({ timeout: 5000 });
-      await expect(
-        showButton.locator('.animate-spin')
-      ).not.toBeVisible({ timeout: 10_000 });
+      await expect(showButton.locator(".animate-spin")).not.toBeVisible({
+        timeout: 10_000,
+      });
       await showButton.click();
 
       // Wait for filter dialog to close
@@ -104,14 +119,16 @@ test.describe("Breathing Pending State (PR1)", () => {
         expect(wasBusy).toBe(true);
       } else {
         // Transition was too fast to observe -- acceptable
-        console.log("Info: Transition completed too fast to observe pending state");
+        console.log(
+          "Info: Transition completed too fast to observe pending state"
+        );
       }
 
       // Wait for transition to complete (URL should include amenities param)
       await waitForUrlParam(page, "amenities", undefined, 30_000);
 
       // After transition, the wrapper should NOT be busy
-      if (await ariaBusyWrapper.count() > 0) {
+      if ((await ariaBusyWrapper.count()) > 0) {
         await expect(ariaBusyWrapper).toHaveAttribute("aria-busy", "false");
       }
 
@@ -131,7 +148,10 @@ test.describe("Breathing Pending State (PR1)", () => {
       await expect(container).toBeVisible({ timeout: timeouts.navigation });
 
       const listingCards = container.locator(selectors.listingCard);
-      const hasListings = await listingCards.first().isVisible({ timeout: timeouts.navigation }).catch(() => false);
+      const hasListings = await listingCards
+        .first()
+        .isVisible({ timeout: timeouts.navigation })
+        .catch(() => false);
 
       if (hasListings) {
         // Count initial listings
@@ -170,8 +190,8 @@ test.describe("Breathing Pending State (PR1)", () => {
       expect(containerPointerEvents).not.toBe("none");
 
       // Also verify that aria-busy wrapper (if present) is not busy
-      const ariaBusyWrapper = resultsContainer.locator('[aria-busy]').first();
-      if (await ariaBusyWrapper.count() > 0) {
+      const ariaBusyWrapper = resultsContainer.locator("[aria-busy]").first();
+      if ((await ariaBusyWrapper.count()) > 0) {
         await expect(ariaBusyWrapper).toHaveAttribute("aria-busy", "false");
       }
     });
@@ -191,19 +211,21 @@ test.describe("Breathing Pending State (PR1)", () => {
 
       // The aria-busy attribute is on the SearchResultsLoadingWrapper (div.relative[aria-busy])
       // which is a child of the search-results-container
-      const ariaBusyWrapper = resultsContainer.locator('[aria-busy]').first();
+      const ariaBusyWrapper = resultsContainer.locator("[aria-busy]").first();
 
-      if (await ariaBusyWrapper.count() > 0) {
+      if ((await ariaBusyWrapper.count()) > 0) {
         // aria-busy should be "false" when not transitioning
         await expect(ariaBusyWrapper).toHaveAttribute("aria-busy", "false");
       } else {
         // If SearchResultsLoadingWrapper hasn't rendered yet or doesn't have aria-busy,
         // check at the page level
-        const pageBusyElement = page.locator('[aria-busy]').first();
-        if (await pageBusyElement.count() > 0) {
+        const pageBusyElement = page.locator("[aria-busy]").first();
+        if ((await pageBusyElement.count()) > 0) {
           await expect(pageBusyElement).toHaveAttribute("aria-busy", "false");
         } else {
-          console.log("Info: No aria-busy attribute found; component may not have rendered loading wrapper");
+          console.log(
+            "Info: No aria-busy attribute found; component may not have rendered loading wrapper"
+          );
         }
       }
     });
@@ -212,26 +234,32 @@ test.describe("Breathing Pending State (PR1)", () => {
       page,
     }) => {
       // Navigate to search with bounds for reliable results
-      await page.goto(`/search?minLat=${SF_BOUNDS.minLat}&maxLat=${SF_BOUNDS.maxLat}&minLng=${SF_BOUNDS.minLng}&maxLng=${SF_BOUNDS.maxLng}`);
+      await page.goto(
+        `/search?minLat=${SF_BOUNDS.minLat}&maxLat=${SF_BOUNDS.maxLat}&minLng=${SF_BOUNDS.minLng}&maxLng=${SF_BOUNDS.maxLng}`
+      );
       await page.waitForLoadState("domcontentloaded");
 
       // Wait for results to appear
-      await expect(
-        page.getByRole("heading", { level: 1 }).first(),
-      ).toBeVisible({ timeout: 30000 });
+      await expect(page.getByRole("heading", { level: 1 }).first()).toBeVisible(
+        { timeout: 30000 }
+      );
 
       // The SearchResultsLoadingWrapper includes a <span class="sr-only" aria-live="polite" role="status">
       // This span is always present (for SR announcements), but may be visually hidden.
-      const statusElement = page.locator('[role="status"][aria-live="polite"]').first();
+      const statusElement = page
+        .locator('[role="status"][aria-live="polite"]')
+        .first();
 
-      if (await statusElement.count() > 0) {
+      if ((await statusElement.count()) > 0) {
         // Verify the element is attached to DOM (it's sr-only so may not be "visible")
         await expect(statusElement).toBeAttached();
         await expect(statusElement).toHaveAttribute("aria-live", "polite");
       } else {
         // The SlowTransitionBadge / status element may not be present
         // if the component hasn't loaded
-        console.log("Info: No role=status element found; acceptable if page loaded fast");
+        console.log(
+          "Info: No role=status element found; acceptable if page loaded fast"
+        );
       }
     });
   });
@@ -259,17 +287,22 @@ test.describe("Breathing Pending State (PR1)", () => {
 
       // The search-results-container has transition-all duration-300 for width changes.
       // Verify it has some transition set.
-      const hasTransition = transitionValue !== "none" && transitionValue !== "" && transitionValue !== "all 0s ease 0s";
+      const hasTransition =
+        transitionValue !== "none" &&
+        transitionValue !== "" &&
+        transitionValue !== "all 0s ease 0s";
       if (hasTransition) {
         expect(hasTransition).toBe(true);
       } else {
         // Fallback: verify the loading wrapper inside has transition support
         // SearchResultsLoadingWrapper's overlay has transition-opacity duration-200
-        const wrapper = resultsContainer.locator('.relative').first();
-        if (await wrapper.count() > 0) {
+        const wrapper = resultsContainer.locator(".relative").first();
+        if ((await wrapper.count()) > 0) {
           await expect(wrapper).toBeAttached();
         }
-        console.log("Info: Container transition check - transitions handled by loading overlay");
+        console.log(
+          "Info: Container transition check - transitions handled by loading overlay"
+        );
       }
     });
   });

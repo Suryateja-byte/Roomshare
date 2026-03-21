@@ -1,8 +1,8 @@
-import { type ClassValue, clsx } from "clsx"
-import { twMerge } from "tailwind-merge"
+import { type ClassValue, clsx } from "clsx";
+import { twMerge } from "tailwind-merge";
 
 export function cn(...inputs: ClassValue[]) {
-    return twMerge(clsx(inputs))
+  return twMerge(clsx(inputs));
 }
 
 /**
@@ -10,19 +10,19 @@ export function cn(...inputs: ClassValue[]) {
  * Handles arrays, comma-separated strings, and unknown input.
  */
 export const normalizeStringList = (value: unknown): string[] => {
-    if (Array.isArray(value)) {
-        return value
-            .filter((item): item is string => typeof item === 'string')
-            .map(item => item.trim())
-            .filter(Boolean);
-    }
-    if (typeof value === 'string') {
-        return value
-            .split(',')
-            .map(item => item.trim())
-            .filter(Boolean);
-    }
-    return [];
+  if (Array.isArray(value)) {
+    return value
+      .filter((item): item is string => typeof item === "string")
+      .map((item) => item.trim())
+      .filter(Boolean);
+  }
+  if (typeof value === "string") {
+    return value
+      .split(",")
+      .map((item) => item.trim())
+      .filter(Boolean);
+  }
+  return [];
 };
 
 /**
@@ -31,9 +31,10 @@ export const normalizeStringList = (value: unknown): string[] => {
  * which can appear as the previous day in timezones behind UTC
  */
 export function parseLocalDate(dateStr: string): Date {
-    if (!dateStr) throw new Error('parseLocalDate: dateStr must be a non-empty string');
-    const [year, month, day] = dateStr.split('-').map(Number);
-    return new Date(year, month - 1, day);
+  if (!dateStr)
+    throw new Error("parseLocalDate: dateStr must be a non-empty string");
+  const [year, month, day] = dateStr.split("-").map(Number);
+  return new Date(year, month - 1, day);
 }
 
 /**
@@ -42,16 +43,22 @@ export function parseLocalDate(dateStr: string): Date {
  * Handles: Date objects, ISO strings, and YYYY-MM-DD strings
  */
 export function parseISODateAsLocal(dateInput: string | Date): Date {
-    if (!dateInput) return new Date();
+  if (!dateInput) return new Date();
 
-    // If it's already a Date object, extract local date parts
-    if (dateInput instanceof Date) {
-        return new Date(dateInput.getFullYear(), dateInput.getMonth(), dateInput.getDate());
-    }
+  // If it's already a Date object, extract local date parts
+  if (dateInput instanceof Date) {
+    return new Date(
+      dateInput.getFullYear(),
+      dateInput.getMonth(),
+      dateInput.getDate()
+    );
+  }
 
-    // Handle both ISO strings (2025-01-15T00:00:00.000Z) and date-only strings (2025-01-15)
-    const dateOnly = dateInput.includes('T') ? dateInput.split('T')[0] : dateInput;
-    return parseLocalDate(dateOnly);
+  // Handle both ISO strings (2025-01-15T00:00:00.000Z) and date-only strings (2025-01-15)
+  const dateOnly = dateInput.includes("T")
+    ? dateInput.split("T")[0]
+    : dateInput;
+  return parseLocalDate(dateOnly);
 }
 
 /**
@@ -59,8 +66,8 @@ export function parseISODateAsLocal(dateInput: string | Date): Date {
  * Avoids timezone issues with toISOString()
  */
 export function formatDateToYMD(date: Date): string {
-    const year = date.getFullYear();
-    const month = String(date.getMonth() + 1).padStart(2, '0');
-    const day = String(date.getDate()).padStart(2, '0');
-    return `${year}-${month}-${day}`;
+  const year = date.getFullYear();
+  const month = String(date.getMonth() + 1).padStart(2, "0");
+  const day = String(date.getDate()).padStart(2, "0");
+  return `${year}-${month}-${day}`;
 }

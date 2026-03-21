@@ -23,17 +23,31 @@ public/sw-version.js
 
 # production
 /build
+/dist
+
+# OS files
+.DS_Store
+Thumbs.db
+*.swp
+*~
+
+# IDE
+.idea/
+.vscode/
+*.code-workspace
 
 # misc
-.DS_Store
 *.pem
+*.bak
 
 # debug
+*.log
 dev.log
 npm-debug.log*
 yarn-debug.log*
 yarn-error.log*
 .pnpm-debug.log*
+pnpm-debug.log*
 test-output.txt
 
 # env files
@@ -53,6 +67,7 @@ next-env.d.ts
 playwright-report.zip
 playwright-report/
 test-results/
+blob-report/
 .playwright-mcp/
 .playwright-cli/
 playwright/.auth/
@@ -91,4 +106,3 @@ output/playwright/
 .mcp.json
 .claude/settings.local.json
 .next-wsl-backup-*
-.mcp.json

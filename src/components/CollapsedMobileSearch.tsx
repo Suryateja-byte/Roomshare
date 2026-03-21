@@ -25,11 +25,11 @@ interface CollapsedMobileSearchProps {
 
 /** Count param values, splitting CSV entries (e.g. "Wifi,AC" → 2). */
 function countParamValues(searchParams: URLSearchParams, key: string): number {
-  return searchParams.getAll(key)
-    .flatMap(v => v.split(","))
-    .map(v => v.trim())
-    .filter(Boolean)
-    .length;
+  return searchParams
+    .getAll(key)
+    .flatMap((v) => v.split(","))
+    .map((v) => v.trim())
+    .filter(Boolean).length;
 }
 
 export default function CollapsedMobileSearch({
@@ -40,7 +40,7 @@ export default function CollapsedMobileSearch({
 
   // Get current search state from URL
   const hasSemanticQuery = searchParams.has("what");
-  const location = hasSemanticQuery ? "" : (searchParams.get("q") || "");
+  const location = hasSemanticQuery ? "" : searchParams.get("q") || "";
   const minPrice = searchParams.get("minPrice");
   const maxPrice = searchParams.get("maxPrice");
 
@@ -76,7 +76,11 @@ export default function CollapsedMobileSearch({
     const minSlots = searchParams.get("minSlots");
     if (minSlots && parseInt(minSlots) >= 2) count++;
     // Count nearMatches filter
-    if (searchParams.get("nearMatches") === "1" || searchParams.get("nearMatches") === "true") count++;
+    if (
+      searchParams.get("nearMatches") === "1" ||
+      searchParams.get("nearMatches") === "true"
+    )
+      count++;
     return count;
   }, [searchParams]);
 

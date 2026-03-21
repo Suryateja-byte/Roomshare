@@ -4,13 +4,19 @@
  * End-to-end integration tests covering complete user workflows,
  * dropdown lifecycle, click-outside behavior, and combined scenarios.
  */
-import React, { useState } from 'react';
-import { render, screen, waitFor, fireEvent, act } from '@testing-library/react';
-import userEvent from '@testing-library/user-event';
-import LocationSearchInput from '@/components/LocationSearchInput';
+import React, { useState } from "react";
+import {
+  render,
+  screen,
+  waitFor,
+  fireEvent,
+  act,
+} from "@testing-library/react";
+import userEvent from "@testing-library/user-event";
+import LocationSearchInput from "@/components/LocationSearchInput";
 
 // Mock geocoding cache to prevent caching between tests
-jest.mock('@/lib/geocoding-cache', () => ({
+jest.mock("@/lib/geocoding-cache", () => ({
   getCachedResults: jest.fn(() => null), // Always return cache miss
   setCachedResults: jest.fn(),
   clearCache: jest.fn(),
@@ -19,7 +25,6 @@ jest.mock('@/lib/geocoding-cache', () => ({
 // Mock fetch globally
 const mockFetch = jest.fn();
 global.fetch = mockFetch;
-
 
 // Controlled wrapper component that manages state for the LocationSearchInput
 // This is necessary because the component uses useDebounce(value, 300) where
@@ -33,7 +38,7 @@ interface WrapperProps {
 }
 
 function ControlledWrapper({
-  initialValue = '',
+  initialValue = "",
   onChangeSpy,
   onLocationSelectSpy,
   placeholder,
@@ -58,17 +63,50 @@ function ControlledWrapper({
 }
 
 const mockPhotonSuggestions = {
-  type: 'FeatureCollection',
+  type: "FeatureCollection",
   features: [
-    { type: 'Feature', geometry: { type: 'Point', coordinates: [-122.4194, 37.7749] }, properties: { osm_id: 1, osm_type: 'R', name: 'San Francisco', state: 'CA', country: 'USA', type: 'city' } },
-    { type: 'Feature', geometry: { type: 'Point', coordinates: [-121.8863, 37.3382] }, properties: { osm_id: 2, osm_type: 'R', name: 'San Jose', state: 'CA', country: 'USA', type: 'city' } },
-    { type: 'Feature', geometry: { type: 'Point', coordinates: [-117.1611, 32.7157] }, properties: { osm_id: 3, osm_type: 'R', name: 'San Diego', state: 'CA', country: 'USA', type: 'city' } },
+    {
+      type: "Feature",
+      geometry: { type: "Point", coordinates: [-122.4194, 37.7749] },
+      properties: {
+        osm_id: 1,
+        osm_type: "R",
+        name: "San Francisco",
+        state: "CA",
+        country: "USA",
+        type: "city",
+      },
+    },
+    {
+      type: "Feature",
+      geometry: { type: "Point", coordinates: [-121.8863, 37.3382] },
+      properties: {
+        osm_id: 2,
+        osm_type: "R",
+        name: "San Jose",
+        state: "CA",
+        country: "USA",
+        type: "city",
+      },
+    },
+    {
+      type: "Feature",
+      geometry: { type: "Point", coordinates: [-117.1611, 32.7157] },
+      properties: {
+        osm_id: 3,
+        osm_type: "R",
+        name: "San Diego",
+        state: "CA",
+        country: "USA",
+        type: "city",
+      },
+    },
   ],
 };
 
-const mockEmptyResponse = { type: 'FeatureCollection', features: [] };
+const mockEmptyResponse = { type: "FeatureCollection", features: [] };
 
-describe('LocationSearchInput - Integration Tests', () => {
+describe("LocationSearchInput - Integration Tests", () => {
   const user = userEvent.setup({ delay: null });
   const mockOnChange = jest.fn();
   const mockOnLocationSelect = jest.fn();
@@ -90,7 +128,7 @@ describe('LocationSearchInput - Integration Tests', () => {
   const renderInput = (props: Partial<WrapperProps> = {}) => {
     return render(
       <ControlledWrapper
-        initialValue={props.initialValue ?? ''}
+        initialValue={props.initialValue ?? ""}
         onChangeSpy={props.onChangeSpy ?? mockOnChange}
         onLocationSelectSpy={props.onLocationSelectSpy ?? mockOnLocationSelect}
         placeholder={props.placeholder}
@@ -99,36 +137,36 @@ describe('LocationSearchInput - Integration Tests', () => {
     );
   };
 
-  describe('Complete User Flow', () => {
-    it('complete flow: type → select → submit', async () => {
+  describe("Complete User Flow", () => {
+    it("complete flow: type → select → submit", async () => {
       renderInput();
-      const input = screen.getByRole('combobox');
+      const input = screen.getByRole("combobox");
 
       // User focuses input
       await user.click(input);
       expect(document.activeElement).toBe(input);
 
       // User types location
-      await user.type(input, 'San');
+      await user.type(input, "San");
       jest.advanceTimersByTime(350);
 
       // Dropdown opens with suggestions
       await waitFor(() => {
-        expect(screen.getByRole('listbox')).toBeInTheDocument();
-        expect(screen.getAllByRole('option')).toHaveLength(3);
+        expect(screen.getByRole("listbox")).toBeInTheDocument();
+        expect(screen.getAllByRole("option")).toHaveLength(3);
       });
 
       // User navigates with keyboard
-      await user.keyboard('{ArrowDown}');
-      await user.keyboard('{ArrowDown}');
+      await user.keyboard("{ArrowDown}");
+      await user.keyboard("{ArrowDown}");
 
       // User selects with Enter
-      await user.keyboard('{Enter}');
+      await user.keyboard("{Enter}");
 
       // Callback fired with correct data
       expect(mockOnLocationSelect).toHaveBeenCalledWith(
         expect.objectContaining({
-          name: 'San Jose, CA, USA',
+          name: "San Jose, CA, USA",
           lat: 37.3382,
           lng: -121.8863,
         })
@@ -136,55 +174,55 @@ describe('LocationSearchInput - Integration Tests', () => {
 
       // Dropdown closes
       await waitFor(() => {
-        expect(screen.queryByRole('listbox')).not.toBeInTheDocument();
+        expect(screen.queryByRole("listbox")).not.toBeInTheDocument();
       });
     });
 
-    it('click selection flow', async () => {
+    it("click selection flow", async () => {
       renderInput();
-      const input = screen.getByRole('combobox');
+      const input = screen.getByRole("combobox");
 
-      await user.type(input, 'San');
+      await user.type(input, "San");
       jest.advanceTimersByTime(350);
 
       // Component splits place_name at comma: "San Diego" in first <p>, "CA, USA" in second
       await waitFor(() => {
-        expect(screen.getByText('San Diego')).toBeInTheDocument();
+        expect(screen.getByText("San Diego")).toBeInTheDocument();
       });
 
       // Click on option
-      await user.click(screen.getByText('San Diego'));
+      await user.click(screen.getByText("San Diego"));
 
       expect(mockOnLocationSelect).toHaveBeenCalledWith(
         expect.objectContaining({
-          name: 'San Diego, CA, USA',
+          name: "San Diego, CA, USA",
         })
       );
 
       await waitFor(() => {
-        expect(screen.queryByRole('listbox')).not.toBeInTheDocument();
+        expect(screen.queryByRole("listbox")).not.toBeInTheDocument();
       });
     });
   });
 
-  describe('Dropdown Lifecycle', () => {
-    it('opens on focus when there are cached suggestions', async () => {
+  describe("Dropdown Lifecycle", () => {
+    it("opens on focus when there are cached suggestions", async () => {
       renderInput();
-      const input = screen.getByRole('combobox');
+      const input = screen.getByRole("combobox");
 
       // First, get some suggestions cached
-      await user.type(input, 'San');
+      await user.type(input, "San");
       jest.advanceTimersByTime(350);
 
       await waitFor(() => {
-        expect(screen.getByRole('listbox')).toBeInTheDocument();
+        expect(screen.getByRole("listbox")).toBeInTheDocument();
       });
 
       // Close dropdown
-      await user.keyboard('{Escape}');
+      await user.keyboard("{Escape}");
 
       await waitFor(() => {
-        expect(screen.queryByRole('listbox')).not.toBeInTheDocument();
+        expect(screen.queryByRole("listbox")).not.toBeInTheDocument();
       });
 
       // Focus input again
@@ -192,25 +230,25 @@ describe('LocationSearchInput - Integration Tests', () => {
 
       // Dropdown should reopen with cached suggestions
       await waitFor(() => {
-        expect(screen.getByRole('listbox')).toBeInTheDocument();
+        expect(screen.getByRole("listbox")).toBeInTheDocument();
       });
     });
 
-    it('closes on blur (after delay for click events)', async () => {
+    it("closes on blur (after delay for click events)", async () => {
       const { container } = renderInput();
 
       // Add another focusable element
-      const button = document.createElement('button');
-      button.textContent = 'Other';
+      const button = document.createElement("button");
+      button.textContent = "Other";
       container.appendChild(button);
 
-      const input = screen.getByRole('combobox');
+      const input = screen.getByRole("combobox");
 
-      await user.type(input, 'San');
+      await user.type(input, "San");
       jest.advanceTimersByTime(350);
 
       await waitFor(() => {
-        expect(screen.getByRole('listbox')).toBeInTheDocument();
+        expect(screen.getByRole("listbox")).toBeInTheDocument();
       });
 
       // Focus another element
@@ -218,53 +256,53 @@ describe('LocationSearchInput - Integration Tests', () => {
       jest.advanceTimersByTime(200); // Wait for blur delay
 
       await waitFor(() => {
-        expect(screen.queryByRole('listbox')).not.toBeInTheDocument();
+        expect(screen.queryByRole("listbox")).not.toBeInTheDocument();
       });
     });
   });
 
-  describe('Click Outside', () => {
-    it('closes dropdown when clicking outside', async () => {
+  describe("Click Outside", () => {
+    it("closes dropdown when clicking outside", async () => {
       const { container } = renderInput();
-      const input = screen.getByRole('combobox');
+      const input = screen.getByRole("combobox");
 
-      await user.type(input, 'San');
+      await user.type(input, "San");
       jest.advanceTimersByTime(350);
 
       await waitFor(() => {
-        expect(screen.getByRole('listbox')).toBeInTheDocument();
+        expect(screen.getByRole("listbox")).toBeInTheDocument();
       });
 
       // Click outside the component
       fireEvent.mouseDown(container.parentElement || document.body);
 
       await waitFor(() => {
-        expect(screen.queryByRole('listbox')).not.toBeInTheDocument();
+        expect(screen.queryByRole("listbox")).not.toBeInTheDocument();
       });
     });
 
-    it('keeps dropdown open when clicking inside dropdown', async () => {
+    it("keeps dropdown open when clicking inside dropdown", async () => {
       renderInput();
-      const input = screen.getByRole('combobox');
+      const input = screen.getByRole("combobox");
 
-      await user.type(input, 'San');
+      await user.type(input, "San");
       jest.advanceTimersByTime(350);
 
       await waitFor(() => {
-        expect(screen.getByRole('listbox')).toBeInTheDocument();
+        expect(screen.getByRole("listbox")).toBeInTheDocument();
       });
 
       // Click on the listbox area (not on an option)
-      const listbox = screen.getByRole('listbox');
+      const listbox = screen.getByRole("listbox");
       fireEvent.mouseDown(listbox);
 
       // Dropdown should still be open
-      expect(screen.getByRole('listbox')).toBeInTheDocument();
+      expect(screen.getByRole("listbox")).toBeInTheDocument();
     });
   });
 
-  describe('No Results', () => {
-    it('shows no results message', async () => {
+  describe("No Results", () => {
+    it("shows no results message", async () => {
       mockFetch.mockResolvedValueOnce({
         ok: true,
         status: 200,
@@ -272,19 +310,21 @@ describe('LocationSearchInput - Integration Tests', () => {
       });
 
       renderInput();
-      const input = screen.getByRole('combobox');
+      const input = screen.getByRole("combobox");
 
-      await user.type(input, 'xyznonexistent');
+      await user.type(input, "xyznonexistent");
       jest.advanceTimersByTime(350);
 
       await waitFor(() => {
-        expect(screen.getByText(/no results|no locations/i)).toBeInTheDocument();
+        expect(
+          screen.getByText(/no results|no locations/i)
+        ).toBeInTheDocument();
       });
     });
   });
 
-  describe('Loading State', () => {
-    it('shows loading indicator while fetching', async () => {
+  describe("Loading State", () => {
+    it("shows loading indicator while fetching", async () => {
       let resolvePromise: (value: Response) => void;
       const slowPromise = new Promise<Response>((resolve) => {
         resolvePromise = resolve;
@@ -293,14 +333,17 @@ describe('LocationSearchInput - Integration Tests', () => {
       mockFetch.mockReturnValueOnce(slowPromise);
 
       renderInput();
-      const input = screen.getByRole('combobox');
+      const input = screen.getByRole("combobox");
 
-      await user.type(input, 'San');
+      await user.type(input, "San");
       jest.advanceTimersByTime(350);
 
       // Loading state should be visible
       await waitFor(() => {
-        expect(screen.getByRole('combobox')).toHaveAttribute('aria-busy', 'true');
+        expect(screen.getByRole("combobox")).toHaveAttribute(
+          "aria-busy",
+          "true"
+        );
       });
 
       // Resolve the promise
@@ -311,15 +354,18 @@ describe('LocationSearchInput - Integration Tests', () => {
       } as Response);
 
       await waitFor(() => {
-        expect(screen.getByRole('combobox')).toHaveAttribute('aria-busy', 'false');
+        expect(screen.getByRole("combobox")).toHaveAttribute(
+          "aria-busy",
+          "false"
+        );
       });
     });
   });
 
-  describe('Controlled Component', () => {
-    it('works as a controlled component', async () => {
+  describe("Controlled Component", () => {
+    it("works as a controlled component", async () => {
       const ControlledWrapper = () => {
-        const [value, setValue] = React.useState('');
+        const [value, setValue] = React.useState("");
 
         return (
           <LocationSearchInput
@@ -330,19 +376,19 @@ describe('LocationSearchInput - Integration Tests', () => {
         );
       };
 
-      const React = await import('react');
+      const React = await import("react");
       render(<ControlledWrapper />);
 
-      const input = screen.getByRole('combobox');
+      const input = screen.getByRole("combobox");
 
-      await user.type(input, 'San Francisco');
+      await user.type(input, "San Francisco");
       jest.advanceTimersByTime(350);
 
-      expect(input).toHaveValue('San Francisco');
+      expect(input).toHaveValue("San Francisco");
     });
 
-    it('updates value when onLocationSelect changes it', async () => {
-      let externalValue = '';
+    it("updates value when onLocationSelect changes it", async () => {
+      let externalValue = "";
       const setExternalValue = (val: string) => {
         externalValue = val;
       };
@@ -351,42 +397,44 @@ describe('LocationSearchInput - Integration Tests', () => {
         setExternalValue(location.name);
       });
 
-      const { rerender } = renderInput({ initialValue: '' });
-      const input = screen.getByRole('combobox');
+      const { rerender } = renderInput({ initialValue: "" });
+      const input = screen.getByRole("combobox");
 
-      await user.type(input, 'San');
+      await user.type(input, "San");
       jest.advanceTimersByTime(350);
 
       // Component splits place_name at comma: "San Francisco" in first <p>, "CA, USA" in second
       await waitFor(() => {
-        expect(screen.getByText('San Francisco')).toBeInTheDocument();
+        expect(screen.getByText("San Francisco")).toBeInTheDocument();
       });
 
-      await user.click(screen.getByText('San Francisco'));
+      await user.click(screen.getByText("San Francisco"));
 
       expect(mockOnLocationSelect).toHaveBeenCalled();
-      expect(externalValue).toBe('San Francisco, CA, USA');
+      expect(externalValue).toBe("San Francisco, CA, USA");
     });
   });
 
-  describe('Placeholder', () => {
-    it('shows placeholder when empty', () => {
-      renderInput({ placeholder: 'Search for a location...' });
-      expect(screen.getByPlaceholderText('Search for a location...')).toBeInTheDocument();
+  describe("Placeholder", () => {
+    it("shows placeholder when empty", () => {
+      renderInput({ placeholder: "Search for a location..." });
+      expect(
+        screen.getByPlaceholderText("Search for a location...")
+      ).toBeInTheDocument();
     });
   });
 
-  describe('Debouncing', () => {
-    it('debounces API calls (300ms)', async () => {
+  describe("Debouncing", () => {
+    it("debounces API calls (300ms)", async () => {
       renderInput();
-      const input = screen.getByRole('combobox');
+      const input = screen.getByRole("combobox");
 
       // Type rapidly
-      await user.type(input, 'S');
+      await user.type(input, "S");
       jest.advanceTimersByTime(100);
-      await user.type(input, 'a');
+      await user.type(input, "a");
       jest.advanceTimersByTime(100);
-      await user.type(input, 'n');
+      await user.type(input, "n");
       jest.advanceTimersByTime(100);
 
       // Should not have called API yet
@@ -401,15 +449,24 @@ describe('LocationSearchInput - Integration Tests', () => {
     });
   });
 
-  describe('bbox Support', () => {
-    it('passes bbox when available in suggestion', async () => {
+  describe("bbox Support", () => {
+    it("passes bbox when available in suggestion", async () => {
       const suggestionsWithBbox = {
-        type: 'FeatureCollection',
-        features: [{
-          type: 'Feature',
-          geometry: { type: 'Point', coordinates: [-119.4179, 36.7783] },
-          properties: { osm_id: 1, osm_type: 'R', name: 'California', country: 'USA', type: 'state', extent: [-124.4096, 32.5343, -114.1312, 42.0095] }
-        }],
+        type: "FeatureCollection",
+        features: [
+          {
+            type: "Feature",
+            geometry: { type: "Point", coordinates: [-119.4179, 36.7783] },
+            properties: {
+              osm_id: 1,
+              osm_type: "R",
+              name: "California",
+              country: "USA",
+              type: "state",
+              extent: [-124.4096, 32.5343, -114.1312, 42.0095],
+            },
+          },
+        ],
       };
 
       mockFetch.mockResolvedValueOnce({
@@ -419,17 +476,17 @@ describe('LocationSearchInput - Integration Tests', () => {
       });
 
       renderInput();
-      const input = screen.getByRole('combobox');
+      const input = screen.getByRole("combobox");
 
-      await user.type(input, 'California');
+      await user.type(input, "California");
       jest.advanceTimersByTime(350);
 
       // Component splits place_name at comma: "California" in first <p>, "USA" in second
       await waitFor(() => {
-        expect(screen.getByText('California')).toBeInTheDocument();
+        expect(screen.getByText("California")).toBeInTheDocument();
       });
 
-      await user.click(screen.getByText('California'));
+      await user.click(screen.getByText("California"));
 
       expect(mockOnLocationSelect).toHaveBeenCalledWith(
         expect.objectContaining({
@@ -439,8 +496,8 @@ describe('LocationSearchInput - Integration Tests', () => {
     });
   });
 
-  describe('Accessibility', () => {
-    it('has proper label association', () => {
+  describe("Accessibility", () => {
+    it("has proper label association", () => {
       render(
         <div>
           <label htmlFor="location-input">Location</label>
@@ -453,10 +510,10 @@ describe('LocationSearchInput - Integration Tests', () => {
         </div>
       );
 
-      expect(screen.getByLabelText('Location')).toBeInTheDocument();
+      expect(screen.getByLabelText("Location")).toBeInTheDocument();
     });
 
-    it('announces loading state to screen readers', async () => {
+    it("announces loading state to screen readers", async () => {
       let resolvePromise: (value: Response) => void;
       const slowPromise = new Promise<Response>((resolve) => {
         resolvePromise = resolve;
@@ -465,14 +522,14 @@ describe('LocationSearchInput - Integration Tests', () => {
       mockFetch.mockReturnValueOnce(slowPromise);
 
       renderInput();
-      const input = screen.getByRole('combobox');
+      const input = screen.getByRole("combobox");
 
-      await user.type(input, 'San');
+      await user.type(input, "San");
       jest.advanceTimersByTime(350);
 
       // Check aria-busy (use waitFor since state updates are async)
       await waitFor(() => {
-        expect(input).toHaveAttribute('aria-busy', 'true');
+        expect(input).toHaveAttribute("aria-busy", "true");
       });
 
       resolvePromise!({
@@ -482,20 +539,20 @@ describe('LocationSearchInput - Integration Tests', () => {
       } as Response);
 
       await waitFor(() => {
-        expect(input).toHaveAttribute('aria-busy', 'false');
+        expect(input).toHaveAttribute("aria-busy", "false");
       });
     });
   });
 
-  describe('Edge Case Combinations', () => {
-    it('handles rapid type → clear → type', async () => {
+  describe("Edge Case Combinations", () => {
+    it("handles rapid type → clear → type", async () => {
       renderInput();
-      const input = screen.getByRole('combobox');
+      const input = screen.getByRole("combobox");
 
-      await user.type(input, 'San');
+      await user.type(input, "San");
       jest.advanceTimersByTime(100);
       await user.clear(input);
-      await user.type(input, 'Los');
+      await user.type(input, "Los");
       jest.advanceTimersByTime(350);
 
       await waitFor(() => {
@@ -503,30 +560,32 @@ describe('LocationSearchInput - Integration Tests', () => {
       });
 
       // Last call should be for "Los"
-      const lastCall = mockFetch.mock.calls[mockFetch.mock.calls.length - 1][0] as string;
-      expect(lastCall.toLowerCase()).toContain('los');
+      const lastCall = mockFetch.mock.calls[
+        mockFetch.mock.calls.length - 1
+      ][0] as string;
+      expect(lastCall.toLowerCase()).toContain("los");
     });
 
-    it('handles select → clear → type again', async () => {
+    it("handles select → clear → type again", async () => {
       renderInput();
-      const input = screen.getByRole('combobox');
+      const input = screen.getByRole("combobox");
 
       // First selection
-      await user.type(input, 'San');
+      await user.type(input, "San");
       jest.advanceTimersByTime(350);
 
       // Component splits place_name at comma: "San Francisco" in first <p>, "CA, USA" in second
       await waitFor(() => {
-        expect(screen.getByText('San Francisco')).toBeInTheDocument();
+        expect(screen.getByText("San Francisco")).toBeInTheDocument();
       });
 
-      await user.click(screen.getByText('San Francisco'));
+      await user.click(screen.getByText("San Francisco"));
 
       expect(mockOnLocationSelect).toHaveBeenCalledTimes(1);
 
       // Clear and search again
       await user.clear(input);
-      await user.type(input, 'Los');
+      await user.type(input, "Los");
       jest.advanceTimersByTime(350);
 
       // Should be able to search again

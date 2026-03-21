@@ -53,7 +53,12 @@ describe("rate-limit", () => {
         const now = new Date();
         // Atomic UPDATE succeeds (count under limit)
         (prisma.$queryRaw as jest.Mock).mockResolvedValue([
-          { id: "entry-123", count: 3, windowStart: now, expiresAt: new Date(now.getTime() + 60000) },
+          {
+            id: "entry-123",
+            count: 3,
+            windowStart: now,
+            expiresAt: new Date(now.getTime() + 60000),
+          },
         ]);
         (prisma.rateLimitEntry.deleteMany as jest.Mock).mockResolvedValue({
           count: 0,
@@ -68,9 +73,16 @@ describe("rate-limit", () => {
       it("uses atomic SQL increment (not stale JS value)", async () => {
         const now = new Date();
         (prisma.$queryRaw as jest.Mock).mockResolvedValue([
-          { id: "entry-123", count: 2, windowStart: now, expiresAt: new Date(now.getTime() + 60000) },
+          {
+            id: "entry-123",
+            count: 2,
+            windowStart: now,
+            expiresAt: new Date(now.getTime() + 60000),
+          },
         ]);
-        (prisma.rateLimitEntry.deleteMany as jest.Mock).mockResolvedValue({ count: 0 });
+        (prisma.rateLimitEntry.deleteMany as jest.Mock).mockResolvedValue({
+          count: 0,
+        });
 
         const result = await checkRateLimit(identifier, endpoint, config);
 
@@ -83,7 +95,12 @@ describe("rate-limit", () => {
       it("returns correct remaining count", async () => {
         const now = new Date();
         (prisma.$queryRaw as jest.Mock).mockResolvedValue([
-          { id: "entry-123", count: 4, windowStart: now, expiresAt: new Date(now.getTime() + 60000) },
+          {
+            id: "entry-123",
+            count: 4,
+            windowStart: now,
+            expiresAt: new Date(now.getTime() + 60000),
+          },
         ]);
         (prisma.rateLimitEntry.deleteMany as jest.Mock).mockResolvedValue({
           count: 0,
@@ -118,7 +135,9 @@ describe("rate-limit", () => {
 
       it("creates new window when atomic UPDATE matches 0 rows and no valid entry", async () => {
         (prisma.$queryRaw as jest.Mock).mockResolvedValue([]);
-        (prisma.rateLimitEntry.deleteMany as jest.Mock).mockResolvedValue({ count: 0 });
+        (prisma.rateLimitEntry.deleteMany as jest.Mock).mockResolvedValue({
+          count: 0,
+        });
         (prisma.rateLimitEntry.findUnique as jest.Mock).mockResolvedValue(null);
         (prisma.rateLimitEntry.upsert as jest.Mock).mockResolvedValue({});
 
@@ -194,6 +213,48 @@ describe("rate-limit", () => {
       });
     });
 
+    describe("E2E bypass production guard", () => {
+      const originalNodeEnv = process.env.NODE_ENV;
+      const originalE2EDisable = process.env.E2E_DISABLE_RATE_LIMIT;
+
+      afterEach(() => {
+        // Restore env vars
+        delete (process.env as { NODE_ENV?: string }).NODE_ENV;
+        (process.env as { NODE_ENV?: string }).NODE_ENV = originalNodeEnv;
+        if (originalE2EDisable === undefined) {
+          delete process.env.E2E_DISABLE_RATE_LIMIT;
+        } else {
+          process.env.E2E_DISABLE_RATE_LIMIT = originalE2EDisable;
+        }
+      });
+
+      it("does NOT bypass rate limiting when NODE_ENV is production", async () => {
+        delete (process.env as { NODE_ENV?: string }).NODE_ENV;
+        (process.env as { NODE_ENV?: string }).NODE_ENV = "production";
+        process.env.E2E_DISABLE_RATE_LIMIT = "true";
+
+        const now = new Date();
+        (prisma.$queryRaw as jest.Mock).mockResolvedValue([
+          {
+            id: "entry-123",
+            count: 3,
+            windowStart: now,
+            expiresAt: new Date(now.getTime() + 60000),
+          },
+        ]);
+        (prisma.rateLimitEntry.deleteMany as jest.Mock).mockResolvedValue({
+          count: 0,
+        });
+
+        const result = await checkRateLimit(identifier, endpoint, config);
+
+        // Should NOT return the bypass response (remaining: 999)
+        expect(result.remaining).not.toBe(999);
+        // Should have actually hit the DB
+        expect(prisma.rateLimitEntry.deleteMany).toHaveBeenCalled();
+      });
+    });
+
     describe("cleanup", () => {
       it("cleans up expired entries", async () => {
         (prisma.rateLimitEntry.deleteMany as jest.Mock).mockResolvedValue({
@@ -222,7 +283,7 @@ describe("rate-limit", () => {
 
       it("allows first request in degraded mode on database error", async () => {
         (prisma.rateLimitEntry.deleteMany as jest.Mock).mockRejectedValue(
-          new Error("DB Error"),
+          new Error("DB Error")
         );
 
         const result = await checkRateLimit(identifier, endpoint, config);
@@ -234,7 +295,7 @@ describe("rate-limit", () => {
 
       it("denies after degraded mode limit exceeded", async () => {
         (prisma.rateLimitEntry.deleteMany as jest.Mock).mockRejectedValue(
-          new Error("DB Error"),
+          new Error("DB Error")
         );
 
         // Exhaust degraded mode limit (10 calls)
@@ -253,7 +314,7 @@ describe("rate-limit", () => {
       it("does not log PII on database error", async () => {
         const consoleSpy = jest.spyOn(console, "error").mockImplementation();
         (prisma.rateLimitEntry.deleteMany as jest.Mock).mockRejectedValue(
-          new Error("DB Error"),
+          new Error("DB Error")
         );
 
         await checkRateLimit("192.168.1.100", endpoint, config);

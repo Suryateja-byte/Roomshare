@@ -25,7 +25,9 @@ const BATCH_SIZE = 10; // concurrent downloads
 const FETCH_TIMEOUT_MS = 15_000;
 
 if (!SUPABASE_URL || !SUPABASE_KEY) {
-  console.error("Missing NEXT_PUBLIC_SUPABASE_URL or SUPABASE_SERVICE_ROLE_KEY");
+  console.error(
+    "Missing NEXT_PUBLIC_SUPABASE_URL or SUPABASE_SERVICE_ROLE_KEY"
+  );
   process.exit(1);
 }
 
@@ -77,7 +79,7 @@ async function downloadImage(url: string): Promise<Buffer | null> {
 
 async function uploadToSupabase(
   buffer: Buffer,
-  originalUrl: string,
+  originalUrl: string
 ): Promise<string | null> {
   const ext = "jpg"; // picsum returns JPEG
   const filename = `seed/${randomUUID()}.${ext}`;
@@ -110,7 +112,7 @@ async function processBatch(urls: string[]): Promise<void> {
       if (newUrl) {
         urlMap.set(url, newUrl);
       }
-    }),
+    })
   );
 }
 
@@ -165,7 +167,9 @@ async function main() {
   console.log("═══════════════════════════════════════════════════\n");
 
   if (!dryRun && !safetyFlag) {
-    console.error("❌ Use --dry-run to preview or --i-understand to execute.\n");
+    console.error(
+      "❌ Use --dry-run to preview or --i-understand to execute.\n"
+    );
     process.exit(1);
   }
 
@@ -214,7 +218,9 @@ async function main() {
   console.log(`  Listings updated: ${updatedListings}`);
   console.log(`  Embeddings reset: ${reset}`);
   console.log("\n✅ MIGRATION COMPLETE");
-  console.log("Now run the embedding sync to generate multimodal embeddings.\n");
+  console.log(
+    "Now run the embedding sync to generate multimodal embeddings.\n"
+  );
 
   process.exit(0);
 }

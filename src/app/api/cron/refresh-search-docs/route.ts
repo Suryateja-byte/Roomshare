@@ -72,7 +72,7 @@ async function fetchDirtyListingIds(limit: number): Promise<string[]> {
  * Returns listings with location and review aggregation
  */
 async function fetchListingsWithData(
-  listingIds: string[],
+  listingIds: string[]
 ): Promise<ListingWithData[]> {
   if (listingIds.length === 0) return [];
 
@@ -124,14 +124,14 @@ async function upsertSearchDoc(listing: ListingWithData): Promise<void> {
     listing.avgRating,
     listing.viewCount,
     listing.reviewCount,
-    listing.createdAt,
+    listing.createdAt
   );
 
   // Compute lowercase arrays for case-insensitive filtering
   const amenitiesLower = listing.amenities.map((a) => a.toLowerCase());
   const houseRulesLower = listing.houseRules.map((r) => r.toLowerCase());
   const householdLanguagesLower = listing.householdLanguages.map((l) =>
-    l.toLowerCase(),
+    l.toLowerCase()
   );
 
   // Note: search_tsv (tsvector) is auto-populated by a BEFORE INSERT/UPDATE
@@ -218,7 +218,7 @@ async function clearDirtyFlags(listingIds: string[]): Promise<number> {
  */
 async function handleOrphanDirtyFlags(
   dirtyIds: string[],
-  foundIds: Set<string>,
+  foundIds: Set<string>
 ): Promise<number> {
   const orphanIds = dirtyIds.filter((id) => !foundIds.has(id));
   if (orphanIds.length === 0) return 0;
@@ -236,6 +236,30 @@ async function handleOrphanDirtyFlags(
   `;
 
   return orphanIds.length;
+}
+
+async function processWithConcurrency<I, T>(
+  items: I[],
+  fn: (item: I) => Promise<T>,
+  concurrency: number
+): Promise<{ fulfilled: T[]; rejected: { item: I; error: unknown }[] }> {
+  const fulfilled: T[] = [];
+  const rejected: { item: I; error: unknown }[] = [];
+
+  for (let i = 0; i < items.length; i += concurrency) {
+    const chunk = items.slice(i, i + concurrency);
+    const results = await Promise.allSettled(chunk.map(fn));
+    for (let j = 0; j < results.length; j++) {
+      const result = results[j];
+      if (result.status === "fulfilled") {
+        fulfilled.push(result.value);
+      } else {
+        rejected.push({ item: chunk[j], error: result.reason });
+      }
+    }
+  }
+
+  return { fulfilled, rejected };
 }
 
 export async function GET(request: NextRequest) {
@@ -262,26 +286,24 @@ export async function GET(request: NextRequest) {
     const listings = await fetchListingsWithData(dirtyIds);
     const foundIds = new Set(listings.map((l) => l.id));
 
-    // 3. Upsert search docs for each listing
-    let upsertedCount = 0;
-    const errors: string[] = [];
-
-    for (const listing of listings) {
-      try {
+    // 3. Upsert search docs for each listing (concurrent batches)
+    const UPSERT_CONCURRENCY = 10;
+    const { fulfilled, rejected } = await processWithConcurrency(
+      listings,
+      async (listing) => {
         await upsertSearchDoc(listing);
-        upsertedCount++;
-      } catch (error) {
-        // Log error without PII (only listing ID)
-        errors.push(
-          `Listing ${listing.id}: ${sanitizeErrorMessage(error)}`,
-        );
-      }
-    }
+        return listing.id;
+      },
+      UPSERT_CONCURRENCY
+    );
+
+    const upsertedCount = fulfilled.length;
+    const errors: string[] = rejected.map(
+      ({ item, error }) => `Listing ${item.id}: ${sanitizeErrorMessage(error)}`
+    );
 
     // 4. Clear dirty flags for successfully processed listings
-    const processedIds = listings
-      .filter((l) => !errors.some((e) => e.startsWith(`Listing ${l.id}:`)))
-      .map((l) => l.id);
+    const processedIds = fulfilled;
     await clearDirtyFlags(processedIds);
 
     // 5. Handle orphan dirty flags (listing deleted or missing location)
@@ -289,7 +311,7 @@ export async function GET(request: NextRequest) {
 
     const durationMs = Date.now() - startTime;
 
-    logger.sync.info('[SearchDoc Cron] Complete', {
+    logger.sync.info("[SearchDoc Cron] Complete", {
       event: "search_doc_cron_complete",
       processed: upsertedCount,
       orphans: orphanCount,
@@ -307,10 +329,12 @@ export async function GET(request: NextRequest) {
       timestamp: new Date().toISOString(),
     });
   } catch (error) {
-    logger.sync.error('[SearchDoc Cron] Error', { error: sanitizeErrorMessage(error) });
+    logger.sync.error("[SearchDoc Cron] Error", {
+      error: sanitizeErrorMessage(error),
+    });
     return NextResponse.json(
       { error: "SearchDoc refresh failed" },
-      { status: 500 },
+      { status: 500 }
     );
   }
 }

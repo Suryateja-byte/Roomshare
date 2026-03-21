@@ -107,7 +107,7 @@ export function estimateWalkMins(miles: number): number {
  */
 export function formatWalkTime(minutes: number): string {
   if (minutes < 1) {
-    return '< 1 min walk';
+    return "< 1 min walk";
   }
   if (minutes >= 60) {
     const hours = Math.floor(minutes / 60);
@@ -155,7 +155,7 @@ export function milesToMeters(miles: number): number {
  */
 export function getWalkabilityRings(): { minutes: number; meters: number }[] {
   return [
-    { minutes: 5, meters: walkMinutesToMeters(5) },   // ~402m
+    { minutes: 5, meters: walkMinutesToMeters(5) }, // ~402m
     { minutes: 10, meters: walkMinutesToMeters(10) }, // ~805m
     { minutes: 15, meters: walkMinutesToMeters(15) }, // ~1207m
   ];

@@ -1,6 +1,6 @@
-'use client';
+"use client";
 
-import { useState, useCallback, useEffect, useRef } from 'react';
+import { useState, useCallback, useEffect, useRef } from "react";
 
 /**
  * Session-based rate limiting for nearby place searches.
@@ -53,7 +53,7 @@ function getStorageKey(listingId: string): string {
 function readState(listingId: string): RateLimitState {
   const freshState = { searchCount: 0, lastSearchTime: 0 };
 
-  if (typeof window === 'undefined') {
+  if (typeof window === "undefined") {
     return freshState;
   }
 
@@ -61,13 +61,15 @@ function readState(listingId: string): RateLimitState {
     const stored = sessionStorage.getItem(getStorageKey(listingId));
     if (stored) {
       const parsed = JSON.parse(stored);
-      const searchCount = typeof parsed.searchCount === 'number' ? parsed.searchCount : 0;
-      const lastSearchTime = typeof parsed.lastSearchTime === 'number' ? parsed.lastSearchTime : 0;
+      const searchCount =
+        typeof parsed.searchCount === "number" ? parsed.searchCount : 0;
+      const lastSearchTime =
+        typeof parsed.lastSearchTime === "number" ? parsed.lastSearchTime : 0;
 
       // Check if the stored data is stale (older than SESSION_EXPIRY_MS)
       // If so, reset the counter to allow fresh searches
       const now = Date.now();
-      if (lastSearchTime > 0 && (now - lastSearchTime) > SESSION_EXPIRY_MS) {
+      if (lastSearchTime > 0 && now - lastSearchTime > SESSION_EXPIRY_MS) {
         // Data is stale - clear storage and return fresh state
         sessionStorage.removeItem(getStorageKey(listingId));
         return freshState;
@@ -86,7 +88,7 @@ function readState(listingId: string): RateLimitState {
  * Write rate limit state to sessionStorage.
  */
 function writeState(listingId: string, state: RateLimitState): void {
-  if (typeof window === 'undefined') return;
+  if (typeof window === "undefined") return;
 
   try {
     sessionStorage.setItem(getStorageKey(listingId), JSON.stringify(state));
@@ -122,7 +124,9 @@ export function useNearbySearchRateLimit(
   listingId: string
 ): UseNearbySearchRateLimitReturn {
   // Initialize state from sessionStorage
-  const [state, setState] = useState<RateLimitState>(() => readState(listingId));
+  const [state, setState] = useState<RateLimitState>(() =>
+    readState(listingId)
+  );
 
   // Track debounce status
   const [isDebounceBusy, setIsDebounceBusy] = useState(false);
@@ -196,7 +200,10 @@ export function useNearbySearchRateLimit(
   }, [listingId]);
 
   // Calculate derived values
-  const remainingSearches = Math.max(0, MAX_SEARCHES_PER_LISTING - state.searchCount);
+  const remainingSearches = Math.max(
+    0,
+    MAX_SEARCHES_PER_LISTING - state.searchCount
+  );
   const canSearch = remainingSearches > 0 && !isDebounceBusy;
 
   // P1-04 FIX: Helper to start countdown interval

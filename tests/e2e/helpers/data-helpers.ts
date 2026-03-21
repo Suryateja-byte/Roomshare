@@ -1,4 +1,4 @@
-import { Page } from '@playwright/test';
+import { Page } from "@playwright/test";
 
 /**
  * Test data generation and management helpers
@@ -20,13 +20,13 @@ export const dataHelpers = {
       title: `Test Listing ${prefix}`,
       description: `This is a test listing created by E2E tests. ${prefix}`,
       price: 1000 + Math.floor(Math.random() * 1000),
-      address: '123 Test Street',
-      city: 'San Francisco',
-      state: 'CA',
-      zipCode: '94102',
-      roomType: 'private',
+      address: "123 Test Street",
+      city: "San Francisco",
+      state: "CA",
+      zipCode: "94102",
+      roomType: "private",
       moveInDate: this.futureDate(30),
-      amenities: ['wifi', 'parking'],
+      amenities: ["wifi", "parking"],
       ...overrides,
     };
   },
@@ -39,9 +39,9 @@ export const dataHelpers = {
     return {
       name: `Test User ${prefix.substring(0, 8)}`,
       email: `test-${prefix}@example.com`,
-      password: process.env.E2E_TEST_PASSWORD || 'TestPassword123!',
+      password: process.env.E2E_TEST_PASSWORD || "TestPassword123!",
       bio: `I am a test user. ${prefix}`,
-      phone: '555-0100',
+      phone: "555-0100",
       ...overrides,
     };
   },
@@ -63,11 +63,11 @@ export const dataHelpers = {
    */
   generateMessage(): string {
     const messages = [
-      'Hello, I am interested in this listing!',
-      'Is this room still available?',
-      'Can you tell me more about the neighborhood?',
-      'What utilities are included?',
-      'When can I schedule a viewing?',
+      "Hello, I am interested in this listing!",
+      "Is this room still available?",
+      "Can you tell me more about the neighborhood?",
+      "What utilities are included?",
+      "When can I schedule a viewing?",
     ];
     return messages[Math.floor(Math.random() * messages.length)];
   },
@@ -89,7 +89,7 @@ export const dataHelpers = {
   futureDate(daysFromNow: number): string {
     const date = new Date();
     date.setDate(date.getDate() + daysFromNow);
-    return date.toISOString().split('T')[0];
+    return date.toISOString().split("T")[0];
   },
 
   /**
@@ -98,25 +98,35 @@ export const dataHelpers = {
   pastDate(daysAgo: number): string {
     const date = new Date();
     date.setDate(date.getDate() - daysAgo);
-    return date.toISOString().split('T')[0];
+    return date.toISOString().split("T")[0];
   },
 
   /**
    * Get today's date string (YYYY-MM-DD format)
    */
   today(): string {
-    return new Date().toISOString().split('T')[0];
+    return new Date().toISOString().split("T")[0];
   },
 
   /**
    * Common test locations
    */
   locations: {
-    sanFrancisco: { city: 'San Francisco', state: 'CA', lat: 37.7749, lng: -122.4194 },
-    losAngeles: { city: 'Los Angeles', state: 'CA', lat: 34.0522, lng: -118.2437 },
-    newYork: { city: 'New York', state: 'NY', lat: 40.7128, lng: -74.006 },
-    seattle: { city: 'Seattle', state: 'WA', lat: 47.6062, lng: -122.3321 },
-    austin: { city: 'Austin', state: 'TX', lat: 30.2672, lng: -97.7431 },
+    sanFrancisco: {
+      city: "San Francisco",
+      state: "CA",
+      lat: 37.7749,
+      lng: -122.4194,
+    },
+    losAngeles: {
+      city: "Los Angeles",
+      state: "CA",
+      lat: 34.0522,
+      lng: -118.2437,
+    },
+    newYork: { city: "New York", state: "NY", lat: 40.7128, lng: -74.006 },
+    seattle: { city: "Seattle", state: "WA", lat: 47.6062, lng: -122.3321 },
+    austin: { city: "Austin", state: "TX", lat: 30.2672, lng: -97.7431 },
   },
 
   /**
@@ -131,24 +141,24 @@ export const dataHelpers = {
   /**
    * Room types
    */
-  roomTypes: ['private', 'shared', 'entire'] as const,
+  roomTypes: ["private", "shared", "entire"] as const,
 
   /**
    * Amenities list
    */
   amenities: [
-    'wifi',
-    'parking',
-    'laundry',
-    'ac',
-    'heating',
-    'kitchen',
-    'gym',
-    'pool',
-    'patio',
-    'furnished',
-    'pets_allowed',
-    'utilities_included',
+    "wifi",
+    "parking",
+    "laundry",
+    "ac",
+    "heating",
+    "kitchen",
+    "gym",
+    "pool",
+    "patio",
+    "furnished",
+    "pets_allowed",
+    "utilities_included",
   ] as const,
 
   /**
@@ -163,22 +173,22 @@ export const dataHelpers = {
    * Test credit card (for payment testing if applicable)
    */
   testCard: {
-    number: '4242424242424242',
-    expiry: '12/30',
-    cvc: '123',
-    zip: '94102',
+    number: "4242424242424242",
+    expiry: "12/30",
+    cvc: "123",
+    zip: "94102",
   },
 
   /**
    * Invalid form data for testing validation
    */
   invalidData: {
-    email: 'not-an-email',
-    shortPassword: '123',
-    emptyString: '',
+    email: "not-an-email",
+    shortPassword: "123",
+    emptyString: "",
     negativePrice: -100,
-    pastDate: '2020-01-01',
-    tooLongText: 'x'.repeat(10001),
+    pastDate: "2020-01-01",
+    tooLongText: "x".repeat(10001),
     specialChars: '<script>alert("xss")</script>',
     sqlInjection: "'; DROP TABLE users; --",
   },
@@ -216,9 +226,9 @@ export const dataHelpers = {
    * Format price for display comparison
    */
   formatPrice(price: number): string {
-    return new Intl.NumberFormat('en-US', {
-      style: 'currency',
-      currency: 'USD',
+    return new Intl.NumberFormat("en-US", {
+      style: "currency",
+      currency: "USD",
       minimumFractionDigits: 0,
       maximumFractionDigits: 0,
     }).format(price);
@@ -228,10 +238,10 @@ export const dataHelpers = {
    * Format date for display comparison
    */
   formatDate(dateStr: string): string {
-    return new Date(dateStr).toLocaleDateString('en-US', {
-      year: 'numeric',
-      month: 'long',
-      day: 'numeric',
+    return new Date(dateStr).toLocaleDateString("en-US", {
+      year: "numeric",
+      month: "long",
+      day: "numeric",
     });
   },
 };
@@ -246,7 +256,7 @@ export interface ListingData {
   city: string;
   state: string;
   zipCode: string;
-  roomType: 'private' | 'shared' | 'entire';
+  roomType: "private" | "shared" | "entire";
   moveInDate: string;
   amenities: string[];
   images?: string[];

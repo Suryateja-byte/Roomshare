@@ -28,7 +28,7 @@ interface BaseEvent {
 }
 
 interface QueryEvent extends BaseEvent {
-  searchMode: 'type' | 'text';
+  searchMode: "type" | "text";
   includedTypes?: string[];
   resultCount: number;
   radiusMeters: number;
@@ -47,25 +47,25 @@ interface PlaceClickedEvent extends BaseEvent {
   placeName?: string;
   placeType?: string;
   distanceMiles?: number;
-  source: 'list' | 'map';
+  source: "list" | "map";
 }
 
 interface MapInteractionEvent extends BaseEvent {
-  action: 'pan' | 'zoom' | 'click_poi' | 'click_ring';
+  action: "pan" | "zoom" | "click_poi" | "click_ring";
   zoomLevel?: number;
 }
 
 interface ProUpgradeClickedEvent extends BaseEvent {
-  context: 'cta_button' | 'blur_overlay';
+  context: "cta_button" | "blur_overlay";
   placeCount?: number;
 }
 
 type NeighborhoodEvent =
-  | { type: 'neighborhood_query'; data: QueryEvent }
-  | { type: 'neighborhood_radius_expanded'; data: RadiusExpandedEvent }
-  | { type: 'neighborhood_place_clicked'; data: PlaceClickedEvent }
-  | { type: 'neighborhood_map_interacted'; data: MapInteractionEvent }
-  | { type: 'neighborhood_pro_upgrade_clicked'; data: ProUpgradeClickedEvent };
+  | { type: "neighborhood_query"; data: QueryEvent }
+  | { type: "neighborhood_radius_expanded"; data: RadiusExpandedEvent }
+  | { type: "neighborhood_place_clicked"; data: PlaceClickedEvent }
+  | { type: "neighborhood_map_interacted"; data: MapInteractionEvent }
+  | { type: "neighborhood_pro_upgrade_clicked"; data: ProUpgradeClickedEvent };
 
 /**
  * Send event to analytics endpoint
@@ -74,7 +74,7 @@ type NeighborhoodEvent =
 async function sendEvent(event: NeighborhoodEvent): Promise<void> {
   try {
     // Only send in browser
-    if (typeof window === 'undefined') return;
+    if (typeof window === "undefined") return;
 
     const payload = {
       eventType: event.type,
@@ -83,18 +83,13 @@ async function sendEvent(event: NeighborhoodEvent): Promise<void> {
       ...event.data,
     };
 
-    // Log in development
-    if (process.env.NODE_ENV === 'development') {
-      console.log('[Neighborhood Analytics]', payload);
-    }
-
     // In production, send to analytics endpoint
     // Using navigator.sendBeacon for reliability on page unload
-    if (process.env.NODE_ENV === 'production') {
+    if (process.env.NODE_ENV === "production") {
       const blob = new Blob([JSON.stringify(payload)], {
-        type: 'application/json',
+        type: "application/json",
       });
-      navigator.sendBeacon('/api/metrics/ops', blob);
+      navigator.sendBeacon("/api/metrics/ops", blob);
     }
   } catch {
     // Fail silently - analytics should never break the app
@@ -106,7 +101,7 @@ async function sendEvent(event: NeighborhoodEvent): Promise<void> {
  */
 export function trackNeighborhoodQuery(data: QueryEvent): void {
   sendEvent({
-    type: 'neighborhood_query',
+    type: "neighborhood_query",
     data,
   });
 }
@@ -116,7 +111,7 @@ export function trackNeighborhoodQuery(data: QueryEvent): void {
  */
 export function trackRadiusExpanded(data: RadiusExpandedEvent): void {
   sendEvent({
-    type: 'neighborhood_radius_expanded',
+    type: "neighborhood_radius_expanded",
     data,
   });
 }
@@ -126,7 +121,7 @@ export function trackRadiusExpanded(data: RadiusExpandedEvent): void {
  */
 export function trackPlaceClicked(data: PlaceClickedEvent): void {
   sendEvent({
-    type: 'neighborhood_place_clicked',
+    type: "neighborhood_place_clicked",
     data,
   });
 }
@@ -136,7 +131,7 @@ export function trackPlaceClicked(data: PlaceClickedEvent): void {
  */
 export function trackMapInteraction(data: MapInteractionEvent): void {
   sendEvent({
-    type: 'neighborhood_map_interacted',
+    type: "neighborhood_map_interacted",
     data,
   });
 }
@@ -146,7 +141,7 @@ export function trackMapInteraction(data: MapInteractionEvent): void {
  */
 export function trackProUpgradeClicked(data: ProUpgradeClickedEvent): void {
   sendEvent({
-    type: 'neighborhood_pro_upgrade_clicked',
+    type: "neighborhood_pro_upgrade_clicked",
     data,
   });
 }

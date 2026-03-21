@@ -35,7 +35,7 @@ jest.mock("next/server", () => ({
   NextResponse: {
     json: (
       data: unknown,
-      init?: { status?: number; headers?: Record<string, string> },
+      init?: { status?: number; headers?: Record<string, string> }
     ) => {
       const headersMap = new Map(Object.entries(init?.headers || {}));
       return {
@@ -157,7 +157,7 @@ describe("Map Listings API", () => {
               minLat: expect.any(Number),
               maxLat: expect.any(Number),
             }),
-          }),
+          })
         );
 
         // Verify clamped spans are within limits
@@ -209,7 +209,7 @@ describe("Map Listings API", () => {
           },
         };
         (withRateLimitRedis as jest.Mock).mockResolvedValueOnce(
-          rateLimitResponse,
+          rateLimitResponse
         );
 
         const request = createRequest({
@@ -308,7 +308,7 @@ describe("Map Listings API", () => {
               minLat: 37.5,
               maxLat: 38.0,
             },
-          }),
+          })
         );
       });
     });

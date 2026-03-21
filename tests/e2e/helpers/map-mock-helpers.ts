@@ -1,4 +1,4 @@
-import { Page } from '@playwright/test';
+import { Page } from "@playwright/test";
 
 /**
  * Minimal valid MapLibre style JSON — prevents all tile source fetching.
@@ -10,17 +10,17 @@ const MINIMAL_STYLE_JSON = JSON.stringify({
   sources: {},
   layers: [
     {
-      id: 'background',
-      type: 'background',
-      paint: { 'background-color': '#f0f0f0' },
+      id: "background",
+      type: "background",
+      paint: { "background-color": "#f0f0f0" },
     },
   ],
 });
 
 /** 1×1 transparent PNG (68 bytes) */
 const TRANSPARENT_1X1_PNG = Buffer.from(
-  'iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAAC0lEQVQI12NgAAIABQABNjN9GQAAAAlwSFlzAAAWJQAAFiUBSVIk8AAAAA0lEQVQI12P4z8BQDwAEgAF/QualIQAAAABJRU5ErkJggg==',
-  'base64',
+  "iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAAC0lEQVQI12NgAAIABQABNjN9GQAAAAlwSFlzAAAWJQAAFiUBSVIk8AAAAA0lEQVQI12P4z8BQDwAEgAF/QualIQAAAABJRU5ErkJggg==",
+  "base64"
 );
 
 /** Empty sprite JSON */
@@ -28,19 +28,19 @@ const EMPTY_SPRITE_JSON = JSON.stringify({});
 
 /** Mock Photon autocomplete response — GeoJSON FeatureCollection */
 const MOCK_PHOTON_RESPONSE = JSON.stringify({
-  type: 'FeatureCollection',
+  type: "FeatureCollection",
   features: [
     {
-      type: 'Feature',
-      geometry: { type: 'Point', coordinates: [-122.4194, 37.7749] },
+      type: "Feature",
+      geometry: { type: "Point", coordinates: [-122.4194, 37.7749] },
       properties: {
         osm_id: 240109189,
-        osm_type: 'R',
-        name: 'San Francisco',
-        state: 'California',
-        country: 'United States',
-        type: 'city',
-        extent: [-122.5164, 37.7066, -122.3570, 37.8324],
+        osm_type: "R",
+        name: "San Francisco",
+        state: "California",
+        country: "United States",
+        type: "city",
+        extent: [-122.5164, 37.7066, -122.357, 37.8324],
       },
     },
   ],
@@ -50,22 +50,24 @@ const MOCK_PHOTON_RESPONSE = JSON.stringify({
 const MOCK_NOMINATIM_SEARCH_RESPONSE = JSON.stringify([
   {
     place_id: 240109189,
-    licence: 'mock',
-    osm_type: 'relation',
+    licence: "mock",
+    osm_type: "relation",
     osm_id: 111968,
-    lat: '37.7749295',
-    lon: '-122.4194155',
-    display_name: 'San Francisco, California, United States',
-    boundingbox: ['37.7066', '37.8324', '-122.5164', '-122.3570'],
+    lat: "37.7749295",
+    lon: "-122.4194155",
+    display_name: "San Francisco, California, United States",
+    boundingbox: ["37.7066", "37.8324", "-122.5164", "-122.3570"],
     geojson: {
-      type: 'Polygon',
-      coordinates: [[
-        [-122.5164, 37.7066],
-        [-122.3570, 37.7066],
-        [-122.3570, 37.8324],
-        [-122.5164, 37.8324],
-        [-122.5164, 37.7066],
-      ]],
+      type: "Polygon",
+      coordinates: [
+        [
+          [-122.5164, 37.7066],
+          [-122.357, 37.7066],
+          [-122.357, 37.8324],
+          [-122.5164, 37.8324],
+          [-122.5164, 37.7066],
+        ],
+      ],
     },
   },
 ]);
@@ -73,17 +75,17 @@ const MOCK_NOMINATIM_SEARCH_RESPONSE = JSON.stringify([
 /** Mock Nominatim reverse response */
 const MOCK_NOMINATIM_REVERSE_RESPONSE = JSON.stringify({
   place_id: 240109189,
-  licence: 'mock',
-  osm_type: 'relation',
+  licence: "mock",
+  osm_type: "relation",
   osm_id: 111968,
-  lat: '37.7749295',
-  lon: '-122.4194155',
-  display_name: 'San Francisco, California, United States',
+  lat: "37.7749295",
+  lon: "-122.4194155",
+  display_name: "San Francisco, California, United States",
   address: {
-    city: 'San Francisco',
-    state: 'California',
-    country: 'United States',
-    country_code: 'us',
+    city: "San Francisco",
+    state: "California",
+    country: "United States",
+    country_code: "us",
   },
 });
 
@@ -100,64 +102,64 @@ const MOCK_NOMINATIM_REVERSE_RESPONSE = JSON.stringify({
  */
 export async function mockMapTileRequests(page: Page): Promise<void> {
   // --- OpenFreeMap style JSON (light mode) ---
-  await page.route('**/tiles.openfreemap.org/styles/**', async (route) => {
+  await page.route("**/tiles.openfreemap.org/styles/**", async (route) => {
     await route.fulfill({
       status: 200,
-      contentType: 'application/json',
+      contentType: "application/json",
       body: MINIMAL_STYLE_JSON,
     });
   });
 
   // --- Local dark-mode style JSON ---
-  await page.route('**/map-styles/liberty-dark.json', async (route) => {
+  await page.route("**/map-styles/liberty-dark.json", async (route) => {
     await route.fulfill({
       status: 200,
-      contentType: 'application/json',
+      contentType: "application/json",
       body: MINIMAL_STYLE_JSON,
     });
   });
 
   // --- OpenFreeMap sprites (JSON + PNG) ---
-  await page.route('**/tiles.openfreemap.org/sprites/**', async (route) => {
+  await page.route("**/tiles.openfreemap.org/sprites/**", async (route) => {
     const url = route.request().url();
-    if (url.endsWith('.json')) {
+    if (url.endsWith(".json")) {
       await route.fulfill({
         status: 200,
-        contentType: 'application/json',
+        contentType: "application/json",
         body: EMPTY_SPRITE_JSON,
       });
-    } else if (url.endsWith('.png')) {
+    } else if (url.endsWith(".png")) {
       await route.fulfill({
         status: 200,
-        contentType: 'image/png',
+        contentType: "image/png",
         body: TRANSPARENT_1X1_PNG,
       });
     } else {
-      await route.fulfill({ status: 204, body: '' });
+      await route.fulfill({ status: 204, body: "" });
     }
   });
 
   // --- Vector tiles + glyphs (.pbf) ---
-  await page.route('**/tiles.openfreemap.org/**/*.pbf', async (route) => {
-    await route.fulfill({ status: 204, body: '' });
+  await page.route("**/tiles.openfreemap.org/**/*.pbf", async (route) => {
+    await route.fulfill({ status: 204, body: "" });
   });
 
   // --- Raster tiles (.png) ---
-  await page.route('**/tiles.openfreemap.org/**/*.png', async (route) => {
+  await page.route("**/tiles.openfreemap.org/**/*.png", async (route) => {
     await route.fulfill({
       status: 200,
-      contentType: 'image/png',
+      contentType: "image/png",
       body: TRANSPARENT_1X1_PNG,
     });
   });
 
   // --- OpenFreeMap planet metadata (vector source URL) ---
-  await page.route('**/tiles.openfreemap.org/planet', async (route) => {
+  await page.route("**/tiles.openfreemap.org/planet", async (route) => {
     await route.fulfill({
       status: 200,
-      contentType: 'application/json',
+      contentType: "application/json",
       body: JSON.stringify({
-        tilejson: '3.0.0',
+        tilejson: "3.0.0",
         tiles: [],
         minzoom: 0,
         maxzoom: 14,
@@ -166,80 +168,80 @@ export async function mockMapTileRequests(page: Page): Promise<void> {
   });
 
   // --- Photon autocomplete API ---
-  await page.route('**/photon.komoot.io/api**', async (route) => {
+  await page.route("**/photon.komoot.io/api**", async (route) => {
     await route.fulfill({
       status: 200,
-      contentType: 'application/json',
+      contentType: "application/json",
       body: MOCK_PHOTON_RESPONSE,
     });
   });
 
   // --- Nominatim search + reverse geocoding ---
-  await page.route('**/nominatim.openstreetmap.org/**', async (route) => {
+  await page.route("**/nominatim.openstreetmap.org/**", async (route) => {
     const url = route.request().url();
-    if (url.includes('/reverse')) {
+    if (url.includes("/reverse")) {
       await route.fulfill({
         status: 200,
-        contentType: 'application/json',
+        contentType: "application/json",
         body: MOCK_NOMINATIM_REVERSE_RESPONSE,
       });
     } else {
       await route.fulfill({
         status: 200,
-        contentType: 'application/json',
+        contentType: "application/json",
         body: MOCK_NOMINATIM_SEARCH_RESPONSE,
       });
     }
   });
 
   // --- Stadia Maps style JSON (light + dark) ---
-  await page.route('**/tiles.stadiamaps.com/styles/**', async (route) => {
+  await page.route("**/tiles.stadiamaps.com/styles/**", async (route) => {
     await route.fulfill({
       status: 200,
-      contentType: 'application/json',
+      contentType: "application/json",
       body: MINIMAL_STYLE_JSON,
     });
   });
 
   // --- Stadia Maps vector tiles (.pbf) + glyphs ---
-  await page.route('**/tiles.stadiamaps.com/**/*.pbf', async (route) => {
-    await route.fulfill({ status: 204, body: '' });
+  await page.route("**/tiles.stadiamaps.com/**/*.pbf", async (route) => {
+    await route.fulfill({ status: 204, body: "" });
   });
 
   // --- Stadia Maps raster tiles (.png) ---
-  await page.route('**/tiles.stadiamaps.com/**/*.png', async (route) => {
+  await page.route("**/tiles.stadiamaps.com/**/*.png", async (route) => {
     await route.fulfill({
       status: 200,
-      contentType: 'image/png',
+      contentType: "image/png",
       body: TRANSPARENT_1X1_PNG,
     });
   });
 
   // --- Stadia Maps sprites ---
-  await page.route('**/tiles.stadiamaps.com/sprites/**', async (route) => {
+  await page.route("**/tiles.stadiamaps.com/sprites/**", async (route) => {
     const url = route.request().url();
-    if (url.endsWith('.json')) {
+    if (url.endsWith(".json")) {
       await route.fulfill({
         status: 200,
-        contentType: 'application/json',
+        contentType: "application/json",
         body: EMPTY_SPRITE_JSON,
       });
-    } else if (url.endsWith('.png')) {
+    } else if (url.endsWith(".png")) {
       await route.fulfill({
         status: 200,
-        contentType: 'image/png',
+        contentType: "image/png",
         body: TRANSPARENT_1X1_PNG,
       });
     } else {
-      await route.fulfill({ status: 204, body: '' });
+      await route.fulfill({ status: 204, body: "" });
     }
   });
 
   // --- Stadia Maps API (style metadata, etc.) ---
-  await page.route('**/api.stadiamaps.com/**', async (route) => {
+  await page.route("**/api.stadiamaps.com/**", async (route) => {
     await route.fulfill({
       status: 200,
-      contentType: 'application/json',
+      contentType: "application/json",
       body: MINIMAL_STYLE_JSON,
     });
   });

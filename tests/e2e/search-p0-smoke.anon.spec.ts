@@ -63,7 +63,10 @@ const BENIGN_ERROR_PATTERNS = [
 
 function filterBenignErrors(errors: string[]): string[] {
   return errors.filter(
-    (e) => !BENIGN_ERROR_PATTERNS.some((pattern) => e.toLowerCase().includes(pattern.toLowerCase())),
+    (e) =>
+      !BENIGN_ERROR_PATTERNS.some((pattern) =>
+        e.toLowerCase().includes(pattern.toLowerCase())
+      )
   );
 }
 
@@ -73,7 +76,9 @@ function filterBenignErrors(errors: string[]): string[] {
 
 test.describe("Search P0 Smoke Suite", () => {
   // S01: Page loads with results, no console errors
-  test("S01: page loads with results and no console errors", async ({ page }) => {
+  test("S01: page loads with results and no console errors", async ({
+    page,
+  }) => {
     const consoleErrors: string[] = [];
     page.on("console", (msg) => {
       if (msg.type() === "error") consoleErrors.push(msg.text());
@@ -109,7 +114,7 @@ test.describe("Search P0 Smoke Suite", () => {
     // At least one card should contain the query text "Mission"
     const allCardTexts = await cards.allTextContents();
     const hasMission = allCardTexts.some((text) =>
-      text.toLowerCase().includes("mission"),
+      text.toLowerCase().includes("mission")
     );
     expect(hasMission).toBe(true);
   });
@@ -145,12 +150,14 @@ test.describe("Search P0 Smoke Suite", () => {
     // Either results appear or we get a valid zero-results state
     const container = searchResultsContainer(page);
     const cards = container.locator('[data-testid="listing-card"]');
-    const zeroResults = page.locator('h2:has-text("No matches found"), h3:has-text("No exact matches")');
+    const zeroResults = page.locator(
+      'h2:has-text("No matches found"), h3:has-text("No exact matches")'
+    );
 
     // Wait for either cards or zero results heading
-    await expect(
-      cards.or(zeroResults).first(),
-    ).toBeAttached({ timeout: 30_000 });
+    await expect(cards.or(zeroResults).first()).toBeAttached({
+      timeout: 30_000,
+    });
 
     // Both outcomes are valid: results with the filter applied, or no matches
     const cardCount = await cards.count();
@@ -159,9 +166,12 @@ test.describe("Search P0 Smoke Suite", () => {
   });
 
   // S05: Clear all filters resets search
-  test("S05: clear all filters resets search", async ({ page, browserName }, testInfo) => {
+  test("S05: clear all filters resets search", async ({
+    page,
+    browserName,
+  }, testInfo) => {
     // Webkit-anon has unreliable filter reset timing due to Desktop Safari rendering
-    if (testInfo.project.name.includes('webkit')) {
+    if (testInfo.project.name.includes("webkit")) {
       test.slow();
     }
 
@@ -171,36 +181,57 @@ test.describe("Search P0 Smoke Suite", () => {
     // Wait for the page to settle -- either results or zero results
     const container = searchResultsContainer(page);
     const cards = container.locator('[data-testid="listing-card"]');
-    const zeroResults = page.locator('h2:has-text("No matches found"), h3:has-text("No exact matches")');
-    await expect(cards.or(zeroResults).first()).toBeAttached({ timeout: 30_000 });
+    const zeroResults = page.locator(
+      'h2:has-text("No matches found"), h3:has-text("No exact matches")'
+    );
+    await expect(cards.or(zeroResults).first()).toBeAttached({
+      timeout: 30_000,
+    });
 
     // Look for the "Clear all" button — scope to visible container to avoid dual-container mismatch
-    const clearAllBtn = container.locator('button:has-text("Clear all"), button:has-text("Clear all filters")')
+    const clearAllBtn = container
+      .locator(
+        'button:has-text("Clear all"), button:has-text("Clear all filters")'
+      )
       .or(page.locator('[data-testid="filter-bar-clear-all"]'));
-    const clearVisible = await clearAllBtn.first().isVisible({ timeout: 10_000 }).catch(() => false);
+    const clearVisible = await clearAllBtn
+      .first()
+      .isVisible({ timeout: 10_000 })
+      .catch(() => false);
 
     if (clearVisible) {
       // Retry click+verify pattern for webkit where the button may be partially
       // obscured by map overlay or bottom sheet, causing intermittent flakes
       await expect(async () => {
         await clearAllBtn.first().scrollIntoViewIfNeeded();
-        await clearAllBtn.first().click({ force: browserName === "webkit", timeout: 5_000 });
+        await clearAllBtn
+          .first()
+          .click({ force: browserName === "webkit", timeout: 5_000 });
         // Allow soft navigation to propagate (WebKit is slower on Next.js client nav)
         await page.waitForTimeout(2_000);
         // Verify the button disappears or URL updates (proving the click worked)
         const url = page.url();
-        expect(!url.includes("maxPrice=") && !url.includes("roomType=")).toBe(true);
-      }).toPass({ timeout: 45_000 }).catch(async () => {
-        // Fallback: navigate directly to /search and verify params are gone
-        await page.goto(`/search?${boundsQS}`);
-        await page.waitForLoadState("domcontentloaded");
-        const url = page.url();
-        expect(!url.includes("maxPrice=") && !url.includes("roomType=")).toBe(true);
-      });
+        expect(!url.includes("maxPrice=") && !url.includes("roomType=")).toBe(
+          true
+        );
+      })
+        .toPass({ timeout: 45_000 })
+        .catch(async () => {
+          // Fallback: navigate directly to /search and verify params are gone
+          await page.goto(`/search?${boundsQS}`);
+          await page.waitForLoadState("domcontentloaded");
+          const url = page.url();
+          expect(!url.includes("maxPrice=") && !url.includes("roomType=")).toBe(
+            true
+          );
+        });
     } else {
       // If no clear button is visible (e.g., filters applied via URL but chips not rendered),
       // the test is inconclusive -- skip rather than fail
-      test.skip(true, "Clear all button not found -- filters may not render chips for URL-only params");
+      test.skip(
+        true,
+        "Clear all button not found -- filters may not render chips for URL-only params"
+      );
     }
   });
 
@@ -220,22 +251,32 @@ test.describe("Search P0 Smoke Suite", () => {
     if (isMobile) {
       // Click mobile sort button (needs hydration wait)
       const sortBtn = page.locator('button[aria-label^="Sort:"]');
-      const mobileSortVisible = await sortBtn.isVisible({ timeout: 30_000 }).catch(() => false);
+      const mobileSortVisible = await sortBtn
+        .isVisible({ timeout: 30_000 })
+        .catch(() => false);
       if (mobileSortVisible) {
         await sortBtn.click();
         // Select "Price: Low to High" from the bottom sheet
-        await page.locator('div.fixed button:not([role="combobox"])').filter({ hasText: "Price: Low to High" }).click();
+        await page
+          .locator('div.fixed button:not([role="combobox"])')
+          .filter({ hasText: "Price: Low to High" })
+          .click();
       }
     } else {
       // Click the desktop Radix Select trigger (role="combobox")
       // SortSelect renders an SSR placeholder without role="combobox", so this
       // only matches after client-side hydration sets mounted = true.
       const selectTrigger = container.locator('button[role="combobox"]');
-      if (await selectTrigger.isVisible({ timeout: 30_000 }).catch(() => false)) {
+      if (
+        await selectTrigger.isVisible({ timeout: 30_000 }).catch(() => false)
+      ) {
         await selectTrigger.click();
         const listbox = page.locator('[role="listbox"]');
         await expect(listbox).toBeVisible({ timeout: 5_000 });
-        await page.locator('[role="option"]').filter({ hasText: "Price: Low to High" }).click();
+        await page
+          .locator('[role="option"]')
+          .filter({ hasText: "Price: Low to High" })
+          .click();
       } else {
         // Fallback: navigate directly with sort param
         await page.goto(`/search?sort=price_asc&${boundsQS}`);
@@ -250,15 +291,25 @@ test.describe("Search P0 Smoke Suite", () => {
     const updatedCards = container.locator('[data-testid="listing-card"]');
     await expect(updatedCards.first()).toBeAttached({ timeout: 30_000 });
 
-    const priceElements = container.locator('[data-testid="listing-card"] [data-testid="listing-price"]');
+    const priceElements = container.locator(
+      '[data-testid="listing-card"] [data-testid="listing-price"]'
+    );
     const priceCount = await priceElements.count();
 
     if (priceCount >= 2) {
       const firstPriceText = await priceElements.first().textContent();
-      const lastPriceText = await priceElements.nth(priceCount - 1).textContent();
+      const lastPriceText = await priceElements
+        .nth(priceCount - 1)
+        .textContent();
 
-      const firstPrice = parseInt((firstPriceText ?? "0").replace(/[^0-9]/g, ""), 10);
-      const lastPrice = parseInt((lastPriceText ?? "0").replace(/[^0-9]/g, ""), 10);
+      const firstPrice = parseInt(
+        (firstPriceText ?? "0").replace(/[^0-9]/g, ""),
+        10
+      );
+      const lastPrice = parseInt(
+        (lastPriceText ?? "0").replace(/[^0-9]/g, ""),
+        10
+      );
 
       expect(firstPrice).toBeLessThanOrEqual(lastPrice);
     }
@@ -293,7 +344,7 @@ test.describe("Search P0 Smoke Suite", () => {
 
     // Collect initial listing IDs
     const initialIds = await cards.evaluateAll((elements) =>
-      elements.map((el) => el.getAttribute("data-listing-id")).filter(Boolean),
+      elements.map((el) => el.getAttribute("data-listing-id")).filter(Boolean)
     );
 
     // Check if "Show more places" button exists
@@ -304,22 +355,29 @@ test.describe("Search P0 Smoke Suite", () => {
       await loadMoreBtn.click();
 
       // Wait for loading to complete (button re-appears or more cards render)
-      await page.waitForFunction(
-        (initialCount) => {
-          const cards = document.querySelectorAll('[data-testid="listing-card"]');
-          return cards.length > initialCount;
-        },
-        initialIds.length,
-        { timeout: 30_000 },
-      ).catch(() => {
-        // Load more may not produce new results if all data is on page 1
-      });
+      await page
+        .waitForFunction(
+          (initialCount) => {
+            const cards = document.querySelectorAll(
+              '[data-testid="listing-card"]'
+            );
+            return cards.length > initialCount;
+          },
+          initialIds.length,
+          { timeout: 30_000 }
+        )
+        .catch(() => {
+          // Load more may not produce new results if all data is on page 1
+        });
 
       // Collect all IDs after loading more
-      const allIds = await container.locator('[data-testid="listing-card"]').evaluateAll(
-        (elements) =>
-          elements.map((el) => el.getAttribute("data-listing-id")).filter(Boolean),
-      );
+      const allIds = await container
+        .locator('[data-testid="listing-card"]')
+        .evaluateAll((elements) =>
+          elements
+            .map((el) => el.getAttribute("data-listing-id"))
+            .filter(Boolean)
+        );
 
       // Assert no duplicate IDs
       const idSet = new Set(allIds);
@@ -337,10 +395,16 @@ test.describe("Search P0 Smoke Suite", () => {
 
     // Check if map is rendered (WebGL may not be available in headless)
     const mapContainer = page.locator(".maplibregl-map, .maplibregl-canvas");
-    const mapVisible = await mapContainer.first().isVisible({ timeout: 10_000 }).catch(() => false);
+    const mapVisible = await mapContainer
+      .first()
+      .isVisible({ timeout: 10_000 })
+      .catch(() => false);
 
     if (!mapVisible) {
-      test.skip(true, "Map not visible (WebGL may be unavailable in headless mode)");
+      test.skip(
+        true,
+        "Map not visible (WebGL may be unavailable in headless mode)"
+      );
       return;
     }
 
@@ -374,16 +438,26 @@ test.describe("Search P0 Smoke Suite", () => {
 
     // The toggle is rendered inside the map component
     const mapContainer = page.locator(".maplibregl-map");
-    const mapVisible = await mapContainer.first().isVisible({ timeout: 10_000 }).catch(() => false);
+    const mapVisible = await mapContainer
+      .first()
+      .isVisible({ timeout: 10_000 })
+      .catch(() => false);
 
     if (!mapVisible) {
-      test.skip(true, "Map not visible -- search-as-I-move toggle lives inside map");
+      test.skip(
+        true,
+        "Map not visible -- search-as-I-move toggle lives inside map"
+      );
       return;
     }
 
     // Look for the "Search as I move" toggle button
-    const toggle = page.locator('button[role="switch"]:has-text("Search as I move")');
-    const toggleVisible = await toggle.isVisible({ timeout: 5_000 }).catch(() => false);
+    const toggle = page.locator(
+      'button[role="switch"]:has-text("Search as I move")'
+    );
+    const toggleVisible = await toggle
+      .isVisible({ timeout: 5_000 })
+      .catch(() => false);
 
     if (!toggleVisible) {
       test.skip(true, "Search as I move toggle not visible");
@@ -415,11 +489,15 @@ test.describe("Search P0 Smoke Suite", () => {
     await page.waitForLoadState("domcontentloaded");
 
     // Assert bottom sheet region is visible
-    const bottomSheet = page.locator('[role="region"][aria-label="Search results"]');
+    const bottomSheet = page.locator(
+      '[role="region"][aria-label="Search results"]'
+    );
     await expect(bottomSheet).toBeAttached({ timeout: 30_000 });
 
     // Assert sheet handle/slider is present
-    const sheetHandle = page.locator('[role="slider"][aria-label="Results panel size"]');
+    const sheetHandle = page.locator(
+      '[role="slider"][aria-label="Results panel size"]'
+    );
     await expect(sheetHandle).toBeAttached();
 
     // Verify the slider has expected aria attributes
@@ -436,8 +514,12 @@ test.describe("Search P0 Smoke Suite", () => {
     // Wait for page to settle
     const container = searchResultsContainer(page);
     const cards = container.locator('[data-testid="listing-card"]');
-    const zeroResults = page.locator('h2:has-text("No matches found"), h3:has-text("No exact matches")');
-    await expect(cards.or(zeroResults).first()).toBeAttached({ timeout: 30_000 });
+    const zeroResults = page.locator(
+      'h2:has-text("No matches found"), h3:has-text("No exact matches")'
+    );
+    await expect(cards.or(zeroResults).first()).toBeAttached({
+      timeout: 30_000,
+    });
 
     // Verify the URL still contains all the search parameters
     const currentUrl = page.url();
@@ -449,7 +531,9 @@ test.describe("Search P0 Smoke Suite", () => {
   });
 
   // S13: Cross-browser basics (page loads and renders)
-  test("S13: page renders listing cards (cross-browser baseline)", async ({ page }) => {
+  test("S13: page renders listing cards (cross-browser baseline)", async ({
+    page,
+  }) => {
     const response = await page.goto(SEARCH_URL);
     expect(response?.status()).toBe(200);
 
@@ -480,13 +564,15 @@ test.describe("Search P0 Smoke Suite", () => {
     // Check if the page rendered (SSR path may succeed despite API route interception)
     const container = searchResultsContainer(page);
     const cards = container.locator('[data-testid="listing-card"]');
-    const errorBoundary = page.locator('h1:has-text("Unable to load search results")');
+    const errorBoundary = page.locator(
+      'h1:has-text("Unable to load search results")'
+    );
     const rateLimitMsg = page.locator('h1:has-text("Too Many Requests")');
 
     // Wait for any outcome: results, error boundary, or rate limit
-    await expect(
-      cards.or(errorBoundary).or(rateLimitMsg).first(),
-    ).toBeAttached({ timeout: 30_000 });
+    await expect(cards.or(errorBoundary).or(rateLimitMsg).first()).toBeAttached(
+      { timeout: 30_000 }
+    );
 
     // If error boundary triggered, verify recovery via "Try again"
     const errorVisible = await errorBoundary.isVisible().catch(() => false);
@@ -512,7 +598,9 @@ test.describe("Search P0 Smoke Suite", () => {
   });
 
   // S15: Combined search + filter + sort preserved
-  test("S15: combined search + filter + sort params preserved", async ({ page }) => {
+  test("S15: combined search + filter + sort params preserved", async ({
+    page,
+  }) => {
     const combinedUrl = `/search?q=room&maxPrice=2000&sort=price_asc&${boundsQS}`;
     await page.goto(combinedUrl);
     await page.waitForLoadState("domcontentloaded");
@@ -520,8 +608,12 @@ test.describe("Search P0 Smoke Suite", () => {
     // Wait for results or zero state
     const container = searchResultsContainer(page);
     const cards = container.locator('[data-testid="listing-card"]');
-    const zeroResults = page.locator('h2:has-text("No matches found"), h3:has-text("No exact matches")');
-    await expect(cards.or(zeroResults).first()).toBeAttached({ timeout: 30_000 });
+    const zeroResults = page.locator(
+      'h2:has-text("No matches found"), h3:has-text("No exact matches")'
+    );
+    await expect(cards.or(zeroResults).first()).toBeAttached({
+      timeout: 30_000,
+    });
 
     // Assert URL preserves all params
     const currentUrl = page.url();
@@ -554,7 +646,7 @@ test.describe("Search P0 Smoke Suite", () => {
         e.toLowerCase().includes("unauthorized") ||
         e.toLowerCase().includes("unauthenticated") ||
         e.toLowerCase().includes("401") ||
-        e.toLowerCase().includes("403"),
+        e.toLowerCase().includes("403")
     );
     expect(authErrors).toHaveLength(0);
 
@@ -570,13 +662,19 @@ test.describe("Search P0 Smoke Suite", () => {
     await page.goto(SEARCH_URL);
     await page.waitForLoadState("domcontentloaded");
 
-    const desktopListContainer = page.locator('[data-testid="search-results-container"]');
+    const desktopListContainer = page.locator(
+      '[data-testid="search-results-container"]'
+    );
     // Desktop split view: the hidden md:flex container should be visible
     const desktopSplitView = page.locator(".md\\:flex").first();
-    await expect(desktopListContainer.or(desktopSplitView).first()).toBeAttached({ timeout: 30_000 });
+    await expect(
+      desktopListContainer.or(desktopSplitView).first()
+    ).toBeAttached({ timeout: 30_000 });
 
     // Mobile bottom sheet should be hidden at desktop
-    const mobileSheet = page.locator('[role="region"][aria-label="Search results"]');
+    const mobileSheet = page.locator(
+      '[role="region"][aria-label="Search results"]'
+    );
     // On desktop, the mobile sheet's parent div has md:hidden so it should not be visible
     // But checking the sheet itself -- it may still be in DOM, just inside a hidden parent
 
@@ -592,20 +690,26 @@ test.describe("Search P0 Smoke Suite", () => {
     await expect(mobileSheet).toBeAttached({ timeout: 10_000 });
 
     // Map should also be present on mobile (behind the sheet)
-    const mapContainer = page.locator(".maplibregl-map, .maplibregl-canvas, [data-testid=\"map\"]");
+    const mapContainer = page.locator(
+      '.maplibregl-map, .maplibregl-canvas, [data-testid="map"]'
+    );
     // Map may or may not render depending on WebGL -- just check that the page is not broken
     const bodyVisible = await page.locator("body").isVisible();
     expect(bodyVisible).toBe(true);
   });
 
   // S18: Performance baseline (navigation timing)
-  test("S18: performance baseline -- domContentLoaded under 5s", async ({ page }) => {
+  test("S18: performance baseline -- domContentLoaded under 5s", async ({
+    page,
+  }) => {
     await page.goto(SEARCH_URL);
     await page.waitForLoadState("domcontentloaded");
 
     // Measure navigation timing using the Performance API
     const timing = await page.evaluate(() => {
-      const nav = performance.getEntriesByType("navigation")[0] as PerformanceNavigationTiming;
+      const nav = performance.getEntriesByType(
+        "navigation"
+      )[0] as PerformanceNavigationTiming;
       if (!nav) return null;
       return {
         domContentLoaded: nav.domContentLoadedEventEnd - nav.startTime,
@@ -623,7 +727,7 @@ test.describe("Search P0 Smoke Suite", () => {
       console.log(
         `[Perf] domContentLoaded: ${Math.round(timing.domContentLoaded)}ms, ` +
           `responseEnd: ${Math.round(timing.responseEnd)}ms, ` +
-          `loadEvent: ${Math.round(timing.loadEvent)}ms`,
+          `loadEvent: ${Math.round(timing.loadEvent)}ms`
       );
     }
 

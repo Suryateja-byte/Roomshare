@@ -15,7 +15,7 @@ jest.mock("next/server", () => ({
   NextResponse: {
     json: (
       data: unknown,
-      init?: { status?: number; headers?: Record<string, string> },
+      init?: { status?: number; headers?: Record<string, string> }
     ) => {
       mockJsonFn(data, init);
       return {
@@ -100,7 +100,7 @@ describe("Nearby Places - Data Semantics", () => {
           listingLng: -122.4194,
           categories: ["food-grocery"],
           radiusMeters: 1609,
-        }),
+        })
       );
 
       const data = await response.json();
@@ -126,7 +126,7 @@ describe("Nearby Places - Data Semantics", () => {
           listingLng: -122.4194,
           categories: ["pharmacy", "fitness"],
           radiusMeters: 1609,
-        }),
+        })
       );
 
       // Check that fetch was called with categories
@@ -170,7 +170,7 @@ describe("Nearby Places - Data Semantics", () => {
           listingLng: -122.4194,
           categories: ["food-grocery"],
           radiusMeters: 1609,
-        }),
+        })
       );
 
       const data = await response.json();
@@ -198,7 +198,7 @@ describe("Nearby Places - Data Semantics", () => {
           listingLng: -122.4194,
           query: "  coffee shops  ",
           radiusMeters: 1609,
-        }),
+        })
       );
 
       // Query should be passed to API
@@ -224,7 +224,7 @@ describe("Nearby Places - Data Semantics", () => {
           query: "",
           categories: ["food-grocery"],
           radiusMeters: 1609,
-        }),
+        })
       );
 
       // Should not throw error
@@ -265,7 +265,7 @@ describe("Nearby Places - Data Semantics", () => {
           listingLng: -122.4194,
           categories: ["food-grocery"],
           radiusMeters: 1609,
-        }),
+        })
       );
 
       const data = await response.json();
@@ -302,7 +302,7 @@ describe("Nearby Places - Data Semantics", () => {
           listingLng: -122.4194,
           categories: ["food-grocery"],
           radiusMeters: 1609,
-        }),
+        })
       );
 
       const data = await response.json();
@@ -337,7 +337,7 @@ describe("Nearby Places - Data Semantics", () => {
           listingLng: -122.4194,
           categories: ["food-grocery"],
           radiusMeters: 1609,
-        }),
+        })
       );
 
       const data = await response.json();
@@ -379,7 +379,7 @@ describe("Nearby Places - Data Semantics", () => {
           listingLng: -122.4194,
           categories: ["food-grocery"],
           radiusMeters: 1609,
-        }),
+        })
       );
 
       const data = await response.json();
@@ -415,7 +415,7 @@ describe("Nearby Places - Data Semantics", () => {
           listingLng: -122.4194,
           categories: ["food-grocery"],
           radiusMeters: 1609,
-        }),
+        })
       );
 
       const data = await response.json();
@@ -453,7 +453,7 @@ describe("Nearby Places - Data Semantics", () => {
           listingLng: -122.4194,
           categories: ["food-grocery"],
           radiusMeters: 1609,
-        }),
+        })
       );
 
       const data = await response.json();
@@ -506,7 +506,7 @@ describe("Nearby Places - Data Semantics", () => {
           listingLng: -122.4194,
           categories: ["food-grocery"],
           radiusMeters: 8046, // 5 miles
-        }),
+        })
       );
 
       const data = await response.json();
@@ -515,7 +515,7 @@ describe("Nearby Places - Data Semantics", () => {
       if (data.places.length > 1) {
         for (let i = 0; i < data.places.length - 1; i++) {
           expect(data.places[i].distanceMiles).toBeLessThanOrEqual(
-            data.places[i + 1].distanceMiles,
+            data.places[i + 1].distanceMiles
           );
         }
       }
@@ -548,7 +548,7 @@ describe("Nearby Places - Data Semantics", () => {
           listingLng: -122.4194,
           categories: ["food-grocery"],
           radiusMeters: 1609,
-        }),
+        })
       );
 
       const data = await response.json();
@@ -580,7 +580,7 @@ describe("Nearby Places - Data Semantics", () => {
           listingLng: -122.4194,
           categories: ["food-grocery"],
           radiusMeters: 1609,
-        }),
+        })
       );
 
       expect(mockFetch).toHaveBeenCalled();
@@ -596,7 +596,7 @@ describe("Nearby Places - Data Semantics", () => {
           listingLng: -122.4194,
           categories: ["food-grocery"],
           radiusMeters: 3218,
-        }),
+        })
       );
 
       const fetchUrl2 = mockFetch.mock.calls[0][0];
@@ -611,7 +611,7 @@ describe("Nearby Places - Data Semantics", () => {
           listingLng: -122.4194,
           categories: ["food-grocery"],
           radiusMeters: 9999, // Not in allowed values
-        }),
+        })
       );
 
       expect(response.status).toBe(400);
@@ -637,7 +637,7 @@ describe("Nearby Places - Data Semantics", () => {
             listingLng: -122.4194,
             categories: ["food-grocery"],
             radiusMeters: radius,
-          }),
+          })
         );
 
         expect(response.status).toBe(200);
@@ -671,7 +671,7 @@ describe("Nearby Places - Data Semantics", () => {
           listingLng: -122.4194,
           categories: ["food-grocery"],
           radiusMeters: 1609,
-        }),
+        })
       );
 
       const data = await response.json();
@@ -704,7 +704,7 @@ describe("Nearby Places - Data Semantics", () => {
           listingLng: -122.4194,
           categories: ["food-grocery"],
           radiusMeters: 1609,
-        }),
+        })
       );
 
       const data = await response.json();

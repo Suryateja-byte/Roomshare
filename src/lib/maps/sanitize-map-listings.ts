@@ -43,7 +43,7 @@ function hasValidCoordinateRange(lat: number, lng: number): boolean {
 }
 
 export function sanitizeMapListing(
-  listing: MapListingInput,
+  listing: MapListingInput
 ): MapListingData | null {
   const lat = toFiniteNumber(listing.location?.lat, Number.NaN);
   const lng = toFiniteNumber(listing.location?.lng, Number.NaN);
@@ -58,7 +58,9 @@ export function sanitizeMapListing(
     price: Math.max(0, toFiniteNumber(listing.price, 0)),
     availableSlots: toSafeSlotCount(listing.availableSlots),
     images: Array.isArray(listing.images)
-      ? listing.images.filter((image): image is string => typeof image === "string")
+      ? listing.images.filter(
+          (image): image is string => typeof image === "string"
+        )
       : [],
     location: { lat, lng },
     tier: listing.tier,
@@ -66,7 +68,7 @@ export function sanitizeMapListing(
 }
 
 export function sanitizeMapListings(
-  listings: MapListingInput[],
+  listings: MapListingInput[]
 ): MapListingData[] {
   return listings.reduce<MapListingData[]>((sanitized, listing) => {
     const safeListing = sanitizeMapListing(listing);

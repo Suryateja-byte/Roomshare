@@ -5,8 +5,8 @@
  * Used by both URL parsing and server-side validation.
  */
 
-import { z } from 'zod';
-import { normalizeLanguages, isValidLanguageCode, LanguageCode } from './languages';
+import { z } from "zod";
+import { normalizeLanguages, LanguageCode } from "./languages";
 import {
   MAX_SAFE_PRICE,
   MAX_SAFE_PAGE,
@@ -15,7 +15,7 @@ import {
   MAX_QUERY_LENGTH,
   DEFAULT_PAGE_SIZE,
   MAX_PAGE_SIZE,
-} from './constants';
+} from "./constants";
 
 // Re-export constants for backward compatibility
 export {
@@ -33,96 +33,92 @@ export {
 // ============================================
 
 export const VALID_AMENITIES = [
-  'Wifi',
-  'AC',
-  'Parking',
-  'Washer',
-  'Dryer',
-  'Kitchen',
-  'Gym',
-  'Pool',
-  'Furnished',
+  "Wifi",
+  "AC",
+  "Parking",
+  "Washer",
+  "Dryer",
+  "Kitchen",
+  "Gym",
+  "Pool",
+  "Furnished",
 ] as const;
 
 export const VALID_HOUSE_RULES = [
-  'Pets allowed',
-  'Smoking allowed',
-  'Couples allowed',
-  'Guests allowed',
+  "Pets allowed",
+  "Smoking allowed",
+  "Couples allowed",
+  "Guests allowed",
 ] as const;
 
 export const VALID_LEASE_DURATIONS = [
-  'any',
-  'Month-to-month',
-  '3 months',
-  '6 months',
-  '12 months',
-  'Flexible',
+  "any",
+  "Month-to-month",
+  "3 months",
+  "6 months",
+  "12 months",
+  "Flexible",
 ] as const;
 
 // Alias mappings for alternative formats (URL-friendly formats like 6_MONTHS)
 export const LEASE_DURATION_ALIASES: Record<string, string> = {
-  'month-to-month': 'Month-to-month',
-  'month_to_month': 'Month-to-month',
-  'mtm': 'Month-to-month',
-  '3_months': '3 months',
-  '3months': '3 months',
-  '6_months': '6 months',
-  '6months': '6 months',
-  '12_months': '12 months',
-  '12months': '12 months',
-  '1_year': '12 months',
-  '1year': '12 months',
+  "month-to-month": "Month-to-month",
+  month_to_month: "Month-to-month",
+  mtm: "Month-to-month",
+  "3_months": "3 months",
+  "3months": "3 months",
+  "6_months": "6 months",
+  "6months": "6 months",
+  "12_months": "12 months",
+  "12months": "12 months",
+  "1_year": "12 months",
+  "1year": "12 months",
 };
 
 export const VALID_ROOM_TYPES = [
-  'any',
-  'Private Room',
-  'Shared Room',
-  'Entire Place',
+  "any",
+  "Private Room",
+  "Shared Room",
+  "Entire Place",
 ] as const;
 
 // Alias mappings for alternative formats (URL-friendly formats like PRIVATE)
 export const ROOM_TYPE_ALIASES: Record<string, string> = {
-  'private': 'Private Room',
-  'private_room': 'Private Room',
-  'privateroom': 'Private Room',
-  'shared': 'Shared Room',
-  'shared_room': 'Shared Room',
-  'sharedroom': 'Shared Room',
-  'entire': 'Entire Place',
-  'entire_place': 'Entire Place',
-  'entireplace': 'Entire Place',
-  'whole': 'Entire Place',
-  'studio': 'Entire Place',
+  private: "Private Room",
+  private_room: "Private Room",
+  privateroom: "Private Room",
+  shared: "Shared Room",
+  shared_room: "Shared Room",
+  sharedroom: "Shared Room",
+  entire: "Entire Place",
+  entire_place: "Entire Place",
+  entireplace: "Entire Place",
+  whole: "Entire Place",
+  studio: "Entire Place",
 };
 
-export const VALID_BOOKING_MODES = [
-  'any',
-  'SHARED',
-  'WHOLE_UNIT',
-] as const;
+export const VALID_BOOKING_MODES = ["any", "SHARED", "WHOLE_UNIT"] as const;
 
 export const VALID_GENDER_PREFERENCES = [
-  'any',
-  'MALE_ONLY',
-  'FEMALE_ONLY',
-  'NO_PREFERENCE',
+  "any",
+  "MALE_ONLY",
+  "FEMALE_ONLY",
+  "NO_PREFERENCE",
 ] as const;
 
 export const VALID_HOUSEHOLD_GENDERS = [
-  'any',
-  'ALL_MALE',
-  'ALL_FEMALE',
-  'MIXED',
+  "any",
+  "ALL_MALE",
+  "ALL_FEMALE",
+  "MIXED",
 ] as const;
 
 export const VALID_SORT_OPTIONS = [
-  'recommended',
-  'price_asc',
-  'price_desc',
-  'newest',
-  'rating',
+  "recommended",
+  "price_asc",
+  "price_desc",
+  "newest",
+  "rating",
 ] as const;
 
 // ============================================
@@ -159,7 +155,7 @@ function caseInsensitiveEnum<T extends readonly string[]>(
     if (!canonical) return undefined;
 
     // 'any' means "no filter"
-    if (options?.treatAnyAsUndefined && canonical === 'any') {
+    if (options?.treatAnyAsUndefined && canonical === "any") {
       return undefined;
     }
 
@@ -170,14 +166,12 @@ function caseInsensitiveEnum<T extends readonly string[]>(
 /**
  * Array field with case-insensitive validation against allowlist
  */
-function caseInsensitiveArrayEnum<T extends readonly string[]>(
-  allowlist: T
-) {
+function caseInsensitiveArrayEnum<T extends readonly string[]>(allowlist: T) {
   const allowMap = new Map(allowlist.map((item) => [item.toLowerCase(), item]));
 
   return z.array(z.string()).transform((arr) => {
     const validated = arr
-      .flatMap((v) => v.split(','))
+      .flatMap((v) => v.split(","))
       .map((v) => v.trim())
       .map((v) => allowMap.get(v.toLowerCase()))
       .filter((v): v is T[number] => Boolean(v));
@@ -205,7 +199,7 @@ const dateSchema = z.string().transform((val) => {
   const trimmed = val.trim();
   if (!/^\d{4}-\d{2}-\d{2}$/.test(trimmed)) return undefined;
 
-  const [yearStr, monthStr, dayStr] = trimmed.split('-');
+  const [yearStr, monthStr, dayStr] = trimmed.split("-");
   const year = parseInt(yearStr, 10);
   const month = parseInt(monthStr, 10);
   const day = parseInt(dayStr, 10);
@@ -252,7 +246,7 @@ const boundsSchema = z
 
     // Throw on inverted lat (consistent with search-params.ts and price validation)
     if (minLat > maxLat) {
-      throw new Error('minLat cannot exceed maxLat');
+      throw new Error("minLat cannot exceed maxLat");
     }
 
     // Note: lng NOT swapped to support antimeridian crossing
@@ -265,7 +259,7 @@ const boundsSchema = z
  */
 const languagesSchema = z.array(z.string()).transform((arr) => {
   const flattened = arr
-    .flatMap((v) => v.split(','))
+    .flatMap((v) => v.split(","))
     .map((v) => v.trim())
     .filter((v) => v.length > 0 && v.length <= 32);
 
@@ -303,10 +297,18 @@ export const filterSchema = z.object({
   languages: languagesSchema.optional(),
 
   // Enum filters (treat 'any' as undefined)
-  roomType: caseInsensitiveEnum(VALID_ROOM_TYPES, { treatAnyAsUndefined: true }).optional(),
-  leaseDuration: caseInsensitiveEnum(VALID_LEASE_DURATIONS, { treatAnyAsUndefined: true }).optional(),
-  genderPreference: caseInsensitiveEnum(VALID_GENDER_PREFERENCES, { treatAnyAsUndefined: true }).optional(),
-  householdGender: caseInsensitiveEnum(VALID_HOUSEHOLD_GENDERS, { treatAnyAsUndefined: true }).optional(),
+  roomType: caseInsensitiveEnum(VALID_ROOM_TYPES, {
+    treatAnyAsUndefined: true,
+  }).optional(),
+  leaseDuration: caseInsensitiveEnum(VALID_LEASE_DURATIONS, {
+    treatAnyAsUndefined: true,
+  }).optional(),
+  genderPreference: caseInsensitiveEnum(VALID_GENDER_PREFERENCES, {
+    treatAnyAsUndefined: true,
+  }).optional(),
+  householdGender: caseInsensitiveEnum(VALID_HOUSEHOLD_GENDERS, {
+    treatAnyAsUndefined: true,
+  }).optional(),
 
   // Date filter
   moveInDate: dateSchema.optional(),
@@ -358,10 +360,10 @@ export interface NormalizedFilters {
   amenities?: Amenity[];
   houseRules?: HouseRule[];
   languages?: LanguageCode[];
-  roomType?: Exclude<RoomType, 'any'>;
-  leaseDuration?: Exclude<LeaseDuration, 'any'>;
-  genderPreference?: Exclude<GenderPreference, 'any'>;
-  householdGender?: Exclude<HouseholdGender, 'any'>;
+  roomType?: Exclude<RoomType, "any">;
+  leaseDuration?: Exclude<LeaseDuration, "any">;
+  genderPreference?: Exclude<GenderPreference, "any">;
+  householdGender?: Exclude<HouseholdGender, "any">;
   moveInDate?: string;
   bounds?: {
     minLat: number;
@@ -395,7 +397,7 @@ export interface NormalizedFilters {
  */
 export function normalizeFilters(input: unknown): NormalizedFilters {
   // Handle null/undefined
-  if (!input || typeof input !== 'object') {
+  if (!input || typeof input !== "object") {
     return { page: 1, limit: DEFAULT_PAGE_SIZE };
   }
 
@@ -403,7 +405,7 @@ export function normalizeFilters(input: unknown): NormalizedFilters {
 
   // Normalize query
   let query: string | undefined;
-  if (typeof raw.query === 'string') {
+  if (typeof raw.query === "string") {
     const trimmed = raw.query.trim();
     if (trimmed.length > 0 && trimmed.length <= MAX_QUERY_LENGTH) {
       query = trimmed;
@@ -416,7 +418,7 @@ export function normalizeFilters(input: unknown): NormalizedFilters {
 
   // P1-13 FIX: Throw validation error instead of silent swap
   if (minPrice !== undefined && maxPrice !== undefined && minPrice > maxPrice) {
-    throw new Error('minPrice cannot exceed maxPrice');
+    throw new Error("minPrice cannot exceed maxPrice");
   }
 
   // Normalize array filters
@@ -425,10 +427,24 @@ export function normalizeFilters(input: unknown): NormalizedFilters {
   const languages = normalizeLanguageArray(raw.languages);
 
   // Normalize enum filters
-  const roomType = normalizeEnum(raw.roomType, VALID_ROOM_TYPES, ROOM_TYPE_ALIASES);
-  const leaseDuration = normalizeEnum(raw.leaseDuration, VALID_LEASE_DURATIONS, LEASE_DURATION_ALIASES);
-  const genderPreference = normalizeEnum(raw.genderPreference, VALID_GENDER_PREFERENCES);
-  const householdGender = normalizeEnum(raw.householdGender, VALID_HOUSEHOLD_GENDERS);
+  const roomType = normalizeEnum(
+    raw.roomType,
+    VALID_ROOM_TYPES,
+    ROOM_TYPE_ALIASES
+  );
+  const leaseDuration = normalizeEnum(
+    raw.leaseDuration,
+    VALID_LEASE_DURATIONS,
+    LEASE_DURATION_ALIASES
+  );
+  const genderPreference = normalizeEnum(
+    raw.genderPreference,
+    VALID_GENDER_PREFERENCES
+  );
+  const householdGender = normalizeEnum(
+    raw.householdGender,
+    VALID_HOUSEHOLD_GENDERS
+  );
 
   // Normalize date
   const moveInDate = normalizeDate(raw.moveInDate);
@@ -439,7 +455,7 @@ export function normalizeFilters(input: unknown): NormalizedFilters {
   // Normalize sort
   const sortMap = new Map(VALID_SORT_OPTIONS.map((s) => [s.toLowerCase(), s]));
   let sort: SortOption | undefined;
-  if (typeof raw.sort === 'string') {
+  if (typeof raw.sort === "string") {
     const normalized = sortMap.get(raw.sort.trim().toLowerCase());
     if (normalized) {
       sort = normalized;
@@ -461,7 +477,8 @@ export function normalizeFilters(input: unknown): NormalizedFilters {
   if (languages !== undefined) result.languages = languages;
   if (roomType !== undefined) result.roomType = roomType;
   if (leaseDuration !== undefined) result.leaseDuration = leaseDuration;
-  if (genderPreference !== undefined) result.genderPreference = genderPreference;
+  if (genderPreference !== undefined)
+    result.genderPreference = genderPreference;
   if (householdGender !== undefined) result.householdGender = householdGender;
   if (moveInDate !== undefined) result.moveInDate = moveInDate;
   if (bounds !== undefined) result.bounds = bounds;
@@ -476,12 +493,12 @@ export function normalizeFilters(input: unknown): NormalizedFilters {
 
 function normalizePrice(value: unknown): number | undefined {
   if (value === undefined || value === null) return undefined;
-  if (typeof value === 'string') {
+  if (typeof value === "string") {
     const parsed = parseFloat(value.trim());
     if (!Number.isFinite(parsed)) return undefined;
     return Math.max(0, Math.min(parsed, MAX_SAFE_PRICE));
   }
-  if (typeof value === 'number') {
+  if (typeof value === "number") {
     if (!Number.isFinite(value)) return undefined;
     return Math.max(0, Math.min(value, MAX_SAFE_PRICE));
   }
@@ -497,9 +514,9 @@ function normalizeInt(
   if (value === undefined || value === null) return defaultVal;
 
   let parsed: number;
-  if (typeof value === 'string') {
+  if (typeof value === "string") {
     parsed = parseInt(value.trim(), 10);
-  } else if (typeof value === 'number') {
+  } else if (typeof value === "number") {
     parsed = Math.floor(value);
   } else {
     return defaultVal;
@@ -518,16 +535,16 @@ function normalizeArrayEnum<T extends readonly string[]>(
   const allowMap = new Map(allowlist.map((item) => [item.toLowerCase(), item]));
   let items: string[];
 
-  if (typeof value === 'string') {
-    items = value.split(',');
+  if (typeof value === "string") {
+    items = value.split(",");
   } else if (Array.isArray(value)) {
-    items = value.flatMap((v) => (typeof v === 'string' ? v.split(',') : []));
+    items = value.flatMap((v) => (typeof v === "string" ? v.split(",") : []));
   } else {
     return undefined;
   }
 
   const validated = items
-    .map((v) => (typeof v === 'string' ? v.trim() : ''))
+    .map((v) => (typeof v === "string" ? v.trim() : ""))
     .map((v) => allowMap.get(v.toLowerCase()))
     .filter((v): v is T[number] => Boolean(v));
 
@@ -540,16 +557,16 @@ function normalizeLanguageArray(value: unknown): LanguageCode[] | undefined {
   if (value === undefined || value === null) return undefined;
 
   let items: string[];
-  if (typeof value === 'string') {
-    items = value.split(',');
+  if (typeof value === "string") {
+    items = value.split(",");
   } else if (Array.isArray(value)) {
-    items = value.flatMap((v) => (typeof v === 'string' ? v.split(',') : []));
+    items = value.flatMap((v) => (typeof v === "string" ? v.split(",") : []));
   } else {
     return undefined;
   }
 
   const trimmed = items
-    .map((v) => (typeof v === 'string' ? v.trim() : ''))
+    .map((v) => (typeof v === "string" ? v.trim() : ""))
     .filter((v) => v.length > 0 && v.length <= 32);
 
   const normalized = normalizeLanguages(trimmed);
@@ -563,9 +580,9 @@ function normalizeEnum<T extends readonly string[]>(
   value: unknown,
   allowlist: T,
   aliases?: Record<string, string>
-): Exclude<T[number], 'any'> | undefined {
+): Exclude<T[number], "any"> | undefined {
   if (value === undefined || value === null) return undefined;
-  if (typeof value !== 'string') return undefined;
+  if (typeof value !== "string") return undefined;
 
   const trimmed = value.trim();
   const lowerTrimmed = trimmed.toLowerCase();
@@ -574,8 +591,8 @@ function normalizeEnum<T extends readonly string[]>(
   if (aliases) {
     const aliasedValue = aliases[lowerTrimmed];
     if (aliasedValue && allowlist.includes(aliasedValue as T[number])) {
-      if (aliasedValue === 'any') return undefined;
-      return aliasedValue as Exclude<T[number], 'any'>;
+      if (aliasedValue === "any") return undefined;
+      return aliasedValue as Exclude<T[number], "any">;
     }
   }
 
@@ -583,18 +600,18 @@ function normalizeEnum<T extends readonly string[]>(
   const allowMap = new Map(allowlist.map((item) => [item.toLowerCase(), item]));
   const canonical = allowMap.get(lowerTrimmed);
 
-  if (!canonical || canonical === 'any') return undefined;
-  return canonical as Exclude<T[number], 'any'>;
+  if (!canonical || canonical === "any") return undefined;
+  return canonical as Exclude<T[number], "any">;
 }
 
 function normalizeDate(value: unknown): string | undefined {
   if (value === undefined || value === null) return undefined;
-  if (typeof value !== 'string') return undefined;
+  if (typeof value !== "string") return undefined;
 
   const trimmed = value.trim();
   if (!/^\d{4}-\d{2}-\d{2}$/.test(trimmed)) return undefined;
 
-  const [yearStr, monthStr, dayStr] = trimmed.split('-');
+  const [yearStr, monthStr, dayStr] = trimmed.split("-");
   const year = parseInt(yearStr, 10);
   const month = parseInt(monthStr, 10);
   const day = parseInt(dayStr, 10);
@@ -624,16 +641,16 @@ function normalizeDate(value: unknown): string | undefined {
 
 function normalizeBounds(
   value: unknown
-): NormalizedFilters['bounds'] | undefined {
+): NormalizedFilters["bounds"] | undefined {
   if (value === undefined || value === null) return undefined;
-  if (typeof value !== 'object') return undefined;
+  if (typeof value !== "object") return undefined;
 
   const b = value as Record<string, unknown>;
 
-  const minLatRaw = typeof b.minLat === 'number' ? b.minLat : undefined;
-  const maxLatRaw = typeof b.maxLat === 'number' ? b.maxLat : undefined;
-  const minLngRaw = typeof b.minLng === 'number' ? b.minLng : undefined;
-  const maxLngRaw = typeof b.maxLng === 'number' ? b.maxLng : undefined;
+  const minLatRaw = typeof b.minLat === "number" ? b.minLat : undefined;
+  const maxLatRaw = typeof b.maxLat === "number" ? b.maxLat : undefined;
+  const minLngRaw = typeof b.minLng === "number" ? b.minLng : undefined;
+  const maxLngRaw = typeof b.maxLng === "number" ? b.maxLng : undefined;
 
   if (
     minLatRaw === undefined ||
@@ -661,7 +678,7 @@ function normalizeBounds(
 
   // Throw on inverted lat (consistent with search-params.ts and price validation)
   if (minLat > maxLat) {
-    throw new Error('minLat cannot exceed maxLat');
+    throw new Error("minLat cannot exceed maxLat");
   }
 
   // Note: lng NOT swapped to support antimeridian crossing
@@ -679,13 +696,16 @@ function normalizeBounds(
  */
 export function validateFilters(
   input: unknown
-): { success: true; data: NormalizedFilters } | { success: false; errors: string[] } {
+):
+  | { success: true; data: NormalizedFilters }
+  | { success: false; errors: string[] } {
   try {
     const normalized = normalizeFilters(input);
     return { success: true, data: normalized };
   } catch (error) {
     // P1-13 FIX: Return specific error message for better user feedback
-    const message = error instanceof Error ? error.message : 'Invalid filter input';
+    const message =
+      error instanceof Error ? error.message : "Invalid filter input";
     return { success: false, errors: [message] };
   }
 }
@@ -713,29 +733,39 @@ export function isEmptyFilters(filters: NormalizedFilters): boolean {
 /**
  * Convert normalized filters to URL search params
  */
-export function filtersToSearchParams(filters: NormalizedFilters): URLSearchParams {
+export function filtersToSearchParams(
+  filters: NormalizedFilters
+): URLSearchParams {
   const params = new URLSearchParams();
 
-  if (filters.query) params.set('q', filters.query);
-  if (filters.minPrice !== undefined) params.set('minPrice', String(filters.minPrice));
-  if (filters.maxPrice !== undefined) params.set('maxPrice', String(filters.maxPrice));
-  if (filters.amenities?.length) params.set('amenities', filters.amenities.join(','));
-  if (filters.houseRules?.length) params.set('houseRules', filters.houseRules.join(','));
-  if (filters.languages?.length) params.set('languages', filters.languages.join(','));
-  if (filters.roomType) params.set('roomType', filters.roomType);
-  if (filters.leaseDuration) params.set('leaseDuration', filters.leaseDuration);
-  if (filters.genderPreference) params.set('genderPreference', filters.genderPreference);
-  if (filters.householdGender) params.set('householdGender', filters.householdGender);
-  if (filters.moveInDate) params.set('moveInDate', filters.moveInDate);
+  if (filters.query) params.set("q", filters.query);
+  if (filters.minPrice !== undefined)
+    params.set("minPrice", String(filters.minPrice));
+  if (filters.maxPrice !== undefined)
+    params.set("maxPrice", String(filters.maxPrice));
+  if (filters.amenities?.length)
+    params.set("amenities", filters.amenities.join(","));
+  if (filters.houseRules?.length)
+    params.set("houseRules", filters.houseRules.join(","));
+  if (filters.languages?.length)
+    params.set("languages", filters.languages.join(","));
+  if (filters.roomType) params.set("roomType", filters.roomType);
+  if (filters.leaseDuration) params.set("leaseDuration", filters.leaseDuration);
+  if (filters.genderPreference)
+    params.set("genderPreference", filters.genderPreference);
+  if (filters.householdGender)
+    params.set("householdGender", filters.householdGender);
+  if (filters.moveInDate) params.set("moveInDate", filters.moveInDate);
   if (filters.bounds) {
-    params.set('minLat', String(filters.bounds.minLat));
-    params.set('maxLat', String(filters.bounds.maxLat));
-    params.set('minLng', String(filters.bounds.minLng));
-    params.set('maxLng', String(filters.bounds.maxLng));
+    params.set("minLat", String(filters.bounds.minLat));
+    params.set("maxLat", String(filters.bounds.maxLat));
+    params.set("minLng", String(filters.bounds.minLng));
+    params.set("maxLng", String(filters.bounds.maxLng));
   }
-  if (filters.sort) params.set('sort', filters.sort);
-  if (filters.page > 1) params.set('page', String(filters.page));
-  if (filters.limit !== DEFAULT_PAGE_SIZE) params.set('limit', String(filters.limit));
+  if (filters.sort) params.set("sort", filters.sort);
+  if (filters.page > 1) params.set("page", String(filters.page));
+  if (filters.limit !== DEFAULT_PAGE_SIZE)
+    params.set("limit", String(filters.limit));
 
   return params;
 }

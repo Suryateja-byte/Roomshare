@@ -1,8 +1,8 @@
-'use client';
+"use client";
 
-import { Search, SlidersHorizontal } from 'lucide-react';
-import { useSearchParams } from 'next/navigation';
-import { useMemo } from 'react';
+import { Search, SlidersHorizontal } from "lucide-react";
+import { useSearchParams } from "next/navigation";
+import { useMemo } from "react";
 
 interface CompactSearchPillProps {
   onExpand: () => void;
@@ -11,30 +11,33 @@ interface CompactSearchPillProps {
 
 /** Count param values, splitting CSV entries (e.g. "Wifi,AC" → 2). */
 function countParamValues(searchParams: URLSearchParams, key: string): number {
-  return searchParams.getAll(key)
-    .flatMap(v => v.split(','))
-    .map(v => v.trim())
-    .filter(Boolean)
-    .length;
+  return searchParams
+    .getAll(key)
+    .flatMap((v) => v.split(","))
+    .map((v) => v.trim())
+    .filter(Boolean).length;
 }
 
 /**
  * CompactSearchPill — Desktop-only shrunk search bar shown when scrolled.
  * Displays a summary of current search state; click expands back to full form.
  */
-export function CompactSearchPill({ onExpand, onOpenFilters }: CompactSearchPillProps) {
+export function CompactSearchPill({
+  onExpand,
+  onOpenFilters,
+}: CompactSearchPillProps) {
   const searchParams = useSearchParams();
 
-  const hasSemanticQuery = searchParams.has('what');
-  const location = hasSemanticQuery ? '' : (searchParams.get('q') || '');
-  const minPrice = searchParams.get('minPrice');
-  const maxPrice = searchParams.get('maxPrice');
-  const roomType = searchParams.get('roomType');
-  const leaseDuration = searchParams.get('leaseDuration');
+  const hasSemanticQuery = searchParams.has("what");
+  const location = hasSemanticQuery ? "" : searchParams.get("q") || "";
+  const minPrice = searchParams.get("minPrice");
+  const maxPrice = searchParams.get("maxPrice");
+  const roomType = searchParams.get("roomType");
+  const leaseDuration = searchParams.get("leaseDuration");
 
   const segments = useMemo(() => {
     const parts: string[] = [];
-    parts.push(location || 'Anywhere');
+    parts.push(location || "Anywhere");
     if (minPrice && maxPrice) {
       parts.push(`$${minPrice}–$${maxPrice}`);
     } else if (minPrice) {
@@ -42,29 +45,39 @@ export function CompactSearchPill({ onExpand, onOpenFilters }: CompactSearchPill
     } else if (maxPrice) {
       parts.push(`Up to $${maxPrice}`);
     }
-    if (roomType && roomType !== 'any') parts.push(roomType);
-    if (leaseDuration && leaseDuration !== 'any') parts.push(leaseDuration);
+    if (roomType && roomType !== "any") parts.push(roomType);
+    if (leaseDuration && leaseDuration !== "any") parts.push(leaseDuration);
     return parts;
   }, [location, minPrice, maxPrice, roomType, leaseDuration]);
 
   // Count active filters
   const filterCount = useMemo(() => {
     let count = 0;
-    const keys = ['moveInDate', 'leaseDuration', 'roomType', 'genderPreference', 'householdGender'];
+    const keys = [
+      "moveInDate",
+      "leaseDuration",
+      "roomType",
+      "genderPreference",
+      "householdGender",
+    ];
     for (const key of keys) {
       const val = searchParams.get(key);
-      if (val && val !== 'any') count++;
+      if (val && val !== "any") count++;
     }
-    count += countParamValues(searchParams, 'amenities');
-    count += countParamValues(searchParams, 'houseRules');
-    count += countParamValues(searchParams, 'languages');
+    count += countParamValues(searchParams, "amenities");
+    count += countParamValues(searchParams, "houseRules");
+    count += countParamValues(searchParams, "languages");
     if (minPrice) count++;
     if (maxPrice) count++;
     // Count minSlots filter
-    const minSlots = searchParams.get('minSlots');
+    const minSlots = searchParams.get("minSlots");
     if (minSlots && parseInt(minSlots) >= 2) count++;
     // Count nearMatches filter
-    if (searchParams.get('nearMatches') === '1' || searchParams.get('nearMatches') === 'true') count++;
+    if (
+      searchParams.get("nearMatches") === "1" ||
+      searchParams.get("nearMatches") === "true"
+    )
+      count++;
     return count;
   }, [searchParams, minPrice, maxPrice]);
 
@@ -85,8 +98,8 @@ export function CompactSearchPill({ onExpand, onOpenFilters }: CompactSearchPill
               <span
                 className={`truncate ${
                   i === 0
-                    ? 'font-medium text-zinc-900 dark:text-white'
-                    : 'text-zinc-500 dark:text-zinc-400'
+                    ? "font-medium text-zinc-900 dark:text-white"
+                    : "text-zinc-500 dark:text-zinc-400"
                 }`}
               >
                 {seg}
@@ -100,7 +113,7 @@ export function CompactSearchPill({ onExpand, onOpenFilters }: CompactSearchPill
         <button
           onClick={onOpenFilters}
           className="relative flex items-center justify-center w-12 h-12 bg-white dark:bg-zinc-900 rounded-full shadow-sm border border-zinc-200 dark:border-zinc-700 hover:shadow-md transition-shadow flex-shrink-0 focus:outline-none focus-visible:ring-2 focus-visible:ring-zinc-900/30 dark:focus-visible:ring-zinc-400/40 focus-visible:ring-offset-2"
-          aria-label={`Filters${filterCount > 0 ? ` (${filterCount} active)` : ''}`}
+          aria-label={`Filters${filterCount > 0 ? ` (${filterCount} active)` : ""}`}
         >
           <SlidersHorizontal className="w-4 h-4 text-zinc-600 dark:text-zinc-400" />
           {filterCount > 0 && (

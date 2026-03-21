@@ -119,9 +119,9 @@ test.describe("SS: Saved Searches Mutations", () => {
     await enableBtn.click();
 
     // After toggling, button title should change to "Disable alerts"
-    await expect(
-      page.locator('button[title="Disable alerts"]')
-    ).toBeVisible({ timeout: timeouts.action });
+    await expect(page.locator('button[title="Disable alerts"]')).toBeVisible({
+      timeout: timeouts.action,
+    });
   });
 
   // SS-06: Toggle alert off
@@ -145,9 +145,9 @@ test.describe("SS: Saved Searches Mutations", () => {
     await disableBtn.click();
 
     // After toggling, button title should change to "Enable alerts"
-    await expect(
-      page.locator('button[title="Enable alerts"]')
-    ).toBeVisible({ timeout: timeouts.action });
+    await expect(page.locator('button[title="Enable alerts"]')).toBeVisible({
+      timeout: timeouts.action,
+    });
   });
 
   // SS-10: Alert state persists after reload
@@ -224,12 +224,14 @@ test.describe("SS: Saved Searches Mutations", () => {
       return;
     }
 
-    const countBefore = await page.getByText(/SF Under|Mission District/i).count();
+    const countBefore = await page
+      .getByText(/SF Under|Mission District/i)
+      .count();
 
     // Handle native browser confirm dialog — accept it
-    page.on('dialog', async (dialog) => {
-      expect(dialog.type()).toBe('confirm');
-      expect(dialog.message()).toContain('Are you sure');
+    page.on("dialog", async (dialog) => {
+      expect(dialog.type()).toBe("confirm");
+      expect(dialog.message()).toContain("Are you sure");
       await dialog.accept();
     });
 
@@ -237,7 +239,9 @@ test.describe("SS: Saved Searches Mutations", () => {
 
     // Count should decrease
     await expect(async () => {
-      const countAfter = await page.getByText(/SF Under|Mission District/i).count();
+      const countAfter = await page
+        .getByText(/SF Under|Mission District/i)
+        .count();
       expect(countAfter).toBeLessThan(countBefore);
     }).toPass({ timeout: timeouts.action });
   });
@@ -259,10 +263,12 @@ test.describe("SS: Saved Searches Mutations", () => {
       return;
     }
 
-    const countBefore = await page.getByText(/SF Under|Mission District/i).count();
+    const countBefore = await page
+      .getByText(/SF Under|Mission District/i)
+      .count();
 
     // Handle native browser confirm dialog — dismiss (cancel) it
-    page.on('dialog', async (dialog) => {
+    page.on("dialog", async (dialog) => {
       await dialog.dismiss();
     });
 
@@ -270,7 +276,9 @@ test.describe("SS: Saved Searches Mutations", () => {
 
     // Brief wait for any potential UI update, then verify count unchanged
     await expect(async () => {
-      const countAfter = await page.getByText(/SF Under|Mission District/i).count();
+      const countAfter = await page
+        .getByText(/SF Under|Mission District/i)
+        .count();
       expect(countAfter).toBe(countBefore);
     }).toPass({ timeout: 3_000 });
   });
@@ -289,7 +297,10 @@ test.describe("SS: Empty State", () => {
     await page.goto("/saved-searches");
     await page.waitForLoadState("domcontentloaded");
 
-    const heading = page.getByRole("heading", { name: /saved searches/i, level: 1 });
+    const heading = page.getByRole("heading", {
+      name: /saved searches/i,
+      level: 1,
+    });
     await expect(heading).toBeVisible({ timeout: timeouts.navigation });
 
     // User2 has no saved searches — should show empty state

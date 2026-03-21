@@ -13,6 +13,7 @@ DB/migration safety, and the PR/delivery checklist.
 ### Tool Selection: LSP vs Grep/Glob
 
 **Use LSP for semantic operations (understanding code):**
+
 - `goToDefinition` — find where a symbol is declared (NEVER use grep for this)
 - `findReferences` — find all usages of a function/variable/type (not grep)
 - `hover` — check type signatures, return types, and doc comments
@@ -20,6 +21,7 @@ DB/migration safety, and the PR/delivery checklist.
 - `documentSymbol` — list all symbols in a file (functions, classes, types)
 
 **Use Grep/Glob for text operations (finding things):**
+
 - String literals, error messages, config values, comments
 - File discovery by name pattern (`**/*.spec.ts`, `src/**/utils.*`)
 - Regex pattern matching across files (`TODO:`, `console\.log`)
@@ -57,4 +59,3 @@ DB/migration safety, and the PR/delivery checklist.
 - If LSP server is not running or still initializing → fall back to grep
 - If LSP returns no results (dynamic code, untyped JS) → supplement with grep
 - For files LSP doesn't cover (JSON, YAML, Markdown, config) → always use grep
-

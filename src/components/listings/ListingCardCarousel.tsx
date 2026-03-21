@@ -39,7 +39,7 @@ export default function ListingCardCarousel({
   const [isInteracting, setIsInteracting] = useState(false);
   // Initialize with first two images if available (no useEffect needed)
   const [loadedImages, setLoadedImages] = useState<Set<number>>(
-    () => new Set(totalImages > 1 ? [0, 1] : [0]),
+    () => new Set(totalImages > 1 ? [0, 1] : [0])
   );
   const scrollContainerRef = useRef<HTMLDivElement>(null);
   const interactionTimeoutRef = useRef<NodeJS.Timeout | null>(null);
@@ -75,7 +75,7 @@ export default function ListingCardCarousel({
         return newSet;
       });
     },
-    [totalImages],
+    [totalImages]
   );
 
   // Navigate prev/next
@@ -85,7 +85,7 @@ export default function ListingCardCarousel({
       e.stopPropagation();
       scrollToIndex(currentIndex - 1);
     },
-    [currentIndex, scrollToIndex],
+    [currentIndex, scrollToIndex]
   );
 
   const goToNext = useCallback(
@@ -94,7 +94,7 @@ export default function ListingCardCarousel({
       e.stopPropagation();
       scrollToIndex(currentIndex + 1);
     },
-    [currentIndex, scrollToIndex],
+    [currentIndex, scrollToIndex]
   );
 
   // Handle keyboard navigation
@@ -108,7 +108,7 @@ export default function ListingCardCarousel({
         scrollToIndex(currentIndex + 1);
       }
     },
-    [currentIndex, scrollToIndex],
+    [currentIndex, scrollToIndex]
   );
 
   // Show controls on interaction (hover/touch)
@@ -203,7 +203,7 @@ export default function ListingCardCarousel({
       <div
         className={cn(
           "absolute inset-0 pointer-events-none transition-opacity duration-200",
-          isInteracting ? "opacity-100" : "opacity-0",
+          isInteracting ? "opacity-100" : "opacity-0"
         )}
       >
         {/* Previous button - 44px touch target with visual 32px appearance */}
@@ -260,7 +260,7 @@ export default function ListingCardCarousel({
                 "block w-1.5 h-1.5 rounded-full transition-all duration-200",
                 index === currentIndex
                   ? "bg-white w-3 shadow-sm"
-                  : "bg-white/60 group-hover/dot:bg-white/80",
+                  : "bg-white/60 group-hover/dot:bg-white/80"
               )}
             />
           </button>

@@ -34,7 +34,12 @@ import {
  * Compute the YYYY-MM-DD string for the 15th of next month.
  * Used as a reliable future date for calendar interaction.
  */
-function getNextMonth15th(): { year: number; month: number; day: number; dateStr: string } {
+function getNextMonth15th(): {
+  year: number;
+  month: number;
+  day: number;
+  dateStr: string;
+} {
   const now = new Date();
   let year = now.getFullYear();
   let month = now.getMonth() + 2; // getMonth is 0-indexed, +1 for current, +1 for next
@@ -59,7 +64,9 @@ test.describe("Move-In Date Filter", () => {
   });
 
   // 7.1: Select move-in date from picker -> URL contains moveInDate=YYYY-MM-DD
-  test(`${tags.core} - selecting a date via picker and applying updates URL`, async ({ page }) => {
+  test(`${tags.core} - selecting a date via picker and applying updates URL`, async ({
+    page,
+  }) => {
     await waitForSearchReady(page);
     const dialog = await openFilterModal(page);
 
@@ -82,9 +89,13 @@ test.describe("Move-In Date Filter", () => {
     // The calendar grid buttons contain just the day number.
     // We target buttons within the Popover content that show "15" and are in the current month.
     const target = getNextMonth15th();
-    const dayButtons = page.locator('[data-radix-popper-content-wrapper] button, [class*="popover"] button').filter({
-      hasText: /^15$/,
-    });
+    const dayButtons = page
+      .locator(
+        '[data-radix-popper-content-wrapper] button, [class*="popover"] button'
+      )
+      .filter({
+        hasText: /^15$/,
+      });
 
     // Click the first visible "15" button that is not disabled
     const dayButton = dayButtons.first();
@@ -104,13 +115,21 @@ test.describe("Move-In Date Filter", () => {
     await applyFilters(page);
 
     // Verify URL contains a moveInDate param in YYYY-MM-DD format
-    await expect.poll(
-      () => {
-        const moveInDate = new URL(page.url(), "http://localhost").searchParams.get("moveInDate");
-        return moveInDate !== null && /^\d{4}-\d{2}-\d{2}$/.test(moveInDate);
-      },
-      { timeout: 30_000, message: 'URL param "moveInDate" to be in YYYY-MM-DD format' },
-    ).toBe(true);
+    await expect
+      .poll(
+        () => {
+          const moveInDate = new URL(
+            page.url(),
+            "http://localhost"
+          ).searchParams.get("moveInDate");
+          return moveInDate !== null && /^\d{4}-\d{2}-\d{2}$/.test(moveInDate);
+        },
+        {
+          timeout: 30_000,
+          message: 'URL param "moveInDate" to be in YYYY-MM-DD format',
+        }
+      )
+      .toBe(true);
 
     const moveInDate = getUrlParam(page, "moveInDate");
     expect(moveInDate).toBeTruthy();
@@ -118,7 +137,9 @@ test.describe("Move-In Date Filter", () => {
   });
 
   // 7.2: Past dates are prevented -> navigate with moveInDate=2020-01-01, no filter chip
-  test(`${tags.core} - past date in URL is rejected and produces no filter chip`, async ({ page }) => {
+  test(`${tags.core} - past date in URL is rejected and produces no filter chip`, async ({
+    page,
+  }) => {
     await page.goto(`${SEARCH_URL}&moveInDate=2020-01-01`);
     await page.waitForLoadState("domcontentloaded");
     await page.waitForTimeout(3_000);
@@ -140,7 +161,9 @@ test.describe("Move-In Date Filter", () => {
   });
 
   // 7.3: Date > 2 years in future rejected -> moveInDate=2030-01-01, no filter
-  test(`${tags.core} - date more than 2 years in future is rejected`, async ({ page }) => {
+  test(`${tags.core} - date more than 2 years in future is rejected`, async ({
+    page,
+  }) => {
     await page.goto(`${SEARCH_URL}&moveInDate=2030-01-01`);
     await page.waitForLoadState("domcontentloaded");
     await page.waitForTimeout(3_000);
@@ -159,7 +182,9 @@ test.describe("Move-In Date Filter", () => {
   });
 
   // 7.4: Invalid date format rejected -> moveInDate=not-a-date, no chip
-  test(`${tags.core} - invalid date format in URL is rejected`, async ({ page }) => {
+  test(`${tags.core} - invalid date format in URL is rejected`, async ({
+    page,
+  }) => {
     // Test with a non-date string
     await page.goto(`${SEARCH_URL}&moveInDate=not-a-date`);
     await page.waitForLoadState("domcontentloaded");

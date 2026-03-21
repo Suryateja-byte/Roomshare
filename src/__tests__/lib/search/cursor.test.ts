@@ -147,7 +147,7 @@ describe("search/cursor", () => {
           s: "newest",
           k: ["2024-01-15T10:00:00.000Z"],
           id: "clxtest",
-        }),
+        })
       ).toString("base64url");
 
       expect(decodeKeysetCursor(wrongVersion)).toBeNull();
@@ -160,7 +160,7 @@ describe("search/cursor", () => {
           s: "invalid_sort", // Not a valid sort option
           k: ["2024-01-15T10:00:00.000Z"],
           id: "clxtest",
-        }),
+        })
       ).toString("base64url");
 
       expect(decodeKeysetCursor(invalidSort)).toBeNull();
@@ -173,7 +173,7 @@ describe("search/cursor", () => {
           s: "newest",
           k: ["2024-01-15T10:00:00.000Z"],
           // Missing id
-        }),
+        })
       ).toString("base64url");
 
       expect(decodeKeysetCursor(missingId)).toBeNull();
@@ -186,7 +186,7 @@ describe("search/cursor", () => {
           s: "newest",
           k: ["2024-01-15T10:00:00.000Z"],
           id: "",
-        }),
+        })
       ).toString("base64url");
 
       expect(decodeKeysetCursor(emptyId)).toBeNull();
@@ -218,7 +218,7 @@ describe("search/cursor", () => {
           s: "recommended",
           k: ["2024-01-15T10:00:00.000Z"], // Should have 2 keys
           id: "clxtest",
-        }),
+        })
       ).toString("base64url");
 
       expect(decodeKeysetCursor(wrongKeyCount)).toBeNull();
@@ -243,7 +243,7 @@ describe("search/cursor", () => {
             s: sort,
             k: [], // Empty keys - always wrong
             id: "clxtest",
-          }),
+          })
         ).toString("base64url");
 
         expect(decodeKeysetCursor(wrongKeyCount)).toBeNull();
@@ -256,7 +256,7 @@ describe("search/cursor", () => {
             s: sort,
             k: keys,
             id: "clxtest",
-          }),
+          })
         ).toString("base64url");
 
         expect(decodeKeysetCursor(correctKeyCount)).not.toBeNull();
@@ -269,8 +269,10 @@ describe("search/cursor", () => {
       process.env.CURSOR_SECRET = "0123456789abcdef0123456789abcdef";
       jest.resetModules();
 
-      const { encodeKeysetCursor: encodeSigned, decodeKeysetCursor: decodeSigned } =
-        await import("@/lib/search/cursor");
+      const {
+        encodeKeysetCursor: encodeSigned,
+        decodeKeysetCursor: decodeSigned,
+      } = await import("@/lib/search/cursor");
 
       const cursor = {
         v: 1 as const,
@@ -287,8 +289,10 @@ describe("search/cursor", () => {
       process.env.CURSOR_SECRET = "0123456789abcdef0123456789abcdef";
       jest.resetModules();
 
-      const { encodeKeysetCursor: encodeSigned, decodeKeysetCursor: decodeSigned } =
-        await import("@/lib/search/cursor");
+      const {
+        encodeKeysetCursor: encodeSigned,
+        decodeKeysetCursor: decodeSigned,
+      } = await import("@/lib/search/cursor");
 
       const cursor = {
         v: 1 as const,
@@ -298,9 +302,13 @@ describe("search/cursor", () => {
       };
 
       const encoded = encodeSigned(cursor);
-      const envelope = JSON.parse(Buffer.from(encoded, "base64url").toString("utf-8"));
+      const envelope = JSON.parse(
+        Buffer.from(encoded, "base64url").toString("utf-8")
+      );
       envelope.p = envelope.p.replace("clxtamper", "clxfakeid");
-      const tampered = Buffer.from(JSON.stringify(envelope)).toString("base64url");
+      const tampered = Buffer.from(JSON.stringify(envelope)).toString(
+        "base64url"
+      );
 
       expect(decodeSigned(tampered)).toBeNull();
     });
@@ -395,7 +403,7 @@ describe("search/cursor", () => {
   describe("decodeLegacyCursor", () => {
     it("should decode legacy page cursor", () => {
       const legacyCursor = Buffer.from(JSON.stringify({ p: 5 })).toString(
-        "base64url",
+        "base64url"
       );
       expect(decodeLegacyCursor(legacyCursor)).toBe(5);
     });
@@ -407,12 +415,12 @@ describe("search/cursor", () => {
 
     it("should return null for page <= 0", () => {
       const zeroPage = Buffer.from(JSON.stringify({ p: 0 })).toString(
-        "base64url",
+        "base64url"
       );
       expect(decodeLegacyCursor(zeroPage)).toBeNull();
 
       const negativePage = Buffer.from(JSON.stringify({ p: -1 })).toString(
-        "base64url",
+        "base64url"
       );
       expect(decodeLegacyCursor(negativePage)).toBeNull();
     });
@@ -431,7 +439,7 @@ describe("search/cursor", () => {
 
     it("should return null for non-numeric page", () => {
       const stringPage = Buffer.from(JSON.stringify({ p: "5" })).toString(
-        "base64url",
+        "base64url"
       );
       expect(decodeLegacyCursor(stringPage)).toBeNull();
     });
@@ -457,7 +465,7 @@ describe("search/cursor", () => {
 
     it("should detect legacy cursor", () => {
       const legacyCursor = Buffer.from(JSON.stringify({ p: 5 })).toString(
-        "base64url",
+        "base64url"
       );
       const result = decodeCursorAny(legacyCursor, "newest");
 

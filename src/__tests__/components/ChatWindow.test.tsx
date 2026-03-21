@@ -1,19 +1,19 @@
-import type { ReactNode } from 'react';
-import '@testing-library/jest-dom';
-import { render, screen, waitFor, act, cleanup } from '@testing-library/react';
+import type { ReactNode } from "react";
+import "@testing-library/jest-dom";
+import { render, screen, waitFor, act, cleanup } from "@testing-library/react";
 
 const mockPush = jest.fn();
 const mockSendMessage = jest.fn();
 const mockCreateChatChannel = jest.fn();
 const mockSafeRemoveChannel = jest.fn();
 
-jest.mock('next/navigation', () => ({
+jest.mock("next/navigation", () => ({
   useRouter: () => ({
     push: mockPush,
   }),
 }));
 
-jest.mock('sonner', () => ({
+jest.mock("sonner", () => ({
   toast: {
     error: jest.fn(),
     info: jest.fn(),
@@ -21,28 +21,28 @@ jest.mock('sonner', () => ({
   },
 }));
 
-jest.mock('use-debounce', () => ({
+jest.mock("use-debounce", () => ({
   useDebouncedCallback: (callback: (...args: unknown[]) => void) => callback,
 }));
 
-jest.mock('@/app/actions/chat', () => ({
+jest.mock("@/app/actions/chat", () => ({
   sendMessage: (...args: unknown[]) => mockSendMessage(...args),
 }));
 
-jest.mock('@/app/actions/block', () => ({
+jest.mock("@/app/actions/block", () => ({
   blockUser: jest.fn(),
   unblockUser: jest.fn(),
 }));
 
-jest.mock('@/hooks/useBlockStatus', () => ({
+jest.mock("@/hooks/useBlockStatus", () => ({
   useBlockStatus: () => ({
-    blockStatus: 'none',
+    blockStatus: "none",
     isBlocked: false,
     refetch: jest.fn(),
   }),
 }));
 
-jest.mock('@/hooks/useRateLimitHandler', () => ({
+jest.mock("@/hooks/useRateLimitHandler", () => ({
   useRateLimitHandler: () => ({
     isRateLimited: false,
     retryAfter: 0,
@@ -51,13 +51,13 @@ jest.mock('@/hooks/useRateLimitHandler', () => ({
   }),
 }));
 
-jest.mock('@/hooks/useNetworkStatus', () => ({
+jest.mock("@/hooks/useNetworkStatus", () => ({
   useNetworkStatus: () => ({
     isOffline: false,
   }),
 }));
 
-jest.mock('@/lib/supabase', () => ({
+jest.mock("@/lib/supabase", () => ({
   supabase: null,
   createChatChannel: (...args: unknown[]) => mockCreateChatChannel(...args),
   broadcastTyping: jest.fn(),
@@ -65,19 +65,19 @@ jest.mock('@/lib/supabase', () => ({
   safeRemoveChannel: (...args: unknown[]) => mockSafeRemoveChannel(...args),
 }));
 
-jest.mock('@/components/UserAvatar', () => ({
+jest.mock("@/components/UserAvatar", () => ({
   __esModule: true,
   default: ({ name }: { name?: string | null }) => (
-    <div data-testid="user-avatar">{name ?? 'avatar'}</div>
+    <div data-testid="user-avatar">{name ?? "avatar"}</div>
   ),
 }));
 
-jest.mock('@/components/chat/BlockedConversationBanner', () => ({
+jest.mock("@/components/chat/BlockedConversationBanner", () => ({
   __esModule: true,
   default: () => <div data-testid="blocked-banner">blocked</div>,
 }));
 
-jest.mock('@/components/CharacterCounter', () => ({
+jest.mock("@/components/CharacterCounter", () => ({
   __esModule: true,
   default: ({ current, max }: { current: number; max: number }) => (
     <div data-testid="character-counter">
@@ -86,14 +86,18 @@ jest.mock('@/components/CharacterCounter', () => ({
   ),
 }));
 
-jest.mock('@/components/RateLimitCountdown', () => ({
+jest.mock("@/components/RateLimitCountdown", () => ({
   __esModule: true,
   default: () => <div data-testid="rate-limit-countdown">rate limit</div>,
 }));
 
-jest.mock('@/components/ui/dropdown-menu', () => ({
-  DropdownMenu: ({ children }: { children: ReactNode }) => <div>{children}</div>,
-  DropdownMenuContent: ({ children }: { children: ReactNode }) => <div>{children}</div>,
+jest.mock("@/components/ui/dropdown-menu", () => ({
+  DropdownMenu: ({ children }: { children: ReactNode }) => (
+    <div>{children}</div>
+  ),
+  DropdownMenuContent: ({ children }: { children: ReactNode }) => (
+    <div>{children}</div>
+  ),
   DropdownMenuItem: ({
     children,
     onClick,
@@ -105,14 +109,21 @@ jest.mock('@/components/ui/dropdown-menu', () => ({
     disabled?: boolean;
     className?: string;
   }) => (
-    <button type="button" onClick={onClick} disabled={disabled} className={className}>
+    <button
+      type="button"
+      onClick={onClick}
+      disabled={disabled}
+      className={className}
+    >
       {children}
     </button>
   ),
-  DropdownMenuTrigger: ({ children }: { children: ReactNode }) => <>{children}</>,
+  DropdownMenuTrigger: ({ children }: { children: ReactNode }) => (
+    <>{children}</>
+  ),
 }));
 
-jest.mock('@/components/ui/alert-dialog', () => ({
+jest.mock("@/components/ui/alert-dialog", () => ({
   AlertDialog: ({ children }: { children: ReactNode }) => <div>{children}</div>,
   AlertDialogAction: ({
     children,
@@ -125,19 +136,36 @@ jest.mock('@/components/ui/alert-dialog', () => ({
     disabled?: boolean;
     className?: string;
   }) => (
-    <button type="button" onClick={onClick} disabled={disabled} className={className}>
+    <button
+      type="button"
+      onClick={onClick}
+      disabled={disabled}
+      className={className}
+    >
       {children}
     </button>
   ),
-  AlertDialogCancel: ({ children }: { children: ReactNode }) => <button type="button">{children}</button>,
-  AlertDialogContent: ({ children }: { children: ReactNode }) => <div>{children}</div>,
-  AlertDialogDescription: ({ children }: { children: ReactNode }) => <div>{children}</div>,
-  AlertDialogFooter: ({ children }: { children: ReactNode }) => <div>{children}</div>,
-  AlertDialogHeader: ({ children }: { children: ReactNode }) => <div>{children}</div>,
-  AlertDialogTitle: ({ children }: { children: ReactNode }) => <div>{children}</div>,
+  AlertDialogCancel: ({ children }: { children: ReactNode }) => (
+    <button type="button">{children}</button>
+  ),
+  AlertDialogContent: ({ children }: { children: ReactNode }) => (
+    <div>{children}</div>
+  ),
+  AlertDialogDescription: ({ children }: { children: ReactNode }) => (
+    <div>{children}</div>
+  ),
+  AlertDialogFooter: ({ children }: { children: ReactNode }) => (
+    <div>{children}</div>
+  ),
+  AlertDialogHeader: ({ children }: { children: ReactNode }) => (
+    <div>{children}</div>
+  ),
+  AlertDialogTitle: ({ children }: { children: ReactNode }) => (
+    <div>{children}</div>
+  ),
 }));
 
-import ChatWindow from '@/app/messages/[id]/ChatWindow';
+import ChatWindow from "@/app/messages/[id]/ChatWindow";
 
 type MockMessage = {
   id: string;
@@ -158,24 +186,30 @@ function createJsonResponse(body: unknown, status = 200) {
   });
 }
 
-function buildMessage(id: string, senderId: string, content: string): MockMessage {
+function buildMessage(
+  id: string,
+  senderId: string,
+  content: string
+): MockMessage {
   return {
     id,
     senderId,
     content,
-    createdAt: new Date(`2026-03-06T12:00:0${id.endsWith('2') ? '2' : '1'}Z`).toISOString(),
+    createdAt: new Date(
+      `2026-03-06T12:00:0${id.endsWith("2") ? "2" : "1"}Z`
+    ).toISOString(),
     sender: {
-      name: senderId === 'other-user' ? 'Other User' : 'Current User',
+      name: senderId === "other-user" ? "Other User" : "Current User",
       image: null,
     },
   };
 }
 
-describe('Route ChatWindow', () => {
+describe("Route ChatWindow", () => {
   const fetchMock = jest.fn();
 
   beforeAll(() => {
-    Object.defineProperty(Element.prototype, 'scrollIntoView', {
+    Object.defineProperty(Element.prototype, "scrollIntoView", {
       configurable: true,
       value: jest.fn(),
     });
@@ -195,10 +229,10 @@ describe('Route ChatWindow', () => {
     jest.useRealTimers();
   });
 
-  it('shows polling mode when realtime is unavailable and never shows connecting', async () => {
+  it("shows polling mode when realtime is unavailable and never shows connecting", async () => {
     fetchMock.mockImplementation((input) => {
       const url = String(input);
-      if (url.includes('/api/messages?')) {
+      if (url.includes("/api/messages?")) {
         return createJsonResponse({ messages: [], hasNewMessages: false });
       }
       throw new Error(`Unexpected fetch: ${url}`);
@@ -213,37 +247,53 @@ describe('Route ChatWindow', () => {
         otherUserId="other-user"
         otherUserName="Other User"
         otherUserImage={null}
-      />,
+      />
     );
 
     await waitFor(() => {
       expect(fetchMock).toHaveBeenCalledWith(
-        expect.stringContaining('/api/messages?conversationId=conv-123&poll=1'),
-        expect.objectContaining({ method: 'GET' }),
+        expect.stringContaining("/api/messages?conversationId=conv-123&poll=1"),
+        expect.objectContaining({ method: "GET" })
       );
     });
 
-    expect(screen.getByTestId('connection-status')).toHaveTextContent('Polling for updates');
-    expect(screen.queryByText('Connecting...')).not.toBeInTheDocument();
+    expect(screen.getByTestId("connection-status")).toHaveTextContent(
+      "Polling for updates"
+    );
+    expect(screen.queryByText("Connecting...")).not.toBeInTheDocument();
     expect(mockCreateChatChannel).not.toHaveBeenCalled();
   });
 
-  it('polls with lastMessageId, merges incremental messages, and marks inbound messages as read', async () => {
-    const firstInbound = buildMessage('msg-1', 'other-user', 'Hello from polling');
-    const secondInbound = buildMessage('msg-2', 'other-user', 'Second poll result');
+  it("polls with lastMessageId, merges incremental messages, and marks inbound messages as read", async () => {
+    const firstInbound = buildMessage(
+      "msg-1",
+      "other-user",
+      "Hello from polling"
+    );
+    const secondInbound = buildMessage(
+      "msg-2",
+      "other-user",
+      "Second poll result"
+    );
 
     fetchMock.mockImplementation((input, init) => {
       const url = String(input);
-      if (url === '/api/messages') {
+      if (url === "/api/messages") {
         return createJsonResponse({ success: true, count: 1 });
       }
-      if (url.includes('/api/messages?')) {
-        if (url.includes('lastMessageId=msg-1')) {
-          return createJsonResponse({ messages: [secondInbound], hasNewMessages: true });
+      if (url.includes("/api/messages?")) {
+        if (url.includes("lastMessageId=msg-1")) {
+          return createJsonResponse({
+            messages: [secondInbound],
+            hasNewMessages: true,
+          });
         }
-        return createJsonResponse({ messages: [firstInbound], hasNewMessages: true });
+        return createJsonResponse({
+          messages: [firstInbound],
+          hasNewMessages: true,
+        });
       }
-      throw new Error(`Unexpected fetch: ${url} ${String(init?.method ?? '')}`);
+      throw new Error(`Unexpected fetch: ${url} ${String(init?.method ?? "")}`);
     });
 
     render(
@@ -255,21 +305,21 @@ describe('Route ChatWindow', () => {
         otherUserId="other-user"
         otherUserName="Other User"
         otherUserImage={null}
-      />,
+      />
     );
 
-    expect(await screen.findByText('Hello from polling')).toBeInTheDocument();
+    expect(await screen.findByText("Hello from polling")).toBeInTheDocument();
 
     await waitFor(() => {
       expect(fetchMock).toHaveBeenCalledWith(
-        '/api/messages',
+        "/api/messages",
         expect.objectContaining({
-          method: 'POST',
+          method: "POST",
           body: JSON.stringify({
-            action: 'markRead',
-            conversationId: 'conv-123',
+            action: "markRead",
+            conversationId: "conv-123",
           }),
-        }),
+        })
       );
     });
 
@@ -277,36 +327,44 @@ describe('Route ChatWindow', () => {
       jest.advanceTimersByTime(5000);
     });
 
-    expect(await screen.findByText('Second poll result')).toBeInTheDocument();
+    expect(await screen.findByText("Second poll result")).toBeInTheDocument();
 
     const pollUrls = fetchMock.mock.calls
       .map(([input]) => String(input))
-      .filter((url) => url.includes('/api/messages?conversationId=conv-123&poll=1'));
+      .filter((url) =>
+        url.includes("/api/messages?conversationId=conv-123&poll=1")
+      );
 
-    expect(pollUrls[0]).toContain('conversationId=conv-123');
-    expect(pollUrls.some((url) => url.includes('lastMessageId=msg-1'))).toBe(true);
-    expect(screen.getAllByTestId('message-bubble')).toHaveLength(2);
+    expect(pollUrls[0]).toContain("conversationId=conv-123");
+    expect(pollUrls.some((url) => url.includes("lastMessageId=msg-1"))).toBe(
+      true
+    );
+    expect(screen.getAllByTestId("message-bubble")).toHaveLength(2);
   });
 
-  it('aborts in-flight polling on unmount without logging a polling error', async () => {
-    const errorSpy = jest.spyOn(console, 'error').mockImplementation(() => {});
+  it("aborts in-flight polling on unmount without logging a polling error", async () => {
+    const errorSpy = jest.spyOn(console, "error").mockImplementation(() => {});
 
     fetchMock.mockImplementation((input, init) => {
       const url = String(input);
-      if (url.includes('/api/messages?')) {
+      if (url.includes("/api/messages?")) {
         return new Promise((_, reject) => {
           const signal = init?.signal;
           if (!signal) {
-            reject(new Error('Missing abort signal'));
+            reject(new Error("Missing abort signal"));
             return;
           }
 
           signal.addEventListener(
-            'abort',
+            "abort",
             () => {
-              reject(Object.assign(new Error('Request aborted'), { name: 'AbortError' }));
+              reject(
+                Object.assign(new Error("Request aborted"), {
+                  name: "AbortError",
+                })
+              );
             },
-            { once: true },
+            { once: true }
           );
         });
       }
@@ -322,13 +380,13 @@ describe('Route ChatWindow', () => {
         otherUserId="other-user"
         otherUserName="Other User"
         otherUserImage={null}
-      />,
+      />
     );
 
     await waitFor(() => {
       expect(fetchMock).toHaveBeenCalledWith(
-        expect.stringContaining('/api/messages?conversationId=conv-123&poll=1'),
-        expect.objectContaining({ method: 'GET' }),
+        expect.stringContaining("/api/messages?conversationId=conv-123&poll=1"),
+        expect.objectContaining({ method: "GET" })
       );
     });
 
@@ -339,7 +397,7 @@ describe('Route ChatWindow', () => {
     });
 
     const loggedPollingError = errorSpy.mock.calls.some(
-      ([message]) => message === 'Polling error:',
+      ([message]) => message === "Polling error:"
     );
 
     expect(loggedPollingError).toBe(false);

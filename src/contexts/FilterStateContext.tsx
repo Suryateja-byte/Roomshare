@@ -87,7 +87,7 @@ export function FilterStateProvider({
       setDrawerOpen,
       openDrawer,
       registerOpenDrawer,
-    ],
+    ]
   );
 
   return (

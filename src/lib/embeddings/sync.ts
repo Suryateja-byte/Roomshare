@@ -6,11 +6,21 @@
  * Uses structured logger (not console) per project rules.
  * Recovers from stuck 'PROCESSING' via attempt counter + timeout.
  */
+import "server-only";
+
 import { prisma } from "@/lib/prisma";
 import pgvector from "pgvector";
-import { generateEmbedding, generateMultimodalEmbedding, EMBEDDING_MODEL } from "./gemini";
+import {
+  generateEmbedding,
+  generateMultimodalEmbedding,
+  EMBEDDING_MODEL,
+} from "./gemini";
 import { composeListingText } from "./compose";
-import { fetchAndProcessListingImages, computeImageHash, type ImagePart } from "./images";
+import {
+  fetchAndProcessListingImages,
+  computeImageHash,
+  type ImagePart,
+} from "./images";
 import { features } from "@/lib/env";
 import { logger } from "@/lib/logger";
 
@@ -42,12 +52,27 @@ interface SearchDocRow {
 }
 
 /** Add Sentry breadcrumb (lazy import, no-op in test) */
-async function addBreadcrumb(data: { category: string; message: string; data: Record<string, unknown>; level: "info" | "error" }) {
-  try { const Sentry = await import("@sentry/nextjs"); Sentry.addBreadcrumb(data); } catch { /* Sentry unavailable */ }
+async function addBreadcrumb(data: {
+  category: string;
+  message: string;
+  data: Record<string, unknown>;
+  level: "info" | "error";
+}) {
+  try {
+    const Sentry = await import("@sentry/nextjs");
+    Sentry.addBreadcrumb(data);
+  } catch {
+    /* Sentry unavailable */
+  }
 }
 
 export async function syncListingEmbedding(listingId: string): Promise<void> {
-  addBreadcrumb({ category: "embedding", message: "Starting embedding sync", data: { listingId }, level: "info" });
+  addBreadcrumb({
+    category: "embedding",
+    message: "Starting embedding sync",
+    data: { listingId },
+    level: "info",
+  });
   try {
     const rows = await prisma.$queryRaw<SearchDocRow[]>`
       SELECT id, title, description, price, room_type, amenities,
@@ -86,10 +111,15 @@ export async function syncListingEmbedding(listingId: string): Promise<void> {
 
     // Image change detection
     const imageUrls: string[] = (doc.images as string[]) || [];
-    const newImageHash = imageUrls.length > 0 ? computeImageHash(imageUrls) : null;
+    const newImageHash =
+      imageUrls.length > 0 ? computeImageHash(imageUrls) : null;
 
     // Skip if BOTH text AND images unchanged (dedup)
-    if (doc.embedding_text === embeddingText && doc.embedding_image_hash === newImageHash) return;
+    if (
+      doc.embedding_text === embeddingText &&
+      doc.embedding_image_hash === newImageHash
+    )
+      return;
 
     // Atomically claim the row for processing (prevents concurrent double-embeds)
     const claimed = await prisma.$executeRaw`
@@ -113,16 +143,20 @@ export async function syncListingEmbedding(listingId: string): Promise<void> {
     }
 
     // Generate embedding (multimodal if images available, text-only otherwise)
-    const embedding = imageParts.length > 0
-      ? await generateMultimodalEmbedding(embeddingText, imageParts)
-      : await generateEmbedding(embeddingText, "RETRIEVAL_DOCUMENT");
+    const embedding =
+      imageParts.length > 0
+        ? await generateMultimodalEmbedding(embeddingText, imageParts)
+        : await generateEmbedding(embeddingText, "RETRIEVAL_DOCUMENT");
     const vecSql = pgvector.toSql(embedding);
 
     // Determine status: COMPLETED if all images processed (or no images), PARTIAL if some failed
-    const expectedImages = features.imageEmbeddings ? Math.min(imageUrls.length, 5) : 0;
-    const embeddingStatus = (expectedImages > 0 && imageParts.length < expectedImages)
-      ? "PARTIAL"
-      : "COMPLETED";
+    const expectedImages = features.imageEmbeddings
+      ? Math.min(imageUrls.length, 5)
+      : 0;
+    const embeddingStatus =
+      expectedImages > 0 && imageParts.length < expectedImages
+        ? "PARTIAL"
+        : "COMPLETED";
 
     // Store embedding with metadata
     await prisma.$executeRaw`
@@ -137,9 +171,22 @@ export async function syncListingEmbedding(listingId: string): Promise<void> {
           embedding_attempts = 0
       WHERE id = ${listingId}
     `;
-    addBreadcrumb({ category: "embedding", message: "Embedding sync completed", data: { listingId, imageCount: imageParts.length }, level: "info" });
+    addBreadcrumb({
+      category: "embedding",
+      message: "Embedding sync completed",
+      data: { listingId, imageCount: imageParts.length },
+      level: "info",
+    });
   } catch (err) {
-    addBreadcrumb({ category: "embedding", message: "Embedding sync failed", data: { listingId, error: err instanceof Error ? err.message : "Unknown" }, level: "error" });
+    addBreadcrumb({
+      category: "embedding",
+      message: "Embedding sync failed",
+      data: {
+        listingId,
+        error: err instanceof Error ? err.message : "Unknown",
+      },
+      level: "error",
+    });
     // Log error without PII (listing ID is safe, not PII)
     logger.sync.error("[embedding] Failed for listing", {
       listingId,

@@ -7,15 +7,15 @@
  * Schedule: 0 5 * * 0 (Sunday 5:00 AM UTC)
  */
 
-import { NextRequest, NextResponse } from 'next/server';
-import { prisma } from '@/lib/prisma';
-import { Prisma } from '@prisma/client';
-import { logger } from '@/lib/logger';
-import { validateCronAuth } from '@/lib/cron-auth';
-import { features } from '@/lib/env';
-import { markListingsDirty } from '@/lib/search/search-doc-dirty';
-import * as Sentry from '@sentry/nextjs';
-import { RECONCILER_ADVISORY_LOCK_KEY } from '@/lib/hold-constants';
+import { NextRequest, NextResponse } from "next/server";
+import { prisma } from "@/lib/prisma";
+import { Prisma } from "@prisma/client";
+import { logger } from "@/lib/logger";
+import { validateCronAuth } from "@/lib/cron-auth";
+import { features } from "@/lib/env";
+import { markListingsDirty } from "@/lib/search/search-doc-dirty";
+import * as Sentry from "@sentry/nextjs";
+import { RECONCILER_ADVISORY_LOCK_KEY } from "@/lib/hold-constants";
 
 interface DriftRow {
   id: string;
@@ -33,24 +33,25 @@ export async function GET(request: NextRequest) {
     if (!features.bookingAudit) {
       return NextResponse.json({
         skipped: true,
-        reason: 'ENABLE_BOOKING_AUDIT is off',
+        reason: "ENABLE_BOOKING_AUDIT is off",
       });
     }
 
     const startTime = Date.now();
 
-    const result = await prisma.$transaction(async (tx: Prisma.TransactionClient) => {
-      // Acquire advisory lock (transaction-scoped, auto-releases on commit)
-      const [lockResult] = await tx.$queryRaw<[{ locked: boolean }]>`
+    const result = await prisma.$transaction(
+      async (tx: Prisma.TransactionClient) => {
+        // Acquire advisory lock (transaction-scoped, auto-releases on commit)
+        const [lockResult] = await tx.$queryRaw<[{ locked: boolean }]>`
         SELECT pg_try_advisory_xact_lock(hashtext(${RECONCILER_ADVISORY_LOCK_KEY})) as locked
       `;
 
-      if (!lockResult.locked) {
-        return { skipped: true, reason: 'lock_held' } as const;
-      }
+        if (!lockResult.locked) {
+          return { skipped: true, reason: "lock_held" } as const;
+        }
 
-      // Detect drift using SUM(slotsRequested), not COUNT
-      const driftRows = await tx.$queryRaw<DriftRow[]>`
+        // Detect drift using SUM(slotsRequested), not COUNT
+        const driftRows = await tx.$queryRaw<DriftRow[]>`
         SELECT
           l.id,
           l."availableSlots" AS actual,
@@ -68,48 +69,54 @@ export async function GET(request: NextRequest) {
         ), 0)
       `;
 
-      const fixedIds: string[] = [];
-      let alertedOnly = 0;
+        const fixedIds: string[] = [];
+        let alertedOnly = 0;
 
-      for (const row of driftRows) {
-        const delta = Math.abs(Number(row.actual) - Number(row.expected));
+        for (const row of driftRows) {
+          const delta = Math.abs(Number(row.actual) - Number(row.expected));
 
-        logger.sync.info('[reconcile-slots] Drift detected', {
-          event: 'slot_drift_detected',
-          listingId: row.id.slice(0, 8) + '...',
-          actual: Number(row.actual),
-          expected: Number(row.expected),
-          delta,
-        });
+          logger.sync.info("[reconcile-slots] Drift detected", {
+            event: "slot_drift_detected",
+            listingId: row.id.slice(0, 8) + "...",
+            actual: Number(row.actual),
+            expected: Number(row.expected),
+            delta,
+          });
 
-        if (delta <= AUTO_FIX_THRESHOLD) {
-          // Fix 2: GREATEST guard prevents negative availableSlots
-          await tx.$executeRaw`
+          if (delta <= AUTO_FIX_THRESHOLD) {
+            // Fix 2: GREATEST guard prevents negative availableSlots
+            await tx.$executeRaw`
             UPDATE "Listing"
             SET "availableSlots" = GREATEST(0, ${Number(row.expected)})
             WHERE id = ${row.id}
           `;
-          fixedIds.push(row.id);
-        } else {
-          // Fix 7: Truncate listing ID in Sentry call
-          Sentry.captureMessage(
-            `[reconcile-slots] Large slot drift detected (delta=${delta})`,
-            {
-              level: 'warning',
-              extra: {
-                listingId: row.id.slice(0, 8) + '...',
-                actual: row.actual,
-                expected: row.expected,
-                delta,
-              },
-            },
-          );
-          alertedOnly++;
+            fixedIds.push(row.id);
+          } else {
+            // Fix 7: Truncate listing ID in Sentry call
+            Sentry.captureMessage(
+              `[reconcile-slots] Large slot drift detected (delta=${delta})`,
+              {
+                level: "warning",
+                extra: {
+                  listingId: row.id.slice(0, 8) + "...",
+                  actual: row.actual,
+                  expected: row.expected,
+                  delta,
+                },
+              }
+            );
+            alertedOnly++;
+          }
         }
-      }
 
-      return { skipped: false, drifted: driftRows.length, fixedIds, alertedOnly } as const;
-    });
+        return {
+          skipped: false,
+          drifted: driftRows.length,
+          fixedIds,
+          alertedOnly,
+        } as const;
+      }
+    );
 
     if (result.skipped) {
       return NextResponse.json({
@@ -122,13 +129,13 @@ export async function GET(request: NextRequest) {
 
     // Mark fixed listings dirty for search doc refresh (OUTSIDE TX)
     if (result.fixedIds.length > 0) {
-      await markListingsDirty(result.fixedIds, 'reconcile_slots');
+      await markListingsDirty(result.fixedIds, "reconcile_slots");
     }
 
     const durationMs = Date.now() - startTime;
 
-    logger.sync.info('[reconcile-slots] Reconciliation complete', {
-      event: 'reconcile_slots_complete',
+    logger.sync.info("[reconcile-slots] Reconciliation complete", {
+      event: "reconcile_slots_complete",
       drifted: result.drifted,
       reconciled: result.fixedIds.length,
       alertedOnly: result.alertedOnly,
@@ -145,12 +152,9 @@ export async function GET(request: NextRequest) {
       timestamp: new Date().toISOString(),
     });
   } catch (error) {
-    logger.sync.error('[reconcile-slots] Reconciliation failed', {
-      error: error instanceof Error ? error.message : 'Unknown error',
+    logger.sync.error("[reconcile-slots] Reconciliation failed", {
+      error: error instanceof Error ? error.message : "Unknown error",
     });
-    return NextResponse.json(
-      { error: 'Reconciler failed' },
-      { status: 500 },
-    );
+    return NextResponse.json({ error: "Reconciler failed" }, { status: 500 });
   }
 }

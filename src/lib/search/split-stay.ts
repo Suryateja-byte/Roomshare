@@ -1,4 +1,4 @@
-import type { ListingData } from '@/lib/data';
+import type { ListingData } from "@/lib/data";
 
 export interface SplitStayPair {
   first: ListingData;
@@ -20,7 +20,7 @@ export interface SplitStayPair {
  */
 export function findSplitStays(
   listings: ListingData[],
-  stayMonths?: number,
+  stayMonths?: number
 ): SplitStayPair[] {
   // Only suggest split stays for 6+ month durations with enough listings
   if (!stayMonths || stayMonths < 6 || listings.length < 2) return [];

@@ -7,7 +7,7 @@ import type { RankableListing, RankingContext } from "../types";
 
 const createListing = (
   id: string,
-  overrides: Partial<RankableListing> = {},
+  overrides: Partial<RankableListing> = {}
 ): RankableListing => ({
   id,
   price: 1000,
@@ -249,7 +249,7 @@ describe("getDebugSignals", () => {
           "recency",
           "geo",
           "total",
-        ]),
+        ])
       );
       expect(keys.length).toBe(7);
     }

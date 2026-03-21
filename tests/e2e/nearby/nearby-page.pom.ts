@@ -8,7 +8,7 @@
  * - RadarAttribution.tsx (Radar branding link)
  */
 
-import { Page, Locator, expect } from '@playwright/test';
+import { Page, Locator, expect } from "@playwright/test";
 
 export class NearbyPlacesPage {
   readonly page: Page;
@@ -67,22 +67,25 @@ export class NearbyPlacesPage {
   constructor(page: Page) {
     this.page = page;
 
-    this.section = page.locator('#nearby-places');
-    this.heading = page.getByRole('heading', { name: 'Nearby Places' });
+    this.section = page.locator("#nearby-places");
+    this.heading = page.getByRole("heading", { name: "Nearby Places" });
 
-    this.signInPrompt = page.getByText('Sign in to explore');
+    this.signInPrompt = page.getByText("Sign in to explore");
 
     this.searchInput = page.locator('input[aria-label="Search nearby places"]');
-    this.searchButton = this.section.getByRole('button', { name: 'Search', exact: true });
+    this.searchButton = this.section.getByRole("button", {
+      name: "Search",
+      exact: true,
+    });
 
     // Category chips: buttons with aria-pressed inside #nearby-places, excluding radius buttons
     this.categoryChips = this.section.locator(
-      '.hide-scrollbar button[aria-pressed]',
+      ".hide-scrollbar button[aria-pressed]"
     );
 
     // Radius options: buttons with aria-pressed inside the radius selector (bg-zinc-100 container)
     this.radiusOptions = this.section.locator(
-      '.flex.bg-zinc-100 button[aria-pressed], .flex.dark\\:bg-zinc-800 button[aria-pressed]',
+      ".flex.bg-zinc-100 button[aria-pressed], .flex.dark\\:bg-zinc-800 button[aria-pressed]"
     );
 
     this.resultsArea = page.locator('[data-testid="results-area"]');
@@ -90,21 +93,25 @@ export class NearbyPlacesPage {
 
     this.placeLinks = page.locator('a[aria-label^="Get directions to"]');
 
-    this.emptyState = page.getByText('No places found');
+    this.emptyState = page.getByText("No places found");
     this.initialState = page.getByText("Discover what's nearby");
-    this.errorState = this.resultsArea.locator('[role="status"][aria-live="polite"]');
+    this.errorState = this.resultsArea.locator(
+      '[role="status"][aria-live="polite"]'
+    );
 
-    this.mapCanvas = page.locator('.maplibregl-canvas').first();
-    this.mapContainer = page.locator('.maplibregl-map').first();
-    this.placeMarkers = page.locator('.poi-marker');
-    this.popup = page.locator('.nearby-popup');
+    this.mapCanvas = page.locator(".maplibregl-canvas").first();
+    this.mapContainer = page.locator(".maplibregl-map").first();
+    this.placeMarkers = page.locator(".poi-marker");
+    this.popup = page.locator(".nearby-popup");
 
-    this.zoomIn = page.getByRole('button', { name: 'Zoom in' });
-    this.zoomOut = page.getByRole('button', { name: 'Zoom out' });
-    this.resetView = page.getByRole('button', { name: 'Reset to listing location' });
-    this.fitAll = page.getByRole('button', { name: 'Fit all markers in view' });
+    this.zoomIn = page.getByRole("button", { name: "Zoom in" });
+    this.zoomOut = page.getByRole("button", { name: "Zoom out" });
+    this.resetView = page.getByRole("button", {
+      name: "Reset to listing location",
+    });
+    this.fitAll = page.getByRole("button", { name: "Fit all markers in view" });
 
-    this.mobileToggleButton = this.section.locator('.lg\\:hidden button');
+    this.mobileToggleButton = this.section.locator(".lg\\:hidden button");
 
     this.radarAttribution = page.locator('a[href*="radar.com"]');
   }
@@ -115,14 +122,14 @@ export class NearbyPlacesPage {
 
   /** Get a specific category chip by label text */
   chipByName(name: string): Locator {
-    return this.section.locator('.hide-scrollbar button[aria-pressed]', {
+    return this.section.locator(".hide-scrollbar button[aria-pressed]", {
       hasText: name,
     });
   }
 
   /** Get a specific radius button by label text */
   radiusByLabel(label: string): Locator {
-    return this.section.getByRole('button', { name: label, exact: true });
+    return this.section.getByRole("button", { name: label, exact: true });
   }
 
   /** Get a specific place result by name */
@@ -145,18 +152,18 @@ export class NearbyPlacesPage {
    */
   async goto(): Promise<void> {
     // Navigate to search first to find a listing
-    await this.page.goto('/search');
+    await this.page.goto("/search");
     // Wait for at least one listing card
     const firstCard = this.page.locator('[data-testid="listing-card"]').first();
     await expect(firstCard).toBeVisible({ timeout: 30_000 });
     // Get the listing link
     const link = firstCard.locator('a[href^="/listings/"]').first();
-    const href = await link.getAttribute('href');
-    if (!href) throw new Error('No listing link found');
+    const href = await link.getAttribute("href");
+    if (!href) throw new Error("No listing link found");
     // Navigate to listing detail
     await this.page.goto(href);
     // Wait for the page to load
-    await this.page.waitForLoadState('domcontentloaded');
+    await this.page.waitForLoadState("domcontentloaded");
   }
 
   /**
@@ -172,7 +179,7 @@ export class NearbyPlacesPage {
    */
   async searchFor(query: string): Promise<void> {
     await this.searchInput.fill(query);
-    await this.searchInput.press('Enter');
+    await this.searchInput.press("Enter");
   }
 
   /**
@@ -193,10 +200,10 @@ export class NearbyPlacesPage {
    * Wait for search results to finish loading (aria-busy transitions to false).
    */
   async waitForResults(): Promise<void> {
-    // Wait for loading to start (brief)
+    // Intentional: brief pause for loading indicator to appear before waiting for it to disappear
     await this.page.waitForTimeout(100);
     // Then wait for loading to finish
-    await expect(this.resultsArea).toHaveAttribute('aria-busy', 'false', {
+    await expect(this.resultsArea).toHaveAttribute("aria-busy", "false", {
       timeout: 15_000,
     });
   }

@@ -32,7 +32,13 @@
  * Run: pnpm playwright test tests/e2e/pagination/pagination-a11y.spec.ts --project=chromium
  */
 
-import { test, expect, SF_BOUNDS, tags, searchResultsContainer } from "../helpers/test-utils";
+import {
+  test,
+  expect,
+  SF_BOUNDS,
+  tags,
+  searchResultsContainer,
+} from "../helpers/test-utils";
 import { setupPaginationMock } from "../helpers/pagination-mock-factory";
 
 const boundsQS = `minLat=${SF_BOUNDS.minLat}&maxLat=${SF_BOUNDS.maxLat}&minLng=${SF_BOUNDS.minLng}&maxLng=${SF_BOUNDS.maxLng}`;
@@ -42,7 +48,7 @@ const sel = {
   card: '[data-testid="listing-card"]',
   loadMoreBtn: 'button:has-text("Show more places")',
   busyBtn: 'button[aria-busy="true"]',
-  srLiveRegion: '[aria-live="polite"][aria-atomic="true"]',
+  srLiveRegion: '[role="status"][aria-live="polite"][aria-atomic="true"]',
   searchResults: "#search-results",
 } as const;
 
@@ -78,7 +84,7 @@ test.describe("Pagination Accessibility (Scenario 11)", () => {
 
       // Verify it has the sr-only class (visually hidden, screen-reader accessible)
       const hasSrOnly = await liveRegion.evaluate((el) =>
-        el.classList.contains("sr-only"),
+        el.classList.contains("sr-only")
       );
       expect(hasSrOnly).toBe(true);
 
@@ -93,7 +99,7 @@ test.describe("Pagination Accessibility (Scenario 11)", () => {
         /Found \d+ listings?/.test(announceText!) ||
         /Found more than 100 listings/.test(announceText!);
       expect(matchesPattern).toBe(true);
-    },
+    }
   );
 
   // -------------------------------------------------------------------------
@@ -119,7 +125,7 @@ test.describe("Pagination Accessibility (Scenario 11)", () => {
       const announceText = await liveRegion.textContent();
       expect(announceText).toBeTruthy();
       expect(announceText).toContain("No listings found");
-    },
+    }
   );
 
   // -------------------------------------------------------------------------
@@ -151,9 +157,7 @@ test.describe("Pagination Accessibility (Scenario 11)", () => {
       // (or "... of 100+ listings" when total is null)
       const idleAriaLabel = await loadMoreBtn.getAttribute("aria-label");
       expect(idleAriaLabel).toBeTruthy();
-      expect(idleAriaLabel).toMatch(
-        /Show more places\. Currently showing \d+/,
-      );
+      expect(idleAriaLabel).toMatch(/Show more places\. Currently showing \d+/);
 
       // Button should NOT be busy or disabled in idle state
       const idleAriaBusy = await loadMoreBtn.getAttribute("aria-busy");
@@ -162,7 +166,7 @@ test.describe("Pagination Accessibility (Scenario 11)", () => {
 
       // Button should have touch-target class (min 44px hit area for mobile)
       const hasTouchTarget = await loadMoreBtn.evaluate((el) =>
-        el.classList.contains("touch-target"),
+        el.classList.contains("touch-target")
       );
       expect(hasTouchTarget).toBe(true);
 
@@ -194,7 +198,7 @@ test.describe("Pagination Accessibility (Scenario 11)", () => {
       await expect(container.locator(sel.busyBtn)).not.toBeVisible({
         timeout: 5_000,
       });
-    },
+    }
   );
 
   // -------------------------------------------------------------------------
@@ -246,7 +250,7 @@ test.describe("Pagination Accessibility (Scenario 11)", () => {
       // The feed should be a descendant of the search-results container
       const feedInsideContainer = searchResultsEl.locator(sel.feed);
       await expect(feedInsideContainer).toBeAttached();
-    },
+    }
   );
 
   // -------------------------------------------------------------------------
@@ -274,7 +278,7 @@ test.describe("Pagination Accessibility (Scenario 11)", () => {
 
       // Verify the button is a native <button> element (inherently keyboard-accessible)
       const tagName = await loadMoreBtn.evaluate((el) =>
-        el.tagName.toLowerCase(),
+        el.tagName.toLowerCase()
       );
       expect(tagName).toBe("button");
 
@@ -307,7 +311,7 @@ test.describe("Pagination Accessibility (Scenario 11)", () => {
       // The key assertion is that pressing Tab still works (not trapped).
       await page.keyboard.press("Tab");
       // If we reach here without timeout, focus is not trapped.
-    },
+    }
   );
 
   // -------------------------------------------------------------------------
@@ -354,6 +358,6 @@ test.describe("Pagination Accessibility (Scenario 11)", () => {
       // Only 1 server action call should have been made.
       // The disabled attribute + isLoadingMore guard prevents duplicate requests.
       expect(mock.loadMoreCallCount()).toBe(1);
-    },
+    }
   );
 });

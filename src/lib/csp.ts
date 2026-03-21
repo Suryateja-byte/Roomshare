@@ -25,7 +25,10 @@ export function buildCspHeader(nonce?: string): string {
     // Required by MapLibre GL for WebGL shader compilation (not application eval)
     scriptSrcTokens.push("'unsafe-eval'");
   }
-  scriptSrcTokens.push("https://maps.googleapis.com", "https://challenges.cloudflare.com");
+  scriptSrcTokens.push(
+    "https://maps.googleapis.com",
+    "https://challenges.cloudflare.com"
+  );
 
   const directives: string[] = [
     "default-src 'self'",

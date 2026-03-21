@@ -1,161 +1,194 @@
-import { render, screen, waitFor } from '@testing-library/react'
-import userEvent from '@testing-library/user-event'
-import SignUpPage from '@/app/signup/page'
+import { render, screen, waitFor } from "@testing-library/react";
+import userEvent from "@testing-library/user-event";
+import SignUpPage from "@/app/signup/page";
 
 // Mock next-auth/react
-const mockSignIn = jest.fn()
-jest.mock('next-auth/react', () => ({
+const mockSignIn = jest.fn();
+jest.mock("next-auth/react", () => ({
   signIn: (...args: any[]) => mockSignIn(...args),
-}))
+}));
 
 // Mock next/navigation
-const mockPush = jest.fn()
-jest.mock('next/navigation', () => ({
+const mockPush = jest.fn();
+jest.mock("next/navigation", () => ({
   useRouter: () => ({
     push: mockPush,
   }),
   useSearchParams: () => new URLSearchParams(),
-}))
+}));
 
 // Mock next/link
-jest.mock('next/link', () => {
-  return function MockLink({ children, href }: { children: React.ReactNode; href: string }) {
-    return <a href={href}>{children}</a>
-  }
-})
+jest.mock("next/link", () => {
+  return function MockLink({
+    children,
+    href,
+  }: {
+    children: React.ReactNode;
+    href: string;
+  }) {
+    return <a href={href}>{children}</a>;
+  };
+});
 
 // Mock fetch — save original and restore in afterAll to prevent cross-file leaks
-const originalFetch = global.fetch
-const mockFetch = jest.fn()
-beforeAll(() => { global.fetch = mockFetch })
-afterAll(() => { global.fetch = originalFetch })
+const originalFetch = global.fetch;
+const mockFetch = jest.fn();
+beforeAll(() => {
+  global.fetch = mockFetch;
+});
+afterAll(() => {
+  global.fetch = originalFetch;
+});
 
-describe('SignUpPage', () => {
+describe("SignUpPage", () => {
   beforeEach(() => {
-    jest.clearAllMocks()
-  })
+    jest.clearAllMocks();
+  });
 
-  it('renders signup form', () => {
-    render(<SignUpPage />)
+  it("renders signup form", () => {
+    render(<SignUpPage />);
 
-    expect(screen.getByText('Create an account')).toBeInTheDocument()
-    expect(screen.getByLabelText(/full name/i)).toBeInTheDocument()
-    expect(screen.getByLabelText(/email/i)).toBeInTheDocument()
-    expect(screen.getByLabelText('Password')).toBeInTheDocument()
-    expect(screen.getByLabelText('Confirm Password')).toBeInTheDocument()
-    expect(screen.getByRole('checkbox')).toBeInTheDocument()
-  })
+    expect(screen.getByRole("heading", { name: "Join RoomShare" })).toBeInTheDocument();
+    expect(screen.getByLabelText(/full name/i)).toBeInTheDocument();
+    expect(screen.getByLabelText(/email/i)).toBeInTheDocument();
+    expect(screen.getByLabelText("Password")).toBeInTheDocument();
+    expect(screen.getByLabelText("Confirm Password")).toBeInTheDocument();
+    expect(screen.getByRole("checkbox")).toBeInTheDocument();
+  });
 
-  it('renders google sign up button', () => {
-    render(<SignUpPage />)
+  it("renders google sign up button", () => {
+    render(<SignUpPage />);
 
-    expect(screen.getByText('Continue with Google')).toBeInTheDocument()
-  })
+    expect(screen.getByText("Continue with Google")).toBeInTheDocument();
+  });
 
-  it('renders sign in link', () => {
-    render(<SignUpPage />)
+  it("renders sign in link", () => {
+    render(<SignUpPage />);
 
-    const signInLink = screen.getByText('Sign in')
-    expect(signInLink.closest('a')).toHaveAttribute('href', '/login')
-  })
+    const signInLink = screen.getByText("Sign in");
+    expect(signInLink.closest("a")).toHaveAttribute("href", "/login");
+  });
 
-  it('submits form successfully', async () => {
+  it("submits form successfully", async () => {
     mockFetch.mockResolvedValue({
       ok: true,
-      json: async () => ({ id: 'user-123', name: 'Test User' }),
-    })
+      json: async () => ({ id: "user-123", name: "Test User" }),
+    });
 
-    render(<SignUpPage />)
+    render(<SignUpPage />);
 
-    await userEvent.type(screen.getByLabelText(/full name/i), 'Test User')
-    await userEvent.type(screen.getByLabelText(/email/i), 'test@example.com')
-    await userEvent.type(screen.getByLabelText('Password'), 'password123')
-    await userEvent.type(screen.getByLabelText('Confirm Password'), 'password123')
-    await userEvent.click(screen.getByRole('checkbox'))
-    await userEvent.click(screen.getByRole('button', { name: /create account/i }))
+    await userEvent.type(screen.getByLabelText(/full name/i), "Test User");
+    await userEvent.type(screen.getByLabelText(/email/i), "test@example.com");
+    await userEvent.type(screen.getByLabelText("Password"), "password123");
+    await userEvent.type(
+      screen.getByLabelText("Confirm Password"),
+      "password123"
+    );
+    await userEvent.click(screen.getByRole("checkbox"));
+    await userEvent.click(
+      screen.getByRole("button", { name: /join roomshare/i })
+    );
 
     await waitFor(() => {
-      expect(mockFetch).toHaveBeenCalledWith('/api/register', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
+      expect(mockFetch).toHaveBeenCalledWith("/api/register", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
         body: expect.any(String),
-      })
-    })
+      });
+    });
 
     await waitFor(() => {
-      expect(mockPush).toHaveBeenCalledWith('/login?registered=true')
-    })
-  })
+      expect(mockPush).toHaveBeenCalledWith("/login?registered=true");
+    });
+  });
 
-  it('shows error on registration failure', async () => {
+  it("shows error on registration failure", async () => {
     mockFetch.mockResolvedValue({
       ok: false,
-      json: async () => ({ error: 'User already exists' }),
-    })
+      json: async () => ({ error: "User already exists" }),
+    });
 
-    render(<SignUpPage />)
+    render(<SignUpPage />);
 
-    await userEvent.type(screen.getByLabelText(/full name/i), 'Test User')
-    await userEvent.type(screen.getByLabelText(/email/i), 'existing@example.com')
-    await userEvent.type(screen.getByLabelText('Password'), 'password123')
-    await userEvent.type(screen.getByLabelText('Confirm Password'), 'password123')
-    await userEvent.click(screen.getByRole('checkbox'))
-    await userEvent.click(screen.getByRole('button', { name: /create account/i }))
+    await userEvent.type(screen.getByLabelText(/full name/i), "Test User");
+    await userEvent.type(
+      screen.getByLabelText(/email/i),
+      "existing@example.com"
+    );
+    await userEvent.type(screen.getByLabelText("Password"), "password123");
+    await userEvent.type(
+      screen.getByLabelText("Confirm Password"),
+      "password123"
+    );
+    await userEvent.click(screen.getByRole("checkbox"));
+    await userEvent.click(
+      screen.getByRole("button", { name: /join roomshare/i })
+    );
 
     await waitFor(() => {
-      expect(screen.getByText('User already exists')).toBeInTheDocument()
-    })
-  })
+      expect(screen.getByText("User already exists")).toBeInTheDocument();
+    });
+  });
 
-  it('calls Google signIn when clicking Google button', async () => {
-    render(<SignUpPage />)
+  it("calls Google signIn when clicking Google button", async () => {
+    render(<SignUpPage />);
 
-    await userEvent.click(screen.getByText('Continue with Google'))
+    await userEvent.click(screen.getByText("Continue with Google"));
 
-    expect(mockSignIn).toHaveBeenCalledWith('google', { callbackUrl: '/' })
-  })
+    expect(mockSignIn).toHaveBeenCalledWith("google", { callbackUrl: "/" });
+  });
 
-  it('shows loading state during registration', async () => {
-    mockFetch.mockImplementation(() => new Promise(() => {})) // Never resolves
+  it("shows loading state during registration", async () => {
+    mockFetch.mockImplementation(() => new Promise(() => {})); // Never resolves
 
-    render(<SignUpPage />)
+    render(<SignUpPage />);
 
-    await userEvent.type(screen.getByLabelText(/full name/i), 'Test User')
-    await userEvent.type(screen.getByLabelText(/email/i), 'test@example.com')
-    await userEvent.type(screen.getByLabelText('Password'), 'password123')
-    await userEvent.type(screen.getByLabelText('Confirm Password'), 'password123')
-    await userEvent.click(screen.getByRole('checkbox'))
-    await userEvent.click(screen.getByRole('button', { name: /create account/i }))
+    await userEvent.type(screen.getByLabelText(/full name/i), "Test User");
+    await userEvent.type(screen.getByLabelText(/email/i), "test@example.com");
+    await userEvent.type(screen.getByLabelText("Password"), "password123");
+    await userEvent.type(
+      screen.getByLabelText("Confirm Password"),
+      "password123"
+    );
+    await userEvent.click(screen.getByRole("checkbox"));
+    await userEvent.click(
+      screen.getByRole("button", { name: /join roomshare/i })
+    );
 
     // Button should be disabled during loading
     await waitFor(() => {
-      expect(screen.getByRole('button', { name: '' })).toBeDisabled()
-    })
-  })
+      expect(screen.getByRole("button", { name: "" })).toBeDisabled();
+    });
+  });
 
-  it('shows password requirements', async () => {
-    render(<SignUpPage />)
+  it("shows password requirements", async () => {
+    render(<SignUpPage />);
 
     // Password strength meter only shows after typing starts
-    await userEvent.type(screen.getByLabelText('Password'), 'a')
+    await userEvent.type(screen.getByLabelText("Password"), "a");
 
-    expect(screen.getByText('At least 12 characters')).toBeInTheDocument()
-  })
+    expect(screen.getByText("At least 12 characters")).toBeInTheDocument();
+  });
 
-  it('handles network errors', async () => {
-    mockFetch.mockRejectedValue(new Error('Network error'))
+  it("handles network errors", async () => {
+    mockFetch.mockRejectedValue(new Error("Network error"));
 
-    render(<SignUpPage />)
+    render(<SignUpPage />);
 
-    await userEvent.type(screen.getByLabelText(/full name/i), 'Test User')
-    await userEvent.type(screen.getByLabelText(/email/i), 'test@example.com')
-    await userEvent.type(screen.getByLabelText('Password'), 'password123')
-    await userEvent.type(screen.getByLabelText('Confirm Password'), 'password123')
-    await userEvent.click(screen.getByRole('checkbox'))
-    await userEvent.click(screen.getByRole('button', { name: /create account/i }))
+    await userEvent.type(screen.getByLabelText(/full name/i), "Test User");
+    await userEvent.type(screen.getByLabelText(/email/i), "test@example.com");
+    await userEvent.type(screen.getByLabelText("Password"), "password123");
+    await userEvent.type(
+      screen.getByLabelText("Confirm Password"),
+      "password123"
+    );
+    await userEvent.click(screen.getByRole("checkbox"));
+    await userEvent.click(
+      screen.getByRole("button", { name: /join roomshare/i })
+    );
 
     await waitFor(() => {
-      expect(screen.getByText('Network error')).toBeInTheDocument()
-    })
-  })
-})
+      expect(screen.getByText("Network error")).toBeInTheDocument();
+    });
+  });
+});

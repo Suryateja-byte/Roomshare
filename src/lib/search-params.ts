@@ -6,7 +6,31 @@ import {
   MAX_QUERY_LENGTH,
   LAT_OFFSET_DEGREES,
 } from "./constants";
-import { VALID_BOOKING_MODES } from "./filter-schema";
+import {
+  VALID_BOOKING_MODES,
+  VALID_AMENITIES,
+  VALID_HOUSE_RULES,
+  VALID_LEASE_DURATIONS,
+  LEASE_DURATION_ALIASES,
+  VALID_ROOM_TYPES,
+  ROOM_TYPE_ALIASES,
+  VALID_GENDER_PREFERENCES,
+  VALID_HOUSEHOLD_GENDERS,
+  VALID_SORT_OPTIONS,
+} from "./filter-schema";
+
+// Re-export filter constants for consumers that import from search-params
+export {
+  VALID_AMENITIES,
+  VALID_HOUSE_RULES,
+  VALID_LEASE_DURATIONS,
+  LEASE_DURATION_ALIASES,
+  VALID_ROOM_TYPES,
+  ROOM_TYPE_ALIASES,
+  VALID_GENDER_PREFERENCES,
+  VALID_HOUSEHOLD_GENDERS,
+  VALID_SORT_OPTIONS,
+};
 
 // Re-export for backward compatibility
 export { MAX_SAFE_PRICE, MAX_SAFE_PAGE, MAX_ARRAY_ITEMS };
@@ -139,7 +163,7 @@ export const FILTER_QUERY_KEYS = [
  * Example: ?amenities=Wifi → { amenities: 'Wifi' } (single values stay as strings)
  */
 export function buildRawParamsFromSearchParams(
-  searchParams: URLSearchParams,
+  searchParams: URLSearchParams
 ): Record<string, string | string[] | undefined> {
   const rawParams: Record<string, string | string[] | undefined> = {};
 
@@ -165,7 +189,7 @@ export function buildRawParamsFromSearchParams(
  * This ensures every consumer (list/map/count/cache keys) uses the same parsed filter set.
  */
 export function buildCanonicalFilterParamsFromSearchParams(
-  searchParams: URLSearchParams,
+  searchParams: URLSearchParams
 ): URLSearchParams {
   const canonical = new URLSearchParams();
 
@@ -185,13 +209,13 @@ export function buildCanonicalFilterParamsFromSearchParams(
     }
 
     filterParams.amenities?.forEach((value) =>
-      canonical.append("amenities", value),
+      canonical.append("amenities", value)
     );
     filterParams.houseRules?.forEach((value) =>
-      canonical.append("houseRules", value),
+      canonical.append("houseRules", value)
     );
     filterParams.languages?.forEach((value) =>
-      canonical.append("languages", value),
+      canonical.append("languages", value)
     );
 
     if (filterParams.moveInDate) {
@@ -216,10 +240,7 @@ export function buildCanonicalFilterParamsFromSearchParams(
       canonical.set("minSlots", String(filterParams.minAvailableSlots));
     }
     if (typeof filterParams.nearMatches === "boolean") {
-      canonical.set(
-        "nearMatches",
-        filterParams.nearMatches ? "true" : "false",
-      );
+      canonical.set("nearMatches", filterParams.nearMatches ? "true" : "false");
     }
   } catch {
     // Best-effort fallback when parsing fails (for malformed URLs).
@@ -233,95 +254,10 @@ export function buildCanonicalFilterParamsFromSearchParams(
   return canonical;
 }
 
-export const VALID_AMENITIES = [
-  "Wifi",
-  "AC",
-  "Parking",
-  "Washer",
-  "Dryer",
-  "Kitchen",
-  "Gym",
-  "Pool",
-  "Furnished",
-] as const;
-export const VALID_HOUSE_RULES = [
-  "Pets allowed",
-  "Smoking allowed",
-  "Couples allowed",
-  "Guests allowed",
-] as const;
-export const VALID_LEASE_DURATIONS = [
-  "any",
-  "Month-to-month",
-  "3 months",
-  "6 months",
-  "12 months",
-  "Flexible",
-] as const;
-// Alias mappings for alternative formats (URL-friendly formats like 6_MONTHS)
-export const LEASE_DURATION_ALIASES: Record<string, string> = {
-  "month-to-month": "Month-to-month",
-  month_to_month: "Month-to-month",
-  mtm: "Month-to-month",
-  "3_months": "3 months",
-  "3months": "3 months",
-  "6_months": "6 months",
-  "6months": "6 months",
-  "12_months": "12 months",
-  "12months": "12 months",
-  "1_year": "12 months",
-  "1year": "12 months",
-};
-export const VALID_ROOM_TYPES = [
-  "any",
-  "Private Room",
-  "Shared Room",
-  "Entire Place",
-] as const;
-// Alias mappings for alternative formats (URL-friendly formats like PRIVATE)
-export const ROOM_TYPE_ALIASES: Record<string, string> = {
-  private: "Private Room",
-  private_room: "Private Room",
-  privateroom: "Private Room",
-  shared: "Shared Room",
-  shared_room: "Shared Room",
-  sharedroom: "Shared Room",
-  entire: "Entire Place",
-  entire_place: "Entire Place",
-  entireplace: "Entire Place",
-  whole: "Entire Place",
-  studio: "Entire Place",
-};
-export const VALID_GENDER_PREFERENCES = [
-  "any",
-  "MALE_ONLY",
-  "FEMALE_ONLY",
-  "NO_PREFERENCE",
-] as const;
-export const VALID_HOUSEHOLD_GENDERS = [
-  "any",
-  "ALL_MALE",
-  "ALL_FEMALE",
-  "MIXED",
-] as const;
-export const VALID_SORT_OPTIONS = [
-  "recommended",
-  "price_asc",
-  "price_desc",
-  "newest",
-  "rating",
-] as const;
-
-const validSortOptions: SortOption[] = [
-  "recommended",
-  "price_asc",
-  "price_desc",
-  "newest",
-  "rating",
-];
+const validSortOptions: SortOption[] = [...VALID_SORT_OPTIONS];
 
 const getFirstValue = (
-  value: string | string[] | undefined,
+  value: string | string[] | undefined
 ): string | undefined => {
   if (Array.isArray(value)) {
     return value[0];
@@ -332,12 +268,12 @@ const getFirstValue = (
 const safeParseArray = (
   values: string | string[] | undefined,
   allowlist: readonly string[],
-  maxItems: number = MAX_ARRAY_ITEMS,
+  maxItems: number = MAX_ARRAY_ITEMS
 ): string[] | undefined => {
   if (!values) return undefined;
   const allowMap = new Map(allowlist.map((item) => [item.toLowerCase(), item]));
   const list = (typeof values === "string" ? [values] : values).flatMap(
-    (value) => value.split(","),
+    (value) => value.split(",")
   );
   const validated = list
     .map((value) => value.trim())
@@ -351,7 +287,7 @@ const safeParseEnum = <T extends string>(
   value: string | undefined,
   allowlist: readonly T[],
   defaultVal?: T,
-  aliases?: Record<string, string>,
+  aliases?: Record<string, string>
 ): T | undefined => {
   if (!value) return defaultVal;
   const trimmed = value.trim();
@@ -377,7 +313,7 @@ const safeParseEnum = <T extends string>(
 const safeParseFloat = (
   value: string | undefined,
   min?: number,
-  max?: number,
+  max?: number
 ): number | undefined => {
   if (!value) return undefined;
   const trimmed = value.trim();
@@ -394,7 +330,7 @@ const safeParseInt = (
   value: string | undefined,
   min?: number,
   max?: number,
-  defaultVal?: number,
+  defaultVal?: number
 ): number => {
   if (!value) return defaultVal ?? 1;
   const trimmed = value.trim();
@@ -448,19 +384,19 @@ export function parseSearchParams(raw: RawSearchParams): ParsedSearchParams {
     getFirstValue(raw.page),
     1,
     MAX_SAFE_PAGE,
-    1,
+    1
   );
 
   // Support budget aliases (minBudget/maxBudget) with canonical precedence
   const validMinPrice = safeParseFloat(
     getFirstValue(raw.minPrice) ?? getFirstValue(raw.minBudget),
     0,
-    MAX_SAFE_PRICE,
+    MAX_SAFE_PRICE
   );
   const validMaxPrice = safeParseFloat(
     getFirstValue(raw.maxPrice) ?? getFirstValue(raw.maxBudget),
     0,
-    MAX_SAFE_PRICE,
+    MAX_SAFE_PRICE
   );
 
   let effectiveMinPrice = validMinPrice;
@@ -535,7 +471,7 @@ export function parseSearchParams(raw: RawSearchParams): ParsedSearchParams {
   }
 
   const sortOption: SortOption = validSortOptions.includes(
-    getFirstValue(raw.sort) as SortOption,
+    getFirstValue(raw.sort) as SortOption
   )
     ? (getFirstValue(raw.sort) as SortOption)
     : "recommended";
@@ -545,33 +481,37 @@ export function parseSearchParams(raw: RawSearchParams): ParsedSearchParams {
     getFirstValue(raw.roomType),
     VALID_ROOM_TYPES as readonly string[],
     undefined,
-    ROOM_TYPE_ALIASES,
+    ROOM_TYPE_ALIASES
   );
   const validLeaseDuration = safeParseEnum(
     getFirstValue(raw.leaseDuration),
     VALID_LEASE_DURATIONS as readonly string[],
     undefined,
-    LEASE_DURATION_ALIASES,
+    LEASE_DURATION_ALIASES
   );
   const validGenderPreference = safeParseEnum(
     getFirstValue(raw.genderPreference),
-    VALID_GENDER_PREFERENCES as readonly string[],
+    VALID_GENDER_PREFERENCES as readonly string[]
   );
   const validHouseholdGender = safeParseEnum(
     getFirstValue(raw.householdGender),
-    VALID_HOUSEHOLD_GENDERS as readonly string[],
+    VALID_HOUSEHOLD_GENDERS as readonly string[]
   );
   const validBookingMode = safeParseEnum(
     getFirstValue(raw.bookingMode),
-    VALID_BOOKING_MODES as readonly string[],
+    VALID_BOOKING_MODES as readonly string[]
   );
 
   // Parse minSlots (minimum available slots filter)
   const rawMinSlots = getFirstValue(raw.minSlots);
-  const parsedMinSlots = rawMinSlots ? (() => {
-    const parsed = parseInt(rawMinSlots.trim(), 10);
-    return Number.isFinite(parsed) && parsed >= 1 && parsed <= 20 ? parsed : undefined;
-  })() : undefined;
+  const parsedMinSlots = rawMinSlots
+    ? (() => {
+        const parsed = parseInt(rawMinSlots.trim(), 10);
+        return Number.isFinite(parsed) && parsed >= 1 && parsed <= 20
+          ? parsed
+          : undefined;
+      })()
+    : undefined;
 
   // Parse nearMatches boolean flag.
   // Accept both boolean strings and numeric toggles for backward compatibility:
@@ -630,7 +570,7 @@ export function parseSearchParams(raw: RawSearchParams): ParsedSearchParams {
  */
 export function getPriceParam(
   searchParams: URLSearchParams,
-  type: "min" | "max",
+  type: "min" | "max"
 ): number | undefined {
   // Canonical param names take precedence
   const canonicalKey = type === "min" ? "minPrice" : "maxPrice";
@@ -690,11 +630,11 @@ export function validateSearchFilters(filters: unknown): FilterParams {
   // Array field validation helper
   const validateArrayField = (
     field: unknown,
-    allowlist: readonly string[],
+    allowlist: readonly string[]
   ): string[] | undefined => {
     if (!Array.isArray(field)) return undefined;
     const allowMap = new Map(
-      allowlist.map((item) => [item.toLowerCase(), item]),
+      allowlist.map((item) => [item.toLowerCase(), item])
     );
     const validated = field
       .filter((v): v is string => typeof v === "string")
@@ -711,7 +651,7 @@ export function validateSearchFilters(filters: unknown): FilterParams {
   // House rules validation
   validated.houseRules = validateArrayField(
     input.houseRules,
-    VALID_HOUSE_RULES,
+    VALID_HOUSE_RULES
   );
 
   // Languages validation (uses normalizeLanguages for normalization)
@@ -730,7 +670,7 @@ export function validateSearchFilters(filters: unknown): FilterParams {
   // Enum field validation helper
   const validateEnumField = (
     field: unknown,
-    allowlist: readonly string[],
+    allowlist: readonly string[]
   ): string | undefined => {
     if (typeof field !== "string") return undefined;
     const trimmed = field.trim();
@@ -744,19 +684,19 @@ export function validateSearchFilters(filters: unknown): FilterParams {
   // Lease duration validation
   validated.leaseDuration = validateEnumField(
     input.leaseDuration,
-    VALID_LEASE_DURATIONS,
+    VALID_LEASE_DURATIONS
   );
 
   // Gender preference validation
   validated.genderPreference = validateEnumField(
     input.genderPreference,
-    VALID_GENDER_PREFERENCES,
+    VALID_GENDER_PREFERENCES
   );
 
   // Household gender validation
   validated.householdGender = validateEnumField(
     input.householdGender,
-    VALID_HOUSEHOLD_GENDERS,
+    VALID_HOUSEHOLD_GENDERS
   );
 
   // Move-in date validation (reuse safeParseDate logic)

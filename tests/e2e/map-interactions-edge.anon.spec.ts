@@ -15,7 +15,16 @@
  * Debug: pnpm playwright test tests/e2e/map-interactions-edge.anon.spec.ts --project=chromium-anon --headed
  */
 
-import { test, expect, tags, timeouts, SF_BOUNDS, selectors, searchResultsContainer, waitForMapReady } from "./helpers/test-utils";
+import {
+  test,
+  expect,
+  tags,
+  timeouts,
+  SF_BOUNDS,
+  selectors,
+  searchResultsContainer,
+  waitForMapReady,
+} from "./helpers/test-utils";
 import { waitForMapRef, isMapAvailable } from "./helpers/sync-helpers";
 import type { Page } from "@playwright/test";
 
@@ -79,7 +88,10 @@ test.describe("Map Interactions Edge Cases (Stories 9-12)", () => {
     test.slow(); // Map tests need extra time for WebGL rendering in CI
     const projectName = testInfo.project.name;
     if (projectName.includes("Mobile")) {
-      test.skip(true, "Map tests require desktop viewport - skipping on mobile");
+      test.skip(
+        true,
+        "Map tests require desktop viewport - skipping on mobile"
+      );
     }
     if (projectName === "webkit") {
       test.skip(true, "Map tests have timing issues on webkit - skipping");
@@ -90,7 +102,9 @@ test.describe("Map Interactions Edge Cases (Stories 9-12)", () => {
   // 9. DynamicMap Lazy Loading
   // =========================================================================
   test.describe("9. DynamicMap Lazy Loading", () => {
-    test(`${tags.anon} 9.1 - Mapbox bundle is loaded lazily (P2)`, async ({ page }) => {
+    test(`${tags.anon} 9.1 - Mapbox bundle is loaded lazily (P2)`, async ({
+      page,
+    }) => {
       // Track all JS chunks loaded during homepage navigation
       const homepageChunks: string[] = [];
       const searchChunks: string[] = [];
@@ -177,14 +191,17 @@ test.describe("Map Interactions Edge Cases (Stories 9-12)", () => {
         const cdp = await context.newCDPSession(page);
         await cdp.send("Network.emulateNetworkConditions", {
           offline: false,
-          downloadThroughput: (400_000 / 8), // Slow 3G: 400kbps
-          uploadThroughput: (200_000 / 8),
+          downloadThroughput: 400_000 / 8, // Slow 3G: 400kbps
+          uploadThroughput: 200_000 / 8,
           latency: 400,
         });
         cdpThrottled = true;
       } catch {
         // CDP not available in non-Chromium browsers — skip since we can't slow down loading
-        test.skip(true, "CDP network throttling not available (non-Chromium browser)");
+        test.skip(
+          true,
+          "CDP network throttling not available (non-Chromium browser)"
+        );
         return;
       }
 
@@ -232,9 +249,11 @@ test.describe("Map Interactions Edge Cases (Stories 9-12)", () => {
         }
       } else if (!canvasVisible) {
         // Neither loading text nor canvas visible -- timing was too fast or WebGL unavailable
-        test.skip(true,
+        test.skip(
+          true,
           "Loading placeholder was too fast to observe and map canvas not rendered " +
-          "(WebGL may be unavailable in headless CI). Run with --headed for full verification.");
+            "(WebGL may be unavailable in headless CI). Run with --headed for full verification."
+        );
         return;
       }
       // If canvas appeared without catching loading text, the bundle loaded fast
@@ -246,7 +265,9 @@ test.describe("Map Interactions Edge Cases (Stories 9-12)", () => {
   // 10. Map Error Boundary
   // =========================================================================
   test.describe("10. Map Error Boundary", () => {
-    test(`${tags.anon} 10.1 - Error boundary shows fallback UI (P1)`, async ({ page }) => {
+    test(`${tags.anon} 10.1 - Error boundary shows fallback UI (P1)`, async ({
+      page,
+    }) => {
       // Approach: Navigate to search page with an intentionally broken Mapbox
       // token to trigger initialization failure. Alternatively, verify the
       // static fallback structure exists by injecting an error condition.
@@ -266,7 +287,9 @@ test.describe("Map Interactions Edge Cases (Stories 9-12)", () => {
       if (!mapAvailable) {
         // Map did not render -- check if the error fallback is showing
         const fallbackText = page.getByText("Map unavailable");
-        const fallbackVisible = await fallbackText.isVisible().catch(() => false);
+        const fallbackVisible = await fallbackText
+          .isVisible()
+          .catch(() => false);
 
         if (fallbackVisible) {
           // Error boundary is working -- verify retry button
@@ -314,7 +337,9 @@ test.describe("Map Interactions Edge Cases (Stories 9-12)", () => {
 
         // Check if fallback appeared after map removal
         const fallbackText = page.getByText("Map unavailable");
-        const fallbackVisible = await fallbackText.isVisible().catch(() => false);
+        const fallbackVisible = await fallbackText
+          .isVisible()
+          .catch(() => false);
 
         if (fallbackVisible) {
           await expect(fallbackText).toBeVisible();
@@ -374,7 +399,9 @@ test.describe("Map Interactions Edge Cases (Stories 9-12)", () => {
       let bannerVisible = false;
 
       try {
-        await expect(alertBanner.first()).toBeVisible({ timeout: timeouts.action });
+        await expect(alertBanner.first()).toBeVisible({
+          timeout: timeouts.action,
+        });
         bannerVisible = true;
       } catch {
         // Alert banner may not appear if V2 mode is active
@@ -425,14 +452,20 @@ test.describe("Map Interactions Edge Cases (Stories 9-12)", () => {
       // Guard: check map is available
       const mapAvailable = await isMapAvailable(page);
       if (!mapAvailable) {
-        test.skip(true, "Map not available (WebGL unavailable in headless mode)");
+        test.skip(
+          true,
+          "Map not available (WebGL unavailable in headless mode)"
+        );
         return;
       }
 
       // Guard: wait for E2E map ref
       const hasMapRef = await waitForMapRef(page);
       if (!hasMapRef) {
-        test.skip(true, "E2E map ref not exposed (NEXT_PUBLIC_E2E may not be set)");
+        test.skip(
+          true,
+          "E2E map ref not exposed (NEXT_PUBLIC_E2E may not be set)"
+        );
         return;
       }
 
@@ -463,7 +496,9 @@ test.describe("Map Interactions Edge Cases (Stories 9-12)", () => {
 
       // If listings exist in bounds, privacy-circles source should be present.
       // If 0 listings, PrivacyCircle component returns null (no source added).
-      const listingCards = searchResultsContainer(page).locator(selectors.listingCard);
+      const listingCards = searchResultsContainer(page).locator(
+        selectors.listingCard
+      );
       const cardCount = await listingCards.count();
 
       if (cardCount > 0) {
@@ -491,7 +526,10 @@ test.describe("Map Interactions Edge Cases (Stories 9-12)", () => {
 
       const mapAvailable = await isMapAvailable(page);
       if (!mapAvailable) {
-        test.skip(true, "Map not available (WebGL unavailable in headless mode)");
+        test.skip(
+          true,
+          "Map not available (WebGL unavailable in headless mode)"
+        );
         return;
       }
 
@@ -575,15 +613,21 @@ test.describe("Map Interactions Edge Cases (Stories 9-12)", () => {
       // (larger radius at higher zoom). If it is an expression (interpolate), the
       // expression itself is the same at both zoom levels (Mapbox evaluates it
       // dynamically), so we verify the expression contains zoom-based interpolation.
-      if (typeof radiusAtZoom12 === "number" && typeof radiusAtZoom16 === "number") {
+      if (
+        typeof radiusAtZoom12 === "number" &&
+        typeof radiusAtZoom16 === "number"
+      ) {
         expect(radiusAtZoom16).toBeGreaterThan(radiusAtZoom12);
       } else {
         // Both should be the same expression (zoom-based interpolation)
         // Verify the expression structure mentions "interpolate" or "zoom"
         const expressionStr =
-          typeof radiusAtZoom12 === "string" ? radiusAtZoom12 : String(radiusAtZoom12);
+          typeof radiusAtZoom12 === "string"
+            ? radiusAtZoom12
+            : String(radiusAtZoom12);
         const hasZoomInterpolation =
-          expressionStr.includes("interpolate") || expressionStr.includes("zoom");
+          expressionStr.includes("interpolate") ||
+          expressionStr.includes("zoom");
         if (hasZoomInterpolation) {
           // Expression-based radius confirmed -- Mapbox will scale at runtime
           expect(hasZoomInterpolation).toBe(true);
@@ -605,7 +649,10 @@ test.describe("Map Interactions Edge Cases (Stories 9-12)", () => {
 
       const mapAvailable = await isMapAvailable(page);
       if (!mapAvailable) {
-        test.skip(true, "Map not available (WebGL unavailable in headless mode)");
+        test.skip(
+          true,
+          "Map not available (WebGL unavailable in headless mode)"
+        );
         return;
       }
 
@@ -617,7 +664,8 @@ test.describe("Map Interactions Edge Cases (Stories 9-12)", () => {
       if (markerCount === 0) {
         test.info().annotations.push({
           type: "skip-reason",
-          description: "No markers rendered -- cannot verify coordinate exposure.",
+          description:
+            "No markers rendered -- cannot verify coordinate exposure.",
         });
         return;
       }
@@ -628,7 +676,9 @@ test.describe("Map Interactions Edge Cases (Stories 9-12)", () => {
         // Pattern for coordinates with 6+ decimal places (e.g., 37.761234 or -122.421234)
         const coordPattern = /-?\d{1,3}\.\d{6,}/;
 
-        const markers = Array.from(document.querySelectorAll(".maplibregl-marker"));
+        const markers = Array.from(
+          document.querySelectorAll(".maplibregl-marker")
+        );
         const exposedCoords: string[] = [];
 
         for (const marker of markers) {
@@ -644,10 +694,14 @@ test.describe("Map Interactions Edge Cases (Stories 9-12)", () => {
           }
 
           // Check inner data attributes (excluding style/transform)
-          const innerElements = marker.querySelectorAll("[data-lat], [data-lng], [data-latitude], [data-longitude]");
+          const innerElements = marker.querySelectorAll(
+            "[data-lat], [data-lng], [data-latitude], [data-longitude]"
+          );
           for (const el of Array.from(innerElements)) {
-            const lat = el.getAttribute("data-lat") || el.getAttribute("data-latitude");
-            const lng = el.getAttribute("data-lng") || el.getAttribute("data-longitude");
+            const lat =
+              el.getAttribute("data-lat") || el.getAttribute("data-latitude");
+            const lng =
+              el.getAttribute("data-lng") || el.getAttribute("data-longitude");
             if (lat && coordPattern.test(lat)) {
               exposedCoords.push(`inner data-lat="${lat}"`);
             }
@@ -676,7 +730,9 @@ test.describe("Map Interactions Edge Cases (Stories 9-12)", () => {
       if ((await popup.count()) > 0) {
         const popupCoordExposure = await page.evaluate(() => {
           const coordPairPattern = /-?\d{1,3}\.\d{6,}\s*,\s*-?\d{1,3}\.\d{6,}/;
-          const popups = Array.from(document.querySelectorAll(".maplibregl-popup"));
+          const popups = Array.from(
+            document.querySelectorAll(".maplibregl-popup")
+          );
           const exposed: string[] = [];
 
           for (const popup of popups) {
@@ -701,14 +757,18 @@ test.describe("Map Interactions Edge Cases (Stories 9-12)", () => {
       page,
     }) => {
       // Navigate with a named location query and tight bounds around Mission District
-      const missionBounds = "minLat=37.75&maxLat=37.77&minLng=-122.43&maxLng=-122.41";
+      const missionBounds =
+        "minLat=37.75&maxLat=37.77&minLng=-122.43&maxLng=-122.41";
       const searchUrl = `/search?q=Mission+District&${missionBounds}`;
 
       await waitForSearchPage(page, searchUrl);
 
       const mapAvailable = await isMapAvailable(page);
       if (!mapAvailable) {
-        test.skip(true, "Map not available (WebGL unavailable in headless mode)");
+        test.skip(
+          true,
+          "Map not available (WebGL unavailable in headless mode)"
+        );
         return;
       }
 
@@ -719,7 +779,9 @@ test.describe("Map Interactions Edge Cases (Stories 9-12)", () => {
       }
 
       // Turn "Search as I move" toggle OFF so panning does not auto-update URL
-      const toggle = page.locator('button[role="switch"]').filter({ hasText: /search as i move/i });
+      const toggle = page
+        .locator('button[role="switch"]')
+        .filter({ hasText: /search as i move/i });
       const toggleCount = await toggle.count();
 
       if (toggleCount === 0) {
@@ -733,15 +795,26 @@ test.describe("Map Interactions Edge Cases (Stories 9-12)", () => {
         // Use force:true because a location-warning banner may overlay the toggle
         try {
           await toggle.first().click({ force: true });
-          await expect(toggle.first()).toHaveAttribute("aria-checked", "false", { timeout: 5_000 });
+          await expect(toggle.first()).toHaveAttribute(
+            "aria-checked",
+            "false",
+            { timeout: 5_000 }
+          );
         } catch {
           // Toggle click failed — try scrolling to it first
           try {
             await toggle.first().scrollIntoViewIfNeeded();
             await toggle.first().click({ force: true });
-            await expect(toggle.first()).toHaveAttribute("aria-checked", "false", { timeout: 5_000 });
+            await expect(toggle.first()).toHaveAttribute(
+              "aria-checked",
+              "false",
+              { timeout: 5_000 }
+            );
           } catch {
-            test.skip(true, "Could not toggle off 'Search as I move' (UI overlay issue in CI)");
+            test.skip(
+              true,
+              "Could not toggle off 'Search as I move' (UI overlay issue in CI)"
+            );
             return;
           }
         }
@@ -784,12 +857,19 @@ test.describe("Map Interactions Edge Cases (Stories 9-12)", () => {
       // It may appear as role="alert" or role="status" with location name reference.
       const conflictBanner = page.getByRole("alert");
       const statusBanner = page.getByRole("status");
-      const searchAreaButton = page.getByRole("button", { name: /search this area/i });
+      const searchAreaButton = page.getByRole("button", {
+        name: /search this area/i,
+      });
 
       let conflictDetected = false;
 
       // Check for alert-type conflict banner
-      if (await conflictBanner.first().isVisible().catch(() => false)) {
+      if (
+        await conflictBanner
+          .first()
+          .isVisible()
+          .catch(() => false)
+      ) {
         const bannerText = await conflictBanner.first().textContent();
         if (
           bannerText?.toLowerCase().includes("mission") ||
@@ -801,12 +881,21 @@ test.describe("Map Interactions Edge Cases (Stories 9-12)", () => {
       }
 
       // Check for status-type banner (e.g., "Search this area" with count)
-      if (!conflictDetected && await statusBanner.first().isVisible().catch(() => false)) {
+      if (
+        !conflictDetected &&
+        (await statusBanner
+          .first()
+          .isVisible()
+          .catch(() => false))
+      ) {
         conflictDetected = true;
       }
 
       // Check if "Search this area" button appeared (indicator of map/query mismatch)
-      if (!conflictDetected && await searchAreaButton.isVisible().catch(() => false)) {
+      if (
+        !conflictDetected &&
+        (await searchAreaButton.isVisible().catch(() => false))
+      ) {
         conflictDetected = true;
       }
 

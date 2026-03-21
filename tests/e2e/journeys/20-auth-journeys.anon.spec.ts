@@ -19,7 +19,9 @@ test.describe("J7: Login Page (Unauthenticated)", () => {
     await page.goto("/login");
     await page.waitForLoadState("domcontentloaded");
     // Wait for the login form to render (Suspense boundary + hydration)
-    await expect(page.getByRole('heading', { name: /log in|sign in|welcome back/i })).toBeVisible({ timeout: 30000 });
+    await expect(
+      page.getByRole("heading", { name: /log in|sign in|welcome back/i })
+    ).toBeVisible({ timeout: 30000 });
 
     // Should have email field
     const emailField = page
@@ -30,7 +32,7 @@ test.describe("J7: Login Page (Unauthenticated)", () => {
 
     // Should have password field
     const passwordField = page
-      .getByLabel('Password', { exact: true })
+      .getByLabel("Password", { exact: true })
       .or(page.locator('input[type="password"]'));
     await expect(passwordField.first()).toBeVisible();
 
@@ -50,7 +52,9 @@ test.describe("J7: Login Page (Unauthenticated)", () => {
     await page.goto("/login");
     await page.waitForLoadState("domcontentloaded");
     // Wait for the login form to render (Suspense boundary + hydration)
-    await expect(page.getByRole('heading', { name: /log in|sign in|welcome back/i })).toBeVisible({ timeout: 30000 });
+    await expect(
+      page.getByRole("heading", { name: /log in|sign in|welcome back/i })
+    ).toBeVisible({ timeout: 30000 });
 
     const signupLink = page
       .getByRole("link", { name: /sign ?up|create|register/i })
@@ -65,7 +69,9 @@ test.describe("J8: Signup Page (Unauthenticated)", () => {
     await page.goto("/signup");
     await page.waitForLoadState("domcontentloaded");
     // Wait for the signup form to render (Suspense boundary + hydration)
-    await expect(page.getByRole('heading', { name: /sign up|create.*account|register/i })).toBeVisible({ timeout: 30000 });
+    await expect(
+      page.getByRole("heading", { name: /sign up|create.*account|register|join/i })
+    ).toBeVisible({ timeout: 30000 });
 
     // Should have email field
     const emailField = page
@@ -75,7 +81,7 @@ test.describe("J8: Signup Page (Unauthenticated)", () => {
 
     // Should have password field
     const passwordField = page
-      .getByLabel('Password', { exact: true })
+      .getByLabel("Password", { exact: true })
       .or(page.locator('input[type="password"]'));
     await expect(passwordField.first()).toBeVisible();
 

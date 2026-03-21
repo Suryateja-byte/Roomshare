@@ -33,7 +33,15 @@ export function SearchResultsLoadingWrapper({
   const filterParamsKey = useMemo(() => {
     const filterOnly = new URLSearchParams(searchParams.toString());
     // Strip geographic/viewport params — focus should not move on map pan
-    for (const k of ['minLat', 'maxLat', 'minLng', 'maxLng', 'lat', 'lng', 'zoom']) {
+    for (const k of [
+      "minLat",
+      "maxLat",
+      "minLng",
+      "maxLng",
+      "lat",
+      "lng",
+      "zoom",
+    ]) {
       filterOnly.delete(k);
     }
     filterOnly.sort();
@@ -64,10 +72,7 @@ export function SearchResultsLoadingWrapper({
   }, [isPending]);
 
   return (
-    <div
-      className="relative"
-      aria-busy={isPending}
-    >
+    <div className="relative" aria-busy={isPending}>
       {/* Explicit SR announcement for result count changes */}
       <span className="sr-only" aria-live="polite" role="status">
         {srAnnouncement}
@@ -88,9 +93,7 @@ export function SearchResultsLoadingWrapper({
       )}
 
       {/* Content - always fully visible for accessibility/automation */}
-      <div>
-        {children}
-      </div>
+      <div>{children}</div>
 
       {/* Translucent overlay dims content during loading without hiding children */}
       {isPending && (

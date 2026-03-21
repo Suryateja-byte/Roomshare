@@ -23,13 +23,14 @@ function makeFeature(
     housenumber?: string;
     extent?: [number, number, number, number];
     coordinates?: [number, number];
-  } = {},
+  } = {}
 ) {
   return {
     type: "Feature" as const,
     geometry: {
       type: "Point" as const,
-      coordinates: overrides.coordinates ?? ([-97.74, 30.27] as [number, number]),
+      coordinates:
+        overrides.coordinates ?? ([-97.74, 30.27] as [number, number]),
     },
     properties: {
       osm_id: overrides.osm_id ?? 12345,
@@ -117,7 +118,7 @@ describe("searchPhoton", () => {
 describe("buildPlaceName", () => {
   it("uses name only when only name is present", async () => {
     mockFetchWithTimeout.mockResolvedValue(
-      makeResponse([makeFeature({ name: "Central Park" })]),
+      makeResponse([makeFeature({ name: "Central Park" })])
     );
 
     const [result] = await searchPhoton("park");
@@ -127,9 +128,7 @@ describe("buildPlaceName", () => {
 
   it("formats street with housenumber when name is absent", async () => {
     mockFetchWithTimeout.mockResolvedValue(
-      makeResponse([
-        makeFeature({ street: "Main St", housenumber: "123" }),
-      ]),
+      makeResponse([makeFeature({ street: "Main St", housenumber: "123" })])
     );
 
     const [result] = await searchPhoton("main");
@@ -140,8 +139,12 @@ describe("buildPlaceName", () => {
   it("builds city + state + country", async () => {
     mockFetchWithTimeout.mockResolvedValue(
       makeResponse([
-        makeFeature({ city: "Austin", state: "Texas", country: "United States" }),
-      ]),
+        makeFeature({
+          city: "Austin",
+          state: "Texas",
+          country: "United States",
+        }),
+      ])
     );
 
     const [result] = await searchPhoton("austin");
@@ -159,7 +162,7 @@ describe("buildPlaceName", () => {
           state: "California",
           country: "United States",
         }),
-      ]),
+      ])
     );
 
     const [result] = await searchPhoton("sf");
@@ -172,9 +175,7 @@ describe("buildPlaceName", () => {
   });
 
   it("returns 'Unknown location' when no name/street/city/district/state/country fields are present", async () => {
-    mockFetchWithTimeout.mockResolvedValue(
-      makeResponse([makeFeature({})]),
-    );
+    mockFetchWithTimeout.mockResolvedValue(makeResponse([makeFeature({})]));
 
     const [result] = await searchPhoton("?");
 
@@ -191,18 +192,18 @@ describe("inferPlaceType", () => {
     "type '%s' maps to place_type ['place']",
     async (osmType) => {
       mockFetchWithTimeout.mockResolvedValue(
-        makeResponse([makeFeature({ type: osmType })]),
+        makeResponse([makeFeature({ type: osmType })])
       );
 
       const [result] = await searchPhoton("q");
 
       expect(result.place_type).toEqual(["place"]);
-    },
+    }
   );
 
   it("type 'street' maps to place_type ['address']", async () => {
     mockFetchWithTimeout.mockResolvedValue(
-      makeResponse([makeFeature({ type: "street" })]),
+      makeResponse([makeFeature({ type: "street" })])
     );
 
     const [result] = await searchPhoton("q");
@@ -214,19 +215,19 @@ describe("inferPlaceType", () => {
     "type '%s' maps to place_type ['region']",
     async (osmType) => {
       mockFetchWithTimeout.mockResolvedValue(
-        makeResponse([makeFeature({ type: osmType })]),
+        makeResponse([makeFeature({ type: osmType })])
       );
 
       const [result] = await searchPhoton("q");
 
       expect(result.place_type).toEqual(["region"]);
-    },
+    }
   );
 
   it("unknown/null type falls back to place_type ['place']", async () => {
     mockFetchWithTimeout.mockResolvedValue(
       // type is undefined (not set in makeFeature defaults)
-      makeResponse([makeFeature({})]),
+      makeResponse([makeFeature({})])
     );
 
     const [result] = await searchPhoton("q");
@@ -244,7 +245,7 @@ describe("Error handling", () => {
     mockFetchWithTimeout.mockResolvedValue({ ok: false, status: 503 });
 
     await expect(searchPhoton("test")).rejects.toThrow(
-      "Location service is temporarily unavailable",
+      "Location service is temporarily unavailable"
     );
   });
 
@@ -252,7 +253,7 @@ describe("Error handling", () => {
     mockFetchWithTimeout.mockResolvedValue({ ok: false, status: 404 });
 
     await expect(searchPhoton("test")).rejects.toThrow(
-      "Failed to fetch suggestions",
+      "Failed to fetch suggestions"
     );
   });
 

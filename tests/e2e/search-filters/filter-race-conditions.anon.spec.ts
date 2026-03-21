@@ -69,10 +69,12 @@ test.describe("Filter Race Conditions", () => {
 
     // Wait for modal to close and URL to update
     await expect(filterDialog(page)).not.toBeVisible({ timeout: 30_000 });
-    await expect.poll(
-      () => page.url().includes("amenities=Wifi"),
-      { timeout: 30_000, message: "URL to contain amenities=Wifi" },
-    ).toBe(true);
+    await expect
+      .poll(() => page.url().includes("amenities=Wifi"), {
+        timeout: 30_000,
+        message: "URL to contain amenities=Wifi",
+      })
+      .toBe(true);
 
     // Verify URL contains amenities=Wifi
     expect(page.url()).toContain("amenities=Wifi");
@@ -113,10 +115,12 @@ test.describe("Filter Race Conditions", () => {
     await expect(filterDialog(page)).not.toBeVisible({ timeout: 30_000 });
 
     // Poll for the specific param rather than generic URL-changed assertion
-    await expect.poll(
-      () => page.url().includes("amenities=Wifi"),
-      { timeout: 30_000, message: "URL to contain amenities=Wifi" },
-    ).toBe(true);
+    await expect
+      .poll(() => page.url().includes("amenities=Wifi"), {
+        timeout: 30_000,
+        message: "URL to contain amenities=Wifi",
+      })
+      .toBe(true);
 
     // Verify amenities parameter is present
     expect(page.url()).toContain("amenities=Wifi");
@@ -139,9 +143,14 @@ test.describe("Filter Race Conditions", () => {
     const loadMoreButton = page.getByRole("button", {
       name: /Show more places/i,
     });
-    const loadMoreVisible = await loadMoreButton.isVisible({ timeout: 5_000 }).catch(() => false);
+    const loadMoreVisible = await loadMoreButton
+      .isVisible({ timeout: 5_000 })
+      .catch(() => false);
     if (!loadMoreVisible) {
-      test.skip(true, "Load more button not visible (need >12 initial results)");
+      test.skip(
+        true,
+        "Load more button not visible (need >12 initial results)"
+      );
       return;
     }
     await loadMoreButton.click();
@@ -226,10 +235,12 @@ test.describe("Filter Race Conditions", () => {
     await expect(filterDialog(page)).not.toBeVisible({ timeout: 30_000 });
 
     // Wait for URL to update via soft navigation
-    await expect.poll(
-      () => page.url().includes("amenities=Wifi"),
-      { timeout: 30_000, message: "URL to contain amenities=Wifi" },
-    ).toBe(true);
+    await expect
+      .poll(() => page.url().includes("amenities=Wifi"), {
+        timeout: 30_000,
+        message: "URL to contain amenities=Wifi",
+      })
+      .toBe(true);
 
     // Verify URL contains amenities=Wifi
     expect(page.url()).toContain("amenities=Wifi");
@@ -257,9 +268,14 @@ test.describe("Filter Race Conditions", () => {
     const loadMoreButton = page.getByRole("button", {
       name: /Show more places/i,
     });
-    const loadMoreVisible = await loadMoreButton.isVisible({ timeout: 5_000 }).catch(() => false);
+    const loadMoreVisible = await loadMoreButton
+      .isVisible({ timeout: 5_000 })
+      .catch(() => false);
     if (!loadMoreVisible) {
-      test.skip(true, "Load more button not visible (need >12 initial results)");
+      test.skip(
+        true,
+        "Load more button not visible (need >12 initial results)"
+      );
       return;
     }
 
@@ -313,10 +329,12 @@ test.describe("Filter Race Conditions", () => {
 
     // Apply filters
     await applyFilters(page);
-    await expect.poll(
-      () => page.url().includes("amenities=Wifi"),
-      { timeout: 30_000, message: "URL to contain amenities=Wifi" },
-    ).toBe(true);
+    await expect
+      .poll(() => page.url().includes("amenities=Wifi"), {
+        timeout: 30_000,
+        message: "URL to contain amenities=Wifi",
+      })
+      .toBe(true);
 
     // Let apply navigation fully settle before next goto
     await waitForUrlStable(page);

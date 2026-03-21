@@ -15,7 +15,15 @@
  * Run: pnpm playwright test tests/e2e/search-error-resilience.anon.spec.ts
  */
 
-import { test, expect, SF_BOUNDS, selectors, timeouts, tags, searchResultsContainer } from "./helpers/test-utils";
+import {
+  test,
+  expect,
+  SF_BOUNDS,
+  selectors,
+  timeouts,
+  tags,
+  searchResultsContainer,
+} from "./helpers/test-utils";
 
 const boundsQS = `minLat=${SF_BOUNDS.minLat}&maxLat=${SF_BOUNDS.maxLat}&minLng=${SF_BOUNDS.minLng}&maxLng=${SF_BOUNDS.maxLng}`;
 const SEARCH_URL = `/search?${boundsQS}`;
@@ -69,7 +77,7 @@ test.describe("Group 1: Zero Results State", () => {
     page,
   }) => {
     await page.goto(
-      `/search?q=xyznonexistent123absolutelynotareallocation&${boundsQS}`,
+      `/search?q=xyznonexistent123absolutelynotareallocation&${boundsQS}`
     );
     await page.waitForLoadState("domcontentloaded");
     await page.waitForLoadState("domcontentloaded").catch(() => {});
@@ -77,13 +85,17 @@ test.describe("Group 1: Zero Results State", () => {
     // The zero results heading should appear — scope to visible container
     // to avoid picking the hidden mobile/desktop duplicate
     const container = searchResultsContainer(page);
-    const noMatchesHeading = container.locator('h2:has-text("No matches found")');
-    const noListingsHeading = container.locator('h3:has-text("No listings found")');
+    const noMatchesHeading = container.locator(
+      'h2:has-text("No matches found")'
+    );
+    const noListingsHeading = container.locator(
+      'h3:has-text("No listings found")'
+    );
     const noExactHeading = container.locator('h3:has-text("No exact matches")');
 
     // Wait for SSR results to settle. One of the zero-result headings should appear.
     await expect(
-      noMatchesHeading.or(noListingsHeading).or(noExactHeading).first(),
+      noMatchesHeading.or(noListingsHeading).or(noExactHeading).first()
     ).toBeVisible({ timeout: timeouts.navigation });
   });
 
@@ -91,18 +103,22 @@ test.describe("Group 1: Zero Results State", () => {
     page,
   }) => {
     await page.goto(
-      `/search?q=xyznonexistent123absolutelynotareallocation&${boundsQS}`,
+      `/search?q=xyznonexistent123absolutelynotareallocation&${boundsQS}`
     );
     await page.waitForLoadState("domcontentloaded");
     await page.waitForLoadState("domcontentloaded").catch(() => {});
 
     // Wait for the no-results state to render — scope to visible container
     const container = searchResultsContainer(page);
-    const noMatchesHeading = container.locator('h2:has-text("No matches found")');
-    const noListingsHeading = container.locator('h3:has-text("No listings found")');
+    const noMatchesHeading = container.locator(
+      'h2:has-text("No matches found")'
+    );
+    const noListingsHeading = container.locator(
+      'h3:has-text("No listings found")'
+    );
     const noExactHeading = container.locator('h3:has-text("No exact matches")');
     await expect(
-      noMatchesHeading.or(noListingsHeading).or(noExactHeading).first(),
+      noMatchesHeading.or(noListingsHeading).or(noExactHeading).first()
     ).toBeVisible({ timeout: timeouts.navigation });
 
     // Should show guidance text: either suggestion buttons, "Try a different area",
@@ -117,18 +133,22 @@ test.describe("Group 1: Zero Results State", () => {
     page,
   }) => {
     await page.goto(
-      `/search?q=xyznonexistent123absolutelynotareallocation&${boundsQS}`,
+      `/search?q=xyznonexistent123absolutelynotareallocation&${boundsQS}`
     );
     await page.waitForLoadState("domcontentloaded");
     await page.waitForLoadState("domcontentloaded").catch(() => {});
 
     // Wait for zero-results state — scope to visible container
     const container = searchResultsContainer(page);
-    const noMatchesHeading = container.locator('h2:has-text("No matches found")');
-    const noListingsHeading = container.locator('h3:has-text("No listings found")');
+    const noMatchesHeading = container.locator(
+      'h2:has-text("No matches found")'
+    );
+    const noListingsHeading = container.locator(
+      'h3:has-text("No listings found")'
+    );
     const noExactHeading = container.locator('h3:has-text("No exact matches")');
     await expect(
-      noMatchesHeading.or(noListingsHeading).or(noExactHeading).first(),
+      noMatchesHeading.or(noListingsHeading).or(noExactHeading).first()
     ).toBeVisible({ timeout: timeouts.navigation });
 
     // Look for any "Clear" action (Clear filters, Clear all filters, Clear all)
@@ -166,10 +186,16 @@ test.describe("Group 1: Zero Results State", () => {
 
     // Should show zero results or a very small number — scope to visible container
     const container = searchResultsContainer(page);
-    const noMatchesHeading = container.locator('h2:has-text("No matches found")');
-    const noListingsHeading = container.locator('h3:has-text("No listings found")');
+    const noMatchesHeading = container.locator(
+      'h2:has-text("No matches found")'
+    );
+    const noListingsHeading = container.locator(
+      'h3:has-text("No listings found")'
+    );
     const noExactHeading = container.locator('h3:has-text("No exact matches")');
-    const zeroPlaces = container.locator('h1').filter({ hasText: /^0\s+place/i });
+    const zeroPlaces = container
+      .locator("h1")
+      .filter({ hasText: /^0\s+place/i });
 
     // Either the zero-results heading or the "0 places" count should appear
     await expect(
@@ -177,12 +203,12 @@ test.describe("Group 1: Zero Results State", () => {
         .or(noListingsHeading)
         .or(noExactHeading)
         .or(zeroPlaces)
-        .first(),
+        .first()
     ).toBeVisible({ timeout: timeouts.navigation });
 
     // Page should not have crashed (no error boundary)
     const errorBoundary = page.locator(
-      'h1:has-text("Unable to load search results")',
+      'h1:has-text("Unable to load search results")'
     );
     await expect(errorBoundary).not.toBeVisible();
   });
@@ -211,7 +237,9 @@ test.describe("Group 2: Client-Side Error Recovery", () => {
 
     // Wait for initial results to render
     const listings = page.locator('a[href^="/listings/"]');
-    await expect(listings.first()).toBeAttached({ timeout: timeouts.navigation });
+    await expect(listings.first()).toBeAttached({
+      timeout: timeouts.navigation,
+    });
 
     // Now intercept subsequent RSC fetch requests (GET with RSC header)
     // and server action requests (POST) to simulate server failure
@@ -247,7 +275,10 @@ test.describe("Group 2: Client-Side Error Recovery", () => {
 
     // Trigger a client-side navigation by changing the sort parameter.
     // This is more reliable than dragging the map in headless mode.
-    const sortSelect = page.locator("select").filter({ hasText: /sort/i }).first();
+    const sortSelect = page
+      .locator("select")
+      .filter({ hasText: /sort/i })
+      .first();
     const sortButton = page
       .getByRole("combobox")
       .or(page.getByRole("button", { name: /sort/i }))
@@ -285,10 +316,12 @@ test.describe("Group 2: Client-Side Error Recovery", () => {
     await page.waitForLoadState("domcontentloaded").catch(() => {});
 
     const errorBoundary = page.locator(
-      'h1:has-text("Unable to load search results")',
+      'h1:has-text("Unable to load search results")'
     );
     const genericError = page.locator('[role="alert"]');
-    const errorOverlay = page.locator("#__next-build-error, #__next-route-error");
+    const errorOverlay = page.locator(
+      "#__next-build-error, #__next-route-error"
+    );
 
     // At least verify the page did not completely crash (still has content)
     const bodyContent = await page.locator("body").textContent();
@@ -305,7 +338,9 @@ test.describe("Group 2: Client-Side Error Recovery", () => {
     await page.goto(SEARCH_URL);
     await page.waitForLoadState("domcontentloaded");
     const listings = page.locator('a[href^="/listings/"]');
-    await expect(listings.first()).toBeAttached({ timeout: timeouts.navigation });
+    await expect(listings.first()).toBeAttached({
+      timeout: timeouts.navigation,
+    });
 
     // Set up route interception to force errors
     await page.route("**/search**", async (route) => {
@@ -345,7 +380,9 @@ test.describe("Group 2: Client-Side Error Recovery", () => {
     }
 
     // After recovery, results should be visible again
-    await expect(listings.first()).toBeAttached({ timeout: timeouts.navigation });
+    await expect(listings.first()).toBeAttached({
+      timeout: timeouts.navigation,
+    });
     const count = await listings.count();
     expect(count).toBeGreaterThanOrEqual(1);
   });
@@ -361,7 +398,9 @@ test.describe("Group 2: Client-Side Error Recovery", () => {
     await page.goto(SEARCH_URL);
     await page.waitForLoadState("domcontentloaded");
     const listings = page.locator('a[href^="/listings/"]');
-    await expect(listings.first()).toBeAttached({ timeout: timeouts.navigation });
+    await expect(listings.first()).toBeAttached({
+      timeout: timeouts.navigation,
+    });
 
     // Set up flaky interception (50% failure rate on RSC fetches)
     await page.route("**/search**", async (route) => {
@@ -400,7 +439,9 @@ test.describe("Group 2: Client-Side Error Recovery", () => {
     await page.goto(SEARCH_URL);
     await page.waitForLoadState("domcontentloaded");
     const listings = page.locator('a[href^="/listings/"]');
-    await expect(listings.first()).toBeAttached({ timeout: timeouts.navigation });
+    await expect(listings.first()).toBeAttached({
+      timeout: timeouts.navigation,
+    });
 
     // Add a 5s delay to the map-listings API to simulate slow network
     await page.route("**/api/map-listings**", async (route) => {
@@ -446,7 +487,7 @@ test.describe("Group 3: Rate Limit UI", () => {
 
     // Fire burst requests to try to trigger rate limiting on the API
     const responses = await Promise.all(
-      Array.from({ length: BURST_COUNT }, () => page.request.get(url)),
+      Array.from({ length: BURST_COUNT }, () => page.request.get(url))
     );
 
     const statuses = responses.map((r) => r.status());
@@ -470,7 +511,7 @@ test.describe("Group 3: Rate Limit UI", () => {
       // Rate limiter may not be configured in dev -- soft pass
       console.warn(
         "Rate limiter did not trigger after burst requests. " +
-          "Verify UPSTASH_REDIS_REST_URL is set.",
+          "Verify UPSTASH_REDIS_REST_URL is set."
       );
     }
   });
@@ -483,7 +524,7 @@ test.describe("Group 3: Rate Limit UI", () => {
     const navigations: Promise<unknown>[] = [];
     for (let i = 0; i < 50; i++) {
       navigations.push(
-        page.request.get(`/search?${boundsQS}&_=${i}`).catch(() => null),
+        page.request.get(`/search?${boundsQS}&_=${i}`).catch(() => null)
       );
     }
     await Promise.all(navigations);
@@ -492,20 +533,23 @@ test.describe("Group 3: Rate Limit UI", () => {
     await page.goto(SEARCH_URL);
     await page.waitForLoadState("domcontentloaded");
 
-    const rateLimitHeading = page.locator(
-      'h1:has-text("Too Many Requests")',
-    );
+    const rateLimitHeading = page.locator('h1:has-text("Too Many Requests")');
     const isRateLimited = await rateLimitHeading
       .isVisible({ timeout: 5_000 })
       .catch(() => false);
 
     if (isRateLimited) {
       // Verify retry guidance is shown
-      const retryText = page.getByText(/try again in|wait.*moment|please wait/i);
+      const retryText = page.getByText(
+        /try again in|wait.*moment|please wait/i
+      );
       await expect(retryText).toBeVisible();
     } else {
       // Rate limiter not configured (no Redis) -- skip this test
-      test.skip(true, "Rate limiter not configured (no Redis) — rate limit page did not appear");
+      test.skip(
+        true,
+        "Rate limiter not configured (no Redis) — rate limit page did not appear"
+      );
       return;
     }
   });
@@ -517,9 +561,7 @@ test.describe("Group 3: Rate Limit UI", () => {
     await page.goto(SEARCH_URL);
     await page.waitForLoadState("domcontentloaded");
 
-    const rateLimitHeading = page.locator(
-      'h1:has-text("Too Many Requests")',
-    );
+    const rateLimitHeading = page.locator('h1:has-text("Too Many Requests")');
     const isRateLimited = await rateLimitHeading
       .isVisible({ timeout: 5_000 })
       .catch(() => false);
@@ -538,7 +580,10 @@ test.describe("Group 3: Rate Limit UI", () => {
       expect(bodyText!.length).toBeGreaterThan(20);
     } else {
       // Rate limiter not configured (no Redis) -- skip this test
-      test.skip(true, "Rate limiter not configured (no Redis) — rate limit page did not appear");
+      test.skip(
+        true,
+        "Rate limiter not configured (no Redis) — rate limit page did not appear"
+      );
       return;
     }
   });
@@ -561,10 +606,7 @@ test.describe("Group 4: Error Boundary", () => {
       const request = route.request();
       // For document requests (initial page load), let Next.js handle but
       // for RSC fetches, return errors that trigger the error boundary
-      if (
-        request.method() === "GET" &&
-        request.headers()["rsc"] === "1"
-      ) {
+      if (request.method() === "GET" && request.headers()["rsc"] === "1") {
         await route.fulfill({
           status: 500,
           contentType: "text/plain",
@@ -583,7 +625,9 @@ test.describe("Group 4: Error Boundary", () => {
     // navigation that will fail.
     await page.evaluate(() => {
       const link = document.createElement("a");
-      link.href = "/search?sort=price_asc&" + new URLSearchParams(window.location.search).toString();
+      link.href =
+        "/search?sort=price_asc&" +
+        new URLSearchParams(window.location.search).toString();
       document.body.appendChild(link);
       link.click();
     });
@@ -592,7 +636,7 @@ test.describe("Group 4: Error Boundary", () => {
 
     // Check for the error boundary heading
     const errorBoundary = page.locator(
-      'h1:has-text("Unable to load search results")',
+      'h1:has-text("Unable to load search results")'
     );
     const isErrorBoundary = await errorBoundary
       .isVisible({ timeout: 3_000 })
@@ -621,10 +665,7 @@ test.describe("Group 4: Error Boundary", () => {
     // We'll force the error boundary by making the RSC payload invalid.
     await page.route("**/search**", async (route) => {
       const request = route.request();
-      if (
-        request.method() === "GET" &&
-        request.headers()["rsc"] === "1"
-      ) {
+      if (request.method() === "GET" && request.headers()["rsc"] === "1") {
         // Return malformed RSC payload
         await route.fulfill({
           status: 200,
@@ -653,7 +694,7 @@ test.describe("Group 4: Error Boundary", () => {
 
     // Check if error boundary appeared
     const errorBoundary = page.locator(
-      'h1:has-text("Unable to load search results")',
+      'h1:has-text("Unable to load search results")'
     );
     const isErrorBoundary = await errorBoundary
       .isVisible({ timeout: 3_000 })
@@ -703,7 +744,7 @@ test.describe("Group 4: Error Boundary", () => {
     // Even if the error boundary appears, URL params should remain intact
     // (error.tsx calls reset() which retries with the same URL)
     const errorBoundary = page.locator(
-      'h1:has-text("Unable to load search results")',
+      'h1:has-text("Unable to load search results")'
     );
     const isErrorBoundary = await errorBoundary
       .isVisible({ timeout: 3_000 })
@@ -712,7 +753,7 @@ test.describe("Group 4: Error Boundary", () => {
     // Regardless of error state, URL should still have the original params
     const afterUrl = new URL(page.url());
     expect(afterUrl.searchParams.get("minLat")).toBe(
-      SF_BOUNDS.minLat.toString(),
+      SF_BOUNDS.minLat.toString()
     );
   });
 });
@@ -729,7 +770,9 @@ test.describe("Group 5: Network Resilience", () => {
     await page.goto(SEARCH_URL);
     await page.waitForLoadState("domcontentloaded");
     const listings = page.locator('a[href^="/listings/"]');
-    await expect(listings.first()).toBeAttached({ timeout: timeouts.navigation });
+    await expect(listings.first()).toBeAttached({
+      timeout: timeouts.navigation,
+    });
 
     // Go offline
     await network.goOffline();
@@ -745,7 +788,7 @@ test.describe("Group 5: Network Resilience", () => {
 
     // Check for offline indicator, error message, or stale content
     const offlineIndicator = page.getByText(
-      /offline|no internet|connection lost|network error|failed to fetch/i,
+      /offline|no internet|connection lost|network error|failed to fetch/i
     );
     const errorAlert = page.locator('[role="alert"]');
     await offlineIndicator
@@ -761,7 +804,10 @@ test.describe("Group 5: Network Resilience", () => {
     if (!bodyContent || bodyContent.length < 10) {
       // Offline simulation did not produce visible feedback -- skip
       await network.goOnline();
-      test.skip(true, "Offline simulation did not produce visible feedback in this environment");
+      test.skip(
+        true,
+        "Offline simulation did not produce visible feedback in this environment"
+      );
       return;
     }
 
@@ -806,7 +852,9 @@ test.describe("Group 5: Network Resilience", () => {
     await page.goto(SEARCH_URL);
     await page.waitForLoadState("domcontentloaded");
     const listings = page.locator('a[href^="/listings/"]');
-    await expect(listings.first()).toBeAttached({ timeout: timeouts.navigation });
+    await expect(listings.first()).toBeAttached({
+      timeout: timeouts.navigation,
+    });
 
     // Go offline briefly
     await network.goOffline();
@@ -819,7 +867,9 @@ test.describe("Group 5: Network Resilience", () => {
     await page.waitForLoadState("domcontentloaded");
 
     // Results should be visible again after network recovery
-    await expect(listings.first()).toBeAttached({ timeout: timeouts.navigation });
+    await expect(listings.first()).toBeAttached({
+      timeout: timeouts.navigation,
+    });
     const count = await listings.count();
     expect(count).toBeGreaterThanOrEqual(1);
   });
@@ -833,9 +883,7 @@ test.describe("Group 6: Invalid Parameters", () => {
     page,
   }) => {
     const sqlInjection = encodeURIComponent("'; DROP TABLE listings;--");
-    const response = await page.goto(
-      `/search?q=${sqlInjection}&${boundsQS}`,
-    );
+    const response = await page.goto(`/search?q=${sqlInjection}&${boundsQS}`);
 
     // Must not return 500 or crash
     expect(response?.status()).not.toBe(500);
@@ -848,7 +896,7 @@ test.describe("Group 6: Invalid Parameters", () => {
 
     // The error boundary should NOT appear for a mere bad query
     const errorBoundary = page.locator(
-      'h1:has-text("Unable to load search results")',
+      'h1:has-text("Unable to load search results")'
     );
     await expect(errorBoundary).not.toBeVisible();
   });
@@ -858,7 +906,7 @@ test.describe("Group 6: Invalid Parameters", () => {
   }) => {
     // Negative min price, extremely high max price
     const response = await page.goto(
-      `/search?minPrice=-1&maxPrice=999999999&${boundsQS}`,
+      `/search?minPrice=-1&maxPrice=999999999&${boundsQS}`
     );
 
     // Must not return 500
@@ -871,7 +919,7 @@ test.describe("Group 6: Invalid Parameters", () => {
 
     // Error boundary should not appear
     const errorBoundary = page.locator(
-      'h1:has-text("Unable to load search results")',
+      'h1:has-text("Unable to load search results")'
     );
     await expect(errorBoundary).not.toBeVisible();
 
@@ -879,7 +927,9 @@ test.describe("Group 6: Invalid Parameters", () => {
     const heading = page
       .locator("#search-results-heading")
       .or(page.locator('h2:has-text("No matches found")'));
-    await expect(heading.first()).toBeAttached({ timeout: timeouts.navigation });
+    await expect(heading.first()).toBeAttached({
+      timeout: timeouts.navigation,
+    });
   });
 
   test(`${tags.anon} 6.3 - Invalid bounds redirect or show error gracefully`, async ({
@@ -887,7 +937,7 @@ test.describe("Group 6: Invalid Parameters", () => {
   }) => {
     // Completely invalid bounds (minLat > maxLat, out of range)
     const response = await page.goto(
-      `/search?minLat=999&maxLat=-999&minLng=999&maxLng=-999`,
+      `/search?minLat=999&maxLat=-999&minLng=999&maxLng=-999`
     );
 
     // Must not return 500
@@ -921,31 +971,25 @@ test.describe("Group 7: Load-More Error States", () => {
 
     // Wait for listings to appear
     const listings = page.locator('a[href^="/listings/"]');
-    await expect(listings.first()).toBeAttached({ timeout: timeouts.navigation });
+    await expect(listings.first()).toBeAttached({
+      timeout: timeouts.navigation,
+    });
 
     // Check if "Show more places" button exists (requires nextCursor)
-    const loadMoreButton = page.locator(
-      'button:has-text("Show more places")',
-    );
+    const loadMoreButton = page.locator('button:has-text("Show more places")');
     const loadMoreVisible = await loadMoreButton
       .isVisible({ timeout: 5_000 })
       .catch(() => false);
 
     if (!loadMoreVisible) {
-      test.skip(
-        true,
-        "Not enough results for load-more test (no next cursor)",
-      );
+      test.skip(true, "Not enough results for load-more test (no next cursor)");
       return;
     }
 
     // Intercept server action POST requests to simulate failure
     await page.route("**/search**", async (route) => {
       const request = route.request();
-      if (
-        request.method() === "POST" &&
-        request.headers()["next-action"]
-      ) {
+      if (request.method() === "POST" && request.headers()["next-action"]) {
         // Abort the request to simulate network failure
         await route.abort("failed");
       } else {
@@ -958,9 +1002,7 @@ test.describe("Group 7: Load-More Error States", () => {
 
     // Wait for the inline error to appear
     // SearchResultsClient shows: <p class="text-sm text-red-600">...</p>
-    const inlineError = page.locator(
-      '[role="alert"]',
-    );
+    const inlineError = page.locator('[role="alert"]');
     await expect(inlineError.first()).toBeVisible({
       timeout: timeouts.action,
     });
@@ -977,20 +1019,17 @@ test.describe("Group 7: Load-More Error States", () => {
     await page.waitForLoadState("domcontentloaded");
 
     const listings = page.locator('a[href^="/listings/"]');
-    await expect(listings.first()).toBeAttached({ timeout: timeouts.navigation });
+    await expect(listings.first()).toBeAttached({
+      timeout: timeouts.navigation,
+    });
 
-    const loadMoreButton = page.locator(
-      'button:has-text("Show more places")',
-    );
+    const loadMoreButton = page.locator('button:has-text("Show more places")');
     const loadMoreVisible = await loadMoreButton
       .isVisible({ timeout: 5_000 })
       .catch(() => false);
 
     if (!loadMoreVisible) {
-      test.skip(
-        true,
-        "Not enough results for load-more test (no next cursor)",
-      );
+      test.skip(true, "Not enough results for load-more test (no next cursor)");
       return;
     }
 
@@ -1019,7 +1058,7 @@ test.describe("Group 7: Load-More Error States", () => {
 
     // Click "Try again" in the error message
     const tryAgainInline = page.locator(
-      '[role="alert"] button:has-text("Try again")',
+      '[role="alert"] button:has-text("Try again")'
     );
     const tryAgainVisible = await tryAgainInline
       .first()
@@ -1040,9 +1079,7 @@ test.describe("Group 7: Load-More Error States", () => {
       const currentListingCount = await listings.count();
 
       // Either the error cleared or we got more listings
-      expect(
-        !errorStillVisible || currentListingCount > 0,
-      ).toBe(true);
+      expect(!errorStillVisible || currentListingCount > 0).toBe(true);
     }
   });
 
@@ -1055,20 +1092,17 @@ test.describe("Group 7: Load-More Error States", () => {
     await page.waitForLoadState("domcontentloaded");
 
     const listings = page.locator('a[href^="/listings/"]');
-    await expect(listings.first()).toBeAttached({ timeout: timeouts.navigation });
+    await expect(listings.first()).toBeAttached({
+      timeout: timeouts.navigation,
+    });
 
-    const loadMoreButton = page.locator(
-      'button:has-text("Show more places")',
-    );
+    const loadMoreButton = page.locator('button:has-text("Show more places")');
     const loadMoreVisible = await loadMoreButton
       .isVisible({ timeout: 5_000 })
       .catch(() => false);
 
     if (!loadMoreVisible) {
-      test.skip(
-        true,
-        "Not enough results for load-more test (no next cursor)",
-      );
+      test.skip(true, "Not enough results for load-more test (no next cursor)");
       return;
     }
 
@@ -1089,9 +1123,7 @@ test.describe("Group 7: Load-More Error States", () => {
     await loadMoreButton.click();
 
     // The button should show loading state (aria-busy="true" and "Loading..." text)
-    const loadingButton = page.locator(
-      'button[aria-busy="true"]',
-    );
+    const loadingButton = page.locator('button[aria-busy="true"]');
     await expect(loadingButton).toBeVisible({ timeout: 2_000 });
 
     // Button text should change to "Loading..."
@@ -1138,7 +1170,9 @@ test.describe("Group 8: Console Error Monitoring", () => {
 
     // Wait for results to render
     const listings = page.locator('a[href^="/listings/"]');
-    await expect(listings.first()).toBeAttached({ timeout: timeouts.navigation });
+    await expect(listings.first()).toBeAttached({
+      timeout: timeouts.navigation,
+    });
 
     // Interact with the page (scroll, hover over a card)
     await page.mouse.wheel(0, 300);
@@ -1152,23 +1186,19 @@ test.describe("Group 8: Console Error Monitoring", () => {
     await page.waitForLoadState("domcontentloaded").catch(() => {});
 
     // Filter out benign errors
-    const realConsoleErrors = consoleErrors.filter(
-      (e) => !isBenignError(e),
-    );
-    const realExceptions = uncaughtExceptions.filter(
-      (e) => !isBenignError(e),
-    );
+    const realConsoleErrors = consoleErrors.filter((e) => !isBenignError(e));
+    const realExceptions = uncaughtExceptions.filter((e) => !isBenignError(e));
 
     // Assert no critical console errors
     expect(
       realConsoleErrors,
-      `Unexpected console errors: ${realConsoleErrors.join(", ")}`,
+      `Unexpected console errors: ${realConsoleErrors.join(", ")}`
     ).toHaveLength(0);
 
     // Assert no unhandled exceptions
     expect(
       realExceptions,
-      `Unhandled exceptions: ${realExceptions.join(", ")}`,
+      `Unhandled exceptions: ${realExceptions.join(", ")}`
     ).toHaveLength(0);
   });
 
@@ -1197,7 +1227,9 @@ test.describe("Group 8: Console Error Monitoring", () => {
     await page.goto(SEARCH_URL);
     await page.waitForLoadState("domcontentloaded");
     const listings = page.locator('a[href^="/listings/"]');
-    await expect(listings.first()).toBeAttached({ timeout: timeouts.navigation });
+    await expect(listings.first()).toBeAttached({
+      timeout: timeouts.navigation,
+    });
 
     // Force an error via route interception
     await page.route("**/api/map-listings**", async (route) => {
@@ -1225,21 +1257,19 @@ test.describe("Group 8: Console Error Monitoring", () => {
     await page.waitForLoadState("domcontentloaded").catch(() => {});
 
     // Filter out benign errors
-    const realRejections = unhandledRejections.filter(
-      (e) => !isBenignError(e),
-    );
+    const realRejections = unhandledRejections.filter((e) => !isBenignError(e));
     const realPageErrors = pageErrors.filter((e) => !isBenignError(e));
 
     // Should have no unhandled promise rejections
     expect(
       realRejections,
-      `Unhandled rejections: ${realRejections.join(", ")}`,
+      `Unhandled rejections: ${realRejections.join(", ")}`
     ).toHaveLength(0);
 
     // Page errors (uncaught exceptions) should be minimal/benign
     expect(
       realPageErrors,
-      `Page errors: ${realPageErrors.join(", ")}`,
+      `Page errors: ${realPageErrors.join(", ")}`
     ).toHaveLength(0);
   });
 });

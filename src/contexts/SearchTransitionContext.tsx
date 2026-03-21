@@ -56,7 +56,11 @@ export function SearchTransitionProvider({
   const router = useRouter();
 
   // Store last navigation for retry
-  const lastNavRef = useRef<{ url: string; method: "push" | "replace"; scroll: boolean } | null>(null);
+  const lastNavRef = useRef<{
+    url: string;
+    method: "push" | "replace";
+    scroll: boolean;
+  } | null>(null);
 
   // Track slow transitions (>6s)
   useEffect(() => {
@@ -82,7 +86,7 @@ export function SearchTransitionProvider({
         router.push(url, { scroll });
       });
     },
-    [router, startTransition],
+    [router, startTransition]
   );
 
   const replaceWithTransition = useCallback(
@@ -93,7 +97,7 @@ export function SearchTransitionProvider({
         router.replace(url, { scroll });
       });
     },
-    [router, startTransition],
+    [router, startTransition]
   );
 
   // Retry callback — only meaningful during slow transitions
@@ -144,7 +148,7 @@ export function useSearchTransition(): SearchTransitionContextValue {
   const context = useContext(SearchTransitionContext);
   if (!context) {
     throw new Error(
-      "useSearchTransition must be used within SearchTransitionProvider",
+      "useSearchTransition must be used within SearchTransitionProvider"
     );
   }
   return context;

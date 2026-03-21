@@ -24,10 +24,14 @@ describe("getCursorSecret", () => {
     const { getCursorSecret: fn } = require("@/lib/env");
 
     // First call should throw
-    expect(() => fn()).toThrow("[SECURITY] CURSOR_SECRET is required in production");
+    expect(() => fn()).toThrow(
+      "[SECURITY] CURSOR_SECRET is required in production"
+    );
 
     // Second call should ALSO throw (no silent degradation)
-    expect(() => fn()).toThrow("[SECURITY] CURSOR_SECRET is required in production");
+    expect(() => fn()).toThrow(
+      "[SECURITY] CURSOR_SECRET is required in production"
+    );
   });
 
   it("returns empty string in development when CURSOR_SECRET is missing", () => {
@@ -62,8 +66,8 @@ describe("getClientEnv Supabase validation", () => {
     expect(() => getClientEnv()).not.toThrow();
     expect(warnSpy).toHaveBeenCalledWith(
       expect.stringContaining(
-        "NEXT_PUBLIC_SUPABASE_URL and NEXT_PUBLIC_SUPABASE_ANON_KEY must both be set or both be omitted",
-      ),
+        "NEXT_PUBLIC_SUPABASE_URL and NEXT_PUBLIC_SUPABASE_ANON_KEY must both be set or both be omitted"
+      )
     );
 
     warnSpy.mockRestore();

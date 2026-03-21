@@ -54,10 +54,7 @@ export const emptyFilterValues: BatchedFilterValues = {
 
 // --- URL parsing helpers (matching SearchForm's logic) ---
 
-function parseParamList(
-  searchParams: URLSearchParams,
-  key: string,
-): string[] {
+function parseParamList(searchParams: URLSearchParams, key: string): string[] {
   const values = searchParams.getAll(key);
   if (values.length === 0) return [];
   return values
@@ -68,11 +65,9 @@ function parseParamList(
 
 function normalizeByAllowlist(
   values: string[],
-  allowlist: readonly string[],
+  allowlist: readonly string[]
 ): string[] {
-  const allowMap = new Map(
-    allowlist.map((item) => [item.toLowerCase(), item]),
-  );
+  const allowMap = new Map(allowlist.map((item) => [item.toLowerCase(), item]));
   const normalized = values
     .map((value) => allowMap.get(value.toLowerCase()))
     .filter((value): value is string => Boolean(value));
@@ -83,16 +78,14 @@ function parseEnumParam(
   searchParams: URLSearchParams,
   key: string,
   allowlist: readonly string[],
-  aliases?: Record<string, string>,
+  aliases?: Record<string, string>
 ): string {
   const value = searchParams.get(key);
   if (!value) return "";
   const trimmed = value.trim();
   if (allowlist.includes(trimmed)) return trimmed;
   const lowerValue = trimmed.toLowerCase();
-  const caseMatch = allowlist.find(
-    (item) => item.toLowerCase() === lowerValue,
-  );
+  const caseMatch = allowlist.find((item) => item.toLowerCase() === lowerValue);
   if (caseMatch) return caseMatch;
   if (aliases) {
     const aliasMatch = aliases[lowerValue];
@@ -108,7 +101,7 @@ function parseEnumParam(
  * after mount if needed.
  */
 export function readFiltersFromURL(
-  searchParams: URLSearchParams,
+  searchParams: URLSearchParams
 ): BatchedFilterValues {
   // Use getPriceParam to support budget aliases (minBudget/maxBudget)
   // with canonical params (minPrice/maxPrice) taking precedence
@@ -121,41 +114,43 @@ export function readFiltersFromURL(
       searchParams,
       "roomType",
       VALID_ROOM_TYPES,
-      ROOM_TYPE_ALIASES,
+      ROOM_TYPE_ALIASES
     ),
     leaseDuration: parseEnumParam(
       searchParams,
       "leaseDuration",
       VALID_LEASE_DURATIONS,
-      LEASE_DURATION_ALIASES,
+      LEASE_DURATION_ALIASES
     ),
     moveInDate: searchParams.get("moveInDate") || "",
     amenities: normalizeByAllowlist(
       parseParamList(searchParams, "amenities"),
-      VALID_AMENITIES,
+      VALID_AMENITIES
     ),
     houseRules: normalizeByAllowlist(
       parseParamList(searchParams, "houseRules"),
-      VALID_HOUSE_RULES,
+      VALID_HOUSE_RULES
     ),
     languages: Array.from(
-      new Set(normalizeLanguages(parseParamList(searchParams, "languages"))),
+      new Set(normalizeLanguages(parseParamList(searchParams, "languages")))
     ),
     genderPreference: parseEnumParam(
       searchParams,
       "genderPreference",
-      VALID_GENDER_PREFERENCES,
+      VALID_GENDER_PREFERENCES
     ),
     householdGender: parseEnumParam(
       searchParams,
       "householdGender",
-      VALID_HOUSEHOLD_GENDERS,
+      VALID_HOUSEHOLD_GENDERS
     ),
     minSlots: (() => {
       const raw = searchParams.get("minSlots");
       if (!raw) return "";
       const parsed = parseInt(raw.trim(), 10);
-      return Number.isFinite(parsed) && parsed >= 1 && parsed <= 20 ? String(parsed) : "";
+      return Number.isFinite(parsed) && parsed >= 1 && parsed <= 20
+        ? String(parsed)
+        : "";
     })(),
   };
 }
@@ -169,10 +164,7 @@ function arraysEqual(a: string[], b: string[]): boolean {
   return sortedA.every((val, i) => val === sortedB[i]);
 }
 
-function filtersEqual(
-  a: BatchedFilterValues,
-  b: BatchedFilterValues,
-): boolean {
+function filtersEqual(a: BatchedFilterValues, b: BatchedFilterValues): boolean {
   return (
     a.minPrice === b.minPrice &&
     a.maxPrice === b.maxPrice &&
@@ -199,7 +191,7 @@ export interface UseBatchedFiltersReturn {
   setPending: (
     valuesOrFn:
       | Partial<BatchedFilterValues>
-      | ((prev: BatchedFilterValues) => Partial<BatchedFilterValues>),
+      | ((prev: BatchedFilterValues) => Partial<BatchedFilterValues>)
   ) => void;
   /** Discard pending changes, restore to URL state */
   reset: () => void;
@@ -225,7 +217,7 @@ export function useBatchedFilters(
   const searchParamsString = searchParams.toString();
   const committed = useMemo(
     () => readFiltersFromURL(new URLSearchParams(searchParamsString)),
-    [searchParamsString],
+    [searchParamsString]
   );
 
   // Pending state — initialized from URL, updated locally
@@ -249,15 +241,21 @@ export function useBatchedFilters(
         const prevCommitted = previousCommittedRef.current;
         const merged: BatchedFilterValues = { ...committed };
         const scalarKeys = [
-          'minPrice', 'maxPrice', 'roomType', 'leaseDuration',
-          'moveInDate', 'genderPreference', 'householdGender', 'minSlots',
+          "minPrice",
+          "maxPrice",
+          "roomType",
+          "leaseDuration",
+          "moveInDate",
+          "genderPreference",
+          "householdGender",
+          "minSlots",
         ] as const;
         for (const key of scalarKeys) {
           if (prevPending[key] !== prevCommitted[key]) {
             merged[key] = prevPending[key];
           }
         }
-        const arrayKeys = ['amenities', 'houseRules', 'languages'] as const;
+        const arrayKeys = ["amenities", "houseRules", "languages"] as const;
         for (const key of arrayKeys) {
           if (!arraysEqual(prevPending[key], prevCommitted[key])) {
             merged[key] = [...prevPending[key]];
@@ -271,7 +269,10 @@ export function useBatchedFilters(
 
     setPendingState((prevPending) => {
       const previousCommitted = previousCommittedRef.current;
-      const committedFiltersChanged = !filtersEqual(committed, previousCommitted);
+      const committedFiltersChanged = !filtersEqual(
+        committed,
+        previousCommitted
+      );
       const hasUnsavedEdits = !filtersEqual(prevPending, previousCommitted);
       const isPostCommitSyncActive = Date.now() < forceSyncUntilRef.current;
 
@@ -282,9 +283,7 @@ export function useBatchedFilters(
       }
 
       const shouldPreserveDirtyEdits =
-        !isPostCommitSyncActive &&
-        !committedFiltersChanged &&
-        hasUnsavedEdits;
+        !isPostCommitSyncActive && !committedFiltersChanged && hasUnsavedEdits;
 
       if (shouldPreserveDirtyEdits) {
         return prevPending;
@@ -297,14 +296,14 @@ export function useBatchedFilters(
 
   const isDirty = useMemo(
     () => !filtersEqual(pending, committed),
-    [pending, committed],
+    [pending, committed]
   );
 
   const setPending = useCallback(
     (
       valuesOrFn:
         | Partial<BatchedFilterValues>
-        | ((prev: BatchedFilterValues) => Partial<BatchedFilterValues>),
+        | ((prev: BatchedFilterValues) => Partial<BatchedFilterValues>)
     ) => {
       setPendingState((prev) => {
         const values =
@@ -312,7 +311,7 @@ export function useBatchedFilters(
         return { ...prev, ...values };
       });
     },
-    [],
+    []
   );
 
   const reset = useCallback(() => {

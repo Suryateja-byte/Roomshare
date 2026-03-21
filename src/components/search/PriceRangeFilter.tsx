@@ -1,9 +1,9 @@
-'use client';
+"use client";
 
-import { useState, useCallback, useRef, useEffect } from 'react';
-import * as Slider from '@radix-ui/react-slider';
-import type { PriceHistogramBucket } from '@/app/api/search/facets/route';
-import { PriceHistogram } from './PriceHistogram';
+import { useState, useCallback, useRef, useEffect } from "react";
+import * as Slider from "@radix-ui/react-slider";
+import type { PriceHistogramBucket } from "@/app/api/search/facets/route";
+import { PriceHistogram } from "./PriceHistogram";
 
 interface PriceRangeFilterProps {
   minPrice: number;
@@ -46,11 +46,14 @@ export function PriceRangeFilter({
     setLocalMax(values[1]);
   }, []);
 
-  const handleValueCommit = useCallback((values: number[]) => {
-    isDragging.current = false;
-    const [min, max] = values;
-    onChange(Math.min(min, max), Math.max(min, max));
-  }, [onChange]);
+  const handleValueCommit = useCallback(
+    (values: number[]) => {
+      isDragging.current = false;
+      const [min, max] = values;
+      onChange(Math.min(min, max), Math.max(min, max));
+    },
+    [onChange]
+  );
 
   // Format price for display
   const formatPrice = (val: number) => {

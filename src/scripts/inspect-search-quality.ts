@@ -43,7 +43,8 @@ async function inspectSearchQuality(query: string) {
   // Step 2: Run similarity search with scores
   console.log("  [2/3] Running vector similarity search...\n");
 
-  const results = await prisma.$queryRawUnsafe<SearchResult[]>(`
+  const results = await prisma.$queryRawUnsafe<SearchResult[]>(
+    `
     WITH semantic AS (
       SELECT
         sd.id,
@@ -80,7 +81,9 @@ async function inspectSearchQuality(query: string) {
     FROM semantic s
     LEFT JOIN keyword k ON s.id = k.id
     ORDER BY s.similarity DESC
-  `, query);
+  `,
+    query
+  );
 
   // Step 3: Display results with explanation
   console.log("  [3/3] Analyzing result relevance...\n");
@@ -93,7 +96,9 @@ async function inspectSearchQuality(query: string) {
   for (let i = 0; i < results.length; i++) {
     const r = results[i];
     const simPercent = (r.similarity * 100).toFixed(1);
-    const simBar = "█".repeat(Math.round(r.similarity * 20)) + "░".repeat(20 - Math.round(r.similarity * 20));
+    const simBar =
+      "█".repeat(Math.round(r.similarity * 20)) +
+      "░".repeat(20 - Math.round(r.similarity * 20));
 
     // Determine relevance tier
     let tier = "❌ IRRELEVANT";
@@ -104,30 +109,44 @@ async function inspectSearchQuality(query: string) {
 
     // Find keyword matches in embedding text
     const textLower = (r.embedding_text || "").toLowerCase();
-    const matchedWords = queryWords.filter(w => w.length > 2 && textLower.includes(w));
+    const matchedWords = queryWords.filter(
+      (w) => w.length > 2 && textLower.includes(w)
+    );
     const hasKeyword = r.keyword_rank > 0;
 
-    console.log(`\n  ${String(i + 1).padStart(2)} │ ${simBar} ${simPercent}% │ KW: ${r.keyword_rank > 0 ? r.keyword_rank.toFixed(3) : "none "} │ ${tier}`);
+    console.log(
+      `\n  ${String(i + 1).padStart(2)} │ ${simBar} ${simPercent}% │ KW: ${r.keyword_rank > 0 ? r.keyword_rank.toFixed(3) : "none "} │ ${tier}`
+    );
     console.log(`     │ Title: ${r.title}`);
     console.log(`     │ ${r.city} · $${r.price}/mo · ${r.room_type || "N/A"}`);
-    console.log(`     │ Amenities: ${r.amenities.slice(0, 5).join(", ") || "none"}`);
+    console.log(
+      `     │ Amenities: ${r.amenities.slice(0, 5).join(", ") || "none"}`
+    );
 
     if (matchedWords.length > 0) {
       console.log(`     │ 🔍 Keyword matches: ${matchedWords.join(", ")}`);
     }
     if (!hasKeyword && r.similarity < 0.35) {
-      console.log(`     │ ⚠️  No keyword match + low similarity — may be irrelevant`);
+      console.log(
+        `     │ ⚠️  No keyword match + low similarity — may be irrelevant`
+      );
     }
   }
 
   // Summary stats
   console.log(`\n  ${"─".repeat(66)}`);
-  const excellent = results.filter(r => r.similarity >= 0.7).length;
-  const good = results.filter(r => r.similarity >= 0.5 && r.similarity < 0.7).length;
-  const marginal = results.filter(r => r.similarity >= 0.35 && r.similarity < 0.5).length;
-  const weak = results.filter(r => r.similarity >= 0.25 && r.similarity < 0.35).length;
-  const irrelevant = results.filter(r => r.similarity < 0.25).length;
-  const withKeyword = results.filter(r => r.keyword_rank > 0).length;
+  const excellent = results.filter((r) => r.similarity >= 0.7).length;
+  const good = results.filter(
+    (r) => r.similarity >= 0.5 && r.similarity < 0.7
+  ).length;
+  const marginal = results.filter(
+    (r) => r.similarity >= 0.35 && r.similarity < 0.5
+  ).length;
+  const weak = results.filter(
+    (r) => r.similarity >= 0.25 && r.similarity < 0.35
+  ).length;
+  const irrelevant = results.filter((r) => r.similarity < 0.25).length;
+  const withKeyword = results.filter((r) => r.keyword_rank > 0).length;
 
   console.log(`\n  QUALITY SUMMARY (top ${results.length} results):`);
   console.log(`    🟢 Excellent (≥70%): ${excellent}`);
@@ -137,13 +156,16 @@ async function inspectSearchQuality(query: string) {
   console.log(`    ❌ Irrelevant (<25%): ${irrelevant}`);
   console.log(`    🔍 With keyword hit: ${withKeyword}/${results.length}`);
 
-  const avgSimilarity = results.reduce((s, r) => s + r.similarity, 0) / results.length;
+  const avgSimilarity =
+    results.reduce((s, r) => s + r.similarity, 0) / results.length;
   console.log(`\n    Average similarity: ${(avgSimilarity * 100).toFixed(1)}%`);
 
   if (avgSimilarity < 0.35) {
     console.log(`\n  ⚠️  LOW RELEVANCE: Average similarity is below 35%.`);
     console.log(`     This query may not match well with the listing corpus.`);
-    console.log(`     Consider: Is this query type expected for a roommate platform?`);
+    console.log(
+      `     Consider: Is this query type expected for a roommate platform?`
+    );
   } else if (avgSimilarity >= 0.5) {
     console.log(`\n  ✅ GOOD RELEVANCE: Results are semantically meaningful.`);
   }
@@ -164,5 +186,5 @@ async function inspectSearchQuality(query: string) {
 
 const query = process.argv.slice(2).join(" ") || "sunny room with parking";
 inspectSearchQuality(query)
-  .catch(e => console.error("Error:", e))
+  .catch((e) => console.error("Error:", e))
   .finally(() => prisma.$disconnect());

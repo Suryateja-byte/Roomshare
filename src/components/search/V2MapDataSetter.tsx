@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect } from "react";
-import { useSearchV2Data, V2MapData } from "@/contexts/SearchV2DataContext";
+import { useSearchV2Setters, V2MapData } from "@/contexts/SearchV2DataContext";
 
 interface V2MapDataSetterProps {
   /** V2 map data to inject into context */
@@ -18,7 +18,7 @@ interface V2MapDataSetterProps {
  * page.tsx → V2MapDataSetter → context → PersistentMapWrapper
  */
 export function V2MapDataSetter({ data }: V2MapDataSetterProps) {
-  const { setV2MapData, setIsV2Enabled } = useSearchV2Data();
+  const { setV2MapData, setIsV2Enabled } = useSearchV2Setters();
 
   useEffect(() => {
     // Mark v2 as enabled so PersistentMapWrapper knows to wait/skip fetch

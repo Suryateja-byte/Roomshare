@@ -67,8 +67,10 @@ The client config (`sentry.client.config.ts`) is automatically loaded by the `@s
 Non-actionable errors are filtered out via `beforeSend`:
 
 **Client:**
-- `AbortError` -- cancelled fetch requests (user navigation)
-- `Failed to fetch` / `Load failed` -- network errors from extensions
+- `AbortError` / `CancelledError` -- cancelled fetch requests (user navigation)
+- `ChunkLoadError` -- dynamic import failures (transient network issues)
+- `ResizeObserver loop` -- benign browser noise
+- Note: `Failed to fetch` / `Load failed` are NOT filtered -- they can indicate real API failures
 
 **Server:**
 - `FetchTimeoutError` -- external service timeouts (handled gracefully)
@@ -404,6 +406,54 @@ Each circuit breaker tracks:
 - Total requests and total failures
 
 Access via `circuitBreakers.redis.getStats()`.
+
+---
+
+## Database Monitoring
+
+### Prisma Logging
+
+Prisma log routing is configured in `src/lib/prisma.ts`:
+
+| Level | Development | Production |
+|-------|-------------|------------|
+| `query` | stdout (all queries) | Event-based (slow query detection only) |
+| `warn` | Structured logger | Structured logger |
+| `error` | Structured logger | Structured logger |
+
+All error and warning events are routed through the structured logger (`logger.sync`) for request ID correlation and PII redaction.
+
+### Slow Query Detection
+
+Queries exceeding **1 second** are logged as warnings via the structured logger:
+
+```json
+{
+  "level": "warn",
+  "message": "Slow database query",
+  "durationMs": 1523,
+  "target": "quaint::connector::postgres",
+  "service": "roomshare",
+  "requestId": "abc-12345"
+}
+```
+
+Monitor for `"Slow database query"` in log aggregation to detect performance regressions. The query text is intentionally omitted from logs to avoid leaking schema details.
+
+### Sentry Prisma Integration
+
+The `prismaIntegration()` (server config) creates Sentry spans for all database queries. This provides:
+- Query duration in Sentry Performance traces
+- Database operation breakdown per transaction
+- Automatic slow query detection in Sentry alerts
+
+### Connection Pool
+
+Optimized for Vercel serverless (`src/lib/prisma.ts`):
+- `connection_limit=5` -- max connections per function instance
+- `pool_timeout=10` -- fail fast if pool exhausted
+- `connect_timeout=5` -- fail fast on connection establishment
+- Singleton cached on `globalThis` to prevent connection churn across warm invocations
 
 ---
 

@@ -1170,7 +1170,7 @@ buildSearchIndex();
 function scoreMatch(
   location: LocalLocation,
   query: string,
-  matchType: "exact" | "prefix" | "contains",
+  matchType: "exact" | "prefix" | "contains"
 ): number {
   let score = 0;
 
@@ -1217,7 +1217,7 @@ export interface LocalSearchResult {
  */
 export function searchLocalLocations(
   query: string,
-  limit: number = 5,
+  limit: number = 5
 ): LocalSearchResult[] {
   if (!query || query.length < 2) return [];
 

@@ -6,7 +6,7 @@ import { getClientIP } from "@/lib/rate-limit";
  * Authenticated traffic uses ip:userId to avoid shared-NAT starvation.
  */
 export async function getSearchRateLimitIdentifier(
-  request: Request,
+  request: Request
 ): Promise<string> {
   const ip = getClientIP(request);
 

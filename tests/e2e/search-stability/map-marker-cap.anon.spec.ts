@@ -32,7 +32,9 @@ const SEARCH_URL = `/search?${boundsQS}`;
 // ---------------------------------------------------------------------------
 
 /** Check if the map canvas is visible (WebGL initialized) */
-async function isMapAvailable(page: import("@playwright/test").Page): Promise<boolean> {
+async function isMapAvailable(
+  page: import("@playwright/test").Page
+): Promise<boolean> {
   try {
     await page.locator(".maplibregl-canvas:visible").first().waitFor({
       state: "visible",
@@ -45,12 +47,14 @@ async function isMapAvailable(page: import("@playwright/test").Page): Promise<bo
 }
 
 /** Wait for the E2E map ref to be exposed */
-async function waitForMapRef(page: import("@playwright/test").Page, timeout = 30_000): Promise<boolean> {
+async function waitForMapRef(
+  page: import("@playwright/test").Page,
+  timeout = 30_000
+): Promise<boolean> {
   try {
-    await page.waitForFunction(
-      () => !!(window as any).__e2eMapRef,
-      { timeout },
-    );
+    await page.waitForFunction(() => !!(window as any).__e2eMapRef, {
+      timeout,
+    });
     return true;
   } catch {
     return false;
@@ -68,7 +72,9 @@ test.describe("Map Marker Cap (MAX_MAP_MARKERS=200)", () => {
     test.slow(); // Map tests need extra time for WebGL rendering
   });
 
-  test("rendered marker count does not exceed MAX_MAP_MARKERS", async ({ page }) => {
+  test("rendered marker count does not exceed MAX_MAP_MARKERS", async ({
+    page,
+  }) => {
     await page.goto(SEARCH_URL);
     await page.waitForLoadState("domcontentloaded");
 
@@ -95,7 +101,9 @@ test.describe("Map Marker Cap (MAX_MAP_MARKERS=200)", () => {
     expect(markerCount).toBeLessThanOrEqual(MAX_MAP_MARKERS);
   });
 
-  test("no console errors about DOM element limits during map rendering", async ({ page }) => {
+  test("no console errors about DOM element limits during map rendering", async ({
+    page,
+  }) => {
     const consoleErrors: string[] = [];
     page.on("console", (msg) => {
       if (msg.type() === "error") {
@@ -121,7 +129,7 @@ test.describe("Map Marker Cap (MAX_MAP_MARKERS=200)", () => {
         msg.toLowerCase().includes("dom") ||
         msg.toLowerCase().includes("too many") ||
         msg.toLowerCase().includes("maximum") ||
-        msg.toLowerCase().includes("exceeded"),
+        msg.toLowerCase().includes("exceeded")
     );
 
     expect(domLimitErrors).toHaveLength(0);

@@ -8,10 +8,9 @@ interface VisuallyHiddenProps {
 /**
  * Visually hides content while keeping it accessible to screen readers
  */
-export function VisuallyHidden({ children, as: Component = "span" }: VisuallyHiddenProps) {
-  return (
-    <Component className="sr-only">
-      {children}
-    </Component>
-  );
+export function VisuallyHidden({
+  children,
+  as: Component = "span",
+}: VisuallyHiddenProps) {
+  return <Component className="sr-only">{children}</Component>;
 }

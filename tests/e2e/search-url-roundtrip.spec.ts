@@ -8,7 +8,14 @@
  * Run: pnpm playwright test tests/e2e/search-url-roundtrip.spec.ts
  */
 
-import { test, expect, SF_BOUNDS, selectors, timeouts, searchResultsContainer } from "./helpers/test-utils";
+import {
+  test,
+  expect,
+  SF_BOUNDS,
+  selectors,
+  timeouts,
+  searchResultsContainer,
+} from "./helpers/test-utils";
 import type { Page } from "@playwright/test";
 
 // ---------------------------------------------------------------------------
@@ -28,14 +35,20 @@ function buildSearchUrl(params?: Record<string, string>): string {
 async function assertUrlParams(page: Page, expected: Record<string, string>) {
   const url = new URL(page.url());
   for (const [key, value] of Object.entries(expected)) {
-    expect(url.searchParams.get(key), `URL param "${key}" should be "${value}"`).toBe(value);
+    expect(
+      url.searchParams.get(key),
+      `URL param "${key}" should be "${value}"`
+    ).toBe(value);
   }
 }
 
 async function assertUrlExcludesParams(page: Page, keys: string[]) {
   const url = new URL(page.url());
   for (const key of keys) {
-    expect(url.searchParams.has(key), `URL should NOT contain param "${key}"`).toBe(false);
+    expect(
+      url.searchParams.has(key),
+      `URL should NOT contain param "${key}"`
+    ).toBe(false);
   }
 }
 
@@ -43,7 +56,9 @@ async function assertUrlExcludesParams(page: Page, keys: string[]) {
 async function waitForSearchContent(page: Page) {
   const container = searchResultsContainer(page);
   const cards = container.locator('[data-testid="listing-card"]');
-  const zeroResults = page.locator('h2:has-text("No matches found"), h3:has-text("No exact matches")');
+  const zeroResults = page.locator(
+    'h2:has-text("No matches found"), h3:has-text("No exact matches")'
+  );
   await expect(cards.or(zeroResults).first()).toBeAttached({ timeout: 30_000 });
 }
 
@@ -59,7 +74,9 @@ test.describe("Search URL Param Round-Trip (P0)", () => {
   // -------------------------------------------------------------------------
   // 1. Set filter via UI -> URL has param -> refresh -> filter still active
   // -------------------------------------------------------------------------
-  test("1: price filter round-trip via UI -> URL -> refresh", async ({ page }) => {
+  test("1: price filter round-trip via UI -> URL -> refresh", async ({
+    page,
+  }) => {
     await page.goto(buildSearchUrl({ maxPrice: "1000" }));
     await page.waitForLoadState("domcontentloaded");
     await waitForSearchContent(page);
@@ -90,7 +107,9 @@ test.describe("Search URL Param Round-Trip (P0)", () => {
   // -------------------------------------------------------------------------
   // 2. Set sort via UI -> URL has sort param -> refresh -> sort preserved
   // -------------------------------------------------------------------------
-  test("2: sort round-trip via URL -> refresh -> sort preserved", async ({ page }) => {
+  test("2: sort round-trip via URL -> refresh -> sort preserved", async ({
+    page,
+  }) => {
     test.slow();
     await page.goto(buildSearchUrl({ sort: "price_asc" }));
     await waitForSearchContent(page);
@@ -104,7 +123,9 @@ test.describe("Search URL Param Round-Trip (P0)", () => {
     // may be in an sr-only or hidden container.
     const container = searchResultsContainer(page);
     const sortLabel = container.locator(':text("Price: Low to High")');
-    const mobileSortBtn = container.locator('button[aria-label^="Sort:"]').or(container.locator('button[aria-label*="Sort: Price"]'));
+    const mobileSortBtn = container
+      .locator('button[aria-label^="Sort:"]')
+      .or(container.locator('button[aria-label*="Sort: Price"]'));
     await expect(async () => {
       const desktopCount = await sortLabel.count();
       const mobileCount = await mobileSortBtn.count();
@@ -120,8 +141,12 @@ test.describe("Search URL Param Round-Trip (P0)", () => {
 
     // Sort label should still be visible after reload (wait for hydration again)
     const containerAfter = searchResultsContainer(page);
-    const sortLabelAfter = containerAfter.locator(':text("Price: Low to High")');
-    const mobileSortBtnAfter = containerAfter.locator('button[aria-label^="Sort:"]').or(containerAfter.locator('button[aria-label*="Sort: Price"]'));
+    const sortLabelAfter = containerAfter.locator(
+      ':text("Price: Low to High")'
+    );
+    const mobileSortBtnAfter = containerAfter
+      .locator('button[aria-label^="Sort:"]')
+      .or(containerAfter.locator('button[aria-label*="Sort: Price"]'));
     await expect(async () => {
       const desktopCountAfter = await sortLabelAfter.count();
       const mobileCountAfter = await mobileSortBtnAfter.count();
@@ -132,7 +157,9 @@ test.describe("Search URL Param Round-Trip (P0)", () => {
   // -------------------------------------------------------------------------
   // 3. Type query -> URL updated -> refresh -> query preserved
   // -------------------------------------------------------------------------
-  test("3: query round-trip via deep link -> refresh -> query preserved", async ({ page }) => {
+  test("3: query round-trip via deep link -> refresh -> query preserved", async ({
+    page,
+  }) => {
     await page.goto(buildSearchUrl({ q: "sunset" }));
     await page.waitForLoadState("domcontentloaded");
 
@@ -150,14 +177,18 @@ test.describe("Search URL Param Round-Trip (P0)", () => {
   // -------------------------------------------------------------------------
   // 4. Map bounds in URL -> refresh -> same bounds preserved
   // -------------------------------------------------------------------------
-  test("4: bounds params survive refresh with full precision", async ({ page }) => {
+  test("4: bounds params survive refresh with full precision", async ({
+    page,
+  }) => {
     const precisionBounds = {
       minLat: "37.708123",
       maxLat: "37.812456",
       minLng: "-122.515789",
       maxLng: "-122.351234",
     };
-    await page.goto(`/search?minLat=${precisionBounds.minLat}&maxLat=${precisionBounds.maxLat}&minLng=${precisionBounds.minLng}&maxLng=${precisionBounds.maxLng}`);
+    await page.goto(
+      `/search?minLat=${precisionBounds.minLat}&maxLat=${precisionBounds.maxLat}&minLng=${precisionBounds.minLng}&maxLng=${precisionBounds.maxLng}`
+    );
     await page.waitForLoadState("domcontentloaded");
 
     // Verify bounds in URL
@@ -206,14 +237,18 @@ test.describe("Search URL Param Round-Trip (P0)", () => {
   // -------------------------------------------------------------------------
   // 6. Bounds params preserve decimal precision
   // -------------------------------------------------------------------------
-  test("6: bounds params are precise -- no decimal truncation", async ({ page }) => {
+  test("6: bounds params are precise -- no decimal truncation", async ({
+    page,
+  }) => {
     const preciseBounds = {
       minLat: "37.7081234567",
       maxLat: "37.8124567890",
       minLng: "-122.5157890123",
       maxLng: "-122.3512345678",
     };
-    await page.goto(`/search?minLat=${preciseBounds.minLat}&maxLat=${preciseBounds.maxLat}&minLng=${preciseBounds.minLng}&maxLng=${preciseBounds.maxLng}`);
+    await page.goto(
+      `/search?minLat=${preciseBounds.minLat}&maxLat=${preciseBounds.maxLat}&minLng=${preciseBounds.minLng}&maxLng=${preciseBounds.maxLng}`
+    );
     await page.waitForLoadState("domcontentloaded");
 
     // The URL should contain the precise values (app should not truncate)
@@ -232,7 +267,9 @@ test.describe("Search URL Param Round-Trip (P0)", () => {
   // 7. Removing a filter updates URL (param removed)
   // -------------------------------------------------------------------------
   test("7: removing a filter removes its param from URL", async ({ page }) => {
-    await page.goto(buildSearchUrl({ maxPrice: "1500", roomType: "Private Room" }));
+    await page.goto(
+      buildSearchUrl({ maxPrice: "1500", roomType: "Private Room" })
+    );
     await page.waitForLoadState("domcontentloaded");
     await waitForSearchContent(page);
 
@@ -241,8 +278,12 @@ test.describe("Search URL Param Round-Trip (P0)", () => {
     expect(url1.searchParams.has("maxPrice")).toBe(true);
 
     // Try to remove via the "Clear all" or individual chip removal
-    const chipsRegion = page.locator('[role="region"][aria-label="Applied filters"]').first();
-    const chipsVisible = await chipsRegion.isVisible({ timeout: 5_000 }).catch(() => false);
+    const chipsRegion = page
+      .locator('[role="region"][aria-label="Applied filters"]')
+      .first();
+    const chipsVisible = await chipsRegion
+      .isVisible({ timeout: 5_000 })
+      .catch(() => false);
 
     if (chipsVisible) {
       // Click "Clear all" to remove all filters
@@ -253,13 +294,19 @@ test.describe("Search URL Param Round-Trip (P0)", () => {
         await clearAllBtn.click();
 
         // Wait for URL to update
-        await expect.poll(
-          () => {
-            const params = new URL(page.url(), "http://localhost").searchParams;
-            return !params.has("maxPrice") && !params.has("roomType");
-          },
-          { timeout: 10_000, message: "URL to have no maxPrice/roomType params after clear" },
-        ).toBe(true);
+        await expect
+          .poll(
+            () => {
+              const params = new URL(page.url(), "http://localhost")
+                .searchParams;
+              return !params.has("maxPrice") && !params.has("roomType");
+            },
+            {
+              timeout: 10_000,
+              message: "URL to have no maxPrice/roomType params after clear",
+            }
+          )
+          .toBe(true);
 
         // Verify params are gone
         await assertUrlExcludesParams(page, ["maxPrice", "roomType"]);
@@ -280,7 +327,11 @@ test.describe("Search URL Param Round-Trip (P0)", () => {
     await waitForSearchContent(page);
 
     // Initial URL should have no cursor
-    await assertUrlExcludesParams(page, ["cursor", "cursorStack", "pageNumber"]);
+    await assertUrlExcludesParams(page, [
+      "cursor",
+      "cursorStack",
+      "pageNumber",
+    ]);
 
     // Try load more
     const loadMoreBtn = page.locator('button:has-text("Show more places")');
@@ -293,7 +344,11 @@ test.describe("Search URL Param Round-Trip (P0)", () => {
       await page.waitForTimeout(3_000);
 
       // cursor should NEVER appear in the URL
-      await assertUrlExcludesParams(page, ["cursor", "cursorStack", "pageNumber"]);
+      await assertUrlExcludesParams(page, [
+        "cursor",
+        "cursorStack",
+        "pageNumber",
+      ]);
     }
 
     // Even after multiple load-more attempts, cursor stays out of URL
@@ -301,20 +356,33 @@ test.describe("Search URL Param Round-Trip (P0)", () => {
     if (hasLoadMore2) {
       await loadMoreBtn.click();
       await page.waitForTimeout(3_000);
-      await assertUrlExcludesParams(page, ["cursor", "cursorStack", "pageNumber"]);
+      await assertUrlExcludesParams(page, [
+        "cursor",
+        "cursorStack",
+        "pageNumber",
+      ]);
     }
   });
 
   // -------------------------------------------------------------------------
   // 9. Pagination state (cursorStack, pageNumber) never in URL
   // -------------------------------------------------------------------------
-  test("9: pagination ephemeral state never appears in URL", async ({ page }) => {
+  test("9: pagination ephemeral state never appears in URL", async ({
+    page,
+  }) => {
     // Navigate with various params
-    await page.goto(buildSearchUrl({ q: "room", sort: "newest", maxPrice: "3000" }));
+    await page.goto(
+      buildSearchUrl({ q: "room", sort: "newest", maxPrice: "3000" })
+    );
     await waitForSearchContent(page);
 
     // Verify no pagination state in URL
-    await assertUrlExcludesParams(page, ["cursor", "cursorStack", "pageNumber", "page"]);
+    await assertUrlExcludesParams(page, [
+      "cursor",
+      "cursorStack",
+      "pageNumber",
+      "page",
+    ]);
 
     // Try load more to trigger cursor usage
     const loadMoreBtn = page.locator('button:has-text("Show more places")');
@@ -325,12 +393,22 @@ test.describe("Search URL Param Round-Trip (P0)", () => {
       await page.waitForTimeout(3_000);
 
       // Still no pagination state in URL
-      await assertUrlExcludesParams(page, ["cursor", "cursorStack", "pageNumber", "page"]);
+      await assertUrlExcludesParams(page, [
+        "cursor",
+        "cursorStack",
+        "pageNumber",
+        "page",
+      ]);
     }
 
     // Refresh -- pagination state should not appear
     await page.reload();
     await page.waitForLoadState("domcontentloaded");
-    await assertUrlExcludesParams(page, ["cursor", "cursorStack", "pageNumber", "page"]);
+    await assertUrlExcludesParams(page, [
+      "cursor",
+      "cursorStack",
+      "pageNumber",
+      "page",
+    ]);
   });
 });

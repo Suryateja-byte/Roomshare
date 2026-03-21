@@ -52,7 +52,7 @@ export interface SearchMeta {
   /** Distance to farthest result in miles */
   farthestMiles: number;
   /** Search mode: 'type' for nearby search, 'text' for text search */
-  searchMode: 'type' | 'text';
+  searchMode: "type" | "text";
   /** Original query text from user */
   queryText?: string;
   /** Timestamp of the search */
@@ -80,7 +80,7 @@ export interface NeighborhoodCacheKey {
   /** Search radius in meters */
   radiusMeters: number;
   /** Search mode */
-  searchMode: 'type' | 'text';
+  searchMode: "type" | "text";
 }
 
 /**
@@ -104,7 +104,7 @@ export interface SelectedPOIState {
   /** Currently selected POI */
   poi: POI | null;
   /** Source of selection: 'list' or 'map' */
-  source: 'list' | 'map' | null;
+  source: "list" | "map" | null;
 }
 
 /**
@@ -114,7 +114,7 @@ export interface HoveredPOIState {
   /** Currently hovered POI ID */
   placeId: string | null;
   /** Source of hover: 'list' or 'map' */
-  source: 'list' | 'map' | null;
+  source: "list" | "map" | null;
 }
 
 /**
@@ -142,11 +142,13 @@ export interface POIDisplayProps {
 /**
  * Subscription tiers for the application.
  */
-export type SubscriptionTier = 'free' | 'pro';
+export type SubscriptionTier = "free" | "pro";
 
 /**
  * Check if a tier has Pro features.
  */
-export function isProTier(tier: SubscriptionTier | string | undefined): boolean {
-  return tier === 'pro';
+export function isProTier(
+  tier: SubscriptionTier | string | undefined
+): boolean {
+  return tier === "pro";
 }

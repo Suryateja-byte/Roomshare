@@ -1,4 +1,4 @@
-import { type Page } from '@playwright/test';
+import { type Page } from "@playwright/test";
 
 /**
  * Set up mobile viewport for authenticated tests.
@@ -11,9 +11,13 @@ export async function setupMobileAuthViewport(page: Page): Promise<void> {
  * Navigate using mobile hamburger menu.
  * Falls back to direct navigation if menu not found.
  */
-export async function navigateWithMobileNav(page: Page, path: string): Promise<void> {
+export async function navigateWithMobileNav(
+  page: Page,
+  path: string
+): Promise<void> {
   // Try hamburger menu first
-  const hamburger = page.getByRole('button', { name: /menu|navigation/i })
+  const hamburger = page
+    .getByRole("button", { name: /menu|navigation/i })
     .or(page.locator('[data-testid="mobile-menu-button"]'))
     .or(page.locator('button[aria-label*="menu"]'))
     .first();
@@ -24,7 +28,9 @@ export async function navigateWithMobileNav(page: Page, path: string): Promise<v
     await page.waitForTimeout(300);
 
     // Try to find and click the nav link
-    const navLink = page.getByRole('link', { name: new RegExp(path.replace('/', ''), 'i') }).first();
+    const navLink = page
+      .getByRole("link", { name: new RegExp(path.replace("/", ""), "i") })
+      .first();
     if (await navLink.isVisible({ timeout: 2000 }).catch(() => false)) {
       await navLink.click();
       return;
@@ -33,5 +39,5 @@ export async function navigateWithMobileNav(page: Page, path: string): Promise<v
 
   // Fallback to direct navigation
   await page.goto(path);
-  await page.waitForLoadState('domcontentloaded');
+  await page.waitForLoadState("domcontentloaded");
 }

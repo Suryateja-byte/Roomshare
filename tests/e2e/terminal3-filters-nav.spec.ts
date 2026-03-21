@@ -70,19 +70,24 @@ test.describe("3.1: Category Icon Bar", () => {
 
     await firstButton.click();
 
-    await expect.poll(
-      () => {
-        const p = new URL(page.url(), "http://localhost").searchParams;
-        return (
-          p.has("amenities") ||
-          p.has("houseRules") ||
-          p.has("roomType") ||
-          p.has("leaseDuration") ||
-          p.has("maxPrice")
-        );
-      },
-      { timeout: 10_000, message: "URL to have at least one filter param after category click" },
-    ).toBe(true);
+    await expect
+      .poll(
+        () => {
+          const p = new URL(page.url(), "http://localhost").searchParams;
+          return (
+            p.has("amenities") ||
+            p.has("houseRules") ||
+            p.has("roomType") ||
+            p.has("leaseDuration") ||
+            p.has("maxPrice")
+          );
+        },
+        {
+          timeout: 10_000,
+          message: "URL to have at least one filter param after category click",
+        }
+      )
+      .toBe(true);
   });
 });
 
@@ -108,7 +113,7 @@ test.describe("3.5: Sort Options", () => {
     // Look for sort-related elements
     const sortEl = page
       .locator(
-        'button:has-text("Sort"), [aria-label*="sort" i], button:has-text("Recommended")',
+        'button:has-text("Sort"), [aria-label*="sort" i], button:has-text("Recommended")'
       )
       .first();
     const visible = await sortEl.isVisible().catch(() => false);
@@ -149,24 +154,29 @@ test.describe("3.6: Applied Filter Chips", () => {
   test("clear all removes filter params from URL", async ({ page }) => {
     await page.goto(
       `/search?${boundsQS}&roomType=Private+Room&amenities=Wifi`,
-      { waitUntil: "domcontentloaded" },
+      { waitUntil: "domcontentloaded" }
     );
     await page.waitForTimeout(5000);
 
     const clearAll = page.locator(
-      'button[aria-label="Clear all filters"], button:has-text("Clear all")',
+      'button[aria-label="Clear all filters"], button:has-text("Clear all")'
     );
     const clearVisible = await clearAll.isVisible().catch(() => false);
 
     if (clearVisible) {
       await clearAll.click();
-      await expect.poll(
-        () => {
-          const p = new URL(page.url(), "http://localhost").searchParams;
-          return !p.has("roomType") && !p.has("amenities");
-        },
-        { timeout: 10_000, message: "URL to have no roomType/amenities params after clear all" },
-      ).toBe(true);
+      await expect
+        .poll(
+          () => {
+            const p = new URL(page.url(), "http://localhost").searchParams;
+            return !p.has("roomType") && !p.has("amenities");
+          },
+          {
+            timeout: 10_000,
+            message: "URL to have no roomType/amenities params after clear all",
+          }
+        )
+        .toBe(true);
     }
     expect(await page.title()).toBeTruthy();
   });
@@ -203,7 +213,7 @@ test.describe("3.7: Natural Language Search", () => {
 
     const searchInput = page
       .locator(
-        'input[name="location"], input[placeholder*="search" i], input[placeholder*="location" i]',
+        'input[name="location"], input[placeholder*="search" i], input[placeholder*="location" i]'
       )
       .first();
     const inputCount = await searchInput.count();

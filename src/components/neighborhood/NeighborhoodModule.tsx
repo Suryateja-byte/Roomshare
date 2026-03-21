@@ -1,4 +1,4 @@
-'use client';
+"use client";
 
 /**
  * NeighborhoodModule - Container orchestrating Neighborhood Intelligence
@@ -18,30 +18,30 @@
  * - Always: gmp-place-attribution
  */
 
-import { useState, useCallback } from 'react';
-import dynamic from 'next/dynamic';
-import { isProUser } from '@/lib/subscription';
-import { ContextBar } from './ContextBar';
-import { ProUpgradeCTA } from './ProUpgradeCTA';
-import { NeighborhoodPlaceList } from './NeighborhoodPlaceList';
-import { PlaceDetailsPanel } from './PlaceDetailsPanel';
-import type { POI, SearchMeta, NeighborhoodSearchResult } from '@/lib/places/types';
+import { useState, useCallback } from "react";
+import dynamic from "next/dynamic";
+import { isProUser } from "@/lib/subscription";
+import { ContextBar } from "./ContextBar";
+import { ProUpgradeCTA } from "./ProUpgradeCTA";
+import { NeighborhoodPlaceList } from "./NeighborhoodPlaceList";
+import { PlaceDetailsPanel } from "./PlaceDetailsPanel";
+import type { POI, NeighborhoodSearchResult } from "@/lib/places/types";
 import {
   trackNeighborhoodQuery,
   trackPlaceClicked,
   trackProUpgradeClicked,
-} from '@/lib/analytics/neighborhood';
+} from "@/lib/analytics/neighborhood";
 
 // Type for normalized intent (matches stableNormalizedIntent from NeighborhoodChat)
 interface NormalizedIntent {
-  mode: 'type' | 'text';
+  mode: "type" | "text";
   includedTypes?: string[];
   textQuery?: string;
 }
 
 // Lazy load the map to avoid SSR issues with Mapbox
 const NeighborhoodMap = dynamic(
-  () => import('./NeighborhoodMap').then((mod) => mod.NeighborhoodMap),
+  () => import("./NeighborhoodMap").then((mod) => mod.NeighborhoodMap),
   {
     ssr: false,
     loading: () => (
@@ -54,7 +54,10 @@ const NeighborhoodMap = dynamic(
 
 // Lazy load NearbyPlacesCard since it uses Google Maps
 const NearbyPlacesCard = dynamic(
-  () => import('@/components/chat/NearbyPlacesCard').then((mod) => mod.NearbyPlacesCard),
+  () =>
+    import("@/components/chat/NearbyPlacesCard").then(
+      (mod) => mod.NearbyPlacesCard
+    ),
   {
     ssr: false,
     loading: () => (
@@ -95,14 +98,15 @@ export function NeighborhoodModule({
   queryText,
   normalizedIntent,
   radiusMeters = 1600,
-  className = '',
+  className = "",
   onSearchSuccess,
   canSearch = true,
   remainingSearches,
   multiBrandDetected,
 }: NeighborhoodModuleProps) {
   // State
-  const [searchResult, setSearchResult] = useState<NeighborhoodSearchResult | null>(null);
+  const [searchResult, setSearchResult] =
+    useState<NeighborhoodSearchResult | null>(null);
   const [selectedPoi, setSelectedPoi] = useState<POI | null>(null);
   const [hoveredPoiId, setHoveredPoiId] = useState<string | null>(null);
   const [isLoading, setIsLoading] = useState(true);
@@ -117,25 +121,28 @@ export function NeighborhoodModule({
   const meta = searchResult?.meta ?? null;
 
   // Handle search results from NearbyPlacesCard
-  const handleSearchResultsReady = useCallback((result: NeighborhoodSearchResult) => {
-    setSearchResult(result);
-    setIsLoading(false);
-    setError(null);
+  const handleSearchResultsReady = useCallback(
+    (result: NeighborhoodSearchResult) => {
+      setSearchResult(result);
+      setIsLoading(false);
+      setError(null);
 
-    // Track analytics
-    if (result.meta) {
-      trackNeighborhoodQuery({
-        listingId,
-        subscriptionTier,
-        searchMode: result.meta.searchMode,
-        includedTypes: normalizedIntent.includedTypes,
-        resultCount: result.meta.resultCount,
-        radiusMeters: result.meta.radiusMeters,
-        closestMiles: result.meta.closestMiles,
-        farthestMiles: result.meta.farthestMiles,
-      });
-    }
-  }, [listingId, subscriptionTier, normalizedIntent.includedTypes]);
+      // Track analytics
+      if (result.meta) {
+        trackNeighborhoodQuery({
+          listingId,
+          subscriptionTier,
+          searchMode: result.meta.searchMode,
+          includedTypes: normalizedIntent.includedTypes,
+          resultCount: result.meta.resultCount,
+          radiusMeters: result.meta.radiusMeters,
+          closestMiles: result.meta.closestMiles,
+          farthestMiles: result.meta.farthestMiles,
+        });
+      }
+    },
+    [listingId, subscriptionTier, normalizedIntent.includedTypes]
+  );
 
   // Handle search error
   const handleSearchError = useCallback((err: string) => {
@@ -144,20 +151,23 @@ export function NeighborhoodModule({
   }, []);
 
   // Handle POI click (Pro users only)
-  const handlePoiClick = useCallback((poi: POI, source: 'list' | 'map' = 'list') => {
-    setSelectedPoi(poi);
+  const handlePoiClick = useCallback(
+    (poi: POI, source: "list" | "map" = "list") => {
+      setSelectedPoi(poi);
 
-    // Track analytics
-    trackPlaceClicked({
-      listingId,
-      subscriptionTier,
-      placeId: poi.placeId,
-      placeName: poi.name,
-      placeType: poi.primaryType,
-      distanceMiles: poi.distanceMiles,
-      source,
-    });
-  }, [listingId, subscriptionTier]);
+      // Track analytics
+      trackPlaceClicked({
+        listingId,
+        subscriptionTier,
+        placeId: poi.placeId,
+        placeName: poi.name,
+        placeType: poi.primaryType,
+        distanceMiles: poi.distanceMiles,
+        source,
+      });
+    },
+    [listingId, subscriptionTier]
+  );
 
   // Handle POI hover (Pro users only)
   const handlePoiHover = useCallback((poi: POI | null) => {
@@ -181,28 +191,30 @@ export function NeighborhoodModule({
     trackProUpgradeClicked({
       listingId,
       subscriptionTier,
-      context: 'cta_button',
+      context: "cta_button",
       placeCount: pois.length,
     });
   }, [listingId, subscriptionTier, pois.length]);
 
   // Wrapper handlers for tracking click source
-  const handleListPoiClick = useCallback((poi: POI) => {
-    handlePoiClick(poi, 'list');
-  }, [handlePoiClick]);
+  const handleListPoiClick = useCallback(
+    (poi: POI) => {
+      handlePoiClick(poi, "list");
+    },
+    [handlePoiClick]
+  );
 
-  const handleMapPoiClick = useCallback((poi: POI) => {
-    handlePoiClick(poi, 'map');
-  }, [handlePoiClick]);
+  const handleMapPoiClick = useCallback(
+    (poi: POI) => {
+      handlePoiClick(poi, "map");
+    },
+    [handlePoiClick]
+  );
 
   return (
     <div className={`relative space-y-3 ${className}`}>
       {/* Context Bar - shows for all users */}
-      <ContextBar
-        meta={meta}
-        isLoading={isLoading}
-        queryText={queryText}
-      />
+      <ContextBar meta={meta} isLoading={isLoading} queryText={queryText} />
 
       {/* Error state with retry */}
       {error && (
@@ -300,10 +312,7 @@ export function NeighborhoodModule({
           </div>
 
           {/* Place Details Panel (slide-in) */}
-          <PlaceDetailsPanel
-            poi={selectedPoi}
-            onClose={handleCloseDetails}
-          />
+          <PlaceDetailsPanel poi={selectedPoi} onClose={handleCloseDetails} />
         </>
       )}
 
@@ -317,9 +326,10 @@ export function NeighborhoodModule({
 
 // Declare custom element for TypeScript
 declare global {
+  // eslint-disable-next-line @typescript-eslint/no-namespace -- required for custom element type declaration
   namespace JSX {
     interface IntrinsicElements {
-      'gmp-place-attribution': React.DetailedHTMLProps<
+      "gmp-place-attribution": React.DetailedHTMLProps<
         React.HTMLAttributes<HTMLElement>,
         HTMLElement
       >;

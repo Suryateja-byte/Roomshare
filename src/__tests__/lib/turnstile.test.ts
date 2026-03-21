@@ -22,7 +22,7 @@ beforeEach(() => {
   // Reset env to known state
   delete process.env.TURNSTILE_ENABLED;
   delete process.env.TURNSTILE_SECRET_KEY;
-  jest.spyOn(global, 'fetch').mockImplementation(jest.fn());
+  jest.spyOn(global, "fetch").mockImplementation(jest.fn());
 });
 
 afterEach(() => {
@@ -109,7 +109,7 @@ describe("verifyTurnstileToken", () => {
     // Verify POST body contains correct params
     const [url, options] = (global.fetch as jest.Mock).mock.calls[0];
     expect(url).toBe(
-      "https://challenges.cloudflare.com/turnstile/v0/siteverify",
+      "https://challenges.cloudflare.com/turnstile/v0/siteverify"
     );
     expect(options.method).toBe("POST");
     const body = options.body as URLSearchParams;
@@ -172,5 +172,44 @@ describe("verifyTurnstileToken", () => {
     const body = (global.fetch as jest.Mock).mock.calls[0][1]
       .body as URLSearchParams;
     expect(body.get("remoteip")).toBe("1.2.3.4");
+  });
+});
+
+describe("Turnstile production warning", () => {
+  it("logs ERROR when disabled in production", async () => {
+    (process.env as Record<string, string | undefined>).NODE_ENV = "production";
+    process.env.TURNSTILE_ENABLED = "false";
+    delete process.env.TURNSTILE_SECRET_KEY;
+
+    const { logger } = await import("@/lib/logger");
+    const { verifyTurnstileToken } = await importModule();
+    await verifyTurnstileToken("some-token");
+
+    expect(logger.sync.error).toHaveBeenCalledWith(
+      expect.stringContaining("CAPTCHA disabled in production"),
+      expect.any(Object)
+    );
+  });
+
+  it("does NOT log error when disabled in development", async () => {
+    (process.env as Record<string, string | undefined>).NODE_ENV = "development";
+    process.env.TURNSTILE_ENABLED = "false";
+    delete process.env.TURNSTILE_SECRET_KEY;
+
+    const { logger } = await import("@/lib/logger");
+    const { verifyTurnstileToken } = await importModule();
+    await verifyTurnstileToken("some-token");
+
+    expect(logger.sync.error).not.toHaveBeenCalled();
+  });
+
+  it("still returns success:true when disabled (bypass preserved)", async () => {
+    (process.env as Record<string, string | undefined>).NODE_ENV = "production";
+    process.env.TURNSTILE_ENABLED = "false";
+    delete process.env.TURNSTILE_SECRET_KEY;
+
+    const { verifyTurnstileToken } = await importModule();
+    const result = await verifyTurnstileToken("some-token");
+    expect(result.success).toBe(true);
   });
 });

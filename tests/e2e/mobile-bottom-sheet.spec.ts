@@ -27,7 +27,7 @@ const selectors = {
   expandButton: 'button[aria-label="Expand results"]',
   collapseButton: 'button[aria-label="Collapse results"]',
   minimizeButton: 'button[aria-label="Minimize results panel"]',
-  contentArea: '[data-snap-current]',
+  contentArea: "[data-snap-current]",
 } as const;
 
 // Snap point constants (from MobileBottomSheet.tsx)
@@ -41,20 +41,24 @@ const SNAP_EXPANDED = 0.85; // ~85vh
  * starts at content-overflow height before animation constrains it).
  */
 async function getSheetHeightFraction(
-  page: import("@playwright/test").Page,
+  page: import("@playwright/test").Page
 ): Promise<number> {
   // Wait for Framer Motion to constrain height to <= viewport
   const sel = selectors.bottomSheet;
-  await page.waitForFunction(
-    (s: string) => {
-      const el = document.querySelector(s);
-      if (!el) return false;
-      const h = parseFloat(window.getComputedStyle(el).height);
-      return h > 0 && h <= window.innerHeight * 1.05;
-    },
-    sel,
-    { timeout: 5000 },
-  ).catch(() => {/* assertion will catch bad values */});
+  await page
+    .waitForFunction(
+      (s: string) => {
+        const el = document.querySelector(s);
+        if (!el) return false;
+        const h = parseFloat(window.getComputedStyle(el).height);
+        return h > 0 && h <= window.innerHeight * 1.05;
+      },
+      sel,
+      { timeout: 5000 }
+    )
+    .catch(() => {
+      /* assertion will catch bad values */
+    });
 
   return page.locator(sel).evaluate((el) => {
     const height = parseFloat(window.getComputedStyle(el).height);
@@ -66,7 +70,7 @@ async function getSheetHeightFraction(
  * Helper to get the current snap index from the content area data attribute
  */
 async function getSnapIndex(
-  page: import("@playwright/test").Page,
+  page: import("@playwright/test").Page
 ): Promise<number> {
   const content = page.locator(selectors.contentArea);
   const snapAttr = await content.getAttribute("data-snap-current");
@@ -79,7 +83,7 @@ async function getSnapIndex(
  * callers rely on toPass() polling to detect final snap state.
  */
 async function waitForSheetAnimation(
-  page: import("@playwright/test").Page,
+  page: import("@playwright/test").Page
 ): Promise<void> {
   await page.waitForTimeout(500);
 }
@@ -89,7 +93,7 @@ async function waitForSheetAnimation(
  * dynamically updates --header-height and the padding-top transition completes.
  */
 async function waitForLayoutStable(
-  page: import("@playwright/test").Page,
+  page: import("@playwright/test").Page
 ): Promise<void> {
   await page
     .waitForFunction(
@@ -104,7 +108,7 @@ async function waitForLayoutStable(
         return curr === prev && curr !== "";
       },
       undefined,
-      { timeout: 5000, polling: 150 },
+      { timeout: 5000, polling: 150 }
     )
     .catch(() => {});
 }
@@ -122,7 +126,7 @@ async function dragHandle(
   page: import("@playwright/test").Page,
   deltaY: number,
   // eslint-disable-next-line @typescript-eslint/no-unused-vars
-  _options?: { velocity?: "slow" | "fast" },
+  _options?: { velocity?: "slow" | "fast" }
 ): Promise<void> {
   // Small deltaY simulates an insufficient drag — no snap change
   if (Math.abs(deltaY) < 40) {
@@ -147,7 +151,9 @@ async function dragHandle(
   await waitForSheetAnimation(page);
 }
 
-test.beforeEach(async () => { test.slow(); });
+test.beforeEach(async () => {
+  test.slow();
+});
 
 test.describe("Mobile Bottom Sheet - Snap Points (7.1)", () => {
   test("bottom sheet renders with 3 snap points (collapsed ~15vh, half ~50vh, expanded ~85vh)", async ({
@@ -167,12 +173,12 @@ test.describe("Mobile Bottom Sheet - Snap Points (7.1)", () => {
     const content = page.locator(selectors.contentArea);
     await expect(content).toHaveAttribute(
       "data-snap-collapsed",
-      String(SNAP_COLLAPSED),
+      String(SNAP_COLLAPSED)
     );
     await expect(content).toHaveAttribute("data-snap-half", String(SNAP_HALF));
     await expect(content).toHaveAttribute(
       "data-snap-expanded",
-      String(SNAP_EXPANDED),
+      String(SNAP_EXPANDED)
     );
 
     // Sheet should start at half position (index 1)
@@ -333,7 +339,9 @@ test.describe("Mobile Bottom Sheet - Expanded Drag Down (7.3)", () => {
 
     // Check if content is scrollable before testing scroll behavior
     const content = page.locator(selectors.contentArea);
-    const isScrollable = await content.evaluate((el) => el.scrollHeight > el.clientHeight);
+    const isScrollable = await content.evaluate(
+      (el) => el.scrollHeight > el.clientHeight
+    );
     if (!isScrollable) {
       test.skip(true, "Content area is not scrollable (not enough listings)");
       return;
@@ -343,6 +351,7 @@ test.describe("Mobile Bottom Sheet - Expanded Drag Down (7.3)", () => {
     await content.evaluate((el) => {
       el.scrollTop = 100;
     });
+    // Intentional: DOM scroll mutation settling time
     await page.waitForTimeout(100);
 
     // Verify scroll was applied
@@ -376,7 +385,7 @@ test.describe("Mobile Bottom Sheet - Map Touch Events (7.4)", () => {
       await minimizeBtn.click();
       await waitForSheetAnimation(page);
     } catch {
-      test.skip(true, 'Minimize button not visible');
+      test.skip(true, "Minimize button not visible");
       return;
     }
 
@@ -387,7 +396,7 @@ test.describe("Mobile Bottom Sheet - Map Touch Events (7.4)", () => {
 
     // Verify sheet has pointer-events: none when collapsed
     const sheetPointerEvents = await sheet.evaluate(
-      (el) => getComputedStyle(el).pointerEvents,
+      (el) => getComputedStyle(el).pointerEvents
     );
     expect(sheetPointerEvents).toBe("none");
 
@@ -397,7 +406,7 @@ test.describe("Mobile Bottom Sheet - Map Touch Events (7.4)", () => {
 
     // The map should be interactive - pointer events should pass through
     const mapPointerEvents = await map.evaluate(
-      (el) => getComputedStyle(el).pointerEvents,
+      (el) => getComputedStyle(el).pointerEvents
     );
     expect(mapPointerEvents).not.toBe("none");
   });
@@ -426,7 +435,7 @@ test.describe("Mobile Bottom Sheet - Map Touch Events (7.4)", () => {
       await minimizeBtn.click();
       await waitForSheetAnimation(page);
     } catch {
-      test.skip(true, 'Minimize button not visible');
+      test.skip(true, "Minimize button not visible");
       return;
     }
 
@@ -439,7 +448,7 @@ test.describe("Mobile Bottom Sheet - Map Touch Events (7.4)", () => {
     const handle = page.locator(selectors.bottomSheetHandle);
     const handleParent = handle.locator("xpath=..");
     const handlePointerEvents = await handleParent.evaluate(
-      (el) => (el as HTMLElement).style.pointerEvents,
+      (el) => (el as HTMLElement).style.pointerEvents
     );
     expect(handlePointerEvents).toBe("auto");
   });
@@ -467,9 +476,11 @@ test.describe("Mobile Bottom Sheet - Escape Key (7.5)", () => {
 
     // Verify expanded via waitForFunction (proven pattern from Body Scroll Lock test)
     await page.waitForFunction(
-      () => document.querySelector('[data-snap-current]')
-            ?.getAttribute('data-snap-current') === '2',
-      { timeout: 10_000 },
+      () =>
+        document
+          .querySelector("[data-snap-current]")
+          ?.getAttribute("data-snap-current") === "2",
+      { timeout: 10_000 }
     );
 
     // Press Escape — should collapse to half position (index 1)
@@ -477,9 +488,11 @@ test.describe("Mobile Bottom Sheet - Escape Key (7.5)", () => {
 
     // Verify half position via waitForFunction
     await page.waitForFunction(
-      () => document.querySelector('[data-snap-current]')
-            ?.getAttribute('data-snap-current') === '1',
-      { timeout: 10_000 },
+      () =>
+        document
+          .querySelector("[data-snap-current]")
+          ?.getAttribute("data-snap-current") === "1",
+      { timeout: 10_000 }
     );
   });
 
@@ -502,9 +515,11 @@ test.describe("Mobile Bottom Sheet - Escape Key (7.5)", () => {
 
     // Verify collapsed
     await page.waitForFunction(
-      () => document.querySelector('[data-snap-current]')
-            ?.getAttribute('data-snap-current') === '0',
-      { timeout: 10_000 },
+      () =>
+        document
+          .querySelector("[data-snap-current]")
+          ?.getAttribute("data-snap-current") === "0",
+      { timeout: 10_000 }
     );
 
     // Press Escape — should stay collapsed (handler skips snap === 0)
@@ -513,9 +528,11 @@ test.describe("Mobile Bottom Sheet - Escape Key (7.5)", () => {
 
     // Still collapsed
     await page.waitForFunction(
-      () => document.querySelector('[data-snap-current]')
-            ?.getAttribute('data-snap-current') === '0',
-      { timeout: 5_000 },
+      () =>
+        document
+          .querySelector("[data-snap-current]")
+          ?.getAttribute("data-snap-current") === "0",
+      { timeout: 5_000 }
     );
   });
 });
@@ -545,7 +562,7 @@ test.describe("Mobile Bottom Sheet - State Preservation (7.6)", () => {
       await expandBtn.click();
       await waitForSheetAnimation(page);
     } catch {
-      test.skip(true, 'Expand button not visible');
+      test.skip(true, "Expand button not visible");
       return;
     }
 
@@ -556,9 +573,12 @@ test.describe("Mobile Bottom Sheet - State Preservation (7.6)", () => {
 
     // Apply a filter (if filter buttons exist)
     const filterBtn = page.locator(
-      'button[data-hydrated][aria-label^="Filters"]',
+      'button[data-hydrated][aria-label^="Filters"]'
     );
-    const hasFilter = await filterBtn.first().isVisible().catch(() => false);
+    const hasFilter = await filterBtn
+      .first()
+      .isVisible()
+      .catch(() => false);
 
     if (hasFilter) {
       // force: true because on mobile the filter button may be partially
@@ -567,7 +587,9 @@ test.describe("Mobile Bottom Sheet - State Preservation (7.6)", () => {
       await page.waitForTimeout(500);
 
       // Close filter modal if opened
-      const closeBtn = page.locator('[aria-label="Close"], button:has-text("Done")');
+      const closeBtn = page.locator(
+        '[aria-label="Close"], button:has-text("Done")'
+      );
       try {
         await expect(closeBtn.first()).toBeVisible({ timeout: 2000 });
         await closeBtn.first().click();
@@ -689,7 +711,7 @@ test.describe("Mobile Bottom Sheet - Pull to Refresh (7.8)", () => {
       await expandBtn.click();
       await waitForSheetAnimation(page);
     } catch {
-      test.skip(true, 'Expand button not visible');
+      test.skip(true, "Expand button not visible");
       return;
     }
 
@@ -712,7 +734,10 @@ test.describe("Mobile Bottom Sheet - Keyboard Navigation (7.9)", () => {
     // (isMobile: true) where keyboard events don't fire consistently.
     // These test desktop keyboard a11y, not realistic mobile interactions.
     const viewport = page.viewportSize();
-    test.skip(!!viewport && viewport.width < 768, "Keyboard nav tests require desktop viewport");
+    test.skip(
+      !!viewport && viewport.width < 768,
+      "Keyboard nav tests require desktop viewport"
+    );
   });
 
   test("arrow up/right expands sheet", async ({ page }) => {
@@ -883,9 +908,7 @@ test.describe("Mobile Bottom Sheet - Body Scroll Lock", () => {
 
     // At half position, body should be scrollable
     expect(await getSnapIndex(page)).toBe(1);
-    let bodyOverflow = await page.evaluate(
-      () => document.body.style.overflow,
-    );
+    let bodyOverflow = await page.evaluate(() => document.body.style.overflow);
     expect(bodyOverflow).not.toBe("hidden");
 
     // Expand the sheet by clicking the expand button (auto-waits for visibility)
@@ -896,11 +919,13 @@ test.describe("Mobile Bottom Sheet - Body Scroll Lock", () => {
     // Wait for React useEffect to apply body scroll lock
     await page.waitForFunction(
       () => {
-        const snap = document.querySelector('[data-snap-current]');
-        return snap?.getAttribute('data-snap-current') === '2'
-          && document.body.style.overflow === 'hidden';
+        const snap = document.querySelector("[data-snap-current]");
+        return (
+          snap?.getAttribute("data-snap-current") === "2" &&
+          document.body.style.overflow === "hidden"
+        );
       },
-      { timeout: 10_000 },
+      { timeout: 10_000 }
     );
     bodyOverflow = await page.evaluate(() => document.body.style.overflow);
     expect(bodyOverflow).toBe("hidden");
@@ -911,7 +936,7 @@ test.describe("Mobile Bottom Sheet - Body Scroll Lock", () => {
     // Wait for React useEffect cleanup to release body scroll lock
     await page.waitForFunction(
       () => document.body.style.overflow !== "hidden",
-      { timeout: 10_000 },
+      { timeout: 10_000 }
     );
     bodyOverflow = await page.evaluate(() => document.body.style.overflow);
     expect(bodyOverflow).not.toBe("hidden");
@@ -935,7 +960,10 @@ test.describe("Mobile Bottom Sheet - Accessibility", () => {
   test("handle updates aria-valuetext based on position", async ({ page }) => {
     // Uses keyboard End/Home to change position — skip on mobile emulation
     const viewport = page.viewportSize();
-    test.skip(!!viewport && viewport.width < 768, "Keyboard-driven test requires desktop viewport");
+    test.skip(
+      !!viewport && viewport.width < 768,
+      "Keyboard-driven test requires desktop viewport"
+    );
 
     await page.goto(`/search?${boundsQS}`);
     await expect(page.locator(selectors.listingCard).first()).toBeAttached({
@@ -953,14 +981,18 @@ test.describe("Mobile Bottom Sheet - Accessibility", () => {
     await page.keyboard.press("End");
     await waitForSheetAnimation(page);
 
-    await expect(handle).toHaveAttribute("aria-valuenow", "2", { timeout: 10_000 });
+    await expect(handle).toHaveAttribute("aria-valuenow", "2", {
+      timeout: 10_000,
+    });
     await expect(handle).toHaveAttribute("aria-valuetext", "expanded");
 
     // Collapse
     await page.keyboard.press("Home");
     await waitForSheetAnimation(page);
 
-    await expect(handle).toHaveAttribute("aria-valuenow", "0", { timeout: 10_000 });
+    await expect(handle).toHaveAttribute("aria-valuenow", "0", {
+      timeout: 10_000,
+    });
     await expect(handle).toHaveAttribute("aria-valuetext", "collapsed");
   });
 });

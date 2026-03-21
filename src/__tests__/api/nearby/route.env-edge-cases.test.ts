@@ -13,7 +13,7 @@ jest.mock("next/server", () => ({
   NextResponse: {
     json: (
       data: unknown,
-      init?: { status?: number; headers?: Record<string, string> },
+      init?: { status?: number; headers?: Record<string, string> }
     ) => {
       mockJsonFn(data, init);
       return {
@@ -151,7 +151,7 @@ describe("POST /api/nearby - Env/Deployment Edge Cases", () => {
           listingLng: -122.4194,
           categories: ["food-grocery"],
           radiusMeters: 1609,
-        }),
+        })
       );
 
       expect(response.status).toBe(400);
@@ -165,7 +165,7 @@ describe("POST /api/nearby - Env/Deployment Edge Cases", () => {
           listingLat: 37.7749,
           categories: ["food-grocery"],
           radiusMeters: 1609,
-        }),
+        })
       );
 
       expect(response.status).toBe(400);
@@ -180,7 +180,7 @@ describe("POST /api/nearby - Env/Deployment Edge Cases", () => {
           listingLng: null,
           categories: ["food-grocery"],
           radiusMeters: 1609,
-        }),
+        })
       );
 
       expect(response.status).toBe(400);
@@ -219,9 +219,9 @@ describe("POST /api/nearby - Env/Deployment Edge Cases", () => {
                     places: [mockRadarPlace],
                   }),
                 }),
-              100,
-            ),
-          ),
+              100
+            )
+          )
       );
 
       const response = await POST(createRequest(validRequestBody));
@@ -255,7 +255,7 @@ describe("POST /api/nearby - Env/Deployment Edge Cases", () => {
           headers: expect.objectContaining({
             "Cache-Control": "no-store, no-cache, must-revalidate",
           }),
-        }),
+        })
       );
     });
 
@@ -270,7 +270,7 @@ describe("POST /api/nearby - Env/Deployment Edge Cases", () => {
           headers: expect.objectContaining({
             Pragma: "no-cache",
           }),
-        }),
+        })
       );
     });
   });
@@ -343,7 +343,7 @@ describe("POST /api/nearby - Env/Deployment Edge Cases", () => {
         createRequest({
           ...validRequestBody,
           radiusMeters: 5000, // Not in allowed values
-        }),
+        })
       );
 
       expect(response.status).toBe(400);
@@ -359,7 +359,7 @@ describe("POST /api/nearby - Env/Deployment Edge Cases", () => {
           createRequest({
             ...validRequestBody,
             radiusMeters: radius,
-          }),
+          })
         );
 
         expect(response.status).toBe(200);
@@ -377,7 +377,7 @@ describe("POST /api/nearby - Env/Deployment Edge Cases", () => {
           listingLng: -122.4194,
           radiusMeters: 1609,
           // No categories
-        }),
+        })
       );
 
       // Should use default categories in fetch call
@@ -395,7 +395,7 @@ describe("POST /api/nearby - Env/Deployment Edge Cases", () => {
           listingLng: -122.4194,
           categories: ["custom-category"],
           radiusMeters: 1609,
-        }),
+        })
       );
 
       const fetchUrl = mockFetch.mock.calls[0][0];
@@ -411,7 +411,7 @@ describe("POST /api/nearby - Env/Deployment Edge Cases", () => {
         createRequest({
           ...validRequestBody,
           query: "coffee shops",
-        }),
+        })
       );
 
       const fetchUrl = mockFetch.mock.calls[0][0];
@@ -427,7 +427,7 @@ describe("POST /api/nearby - Env/Deployment Edge Cases", () => {
           listingLng: -122.4194,
           query: "starbucks",
           radiusMeters: 1609,
-        }),
+        })
       );
 
       expect(response.status).toBe(200);
@@ -446,7 +446,7 @@ describe("POST /api/nearby - Env/Deployment Edge Cases", () => {
           headers: expect.objectContaining({
             Authorization: "prj_test_pk_1234567890",
           }),
-        }),
+        })
       );
     });
   });

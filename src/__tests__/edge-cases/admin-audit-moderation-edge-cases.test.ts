@@ -72,6 +72,31 @@ jest.mock("@/lib/audit", () => ({
   getAdminActionHistory: jest.fn(),
 }));
 
+jest.mock("@/lib/logger", () => ({
+  logger: { sync: { error: jest.fn(), warn: jest.fn(), info: jest.fn() } },
+}));
+
+jest.mock("next/headers", () => ({
+  headers: jest.fn().mockResolvedValue(new Headers()),
+}));
+
+jest.mock("@/lib/rate-limit", () => ({
+  checkRateLimit: jest.fn().mockResolvedValue({
+    success: true,
+    remaining: 19,
+    resetAt: new Date(),
+  }),
+  getClientIPFromHeaders: jest.fn().mockReturnValue("127.0.0.1"),
+  RATE_LIMITS: {
+    adminWrite: { limit: 20, windowMs: 60_000 },
+    adminDelete: { limit: 5, windowMs: 3_600_000 },
+  },
+}));
+
+jest.mock("@/lib/search/search-doc-dirty", () => ({
+  markListingDirty: jest.fn().mockResolvedValue(undefined),
+}));
+
 import {
   getUsers,
   toggleUserAdmin,
@@ -154,7 +179,7 @@ describe("Category I: Admin + Audit Logs + Moderation Edge Cases", () => {
       // The actual logAdminAction implementation catches errors and only logs them
       // This test verifies that the mock behaves correctly when used
       (prisma.auditLog.create as jest.Mock).mockRejectedValue(
-        new Error("DB Error"),
+        new Error("DB Error")
       );
 
       // The actual function would not throw - it just logs the error
@@ -168,7 +193,7 @@ describe("Category I: Admin + Audit Logs + Moderation Edge Cases", () => {
           action: "USER_SUSPENDED",
           targetType: "User",
           targetId: "user-456",
-        }),
+        })
       ).resolves.toBeUndefined();
     });
 
@@ -201,7 +226,7 @@ describe("Category I: Admin + Audit Logs + Moderation Edge Cases", () => {
             userName: "John Doe",
             targetUserId: "user-789",
           }),
-        }),
+        })
       );
     });
   });
@@ -350,7 +375,7 @@ describe("Category I: Admin + Audit Logs + Moderation Edge Cases", () => {
       const result = await resolveReport(
         "report-123",
         "DISMISSED",
-        "Not a violation",
+        "Not a violation"
       );
 
       expect(result.success).toBe(true);
@@ -383,16 +408,24 @@ describe("Category I: Admin + Audit Logs + Moderation Edge Cases", () => {
             }),
             update: jest.fn().mockResolvedValue({}),
           },
-          $queryRaw: jest.fn().mockResolvedValue([{
-            id: "listing-123", title: "Inappropriate Listing", ownerId: "owner-123",
-          }]),
+          $queryRaw: jest.fn().mockResolvedValue([
+            {
+              id: "listing-123",
+              title: "Inappropriate Listing",
+              ownerId: "owner-123",
+            },
+          ]),
           booking: {
             count: jest.fn().mockResolvedValue(0), // No active ACCEPTED bookings
             findMany: jest.fn().mockResolvedValue(affectedBookings),
             updateMany: jest.fn().mockResolvedValue({ count: 2 }),
           },
-          notification: { create: jest.fn().mockResolvedValue({ id: "notif" }) },
-          listing: { delete: jest.fn().mockResolvedValue({ id: "listing-123" }) },
+          notification: {
+            createMany: jest.fn().mockResolvedValue({ count: 3 }),
+          },
+          listing: {
+            delete: jest.fn().mockResolvedValue({ id: "listing-123" }),
+          },
         };
         return fn(tx);
       });
@@ -400,7 +433,7 @@ describe("Category I: Admin + Audit Logs + Moderation Edge Cases", () => {
 
       const result = await resolveReportAndRemoveListing(
         "report-123",
-        "Policy violation",
+        "Policy violation"
       );
 
       expect(result.success).toBe(true);
@@ -417,9 +450,14 @@ describe("Category I: Admin + Audit Logs + Moderation Edge Cases", () => {
       // deleteListing now uses interactive transaction with FOR UPDATE
       (prisma.$transaction as jest.Mock).mockImplementation(async (fn) => {
         const tx = {
-          $queryRaw: jest.fn().mockResolvedValue([{
-            id: "listing-123", title: "Active Listing", ownerId: "owner-123", status: "ACTIVE",
-          }]),
+          $queryRaw: jest.fn().mockResolvedValue([
+            {
+              id: "listing-123",
+              title: "Active Listing",
+              ownerId: "owner-123",
+              status: "ACTIVE",
+            },
+          ]),
           booking: { count: jest.fn().mockResolvedValue(3) },
         };
         return fn(tx);
@@ -439,16 +477,25 @@ describe("Category I: Admin + Audit Logs + Moderation Edge Cases", () => {
 
       (prisma.$transaction as jest.Mock).mockImplementation(async (fn) => {
         const tx = {
-          $queryRaw: jest.fn().mockResolvedValue([{
-            id: "listing-123", title: "To Delete Listing", ownerId: "owner-123", status: "ACTIVE",
-          }]),
+          $queryRaw: jest.fn().mockResolvedValue([
+            {
+              id: "listing-123",
+              title: "To Delete Listing",
+              ownerId: "owner-123",
+              status: "ACTIVE",
+            },
+          ]),
           booking: {
             count: jest.fn().mockResolvedValue(0),
             findMany: jest.fn().mockResolvedValue(pendingBookings),
             updateMany: jest.fn().mockResolvedValue({ count: 3 }),
           },
-          notification: { create: jest.fn().mockResolvedValue({ id: "notif" }) },
-          listing: { delete: jest.fn().mockResolvedValue({ id: "listing-123" }) },
+          notification: {
+            createMany: jest.fn().mockResolvedValue({ count: 3 }),
+          },
+          listing: {
+            delete: jest.fn().mockResolvedValue({ id: "listing-123" }),
+          },
         };
         return fn(tx);
       });
@@ -464,16 +511,23 @@ describe("Category I: Admin + Audit Logs + Moderation Edge Cases", () => {
     it("handles listing deletion with no pending bookings gracefully", async () => {
       (prisma.$transaction as jest.Mock).mockImplementation(async (fn) => {
         const tx = {
-          $queryRaw: jest.fn().mockResolvedValue([{
-            id: "listing-123", title: "Empty Listing", ownerId: "owner-123", status: "DRAFT",
-          }]),
+          $queryRaw: jest.fn().mockResolvedValue([
+            {
+              id: "listing-123",
+              title: "Empty Listing",
+              ownerId: "owner-123",
+              status: "DRAFT",
+            },
+          ]),
           booking: {
             count: jest.fn().mockResolvedValue(0),
             findMany: jest.fn().mockResolvedValue([]),
             updateMany: jest.fn().mockResolvedValue({ count: 0 }),
           },
-          notification: { create: jest.fn() },
-          listing: { delete: jest.fn().mockResolvedValue({ id: "listing-123" }) },
+          notification: { createMany: jest.fn().mockResolvedValue({ count: 0 }) },
+          listing: {
+            delete: jest.fn().mockResolvedValue({ id: "listing-123" }),
+          },
         };
         return fn(tx);
       });
@@ -518,7 +572,7 @@ describe("Category I: Admin + Audit Logs + Moderation Edge Cases", () => {
 
     it("handles database error in stats gracefully", async () => {
       (prisma.user.count as jest.Mock).mockRejectedValue(
-        new Error("DB timeout"),
+        new Error("DB timeout")
       );
 
       const result = await getAdminStats();
@@ -572,7 +626,7 @@ describe("Category I: Admin + Audit Logs + Moderation Edge Cases", () => {
       expect(prisma.report.findMany).toHaveBeenCalledWith(
         expect.objectContaining({
           where: expect.objectContaining({ status: "OPEN" }),
-        }),
+        })
       );
     });
 
@@ -585,7 +639,7 @@ describe("Category I: Admin + Audit Logs + Moderation Edge Cases", () => {
       expect(prisma.report.findMany).toHaveBeenCalledWith(
         expect.objectContaining({
           orderBy: { createdAt: "desc" },
-        }),
+        })
       );
     });
 
@@ -602,7 +656,7 @@ describe("Category I: Admin + Audit Logs + Moderation Edge Cases", () => {
             reporter: expect.any(Object),
             reviewer: expect.any(Object),
           }),
-        }),
+        })
       );
     });
   });
@@ -672,7 +726,7 @@ describe("Category I: Admin + Audit Logs + Moderation Edge Cases", () => {
   describe("I10: Audit log edge case timestamps and pagination", () => {
     it("handles pagination correctly with totalPages calculation", async () => {
       const mockGetAuditLogs = async (
-        params: { page?: number; limit?: number } = {},
+        params: { page?: number; limit?: number } = {}
       ) => {
         const page = params.page || 1;
         const limit = params.limit || 50;
@@ -759,7 +813,7 @@ describe("Category I: Admin + Audit Logs + Moderation Edge Cases", () => {
       expect(prisma.auditLog.findMany).toHaveBeenCalledWith(
         expect.objectContaining({
           orderBy: { createdAt: "desc" },
-        }),
+        })
       );
     });
   });

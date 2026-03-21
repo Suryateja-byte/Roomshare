@@ -7,7 +7,14 @@
 
 import { getLanguageName } from "@/lib/languages";
 import { getPriceParam } from "@/lib/search-params";
-import { LEASE_DURATION_ALIASES, ROOM_TYPE_ALIASES, VALID_LEASE_DURATIONS, VALID_AMENITIES, VALID_HOUSE_RULES, VALID_ROOM_TYPES } from "@/lib/filter-schema";
+import {
+  LEASE_DURATION_ALIASES,
+  ROOM_TYPE_ALIASES,
+  VALID_LEASE_DURATIONS,
+  VALID_AMENITIES,
+  VALID_HOUSE_RULES,
+  VALID_ROOM_TYPES,
+} from "@/lib/filter-schema";
 
 /**
  * Represents a single filter chip that can be displayed and removed
@@ -76,7 +83,7 @@ function parseArrayParam(searchParams: URLSearchParams, key: string): string[] {
  * Convert URLSearchParams to an array of filter chips
  */
 export function urlToFilterChips(
-  searchParams: URLSearchParams,
+  searchParams: URLSearchParams
 ): FilterChipData[] {
   const chips: FilterChipData[] = [];
 
@@ -113,7 +120,11 @@ export function urlToFilterChips(
     if (/^\d{4}-\d{2}-\d{2}$/.test(trimmed)) {
       const [y, m, d] = trimmed.split("-").map(Number);
       const date = new Date(y, m - 1, d);
-      if (date.getFullYear() === y && date.getMonth() === m - 1 && date.getDate() === d) {
+      if (
+        date.getFullYear() === y &&
+        date.getMonth() === m - 1 &&
+        date.getDate() === d
+      ) {
         const today = new Date();
         today.setHours(0, 0, 0, 0);
         const maxDate = new Date();
@@ -138,8 +149,9 @@ export function urlToFilterChips(
     const lower = roomType.toLowerCase();
     // Resolve aliases first (e.g., "private" → "Private Room"), then check allowlist
     const resolved = ROOM_TYPE_ALIASES[lower];
-    const canonical = resolved
-      ?? (VALID_ROOM_TYPES as readonly string[]).find(
+    const canonical =
+      resolved ??
+      (VALID_ROOM_TYPES as readonly string[]).find(
         (v) => v.toLowerCase() === lower
       );
     if (canonical && canonical !== "any") {
@@ -155,8 +167,11 @@ export function urlToFilterChips(
   const leaseDuration = searchParams.get("leaseDuration");
   if (leaseDuration && leaseDuration !== "any") {
     const lower = leaseDuration.toLowerCase();
-    const resolved = LEASE_DURATION_ALIASES[lower]
-      ?? (VALID_LEASE_DURATIONS as readonly string[]).find(v => v.toLowerCase() === lower);
+    const resolved =
+      LEASE_DURATION_ALIASES[lower] ??
+      (VALID_LEASE_DURATIONS as readonly string[]).find(
+        (v) => v.toLowerCase() === lower
+      );
     if (resolved && resolved !== "any") {
       chips.push({
         id: "leaseDuration",
@@ -298,7 +313,7 @@ export function urlToFilterChips(
  */
 export function removeFilterFromUrl(
   searchParams: URLSearchParams,
-  chip: FilterChipData,
+  chip: FilterChipData
 ): string {
   const newParams = new URLSearchParams(searchParams);
 
@@ -355,18 +370,27 @@ export function clearAllFilters(searchParams: URLSearchParams): string {
 
 /** Quick check — returns true if any filter param is set (no chip construction) */
 export const FILTER_PARAM_KEYS = [
-  'minPrice', 'maxPrice', 'minBudget', 'maxBudget',
-  'moveInDate', 'roomType', 'leaseDuration',
-  'amenities', 'houseRules', 'languages',
-  'genderPreference', 'householdGender', 'nearMatches',
-  'minSlots',
+  "minPrice",
+  "maxPrice",
+  "minBudget",
+  "maxBudget",
+  "moveInDate",
+  "roomType",
+  "leaseDuration",
+  "amenities",
+  "houseRules",
+  "languages",
+  "genderPreference",
+  "householdGender",
+  "nearMatches",
+  "minSlots",
 ] as const;
 
 export function hasAnyFilter(searchParams: URLSearchParams): boolean {
-  return FILTER_PARAM_KEYS.some(k => {
+  return FILTER_PARAM_KEYS.some((k) => {
     const v = searchParams.get(k);
-    if (v === null || v === '' || v === 'any') return false;
-    if (k === 'nearMatches' && (v === '0' || v === 'false')) return false;
+    if (v === null || v === "" || v === "any") return false;
+    if (k === "nearMatches" && (v === "0" || v === "false")) return false;
     return true;
   });
 }

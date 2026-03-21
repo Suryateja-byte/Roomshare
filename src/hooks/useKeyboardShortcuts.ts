@@ -82,7 +82,7 @@ function isInputElement(element: Element | null): boolean {
  */
 export function useKeyboardShortcuts(
   shortcuts: ShortcutConfig[],
-  options: UseKeyboardShortcutsOptions = {},
+  options: UseKeyboardShortcutsOptions = {}
 ) {
   const { disabled: globallyDisabled = false } = options;
 
@@ -133,7 +133,7 @@ export function useKeyboardShortcuts(
         break; // Only execute first matching shortcut
       }
     },
-    [globallyDisabled],
+    [globallyDisabled]
   );
 
   useEffect(() => {
@@ -146,7 +146,7 @@ export function useKeyboardShortcuts(
  * Format a shortcut for display (e.g., "⌘K" or "Ctrl+K")
  */
 export function formatShortcut(
-  config: Pick<ShortcutConfig, "key" | "meta" | "shift">,
+  config: Pick<ShortcutConfig, "key" | "meta" | "shift">
 ): string {
   const parts: string[] = [];
 
@@ -154,7 +154,8 @@ export function formatShortcut(
   // Prefer navigator.userAgentData (modern API) with fallback to deprecated navigator.platform
   const isMac =
     typeof navigator !== "undefined" &&
-    ((navigator as Navigator & { userAgentData?: { platform?: string } }).userAgentData?.platform === "macOS" ||
+    ((navigator as Navigator & { userAgentData?: { platform?: string } })
+      .userAgentData?.platform === "macOS" ||
       /Mac|iPod|iPhone|iPad/.test(navigator.platform));
 
   if (config.meta) {

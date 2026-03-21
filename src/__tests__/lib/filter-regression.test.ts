@@ -21,11 +21,11 @@ import {
   type FilterScenario,
   type FilterExecutor,
   type GoldenScenario,
-} from '@/lib/filter-regression';
-import { normalizeFilters } from '@/lib/filter-schema';
-import { ACTIVE_LISTINGS, applyFilters } from '../fixtures/listings.fixture';
+} from "@/lib/filter-regression";
+import { normalizeFilters } from "@/lib/filter-schema";
+import { ACTIVE_LISTINGS, applyFilters } from "../fixtures/listings.fixture";
 
-describe('Filter Regression Framework', () => {
+describe("Filter Regression Framework", () => {
   beforeEach(() => {
     clearScenarios();
   });
@@ -34,10 +34,10 @@ describe('Filter Regression Framework', () => {
   // Scenario Capture Tests
   // ============================================
 
-  describe('captureFilterScenario', () => {
-    it('captures a filter scenario with all required fields', () => {
+  describe("captureFilterScenario", () => {
+    it("captures a filter scenario with all required fields", () => {
       const rawInput = { minPrice: 500, maxPrice: 2000 };
-      const resultIds = ['id-1', 'id-2', 'id-3'];
+      const resultIds = ["id-1", "id-2", "id-3"];
 
       const scenario = captureFilterScenario(rawInput, resultIds, 10);
 
@@ -51,7 +51,7 @@ describe('Filter Regression Framework', () => {
       expect(scenario.behaviorHash).toBeDefined();
     });
 
-    it('normalizes the filter input', () => {
+    it("normalizes the filter input", () => {
       // P1-13: Valid price range (non-inverted)
       const rawInput = { minPrice: 500, maxPrice: 2000 };
       const scenario = captureFilterScenario(rawInput, [], 5);
@@ -60,15 +60,15 @@ describe('Filter Regression Framework', () => {
       expect(scenario.normalizedFilters.maxPrice).toBe(2000);
     });
 
-    it('throws for inverted price ranges (P1-13)', () => {
+    it("throws for inverted price ranges (P1-13)", () => {
       const rawInput = { minPrice: 2000, maxPrice: 500 }; // Inverted
       // P1-13: Now throws instead of silently swapping
       expect(() => captureFilterScenario(rawInput, [], 5)).toThrow(
-        'minPrice cannot exceed maxPrice'
+        "minPrice cannot exceed maxPrice"
       );
     });
 
-    it('generates unique IDs for each scenario', () => {
+    it("generates unique IDs for each scenario", () => {
       const ids = new Set<string>();
 
       for (let i = 0; i < 100; i++) {
@@ -83,10 +83,10 @@ describe('Filter Regression Framework', () => {
   // Behavior Hash Tests
   // ============================================
 
-  describe('createBehaviorHash', () => {
-    it('produces consistent hash for same input', () => {
+  describe("createBehaviorHash", () => {
+    it("produces consistent hash for same input", () => {
       const filters = normalizeFilters({ maxPrice: 1000 });
-      const resultIds = ['a', 'b', 'c'];
+      const resultIds = ["a", "b", "c"];
 
       const hash1 = createBehaviorHash(filters, resultIds);
       const hash2 = createBehaviorHash(filters, resultIds);
@@ -94,17 +94,17 @@ describe('Filter Regression Framework', () => {
       expect(hash1).toBe(hash2);
     });
 
-    it('produces different hash for different results', () => {
+    it("produces different hash for different results", () => {
       const filters = normalizeFilters({ maxPrice: 1000 });
 
-      const hash1 = createBehaviorHash(filters, ['a', 'b', 'c']);
-      const hash2 = createBehaviorHash(filters, ['a', 'b', 'd']);
+      const hash1 = createBehaviorHash(filters, ["a", "b", "c"]);
+      const hash2 = createBehaviorHash(filters, ["a", "b", "d"]);
 
       expect(hash1).not.toBe(hash2);
     });
 
-    it('produces different hash for different filters', () => {
-      const resultIds = ['a', 'b', 'c'];
+    it("produces different hash for different filters", () => {
+      const resultIds = ["a", "b", "c"];
 
       const hash1 = createBehaviorHash(
         normalizeFilters({ maxPrice: 1000 }),
@@ -118,11 +118,11 @@ describe('Filter Regression Framework', () => {
       expect(hash1).not.toBe(hash2);
     });
 
-    it('is order-independent for result IDs', () => {
+    it("is order-independent for result IDs", () => {
       const filters = normalizeFilters({});
 
-      const hash1 = createBehaviorHash(filters, ['a', 'b', 'c']);
-      const hash2 = createBehaviorHash(filters, ['c', 'b', 'a']);
+      const hash1 = createBehaviorHash(filters, ["a", "b", "c"]);
+      const hash2 = createBehaviorHash(filters, ["c", "b", "a"]);
 
       expect(hash1).toBe(hash2);
     });
@@ -132,20 +132,20 @@ describe('Filter Regression Framework', () => {
   // Scenario Storage Tests
   // ============================================
 
-  describe('scenario storage', () => {
-    it('stores and retrieves scenarios', () => {
-      const scenario = captureFilterScenario({ minPrice: 100 }, ['id-1'], 5);
+  describe("scenario storage", () => {
+    it("stores and retrieves scenarios", () => {
+      const scenario = captureFilterScenario({ minPrice: 100 }, ["id-1"], 5);
       storeScenario(scenario);
 
       const retrieved = getScenario(scenario.id);
       expect(retrieved).toEqual(scenario);
     });
 
-    it('returns undefined for unknown scenario', () => {
-      expect(getScenario('unknown-id')).toBeUndefined();
+    it("returns undefined for unknown scenario", () => {
+      expect(getScenario("unknown-id")).toBeUndefined();
     });
 
-    it('clears all scenarios', () => {
+    it("clears all scenarios", () => {
       storeScenario(captureFilterScenario({}, [], 1));
       storeScenario(captureFilterScenario({}, [], 1));
 
@@ -156,9 +156,9 @@ describe('Filter Regression Framework', () => {
       expect(getAllScenarios().length).toBe(0);
     });
 
-    it('exports and imports scenarios as JSON', () => {
-      const scenario1 = captureFilterScenario({ minPrice: 100 }, ['a'], 5);
-      const scenario2 = captureFilterScenario({ maxPrice: 500 }, ['b'], 10);
+    it("exports and imports scenarios as JSON", () => {
+      const scenario1 = captureFilterScenario({ minPrice: 100 }, ["a"], 5);
+      const scenario2 = captureFilterScenario({ maxPrice: 500 }, ["b"], 10);
       storeScenario(scenario1);
       storeScenario(scenario2);
 
@@ -179,13 +179,13 @@ describe('Filter Regression Framework', () => {
   // Regression Testing
   // ============================================
 
-  describe('runScenario', () => {
+  describe("runScenario", () => {
     const mockExecutor: FilterExecutor = (filters) => {
       const results = applyFilters(ACTIVE_LISTINGS, filters);
       return results.map((r) => r.id);
     };
 
-    it('passes when behavior matches', async () => {
+    it("passes when behavior matches", async () => {
       // Create scenario with current behavior
       const filters = { maxPrice: 2000 };
       const currentResults = applyFilters(
@@ -201,13 +201,13 @@ describe('Filter Regression Framework', () => {
 
       const report = await runScenario(scenario, mockExecutor);
 
-      expect(report.status).toBe('pass');
+      expect(report.status).toBe("pass");
     });
 
-    it('fails when normalization changes', async () => {
+    it("fails when normalization changes", async () => {
       // Create scenario with manually modified normalized filters
       const scenario: FilterScenario = {
-        id: 'test-scenario',
+        id: "test-scenario",
         timestamp: new Date().toISOString(),
         rawInput: { maxPrice: 2000 },
         normalizedFilters: {
@@ -219,30 +219,30 @@ describe('Filter Regression Framework', () => {
         resultCount: 10,
         resultIds: [],
         executionTimeMs: 10,
-        behaviorHash: 'fake-hash',
+        behaviorHash: "fake-hash",
       };
 
       const report = await runScenario(scenario, mockExecutor);
 
-      expect(report.status).toBe('fail');
+      expect(report.status).toBe("fail");
       expect(report.diff?.normalizedFilters).toBeDefined();
     });
 
-    it('handles execution errors gracefully', async () => {
+    it("handles execution errors gracefully", async () => {
       const errorExecutor: FilterExecutor = () => {
-        throw new Error('Database connection failed');
+        throw new Error("Database connection failed");
       };
 
       const scenario = captureFilterScenario({}, [], 1);
       const report = await runScenario(scenario, errorExecutor);
 
-      expect(report.status).toBe('fail');
-      expect(report.message).toContain('Execution error');
+      expect(report.status).toBe("fail");
+      expect(report.message).toContain("Execution error");
     });
   });
 
-  describe('runRegressionSuite', () => {
-    it('runs all stored scenarios', async () => {
+  describe("runRegressionSuite", () => {
+    it("runs all stored scenarios", async () => {
       const mockExecutor: FilterExecutor = (filters) => {
         return applyFilters(ACTIVE_LISTINGS, filters).map((r) => r.id);
       };
@@ -250,7 +250,10 @@ describe('Filter Regression Framework', () => {
       // Create scenarios matching current behavior
       for (let i = 0; i < 5; i++) {
         const filters = { maxPrice: 1000 + i * 500 };
-        const results = applyFilters(ACTIVE_LISTINGS, normalizeFilters(filters));
+        const results = applyFilters(
+          ACTIVE_LISTINGS,
+          normalizeFilters(filters)
+        );
         const scenario = captureFilterScenario(
           filters,
           results.map((r) => r.id),
@@ -271,20 +274,26 @@ describe('Filter Regression Framework', () => {
   // Scenario Sampler Tests
   // ============================================
 
-  describe('ScenarioSampler', () => {
-    it('samples scenarios into buckets by filter characteristics', () => {
+  describe("ScenarioSampler", () => {
+    it("samples scenarios into buckets by filter characteristics", () => {
       const sampler = new ScenarioSampler(5, 100);
 
       // Add scenarios with different filter combinations
       sampler.sample(captureFilterScenario({ minPrice: 100 }, [], 1));
-      sampler.sample(captureFilterScenario({ amenities: ['Wifi'] }, [], 1));
-      sampler.sample(captureFilterScenario({ bounds: { minLat: 0, maxLat: 1, minLng: 0, maxLng: 1 } }, [], 1));
+      sampler.sample(captureFilterScenario({ amenities: ["Wifi"] }, [], 1));
+      sampler.sample(
+        captureFilterScenario(
+          { bounds: { minLat: 0, maxLat: 1, minLng: 0, maxLng: 1 } },
+          [],
+          1
+        )
+      );
 
       const stats = sampler.getCoverageStats();
       expect(Object.keys(stats).length).toBeGreaterThanOrEqual(3);
     });
 
-    it('respects per-bucket limit', () => {
+    it("respects per-bucket limit", () => {
       const sampler = new ScenarioSampler(3, 100);
 
       // Add many scenarios with same filter type
@@ -293,10 +302,10 @@ describe('Filter Regression Framework', () => {
       }
 
       const stats = sampler.getCoverageStats();
-      expect(stats['price']).toBe(3);
+      expect(stats["price"]).toBe(3);
     });
 
-    it('respects total limit', () => {
+    it("respects total limit", () => {
       const sampler = new ScenarioSampler(100, 10);
 
       for (let i = 0; i < 50; i++) {
@@ -307,7 +316,7 @@ describe('Filter Regression Framework', () => {
       expect(scenarios.length).toBeLessThanOrEqual(10);
     });
 
-    it('clears all samples', () => {
+    it("clears all samples", () => {
       const sampler = new ScenarioSampler();
       sampler.sample(captureFilterScenario({}, [], 1));
       sampler.sample(captureFilterScenario({}, [], 1));
@@ -322,26 +331,24 @@ describe('Filter Regression Framework', () => {
   // Golden Scenario Tests
   // ============================================
 
-  describe('Golden Scenarios', () => {
-    it('creates golden scenario with current normalization', () => {
-      const golden = createGoldenScenario(
-        'test',
-        'Test scenario',
-        { minPrice: 500 }
-      );
+  describe("Golden Scenarios", () => {
+    it("creates golden scenario with current normalization", () => {
+      const golden = createGoldenScenario("test", "Test scenario", {
+        minPrice: 500,
+      });
 
-      expect(golden.name).toBe('test');
-      expect(golden.description).toBe('Test scenario');
+      expect(golden.name).toBe("test");
+      expect(golden.description).toBe("Test scenario");
       expect(golden.input).toEqual({ minPrice: 500 });
-      expect(golden.expectedNormalized).toEqual(normalizeFilters({ minPrice: 500 }));
+      expect(golden.expectedNormalized).toEqual(
+        normalizeFilters({ minPrice: 500 })
+      );
     });
 
-    it('validates golden scenario against current implementation', () => {
-      const golden = createGoldenScenario(
-        'test',
-        'Test scenario',
-        { maxPrice: 2000 }
-      );
+    it("validates golden scenario against current implementation", () => {
+      const golden = createGoldenScenario("test", "Test scenario", {
+        maxPrice: 2000,
+      });
 
       const result = validateGoldenScenario(golden);
 
@@ -349,10 +356,10 @@ describe('Filter Regression Framework', () => {
       expect(result.errors).toEqual([]);
     });
 
-    it('detects mismatch in golden scenario', () => {
+    it("detects mismatch in golden scenario", () => {
       const golden: GoldenScenario = {
-        name: 'test',
-        description: 'Test scenario',
+        name: "test",
+        description: "Test scenario",
         input: { maxPrice: 2000 },
         expectedNormalized: { maxPrice: 9999, page: 1, limit: 12 }, // Wrong expected value
       };
@@ -368,20 +375,20 @@ describe('Filter Regression Framework', () => {
   // Critical Scenarios Tests
   // ============================================
 
-  describe('Critical Scenarios', () => {
-    it('has all required critical scenarios', () => {
+  describe("Critical Scenarios", () => {
+    it("has all required critical scenarios", () => {
       // P1-13: Reduced by 1 since inverted-price-range now throws
       expect(CRITICAL_SCENARIOS.length).toBeGreaterThanOrEqual(9);
 
       const names = CRITICAL_SCENARIOS.map((s) => s.name);
-      expect(names).toContain('empty-filters');
-      expect(names).toContain('basic-price-filter');
+      expect(names).toContain("empty-filters");
+      expect(names).toContain("basic-price-filter");
       // P1-13: inverted-price-range removed - now throws instead of swapping
-      expect(names).toContain('antimeridian-crossing');
-      expect(names).toContain('malformed-input');
+      expect(names).toContain("antimeridian-crossing");
+      expect(names).toContain("malformed-input");
     });
 
-    it('all critical scenarios validate successfully', () => {
+    it("all critical scenarios validate successfully", () => {
       const results = validateCriticalScenarios();
 
       expect(results.allValid).toBe(true);
@@ -391,22 +398,26 @@ describe('Filter Regression Framework', () => {
       });
     });
 
-    it('empty-filters scenario normalizes correctly', () => {
-      const scenario = CRITICAL_SCENARIOS.find((s) => s.name === 'empty-filters');
+    it("empty-filters scenario normalizes correctly", () => {
+      const scenario = CRITICAL_SCENARIOS.find(
+        (s) => s.name === "empty-filters"
+      );
       const result = validateGoldenScenario(scenario!);
 
       expect(result.valid).toBe(true);
     });
 
-    it('inverted price range throws validation error (P1-13)', () => {
+    it("inverted price range throws validation error (P1-13)", () => {
       // P1-13: Inverted price ranges now throw instead of silently swapping
       const input = { minPrice: 2000, maxPrice: 500 };
-      expect(() => normalizeFilters(input)).toThrow('minPrice cannot exceed maxPrice');
+      expect(() => normalizeFilters(input)).toThrow(
+        "minPrice cannot exceed maxPrice"
+      );
     });
 
-    it('antimeridian-crossing scenario preserves longitude order', () => {
+    it("antimeridian-crossing scenario preserves longitude order", () => {
       const scenario = CRITICAL_SCENARIOS.find(
-        (s) => s.name === 'antimeridian-crossing'
+        (s) => s.name === "antimeridian-crossing"
       );
       const normalized = normalizeFilters(scenario!.input);
 
@@ -415,8 +426,10 @@ describe('Filter Regression Framework', () => {
       expect(normalized.bounds?.maxLng).toBe(-150);
     });
 
-    it('extreme-values scenario clamps correctly', () => {
-      const scenario = CRITICAL_SCENARIOS.find((s) => s.name === 'extreme-values');
+    it("extreme-values scenario clamps correctly", () => {
+      const scenario = CRITICAL_SCENARIOS.find(
+        (s) => s.name === "extreme-values"
+      );
       const normalized = normalizeFilters(scenario!.input);
 
       expect(normalized.minPrice).toBeGreaterThanOrEqual(0);

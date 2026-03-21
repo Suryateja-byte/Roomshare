@@ -11,6 +11,7 @@ jest.mock("@/lib/prisma", () => ({
     verificationToken: {
       create: jest.fn(),
     },
+    $transaction: jest.fn(),
   },
 }));
 
@@ -117,7 +118,9 @@ describe("Register API", () => {
       expect(response.status).toBe(400);
       const data = await response.json();
       // P1-06/P1-07: Generic message prevents user enumeration
-      expect(data.error).toBe("Registration failed. Please try again or use forgot password if you already have an account.");
+      expect(data.error).toBe(
+        "Registration failed. Please try again or use forgot password if you already have an account."
+      );
     });
 
     it("creates user successfully", async () => {
@@ -128,7 +131,7 @@ describe("Register API", () => {
         email: "new@test.com",
         password: "hashed_password",
       };
-      (prisma.user.create as jest.Mock).mockResolvedValue(mockUser);
+      (prisma.$transaction as jest.Mock).mockResolvedValue([mockUser, {}]);
 
       const request = new Request("http://localhost/api/register", {
         method: "POST",
@@ -142,14 +145,7 @@ describe("Register API", () => {
 
       expect(response.status).toBe(201);
       expect(bcrypt.hash).toHaveBeenCalledWith("password12345", 12);
-      expect(prisma.user.create).toHaveBeenCalledWith({
-        data: {
-          name: "Test User",
-          email: "new@test.com",
-          password: "hashed_password",
-          emailVerified: null,
-        },
-      });
+      expect(prisma.$transaction).toHaveBeenCalledTimes(1);
 
       // Verify password is not in response
       const data = await response.json();
@@ -158,7 +154,7 @@ describe("Register API", () => {
 
     it("handles database errors", async () => {
       (prisma.user.findUnique as jest.Mock).mockRejectedValue(
-        new Error("DB Error"),
+        new Error("DB Error")
       );
 
       const request = new Request("http://localhost/api/register", {

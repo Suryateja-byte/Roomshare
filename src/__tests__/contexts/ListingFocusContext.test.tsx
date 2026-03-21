@@ -239,7 +239,7 @@ describe("ListingFocusContext", () => {
           focus: useListingFocus(),
           isFocused: useIsListingFocused("listing-123"),
         }),
-        { wrapper },
+        { wrapper }
       );
 
       act(() => {
@@ -256,7 +256,7 @@ describe("ListingFocusContext", () => {
           focus: useListingFocus(),
           isFocused: useIsListingFocused("listing-123"),
         }),
-        { wrapper },
+        { wrapper }
       );
 
       act(() => {
@@ -273,7 +273,7 @@ describe("ListingFocusContext", () => {
           focus: useListingFocus(),
           isFocused: useIsListingFocused("listing-123"),
         }),
-        { wrapper },
+        { wrapper }
       );
 
       // Initially not focused

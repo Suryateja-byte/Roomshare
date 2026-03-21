@@ -8,6 +8,8 @@
  * Remove them once the NeighborhoodCache model is added to schema.prisma.
  */
 
+import "server-only";
+
 import { prisma } from "@/lib/prisma";
 import type {
   POI,
@@ -28,7 +30,7 @@ const DEFAULT_TTL_DAYS = 7;
  * @returns Cached result or null if not found/expired
  */
 export async function getCachedSearch(
-  key: NeighborhoodCacheKey,
+  key: NeighborhoodCacheKey
 ): Promise<CachedNeighborhoodResult | null> {
   try {
     // @ts-expect-error — NeighborhoodCache model not yet in schema
@@ -97,7 +99,7 @@ export async function cacheSearch(
   key: NeighborhoodCacheKey,
   pois: POI[],
   meta: SearchMeta,
-  ttlDays: number = DEFAULT_TTL_DAYS,
+  ttlDays: number = DEFAULT_TTL_DAYS
 ): Promise<void> {
   try {
     // Enforce maximum TTL
@@ -122,7 +124,7 @@ export async function cacheSearch(
         // Note: distanceMiles and walkMins are computed client-side and cached
         distanceMiles: poi.distanceMiles,
         walkMins: poi.walkMins,
-      })),
+      }))
     );
 
     // @ts-expect-error — NeighborhoodCache model not yet in schema
@@ -236,7 +238,7 @@ export function isCacheStale(cachedAt: Date, staleDays: number = 3): boolean {
  * @param listingId - Listing ID to invalidate cache for
  */
 export async function invalidateListingCache(
-  listingId: string,
+  listingId: string
 ): Promise<number> {
   try {
     // @ts-expect-error — NeighborhoodCache model not yet in schema

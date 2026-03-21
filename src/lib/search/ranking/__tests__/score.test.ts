@@ -153,7 +153,7 @@ describe("normalizeRecency", () => {
 
     expect(normalizeRecency(now)).toBeGreaterThan(normalizeRecency(weekAgo));
     expect(normalizeRecency(weekAgo)).toBeGreaterThan(
-      normalizeRecency(monthAgo),
+      normalizeRecency(monthAgo)
     );
   });
 
@@ -204,7 +204,7 @@ describe("computeMedianPrice", () => {
 
   it("returns undefined when no valid prices", () => {
     expect(
-      computeMedianPrice([{ price: null }, { price: undefined }]),
+      computeMedianPrice([{ price: null }, { price: undefined }])
     ).toBeUndefined();
     expect(computeMedianPrice([{ price: 0 }, { price: -100 }])).toBeUndefined();
   });
@@ -215,7 +215,7 @@ describe("computeMedianPrice", () => {
 
   it("returns median for odd count", () => {
     expect(
-      computeMedianPrice([{ price: 100 }, { price: 200 }, { price: 300 }]),
+      computeMedianPrice([{ price: 100 }, { price: 200 }, { price: 300 }])
     ).toBe(200);
   });
 
@@ -226,7 +226,7 @@ describe("computeMedianPrice", () => {
         { price: 200 },
         { price: 300 },
         { price: 400 },
-      ]),
+      ])
     ).toBe(250);
   });
 
@@ -238,7 +238,7 @@ describe("computeMedianPrice", () => {
         { price: 0 },
         { price: 200 },
         { price: 300 },
-      ]),
+      ])
     ).toBe(200);
   });
 });
@@ -294,11 +294,11 @@ describe("computeScore", () => {
   it("higher quality listing scores higher", () => {
     const lowQuality = computeScore(
       { ...baseListing, recommendedScore: 10 },
-      baseContext,
+      baseContext
     );
     const highQuality = computeScore(
       { ...baseListing, recommendedScore: 100 },
-      baseContext,
+      baseContext
     );
     expect(highQuality).toBeGreaterThan(lowQuality);
   });
@@ -306,11 +306,11 @@ describe("computeScore", () => {
   it("higher rated listing scores higher", () => {
     const lowRating = computeScore(
       { ...baseListing, avgRating: 2.0 },
-      baseContext,
+      baseContext
     );
     const highRating = computeScore(
       { ...baseListing, avgRating: 5.0 },
-      baseContext,
+      baseContext
     );
     expect(highRating).toBeGreaterThan(lowRating);
   });

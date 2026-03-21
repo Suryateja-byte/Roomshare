@@ -2,7 +2,7 @@
  * Tests for manage-booking server actions
  */
 
-jest.mock('@/lib/booking-audit', () => ({ logBookingAudit: jest.fn() }));
+jest.mock("@/lib/booking-audit", () => ({ logBookingAudit: jest.fn() }));
 
 // Mock dependencies before imports
 jest.mock("@/lib/prisma", () => ({
@@ -97,7 +97,7 @@ import { sendNotificationEmailWithPreference } from "@/lib/email";
 import { checkSuspension } from "@/app/actions/suspension";
 import { validateTransition } from "@/lib/booking-state-machine";
 import { checkRateLimit } from "@/lib/rate-limit";
-import { logBookingAudit } from '@/lib/booking-audit';
+import { logBookingAudit } from "@/lib/booking-audit";
 
 describe("manage-booking actions", () => {
   const mockSession = {
@@ -158,12 +158,18 @@ describe("manage-booking actions", () => {
   beforeEach(() => {
     jest.clearAllMocks();
     (auth as jest.Mock).mockResolvedValue(mockSession);
-    (createInternalNotification as jest.Mock).mockResolvedValue({ success: true });
+    (createInternalNotification as jest.Mock).mockResolvedValue({
+      success: true,
+    });
     (sendNotificationEmailWithPreference as jest.Mock).mockResolvedValue({
       success: true,
     });
     (checkSuspension as jest.Mock).mockResolvedValue({ suspended: false });
-    (checkRateLimit as jest.Mock).mockResolvedValue({ success: true, remaining: 29, resetAt: new Date() });
+    (checkRateLimit as jest.Mock).mockResolvedValue({
+      success: true,
+      remaining: 29,
+      resetAt: new Date(),
+    });
     (validateTransition as jest.Mock).mockImplementation(() => {});
     // Mock user.findUnique for suspension check
     (prisma.user.findUnique as jest.Mock).mockResolvedValue({
@@ -202,7 +208,11 @@ describe("manage-booking actions", () => {
 
       it("returns error when rate limited", async () => {
         (auth as jest.Mock).mockResolvedValue(mockOwnerSession);
-        (checkRateLimit as jest.Mock).mockResolvedValue({ success: false, remaining: 0, resetAt: new Date() });
+        (checkRateLimit as jest.Mock).mockResolvedValue({
+          success: false,
+          remaining: 0,
+          resetAt: new Date(),
+        });
 
         const result = await updateBookingStatus("booking-123", "ACCEPTED");
 
@@ -232,7 +242,7 @@ describe("manage-booking actions", () => {
         const result = await updateBookingStatus("booking-123", "ACCEPTED");
 
         expect(result.error).toBe(
-          "Only the listing owner can accept or reject bookings",
+          "Only the listing owner can accept or reject bookings"
         );
       });
 
@@ -242,7 +252,7 @@ describe("manage-booking actions", () => {
         const result = await updateBookingStatus("booking-123", "REJECTED");
 
         expect(result.error).toBe(
-          "Only the listing owner can accept or reject bookings",
+          "Only the listing owner can accept or reject bookings"
         );
       });
 
@@ -262,18 +272,22 @@ describe("manage-booking actions", () => {
               $queryRaw: jest
                 .fn()
                 .mockResolvedValueOnce([
-                  { availableSlots: 2, totalSlots: 3, id: "listing-123", ownerId: "owner-123", bookingMode: "SHARED" },
+                  {
+                    availableSlots: 2,
+                    totalSlots: 3,
+                    id: "listing-123",
+                    ownerId: "owner-123",
+                    bookingMode: "SHARED",
+                  },
                 ])
                 .mockResolvedValueOnce([{ total: BigInt(0) }]),
               $executeRaw: jest.fn().mockResolvedValue(1),
               booking: {
-                updateMany: jest
-                  .fn()
-                  .mockResolvedValue({ count: 1 }),
+                updateMany: jest.fn().mockResolvedValue({ count: 1 }),
               },
             };
             return callback(tx);
-          },
+          }
         );
 
         const result = await updateBookingStatus("booking-123", "ACCEPTED");
@@ -289,25 +303,32 @@ describe("manage-booking actions", () => {
               $queryRaw: jest
                 .fn()
                 .mockResolvedValueOnce([
-                  { availableSlots: 2, totalSlots: 3, id: "listing-123", ownerId: "owner-123", bookingMode: "SHARED" },
+                  {
+                    availableSlots: 2,
+                    totalSlots: 3,
+                    id: "listing-123",
+                    ownerId: "owner-123",
+                    bookingMode: "SHARED",
+                  },
                 ])
                 .mockResolvedValueOnce([{ total: BigInt(0) }]),
               $executeRaw: jest.fn().mockResolvedValue(1),
               booking: {
-                updateMany: jest
-                  .fn()
-                  .mockResolvedValue({ count: 1 }),
+                updateMany: jest.fn().mockResolvedValue({ count: 1 }),
               },
             };
             return callback(tx);
-          },
+          }
         );
 
         await updateBookingStatus("booking-123", "ACCEPTED");
 
         expect(logBookingAudit).toHaveBeenCalledWith(
           expect.anything(),
-          expect.objectContaining({ action: 'ACCEPTED', previousStatus: 'PENDING' }),
+          expect.objectContaining({
+            action: "ACCEPTED",
+            previousStatus: "PENDING",
+          })
         );
       });
 
@@ -321,7 +342,7 @@ describe("manage-booking actions", () => {
               },
             };
             return callback(tx);
-          },
+          }
         );
 
         const result = await updateBookingStatus("booking-123", "CANCELLED");
@@ -341,18 +362,22 @@ describe("manage-booking actions", () => {
           $queryRaw: jest
             .fn()
             .mockResolvedValueOnce([
-              { availableSlots: 2, totalSlots: 3, id: "listing-123", ownerId: "owner-123", bookingMode: "SHARED" },
+              {
+                availableSlots: 2,
+                totalSlots: 3,
+                id: "listing-123",
+                ownerId: "owner-123",
+                bookingMode: "SHARED",
+              },
             ])
             .mockResolvedValueOnce([{ total: BigInt(0) }]),
           $executeRaw: jest.fn().mockResolvedValue(1),
           booking: {
-            updateMany: jest
-              .fn()
-              .mockResolvedValue({ count: 1 }),
+            updateMany: jest.fn().mockResolvedValue({ count: 1 }),
           },
         };
         (prisma.$transaction as jest.Mock).mockImplementation(
-          async (callback) => callback(mockTx),
+          async (callback) => callback(mockTx)
         );
 
         await updateBookingStatus("booking-123", "ACCEPTED");
@@ -365,14 +390,18 @@ describe("manage-booking actions", () => {
         (prisma.$transaction as jest.Mock).mockImplementation(
           async (callback) => {
             const tx = {
-              $queryRaw: jest
-                .fn()
-                .mockResolvedValue([
-                  { availableSlots: 0, totalSlots: 2, id: "listing-123", ownerId: "owner-123", bookingMode: "SHARED" },
-                ]),
+              $queryRaw: jest.fn().mockResolvedValue([
+                {
+                  availableSlots: 0,
+                  totalSlots: 2,
+                  id: "listing-123",
+                  ownerId: "owner-123",
+                  bookingMode: "SHARED",
+                },
+              ]),
             };
             return callback(tx);
-          },
+          }
         );
 
         const result = await updateBookingStatus("booking-123", "ACCEPTED");
@@ -387,18 +416,24 @@ describe("manage-booking actions", () => {
               $queryRaw: jest
                 .fn()
                 .mockResolvedValueOnce([
-                  { availableSlots: 1, totalSlots: 2, id: "listing-123", ownerId: "owner-123", bookingMode: "SHARED" },
+                  {
+                    availableSlots: 1,
+                    totalSlots: 2,
+                    id: "listing-123",
+                    ownerId: "owner-123",
+                    bookingMode: "SHARED",
+                  },
                 ])
                 .mockResolvedValueOnce([{ total: BigInt(2) }]), // SUM=2 slots used = capacity exceeded
             };
             return callback(tx);
-          },
+          }
         );
 
         const result = await updateBookingStatus("booking-123", "ACCEPTED");
 
         expect(result.error).toBe(
-          "Cannot accept: all slots for these dates are already booked",
+          "Cannot accept: all slots for these dates are already booked"
         );
       });
 
@@ -409,18 +444,22 @@ describe("manage-booking actions", () => {
               $queryRaw: jest
                 .fn()
                 .mockResolvedValueOnce([
-                  { availableSlots: 2, totalSlots: 3, id: "listing-123", ownerId: "owner-123", bookingMode: "SHARED" },
+                  {
+                    availableSlots: 2,
+                    totalSlots: 3,
+                    id: "listing-123",
+                    ownerId: "owner-123",
+                    bookingMode: "SHARED",
+                  },
                 ])
                 .mockResolvedValueOnce([{ total: BigInt(0) }]),
               $executeRaw: jest.fn().mockResolvedValue(1),
               booking: {
-                updateMany: jest
-                  .fn()
-                  .mockResolvedValue({ count: 1 }),
+                updateMany: jest.fn().mockResolvedValue({ count: 1 }),
               },
             };
             return callback(tx);
-          },
+          }
         );
 
         await updateBookingStatus("booking-123", "ACCEPTED");
@@ -441,18 +480,22 @@ describe("manage-booking actions", () => {
               $queryRaw: jest
                 .fn()
                 .mockResolvedValueOnce([
-                  { availableSlots: 2, totalSlots: 3, id: "listing-123", ownerId: "owner-123", bookingMode: "SHARED" },
+                  {
+                    availableSlots: 2,
+                    totalSlots: 3,
+                    id: "listing-123",
+                    ownerId: "owner-123",
+                    bookingMode: "SHARED",
+                  },
                 ])
                 .mockResolvedValueOnce([{ total: BigInt(0) }]),
               $executeRaw: jest.fn().mockResolvedValue(1),
               booking: {
-                updateMany: jest
-                  .fn()
-                  .mockResolvedValue({ count: 1 }),
+                updateMany: jest.fn().mockResolvedValue({ count: 1 }),
               },
             };
             return callback(tx);
-          },
+          }
         );
 
         await updateBookingStatus("booking-123", "ACCEPTED");
@@ -464,7 +507,7 @@ describe("manage-booking actions", () => {
           expect.objectContaining({
             tenantName: "Tenant User",
             listingTitle: "Cozy Room",
-          }),
+          })
         );
       });
 
@@ -475,18 +518,22 @@ describe("manage-booking actions", () => {
               $queryRaw: jest
                 .fn()
                 .mockResolvedValueOnce([
-                  { availableSlots: 2, totalSlots: 3, id: "listing-123", ownerId: "owner-123", bookingMode: "SHARED" },
+                  {
+                    availableSlots: 2,
+                    totalSlots: 3,
+                    id: "listing-123",
+                    ownerId: "owner-123",
+                    bookingMode: "SHARED",
+                  },
                 ])
                 .mockResolvedValueOnce([{ total: BigInt(0) }]),
               $executeRaw: jest.fn().mockResolvedValue(1),
               booking: {
-                updateMany: jest
-                  .fn()
-                  .mockResolvedValue({ count: 1 }),
+                updateMany: jest.fn().mockResolvedValue({ count: 1 }),
               },
             };
             return callback(tx);
-          },
+          }
         );
 
         await updateBookingStatus("booking-123", "ACCEPTED");
@@ -501,18 +548,22 @@ describe("manage-booking actions", () => {
               $queryRaw: jest
                 .fn()
                 .mockResolvedValueOnce([
-                  { availableSlots: 1, totalSlots: 3, id: "listing-123", ownerId: "owner-123", bookingMode: "SHARED" },
+                  {
+                    availableSlots: 1,
+                    totalSlots: 3,
+                    id: "listing-123",
+                    ownerId: "owner-123",
+                    bookingMode: "SHARED",
+                  },
                 ])
                 .mockResolvedValueOnce([{ total: BigInt(0) }]),
               $executeRaw: jest.fn().mockResolvedValue(0), // WHERE guard failed — no rows updated
               booking: {
-                updateMany: jest
-                  .fn()
-                  .mockResolvedValue({ count: 1 }),
+                updateMany: jest.fn().mockResolvedValue({ count: 1 }),
               },
             };
             return callback(tx);
-          },
+          }
         );
 
         const result = await updateBookingStatus("booking-123", "ACCEPTED");
@@ -532,13 +583,15 @@ describe("manage-booking actions", () => {
         (prisma.$transaction as jest.Mock).mockImplementation(
           async (callback) => {
             const tx = {
-              $queryRaw: jest.fn().mockResolvedValue([{ ownerId: "owner-123" }]),
+              $queryRaw: jest
+                .fn()
+                .mockResolvedValue([{ ownerId: "owner-123" }]),
               booking: {
                 updateMany: mockTxUpdateMany,
               },
             };
             return callback(tx);
-          },
+          }
         );
       });
 
@@ -547,7 +600,12 @@ describe("manage-booking actions", () => {
 
         expect(mockTxUpdateMany).toHaveBeenCalledWith({
           where: { id: "booking-123", version: 1 },
-          data: { status: "REJECTED", rejectionReason: null, heldUntil: null, version: { increment: 1 } },
+          data: {
+            status: "REJECTED",
+            rejectionReason: null,
+            heldUntil: null,
+            version: { increment: 1 },
+          },
         });
       });
 
@@ -556,7 +614,7 @@ describe("manage-booking actions", () => {
 
         expect(logBookingAudit).toHaveBeenCalledWith(
           expect.anything(),
-          expect.objectContaining({ action: 'REJECTED' }),
+          expect.objectContaining({ action: "REJECTED" })
         );
       });
 
@@ -582,7 +640,7 @@ describe("manage-booking actions", () => {
           expect.objectContaining({
             tenantName: "Tenant User",
             listingTitle: "Cozy Room",
-          }),
+          })
         );
       });
     });
@@ -595,20 +653,18 @@ describe("manage-booking actions", () => {
       it("increments slots (clamped to totalSlots) when cancelling accepted booking", async () => {
         const acceptedBooking = { ...mockBooking, status: "ACCEPTED" };
         (prisma.booking.findUnique as jest.Mock).mockResolvedValue(
-          acceptedBooking,
+          acceptedBooking
         );
 
         const mockTx = {
           booking: {
-            updateMany: jest
-              .fn()
-              .mockResolvedValue({ count: 1 }),
+            updateMany: jest.fn().mockResolvedValue({ count: 1 }),
           },
           $queryRaw: jest.fn().mockResolvedValue([]), // FOR UPDATE lock on Listing
           $executeRaw: jest.fn().mockResolvedValue(1),
         };
         (prisma.$transaction as jest.Mock).mockImplementation(
-          async (callback) => callback(mockTx),
+          async (callback) => callback(mockTx)
         );
 
         await updateBookingStatus("booking-123", "CANCELLED");
@@ -628,7 +684,7 @@ describe("manage-booking actions", () => {
               },
             };
             return callback(tx);
-          },
+          }
         );
 
         await updateBookingStatus("booking-123", "CANCELLED");
@@ -650,14 +706,17 @@ describe("manage-booking actions", () => {
               },
             };
             return callback(tx);
-          },
+          }
         );
 
         await updateBookingStatus("booking-123", "CANCELLED");
 
         expect(logBookingAudit).toHaveBeenCalledWith(
           expect.anything(),
-          expect.objectContaining({ action: 'CANCELLED', previousStatus: 'PENDING' }),
+          expect.objectContaining({
+            action: "CANCELLED",
+            previousStatus: "PENDING",
+          })
         );
       });
 
@@ -671,7 +730,7 @@ describe("manage-booking actions", () => {
               },
             };
             return callback(tx);
-          },
+          }
         );
 
         await updateBookingStatus("booking-123", "CANCELLED");
@@ -688,20 +747,18 @@ describe("manage-booking actions", () => {
       it("uses transaction for atomic slot increment on accepted booking", async () => {
         const acceptedBooking = { ...mockBooking, status: "ACCEPTED" };
         (prisma.booking.findUnique as jest.Mock).mockResolvedValue(
-          acceptedBooking,
+          acceptedBooking
         );
         (prisma.$transaction as jest.Mock).mockImplementation(
           async (callback) => {
             const tx = {
               booking: {
-                updateMany: jest
-                  .fn()
-                  .mockResolvedValue({ count: 1 }),
+                updateMany: jest.fn().mockResolvedValue({ count: 1 }),
               },
               $executeRaw: jest.fn().mockResolvedValue(1),
             };
             return callback(tx);
-          },
+          }
         );
 
         await updateBookingStatus("booking-123", "CANCELLED");
@@ -718,13 +775,15 @@ describe("manage-booking actions", () => {
         (prisma.$transaction as jest.Mock).mockImplementation(
           async (callback) => {
             const tx = {
-              $queryRaw: jest.fn().mockResolvedValue([{ ownerId: "owner-123" }]),
+              $queryRaw: jest
+                .fn()
+                .mockResolvedValue([{ ownerId: "owner-123" }]),
               booking: {
                 updateMany: jest.fn().mockResolvedValue({ count: 1 }),
               },
             };
             return callback(tx);
-          },
+          }
         );
       });
 
@@ -745,7 +804,7 @@ describe("manage-booking actions", () => {
       it("returns error on database failure", async () => {
         (auth as jest.Mock).mockResolvedValue(mockOwnerSession);
         (prisma.booking.findUnique as jest.Mock).mockRejectedValue(
-          new Error("DB Error"),
+          new Error("DB Error")
         );
 
         const result = await updateBookingStatus("booking-123", "ACCEPTED");
@@ -757,7 +816,7 @@ describe("manage-booking actions", () => {
         (auth as jest.Mock).mockResolvedValue(mockOwnerSession);
         (prisma.booking.findUnique as jest.Mock).mockResolvedValue(mockBooking);
         (prisma.$transaction as jest.Mock).mockRejectedValue(
-          new Error("Transaction failed"),
+          new Error("Transaction failed")
         );
 
         const result = await updateBookingStatus("booking-123", "ACCEPTED");
@@ -806,9 +865,16 @@ describe("manage-booking actions", () => {
         (prisma.$transaction as jest.Mock).mockImplementation(
           async (callback) => {
             const tx = {
-              $queryRaw: jest.fn()
+              $queryRaw: jest
+                .fn()
                 .mockResolvedValueOnce([
-                  { availableSlots: 2, totalSlots: 3, id: "listing-123", ownerId: "owner-123", bookingMode: "SHARED" },
+                  {
+                    availableSlots: 2,
+                    totalSlots: 3,
+                    id: "listing-123",
+                    ownerId: "owner-123",
+                    bookingMode: "SHARED",
+                  },
                 ])
                 .mockResolvedValueOnce([{ total: BigInt(0) }]),
               $executeRaw: jest.fn().mockResolvedValue(1),
@@ -817,10 +883,10 @@ describe("manage-booking actions", () => {
               },
             };
             return callback(tx);
-          },
+          }
         );
         (sendNotificationEmailWithPreference as jest.Mock).mockRejectedValue(
-          new Error("Resend API down"),
+          new Error("Resend API down")
         );
 
         const result = await updateBookingStatus("booking-123", "ACCEPTED");
@@ -835,9 +901,16 @@ describe("manage-booking actions", () => {
         (prisma.$transaction as jest.Mock).mockImplementation(
           async (callback) => {
             const tx = {
-              $queryRaw: jest.fn()
+              $queryRaw: jest
+                .fn()
                 .mockResolvedValueOnce([
-                  { availableSlots: 2, totalSlots: 3, id: "listing-123", ownerId: "owner-123", bookingMode: "SHARED" },
+                  {
+                    availableSlots: 2,
+                    totalSlots: 3,
+                    id: "listing-123",
+                    ownerId: "owner-123",
+                    bookingMode: "SHARED",
+                  },
                 ])
                 .mockResolvedValueOnce([{ total: BigInt(0) }]),
               $executeRaw: jest.fn().mockResolvedValue(1),
@@ -846,10 +919,10 @@ describe("manage-booking actions", () => {
               },
             };
             return callback(tx);
-          },
+          }
         );
         (createInternalNotification as jest.Mock).mockRejectedValue(
-          new Error("DB timeout"),
+          new Error("DB timeout")
         );
 
         const result = await updateBookingStatus("booking-123", "ACCEPTED");
@@ -872,10 +945,10 @@ describe("manage-booking actions", () => {
               },
             };
             return callback(tx);
-          },
+          }
         );
         (sendNotificationEmailWithPreference as jest.Mock).mockRejectedValue(
-          new Error("Resend API down"),
+          new Error("Resend API down")
         );
 
         const result = await updateBookingStatus("booking-123", "REJECTED");
@@ -975,7 +1048,7 @@ describe("manage-booking actions", () => {
         expect(prisma.booking.findMany).toHaveBeenCalledWith(
           expect.objectContaining({
             orderBy: { createdAt: "desc" },
-          }),
+          })
         );
       });
     });
@@ -983,7 +1056,7 @@ describe("manage-booking actions", () => {
     describe("error handling", () => {
       it("returns error on database failure", async () => {
         (prisma.booking.findMany as jest.Mock).mockRejectedValue(
-          new Error("DB Error"),
+          new Error("DB Error")
         );
 
         const result = await getMyBookings();

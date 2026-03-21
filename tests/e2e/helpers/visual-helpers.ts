@@ -5,7 +5,7 @@
  * Provides animation disabling, default masks, and viewport constants.
  */
 
-import type { Page, Locator } from '@playwright/test';
+import type { Page, Locator } from "@playwright/test";
 
 // ---------------------------------------------------------------------------
 // Viewport Constants
@@ -14,8 +14,8 @@ import type { Page, Locator } from '@playwright/test';
 export const VIEWPORTS = {
   desktop: { width: 1440, height: 900 },
   tablet: { width: 768, height: 1024 },
-  mobileLarge: { width: 390, height: 844 },   // iPhone 14
-  mobileSmall: { width: 375, height: 667 },   // iPhone SE
+  mobileLarge: { width: 390, height: 844 }, // iPhone 14
+  mobileSmall: { width: 375, height: 667 }, // iPhone SE
 } as const;
 
 // ---------------------------------------------------------------------------
@@ -45,7 +45,7 @@ export async function disableAnimations(page: Page): Promise<void> {
  * Lighter than CSS injection — respects prefers-reduced-motion media queries.
  */
 export async function emulateReducedMotion(page: Page): Promise<void> {
-  await page.emulateMedia({ reducedMotion: 'reduce' });
+  await page.emulateMedia({ reducedMotion: "reduce" });
 }
 
 // ---------------------------------------------------------------------------
@@ -58,10 +58,10 @@ export async function emulateReducedMotion(page: Page): Promise<void> {
  */
 export function defaultMasks(page: Page): Locator[] {
   return [
-    page.locator('.maplibregl-canvas'),
-    page.locator('.maplibregl-map'),
-    page.locator('.maplibregl-canvas'),
-    page.locator('.maplibregl-map'),
+    page.locator(".maplibregl-canvas"),
+    page.locator(".maplibregl-map"),
+    page.locator(".maplibregl-canvas"),
+    page.locator(".maplibregl-map"),
   ];
 }
 
@@ -85,16 +85,16 @@ export const SCREENSHOT_DEFAULTS = {
   fullPage: {
     fullPage: true,
     maxDiffPixelRatio: 0.02,
-    animations: 'disabled' as const,
+    animations: "disabled" as const,
   },
   component: {
     maxDiffPixelRatio: 0.02,
-    animations: 'disabled' as const,
+    animations: "disabled" as const,
   },
   /** More lenient for pages with user-generated images */
   withImages: {
     fullPage: true,
     maxDiffPixelRatio: 0.05,
-    animations: 'disabled' as const,
+    animations: "disabled" as const,
   },
 } as const;

@@ -19,7 +19,14 @@
  *   pnpm playwright test tests/e2e/map-search-toggle.anon.spec.ts --project=chromium-anon --headed
  */
 
-import { test, expect, SF_BOUNDS, selectors, waitForMapReady, waitForDebounceAndResponse } from "./helpers/test-utils";
+import {
+  test,
+  expect,
+  SF_BOUNDS,
+  selectors,
+  waitForMapReady,
+  waitForDebounceAndResponse,
+} from "./helpers/test-utils";
 import type { Page, Route } from "@playwright/test";
 
 // ---------------------------------------------------------------------------
@@ -55,7 +62,9 @@ async function waitForSearchPage(page: Page) {
   await page.goto(SEARCH_URL);
   await page.waitForLoadState("domcontentloaded");
   // Wait for toggle to be visible (indicates map UI is ready)
-  await page.waitForSelector(toggleSelectors.searchAsMoveToggle, { timeout: 30_000 });
+  await page.waitForSelector(toggleSelectors.searchAsMoveToggle, {
+    timeout: 30_000,
+  });
   // Wait for map to be fully loaded and idle
   await waitForMapReady(page);
 }
@@ -96,7 +105,9 @@ async function turnToggleOff(page: Page) {
   if (isChecked === "true") {
     await toggle.click();
     // Wait for state to update
-    await expect(toggle).toHaveAttribute("aria-checked", "false", { timeout: 5_000 });
+    await expect(toggle).toHaveAttribute("aria-checked", "false", {
+      timeout: 5_000,
+    });
   }
 }
 
@@ -109,7 +120,9 @@ async function turnToggleOn(page: Page) {
   const isChecked = await toggle.getAttribute("aria-checked");
   if (isChecked === "false") {
     await toggle.click();
-    await expect(toggle).toHaveAttribute("aria-checked", "true", { timeout: 5_000 });
+    await expect(toggle).toHaveAttribute("aria-checked", "true", {
+      timeout: 5_000,
+    });
   }
 }
 
@@ -117,7 +130,11 @@ async function turnToggleOn(page: Page) {
  * Simulate a map pan by dragging the map container.
  * Returns true if the pan actually moved the map (banner appeared or context state changed).
  */
-async function simulateMapPanAndVerify(page: Page, deltaX = 100, deltaY = 50): Promise<boolean> {
+async function simulateMapPanAndVerify(
+  page: Page,
+  deltaX = 100,
+  deltaY = 50
+): Promise<boolean> {
   const map = page.locator(toggleSelectors.mapContainer).first();
   if ((await map.count()) === 0) return false;
 
@@ -179,41 +196,57 @@ async function mockSearchCountApi(
 
 test.describe("4.x: Search as I move toggle", () => {
   // Map tests need extra time for WebGL rendering and tile loading in CI
-  test.beforeEach(async () => { test.slow(); });
+  test.beforeEach(async () => {
+    test.slow();
+  });
 
   // ---------------------------------------------------------------------------
   // P0: Core Functionality
   // ---------------------------------------------------------------------------
   test.describe("P0: Core functionality", () => {
-    test("4.1 - Toggle defaults to ON per session, no banner visible", async ({ page }) => {
+    test("4.1 - Toggle defaults to ON per session, no banner visible", async ({
+      page,
+    }) => {
       await waitForSearchPage(page);
 
       if (!(await isMapInteractive(page))) {
-        test.skip(true, "Map controls not available (WebGL unavailable in headless)");
+        test.skip(
+          true,
+          "Map controls not available (WebGL unavailable in headless)"
+        );
         return;
       }
 
       // Toggle should be checked (ON) by default
       const toggle = page.locator(toggleSelectors.searchAsMoveToggle);
-      await expect(toggle).toHaveAttribute("aria-checked", "true", { timeout: 5_000 });
+      await expect(toggle).toHaveAttribute("aria-checked", "true", {
+        timeout: 5_000,
+      });
 
       // Banner should NOT be visible when toggle is ON
       const searchAreaBtn = page.locator(toggleSelectors.searchThisAreaBtn);
       await expect(searchAreaBtn).not.toBeVisible();
 
       // The green indicator dot should be visible when toggle is ON
-      const greenDot = toggle.locator('[data-testid="search-toggle-indicator"]');
+      const greenDot = toggle.locator(
+        '[data-testid="search-toggle-indicator"]'
+      );
       await expect(greenDot).toBeVisible();
     });
 
-    test("4.2 - Toggle OFF shows 'Search this area' banner on map move", async ({ page }) => {
+    test("4.2 - Toggle OFF shows 'Search this area' banner on map move", async ({
+      page,
+    }) => {
       // Mock the API to avoid actual network calls
       await mockSearchCountApi(page, { count: 15 });
 
       await waitForSearchPage(page);
 
       if (!(await isMapInteractive(page))) {
-        test.skip(true, "Map controls not available (WebGL unavailable in headless)");
+        test.skip(
+          true,
+          "Map controls not available (WebGL unavailable in headless)"
+        );
         return;
       }
 
@@ -228,7 +261,9 @@ test.describe("4.x: Search as I move toggle", () => {
 
       // Verify toggle is now OFF
       const toggle = page.locator(toggleSelectors.searchAsMoveToggle);
-      await expect(toggle).toHaveAttribute("aria-checked", "false", { timeout: 5_000 });
+      await expect(toggle).toHaveAttribute("aria-checked", "false", {
+        timeout: 5_000,
+      });
 
       // Banner should not be visible yet (no map movement)
       const searchAreaBtn = page.locator(toggleSelectors.searchThisAreaBtn);
@@ -237,12 +272,18 @@ test.describe("4.x: Search as I move toggle", () => {
       // Simulate map pan and verify it actually worked
       const panned = await simulateMapPanAndVerify(page);
       if (!panned) {
-        test.skip(true, "Map pan did not trigger state change (WebGL may not be working)");
+        test.skip(
+          true,
+          "Map pan did not trigger state change (WebGL may not be working)"
+        );
         return;
       }
 
       // Wait for debounce + API response
-      await waitForDebounceAndResponse(page, { debounceMs: AREA_COUNT_DEBOUNCE_MS, responsePattern: 'search-count' });
+      await waitForDebounceAndResponse(page, {
+        debounceMs: AREA_COUNT_DEBOUNCE_MS,
+        responsePattern: "search-count",
+      });
 
       // Banner should now be visible with "Search this area" button
       await expect(searchAreaBtn).toBeVisible({ timeout: 5000 });
@@ -251,13 +292,18 @@ test.describe("4.x: Search as I move toggle", () => {
       await expect(searchAreaBtn).toContainText("15");
     });
 
-    test("4.3 - 'Search this area (N)' button triggers search with updated URL", async ({ page }) => {
+    test("4.3 - 'Search this area (N)' button triggers search with updated URL", async ({
+      page,
+    }) => {
       await mockSearchCountApi(page, { count: 28 });
 
       await waitForSearchPage(page);
 
       if (!(await isMapInteractive(page))) {
-        test.skip(true, "Map controls not available (WebGL unavailable in headless)");
+        test.skip(
+          true,
+          "Map controls not available (WebGL unavailable in headless)"
+        );
         return;
       }
 
@@ -273,12 +319,18 @@ test.describe("4.x: Search as I move toggle", () => {
       await turnToggleOff(page);
       const panned = await simulateMapPanAndVerify(page, 150, 75);
       if (!panned) {
-        test.skip(true, "Map pan did not trigger state change (WebGL may not be working)");
+        test.skip(
+          true,
+          "Map pan did not trigger state change (WebGL may not be working)"
+        );
         return;
       }
 
       // Wait for banner to appear
-      await waitForDebounceAndResponse(page, { debounceMs: AREA_COUNT_DEBOUNCE_MS, responsePattern: 'search-count' });
+      await waitForDebounceAndResponse(page, {
+        debounceMs: AREA_COUNT_DEBOUNCE_MS,
+        responsePattern: "search-count",
+      });
       const searchAreaBtn = page.locator(toggleSelectors.searchThisAreaBtn);
       await expect(searchAreaBtn).toBeVisible({ timeout: 5000 });
 
@@ -286,19 +338,26 @@ test.describe("4.x: Search as I move toggle", () => {
       await searchAreaBtn.click();
 
       // URL should have changed (bounds should be different)
-      await expect.poll(() => page.url(), { timeout: 5000 }).not.toBe(initialUrl);
+      await expect
+        .poll(() => page.url(), { timeout: 5000 })
+        .not.toBe(initialUrl);
 
       // Banner should disappear after search triggered
       await expect(searchAreaBtn).not.toBeVisible({ timeout: 5000 });
     });
 
-    test("4.4 - Reset button (X) returns map to original URL bounds", async ({ page }) => {
+    test("4.4 - Reset button (X) returns map to original URL bounds", async ({
+      page,
+    }) => {
       await mockSearchCountApi(page, { count: 33 });
 
       await waitForSearchPage(page);
 
       if (!(await isMapInteractive(page))) {
-        test.skip(true, "Map controls not available (WebGL unavailable in headless)");
+        test.skip(
+          true,
+          "Map controls not available (WebGL unavailable in headless)"
+        );
         return;
       }
 
@@ -314,12 +373,18 @@ test.describe("4.x: Search as I move toggle", () => {
       await turnToggleOff(page);
       const panned = await simulateMapPanAndVerify(page, 200, 100);
       if (!panned) {
-        test.skip(true, "Map pan did not trigger state change (WebGL may not be working)");
+        test.skip(
+          true,
+          "Map pan did not trigger state change (WebGL may not be working)"
+        );
         return;
       }
 
       // Wait for banner
-      await waitForDebounceAndResponse(page, { debounceMs: AREA_COUNT_DEBOUNCE_MS, responsePattern: 'search-count' });
+      await waitForDebounceAndResponse(page, {
+        debounceMs: AREA_COUNT_DEBOUNCE_MS,
+        responsePattern: "search-count",
+      });
       const resetBtn = page.locator(toggleSelectors.resetMapBtn);
       await expect(resetBtn).toBeVisible({ timeout: 5000 });
 
@@ -357,7 +422,10 @@ test.describe("4.x: Search as I move toggle", () => {
       await waitForSearchPage(page);
 
       if (!(await isMapInteractive(page))) {
-        test.skip(true, "Map controls not available (WebGL unavailable in headless)");
+        test.skip(
+          true,
+          "Map controls not available (WebGL unavailable in headless)"
+        );
         return;
       }
 
@@ -375,12 +443,18 @@ test.describe("4.x: Search as I move toggle", () => {
       // Simulate map pan
       const panned = await simulateMapPanAndVerify(page);
       if (!panned) {
-        test.skip(true, "Map pan did not trigger state change (WebGL may not be working)");
+        test.skip(
+          true,
+          "Map pan did not trigger state change (WebGL may not be working)"
+        );
         return;
       }
 
       // Wait for debounced request to be made
-      await waitForDebounceAndResponse(page, { debounceMs: AREA_COUNT_DEBOUNCE_MS, responsePattern: 'search-count' });
+      await waitForDebounceAndResponse(page, {
+        debounceMs: AREA_COUNT_DEBOUNCE_MS,
+        responsePattern: "search-count",
+      });
 
       // Verify at least one request was made
       expect(requestTimestamps.length).toBeGreaterThanOrEqual(1);
@@ -394,7 +468,9 @@ test.describe("4.x: Search as I move toggle", () => {
       expect(timeSincePan).toBeGreaterThanOrEqual(AREA_COUNT_DEBOUNCE_MS - 100);
     });
 
-    test("4.6 - Area count cached for 30s (no API call on return to same area)", async ({ page }) => {
+    test("4.6 - Area count cached for 30s (no API call on return to same area)", async ({
+      page,
+    }) => {
       let requestCount = 0;
 
       await page.route("**/api/search-count*", async (route) => {
@@ -409,7 +485,10 @@ test.describe("4.x: Search as I move toggle", () => {
       await waitForSearchPage(page);
 
       if (!(await isMapInteractive(page))) {
-        test.skip(true, "Map controls not available (WebGL unavailable in headless)");
+        test.skip(
+          true,
+          "Map controls not available (WebGL unavailable in headless)"
+        );
         return;
       }
 
@@ -424,12 +503,18 @@ test.describe("4.x: Search as I move toggle", () => {
       // First pan - should trigger API call
       const panned1 = await simulateMapPanAndVerify(page, 100, 50);
       if (!panned1) {
-        test.skip(true, "Map pan did not trigger state change (WebGL may not be working)");
+        test.skip(
+          true,
+          "Map pan did not trigger state change (WebGL may not be working)"
+        );
         return;
       }
 
       // Wait for debounce + API response
-      await waitForDebounceAndResponse(page, { debounceMs: AREA_COUNT_DEBOUNCE_MS, responsePattern: 'search-count' });
+      await waitForDebounceAndResponse(page, {
+        debounceMs: AREA_COUNT_DEBOUNCE_MS,
+        responsePattern: "search-count",
+      });
 
       const requestsAfterFirstPan = requestCount;
       expect(requestsAfterFirstPan).toBeGreaterThanOrEqual(1);
@@ -455,7 +540,9 @@ test.describe("4.x: Search as I move toggle", () => {
       expect(requestCount).toBeLessThanOrEqual(requestsAfterFirstPan + 2);
     });
 
-    test("4.7 - AbortController cancels duplicate in-flight requests", async ({ page }) => {
+    test("4.7 - AbortController cancels duplicate in-flight requests", async ({
+      page,
+    }) => {
       const completedRequests: number[] = [];
       const abortedRequests: number[] = [];
       let requestId = 0;
@@ -481,7 +568,10 @@ test.describe("4.x: Search as I move toggle", () => {
       await waitForSearchPage(page);
 
       if (!(await isMapInteractive(page))) {
-        test.skip(true, "Map controls not available (WebGL unavailable in headless)");
+        test.skip(
+          true,
+          "Map controls not available (WebGL unavailable in headless)"
+        );
         return;
       }
 
@@ -497,7 +587,10 @@ test.describe("4.x: Search as I move toggle", () => {
       // The AbortController should cancel previous in-flight requests
       const panned1 = await simulateMapPanAndVerify(page, 50, 25);
       if (!panned1) {
-        test.skip(true, "Map pan did not trigger state change (WebGL may not be working)");
+        test.skip(
+          true,
+          "Map pan did not trigger state change (WebGL may not be working)"
+        );
         return;
       }
       // debounce wait: let debounce timer fire so first request starts
@@ -512,7 +605,7 @@ test.describe("4.x: Search as I move toggle", () => {
       await page.waitForTimeout(AREA_COUNT_DEBOUNCE_MS + 100);
 
       // Wait for all in-flight requests to settle
-      await page.waitForLoadState('domcontentloaded');
+      await page.waitForLoadState("domcontentloaded");
 
       // Only the last request should complete successfully
       // Earlier requests should have been aborted
@@ -539,26 +632,37 @@ test.describe("4.x: Search as I move toggle", () => {
   // Edge Cases
   // ---------------------------------------------------------------------------
   test.describe("Edge cases", () => {
-    test("Toggle persists state during session (ON -> OFF -> ON)", async ({ page }) => {
+    test("Toggle persists state during session (ON -> OFF -> ON)", async ({
+      page,
+    }) => {
       await waitForSearchPage(page);
 
       if (!(await isMapInteractive(page))) {
-        test.skip(true, "Map controls not available (WebGL unavailable in headless)");
+        test.skip(
+          true,
+          "Map controls not available (WebGL unavailable in headless)"
+        );
         return;
       }
 
       const toggle = page.locator(toggleSelectors.searchAsMoveToggle);
 
       // Start: ON
-      await expect(toggle).toHaveAttribute("aria-checked", "true", { timeout: 5_000 });
+      await expect(toggle).toHaveAttribute("aria-checked", "true", {
+        timeout: 5_000,
+      });
 
       // Toggle OFF
       await toggle.click();
-      await expect(toggle).toHaveAttribute("aria-checked", "false", { timeout: 5_000 });
+      await expect(toggle).toHaveAttribute("aria-checked", "false", {
+        timeout: 5_000,
+      });
 
       // Toggle ON again
       await toggle.click();
-      await expect(toggle).toHaveAttribute("aria-checked", "true", { timeout: 5_000 });
+      await expect(toggle).toHaveAttribute("aria-checked", "true", {
+        timeout: 5_000,
+      });
 
       // Verify no banner when toggle is ON
       const searchAreaBtn = page.locator(toggleSelectors.searchThisAreaBtn);
@@ -572,7 +676,10 @@ test.describe("4.x: Search as I move toggle", () => {
       await waitForSearchPage(page);
 
       if (!(await isMapInteractive(page))) {
-        test.skip(true, "Map controls not available (WebGL unavailable in headless)");
+        test.skip(
+          true,
+          "Map controls not available (WebGL unavailable in headless)"
+        );
         return;
       }
 
@@ -585,12 +692,18 @@ test.describe("4.x: Search as I move toggle", () => {
       await turnToggleOff(page);
       const panned = await simulateMapPanAndVerify(page);
       if (!panned) {
-        test.skip(true, "Map pan did not trigger state change (WebGL may not be working)");
+        test.skip(
+          true,
+          "Map pan did not trigger state change (WebGL may not be working)"
+        );
         return;
       }
 
       // Wait for debounce + API response
-      await waitForDebounceAndResponse(page, { debounceMs: AREA_COUNT_DEBOUNCE_MS, responsePattern: 'search-count' });
+      await waitForDebounceAndResponse(page, {
+        debounceMs: AREA_COUNT_DEBOUNCE_MS,
+        responsePattern: "search-count",
+      });
       const searchAreaBtn = page.locator(toggleSelectors.searchThisAreaBtn);
       await expect(searchAreaBtn).toBeVisible({ timeout: 5000 });
 
@@ -602,7 +715,10 @@ test.describe("4.x: Search as I move toggle", () => {
       await waitForSearchPage(page);
 
       if (!(await isMapInteractive(page))) {
-        test.skip(true, "Map controls not available (WebGL unavailable in headless)");
+        test.skip(
+          true,
+          "Map controls not available (WebGL unavailable in headless)"
+        );
         return;
       }
 
@@ -612,13 +728,19 @@ test.describe("4.x: Search as I move toggle", () => {
       await toggle.focus();
 
       // Toggle with Enter key
-      await expect(toggle).toHaveAttribute("aria-checked", "true", { timeout: 5_000 });
+      await expect(toggle).toHaveAttribute("aria-checked", "true", {
+        timeout: 5_000,
+      });
       await page.keyboard.press("Enter");
-      await expect(toggle).toHaveAttribute("aria-checked", "false", { timeout: 5_000 });
+      await expect(toggle).toHaveAttribute("aria-checked", "false", {
+        timeout: 5_000,
+      });
 
       // Toggle back with Space key
       await page.keyboard.press("Space");
-      await expect(toggle).toHaveAttribute("aria-checked", "true", { timeout: 5_000 });
+      await expect(toggle).toHaveAttribute("aria-checked", "true", {
+        timeout: 5_000,
+      });
     });
   });
 });

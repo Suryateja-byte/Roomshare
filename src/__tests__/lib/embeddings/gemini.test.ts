@@ -22,7 +22,9 @@ jest.mock("@google/genai", () => ({
   })),
 }));
 
-jest.mock("@sentry/nextjs", () => ({ addBreadcrumb: jest.fn() }), { virtual: true });
+jest.mock("@sentry/nextjs", () => ({ addBreadcrumb: jest.fn() }), {
+  virtual: true,
+});
 
 import {
   generateEmbedding,
@@ -185,9 +187,9 @@ describe("generateMultimodalEmbedding", () => {
   it("throws on empty embeddings response", async () => {
     mockEmbedContent.mockResolvedValueOnce({ embeddings: [] });
 
-    await expect(
-      generateMultimodalEmbedding("text", [])
-    ).rejects.toThrow("No multimodal embedding");
+    await expect(generateMultimodalEmbedding("text", [])).rejects.toThrow(
+      "No multimodal embedding"
+    );
   });
 
   it("throws on null values in embedding", async () => {
@@ -195,9 +197,9 @@ describe("generateMultimodalEmbedding", () => {
       embeddings: [{ values: null }],
     });
 
-    await expect(
-      generateMultimodalEmbedding("text", [])
-    ).rejects.toThrow("No multimodal embedding");
+    await expect(generateMultimodalEmbedding("text", [])).rejects.toThrow(
+      "No multimodal embedding"
+    );
   });
 
   it("handles zero images (text-only parts)", async () => {

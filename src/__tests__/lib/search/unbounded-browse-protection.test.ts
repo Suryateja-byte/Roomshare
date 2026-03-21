@@ -33,6 +33,14 @@ jest.mock("@/lib/prisma", () => {
   };
 });
 
+// Mock queryWithTimeout used by data.ts — delegates to the same prisma mock
+jest.mock("@/lib/query-timeout", () => ({
+  queryWithTimeout: jest.fn(async (query: string, params: unknown[]) => {
+    const { prisma: p } = require("@/lib/prisma");
+    return p.$queryRawUnsafe(query, ...params);
+  }),
+}));
+
 import { prisma } from "@/lib/prisma";
 import {
   getSearchDocLimitedCount,
@@ -84,7 +92,9 @@ describe("Unbounded Browse Protection", () => {
   describe("getSearchDocLimitedCount", () => {
     it("returns null for unbounded browse (no query, no bounds)", async () => {
       // Arrange: Mock prisma to return results if called (shouldn't be called)
-      (prisma.$queryRawUnsafe as jest.Mock).mockResolvedValue([{ count: BigInt(50) }]);
+      (prisma.$queryRawUnsafe as jest.Mock).mockResolvedValue([
+        { count: BigInt(50) },
+      ]);
 
       // Act: Call with empty params (browse-all scenario)
       const result = await getSearchDocLimitedCount({});
@@ -97,7 +107,9 @@ describe("Unbounded Browse Protection", () => {
 
     it("executes count query when filters are active (no bounds)", async () => {
       // Arrange
-      (prisma.$queryRawUnsafe as jest.Mock).mockResolvedValue([{ count: BigInt(30) }]);
+      (prisma.$queryRawUnsafe as jest.Mock).mockResolvedValue([
+        { count: BigInt(30) },
+      ]);
 
       // Act: Call with filters but no bounds or query
       const result = await getSearchDocLimitedCount({
@@ -113,7 +125,9 @@ describe("Unbounded Browse Protection", () => {
 
     it("executes query when bounds are provided", async () => {
       // Arrange: Mock returns count within threshold
-      (prisma.$queryRawUnsafe as jest.Mock).mockResolvedValue([{ count: BigInt(50) }]);
+      (prisma.$queryRawUnsafe as jest.Mock).mockResolvedValue([
+        { count: BigInt(50) },
+      ]);
 
       // Act: Call with bounds (bounded search)
       const result = await getSearchDocLimitedCount({
@@ -136,7 +150,9 @@ describe("Unbounded Browse Protection", () => {
 
     it("executes query when query+bounds are provided", async () => {
       // Arrange
-      (prisma.$queryRawUnsafe as jest.Mock).mockResolvedValue([{ count: BigInt(25) }]);
+      (prisma.$queryRawUnsafe as jest.Mock).mockResolvedValue([
+        { count: BigInt(25) },
+      ]);
 
       // Act: Text search with bounds
       const result = await getSearchDocLimitedCount({
@@ -159,7 +175,7 @@ describe("Unbounded Browse Protection", () => {
     it("throws error for unbounded browse (no query, no bounds)", async () => {
       // Act & Assert: Should throw for ANY unbounded query, not just text searches
       await expect(getSearchDocMapListings({})).rejects.toThrow(
-        /bounds required/i,
+        /bounds required/i
       );
 
       // Prisma should not be called
@@ -172,7 +188,7 @@ describe("Unbounded Browse Protection", () => {
         getSearchDocMapListings({
           minPrice: 500,
           maxPrice: 1500,
-        }),
+        })
       ).rejects.toThrow(/bounds required/i);
 
       expect(prisma.$queryRawUnsafe).not.toHaveBeenCalled();
@@ -183,7 +199,7 @@ describe("Unbounded Browse Protection", () => {
       await expect(
         getSearchDocMapListings({
           query: "downtown apartment",
-        }),
+        })
       ).rejects.toThrow(/bounds required/i);
 
       expect(prisma.$queryRawUnsafe).not.toHaveBeenCalled();
@@ -249,7 +265,8 @@ describe("Unbounded Browse Protection", () => {
       });
 
       // Assert
-      const sql = (prisma.$queryRawUnsafe as jest.Mock).mock.calls[0][0] as string;
+      const sql = (prisma.$queryRawUnsafe as jest.Mock).mock
+        .calls[0][0] as string;
       expect(sql).toContain("ORDER BY d.price ASC NULLS LAST");
       expect(sql).toContain("d.listing_created_at DESC");
       expect(sql).toContain("d.id ASC");
@@ -261,8 +278,9 @@ describe("Unbounded Browse Protection", () => {
 
     it("caps results at MAX_UNBOUNDED_RESULTS for unbounded browse", async () => {
       // Arrange: Mock to return many results
-      const manyResults = Array.from({ length: MAX_UNBOUNDED_RESULTS + 2 }, (_, i) =>
-        createMockSearchDocRow(`listing-${i}`),
+      const manyResults = Array.from(
+        { length: MAX_UNBOUNDED_RESULTS + 2 },
+        (_, i) => createMockSearchDocRow(`listing-${i}`)
       );
       (prisma.$queryRawUnsafe as jest.Mock)
         .mockResolvedValueOnce([{ count: null }]) // Count query returns null for unbounded
@@ -281,7 +299,7 @@ describe("Unbounded Browse Protection", () => {
     it("respects smaller limit when under MAX_UNBOUNDED_RESULTS", async () => {
       // Arrange
       const fewResults = Array.from({ length: 7 }, (_, i) =>
-        createMockSearchDocRow(`listing-${i}`),
+        createMockSearchDocRow(`listing-${i}`)
       );
       (prisma.$queryRawUnsafe as jest.Mock)
         .mockResolvedValueOnce([{ count: null }]) // Count query
@@ -299,7 +317,7 @@ describe("Unbounded Browse Protection", () => {
     it("does not cap when bounds are provided", async () => {
       // Arrange
       const manyResults = Array.from({ length: 61 }, (_, i) =>
-        createMockSearchDocRow(`listing-${i}`),
+        createMockSearchDocRow(`listing-${i}`)
       );
       (prisma.$queryRawUnsafe as jest.Mock)
         .mockResolvedValueOnce([{ count: BigInt(60) }]) // Count query
@@ -326,7 +344,7 @@ describe("Unbounded Browse Protection", () => {
       await expect(
         getSearchDocListingsPaginated({
           query: "downtown",
-        }),
+        })
       ).rejects.toThrow(/bounds required/i);
     });
   });
@@ -339,7 +357,7 @@ describe("Unbounded Browse Protection", () => {
     it("allows small unbounded queries (featured listings use case)", async () => {
       // Arrange
       const featuredResults = Array.from({ length: 7 }, (_, i) =>
-        createMockSearchDocRow(`listing-${i}`),
+        createMockSearchDocRow(`listing-${i}`)
       );
       (prisma.$queryRawUnsafe as jest.Mock)
         .mockResolvedValueOnce([{ count: null }]) // Count query (null for unbounded)
@@ -438,7 +456,7 @@ describe("V1 Fallback Browse Protection", () => {
             fn({
               $executeRawUnsafe: jest.fn(),
               $queryRawUnsafe: jest.fn().mockResolvedValue([{ count: 42 }]),
-            }),
+            })
           ),
         },
       }));
@@ -470,7 +488,7 @@ describe("V1 Fallback Browse Protection", () => {
       // V1 getListingsPaginated makes 2 queries: count then data
       // For unbounded browse with 100 total, cap total at 48
       const mockDataResults = Array.from({ length: ITEMS_PER_PAGE }, (_, i) =>
-        createMockV1ListingRow(`listing-${i}`),
+        createMockV1ListingRow(`listing-${i}`)
       );
 
       // Import prisma and set up mock BEFORE importing data module
@@ -497,7 +515,7 @@ describe("V1 Fallback Browse Protection", () => {
 
     it("caps total at MAX_UNBOUNDED_RESULTS for unbounded browse", async () => {
       const mockDataResults = Array.from({ length: ITEMS_PER_PAGE }, (_, i) =>
-        createMockV1ListingRow(`listing-${i}`),
+        createMockV1ListingRow(`listing-${i}`)
       );
 
       // Import prisma and set up mock BEFORE importing data module
@@ -521,7 +539,7 @@ describe("V1 Fallback Browse Protection", () => {
 
     it("does not cap when bounds are provided", async () => {
       const mockDataResults = Array.from({ length: ITEMS_PER_PAGE }, (_, i) =>
-        createMockV1ListingRow(`listing-${i}`),
+        createMockV1ListingRow(`listing-${i}`)
       );
 
       // Import prisma and set up mock BEFORE importing data module
@@ -552,7 +570,7 @@ describe("V1 Fallback Browse Protection", () => {
 
     it("does not cap when query is provided with bounds", async () => {
       const mockDataResults = Array.from({ length: 12 }, (_, i) =>
-        createMockV1ListingRow(`listing-${i}`),
+        createMockV1ListingRow(`listing-${i}`)
       );
 
       // Import prisma and set up mock BEFORE importing data module

@@ -58,7 +58,7 @@ const mockFeatures = features as { searchKeyset: boolean; searchV2: boolean };
 // Helper to create mock listing data
 function createMockListingData(
   id: string,
-  overrides: Partial<ListingData & { _cursorCreatedAt?: string }> = {},
+  overrides: Partial<ListingData & { _cursorCreatedAt?: string }> = {}
 ): ListingData {
   return {
     id,
@@ -88,7 +88,7 @@ function createMockListingData(
 function createMockKeysetResult(
   items: ListingData[],
   nextCursor: string | null,
-  total: number = items.length,
+  total: number = items.length
 ) {
   return {
     items,
@@ -123,7 +123,7 @@ describe("Keyset Pagination Integration", () => {
       });
 
       (getSearchDocListingsFirstPage as jest.Mock).mockResolvedValue(
-        createMockKeysetResult(mockListings, mockNextCursor, 100),
+        createMockKeysetResult(mockListings, mockNextCursor, 100)
       );
       (getSearchDocMapListings as jest.Mock).mockResolvedValue([]);
 
@@ -156,7 +156,7 @@ describe("Keyset Pagination Integration", () => {
       });
 
       (getSearchDocListingsWithKeyset as jest.Mock).mockResolvedValue(
-        createMockKeysetResult(mockListings, mockNextCursor, 100),
+        createMockKeysetResult(mockListings, mockNextCursor, 100)
       );
       (getSearchDocMapListings as jest.Mock).mockResolvedValue([]);
 
@@ -166,7 +166,7 @@ describe("Keyset Pagination Integration", () => {
 
       expect(getSearchDocListingsWithKeyset).toHaveBeenCalledWith(
         expect.any(Object),
-        cursor,
+        cursor
       );
       expect(result.response?.list.nextCursor).toBe(mockNextCursor);
     });
@@ -185,7 +185,7 @@ describe("Keyset Pagination Integration", () => {
       });
 
       (getSearchDocListingsFirstPage as jest.Mock).mockResolvedValue(
-        createMockKeysetResult(page1Items, page1Cursor, 100),
+        createMockKeysetResult(page1Items, page1Cursor, 100)
       );
       (getSearchDocMapListings as jest.Mock).mockResolvedValue([]);
 
@@ -205,7 +205,7 @@ describe("Keyset Pagination Integration", () => {
       });
 
       (getSearchDocListingsWithKeyset as jest.Mock).mockResolvedValue(
-        createMockKeysetResult(page2Items, page2Cursor, 100),
+        createMockKeysetResult(page2Items, page2Cursor, 100)
       );
 
       const result2 = await executeSearchV2({
@@ -232,7 +232,7 @@ describe("Keyset Pagination Integration", () => {
       // number. This prevents duplicate results when the ranking engine changes
       // mid-session (e.g., semantic → FTS fallback).
       const { getSearchDocListingsPaginated } = jest.requireMock(
-        "@/lib/search/search-doc-queries",
+        "@/lib/search/search-doc-queries"
       );
       getSearchDocListingsPaginated.mockResolvedValue({
         items: mockListings,
@@ -258,7 +258,7 @@ describe("Keyset Pagination Integration", () => {
       const mockListings = [createMockListingData("1")];
 
       (getSearchDocListingsFirstPage as jest.Mock).mockResolvedValue(
-        createMockKeysetResult(mockListings, null, 1),
+        createMockKeysetResult(mockListings, null, 1)
       );
       (getSearchDocMapListings as jest.Mock).mockResolvedValue([]);
 
@@ -269,7 +269,7 @@ describe("Keyset Pagination Integration", () => {
 
     it("should handle empty results", async () => {
       (getSearchDocListingsFirstPage as jest.Mock).mockResolvedValue(
-        createMockKeysetResult([], null, 0),
+        createMockKeysetResult([], null, 0)
       );
       (getSearchDocMapListings as jest.Mock).mockResolvedValue([]);
 
@@ -293,7 +293,7 @@ describe("Keyset Pagination Integration", () => {
 
       // When cursor sort doesn't match, it should restart from beginning
       (getSearchDocListingsFirstPage as jest.Mock).mockResolvedValue(
-        createMockKeysetResult(mockListings, null, 1),
+        createMockKeysetResult(mockListings, null, 1)
       );
       (getSearchDocMapListings as jest.Mock).mockResolvedValue([]);
 
@@ -316,7 +316,7 @@ describe("Keyset Pagination Integration", () => {
 
     it("should use offset pagination when keyset is disabled", async () => {
       const { getSearchDocListingsPaginated } = jest.requireMock(
-        "@/lib/search/search-doc-queries",
+        "@/lib/search/search-doc-queries"
       );
 
       const mockListings = [createMockListingData("1")];
@@ -342,7 +342,7 @@ describe("Keyset Pagination Integration", () => {
       expect(nextCursor).not.toBeNull();
       // Legacy cursor should be decodable to page 2
       const decoded = JSON.parse(
-        Buffer.from(nextCursor!, "base64url").toString("utf-8"),
+        Buffer.from(nextCursor!, "base64url").toString("utf-8")
       );
       expect(decoded.p).toBe(2);
     });
@@ -377,7 +377,7 @@ describe("Keyset Pagination Integration", () => {
       const cursor = buildCursorFromRow(row, "recommended");
       const encoded = encodeKeysetCursor(cursor);
       const decoded = JSON.parse(
-        Buffer.from(encoded, "base64url").toString("utf-8"),
+        Buffer.from(encoded, "base64url").toString("utf-8")
       );
 
       // Verify precision is preserved

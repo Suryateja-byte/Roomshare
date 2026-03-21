@@ -8,20 +8,20 @@
  * Note: 4 visual tests (focus outline, Escape, contrast, zoom) are E2E
  */
 
-import React from 'react';
-import { render, screen, fireEvent, within, act } from '@testing-library/react';
-import userEvent from '@testing-library/user-event';
+import React from "react";
+import { render, screen, fireEvent, within, act } from "@testing-library/react";
+import userEvent from "@testing-library/user-event";
 
 // Mock next-auth
 const mockSession = {
-  user: { id: 'user-123', name: 'Test User', email: 'test@example.com' },
+  user: { id: "user-123", name: "Test User", email: "test@example.com" },
   expires: new Date(Date.now() + 86400000).toISOString(),
 };
 
-jest.mock('next-auth/react', () => ({
+jest.mock("next-auth/react", () => ({
   useSession: jest.fn(() => ({
     data: mockSession,
-    status: 'authenticated',
+    status: "authenticated",
   })),
 }));
 
@@ -30,7 +30,7 @@ const mockFetch = jest.fn();
 global.fetch = mockFetch;
 
 // Mock Lucide icons
-jest.mock('lucide-react', () => ({
+jest.mock("lucide-react", () => ({
   MapPin: () => <span data-testid="map-pin-icon">M</span>,
   Search: () => <span data-testid="search-icon">S</span>,
   AlertCircle: () => <span data-testid="alert-icon">!</span>,
@@ -48,27 +48,27 @@ jest.mock('lucide-react', () => ({
 }));
 
 // Mock UI components
-jest.mock('@/components/ui/button', () => ({
-  Button: ({ children, asChild, ...props }: React.PropsWithChildren<{ asChild?: boolean }>) =>
-    asChild ? (
-      <>{children}</>
-    ) : (
-      <button {...props}>{children}</button>
-    ),
+jest.mock("@/components/ui/button", () => ({
+  Button: ({
+    children,
+    asChild,
+    ...props
+  }: React.PropsWithChildren<{ asChild?: boolean }>) =>
+    asChild ? <>{children}</> : <button {...props}>{children}</button>,
 }));
 
-import NearbyPlacesPanel from '@/components/nearby/NearbyPlacesPanel';
-import type { NearbyPlace } from '@/types/nearby';
+import NearbyPlacesPanel from "@/components/nearby/NearbyPlacesPanel";
+import type { NearbyPlace } from "@/types/nearby";
 
-describe('NearbyPlacesPanel - Accessibility', () => {
+describe("NearbyPlacesPanel - Accessibility", () => {
   const listingLat = 37.7749;
   const listingLng = -122.4194;
 
   const createMockPlace = (id: string): NearbyPlace => ({
     id,
     name: `Place ${id}`,
-    address: '123 Test St',
-    category: 'food-grocery',
+    address: "123 Test St",
+    category: "food-grocery",
     location: { lat: 37.7749, lng: -122.4194 },
     distanceMiles: 0.5,
   });
@@ -79,7 +79,7 @@ describe('NearbyPlacesPanel - Accessibility', () => {
       ok: true,
       status: 200,
       json: async () => ({
-        places: [createMockPlace('place-1'), createMockPlace('place-2')],
+        places: [createMockPlace("place-1"), createMockPlace("place-2")],
         meta: { count: 2, cached: false },
       }),
     });
@@ -96,13 +96,13 @@ describe('NearbyPlacesPanel - Accessibility', () => {
   };
 
   // F1: Chips reachable via Tab
-  describe('F1: Focus Management', () => {
-    it('category chips are reachable via Tab key', async () => {
+  describe("F1: Focus Management", () => {
+    it("category chips are reachable via Tab key", async () => {
       renderPanel();
 
       // Get all interactive elements
       const searchInput = screen.getByPlaceholderText(/search/i);
-      const chips = screen.getAllByRole('button');
+      const chips = screen.getAllByRole("button");
 
       // Focus should start at search input
       searchInput.focus();
@@ -115,17 +115,17 @@ describe('NearbyPlacesPanel - Accessibility', () => {
       }
     });
 
-    it('search input has proper aria-label', () => {
+    it("search input has proper aria-label", () => {
       renderPanel();
 
-      const searchInput = screen.getByRole('textbox');
-      expect(searchInput).toHaveAttribute('aria-label', 'Search nearby places');
+      const searchInput = screen.getByRole("textbox");
+      expect(searchInput).toHaveAttribute("aria-label", "Search nearby places");
     });
   });
 
   // F3: Enter key doesn't submit parent form
-  describe('F3: Form Isolation', () => {
-    it('Enter key in search input does not trigger form submission', async () => {
+  describe("F3: Form Isolation", () => {
+    it("Enter key in search input does not trigger form submission", async () => {
       const handleSubmit = jest.fn((e: React.FormEvent) => e.preventDefault());
 
       render(
@@ -135,76 +135,88 @@ describe('NearbyPlacesPanel - Accessibility', () => {
       );
 
       const searchInput = screen.getByPlaceholderText(/search/i);
-      await userEvent.type(searchInput, 'coffee{enter}');
+      await userEvent.type(searchInput, "coffee{enter}");
 
       // Form should not be submitted
       expect(handleSubmit).not.toHaveBeenCalled();
     });
 
-    it('category chips are type button, not submit', () => {
+    it("category chips are type button, not submit", () => {
       renderPanel();
 
-      const chips = screen.getAllByRole('button');
+      const chips = screen.getAllByRole("button");
       chips.forEach((chip) => {
         // Buttons without explicit type default to "submit" in forms
         // But clicking them should not submit forms due to our event handling
-        expect(chip.tagName.toLowerCase()).toBe('button');
+        expect(chip.tagName.toLowerCase()).toBe("button");
       });
     });
   });
 
   // F4: Unique aria-label per chip
-  describe('F4: Screen Reader Labels', () => {
-    it('each chip has accessible name', () => {
+  describe("F4: Screen Reader Labels", () => {
+    it("each chip has accessible name", () => {
       renderPanel();
 
-      const chips = screen.getAllByRole('button');
+      const chips = screen.getAllByRole("button");
 
       // Each chip should have accessible text
       chips.forEach((chip) => {
-        const accessibleName = chip.textContent || chip.getAttribute('aria-label');
+        const accessibleName =
+          chip.textContent || chip.getAttribute("aria-label");
         expect(accessibleName).toBeTruthy();
       });
     });
 
-    it('chips have aria-pressed attribute', () => {
+    it("chips have aria-pressed attribute", () => {
       renderPanel();
 
       // Find category chips (not radius buttons)
-      const categoryChips = screen.getAllByRole('button').filter((btn) =>
-        ['Grocery', 'Restaurants', 'Shopping', 'Gas', 'Fitness', 'Pharmacy'].some((label) =>
-          btn.textContent?.includes(label)
-        )
-      );
+      const categoryChips = screen
+        .getAllByRole("button")
+        .filter((btn) =>
+          [
+            "Grocery",
+            "Restaurants",
+            "Shopping",
+            "Gas",
+            "Fitness",
+            "Pharmacy",
+          ].some((label) => btn.textContent?.includes(label))
+        );
 
       categoryChips.forEach((chip) => {
-        expect(chip).toHaveAttribute('aria-pressed');
+        expect(chip).toHaveAttribute("aria-pressed");
       });
     });
 
-    it('radius buttons have aria-pressed attribute', () => {
+    it("radius buttons have aria-pressed attribute", () => {
       renderPanel();
 
       // Find radius buttons
-      const radiusButtons = screen.getAllByRole('button').filter((btn) =>
-        ['1 mi', '2 mi', '5 mi'].some((label) => btn.textContent?.includes(label))
-      );
+      const radiusButtons = screen
+        .getAllByRole("button")
+        .filter((btn) =>
+          ["1 mi", "2 mi", "5 mi"].some((label) =>
+            btn.textContent?.includes(label)
+          )
+        );
 
       radiusButtons.forEach((button) => {
-        expect(button).toHaveAttribute('aria-pressed');
+        expect(button).toHaveAttribute("aria-pressed");
       });
     });
   });
 
   // F5: Aria-live region has role="status"
-  describe('F5: Live Regions', () => {
+  describe("F5: Live Regions", () => {
     it('error state has role="status" and aria-live', async () => {
-      mockFetch.mockRejectedValue(new Error('Network error'));
+      mockFetch.mockRejectedValue(new Error("Network error"));
 
       renderPanel();
 
       // Trigger a search
-      const groceryChip = screen.getByRole('button', { name: /grocery/i });
+      const groceryChip = screen.getByRole("button", { name: /grocery/i });
       await act(async () => {
         fireEvent.click(groceryChip);
       });
@@ -213,12 +225,12 @@ describe('NearbyPlacesPanel - Accessibility', () => {
       await screen.findByText(/network error/i);
 
       // Check for live region
-      const errorContainer = screen.getByRole('status');
+      const errorContainer = screen.getByRole("status");
       expect(errorContainer).toBeInTheDocument();
-      expect(errorContainer).toHaveAttribute('aria-live', 'polite');
+      expect(errorContainer).toHaveAttribute("aria-live", "polite");
     });
 
-    it('results area has aria-busy during loading', async () => {
+    it("results area has aria-busy during loading", async () => {
       // Delay the response
       mockFetch.mockImplementation(
         () =>
@@ -229,7 +241,7 @@ describe('NearbyPlacesPanel - Accessibility', () => {
                   ok: true,
                   status: 200,
                   json: async () => ({
-                    places: [createMockPlace('place-1')],
+                    places: [createMockPlace("place-1")],
                     meta: { count: 1, cached: false },
                   }),
                 }),
@@ -240,27 +252,27 @@ describe('NearbyPlacesPanel - Accessibility', () => {
 
       renderPanel();
 
-      const groceryChip = screen.getByRole('button', { name: /grocery/i });
+      const groceryChip = screen.getByRole("button", { name: /grocery/i });
       await act(async () => {
         fireEvent.click(groceryChip);
       });
 
       // Check for aria-busy on results area
-      const resultsArea = screen.getByTestId('results-area');
-      expect(resultsArea).toHaveAttribute('aria-busy', 'true');
+      const resultsArea = screen.getByTestId("results-area");
+      expect(resultsArea).toHaveAttribute("aria-busy", "true");
     });
 
     it('results area has aria-busy="false" when not loading', () => {
       renderPanel();
 
-      const resultsArea = screen.getByTestId('results-area');
-      expect(resultsArea).toHaveAttribute('aria-busy', 'false');
+      const resultsArea = screen.getByTestId("results-area");
+      expect(resultsArea).toHaveAttribute("aria-busy", "false");
     });
   });
 
   // F7: Aria-busy="true" during loading
-  describe('F7: Loading State Accessibility', () => {
-    it('sets aria-busy during fetch', async () => {
+  describe("F7: Loading State Accessibility", () => {
+    it("sets aria-busy during fetch", async () => {
       let resolveRequest: (() => void) | null = null;
       mockFetch.mockImplementation(
         () =>
@@ -270,7 +282,7 @@ describe('NearbyPlacesPanel - Accessibility', () => {
                 ok: true,
                 status: 200,
                 json: async () => ({
-                  places: [createMockPlace('place-1')],
+                  places: [createMockPlace("place-1")],
                   meta: { count: 1, cached: false },
                 }),
               });
@@ -279,14 +291,14 @@ describe('NearbyPlacesPanel - Accessibility', () => {
 
       renderPanel();
 
-      const groceryChip = screen.getByRole('button', { name: /grocery/i });
+      const groceryChip = screen.getByRole("button", { name: /grocery/i });
       await act(async () => {
         fireEvent.click(groceryChip);
       });
 
       // Should be busy while loading
-      const resultsArea = screen.getByTestId('results-area');
-      expect(resultsArea).toHaveAttribute('aria-busy', 'true');
+      const resultsArea = screen.getByTestId("results-area");
+      expect(resultsArea).toHaveAttribute("aria-busy", "true");
 
       // Resolve the request
       await act(async () => {
@@ -294,10 +306,10 @@ describe('NearbyPlacesPanel - Accessibility', () => {
       });
 
       // Should no longer be busy
-      expect(resultsArea).toHaveAttribute('aria-busy', 'false');
+      expect(resultsArea).toHaveAttribute("aria-busy", "false");
     });
 
-    it('disables inputs during loading', async () => {
+    it("disables inputs during loading", async () => {
       let resolveRequest: (() => void) | null = null;
       mockFetch.mockImplementation(
         () =>
@@ -307,7 +319,7 @@ describe('NearbyPlacesPanel - Accessibility', () => {
                 ok: true,
                 status: 200,
                 json: async () => ({
-                  places: [createMockPlace('place-1')],
+                  places: [createMockPlace("place-1")],
                   meta: { count: 1, cached: false },
                 }),
               });
@@ -316,7 +328,7 @@ describe('NearbyPlacesPanel - Accessibility', () => {
 
       renderPanel();
 
-      const groceryChip = screen.getByRole('button', { name: /grocery/i });
+      const groceryChip = screen.getByRole("button", { name: /grocery/i });
       await act(async () => {
         fireEvent.click(groceryChip);
       });
@@ -336,11 +348,11 @@ describe('NearbyPlacesPanel - Accessibility', () => {
   });
 
   // F9: prefers-reduced-motion respected
-  describe('F9: Reduced Motion', () => {
-    it('component renders without requiring animations', () => {
+  describe("F9: Reduced Motion", () => {
+    it("component renders without requiring animations", () => {
       // Mock reduced motion preference
       const matchMediaMock = jest.fn().mockImplementation((query) => ({
-        matches: query === '(prefers-reduced-motion: reduce)',
+        matches: query === "(prefers-reduced-motion: reduce)",
         media: query,
         onchange: null,
         addListener: jest.fn(),
@@ -358,13 +370,13 @@ describe('NearbyPlacesPanel - Accessibility', () => {
       expect(screen.getByPlaceholderText(/search/i)).toBeInTheDocument();
     });
 
-    it('transitions use CSS classes that can be disabled', () => {
+    it("transitions use CSS classes that can be disabled", () => {
       renderPanel();
 
       // Check that transition classes are CSS-based (can be disabled via prefers-reduced-motion)
-      const chips = screen.getAllByRole('button');
+      const chips = screen.getAllByRole("button");
       chips.forEach((chip) => {
-        const hasTransition = chip.className.includes('transition');
+        const hasTransition = chip.className.includes("transition");
         // All transitions should be CSS-based
         if (hasTransition) {
           expect(chip.className).toMatch(/transition(-\w+)?/);
@@ -374,42 +386,47 @@ describe('NearbyPlacesPanel - Accessibility', () => {
   });
 
   // Additional accessibility tests
-  describe('Results Accessibility', () => {
-    it('result links have accessible names with directions context', async () => {
+  describe("Results Accessibility", () => {
+    it("result links have accessible names with directions context", async () => {
       mockFetch.mockResolvedValue({
         ok: true,
         status: 200,
         json: async () => ({
-          places: [createMockPlace('test-place')],
+          places: [createMockPlace("test-place")],
           meta: { count: 1, cached: false },
         }),
       });
 
       renderPanel();
 
-      const groceryChip = screen.getByRole('button', { name: /grocery/i });
+      const groceryChip = screen.getByRole("button", { name: /grocery/i });
       await act(async () => {
         fireEvent.click(groceryChip);
       });
 
-      await screen.findByText('Place test-place');
+      await screen.findByText("Place test-place");
 
       // Result should have aria-label for directions
-      const resultLink = screen.getByLabelText(/get directions to place test-place/i);
+      const resultLink = screen.getByLabelText(
+        /get directions to place test-place/i
+      );
       expect(resultLink).toBeInTheDocument();
-      expect(resultLink.tagName.toLowerCase()).toBe('a');
+      expect(resultLink.tagName.toLowerCase()).toBe("a");
     });
 
-    it('results area has aria-label', () => {
+    it("results area has aria-label", () => {
       renderPanel();
 
-      const resultsArea = screen.getByTestId('results-area');
-      expect(resultsArea).toHaveAttribute('aria-label', 'Nearby places results');
+      const resultsArea = screen.getByTestId("results-area");
+      expect(resultsArea).toHaveAttribute(
+        "aria-label",
+        "Nearby places results"
+      );
     });
   });
 
-  describe('Empty State Accessibility', () => {
-    it('no results state is accessible', async () => {
+  describe("Empty State Accessibility", () => {
+    it("no results state is accessible", async () => {
       mockFetch.mockResolvedValue({
         ok: true,
         status: 200,
@@ -421,7 +438,7 @@ describe('NearbyPlacesPanel - Accessibility', () => {
 
       renderPanel();
 
-      const groceryChip = screen.getByRole('button', { name: /grocery/i });
+      const groceryChip = screen.getByRole("button", { name: /grocery/i });
       await act(async () => {
         fireEvent.click(groceryChip);
       });
@@ -431,35 +448,35 @@ describe('NearbyPlacesPanel - Accessibility', () => {
     });
   });
 
-  describe('Login Prompt Accessibility', () => {
-    it('unauthenticated state shows accessible login link', () => {
-      const { useSession } = require('next-auth/react');
+  describe("Login Prompt Accessibility", () => {
+    it("unauthenticated state shows accessible login link", () => {
+      const { useSession } = require("next-auth/react");
       useSession.mockReturnValue({
         data: null,
-        status: 'unauthenticated',
+        status: "unauthenticated",
       });
 
       renderPanel();
 
-      const loginLink = screen.getByRole('link', { name: /sign in/i });
-      expect(loginLink).toHaveAttribute('href', '/login');
+      const loginLink = screen.getByRole("link", { name: /sign in/i });
+      expect(loginLink).toHaveAttribute("href", "/login");
     });
   });
 
-  describe('Icon Accessibility', () => {
-    it('alert icon in error state is decorative', async () => {
+  describe("Icon Accessibility", () => {
+    it("alert icon in error state is decorative", async () => {
       // Reset session mock to authenticated state
-      const { useSession } = require('next-auth/react');
+      const { useSession } = require("next-auth/react");
       useSession.mockReturnValue({
         data: mockSession,
-        status: 'authenticated',
+        status: "authenticated",
       });
 
-      mockFetch.mockRejectedValue(new Error('Test error'));
+      mockFetch.mockRejectedValue(new Error("Test error"));
 
       renderPanel();
 
-      const groceryChip = screen.getByRole('button', { name: /grocery/i });
+      const groceryChip = screen.getByRole("button", { name: /grocery/i });
       await act(async () => {
         fireEvent.click(groceryChip);
       });
@@ -469,10 +486,10 @@ describe('NearbyPlacesPanel - Accessibility', () => {
       // AlertCircle component in the error state has aria-hidden="true"
       // The mocked icon doesn't render the actual SVG, so we verify the
       // component structure by checking the error container is present
-      const errorContainer = screen.getByRole('status');
+      const errorContainer = screen.getByRole("status");
       expect(errorContainer).toBeInTheDocument();
       // The icon itself should be present in the error container
-      const alertIcon = screen.getByTestId('alert-icon');
+      const alertIcon = screen.getByTestId("alert-icon");
       expect(alertIcon).toBeInTheDocument();
     });
   });

@@ -19,7 +19,13 @@
  * Debug: pnpm playwright test tests/e2e/map-bounds-roundtrip.anon.spec.ts --project=chromium-anon --headed
  */
 
-import { test, expect, SF_BOUNDS, selectors, waitForMapReady } from "./helpers/test-utils";
+import {
+  test,
+  expect,
+  SF_BOUNDS,
+  selectors,
+  waitForMapReady,
+} from "./helpers/test-utils";
 import type { Page } from "@playwright/test";
 
 // ---------------------------------------------------------------------------
@@ -48,10 +54,9 @@ async function waitForSearchPage(page: Page, url = SEARCH_URL) {
  */
 async function waitForMapRef(page: Page, timeout = 30_000): Promise<boolean> {
   try {
-    await page.waitForFunction(
-      () => !!(window as any).__e2eMapRef,
-      { timeout },
-    );
+    await page.waitForFunction(() => !!(window as any).__e2eMapRef, {
+      timeout,
+    });
     return true;
   } catch {
     return false;
@@ -139,7 +144,7 @@ async function getMapViewportBounds(page: Page): Promise<{
 async function simulateMapPan(
   page: Page,
   deltaX = 100,
-  deltaY = 50,
+  deltaY = 50
 ): Promise<boolean> {
   const map = page.locator(selectors.map).first();
   if ((await map.count()) === 0) return false;
@@ -167,17 +172,23 @@ async function simulateMapPan(
  * Ensure "Search as I move" is ON.
  */
 async function ensureSearchAsMoveOn(page: Page) {
-  const toggle = page.locator('button[role="switch"]:has-text("Search as I move")');
+  const toggle = page.locator(
+    'button[role="switch"]:has-text("Search as I move")'
+  );
   if ((await toggle.count()) === 0) return;
   const isChecked = await toggle.getAttribute("aria-checked");
   if (isChecked === "false") {
     await toggle.click();
-    await expect(toggle).toHaveAttribute("aria-checked", "true", { timeout: 5_000 });
+    await expect(toggle).toHaveAttribute("aria-checked", "true", {
+      timeout: 5_000,
+    });
   }
 }
 
 // Map tests need extra time for WebGL rendering and tile loading in CI
-test.beforeEach(async () => { test.slow(); });
+test.beforeEach(async () => {
+  test.slow();
+});
 
 // ---------------------------------------------------------------------------
 // Group 1: Bounds in URL
@@ -206,13 +217,19 @@ test.describe("Bounds round-trip: Bounds in URL", () => {
 
     // Map should have been fitted to URL bounds (with some tolerance for padding)
     const tolerance = 0.5; // Generous tolerance for fitBounds padding in headless CI
-    expect(mapBounds.minLat).toBeGreaterThanOrEqual(urlBounds.minLat! - tolerance);
+    expect(mapBounds.minLat).toBeGreaterThanOrEqual(
+      urlBounds.minLat! - tolerance
+    );
     expect(mapBounds.maxLat).toBeLessThanOrEqual(urlBounds.maxLat! + tolerance);
-    expect(mapBounds.minLng).toBeGreaterThanOrEqual(urlBounds.minLng! - tolerance);
+    expect(mapBounds.minLng).toBeGreaterThanOrEqual(
+      urlBounds.minLng! - tolerance
+    );
     expect(mapBounds.maxLng).toBeLessThanOrEqual(urlBounds.maxLng! + tolerance);
   });
 
-  test("2 - After map move, URL bounds update to new viewport", async ({ page }) => {
+  test("2 - After map move, URL bounds update to new viewport", async ({
+    page,
+  }) => {
     await waitForSearchPage(page);
 
     if (!(await isMapFullyLoaded(page))) {
@@ -232,11 +249,11 @@ test.describe("Bounds round-trip: Bounds in URL", () => {
     }
 
     // Wait for URL bounds to update after debounce
-    await page.waitForFunction(
-      (prev) => window.location.href !== prev,
-      page.url(),
-      { timeout: 30_000 },
-    ).catch(() => {});
+    await page
+      .waitForFunction((prev) => window.location.href !== prev, page.url(), {
+        timeout: 30_000,
+      })
+      .catch(() => {});
 
     const newBounds = getUrlBounds(page.url());
 
@@ -248,12 +265,17 @@ test.describe("Bounds round-trip: Bounds in URL", () => {
       initialBounds.maxLng !== newBounds.maxLng;
 
     if (!changed) {
-      test.skip(true, "Map pan did not update URL bounds (WebGL/headless limitation)");
+      test.skip(
+        true,
+        "Map pan did not update URL bounds (WebGL/headless limitation)"
+      );
       return;
     }
   });
 
-  test("3 - Bounds precision: minLat/maxLat/minLng/maxLng have reasonable decimal precision", async ({ page }) => {
+  test("3 - Bounds precision: minLat/maxLat/minLng/maxLng have reasonable decimal precision", async ({
+    page,
+  }) => {
     await waitForSearchPage(page);
 
     if (!(await isMapFullyLoaded(page))) {
@@ -270,11 +292,11 @@ test.describe("Bounds round-trip: Bounds in URL", () => {
       return;
     }
 
-    await page.waitForFunction(
-      (prev) => window.location.href !== prev,
-      page.url(),
-      { timeout: 30_000 },
-    ).catch(() => {});
+    await page
+      .waitForFunction((prev) => window.location.href !== prev, page.url(), {
+        timeout: 30_000,
+      })
+      .catch(() => {});
 
     const url = new URL(page.url(), "http://localhost");
     const boundsParams = ["minLat", "maxLat", "minLng", "maxLng"];
@@ -288,7 +310,9 @@ test.describe("Bounds round-trip: Bounds in URL", () => {
 
       // Should have reasonable precision (not too many decimals, not too few)
       // Map.tsx uses toFixed(6) for bounds in some places
-      const decimalPlaces = value.includes(".") ? value.split(".")[1].length : 0;
+      const decimalPlaces = value.includes(".")
+        ? value.split(".")[1].length
+        : 0;
       expect(decimalPlaces).toBeGreaterThanOrEqual(1);
       expect(decimalPlaces).toBeLessThanOrEqual(15);
 
@@ -303,7 +327,9 @@ test.describe("Bounds round-trip: Bounds in URL", () => {
     }
   });
 
-  test("4 - Bounds updates use replaceState (no history entries)", async ({ page }) => {
+  test("4 - Bounds updates use replaceState (no history entries)", async ({
+    page,
+  }) => {
     await waitForSearchPage(page);
 
     if (!(await isMapFullyLoaded(page))) {
@@ -314,7 +340,9 @@ test.describe("Bounds round-trip: Bounds in URL", () => {
     await ensureSearchAsMoveOn(page);
 
     // Track history length
-    const initialHistoryLength = await page.evaluate(() => window.history.length);
+    const initialHistoryLength = await page.evaluate(
+      () => window.history.length
+    );
 
     // Pan the map
     const panned = await simulateMapPan(page, 120, 60);
@@ -324,11 +352,11 @@ test.describe("Bounds round-trip: Bounds in URL", () => {
     }
 
     // Wait for URL to update after debounce
-    await page.waitForFunction(
-      (prev) => window.location.href !== prev,
-      page.url(),
-      { timeout: 30_000 },
-    ).catch(() => {});
+    await page
+      .waitForFunction((prev) => window.location.href !== prev, page.url(), {
+        timeout: 30_000,
+      })
+      .catch(() => {});
 
     // History length should NOT have increased (replaceState, not pushState)
     const afterHistoryLength = await page.evaluate(() => window.history.length);
@@ -344,13 +372,15 @@ test.describe("Bounds round-trip: Bounds in URL", () => {
 // ---------------------------------------------------------------------------
 
 test.describe("Bounds round-trip: Deep link with bounds", () => {
-  test("5 - Deep link with specific bounds centers map on those bounds", async ({ page }) => {
+  test("5 - Deep link with specific bounds centers map on those bounds", async ({
+    page,
+  }) => {
     // Use specific bounds for downtown SF
     const customBounds = {
       minLat: 37.78,
-      maxLat: 37.80,
+      maxLat: 37.8,
       minLng: -122.42,
-      maxLng: -122.40,
+      maxLng: -122.4,
     };
     const customBoundsQS = `minLat=${customBounds.minLat}&maxLat=${customBounds.maxLat}&minLng=${customBounds.minLng}&maxLng=${customBounds.maxLng}`;
 
@@ -386,7 +416,9 @@ test.describe("Bounds round-trip: Deep link with bounds", () => {
     expect(center.lng).toBeLessThanOrEqual(expectedLng + tolerance);
   });
 
-  test("6 - Deep link with no bounds loads map at default/full extent", async ({ page }) => {
+  test("6 - Deep link with no bounds loads map at default/full extent", async ({
+    page,
+  }) => {
     // Navigate to search without any bounds params
     await page.goto("/search");
     await page.waitForLoadState("domcontentloaded");
@@ -417,14 +449,18 @@ test.describe("Bounds round-trip: Deep link with bounds", () => {
     }
   });
 
-  test("7 - Deep link with invalid bounds is handled gracefully", async ({ page }) => {
+  test("7 - Deep link with invalid bounds is handled gracefully", async ({
+    page,
+  }) => {
     const consoleErrors: string[] = [];
     page.on("console", (msg) => {
       if (msg.type() === "error") consoleErrors.push(msg.text());
     });
 
     // Navigate with invalid bounds (NaN, Infinity, inverted)
-    await page.goto("/search?minLat=NaN&maxLat=Infinity&minLng=-999&maxLng=999");
+    await page.goto(
+      "/search?minLat=NaN&maxLat=Infinity&minLng=-999&maxLng=999"
+    );
     await page.waitForLoadState("domcontentloaded");
     await page.waitForLoadState("domcontentloaded");
 
@@ -458,14 +494,16 @@ test.describe("Bounds round-trip: Deep link with bounds", () => {
         !e.includes("maplibre") &&
         !e.includes("Mapbox") &&
         !e.includes("tile") &&
-        !e.includes("pbf"),
+        !e.includes("pbf")
     );
 
     // No unexpected JS errors
     expect(realErrors).toHaveLength(0);
   });
 
-  test("8 - URL bounds round-trip: read bounds, pan, refresh, same new bounds", async ({ page }) => {
+  test("8 - URL bounds round-trip: read bounds, pan, refresh, same new bounds", async ({
+    page,
+  }) => {
     await waitForSearchPage(page);
 
     if (!(await isMapFullyLoaded(page))) {
@@ -483,11 +521,11 @@ test.describe("Bounds round-trip: Deep link with bounds", () => {
     }
 
     // Wait for URL to update after debounce
-    await page.waitForFunction(
-      (prev) => window.location.href !== prev,
-      page.url(),
-      { timeout: 30_000 },
-    ).catch(() => {});
+    await page
+      .waitForFunction((prev) => window.location.href !== prev, page.url(), {
+        timeout: 30_000,
+      })
+      .catch(() => {});
 
     // Read new bounds from URL
     const boundsAfterPan = getUrlBounds(page.url());
@@ -522,10 +560,18 @@ test.describe("Bounds round-trip: Deep link with bounds", () => {
 
       if (center && boundsAfterRefresh.minLat !== null) {
         // Center should be within the bounds
-        expect(center.lat).toBeGreaterThanOrEqual(boundsAfterRefresh.minLat! - 0.15);
-        expect(center.lat).toBeLessThanOrEqual(boundsAfterRefresh.maxLat! + 0.15);
-        expect(center.lng).toBeGreaterThanOrEqual(boundsAfterRefresh.minLng! - 0.15);
-        expect(center.lng).toBeLessThanOrEqual(boundsAfterRefresh.maxLng! + 0.15);
+        expect(center.lat).toBeGreaterThanOrEqual(
+          boundsAfterRefresh.minLat! - 0.15
+        );
+        expect(center.lat).toBeLessThanOrEqual(
+          boundsAfterRefresh.maxLat! + 0.15
+        );
+        expect(center.lng).toBeGreaterThanOrEqual(
+          boundsAfterRefresh.minLng! - 0.15
+        );
+        expect(center.lng).toBeLessThanOrEqual(
+          boundsAfterRefresh.maxLng! + 0.15
+        );
       }
     }
   });
@@ -583,7 +629,9 @@ test.describe("Bounds round-trip: Bounds + filters", () => {
     expect(url.searchParams.get("sort")).toBe("price_asc");
   });
 
-  test("11 - Bounds updated independently from filter changes", async ({ page }) => {
+  test("11 - Bounds updated independently from filter changes", async ({
+    page,
+  }) => {
     await waitForSearchPage(page);
 
     if (!(await isMapFullyLoaded(page))) {
@@ -609,11 +657,11 @@ test.describe("Bounds round-trip: Bounds + filters", () => {
       return;
     }
 
-    await page.waitForFunction(
-      (prev) => window.location.href !== prev,
-      page.url(),
-      { timeout: 30_000 },
-    ).catch(() => {});
+    await page
+      .waitForFunction((prev) => window.location.href !== prev, page.url(), {
+        timeout: 30_000,
+      })
+      .catch(() => {});
 
     const afterPanUrl = new URL(page.url(), "http://localhost");
     const afterPanFilter = afterPanUrl.searchParams.get("roomType");

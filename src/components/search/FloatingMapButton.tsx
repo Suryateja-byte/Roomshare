@@ -33,7 +33,10 @@ export default function FloatingMapButton({
       <AnimatePresence mode="wait">
         <m.button
           key={isListMode ? "map" : "list"}
-          onClick={() => { triggerHaptic(); onToggle(); }}
+          onClick={() => {
+            triggerHaptic();
+            onToggle();
+          }}
           initial={{ scale: 0.9, opacity: 0 }}
           animate={{ scale: 1, opacity: 1 }}
           exit={{ scale: 0.9, opacity: 0 }}
@@ -53,7 +56,9 @@ export default function FloatingMapButton({
           ) : (
             <List className="w-4 h-4" />
           )}
-          <span className="text-sm font-semibold whitespace-nowrap">{label}</span>
+          <span className="text-sm font-semibold whitespace-nowrap">
+            {label}
+          </span>
         </m.button>
       </AnimatePresence>
     </LazyMotion>

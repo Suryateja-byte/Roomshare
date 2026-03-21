@@ -48,7 +48,11 @@ import {
 import { useSearchParams } from "next/navigation";
 import { rateLimitedFetch, RateLimitError } from "@/lib/rate-limit-client";
 import { buildCanonicalFilterParamsFromSearchParams } from "@/lib/search-params";
-import { PROGRAMMATIC_MOVE_TIMEOUT_MS, AREA_COUNT_DEBOUNCE_MS, AREA_COUNT_CACHE_TTL_MS } from "@/lib/constants";
+import {
+  PROGRAMMATIC_MOVE_TIMEOUT_MS,
+  AREA_COUNT_DEBOUNCE_MS,
+  AREA_COUNT_CACHE_TTL_MS,
+} from "@/lib/constants";
 
 /** Coordinates for map bounds */
 export interface MapBoundsCoords {
@@ -160,7 +164,9 @@ interface MapBoundsActionsValue {
 }
 
 const MapBoundsStateContext = createContext<MapBoundsStateValue | null>(null);
-const MapBoundsActionsContext = createContext<MapBoundsActionsValue | null>(null);
+const MapBoundsActionsContext = createContext<MapBoundsActionsValue | null>(
+  null
+);
 
 /**
  * Module-level SSR fallback for state context.
@@ -182,17 +188,17 @@ const SSR_STATE_FALLBACK: MapBoundsStateValue = {
  * Module-level SSR fallback for actions context.
  */
 const SSR_ACTIONS_FALLBACK: MapBoundsActionsValue = {
-  searchCurrentArea: () => { },
-  resetToUrlBounds: () => { },
-  setHasUserMoved: () => { },
-  setBoundsDirty: () => { },
-  setSearchAsMove: () => { },
-  setProgrammaticMove: () => { },
-  setSearchLocation: () => { },
-  setCurrentMapBounds: () => { },
-  setSearchHandler: () => { },
-  setResetHandler: () => { },
-  setActivePanBounds: () => { },
+  searchCurrentArea: () => {},
+  resetToUrlBounds: () => {},
+  setHasUserMoved: () => {},
+  setBoundsDirty: () => {},
+  setSearchAsMove: () => {},
+  setProgrammaticMove: () => {},
+  setSearchLocation: () => {},
+  setCurrentMapBounds: () => {},
+  setSearchHandler: () => {},
+  setResetHandler: () => {},
+  setActivePanBounds: () => {},
   isProgrammaticMoveRef: { current: false },
 };
 
@@ -211,17 +217,17 @@ const SSR_FALLBACK: MapBoundsContextValue = {
   areaCount: null,
   isAreaCountLoading: false,
   activePanBounds: null,
-  searchCurrentArea: () => { },
-  resetToUrlBounds: () => { },
-  setHasUserMoved: () => { },
-  setBoundsDirty: () => { },
-  setSearchAsMove: () => { },
-  setProgrammaticMove: () => { },
-  setSearchLocation: () => { },
-  setCurrentMapBounds: () => { },
-  setSearchHandler: () => { },
-  setResetHandler: () => { },
-  setActivePanBounds: () => { },
+  searchCurrentArea: () => {},
+  resetToUrlBounds: () => {},
+  setHasUserMoved: () => {},
+  setBoundsDirty: () => {},
+  setSearchAsMove: () => {},
+  setProgrammaticMove: () => {},
+  setSearchLocation: () => {},
+  setCurrentMapBounds: () => {},
+  setSearchHandler: () => {},
+  setResetHandler: () => {},
+  setActivePanBounds: () => {},
   isProgrammaticMoveRef: { current: false },
 };
 
@@ -236,8 +242,6 @@ function isPointInBounds(point: PointCoords, bounds: MapBoundsCoords): boolean {
     point.lng <= bounds.maxLng
   );
 }
-
-
 
 export function MapBoundsProvider({ children }: { children: React.ReactNode }) {
   const [hasUserMoved, setHasUserMovedState] = useState(false);
@@ -254,7 +258,7 @@ export function MapBoundsProvider({ children }: { children: React.ReactNode }) {
   }, []);
   const [isProgrammaticMove, setIsProgrammaticMoveState] = useState(false);
   const [searchLocationName, setSearchLocationName] = useState<string | null>(
-    null,
+    null
   );
   const [searchLocationCenter, setSearchLocationCenter] =
     useState<PointCoords | null>(null);
@@ -291,7 +295,7 @@ export function MapBoundsProvider({ children }: { children: React.ReactNode }) {
       prevSearchParamsRef.current !== currentParams
     ) {
       // Compare non-bounds params to detect true route changes
-      const BOUNDS_KEYS = ['minLat', 'maxLat', 'minLng', 'maxLng'];
+      const BOUNDS_KEYS = ["minLat", "maxLat", "minLng", "maxLng"];
       const stripBounds = (raw: string) => {
         const sp = new URLSearchParams(raw);
         BOUNDS_KEYS.forEach((k) => sp.delete(k));
@@ -390,7 +394,7 @@ export function MapBoundsProvider({ children }: { children: React.ReactNode }) {
       setSearchLocationName(name);
       setSearchLocationCenter(center);
     },
-    [],
+    []
   );
 
   const setCurrentMapBounds = useCallback((bounds: MapBoundsCoords | null) => {
@@ -417,8 +421,12 @@ export function MapBoundsProvider({ children }: { children: React.ReactNode }) {
   const [areaCount, setAreaCount] = useState<number | null>(null);
   const [isAreaCountLoading, setIsAreaCountLoading] = useState(false);
   const areaCountAbortRef = useRef<AbortController | null>(null);
-  const areaCountDebounceRef = useRef<ReturnType<typeof setTimeout> | null>(null);
-  const areaCountCacheRef = useRef<Map<string, { count: number | null; expiresAt: number }>>(new Map());
+  const areaCountDebounceRef = useRef<ReturnType<typeof setTimeout> | null>(
+    null
+  );
+  const areaCountCacheRef = useRef<
+    Map<string, { count: number | null; expiresAt: number }>
+  >(new Map());
 
   // Area count is enabled only when banner would show (toggle OFF + bounds dirty)
   const areaCountEnabled = hasUserMoved && boundsDirty && !searchAsMove;
@@ -444,7 +452,8 @@ export function MapBoundsProvider({ children }: { children: React.ReactNode }) {
     // Build cache key from current map bounds + URL filter params
     const boundsKey = `${currentMapBounds.minLat},${currentMapBounds.maxLat},${currentMapBounds.minLng},${currentMapBounds.maxLng}`;
     // Canonical filter key (shared parser output) avoids stale cache hits from non-filter URL noise.
-    const filterKey = buildCanonicalFilterParamsFromSearchParams(searchParams).toString();
+    const filterKey =
+      buildCanonicalFilterParamsFromSearchParams(searchParams).toString();
     const cacheKey = `${boundsKey}|${filterKey}`;
 
     // Check cache
@@ -493,7 +502,7 @@ export function MapBoundsProvider({ children }: { children: React.ReactNode }) {
         .then((data) => {
           // P2-FIX (#67): Guard against state update after unmount
           if (!controller.signal.aborted && isMountedRef.current) {
-            const count = (data.count as number | null);
+            const count = data.count as number | null;
             setAreaCount(count);
             setIsAreaCountLoading(false);
             areaCountCacheRef.current.set(cacheKey, {
@@ -509,7 +518,8 @@ export function MapBoundsProvider({ children }: { children: React.ReactNode }) {
             return;
           }
           if (err instanceof RateLimitError) {
-            if (!controller.signal.aborted && isMountedRef.current) setIsAreaCountLoading(false);
+            if (!controller.signal.aborted && isMountedRef.current)
+              setIsAreaCountLoading(false);
             return;
           }
           if (!controller.signal.aborted && isMountedRef.current) {
@@ -690,7 +700,10 @@ export function useMapBoundsActions(): MapBoundsActionsValue {
  * Selector hook for area count only.
  * Use when you only need the listing count for the current map area.
  */
-export function useAreaCount(): { areaCount: number | null; isAreaCountLoading: boolean } {
+export function useAreaCount(): {
+  areaCount: number | null;
+  isAreaCountLoading: boolean;
+} {
   const { areaCount, isAreaCountLoading } = useMapBoundsState();
   return useMemo(
     () => ({ areaCount, isAreaCountLoading }),
@@ -702,7 +715,10 @@ export function useAreaCount(): { areaCount: number | null; isAreaCountLoading: 
  * Selector hook for searchAsMove toggle state and setter.
  * Use for the "Search as I move" toggle component.
  */
-export function useSearchAsMove(): { searchAsMove: boolean; setSearchAsMove: (value: boolean) => void } {
+export function useSearchAsMove(): {
+  searchAsMove: boolean;
+  setSearchAsMove: (value: boolean) => void;
+} {
   const { searchAsMove } = useMapBoundsState();
   const { setSearchAsMove } = useMapBoundsActions();
   return useMemo(
@@ -715,7 +731,10 @@ export function useSearchAsMove(): { searchAsMove: boolean; setSearchAsMove: (va
  * Selector hook for bounds dirty state.
  * Use when you only need to know if map bounds differ from URL bounds.
  */
-export function useBoundsDirty(): { boundsDirty: boolean; setBoundsDirty: (value: boolean) => void } {
+export function useBoundsDirty(): {
+  boundsDirty: boolean;
+  setBoundsDirty: (value: boolean) => void;
+} {
   const { boundsDirty } = useMapBoundsState();
   const { setBoundsDirty } = useMapBoundsActions();
   return useMemo(

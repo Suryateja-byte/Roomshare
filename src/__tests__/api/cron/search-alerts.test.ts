@@ -5,11 +5,21 @@
  * alert processing delegation, and error handling.
  */
 
-jest.mock('@/lib/search-alerts', () => ({
+jest.mock("@/lib/search-alerts", () => ({
   processSearchAlerts: jest.fn(),
-}))
+}));
 
-jest.mock('@/lib/logger', () => ({
+jest.mock("@/lib/prisma", () => ({
+  prisma: {
+    $queryRaw: jest.fn(),
+  },
+}));
+
+jest.mock("@/lib/retry", () => ({
+  withRetry: jest.fn((fn: () => unknown) => fn()),
+}));
+
+jest.mock("@/lib/logger", () => ({
   logger: {
     sync: {
       error: jest.fn(),
@@ -18,19 +28,19 @@ jest.mock('@/lib/logger', () => ({
     },
   },
   sanitizeErrorMessage: jest.fn((e: unknown) =>
-    e instanceof Error ? e.message : typeof e === 'string' ? e : 'Unknown error'
+    e instanceof Error ? e.message : typeof e === "string" ? e : "Unknown error"
   ),
-}))
+}));
 
-jest.mock('@sentry/nextjs', () => ({
+jest.mock("@sentry/nextjs", () => ({
   captureException: jest.fn(),
-}))
+}));
 
-jest.mock('next/server', () => ({
+jest.mock("next/server", () => ({
   NextRequest: class MockNextRequest extends Request {
-    declare headers: Headers
+    declare headers: Headers;
     constructor(url: string, init?: RequestInit) {
-      super(url, init)
+      super(url, init);
     }
   },
   NextResponse: {
@@ -40,182 +50,255 @@ jest.mock('next/server', () => ({
       headers: new Map(),
     }),
   },
-}))
+}));
 
-import { GET } from '@/app/api/cron/search-alerts/route'
-import { processSearchAlerts } from '@/lib/search-alerts'
-import * as Sentry from '@sentry/nextjs'
-import { NextRequest } from 'next/server'
+import { GET } from "@/app/api/cron/search-alerts/route";
+import { processSearchAlerts } from "@/lib/search-alerts";
+import { prisma } from "@/lib/prisma";
+import * as Sentry from "@sentry/nextjs";
+import { NextRequest } from "next/server";
 
-describe('GET /api/cron/search-alerts', () => {
-  const VALID_CRON_SECRET = 'a-very-long-and-secure-cron-secret-that-is-at-least-32-characters'
-  const originalEnv = process.env
+describe("GET /api/cron/search-alerts", () => {
+  const VALID_CRON_SECRET =
+    "a-very-long-and-secure-cron-secret-that-is-at-least-32-characters";
+  const originalEnv = process.env;
 
   beforeEach(() => {
-    jest.clearAllMocks()
-    process.env = { ...originalEnv, CRON_SECRET: VALID_CRON_SECRET }
-  })
+    jest.clearAllMocks();
+    process.env = { ...originalEnv, CRON_SECRET: VALID_CRON_SECRET };
+    // Default: advisory lock acquired successfully
+    (prisma.$queryRaw as jest.Mock).mockResolvedValue([{ locked: true }]);
+  });
 
   afterEach(() => {
-    process.env = originalEnv
-  })
+    process.env = originalEnv;
+  });
 
   function createRequest(authHeader?: string): NextRequest {
-    const headers: Record<string, string> = {}
+    const headers: Record<string, string> = {};
     if (authHeader) {
-      headers['authorization'] = authHeader
+      headers["authorization"] = authHeader;
     }
-    return new NextRequest('http://localhost:3000/api/cron/search-alerts', {
-      method: 'GET',
+    return new NextRequest("http://localhost:3000/api/cron/search-alerts", {
+      method: "GET",
       headers,
-    })
+    });
   }
 
-  describe('authentication', () => {
-    it('returns 401 when authorization header is missing', async () => {
-      const response = await GET(createRequest())
+  describe("authentication", () => {
+    it("returns 401 when authorization header is missing", async () => {
+      const response = await GET(createRequest());
 
-      expect(response.status).toBe(401)
-      const data = await response.json()
-      expect(data.error).toBe('Unauthorized')
-    })
+      expect(response.status).toBe(401);
+      const data = await response.json();
+      expect(data.error).toBe("Unauthorized");
+    });
 
-    it('returns 401 when authorization header has wrong secret', async () => {
-      const response = await GET(createRequest('Bearer wrong-secret'))
+    it("returns 401 when authorization header has wrong secret", async () => {
+      const response = await GET(createRequest("Bearer wrong-secret"));
 
-      expect(response.status).toBe(401)
-    })
-  })
+      expect(response.status).toBe(401);
+    });
+  });
 
-  describe('defense in depth - secret validation', () => {
-    it('returns 500 when CRON_SECRET is not configured', async () => {
-      delete process.env.CRON_SECRET
+  describe("defense in depth - secret validation", () => {
+    it("returns 500 when CRON_SECRET is not configured", async () => {
+      delete process.env.CRON_SECRET;
 
-      const response = await GET(createRequest(`Bearer ${VALID_CRON_SECRET}`))
+      const response = await GET(createRequest(`Bearer ${VALID_CRON_SECRET}`));
 
-      expect(response.status).toBe(500)
-      const data = await response.json()
-      expect(data.error).toBe('Server configuration error')
-    })
+      expect(response.status).toBe(500);
+      const data = await response.json();
+      expect(data.error).toBe("Server configuration error");
+    });
 
-    it('returns 500 when CRON_SECRET is too short (< 32 chars)', async () => {
-      process.env.CRON_SECRET = 'short'
+    it("returns 500 when CRON_SECRET is too short (< 32 chars)", async () => {
+      process.env.CRON_SECRET = "short";
 
-      const response = await GET(createRequest('Bearer short'))
+      const response = await GET(createRequest("Bearer short"));
 
-      expect(response.status).toBe(500)
-    })
+      expect(response.status).toBe(500);
+    });
 
-    it('returns 500 when CRON_SECRET contains placeholder value', async () => {
-      process.env.CRON_SECRET = 'change-in-production-aaaa-bbbb-cccc-dddd-eeee'
+    it("returns 500 when CRON_SECRET contains placeholder value", async () => {
+      process.env.CRON_SECRET = "change-in-production-aaaa-bbbb-cccc-dddd-eeee";
 
-      const response = await GET(createRequest('Bearer change-in-production-aaaa-bbbb-cccc-dddd-eeee'))
+      const response = await GET(
+        createRequest("Bearer change-in-production-aaaa-bbbb-cccc-dddd-eeee")
+      );
 
-      expect(response.status).toBe(500)
-    })
-  })
+      expect(response.status).toBe(500);
+    });
+  });
 
-  describe('successful alert processing', () => {
-    it('processes alerts and returns result with duration', async () => {
-      ;(processSearchAlerts as jest.Mock).mockResolvedValue({
+  describe("successful alert processing", () => {
+    it("processes alerts and returns result with duration", async () => {
+      (processSearchAlerts as jest.Mock).mockResolvedValue({
         processed: 5,
         alertsSent: 3,
         errors: 0,
-        details: ['Found 5 saved searches to process'],
-      })
+        details: ["Found 5 saved searches to process"],
+      });
 
-      const response = await GET(createRequest(`Bearer ${VALID_CRON_SECRET}`))
+      const response = await GET(createRequest(`Bearer ${VALID_CRON_SECRET}`));
 
-      expect(response.status).toBe(200)
-      const data = await response.json()
-      expect(data.success).toBe(true)
-      expect(data.processed).toBe(5)
-      expect(data.alertsSent).toBe(3)
-      expect(data.errors).toBe(0)
-      expect(data.duration).toBeDefined()
-    })
+      expect(response.status).toBe(200);
+      const data = await response.json();
+      expect(data.success).toBe(true);
+      expect(data.processed).toBe(5);
+      expect(data.alertsSent).toBe(3);
+      expect(data.errors).toBe(0);
+      expect(data.duration).toBeDefined();
+    });
 
-    it('handles no alerts to process', async () => {
-      ;(processSearchAlerts as jest.Mock).mockResolvedValue({
+    it("handles no alerts to process", async () => {
+      (processSearchAlerts as jest.Mock).mockResolvedValue({
         processed: 0,
         alertsSent: 0,
         errors: 0,
-        details: ['Found 0 saved searches to process'],
-      })
+        details: ["Found 0 saved searches to process"],
+      });
 
-      const response = await GET(createRequest(`Bearer ${VALID_CRON_SECRET}`))
+      const response = await GET(createRequest(`Bearer ${VALID_CRON_SECRET}`));
 
-      expect(response.status).toBe(200)
-      const data = await response.json()
-      expect(data.success).toBe(true)
-      expect(data.processed).toBe(0)
-      expect(data.alertsSent).toBe(0)
-    })
+      expect(response.status).toBe(200);
+      const data = await response.json();
+      expect(data.success).toBe(true);
+      expect(data.processed).toBe(0);
+      expect(data.alertsSent).toBe(0);
+    });
 
-    it('calls processSearchAlerts function', async () => {
-      ;(processSearchAlerts as jest.Mock).mockResolvedValue({
+    it("calls processSearchAlerts function", async () => {
+      (processSearchAlerts as jest.Mock).mockResolvedValue({
         processed: 0,
         alertsSent: 0,
         errors: 0,
         details: [],
-      })
+      });
 
-      await GET(createRequest(`Bearer ${VALID_CRON_SECRET}`))
+      await GET(createRequest(`Bearer ${VALID_CRON_SECRET}`));
 
-      expect(processSearchAlerts).toHaveBeenCalledTimes(1)
-    })
+      expect(processSearchAlerts).toHaveBeenCalledTimes(1);
+    });
 
-    it('returns partial success when some alerts have errors', async () => {
-      ;(processSearchAlerts as jest.Mock).mockResolvedValue({
+    it("returns partial success when some alerts have errors", async () => {
+      (processSearchAlerts as jest.Mock).mockResolvedValue({
         processed: 10,
         alertsSent: 7,
         errors: 3,
-        details: ['Processed with some errors'],
-      })
+        details: ["Processed with some errors"],
+      });
 
-      const response = await GET(createRequest(`Bearer ${VALID_CRON_SECRET}`))
+      const response = await GET(createRequest(`Bearer ${VALID_CRON_SECRET}`));
 
-      expect(response.status).toBe(200)
-      const data = await response.json()
-      expect(data.success).toBe(true)
-      expect(data.errors).toBe(3)
-    })
-  })
+      expect(response.status).toBe(200);
+      const data = await response.json();
+      expect(data.success).toBe(true);
+      expect(data.errors).toBe(3);
+    });
+  });
 
-  describe('error handling', () => {
-    it('returns 500 when processSearchAlerts throws', async () => {
-      ;(processSearchAlerts as jest.Mock).mockRejectedValue(
-        new Error('Database connection failed')
-      )
+  describe("error handling", () => {
+    it("returns 500 when processSearchAlerts throws", async () => {
+      (processSearchAlerts as jest.Mock).mockRejectedValue(
+        new Error("Database connection failed")
+      );
 
-      const response = await GET(createRequest(`Bearer ${VALID_CRON_SECRET}`))
+      const response = await GET(createRequest(`Bearer ${VALID_CRON_SECRET}`));
 
-      expect(response.status).toBe(500)
-      const data = await response.json()
-      expect(data.success).toBe(false)
-      expect(data.error).toBe('Search alerts processing failed')
-    })
+      expect(response.status).toBe(500);
+      const data = await response.json();
+      expect(data.success).toBe(false);
+      expect(data.error).toBe("Search alerts processing failed");
+    });
 
-    it('reports errors to Sentry', async () => {
-      const processError = new Error('Unexpected failure')
-      ;(processSearchAlerts as jest.Mock).mockRejectedValue(processError)
+    it("reports errors to Sentry", async () => {
+      const processError = new Error("Unexpected failure");
+      (processSearchAlerts as jest.Mock).mockRejectedValue(processError);
 
-      await GET(createRequest(`Bearer ${VALID_CRON_SECRET}`))
+      await GET(createRequest(`Bearer ${VALID_CRON_SECRET}`));
 
-      expect(Sentry.captureException).toHaveBeenCalledWith(
-        processError,
-        { tags: { cron: 'search-alerts' } }
-      )
-    })
+      expect(Sentry.captureException).toHaveBeenCalledWith(processError, {
+        tags: { cron: "search-alerts" },
+      });
+    });
 
-    it('handles non-Error thrown values', async () => {
-      ;(processSearchAlerts as jest.Mock).mockRejectedValue('string error')
+    it("handles non-Error thrown values", async () => {
+      (processSearchAlerts as jest.Mock).mockRejectedValue("string error");
 
-      const response = await GET(createRequest(`Bearer ${VALID_CRON_SECRET}`))
+      const response = await GET(createRequest(`Bearer ${VALID_CRON_SECRET}`));
 
-      expect(response.status).toBe(500)
-      const data = await response.json()
-      expect(data.error).toBe('Search alerts processing failed')
-    })
-  })
-})
+      expect(response.status).toBe(500);
+      const data = await response.json();
+      expect(data.error).toBe("Search alerts processing failed");
+    });
+  });
+
+  describe("advisory lock", () => {
+    it("acquires advisory lock before processing", async () => {
+      (processSearchAlerts as jest.Mock).mockResolvedValue({
+        processed: 0,
+        alertsSent: 0,
+        errors: 0,
+        details: [],
+      });
+
+      await GET(createRequest(`Bearer ${VALID_CRON_SECRET}`));
+
+      // First call should be the lock acquisition
+      const calls = (prisma.$queryRaw as jest.Mock).mock.calls;
+      expect(calls.length).toBeGreaterThanOrEqual(1);
+      // Tagged template: first arg is TemplateStringsArray (a string[])
+      const lockCallStrings = calls[0][0].join("");
+      expect(lockCallStrings).toContain("pg_try_advisory_lock");
+    });
+
+    it("skips processing when lock is held by another instance", async () => {
+      (prisma.$queryRaw as jest.Mock).mockResolvedValue([{ locked: false }]);
+
+      const response = await GET(createRequest(`Bearer ${VALID_CRON_SECRET}`));
+
+      expect(response.status).toBe(200);
+      const data = await response.json();
+      expect(data.skipped).toBe(true);
+      expect(data.reason).toBe("lock_held");
+      expect(processSearchAlerts).not.toHaveBeenCalled();
+    });
+
+    it("releases lock after successful processing", async () => {
+      // First call: lock acquisition (success), second call: lock release
+      (prisma.$queryRaw as jest.Mock)
+        .mockResolvedValueOnce([{ locked: true }])
+        .mockResolvedValueOnce([{ unlocked: true }]);
+      (processSearchAlerts as jest.Mock).mockResolvedValue({
+        processed: 1,
+        alertsSent: 1,
+        errors: 0,
+        details: [],
+      });
+
+      await GET(createRequest(`Bearer ${VALID_CRON_SECRET}`));
+
+      const calls = (prisma.$queryRaw as jest.Mock).mock.calls;
+      expect(calls.length).toBe(2);
+      const unlockCallStrings = calls[1][0].join("");
+      expect(unlockCallStrings).toContain("pg_advisory_unlock");
+    });
+
+    it("releases lock even on error", async () => {
+      (prisma.$queryRaw as jest.Mock)
+        .mockResolvedValueOnce([{ locked: true }])
+        .mockResolvedValueOnce([{ unlocked: true }]);
+      (processSearchAlerts as jest.Mock).mockRejectedValue(
+        new Error("Processing failed")
+      );
+
+      await GET(createRequest(`Bearer ${VALID_CRON_SECRET}`));
+
+      const calls = (prisma.$queryRaw as jest.Mock).mock.calls;
+      expect(calls.length).toBe(2);
+      const unlockCallStrings = calls[1][0].join("");
+      expect(unlockCallStrings).toContain("pg_advisory_unlock");
+    });
+  });
+});

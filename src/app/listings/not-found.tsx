@@ -1,8 +1,8 @@
-import Link from 'next/link';
+import Link from "next/link";
 
 export default function ListingNotFound() {
   return (
-    <main className="flex flex-col items-center justify-center min-h-[60vh] px-4 text-center">
+    <section className="flex flex-col items-center justify-center min-h-[60vh] px-4 text-center">
       <h1 className="text-2xl font-bold mb-2">Listing not found</h1>
       <p className="text-muted-foreground mb-6">
         This listing may have been removed or the link is incorrect.
@@ -13,6 +13,6 @@ export default function ListingNotFound() {
       >
         Browse listings
       </Link>
-    </main>
+    </section>
   );
 }

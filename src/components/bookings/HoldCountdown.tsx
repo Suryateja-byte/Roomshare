@@ -1,7 +1,7 @@
-'use client';
+"use client";
 
-import { useState, useEffect, useRef, useCallback } from 'react';
-import { Clock } from 'lucide-react';
+import { useState, useEffect, useRef, useCallback } from "react";
+import { Clock } from "lucide-react";
 
 interface HoldCountdownProps {
   heldUntil: string;
@@ -14,29 +14,35 @@ function getRemainingMs(heldUntil: string): number {
 }
 
 function formatCountdown(ms: number): string {
-  if (ms <= 0) return '0:00';
+  if (ms <= 0) return "0:00";
   const totalSeconds = Math.ceil(ms / 1000);
   const minutes = Math.floor(totalSeconds / 60);
   const seconds = totalSeconds % 60;
-  return `${minutes}:${seconds.toString().padStart(2, '0')}`;
+  return `${minutes}:${seconds.toString().padStart(2, "0")}`;
 }
 
 function getUrgencyColor(remainingMs: number, ttlMs: number): string {
   if (remainingMs <= 0) {
-    return 'text-zinc-400 dark:text-zinc-500';
+    return "text-zinc-400 dark:text-zinc-500";
   }
   const ratio = remainingMs / ttlMs;
   if (ratio > 0.5) {
-    return 'text-green-600 dark:text-green-400';
+    return "text-green-600 dark:text-green-400";
   }
   if (remainingMs > 2 * 60 * 1000) {
-    return 'text-amber-600 dark:text-amber-400';
+    return "text-amber-600 dark:text-amber-400";
   }
-  return 'text-red-600 dark:text-red-400 animate-pulse';
+  return "text-red-600 dark:text-red-400 animate-pulse";
 }
 
-export default function HoldCountdown({ heldUntil, holdTtlMinutes = 15, onExpired }: HoldCountdownProps) {
-  const [remainingMs, setRemainingMs] = useState(() => getRemainingMs(heldUntil));
+export default function HoldCountdown({
+  heldUntil,
+  holdTtlMinutes = 15,
+  onExpired,
+}: HoldCountdownProps) {
+  const [remainingMs, setRemainingMs] = useState(() =>
+    getRemainingMs(heldUntil)
+  );
   const expiredRef = useRef(false);
   const onExpiredRef = useRef(onExpired);
   useEffect(() => {
@@ -81,7 +87,9 @@ export default function HoldCountdown({ heldUntil, holdTtlMinutes = 15, onExpire
   }
 
   return (
-    <span className={`inline-flex items-center gap-1 text-xs font-medium ${colorClass}`}>
+    <span
+      className={`inline-flex items-center gap-1 text-xs font-medium ${colorClass}`}
+    >
       <Clock className="w-3 h-3" />
       {formatCountdown(remainingMs)}
     </span>

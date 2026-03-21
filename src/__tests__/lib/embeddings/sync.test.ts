@@ -19,7 +19,8 @@ const mockGenerateEmbedding = jest.fn();
 const mockGenerateMultimodalEmbedding = jest.fn();
 jest.mock("@/lib/embeddings/gemini", () => ({
   generateEmbedding: (...args: unknown[]) => mockGenerateEmbedding(...args),
-  generateMultimodalEmbedding: (...args: unknown[]) => mockGenerateMultimodalEmbedding(...args),
+  generateMultimodalEmbedding: (...args: unknown[]) =>
+    mockGenerateMultimodalEmbedding(...args),
   EMBEDDING_MODEL: "gemini-embedding-2-preview",
 }));
 
@@ -31,14 +32,17 @@ jest.mock("@/lib/embeddings/compose", () => ({
 const mockFetchAndProcessListingImages = jest.fn();
 const mockComputeImageHash = jest.fn();
 jest.mock("@/lib/embeddings/images", () => ({
-  fetchAndProcessListingImages: (...args: unknown[]) => mockFetchAndProcessListingImages(...args),
+  fetchAndProcessListingImages: (...args: unknown[]) =>
+    mockFetchAndProcessListingImages(...args),
   computeImageHash: (...args: unknown[]) => mockComputeImageHash(...args),
 }));
 
 let mockImageEmbeddingsFlag = false;
 jest.mock("@/lib/env", () => ({
   features: {
-    get imageEmbeddings() { return mockImageEmbeddingsFlag; },
+    get imageEmbeddings() {
+      return mockImageEmbeddingsFlag;
+    },
   },
 }));
 
@@ -119,7 +123,11 @@ describe("syncListingEmbedding", () => {
     const existingText = "composed text";
     mockComposeListingText.mockReturnValue(existingText);
     mockQueryRaw.mockResolvedValueOnce([
-      makeDoc({ embedding_text: existingText, embedding_status: "COMPLETED", embedding_image_hash: null }),
+      makeDoc({
+        embedding_text: existingText,
+        embedding_status: "COMPLETED",
+        embedding_image_hash: null,
+      }),
     ]);
 
     await syncListingEmbedding(LISTING_ID);
@@ -180,7 +188,9 @@ describe("syncListingEmbedding", () => {
   it("sets status to FAILED and increments attempts on Gemini error", async () => {
     mockQueryRaw.mockResolvedValueOnce([makeDoc()]);
     mockExecuteRaw.mockResolvedValueOnce(1); // claim
-    mockGenerateEmbedding.mockRejectedValueOnce(new Error("API quota exceeded"));
+    mockGenerateEmbedding.mockRejectedValueOnce(
+      new Error("API quota exceeded")
+    );
     mockExecuteRaw.mockResolvedValueOnce(1); // FAILED update
 
     await syncListingEmbedding(LISTING_ID);
@@ -256,7 +266,7 @@ describe("image hash change detection", () => {
       makeDoc({
         images: ["https://example.com/img1.jpg"],
         embedding_text: "composed text", // matches mockComposeListingText return
-        embedding_image_hash: "hash-abc",  // matches mockComputeImageHash return
+        embedding_image_hash: "hash-abc", // matches mockComputeImageHash return
         embedding_status: "COMPLETED",
       }),
     ]);
@@ -274,7 +284,7 @@ describe("image hash change detection", () => {
       makeDoc({
         images: ["https://example.com/img1.jpg"],
         embedding_text: "composed text", // text unchanged
-        embedding_image_hash: null,       // no images before → hash was null
+        embedding_image_hash: null, // no images before → hash was null
         embedding_status: "COMPLETED",
       }),
     ]);
@@ -330,9 +340,7 @@ describe("feature flag gating", () => {
 
   it("flag ON + images=[] → does NOT call fetchAndProcessListingImages, uses generateEmbedding", async () => {
     mockImageEmbeddingsFlag = true;
-    mockQueryRaw.mockResolvedValueOnce([
-      makeDoc({ images: [] }),
-    ]);
+    mockQueryRaw.mockResolvedValueOnce([makeDoc({ images: [] })]);
     mockExecuteRaw.mockResolvedValueOnce(1); // claim
     mockGenerateEmbedding.mockResolvedValueOnce([0.1, 0.2]);
     mockExecuteRaw.mockResolvedValueOnce(1); // update
@@ -352,7 +360,9 @@ describe("feature flag gating", () => {
     mockQueryRaw.mockResolvedValueOnce([
       makeDoc({ images: imageUrls, embedding_image_hash: "hash-old" }),
     ]);
-    mockFetchAndProcessListingImages.mockResolvedValue([{ type: "image", data: "base64data", mimeType: "image/jpeg" }]);
+    mockFetchAndProcessListingImages.mockResolvedValue([
+      { type: "image", data: "base64data", mimeType: "image/jpeg" },
+    ]);
     mockExecuteRaw.mockResolvedValueOnce(1); // claim
     mockGenerateMultimodalEmbedding.mockResolvedValueOnce([0.1, 0.2, 0.3]);
     mockExecuteRaw.mockResolvedValueOnce(1); // update
@@ -369,7 +379,9 @@ describe("feature flag gating", () => {
     mockQueryRaw.mockResolvedValueOnce([
       makeDoc({ images: imageUrls, embedding_image_hash: "hash-old" }),
     ]);
-    mockFetchAndProcessListingImages.mockRejectedValue(new Error("Network timeout"));
+    mockFetchAndProcessListingImages.mockRejectedValue(
+      new Error("Network timeout")
+    );
     mockExecuteRaw.mockResolvedValueOnce(1); // claim
     mockGenerateEmbedding.mockResolvedValueOnce([0.1, 0.2]);
     mockExecuteRaw.mockResolvedValueOnce(1); // update
@@ -388,7 +400,9 @@ describe("multimodal vs text-only embedding", () => {
     mockImageEmbeddingsFlag = true;
     const imageUrls = ["https://example.com/img1.jpg"];
     mockComputeImageHash.mockReturnValue("hash-new");
-    const imageParts = [{ type: "image", data: "base64data", mimeType: "image/jpeg" }];
+    const imageParts = [
+      { type: "image", data: "base64data", mimeType: "image/jpeg" },
+    ];
     mockFetchAndProcessListingImages.mockResolvedValue(imageParts);
     mockQueryRaw.mockResolvedValueOnce([
       makeDoc({ images: imageUrls, embedding_image_hash: "hash-old" }),
@@ -399,7 +413,10 @@ describe("multimodal vs text-only embedding", () => {
 
     await syncListingEmbedding(LISTING_ID);
 
-    expect(mockGenerateMultimodalEmbedding).toHaveBeenCalledWith("composed text", imageParts);
+    expect(mockGenerateMultimodalEmbedding).toHaveBeenCalledWith(
+      "composed text",
+      imageParts
+    );
     expect(mockGenerateEmbedding).not.toHaveBeenCalled();
   });
 
@@ -413,7 +430,10 @@ describe("multimodal vs text-only embedding", () => {
 
     await syncListingEmbedding(LISTING_ID);
 
-    expect(mockGenerateEmbedding).toHaveBeenCalledWith("composed text", "RETRIEVAL_DOCUMENT");
+    expect(mockGenerateEmbedding).toHaveBeenCalledWith(
+      "composed text",
+      "RETRIEVAL_DOCUMENT"
+    );
     expect(mockGenerateMultimodalEmbedding).not.toHaveBeenCalled();
   });
 
@@ -439,7 +459,10 @@ describe("multimodal vs text-only embedding", () => {
 describe("PARTIAL vs COMPLETED status", () => {
   it("COMPLETED when all images processed (imageParts.length === expectedImages)", async () => {
     mockImageEmbeddingsFlag = true;
-    const imageUrls = ["https://example.com/img1.jpg", "https://example.com/img2.jpg"];
+    const imageUrls = [
+      "https://example.com/img1.jpg",
+      "https://example.com/img2.jpg",
+    ];
     mockComputeImageHash.mockReturnValue("hash-new");
     // Both images processed successfully
     const imageParts = [
@@ -471,7 +494,9 @@ describe("PARTIAL vs COMPLETED status", () => {
     ];
     mockComputeImageHash.mockReturnValue("hash-new");
     // Only 1 of 3 images processed (2 failed silently inside fetchAndProcessListingImages)
-    const imageParts = [{ type: "image", data: "b64a", mimeType: "image/jpeg" }];
+    const imageParts = [
+      { type: "image", data: "b64a", mimeType: "image/jpeg" },
+    ];
     mockFetchAndProcessListingImages.mockResolvedValue(imageParts);
     mockQueryRaw.mockResolvedValueOnce([
       makeDoc({ images: imageUrls, embedding_image_hash: "hash-old" }),
@@ -504,7 +529,10 @@ describe("PARTIAL vs COMPLETED status", () => {
 
   it("embedding_image_count matches imageParts.length in UPDATE SQL", async () => {
     mockImageEmbeddingsFlag = true;
-    const imageUrls = ["https://example.com/img1.jpg", "https://example.com/img2.jpg"];
+    const imageUrls = [
+      "https://example.com/img1.jpg",
+      "https://example.com/img2.jpg",
+    ];
     mockComputeImageHash.mockReturnValue("hash-new");
     const imageParts = [
       { type: "image", data: "b64a", mimeType: "image/jpeg" },
@@ -537,7 +565,9 @@ describe("image failure does not increment embedding_attempts", () => {
     mockImageEmbeddingsFlag = true;
     const imageUrls = ["https://example.com/img1.jpg"];
     mockComputeImageHash.mockReturnValue("hash-new");
-    mockFetchAndProcessListingImages.mockRejectedValue(new Error("CDN timeout"));
+    mockFetchAndProcessListingImages.mockRejectedValue(
+      new Error("CDN timeout")
+    );
     mockQueryRaw.mockResolvedValueOnce([
       makeDoc({ images: imageUrls, embedding_image_hash: "hash-old" }),
     ]);
@@ -586,7 +616,9 @@ describe("image failure does not increment embedding_attempts", () => {
     const imageUrls = ["https://example.com/img1.jpg"];
     mockComputeImageHash.mockReturnValue("hash-new");
     // Entire image fetch fails → imageParts = []
-    mockFetchAndProcessListingImages.mockRejectedValue(new Error("All images failed"));
+    mockFetchAndProcessListingImages.mockRejectedValue(
+      new Error("All images failed")
+    );
     mockQueryRaw.mockResolvedValueOnce([
       makeDoc({ images: imageUrls, embedding_image_hash: "hash-old" }),
     ]);

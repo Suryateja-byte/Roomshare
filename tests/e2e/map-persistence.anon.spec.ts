@@ -19,7 +19,14 @@
  * Debug: pnpm playwright test tests/e2e/map-persistence.anon.spec.ts --project=chromium-anon --headed
  */
 
-import { test, expect, SF_BOUNDS, selectors, timeouts, waitForMapReady } from "./helpers/test-utils";
+import {
+  test,
+  expect,
+  SF_BOUNDS,
+  selectors,
+  timeouts,
+  waitForMapReady,
+} from "./helpers/test-utils";
 import type { Page } from "@playwright/test";
 
 // ---------------------------------------------------------------------------
@@ -48,10 +55,9 @@ async function waitForSearchPage(page: Page, url = SEARCH_URL) {
  */
 async function waitForMapRef(page: Page, timeout = 30_000): Promise<boolean> {
   try {
-    await page.waitForFunction(
-      () => !!(window as any).__e2eMapRef,
-      { timeout },
-    );
+    await page.waitForFunction(() => !!(window as any).__e2eMapRef, {
+      timeout,
+    });
     return true;
   } catch {
     return false;
@@ -63,9 +69,8 @@ async function waitForMapRef(page: Page, timeout = 30_000): Promise<boolean> {
  */
 async function getMapE2EState(page: Page) {
   return page.evaluate(() => {
-    const roomshare = (window as unknown as Record<string, unknown>).__roomshare as
-      | Record<string, unknown>
-      | undefined;
+    const roomshare = (window as unknown as Record<string, unknown>)
+      .__roomshare as Record<string, unknown> | undefined;
     if (!roomshare) return null;
     return {
       mapInstanceId: roomshare.mapInstanceId as string | undefined,
@@ -88,7 +93,9 @@ async function getMapZoom(page: Page): Promise<number | null> {
 /**
  * Get the current map center from the Mapbox GL JS instance.
  */
-async function getMapCenter(page: Page): Promise<{ lng: number; lat: number } | null> {
+async function getMapCenter(
+  page: Page
+): Promise<{ lng: number; lat: number } | null> {
   return page.evaluate(() => {
     const map = (window as any).__e2eMapRef;
     if (!map?.getCenter) return null;
@@ -130,26 +137,39 @@ async function isMapContainerVisible(page: Page): Promise<boolean> {
 /**
  * Navigate with a filter applied via URL parameter.
  */
-async function navigateWithFilter(page: Page, paramKey: string, paramValue: string) {
-  await page.goto(`${SEARCH_URL}&${paramKey}=${encodeURIComponent(paramValue)}`);
+async function navigateWithFilter(
+  page: Page,
+  paramKey: string,
+  paramValue: string
+) {
+  await page.goto(
+    `${SEARCH_URL}&${paramKey}=${encodeURIComponent(paramValue)}`
+  );
   await page.waitForLoadState("domcontentloaded");
   await waitForMapReady(page);
 }
 
 // Map tests need extra time for WebGL rendering and tile loading in CI
-test.beforeEach(async () => { test.slow(); });
+test.beforeEach(async () => {
+  test.slow();
+});
 
 // ---------------------------------------------------------------------------
 // Group 1: Map Survives Changes
 // ---------------------------------------------------------------------------
 
 test.describe("Map persistence: Map survives changes", () => {
-  test("1 - Map initializes once: mapInitCount stays 1 after filter change", async ({ page }) => {
+  test("1 - Map initializes once: mapInitCount stays 1 after filter change", async ({
+    page,
+  }) => {
     await waitForSearchPage(page);
 
     const initialState = await getMapE2EState(page);
     if (!initialState?.mapInitCount) {
-      test.skip(true, "E2E instrumentation not enabled (NEXT_PUBLIC_E2E!=true)");
+      test.skip(
+        true,
+        "E2E instrumentation not enabled (NEXT_PUBLIC_E2E!=true)"
+      );
       return;
     }
 
@@ -164,12 +184,17 @@ test.describe("Map persistence: Map survives changes", () => {
     expect(afterState?.mapInitCount).toBe(initialInitCount);
   });
 
-  test("2 - Map instance ID unchanged after filter change", async ({ page }) => {
+  test("2 - Map instance ID unchanged after filter change", async ({
+    page,
+  }) => {
     await waitForSearchPage(page);
 
     const initialState = await getMapE2EState(page);
     if (!initialState?.mapInstanceId) {
-      test.skip(true, "E2E instrumentation not enabled (NEXT_PUBLIC_E2E!=true)");
+      test.skip(
+        true,
+        "E2E instrumentation not enabled (NEXT_PUBLIC_E2E!=true)"
+      );
       return;
     }
 
@@ -236,11 +261,17 @@ test.describe("Map persistence: Map survives changes", () => {
 
     // Center should be approximately the same (tolerance ~0.05 degrees)
     const tolerance = 0.05;
-    expect(Math.abs(afterCenter!.lat - initialCenter.lat)).toBeLessThan(tolerance);
-    expect(Math.abs(afterCenter!.lng - initialCenter.lng)).toBeLessThan(tolerance);
+    expect(Math.abs(afterCenter!.lat - initialCenter.lat)).toBeLessThan(
+      tolerance
+    );
+    expect(Math.abs(afterCenter!.lng - initialCenter.lng)).toBeLessThan(
+      tolerance
+    );
   });
 
-  test("5 - Map survives sort change: same instance, same zoom/center", async ({ page }) => {
+  test("5 - Map survives sort change: same instance, same zoom/center", async ({
+    page,
+  }) => {
     await waitForSearchPage(page);
 
     const initialState = await getMapE2EState(page);
@@ -282,7 +313,9 @@ test.describe("Map persistence: Map survives changes", () => {
     }
   });
 
-  test("6 - Map survives query change: same instance after search query", async ({ page }) => {
+  test("6 - Map survives query change: same instance after search query", async ({
+    page,
+  }) => {
     await waitForSearchPage(page);
 
     const initialState = await getMapE2EState(page);
@@ -303,7 +336,9 @@ test.describe("Map persistence: Map survives changes", () => {
     expect(afterState?.mapInitCount).toBe(initialState.mapInitCount);
   });
 
-  test("7 - Map canvas remains visible during filter transition (no flicker/unmount)", async ({ page }) => {
+  test("7 - Map canvas remains visible during filter transition (no flicker/unmount)", async ({
+    page,
+  }) => {
     await waitForSearchPage(page);
 
     if (!(await isMapCanvasVisible(page))) {
@@ -324,7 +359,10 @@ test.describe("Map persistence: Map survives changes", () => {
     // (PersistentMapWrapper in layout.tsx keeps the map mounted)
     const canvasVisibleAfter = await isMapCanvasVisible(page);
     if (!canvasVisibleAfter) {
-      test.skip(true, "Map canvas not visible after filter change (WebGL lost in CI)");
+      test.skip(
+        true,
+        "Map canvas not visible after filter change (WebGL lost in CI)"
+      );
       return;
     }
 
@@ -364,10 +402,18 @@ test.describe("Map persistence: Map state recovery", () => {
 
     // URL bounds should still be present
     const refreshedUrl = new URL(page.url(), "http://localhost");
-    expect(refreshedUrl.searchParams.get("minLat")).toBe(String(SF_BOUNDS.minLat));
-    expect(refreshedUrl.searchParams.get("maxLat")).toBe(String(SF_BOUNDS.maxLat));
-    expect(refreshedUrl.searchParams.get("minLng")).toBe(String(SF_BOUNDS.minLng));
-    expect(refreshedUrl.searchParams.get("maxLng")).toBe(String(SF_BOUNDS.maxLng));
+    expect(refreshedUrl.searchParams.get("minLat")).toBe(
+      String(SF_BOUNDS.minLat)
+    );
+    expect(refreshedUrl.searchParams.get("maxLat")).toBe(
+      String(SF_BOUNDS.maxLat)
+    );
+    expect(refreshedUrl.searchParams.get("minLng")).toBe(
+      String(SF_BOUNDS.minLng)
+    );
+    expect(refreshedUrl.searchParams.get("maxLng")).toBe(
+      String(SF_BOUNDS.maxLng)
+    );
 
     // After map loads, center should be within the specified bounds
     const hasRef = await waitForMapRef(page, 15_000);
@@ -382,7 +428,9 @@ test.describe("Map persistence: Map state recovery", () => {
     }
   });
 
-  test("9 - Browser back preserves map after navigating to listing", async ({ page }) => {
+  test("9 - Browser back preserves map after navigating to listing", async ({
+    page,
+  }) => {
     test.slow();
     await waitForSearchPage(page);
 
@@ -399,8 +447,12 @@ test.describe("Map persistence: Map state recovery", () => {
     const container = page.locator('[data-testid="search-results-container"]');
     const hasContainer = (await container.count()) > 0;
     const listingLink = hasContainer
-      ? container.locator('[data-testid="listing-card"] a[href*="/listings/"]').first()
-      : page.locator('[data-testid="listing-card"] a[href*="/listings/"]:visible').first();
+      ? container
+          .locator('[data-testid="listing-card"] a[href*="/listings/"]')
+          .first()
+      : page
+          .locator('[data-testid="listing-card"] a[href*="/listings/"]:visible')
+          .first();
     if ((await listingLink.count()) === 0) {
       // Wait longer for SSR hydration to produce listing cards
       await page.waitForTimeout(8_000);
@@ -410,9 +462,14 @@ test.describe("Map persistence: Map state recovery", () => {
       }
     }
 
-    const linkVisible = await listingLink.isVisible({ timeout: 20_000 }).catch(() => false);
+    const linkVisible = await listingLink
+      .isVisible({ timeout: 20_000 })
+      .catch(() => false);
     if (!linkVisible) {
-      test.skip(true, "Listing card link not visible (hidden in mobile/desktop container)");
+      test.skip(
+        true,
+        "Listing card link not visible (hidden in mobile/desktop container)"
+      );
       return;
     }
 
@@ -440,7 +497,9 @@ test.describe("Map persistence: Map state recovery", () => {
     expect(page.url()).toContain("/search");
   });
 
-  test("10 - Map persists across multiple sequential filter changes", async ({ page }) => {
+  test("10 - Map persists across multiple sequential filter changes", async ({
+    page,
+  }) => {
     await waitForSearchPage(page);
 
     const initialState = await getMapE2EState(page);
@@ -462,7 +521,9 @@ test.describe("Map persistence: Map state recovery", () => {
     expect(state2?.mapInstanceId).toBe(initialState.mapInstanceId);
 
     // Apply filter 3
-    await page.goto(`${SEARCH_URL}&roomType=Private+Room&maxPrice=2000&amenities=Wifi`);
+    await page.goto(
+      `${SEARCH_URL}&roomType=Private+Room&maxPrice=2000&amenities=Wifi`
+    );
     await page.waitForLoadState("domcontentloaded");
     await waitForMapReady(page);
     const state3 = await getMapE2EState(page);
@@ -478,7 +539,9 @@ test.describe("Map persistence: Map state recovery", () => {
 // ---------------------------------------------------------------------------
 
 test.describe("Map persistence: Lazy loading", () => {
-  test("11 - Map loads without blocking search results (results appear before map)", async ({ page }) => {
+  test("11 - Map loads without blocking search results (results appear before map)", async ({
+    page,
+  }) => {
     // Track when listing cards and map appear using mutable object
     // (TS control flow analysis does not narrow `let` vars assigned in closures)
     const timing: { listings: number | null; map: number | null } = {
@@ -522,7 +585,9 @@ test.describe("Map persistence: Lazy loading", () => {
     }
   });
 
-  test("12 - Map shows loading indicator while initializing", async ({ page }) => {
+  test("12 - Map shows loading indicator while initializing", async ({
+    page,
+  }) => {
     await page.goto(SEARCH_URL);
     await page.waitForLoadState("domcontentloaded");
 
@@ -537,7 +602,9 @@ test.describe("Map persistence: Lazy loading", () => {
       .then(() => true)
       .catch(() => false);
 
-    const mapVisible = await page.locator(selectors.map).first()
+    const mapVisible = await page
+      .locator(selectors.map)
+      .first()
       .waitFor({ state: "visible", timeout: 30_000 })
       .then(() => true)
       .catch(() => false);

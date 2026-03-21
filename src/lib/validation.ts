@@ -15,7 +15,7 @@ import {
   MAX_LAT_SPAN,
   MAX_LNG_SPAN,
   LAT_OFFSET_DEGREES,
-} from './constants';
+} from "./constants";
 
 // Re-export for backward compatibility
 export { MAX_LAT_SPAN, MAX_LNG_SPAN };
@@ -52,7 +52,7 @@ export function validateAndParseBounds(
   maxLng: string | null,
   minLat: string | null,
   maxLat: string | null,
-  options: BoundsValidationOptions = {},
+  options: BoundsValidationOptions = {}
 ): BoundsValidationResult {
   // Require all four bounds - no full-table scans allowed
   if (!minLng || !maxLng || !minLat || !maxLat) {
@@ -94,7 +94,7 @@ export function validateAndParseBounds(
   const latSpan = parsed.maxLat - parsed.minLat;
   const crossesAntimeridian = parsed.minLng > parsed.maxLng;
   const lngSpan = crossesAntimeridian
-    ? (180 - parsed.minLng) + (parsed.maxLng + 180)
+    ? 180 - parsed.minLng + (parsed.maxLng + 180)
     : parsed.maxLng - parsed.minLng;
 
   if (latSpan > maxLatSpan || lngSpan > maxLngSpan) {
@@ -120,14 +120,14 @@ export function validateAndParseBounds(
 export function clampBoundsToMaxSpan(
   bounds: MapBounds,
   maxLatSpan: number = MAX_LAT_SPAN,
-  maxLngSpan: number = MAX_LNG_SPAN,
+  maxLngSpan: number = MAX_LNG_SPAN
 ): MapBounds {
   const { minLat, maxLat, minLng, maxLng } = bounds;
 
   const latSpan = maxLat - minLat;
   const crossesAntimeridian = minLng > maxLng;
   const lngSpan = crossesAntimeridian
-    ? (180 - minLng) + (maxLng + 180)
+    ? 180 - minLng + (maxLng + 180)
     : maxLng - minLng;
 
   // If within limits, return unchanged (preserves antimeridian crossing)

@@ -16,13 +16,18 @@ jest.mock("@/lib/prisma", () => ({
     return {
       $queryRawUnsafe: queryRawUnsafe,
       $executeRawUnsafe: executeRawUnsafe,
-      $transaction: jest.fn(async (callback: (tx: {
-        $executeRawUnsafe: jest.Mock;
-        $queryRawUnsafe: jest.Mock;
-      }) => Promise<unknown>) => callback({
-        $executeRawUnsafe: executeRawUnsafe,
-        $queryRawUnsafe: queryRawUnsafe,
-      })),
+      $transaction: jest.fn(
+        async (
+          callback: (tx: {
+            $executeRawUnsafe: jest.Mock;
+            $queryRawUnsafe: jest.Mock;
+          }) => Promise<unknown>
+        ) =>
+          callback({
+            $executeRawUnsafe: executeRawUnsafe,
+            $queryRawUnsafe: queryRawUnsafe,
+          })
+      ),
     };
   })(),
 }));
@@ -37,7 +42,9 @@ jest.mock("@/lib/request-context", () => ({
   createContextFromHeaders: jest.fn().mockReturnValue({}),
   runWithRequestContext: jest.fn((_, fn) => fn()),
   getRequestId: jest.fn().mockReturnValue("test-request-id"),
-  getRequestContext: jest.fn().mockReturnValue({ requestId: "test-request-id" }),
+  getRequestContext: jest
+    .fn()
+    .mockReturnValue({ requestId: "test-request-id" }),
 }));
 
 // Mock unstable_cache to execute function immediately
@@ -50,7 +57,7 @@ jest.mock("next/server", () => ({
   NextResponse: {
     json: (
       data: unknown,
-      init?: { status?: number; headers?: Record<string, string> },
+      init?: { status?: number; headers?: Record<string, string> }
     ) => {
       const headersMap = new Map(Object.entries(init?.headers || {}));
       return {
@@ -81,13 +88,17 @@ const mockExecuteRawUnsafe = prisma.$executeRawUnsafe as jest.Mock;
 afterEach(() => {
   const listeners = process.listeners("unhandledRejection");
   if (listeners.length > preImportListenerCount) {
-    listeners.slice(preImportListenerCount).forEach((l) => process.removeListener("unhandledRejection", l));
+    listeners
+      .slice(preImportListenerCount)
+      .forEach((l) => process.removeListener("unhandledRejection", l));
   }
 });
 afterAll(() => {
   const listeners = process.listeners("unhandledRejection");
   if (listeners.length > preImportListenerCount) {
-    listeners.slice(preImportListenerCount).forEach((l) => process.removeListener("unhandledRejection", l));
+    listeners
+      .slice(preImportListenerCount)
+      .forEach((l) => process.removeListener("unhandledRejection", l));
   }
 });
 
@@ -365,7 +376,7 @@ describe("/api/search/facets", () => {
       };
       jest
         .mocked(
-          (await import("@/lib/with-rate-limit-redis")).withRateLimitRedis,
+          (await import("@/lib/with-rate-limit-redis")).withRateLimitRedis
         )
         .mockResolvedValueOnce(mockRateLimitResponse as never);
 

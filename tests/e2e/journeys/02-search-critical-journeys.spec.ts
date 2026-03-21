@@ -5,7 +5,15 @@
  * on the Roomshare search page. Each journey tests a distinct user scenario.
  */
 
-import { test, expect, selectors, timeouts, tags, SF_BOUNDS, searchResultsContainer } from "../helpers";
+import {
+  test,
+  expect,
+  selectors,
+  timeouts,
+  tags,
+  SF_BOUNDS,
+  searchResultsContainer,
+} from "../helpers";
 import {
   openFilterModal,
   openFilterModalAndWaitForFacets,
@@ -15,7 +23,9 @@ import {
 const SEARCH_URL_WITH_BOUNDS = `/search?minLat=${SF_BOUNDS.minLat}&maxLat=${SF_BOUNDS.maxLat}&minLng=${SF_BOUNDS.minLng}&maxLng=${SF_BOUNDS.maxLng}`;
 
 test.describe("20 Critical Search Page Journeys", () => {
-  test.beforeEach(async () => { test.slow(); });
+  test.beforeEach(async () => {
+    test.slow();
+  });
 
   // ─────────────────────────────────────────────────
   // J1: Basic search page loads with results
@@ -43,7 +53,10 @@ test.describe("20 Critical Search Page Journeys", () => {
   // ─────────────────────────────────────────────────
   // J2: Price filter (min + max) applied via URL
   // ─────────────────────────────────────────────────
-  test("J2: Price filters applied and reflected in UI", async ({ page, nav }) => {
+  test("J2: Price filters applied and reflected in UI", async ({
+    page,
+    nav,
+  }) => {
     await nav.goToSearch({ bounds: SF_BOUNDS, minPrice: 500, maxPrice: 1500 });
     await page.waitForLoadState("domcontentloaded");
 
@@ -54,12 +67,16 @@ test.describe("20 Critical Search Page Journeys", () => {
     // Verify price inputs reflect values (wait for hydration to populate inputs)
     const minInput = page.getByLabel(/minimum budget/i);
     const maxInput = page.getByLabel(/maximum budget/i);
-    await expect.poll(() => minInput.inputValue(), { timeout: 10_000 }).not.toBe('');
+    await expect
+      .poll(() => minInput.inputValue(), { timeout: 10_000 })
+      .not.toBe("");
     await expect(minInput).toHaveValue("500");
     await expect(maxInput).toHaveValue("1500");
 
     // Results heading should be visible
-    await expect(page.getByRole("heading", { level: 1 }).first()).toBeVisible({ timeout: 30000 });
+    await expect(page.getByRole("heading", { level: 1 }).first()).toBeVisible({
+      timeout: 30000,
+    });
   });
 
   // ─────────────────────────────────────────────────
@@ -68,19 +85,22 @@ test.describe("20 Critical Search Page Journeys", () => {
   test("J3: Room type category tabs filter results", async ({ page, nav }) => {
     const viewport = page.viewportSize();
     if (!viewport || viewport.width < 768) {
-      test.skip(true, 'Room type tab navigation unreliable on mobile viewport');
+      test.skip(true, "Room type tab navigation unreliable on mobile viewport");
       return;
     }
 
     await nav.goToSearch({ bounds: SF_BOUNDS });
     await page.waitForLoadState("domcontentloaded");
-    await expect(page.getByRole("heading", { level: 1 }).first()).toBeVisible({ timeout: 30000 });
+    await expect(page.getByRole("heading", { level: 1 }).first()).toBeVisible({
+      timeout: 30000,
+    });
 
     // Wait for hydration before interacting with tabs
     await page.waitForLoadState("networkidle").catch(() => {});
 
     // Find category tabs
-    const privateTab = page.getByRole("button", { name: /private/i })
+    const privateTab = page
+      .getByRole("button", { name: /private/i })
       .or(page.locator('button:has-text("Private")'));
 
     if (await privateTab.first().isVisible()) {
@@ -88,10 +108,15 @@ test.describe("20 Critical Search Page Journeys", () => {
       // Try clicking the tab — if requestSubmit doesn't fire in CI, fall back to URL nav
       try {
         await privateTab.first().click();
-        await expect.poll(
-          () => new URL(page.url(), "http://localhost").searchParams.get("roomType"),
-          { timeout: 10000 },
-        ).not.toBeNull();
+        await expect
+          .poll(
+            () =>
+              new URL(page.url(), "http://localhost").searchParams.get(
+                "roomType"
+              ),
+            { timeout: 10000 }
+          )
+          .not.toBeNull();
       } catch {
         // requestSubmit() unreliable in CI — navigate with param directly
         const url = new URL(page.url(), "http://localhost");
@@ -101,7 +126,9 @@ test.describe("20 Critical Search Page Journeys", () => {
       }
 
       // Verify the tab reflects the selected state
-      const selectedTab = page.locator('button[aria-pressed="true"]').filter({ hasText: /private/i });
+      const selectedTab = page
+        .locator('button[aria-pressed="true"]')
+        .filter({ hasText: /private/i });
       await expect(selectedTab.first()).toBeVisible({ timeout: 15000 });
     }
   });
@@ -109,10 +136,15 @@ test.describe("20 Critical Search Page Journeys", () => {
   // ─────────────────────────────────────────────────
   // J4: Open filter modal, select amenities, apply
   // ─────────────────────────────────────────────────
-  test("J4: Filter modal - select amenities and apply", async ({ page, nav }) => {
+  test("J4: Filter modal - select amenities and apply", async ({
+    page,
+    nav,
+  }) => {
     await nav.goToSearch({ bounds: SF_BOUNDS });
     await page.waitForLoadState("domcontentloaded");
-    await expect(page.getByRole("heading", { level: 1 }).first()).toBeVisible({ timeout: 30000 });
+    await expect(page.getByRole("heading", { level: 1 }).first()).toBeVisible({
+      timeout: 30000,
+    });
 
     // Open more filters (uses retry-click for hydration race + waits for facets)
     const modal = await openFilterModalAndWaitForFacets(page);
@@ -127,10 +159,13 @@ test.describe("20 Critical Search Page Journeys", () => {
 
     // Apply and verify URL updates
     await applyFilters(page);
-    await expect.poll(
-      () => new URL(page.url(), "http://localhost").searchParams.get("amenities"),
-      { timeout: 10000, message: 'URL param "amenities" to be present' },
-    ).not.toBeNull();
+    await expect
+      .poll(
+        () =>
+          new URL(page.url(), "http://localhost").searchParams.get("amenities"),
+        { timeout: 10000, message: 'URL param "amenities" to be present' }
+      )
+      .not.toBeNull();
     expect(page.url()).toMatch(/amenities/i);
   });
 
@@ -139,23 +174,35 @@ test.describe("20 Critical Search Page Journeys", () => {
   // ─────────────────────────────────────────────────
   test("J5: Clear all filters resets search", async ({ page }) => {
     // Start with filters applied
-    await page.goto(`${SEARCH_URL_WITH_BOUNDS}&minPrice=500&maxPrice=2000&amenities=Wifi`);
+    await page.goto(
+      `${SEARCH_URL_WITH_BOUNDS}&minPrice=500&maxPrice=2000&amenities=Wifi`
+    );
     await page.waitForLoadState("domcontentloaded");
 
     // Find "Clear all" button (filter bar or filter modal)
     // On mobile, wait for the heading first so the page is ready
-    await expect(page.getByRole("heading", { level: 1 }).first()).toBeVisible({ timeout: 30000 });
-    const clearAllBtn = page.locator('[data-testid="filter-bar-clear-all"]')
+    await expect(page.getByRole("heading", { level: 1 }).first()).toBeVisible({
+      timeout: 30000,
+    });
+    const clearAllBtn = page
+      .locator('[data-testid="filter-bar-clear-all"]')
       .or(page.getByRole("button", { name: /clear all/i }));
 
-    if (await clearAllBtn.first().isVisible({ timeout: 5000 }).catch(() => false)) {
+    if (
+      await clearAllBtn
+        .first()
+        .isVisible({ timeout: 5000 })
+        .catch(() => false)
+    ) {
       await clearAllBtn.first().click();
 
       // Poll URL for filter removal (soft navigation may not trigger domcontentloaded)
-      await expect.poll(
-        () => new URL(page.url()).searchParams.has("minPrice"),
-        { timeout: 15000, message: "minPrice to be removed from URL after clear-all" },
-      ).toBe(false);
+      await expect
+        .poll(() => new URL(page.url()).searchParams.has("minPrice"), {
+          timeout: 15000,
+          message: "minPrice to be removed from URL after clear-all",
+        })
+        .toBe(false);
 
       const url = new URL(page.url());
       expect(url.searchParams.has("amenities")).toBeFalsy();
@@ -170,7 +217,10 @@ test.describe("20 Critical Search Page Journeys", () => {
     await page.waitForLoadState("domcontentloaded");
 
     // Sort selector (desktop only - hidden on mobile)
-    const sortTrigger = page.locator('button').filter({ hasText: /recommended|sort/i }).first();
+    const sortTrigger = page
+      .locator("button")
+      .filter({ hasText: /recommended|sort/i })
+      .first();
 
     // Check viewport - sort is hidden on mobile
     const viewport = page.viewportSize();
@@ -179,15 +229,28 @@ test.describe("20 Critical Search Page Journeys", () => {
         await sortTrigger.click();
 
         // Select "Price: Low to High"
-        const option = page.getByRole("option", { name: /low.*high/i })
-          .or(page.locator('[role="option"]').filter({ hasText: /Low to High/i }));
+        const option = page
+          .getByRole("option", { name: /low.*high/i })
+          .or(
+            page.locator('[role="option"]').filter({ hasText: /Low to High/i })
+          );
 
-        if (await option.first().isVisible({ timeout: 3000 }).catch(() => false)) {
+        if (
+          await option
+            .first()
+            .isVisible({ timeout: 3000 })
+            .catch(() => false)
+        ) {
           await option.first().click();
-          await expect.poll(
-            () => new URL(page.url(), "http://localhost").searchParams.get("sort"),
-            { timeout: 10000, message: 'URL param "sort" to be "price_asc"' },
-          ).toBe("price_asc");
+          await expect
+            .poll(
+              () =>
+                new URL(page.url(), "http://localhost").searchParams.get(
+                  "sort"
+                ),
+              { timeout: 10000, message: 'URL param "sort" to be "price_asc"' }
+            )
+            .toBe("price_asc");
         }
       }
     }
@@ -212,7 +275,10 @@ test.describe("20 Critical Search Page Journeys", () => {
 
         // Should show page 2 indicator
         const url = page.url();
-        const hasPageParam = url.includes("page=2") || url.includes("pageNumber=2") || url.includes("cursor=");
+        const hasPageParam =
+          url.includes("page=2") ||
+          url.includes("pageNumber=2") ||
+          url.includes("cursor=");
         expect(hasPageParam).toBeTruthy();
 
         // Go back
@@ -233,12 +299,14 @@ test.describe("20 Critical Search Page Journeys", () => {
     await page.waitForLoadState("domcontentloaded");
 
     // Should show "No matches found" or "0 places"
-    const zeroIndicator = searchResultsContainer(page).getByText(/no\s+matches/i)
+    const zeroIndicator = searchResultsContainer(page)
+      .getByText(/no\s+matches/i)
       .or(page.getByRole("heading", { level: 1, name: /^0\s+place/i }));
     await zeroIndicator.first().waitFor({ state: "attached", timeout: 30000 });
 
     // "Clear all filters" link should be available
-    const clearLink = page.getByRole("link", { name: /clear all filters/i })
+    const clearLink = page
+      .getByRole("link", { name: /clear all filters/i })
       .or(page.getByText(/clear all/i));
     await clearLink.first().waitFor({ state: "attached", timeout: 5000 });
   });
@@ -250,7 +318,9 @@ test.describe("20 Critical Search Page Journeys", () => {
     await nav.goToSearch({ bounds: SF_BOUNDS });
     await page.waitForLoadState("domcontentloaded");
 
-    const firstCard = searchResultsContainer(page).locator(selectors.listingCard).first();
+    const firstCard = searchResultsContainer(page)
+      .locator(selectors.listingCard)
+      .first();
     await firstCard.waitFor({ state: "attached", timeout: 30000 });
 
     // Get href from the <a> link inside the listing card div
@@ -260,7 +330,10 @@ test.describe("20 Critical Search Page Journeys", () => {
 
     // Navigate to the listing page
     await page.goto(href!);
-    await page.waitForURL(/\/listings\//, { timeout: timeouts.navigation, waitUntil: "commit" });
+    await page.waitForURL(/\/listings\//, {
+      timeout: timeouts.navigation,
+      waitUntil: "commit",
+    });
     expect(page.url()).toMatch(/\/listings\//);
   });
 
@@ -271,23 +344,32 @@ test.describe("20 Critical Search Page Journeys", () => {
     // Start with filters
     await page.goto(`${SEARCH_URL_WITH_BOUNDS}&minPrice=800&maxPrice=2000`);
     await page.waitForLoadState("domcontentloaded");
-    await expect(page.getByRole("heading", { level: 1 }).first()).toBeVisible({ timeout: 30000 });
+    await expect(page.getByRole("heading", { level: 1 }).first()).toBeVisible({
+      timeout: 30000,
+    });
 
     // Click a listing
-    const firstCard = searchResultsContainer(page).locator(selectors.listingCard).first();
+    const firstCard = searchResultsContainer(page)
+      .locator(selectors.listingCard)
+      .first();
     await firstCard.waitFor({ state: "attached", timeout: 10000 });
     const cardLink = firstCard.locator('a[href^="/listings/"]').first();
     const href = await cardLink.getAttribute("href");
     if (href) {
       await page.goto(href);
-      await page.waitForURL(/\/listings\//, { timeout: timeouts.navigation, waitUntil: "commit" });
+      await page.waitForURL(/\/listings\//, {
+        timeout: timeouts.navigation,
+        waitUntil: "commit",
+      });
 
       // Go back
       await page.goBack();
-      await expect.poll(
-        () => new URL(page.url()).pathname,
-        { timeout: timeouts.navigation, message: "URL pathname to be /search after goBack" },
-      ).toContain("/search");
+      await expect
+        .poll(() => new URL(page.url()).pathname, {
+          timeout: timeouts.navigation,
+          message: "URL pathname to be /search after goBack",
+        })
+        .toContain("/search");
 
       // Filters should be preserved
       const url = new URL(page.url());
@@ -302,13 +384,15 @@ test.describe("20 Critical Search Page Journeys", () => {
   test("J11: Lease duration filter works", async ({ page, nav }) => {
     await nav.goToSearch({ bounds: SF_BOUNDS });
     await page.waitForLoadState("domcontentloaded");
-    await expect(page.getByRole("heading", { level: 1 }).first()).toBeVisible({ timeout: 30000 });
+    await expect(page.getByRole("heading", { level: 1 }).first()).toBeVisible({
+      timeout: 30000,
+    });
 
     // Open filter modal (uses retry-click for hydration race + waits for facets)
     const modal = await openFilterModalAndWaitForFacets(page);
 
     // Find lease duration trigger
-    const leaseTrigger = modal.locator('#filter-lease');
+    const leaseTrigger = modal.locator("#filter-lease");
     if (await leaseTrigger.isVisible()) {
       await leaseTrigger.click();
 
@@ -325,10 +409,15 @@ test.describe("20 Critical Search Page Journeys", () => {
 
     // Apply
     await applyFilters(page);
-    await expect.poll(
-      () => new URL(page.url(), "http://localhost").searchParams.get("leaseDuration"),
-      { timeout: 10000, message: 'URL param "leaseDuration" to be present' },
-    ).not.toBeNull();
+    await expect
+      .poll(
+        () =>
+          new URL(page.url(), "http://localhost").searchParams.get(
+            "leaseDuration"
+          ),
+        { timeout: 10000, message: 'URL param "leaseDuration" to be present' }
+      )
+      .not.toBeNull();
 
     expect(page.url()).toMatch(/leaseDuration/i);
   });
@@ -339,7 +428,9 @@ test.describe("20 Critical Search Page Journeys", () => {
   test("J12: House rules filter toggles work", async ({ page, nav }) => {
     await nav.goToSearch({ bounds: SF_BOUNDS });
     await page.waitForLoadState("domcontentloaded");
-    await expect(page.getByRole("heading", { level: 1 }).first()).toBeVisible({ timeout: 30000 });
+    await expect(page.getByRole("heading", { level: 1 }).first()).toBeVisible({
+      timeout: 30000,
+    });
 
     // Open filter modal + wait for facets to prevent mid-interaction re-render
     const modal = await openFilterModalAndWaitForFacets(page);
@@ -348,15 +439,22 @@ test.describe("20 Critical Search Page Journeys", () => {
     const petsBtn = modal.getByRole("button", { name: "Pets allowed" });
     if (await petsBtn.isVisible()) {
       await petsBtn.click();
-      await expect(petsBtn).toHaveAttribute("aria-pressed", "true", { timeout: 5_000 });
+      await expect(petsBtn).toHaveAttribute("aria-pressed", "true", {
+        timeout: 5_000,
+      });
     }
 
     // Apply and verify
     await applyFilters(page);
-    await expect.poll(
-      () => new URL(page.url(), "http://localhost").searchParams.get("houseRules"),
-      { timeout: 10000, message: 'URL param "houseRules" to be present' },
-    ).not.toBeNull();
+    await expect
+      .poll(
+        () =>
+          new URL(page.url(), "http://localhost").searchParams.get(
+            "houseRules"
+          ),
+        { timeout: 10000, message: 'URL param "houseRules" to be present' }
+      )
+      .not.toBeNull();
     expect(page.url()).toMatch(/houseRules/i);
   });
 
@@ -366,31 +464,46 @@ test.describe("20 Critical Search Page Journeys", () => {
   test("J13: Gender preference filter works", async ({ page, nav }) => {
     await nav.goToSearch({ bounds: SF_BOUNDS });
     await page.waitForLoadState("domcontentloaded");
-    await expect(page.getByRole("heading", { level: 1 }).first()).toBeVisible({ timeout: 30000 });
+    await expect(page.getByRole("heading", { level: 1 }).first()).toBeVisible({
+      timeout: 30000,
+    });
 
     // Open filter modal (uses retry-click for hydration race)
     const modal = await openFilterModal(page);
 
     // Find gender preference trigger — skip if not available in this UI layout
-    const genderTrigger = modal.locator('#filter-gender-pref');
+    const genderTrigger = modal.locator("#filter-gender-pref");
     if (!(await genderTrigger.isVisible())) {
       // Close modal without applying and skip — gender pref filter not present
-      await page.keyboard.press('Escape');
-      test.skip(true, 'Gender preference filter not visible in current layout');
+      await page.keyboard.press("Escape");
+      test.skip(true, "Gender preference filter not visible in current layout");
       return;
     }
 
     await genderTrigger.click();
     const option = page.getByRole("option", { name: /female/i });
-    if (await option.first().isVisible({ timeout: 3000 }).catch(() => false)) {
+    if (
+      await option
+        .first()
+        .isVisible({ timeout: 3000 })
+        .catch(() => false)
+    ) {
       await option.first().click();
     }
 
     await applyFilters(page);
-    await expect.poll(
-      () => new URL(page.url(), "http://localhost").searchParams.get("genderPreference"),
-      { timeout: 10000, message: 'URL param "genderPreference" to be present' },
-    ).not.toBeNull();
+    await expect
+      .poll(
+        () =>
+          new URL(page.url(), "http://localhost").searchParams.get(
+            "genderPreference"
+          ),
+        {
+          timeout: 10000,
+          message: 'URL param "genderPreference" to be present',
+        }
+      )
+      .not.toBeNull();
     expect(page.url()).toMatch(/genderPreference/i);
   });
 
@@ -398,16 +511,30 @@ test.describe("20 Critical Search Page Journeys", () => {
   // J14: Filter removal via pill X button
   // ─────────────────────────────────────────────────
   test("J14: Removing filter pill updates results", async ({ page }) => {
-    await page.goto(`${SEARCH_URL_WITH_BOUNDS}&amenities=Wifi&amenities=Parking`);
+    await page.goto(
+      `${SEARCH_URL_WITH_BOUNDS}&amenities=Wifi&amenities=Parking`
+    );
     await page.waitForLoadState("domcontentloaded");
 
     // Look for filter pill remove buttons
-    const pillRemoveBtn = page.locator('button[aria-label*="Remove"]')
+    const pillRemoveBtn = page
+      .locator('button[aria-label*="Remove"]')
       .or(page.locator('[class*="FilterPill"] button'))
-      .or(page.locator('button').filter({ hasText: /Wifi/ }).locator('svg').first());
+      .or(
+        page
+          .locator("button")
+          .filter({ hasText: /Wifi/ })
+          .locator("svg")
+          .first()
+      );
 
     // If filter pills are visible, try removing one
-    if (await pillRemoveBtn.first().isVisible({ timeout: 5000 }).catch(() => false)) {
+    if (
+      await pillRemoveBtn
+        .first()
+        .isVisible({ timeout: 5000 })
+        .catch(() => false)
+    ) {
       await pillRemoveBtn.first().click();
       await page.waitForLoadState("domcontentloaded");
     }
@@ -436,7 +563,9 @@ test.describe("20 Critical Search Page Journeys", () => {
     await page.waitForLoadState("domcontentloaded");
 
     // Verify initial state
-    await expect(page.getByRole("heading", { level: 1 }).first()).toBeVisible({ timeout: 30000 });
+    await expect(page.getByRole("heading", { level: 1 }).first()).toBeVisible({
+      timeout: 30000,
+    });
 
     // Refresh
     await page.reload();
@@ -449,7 +578,9 @@ test.describe("20 Critical Search Page Journeys", () => {
 
     // Verify price input still shows correct value (wait for hydration)
     const minInput = page.getByLabel(/minimum budget/i);
-    await expect.poll(() => minInput.inputValue(), { timeout: 10_000 }).not.toBe('');
+    await expect
+      .poll(() => minInput.inputValue(), { timeout: 10_000 })
+      .not.toBe("");
     await expect(minInput).toHaveValue("700");
   });
 
@@ -460,24 +591,35 @@ test.describe("20 Critical Search Page Journeys", () => {
     test.slow();
     await nav.goToSearch({ bounds: SF_BOUNDS });
     await page.waitForLoadState("domcontentloaded").catch(() => {});
-    await expect(page.getByRole("heading", { level: 1 }).first()).toBeVisible({ timeout: 30000 });
+    await expect(page.getByRole("heading", { level: 1 }).first()).toBeVisible({
+      timeout: 30000,
+    });
 
     // Look for map toggle button
-    const mapToggle = page.getByRole("button", { name: /show map|^map$/i })
+    const mapToggle = page
+      .getByRole("button", { name: /show map|^map$/i })
       .or(page.locator('[data-testid="map-toggle"]'));
 
-    if (await mapToggle.first().isVisible({ timeout: 10000 }).catch(() => false)) {
+    if (
+      await mapToggle
+        .first()
+        .isVisible({ timeout: 10000 })
+        .catch(() => false)
+    ) {
       await expect(mapToggle.first()).toBeEnabled({ timeout: 10000 });
       await mapToggle.first().click();
       await page.waitForTimeout(1500); // Map init time
 
       // Map should be visible
       const map = page.locator(selectors.map);
-      const mapVisible = await map.isVisible({ timeout: 10000 }).catch(() => false);
+      const mapVisible = await map
+        .isVisible({ timeout: 10000 })
+        .catch(() => false);
 
       if (mapVisible) {
         // Toggle map off
-        const hideMapBtn = page.getByRole("button", { name: /hide map|list/i })
+        const hideMapBtn = page
+          .getByRole("button", { name: /hide map|list/i })
           .or(mapToggle.first());
         if (await hideMapBtn.isVisible()) {
           await hideMapBtn.click();
@@ -495,7 +637,9 @@ test.describe("20 Critical Search Page Journeys", () => {
     await page.waitForLoadState("domcontentloaded");
 
     // Should show "Please select a location" or browse mode
-    const locationPrompt = page.getByText(/select a location|showing top listings/i);
+    const locationPrompt = page.getByText(
+      /select a location|showing top listings/i
+    );
     await expect(locationPrompt.first()).toBeVisible({ timeout: 30000 });
   });
 
@@ -517,8 +661,15 @@ test.describe("20 Critical Search Page Journeys", () => {
     // or if results still load (server-side rate limit not triggered via mock)
     // Wait for either rate limit text or the results heading
     await expect(async () => {
-      const hasRateLimit = await page.getByText(/too many requests/i).isVisible().catch(() => false);
-      const hasHeading = await page.getByRole("heading", { level: 1 }).first().isVisible().catch(() => false);
+      const hasRateLimit = await page
+        .getByText(/too many requests/i)
+        .isVisible()
+        .catch(() => false);
+      const hasHeading = await page
+        .getByRole("heading", { level: 1 })
+        .first()
+        .isVisible()
+        .catch(() => false);
       expect(hasRateLimit || hasHeading).toBeTruthy();
     }).toPass({ timeout: 30000 });
   });
@@ -526,7 +677,10 @@ test.describe("20 Critical Search Page Journeys", () => {
   // ─────────────────────────────────────────────────
   // J20: Mobile viewport - collapsed header and responsive layout
   // ─────────────────────────────────────────────────
-  test(`${tags.mobile} J20: Mobile layout is responsive and functional`, async ({ page, nav }) => {
+  test(`${tags.mobile} J20: Mobile layout is responsive and functional`, async ({
+    page,
+    nav,
+  }) => {
     test.slow(); // Mobile viewport under load needs extra time
     // Set mobile viewport
     await page.setViewportSize({ width: 375, height: 812 });
@@ -535,12 +689,19 @@ test.describe("20 Critical Search Page Journeys", () => {
     await page.waitForLoadState("domcontentloaded").catch(() => {});
 
     // Results heading visible
-    await expect(page.getByRole("heading", { level: 1 }).first()).toBeVisible({ timeout: 30000 });
+    await expect(page.getByRole("heading", { level: 1 }).first()).toBeVisible({
+      timeout: 30000,
+    });
 
     // Listing cards or empty state should exist after page renders
     await expect(async () => {
-      const cardCount = await searchResultsContainer(page).locator(selectors.listingCard).count();
-      const hasEmpty = await searchResultsContainer(page).getByText(/no\s+matches|no listings/i).isVisible().catch(() => false);
+      const cardCount = await searchResultsContainer(page)
+        .locator(selectors.listingCard)
+        .count();
+      const hasEmpty = await searchResultsContainer(page)
+        .getByText(/no\s+matches|no listings/i)
+        .isVisible()
+        .catch(() => false);
       expect(cardCount > 0 || hasEmpty).toBeTruthy();
     }).toPass({ timeout: 30000 });
 
@@ -549,7 +710,9 @@ test.describe("20 Critical Search Page Journeys", () => {
     const modal = await openFilterModal(page);
 
     // Close it via the X button (not the backdrop, which is behind the modal content)
-    const closeBtn = page.getByRole("button", { name: "Close filters" }).first();
+    const closeBtn = page
+      .getByRole("button", { name: "Close filters" })
+      .first();
     await expect(closeBtn).toBeVisible({ timeout: 5000 });
     await closeBtn.click();
     await expect(modal).not.toBeVisible({ timeout: 5000 });
@@ -558,10 +721,16 @@ test.describe("20 Critical Search Page Journeys", () => {
   // ─────────────────────────────────────────────────
   // J-BONUS: Accessibility basics on search page
   // ─────────────────────────────────────────────────
-  test(`${tags.a11y} J-A11Y: Search page meets accessibility basics`, async ({ page, nav, assert }) => {
+  test(`${tags.a11y} J-A11Y: Search page meets accessibility basics`, async ({
+    page,
+    nav,
+    assert,
+  }) => {
     await nav.goToSearch({ bounds: SF_BOUNDS });
     await page.waitForLoadState("domcontentloaded");
-    await expect(page.getByRole("heading", { level: 1 }).first()).toBeVisible({ timeout: 30000 });
+    await expect(page.getByRole("heading", { level: 1 }).first()).toBeVisible({
+      timeout: 30000,
+    });
 
     // Basic a11y checks
     await assert.basicA11y();

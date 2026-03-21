@@ -20,7 +20,7 @@ function makeSearchResult(
     display_name: string;
     boundingbox: [string, string, string, string];
     geojson: GeoJSON.Geometry;
-  }> = {},
+  }> = {}
 ) {
   return {
     place_id: 1,
@@ -28,8 +28,11 @@ function makeSearchResult(
     osm_id: 12345,
     lat: overrides.lat ?? "30.267",
     lon: overrides.lon ?? "-97.743",
-    display_name: overrides.display_name ?? "Austin, Travis County, Texas, United States",
-    boundingbox: overrides.boundingbox ?? (["30.1", "30.5", "-97.9", "-97.5"] as [string, string, string, string]),
+    display_name:
+      overrides.display_name ?? "Austin, Travis County, Texas, United States",
+    boundingbox:
+      overrides.boundingbox ??
+      (["30.1", "30.5", "-97.9", "-97.5"] as [string, string, string, string]),
     geojson: overrides.geojson,
   };
 }
@@ -50,7 +53,8 @@ function makeReverseResult(overrides: Partial<{ display_name: string }> = {}) {
     osm_id: 9999,
     lat: "30.267",
     lon: "-97.743",
-    display_name: overrides.display_name ?? "Austin, Travis County, Texas, United States",
+    display_name:
+      overrides.display_name ?? "Austin, Travis County, Texas, United States",
   };
 }
 
@@ -81,7 +85,9 @@ beforeEach(() => jest.clearAllMocks());
 describe("forwardGeocode", () => {
   it("parses string lat/lon from Nominatim response as floats", async () => {
     mockFetchWithTimeout.mockResolvedValue(
-      makeSearchResponse([makeSearchResult({ lat: "30.267153", lon: "-97.743061" })]),
+      makeSearchResponse([
+        makeSearchResult({ lat: "30.267153", lon: "-97.743061" }),
+      ])
     );
 
     const result = await forwardGeocode("Austin, TX");
@@ -103,27 +109,34 @@ describe("forwardGeocode", () => {
   });
 
   it("throws an error with status code and statusText on non-200 response", async () => {
-    mockFetchWithTimeout.mockResolvedValue(makeErrorResponse(429, "Too Many Requests"));
+    mockFetchWithTimeout.mockResolvedValue(
+      makeErrorResponse(429, "Too Many Requests")
+    );
 
     await expect(forwardGeocode("Austin")).rejects.toThrow(
-      "Nominatim search failed: 429 Too Many Requests",
+      "Nominatim search failed: 429 Too Many Requests"
     );
   });
 
   it("sends the correct User-Agent header on every request", async () => {
     mockFetchWithTimeout.mockResolvedValue(
-      makeSearchResponse([makeSearchResult()]),
+      makeSearchResponse([makeSearchResult()])
     );
 
     await forwardGeocode("Austin");
 
-    const [, options] = mockFetchWithTimeout.mock.calls[0] as [string, { headers: Record<string, string> }];
-    expect(options.headers["User-Agent"]).toBe("Roomshare/1.0 (contact@roomshare.app)");
+    const [, options] = mockFetchWithTimeout.mock.calls[0] as [
+      string,
+      { headers: Record<string, string> },
+    ];
+    expect(options.headers["User-Agent"]).toBe(
+      "Roomshare/1.0 (contact@roomshare.app)"
+    );
   });
 
   it("URL-encodes the query parameter", async () => {
     mockFetchWithTimeout.mockResolvedValue(
-      makeSearchResponse([makeSearchResult()]),
+      makeSearchResponse([makeSearchResult()])
     );
 
     await forwardGeocode("New York City");
@@ -140,7 +153,11 @@ describe("forwardGeocode", () => {
 describe("reverseGeocode", () => {
   it("returns display_name string for valid coordinates", async () => {
     mockFetchWithTimeout.mockResolvedValue(
-      makeReverseResponse(makeReverseResult({ display_name: "Austin, Travis County, Texas, United States" })),
+      makeReverseResponse(
+        makeReverseResult({
+          display_name: "Austin, Travis County, Texas, United States",
+        })
+      )
     );
 
     const result = await reverseGeocode(30.267, -97.743);
@@ -169,7 +186,9 @@ describe("reverseGeocode", () => {
   });
 
   it("returns null (does not throw) on non-200 status", async () => {
-    mockFetchWithTimeout.mockResolvedValue(makeErrorResponse(503, "Service Unavailable"));
+    mockFetchWithTimeout.mockResolvedValue(
+      makeErrorResponse(503, "Service Unavailable")
+    );
 
     // reverseGeocode silently returns null on errors — different from forwardGeocode
     const result = await reverseGeocode(30.267, -97.743);
@@ -179,13 +198,18 @@ describe("reverseGeocode", () => {
 
   it("sends the correct User-Agent header", async () => {
     mockFetchWithTimeout.mockResolvedValue(
-      makeReverseResponse(makeReverseResult()),
+      makeReverseResponse(makeReverseResult())
     );
 
     await reverseGeocode(37.77, -122.41);
 
-    const [, options] = mockFetchWithTimeout.mock.calls[0] as [string, { headers: Record<string, string> }];
-    expect(options.headers["User-Agent"]).toBe("Roomshare/1.0 (contact@roomshare.app)");
+    const [, options] = mockFetchWithTimeout.mock.calls[0] as [
+      string,
+      { headers: Record<string, string> },
+    ];
+    expect(options.headers["User-Agent"]).toBe(
+      "Roomshare/1.0 (contact@roomshare.app)"
+    );
   });
 });
 
@@ -197,18 +221,28 @@ describe("searchBoundary", () => {
   it("returns geometry when geojson is present in the result", async () => {
     const polygon: GeoJSON.Geometry = {
       type: "Polygon",
-      coordinates: [[[-97.9, 30.1], [-97.5, 30.1], [-97.5, 30.5], [-97.9, 30.5], [-97.9, 30.1]]],
+      coordinates: [
+        [
+          [-97.9, 30.1],
+          [-97.5, 30.1],
+          [-97.5, 30.5],
+          [-97.9, 30.5],
+          [-97.9, 30.1],
+        ],
+      ],
     };
 
     mockFetchWithTimeout.mockResolvedValue(
-      makeSearchResponse([makeSearchResult({ geojson: polygon })]),
+      makeSearchResponse([makeSearchResult({ geojson: polygon })])
     );
 
     const result = await searchBoundary("Austin, TX");
 
     expect(result).not.toBeNull();
     expect(result!.geometry).toEqual(polygon);
-    expect(result!.displayName).toBe("Austin, Travis County, Texas, United States");
+    expect(result!.displayName).toBe(
+      "Austin, Travis County, Texas, United States"
+    );
   });
 
   it("converts Nominatim boundingbox [minLat, maxLat, minLon, maxLon] to GeoJSON [minLng, minLat, maxLng, maxLat]", async () => {
@@ -219,7 +253,7 @@ describe("searchBoundary", () => {
           boundingbox: ["30.1", "30.5", "-97.9", "-97.5"],
           geojson: undefined,
         }),
-      ]),
+      ])
     );
 
     const result = await searchBoundary("Austin, TX");
@@ -236,7 +270,7 @@ describe("searchBoundary", () => {
           geojson: undefined,
           boundingbox: ["30.1", "30.5", "-97.9", "-97.5"],
         }),
-      ]),
+      ])
     );
 
     const result = await searchBoundary("Austin, TX");
@@ -255,7 +289,9 @@ describe("searchBoundary", () => {
   });
 
   it("returns null (does not throw) on non-200 status", async () => {
-    mockFetchWithTimeout.mockResolvedValue(makeErrorResponse(503, "Service Unavailable"));
+    mockFetchWithTimeout.mockResolvedValue(
+      makeErrorResponse(503, "Service Unavailable")
+    );
 
     const result = await searchBoundary("Austin");
 
@@ -268,7 +304,7 @@ describe("searchBoundary", () => {
         makeSearchResult({
           boundingbox: ["51.2867602", "51.6918741", "-0.5103751", "0.3340155"],
         }),
-      ]),
+      ])
     );
 
     const result = await searchBoundary("London");
@@ -298,14 +334,14 @@ describe("Rate limiting", () => {
     let isolatedForwardGeocode!: typeof forwardGeocode;
 
     jest.isolateModules(() => {
-      const mod = jest.requireActual<typeof import("@/lib/geocoding/nominatim")>(
-        "@/lib/geocoding/nominatim",
-      );
+      const mod = jest.requireActual<
+        typeof import("@/lib/geocoding/nominatim")
+      >("@/lib/geocoding/nominatim");
       isolatedForwardGeocode = mod.forwardGeocode;
     });
 
     mockFetchWithTimeout.mockResolvedValue(
-      makeSearchResponse([makeSearchResult()]),
+      makeSearchResponse([makeSearchResult()])
     );
 
     const start = Date.now();
@@ -321,7 +357,7 @@ describe("Rate limiting", () => {
 
     try {
       mockFetchWithTimeout.mockResolvedValue(
-        makeSearchResponse([makeSearchResult()]),
+        makeSearchResponse([makeSearchResult()])
       );
 
       // First call (no delay)
@@ -347,14 +383,14 @@ describe("Rate limiting", () => {
 
     jest.isolateModules(() => {
       // Each isolateModules call gets its own module scope with lastRequestTimestamp = 0
-      const mod = jest.requireActual<typeof import("@/lib/geocoding/nominatim")>(
-        "@/lib/geocoding/nominatim",
-      );
+      const mod = jest.requireActual<
+        typeof import("@/lib/geocoding/nominatim")
+      >("@/lib/geocoding/nominatim");
       freshForwardGeocode = mod.forwardGeocode;
     });
 
     mockFetchWithTimeout.mockResolvedValue(
-      makeSearchResponse([makeSearchResult()]),
+      makeSearchResponse([makeSearchResult()])
     );
 
     // The isolated module starts with lastRequestTimestamp = 0 so the first

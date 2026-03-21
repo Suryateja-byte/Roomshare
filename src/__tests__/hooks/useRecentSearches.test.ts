@@ -60,7 +60,7 @@ describe("useRecentSearches", () => {
         },
       ];
       localStorageMock.getItem.mockReturnValueOnce(
-        JSON.stringify(existingSearches),
+        JSON.stringify(existingSearches)
       );
 
       const { result } = renderHook(() => useRecentSearches());
@@ -80,7 +80,7 @@ describe("useRecentSearches", () => {
         },
       ];
       localStorageMock.getItem.mockReturnValueOnce(
-        JSON.stringify(legacySearches),
+        JSON.stringify(legacySearches)
       );
 
       const { result } = renderHook(() => useRecentSearches());
@@ -101,7 +101,7 @@ describe("useRecentSearches", () => {
         },
       ];
       localStorageMock.getItem.mockReturnValueOnce(
-        JSON.stringify(legacySearches),
+        JSON.stringify(legacySearches)
       );
 
       renderHook(() => useRecentSearches());
@@ -109,7 +109,7 @@ describe("useRecentSearches", () => {
       // Should have called setItem to save migrated format
       expect(localStorageMock.setItem).toHaveBeenCalled();
       const savedData = JSON.parse(
-        localStorageMock.setItem.mock.calls[0][1],
+        localStorageMock.setItem.mock.calls[0][1]
       ) as RecentSearch[];
       expect(savedData[0].id).toBeDefined();
       expect(savedData[0].filters).toEqual({});
@@ -124,7 +124,7 @@ describe("useRecentSearches", () => {
         result.current.saveRecentSearch(
           "Austin, TX",
           { lat: 30.2672, lng: -97.7431 },
-          { minPrice: "500", maxPrice: "1500", amenities: ["Wifi", "Parking"] },
+          { minPrice: "500", maxPrice: "1500", amenities: ["Wifi", "Parking"] }
         );
       });
 
@@ -208,7 +208,7 @@ describe("useRecentSearches", () => {
         },
       ];
       localStorageMock.getItem.mockReturnValueOnce(
-        JSON.stringify(existingSearches),
+        JSON.stringify(existingSearches)
       );
 
       const { result } = renderHook(() => useRecentSearches());
@@ -233,7 +233,7 @@ describe("useRecentSearches", () => {
         },
       ];
       localStorageMock.getItem.mockReturnValueOnce(
-        JSON.stringify(existingSearches),
+        JSON.stringify(existingSearches)
       );
 
       const { result } = renderHook(() => useRecentSearches());
@@ -244,7 +244,7 @@ describe("useRecentSearches", () => {
 
       expect(result.current.recentSearches).toHaveLength(0);
       expect(localStorageMock.removeItem).toHaveBeenCalledWith(
-        "roomshare-recent-searches",
+        "roomshare-recent-searches"
       );
     });
   });
@@ -327,7 +327,7 @@ describe("formatRecentSearch", () => {
     };
 
     expect(formatRecentSearch(search)).toBe(
-      "Austin, TX · $500-1500 · Private Room · Wifi",
+      "Austin, TX · $500-1500 · Private Room · Wifi"
     );
   });
 });

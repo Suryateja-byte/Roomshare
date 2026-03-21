@@ -8,17 +8,20 @@
  * - Offline detection
  */
 
-import type { NearbyPlace } from '@/types/nearby';
+import type { NearbyPlace } from "@/types/nearby";
 
 /**
  * Create a mock place for network testing
  */
-export function createMockPlace(id: string, overrides: Partial<NearbyPlace> = {}): NearbyPlace {
+export function createMockPlace(
+  id: string,
+  overrides: Partial<NearbyPlace> = {}
+): NearbyPlace {
   return {
     id,
     name: `Place ${id}`,
     address: `123 Test St, City`,
-    category: 'food-grocery',
+    category: "food-grocery",
     location: { lat: 37.7749, lng: -122.4194 },
     distanceMiles: 0.5,
     ...overrides,
@@ -56,9 +59,9 @@ export function mock429WithRetryAfter(seconds: number) {
   return {
     ok: false,
     status: 429,
-    headers: new Headers({ 'Retry-After': seconds.toString() }),
-    json: async () => ({ error: 'Rate limit exceeded' }),
-    text: async () => JSON.stringify({ error: 'Rate limit exceeded' }),
+    headers: new Headers({ "Retry-After": seconds.toString() }),
+    json: async () => ({ error: "Rate limit exceeded" }),
+    text: async () => JSON.stringify({ error: "Rate limit exceeded" }),
   };
 }
 
@@ -71,7 +74,7 @@ export function mockFailThenSucceed(failCount: number, successData: unknown) {
   return jest.fn(async () => {
     attempts++;
     if (attempts <= failCount) {
-      throw new Error('Network error');
+      throw new Error("Network error");
     }
     return {
       ok: true,
@@ -90,8 +93,8 @@ export function mockNetworkTimeout() {
       new Promise((resolve, reject) => {
         const signal = options?.signal;
         if (signal) {
-          signal.addEventListener('abort', () => {
-            reject(new DOMException('The operation was aborted', 'AbortError'));
+          signal.addEventListener("abort", () => {
+            reject(new DOMException("The operation was aborted", "AbortError"));
           });
         }
         // Never resolves naturally - waits for abort
@@ -128,9 +131,9 @@ export function mockWithAbortTracking() {
         const signal = options?.signal;
 
         if (signal) {
-          signal.addEventListener('abort', () => {
+          signal.addEventListener("abort", () => {
             abortedCalls.push(currentCall);
-            reject(new DOMException('The operation was aborted', 'AbortError'));
+            reject(new DOMException("The operation was aborted", "AbortError"));
           });
         }
 
@@ -203,11 +206,13 @@ export function createNetworkStatusMock() {
 /**
  * Mock DNS/connection errors
  */
-export function mockConnectionError(errorType: 'dns' | 'refused' | 'timeout' = 'refused') {
+export function mockConnectionError(
+  errorType: "dns" | "refused" | "timeout" = "refused"
+) {
   const errors = {
-    dns: 'getaddrinfo ENOTFOUND api.radar.io',
-    refused: 'connect ECONNREFUSED 127.0.0.1:443',
-    timeout: 'ETIMEDOUT',
+    dns: "getaddrinfo ENOTFOUND api.radar.io",
+    refused: "connect ECONNREFUSED 127.0.0.1:443",
+    timeout: "ETIMEDOUT",
   };
   return jest.fn(() => Promise.reject(new Error(errors[errorType])));
 }

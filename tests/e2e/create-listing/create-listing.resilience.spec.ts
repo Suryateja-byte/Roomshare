@@ -7,13 +7,18 @@
  * IDs: R-001 through R-011
  */
 
-import { test, expect, tags, timeouts } from '../helpers/test-utils';
-import { CreateListingPage, CreateListingData } from '../page-objects/create-listing.page';
-import type { ListingData } from '../helpers/data-helpers';
+import { test, expect, tags, timeouts } from "../helpers/test-utils";
+import {
+  CreateListingPage,
+  CreateListingData,
+} from "../page-objects/create-listing.page";
+import type { ListingData } from "../helpers/data-helpers";
 
-test.describe('Create Listing – Resilience', () => {
-  test.use({ storageState: 'playwright/.auth/user.json' });
-  test.beforeEach(async () => { test.slow(); });
+test.describe("Create Listing – Resilience", () => {
+  test.use({ storageState: "playwright/.auth/user.json" });
+  test.beforeEach(async () => {
+    test.slow();
+  });
 
   let createPage: CreateListingPage;
 
@@ -23,7 +28,7 @@ test.describe('Create Listing – Resilience', () => {
       title: d.title,
       description: d.description,
       price: d.price,
-      totalSlots: '2',
+      totalSlots: "2",
       address: d.address,
       city: d.city,
       state: d.state,
@@ -35,8 +40,8 @@ test.describe('Create Listing – Resilience', () => {
 
   /** Shared setup: instantiate POM, navigate, fill form, mock image upload */
   async function setupFilledForm(
-    page: import('@playwright/test').Page,
-    formData: CreateListingData,
+    page: import("@playwright/test").Page,
+    formData: CreateListingData
   ) {
     const cp = new CreateListingPage(page);
     await cp.goto();
@@ -51,7 +56,7 @@ test.describe('Create Listing – Resilience', () => {
   // ────────────────────────────────────────────────
   // R-001: API returns 500 Internal Server Error
   // ────────────────────────────────────────────────
-  test('R-001: shows error banner on 500 server error and preserves form', async ({
+  test("R-001: shows error banner on 500 server error and preserves form", async ({
     page,
     data,
   }) => {
@@ -60,7 +65,9 @@ test.describe('Create Listing – Resilience', () => {
     createPage = await setupFilledForm(page, formData);
 
     // Mock the API to return 500 before submitting
-    await createPage.mockListingApiError(500, { error: 'Internal server error' });
+    await createPage.mockListingApiError(500, {
+      error: "Internal server error",
+    });
 
     await createPage.submitAndWaitForResponse();
 
@@ -77,7 +84,7 @@ test.describe('Create Listing – Resilience', () => {
   // ────────────────────────────────────────────────
   // R-002: API returns 429 Rate Limit
   // ────────────────────────────────────────────────
-  test('R-002: shows rate limit message on 429 and preserves form', async ({
+  test("R-002: shows rate limit message on 429 and preserves form", async ({
     page,
     data,
   }) => {
@@ -86,7 +93,7 @@ test.describe('Create Listing – Resilience', () => {
     createPage = await setupFilledForm(page, formData);
 
     await createPage.mockListingApiError(429, {
-      error: 'Rate limit exceeded. Try again later.',
+      error: "Rate limit exceeded. Try again later.",
     });
 
     await createPage.submitAndWaitForResponse();
@@ -99,7 +106,7 @@ test.describe('Create Listing – Resilience', () => {
   // ────────────────────────────────────────────────
   // R-003: API returns 401 Auth Expired
   // ────────────────────────────────────────────────
-  test('R-003: handles 401 auth expired with error or redirect', async ({
+  test("R-003: handles 401 auth expired with error or redirect", async ({
     page,
     data,
   }) => {
@@ -107,13 +114,16 @@ test.describe('Create Listing – Resilience', () => {
     const formData = toPomData(listingData);
     createPage = await setupFilledForm(page, formData);
 
-    await createPage.mockListingApiError(401, { error: 'Not authenticated' });
+    await createPage.mockListingApiError(401, { error: "Not authenticated" });
 
     await createPage.submitAndWaitForResponse();
 
     // Either an error banner is shown OR user is redirected to login
-    const errorVisible = await createPage.errorBanner.isVisible().catch(() => false);
-    const onLoginPage = page.url().includes('/login') || page.url().includes('/sign-in');
+    const errorVisible = await createPage.errorBanner
+      .isVisible()
+      .catch(() => false);
+    const onLoginPage =
+      page.url().includes("/login") || page.url().includes("/sign-in");
 
     expect(errorVisible || onLoginPage).toBe(true);
   });
@@ -121,7 +131,7 @@ test.describe('Create Listing – Resilience', () => {
   // ────────────────────────────────────────────────
   // R-004: API returns 403 Account Suspended
   // ────────────────────────────────────────────────
-  test('R-004: shows suspension error on 403 and preserves form', async ({
+  test("R-004: shows suspension error on 403 and preserves form", async ({
     page,
     data,
   }) => {
@@ -129,7 +139,9 @@ test.describe('Create Listing – Resilience', () => {
     const formData = toPomData(listingData);
     createPage = await setupFilledForm(page, formData);
 
-    await createPage.mockListingApiError(403, { error: 'Your account is suspended' });
+    await createPage.mockListingApiError(403, {
+      error: "Your account is suspended",
+    });
 
     await createPage.submitAndWaitForResponse();
 
@@ -141,12 +153,13 @@ test.describe('Create Listing – Resilience', () => {
   // ────────────────────────────────────────────────
   // R-005: Discriminatory Language Guard
   // ────────────────────────────────────────────────
-  test('R-005: server rejects discriminatory language in description', async ({
+  test("R-005: server rejects discriminatory language in description", async ({
     page,
     data,
   }) => {
     const listingData = data.generateListingData({
-      description: 'English speakers only, no foreigners allowed. Americans only.',
+      description:
+        "English speakers only, no foreigners allowed. Americans only.",
     });
     const formData = toPomData(listingData);
 
@@ -166,15 +179,21 @@ test.describe('Create Listing – Resilience', () => {
     await createPage.expectOnCreatePage();
 
     // Error banner or field error should be visible
-    const errorVisible = await createPage.errorBanner.isVisible().catch(() => false);
-    const fieldErrorVisible = await page.locator('[role="alert"]').first().isVisible().catch(() => false);
+    const errorVisible = await createPage.errorBanner
+      .isVisible()
+      .catch(() => false);
+    const fieldErrorVisible = await page
+      .locator('[role="alert"]')
+      .first()
+      .isVisible()
+      .catch(() => false);
     expect(errorVisible || fieldErrorVisible).toBe(true);
   });
 
   // ────────────────────────────────────────────────
   // R-006: Geocoding Failure
   // ────────────────────────────────────────────────
-  test('R-006: shows address error on geocoding failure and preserves form', async ({
+  test("R-006: shows address error on geocoding failure and preserves form", async ({
     page,
     data,
   }) => {
@@ -182,7 +201,9 @@ test.describe('Create Listing – Resilience', () => {
     const formData = toPomData(listingData);
     createPage = await setupFilledForm(page, formData);
 
-    await createPage.mockListingApiError(400, { error: 'Could not verify address' });
+    await createPage.mockListingApiError(400, {
+      error: "Could not verify address",
+    });
 
     await createPage.submitAndWaitForResponse();
 
@@ -194,7 +215,7 @@ test.describe('Create Listing – Resilience', () => {
   // ────────────────────────────────────────────────
   // R-007: Maximum Listings Reached
   // ────────────────────────────────────────────────
-  test('R-007: shows limit message when max listings reached', async ({
+  test("R-007: shows limit message when max listings reached", async ({
     page,
     data,
   }) => {
@@ -203,7 +224,7 @@ test.describe('Create Listing – Resilience', () => {
     createPage = await setupFilledForm(page, formData);
 
     await createPage.mockListingApiError(400, {
-      error: 'Maximum 10 active listings reached',
+      error: "Maximum 10 active listings reached",
     });
 
     await createPage.submitAndWaitForResponse();
@@ -216,7 +237,7 @@ test.describe('Create Listing – Resilience', () => {
   // ────────────────────────────────────────────────
   // R-008: Double Submit Prevention
   // ────────────────────────────────────────────────
-  test('R-008: double-click submit only fires one API call', async ({
+  test("R-008: double-click submit only fires one API call", async ({
     page,
     data,
   }) => {
@@ -240,7 +261,7 @@ test.describe('Create Listing – Resilience', () => {
   // ────────────────────────────────────────────────
   // R-009: Network Timeout / Aborted Request
   // ────────────────────────────────────────────────
-  test('R-009: handles network timeout gracefully and preserves form', async ({
+  test("R-009: handles network timeout gracefully and preserves form", async ({
     page,
     data,
   }) => {
@@ -249,9 +270,9 @@ test.describe('Create Listing – Resilience', () => {
     createPage = await setupFilledForm(page, formData);
 
     // Abort POST requests to simulate a timeout
-    await page.route('**/api/listings', async (route) => {
-      if (route.request().method() === 'POST') {
-        await route.abort('timedout');
+    await page.route("**/api/listings", async (route) => {
+      if (route.request().method() === "POST") {
+        await route.abort("timedout");
       } else {
         await route.continue();
       }
@@ -268,7 +289,7 @@ test.describe('Create Listing – Resilience', () => {
   // ────────────────────────────────────────────────
   // R-010: Slow API Response (loading state)
   // ────────────────────────────────────────────────
-  test('R-010: shows loading spinner and disables submit during slow response', async ({
+  test("R-010: shows loading spinner and disables submit during slow response", async ({
     page,
     data,
   }) => {
@@ -286,14 +307,16 @@ test.describe('Create Listing – Resilience', () => {
     await expect(createPage.submitButton).toBeDisabled({ timeout: 2000 });
 
     // Check for loading indicator inside the button (Loader2 has animate-spin class)
-    const spinnerInButton = createPage.submitButton.locator('.animate-spin, svg.lucide-loader-2, svg[class*="animate"]');
+    const spinnerInButton = createPage.submitButton.locator(
+      '.animate-spin, svg.lucide-loader-2, svg[class*="animate"]'
+    );
     await expect(spinnerInButton).toBeVisible({ timeout: 2000 });
   });
 
   // ────────────────────────────────────────────────
   // R-011: Malformed (HTML) Response
   // ────────────────────────────────────────────────
-  test('R-011: handles malformed HTML response gracefully', async ({
+  test("R-011: handles malformed HTML response gracefully", async ({
     page,
     data,
   }) => {
@@ -302,12 +325,12 @@ test.describe('Create Listing – Resilience', () => {
     createPage = await setupFilledForm(page, formData);
 
     // Mock API to return HTML instead of JSON
-    await page.route('**/api/listings', async (route) => {
-      if (route.request().method() === 'POST') {
+    await page.route("**/api/listings", async (route) => {
+      if (route.request().method() === "POST") {
         await route.fulfill({
           status: 200,
-          contentType: 'text/html',
-          body: '<html><body>Server Error</body></html>',
+          contentType: "text/html",
+          body: "<html><body>Server Error</body></html>",
         });
       } else {
         await route.continue();

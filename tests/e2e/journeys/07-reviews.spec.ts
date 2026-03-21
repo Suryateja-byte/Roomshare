@@ -40,7 +40,7 @@ test.describe("Reviews Journeys", () => {
 
       // Check for review cards or empty state
       const reviewCards = page.locator(
-        '[data-testid="review-card"], [class*="review-card"]',
+        '[data-testid="review-card"], [class*="review-card"]'
       );
       const reviewCount = await reviewCards.count();
 
@@ -51,9 +51,11 @@ test.describe("Reviews Journeys", () => {
 
         // Should have rating
         const rating = firstReview.locator(
-          '[data-testid="rating"], [class*="star"], [aria-label*="rating"]',
+          '[data-testid="rating"], [class*="star"], [aria-label*="rating"]'
         );
-        await expect(rating.or(firstReview.locator("svg")).first()).toBeVisible();
+        await expect(
+          rating.or(firstReview.locator("svg")).first()
+        ).toBeVisible();
       }
     });
 
@@ -72,9 +74,11 @@ test.describe("Reviews Journeys", () => {
 
       if (await reviewsSection.isVisible().catch(() => false)) {
         // Check for pagination or load more
-        const loadMore = page.getByRole("button", {
-          name: /load more|show more|view all/i,
-        }).first();
+        const loadMore = page
+          .getByRole("button", {
+            name: /load more|show more|view all/i,
+          })
+          .first();
 
         if (await loadMore.isVisible().catch(() => false)) {
           const initialCount = await page
@@ -136,12 +140,14 @@ test.describe("Reviews Journeys", () => {
 
         if (await reviewText.isVisible().catch(() => false)) {
           await reviewText.fill(
-            "Great experience! The room was exactly as described and the host was very responsive.",
+            "Great experience! The room was exactly as described and the host was very responsive."
           );
         }
 
         // Submit
-        const submitButton = page.getByRole("button", { name: /submit|post/i }).first();
+        const submitButton = page
+          .getByRole("button", { name: /submit|post/i })
+          .first();
         if (await submitButton.isVisible().catch(() => false)) {
           await submitButton.click();
 
@@ -150,7 +156,7 @@ test.describe("Reviews Journeys", () => {
             page
               .locator(selectors.toast)
               .or(page.getByText(/submitted|posted|thank you/i))
-              .first(),
+              .first()
           ).toBeVisible({ timeout: 10000 });
         }
       }
@@ -191,7 +197,10 @@ test.describe("Reviews Journeys", () => {
 
   test.describe("J059: Edit review", () => {
     test(`${tags.auth} - Edit own review`, async ({ page, nav }) => {
-      test.skip(true, 'Review editing UI not available on profile page — needs dedicated reviews page');
+      test.skip(
+        true,
+        "Review editing UI not available on profile page — needs dedicated reviews page"
+      );
 
       await nav.goToProfile();
 
@@ -222,13 +231,18 @@ test.describe("Reviews Journeys", () => {
           await reviewText.fill("Updated review: Still a great experience!");
 
           // Save changes
-          const saveButton = page.getByRole("button", { name: /save|update/i }).first();
+          const saveButton = page
+            .getByRole("button", { name: /save|update/i })
+            .first();
           if (await saveButton.isVisible().catch(() => false)) {
             await saveButton.click();
 
             // Verify success
             await expect(
-              page.locator(selectors.toast).or(page.getByText(/updated|saved/i)).first(),
+              page
+                .locator(selectors.toast)
+                .or(page.getByText(/updated|saved/i))
+                .first()
             ).toBeVisible({ timeout: 10000 });
           }
         }
@@ -263,7 +277,8 @@ test.describe("Reviews Journeys", () => {
         // Confirm deletion
         const confirmButton = page
           .locator(selectors.modal)
-          .getByRole("button", { name: /confirm|delete|yes/i }).first();
+          .getByRole("button", { name: /confirm|delete|yes/i })
+          .first();
 
         if (await confirmButton.isVisible().catch(() => false)) {
           await confirmButton.click();
@@ -272,7 +287,7 @@ test.describe("Reviews Journeys", () => {
             page
               .locator(selectors.toast)
               .or(page.getByText(/deleted|removed/i))
-              .first(),
+              .first()
           ).toBeVisible({ timeout: 10000 });
         }
       }
@@ -303,17 +318,22 @@ test.describe("Reviews Journeys", () => {
         const responseText = page.locator("textarea").first();
         if (await responseText.isVisible().catch(() => false)) {
           await responseText.fill(
-            "Thank you for your kind review! We hope to host you again.",
+            "Thank you for your kind review! We hope to host you again."
           );
 
-          const submitButton = page.getByRole("button", {
-            name: /submit|post|reply/i,
-          }).first();
+          const submitButton = page
+            .getByRole("button", {
+              name: /submit|post|reply/i,
+            })
+            .first();
           if (await submitButton.isVisible().catch(() => false)) {
             await submitButton.click();
 
             await expect(
-              page.locator(selectors.toast).or(page.getByText(/posted|submitted/i)).first(),
+              page
+                .locator(selectors.toast)
+                .or(page.getByText(/posted|submitted/i))
+                .first()
             ).toBeVisible({ timeout: 10000 });
           }
         }
@@ -339,7 +359,7 @@ test.describe("Reviews Journeys", () => {
         .locator('[data-testid="review-card"]')
         .filter({
           has: page.locator(
-            '[data-testid="host-response"], [class*="response"]',
+            '[data-testid="host-response"], [class*="response"]'
           ),
         });
 
@@ -457,9 +477,11 @@ test.describe("Reviews Journeys", () => {
       await page.waitForLoadState("domcontentloaded");
 
       // Look for write review button
-      const writeReviewButton = page.getByRole("button", {
-        name: /write.*review/i,
-      }).first();
+      const writeReviewButton = page
+        .getByRole("button", {
+          name: /write.*review/i,
+        })
+        .first();
 
       // Should not be available if no completed booking
       const canReview = await writeReviewButton.isVisible().catch(() => false);
@@ -473,7 +495,7 @@ test.describe("Reviews Journeys", () => {
           page
             .getByText(/booking|complete|stay/i)
             .or(page.locator(selectors.toast))
-            .first(),
+            .first()
         ).toBeVisible({ timeout: 5000 });
       }
     });

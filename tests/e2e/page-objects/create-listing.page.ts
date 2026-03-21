@@ -1,6 +1,6 @@
-import { Page, Locator, expect } from '@playwright/test';
-import { timeouts } from '../helpers/test-utils';
-import path from 'path';
+import { Page, Locator, expect } from "@playwright/test";
+import { timeouts } from "../helpers/test-utils";
+import path from "path";
 
 /**
  * Test data interface for create listing form
@@ -75,38 +75,40 @@ export class CreateListingPage {
 
   constructor(readonly page: Page) {
     // Section 1: The Basics
-    this.titleInput = page.getByLabel('Listing Title');
-    this.descriptionInput = page.getByLabel('Description');
-    this.priceInput = page.getByLabel('Monthly Rent ($)');
-    this.totalSlotsInput = page.getByLabel('Total Roommates');
+    this.titleInput = page.getByLabel("Listing Title");
+    this.descriptionInput = page.getByLabel("Description");
+    this.priceInput = page.getByLabel("Monthly Rent ($)");
+    this.totalSlotsInput = page.getByLabel("Total Roommates");
 
     // Section 2: Location
-    this.addressInput = page.getByLabel('Street Address');
-    this.cityInput = page.getByLabel('City');
-    this.stateInput = page.getByLabel('State');
-    this.zipInput = page.getByLabel('Zip Code');
+    this.addressInput = page.getByLabel("Street Address");
+    this.cityInput = page.getByLabel("City");
+    this.stateInput = page.getByLabel("State");
+    this.zipInput = page.getByLabel("Zip Code");
 
     // Section 3: Photos (hidden file input)
     this.imageFileInput = page.locator('input[type="file"]').first();
 
     // Section 4: Finer Details
-    this.amenitiesInput = page.getByLabel('Amenities');
-    this.moveInDateInput = page.getByLabel('Move-In Date');
-    this.leaseDurationTrigger = page.locator('#leaseDuration');
-    this.roomTypeTrigger = page.locator('#roomType');
-    this.genderPrefTrigger = page.locator('#genderPreference');
-    this.householdGenderTrigger = page.locator('#householdGender');
-    this.houseRulesInput = page.getByLabel('House Rules');
+    this.amenitiesInput = page.getByLabel("Amenities");
+    this.moveInDateInput = page.getByLabel("Move-In Date");
+    this.leaseDurationTrigger = page.locator("#leaseDuration");
+    this.roomTypeTrigger = page.locator("#roomType");
+    this.genderPrefTrigger = page.locator("#genderPreference");
+    this.householdGenderTrigger = page.locator("#householdGender");
+    this.houseRulesInput = page.getByLabel("House Rules");
 
     // Actions
-    this.submitButton = page.getByRole('button', { name: /create|submit|publish/i });
-    this.form = page.locator('form[novalidate]').first();
+    this.submitButton = page.getByRole("button", {
+      name: /create|submit|publish/i,
+    });
+    this.form = page.locator("form[novalidate]").first();
 
     // State — error banner uses role="alert" and data-testid
     this.errorBanner = page.locator('[data-testid="form-error-banner"]');
-    this.draftBanner = page.getByText('You have a saved draft');
-    this.resumeDraftButton = page.getByRole('button', { name: 'Resume Draft' });
-    this.startFreshButton = page.getByRole('button', { name: 'Start Fresh' });
+    this.draftBanner = page.getByText("You have a saved draft");
+    this.resumeDraftButton = page.getByRole("button", { name: "Resume Draft" });
+    this.startFreshButton = page.getByRole("button", { name: "Start Fresh" });
     this.autoSaveIndicator = page.getByText(/Draft saved/);
 
     // Progress
@@ -114,30 +116,39 @@ export class CreateListingPage {
     this.progressText = page.getByText(/sections? complete|Ready to publish/);
 
     // Partial upload confirmation
-    this.partialUploadDialog = page.getByRole('alertdialog');
+    this.partialUploadDialog = page.getByRole("alertdialog");
   }
 
   // ── Navigation ──
 
   async goto() {
-    await this.page.goto('/listings/create');
-    await this.page.waitForLoadState('domcontentloaded');
-    await this.form.waitFor({ state: 'visible', timeout: timeouts.navigation });
+    await this.page.goto("/listings/create");
+    await this.page.waitForLoadState("domcontentloaded");
+    await this.form.waitFor({ state: "visible", timeout: timeouts.navigation });
   }
 
   // ── Form Fill Actions ──
 
-  async fillBasics(data: Pick<CreateListingData, 'title' | 'description' | 'price' | 'totalSlots'>) {
+  async fillBasics(
+    data: Pick<
+      CreateListingData,
+      "title" | "description" | "price" | "totalSlots"
+    >
+  ) {
     await this.titleInput.fill(data.title);
     await this.descriptionInput.fill(data.description);
     await this.priceInput.fill(String(data.price));
-    await expect(this.priceInput).toHaveValue(String(data.price), { timeout: 2_000 });
+    await expect(this.priceInput).toHaveValue(String(data.price), {
+      timeout: 2_000,
+    });
     if (data.totalSlots !== undefined) {
       await this.totalSlotsInput.fill(String(data.totalSlots));
     }
   }
 
-  async fillLocation(data: Pick<CreateListingData, 'address' | 'city' | 'state' | 'zipCode'>) {
+  async fillLocation(
+    data: Pick<CreateListingData, "address" | "city" | "state" | "zipCode">
+  ) {
     await this.addressInput.fill(data.address);
     await this.cityInput.fill(data.city);
     await this.stateInput.fill(data.state);
@@ -166,17 +177,20 @@ export class CreateListingPage {
       await this.selectOption(this.genderPrefTrigger, data.genderPreference);
     }
     if (data.householdGender) {
-      await this.selectOption(this.householdGenderTrigger, data.householdGender);
+      await this.selectOption(
+        this.householdGenderTrigger,
+        data.householdGender
+      );
     }
     if (data.moveInDate) {
       // DatePicker is a Radix Popover button trigger — cannot use .fill()
       // Click trigger to open calendar, then click "Today" to set a date
       // Wait for the element to be stable before scrolling (may detach during re-render)
-      await this.moveInDateInput.waitFor({ state: 'visible', timeout: 5000 });
+      await this.moveInDateInput.waitFor({ state: "visible", timeout: 5000 });
       await this.moveInDateInput.scrollIntoViewIfNeeded();
       await this.moveInDateInput.click();
-      const todayButton = this.page.getByRole('button', { name: 'Today' });
-      await todayButton.waitFor({ state: 'visible', timeout: 5000 });
+      const todayButton = this.page.getByRole("button", { name: "Today" });
+      await todayButton.waitFor({ state: "visible", timeout: 5000 });
       await todayButton.click();
     }
   }
@@ -193,10 +207,12 @@ export class CreateListingPage {
     await trigger.scrollIntoViewIfNeeded();
     await trigger.click();
     // Wait for the Radix Select portal listbox to appear
-    const listbox = this.page.getByRole('listbox');
-    await listbox.waitFor({ state: 'visible', timeout: 5000 });
+    const listbox = this.page.getByRole("listbox");
+    await listbox.waitFor({ state: "visible", timeout: 5000 });
     // Click the matching option
-    const option = this.page.getByRole('option', { name: new RegExp(`^${value}$`, 'i') });
+    const option = this.page.getByRole("option", {
+      name: new RegExp(`^${value}$`, "i"),
+    });
     await option.click();
   }
 
@@ -208,12 +224,12 @@ export class CreateListingPage {
    */
   async mockImageUpload() {
     let uploadCount = 0;
-    await this.page.route('**/api/upload', async (route) => {
+    await this.page.route("**/api/upload", async (route) => {
       uploadCount++;
       const id = `mock-${Date.now()}-${uploadCount}`;
       await route.fulfill({
         status: 200,
-        contentType: 'application/json',
+        contentType: "application/json",
         body: JSON.stringify({
           url: `https://fake.supabase.co/storage/v1/object/public/images/listings/${id}.jpg`,
         }),
@@ -224,8 +240,12 @@ export class CreateListingPage {
   /**
    * Upload a test image file via the hidden file input.
    */
-  async uploadTestImage(fileName: string = 'valid-photo.jpg') {
-    const filePath = path.resolve(__dirname, '../fixtures/test-images', fileName);
+  async uploadTestImage(fileName: string = "valid-photo.jpg") {
+    const filePath = path.resolve(
+      __dirname,
+      "../fixtures/test-images",
+      fileName
+    );
     await this.imageFileInput.setInputFiles(filePath);
   }
 
@@ -234,10 +254,14 @@ export class CreateListingPage {
    */
   async waitForUploadComplete(count: number = 1) {
     // Wait for preview image to render
-    await expect(this.page.locator(`img[alt="Preview ${count}"]`)).toBeVisible({ timeout: 10000 });
+    await expect(this.page.locator(`img[alt="Preview ${count}"]`)).toBeVisible({
+      timeout: 10000,
+    });
     // Wait for React state to settle (success summary appears)
     await expect(
-      this.page.getByText(new RegExp(`${count} image[s]? uploaded successfully`))
+      this.page.getByText(
+        new RegExp(`${count} image[s]? uploaded successfully`)
+      )
     ).toBeVisible({ timeout: 10000 });
   }
 
@@ -246,7 +270,7 @@ export class CreateListingPage {
    */
   async uploadMultipleImages(count: number) {
     for (let i = 0; i < count; i++) {
-      await this.uploadTestImage('valid-photo.jpg');
+      await this.uploadTestImage("valid-photo.jpg");
       // Wait for each upload to show preview
       await this.page.waitForTimeout(300);
     }
@@ -257,7 +281,9 @@ export class CreateListingPage {
    */
   async getUploadedImageCount(): Promise<number> {
     // Image previews are rendered in the ImageUploader component
-    const previews = this.page.locator('[class*="relative"] img[src*="supabase"], [class*="relative"] img[src*="blob:"]');
+    const previews = this.page.locator(
+      '[class*="relative"] img[src*="supabase"], [class*="relative"] img[src*="blob:"]'
+    );
     return previews.count();
   }
 
@@ -276,7 +302,9 @@ export class CreateListingPage {
    */
   async submitAndWaitForResponse() {
     const responsePromise = this.page.waitForResponse(
-      (resp) => resp.url().includes('/api/listings') && resp.request().method() === 'POST',
+      (resp) =>
+        resp.url().includes("/api/listings") &&
+        resp.request().method() === "POST",
       { timeout: timeouts.navigation }
     );
     await this.submitButton.click();
@@ -287,17 +315,21 @@ export class CreateListingPage {
 
   async expectSuccess() {
     // Wait for redirect to /listings/{id} — must NOT match /listings/create
-    await this.page.waitForURL(/\/listings\/(?!create)[a-zA-Z0-9]/, { timeout: timeouts.navigation });
+    await this.page.waitForURL(/\/listings\/(?!create)[a-zA-Z0-9]/, {
+      timeout: timeouts.navigation,
+    });
   }
 
   async expectSuccessToast() {
     await expect(
-      this.page.locator('[data-sonner-toast]').filter({ hasText: /published|success/i })
+      this.page
+        .locator("[data-sonner-toast]")
+        .filter({ hasText: /published|success/i })
     ).toBeVisible({ timeout: 5000 });
   }
 
   async expectOnCreatePage() {
-    expect(this.page.url()).toContain('/listings/create');
+    expect(this.page.url()).toContain("/listings/create");
   }
 
   async expectValidationError(fieldId: string) {
@@ -306,7 +338,10 @@ export class CreateListingPage {
   }
 
   async expectFieldAriaInvalid(fieldId: string) {
-    await expect(this.page.locator(`#${fieldId}`)).toHaveAttribute('aria-invalid', 'true');
+    await expect(this.page.locator(`#${fieldId}`)).toHaveAttribute(
+      "aria-invalid",
+      "true"
+    );
   }
 
   async expectErrorBanner(message?: string | RegExp) {
@@ -333,7 +368,9 @@ export class CreateListingPage {
   async getCompletedStepCount(): Promise<number> {
     // TODO: add data-step-complete attribute to step circles in CreateListingForm
     // Completed step circles show a Check icon (green background with checkmark)
-    const greenSteps = this.page.locator('[data-testid="progress-steps"] .w-10.h-10.rounded-full.bg-green-50, [data-testid="progress-steps"] .w-10.h-10.rounded-full[class*="bg-green-900"]');
+    const greenSteps = this.page.locator(
+      '[data-testid="progress-steps"] .w-10.h-10.rounded-full.bg-green-50, [data-testid="progress-steps"] .w-10.h-10.rounded-full[class*="bg-green-900"]'
+    );
     return greenSteps.count();
   }
 
@@ -357,30 +394,33 @@ export class CreateListingPage {
    */
   async seedDraft(data: Partial<CreateListingData>) {
     const draftData = {
-      title: data.title || '',
-      description: data.description || '',
-      price: String(data.price || ''),
-      totalSlots: String(data.totalSlots || '1'),
-      address: data.address || '',
-      city: data.city || '',
-      state: data.state || '',
-      zip: data.zipCode || '',
-      amenities: data.amenities || '',
-      houseRules: data.houseRules || '',
-      moveInDate: data.moveInDate || '',
-      leaseDuration: data.leaseDuration || '',
-      roomType: data.roomType || '',
-      genderPreference: data.genderPreference || '',
-      householdGender: data.householdGender || '',
+      title: data.title || "",
+      description: data.description || "",
+      price: String(data.price || ""),
+      totalSlots: String(data.totalSlots || "1"),
+      address: data.address || "",
+      city: data.city || "",
+      state: data.state || "",
+      zip: data.zipCode || "",
+      amenities: data.amenities || "",
+      houseRules: data.houseRules || "",
+      moveInDate: data.moveInDate || "",
+      leaseDuration: data.leaseDuration || "",
+      roomType: data.roomType || "",
+      genderPreference: data.genderPreference || "",
+      householdGender: data.householdGender || "",
       selectedLanguages: data.languages || [],
       images: [],
     };
 
     await this.page.addInitScript((draft) => {
-      localStorage.setItem('listing-draft', JSON.stringify({
-        data: draft,
-        savedAt: Date.now(),
-      }));
+      localStorage.setItem(
+        "listing-draft",
+        JSON.stringify({
+          data: draft,
+          savedAt: Date.now(),
+        })
+      );
     }, draftData);
   }
 
@@ -389,7 +429,7 @@ export class CreateListingPage {
    */
   async clearDraft() {
     await this.page.evaluate(() => {
-      localStorage.removeItem('listing-draft');
+      localStorage.removeItem("listing-draft");
     });
   }
 
@@ -399,11 +439,11 @@ export class CreateListingPage {
    * Mock POST /api/listings to return a specific error.
    */
   async mockListingApiError(status: number, body: Record<string, unknown>) {
-    await this.page.route('**/api/listings', async (route) => {
-      if (route.request().method() === 'POST') {
+    await this.page.route("**/api/listings", async (route) => {
+      if (route.request().method() === "POST") {
         await route.fulfill({
           status,
-          contentType: 'application/json',
+          contentType: "application/json",
           body: JSON.stringify(body),
         });
       } else {
@@ -416,13 +456,13 @@ export class CreateListingPage {
    * Mock POST /api/listings with a delay (slow response).
    */
   async mockListingApiSlow(delayMs: number = 5000) {
-    await this.page.route('**/api/listings', async (route) => {
-      if (route.request().method() === 'POST') {
+    await this.page.route("**/api/listings", async (route) => {
+      if (route.request().method() === "POST") {
         await new Promise((r) => setTimeout(r, delayMs));
         await route.fulfill({
           status: 201,
-          contentType: 'application/json',
-          body: JSON.stringify({ id: 'mock-slow-id' }),
+          contentType: "application/json",
+          body: JSON.stringify({ id: "mock-slow-id" }),
         });
       } else {
         await route.continue();
@@ -435,11 +475,11 @@ export class CreateListingPage {
    */
   async mockListingApiSuccess(id?: string) {
     const mockId = id || `mock-${Date.now()}`;
-    await this.page.route('**/api/listings', async (route) => {
-      if (route.request().method() === 'POST') {
+    await this.page.route("**/api/listings", async (route) => {
+      if (route.request().method() === "POST") {
         await route.fulfill({
           status: 201,
-          contentType: 'application/json',
+          contentType: "application/json",
           body: JSON.stringify({ id: mockId }),
         });
       } else {
@@ -454,12 +494,12 @@ export class CreateListingPage {
    */
   async countListingApiCalls(): Promise<() => number> {
     let count = 0;
-    await this.page.route('**/api/listings', async (route) => {
-      if (route.request().method() === 'POST') {
+    await this.page.route("**/api/listings", async (route) => {
+      if (route.request().method() === "POST") {
         count++;
         await route.fulfill({
           status: 201,
-          contentType: 'application/json',
+          contentType: "application/json",
           body: JSON.stringify({ id: `mock-counted-${count}` }),
         });
       } else {

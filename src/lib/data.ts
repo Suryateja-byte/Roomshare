@@ -1,3 +1,5 @@
+import "server-only";
+
 import { prisma } from "@/lib/prisma";
 import { wrapDatabaseError } from "@/lib/errors";
 import { logger } from "@/lib/logger";
@@ -7,9 +9,7 @@ import {
   MAX_UNBOUNDED_RESULTS,
 } from "@/lib/search/search-doc-queries";
 import { hasActiveFilters } from "@/lib/search-params";
-import {
-  clampBoundsToMaxSpan,
-} from "@/lib/validation";
+import { clampBoundsToMaxSpan } from "@/lib/validation";
 import { sanitizeMapListings } from "@/lib/maps/sanitize-map-listings";
 import {
   MIN_QUERY_LENGTH,
@@ -17,6 +17,7 @@ import {
   MAP_FETCH_MAX_LAT_SPAN,
   MAP_FETCH_MAX_LNG_SPAN,
 } from "@/lib/constants";
+import { queryWithTimeout } from "@/lib/query-timeout";
 
 // Re-export types and utilities from search-types for backward compatibility.
 // These were extracted to break the circular dependency: data.ts <-> search-doc-queries.ts.
@@ -35,8 +36,21 @@ export {
   crossesAntimeridian,
 } from "@/lib/search-types";
 
-import type { FilterParams, FilterSuggestion, ListingWithMetadata, ListingData, PaginatedResult, SortOption, MapListingData } from "@/lib/search-types";
-import { sanitizeSearchQuery, isValidQuery, crossesAntimeridian, hasValidCoordinates } from "@/lib/search-types";
+import type {
+  FilterParams,
+  FilterSuggestion,
+  ListingWithMetadata,
+  ListingData,
+  PaginatedResult,
+  SortOption,
+  MapListingData,
+} from "@/lib/search-types";
+import {
+  sanitizeSearchQuery,
+  isValidQuery,
+  crossesAntimeridian,
+  hasValidCoordinates,
+} from "@/lib/search-types";
 
 // Re-export for backward compatibility
 export { MIN_QUERY_LENGTH, MAX_QUERY_LENGTH };
@@ -49,7 +63,7 @@ export { MIN_QUERY_LENGTH, MAX_QUERY_LENGTH };
 // do not require auth to enable anonymous browsing. Functions that return user-specific
 // data (e.g., getSavedListings) require auth.
 export async function getLimitedCount(
-  params: FilterParams,
+  params: FilterParams
 ): Promise<number | null> {
   // Unbounded browse protection - return null (unknown count)
   // Prevents full-table scans on both SearchDoc and V1 paths
@@ -85,7 +99,7 @@ function parseDateOnly(value: string): Date {
 export function filterByPrice<T extends { price: number }>(
   listings: T[],
   minPrice?: number | null,
-  maxPrice?: number | null,
+  maxPrice?: number | null
 ): T[] {
   let results = listings;
   if (minPrice !== undefined && minPrice !== null) {
@@ -100,81 +114,79 @@ export function filterByPrice<T extends { price: number }>(
 // Filter by amenities (AND logic - must have ALL selected)
 export function filterByAmenities<T extends { amenities: string[] }>(
   listings: T[],
-  amenities?: string[],
+  amenities?: string[]
 ): T[] {
   if (!amenities || amenities.length === 0) return listings;
   // Use partial matching: UI sends 'Pool' but DB has 'Pool Access'
   const amenitiesLower = amenities.map((a) => a.toLowerCase());
   return listings.filter((l) =>
     amenitiesLower.every((a) =>
-      l.amenities.some((la: string) => la.toLowerCase().includes(a)),
-    ),
+      l.amenities.some((la: string) => la.toLowerCase().includes(a))
+    )
   );
 }
 
 // Filter by house rules (AND logic - must have ALL selected)
 export function filterByHouseRules<T extends { houseRules: string[] }>(
   listings: T[],
-  houseRules?: string[],
+  houseRules?: string[]
 ): T[] {
   if (!houseRules || houseRules.length === 0) return listings;
   const rulesLower = houseRules.map((r) => r.toLowerCase());
   return listings.filter((l) =>
     rulesLower.every((r) =>
-      l.houseRules.some((hr: string) => hr.toLowerCase() === r),
-    ),
+      l.houseRules.some((hr: string) => hr.toLowerCase() === r)
+    )
   );
 }
 
 // Filter by languages (OR logic - show if household speaks ANY selected language)
 export function filterByLanguages<T extends { householdLanguages: string[] }>(
   listings: T[],
-  languages?: string[],
+  languages?: string[]
 ): T[] {
   if (!languages || languages.length === 0) return listings;
   const languagesLower = languages.map((l) => l.toLowerCase());
   return listings.filter((listing) =>
     languagesLower.some((lang) =>
-      listing.householdLanguages.some(
-        (ll: string) => ll.toLowerCase() === lang,
-      ),
-    ),
+      listing.householdLanguages.some((ll: string) => ll.toLowerCase() === lang)
+    )
   );
 }
 
 // Filter by room type (exact match, case-insensitive)
 export function filterByRoomType<T extends { roomType?: string }>(
   listings: T[],
-  roomType?: string,
+  roomType?: string
 ): T[] {
   if (!roomType) return listings;
   const roomTypeLower = roomType.toLowerCase();
   return listings.filter(
-    (l) => l.roomType && l.roomType.toLowerCase() === roomTypeLower,
+    (l) => l.roomType && l.roomType.toLowerCase() === roomTypeLower
   );
 }
 
 // Filter by lease duration (exact match, case-insensitive)
 export function filterByLeaseDuration<T extends { leaseDuration?: string }>(
   listings: T[],
-  leaseDuration?: string,
+  leaseDuration?: string
 ): T[] {
   if (!leaseDuration) return listings;
   const leaseLower = leaseDuration.toLowerCase();
   return listings.filter(
-    (l) => l.leaseDuration && l.leaseDuration.toLowerCase() === leaseLower,
+    (l) => l.leaseDuration && l.leaseDuration.toLowerCase() === leaseLower
   );
 }
 
 // Filter by move-in date (listing available by target date)
 export function filterByMoveInDate<T extends { moveInDate?: Date }>(
   listings: T[],
-  moveInDate?: string,
+  moveInDate?: string
 ): T[] {
   if (!moveInDate) return listings;
   const targetDate = new Date(moveInDate);
   return listings.filter(
-    (l) => !l.moveInDate || new Date(l.moveInDate) <= targetDate,
+    (l) => !l.moveInDate || new Date(l.moveInDate) <= targetDate
   );
 }
 
@@ -185,20 +197,20 @@ export function filterByGenderPreference<
   if (!genderPreference) return listings;
   const prefLower = genderPreference.toLowerCase();
   return listings.filter(
-    (l) => l.genderPreference && l.genderPreference.toLowerCase() === prefLower,
+    (l) => l.genderPreference && l.genderPreference.toLowerCase() === prefLower
   );
 }
 
 // Filter by household gender (exact match, case-insensitive)
 export function filterByHouseholdGender<T extends { householdGender?: string }>(
   listings: T[],
-  householdGender?: string,
+  householdGender?: string
 ): T[] {
   if (!householdGender) return listings;
   const householdLower = householdGender.toLowerCase();
   return listings.filter(
     (l) =>
-      l.householdGender && l.householdGender.toLowerCase() === householdLower,
+      l.householdGender && l.householdGender.toLowerCase() === householdLower
   );
 }
 
@@ -207,7 +219,7 @@ export function filterByBounds<
   T extends { location: { lat: number; lng: number } },
 >(
   listings: T[],
-  bounds?: { minLat: number; maxLat: number; minLng: number; maxLng: number },
+  bounds?: { minLat: number; maxLat: number; minLng: number; maxLng: number }
 ): T[] {
   if (!bounds) return listings;
   return listings.filter(
@@ -215,7 +227,7 @@ export function filterByBounds<
       l.location.lat >= bounds.minLat &&
       l.location.lat <= bounds.maxLat &&
       l.location.lng >= bounds.minLng &&
-      l.location.lng <= bounds.maxLng,
+      l.location.lng <= bounds.maxLng
   );
 }
 
@@ -235,7 +247,7 @@ export function filterByQuery<
       l.title.toLowerCase().includes(q) ||
       l.description.toLowerCase().includes(q) ||
       l.location.city.toLowerCase().includes(q) ||
-      l.location.state.toLowerCase().includes(q),
+      l.location.state.toLowerCase().includes(q)
   );
 }
 
@@ -245,7 +257,7 @@ export function filterByQuery<
 
 export function sortListings(
   listings: ListingWithMetadata[],
-  sort: SortOption = "recommended",
+  sort: SortOption = "recommended"
 ): ListingWithMetadata[] {
   const results = [...listings]; // Don't mutate original
   switch (sort) {
@@ -303,7 +315,7 @@ const MAX_RESULTS_CAP = 500;
  * P0 #15 fix: All filters pushed to SQL WHERE clauses instead of JS post-filtering.
  */
 export async function getListings(
-  params: FilterParams = {},
+  params: FilterParams = {}
 ): Promise<ListingData[]> {
   const {
     query,
@@ -334,7 +346,8 @@ export async function getListings(
       "ST_Y(loc.coords::geometry) BETWEEN -90 AND 90",
       "ST_X(loc.coords::geometry) BETWEEN -180 AND 180",
     ];
-    const queryParams: (string | number | boolean | null | Date | string[])[] = [slotThreshold];
+    const queryParams: (string | number | boolean | null | Date | string[])[] =
+      [slotThreshold];
     let paramIndex = 2;
 
     // Geographic bounds filter (SQL level)
@@ -345,7 +358,7 @@ export async function getListings(
       queryParams.push(bounds.maxLat);
       if (crossesAntimeridian(bounds.minLng, bounds.maxLng)) {
         conditions.push(
-          `(ST_X(loc.coords::geometry) >= $${paramIndex++} OR ST_X(loc.coords::geometry) <= $${paramIndex++})`,
+          `(ST_X(loc.coords::geometry) >= $${paramIndex++} OR ST_X(loc.coords::geometry) <= $${paramIndex++})`
         );
         queryParams.push(bounds.minLng);
         queryParams.push(bounds.maxLng);
@@ -385,7 +398,9 @@ export async function getListings(
 
     // Amenities filter (SQL level, AND logic with partial match)
     if (amenities?.length) {
-      const normalizedAmenities = amenities.map((a) => a.trim().toLowerCase()).filter(Boolean);
+      const normalizedAmenities = amenities
+        .map((a) => a.trim().toLowerCase())
+        .filter(Boolean);
       if (normalizedAmenities.length > 0) {
         conditions.push(`NOT EXISTS (
           SELECT 1 FROM unnest($${paramIndex++}::text[]) AS search_term
@@ -400,7 +415,9 @@ export async function getListings(
 
     // Move-in date filter (SQL level)
     if (moveInDate) {
-      conditions.push(`(l."moveInDate" IS NULL OR l."moveInDate" <= $${paramIndex++})`);
+      conditions.push(
+        `(l."moveInDate" IS NULL OR l."moveInDate" <= $${paramIndex++})`
+      );
       queryParams.push(parseDateOnly(moveInDate));
     }
 
@@ -412,10 +429,12 @@ export async function getListings(
 
     // House rules filter (SQL level, AND logic)
     if (houseRules?.length) {
-      const normalizedRules = houseRules.map((r) => r.trim().toLowerCase()).filter(Boolean);
+      const normalizedRules = houseRules
+        .map((r) => r.trim().toLowerCase())
+        .filter(Boolean);
       if (normalizedRules.length > 0) {
         conditions.push(
-          `ARRAY(SELECT LOWER(x) FROM unnest(l."houseRules") AS x WHERE x IS NOT NULL) @> $${paramIndex++}::text[]`,
+          `ARRAY(SELECT LOWER(x) FROM unnest(l."houseRules") AS x WHERE x IS NOT NULL) @> $${paramIndex++}::text[]`
         );
         queryParams.push(normalizedRules);
       }
@@ -429,7 +448,9 @@ export async function getListings(
 
     // Languages filter (SQL level, OR logic with GIN index)
     if (languages?.length) {
-      const normalized = languages.map((l) => l.trim().toLowerCase()).filter(Boolean);
+      const normalized = languages
+        .map((l) => l.trim().toLowerCase())
+        .filter(Boolean);
       if (normalized.length > 0) {
         conditions.push(`l."household_languages" && $${paramIndex++}::text[]`);
         queryParams.push(normalized);
@@ -463,11 +484,13 @@ export async function getListings(
         orderByClause = 'l."createdAt" DESC, l.id ASC';
         break;
       case "rating":
-        orderByClause = 'COALESCE(AVG(r.rating), 0) DESC, COUNT(r.id) DESC, l."createdAt" DESC';
+        orderByClause =
+          'COALESCE(AVG(r.rating), 0) DESC, COUNT(r.id) DESC, l."createdAt" DESC';
         break;
       case "recommended":
       default:
-        orderByClause = '(COALESCE(AVG(r.rating), 0) * 20 + l."viewCount" * 0.1 + COUNT(r.id) * 5) DESC, l."createdAt" DESC';
+        orderByClause =
+          '(COALESCE(AVG(r.rating), 0) * 20 + l."viewCount" * 0.1 + COUNT(r.id) * 5) DESC, l."createdAt" DESC';
         break;
     }
 
@@ -512,7 +535,8 @@ export async function getListings(
       LIMIT ${MAX_RESULTS_CAP}
     `;
 
-    const listings = await prisma.$queryRawUnsafe<any[]>(sqlQuery, ...queryParams);
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any -- Raw SQL query returns untyped rows; mapped to ListingData below
+    const listings = await queryWithTimeout<any>(sqlQuery, queryParams);
 
     return listings.map((l) => ({
       id: l.id,
@@ -572,7 +596,7 @@ const MAX_MAP_MARKERS = 200;
  * - ~70% smaller payload per listing
  */
 export async function getMapListings(
-  params: FilterParams = {},
+  params: FilterParams = {}
 ): Promise<MapListingData[]> {
   const {
     query,
@@ -595,15 +619,18 @@ export async function getMapListings(
   // This prevents full-table scans that are expensive and not useful
   if (query && !bounds) {
     throw new Error(
-      "Unbounded text search not allowed: geographic bounds required when query is present",
+      "Unbounded text search not allowed: geographic bounds required when query is present"
     );
   }
 
   // Build WHERE conditions dynamically
   // minAvailableSlots defaults to 1 (at least one slot available)
   const slotThreshold = Math.max(minAvailableSlots ?? 1, 1);
+  const queryParams: (string | number | boolean | null | Date | string[])[] =
+    [slotThreshold];
+  let paramIndex = 2;
   const conditions: string[] = [
-    `l."availableSlots" >= ${slotThreshold}`,
+    'l."availableSlots" >= $1',
     "l.status = 'ACTIVE'",
     "ST_X(loc.coords::geometry) IS NOT NULL",
     "ST_Y(loc.coords::geometry) IS NOT NULL",
@@ -611,8 +638,6 @@ export async function getMapListings(
     "ST_Y(loc.coords::geometry) BETWEEN -90 AND 90",
     "ST_X(loc.coords::geometry) BETWEEN -180 AND 180",
   ];
-  const queryParams: (string | number | boolean | null | Date | string[])[] = [];
-  let paramIndex = 1;
 
   // SQL-level bounds filtering using PostGIS spatial index with antimeridian support
   if (bounds) {
@@ -629,13 +654,13 @@ export async function getMapListings(
     } else {
       // Normal envelope
       conditions.push(
-        `ST_Intersects(loc.coords, ST_MakeEnvelope($${paramIndex++}, $${paramIndex++}, $${paramIndex++}, $${paramIndex++}, 4326))`,
+        `ST_Intersects(loc.coords, ST_MakeEnvelope($${paramIndex++}, $${paramIndex++}, $${paramIndex++}, $${paramIndex++}, 4326))`
       );
       queryParams.push(
         bounds.minLng,
         bounds.minLat,
         bounds.maxLng,
-        bounds.maxLat,
+        bounds.maxLat
       );
     }
   }
@@ -681,7 +706,7 @@ export async function getMapListings(
   // Move-in date filter (SQL level)
   if (moveInDate) {
     conditions.push(
-      `(l."moveInDate" IS NULL OR l."moveInDate" <= $${paramIndex++})`,
+      `(l."moveInDate" IS NULL OR l."moveInDate" <= $${paramIndex++})`
     );
     queryParams.push(parseDateOnly(moveInDate));
   }
@@ -742,7 +767,7 @@ export async function getMapListings(
       .filter(Boolean);
     if (normalizedRules.length > 0) {
       conditions.push(
-        `ARRAY(SELECT LOWER(x) FROM unnest(l."houseRules") AS x WHERE x IS NOT NULL) @> $${paramIndex++}::text[]`,
+        `ARRAY(SELECT LOWER(x) FROM unnest(l."houseRules") AS x WHERE x IS NOT NULL) @> $${paramIndex++}::text[]`
       );
       queryParams.push(normalizedRules);
     }
@@ -771,22 +796,22 @@ export async function getMapListings(
     `;
 
   try {
-    const listings = await prisma.$queryRawUnsafe<any[]>(
-      sqlQuery,
-      ...queryParams,
-    );
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any -- Raw SQL query returns untyped rows; mapped to ListingData below
+    const listings = await queryWithTimeout<any>(sqlQuery, queryParams);
 
-    return sanitizeMapListings(listings.map((l) => ({
-      id: l.id,
-      title: l.title,
-      price: Number(l.price),
-      availableSlots: l.availableSlots,
-      images: l.images || [],
-      location: {
-        lat: l.lat,
-        lng: l.lng,
-      },
-    })));
+    return sanitizeMapListings(
+      listings.map((l) => ({
+        id: l.id,
+        title: l.title,
+        price: Number(l.price),
+        availableSlots: l.availableSlots,
+        images: l.images || [],
+        location: {
+          lat: l.lat,
+          lng: l.lng,
+        },
+      }))
+    );
   } catch (error) {
     const dataError = wrapDatabaseError(error, "getMapListings");
     dataError.log({
@@ -798,7 +823,7 @@ export async function getMapListings(
 }
 
 export async function getListingsPaginated(
-  params: FilterParams = {},
+  params: FilterParams = {}
 ): Promise<PaginatedResult<ListingData>> {
   const {
     query,
@@ -830,7 +855,11 @@ export async function getListingsPaginated(
       : rawBounds.maxLng - rawBounds.minLng;
 
     if (latSpan > MAP_FETCH_MAX_LAT_SPAN || lngSpan > MAP_FETCH_MAX_LNG_SPAN) {
-      bounds = clampBoundsToMaxSpan(rawBounds, MAP_FETCH_MAX_LAT_SPAN, MAP_FETCH_MAX_LNG_SPAN);
+      bounds = clampBoundsToMaxSpan(
+        rawBounds,
+        MAP_FETCH_MAX_LAT_SPAN,
+        MAP_FETCH_MAX_LNG_SPAN
+      );
     }
   }
 
@@ -841,22 +870,27 @@ export async function getListingsPaginated(
   const effectiveLimit = isUnboundedBrowse
     ? Math.min(limit, MAX_UNBOUNDED_RESULTS)
     : limit;
-  const effectivePage = isUnboundedBrowse ? Math.min(page, MAX_BROWSE_PAGES) : page;
+  const effectivePage = isUnboundedBrowse
+    ? Math.min(page, MAX_BROWSE_PAGES)
+    : page;
 
   try {
     // Defense in depth: block unbounded text searches
     // This prevents full-table scans that are expensive and not useful
     if (query && !bounds) {
       throw new Error(
-        "Unbounded text search not allowed: geographic bounds required when query is present",
+        "Unbounded text search not allowed: geographic bounds required when query is present"
       );
     }
 
     // Build dynamic WHERE conditions for SQL
     // minAvailableSlots defaults to 1 (at least one slot available)
     const slotThreshold = Math.max(minAvailableSlots ?? 1, 1);
+    const queryParams: (string | number | boolean | null | Date | string[])[] =
+      [slotThreshold];
+    let paramIndex = 2;
     const conditions: string[] = [
-      `l."availableSlots" >= ${slotThreshold}`,
+      'l."availableSlots" >= $1',
       "l.status = 'ACTIVE'",
       // Exclude listings with invalid coordinates (null, zero, or out of range)
       "ST_X(loc.coords::geometry) IS NOT NULL",
@@ -865,8 +899,6 @@ export async function getListingsPaginated(
       "ST_Y(loc.coords::geometry) BETWEEN -90 AND 90",
       "ST_X(loc.coords::geometry) BETWEEN -180 AND 180",
     ];
-    const queryParams: (string | number | boolean | null | Date | string[])[] = [];
-    let paramIndex = 1;
 
     // Geographic bounds filter (SQL level) with antimeridian support
     if (bounds) {
@@ -880,7 +912,7 @@ export async function getListingsPaginated(
       if (crossesAntimeridian(bounds.minLng, bounds.maxLng)) {
         // Split query: (minLng to 180) OR (-180 to maxLng)
         conditions.push(
-          `(ST_X(loc.coords::geometry) >= $${paramIndex++} OR ST_X(loc.coords::geometry) <= $${paramIndex++})`,
+          `(ST_X(loc.coords::geometry) >= $${paramIndex++} OR ST_X(loc.coords::geometry) <= $${paramIndex++})`
         );
         queryParams.push(bounds.minLng);
         queryParams.push(bounds.maxLng);
@@ -935,7 +967,7 @@ export async function getListingsPaginated(
     // Move-in date filter (SQL level)
     if (moveInDate) {
       conditions.push(
-        `(l."moveInDate" IS NULL OR l."moveInDate" <= $${paramIndex++})`,
+        `(l."moveInDate" IS NULL OR l."moveInDate" <= $${paramIndex++})`
       );
       queryParams.push(parseDateOnly(moveInDate));
     }
@@ -998,7 +1030,7 @@ export async function getListingsPaginated(
         .filter(Boolean);
       if (normalizedRules.length > 0) {
         conditions.push(
-          `ARRAY(SELECT LOWER(x) FROM unnest(l."houseRules") AS x WHERE x IS NOT NULL) @> $${paramIndex++}::text[]`,
+          `ARRAY(SELECT LOWER(x) FROM unnest(l."houseRules") AS x WHERE x IS NOT NULL) @> $${paramIndex++}::text[]`
         );
         queryParams.push(normalizedRules);
       }
@@ -1087,8 +1119,9 @@ export async function getListingsPaginated(
 
     // Execute both queries concurrently
     const [countResult, listings] = await Promise.all([
-      prisma.$queryRawUnsafe<{ total: bigint }[]>(countQuery, ...queryParams),
-      prisma.$queryRawUnsafe<any[]>(dataQuery, ...dataParams),
+      queryWithTimeout<{ total: bigint }>(countQuery, queryParams),
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any -- Raw SQL query returns untyped rows
+      queryWithTimeout<any>(dataQuery, dataParams),
     ]);
 
     const rawTotal = Number(countResult[0]?.total || 0);
@@ -1164,7 +1197,7 @@ export async function getListingsPaginated(
  * This version only runs a lightweight COUNT query with the same WHERE clause logic.
  */
 async function getListingsCountEfficient(
-  params: FilterParams,
+  params: FilterParams
 ): Promise<number> {
   const {
     query,
@@ -1194,7 +1227,9 @@ async function getListingsCountEfficient(
     "ST_Y(loc.coords::geometry) BETWEEN -90 AND 90",
     "ST_X(loc.coords::geometry) BETWEEN -180 AND 180",
   ];
-  const queryParams: (string | number | boolean | null | Date | string[])[] = [slotThreshold];
+  const queryParams: (string | number | boolean | null | Date | string[])[] = [
+    slotThreshold,
+  ];
   let paramIndex = 2;
 
   // Geographic bounds filter with antimeridian support
@@ -1206,7 +1241,7 @@ async function getListingsCountEfficient(
 
     if (crossesAntimeridian(bounds.minLng, bounds.maxLng)) {
       conditions.push(
-        `(ST_X(loc.coords::geometry) >= $${paramIndex++} OR ST_X(loc.coords::geometry) <= $${paramIndex++})`,
+        `(ST_X(loc.coords::geometry) >= $${paramIndex++} OR ST_X(loc.coords::geometry) <= $${paramIndex++})`
       );
       queryParams.push(bounds.minLng);
       queryParams.push(bounds.maxLng);
@@ -1259,7 +1294,7 @@ async function getListingsCountEfficient(
   // Move-in date filter
   if (moveInDate) {
     conditions.push(
-      `(l."moveInDate" IS NULL OR l."moveInDate" <= $${paramIndex++})`,
+      `(l."moveInDate" IS NULL OR l."moveInDate" <= $${paramIndex++})`
     );
     queryParams.push(parseDateOnly(moveInDate));
   }
@@ -1295,7 +1330,7 @@ async function getListingsCountEfficient(
       .filter(Boolean);
     if (normalizedAmenities.length > 0) {
       conditions.push(
-        `NOT EXISTS (SELECT 1 FROM unnest($${paramIndex++}::text[]) AS search_term WHERE NOT EXISTS (SELECT 1 FROM unnest(l.amenities) AS la WHERE LOWER(la) LIKE '%' || search_term || '%'))`,
+        `NOT EXISTS (SELECT 1 FROM unnest($${paramIndex++}::text[]) AS search_term WHERE NOT EXISTS (SELECT 1 FROM unnest(l.amenities) AS la WHERE LOWER(la) LIKE '%' || search_term || '%'))`
       );
       queryParams.push(normalizedAmenities);
     }
@@ -1308,7 +1343,7 @@ async function getListingsCountEfficient(
       .filter(Boolean);
     if (normalizedRules.length > 0) {
       conditions.push(
-        `ARRAY(SELECT LOWER(x) FROM unnest(l."houseRules") AS x WHERE x IS NOT NULL) @> $${paramIndex++}::text[]`,
+        `ARRAY(SELECT LOWER(x) FROM unnest(l."houseRules") AS x WHERE x IS NOT NULL) @> $${paramIndex++}::text[]`
       );
       queryParams.push(normalizedRules);
     }
@@ -1326,9 +1361,9 @@ async function getListingsCountEfficient(
     `;
 
   try {
-    const result = await prisma.$queryRawUnsafe<[{ total: bigint }]>(
+    const result = await queryWithTimeout<{ total: bigint }>(
       countQuery,
-      ...queryParams,
+      queryParams
     );
     return Number(result[0]?.total ?? 0);
   } catch (error) {
@@ -1364,7 +1399,7 @@ async function safeGetCount(params: FilterParams): Promise<number | null> {
 // P0 fix: Now uses efficient COUNT queries instead of fetching all data
 // Perf fix: All count queries run in parallel via Promise.all
 export async function analyzeFilterImpact(
-  params: FilterParams,
+  params: FilterParams
 ): Promise<FilterSuggestion[]> {
   // Build list of filter checks to run in parallel
   const checks: {
@@ -1378,7 +1413,8 @@ export async function analyzeFilterImpact(
     checks.push({
       filter: "maxPrice",
       label: `max price ($${params.maxPrice})`,
-      suggestionTemplate: (n) => `Increase your budget to see ${n} more listing${n > 1 ? "s" : ""}`,
+      suggestionTemplate: (n) =>
+        `Increase your budget to see ${n} more listing${n > 1 ? "s" : ""}`,
       countParams: { ...params, maxPrice: undefined },
     });
   }
@@ -1387,7 +1423,8 @@ export async function analyzeFilterImpact(
     checks.push({
       filter: "minPrice",
       label: `min price ($${params.minPrice})`,
-      suggestionTemplate: (n) => `Lower your minimum budget to see ${n} more listing${n > 1 ? "s" : ""}`,
+      suggestionTemplate: (n) =>
+        `Lower your minimum budget to see ${n} more listing${n > 1 ? "s" : ""}`,
       countParams: { ...params, minPrice: undefined },
     });
   }
@@ -1396,7 +1433,8 @@ export async function analyzeFilterImpact(
     checks.push({
       filter: "amenities",
       label: `amenities (${params.amenities.join(", ")})`,
-      suggestionTemplate: (n) => `Remove amenity filters to see ${n} listing${n > 1 ? "s" : ""}`,
+      suggestionTemplate: (n) =>
+        `Remove amenity filters to see ${n} listing${n > 1 ? "s" : ""}`,
       countParams: { ...params, amenities: [] },
     });
   }
@@ -1405,7 +1443,8 @@ export async function analyzeFilterImpact(
     checks.push({
       filter: "houseRules",
       label: `house rules (${params.houseRules.join(", ")})`,
-      suggestionTemplate: (n) => `Remove house rules filters to see ${n} listing${n > 1 ? "s" : ""}`,
+      suggestionTemplate: (n) =>
+        `Remove house rules filters to see ${n} listing${n > 1 ? "s" : ""}`,
       countParams: { ...params, houseRules: [] },
     });
   }
@@ -1414,7 +1453,8 @@ export async function analyzeFilterImpact(
     checks.push({
       filter: "roomType",
       label: `room type (${params.roomType})`,
-      suggestionTemplate: (n) => `Include all room types to see ${n} listing${n > 1 ? "s" : ""}`,
+      suggestionTemplate: (n) =>
+        `Include all room types to see ${n} listing${n > 1 ? "s" : ""}`,
       countParams: { ...params, roomType: undefined },
     });
   }
@@ -1423,7 +1463,8 @@ export async function analyzeFilterImpact(
     checks.push({
       filter: "leaseDuration",
       label: `lease duration (${params.leaseDuration})`,
-      suggestionTemplate: (n) => `Include all lease durations to see ${n} listing${n > 1 ? "s" : ""}`,
+      suggestionTemplate: (n) =>
+        `Include all lease durations to see ${n} listing${n > 1 ? "s" : ""}`,
       countParams: { ...params, leaseDuration: undefined },
     });
   }
@@ -1432,7 +1473,8 @@ export async function analyzeFilterImpact(
     checks.push({
       filter: "location",
       label: "search area",
-      suggestionTemplate: (n) => `Expand your search area to see ${n} listing${n > 1 ? "s" : ""}`,
+      suggestionTemplate: (n) =>
+        `Expand your search area to see ${n} listing${n > 1 ? "s" : ""}`,
       countParams: { ...params, bounds: undefined },
     });
   }
@@ -1441,7 +1483,7 @@ export async function analyzeFilterImpact(
 
   // Run all count queries in parallel
   const counts = await Promise.all(
-    checks.map((check) => safeGetCount(check.countParams)),
+    checks.map((check) => safeGetCount(check.countParams))
   );
 
   // Build suggestions from results

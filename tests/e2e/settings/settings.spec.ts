@@ -51,9 +51,9 @@ test.describe("Settings — Read-only", () => {
     await page.goto(SETTINGS_URL, { waitUntil: "domcontentloaded" });
 
     // Wait for the page heading
-    await expect(
-      page.getByRole("heading", { name: "Settings" })
-    ).toBeVisible({ timeout: timeouts.navigation });
+    await expect(page.getByRole("heading", { name: "Settings" })).toBeVisible({
+      timeout: timeouts.navigation,
+    });
 
     // Section 1: Email Notifications
     await expect(
@@ -167,9 +167,9 @@ test.describe("Settings — Read-only", () => {
   test("ST-17: axe-core a11y scan passes", async ({ page }) => {
     await page.goto(SETTINGS_URL, { waitUntil: "domcontentloaded" });
 
-    await expect(
-      page.getByRole("heading", { name: "Settings" })
-    ).toBeVisible({ timeout: timeouts.navigation });
+    await expect(page.getByRole("heading", { name: "Settings" })).toBeVisible({
+      timeout: timeouts.navigation,
+    });
 
     const results = await new AxeBuilder({ page })
       .withTags([...A11Y_CONFIG.tags])
@@ -234,9 +234,9 @@ test.describe("Settings — Notification Preferences", () => {
     await saveButton.click();
 
     // Should show "Saved!" feedback
-    await expect(
-      page.getByRole("button", { name: "Saved!" })
-    ).toBeVisible({ timeout: timeouts.action });
+    await expect(page.getByRole("button", { name: "Saved!" })).toBeVisible({
+      timeout: timeouts.action,
+    });
   });
 
   test("ST-04: toggle + save + reload persists without error", async ({
@@ -259,9 +259,9 @@ test.describe("Settings — Notification Preferences", () => {
     // Save
     const saveButton = page.getByRole("button", { name: "Save Preferences" });
     await saveButton.click();
-    await expect(
-      page.getByRole("button", { name: "Saved!" })
-    ).toBeVisible({ timeout: timeouts.action });
+    await expect(page.getByRole("button", { name: "Saved!" })).toBeVisible({
+      timeout: timeouts.action,
+    });
 
     // Reload
     await page.reload({ waitUntil: "domcontentloaded" });
@@ -280,9 +280,9 @@ test.describe("Settings — Notification Preferences", () => {
     // Toggle it back to original state to avoid polluting other tests
     await reloadedToggle.click();
     await saveButton.click();
-    await expect(
-      page.getByRole("button", { name: "Saved!" })
-    ).toBeVisible({ timeout: timeouts.action });
+    await expect(page.getByRole("button", { name: "Saved!" })).toBeVisible({
+      timeout: timeouts.action,
+    });
   });
 
   test("ST-05: toggle 3 switches and save atomically", async ({ page }) => {
@@ -306,18 +306,18 @@ test.describe("Settings — Notification Preferences", () => {
     await saveButton.click();
 
     // Should show "Saved!" feedback
-    await expect(
-      page.getByRole("button", { name: "Saved!" })
-    ).toBeVisible({ timeout: timeouts.action });
+    await expect(page.getByRole("button", { name: "Saved!" })).toBeVisible({
+      timeout: timeouts.action,
+    });
 
     // Toggle them back to original state
     for (let i = 0; i < numToToggle; i++) {
       await toggles.nth(i).click();
     }
     await saveButton.click();
-    await expect(
-      page.getByRole("button", { name: "Saved!" })
-    ).toBeVisible({ timeout: timeouts.action });
+    await expect(page.getByRole("button", { name: "Saved!" })).toBeVisible({
+      timeout: timeouts.action,
+    });
   });
 
   test("ST-18: resilience — server error shows error feedback", async ({
@@ -363,7 +363,7 @@ test.describe("Settings — Notification Preferences", () => {
     // handleSavePreferences calls toast.error('Failed to save preferences').
     // But depending on how Next.js handles the abort, we may see different behavior.
     // We check for any toast or the fact that "Saved!" does NOT appear.
-    const toastError = page.locator('[data-sonner-toast]').filter({
+    const toastError = page.locator("[data-sonner-toast]").filter({
       hasText: /fail|error/i,
     });
     const savedButton = page.getByRole("button", { name: "Saved!" });
@@ -449,11 +449,15 @@ test.describe("Settings — Password Change", () => {
     // Should show error about incorrect password.
     // Server returns "Current password is incorrect" but under CI load may
     // return generic "Failed to change password". Check both inline and toast.
-    const inlineError = page.getByText(/incorrect|wrong|invalid|failed.*password/i);
-    const toastError = page.locator('[data-sonner-toast]').filter({
+    const inlineError = page.getByText(
+      /incorrect|wrong|invalid|failed.*password/i
+    );
+    const toastError = page.locator("[data-sonner-toast]").filter({
       hasText: /incorrect|wrong|invalid|failed.*password/i,
     });
-    await expect(inlineError.or(toastError)).toBeVisible({ timeout: timeouts.action });
+    await expect(inlineError.or(toastError)).toBeVisible({
+      timeout: timeouts.action,
+    });
   });
 
   test("ST-09: mismatched new + confirm passwords shows error", async ({
@@ -526,19 +530,15 @@ test.describe("Settings — Password Change", () => {
 
     // PasswordStrengthMeter should show strength info
     // It renders: "Password strength" label + "Weak" level + checklist items
-    await expect(
-      page.getByText("Password strength")
-    ).toBeVisible({ timeout: timeouts.action });
+    await expect(page.getByText("Password strength")).toBeVisible({
+      timeout: timeouts.action,
+    });
 
     // Should show "Weak" for a very short password
-    await expect(
-      page.getByText("Weak")
-    ).toBeVisible();
+    await expect(page.getByText("Weak")).toBeVisible();
 
     // Should show the "At least 12 characters" check item
-    await expect(
-      page.getByText("At least 12 characters")
-    ).toBeVisible();
+    await expect(page.getByText("At least 12 characters")).toBeVisible();
   });
 });
 
@@ -566,13 +566,18 @@ test.describe("Settings — Account Deletion", () => {
     // Click "Delete My Account" to reveal the confirmation step
     // scrollIntoViewIfNeeded handles mobile viewports where CustomScrollContainer
     // prevents Playwright's auto-scroll from reaching the button
-    const deleteAccountBtnST14 = page.getByRole("button", { name: "Delete My Account" });
+    const deleteAccountBtnST14 = page.getByRole("button", {
+      name: "Delete My Account",
+    });
     await deleteAccountBtnST14.scrollIntoViewIfNeeded();
     await deleteAccountBtnST14.click({ force: true });
 
     // Wait for confirmation section to mount, then scroll into view on mobile
     const confirmInputST14 = page.locator("#deleteConfirmText");
-    await confirmInputST14.waitFor({ state: "attached", timeout: timeouts.action });
+    await confirmInputST14.waitFor({
+      state: "attached",
+      timeout: timeouts.action,
+    });
     await confirmInputST14.scrollIntoViewIfNeeded();
     await expect(confirmInputST14).toBeVisible({ timeout: timeouts.action });
 
@@ -599,13 +604,18 @@ test.describe("Settings — Account Deletion", () => {
     // Click "Delete My Account"
     // scrollIntoViewIfNeeded handles mobile viewports where CustomScrollContainer
     // prevents Playwright's auto-scroll from reaching the button
-    const deleteAccountBtnST15 = page.getByRole("button", { name: "Delete My Account" });
+    const deleteAccountBtnST15 = page.getByRole("button", {
+      name: "Delete My Account",
+    });
     await deleteAccountBtnST15.scrollIntoViewIfNeeded();
     await deleteAccountBtnST15.click({ force: true });
 
     // Wait for confirmation section to mount, then scroll into view on mobile
     const confirmInputST15 = page.locator("#deleteConfirmText");
-    await confirmInputST15.waitFor({ state: "attached", timeout: timeouts.action });
+    await confirmInputST15.waitFor({
+      state: "attached",
+      timeout: timeouts.action,
+    });
     await confirmInputST15.scrollIntoViewIfNeeded();
     await expect(confirmInputST15).toBeVisible({ timeout: timeouts.action });
 
@@ -659,8 +669,9 @@ test.describe("Settings — Blocked Users", () => {
     await unblockButtons.first().click();
 
     // Wait for the count to decrease
-    await expect(
-      page.getByRole("button", { name: "Unblock" })
-    ).toHaveCount(initialCount - 1, { timeout: timeouts.action });
+    await expect(page.getByRole("button", { name: "Unblock" })).toHaveCount(
+      initialCount - 1,
+      { timeout: timeouts.action }
+    );
   });
 });

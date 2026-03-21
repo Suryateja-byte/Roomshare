@@ -7,12 +7,18 @@
  * @see Plan Category H - Marker/Popup DOM & Events (10 tests)
  */
 
-import React from 'react';
-import { render, screen, act, waitFor, fireEvent } from '@testing-library/react';
+import React from "react";
+import {
+  render,
+  screen,
+  act,
+  waitFor,
+  fireEvent,
+} from "@testing-library/react";
 
 // Mock next-themes
-const mockResolvedTheme = jest.fn().mockReturnValue('light');
-jest.mock('next-themes', () => ({
+const mockResolvedTheme = jest.fn().mockReturnValue("light");
+jest.mock("next-themes", () => ({
   useTheme: () => ({
     resolvedTheme: mockResolvedTheme(),
     theme: mockResolvedTheme(),
@@ -43,7 +49,7 @@ const createdMarkers: Array<{
   popup: { setHTML: jest.Mock; remove: jest.Mock; isOpen: jest.Mock };
 }> = [];
 
-jest.mock('maplibre-gl', () => {
+jest.mock("maplibre-gl", () => {
   return {
     Map: jest.fn().mockImplementation(() => ({
       on: mockMapOn,
@@ -82,7 +88,7 @@ jest.mock('maplibre-gl', () => {
 });
 
 // Mock Lucide icons
-jest.mock('lucide-react', () => ({
+jest.mock("lucide-react", () => ({
   Plus: () => <span data-testid="plus-icon">+</span>,
   Minus: () => <span data-testid="minus-icon">-</span>,
   Navigation: () => <span data-testid="nav-icon">N</span>,
@@ -90,28 +96,31 @@ jest.mock('lucide-react', () => ({
 }));
 
 // Mock RadarAttribution
-jest.mock('@/components/nearby/RadarAttribution', () => ({
+jest.mock("@/components/nearby/RadarAttribution", () => ({
   __esModule: true,
   default: () => <div data-testid="radar-attribution">Radar Attribution</div>,
 }));
 
 // Mock Stadia lib
-jest.mock('@/lib/maps/stadia', () => ({
-  getStadiaStyle: jest.fn(() => 'https://stadia.style.json'),
+jest.mock("@/lib/maps/stadia", () => ({
+  getStadiaStyle: jest.fn(() => "https://stadia.style.json"),
 }));
 
-import NearbyPlacesMap from '@/components/nearby/NearbyPlacesMap';
-import type { NearbyPlace } from '@/types/nearby';
+import NearbyPlacesMap from "@/components/nearby/NearbyPlacesMap";
+import type { NearbyPlace } from "@/types/nearby";
 
-describe('NearbyPlacesMap - Marker/Popup DOM & Events', () => {
+describe("NearbyPlacesMap - Marker/Popup DOM & Events", () => {
   const listingLat = 37.7749;
   const listingLng = -122.4194;
 
-  const createMockPlace = (id: string, overrides: Partial<NearbyPlace> = {}): NearbyPlace => ({
+  const createMockPlace = (
+    id: string,
+    overrides: Partial<NearbyPlace> = {}
+  ): NearbyPlace => ({
     id,
     name: `Place ${id}`,
     address: `123 Test St`,
-    category: 'food-grocery',
+    category: "food-grocery",
     location: { lat: 37.7749, lng: -122.4194 },
     distanceMiles: 0.5,
     ...overrides,
@@ -120,13 +129,13 @@ describe('NearbyPlacesMap - Marker/Popup DOM & Events', () => {
   beforeEach(() => {
     jest.clearAllMocks();
     createdMarkers.length = 0;
-    mockResolvedTheme.mockReturnValue('light');
+    mockResolvedTheme.mockReturnValue("light");
   });
 
   // Trigger map 'load' event to initialize markers
   const triggerMapLoad = () => {
     const loadHandler = mockMapOn.mock.calls.find(
-      (call) => call[0] === 'load'
+      (call) => call[0] === "load"
     )?.[1];
     if (loadHandler) {
       act(() => {
@@ -136,9 +145,9 @@ describe('NearbyPlacesMap - Marker/Popup DOM & Events', () => {
   };
 
   // H1: Marker DOM reused correctly on update
-  describe('H1: DOM Recycling', () => {
-    it('reuses existing markers when places update with same IDs', async () => {
-      const places = [createMockPlace('place-1'), createMockPlace('place-2')];
+  describe("H1: DOM Recycling", () => {
+    it("reuses existing markers when places update with same IDs", async () => {
+      const places = [createMockPlace("place-1"), createMockPlace("place-2")];
 
       const { rerender } = render(
         <NearbyPlacesMap
@@ -155,8 +164,8 @@ describe('NearbyPlacesMap - Marker/Popup DOM & Events', () => {
 
       // Update with same places (should reuse)
       const updatedPlaces = [
-        createMockPlace('place-1', { name: 'Updated Name' }),
-        createMockPlace('place-2'),
+        createMockPlace("place-1", { name: "Updated Name" }),
+        createMockPlace("place-2"),
       ];
 
       rerender(
@@ -172,9 +181,9 @@ describe('NearbyPlacesMap - Marker/Popup DOM & Events', () => {
       expect(createdMarkers.length).toBe(initialMarkerCount);
     });
 
-    it('removes old markers and adds new ones on category change', () => {
+    it("removes old markers and adds new ones on category change", () => {
       const groceryPlaces = [
-        createMockPlace('grocery-1', { category: 'food-grocery' }),
+        createMockPlace("grocery-1", { category: "food-grocery" }),
       ];
 
       const { rerender } = render(
@@ -189,7 +198,7 @@ describe('NearbyPlacesMap - Marker/Popup DOM & Events', () => {
 
       // Switch to different category with different places
       const pharmacyPlaces = [
-        createMockPlace('pharmacy-1', { category: 'pharmacy' }),
+        createMockPlace("pharmacy-1", { category: "pharmacy" }),
       ];
 
       rerender(
@@ -206,9 +215,9 @@ describe('NearbyPlacesMap - Marker/Popup DOM & Events', () => {
   });
 
   // H2: Popup updates while open don't flicker
-  describe('H2: Open Popup Updates', () => {
-    it('maintains popup stability during marker updates', () => {
-      const places = [createMockPlace('place-1')];
+  describe("H2: Open Popup Updates", () => {
+    it("maintains popup stability during marker updates", () => {
+      const places = [createMockPlace("place-1")];
 
       const { rerender } = render(
         <NearbyPlacesMap
@@ -239,9 +248,9 @@ describe('NearbyPlacesMap - Marker/Popup DOM & Events', () => {
   });
 
   // H3: Marker click + map click race handled
-  describe('H3: Event Timing', () => {
-    it('handles rapid click events without errors', async () => {
-      const places = [createMockPlace('place-1')];
+  describe("H3: Event Timing", () => {
+    it("handles rapid click events without errors", async () => {
+      const places = [createMockPlace("place-1")];
 
       render(
         <NearbyPlacesMap
@@ -254,7 +263,7 @@ describe('NearbyPlacesMap - Marker/Popup DOM & Events', () => {
       triggerMapLoad();
 
       // Rapid clicks should not throw
-      const controls = screen.getAllByRole('button');
+      const controls = screen.getAllByRole("button");
       controls.forEach((control) => {
         for (let i = 0; i < 5; i++) {
           fireEvent.click(control);
@@ -268,12 +277,12 @@ describe('NearbyPlacesMap - Marker/Popup DOM & Events', () => {
   });
 
   // H4: Ghost markers removed on category change
-  describe('H4: Marker Cleanup', () => {
-    it('removes all markers when places array is cleared', () => {
+  describe("H4: Marker Cleanup", () => {
+    it("removes all markers when places array is cleared", () => {
       const places = [
-        createMockPlace('place-1'),
-        createMockPlace('place-2'),
-        createMockPlace('place-3'),
+        createMockPlace("place-1"),
+        createMockPlace("place-2"),
+        createMockPlace("place-3"),
       ];
 
       const { rerender } = render(
@@ -299,11 +308,11 @@ describe('NearbyPlacesMap - Marker/Popup DOM & Events', () => {
       expect(mockMarkerRemove).toHaveBeenCalled();
     });
 
-    it('removes only stale markers on partial update', () => {
+    it("removes only stale markers on partial update", () => {
       const places = [
-        createMockPlace('place-1'),
-        createMockPlace('place-2'),
-        createMockPlace('place-3'),
+        createMockPlace("place-1"),
+        createMockPlace("place-2"),
+        createMockPlace("place-3"),
       ];
 
       const { rerender } = render(
@@ -323,7 +332,7 @@ describe('NearbyPlacesMap - Marker/Popup DOM & Events', () => {
         <NearbyPlacesMap
           listingLat={listingLat}
           listingLng={listingLng}
-          places={[createMockPlace('place-1'), createMockPlace('place-2')]}
+          places={[createMockPlace("place-1"), createMockPlace("place-2")]}
         />
       );
 
@@ -333,9 +342,9 @@ describe('NearbyPlacesMap - Marker/Popup DOM & Events', () => {
   });
 
   // H5: Only one popup open at a time
-  describe('H5: Single Popup', () => {
-    it('configures popups with no close button per design', () => {
-      const places = [createMockPlace('place-1')];
+  describe("H5: Single Popup", () => {
+    it("configures popups with no close button per design", () => {
+      const places = [createMockPlace("place-1")];
 
       render(
         <NearbyPlacesMap
@@ -348,7 +357,7 @@ describe('NearbyPlacesMap - Marker/Popup DOM & Events', () => {
       triggerMapLoad();
 
       // MapLibre's Popup is configured with closeButton: false
-      const maplibregl = require('maplibre-gl');
+      const maplibregl = require("maplibre-gl");
       expect(maplibregl.Popup).toHaveBeenCalledWith(
         expect.objectContaining({
           closeButton: false,
@@ -358,9 +367,9 @@ describe('NearbyPlacesMap - Marker/Popup DOM & Events', () => {
   });
 
   // H6: Hover scale doesn't shift marker position
-  describe('H6: Transform Origin', () => {
-    it('creates markers with centered transform origin via CSS classes', () => {
-      const places = [createMockPlace('place-1')];
+  describe("H6: Transform Origin", () => {
+    it("creates markers with centered transform origin via CSS classes", () => {
+      const places = [createMockPlace("place-1")];
 
       render(
         <NearbyPlacesMap
@@ -375,21 +384,21 @@ describe('NearbyPlacesMap - Marker/Popup DOM & Events', () => {
       // Markers should have class with centering for stable hover
       // The wrapper uses 'flex items-center justify-center' for centering
       const markerElements = createdMarkers
-        .filter((m) => m.element?.classList?.contains('poi-marker'))
+        .filter((m) => m.element?.classList?.contains("poi-marker"))
         .map((m) => m.element);
 
       markerElements.forEach((el) => {
         // Check for flex centering classes that ensure stable transform
-        expect(el.className).toContain('flex');
-        expect(el.className).toContain('items-center');
-        expect(el.className).toContain('justify-center');
+        expect(el.className).toContain("flex");
+        expect(el.className).toContain("items-center");
+        expect(el.className).toContain("justify-center");
       });
     });
   });
 
   // H7: Dense markers (50+) don't lag on mousemove
-  describe('H7: Performance', () => {
-    it('handles 50+ markers without excessive rendering', () => {
+  describe("H7: Performance", () => {
+    it("handles 50+ markers without excessive rendering", () => {
       const manyPlaces = Array.from({ length: 60 }, (_, i) =>
         createMockPlace(`place-${i}`, {
           location: { lat: 37.7749 + i * 0.001, lng: -122.4194 + i * 0.001 },
@@ -419,9 +428,9 @@ describe('NearbyPlacesMap - Marker/Popup DOM & Events', () => {
   });
 
   // H8: Detached marker removes event listener
-  describe('H8: Listener Cleanup', () => {
-    it('cleans up map on unmount', () => {
-      const places = [createMockPlace('place-1')];
+  describe("H8: Listener Cleanup", () => {
+    it("cleans up map on unmount", () => {
+      const places = [createMockPlace("place-1")];
 
       const { unmount } = render(
         <NearbyPlacesMap
@@ -441,9 +450,9 @@ describe('NearbyPlacesMap - Marker/Popup DOM & Events', () => {
   });
 
   // H9: POI markers render above listing marker
-  describe('H9: Z-Order', () => {
-    it('adds listing marker first, then POI markers', () => {
-      const places = [createMockPlace('place-1')];
+  describe("H9: Z-Order", () => {
+    it("adds listing marker first, then POI markers", () => {
+      const places = [createMockPlace("place-1")];
 
       render(
         <NearbyPlacesMap
@@ -466,9 +475,9 @@ describe('NearbyPlacesMap - Marker/Popup DOM & Events', () => {
   });
 
   // H10: innerHTML XSS prevention (regression)
-  describe('H10: XSS Prevention', () => {
-    it('escapes HTML in place names to prevent XSS', () => {
-      const maliciousPlace = createMockPlace('xss-test', {
+  describe("H10: XSS Prevention", () => {
+    it("escapes HTML in place names to prevent XSS", () => {
+      const maliciousPlace = createMockPlace("xss-test", {
         name: '<script>alert("XSS")</script>Malicious',
         address: '<img onerror="alert(1)" src="x">',
       });
@@ -489,7 +498,7 @@ describe('NearbyPlacesMap - Marker/Popup DOM & Events', () => {
       // Get the HTML that was set - find the POI popup (contains nearby-popup class)
       const popupCalls = mockPopupSetHTML.mock.calls;
       const poiPopupCall = popupCalls.find(
-        (call) => call[0] && call[0].includes('nearby-popup')
+        (call) => call[0] && call[0].includes("nearby-popup")
       );
 
       // POI popup should exist
@@ -498,17 +507,17 @@ describe('NearbyPlacesMap - Marker/Popup DOM & Events', () => {
       if (poiPopupCall) {
         const htmlContent = poiPopupCall[0];
         // Script tags should be escaped, not executable
-        expect(htmlContent).not.toContain('<script>');
+        expect(htmlContent).not.toContain("<script>");
         // The escaped version should be present
-        expect(htmlContent).toContain('&lt;script&gt;');
+        expect(htmlContent).toContain("&lt;script&gt;");
       }
     });
 
-    it('uses escapeHtml utility for popup content', () => {
+    it("uses escapeHtml utility for popup content", () => {
       // The component uses escapeHtml() function
       // Verify by checking popup HTML doesn't contain raw script tags
-      const dangerousName = '<script>steal(cookies)</script>';
-      const place = createMockPlace('test', { name: dangerousName });
+      const dangerousName = "<script>steal(cookies)</script>";
+      const place = createMockPlace("test", { name: dangerousName });
 
       render(
         <NearbyPlacesMap
@@ -522,7 +531,9 @@ describe('NearbyPlacesMap - Marker/Popup DOM & Events', () => {
 
       // Check that setHTML was called with escaped content
       const calls = mockPopupSetHTML.mock.calls;
-      const htmlArgs = calls.map((c) => c[0]).filter((h) => h && h.includes('nearby-popup'));
+      const htmlArgs = calls
+        .map((c) => c[0])
+        .filter((h) => h && h.includes("nearby-popup"));
 
       htmlArgs.forEach((html) => {
         // Should not contain raw script tag
@@ -532,9 +543,9 @@ describe('NearbyPlacesMap - Marker/Popup DOM & Events', () => {
   });
 
   // Additional edge case tests
-  describe('Highlight State Management', () => {
-    it('applies highlighted class when highlightedPlaceId matches', () => {
-      const places = [createMockPlace('place-1'), createMockPlace('place-2')];
+  describe("Highlight State Management", () => {
+    it("applies highlighted class when highlightedPlaceId matches", () => {
+      const places = [createMockPlace("place-1"), createMockPlace("place-2")];
 
       const { rerender } = render(
         <NearbyPlacesMap
@@ -559,11 +570,11 @@ describe('NearbyPlacesMap - Marker/Popup DOM & Events', () => {
 
       // The marker element should have highlighted class added
       // This is handled by the useEffect that iterates markers
-      expect(mockMapOn).toHaveBeenCalledWith('load', expect.any(Function));
+      expect(mockMapOn).toHaveBeenCalledWith("load", expect.any(Function));
     });
 
-    it('clears highlight when highlightedPlaceId changes to null', () => {
-      const places = [createMockPlace('place-1')];
+    it("clears highlight when highlightedPlaceId changes to null", () => {
+      const places = [createMockPlace("place-1")];
 
       const { rerender } = render(
         <NearbyPlacesMap
@@ -591,9 +602,9 @@ describe('NearbyPlacesMap - Marker/Popup DOM & Events', () => {
     });
   });
 
-  describe('Map Controls', () => {
-    it('fit all markers button appears when places exist', () => {
-      const places = [createMockPlace('place-1')];
+  describe("Map Controls", () => {
+    it("fit all markers button appears when places exist", () => {
+      const places = [createMockPlace("place-1")];
 
       render(
         <NearbyPlacesMap
@@ -604,10 +615,12 @@ describe('NearbyPlacesMap - Marker/Popup DOM & Events', () => {
       );
 
       // Fit all button should be visible
-      expect(screen.getByLabelText('Fit all markers in view')).toBeInTheDocument();
+      expect(
+        screen.getByLabelText("Fit all markers in view")
+      ).toBeInTheDocument();
     });
 
-    it('fit all markers button hidden when no places', () => {
+    it("fit all markers button hidden when no places", () => {
       render(
         <NearbyPlacesMap
           listingLat={listingLat}
@@ -617,10 +630,12 @@ describe('NearbyPlacesMap - Marker/Popup DOM & Events', () => {
       );
 
       // Fit all button should not be visible
-      expect(screen.queryByLabelText('Fit all markers in view')).not.toBeInTheDocument();
+      expect(
+        screen.queryByLabelText("Fit all markers in view")
+      ).not.toBeInTheDocument();
     });
 
-    it('reset view navigates to listing location', () => {
+    it("reset view navigates to listing location", () => {
       render(
         <NearbyPlacesMap
           listingLat={listingLat}
@@ -629,7 +644,7 @@ describe('NearbyPlacesMap - Marker/Popup DOM & Events', () => {
         />
       );
 
-      fireEvent.click(screen.getByLabelText('Reset to listing location'));
+      fireEvent.click(screen.getByLabelText("Reset to listing location"));
 
       expect(mockMapFlyTo).toHaveBeenCalledWith(
         expect.objectContaining({
@@ -640,9 +655,9 @@ describe('NearbyPlacesMap - Marker/Popup DOM & Events', () => {
     });
   });
 
-  describe('Theme Support', () => {
-    it('recreates map when theme changes', () => {
-      const places = [createMockPlace('place-1')];
+  describe("Theme Support", () => {
+    it("recreates map when theme changes", () => {
+      const places = [createMockPlace("place-1")];
 
       const { rerender } = render(
         <NearbyPlacesMap
@@ -653,7 +668,7 @@ describe('NearbyPlacesMap - Marker/Popup DOM & Events', () => {
       );
 
       // Change theme
-      mockResolvedTheme.mockReturnValue('dark');
+      mockResolvedTheme.mockReturnValue("dark");
 
       rerender(
         <NearbyPlacesMap

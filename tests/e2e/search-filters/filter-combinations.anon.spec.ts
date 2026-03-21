@@ -44,7 +44,9 @@ test.describe("Filter Combinations", () => {
   });
 
   // 1. Price + room type combination
-  test(`${tags.core} - price and room type filters work together`, async ({ page }) => {
+  test(`${tags.core} - price and room type filters work together`, async ({
+    page,
+  }) => {
     await page.goto(`${SEARCH_URL}&maxPrice=1500&roomType=Private+Room`);
     await page.waitForLoadState("domcontentloaded");
     await page.waitForLoadState("domcontentloaded").catch(() => {});
@@ -64,12 +66,16 @@ test.describe("Filter Combinations", () => {
     const region = appliedFiltersRegion(page);
     const regionVisible = await region.isVisible().catch(() => false);
     if (regionVisible) {
-      await expect(region.locator("text=/Private Room/i").first()).toBeVisible({ timeout: 10_000 });
+      await expect(region.locator("text=/Private Room/i").first()).toBeVisible({
+        timeout: 10_000,
+      });
     }
   });
 
   // 2. Price + amenities combination
-  test(`${tags.core} - price and amenities filters work together`, async ({ page }) => {
+  test(`${tags.core} - price and amenities filters work together`, async ({
+    page,
+  }) => {
     await page.goto(`${SEARCH_URL}&maxPrice=2000&amenities=Wifi,Parking`);
     await page.waitForLoadState("domcontentloaded");
     await page.waitForLoadState("domcontentloaded").catch(() => {});
@@ -83,7 +89,9 @@ test.describe("Filter Combinations", () => {
   });
 
   // 3. All filters together
-  test(`${tags.core} - multiple different filter types applied simultaneously`, async ({ page }) => {
+  test(`${tags.core} - multiple different filter types applied simultaneously`, async ({
+    page,
+  }) => {
     const filterQS = [
       boundsQS,
       "minPrice=500",
@@ -109,7 +117,9 @@ test.describe("Filter Combinations", () => {
   });
 
   // 4. Adding filter to existing filters (additive)
-  test(`${tags.core} - adding a filter preserves existing filters`, async ({ page }) => {
+  test(`${tags.core} - adding a filter preserves existing filters`, async ({
+    page,
+  }) => {
     // Start with room type
     await page.goto(`${SEARCH_URL}&roomType=Private+Room`);
     await page.waitForLoadState("domcontentloaded");
@@ -128,10 +138,15 @@ test.describe("Filter Combinations", () => {
       await applyFilters(page);
 
       // Wait for URL to update via soft navigation
-      await expect.poll(
-        () => new URL(page.url(), "http://localhost").searchParams.get("amenities"),
-        { timeout: 30_000, message: 'URL param "amenities" to be present' },
-      ).not.toBeNull();
+      await expect
+        .poll(
+          () =>
+            new URL(page.url(), "http://localhost").searchParams.get(
+              "amenities"
+            ),
+          { timeout: 30_000, message: 'URL param "amenities" to be present' }
+        )
+        .not.toBeNull();
 
       // Both room type and amenity should be in URL
       expect(getUrlParam(page, "roomType")).toBe("Private Room");
@@ -140,8 +155,12 @@ test.describe("Filter Combinations", () => {
   });
 
   // 5. Removing one filter from multiple (others preserved)
-  test(`${tags.core} - removing one filter preserves the others`, async ({ page }) => {
-    await page.goto(`${SEARCH_URL}&roomType=Private+Room&amenities=Wifi&maxPrice=2000`);
+  test(`${tags.core} - removing one filter preserves the others`, async ({
+    page,
+  }) => {
+    await page.goto(
+      `${SEARCH_URL}&roomType=Private+Room&amenities=Wifi&maxPrice=2000`
+    );
     await page.waitForLoadState("domcontentloaded");
     await page.waitForLoadState("domcontentloaded").catch(() => {});
 
@@ -150,16 +169,23 @@ test.describe("Filter Combinations", () => {
     test.skip(!regionVisible, "Applied filters region not visible");
 
     // Remove the roomType chip
-    const removeRoomType = region.getByRole("button", { name: /remove filter.*private room/i });
+    const removeRoomType = region.getByRole("button", {
+      name: /remove filter.*private room/i,
+    });
     const removeVisible = await removeRoomType.isVisible().catch(() => false);
 
     if (removeVisible) {
       await removeRoomType.click();
 
-      await expect.poll(
-        () => new URL(page.url(), "http://localhost").searchParams.get("roomType"),
-        { timeout: 30_000, message: 'URL param "roomType" to be absent' },
-      ).toBeNull();
+      await expect
+        .poll(
+          () =>
+            new URL(page.url(), "http://localhost").searchParams.get(
+              "roomType"
+            ),
+          { timeout: 30_000, message: 'URL param "roomType" to be absent' }
+        )
+        .toBeNull();
 
       // roomType removed, others preserved
       expect(getUrlParam(page, "roomType")).toBeNull();
@@ -169,7 +195,9 @@ test.describe("Filter Combinations", () => {
   });
 
   // 6. Filter + sort combination preserves both
-  test(`${tags.core} - filter and sort params coexist in URL`, async ({ page }) => {
+  test(`${tags.core} - filter and sort params coexist in URL`, async ({
+    page,
+  }) => {
     await page.goto(`${SEARCH_URL}&roomType=Private+Room&sort=price_asc`);
     await page.waitForLoadState("domcontentloaded");
     await page.waitForLoadState("domcontentloaded").catch(() => {});
@@ -182,7 +210,9 @@ test.describe("Filter Combinations", () => {
   });
 
   // 7. Filter + query combination preserves both
-  test(`${tags.core} - filter and query params coexist in URL`, async ({ page }) => {
+  test(`${tags.core} - filter and query params coexist in URL`, async ({
+    page,
+  }) => {
     await page.goto(`${SEARCH_URL}&q=downtown&roomType=Private+Room`);
     await page.waitForLoadState("domcontentloaded");
     await page.waitForLoadState("domcontentloaded").catch(() => {});
@@ -194,7 +224,9 @@ test.describe("Filter Combinations", () => {
   });
 
   // 8. Pagination resets when any filter changes
-  test(`${tags.core} - pagination params are cleared when filters change`, async ({ page }) => {
+  test(`${tags.core} - pagination params are cleared when filters change`, async ({
+    page,
+  }) => {
     // Start with a page param
     await page.goto(`${SEARCH_URL}&roomType=Private+Room&page=2`);
     await page.waitForLoadState("domcontentloaded");
@@ -215,10 +247,15 @@ test.describe("Filter Combinations", () => {
       await applyFilters(page);
 
       // Wait for navigation via soft navigation
-      await expect.poll(
-        () => new URL(page.url(), "http://localhost").searchParams.get("amenities"),
-        { timeout: 30_000, message: 'URL param "amenities" to be present' },
-      ).not.toBeNull();
+      await expect
+        .poll(
+          () =>
+            new URL(page.url(), "http://localhost").searchParams.get(
+              "amenities"
+            ),
+          { timeout: 30_000, message: 'URL param "amenities" to be present' }
+        )
+        .not.toBeNull();
 
       // page param should have been removed by commit()
       const params = getUrlParams(page);
@@ -230,7 +267,9 @@ test.describe("Filter Combinations", () => {
   });
 
   // 9. Filter combination with bounds preserved
-  test(`${tags.core} - geographic bounds persist through filter changes`, async ({ page }) => {
+  test(`${tags.core} - geographic bounds persist through filter changes`, async ({
+    page,
+  }) => {
     await page.goto(`${SEARCH_URL}&roomType=Private+Room`);
     await page.waitForLoadState("domcontentloaded");
     await page.waitForLoadState("domcontentloaded").catch(() => {});
@@ -254,7 +293,9 @@ test.describe("Filter Combinations", () => {
   });
 
   // 10. House rules and amenities together
-  test(`${tags.core} - house rules and amenities can be combined`, async ({ page }) => {
+  test(`${tags.core} - house rules and amenities can be combined`, async ({
+    page,
+  }) => {
     await page.goto(`${SEARCH_URL}&amenities=Wifi&houseRules=Pets+allowed`);
     await page.waitForLoadState("domcontentloaded");
     await page.waitForLoadState("domcontentloaded").catch(() => {});
@@ -266,17 +307,29 @@ test.describe("Filter Combinations", () => {
     const region = appliedFiltersRegion(page);
     const regionVisible = await region.isVisible().catch(() => false);
     if (regionVisible) {
-      await expect(region.locator("text=/Wifi/i").first()).toBeVisible({ timeout: 10_000 });
-      await expect(region.locator("text=/Pets allowed/i").first()).toBeVisible({ timeout: 10_000 });
+      await expect(region.locator("text=/Wifi/i").first()).toBeVisible({
+        timeout: 10_000,
+      });
+      await expect(region.locator("text=/Pets allowed/i").first()).toBeVisible({
+        timeout: 10_000,
+      });
     }
 
     expect(await page.title()).toBeTruthy();
   });
 
   // 11. All sort options work with active filters
-  test(`${tags.core} - all sort options work with active filters`, async ({ page }) => {
+  test(`${tags.core} - all sort options work with active filters`, async ({
+    page,
+  }) => {
     test.slow(); // 5 navigations in loop on WSL2/NTFS
-    const sortOptions = ["recommended", "price_asc", "price_desc", "newest", "rating"];
+    const sortOptions = [
+      "recommended",
+      "price_asc",
+      "price_desc",
+      "newest",
+      "rating",
+    ];
 
     for (const sort of sortOptions) {
       await page.goto(`${SEARCH_URL}&roomType=Private+Room&sort=${sort}`);
@@ -292,7 +345,9 @@ test.describe("Filter Combinations", () => {
   });
 
   // 12. No console errors with complex filter combinations
-  test(`${tags.core} - no console errors with complex filter combinations`, async ({ page }) => {
+  test(`${tags.core} - no console errors with complex filter combinations`, async ({
+    page,
+  }) => {
     const consoleErrors: string[] = [];
     page.on("console", (msg) => {
       if (msg.type() === "error") {
@@ -331,7 +386,7 @@ test.describe("Filter Combinations", () => {
         !e.includes("abort") &&
         !e.includes("cancelled") &&
         !e.includes("net::ERR") &&
-        !e.includes("Failed to load resource"),
+        !e.includes("Failed to load resource")
     );
 
     expect(realErrors).toHaveLength(0);

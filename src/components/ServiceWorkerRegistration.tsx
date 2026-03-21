@@ -12,7 +12,8 @@ export function ServiceWorkerRegistration({
   onSuccess,
 }: ServiceWorkerRegistrationProps) {
   const [updateAvailable, setUpdateAvailable] = useState(false);
-  const [registration, setRegistration] = useState<ServiceWorkerRegistration | null>(null);
+  const [registration, setRegistration] =
+    useState<ServiceWorkerRegistration | null>(null);
 
   useEffect(() => {
     if (typeof window === "undefined" || !("serviceWorker" in navigator)) {
@@ -21,18 +22,16 @@ export function ServiceWorkerRegistration({
 
     // In development, don't register SW — actively clean up stale ones
     // from previous production builds to prevent cache-first serving stale assets
-    if (process.env.NODE_ENV !== 'production') {
+    if (process.env.NODE_ENV !== "production") {
       navigator.serviceWorker.getRegistrations().then((registrations) => {
         for (const registration of registrations) {
           registration.unregister();
-          console.log('[SW] Unregistered stale service worker in dev mode');
         }
       });
-      if ('caches' in window) {
+      if ("caches" in window) {
         caches.keys().then((cacheNames) => {
           for (const cacheName of cacheNames) {
             caches.delete(cacheName);
-            console.log('[SW] Deleted cache in dev mode:', cacheName);
           }
         });
       }
@@ -71,9 +70,12 @@ export function ServiceWorkerRegistration({
         });
 
         // Check for updates periodically (every hour)
-        updateInterval = setInterval(() => {
-          reg.update();
-        }, 60 * 60 * 1000);
+        updateInterval = setInterval(
+          () => {
+            reg.update();
+          },
+          60 * 60 * 1000
+        );
 
         console.log("[SW] Service Worker registered successfully");
       } catch (error) {

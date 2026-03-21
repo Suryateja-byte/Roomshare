@@ -30,7 +30,11 @@ import {
 } from "react";
 import type { MapListingData } from "@/lib/data";
 import { buildCanonicalFilterParamsFromSearchParams } from "@/lib/search-params";
-import { useSearchV2Data, type V2MapData } from "@/contexts/SearchV2DataContext";
+import {
+  useV2MapData,
+  useIsV2Enabled,
+  type V2MapData,
+} from "@/contexts/SearchV2DataContext";
 import { useActivePanBounds } from "@/contexts/MapBoundsContext";
 import { MapErrorBoundary } from "@/components/map/MapErrorBoundary";
 import { useSearchTransitionSafe } from "@/contexts/SearchTransitionContext";
@@ -77,7 +81,8 @@ interface SpatialCacheEntry {
 
 /** Quantize bounds to BOUNDS_EPSILON precision for cache key */
 function quantizeBounds(bounds: ViewportBounds): string {
-  const q = (n: number) => (Math.round(n / BOUNDS_EPSILON) * BOUNDS_EPSILON).toFixed(3);
+  const q = (n: number) =>
+    (Math.round(n / BOUNDS_EPSILON) * BOUNDS_EPSILON).toFixed(3);
   return `${q(bounds.minLat)},${q(bounds.maxLat)},${q(bounds.minLng)},${q(bounds.maxLng)}`;
 }
 
@@ -85,8 +90,13 @@ function quantizeBounds(bounds: ViewportBounds): string {
  * Check if inner viewport is mostly contained within outer bounds.
  * Returns true if overlap >= threshold of inner's area (skip fetch).
  */
-function isViewportContained(inner: ViewportBounds, outer: ViewportBounds, threshold = 0.9): boolean {
-  const innerArea = (inner.maxLat - inner.minLat) * (inner.maxLng - inner.minLng);
+function isViewportContained(
+  inner: ViewportBounds,
+  outer: ViewportBounds,
+  threshold = 0.9
+): boolean {
+  const innerArea =
+    (inner.maxLat - inner.minLat) * (inner.maxLng - inner.minLng);
   if (innerArea <= 0) return false;
 
   const overlapMinLat = Math.max(inner.minLat, outer.minLat);
@@ -94,17 +104,22 @@ function isViewportContained(inner: ViewportBounds, outer: ViewportBounds, thres
   const overlapMinLng = Math.max(inner.minLng, outer.minLng);
   const overlapMaxLng = Math.min(inner.maxLng, outer.maxLng);
 
-  if (overlapMinLat >= overlapMaxLat || overlapMinLng >= overlapMaxLng) return false;
+  if (overlapMinLat >= overlapMaxLat || overlapMinLng >= overlapMaxLng)
+    return false;
 
-  const overlapArea = (overlapMaxLat - overlapMinLat) * (overlapMaxLng - overlapMinLng);
-  return (overlapArea / innerArea) >= threshold;
+  const overlapArea =
+    (overlapMaxLat - overlapMinLat) * (overlapMaxLng - overlapMinLng);
+  return overlapArea / innerArea >= threshold;
 }
 
 /**
  * Pad viewport bounds by a percentage to pre-fetch nearby listings.
  * Clamps to LAT/LNG limits and map fetch max spans.
  */
-function padBounds(bounds: ViewportBounds, padding = FETCH_BOUNDS_PADDING): ViewportBounds {
+function padBounds(
+  bounds: ViewportBounds,
+  padding = FETCH_BOUNDS_PADDING
+): ViewportBounds {
   const latSpan = bounds.maxLat - bounds.minLat;
   const lngSpan = bounds.maxLng - bounds.minLng;
   const padded = {
@@ -166,7 +181,7 @@ const MAP_VIEWPORT_KEYS = MAP_RELEVANT_KEYS.filter(
     key === "minLng" ||
     key === "maxLng" ||
     key === "lat" ||
-    key === "lng",
+    key === "lng"
 );
 
 function getMapRelevantParams(searchParams: URLSearchParams): string {
@@ -319,11 +334,19 @@ function MapDataLoadingBar() {
       <div className="h-full bg-zinc-900/80 dark:bg-white/80 animate-[shimmer_1.5s_ease-in-out_infinite] origin-left" />
       <style jsx>{`
         @keyframes shimmer {
-          0% { transform: translateX(-100%); }
-          100% { transform: translateX(200%); }
+          0% {
+            transform: translateX(-100%);
+          }
+          100% {
+            transform: translateX(200%);
+          }
         }
         @media (prefers-reduced-motion: reduce) {
-          div { animation: none; opacity: 0.7; transform: none; }
+          div {
+            animation: none;
+            opacity: 0.7;
+            transform: none;
+          }
         }
       `}</style>
     </div>
@@ -352,30 +375,35 @@ export function v2MapDataToListings(v2MapData: V2MapData): MapListingData[] {
   }
 
   // P2-3 FIX: Filter out malformed features before accessing coordinates
-  return sanitizeMapListings(v2MapData.geojson.features
-    .filter((feature) => {
-      const coordinates = feature.geometry?.coordinates;
-      if (!Array.isArray(coordinates) || coordinates.length < 2) return false;
-      const [lng, lat] = coordinates;
-      return (
-        Number.isFinite(lng) && Number.isFinite(lat) &&
-        lat >= -90 && lat <= 90 &&
-        lng >= -180 && lng <= 180
-      );
-    })
-    .map((feature) => {
-      const [lng, lat] = feature.geometry.coordinates;
-      return {
-        id: feature.properties.id,
-        title: feature.properties.title ?? "",
-        price: feature.properties.price,
-        availableSlots: feature.properties.availableSlots,
-        images: feature.properties.image ? [feature.properties.image] : [],
-        location: { lng, lat },
-        // Add tier from pins lookup (defaults to undefined if not in pins mode)
-        tier: pinTierMap.get(feature.properties.id),
-      };
-    }));
+  return sanitizeMapListings(
+    v2MapData.geojson.features
+      .filter((feature) => {
+        const coordinates = feature.geometry?.coordinates;
+        if (!Array.isArray(coordinates) || coordinates.length < 2) return false;
+        const [lng, lat] = coordinates;
+        return (
+          Number.isFinite(lng) &&
+          Number.isFinite(lat) &&
+          lat >= -90 &&
+          lat <= 90 &&
+          lng >= -180 &&
+          lng <= 180
+        );
+      })
+      .map((feature) => {
+        const [lng, lat] = feature.geometry.coordinates;
+        return {
+          id: feature.properties.id,
+          title: feature.properties.title ?? "",
+          price: feature.properties.price,
+          availableSlots: feature.properties.availableSlots,
+          images: feature.properties.image ? [feature.properties.image] : [],
+          location: { lng, lat },
+          // Add tier from pins lookup (defaults to undefined if not in pins mode)
+          tier: pinTierMap.get(feature.properties.id),
+        };
+      })
+  );
 }
 
 interface PersistentMapWrapperProps {
@@ -392,7 +420,7 @@ export default function PersistentMapWrapper({
   const searchParams = useSearchParams();
   const [listings, setListings] = useState<MapListingData[]>([]);
   // mapSource tracks whether the most recent data came from a client fetch ('v1') or SSR payload ('v2')
-  const [mapSource, setMapSource] = useState<'v1' | 'v2'>('v2');
+  const [mapSource, setMapSource] = useState<"v1" | "v2">("v2");
   const [isFetchingMapData, setIsFetchingMapData] = useState(false);
   const [error, setError] = useState<string | null>(null);
   // Stale-while-revalidate: keep last successful fetch visible during loading
@@ -407,7 +435,8 @@ export default function PersistentMapWrapper({
   const [infoMessage, setInfoMessage] = useState<string | null>(null);
 
   // Check for v2 data from context (injected by page.tsx via V2MapDataSetter)
-  const { v2MapData, isV2Enabled, setIsV2Enabled } = useSearchV2Data();
+  const v2MapData = useV2MapData();
+  const { isV2Enabled, setIsV2Enabled } = useIsV2Enabled();
   // P2-FIX (#124): Use state instead of ref for last V2 data to ensure memo dependencies are correct
   // Using a ref in useMemo causes stale data because refs aren't tracked by React
   const [lastV2Data, setLastV2Data] = useState<V2MapData | null>(null);
@@ -458,7 +487,7 @@ export default function PersistentMapWrapper({
   useEffect(() => {
     if (v2MapData) {
       setLastV2Data(v2MapData);
-      setMapSource('v2');
+      setMapSource("v2");
     } else if (!isV2Enabled) {
       // Clear stale V2 cache when v1 path is active to prevent map/list desync.
       setLastV2Data(null);
@@ -471,7 +500,8 @@ export default function PersistentMapWrapper({
   const effectiveListings = useMemo(() => {
     // P2-FIX (#124): Use lastV2Data state (not ref) so memo properly recalculates
     // We strictly use V2 data ONLY if it's the active source (not overridden by recent client fetch)
-    const activeV2Data = (isV2Enabled && mapSource === 'v2') ? (v2MapData ?? lastV2Data) : null;
+    const activeV2Data =
+      isV2Enabled && mapSource === "v2" ? (v2MapData ?? lastV2Data) : null;
     if (activeV2Data) {
       return v2MapDataToListings(activeV2Data).slice(0, MAX_MAP_MARKERS);
     }
@@ -508,7 +538,14 @@ export default function PersistentMapWrapper({
       return merged;
     }
     return listings.slice(0, MAX_MAP_MARKERS);
-  }, [isV2Enabled, mapSource, v2MapData, lastV2Data, listings, isFetchingMapData]);
+  }, [
+    isV2Enabled,
+    mapSource,
+    v2MapData,
+    lastV2Data,
+    listings,
+    isFetchingMapData,
+  ]);
 
   // Track current params to detect changes for debouncing
   const lastFetchedParamsRef = useRef<string | null>(null);
@@ -521,7 +558,11 @@ export default function PersistentMapWrapper({
   const isRetryScheduledRef = useRef<boolean>(false);
 
   const fetchListings = useCallback(
-    async (paramsString: string, signal?: AbortSignal, fetchBounds?: ViewportBounds) => {
+    async (
+      paramsString: string,
+      signal?: AbortSignal,
+      fetchBounds?: ViewportBounds
+    ) => {
       isRetryScheduledRef.current = false;
       setIsFetchingMapData(true);
       setError(null);
@@ -547,7 +588,7 @@ export default function PersistentMapWrapper({
               clearTimeout(timeoutId);
               timeoutController.abort();
             },
-            { once: true },
+            { once: true }
           );
         }
       }
@@ -581,8 +622,12 @@ export default function PersistentMapWrapper({
               : 2000; // Default 2s exponential backoff
 
             // P2-7 FIX: Guard dev logging to avoid production console pollution
-            if (process.env.NODE_ENV === 'development') {
-              console.debug('[PersistentMapWrapper] Rate limited (429), retrying after', retryDelayMs, 'ms');
+            if (process.env.NODE_ENV === "development") {
+              console.debug(
+                "[PersistentMapWrapper] Rate limited (429), retrying after",
+                retryDelayMs,
+                "ms"
+              );
             }
 
             // D3.1 FIX: Mark retry as scheduled BEFORE returning so the finally
@@ -601,11 +646,14 @@ export default function PersistentMapWrapper({
           // Use warn for 400 (expected validation failures) to avoid polluting error overlay
           if (response.status === 400) {
             // P2-7 FIX: Guard dev logging
-            if (process.env.NODE_ENV === 'development') {
-              console.debug('[PersistentMapWrapper] Map viewport validation failed:', {
-                status: response.status,
-                error: serverMessage,
-              });
+            if (process.env.NODE_ENV === "development") {
+              console.debug(
+                "[PersistentMapWrapper] Map viewport validation failed:",
+                {
+                  status: response.status,
+                  error: serverMessage,
+                }
+              );
             }
           } else {
             console.error("Map listings fetch failed:", {
@@ -618,7 +666,7 @@ export default function PersistentMapWrapper({
 
           const errorMessage = getStatusErrorMessage(
             response.status,
-            serverMessage,
+            serverMessage
           );
           throw new Error(errorMessage);
         }
@@ -627,7 +675,7 @@ export default function PersistentMapWrapper({
         const fetched = data.listings || [];
         previousListingsRef.current = fetched;
         setListings(fetched);
-        setMapSource('v1'); // Set v1 as active since we just fetched client-side
+        setMapSource("v1"); // Set v1 as active since we just fetched client-side
 
         // Store in spatial cache for instant zoom-out/pan-back display
         if (fetchBounds) {
@@ -674,7 +722,7 @@ export default function PersistentMapWrapper({
         }
       }
     },
-    [],
+    []
   );
 
   // Single effect that handles both initial fetch and param changes
@@ -699,7 +747,9 @@ export default function PersistentMapWrapper({
       searchParams.has("maxLat");
 
     // Writable copy used for request params
-    const requestSearchParams: URLSearchParams = new URLSearchParams(searchParams.toString());
+    const requestSearchParams: URLSearchParams = new URLSearchParams(
+      searchParams.toString()
+    );
 
     if (hasBounds) {
       // Client-side bounds validation - applies to both v1 and v2 paths
@@ -779,7 +829,10 @@ export default function PersistentMapWrapper({
     }
 
     // Viewport hysteresis: skip fetch if new viewport is mostly within last-fetched padded area
-    if (lastFetchedBoundsRef.current && isViewportContained(currentBounds, lastFetchedBoundsRef.current)) {
+    if (
+      lastFetchedBoundsRef.current &&
+      isViewportContained(currentBounds, lastFetchedBoundsRef.current)
+    ) {
       return;
     }
 
@@ -827,6 +880,7 @@ export default function PersistentMapWrapper({
         abortControllerRef.current.abort();
       }
     };
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- intentional dependency omission to prevent infinite loops
   }, [searchParams, fetchListings, shouldRenderMap, isV2Enabled, hasV2Data]);
 
   // Proactive fetching during map pan (triggered via activePanBounds)
@@ -837,7 +891,7 @@ export default function PersistentMapWrapper({
     const latSpan = activePanBounds.maxLat - activePanBounds.minLat;
     const crossesAntimeridian = activePanBounds.minLng > activePanBounds.maxLng;
     const lngSpan = crossesAntimeridian
-      ? (180 - activePanBounds.minLng) + (activePanBounds.maxLng + 180)
+      ? 180 - activePanBounds.minLng + (activePanBounds.maxLng + 180)
       : activePanBounds.maxLng - activePanBounds.minLng;
     if (latSpan > MAP_FETCH_MAX_LAT_SPAN || lngSpan > MAP_FETCH_MAX_LNG_SPAN) {
       setInfoMessage("Zoom in further to load listings in this area");
@@ -845,7 +899,10 @@ export default function PersistentMapWrapper({
     }
 
     // Viewport hysteresis: skip fetch if new viewport is mostly within last-fetched padded area
-    if (lastFetchedBoundsRef.current && isViewportContained(activePanBounds, lastFetchedBoundsRef.current)) {
+    if (
+      lastFetchedBoundsRef.current &&
+      isViewportContained(activePanBounds, lastFetchedBoundsRef.current)
+    ) {
       return;
     }
 
@@ -872,8 +929,13 @@ export default function PersistentMapWrapper({
       lastFetchedParamsRef.current = paddedParamsString;
       fetchListings(paddedParamsString, abortController.signal, paddedBounds);
     }, 100);
-
-  }, [activePanBounds, searchParams, shouldRenderMap, isV2Enabled, fetchListings]);
+  }, [
+    activePanBounds,
+    searchParams,
+    shouldRenderMap,
+    isV2Enabled,
+    fetchListings,
+  ]);
 
   const handleRetry = useCallback(() => {
     // Validate viewport before retrying - prevents API call for known-invalid viewports
@@ -900,7 +962,8 @@ export default function PersistentMapWrapper({
 
   // P2-FIX (#115): Also show placeholder when data path hasn't been determined yet.
   // This prevents the brief empty map flash between mount and v2 signal.
-  const showInitialPlaceholder = !dataPathDetermined || (isV2Enabled && !hasAnyV2Data);
+  const showInitialPlaceholder =
+    !dataPathDetermined || (isV2Enabled && !hasAnyV2Data);
   const showV2LoadingOverlay = isV2Enabled && !hasV2Data && hasAnyV2Data;
 
   // CRITICAL: Don't render map component if shouldRenderMap is false

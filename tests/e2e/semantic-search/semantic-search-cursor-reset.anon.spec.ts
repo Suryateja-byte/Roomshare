@@ -26,9 +26,9 @@ const boundsQS = `minLat=${SF_BOUNDS.minLat}&maxLat=${SF_BOUNDS.maxLat}&minLng=$
 async function waitForSearchOutcome(page: import("@playwright/test").Page) {
   const container = searchResultsContainer(page);
   const cards = container.locator('[data-testid="listing-card"]');
-  const cardOrEmpty = cards.first().or(
-    container.getByText(/no (matches|results|listings)/i).first()
-  );
+  const cardOrEmpty = cards
+    .first()
+    .or(container.getByText(/no (matches|results|listings)/i).first());
   await expect(cardOrEmpty).toBeVisible({ timeout: 30_000 });
 }
 
@@ -41,7 +41,9 @@ test.describe("Semantic Search - Cursor Reset", () => {
     test.slow();
   });
 
-  test(`${tags.core} SS-58: changing search params resets accumulated results`, async ({ page }) => {
+  test(`${tags.core} SS-58: changing search params resets accumulated results`, async ({
+    page,
+  }) => {
     test.skip(!SEMANTIC_ENABLED, "Requires ENABLE_SEMANTIC_SEARCH=true");
 
     // Step 1: Search with semantic query
@@ -51,7 +53,10 @@ test.describe("Semantic Search - Cursor Reset", () => {
     const container = searchResultsContainer(page);
     const cards = container.locator('[data-testid="listing-card"]');
     const initialCount = await cards.count();
-    test.skip(initialCount < 12, "Fewer than 12 results — Load More unavailable");
+    test.skip(
+      initialCount < 12,
+      "Fewer than 12 results — Load More unavailable"
+    );
 
     // Step 2: Click Load More to accumulate >12 results
     const loadMoreBtn = container.locator(
@@ -60,10 +65,12 @@ test.describe("Semantic Search - Cursor Reset", () => {
     await expect(loadMoreBtn).toBeVisible({ timeout: 10_000 });
     await loadMoreBtn.click();
 
-    await expect.poll(
-      () => cards.count(),
-      { timeout: 30_000, message: "Expected more cards after Load More" }
-    ).toBeGreaterThan(initialCount);
+    await expect
+      .poll(() => cards.count(), {
+        timeout: 30_000,
+        message: "Expected more cards after Load More",
+      })
+      .toBeGreaterThan(initialCount);
 
     const accumulatedCount = await cards.count();
     expect(accumulatedCount).toBeGreaterThan(initialCount);

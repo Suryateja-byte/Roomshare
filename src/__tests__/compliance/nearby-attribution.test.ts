@@ -10,9 +10,12 @@
 
 // Mock NextResponse before importing the route
 const mockJsonFn = jest.fn();
-jest.mock('next/server', () => ({
+jest.mock("next/server", () => ({
   NextResponse: {
-    json: (data: unknown, init?: { status?: number; headers?: Record<string, string> }) => {
+    json: (
+      data: unknown,
+      init?: { status?: number; headers?: Record<string, string> }
+    ) => {
       mockJsonFn(data, init);
       return {
         status: init?.status || 200,
@@ -24,12 +27,12 @@ jest.mock('next/server', () => ({
 }));
 
 // Mock auth
-jest.mock('@/auth', () => ({
+jest.mock("@/auth", () => ({
   auth: jest.fn(),
 }));
 
 // Mock rate limiting
-jest.mock('@/lib/with-rate-limit', () => ({
+jest.mock("@/lib/with-rate-limit", () => ({
   withRateLimit: jest.fn().mockResolvedValue(null),
 }));
 
@@ -43,26 +46,26 @@ const originalError = console.error;
 const mockWarn = jest.fn();
 const mockError = jest.fn();
 
-import { POST } from '@/app/api/nearby/route';
-import { auth } from '@/auth';
-import { mockRadarPlace } from '@/__tests__/utils/mocks/radar-api.mock';
+import { POST } from "@/app/api/nearby/route";
+import { auth } from "@/auth";
+import { mockRadarPlace } from "@/__tests__/utils/mocks/radar-api.mock";
 
-describe('Nearby Places API - Compliance & Legal', () => {
+describe("Nearby Places API - Compliance & Legal", () => {
   const mockSession = {
-    user: { id: 'user-123', name: 'Test User', email: 'test@example.com' },
+    user: { id: "user-123", name: "Test User", email: "test@example.com" },
   };
 
   const validRequestBody = {
     listingLat: 37.7749,
     listingLng: -122.4194,
-    categories: ['food-grocery'],
+    categories: ["food-grocery"],
     radiusMeters: 1609,
   };
 
   beforeEach(() => {
     jest.clearAllMocks();
     (auth as jest.Mock).mockResolvedValue(mockSession);
-    process.env.RADAR_SECRET_KEY = 'test-secret-key';
+    process.env.RADAR_SECRET_KEY = "test-secret-key";
     mockFetch.mockResolvedValue({
       ok: true,
       status: 200,
@@ -81,14 +84,14 @@ describe('Nearby Places API - Compliance & Legal', () => {
   const createRequest = (body: unknown): Request => {
     return {
       json: async () => body,
-      url: 'http://localhost:3000/api/nearby',
+      url: "http://localhost:3000/api/nearby",
       headers: new Headers(),
     } as unknown as Request;
   };
 
   // J4: No Google Maps branding misuse
-  describe('J4: Branding Compliance', () => {
-    it('does not use Google Maps API or branding', async () => {
+  describe("J4: Branding Compliance", () => {
+    it("does not use Google Maps API or branding", async () => {
       const response = await POST(createRequest(validRequestBody));
       const data = await response.json();
 
@@ -96,12 +99,12 @@ describe('Nearby Places API - Compliance & Legal', () => {
 
       // Verify no Google-specific data in response
       const responseStr = JSON.stringify(data);
-      expect(responseStr).not.toContain('google');
-      expect(responseStr).not.toContain('Google');
-      expect(responseStr).not.toContain('googleapis');
+      expect(responseStr).not.toContain("google");
+      expect(responseStr).not.toContain("Google");
+      expect(responseStr).not.toContain("googleapis");
     });
 
-    it('uses Radar API endpoint, not Google', async () => {
+    it("uses Radar API endpoint, not Google", async () => {
       // Make a request first to trigger fetch
       await POST(createRequest(validRequestBody));
 
@@ -109,15 +112,15 @@ describe('Nearby Places API - Compliance & Legal', () => {
       expect(mockFetch).toHaveBeenCalled();
       const fetchUrl = mockFetch.mock.calls[0]?.[0];
       if (fetchUrl) {
-        expect(fetchUrl).toContain('radar.io');
-        expect(fetchUrl).not.toContain('google');
+        expect(fetchUrl).toContain("radar.io");
+        expect(fetchUrl).not.toContain("google");
       }
     });
   });
 
   // J5: POI data not stored in logs
-  describe('J5: No-Cache Compliance', () => {
-    it('includes Cache-Control no-cache headers', async () => {
+  describe("J5: No-Cache Compliance", () => {
+    it("includes Cache-Control no-cache headers", async () => {
       const response = await POST(createRequest(validRequestBody));
 
       expect(response.status).toBe(200);
@@ -127,13 +130,13 @@ describe('Nearby Places API - Compliance & Legal', () => {
         expect.anything(),
         expect.objectContaining({
           headers: expect.objectContaining({
-            'Cache-Control': expect.stringContaining('no-store'),
+            "Cache-Control": expect.stringContaining("no-store"),
           }),
         })
       );
     });
 
-    it('does not log POI data in production-like calls', async () => {
+    it("does not log POI data in production-like calls", async () => {
       await POST(createRequest(validRequestBody));
 
       // Console logs should not contain POI data
@@ -149,8 +152,8 @@ describe('Nearby Places API - Compliance & Legal', () => {
   });
 
   // J6: User queries not in analytics
-  describe('J6: Privacy Protection', () => {
-    it('does not expose user search queries in response metadata', async () => {
+  describe("J6: Privacy Protection", () => {
+    it("does not expose user search queries in response metadata", async () => {
       const sensitiveRequest = {
         ...validRequestBody,
         // Simulating a request that might have user-specific data
@@ -160,9 +163,9 @@ describe('Nearby Places API - Compliance & Legal', () => {
       const data = await response.json();
 
       // Response should not echo back the full request
-      expect(data).not.toHaveProperty('query');
-      expect(data).not.toHaveProperty('request');
-      expect(data).not.toHaveProperty('userLocation');
+      expect(data).not.toHaveProperty("query");
+      expect(data).not.toHaveProperty("request");
+      expect(data).not.toHaveProperty("userLocation");
 
       // Meta should only contain safe aggregated info
       expect(data.meta).toEqual(
@@ -173,25 +176,25 @@ describe('Nearby Places API - Compliance & Legal', () => {
       );
     });
 
-    it('does not include user ID in response', async () => {
+    it("does not include user ID in response", async () => {
       const response = await POST(createRequest(validRequestBody));
       const data = await response.json();
 
       const responseStr = JSON.stringify(data);
-      expect(responseStr).not.toContain('user-123');
+      expect(responseStr).not.toContain("user-123");
       expect(responseStr).not.toContain(mockSession.user.email);
     });
   });
 
   // J7: Rate-limit error sanitized
-  describe('J7: Error Sanitization', () => {
-    it('sanitizes rate limit error to hide internal details', async () => {
+  describe("J7: Error Sanitization", () => {
+    it("sanitizes rate limit error to hide internal details", async () => {
       mockFetch.mockResolvedValueOnce({
         ok: false,
         status: 429,
         json: async () => ({
-          error: 'Rate limit exceeded',
-          meta: { code: 429, internalDetails: 'Quota: 1000/day' },
+          error: "Rate limit exceeded",
+          meta: { code: 429, internalDetails: "Quota: 1000/day" },
         }),
       });
 
@@ -200,18 +203,18 @@ describe('Nearby Places API - Compliance & Legal', () => {
 
       // Error should be generic, not expose internal quota info
       expect(data.error).toBeDefined();
-      expect(JSON.stringify(data)).not.toContain('internalDetails');
-      expect(JSON.stringify(data)).not.toContain('Quota');
+      expect(JSON.stringify(data)).not.toContain("internalDetails");
+      expect(JSON.stringify(data)).not.toContain("Quota");
     });
   });
 
   // J8: Error responses hide coordinates
-  describe('J8: Coordinate Privacy', () => {
-    it('error responses do not expose listing coordinates', async () => {
+  describe("J8: Coordinate Privacy", () => {
+    it("error responses do not expose listing coordinates", async () => {
       mockFetch.mockResolvedValueOnce({
         ok: false,
         status: 500,
-        json: async () => ({ error: 'Internal server error' }),
+        json: async () => ({ error: "Internal server error" }),
       });
 
       const response = await POST(createRequest(validRequestBody));
@@ -219,13 +222,13 @@ describe('Nearby Places API - Compliance & Legal', () => {
 
       // Error response should not contain the user's coordinates
       const responseStr = JSON.stringify(data);
-      expect(responseStr).not.toContain('37.7749');
-      expect(responseStr).not.toContain('-122.4194');
+      expect(responseStr).not.toContain("37.7749");
+      expect(responseStr).not.toContain("-122.4194");
     });
 
-    it('error messages do not include API keys', async () => {
+    it("error messages do not include API keys", async () => {
       mockFetch.mockRejectedValueOnce(
-        new Error('Invalid API key: prj_test_xxx...')
+        new Error("Invalid API key: prj_test_xxx...")
       );
 
       const response = await POST(createRequest(validRequestBody));
@@ -233,65 +236,65 @@ describe('Nearby Places API - Compliance & Legal', () => {
 
       // Error should be generic
       const responseStr = JSON.stringify(data);
-      expect(responseStr).not.toContain('prj_');
-      expect(responseStr).not.toContain('API key');
-      expect(data.error).toBe('Internal server error');
+      expect(responseStr).not.toContain("prj_");
+      expect(responseStr).not.toContain("API key");
+      expect(data.error).toBe("Internal server error");
     });
   });
 
   // Additional compliance tests
-  describe('Response Structure Compliance', () => {
-    it('includes required meta fields per API contract', async () => {
+  describe("Response Structure Compliance", () => {
+    it("includes required meta fields per API contract", async () => {
       const response = await POST(createRequest(validRequestBody));
       const data = await response.json();
 
-      expect(data).toHaveProperty('places');
-      expect(data).toHaveProperty('meta');
-      expect(data.meta).toHaveProperty('count');
-      expect(data.meta).toHaveProperty('cached');
-      expect(typeof data.meta.count).toBe('number');
-      expect(typeof data.meta.cached).toBe('boolean');
+      expect(data).toHaveProperty("places");
+      expect(data).toHaveProperty("meta");
+      expect(data.meta).toHaveProperty("count");
+      expect(data.meta).toHaveProperty("cached");
+      expect(typeof data.meta.count).toBe("number");
+      expect(typeof data.meta.cached).toBe("boolean");
     });
 
-    it('places array contains required fields', async () => {
+    it("places array contains required fields", async () => {
       const response = await POST(createRequest(validRequestBody));
       const data = await response.json();
 
       if (data.places.length > 0) {
         const place = data.places[0];
-        expect(place).toHaveProperty('id');
-        expect(place).toHaveProperty('name');
-        expect(place).toHaveProperty('address');
-        expect(place).toHaveProperty('location');
-        expect(place).toHaveProperty('distanceMiles');
-        expect(place.location).toHaveProperty('lat');
-        expect(place.location).toHaveProperty('lng');
+        expect(place).toHaveProperty("id");
+        expect(place).toHaveProperty("name");
+        expect(place).toHaveProperty("address");
+        expect(place).toHaveProperty("location");
+        expect(place).toHaveProperty("distanceMiles");
+        expect(place.location).toHaveProperty("lat");
+        expect(place.location).toHaveProperty("lng");
       }
     });
   });
 
-  describe('Security Headers', () => {
-    it('does not expose internal error stack traces', async () => {
+  describe("Security Headers", () => {
+    it("does not expose internal error stack traces", async () => {
       mockFetch.mockImplementationOnce(() => {
-        throw new Error('Detailed internal error with stack trace');
+        throw new Error("Detailed internal error with stack trace");
       });
 
       const response = await POST(createRequest(validRequestBody));
       const data = await response.json();
 
       const responseStr = JSON.stringify(data);
-      expect(responseStr).not.toContain('stack');
-      expect(responseStr).not.toContain('at ');
-      expect(responseStr).not.toContain('node_modules');
+      expect(responseStr).not.toContain("stack");
+      expect(responseStr).not.toContain("at ");
+      expect(responseStr).not.toContain("node_modules");
     });
   });
 
-  describe('Input Sanitization', () => {
-    it('rejects invalid coordinate values', async () => {
+  describe("Input Sanitization", () => {
+    it("rejects invalid coordinate values", async () => {
       const invalidRequest = {
-        listingLat: 'not-a-number',
+        listingLat: "not-a-number",
         listingLng: -122.4194,
-        categories: ['food-grocery'],
+        categories: ["food-grocery"],
         radiusMeters: 1609,
       };
 
@@ -301,11 +304,11 @@ describe('Nearby Places API - Compliance & Legal', () => {
       expect(response.status).toBe(400);
     });
 
-    it('rejects out-of-range coordinates', async () => {
+    it("rejects out-of-range coordinates", async () => {
       const invalidRequest = {
         listingLat: 200, // Invalid latitude
         listingLng: -122.4194,
-        categories: ['food-grocery'],
+        categories: ["food-grocery"],
         radiusMeters: 1609,
       };
 
@@ -315,11 +318,11 @@ describe('Nearby Places API - Compliance & Legal', () => {
       expect(response.status).toBe(400);
     });
 
-    it('sanitizes category input', async () => {
+    it("sanitizes category input", async () => {
       const maliciousRequest = {
         listingLat: 37.7749,
         listingLng: -122.4194,
-        categories: ['<script>alert(1)</script>'],
+        categories: ["<script>alert(1)</script>"],
         radiusMeters: 1609,
       };
 

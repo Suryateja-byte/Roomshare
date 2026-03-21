@@ -16,7 +16,7 @@
  * SUPPORTED_LANGUAGES list to ensure all 54 languages are covered.
  */
 
-import { SUPPORTED_LANGUAGES, LEGACY_NAME_TO_CODE } from '@/lib/languages';
+import { SUPPORTED_LANGUAGES, LEGACY_NAME_TO_CODE } from "@/lib/languages";
 
 export interface LanguageComplianceResult {
   allowed: boolean;
@@ -32,11 +32,11 @@ function generateLanguageWordList(): string[] {
 
   // Only exclude truly generic tokens - NOT actual language names
   const EXCLUDED_WORDS = new Set([
-    'language',
-    'languages',
-    'speaker',
-    'speakers',
-    'speaking',
+    "language",
+    "languages",
+    "speaker",
+    "speakers",
+    "speaking",
   ]);
 
   // Add all display names from SUPPORTED_LANGUAGES
@@ -70,9 +70,9 @@ const LANGUAGE_WORDS = generateLanguageWordList();
  */
 function buildLanguagePattern(template: (langs: string) => string): RegExp {
   const escapedLangs = LANGUAGE_WORDS.map((lang) =>
-    lang.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')
-  ).join('|');
-  return new RegExp(template(escapedLangs), 'i');
+    lang.replace(/[.*+?^${}()|[\]\\]/g, "\\$&")
+  ).join("|");
+  return new RegExp(template(escapedLangs), "i");
 }
 
 /**
@@ -128,7 +128,7 @@ const REFUSAL_MESSAGE =
 export function checkListingLanguageCompliance(
   description: string
 ): LanguageComplianceResult {
-  if (!description || typeof description !== 'string') {
+  if (!description || typeof description !== "string") {
     return { allowed: true };
   }
 
@@ -154,7 +154,8 @@ export function checkListingLanguageCompliance(
 /**
  * Number of patterns for testing purposes
  */
-export const LANGUAGE_EXCLUSION_PATTERN_COUNT = LANGUAGE_EXCLUSION_PATTERNS.length;
+export const LANGUAGE_EXCLUSION_PATTERN_COUNT =
+  LANGUAGE_EXCLUSION_PATTERNS.length;
 
 /**
  * Number of unique language words covered by patterns (for testing)

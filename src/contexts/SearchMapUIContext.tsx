@@ -64,7 +64,7 @@ export function SearchMapUIProvider({
   shouldShowMap,
 }: SearchMapUIProviderProps) {
   const [pendingFocus, setPendingFocus] = useState<PendingMapFocus | null>(
-    null,
+    null
   );
   const nonceRef = useRef(0);
   const dismissRef = useRef<(() => void) | null>(null);
@@ -81,7 +81,7 @@ export function SearchMapUIProvider({
         showMap();
       }
     },
-    [showMap, shouldShowMap],
+    [showMap, shouldShowMap]
   );
 
   const acknowledgeFocus = useCallback((nonce: number) => {
@@ -116,7 +116,7 @@ export function SearchMapUIProvider({
       clearPendingFocus,
       registerDismiss,
       dismiss,
-    ],
+    ]
   );
 
   return (

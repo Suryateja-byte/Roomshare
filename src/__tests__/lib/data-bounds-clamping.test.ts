@@ -9,15 +9,12 @@
  * will use.
  */
 
-import {
-  clampBoundsToMaxSpan,
-  type MapBounds,
-} from '@/lib/validation';
-import { crossesAntimeridian } from '@/lib/data';
+import { clampBoundsToMaxSpan, type MapBounds } from "@/lib/validation";
+import { crossesAntimeridian } from "@/lib/data";
 import {
   MAP_FETCH_MAX_LAT_SPAN,
   MAP_FETCH_MAX_LNG_SPAN,
-} from '@/lib/constants';
+} from "@/lib/constants";
 
 /**
  * Helper function to determine if bounds need clamping.
@@ -26,7 +23,7 @@ import {
 function shouldClampBounds(bounds: MapBounds): boolean {
   const latSpan = bounds.maxLat - bounds.minLat;
   const lngSpan = crossesAntimeridian(bounds.minLng, bounds.maxLng)
-    ? (180 - bounds.minLng) + (bounds.maxLng + 180)
+    ? 180 - bounds.minLng + (bounds.maxLng + 180)
     : bounds.maxLng - bounds.minLng;
 
   return latSpan > MAP_FETCH_MAX_LAT_SPAN || lngSpan > MAP_FETCH_MAX_LNG_SPAN;
@@ -38,14 +35,18 @@ function shouldClampBounds(bounds: MapBounds): boolean {
  */
 function clampBoundsIfNeeded(bounds: MapBounds): MapBounds {
   if (shouldClampBounds(bounds)) {
-    return clampBoundsToMaxSpan(bounds, MAP_FETCH_MAX_LAT_SPAN, MAP_FETCH_MAX_LNG_SPAN);
+    return clampBoundsToMaxSpan(
+      bounds,
+      MAP_FETCH_MAX_LAT_SPAN,
+      MAP_FETCH_MAX_LNG_SPAN
+    );
   }
   return bounds;
 }
 
-describe('bounds clamping helpers for getListingsPaginated', () => {
-  describe('shouldClampBounds', () => {
-    it('returns true when latitude span exceeds MAP_FETCH_MAX_LAT_SPAN', () => {
+describe("bounds clamping helpers for getListingsPaginated", () => {
+  describe("shouldClampBounds", () => {
+    it("returns true when latitude span exceeds MAP_FETCH_MAX_LAT_SPAN", () => {
       const oversizedLat: MapBounds = {
         minLat: -5.0,
         maxLat: 65.0, // 70° span - exceeds 60° limit
@@ -56,7 +57,7 @@ describe('bounds clamping helpers for getListingsPaginated', () => {
       expect(shouldClampBounds(oversizedLat)).toBe(true);
     });
 
-    it('returns true when longitude span exceeds MAP_FETCH_MAX_LNG_SPAN', () => {
+    it("returns true when longitude span exceeds MAP_FETCH_MAX_LNG_SPAN", () => {
       const oversizedLng: MapBounds = {
         minLat: 40.0,
         maxLat: 42.0,
@@ -67,7 +68,7 @@ describe('bounds clamping helpers for getListingsPaginated', () => {
       expect(shouldClampBounds(oversizedLng)).toBe(true);
     });
 
-    it('returns true for world-spanning bounds (DoS case)', () => {
+    it("returns true for world-spanning bounds (DoS case)", () => {
       const worldBounds: MapBounds = {
         minLat: -85.0,
         maxLat: 85.0, // 170° span
@@ -78,7 +79,7 @@ describe('bounds clamping helpers for getListingsPaginated', () => {
       expect(shouldClampBounds(worldBounds)).toBe(true);
     });
 
-    it('returns false when bounds are within limits', () => {
+    it("returns false when bounds are within limits", () => {
       const validBounds: MapBounds = {
         minLat: 40.0,
         maxLat: 42.0, // 2° span
@@ -89,7 +90,7 @@ describe('bounds clamping helpers for getListingsPaginated', () => {
       expect(shouldClampBounds(validBounds)).toBe(false);
     });
 
-    it('returns false when bounds are exactly at limit', () => {
+    it("returns false when bounds are exactly at limit", () => {
       const exactLimitBounds: MapBounds = {
         minLat: 40.0,
         maxLat: 40.0 + MAP_FETCH_MAX_LAT_SPAN, // Exactly at span limit
@@ -100,7 +101,7 @@ describe('bounds clamping helpers for getListingsPaginated', () => {
       expect(shouldClampBounds(exactLimitBounds)).toBe(false);
     });
 
-    it('returns true for oversized antimeridian-crossing bounds', () => {
+    it("returns true for oversized antimeridian-crossing bounds", () => {
       const oversizedAntimeridian: MapBounds = {
         minLat: 40.0,
         maxLat: 42.0,
@@ -111,7 +112,7 @@ describe('bounds clamping helpers for getListingsPaginated', () => {
       expect(shouldClampBounds(oversizedAntimeridian)).toBe(true);
     });
 
-    it('returns false for valid antimeridian-crossing bounds', () => {
+    it("returns false for valid antimeridian-crossing bounds", () => {
       const validAntimeridian: MapBounds = {
         minLat: 40.0,
         maxLat: 42.0,
@@ -123,8 +124,8 @@ describe('bounds clamping helpers for getListingsPaginated', () => {
     });
   });
 
-  describe('clampBoundsIfNeeded', () => {
-    it('clamps oversized bounds', () => {
+  describe("clampBoundsIfNeeded", () => {
+    it("clamps oversized bounds", () => {
       const oversized: MapBounds = {
         minLat: -5.0,
         maxLat: 65.0, // 70° span - exceeds 60° limit
@@ -134,11 +135,15 @@ describe('bounds clamping helpers for getListingsPaginated', () => {
 
       const result = clampBoundsIfNeeded(oversized);
 
-      expect(result.maxLat - result.minLat).toBeLessThanOrEqual(MAP_FETCH_MAX_LAT_SPAN + 0.01);
-      expect(result.maxLng - result.minLng).toBeLessThanOrEqual(MAP_FETCH_MAX_LNG_SPAN + 0.01);
+      expect(result.maxLat - result.minLat).toBeLessThanOrEqual(
+        MAP_FETCH_MAX_LAT_SPAN + 0.01
+      );
+      expect(result.maxLng - result.minLng).toBeLessThanOrEqual(
+        MAP_FETCH_MAX_LNG_SPAN + 0.01
+      );
     });
 
-    it('preserves center when clamping', () => {
+    it("preserves center when clamping", () => {
       const oversized: MapBounds = {
         minLat: -5.0,
         maxLat: 65.0,
@@ -156,7 +161,7 @@ describe('bounds clamping helpers for getListingsPaginated', () => {
       expect(newLngCenter).toBeCloseTo(originalLngCenter);
     });
 
-    it('returns original bounds when within limits', () => {
+    it("returns original bounds when within limits", () => {
       const valid: MapBounds = {
         minLat: 40.0,
         maxLat: 42.0,
@@ -169,7 +174,7 @@ describe('bounds clamping helpers for getListingsPaginated', () => {
       expect(result).toEqual(valid);
     });
 
-    it('clamps world-spanning bounds to MAX dimensions', () => {
+    it("clamps world-spanning bounds to MAX dimensions", () => {
       const world: MapBounds = {
         minLat: -85.0,
         maxLat: 85.0,
@@ -208,8 +213,8 @@ describe('bounds clamping helpers for getListingsPaginated', () => {
  * }
  * ```
  */
-describe('getListingsPaginated clamping pattern', () => {
-  it('should use clamped bounds for database query when oversized', () => {
+describe("getListingsPaginated clamping pattern", () => {
+  it("should use clamped bounds for database query when oversized", () => {
     // Simulate the clamping logic that will be in getListingsPaginated
     let bounds: MapBounds | undefined = {
       minLat: -85.0,
@@ -222,11 +227,18 @@ describe('getListingsPaginated clamping pattern', () => {
     if (bounds) {
       const latSpan = bounds.maxLat - bounds.minLat;
       const lngSpan = crossesAntimeridian(bounds.minLng, bounds.maxLng)
-        ? (180 - bounds.minLng) + (bounds.maxLng + 180)
+        ? 180 - bounds.minLng + (bounds.maxLng + 180)
         : bounds.maxLng - bounds.minLng;
 
-      if (latSpan > MAP_FETCH_MAX_LAT_SPAN || lngSpan > MAP_FETCH_MAX_LNG_SPAN) {
-        bounds = clampBoundsToMaxSpan(bounds, MAP_FETCH_MAX_LAT_SPAN, MAP_FETCH_MAX_LNG_SPAN);
+      if (
+        latSpan > MAP_FETCH_MAX_LAT_SPAN ||
+        lngSpan > MAP_FETCH_MAX_LNG_SPAN
+      ) {
+        bounds = clampBoundsToMaxSpan(
+          bounds,
+          MAP_FETCH_MAX_LAT_SPAN,
+          MAP_FETCH_MAX_LNG_SPAN
+        );
       }
     }
 
@@ -235,7 +247,7 @@ describe('getListingsPaginated clamping pattern', () => {
     expect(bounds!.maxLng - bounds!.minLng).toBeCloseTo(MAP_FETCH_MAX_LNG_SPAN);
   });
 
-  it('should NOT modify bounds when within limits', () => {
+  it("should NOT modify bounds when within limits", () => {
     let bounds: MapBounds | undefined = {
       minLat: 40.0,
       maxLat: 42.0,
@@ -248,11 +260,18 @@ describe('getListingsPaginated clamping pattern', () => {
     if (bounds) {
       const latSpan = bounds.maxLat - bounds.minLat;
       const lngSpan = crossesAntimeridian(bounds.minLng, bounds.maxLng)
-        ? (180 - bounds.minLng) + (bounds.maxLng + 180)
+        ? 180 - bounds.minLng + (bounds.maxLng + 180)
         : bounds.maxLng - bounds.minLng;
 
-      if (latSpan > MAP_FETCH_MAX_LAT_SPAN || lngSpan > MAP_FETCH_MAX_LNG_SPAN) {
-        bounds = clampBoundsToMaxSpan(bounds, MAP_FETCH_MAX_LAT_SPAN, MAP_FETCH_MAX_LNG_SPAN);
+      if (
+        latSpan > MAP_FETCH_MAX_LAT_SPAN ||
+        lngSpan > MAP_FETCH_MAX_LNG_SPAN
+      ) {
+        bounds = clampBoundsToMaxSpan(
+          bounds,
+          MAP_FETCH_MAX_LAT_SPAN,
+          MAP_FETCH_MAX_LNG_SPAN
+        );
       }
     }
 

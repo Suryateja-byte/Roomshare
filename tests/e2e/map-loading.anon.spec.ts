@@ -14,7 +14,15 @@
  * Run with: pnpm playwright test tests/e2e/map-loading.anon.spec.ts --project=chromium-anon
  */
 
-import { test, expect, SF_BOUNDS, selectors, waitForMapMarkers, searchResultsContainer, waitForMapReady } from "./helpers/test-utils";
+import {
+  test,
+  expect,
+  SF_BOUNDS,
+  selectors,
+  waitForMapMarkers,
+  searchResultsContainer,
+  waitForMapReady,
+} from "./helpers/test-utils";
 
 // Build URL query string from SF bounds
 const boundsQS = `minLat=${SF_BOUNDS.minLat}&maxLat=${SF_BOUNDS.maxLat}&minLng=${SF_BOUNDS.minLng}&maxLng=${SF_BOUNDS.maxLng}`;
@@ -54,7 +62,10 @@ function filterBenignErrors(errors: string[]): string[] {
 /**
  * Helper: wait for the search page to be interactive
  */
-async function waitForSearchPage(page: import("@playwright/test").Page, url = SEARCH_URL) {
+async function waitForSearchPage(
+  page: import("@playwright/test").Page,
+  url = SEARCH_URL
+) {
   await page.goto(url);
   await page.waitForLoadState("domcontentloaded");
   // Wait for any button to appear (indicates page is interactive)
@@ -67,9 +78,8 @@ async function waitForSearchPage(page: import("@playwright/test").Page, url = SE
  */
 async function getMapE2EState(page: import("@playwright/test").Page) {
   return page.evaluate(() => {
-    const roomshare = (window as unknown as Record<string, unknown>).__roomshare as
-      | Record<string, unknown>
-      | undefined;
+    const roomshare = (window as unknown as Record<string, unknown>)
+      .__roomshare as Record<string, unknown> | undefined;
     if (!roomshare) return null;
     return {
       mapInstanceId: roomshare.mapInstanceId as string | undefined,
@@ -82,7 +92,10 @@ async function getMapE2EState(page: import("@playwright/test").Page) {
 /**
  * Helper: Check if map container is visible, with graceful failure
  */
-async function isMapVisible(page: import("@playwright/test").Page, timeout = 15_000): Promise<boolean> {
+async function isMapVisible(
+  page: import("@playwright/test").Page,
+  timeout = 15_000
+): Promise<boolean> {
   try {
     const mapContainer = page.locator(selectors.map);
     await mapContainer.first().waitFor({ state: "visible", timeout });
@@ -93,13 +106,17 @@ async function isMapVisible(page: import("@playwright/test").Page, timeout = 15_
 }
 
 // Map tests need extra time for WebGL rendering and tile loading in CI
-test.beforeEach(async () => { test.slow(); });
+test.beforeEach(async () => {
+  test.slow();
+});
 
 // ---------------------------------------------------------------------------
 // 1.1: Map loads without JavaScript errors (P0)
 // ---------------------------------------------------------------------------
 test.describe("1.1: Map loads without JavaScript errors", () => {
-  test("search page with map loads without critical JS errors", async ({ page }) => {
+  test("search page with map loads without critical JS errors", async ({
+    page,
+  }) => {
     const consoleErrors: string[] = [];
     page.on("console", (msg) => {
       if (msg.type() === "error") {
@@ -128,7 +145,8 @@ test.describe("1.1: Map loads without JavaScript errors", () => {
 
     // Filter out benign errors (WebGL, network, hydration, etc.)
     const criticalErrors = pageErrors.filter(
-      (e) => !BENIGN_ERROR_PATTERNS.some((pattern) => e.message.includes(pattern))
+      (e) =>
+        !BENIGN_ERROR_PATTERNS.some((pattern) => e.message.includes(pattern))
     );
     expect(criticalErrors).toHaveLength(0);
   });
@@ -165,7 +183,8 @@ test.describe("1.2: Map displays markers for listings in bounds", () => {
       if (cardCount > 0) {
         test.info().annotations.push({
           type: "skip-reason",
-          description: "Markers not rendered (WebGL unavailable in headless mode)",
+          description:
+            "Markers not rendered (WebGL unavailable in headless mode)",
         });
       }
     }
@@ -181,7 +200,10 @@ test.describe("1.2: Map displays markers for listings in bounds", () => {
 
     // E2E instrumentation only available when NEXT_PUBLIC_E2E=true
     if (!e2eState) {
-      test.skip(true, "E2E instrumentation not enabled (NEXT_PUBLIC_E2E!=true)");
+      test.skip(
+        true,
+        "E2E instrumentation not enabled (NEXT_PUBLIC_E2E!=true)"
+      );
       return;
     }
 
@@ -203,7 +225,10 @@ test.describe("1.3: Map persists across navigation", () => {
     const initialState = await getMapE2EState(page);
 
     if (!initialState || !initialState.mapInstanceId) {
-      test.skip(true, "E2E instrumentation not enabled (NEXT_PUBLIC_E2E!=true)");
+      test.skip(
+        true,
+        "E2E instrumentation not enabled (NEXT_PUBLIC_E2E!=true)"
+      );
       return;
     }
 
@@ -224,12 +249,17 @@ test.describe("1.3: Map persists across navigation", () => {
 
     // Init count should NOT have increased (no remount)
     // Note: With client-side navigation, the component shouldn't remount
-    if (initialInitCount !== undefined && afterState?.mapInitCount !== undefined) {
+    if (
+      initialInitCount !== undefined &&
+      afterState?.mapInitCount !== undefined
+    ) {
       expect(afterState.mapInitCount).toBe(initialInitCount);
     }
   });
 
-  test("map does not reinitialize when changing sort order", async ({ page }) => {
+  test("map does not reinitialize when changing sort order", async ({
+    page,
+  }) => {
     // Start with default search
     await waitForSearchPage(page);
 
@@ -240,7 +270,10 @@ test.describe("1.3: Map persists across navigation", () => {
     }
 
     // Find and click a sort button if available
-    const sortButton = page.locator('button').filter({ hasText: /newest|price/i }).first();
+    const sortButton = page
+      .locator("button")
+      .filter({ hasText: /newest|price/i })
+      .first();
     if ((await sortButton.count()) === 0) {
       // No sort button - use URL navigation
       await page.goto(`${SEARCH_URL}&sort=price_asc`);
@@ -263,9 +296,9 @@ test.describe("1.4: Map initializes to URL bounds", () => {
     // Use specific bounds that we can verify
     const testBounds = {
       minLat: 37.75,
-      maxLat: 37.80,
+      maxLat: 37.8,
       minLng: -122.45,
-      maxLng: -122.40,
+      maxLng: -122.4,
     };
     const testBoundsQS = `minLat=${testBounds.minLat}&maxLat=${testBounds.maxLat}&minLng=${testBounds.minLng}&maxLng=${testBounds.maxLng}`;
 
@@ -336,7 +369,9 @@ test.describe("1.4: Map initializes to URL bounds", () => {
 // 1.5: Map falls back to first listing location when no bounds (P1)
 // ---------------------------------------------------------------------------
 test.describe("1.5: Map falls back to first listing location when no bounds", () => {
-  test("map loads with default center when no bounds provided", async ({ page }) => {
+  test("map loads with default center when no bounds provided", async ({
+    page,
+  }) => {
     // Navigate to search WITHOUT bounds params
     await page.goto("/search");
     await page.waitForLoadState("domcontentloaded");
@@ -353,7 +388,10 @@ test.describe("1.5: Map falls back to first listing location when no bounds", ()
   });
 
   // eslint-disable-next-line @typescript-eslint/no-unused-vars
-  test("map centers on first listing when no URL bounds", async ({ page, network: _network }) => {
+  test("map centers on first listing when no URL bounds", async ({
+    page,
+    network: _network,
+  }) => {
     // NOTE: API mocking only works for client-side requests.
     // Server-side rendering will not see the mock, so we test the fallback
     // behavior with actual data instead.
@@ -372,7 +410,8 @@ test.describe("1.5: Map falls back to first listing location when no bounds", ()
       expect(bodyVisible).toBe(true);
       test.info().annotations.push({
         type: "skip-reason",
-        description: "Map not rendered without bounds (server may require bounds)",
+        description:
+          "Map not rendered without bounds (server may require bounds)",
       });
       return;
     }
@@ -398,7 +437,9 @@ test.describe("1.5: Map falls back to first listing location when no bounds", ()
     }
   });
 
-  test("map uses SF default when no listings and no bounds", async ({ page }) => {
+  test("map uses SF default when no listings and no bounds", async ({
+    page,
+  }) => {
     // Navigate without bounds to a search that likely has no results
     // Use browse mode (no query) which should show all listings or SF default
     await page.goto("/search");

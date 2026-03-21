@@ -5,7 +5,13 @@
  * - List items populate from v2 response
  * - Map renders markers/clusters from v2 geojson/pins
  */
-import { test, expect, tags, SF_BOUNDS, searchResultsContainer } from "../helpers";
+import {
+  test,
+  expect,
+  tags,
+  SF_BOUNDS,
+  searchResultsContainer,
+} from "../helpers";
 
 test.describe("Search V2 UI Integration", () => {
   test.beforeEach(async () => {
@@ -30,7 +36,9 @@ test.describe("Search V2 UI Integration", () => {
     await expect(heading).toBeVisible({ timeout: 30000 });
 
     // Check for listing cards
-    const cards = searchResultsContainer(page).locator('[data-testid="listing-card"]');
+    const cards = searchResultsContainer(page).locator(
+      '[data-testid="listing-card"]'
+    );
 
     // Wait for cards or empty state to appear
     const cardOrEmptyState = cards
@@ -61,7 +69,7 @@ test.describe("Search V2 UI Integration", () => {
 
     // Include bounds to skip throttle delay and ensure we're in the seed data area
     await page.goto(
-      `/search?v2=1&minLat=${SF_BOUNDS.minLat}&maxLat=${SF_BOUNDS.maxLat}&minLng=${SF_BOUNDS.minLng}&maxLng=${SF_BOUNDS.maxLng}`,
+      `/search?v2=1&minLat=${SF_BOUNDS.minLat}&maxLat=${SF_BOUNDS.maxLat}&minLng=${SF_BOUNDS.minLng}&maxLng=${SF_BOUNDS.maxLng}`
     );
     // Don't use domcontentloaded - page has continuous polling
     await page.waitForLoadState("domcontentloaded");
@@ -94,7 +102,7 @@ test.describe("Search V2 UI Integration", () => {
         !e.includes("ResizeObserver") && // Ignore ResizeObserver warnings
         !e.includes("Failed to load resource") && // Ignore 404s for optional assets
         !e.includes("WebGL") && // Ignore WebGL not supported errors
-        !e.includes("Access token"), // Ignore token errors in test env
+        !e.includes("Access token") // Ignore token errors in test env
     );
     expect(fatalMapErrors).toHaveLength(0);
 
@@ -110,7 +118,10 @@ test.describe("Search V2 UI Integration", () => {
     page,
   }) => {
     const viewport = page.viewportSize();
-    test.skip(!!viewport && viewport.width < 768, "Desktop-only: mobile panel not visible on small viewports");
+    test.skip(
+      !!viewport && viewport.width < 768,
+      "Desktop-only: mobile panel not visible on small viewports"
+    );
 
     // Desktop viewport for map visibility
     await page.setViewportSize({ width: 1280, height: 800 });
@@ -126,7 +137,7 @@ test.describe("Search V2 UI Integration", () => {
     });
 
     await page.goto(
-      `/search?v2=1&minLat=${SF_BOUNDS.minLat}&maxLat=${SF_BOUNDS.maxLat}&minLng=${SF_BOUNDS.minLng}&maxLng=${SF_BOUNDS.maxLng}`,
+      `/search?v2=1&minLat=${SF_BOUNDS.minLat}&maxLat=${SF_BOUNDS.maxLat}&minLng=${SF_BOUNDS.minLng}&maxLng=${SF_BOUNDS.maxLng}`
     );
     await page.waitForLoadState("domcontentloaded");
 

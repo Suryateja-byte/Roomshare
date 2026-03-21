@@ -4,7 +4,7 @@
  * Uses process.env replacement + jest.resetModules() to isolate
  * each test case (Zod schema is evaluated at module import time).
  */
-describe('Multi-slot booking feature flag cross-validation', () => {
+describe("Multi-slot booking feature flag cross-validation", () => {
   const originalEnv = process.env;
 
   // All required serverEnvSchema keys (verified from env-turnstile-production.test.ts)
@@ -33,12 +33,12 @@ describe('Multi-slot booking feature flag cross-validation', () => {
     process.env = originalEnv;
   });
 
-  it('passes with no feature flags set (all undefined)', async () => {
+  it("passes with no feature flags set (all undefined)", async () => {
     const { getServerEnv } = await import("@/lib/env");
     expect(() => getServerEnv()).not.toThrow();
   });
 
-  it('passes with valid full combo (all flags enabled correctly)', async () => {
+  it("passes with valid full combo (all flags enabled correctly)", async () => {
     process.env.ENABLE_MULTI_SLOT_BOOKING = "true";
     process.env.ENABLE_WHOLE_UNIT_MODE = "true";
     process.env.ENABLE_SOFT_HOLDS = "on";
@@ -47,54 +47,58 @@ describe('Multi-slot booking feature flag cross-validation', () => {
     expect(() => getServerEnv()).not.toThrow();
   });
 
-  it('passes with MULTI_SLOT only', async () => {
+  it("passes with MULTI_SLOT only", async () => {
     process.env.ENABLE_MULTI_SLOT_BOOKING = "true";
     const { getServerEnv } = await import("@/lib/env");
     expect(() => getServerEnv()).not.toThrow();
   });
 
-  it('passes with SOFT_HOLDS=drain (does not require MULTI_SLOT)', async () => {
+  it("passes with SOFT_HOLDS=drain (does not require MULTI_SLOT)", async () => {
     process.env.ENABLE_SOFT_HOLDS = "drain";
     const { getServerEnv } = await import("@/lib/env");
     expect(() => getServerEnv()).not.toThrow();
   });
 
-  it('throws when WHOLE_UNIT=true without MULTI_SLOT', async () => {
+  it("throws when WHOLE_UNIT=true without MULTI_SLOT", async () => {
     process.env.ENABLE_WHOLE_UNIT_MODE = "true";
     const consoleSpy = jest.spyOn(console, "error").mockImplementation();
     const { getServerEnv } = await import("@/lib/env");
     expect(() => getServerEnv()).toThrow("Invalid environment configuration");
     expect(consoleSpy).toHaveBeenCalledWith(
-      expect.stringContaining("ENABLE_WHOLE_UNIT_MODE requires ENABLE_MULTI_SLOT_BOOKING"),
+      expect.stringContaining(
+        "ENABLE_WHOLE_UNIT_MODE requires ENABLE_MULTI_SLOT_BOOKING"
+      )
     );
     consoleSpy.mockRestore();
   });
 
-  it('throws when BOOKING_AUDIT=true without SOFT_HOLDS=on', async () => {
+  it("throws when BOOKING_AUDIT=true without SOFT_HOLDS=on", async () => {
     process.env.ENABLE_MULTI_SLOT_BOOKING = "true";
     process.env.ENABLE_BOOKING_AUDIT = "true";
     const consoleSpy = jest.spyOn(console, "error").mockImplementation();
     const { getServerEnv } = await import("@/lib/env");
     expect(() => getServerEnv()).toThrow("Invalid environment configuration");
     expect(consoleSpy).toHaveBeenCalledWith(
-      expect.stringContaining("ENABLE_BOOKING_AUDIT requires ENABLE_SOFT_HOLDS"),
+      expect.stringContaining("ENABLE_BOOKING_AUDIT requires ENABLE_SOFT_HOLDS")
     );
     consoleSpy.mockRestore();
   });
 
-  it('throws when SOFT_HOLDS=on without MULTI_SLOT', async () => {
+  it("throws when SOFT_HOLDS=on without MULTI_SLOT", async () => {
     process.env.ENABLE_SOFT_HOLDS = "on";
     const consoleSpy = jest.spyOn(console, "error").mockImplementation();
     const { getServerEnv } = await import("@/lib/env");
     expect(() => getServerEnv()).toThrow("Invalid environment configuration");
     expect(consoleSpy).toHaveBeenCalledWith(
-      expect.stringContaining("ENABLE_SOFT_HOLDS=on requires ENABLE_MULTI_SLOT_BOOKING"),
+      expect.stringContaining(
+        "ENABLE_SOFT_HOLDS=on requires ENABLE_MULTI_SLOT_BOOKING"
+      )
     );
     consoleSpy.mockRestore();
   });
 
-  it('feature getters do not throw on unrelated invalid production secrets', async () => {
-    process.env.CRON_SECRET = 'change-in-production-aaaa-bbbb-cccc-dddd-eeee';
+  it("feature getters do not throw on unrelated invalid production secrets", async () => {
+    process.env.CRON_SECRET = "change-in-production-aaaa-bbbb-cccc-dddd-eeee";
     process.env.ENABLE_MULTI_SLOT_BOOKING = "true";
     process.env.ENABLE_SOFT_HOLDS = "on";
 
@@ -105,8 +109,8 @@ describe('Multi-slot booking feature flag cross-validation', () => {
     expect(features.multiSlotBooking).toBe(true);
   });
 
-  it('disables keyset pagination when CURSOR_SECRET is invalid', async () => {
-    process.env.CURSOR_SECRET = 'short';
+  it("disables keyset pagination when CURSOR_SECRET is invalid", async () => {
+    process.env.CURSOR_SECRET = "short";
 
     const { features } = await import("@/lib/env");
 

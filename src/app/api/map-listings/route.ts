@@ -59,7 +59,7 @@ export async function GET(request: NextRequest) {
           maxLatSpan: MAP_FETCH_MAX_LAT_SPAN,
           maxLngSpan: MAP_FETCH_MAX_LNG_SPAN,
           clampOversized: true,
-        },
+        }
       );
 
       let bounds = boundsResult.valid ? boundsResult.bounds : null;
@@ -96,11 +96,15 @@ export async function GET(request: NextRequest) {
       // Bounds are required - prevents full-table scans
       if (!bounds) {
         return NextResponse.json(
-          { error: boundsResult.error || "Bounds required: provide minLat/maxLat/minLng/maxLng or lat/lng" },
+          {
+            error:
+              boundsResult.error ||
+              "Bounds required: provide minLat/maxLat/minLng/maxLng or lat/lng",
+          },
           {
             status: 400,
             headers: { "x-request-id": requestId },
-          },
+          }
         );
       }
 
@@ -142,14 +146,14 @@ export async function GET(request: NextRequest) {
         const result = await withTimeout(
           getSearchDocMapListings(mapFilterParams),
           DEFAULT_TIMEOUTS.DATABASE,
-          "getSearchDocMapListings",
+          "getSearchDocMapListings"
         );
         listings = result.listings;
       } else {
         listings = await withTimeout(
           getMapListings(mapFilterParams),
           DEFAULT_TIMEOUTS.DATABASE,
-          "getMapListings",
+          "getMapListings"
         );
       }
 
@@ -166,7 +170,7 @@ export async function GET(request: NextRequest) {
             // Vary by Accept-Encoding for proper CDN compression handling
             Vary: "Accept-Encoding",
           },
-        },
+        }
       );
     } catch (error) {
       logger.sync.error("Map listings API error", {
@@ -180,7 +184,7 @@ export async function GET(request: NextRequest) {
         {
           status: 500,
           headers: { "x-request-id": requestId },
-        },
+        }
       );
     }
   });

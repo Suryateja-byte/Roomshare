@@ -9,6 +9,7 @@ describe("ListScrollBridge CSS safety", () => {
     expect(safeId).not.toContain('"');
     expect(safeId).not.toContain("}");
 
-    if (globalThis.CSS && originalEscape) globalThis.CSS.escape = originalEscape;
+    if (globalThis.CSS && originalEscape)
+      globalThis.CSS.escape = originalEscape;
   });
 });

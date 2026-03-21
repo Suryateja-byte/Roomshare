@@ -2,74 +2,73 @@
  * Tests for booking utility functions
  */
 
-jest.mock('@/lib/prisma', () => ({
+jest.mock("@/lib/prisma", () => ({
   prisma: {
     booking: {
       findMany: jest.fn(),
       count: jest.fn(),
     },
   },
-}))
+}));
 
 import {
   getActiveBookingsForListing,
   hasActiveAcceptedBookings,
   getActiveAcceptedBookingsCount,
-} from '@/lib/booking-utils'
-import { prisma } from '@/lib/prisma'
+} from "@/lib/booking-utils";
+import { prisma } from "@/lib/prisma";
 
-describe('booking-utils', () => {
+describe("booking-utils", () => {
   const mockTenant = {
-    id: 'tenant-123',
-    email: 'tenant@example.com',
-    name: 'Tenant User',
-  }
+    id: "tenant-123",
+    email: "tenant@example.com",
+    name: "Tenant User",
+  };
 
-  const futureDate = new Date(Date.now() + 30 * 24 * 60 * 60 * 1000)
-  const pastDate = new Date(Date.now() - 30 * 24 * 60 * 60 * 1000)
+  const futureDate = new Date(Date.now() + 30 * 24 * 60 * 60 * 1000);
 
   const mockBookings = [
     {
-      id: 'booking-1',
-      listingId: 'listing-123',
-      status: 'ACCEPTED',
+      id: "booking-1",
+      listingId: "listing-123",
+      status: "ACCEPTED",
       endDate: futureDate,
       tenant: mockTenant,
     },
     {
-      id: 'booking-2',
-      listingId: 'listing-123',
-      status: 'PENDING',
+      id: "booking-2",
+      listingId: "listing-123",
+      status: "PENDING",
       endDate: futureDate,
       tenant: mockTenant,
     },
-  ]
+  ];
 
   beforeEach(() => {
-    jest.clearAllMocks()
-  })
+    jest.clearAllMocks();
+  });
 
-  describe('getActiveBookingsForListing', () => {
-    it('returns PENDING, ACCEPTED, and HELD bookings', async () => {
-      ;(prisma.booking.findMany as jest.Mock).mockResolvedValue(mockBookings)
+  describe("getActiveBookingsForListing", () => {
+    it("returns PENDING, ACCEPTED, and HELD bookings", async () => {
+      (prisma.booking.findMany as jest.Mock).mockResolvedValue(mockBookings);
 
-      const result = await getActiveBookingsForListing('listing-123')
+      const result = await getActiveBookingsForListing("listing-123");
 
-      expect(result).toEqual(mockBookings)
+      expect(result).toEqual(mockBookings);
       expect(prisma.booking.findMany).toHaveBeenCalledWith(
         expect.objectContaining({
           where: expect.objectContaining({
-            listingId: 'listing-123',
-            status: { in: ['PENDING', 'ACCEPTED', 'HELD'] },
+            listingId: "listing-123",
+            status: { in: ["PENDING", "ACCEPTED", "HELD"] },
           }),
         })
-      )
-    })
+      );
+    });
 
-    it('filters bookings with future end dates', async () => {
-      ;(prisma.booking.findMany as jest.Mock).mockResolvedValue(mockBookings)
+    it("filters bookings with future end dates", async () => {
+      (prisma.booking.findMany as jest.Mock).mockResolvedValue(mockBookings);
 
-      await getActiveBookingsForListing('listing-123')
+      await getActiveBookingsForListing("listing-123");
 
       expect(prisma.booking.findMany).toHaveBeenCalledWith(
         expect.objectContaining({
@@ -77,13 +76,13 @@ describe('booking-utils', () => {
             endDate: { gte: expect.any(Date) },
           }),
         })
-      )
-    })
+      );
+    });
 
-    it('includes tenant data', async () => {
-      ;(prisma.booking.findMany as jest.Mock).mockResolvedValue(mockBookings)
+    it("includes tenant data", async () => {
+      (prisma.booking.findMany as jest.Mock).mockResolvedValue(mockBookings);
 
-      await getActiveBookingsForListing('listing-123')
+      await getActiveBookingsForListing("listing-123");
 
       expect(prisma.booking.findMany).toHaveBeenCalledWith(
         expect.objectContaining({
@@ -91,127 +90,39 @@ describe('booking-utils', () => {
             tenant: { select: { id: true, name: true } },
           },
         })
-      )
-    })
+      );
+    });
 
-    it('returns empty array when no active bookings', async () => {
-      ;(prisma.booking.findMany as jest.Mock).mockResolvedValue([])
+    it("returns empty array when no active bookings", async () => {
+      (prisma.booking.findMany as jest.Mock).mockResolvedValue([]);
 
-      const result = await getActiveBookingsForListing('listing-123')
+      const result = await getActiveBookingsForListing("listing-123");
 
-      expect(result).toEqual([])
-    })
-  })
+      expect(result).toEqual([]);
+    });
+  });
 
-  describe('hasActiveAcceptedBookings', () => {
-    it('returns true when accepted booking exists', async () => {
-      ;(prisma.booking.count as jest.Mock).mockResolvedValue(1)
+  describe("hasActiveAcceptedBookings", () => {
+    it("returns true when accepted booking exists", async () => {
+      (prisma.booking.count as jest.Mock).mockResolvedValue(1);
 
-      const result = await hasActiveAcceptedBookings('listing-123')
+      const result = await hasActiveAcceptedBookings("listing-123");
 
-      expect(result).toBe(true)
-    })
+      expect(result).toBe(true);
+    });
 
-    it('returns false when no accepted bookings', async () => {
-      ;(prisma.booking.count as jest.Mock).mockResolvedValue(0)
+    it("returns false when no accepted bookings", async () => {
+      (prisma.booking.count as jest.Mock).mockResolvedValue(0);
 
-      const result = await hasActiveAcceptedBookings('listing-123')
+      const result = await hasActiveAcceptedBookings("listing-123");
 
-      expect(result).toBe(false)
-    })
+      expect(result).toBe(false);
+    });
 
-    it('only counts bookings with future end dates', async () => {
-      ;(prisma.booking.count as jest.Mock).mockResolvedValue(0)
+    it("only counts bookings with future end dates", async () => {
+      (prisma.booking.count as jest.Mock).mockResolvedValue(0);
 
-      await hasActiveAcceptedBookings('listing-123')
-
-      expect(prisma.booking.count).toHaveBeenCalledWith(
-        expect.objectContaining({
-          where: expect.objectContaining({
-            endDate: { gte: expect.any(Date) },
-          }),
-        })
-      )
-    })
-
-    it('counts ACCEPTED and HELD status bookings', async () => {
-      ;(prisma.booking.count as jest.Mock).mockResolvedValue(0)
-
-      await hasActiveAcceptedBookings('listing-123')
-
-      expect(prisma.booking.count).toHaveBeenCalledWith(
-        expect.objectContaining({
-          where: expect.objectContaining({
-            status: { in: ['ACCEPTED', 'HELD'] },
-          }),
-        })
-      )
-    })
-
-    it('filters by listing ID', async () => {
-      ;(prisma.booking.count as jest.Mock).mockResolvedValue(0)
-
-      await hasActiveAcceptedBookings('listing-456')
-
-      expect(prisma.booking.count).toHaveBeenCalledWith(
-        expect.objectContaining({
-          where: expect.objectContaining({
-            listingId: 'listing-456',
-          }),
-        })
-      )
-    })
-  })
-
-  describe('getActiveAcceptedBookingsCount', () => {
-    it('returns correct count', async () => {
-      ;(prisma.booking.count as jest.Mock).mockResolvedValue(3)
-
-      const result = await getActiveAcceptedBookingsCount('listing-123')
-
-      expect(result).toBe(3)
-    })
-
-    it('returns 0 when no accepted bookings', async () => {
-      ;(prisma.booking.count as jest.Mock).mockResolvedValue(0)
-
-      const result = await getActiveAcceptedBookingsCount('listing-123')
-
-      expect(result).toBe(0)
-    })
-
-    it('filters by listing ID', async () => {
-      ;(prisma.booking.count as jest.Mock).mockResolvedValue(0)
-
-      await getActiveAcceptedBookingsCount('listing-789')
-
-      expect(prisma.booking.count).toHaveBeenCalledWith(
-        expect.objectContaining({
-          where: expect.objectContaining({
-            listingId: 'listing-789',
-          }),
-        })
-      )
-    })
-
-    it('counts ACCEPTED and HELD status', async () => {
-      ;(prisma.booking.count as jest.Mock).mockResolvedValue(0)
-
-      await getActiveAcceptedBookingsCount('listing-123')
-
-      expect(prisma.booking.count).toHaveBeenCalledWith(
-        expect.objectContaining({
-          where: expect.objectContaining({
-            status: { in: ['ACCEPTED', 'HELD'] },
-          }),
-        })
-      )
-    })
-
-    it('only counts future end dates', async () => {
-      ;(prisma.booking.count as jest.Mock).mockResolvedValue(0)
-
-      await getActiveAcceptedBookingsCount('listing-123')
+      await hasActiveAcceptedBookings("listing-123");
 
       expect(prisma.booking.count).toHaveBeenCalledWith(
         expect.objectContaining({
@@ -219,7 +130,127 @@ describe('booking-utils', () => {
             endDate: { gte: expect.any(Date) },
           }),
         })
-      )
-    })
-  })
-})
+      );
+    });
+
+    it("counts ACCEPTED and HELD status bookings", async () => {
+      (prisma.booking.count as jest.Mock).mockResolvedValue(0);
+
+      await hasActiveAcceptedBookings("listing-123");
+
+      expect(prisma.booking.count).toHaveBeenCalledWith(
+        expect.objectContaining({
+          where: expect.objectContaining({
+            status: { in: ["ACCEPTED", "HELD"] },
+          }),
+        })
+      );
+    });
+
+    it("filters by listing ID", async () => {
+      (prisma.booking.count as jest.Mock).mockResolvedValue(0);
+
+      await hasActiveAcceptedBookings("listing-456");
+
+      expect(prisma.booking.count).toHaveBeenCalledWith(
+        expect.objectContaining({
+          where: expect.objectContaining({
+            listingId: "listing-456",
+          }),
+        })
+      );
+    });
+  });
+
+  describe("getActiveAcceptedBookingsCount", () => {
+    it("returns correct count", async () => {
+      (prisma.booking.count as jest.Mock).mockResolvedValue(3);
+
+      const result = await getActiveAcceptedBookingsCount("listing-123");
+
+      expect(result).toBe(3);
+    });
+
+    it("returns 0 when no accepted bookings", async () => {
+      (prisma.booking.count as jest.Mock).mockResolvedValue(0);
+
+      const result = await getActiveAcceptedBookingsCount("listing-123");
+
+      expect(result).toBe(0);
+    });
+
+    it("filters by listing ID", async () => {
+      (prisma.booking.count as jest.Mock).mockResolvedValue(0);
+
+      await getActiveAcceptedBookingsCount("listing-789");
+
+      expect(prisma.booking.count).toHaveBeenCalledWith(
+        expect.objectContaining({
+          where: expect.objectContaining({
+            listingId: "listing-789",
+          }),
+        })
+      );
+    });
+
+    it("counts ACCEPTED and HELD status", async () => {
+      (prisma.booking.count as jest.Mock).mockResolvedValue(0);
+
+      await getActiveAcceptedBookingsCount("listing-123");
+
+      expect(prisma.booking.count).toHaveBeenCalledWith(
+        expect.objectContaining({
+          where: expect.objectContaining({
+            status: { in: ["ACCEPTED", "HELD"] },
+          }),
+        })
+      );
+    });
+
+    it("only counts future end dates", async () => {
+      (prisma.booking.count as jest.Mock).mockResolvedValue(0);
+
+      await getActiveAcceptedBookingsCount("listing-123");
+
+      expect(prisma.booking.count).toHaveBeenCalledWith(
+        expect.objectContaining({
+          where: expect.objectContaining({
+            endDate: { gte: expect.any(Date) },
+          }),
+        })
+      );
+    });
+  });
+
+  describe("error handling", () => {
+    it("propagates database errors from findMany", async () => {
+      (prisma.booking.findMany as jest.Mock).mockRejectedValue(
+        new Error("Connection refused")
+      );
+
+      await expect(
+        getActiveBookingsForListing("listing-123")
+      ).rejects.toThrow("Connection refused");
+    });
+
+    it("propagates database errors from count", async () => {
+      (prisma.booking.count as jest.Mock).mockRejectedValue(
+        new Error("Connection refused")
+      );
+
+      await expect(
+        hasActiveAcceptedBookings("listing-123")
+      ).rejects.toThrow("Connection refused");
+    });
+
+    it("propagates database errors from getActiveAcceptedBookingsCount", async () => {
+      (prisma.booking.count as jest.Mock).mockRejectedValue(
+        new Error("Query timeout")
+      );
+
+      await expect(
+        getActiveAcceptedBookingsCount("listing-123")
+      ).rejects.toThrow("Query timeout");
+    });
+  });
+});
