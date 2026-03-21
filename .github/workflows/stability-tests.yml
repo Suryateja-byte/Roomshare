@@ -59,7 +59,7 @@ jobs:
       TURNSTILE_ENABLED: 'false'
 
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v6
 
       - name: Install pgvector extension in PostgreSQL
         run: |
