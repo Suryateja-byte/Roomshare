@@ -550,7 +550,11 @@ export default function PersistentMapWrapper({
   // Track current params to detect changes for debouncing
   const lastFetchedParamsRef = useRef<string | null>(null);
   const fetchTimeoutRef = useRef<NodeJS.Timeout | null>(null);
-  const abortControllerRef = useRef<AbortController | null>(null);
+  // P1-#4 FIX: Separate abort controllers for search and pan effects.
+  // Previously shared — a pan during a search debounce would abort the search
+  // controller, causing the search fetch to silently fail with AbortError.
+  const searchAbortRef = useRef<AbortController | null>(null);
+  const panAbortRef = useRef<AbortController | null>(null);
   const retryCountRef = useRef<number>(0);
   const retryTimeoutRef = useRef<NodeJS.Timeout | null>(null);
   // D3.1 FIX: Track whether a 429 retry is scheduled so the finally block
@@ -639,7 +643,7 @@ export default function PersistentMapWrapper({
             // (e.g., user panned) between the 429 and the retry timeout firing.
             retryTimeoutRef.current = setTimeout(() => {
               const retryController = new AbortController();
-              abortControllerRef.current = retryController;
+              searchAbortRef.current = retryController;
               fetchListings(paramsString, retryController.signal, fetchBounds);
             }, retryDelayMs);
 
@@ -848,13 +852,13 @@ export default function PersistentMapWrapper({
     // M6-MAP: Client AbortController cancels the fetch but cannot cancel the
     // in-progress DB query on the server. Server-side statement_timeout provides
     // the safety net for runaway queries.
-    if (abortControllerRef.current) {
-      abortControllerRef.current.abort();
+    if (searchAbortRef.current) {
+      searchAbortRef.current.abort();
     }
 
-    // Create abort controller for this fetch
+    // Create abort controller for this search fetch
     const abortController = new AbortController();
-    abortControllerRef.current = abortController;
+    searchAbortRef.current = abortController;
 
     // Pad fetch bounds by 20% to pre-fetch nearby listings (reduces fetches on small pans)
     // Only the map's /api/map-listings fetch uses padded bounds.
@@ -880,8 +884,8 @@ export default function PersistentMapWrapper({
       if (retryTimeoutRef.current) {
         clearTimeout(retryTimeoutRef.current);
       }
-      if (abortControllerRef.current) {
-        abortControllerRef.current.abort();
+      if (searchAbortRef.current) {
+        searchAbortRef.current.abort();
       }
     };
     // eslint-disable-next-line react-hooks/exhaustive-deps -- intentional dependency omission to prevent infinite loops
@@ -923,16 +927,22 @@ export default function PersistentMapWrapper({
     if (paddedParamsString === lastFetchedParamsRef.current) return;
 
     if (fetchTimeoutRef.current) clearTimeout(fetchTimeoutRef.current);
-    if (abortControllerRef.current) abortControllerRef.current.abort();
+    if (panAbortRef.current) panAbortRef.current.abort();
 
     const abortController = new AbortController();
-    abortControllerRef.current = abortController;
+    panAbortRef.current = abortController;
 
     // Fast debounce for dragging
     fetchTimeoutRef.current = setTimeout(() => {
       lastFetchedParamsRef.current = paddedParamsString;
       fetchListings(paddedParamsString, abortController.signal, paddedBounds);
     }, 100);
+
+    return () => {
+      if (panAbortRef.current) {
+        panAbortRef.current.abort();
+      }
+    };
   }, [
     activePanBounds,
     searchParams,
@@ -950,13 +960,13 @@ export default function PersistentMapWrapper({
     }
 
     // P1-1 FIX: Abort any existing request before starting retry
-    if (abortControllerRef.current) {
-      abortControllerRef.current.abort();
+    if (searchAbortRef.current) {
+      searchAbortRef.current.abort();
     }
 
     // Create new AbortController for retry request
     const abortController = new AbortController();
-    abortControllerRef.current = abortController;
+    searchAbortRef.current = abortController;
 
     // Force a refetch by clearing the last fetched ref
     lastFetchedParamsRef.current = null;

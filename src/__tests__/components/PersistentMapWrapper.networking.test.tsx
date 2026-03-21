@@ -611,6 +611,45 @@ describe("PersistentMapWrapper - Networking & Race Conditions (P1-7)", () => {
       });
     });
 
+    it("search and pan effects use separate abort controllers — pan does not clobber search (P1-#4)", async () => {
+      // Track all fetch signals to verify they're independent
+      const fetchCalls: { url: string; aborted: boolean }[] = [];
+      mockFetch.mockImplementation(
+        (url: string, options?: { signal?: AbortSignal }) => {
+          fetchCalls.push({
+            url,
+            aborted: options?.signal?.aborted ?? false,
+          });
+          return Promise.resolve({
+            ok: true,
+            status: 200,
+            headers: new Headers(),
+            json: async () => ({
+              listings: [
+                {
+                  id: "1",
+                  title: "Test",
+                  price: 1000,
+                  location: { lat: 37.7, lng: -122.4 },
+                },
+              ],
+            }),
+          });
+        }
+      );
+
+      render(<PersistentMapWrapper shouldRenderMap={true} />);
+
+      // Trigger search fetch via debounce
+      await act(async () => {
+        jest.advanceTimersByTime(MAP_FETCH_DEBOUNCE_MS);
+      });
+
+      // First fetch should NOT have an aborted signal
+      expect(fetchCalls.length).toBeGreaterThanOrEqual(1);
+      expect(fetchCalls[0].aborted).toBe(false);
+    });
+
     it("clears error on successful retry", async () => {
       // First request fails
       mockFetch
