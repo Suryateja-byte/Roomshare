@@ -80,7 +80,7 @@ export function AppliedFilterChips({
         </div>
 
         {/* Clear All button - only show when multiple filters */}
-        {chips.length >= 1 && (
+        {chips.length > 1 && (
           <button
             type="button"
             onClick={handleClearAll}

@@ -28,6 +28,7 @@ import {
   sanitizeSearchQuery,
   isValidQuery,
   crossesAntimeridian,
+  hasValidCoordinates,
 } from "@/lib/search-types";
 import { sanitizeMapListings } from "@/lib/maps/sanitize-map-listings";
 import {
@@ -694,32 +695,34 @@ export async function getSearchDocLimitedCount(
  * Shared by all paginated listing queries to avoid duplication.
  */
 function mapRawListingsToPublic(listings: ListingRaw[]): ListingData[] {
-  return listings.map((l) => ({
-    id: l.id,
-    title: l.title,
-    description: l.description,
-    price: Number(l.price),
-    images: l.images || [],
-    availableSlots: l.availableSlots,
-    totalSlots: l.totalSlots,
-    amenities: l.amenities || [],
-    houseRules: l.houseRules || [],
-    householdLanguages: l.householdLanguages || [],
-    primaryHomeLanguage: l.primaryHomeLanguage,
-    leaseDuration: l.leaseDuration,
-    roomType: l.roomType,
-    moveInDate: l.moveInDate ? new Date(l.moveInDate) : undefined,
-    createdAt: l.createdAt ? new Date(l.createdAt) : new Date(),
-    viewCount: Number(l.viewCount) || 0,
-    avgRating: Number(l.avgRating) || 0,
-    reviewCount: Number(l.reviewCount) || 0,
-    location: {
-      city: l.city,
-      state: l.state,
-      lat: Number(l.lat) || 0,
-      lng: Number(l.lng) || 0,
-    },
-  }));
+  return listings
+    .filter((l) => hasValidCoordinates(Number(l.lat), Number(l.lng)))
+    .map((l) => ({
+      id: l.id,
+      title: l.title,
+      description: l.description,
+      price: Number(l.price),
+      images: l.images || [],
+      availableSlots: l.availableSlots,
+      totalSlots: l.totalSlots,
+      amenities: l.amenities || [],
+      houseRules: l.houseRules || [],
+      householdLanguages: l.householdLanguages || [],
+      primaryHomeLanguage: l.primaryHomeLanguage,
+      leaseDuration: l.leaseDuration,
+      roomType: l.roomType,
+      moveInDate: l.moveInDate ? new Date(l.moveInDate) : undefined,
+      createdAt: l.createdAt ? new Date(l.createdAt) : new Date(),
+      viewCount: Number(l.viewCount) || 0,
+      avgRating: Number(l.avgRating) || 0,
+      reviewCount: Number(l.reviewCount) || 0,
+      location: {
+        city: l.city,
+        state: l.state,
+        lat: Number(l.lat),
+        lng: Number(l.lng),
+      },
+    }));
 }
 
 // ============================================
@@ -1233,7 +1236,20 @@ export async function getSearchDocListingsWithKeyset(
     // Near matches are only shown on page 1 which uses offset-based pagination
 
     // Hybrid count - use cached count for consistency
-    const limitedCount = await getSearchDocLimitedCount(params);
+    // Wrapped in try/catch: count is informational only (for UI pagination).
+    // If it fails, return null (UI shows "100+") rather than discarding valid listings.
+    let limitedCount: number | null = null;
+    try {
+      limitedCount = await getSearchDocLimitedCount(params);
+    } catch (countError) {
+      logger.sync.warn(
+        "[getSearchDocListingsWithKeyset] Count query failed, using null",
+        {
+          error:
+            countError instanceof Error ? countError.message : "Unknown",
+        }
+      );
+    }
     const total = limitedCount;
     const totalPages =
       limitedCount !== null ? Math.ceil(limitedCount / limit) : null;
@@ -1607,7 +1623,9 @@ export async function semanticSearchQuery(
 export function mapSemanticRowsToListingData(
   rows: SemanticSearchRow[]
 ): ListingData[] {
-  return rows.map((row) => ({
+  return rows
+    .filter((row) => hasValidCoordinates(row.lat, row.lng))
+    .map((row) => ({
     id: row.id,
     title: row.title,
     description: row.description,
@@ -1625,13 +1643,18 @@ export function mapSemanticRowsToListingData(
     householdGender: row.household_gender ?? undefined,
     moveInDate: row.move_in_date ?? undefined,
     ownerId: row.owner_id,
+    // Match mapRawListingsToPublic: include rating/review/view fields
+    // for ListingCard rendering (star ratings, review counts)
+    avgRating: Number(row.avg_rating) || 0,
+    reviewCount: Number(row.review_count) || 0,
+    viewCount: Number(row.view_count) || 0,
     location: {
       address: row.address,
       city: row.city,
       state: row.state,
       zip: row.zip,
-      lat: row.lat ?? 0,
-      lng: row.lng ?? 0,
+      lat: row.lat!,
+      lng: row.lng!,
     },
   }));
 }

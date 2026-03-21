@@ -98,9 +98,18 @@ export default function SearchHeaderWrapper() {
         setIsProfileOpen(false);
       }
     };
+    const handleKeyDown = (event: KeyboardEvent) => {
+      if (event.key === "Escape" && isProfileOpen) {
+        setIsProfileOpen(false);
+      }
+    };
     document.addEventListener("mousedown", handleClickOutside);
-    return () => document.removeEventListener("mousedown", handleClickOutside);
-  }, []);
+    document.addEventListener("keydown", handleKeyDown);
+    return () => {
+      document.removeEventListener("mousedown", handleClickOutside);
+      document.removeEventListener("keydown", handleKeyDown);
+    };
+  }, [isProfileOpen]);
 
   // Dynamically update --header-height CSS variable to ensure perfect layout spacing
   // regardless of responsive wrapping inside the search form.

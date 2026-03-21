@@ -206,6 +206,8 @@ export function CategoryBar() {
     // Reset pagination
     params.delete("cursor");
     params.delete("page");
+    params.delete("cursorStack");
+    params.delete("pageNumber");
 
     startTransition(() => {
       const qs = params.toString();

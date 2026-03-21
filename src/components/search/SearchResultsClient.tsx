@@ -35,7 +35,6 @@ interface SearchResultsClientProps {
   browseMode: boolean;
   hasConfirmedZeroResults: boolean;
   filterSuggestions: FilterSuggestion[];
-  sortOption: string;
 }
 
 export function SearchResultsClient({

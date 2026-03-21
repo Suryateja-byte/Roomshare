@@ -340,7 +340,6 @@ export default async function SearchPage({ searchParams }: SearchPageProps) {
           browseMode={browseMode}
           hasConfirmedZeroResults={hasConfirmedZeroResults}
           filterSuggestions={[]}
-          sortOption={sortOption}
         />
       </div>
     </div>

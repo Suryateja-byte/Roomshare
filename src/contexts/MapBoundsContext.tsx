@@ -54,6 +54,9 @@ import {
   AREA_COUNT_CACHE_TTL_MS,
 } from "@/lib/constants";
 
+/** Maximum area count cache entries before LRU eviction */
+const AREA_COUNT_CACHE_MAX_ENTRIES = 50;
+
 /** Coordinates for map bounds */
 export interface MapBoundsCoords {
   minLng: number;
@@ -509,6 +512,20 @@ export function MapBoundsProvider({ children }: { children: React.ReactNode }) {
               count,
               expiresAt: Date.now() + AREA_COUNT_CACHE_TTL_MS,
             });
+            // LRU eviction: remove soonest-to-expire entry beyond limit
+            if (
+              areaCountCacheRef.current.size > AREA_COUNT_CACHE_MAX_ENTRIES
+            ) {
+              let oldestKey: string | null = null;
+              let oldestTime = Infinity;
+              for (const [k, entry] of areaCountCacheRef.current) {
+                if (entry.expiresAt < oldestTime) {
+                  oldestTime = entry.expiresAt;
+                  oldestKey = k;
+                }
+              }
+              if (oldestKey) areaCountCacheRef.current.delete(oldestKey);
+            }
           }
         })
         .catch((err) => {
