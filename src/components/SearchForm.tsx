@@ -35,6 +35,7 @@ import {
 import { safeMark } from "@/lib/perf";
 // Import canonical allowlists from shared parsing module
 import { VALID_AMENITIES, VALID_HOUSE_RULES } from "@/lib/search-params";
+import { clearAllFilters } from "@/components/filters/filter-chip-utils";
 import { useSearchTransitionSafe } from "@/contexts/SearchTransitionContext";
 import { useMobileSearch } from "@/contexts/MobileSearchContext";
 import { cn } from "@/lib/utils";
@@ -685,13 +686,11 @@ export default function SearchForm({
     [setPending]
   );
 
-  // Clear all filters and reset to defaults
-  // INP optimization: Batch state updates in startTransition
+  // Clear all filters but preserve location, bounds, and sort (#15)
+  // Matches AppliedFilterChips "Clear all" behavior via shared clearAllFilters()
   const handleClearAllFilters = useCallback(() => {
     startTransition(() => {
-      setLocation("");
       setWhatQuery("");
-      setSelectedCoords(null);
       setPending({
         minPrice: "",
         maxPrice: "",
@@ -706,13 +705,17 @@ export default function SearchForm({
         minSlots: "",
       });
     });
-    // Navigate to clean search page (outside transition - navigation is user-facing)
+    // Navigate preserving location, bounds, and sort — only clear filter params
+    const preserved = clearAllFilters(
+      new URLSearchParams(searchParams.toString())
+    );
+    const searchUrl = `/search${preserved ? `?${preserved}` : ""}`;
     if (transitionContext) {
-      transitionContext.navigateWithTransition("/search");
+      transitionContext.navigateWithTransition(searchUrl);
     } else {
-      router.push("/search");
+      router.push(searchUrl);
     }
-  }, [transitionContext, router, setPending]);
+  }, [transitionContext, router, setPending, searchParams]);
 
   // Count active filters for badge - use COMMITTED (URL) state, not pending
   // This ensures the badge updates instantly when chips are removed
