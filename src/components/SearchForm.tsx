@@ -553,9 +553,12 @@ export default function SearchForm({
       if (committed.leaseDuration)
         params.set("leaseDuration", committed.leaseDuration);
       if (committed.roomType) params.set("roomType", committed.roomType);
-      committed.amenities.forEach((a) => params.append("amenities", a));
-      committed.houseRules.forEach((r) => params.append("houseRules", r));
-      committed.languages.forEach((l) => params.append("languages", l));
+      if (committed.amenities.length > 0)
+        params.set("amenities", committed.amenities.join(","));
+      if (committed.houseRules.length > 0)
+        params.set("houseRules", committed.houseRules.join(","));
+      if (committed.languages.length > 0)
+        params.set("languages", committed.languages.join(","));
       if (committed.genderPreference)
         params.set("genderPreference", committed.genderPreference);
       if (committed.householdGender)
@@ -881,13 +884,12 @@ export default function SearchForm({
         {semanticSearchEnabled && !isCompact && (
           <>
             <div
-              style={getFieldFlex("what")}
-              className={cn(
-                "w-full flex flex-col relative",
-                isCompact ? "px-4 py-2" : "px-6 py-2.5",
-                focusedField === "what" && "md:bg-white/[0.03] md:rounded-2xl"
-              )}
-            >
+                style={getFieldFlex('what')}
+                className={cn(
+                'w-full flex flex-col relative overflow-hidden whitespace-nowrap transition-opacity duration-300',
+                isCompact ? 'px-4 py-2' : 'px-4 py-2 md:px-6 md:py-2.5',
+                focusedField === 'what' ? 'md:bg-white/[0.03] md:rounded-2xl opacity-100' : (focusedField !== null ? 'opacity-50' : 'opacity-100'),
+            )}>
               <label
                 htmlFor="search-what"
                 className={cn(
@@ -939,9 +941,9 @@ export default function SearchForm({
         <div
           style={getFieldFlex("where")}
           className={cn(
-            "w-full flex flex-col relative group/input",
-            isCompact ? "px-4 py-2" : "px-6 py-2.5",
-            focusedField === "where" && "md:bg-white/[0.03] md:rounded-2xl"
+            "w-full flex flex-col relative group/input overflow-hidden whitespace-nowrap transition-opacity duration-300",
+            isCompact ? "px-4 py-2" : "px-4 py-2 md:px-6 md:py-2.5",
+            focusedField === "where" ? "md:bg-white/[0.03] md:rounded-2xl opacity-100" : (focusedField !== null ? "opacity-50" : "opacity-100")
           )}
         >
           {!isCompact && (
@@ -1067,9 +1069,9 @@ export default function SearchForm({
         <div
           style={getFieldFlex("budget")}
           className={cn(
-            "w-full flex flex-col",
-            isCompact ? "px-4 py-2" : "px-6 py-2.5",
-            focusedField === "budget" && "md:bg-white/[0.03] md:rounded-2xl"
+            "w-full flex flex-col overflow-hidden whitespace-nowrap transition-opacity duration-300",
+            isCompact ? "px-4 py-2" : "px-4 py-2 md:px-6 md:py-2.5",
+            focusedField === "budget" ? "md:bg-white/[0.03] md:rounded-2xl opacity-100" : (focusedField !== null ? "opacity-50" : "opacity-100")
           )}
         >
           {!isCompact && (
