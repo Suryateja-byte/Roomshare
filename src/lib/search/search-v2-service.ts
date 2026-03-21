@@ -146,7 +146,8 @@ export async function executeSearchV2(
         keysetCursor = decoded.cursor;
       } else if (decoded?.type === "legacy") {
         // Legacy cursor - use page number, but return keyset cursor going forward
-        page = decoded.page;
+        // Clamp to prevent unbounded OFFSET from crafted cursors (DoS prevention)
+        page = Math.min(decoded.page, 100);
       }
       // If invalid cursor, start from beginning (page 1, no keyset cursor)
     } else if (cursorStr) {

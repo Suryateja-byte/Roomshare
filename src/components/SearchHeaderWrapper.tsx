@@ -142,7 +142,7 @@ export default function SearchHeaderWrapper() {
     return () => {
       observer.disconnect();
     };
-  }, [isCollapsed, isExpanded]);
+  }, []);
 
   useKeyboardShortcuts([
     {

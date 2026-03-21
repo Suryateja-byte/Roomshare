@@ -838,22 +838,12 @@ export default function SearchForm({
     },
   ]);
 
-  // Prevent body scroll when drawer is open
-  useEffect(() => {
-    if (showFilters) {
-      document.body.style.overflow = "hidden";
-      return () => {
-        document.body.style.overflow = "";
-      };
-    }
-  }, [showFilters]);
+  // Body scroll lock for filter drawer is handled by FilterModal's useBodyScrollLock(isOpen).
+  // No duplicate lock needed here.
 
   const isCompact = variant === "compact";
-  const minMoveInDate = new Date(
-    Date.now() - new Date().getTimezoneOffset() * 60000
-  )
-    .toISOString()
-    .split("T")[0];
+  // 'en-CA' locale returns YYYY-MM-DD format in local timezone, safe across DST transitions
+  const minMoveInDate = new Date().toLocaleDateString("en-CA");
 
   // Compute inline flex styles for focus-triggered expansion.
   // Uses inline styles instead of Tailwind classes because Tailwind v4

@@ -46,7 +46,6 @@ import {
   LAT_MAX,
   LNG_MIN,
   LNG_MAX,
-  BOUNDS_EPSILON,
 } from "@/lib/constants";
 
 // CRITICAL: Lazy import - only loads when component renders
@@ -79,10 +78,10 @@ interface SpatialCacheEntry {
   timestamp: number;
 }
 
-/** Quantize bounds to BOUNDS_EPSILON precision for cache key */
+/** Quantize bounds to BOUNDS_EPSILON precision for cache key.
+ *  Uses integer math to avoid IEEE 754 float multiplication issues. */
 function quantizeBounds(bounds: ViewportBounds): string {
-  const q = (n: number) =>
-    (Math.round(n / BOUNDS_EPSILON) * BOUNDS_EPSILON).toFixed(3);
+  const q = (n: number) => (Math.round(n * 1000) / 1000).toFixed(3);
   return `${q(bounds.minLat)},${q(bounds.maxLat)},${q(bounds.minLng)},${q(bounds.maxLng)}`;
 }
 

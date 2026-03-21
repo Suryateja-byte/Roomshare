@@ -1535,6 +1535,10 @@ export default function MapComponent({
       if (programmaticClearTimeoutRef.current) {
         clearTimeout(programmaticClearTimeoutRef.current);
       }
+      if (onMoveThrottleRef.current) {
+        clearTimeout(onMoveThrottleRef.current);
+        onMoveThrottleRef.current = null;
+      }
       if (hoverScrollTimeoutRef.current) {
         clearTimeout(hoverScrollTimeoutRef.current);
       }
@@ -2018,7 +2022,7 @@ export default function MapComponent({
   useEffect(() => {
     if (!mapRef.current) return;
     patchMapPrototypeAddLayer(mapRef.current.getMap());
-  });
+  }, [isMapLoaded]);
 
   useEffect(() => {
     if (isDarkMode) return;
