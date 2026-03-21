@@ -235,15 +235,19 @@ const SSR_FALLBACK: MapBoundsContextValue = {
 };
 
 /**
- * Check if a point is within map bounds (with small padding for edge cases)
+ * Check if a point is within map bounds.
+ * Handles antimeridian crossing (minLng > maxLng) where the viewport
+ * wraps around ±180° — e.g., minLng=170, maxLng=-170 for Pacific views.
  */
 function isPointInBounds(point: PointCoords, bounds: MapBoundsCoords): boolean {
-  return (
-    point.lat >= bounds.minLat &&
-    point.lat <= bounds.maxLat &&
-    point.lng >= bounds.minLng &&
-    point.lng <= bounds.maxLng
-  );
+  const latInBounds = point.lat >= bounds.minLat && point.lat <= bounds.maxLat;
+  if (!latInBounds) return false;
+
+  // Antimeridian crossing: viewport wraps around ±180°
+  if (bounds.minLng > bounds.maxLng) {
+    return point.lng >= bounds.minLng || point.lng <= bounds.maxLng;
+  }
+  return point.lng >= bounds.minLng && point.lng <= bounds.maxLng;
 }
 
 export function MapBoundsProvider({ children }: { children: React.ReactNode }) {
