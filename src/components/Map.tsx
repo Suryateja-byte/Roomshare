@@ -1799,7 +1799,17 @@ export default function MapComponent({
   useEffect(() => {
     if (!activeId || activeId === lastMapActiveRef.current) return;
     const listing = listings.find((l) => l.id === activeId);
-    if (!listing) return;
+    if (!listing) {
+      // UX-12 FIX: Show info message when listing isn't in the map's dataset.
+      // This happens when "Show on Map" is clicked for a listing loaded via
+      // "Load more" that's beyond the map's 200-marker cap or outside the
+      // current padded viewport.
+      setViewportInfoMessage("This listing is outside the current map view");
+      setTimeout(() => {
+        if (isMountedRef.current) setViewportInfoMessage(null);
+      }, 3000);
+      return;
+    }
     setSelectedListing(listing);
     setProgrammaticMove(true);
     // Safety: clear programmatic flag if moveEnd doesn't fire

@@ -3,19 +3,11 @@
 import { Search, SlidersHorizontal } from "lucide-react";
 import { useSearchParams } from "next/navigation";
 import { useMemo } from "react";
+import { countActiveFilters } from "@/components/filters/filter-chip-utils";
 
 interface CompactSearchPillProps {
   onExpand: () => void;
   onOpenFilters?: () => void;
-}
-
-/** Count param values, splitting CSV entries (e.g. "Wifi,AC" → 2). */
-function countParamValues(searchParams: URLSearchParams, key: string): number {
-  return searchParams
-    .getAll(key)
-    .flatMap((v) => v.split(","))
-    .map((v) => v.trim())
-    .filter(Boolean).length;
 }
 
 /**
@@ -50,36 +42,12 @@ export function CompactSearchPill({
     return parts;
   }, [location, minPrice, maxPrice, roomType, leaseDuration]);
 
-  // Count active filters
-  const filterCount = useMemo(() => {
-    let count = 0;
-    const keys = [
-      "moveInDate",
-      "leaseDuration",
-      "roomType",
-      "genderPreference",
-      "householdGender",
-    ];
-    for (const key of keys) {
-      const val = searchParams.get(key);
-      if (val && val !== "any") count++;
-    }
-    count += countParamValues(searchParams, "amenities");
-    count += countParamValues(searchParams, "houseRules");
-    count += countParamValues(searchParams, "languages");
-    if (minPrice) count++;
-    if (maxPrice) count++;
-    // Count minSlots filter
-    const minSlots = searchParams.get("minSlots");
-    if (minSlots && parseInt(minSlots) >= 2) count++;
-    // Count nearMatches filter
-    if (
-      searchParams.get("nearMatches") === "1" ||
-      searchParams.get("nearMatches") === "true"
-    )
-      count++;
-    return count;
-  }, [searchParams, minPrice, maxPrice]);
+  // P1-3 FIX: Use shared countActiveFilters instead of ad-hoc counting.
+  // Validates against allowlists, counts price range as 1 chip, handles nearMatches consistently.
+  const filterCount = useMemo(
+    () => countActiveFilters(searchParams),
+    [searchParams]
+  );
 
   return (
     <div className="hidden md:flex items-center gap-2 w-full max-w-2xl mx-auto">

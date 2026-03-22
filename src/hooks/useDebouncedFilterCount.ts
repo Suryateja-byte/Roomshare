@@ -20,6 +20,7 @@ import { useSearchParams } from "next/navigation";
 import type { BatchedFilterValues } from "./useBatchedFilters";
 import { rateLimitedFetch, RateLimitError } from "@/lib/rate-limit-client";
 import { createTTLCache } from "./createTTLCache";
+import { setRateLimited } from "./useRateLimitStatus";
 
 interface CachedCount {
   count: number | null;
@@ -257,9 +258,10 @@ export function useDebouncedFilterCount({
       if (err instanceof Error && err.name === "AbortError") {
         return;
       }
-      // Silently back off on rate limit — shared state prevents further fetches
+      // Back off on rate limit — notify shared status for UI feedback (P1-6)
       if (err instanceof RateLimitError) {
         if (!abortController.signal.aborted) setIsLoading(false);
+        setRateLimited(err.retryAfterMs);
         return;
       }
 

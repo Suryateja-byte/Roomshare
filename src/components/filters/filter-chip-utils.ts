@@ -394,3 +394,17 @@ export function hasAnyFilter(searchParams: URLSearchParams): boolean {
     return true;
   });
 }
+
+/**
+ * Count active filters from URL params with allowlist validation.
+ *
+ * Single source of truth for filter badge counts. Delegates to urlToFilterChips()
+ * which validates against canonical allowlists, handles price as one combined chip,
+ * validates dates, resolves aliases, and deduplicates array values.
+ *
+ * P1-3 FIX: Replaces 4 independent ad-hoc counting implementations that disagreed
+ * on nearMatches inclusion, price counting (1 vs 2), and allowlist validation.
+ */
+export function countActiveFilters(searchParams: URLSearchParams): number {
+  return urlToFilterChips(searchParams).length;
+}

@@ -12,14 +12,9 @@ import { X } from "lucide-react";
 import PullToRefresh from "./PullToRefresh";
 import { useBodyScrollLock } from "@/hooks/useBodyScrollLock";
 import { useMediaQuery } from "@/hooks/useMediaQuery";
-
-/**
- * Snap points as fractions of viewport height (from bottom).
- * collapsed = just header peek, half = half screen, expanded = near full.
- */
-const SNAP_COLLAPSED = 0.15; // ~15vh
-const SNAP_HALF = 0.5; // ~50vh
-const SNAP_EXPANDED = 0.85; // ~85vh
+// P2-18 FIX: Import snap points from shared constants so FloatingMapButton
+// and MobileBottomSheet stay in sync. Previously hardcoded locally.
+import { SNAP_COLLAPSED, SNAP_HALF, SNAP_EXPANDED } from "@/lib/mobile-layout";
 
 const SNAP_POINTS = [SNAP_COLLAPSED, SNAP_HALF, SNAP_EXPANDED] as const;
 

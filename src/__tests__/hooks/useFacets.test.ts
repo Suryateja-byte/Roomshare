@@ -311,14 +311,14 @@ describe("useFacets", () => {
     expect(mockFetch).toHaveBeenCalledTimes(2);
   });
 
-  // ── 7. 400 + boundsRequired → EMPTY_FACETS ──────────────────────────────
+  // ── 7. 200 + boundsRequired → EMPTY_FACETS + boundsRequired flag ────────
 
-  it("7. 400 + boundsRequired:true returns EMPTY_FACETS gracefully without throwing", async () => {
+  it("7. 200 + boundsRequired:true returns empty facets and sets boundsRequired flag (P1-5)", async () => {
     (useSearchParams as jest.Mock).mockReturnValue(
       makeSearchParams({ lat: "37.5", lng: "-122.5" })
     );
     mockFetch.mockResolvedValueOnce(
-      mockErrorResponse(400, { boundsRequired: true })
+      mockOkResponse({ ...EMPTY_FACETS, boundsRequired: true })
     );
 
     const { result } = renderHook(() =>
@@ -330,11 +330,14 @@ describe("useFacets", () => {
     });
 
     await waitFor(() => {
-      expect(result.current.facets).toEqual(EMPTY_FACETS);
+      expect(result.current.facets).toEqual(
+        expect.objectContaining(EMPTY_FACETS)
+      );
     });
 
     expect(result.current.isLoading).toBe(false);
     expect(result.current.error).toBeNull();
+    expect(result.current.boundsRequired).toBe(true);
   });
 
   // ── 8. 500 error → EMPTY_FACETS, no throw ──────────────────────────────

@@ -432,6 +432,8 @@ export default function PersistentMapWrapper({
   const lastFilterKeyRef = useRef<string>("");
   // P2-FIX (#151): Separate info messages from errors - info is non-blocking (no retry needed)
   const [infoMessage, setInfoMessage] = useState<string | null>(null);
+  // UX-13 FIX: Track whether the map data was truncated (>200 listings in viewport)
+  const [isMapTruncated, setIsMapTruncated] = useState(false);
 
   // Check for v2 data from context (injected by page.tsx via V2MapDataSetter)
   const v2MapData = useV2MapData();
@@ -545,6 +547,17 @@ export default function PersistentMapWrapper({
     listings,
     isFetchingMapData,
   ]);
+
+  // UX-13 FIX: Compute effective truncation status.
+  // V1 path uses explicit `truncated` flag from API response (LIMIT+1 detection).
+  // V2 path uses listing count heuristic (V2MapData type doesn't include truncated yet).
+  // Both are capped at MAX_MAP_MARKERS (200) — if we have exactly 200, data was likely truncated.
+  const effectiveTruncated = useMemo(() => {
+    if (isV2Enabled && mapSource === "v2") {
+      return effectiveListings.length >= MAX_MAP_MARKERS;
+    }
+    return isMapTruncated;
+  }, [isV2Enabled, mapSource, effectiveListings.length, isMapTruncated]);
 
   // Track current params to detect changes for debouncing
   const lastFetchedParamsRef = useRef<string | null>(null);
@@ -680,6 +693,8 @@ export default function PersistentMapWrapper({
 
         const data = await response.json();
         const fetched = data.listings || [];
+        // UX-13 FIX: Read truncation flag from API response (LIMIT+1 detection)
+        setIsMapTruncated(data.truncated === true);
         previousListingsRef.current = fetched;
         setListings(fetched);
         setMapSource("v1"); // Set v1 as active since we just fetched client-side
@@ -1007,6 +1022,10 @@ export default function PersistentMapWrapper({
       {/* P2-FIX (#151): Show error banner for errors, info banner for non-error messages */}
       {error && <MapErrorBanner message={error} onRetry={handleRetry} />}
       {!error && infoMessage && <MapInfoBanner message={infoMessage} />}
+      {/* UX-13 FIX: Show truncation banner when >200 listings exist in viewport */}
+      {!error && !infoMessage && effectiveTruncated && (
+        <MapInfoBanner message="Showing top 200 listings. Zoom in to see more." />
+      )}
       {/* Data loading bar - shows when fetching map markers after pan/zoom/filter */}
       {(isFetchingMapData || isListTransitioning || showV2LoadingOverlay) && (
         <MapDataLoadingBar />

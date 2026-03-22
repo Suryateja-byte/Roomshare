@@ -14,7 +14,7 @@
 import "server-only";
 
 import { prisma } from "@/lib/prisma";
-import { logger } from "@/lib/logger";
+import { logger, sanitizeErrorMessage } from "@/lib/logger";
 import { features } from "@/lib/env";
 
 type DirtyReason =
@@ -54,7 +54,7 @@ export async function markListingDirty(
     logger.sync.error("[SearchDoc] Failed to mark listing dirty", {
       listingId: listingId.slice(0, 8) + "...",
       reason,
-      error: error instanceof Error ? error.message : "Unknown error",
+      error: sanitizeErrorMessage(error),
     });
   }
 }
@@ -82,7 +82,7 @@ export async function markListingsDirty(
     logger.sync.error("[SearchDoc] Failed to mark listings dirty", {
       count: listingIds.length,
       reason,
-      error: error instanceof Error ? error.message : "Unknown error",
+      error: sanitizeErrorMessage(error),
     });
   }
 }

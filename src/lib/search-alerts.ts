@@ -4,7 +4,7 @@ import { prisma } from "./prisma";
 import { sendNotificationEmail } from "./email";
 import { Prisma } from "@prisma/client";
 import { buildSearchUrl, type SearchFilters } from "./search-utils";
-import { logger } from "./logger";
+import { logger, sanitizeErrorMessage } from "./logger";
 import { parseLocalDate } from "./utils";
 
 // Type for new listing data used in instant alerts
@@ -303,11 +303,8 @@ export async function processSearchAlerts(): Promise<ProcessResult> {
           }
         } catch (error) {
           result.errors++;
-          // M7 fix: Sanitize error message to prevent PII path leakage
-          const safeMessage =
-            error instanceof Error ? error.message : "Unknown error";
           result.details.push(
-            `Error processing ${savedSearch.id}: ${safeMessage}`
+            `Error processing ${savedSearch.id}: ${sanitizeErrorMessage(error)}`
           );
         }
       }
@@ -324,10 +321,7 @@ export async function processSearchAlerts(): Promise<ProcessResult> {
     return result;
   } catch (error) {
     result.errors++;
-    // M7 fix: Sanitize error message to prevent PII path leakage
-    const safeMessage =
-      error instanceof Error ? error.message : "Unknown error";
-    result.details.push(`Fatal error: ${safeMessage}`);
+    result.details.push(`Fatal error: ${sanitizeErrorMessage(error)}`);
     return result;
   }
 }
@@ -575,7 +569,7 @@ export async function triggerInstantAlerts(
         logger.sync.error("Instant alert processing failed for saved search", {
           action: "triggerInstantAlerts",
           savedSearchId: savedSearch.id,
-          error: error instanceof Error ? error.message : String(error),
+          error: sanitizeErrorMessage(error),
         });
         errors++;
       }
@@ -583,7 +577,7 @@ export async function triggerInstantAlerts(
   } catch (error) {
     logger.sync.error("Instant alerts fatal error", {
       action: "triggerInstantAlerts",
-      error: error instanceof Error ? error.message : String(error),
+      error: sanitizeErrorMessage(error),
     });
     errors++;
   }

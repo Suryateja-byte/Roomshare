@@ -3,6 +3,7 @@ import {
   removeFilterFromUrl,
   clearAllFilters,
   hasAnyFilter,
+  countActiveFilters,
   type FilterChipData,
 } from "@/components/filters/filter-chip-utils";
 
@@ -599,6 +600,105 @@ describe("filter-chip-utils", () => {
 
     it("returns false for empty string values", () => {
       expect(hasAnyFilter(new URLSearchParams("maxPrice="))).toBe(false);
+    });
+  });
+
+  // P1-3: countActiveFilters — single source of truth for filter badge counts
+  describe("countActiveFilters", () => {
+    it("returns 0 for empty params", () => {
+      expect(countActiveFilters(new URLSearchParams())).toBe(0);
+    });
+
+    it("counts price range as 1 (combined chip)", () => {
+      expect(
+        countActiveFilters(new URLSearchParams("minPrice=500&maxPrice=1500"))
+      ).toBe(1);
+    });
+
+    it("counts min-only price as 1", () => {
+      expect(countActiveFilters(new URLSearchParams("minPrice=500"))).toBe(1);
+    });
+
+    it("counts max-only price as 1", () => {
+      expect(countActiveFilters(new URLSearchParams("maxPrice=1500"))).toBe(1);
+    });
+
+    it("counts each amenity separately", () => {
+      expect(
+        countActiveFilters(new URLSearchParams("amenities=Wifi,AC"))
+      ).toBe(2);
+    });
+
+    it("counts each house rule separately", () => {
+      expect(
+        countActiveFilters(
+          new URLSearchParams("houseRules=Pets%20allowed,Smoking%20allowed")
+        )
+      ).toBe(2);
+    });
+
+    it("counts each language separately", () => {
+      expect(
+        countActiveFilters(new URLSearchParams("languages=en,es,te"))
+      ).toBe(3);
+    });
+
+    it("does NOT count invalid filter values", () => {
+      expect(
+        countActiveFilters(new URLSearchParams("roomType=INVALID"))
+      ).toBe(0);
+    });
+
+    it("does NOT count invalid amenities", () => {
+      expect(
+        countActiveFilters(new URLSearchParams("amenities=SwimmingPool"))
+      ).toBe(0);
+    });
+
+    it("counts nearMatches when active", () => {
+      expect(
+        countActiveFilters(new URLSearchParams("nearMatches=1"))
+      ).toBe(1);
+    });
+
+    it("does NOT count nearMatches=0", () => {
+      expect(
+        countActiveFilters(new URLSearchParams("nearMatches=0"))
+      ).toBe(0);
+    });
+
+    it("does NOT count preserved params (q, sort, bounds)", () => {
+      expect(
+        countActiveFilters(
+          new URLSearchParams("q=austin&sort=newest&minLat=30&maxLat=31")
+        )
+      ).toBe(0);
+    });
+
+    it("counts multiple filter types together", () => {
+      expect(
+        countActiveFilters(
+          new URLSearchParams(
+            "minPrice=500&maxPrice=1500&amenities=Wifi,AC&roomType=Private%20Room&languages=en"
+          )
+        )
+      ).toBe(5); // price-range(1) + 2 amenities + roomType + 1 language
+    });
+
+    it("matches urlToFilterChips length exactly", () => {
+      const params = new URLSearchParams(
+        "minPrice=500&maxPrice=1500&amenities=Wifi&roomType=Private%20Room&nearMatches=1"
+      );
+      const chips = urlToFilterChips(params);
+      expect(countActiveFilters(params)).toBe(chips.length);
+    });
+
+    it("deduplicates repeated amenity params", () => {
+      const params = new URLSearchParams(
+        "amenities=Wifi&amenities=AC,Wifi"
+      );
+      // Wifi appears twice but should be deduplicated to 1 chip
+      expect(countActiveFilters(params)).toBe(2); // Wifi + AC
     });
   });
 });

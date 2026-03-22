@@ -650,17 +650,25 @@ export async function GET(request: NextRequest) {
       if (filterParams.query) {
         // Check if bounds are missing (neither explicit bounds nor derived from lat/lng)
         if (!filterParams.bounds) {
-          logger.warn("[search/facets] Query without bounds rejected", {
+          // P1-5 FIX: Return HTTP 200 with empty FacetsResponse + boundsRequired flag.
+          // Previously returned HTTP 400, which was semantically wrong ("needs location"
+          // is not a client error) and required useFacets to special-case the 400 status.
+          // Now aligned with /api/search-count which also returns 200 for boundsRequired.
+          logger.debug("[search/facets] Query without bounds — returning empty facets", {
             hasQuery: true,
             hasBounds: false,
           });
           return NextResponse.json(
             {
-              error: "Please select a location",
+              amenities: {},
+              houseRules: {},
+              roomTypes: {},
+              priceRanges: { min: null, max: null, median: null },
+              priceHistogram: null,
               boundsRequired: true,
-            },
+            } satisfies FacetsResponse & { boundsRequired: true },
             {
-              status: 400,
+              status: 200,
               headers: {
                 "Cache-Control": "private, no-store",
                 "x-request-id": getRequestId(),

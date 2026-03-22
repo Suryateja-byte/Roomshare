@@ -214,6 +214,17 @@ export default function SearchForm({
   // Language search filter state
   const [languageSearch, setLanguageSearch] = useState("");
 
+  // P2-9 FIX: Reset language search text when filter drawer closes.
+  // Without this, typing "Spa" in language search, closing the drawer,
+  // then reopening would show "Spa" still filtering the language list.
+  // Uses useEffect instead of adding resets to each close handler
+  // to catch ALL close paths (onClose, onApply, Escape key, future paths).
+  useEffect(() => {
+    if (!showFilters) {
+      setLanguageSearch("");
+    }
+  }, [showFilters]);
+
   // Get all language codes from canonical list
   const LANGUAGE_CODES = Object.keys(SUPPORTED_LANGUAGES) as LanguageCode[];
 

@@ -47,6 +47,7 @@ import {
 } from "react";
 import { useSearchParams } from "next/navigation";
 import { rateLimitedFetch, RateLimitError } from "@/lib/rate-limit-client";
+import { setRateLimited } from "@/hooks/useRateLimitStatus";
 import { buildCanonicalFilterParamsFromSearchParams } from "@/lib/search-params";
 import {
   PROGRAMMATIC_MOVE_TIMEOUT_MS,
@@ -281,6 +282,11 @@ export function MapBoundsProvider({ children }: { children: React.ReactNode }) {
 
   // Ref to track programmatic move state for the safe setter callback
   const isProgrammaticMoveRef = useRef(false);
+  // P2-16 FIX: Counter to handle overlapping programmatic moves correctly.
+  // A single boolean flag fails when two animations overlap (e.g., cluster click
+  // immediately followed by card "Show on Map") — the first moveEnd clears the
+  // flag for both, causing a false "user moved" detection.
+  const programmaticMoveCountRef = useRef(0);
   // Ref to track timeout for cleanup
   const programmaticMoveTimeoutRef = useRef<NodeJS.Timeout | null>(null);
   // Ref to track previous search params for route change detection
@@ -338,12 +344,26 @@ export function MapBoundsProvider({ children }: { children: React.ReactNode }) {
   }, []);
 
   /**
-   * Set programmatic move flag with auto-clear timeout
-   * Call this BEFORE flyTo/fitBounds/easeTo to prevent banner showing
+   * Set programmatic move flag with auto-clear timeout.
+   * Call this BEFORE flyTo/fitBounds/easeTo to prevent banner showing.
+   *
+   * P2-16 FIX: Uses a counter instead of a boolean to handle overlapping
+   * programmatic moves. Each setProgrammaticMove(true) increments the counter,
+   * each setProgrammaticMove(false) decrements it. The flag only clears when
+   * all overlapping moves have completed (counter reaches 0).
    */
   const setProgrammaticMove = useCallback((value: boolean) => {
-    setIsProgrammaticMoveState(value);
-    isProgrammaticMoveRef.current = value;
+    if (value) {
+      programmaticMoveCountRef.current += 1;
+    } else {
+      programmaticMoveCountRef.current = Math.max(
+        0,
+        programmaticMoveCountRef.current - 1
+      );
+    }
+    const isActive = programmaticMoveCountRef.current > 0;
+    setIsProgrammaticMoveState(isActive);
+    isProgrammaticMoveRef.current = isActive;
 
     // Clear any existing timeout
     if (programmaticMoveTimeoutRef.current) {
@@ -351,9 +371,11 @@ export function MapBoundsProvider({ children }: { children: React.ReactNode }) {
       programmaticMoveTimeoutRef.current = null;
     }
 
-    // Auto-clear after animation duration
-    if (value) {
+    // Safety timeout: force-clear all if moveEnd events don't fire
+    // (e.g., animation cancelled by MapLibre without firing moveEnd)
+    if (isActive) {
       programmaticMoveTimeoutRef.current = setTimeout(() => {
+        programmaticMoveCountRef.current = 0;
         setIsProgrammaticMoveState(false);
         isProgrammaticMoveRef.current = false;
       }, PROGRAMMATIC_MOVE_TIMEOUT_MS);
@@ -456,8 +478,12 @@ export function MapBoundsProvider({ children }: { children: React.ReactNode }) {
       return;
     }
 
-    // Build cache key from current map bounds + URL filter params
-    const boundsKey = `${currentMapBounds.minLat},${currentMapBounds.maxLat},${currentMapBounds.minLng},${currentMapBounds.maxLng}`;
+    // Build cache key from current map bounds + URL filter params.
+    // P2-17 FIX: Quantize bounds to 4 decimal places (~11m precision) so that
+    // sub-pixel map movements produce the same cache key. Without this, raw
+    // IEEE 754 floats from MapLibre create unique keys on every moveEnd,
+    // making the cache nearly useless during panning.
+    const boundsKey = `${currentMapBounds.minLat.toFixed(4)},${currentMapBounds.maxLat.toFixed(4)},${currentMapBounds.minLng.toFixed(4)},${currentMapBounds.maxLng.toFixed(4)}`;
     // Canonical filter key (shared parser output) avoids stale cache hits from non-filter URL noise.
     const filterKey =
       buildCanonicalFilterParamsFromSearchParams(searchParams).toString();
@@ -541,6 +567,7 @@ export function MapBoundsProvider({ children }: { children: React.ReactNode }) {
           if (err instanceof RateLimitError) {
             if (!controller.signal.aborted && isMountedRef.current)
               setIsAreaCountLoading(false);
+            setRateLimited(err.retryAfterMs);
             return;
           }
           if (!controller.signal.aborted && isMountedRef.current) {

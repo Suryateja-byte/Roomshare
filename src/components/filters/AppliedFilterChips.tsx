@@ -67,14 +67,13 @@ export function AppliedFilterChips({
       <div className="flex items-center gap-2 overflow-x-auto scrollbar-hide">
         {/* Filter chips */}
         <div className="flex items-center gap-2 flex-nowrap">
-          {chips.map((chip, i) => (
+          {chips.map((chip) => (
             <FilterChipWithImpact
               key={chip.id}
               chip={chip}
               onRemove={() => handleRemove(chip)}
               isRemoving={isPending}
               currentCount={currentCount}
-              index={i}
             />
           ))}
         </div>

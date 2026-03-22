@@ -14,7 +14,7 @@
 import "server-only";
 
 import { prisma } from "@/lib/prisma";
-import { logger } from "@/lib/logger";
+import { logger, sanitizeErrorMessage } from "@/lib/logger";
 import { computeRecommendedScore } from "@/lib/search/recommended-score";
 
 interface ListingSearchData {
@@ -222,7 +222,7 @@ export async function upsertSearchDocSync(listingId: string): Promise<boolean> {
     logger.sync.error("Search doc sync failed", {
       action: "upsertSearchDocSync",
       listingId: listingId.slice(0, 8) + "...",
-      error: error instanceof Error ? error.message : "Unknown error",
+      error: sanitizeErrorMessage(error),
     });
     return false;
   }
