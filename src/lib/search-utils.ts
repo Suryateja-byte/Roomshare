@@ -32,16 +32,14 @@ export function buildSearchUrl(filters: SearchFilters): string {
   if (filters.maxPrice !== undefined)
     params.set("maxPrice", filters.maxPrice.toString());
   if (filters.amenities?.length)
-    filters.amenities.forEach((amenity) => params.append("amenities", amenity));
+    params.set("amenities", filters.amenities.join(","));
   if (filters.moveInDate) params.set("moveInDate", filters.moveInDate);
   if (filters.leaseDuration) params.set("leaseDuration", filters.leaseDuration);
   if (filters.houseRules?.length)
-    filters.houseRules.forEach((rule) => params.append("houseRules", rule));
+    params.set("houseRules", filters.houseRules.join(","));
   if (filters.roomType) params.set("roomType", filters.roomType);
   if (filters.languages?.length)
-    filters.languages.forEach((language) =>
-      params.append("languages", language)
-    );
+    params.set("languages", filters.languages.join(","));
   if (filters.genderPreference)
     params.set("genderPreference", filters.genderPreference);
   if (filters.householdGender)

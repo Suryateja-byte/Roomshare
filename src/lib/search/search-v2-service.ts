@@ -54,7 +54,7 @@ import {
   MAP_FETCH_MAX_LAT_SPAN,
   MAP_FETCH_MAX_LNG_SPAN,
 } from "@/lib/constants";
-import { logger } from "@/lib/logger";
+import { logger, sanitizeErrorMessage } from "@/lib/logger";
 import { withTimeout, DEFAULT_TIMEOUTS } from "@/lib/timeout-wrapper";
 
 /**
@@ -146,7 +146,8 @@ export async function executeSearchV2(
         keysetCursor = decoded.cursor;
       } else if (decoded?.type === "legacy") {
         // Legacy cursor - use page number, but return keyset cursor going forward
-        page = decoded.page;
+        // Clamp to prevent unbounded OFFSET from crafted cursors (DoS prevention)
+        page = Math.min(decoded.page, 100);
       }
       // If invalid cursor, start from beginning (page 1, no keyset cursor)
     } else if (cursorStr) {
@@ -192,10 +193,10 @@ export async function executeSearchV2(
           );
           const semanticResult: PaginatedResultHybrid<ListingData> = {
             items,
-            total: null,
+            total: hasNextPage ? null : items.length,
             page,
             limit: pageSize,
-            totalPages: null,
+            totalPages: hasNextPage ? null : 1,
             hasNextPage,
             nextCursor: hasNextPage ? encodeCursor(page + 1) : null,
           };
@@ -500,7 +501,7 @@ export async function executeSearchV2(
     // Log without PII (no user data, just error context)
     logger.sync.error("SearchV2 service error", {
       action: "executeSearchV2",
-      error: error instanceof Error ? error.message : "Unknown error",
+      error: sanitizeErrorMessage(error),
     });
     return {
       response: null,

@@ -14,11 +14,12 @@ describe("buildSearchUrl", () => {
     expect(url).toContain("maxPrice=1000");
   });
 
-  it("should build URL with amenities", () => {
+  it("should build URL with amenities (comma-separated)", () => {
     const filters: SearchFilters = { amenities: ["WiFi", "Parking"] };
     const url = buildSearchUrl(filters);
-    expect(url).toContain("amenities=WiFi");
-    expect(url).toContain("amenities=Parking");
+    // Comma-separated format for cache key consistency (#8)
+    const params = new URLSearchParams(url.split("?")[1]);
+    expect(params.get("amenities")).toBe("WiFi,Parking");
   });
 
   it("should build URL with moveInDate", () => {
@@ -33,11 +34,11 @@ describe("buildSearchUrl", () => {
     expect(url).toContain("leaseDuration=6+months");
   });
 
-  it("should build URL with houseRules", () => {
+  it("should build URL with houseRules (comma-separated)", () => {
     const filters: SearchFilters = { houseRules: ["No Smoking", "No Pets"] };
     const url = buildSearchUrl(filters);
-    expect(url).toContain("houseRules=No+Smoking");
-    expect(url).toContain("houseRules=No+Pets");
+    const params = new URLSearchParams(url.split("?")[1]);
+    expect(params.get("houseRules")).toBe("No Smoking,No Pets");
   });
 
   it("should build URL with roomType", () => {
@@ -126,22 +127,23 @@ describe("buildSearchUrl", () => {
     expect(url).not.toContain("minPrice");
   });
 
-  it("should append multiple amenities params", () => {
+  it("should set comma-separated amenities (single param)", () => {
     const filters: SearchFilters = { amenities: ["WiFi", "Parking", "AC"] };
     const url = buildSearchUrl(filters);
-    expect(url).toContain("amenities=WiFi");
-    expect(url).toContain("amenities=Parking");
-    expect(url).toContain("amenities=AC");
+    const params = new URLSearchParams(url.split("?")[1]);
+    expect(params.get("amenities")).toBe("WiFi,Parking,AC");
+    // Should be a single param, not repeated
+    expect(params.getAll("amenities")).toHaveLength(1);
   });
 
-  it("should append multiple house rules params", () => {
+  it("should set comma-separated house rules (single param)", () => {
     const filters: SearchFilters = {
       houseRules: ["No Smoking", "No Pets", "No Parties"],
     };
     const url = buildSearchUrl(filters);
-    expect(url).toContain("houseRules=No+Smoking");
-    expect(url).toContain("houseRules=No+Pets");
-    expect(url).toContain("houseRules=No+Parties");
+    const params = new URLSearchParams(url.split("?")[1]);
+    expect(params.get("houseRules")).toBe("No Smoking,No Pets,No Parties");
+    expect(params.getAll("houseRules")).toHaveLength(1);
   });
 
   it("should handle special characters in amenities", () => {

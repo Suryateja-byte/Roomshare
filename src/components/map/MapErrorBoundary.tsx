@@ -9,15 +9,16 @@ interface Props {
 interface State {
   hasError: boolean;
   errorMessage?: string;
+  retryKey: number;
 }
 
 export class MapErrorBoundary extends React.Component<Props, State> {
   constructor(props: Props) {
     super(props);
-    this.state = { hasError: false, errorMessage: undefined };
+    this.state = { hasError: false, errorMessage: undefined, retryKey: 0 };
   }
 
-  static getDerivedStateFromError(error: Error): State {
+  static getDerivedStateFromError(error: Error): Partial<State> {
     return { hasError: true, errorMessage: error.message };
   }
 
@@ -39,7 +40,12 @@ export class MapErrorBoundary extends React.Component<Props, State> {
             {fallbackMessage}
           </p>
           <button
-            onClick={() => this.setState({ hasError: false })}
+            onClick={() =>
+              this.setState((prev) => ({
+                hasError: false,
+                retryKey: prev.retryKey + 1,
+              }))
+            }
             className="px-4 py-2 text-sm font-medium rounded-md bg-zinc-100 dark:bg-zinc-800 hover:bg-zinc-200 dark:hover:bg-zinc-700 text-zinc-700 dark:text-zinc-300 transition-colors focus:outline-none focus-visible:ring-2 focus-visible:ring-zinc-900/30 dark:focus-visible:ring-zinc-400/40 focus-visible:ring-offset-2"
           >
             Retry
@@ -48,6 +54,12 @@ export class MapErrorBoundary extends React.Component<Props, State> {
       );
     }
 
-    return this.props.children;
+    // Key forces full remount of children on retry, ensuring a fresh
+    // WebGL context instead of resuming from corrupted state (#43)
+    return (
+      <React.Fragment key={this.state.retryKey}>
+        {this.props.children}
+      </React.Fragment>
+    );
   }
 }

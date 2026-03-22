@@ -307,4 +307,29 @@ describe("orchestrateSearch - v2→v1 fallback behavior", () => {
     );
     expect(result.paginatedResult.items).toHaveLength(0);
   });
+
+  it("returns early with error when v2 signals unboundedSearch — does NOT fall through to v1 (#30)", async () => {
+    // V2 returns unboundedSearch: true (text query without geographic bounds)
+    mockExecuteSearchV2.mockResolvedValue({
+      response: null,
+      paginatedResult: null,
+      unboundedSearch: true,
+    });
+
+    const result = await orchestrateSearch(
+      { q: "cozy room" }, // No bounds
+      { query: "cozy room" },
+      1,
+      20,
+      true
+    );
+
+    // V1 must NOT be called — unbounded search would cause full-table scan
+    expect(mockGetListingsPaginated).not.toHaveBeenCalled();
+
+    // Should return empty results with an error message
+    expect(result.paginatedResult.items).toHaveLength(0);
+    expect(result.fetchError).toContain("location");
+    expect(result.usedV1Fallback).toBe(false);
+  });
 });

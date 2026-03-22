@@ -1,6 +1,7 @@
 "use client";
 
-import { useRef, useState, useEffect, useCallback } from "react";
+import { useRef, useState, useEffect, useCallback, useMemo } from "react";
+import { useSearchParams } from "next/navigation";
 import { Map, MapPinOff } from "lucide-react";
 import MobileBottomSheet from "./search/MobileBottomSheet";
 import FloatingMapButton from "./search/FloatingMapButton";
@@ -33,10 +34,34 @@ export default function SearchViewToggle({
   const [hasMounted, setHasMounted] = useState(false);
   const [mobileSnap, setMobileSnap] = useState(1); // 0=collapsed, 1=half, 2=expanded
   const { activeId } = useListingFocus();
+  const searchParams = useSearchParams();
 
   useEffect(() => {
     setHasMounted(true);
   }, []);
+
+  // Compute a key from filter/sort/query params only — excludes geographic bounds.
+  // Same pattern as SearchResultsLoadingWrapper.tsx:33-48.
+  const filterParamsKey = useMemo(() => {
+    const filterOnly = new URLSearchParams(searchParams.toString());
+    for (const k of ["minLat", "maxLat", "minLng", "maxLng", "lat", "lng", "zoom"]) {
+      filterOnly.delete(k);
+    }
+    filterOnly.sort();
+    return filterOnly.toString();
+  }, [searchParams]);
+
+  // Reset bottom sheet to half-open when search results change (filter/sort/query).
+  // Prevents the sheet staying collapsed after the user navigates to a new search.
+  // Skips initial mount (mobileSnap is already 1) and bounds-only changes (map pans).
+  const isInitialFilterKey = useRef(true);
+  useEffect(() => {
+    if (isInitialFilterKey.current) {
+      isInitialFilterKey.current = false;
+      return;
+    }
+    setMobileSnap(1);
+  }, [filterParamsKey]);
 
   // When a map pin is tapped (activeId changes) on mobile, snap sheet to half
   useEffect(() => {

@@ -6,6 +6,7 @@ import type { SortOption } from "@/lib/data";
 import { useSearchTransitionSafe } from "@/contexts/SearchTransitionContext";
 import { ArrowUpDown, Check } from "lucide-react";
 import { FocusTrap } from "@/components/ui/FocusTrap";
+import { useBodyScrollLock } from "@/hooks/useBodyScrollLock";
 import {
   Select,
   SelectContent,
@@ -33,6 +34,7 @@ export default function SortSelect({ currentSort }: SortSelectProps) {
   const router = useRouter();
   const searchParams = useSearchParams();
   const transitionContext = useSearchTransitionSafe();
+  useBodyScrollLock(mobileOpen);
 
   // Prevent hydration mismatch from Radix UI generating different IDs on server vs client
   useEffect(() => {

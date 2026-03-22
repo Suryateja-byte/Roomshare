@@ -46,7 +46,6 @@ import {
   LAT_MAX,
   LNG_MIN,
   LNG_MAX,
-  BOUNDS_EPSILON,
 } from "@/lib/constants";
 
 // CRITICAL: Lazy import - only loads when component renders
@@ -79,10 +78,10 @@ interface SpatialCacheEntry {
   timestamp: number;
 }
 
-/** Quantize bounds to BOUNDS_EPSILON precision for cache key */
+/** Quantize bounds to BOUNDS_EPSILON precision for cache key.
+ *  Uses integer math to avoid IEEE 754 float multiplication issues. */
 function quantizeBounds(bounds: ViewportBounds): string {
-  const q = (n: number) =>
-    (Math.round(n / BOUNDS_EPSILON) * BOUNDS_EPSILON).toFixed(3);
+  const q = (n: number) => (Math.round(n * 1000) / 1000).toFixed(3);
   return `${q(bounds.minLat)},${q(bounds.maxLat)},${q(bounds.minLng)},${q(bounds.maxLng)}`;
 }
 
@@ -433,6 +432,8 @@ export default function PersistentMapWrapper({
   const lastFilterKeyRef = useRef<string>("");
   // P2-FIX (#151): Separate info messages from errors - info is non-blocking (no retry needed)
   const [infoMessage, setInfoMessage] = useState<string | null>(null);
+  // UX-13 FIX: Track whether the map data was truncated (>200 listings in viewport)
+  const [isMapTruncated, setIsMapTruncated] = useState(false);
 
   // Check for v2 data from context (injected by page.tsx via V2MapDataSetter)
   const v2MapData = useV2MapData();
@@ -547,10 +548,25 @@ export default function PersistentMapWrapper({
     isFetchingMapData,
   ]);
 
+  // UX-13 FIX: Compute effective truncation status.
+  // V1 path uses explicit `truncated` flag from API response (LIMIT+1 detection).
+  // V2 path uses listing count heuristic (V2MapData type doesn't include truncated yet).
+  // Both are capped at MAX_MAP_MARKERS (200) — if we have exactly 200, data was likely truncated.
+  const effectiveTruncated = useMemo(() => {
+    if (isV2Enabled && mapSource === "v2") {
+      return effectiveListings.length >= MAX_MAP_MARKERS;
+    }
+    return isMapTruncated;
+  }, [isV2Enabled, mapSource, effectiveListings.length, isMapTruncated]);
+
   // Track current params to detect changes for debouncing
   const lastFetchedParamsRef = useRef<string | null>(null);
   const fetchTimeoutRef = useRef<NodeJS.Timeout | null>(null);
-  const abortControllerRef = useRef<AbortController | null>(null);
+  // P1-#4 FIX: Separate abort controllers for search and pan effects.
+  // Previously shared — a pan during a search debounce would abort the search
+  // controller, causing the search fetch to silently fail with AbortError.
+  const searchAbortRef = useRef<AbortController | null>(null);
+  const panAbortRef = useRef<AbortController | null>(null);
   const retryCountRef = useRef<number>(0);
   const retryTimeoutRef = useRef<NodeJS.Timeout | null>(null);
   // D3.1 FIX: Track whether a 429 retry is scheduled so the finally block
@@ -634,9 +650,13 @@ export default function PersistentMapWrapper({
             // block keeps isFetchingMapData=true (loading bar stays visible).
             isRetryScheduledRef.current = true;
 
-            // Schedule automatic retry
+            // Schedule automatic retry with a FRESH AbortController.
+            // The original `signal` may have been aborted by effect cleanup
+            // (e.g., user panned) between the 429 and the retry timeout firing.
             retryTimeoutRef.current = setTimeout(() => {
-              fetchListings(paramsString, signal, fetchBounds);
+              const retryController = new AbortController();
+              searchAbortRef.current = retryController;
+              fetchListings(paramsString, retryController.signal, fetchBounds);
             }, retryDelayMs);
 
             return; // Exit without throwing - retry will happen automatically
@@ -673,6 +693,8 @@ export default function PersistentMapWrapper({
 
         const data = await response.json();
         const fetched = data.listings || [];
+        // UX-13 FIX: Read truncation flag from API response (LIMIT+1 detection)
+        setIsMapTruncated(data.truncated === true);
         previousListingsRef.current = fetched;
         setListings(fetched);
         setMapSource("v1"); // Set v1 as active since we just fetched client-side
@@ -844,13 +866,13 @@ export default function PersistentMapWrapper({
     // M6-MAP: Client AbortController cancels the fetch but cannot cancel the
     // in-progress DB query on the server. Server-side statement_timeout provides
     // the safety net for runaway queries.
-    if (abortControllerRef.current) {
-      abortControllerRef.current.abort();
+    if (searchAbortRef.current) {
+      searchAbortRef.current.abort();
     }
 
-    // Create abort controller for this fetch
+    // Create abort controller for this search fetch
     const abortController = new AbortController();
-    abortControllerRef.current = abortController;
+    searchAbortRef.current = abortController;
 
     // Pad fetch bounds by 20% to pre-fetch nearby listings (reduces fetches on small pans)
     // Only the map's /api/map-listings fetch uses padded bounds.
@@ -876,8 +898,8 @@ export default function PersistentMapWrapper({
       if (retryTimeoutRef.current) {
         clearTimeout(retryTimeoutRef.current);
       }
-      if (abortControllerRef.current) {
-        abortControllerRef.current.abort();
+      if (searchAbortRef.current) {
+        searchAbortRef.current.abort();
       }
     };
     // eslint-disable-next-line react-hooks/exhaustive-deps -- intentional dependency omission to prevent infinite loops
@@ -919,16 +941,22 @@ export default function PersistentMapWrapper({
     if (paddedParamsString === lastFetchedParamsRef.current) return;
 
     if (fetchTimeoutRef.current) clearTimeout(fetchTimeoutRef.current);
-    if (abortControllerRef.current) abortControllerRef.current.abort();
+    if (panAbortRef.current) panAbortRef.current.abort();
 
     const abortController = new AbortController();
-    abortControllerRef.current = abortController;
+    panAbortRef.current = abortController;
 
     // Fast debounce for dragging
     fetchTimeoutRef.current = setTimeout(() => {
       lastFetchedParamsRef.current = paddedParamsString;
       fetchListings(paddedParamsString, abortController.signal, paddedBounds);
     }, 100);
+
+    return () => {
+      if (panAbortRef.current) {
+        panAbortRef.current.abort();
+      }
+    };
   }, [
     activePanBounds,
     searchParams,
@@ -946,13 +974,13 @@ export default function PersistentMapWrapper({
     }
 
     // P1-1 FIX: Abort any existing request before starting retry
-    if (abortControllerRef.current) {
-      abortControllerRef.current.abort();
+    if (searchAbortRef.current) {
+      searchAbortRef.current.abort();
     }
 
     // Create new AbortController for retry request
     const abortController = new AbortController();
-    abortControllerRef.current = abortController;
+    searchAbortRef.current = abortController;
 
     // Force a refetch by clearing the last fetched ref
     lastFetchedParamsRef.current = null;
@@ -994,6 +1022,10 @@ export default function PersistentMapWrapper({
       {/* P2-FIX (#151): Show error banner for errors, info banner for non-error messages */}
       {error && <MapErrorBanner message={error} onRetry={handleRetry} />}
       {!error && infoMessage && <MapInfoBanner message={infoMessage} />}
+      {/* UX-13 FIX: Show truncation banner when >200 listings exist in viewport */}
+      {!error && !infoMessage && effectiveTruncated && (
+        <MapInfoBanner message="Showing top 200 listings. Zoom in to see more." />
+      )}
       {/* Data loading bar - shows when fetching map markers after pan/zoom/filter */}
       {(isFetchingMapData || isListTransitioning || showV2LoadingOverlay) && (
         <MapDataLoadingBar />

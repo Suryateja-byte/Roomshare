@@ -16,6 +16,8 @@ export interface TTLCache<T> {
   get(key: string): T | undefined;
   set(key: string, value: T, ttlMs: number): void;
   clear(): void;
+  /** Stop periodic sweep and clear all entries. Call only if cache is no longer needed. */
+  destroy(): void;
   /** Exposed for testing */
   readonly size: number;
 }
@@ -32,9 +34,10 @@ export function createTTLCache<T>(maxSize: number = 100): TTLCache<T> {
     }
   }
 
-  // Periodic sweep in browser only
+  // Periodic sweep in browser only (module-level caches live for tab lifetime)
+  let sweepInterval: ReturnType<typeof setInterval> | null = null;
   if (typeof window !== "undefined") {
-    setInterval(sweep, 60_000);
+    sweepInterval = setInterval(sweep, 60_000);
   }
 
   return {
@@ -74,6 +77,14 @@ export function createTTLCache<T>(maxSize: number = 100): TTLCache<T> {
     },
 
     clear(): void {
+      store.clear();
+    },
+
+    destroy(): void {
+      if (sweepInterval !== null) {
+        clearInterval(sweepInterval);
+        sweepInterval = null;
+      }
       store.clear();
     },
 

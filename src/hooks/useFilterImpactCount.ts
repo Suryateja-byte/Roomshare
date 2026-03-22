@@ -15,6 +15,7 @@ import type { FilterChipData } from "@/components/filters/filter-chip-utils";
 import { removeFilterFromUrl } from "@/components/filters/filter-chip-utils";
 import { rateLimitedFetch, RateLimitError } from "@/lib/rate-limit-client";
 import { createTTLCache } from "./createTTLCache";
+import { setRateLimited } from "./useRateLimitStatus";
 
 const impactCache = createTTLCache<number | null>(100);
 const CACHE_TTL_MS = 60_000; // 60 seconds (longer than filter count cache)
@@ -149,6 +150,7 @@ export function useFilterImpactCount({
           setIsLoading(false);
           setHasFetched(true);
         }
+        setRateLimited(err.retryAfterMs);
         return;
       }
 

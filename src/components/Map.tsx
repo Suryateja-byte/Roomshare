@@ -1535,6 +1535,10 @@ export default function MapComponent({
       if (programmaticClearTimeoutRef.current) {
         clearTimeout(programmaticClearTimeoutRef.current);
       }
+      if (onMoveThrottleRef.current) {
+        clearTimeout(onMoveThrottleRef.current);
+        onMoveThrottleRef.current = null;
+      }
       if (hoverScrollTimeoutRef.current) {
         clearTimeout(hoverScrollTimeoutRef.current);
       }
@@ -1795,7 +1799,17 @@ export default function MapComponent({
   useEffect(() => {
     if (!activeId || activeId === lastMapActiveRef.current) return;
     const listing = listings.find((l) => l.id === activeId);
-    if (!listing) return;
+    if (!listing) {
+      // UX-12 FIX: Show info message when listing isn't in the map's dataset.
+      // This happens when "Show on Map" is clicked for a listing loaded via
+      // "Load more" that's beyond the map's 200-marker cap or outside the
+      // current padded viewport.
+      setViewportInfoMessage("This listing is outside the current map view");
+      setTimeout(() => {
+        if (isMountedRef.current) setViewportInfoMessage(null);
+      }, 3000);
+      return;
+    }
     setSelectedListing(listing);
     setProgrammaticMove(true);
     // Safety: clear programmatic flag if moveEnd doesn't fire
@@ -1873,6 +1887,12 @@ export default function MapComponent({
       // Skip search/dirty logic during programmatic moves (auto-fly, card click, cluster expand)
       let skipCenterDedup = false;
       if (isProgrammaticMoveRef.current) {
+        // Clear the safety timeout before clearing the flag — prevents orphaned
+        // timeout from firing after a new programmatic move starts (#32)
+        if (programmaticClearTimeoutRef.current) {
+          clearTimeout(programmaticClearTimeoutRef.current);
+          programmaticClearTimeoutRef.current = null;
+        }
         setProgrammaticMove(false); // Clear immediately on moveend instead of waiting for timeout
         setActivePanBounds(null); // Clear active pan bounds
         // CLUSTER FIX: Don't clear isClusterExpandingRef here - wait for onIdle
@@ -2012,7 +2032,7 @@ export default function MapComponent({
   useEffect(() => {
     if (!mapRef.current) return;
     patchMapPrototypeAddLayer(mapRef.current.getMap());
-  });
+  }, [isMapLoaded]);
 
   useEffect(() => {
     if (isDarkMode) return;

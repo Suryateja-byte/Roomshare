@@ -12,6 +12,7 @@ import { Search } from "lucide-react";
 import {
   parseSearchParams,
   buildRawParamsFromSearchParams,
+  buildCanonicalFilterParamsFromSearchParams,
 } from "@/lib/search-params";
 import { executeSearchV2 } from "@/lib/search/search-v2-service";
 import { V1PathResetSetter } from "@/components/search/V1PathResetSetter";
@@ -22,7 +23,11 @@ import { RecommendedFilters } from "@/components/search/RecommendedFilters";
 import { features } from "@/lib/env";
 import { withTimeout, DEFAULT_TIMEOUTS } from "@/lib/timeout-wrapper";
 import { DEFAULT_PAGE_SIZE } from "@/lib/constants";
-import { sanitizeErrorMessage } from "@/lib/logger";
+import { logger, sanitizeErrorMessage } from "@/lib/logger";
+import { circuitBreakers, isCircuitOpenError } from "@/lib/circuit-breaker";
+import { checkServerComponentRateLimit } from "@/lib/with-rate-limit";
+import { headers } from "next/headers";
+import * as Sentry from "@sentry/nextjs";
 import type { Metadata } from "next";
 
 type SearchPageSearchParams = {
@@ -178,6 +183,37 @@ export default async function SearchPage({ searchParams }: SearchPageProps) {
     );
   }
 
+  // P0-2 FIX: Rate limit SSR search to prevent bot-driven DB connection pool exhaustion.
+  // This is the only search path that previously lacked rate limiting:
+  // - API routes have withRateLimitRedis
+  // - Server actions have checkServerComponentRateLimit
+  // - SSR page had nothing — bots could hammer /search with varying params
+  // Uses dedicated "search-ssr" bucket (120/min) separate from "search" (60/min for server actions)
+  // to prevent map panning (which generates SSR at 800ms intervals) from exhausting Load More budget.
+  const headersList = await headers();
+  const ssrRateLimit = await checkServerComponentRateLimit(
+    headersList,
+    "search-ssr",
+    "/search"
+  );
+  if (!ssrRateLimit.allowed) {
+    return (
+      <>
+        <V1PathResetSetter />
+        <div className="px-4 sm:px-6 py-8 sm:py-12 max-w-[840px] mx-auto">
+          <div className="text-center py-12">
+            <h1 className="text-2xl font-bold text-zinc-900 dark:text-white mb-3">
+              Too many requests
+            </h1>
+            <p className="text-zinc-600 dark:text-zinc-400 max-w-md mx-auto mb-6">
+              Please wait a moment before searching again.
+            </p>
+          </div>
+        </div>
+      </>
+    );
+  }
+
   // Track whether v2 was used successfully
   let usedV2 = false;
   let paginatedResult:
@@ -209,17 +245,30 @@ export default async function SearchPage({ searchParams }: SearchPageProps) {
         )
       );
 
-      // P0 FIX: Add timeout protection to prevent SSR hangs
+      // P0 FIX: Circuit breaker + timeout protection to prevent SSR hangs
+      // Circuit breaker skips V2 entirely after 3 consecutive failures (saves 10s/request during outage)
       // V1 fallback (catch block below) IS the retry mechanism — no withRetry needed
-      const v2Result = await withTimeout(
-        executeSearchV2({
-          rawParams: rawParamsForV2,
-          limit: DEFAULT_PAGE_SIZE,
-          includeMap: false,
-        }),
-        DEFAULT_TIMEOUTS.DATABASE,
-        "SSR-executeSearchV2"
-      );
+      // P0-1 FIX: Throw on V2 error-returns so circuit breaker correctly tracks failures.
+      // Previously, executeSearchV2 swallowed errors into { error: "..." } return values,
+      // which resolved the promise successfully — the circuit breaker never saw failures.
+      const v2Result = await circuitBreakers.searchV2.execute(async () => {
+        const result = await withTimeout(
+          executeSearchV2({
+            rawParams: rawParamsForV2,
+            limit: DEFAULT_PAGE_SIZE,
+            includeMap: false,
+          }),
+          DEFAULT_TIMEOUTS.DATABASE,
+          "SSR-executeSearchV2"
+        );
+        // Let unboundedSearch pass through — it's intentional, not a failure
+        if (result.unboundedSearch) return result;
+        // Throw on actual V2 failures so circuit breaker tracks them
+        if (!result.response || result.error) {
+          throw new Error(result.error || "V2 search returned no response");
+        }
+        return result;
+      });
 
       // V2 returned valid data - use it
       if (v2Result.response && v2Result.paginatedResult) {
@@ -227,20 +276,23 @@ export default async function SearchPage({ searchParams }: SearchPageProps) {
         usedV2 = true;
         paginatedResult = v2Result.paginatedResult;
         v2NextCursor = v2Result.response.list.nextCursor ?? null;
-      } else if (v2Result.error) {
-        // V2 returned error without throwing - log it before falling through to V1
-        const sanitized = sanitizeErrorMessage(v2Result.error);
-        console.warn("[search/page] V2 returned error:", sanitized);
       }
     } catch (err) {
       // V2 failed - will fall back to v1 below
-      const sanitized = sanitizeErrorMessage(err);
-      console.warn(
-        "[search/page] V2 orchestration failed, falling back to v1:",
-        {
-          error: sanitized,
-        }
-      );
+      if (isCircuitOpenError(err)) {
+        // Circuit open — skip V2 entirely, no timeout delay
+        logger.sync.info("[search/page] V2 circuit open, using V1 fallback");
+      } else {
+        // Unexpected V2 failure — capture for monitoring
+        Sentry.captureException(err, {
+          tags: { component: "search-ssr", path: "v2-fallback" },
+          extra: { hasV2Override: v2Override },
+        });
+        logger.sync.warn(
+          "[search/page] V2 orchestration failed, falling back to v1",
+          { error: sanitizeErrorMessage(err) }
+        );
+      }
     }
   }
 
@@ -270,6 +322,12 @@ export default async function SearchPage({ searchParams }: SearchPageProps) {
   // whereas 0 means "confirmed zero results"
   const total = rawTotal;
 
+  // Extract near-match expansion description for UI disclosure
+  const nearMatchExpansion =
+    "nearMatchExpansion" in paginatedResult
+      ? paginatedResult.nearMatchExpansion
+      : undefined;
+
   // Only show zero-results UI when we have confirmed zero results (total === 0)
   // Not when total is null (unknown count, >100 results)
   const hasConfirmedZeroResults = total !== null && total === 0;
@@ -287,6 +345,29 @@ export default async function SearchPage({ searchParams }: SearchPageProps) {
     }
   }
   const searchParamsString = apiParams.toString();
+
+  // P2-11 FIX: Build normalized key for SearchResultsClient's React key.
+  // Raw searchParamsString is kept for API calls (backward compatible).
+  // Normalized key prevents unnecessary remounts when URL has non-canonical values
+  // (e.g., roomType=PRIVATE vs roomType=Private+Room from manual URL editing).
+  // Uses buildCanonicalFilterParamsFromSearchParams (validated, sorted, aliased)
+  // plus sort and quantized bounds (which the canonical builder excludes).
+  const normalizedKey = buildCanonicalFilterParamsFromSearchParams(
+    new URLSearchParams(searchParamsString)
+  );
+  if (sortOption !== "recommended") {
+    normalizedKey.set("sort", sortOption);
+  }
+  if (filterParams.bounds) {
+    // Quantize to 3 decimal places (~100m precision) to avoid micro-remounts
+    // from sub-pixel map pans. Aligns with BOUNDS_EPSILON = 0.001 in constants.ts.
+    normalizedKey.set("minLat", filterParams.bounds.minLat.toFixed(3));
+    normalizedKey.set("maxLat", filterParams.bounds.maxLat.toFixed(3));
+    normalizedKey.set("minLng", filterParams.bounds.minLng.toFixed(3));
+    normalizedKey.set("maxLng", filterParams.bounds.maxLng.toFixed(3));
+  }
+  normalizedKey.sort();
+  const normalizedKeyString = normalizedKey.toString();
 
   // Extract nextCursor: prefer V2 response cursor, fallback to paginatedResult for keyset path
   const initialNextCursor =
@@ -329,7 +410,7 @@ export default async function SearchPage({ searchParams }: SearchPageProps) {
         </div>
 
         <SearchResultsClient
-          key={searchParamsString}
+          key={normalizedKeyString}
           initialListings={listings}
           initialNextCursor={initialNextCursor}
           initialTotal={total}
@@ -340,7 +421,7 @@ export default async function SearchPage({ searchParams }: SearchPageProps) {
           browseMode={browseMode}
           hasConfirmedZeroResults={hasConfirmedZeroResults}
           filterSuggestions={[]}
-          sortOption={sortOption}
+          nearMatchExpansion={nearMatchExpansion}
         />
       </div>
     </div>

@@ -30,6 +30,9 @@ jest.mock("@/lib/logger", () => ({
       error: jest.fn(),
     },
   },
+  sanitizeErrorMessage: jest.fn(
+    (error: unknown) => error instanceof Error ? error.message : "Unknown error"
+  ),
 }));
 
 import { processSearchAlerts, triggerInstantAlerts } from "@/lib/search-alerts";

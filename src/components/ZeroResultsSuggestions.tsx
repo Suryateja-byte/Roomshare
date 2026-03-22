@@ -111,6 +111,22 @@ export default function ZeroResultsSuggestions({
             params.set("maxLng", expandedMaxLng.toString());
             params.delete("lat");
             params.delete("lng");
+
+            // Safety net: validate expansion produced sane bounds
+            const exMinLat = parseFloat(params.get("minLat") ?? "");
+            const exMaxLat = parseFloat(params.get("maxLat") ?? "");
+            if (
+              !Number.isFinite(exMinLat) ||
+              !Number.isFinite(exMaxLat) ||
+              exMinLat >= exMaxLat
+            ) {
+              // Expansion math produced invalid bounds — fall back to browse-all
+              params.delete("minLat");
+              params.delete("maxLat");
+              params.delete("minLng");
+              params.delete("maxLng");
+              params.delete("q");
+            }
             break;
           }
 

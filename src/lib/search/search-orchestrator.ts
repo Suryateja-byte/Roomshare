@@ -53,6 +53,27 @@ export async function orchestrateSearch(
       limit,
     });
 
+    // Block unbounded search from falling through to V1 — V1 has no bounds guard
+    // and would run an expensive full-table scan.
+    // In production, page.tsx catches boundsRequired BEFORE calling any search function,
+    // so this is a defensive guard for direct callers of orchestrateSearch.
+    if (v2Result.unboundedSearch) {
+      return {
+        paginatedResult: {
+          items: [],
+          total: 0,
+          totalPages: 0,
+          hasNextPage: false,
+          hasPrevPage: false,
+          page: requestedPage,
+          limit,
+        },
+        v2MapData: null,
+        fetchError: "Please select a location to search",
+        usedV1Fallback: false,
+      };
+    }
+
     if (v2Result.response && v2Result.paginatedResult) {
       // Extract map data for context injection
       v2MapData = {

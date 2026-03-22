@@ -251,4 +251,11 @@ export const circuitBreakers = {
     resetTimeout: 30000, // 30 seconds
     successThreshold: 2,
   }),
+
+  searchV2: new CircuitBreaker({
+    name: "search-v2",
+    failureThreshold: 3, // Open after 3 consecutive failures (max 30s degraded = 3 × 10s timeout)
+    resetTimeout: 30000, // 30 seconds before retrying V2
+    successThreshold: 1, // Close immediately on first success (V2 either works or doesn't)
+  }),
 };

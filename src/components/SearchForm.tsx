@@ -35,6 +35,7 @@ import {
 import { safeMark } from "@/lib/perf";
 // Import canonical allowlists from shared parsing module
 import { VALID_AMENITIES, VALID_HOUSE_RULES } from "@/lib/search-params";
+import { clearAllFilters } from "@/components/filters/filter-chip-utils";
 import { useSearchTransitionSafe } from "@/contexts/SearchTransitionContext";
 import { useMobileSearch } from "@/contexts/MobileSearchContext";
 import { cn } from "@/lib/utils";
@@ -212,6 +213,17 @@ export default function SearchForm({
 
   // Language search filter state
   const [languageSearch, setLanguageSearch] = useState("");
+
+  // P2-9 FIX: Reset language search text when filter drawer closes.
+  // Without this, typing "Spa" in language search, closing the drawer,
+  // then reopening would show "Spa" still filtering the language list.
+  // Uses useEffect instead of adding resets to each close handler
+  // to catch ALL close paths (onClose, onApply, Escape key, future paths).
+  useEffect(() => {
+    if (!showFilters) {
+      setLanguageSearch("");
+    }
+  }, [showFilters]);
 
   // Get all language codes from canonical list
   const LANGUAGE_CODES = Object.keys(SUPPORTED_LANGUAGES) as LanguageCode[];
@@ -553,9 +565,12 @@ export default function SearchForm({
       if (committed.leaseDuration)
         params.set("leaseDuration", committed.leaseDuration);
       if (committed.roomType) params.set("roomType", committed.roomType);
-      committed.amenities.forEach((a) => params.append("amenities", a));
-      committed.houseRules.forEach((r) => params.append("houseRules", r));
-      committed.languages.forEach((l) => params.append("languages", l));
+      if (committed.amenities.length > 0)
+        params.set("amenities", committed.amenities.join(","));
+      if (committed.houseRules.length > 0)
+        params.set("houseRules", committed.houseRules.join(","));
+      if (committed.languages.length > 0)
+        params.set("languages", committed.languages.join(","));
       if (committed.genderPreference)
         params.set("genderPreference", committed.genderPreference);
       if (committed.householdGender)
@@ -682,13 +697,11 @@ export default function SearchForm({
     [setPending]
   );
 
-  // Clear all filters and reset to defaults
-  // INP optimization: Batch state updates in startTransition
+  // Clear all filters but preserve location, bounds, and sort (#15)
+  // Matches AppliedFilterChips "Clear all" behavior via shared clearAllFilters()
   const handleClearAllFilters = useCallback(() => {
     startTransition(() => {
-      setLocation("");
       setWhatQuery("");
-      setSelectedCoords(null);
       setPending({
         minPrice: "",
         maxPrice: "",
@@ -703,13 +716,17 @@ export default function SearchForm({
         minSlots: "",
       });
     });
-    // Navigate to clean search page (outside transition - navigation is user-facing)
+    // Navigate preserving location, bounds, and sort — only clear filter params
+    const preserved = clearAllFilters(
+      new URLSearchParams(searchParams.toString())
+    );
+    const searchUrl = `/search${preserved ? `?${preserved}` : ""}`;
     if (transitionContext) {
-      transitionContext.navigateWithTransition("/search");
+      transitionContext.navigateWithTransition(searchUrl);
     } else {
-      router.push("/search");
+      router.push(searchUrl);
     }
-  }, [transitionContext, router, setPending]);
+  }, [transitionContext, router, setPending, searchParams]);
 
   // Count active filters for badge - use COMMITTED (URL) state, not pending
   // This ensures the badge updates instantly when chips are removed
@@ -835,22 +852,12 @@ export default function SearchForm({
     },
   ]);
 
-  // Prevent body scroll when drawer is open
-  useEffect(() => {
-    if (showFilters) {
-      document.body.style.overflow = "hidden";
-      return () => {
-        document.body.style.overflow = "";
-      };
-    }
-  }, [showFilters]);
+  // Body scroll lock for filter drawer is handled by FilterModal's useBodyScrollLock(isOpen).
+  // No duplicate lock needed here.
 
   const isCompact = variant === "compact";
-  const minMoveInDate = new Date(
-    Date.now() - new Date().getTimezoneOffset() * 60000
-  )
-    .toISOString()
-    .split("T")[0];
+  // 'en-CA' locale returns YYYY-MM-DD format in local timezone, safe across DST transitions
+  const minMoveInDate = new Date().toLocaleDateString("en-CA");
 
   // Compute inline flex styles for focus-triggered expansion.
   // Uses inline styles instead of Tailwind classes because Tailwind v4
@@ -881,13 +888,12 @@ export default function SearchForm({
         {semanticSearchEnabled && !isCompact && (
           <>
             <div
-              style={getFieldFlex("what")}
-              className={cn(
-                "w-full flex flex-col relative",
-                isCompact ? "px-4 py-2" : "px-6 py-2.5",
-                focusedField === "what" && "md:bg-white/[0.03] md:rounded-2xl"
-              )}
-            >
+                style={getFieldFlex('what')}
+                className={cn(
+                'w-full flex flex-col relative overflow-hidden whitespace-nowrap transition-opacity duration-300',
+                isCompact ? 'px-4 py-2' : 'px-4 py-2 md:px-6 md:py-2.5',
+                focusedField === 'what' ? 'md:bg-white/[0.03] md:rounded-2xl opacity-100' : (focusedField !== null ? 'opacity-50' : 'opacity-100'),
+            )}>
               <label
                 htmlFor="search-what"
                 className={cn(
@@ -939,9 +945,9 @@ export default function SearchForm({
         <div
           style={getFieldFlex("where")}
           className={cn(
-            "w-full flex flex-col relative group/input",
-            isCompact ? "px-4 py-2" : "px-6 py-2.5",
-            focusedField === "where" && "md:bg-white/[0.03] md:rounded-2xl"
+            "w-full flex flex-col relative group/input overflow-hidden whitespace-nowrap transition-opacity duration-300",
+            isCompact ? "px-4 py-2" : "px-4 py-2 md:px-6 md:py-2.5",
+            focusedField === "where" ? "md:bg-white/[0.03] md:rounded-2xl opacity-100" : (focusedField !== null ? "opacity-50" : "opacity-100")
           )}
         >
           {!isCompact && (
@@ -1067,9 +1073,9 @@ export default function SearchForm({
         <div
           style={getFieldFlex("budget")}
           className={cn(
-            "w-full flex flex-col",
-            isCompact ? "px-4 py-2" : "px-6 py-2.5",
-            focusedField === "budget" && "md:bg-white/[0.03] md:rounded-2xl"
+            "w-full flex flex-col overflow-hidden whitespace-nowrap transition-opacity duration-300",
+            isCompact ? "px-4 py-2" : "px-4 py-2 md:px-6 md:py-2.5",
+            focusedField === "budget" ? "md:bg-white/[0.03] md:rounded-2xl opacity-100" : (focusedField !== null ? "opacity-50" : "opacity-100")
           )}
         >
           {!isCompact && (
