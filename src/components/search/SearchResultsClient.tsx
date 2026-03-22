@@ -1,11 +1,12 @@
 "use client";
 
-import { useState, useCallback, useRef, useMemo, useEffect } from "react";
+import { useState, useCallback, useRef, useMemo, useEffect, Fragment } from "react";
 import { safeMark, safeMeasure } from "@/lib/perf";
 import { Search, Loader2 } from "lucide-react";
 import Link from "next/link";
 import { Suspense } from "react";
 import ListingCard from "@/components/listings/ListingCard";
+import NearMatchSeparator from "@/components/listings/NearMatchSeparator";
 import ZeroResultsSuggestions from "@/components/ZeroResultsSuggestions";
 import SuggestedSearches from "@/components/search/SuggestedSearches";
 import { fetchMoreListings } from "@/app/search/actions";
@@ -35,6 +36,8 @@ interface SearchResultsClientProps {
   browseMode: boolean;
   hasConfirmedZeroResults: boolean;
   filterSuggestions: FilterSuggestion[];
+  /** Description of near-match expansion (e.g., "Showing rooms within $200 of your budget") */
+  nearMatchExpansion?: string;
 }
 
 export function SearchResultsClient({
@@ -48,6 +51,7 @@ export function SearchResultsClient({
   browseMode,
   hasConfirmedZeroResults,
   filterSuggestions,
+  nearMatchExpansion,
 }: SearchResultsClientProps) {
   const [isHydrated, setIsHydrated] = useState(false);
   const [extraListings, setExtraListings] = useState<ListingData[]>([]);
@@ -57,6 +61,7 @@ export function SearchResultsClient({
   const [isLoadingMore, setIsLoadingMore] = useState(false);
   const isLoadingRef = useRef(false);
   const [loadError, setLoadError] = useState<string | null>(null);
+  const [isDegraded, setIsDegraded] = useState(false);
   const [loadMoreAnnouncement, setLoadMoreAnnouncement] = useState("");
   const [showTotalPrice, setShowTotalPrice] = useState(false);
   // Effective value: suppress total price display until sessionStorage is read.
@@ -112,6 +117,12 @@ export function SearchResultsClient({
     [initialListings, extraListings]
   );
   const reachedCap = allListings.length >= MAX_ACCUMULATED;
+
+  // Near-match items are appended at the end by expandWithNearMatches
+  const nearMatchCount = useMemo(
+    () => allListings.filter((l) => l.isNearMatch).length,
+    [allListings]
+  );
 
   // O(1) lookup for saved listing IDs instead of O(n) .includes()
   const savedIdsSet = useMemo(
@@ -172,12 +183,22 @@ export function SearchResultsClient({
     isLoadingRef.current = true;
     setIsLoadingMore(true);
     setLoadError(null);
+    setIsDegraded(false);
     safeMark("load-more-start");
 
     try {
       const result = await fetchMoreListings(nextCursor, rawParams);
+
+      // V2 unavailable — show error with working retry (cursor preserved for circuit breaker recovery)
+      if (result.degraded) {
+        setIsDegraded(true);
+        setLoadError("Can't load more right now. Try again in a moment.");
+        return;
+      }
+
       safeMark("load-more-end");
       safeMeasure("load-more", "load-more-start", "load-more-end");
+      setIsDegraded(false);
 
       // Deduplicate by ID
       const dedupedItems = result.items.filter((item) => {
@@ -375,16 +396,34 @@ export function SearchResultsClient({
             aria-busy={isLoadingMore}
             className="grid grid-cols-1 sm:grid-cols-2 gap-4 sm:gap-x-6 sm:gap-y-8"
           >
-            {allListings.map((listing, index) => (
-              <ListingCard
-                key={listing.id}
-                listing={listing}
-                isSaved={savedIdsSet.has(listing.id)}
-                priority={index === 0}
-                showTotalPrice={effectiveShowTotalPrice}
-                estimatedMonths={estimatedMonths}
-              />
-            ))}
+            {allListings.map((listing, index) => {
+              // Insert separator before the first near-match item
+              const isFirstNearMatch =
+                listing.isNearMatch &&
+                (index === 0 || !allListings[index - 1]?.isNearMatch);
+
+              return (
+                <Fragment key={listing.id}>
+                  {isFirstNearMatch && nearMatchCount > 0 && (
+                    <>
+                      <NearMatchSeparator nearMatchCount={nearMatchCount} />
+                      {nearMatchExpansion && (
+                        <p className="col-span-full text-sm text-amber-600 dark:text-amber-400 -mt-2 mb-2">
+                          {nearMatchExpansion}
+                        </p>
+                      )}
+                    </>
+                  )}
+                  <ListingCard
+                    listing={listing}
+                    isSaved={savedIdsSet.has(listing.id)}
+                    priority={index === 0}
+                    showTotalPrice={effectiveShowTotalPrice}
+                    estimatedMonths={estimatedMonths}
+                  />
+                </Fragment>
+              );
+            })}
           </div>
 
           {/* Split stay suggestions for long durations */}
@@ -407,7 +446,7 @@ export function SearchResultsClient({
           )}
 
           {/* Load more section with progress indicator */}
-          {isHydrated && nextCursor && !reachedCap && (
+          {isHydrated && nextCursor && !reachedCap && !isDegraded && (
             <div className="flex flex-col items-center mt-8 mb-4 gap-2">
               <p className="text-xs text-zinc-500 dark:text-zinc-500">
                 Showing {allListings.length} of{" "}

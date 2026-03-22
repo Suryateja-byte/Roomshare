@@ -63,11 +63,11 @@ describe("expandFiltersForNearMatches for map listings", () => {
     const { expanded, expandedDimension } = expandFiltersForNearMatches(params);
 
     expect(expandedDimension).toBe("date");
-    // Date should be expanded back by 7 days
+    // Date should be expanded forward by 7 days
     const expandedDate = new Date(expanded.moveInDate + "T00:00:00");
     const originalDate = new Date(dateStr + "T00:00:00");
     const daysDiff = Math.round(
-      (originalDate.getTime() - expandedDate.getTime()) / (1000 * 60 * 60 * 24)
+      (expandedDate.getTime() - originalDate.getTime()) / (1000 * 60 * 60 * 24)
     );
     expect(daysDiff).toBe(NEAR_MATCH_RULES.date.expandDays);
   });

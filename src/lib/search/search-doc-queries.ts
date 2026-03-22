@@ -228,6 +228,10 @@ export function buildKeysetWhereClause(
       const dateParam = nextParam();
       const idParam = nextParam();
       const cursorScore = cursor.k[0] !== null ? parseFloat(cursor.k[0]) : null;
+      // Defense-in-depth: reject NaN cursor values (e.g., from DB NaN in float8 column)
+      if (cursorScore !== null && !Number.isFinite(cursorScore)) {
+        return { clause: "FALSE", params: [], nextParamIndex: startParamIndex };
+      }
       params.push(cursorScore, cursor.k[1], cursor.id);
 
       if (cursorScore === null) {
@@ -271,6 +275,9 @@ export function buildKeysetWhereClause(
       const idParam = nextParam();
 
       const cursorPrice = cursor.k[0] !== null ? parseFloat(cursor.k[0]) : null;
+      if (cursorPrice !== null && !Number.isFinite(cursorPrice)) {
+        return { clause: "FALSE", params: [], nextParamIndex: startParamIndex };
+      }
       params.push(cursorPrice, cursor.k[1], cursor.id);
 
       // Handle NULL cursor price separately to avoid SQL comparison issues (d.price = NULL always false)
@@ -303,6 +310,9 @@ export function buildKeysetWhereClause(
       const idParam = nextParam();
 
       const cursorPrice = cursor.k[0] !== null ? parseFloat(cursor.k[0]) : null;
+      if (cursorPrice !== null && !Number.isFinite(cursorPrice)) {
+        return { clause: "FALSE", params: [], nextParamIndex: startParamIndex };
+      }
       params.push(cursorPrice, cursor.k[1], cursor.id);
 
       // Handle NULL cursor price separately to avoid SQL comparison issues
@@ -339,6 +349,12 @@ export function buildKeysetWhereClause(
         cursor.k[0] !== null ? parseFloat(cursor.k[0]) : null;
       const cursorCount =
         cursor.k[1] !== null ? parseInt(cursor.k[1], 10) : null;
+      if (
+        (cursorRating !== null && !Number.isFinite(cursorRating)) ||
+        (cursorCount !== null && !Number.isFinite(cursorCount))
+      ) {
+        return { clause: "FALSE", params: [], nextParamIndex: startParamIndex };
+      }
       params.push(cursorRating, cursorCount, cursor.k[2], cursor.id);
 
       // Handle NULL cursor values separately to avoid SQL comparison issues
@@ -1651,17 +1667,17 @@ export function mapSemanticRowsToListingData(
     genderPreference: row.gender_preference ?? undefined,
     householdGender: row.household_gender ?? undefined,
     moveInDate: row.move_in_date ?? undefined,
-    ownerId: row.owner_id,
-    // Match mapRawListingsToPublic: include rating/review/view fields
-    // for ListingCard rendering (star ratings, review counts)
+    // ownerId intentionally omitted — @deprecated, S3 security fix (types/listing.ts:28)
+    // Match mapRawListingsToPublic: include rating/review/view/createdAt fields
+    // for ListingCard rendering (star ratings, review counts, recency)
     avgRating: Number(row.avg_rating) || 0,
     reviewCount: Number(row.review_count) || 0,
     viewCount: Number(row.view_count) || 0,
+    createdAt: row.listing_created_at ?? new Date(),
     location: {
-      address: row.address,
+      // address and zip intentionally omitted — "only included in listing detail, not search" (search-types.ts:37)
       city: row.city,
       state: row.state,
-      zip: row.zip,
       lat: row.lat!,
       lng: row.lng!,
     },

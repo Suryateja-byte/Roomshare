@@ -8,13 +8,13 @@ import Image from "next/image";
 import dynamic from "next/dynamic";
 
 const SearchForm = lazy(() => import("@/components/SearchForm"));
-const ScrollAnimation = dynamic(() => import("@/components/ScrollAnimation"), {
-  ssr: false,
-  loading: () => (
-    <div className="relative bg-zinc-950" style={{ height: "400vh" }}>
-      <div className="sticky top-0 h-screen" />
-    </div>
-  ),
+const ScrollAnimation = dynamic(() => import('@/components/ScrollAnimation'), {
+    ssr: false,
+    loading: () => (
+        <div className="relative bg-zinc-950" style={{ height: '200vh' }}>
+            <div className="sticky top-0 h-screen" />
+        </div>
+    ),
 });
 import { Button } from "@/components/ui/button";
 import { ShieldCheck, Zap, Coffee, ArrowRight } from "lucide-react";
@@ -45,19 +45,21 @@ export default function HomeClient() {
     <LazyMotion features={domAnimation}>
       <div className="flex flex-col bg-white dark:bg-zinc-950 text-zinc-900 dark:text-zinc-50 font-sans selection:bg-zinc-900 selection:text-white dark:selection:bg-white dark:selection:text-zinc-900">
         {/* Hero Section */}
-        <section className="relative pt-32 pb-24 md:pt-48 md:pb-32 min-h-screen flex flex-col justify-center overflow-x-hidden">
+        <section className="relative pt-32 pb-24 md:pt-40 md:pb-24 min-h-screen flex flex-col justify-center overflow-x-hidden">
           <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 w-full z-10">
-            <div className="flex flex-col lg:flex-row gap-16 items-center">
-              {/* Left Content */}
-              <div className="flex-1 text-center lg:text-left flex flex-col justify-center">
+            <div className="flex flex-col items-center text-center">
+              
+              {/* Center Content */}
+              <div className="w-full flex flex-col items-center justify-center mb-12 md:mb-16">
                 <m.div
                   initial="hidden"
                   animate="visible"
                   variants={staggerContainer}
+                  className="w-full flex flex-col items-center"
                 >
                   <m.div
                     variants={fadeInUp}
-                    className="inline-flex items-center gap-2 px-3 py-1.5 rounded-full border border-zinc-200/50 dark:border-zinc-800 bg-zinc-50 dark:bg-zinc-900/50 text-zinc-600 dark:text-zinc-400 text-xs font-bold uppercase tracking-[0.2em] mb-8"
+                    className="inline-flex items-center gap-2 px-3 py-1.5 rounded-full border border-zinc-200/50 dark:border-zinc-800 bg-zinc-50 dark:bg-zinc-900/50 text-zinc-500 dark:text-zinc-400 text-xs font-bold uppercase tracking-[0.15em] mb-8"
                   >
                     <span className="w-1.5 h-1.5 rounded-full bg-indigo-500"></span>
                     Now in 12 cities
@@ -67,13 +69,13 @@ export default function HomeClient() {
                     variants={fadeInUp}
                     className="text-5xl md:text-7xl lg:text-[5.5rem] font-medium tracking-tighter text-zinc-900 dark:text-white mb-6 leading-[1.05]"
                   >
-                    Love where <br className="hidden lg:block" />
+                    Love where <br className="hidden md:block" />
                     you live.
                   </m.h1>
 
                   <m.p
                     variants={fadeInUp}
-                    className="text-lg md:text-xl text-zinc-500 dark:text-zinc-400 mb-10 max-w-xl mx-auto lg:mx-0 font-light leading-relaxed"
+                    className="text-lg md:text-xl text-zinc-500 dark:text-zinc-400 mb-10 max-w-2xl mx-auto font-light leading-relaxed"
                   >
                     Verified roommates. Real listings. People who actually
                     show up to the tour.
@@ -82,7 +84,7 @@ export default function HomeClient() {
                   <m.div
                     variants={fadeInUp}
                     ref={searchFormRef}
-                    className="w-full mx-auto max-w-2xl lg:mx-0 relative z-20"
+                    className="w-full mx-auto max-w-4xl relative z-20"
                   >
                     <Suspense
                       fallback={
@@ -96,7 +98,7 @@ export default function HomeClient() {
                   {status !== "loading" && !isLoggedIn && (
                     <m.div
                       variants={fadeInUp}
-                      className="mt-8 flex items-center justify-center lg:justify-start gap-3 text-sm"
+                      className="mt-8 flex items-center justify-center gap-3 text-sm"
                     >
                       <span className="text-zinc-400">New here?</span>
                       <Link
@@ -110,25 +112,26 @@ export default function HomeClient() {
                 </m.div>
               </div>
 
-              {/* Right Visuals */}
-              <div className="flex-1 w-full max-w-xl lg:max-w-none">
+              {/* Cinematic Showcase Image below the search bar */}
+              <div className="w-full max-w-6xl mx-auto mt-4 md:mt-8 hidden md:block">
                 <m.div
-                  initial={{ opacity: 0, scale: 0.98 }}
-                  animate={{ opacity: 1, scale: 1 }}
-                  transition={{ duration: 0.8, ease: [0.16, 1, 0.3, 1] }}
-                  className="relative aspect-[4/5] lg:aspect-square rounded-[2rem] overflow-hidden bg-zinc-100 dark:bg-zinc-900 shadow-2xl shadow-zinc-900/10"
+                  initial={{ opacity: 0, y: 40 }}
+                  animate={{ opacity: 1, y: 0 }}
+                  transition={{ duration: 0.8, delay: 0.2, ease: [0.16, 1, 0.3, 1] }}
+                  className="relative aspect-[21/9] rounded-[2rem] overflow-hidden bg-zinc-100 dark:bg-zinc-900 shadow-2xl shadow-zinc-900/20"
                 >
                   <Image
                     src="https://images.unsplash.com/photo-1522708323590-d24dbb6b0267?ixlib=rb-4.0.3&auto=format&fit=crop&w=2340&q=80"
                     alt="Modern Living Space"
                     fill
                     priority
-                    sizes="(max-width: 768px) 100vw, 50vw"
+                    sizes="100vw"
                     className="object-cover"
                   />
-                  <div className="absolute inset-0 bg-gradient-to-t from-black/20 to-transparent"></div>
+                  <div className="absolute inset-0 bg-gradient-to-t from-black/10 to-transparent"></div>
                 </m.div>
               </div>
+
             </div>
           </div>
         </section>
