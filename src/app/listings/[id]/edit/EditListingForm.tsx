@@ -838,9 +838,10 @@ export default function EditListingForm({
                 </SelectTrigger>
                 <SelectContent>
                   <SelectItem value="Month-to-month">Month-to-month</SelectItem>
+                  <SelectItem value="3 months">3 months</SelectItem>
                   <SelectItem value="6 months">6 months</SelectItem>
-                  <SelectItem value="1 year">1 year</SelectItem>
-                  <SelectItem value="1 year+">1 year+</SelectItem>
+                  <SelectItem value="12 months">12 months</SelectItem>
+                  <SelectItem value="Flexible">Flexible</SelectItem>
                 </SelectContent>
               </Select>
             </div>

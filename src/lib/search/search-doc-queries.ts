@@ -67,6 +67,10 @@ interface MapListingRaw {
   primaryImage: string | null;
   lat: number | string;
   lng: number | string;
+  avgRating: number | string | null;
+  reviewCount: number | string | null;
+  recommendedScore: number | string | null;
+  createdAt: string | null;
 }
 
 /** Raw row shape from paginated listings query */
@@ -733,7 +737,8 @@ function mapRawListingsToPublic(listings: ListingRaw[]): ListingData[] {
       primaryHomeLanguage: l.primaryHomeLanguage,
       leaseDuration: l.leaseDuration,
       roomType: l.roomType,
-      moveInDate: l.moveInDate ? new Date(l.moveInDate) : undefined,
+      moveInDate: l.moveInDate && !isNaN(new Date(l.moveInDate).getTime())
+        ? new Date(l.moveInDate) : undefined,
       createdAt: l.createdAt ? new Date(l.createdAt) : new Date(),
       viewCount: Number(l.viewCount) || 0,
       avgRating: Number(l.avgRating) || 0,
@@ -802,7 +807,11 @@ async function getSearchDocMapListingsInternal(
       d.available_slots as "availableSlots",
       d.images[1] as "primaryImage",
       d.lat,
-      d.lng
+      d.lng,
+      d.avg_rating as "avgRating",
+      d.review_count as "reviewCount",
+      d.recommended_score as "recommendedScore",
+      d.listing_created_at as "createdAt"
     FROM listing_search_docs d
     WHERE ${whereClause}
     ORDER BY ${orderByClause}
@@ -829,9 +838,17 @@ async function getSearchDocMapListingsInternal(
         availableSlots: l.availableSlots,
         images: l.primaryImage ? [l.primaryImage] : [],
         location: {
-          lat: l.lat,
-          lng: l.lng,
+          // MED-4 FIX: Explicit Number() conversion — PostgreSQL raw queries may return
+          // numeric/float8 columns as strings depending on column type.
+          lat: Number(l.lat),
+          lng: Number(l.lng),
         },
+        avgRating: Number(l.avgRating) || 0,
+        reviewCount: Number(l.reviewCount) || 0,
+        // L-9 FIX: Use explicit null check instead of falsy coalescing.
+        // `Number(0) || null` falsely converts a valid score of 0 to null.
+        recommendedScore: l.recommendedScore != null ? Number(l.recommendedScore) : null,
+        createdAt: l.createdAt ? new Date(l.createdAt) : null,
       }))
     );
 
@@ -906,9 +923,11 @@ async function expandWithNearMatches(
     .filter((item) => !exactIds.has(item.id))
     .slice(0, LOW_RESULTS_THRESHOLD)
     .map((item) => {
-      const availableFromStr = item.moveInDate
-        ? item.moveInDate.toISOString().split("T")[0]
-        : null;
+      // EU-C: Guard against Invalid Date before calling toISOString()
+      const availableFromStr =
+        item.moveInDate && !isNaN(item.moveInDate.getTime())
+          ? item.moveInDate.toISOString().split("T")[0]
+          : null;
       const isNearMatchResult = isNearMatch(
         { price: item.price, available_from: availableFromStr },
         params,

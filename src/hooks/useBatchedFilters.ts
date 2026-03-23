@@ -294,9 +294,31 @@ export function useBatchedFilters(
     previousCommittedRef.current = committed;
   }, [committed, isDrawerOpen]);
 
+  // N1 FIX: Clear expired moveInDate after hydration.
+  // readFiltersFromURL() intentionally skips date validation (causes hydration mismatch).
+  // Server's safeParseDate rejects past dates, so UI would show an expired date as active
+  // while results are unfiltered. This effect syncs the client to match server behavior.
+  const hasRunDateCleanup = useRef(false);
+  useEffect(() => {
+    if (hasRunDateCleanup.current) return;
+    hasRunDateCleanup.current = true;
+    setPendingState((prev) => {
+      if (!prev.moveInDate) return prev;
+      const d = new Date(prev.moveInDate);
+      const today = new Date();
+      today.setHours(0, 0, 0, 0);
+      if (isNaN(d.getTime()) || d < today) {
+        return { ...prev, moveInDate: "" };
+      }
+      return prev;
+    });
+  }, []);
+
+  // F5 FIX: Suppress isDirty during active transitions to prevent flash of "pending changes" banner.
+  // During the window between commit() and URL update, pending != committed but the transition is in progress.
   const isDirty = useMemo(
-    () => !filtersEqual(pending, committed),
-    [pending, committed]
+    () => !filtersEqual(pending, committed) && !transitionContext?.isPending,
+    [pending, committed, transitionContext?.isPending]
   );
 
   const setPending = useCallback(
@@ -338,6 +360,9 @@ export function useBatchedFilters(
     const filterKeys = [
       "minPrice",
       "maxPrice",
+      // HIGH-5 FIX: Clean up budget aliases so they don't persist alongside canonical params
+      "minBudget",
+      "maxBudget",
       "moveInDate",
       "leaseDuration",
       "roomType",

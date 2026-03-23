@@ -6,6 +6,7 @@ import { Search, Loader2 } from "lucide-react";
 import Link from "next/link";
 import { Suspense } from "react";
 import ListingCard from "@/components/listings/ListingCard";
+import { ListingCardErrorBoundary } from "@/components/search/ListingCardErrorBoundary";
 import NearMatchSeparator from "@/components/listings/NearMatchSeparator";
 import ZeroResultsSuggestions from "@/components/ZeroResultsSuggestions";
 import SuggestedSearches from "@/components/search/SuggestedSearches";
@@ -60,6 +61,8 @@ export function SearchResultsClient({
   );
   const [isLoadingMore, setIsLoadingMore] = useState(false);
   const isLoadingRef = useRef(false);
+  // F2 FIX: Ref for total count avoids allListings in handleLoadMore deps
+  const totalCountRef = useRef(initialListings.length);
   const [loadError, setLoadError] = useState<string | null>(null);
   const [isDegraded, setIsDegraded] = useState(false);
   const [loadMoreAnnouncement, setLoadMoreAnnouncement] = useState("");
@@ -115,6 +118,11 @@ export function SearchResultsClient({
   const allListings = useMemo(
     () => [...initialListings, ...extraListings],
     [initialListings, extraListings]
+  );
+  // F8 FIX: Stable string key for effects that depend on listing IDs, not array reference
+  const allListingIdsKey = useMemo(
+    () => allListings.map((l) => l.id).join(","),
+    [allListings]
   );
   const reachedCap = allListings.length >= MAX_ACCUMULATED;
 
@@ -189,6 +197,12 @@ export function SearchResultsClient({
     try {
       const result = await fetchMoreListings(nextCursor, rawParams);
 
+      // M14 FIX: Handle rate limit via discriminated field (not string matching)
+      if (result.rateLimited) {
+        setLoadError("Too many requests — please wait 30 seconds and try again.");
+        return;
+      }
+
       // V2 unavailable — show error with working retry (cursor preserved for circuit breaker recovery)
       if (result.degraded) {
         setIsDegraded(true);
@@ -200,18 +214,27 @@ export function SearchResultsClient({
       safeMeasure("load-more", "load-more-start", "load-more-end");
       setIsDegraded(false);
 
+      // Defensive guard: ensure items is an array (protects against malformed server responses)
+      const items = Array.isArray(result.items) ? result.items : [];
+
       // Deduplicate by ID
-      const dedupedItems = result.items.filter((item) => {
+      const dedupedItems = items.filter((item) => {
         if (seenIdsRef.current.has(item.id)) return false;
         seenIdsRef.current.add(item.id);
         return true;
       });
 
-      setExtraListings((prev) => [...prev, ...dedupedItems]);
+      setExtraListings((prev) => {
+        const next = [...prev, ...dedupedItems];
+        // F2 FIX: Update ref inside setState for deterministic count
+        totalCountRef.current = initialListings.length + next.length;
+        return next;
+      });
       setNextCursor(result.nextCursor);
 
       // Announce to screen readers (after state update)
-      const newCount = allListings.length + dedupedItems.length;
+      // F2 FIX: Use ref for count instead of stale allListings closure
+      const newCount = totalCountRef.current;
       const totalLabel = initialTotal !== null ? ` of ~${initialTotal}` : "";
       setLoadMoreAnnouncement(
         `Loaded ${dedupedItems.length} more listing${dedupedItems.length === 1 ? "" : "s"}, showing ${newCount}${totalLabel}`
@@ -230,7 +253,8 @@ export function SearchResultsClient({
       isLoadingRef.current = false;
       setIsLoadingMore(false);
     }
-  }, [nextCursor, rawParams, allListings, initialTotal]);
+  // F2 FIX: Removed allListings dep — count read from totalCountRef instead
+  }, [nextCursor, rawParams, initialTotal, initialListings.length]);
 
   const total = initialTotal;
 
@@ -288,7 +312,10 @@ export function SearchResultsClient({
     })();
 
     return () => controller.abort();
-  }, [allListings]);
+  // F8 FIX: Use stable ID key instead of allListings array reference
+  // Prevents unnecessary effect cycles when allListings recreates with same IDs
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [allListingIdsKey]);
 
   useEffect(() => {
     if (!hasConfirmedZeroResults) {
@@ -299,9 +326,16 @@ export function SearchResultsClient({
     let cancelled = false;
 
     void (async () => {
-      const suggestions = await getFilterSuggestions(filterParams);
-      if (!cancelled) {
-        setResolvedFilterSuggestions(suggestions);
+      try {
+        const suggestions = await getFilterSuggestions(filterParams);
+        if (!cancelled) {
+          setResolvedFilterSuggestions(suggestions);
+        }
+      } catch {
+        // Network error or server action failure — silently degrade
+        if (!cancelled) {
+          setResolvedFilterSuggestions([]);
+        }
       }
     })();
 
@@ -414,13 +448,15 @@ export function SearchResultsClient({
                       )}
                     </>
                   )}
-                  <ListingCard
-                    listing={listing}
-                    isSaved={savedIdsSet.has(listing.id)}
-                    priority={index === 0}
-                    showTotalPrice={effectiveShowTotalPrice}
-                    estimatedMonths={estimatedMonths}
-                  />
+                  <ListingCardErrorBoundary listingId={listing.id}>
+                    <ListingCard
+                      listing={listing}
+                      isSaved={savedIdsSet.has(listing.id)}
+                      priority={index === 0}
+                      showTotalPrice={effectiveShowTotalPrice}
+                      estimatedMonths={estimatedMonths}
+                    />
+                  </ListingCardErrorBoundary>
                 </Fragment>
               );
             })}
@@ -434,12 +470,16 @@ export function SearchResultsClient({
               </h3>
               <div className="grid grid-cols-1 gap-4">
                 {splitStayPairs.map((pair) => (
-                  <SplitStayCard
+                  <ListingCardErrorBoundary
                     key={`${pair.first.id}-${pair.second.id}`}
-                    pair={pair}
-                    showTotalPrice={effectiveShowTotalPrice}
-                    estimatedMonths={estimatedMonths}
-                  />
+                    listingId={`split-${pair.first.id}-${pair.second.id}`}
+                  >
+                    <SplitStayCard
+                      pair={pair}
+                      showTotalPrice={effectiveShowTotalPrice}
+                      estimatedMonths={estimatedMonths}
+                    />
+                  </ListingCardErrorBoundary>
                 ))}
               </div>
             </div>
@@ -481,8 +521,9 @@ export function SearchResultsClient({
           {/* Cap reached — nudge user to refine */}
           {reachedCap && nextCursor && (
             <p className="text-center text-sm text-zinc-500 dark:text-zinc-400 mt-6">
-              Showing {allListings.length} results. Refine your filters to
-              narrow down.
+              Showing {allListings.length} results.{" "}
+              Try adjusting your filters or zooming into a specific area to find
+              more relevant listings.
             </p>
           )}
 

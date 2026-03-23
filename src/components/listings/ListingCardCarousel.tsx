@@ -11,7 +11,7 @@
  * - A11y: aria-labels, live region for index
  */
 
-import { useState, useRef, useCallback, useEffect } from "react";
+import React, { useState, useRef, useCallback, useEffect } from "react";
 import Image from "next/image";
 import { ChevronLeft, ChevronRight } from "lucide-react";
 import { cn } from "@/lib/utils";
@@ -23,13 +23,17 @@ interface ListingCardCarouselProps {
   maxImages?: number;
   /** Called when image fails to load */
   onImageError?: () => void;
+  /** Whether this card is above the fold and first image should load with priority */
+  priority?: boolean;
 }
 
-export default function ListingCardCarousel({
+// L-6 FIX: React.memo prevents unnecessary re-renders from parent
+function ListingCardCarousel({
   images,
   alt,
   maxImages = 5,
   onImageError,
+  priority = false,
 }: ListingCardCarouselProps) {
   // Limit images to maxImages
   const displayImages = images.slice(0, maxImages);
@@ -190,7 +194,7 @@ export default function ListingCardCarousel({
                 sizes="(max-width: 768px) 100vw, (max-width: 1200px) 50vw, 33vw"
                 onError={index === 0 ? onImageError : undefined}
                 loading={index === 0 ? "eager" : "lazy"}
-                priority={index === 0}
+                priority={priority && index === 0}
               />
             ) : (
               <div className="w-full h-full bg-zinc-200 dark:bg-zinc-700 animate-pulse" />
@@ -274,3 +278,5 @@ export default function ListingCardCarousel({
     </div>
   );
 }
+
+export default React.memo(ListingCardCarousel);

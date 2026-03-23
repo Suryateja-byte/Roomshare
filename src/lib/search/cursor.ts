@@ -13,6 +13,7 @@
  */
 
 import { z } from "zod";
+import type { SortOption } from "../search-types";
 import { createHmac, timingSafeEqual } from "crypto";
 import { getCursorSecret } from "@/lib/env";
 
@@ -54,16 +55,9 @@ function fromBase64Url(base64url: string): string {
 // Types
 // ============================================================================
 
-/**
- * Valid sort options for search v2.
- * Must match the sort options in search-doc-queries.ts
- */
-export type SortOption =
-  | "recommended"
-  | "newest"
-  | "price_asc"
-  | "price_desc"
-  | "rating";
+// Canonical SortOption lives in search-types.ts (single source of truth).
+// Re-exported here for consumers that import from cursor.ts.
+export type { SortOption };
 
 export const SORT_OPTIONS: readonly SortOption[] = [
   "recommended",

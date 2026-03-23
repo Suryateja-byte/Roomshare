@@ -1,4 +1,4 @@
-import { render, screen, act } from "@testing-library/react";
+import { render, screen } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import {
   SearchTransitionProvider,
@@ -187,8 +187,9 @@ describe("SearchTransitionContext", () => {
         </SearchTransitionProvider>
       );
 
-      // No navigation yet + not slow → null
-      expect(capturedContext!.retryLastNavigation).toBeNull();
+      // F9 FIX: retryLastNavigation is always a function (stable identity).
+      // Consumers check isSlowTransition before showing retry UI.
+      expect(capturedContext!.retryLastNavigation).toBeInstanceOf(Function);
     });
 
     it("is null when transition is not slow (even after navigation)", async () => {
@@ -207,8 +208,9 @@ describe("SearchTransitionContext", () => {
 
       await user.click(screen.getByTestId("navigate-btn"));
 
-      // Not a slow transition, so retry should be null
-      expect(capturedContext!.retryLastNavigation).toBeNull();
+      // F9 FIX: retryLastNavigation is always a function (stable identity).
+      // Consumers check isSlowTransition before showing retry UI.
+      expect(capturedContext!.retryLastNavigation).toBeInstanceOf(Function);
     });
   });
 });

@@ -27,6 +27,11 @@ import {
 } from "@/lib/search-params";
 import { getLimitedCount } from "@/lib/data";
 import { logger, sanitizeErrorMessage } from "@/lib/logger";
+import { clampBoundsToMaxSpan } from "@/lib/validation";
+import {
+  MAP_FETCH_MAX_LAT_SPAN,
+  MAP_FETCH_MAX_LNG_SPAN,
+} from "@/lib/constants";
 
 // Disable static caching - counts must be fresh
 export const dynamic = "force-dynamic";
@@ -83,9 +88,15 @@ export async function GET(request: NextRequest) {
         );
       }
 
+      // Clamp oversized bounds for consistency with /api/search/facets and /api/map-listings.
+      // LIMIT 101 subquery already caps row scan, but clamping prevents unnecessarily broad ST_MakeEnvelope.
+      const effectiveFilterParams = filterParams.bounds
+        ? { ...filterParams, bounds: clampBoundsToMaxSpan(filterParams.bounds, MAP_FETCH_MAX_LAT_SPAN, MAP_FETCH_MAX_LNG_SPAN) }
+        : filterParams;
+
       // Get count using existing getLimitedCount function
       // Returns exact count if ≤100, null if >100
-      const count = await getLimitedCount(filterParams);
+      const count = await getLimitedCount(effectiveFilterParams);
 
       logger.debug("Search count request", {
         requestId,

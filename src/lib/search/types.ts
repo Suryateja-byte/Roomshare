@@ -96,6 +96,8 @@ export interface SearchV2Meta {
   rankingEnabled?: boolean;
   /** Top signals for debugging (capped at 5, no PII, debug only) */
   topSignals?: SearchV2DebugSignals[];
+  /** Non-fatal warnings (e.g., bounds clamped, fallback used) */
+  warnings?: string[];
 }
 
 /** List section of the response */

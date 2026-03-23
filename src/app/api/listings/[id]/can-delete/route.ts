@@ -28,12 +28,8 @@ export async function GET(
       select: { ownerId: true },
     });
 
-    if (!listing) {
+    if (!listing || listing.ownerId !== session.user.id) {
       return NextResponse.json({ error: "Listing not found" }, { status: 404 });
-    }
-
-    if (listing.ownerId !== session.user.id) {
-      return NextResponse.json({ error: "Forbidden" }, { status: 403 });
     }
 
     // Count active ACCEPTED bookings (blocks deletion)

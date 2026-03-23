@@ -381,7 +381,14 @@ export async function updateListingStatus(
     });
 
     // Fire-and-forget: mark listing dirty for search doc refresh
-    markListingDirty(listingId, "status_changed").catch(() => {});
+    markListingDirty(listingId, "status_changed").catch((err) => {
+      logger.sync.warn("markListingDirty failed", {
+        action: "adminUpdateListingStatus",
+        listingId,
+        reason: "status_changed",
+        error: err instanceof Error ? err.message : String(err),
+      });
+    });
 
     // Audit log
     await logAdminAction({

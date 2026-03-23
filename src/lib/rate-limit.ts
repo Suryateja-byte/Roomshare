@@ -269,7 +269,6 @@ export const RATE_LIMITS = {
   // Server action rate limits
   viewCount: { limit: 60, windowMs: 60 * 1000 }, // 60 per minute (prevent view gaming)
   filterSuggestions: { limit: 30, windowMs: 60 * 1000 }, // 30 per minute
-  getListingsInBounds: { limit: 60, windowMs: 60 * 1000 }, // 60 per minute
   chatSendMessage: { limit: 100, windowMs: 60 * 60 * 1000 }, // 100 per hour
   chatStartConversation: { limit: 20, windowMs: 60 * 60 * 1000 }, // 20 per hour
   savedListings: { limit: 60, windowMs: 60 * 60 * 1000 }, // 60 per hour

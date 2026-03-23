@@ -35,9 +35,7 @@ jest.mock("@/lib/geocoding", () => ({
   geocodeAddress: jest.fn(),
 }));
 
-jest.mock("@/lib/data", () => ({
-  getListings: jest.fn(),
-}));
+jest.mock("@/lib/data", () => ({}));
 
 jest.mock("@/lib/with-rate-limit", () => ({
   withRateLimit: jest.fn().mockResolvedValue(null),
@@ -462,6 +460,120 @@ describe("POST /api/listings — XSS / injection / boundary tests", () => {
         makeRequest({
           ...validBody,
           title: 'Room & Board - "Best Deal" in Town',
+        })
+      );
+      expect(response.status).toBe(201);
+    });
+  });
+
+  // =========================================================================
+  // P0-5: XSS in address, city, state fields
+  // =========================================================================
+
+  describe("XSS in address field", () => {
+    it('rejects <script> tag in address', async () => {
+      const response = await POST(
+        makeRequest({
+          ...validBody,
+          address: '<script>alert("xss")</script>',
+        })
+      );
+      expect(response.status).toBe(400);
+    });
+
+    it("rejects <img onerror> in address", async () => {
+      const response = await POST(
+        makeRequest({
+          ...validBody,
+          address: '<img src=x onerror=alert(1)>',
+        })
+      );
+      expect(response.status).toBe(400);
+    });
+
+    it("allows normal address with special characters", async () => {
+      mockSuccessfulTransaction();
+      const response = await POST(
+        makeRequest({
+          ...validBody,
+          address: "123 O'Brien St, Apt #4B",
+        })
+      );
+      expect(response.status).toBe(201);
+    });
+
+    it("allows international address with accented characters", async () => {
+      mockSuccessfulTransaction();
+      const response = await POST(
+        makeRequest({
+          ...validBody,
+          address: "123 Rue de Café, São Paulo",
+        })
+      );
+      expect(response.status).toBe(201);
+    });
+  });
+
+  describe("XSS in city field", () => {
+    it('rejects <script> tag in city', async () => {
+      const response = await POST(
+        makeRequest({
+          ...validBody,
+          city: '<script>alert("xss")</script>',
+        })
+      );
+      expect(response.status).toBe(400);
+    });
+
+    it("rejects <img onerror> in city", async () => {
+      const response = await POST(
+        makeRequest({
+          ...validBody,
+          city: '<img src=x onerror=alert(1)>',
+        })
+      );
+      expect(response.status).toBe(400);
+    });
+
+    it("allows city with accented characters", async () => {
+      mockSuccessfulTransaction();
+      const response = await POST(
+        makeRequest({
+          ...validBody,
+          city: "San José",
+        })
+      );
+      expect(response.status).toBe(201);
+    });
+  });
+
+  describe("XSS in state field", () => {
+    it('rejects <script> tag in state', async () => {
+      const response = await POST(
+        makeRequest({
+          ...validBody,
+          state: '<script>alert(1)</script>',
+        })
+      );
+      expect(response.status).toBe(400);
+    });
+
+    it("rejects <svg onload> in state", async () => {
+      const response = await POST(
+        makeRequest({
+          ...validBody,
+          state: '<svg onload=alert(1)>',
+        })
+      );
+      expect(response.status).toBe(400);
+    });
+
+    it("allows normal state abbreviations", async () => {
+      mockSuccessfulTransaction();
+      const response = await POST(
+        makeRequest({
+          ...validBody,
+          state: "CA",
         })
       );
       expect(response.status).toBe(201);

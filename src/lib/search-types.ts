@@ -79,6 +79,13 @@ export interface FilterParams {
   nearMatches?: boolean;
 }
 
+/**
+ * Filter criteria without pagination fields.
+ * Used by URL-parsing layer (parseSearchParams) where page/limit are
+ * returned as separate fields, not embedded in the filter object.
+ */
+export type FilterCriteria = Omit<FilterParams, "page" | "limit">;
+
 export interface PaginatedResult<T> {
   items: T[];
   total: number;
@@ -118,6 +125,14 @@ export interface MapListingData {
   };
   /** Pin tier for V2 mode: primary = larger pin, mini = smaller pin */
   tier?: "primary" | "mini";
+  /** Average rating for ranking pins (optional — not all query paths populate this) */
+  avgRating?: number;
+  /** Review count for ranking pins (optional — not all query paths populate this) */
+  reviewCount?: number;
+  /** Recommended score for ranking (precomputed in SearchDoc) */
+  recommendedScore?: number | null;
+  /** Creation date for ranking by recency */
+  createdAt?: Date | null;
 }
 
 // Extended listing type with computed fields for filtering/sorting
@@ -194,6 +209,10 @@ export function hasValidCoordinates(
   lng: number | null | undefined
 ): boolean {
   if (lat === null || lat === undefined || lng === null || lng === undefined) {
+    return false;
+  }
+  // Reject NaN, Infinity, -Infinity — these pass all comparison operators silently
+  if (!Number.isFinite(lat) || !Number.isFinite(lng)) {
     return false;
   }
   // Check for zero coordinates (invalid geocoding result)

@@ -403,6 +403,12 @@ jest.mock("@/contexts/MapBoundsContext", () => ({
   }),
 }));
 
+jest.mock("@/contexts/ActivePanBoundsContext", () => ({
+  useActivePanBoundsSetter: () => ({
+    setActivePanBounds: jest.fn(),
+  }),
+}));
+
 // Mock child components
 jest.mock("@/components/map/MapMovedBanner", () => ({
   MapMovedBanner: () => null,

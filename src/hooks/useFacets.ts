@@ -277,5 +277,13 @@ export function useFacets({
     // cacheKey already captures filter+location state, so fetchFacets changes are covered.
   }, [cacheKey, isDrawerOpen, fetchFacets]);
 
+  // EU-E: Reset boundsRequired when drawer closes to prevent stale state
+  // on next open (e.g., user adds location between opens)
+  useEffect(() => {
+    if (!isDrawerOpen) {
+      setBoundsRequired(false);
+    }
+  }, [isDrawerOpen]);
+
   return { facets, isLoading, error, boundsRequired };
 }

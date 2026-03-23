@@ -17,6 +17,14 @@ export async function queryWithTimeout<T>(
   params: unknown[],
   timeoutMs: number = DEFAULT_QUERY_TIMEOUT_MS
 ): Promise<T[]> {
+  // MED-5 FIX: Validate timeoutMs before interpolation into SQL.
+  // PostgreSQL SET LOCAL doesn't support $N params, so we must interpolate,
+  // but we enforce that the value is a safe positive integer first.
+  if (!Number.isInteger(timeoutMs) || timeoutMs <= 0 || timeoutMs > 30000) {
+    throw new Error(
+      `Invalid query timeout: ${timeoutMs}. Must be a positive integer <= 30000.`
+    );
+  }
   return prisma.$transaction(async (tx) => {
     await tx.$executeRawUnsafe(
       `SET LOCAL statement_timeout = ${timeoutMs}`

@@ -64,6 +64,14 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
     }
 
+    // Per-user rate limiting (after auth, complements IP-based rate limit above)
+    const userUploadRateLimit = await withRateLimit(request, {
+      type: "upload",
+      getIdentifier: () => `user:${session.user.id}`,
+      endpoint: "/api/upload/user",
+    });
+    if (userUploadRateLimit) return userUploadRateLimit;
+
     // Check Supabase configuration
     if (!supabaseUrl || !supabaseServiceKey) {
       logger.sync.error("Missing Supabase config", {

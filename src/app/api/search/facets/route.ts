@@ -614,6 +614,8 @@ export async function GET(request: NextRequest) {
       });
 
       const { filterParams } = parseSearchParams(rawParams);
+      // Immutable working copy — may be replaced with clamped bounds below
+      let effectiveFilterParams = filterParams;
 
       // Security: Return empty facets for unbounded requests to prevent
       // full-table GROUP BY aggregation DoS (5 parallel scans with no WHERE bounds).
@@ -720,7 +722,8 @@ export async function GET(request: NextRequest) {
             MAP_FETCH_MAX_LAT_SPAN,
             MAP_FETCH_MAX_LNG_SPAN
           );
-          filterParams.bounds = clampedBounds;
+          // Immutable: create new object instead of mutating parseSearchParams output
+          effectiveFilterParams = { ...filterParams, bounds: clampedBounds };
           logger.debug("[search/facets] Oversized bounds clamped", {
             original: {
               latSpan: latSpan.toFixed(2),
@@ -735,11 +738,11 @@ export async function GET(request: NextRequest) {
       }
 
       // Build cache key and fetch with caching
-      const cacheKey = generateFacetsCacheKey(filterParams);
+      const cacheKey = generateFacetsCacheKey(effectiveFilterParams);
 
       const facets = await withTimeout(
         unstable_cache(
-          async () => getFacetsInternal(filterParams),
+          async () => getFacetsInternal(effectiveFilterParams),
           ["search-facets", cacheKey],
           { revalidate: CACHE_TTL }
         )(),

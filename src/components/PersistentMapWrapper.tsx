@@ -35,7 +35,7 @@ import {
   useIsV2Enabled,
   type V2MapData,
 } from "@/contexts/SearchV2DataContext";
-import { useActivePanBounds } from "@/contexts/MapBoundsContext";
+import { useActivePanBoundsState } from "@/contexts/ActivePanBoundsContext";
 import { MapErrorBoundary } from "@/components/map/MapErrorBoundary";
 import { useSearchTransitionSafe } from "@/contexts/SearchTransitionContext";
 import { sanitizeMapListings } from "@/lib/maps/sanitize-map-listings";
@@ -446,7 +446,7 @@ export default function PersistentMapWrapper({
   const [dataPathDetermined, setDataPathDetermined] = useState(false);
 
   // Read active pan bounds to proactively fetch listings while the user is dragging the map
-  const { activePanBounds } = useActivePanBounds();
+  const { activePanBounds } = useActivePanBoundsState();
 
   // Coordinate with list transitions - show overlay when list is loading
   const transitionContext = useSearchTransitionSafe();
@@ -547,6 +547,20 @@ export default function PersistentMapWrapper({
     listings,
     isFetchingMapData,
   ]);
+
+  // H2 FIX: Stabilize listings reference for Map.tsx GeoJSON memo.
+  // When effectiveListings recomputes but contains the same listing IDs,
+  // return the previous reference to prevent unnecessary GeoJSON rebuild.
+  const prevEffectiveListingsRef = useRef(effectiveListings);
+  const stableEffectiveListings = useMemo(() => {
+    const prevIds = prevEffectiveListingsRef.current.map((l) => l.id).join(",");
+    const nextIds = effectiveListings.map((l) => l.id).join(",");
+    if (prevIds === nextIds) {
+      return prevEffectiveListingsRef.current;
+    }
+    prevEffectiveListingsRef.current = effectiveListings;
+    return effectiveListings;
+  }, [effectiveListings]);
 
   // UX-13 FIX: Compute effective truncation status.
   // V1 path uses explicit `truncated` flag from API response (LIMIT+1 detection).
@@ -1036,7 +1050,7 @@ export default function PersistentMapWrapper({
       <MapErrorBoundary>
         <Suspense fallback={<MapLoadingPlaceholder />}>
           <LazyDynamicMap
-            listings={effectiveListings}
+            listings={stableEffectiveListings}
             suppressEmptyState={Boolean(infoMessage)}
           />
         </Suspense>

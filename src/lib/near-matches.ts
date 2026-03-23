@@ -99,6 +99,12 @@ export function expandFiltersForNearMatches(
     const { expandDays } = NEAR_MATCH_RULES.date;
     const originalDate = new Date(params.moveInDate);
 
+    // Defense-in-depth: skip expansion if date string is invalid
+    // (producer at search-doc-queries.ts already guards, but malformed data could arrive via other paths)
+    if (isNaN(originalDate.getTime())) {
+      return { expanded: params, expandedDimension: null, expansionDescription: null };
+    }
+
     // Expand by moving the date forward by expandDays
     // This relaxes the SQL filter (move_in_date <= $N) to include
     // listings available up to 7 days after the user's target date

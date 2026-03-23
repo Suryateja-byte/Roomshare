@@ -3,7 +3,10 @@
 import Image from "next/image";
 import Link from "next/link";
 import { MapPin } from "lucide-react";
-import { useListingFocus } from "@/contexts/ListingFocusContext";
+import {
+  useListingFocusState,
+  useListingFocusActions,
+} from "@/contexts/ListingFocusContext";
 import type { SplitStayPair } from "@/lib/search/split-stay";
 import { cn } from "@/lib/utils";
 
@@ -108,8 +111,12 @@ function SplitStayHalf({
   showTotalPrice?: boolean;
 }) {
   const image = listing.images?.[0];
-  const { hoveredId, activeId, setHovered, setActive, focusSource } =
-    useListingFocus();
+  // HIGH-2 FIX: Use split contexts instead of combined useListingFocus().
+  // useListingFocusState() subscribes to state-only context (re-renders on hover/active changes).
+  // useListingFocusActions() subscribes to actions-only context (stable, never triggers re-renders).
+  // This prevents SplitStayHalf from re-rendering on unrelated context changes (scrollRequest, etc.).
+  const { hoveredId, activeId } = useListingFocusState();
+  const { setHovered, setActive, focusSourceRef } = useListingFocusActions();
   const isHovered = hoveredId === listing.id;
   const isActive = activeId === listing.id;
 
@@ -123,12 +130,12 @@ function SplitStayHalf({
           "ring-1 ring-indigo-200 dark:ring-indigo-800 ring-inset"
       )}
       onMouseEnter={() => {
-        if (focusSource === "map") return;
+        if (focusSourceRef.current === "map") return;
         setHovered(listing.id, "list");
       }}
       onMouseLeave={() => setHovered(null)}
       onFocus={() => {
-        if (focusSource === "map") return;
+        if (focusSourceRef.current === "map") return;
         setHovered(listing.id, "list");
       }}
       onBlur={() => setHovered(null)}

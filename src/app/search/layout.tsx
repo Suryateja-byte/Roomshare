@@ -2,6 +2,7 @@ import SearchLayoutView from "@/components/SearchLayoutView";
 import SearchHeaderWrapper from "@/components/SearchHeaderWrapper";
 import { SkipLink } from "@/components/ui/SkipLink";
 import { MapBoundsProvider } from "@/contexts/MapBoundsContext";
+import { ActivePanBoundsProvider } from "@/contexts/ActivePanBoundsContext";
 import { SearchTransitionProvider } from "@/contexts/SearchTransitionContext";
 import { FilterStateProvider } from "@/contexts/FilterStateContext";
 import { ListingFocusProvider } from "@/contexts/ListingFocusContext";
@@ -61,11 +62,13 @@ export default function SearchLayout({
             >
               {/* Split view: List (from page) + Map (managed by SearchLayoutView) */}
               <MapBoundsProvider>
-                <ListingFocusProvider>
-                  <SearchV2DataProvider>
-                    <SearchLayoutView>{children}</SearchLayoutView>
-                  </SearchV2DataProvider>
-                </ListingFocusProvider>
+                <ActivePanBoundsProvider>
+                  <ListingFocusProvider>
+                    <SearchV2DataProvider>
+                      <SearchLayoutView>{children}</SearchLayoutView>
+                    </SearchV2DataProvider>
+                  </ListingFocusProvider>
+                </ActivePanBoundsProvider>
               </MapBoundsProvider>
             </div>
           </div>

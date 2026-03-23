@@ -165,10 +165,9 @@ export class CircuitBreaker {
    * Get current circuit state
    */
   getState(): CircuitState {
-    // Check for automatic transition from OPEN to HALF_OPEN
-    if (this.state === "OPEN" && this.shouldAttemptReset()) {
-      return "HALF_OPEN";
-    }
+    // MED-6 FIX: getState() is a pure reader — only execute() performs state transitions.
+    // Previously, getState() would report HALF_OPEN without resetting the success counter,
+    // causing inconsistency between getState() and execute() behavior.
     return this.state;
   }
 
@@ -201,8 +200,12 @@ export class CircuitBreaker {
    * Check if circuit is allowing requests (CLOSED or HALF_OPEN)
    */
   isAllowingRequests(): boolean {
-    const currentState = this.getState();
-    return currentState === "CLOSED" || currentState === "HALF_OPEN";
+    // MED-6 FIX: Since getState() no longer auto-transitions, check shouldAttemptReset()
+    // directly to correctly report that the circuit is ready for a trial request.
+    if (this.state === "OPEN") {
+      return this.shouldAttemptReset();
+    }
+    return this.state === "CLOSED" || this.state === "HALF_OPEN";
   }
 }
 

@@ -412,13 +412,11 @@ export async function executeSearchV2(
           price: listing.price,
           lat: listing.location.lat,
           lng: listing.location.lng,
-          // SearchDoc fields (may be undefined for legacy path)
-          recommendedScore: (listing as { recommendedScore?: number | null })
-            .recommendedScore,
-          avgRating: (listing as { avgRating?: number | null }).avgRating,
-          reviewCount: (listing as { reviewCount?: number | null }).reviewCount,
-          createdAt: (listing as { createdAt?: Date | string | null })
-            .createdAt,
+          // MapListingData now includes all ranking fields (C1 fix)
+          avgRating: listing.avgRating,
+          reviewCount: listing.reviewCount,
+          recommendedScore: listing.recommendedScore ?? null,
+          createdAt: listing.createdAt ?? null,
         })
       );
 

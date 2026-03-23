@@ -12,13 +12,17 @@ export type {
 } from "@/components/Map";
 
 // M2-MAP FIX: Detect WebGL support before mounting the map
+// EU-H: Cache result at module level — WebGL support doesn't change during session
+let cachedWebGLSupport: boolean | null = null;
 function hasWebGLSupport(): boolean {
+  if (cachedWebGLSupport !== null) return cachedWebGLSupport;
   try {
     const canvas = document.createElement("canvas");
-    return !!(canvas.getContext("webgl") || canvas.getContext("webgl2"));
+    cachedWebGLSupport = !!(canvas.getContext("webgl") || canvas.getContext("webgl2"));
   } catch {
-    return false;
+    cachedWebGLSupport = false;
   }
+  return cachedWebGLSupport;
 }
 
 // Dynamic import for Map component - defers maplibre-gl bundle until needed
