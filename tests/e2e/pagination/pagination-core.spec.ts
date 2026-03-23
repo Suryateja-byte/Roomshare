@@ -39,7 +39,7 @@ const sel = {
   card: '[data-testid="listing-card"]',
   loadMoreBtn: 'button:has-text("Show more places")',
   loadingBtn: 'button[aria-busy="true"]',
-  capMessage: "text=/Showing \\d+ results.*Refine/",
+  capMessage: "text=/Showing \\d+ results.*adjust/i",
   endMessage: "text=/seen all \\d+ results/",
   errorText: '[role="alert"]',
   retryBtn: 'button:has-text("Try again")',
