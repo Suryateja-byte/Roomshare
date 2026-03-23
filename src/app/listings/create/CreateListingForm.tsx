@@ -32,7 +32,8 @@ import {
 } from "lucide-react";
 import { toast } from "sonner";
 import * as Sentry from "@sentry/nextjs";
-import { createListingSchema } from "@/lib/schemas";
+import { createListingClientSchema } from "@/lib/schemas";
+import { checkListingLanguageCompliance } from "@/lib/listing-language-guard";
 import ImageUploader from "@/components/listings/ImageUploader";
 import {
   useFormPersistence,
@@ -424,7 +425,7 @@ export default function CreateListingForm({
     };
 
     // Client-side Zod pre-validation (optimistic — server validates as defense-in-depth)
-    const clientParsed = createListingSchema.safeParse(bodyObj);
+    const clientParsed = createListingClientSchema.safeParse(bodyObj);
     if (!clientParsed.success) {
       const errors: Record<string, string> = {};
       clientParsed.error.issues.forEach((issue) => {
@@ -437,6 +438,28 @@ export default function CreateListingForm({
       if (firstErrorKey) {
         document.getElementById(firstErrorKey)?.focus();
       }
+      setLoading(false);
+      isSubmittingRef.current = false;
+      return;
+    }
+
+    // Client-side language compliance pre-check (server validates as defense-in-depth)
+    const titleCompliance = checkListingLanguageCompliance(bodyObj.title);
+    if (!titleCompliance.allowed) {
+      setFieldErrors({
+        title: titleCompliance.message || "Content policy violation",
+      });
+      document.getElementById("title")?.focus();
+      setLoading(false);
+      isSubmittingRef.current = false;
+      return;
+    }
+    const descCompliance = checkListingLanguageCompliance(bodyObj.description);
+    if (!descCompliance.allowed) {
+      setFieldErrors({
+        description: descCompliance.message || "Content policy violation",
+      });
+      document.getElementById("description")?.focus();
       setLoading(false);
       isSubmittingRef.current = false;
       return;
@@ -468,8 +491,13 @@ export default function CreateListingForm({
           idempotencyKeyRef.current = crypto.randomUUID();
         }
 
-        if (json.fields) {
-          const newFieldErrors = json.fields as Record<string, string>;
+        if (json.fields || json.field) {
+          const newFieldErrors = json.fields
+            ? (json.fields as Record<string, string>)
+            : ({ [json.field]: json.error || "Validation error" } as Record<
+                string,
+                string
+              >);
           setFieldErrors(newFieldErrors);
           const firstErrorKey = Object.keys(newFieldErrors)[0];
           if (firstErrorKey) {

@@ -1,0 +1,773 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Roomshare Search Page — Architecture Map</title>
+<script src="https://cdn.jsdelivr.net/npm/mermaid@11/dist/mermaid.min.js"></script>
+<style>
+  :root {
+    --bg: #0a0a0f;
+    --surface: #13131a;
+    --surface2: #1a1a24;
+    --border: #2a2a3a;
+    --text: #e4e4ef;
+    --text-dim: #8888a0;
+    --accent: #818cf8;
+    --accent2: #34d399;
+    --accent3: #f472b6;
+    --accent4: #fbbf24;
+    --danger: #f87171;
+  }
+  * { margin: 0; padding: 0; box-sizing: border-box; }
+  body {
+    font-family: 'Inter', -apple-system, BlinkMacSystemFont, system-ui, sans-serif;
+    background: var(--bg);
+    color: var(--text);
+    line-height: 1.6;
+  }
+  .header {
+    text-align: center;
+    padding: 48px 24px 32px;
+    border-bottom: 1px solid var(--border);
+  }
+  .header h1 {
+    font-size: 2rem;
+    font-weight: 700;
+    letter-spacing: -0.03em;
+    margin-bottom: 8px;
+  }
+  .header h1 span { color: var(--accent); }
+  .header p { color: var(--text-dim); font-size: 0.95rem; }
+  .stats {
+    display: flex; gap: 32px; justify-content: center;
+    margin-top: 24px; flex-wrap: wrap;
+  }
+  .stat {
+    text-align: center;
+  }
+  .stat-value {
+    font-size: 1.75rem; font-weight: 700; color: var(--accent);
+  }
+  .stat-label { font-size: 0.75rem; color: var(--text-dim); text-transform: uppercase; letter-spacing: 0.05em; }
+  nav {
+    display: flex; gap: 8px; justify-content: center;
+    padding: 16px 24px; flex-wrap: wrap;
+    position: sticky; top: 0; z-index: 100;
+    background: var(--bg); border-bottom: 1px solid var(--border);
+  }
+  nav a {
+    color: var(--text-dim); text-decoration: none; font-size: 0.8rem;
+    padding: 6px 14px; border-radius: 20px; border: 1px solid var(--border);
+    transition: all 0.2s;
+  }
+  nav a:hover { color: var(--accent); border-color: var(--accent); }
+  section {
+    max-width: 1200px; margin: 0 auto; padding: 48px 24px;
+  }
+  section h2 {
+    font-size: 1.4rem; font-weight: 600; margin-bottom: 8px;
+    display: flex; align-items: center; gap: 10px;
+  }
+  section h2 .badge {
+    font-size: 0.65rem; padding: 3px 10px; border-radius: 12px;
+    background: var(--surface2); color: var(--text-dim); font-weight: 500;
+  }
+  section > p { color: var(--text-dim); font-size: 0.9rem; margin-bottom: 24px; }
+  .diagram-container {
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: 16px;
+    padding: 32px 24px;
+    overflow-x: auto;
+    margin-bottom: 32px;
+  }
+  .mermaid { display: flex; justify-content: center; }
+  .legend {
+    display: flex; gap: 20px; flex-wrap: wrap;
+    padding: 12px 16px; background: var(--surface2);
+    border-radius: 10px; font-size: 0.75rem; margin-top: 16px;
+  }
+  .legend-item { display: flex; align-items: center; gap: 6px; }
+  .legend-dot {
+    width: 10px; height: 10px; border-radius: 50%;
+  }
+  .file-grid {
+    display: grid; grid-template-columns: repeat(auto-fill, minmax(320px, 1fr));
+    gap: 12px; margin-top: 16px;
+  }
+  .file-card {
+    background: var(--surface2); border: 1px solid var(--border);
+    border-radius: 10px; padding: 14px 16px;
+    font-size: 0.8rem; transition: border-color 0.2s;
+  }
+  .file-card:hover { border-color: var(--accent); }
+  .file-card .path { color: var(--accent); font-family: 'JetBrains Mono', monospace; font-size: 0.72rem; }
+  .file-card .desc { color: var(--text-dim); margin-top: 4px; }
+  .file-card .lines { color: var(--text-dim); font-size: 0.65rem; float: right; }
+  .divider {
+    border: none; border-top: 1px solid var(--border);
+    margin: 0;
+  }
+</style>
+</head>
+<body>
+
+<div class="header">
+  <h1>Roomshare <span>Search Page</span> Architecture</h1>
+  <p>Complete system map — every file, every data flow, every connection</p>
+  <div class="stats">
+    <div class="stat"><div class="stat-value">120+</div><div class="stat-label">Files</div></div>
+    <div class="stat"><div class="stat-value">20K+</div><div class="stat-label">Lines</div></div>
+    <div class="stat"><div class="stat-value">7</div><div class="stat-label">Context Providers</div></div>
+    <div class="stat"><div class="stat-value">6</div><div class="stat-label">API Routes</div></div>
+    <div class="stat"><div class="stat-value">3</div><div class="stat-label">Layers</div></div>
+  </div>
+</div>
+
+<nav>
+  <a href="#layer-overview">Layer Overview</a>
+  <a href="#ssr-flow">SSR Data Flow</a>
+  <a href="#context-tree">Context Tree</a>
+  <a href="#v2-v1-fallback">V2/V1 Fallback</a>
+  <a href="#map-data">Map Data Flow</a>
+  <a href="#filter-pipeline">Filter Pipeline</a>
+  <a href="#load-more">Load More Flow</a>
+  <a href="#mobile-arch">Mobile Architecture</a>
+  <a href="#ranking">Ranking System</a>
+  <a href="#safety">Safety Layers</a>
+  <a href="#files">File Inventory</a>
+</nav>
+
+<!-- 1. LAYER OVERVIEW -->
+<section id="layer-overview">
+<h2>Layer Overview <span class="badge">Architecture</span></h2>
+<p>Three-layer architecture: Next.js App Router (SSR) → Client Components → API Routes → PostgreSQL</p>
+<div class="diagram-container">
+<pre class="mermaid">
+graph TB
+  subgraph Browser["🖥️ Browser"]
+    direction TB
+    subgraph Layout["layout.tsx — Persistent Shell"]
+      Header["SearchHeaderWrapper<br/><small>Collapsible header + Cmd+K</small>"]
+      subgraph Providers["7 Context Providers"]
+        STP["SearchTransitionProvider"]
+        FSP["FilterStateProvider"]
+        MSP["MobileSearchProvider"]
+        MBP["MapBoundsProvider"]
+        LFP["ListingFocusProvider"]
+        SVP["SearchV2DataProvider"]
+      end
+      SLV["SearchLayoutView<br/><small>Split view orchestrator</small>"]
+    end
+
+    subgraph Page["page.tsx — SSR per navigation"]
+      SSR["Server Component<br/><small>V2 → V1 fallback</small>"]
+      SRC["SearchResultsClient<br/><small>Load More + dedup</small>"]
+      Cards["ListingCard × N<br/><small>Image carousel + focus sync</small>"]
+    end
+
+    subgraph MapSide["Map (Persistent)"]
+      PMW["PersistentMapWrapper<br/><small>Spatial cache + V2 data</small>"]
+      Map["Map.tsx (3139 lines)<br/><small>MapLibre GL + clustering</small>"]
+    end
+
+    subgraph Mobile["Mobile"]
+      MBS["MobileBottomSheet<br/><small>3 snap points + drag</small>"]
+      FAB["FloatingMapButton"]
+    end
+  end
+
+  subgraph Server["⚙️ Server"]
+    direction TB
+    V2API["/api/search/v2"]
+    MapAPI["/api/map-listings"]
+    FacetsAPI["/api/search/facets"]
+    CountAPI["/api/search-count"]
+    NearbyAPI["/api/nearby"]
+    FavAPI["/api/favorites"]
+    SA["Server Action:<br/>fetchMoreListings"]
+  end
+
+  subgraph Data["🗄️ Data Layer"]
+    V2Svc["search-v2-service.ts<br/><small>Orchestrator</small>"]
+    SDQ["search-doc-queries.ts<br/><small>1670 lines SQL</small>"]
+    Data1["data.ts (V1 fallback)"]
+    PG[("PostgreSQL<br/>listing_search_docs")]
+  end
+
+  SSR --> V2Svc
+  SSR --> Data1
+  SRC --> SA
+  SA --> V2Svc
+  PMW --> MapAPI
+  PMW --> SVP
+
+  V2API --> V2Svc
+  MapAPI --> SDQ
+  FacetsAPI --> SDQ
+  CountAPI --> SDQ
+  V2Svc --> SDQ
+  V2Svc --> Data1
+  SDQ --> PG
+  Data1 --> PG
+
+  SRC --> FavAPI
+  Map --> NearbyAPI
+
+  style Browser fill:#1a1a2e,stroke:#818cf8,color:#e4e4ef
+  style Server fill:#1a2e1a,stroke:#34d399,color:#e4e4ef
+  style Data fill:#2e1a1a,stroke:#f472b6,color:#e4e4ef
+  style Layout fill:#13131a,stroke:#444,color:#e4e4ef
+  style Page fill:#13131a,stroke:#444,color:#e4e4ef
+  style MapSide fill:#13131a,stroke:#444,color:#e4e4ef
+  style Mobile fill:#13131a,stroke:#444,color:#e4e4ef
+</pre>
+</div>
+<div class="legend">
+  <div class="legend-item"><div class="legend-dot" style="background:#818cf8"></div> Browser / Client</div>
+  <div class="legend-item"><div class="legend-dot" style="background:#34d399"></div> Server / API</div>
+  <div class="legend-item"><div class="legend-dot" style="background:#f472b6"></div> Data Layer / DB</div>
+</div>
+</section>
+
+<hr class="divider">
+
+<!-- 2. SSR DATA FLOW -->
+<section id="ssr-flow">
+<h2>SSR Data Flow <span class="badge">Request Lifecycle</span></h2>
+<p>What happens when a user navigates to /search?q=Austin&minPrice=500</p>
+<div class="diagram-container">
+<pre class="mermaid">
+sequenceDiagram
+  participant U as User Browser
+  participant P as page.tsx (SSR)
+  participant V2 as search-v2-service
+  participant CB as CircuitBreaker
+  participant SDQ as search-doc-queries
+  participant DB as PostgreSQL
+  participant CL as Client Hydration
+
+  U->>P: GET /search?q=Austin&minPrice=500
+  P->>P: parseSearchParams(rawParams)
+  P->>P: Check boundsRequired (q without bounds?)
+  Note over P: q=Austin has lat/lng → bounds derived
+
+  P->>CB: circuitBreakers.searchV2.execute()
+  alt Circuit CLOSED (normal)
+    CB->>V2: executeSearchV2({rawParams, limit:12})
+    V2->>V2: parseSearchParams → filterParams
+    V2->>V2: Detect sort, cursor, keyset mode
+    V2->>SDQ: getSearchDocListingsFirstPage(params)
+    SDQ->>SDQ: buildSearchDocWhereConditions()
+    SDQ->>SDQ: buildOrderByClause()
+    SDQ->>DB: SELECT ... FROM listing_search_docs WHERE ... LIMIT 13
+    DB-->>SDQ: 13 rows (12 + 1 for hasNextPage)
+    SDQ->>SDQ: mapRawListingsToPublic()
+    SDQ->>SDQ: buildCursorFromRow(lastRow)
+    SDQ-->>V2: {items: 12, nextCursor, total, hasNextPage}
+    V2-->>CB: result
+    CB-->>P: result (record success)
+  else Circuit OPEN (V2 down)
+    CB-->>P: CircuitOpenError (instant, no 10s wait)
+    P->>P: logger.sync.info("circuit open")
+    P->>P: Fall through to V1
+  end
+
+  P->>P: Build searchParamsString (strip cursor/page)
+  P->>P: Extract initialNextCursor
+
+  P-->>U: HTML with SSR listings + hydration payload
+  U->>CL: React hydrates SearchResultsClient
+  CL->>CL: Initialize seenIdsRef with SSR listing IDs
+  CL->>CL: Fetch /api/favorites?ids=...
+</pre>
+</div>
+</section>
+
+<hr class="divider">
+
+<!-- 3. CONTEXT PROVIDER TREE -->
+<section id="context-tree">
+<h2>Context Provider Tree <span class="badge">State Management</span></h2>
+<p>7 providers nested in layout.tsx — each serves a specific coordination role</p>
+<div class="diagram-container">
+<pre class="mermaid">
+graph TD
+  Root["SearchLayout (layout.tsx)"]
+
+  Root --> STP["🔄 SearchTransitionProvider<br/><small>isPending, isSlowTransition<br/>navigateWithTransition, replaceWithTransition</small>"]
+  STP --> FSP["📋 FilterStateProvider<br/><small>isDirty, changeCount, isDrawerOpen<br/>openDrawer, registerOpenDrawer</small>"]
+  FSP --> MSP["📱 MobileSearchProvider<br/><small>isExpanded, expand, collapse<br/>openFilters, registerOpenFilters</small>"]
+  MSP --> HEADER["SearchHeaderWrapper"]
+  MSP --> MAIN["Main Content Area"]
+  MAIN --> MBP["📍 MapBoundsProvider<br/><small>activeBounds, mapMoved, areaCount<br/>searchAsIMove, onSearch, onReset</small>"]
+  MBP --> LFP["🎯 ListingFocusProvider<br/><small>hoveredId, activeId, scrollRequest<br/>Split: State vs Actions contexts</small>"]
+  LFP --> SVP["📊 SearchV2DataProvider<br/><small>v2MapData, isV2Enabled, dataVersion<br/>Split: State vs Setter contexts</small>"]
+  SVP --> SLV["SearchLayoutView"]
+
+  SLV --> LIST["List Panel (children = page.tsx)"]
+  SLV --> MAPW["PersistentMapWrapper"]
+
+  style Root fill:#2a1a3e,stroke:#818cf8,color:#e4e4ef
+  style STP fill:#1a2e2a,stroke:#34d399,color:#e4e4ef
+  style FSP fill:#1a2e2a,stroke:#34d399,color:#e4e4ef
+  style MSP fill:#1a2e2a,stroke:#34d399,color:#e4e4ef
+  style MBP fill:#1a2e2a,stroke:#34d399,color:#e4e4ef
+  style LFP fill:#1a2e2a,stroke:#34d399,color:#e4e4ef
+  style SVP fill:#1a2e2a,stroke:#34d399,color:#e4e4ef
+</pre>
+</div>
+<div class="legend">
+  <div class="legend-item"><div class="legend-dot" style="background:#818cf8"></div> Layout Shell</div>
+  <div class="legend-item"><div class="legend-dot" style="background:#34d399"></div> Context Provider (persists across /search navigations)</div>
+</div>
+</section>
+
+<hr class="divider">
+
+<!-- 4. V2/V1 FALLBACK -->
+<section id="v2-v1-fallback">
+<h2>V2 / V1 Fallback Chain <span class="badge">Resilience</span></h2>
+<p>Triple fallback: V2 SearchDoc → V1 Prisma joins → Error boundary</p>
+<div class="diagram-container">
+<pre class="mermaid">
+flowchart TD
+  Start([User navigates to /search]) --> FF{Feature flag<br/>searchV2 enabled?}
+  FF -->|No| V1Path
+  FF -->|Yes| CB{Circuit breaker<br/>searchV2 state?}
+
+  CB -->|OPEN| CBSkip["⚡ Skip V2 instantly<br/><small>No 10s timeout penalty</small>"]
+  CBSkip --> V1Path
+  CB -->|CLOSED/HALF_OPEN| V2Try
+
+  V2Try["Try V2: executeSearchV2()"] --> TO{Timeout<br/>10s exceeded?}
+  TO -->|Yes| V2Fail["V2 Timeout<br/><small>Sentry.captureException</small>"]
+  TO -->|No| V2Check{V2 returned<br/>valid data?}
+
+  V2Check -->|Yes| V2OK["✅ Use V2 data<br/><small>SearchDoc + keyset cursor</small>"]
+  V2Check -->|No/Error| V2Fail
+  V2Fail --> V1Path
+
+  V1Path["V1: getListingsPaginated()"] --> V1TO{Timeout<br/>10s exceeded?}
+  V1TO -->|No| V1OK["✅ Use V1 data<br/><small>Multi-table JOIN</small>"]
+  V1TO -->|Yes| V1Err["💥 Error thrown"]
+  V1Err --> EB["error.tsx boundary<br/><small>Try again + Go home</small>"]
+
+  V2OK --> Render["Render SearchResultsClient<br/><small>+ V1PathResetSetter or V2MapDataSetter</small>"]
+  V1OK --> Render
+
+  style V2OK fill:#1a3e1a,stroke:#34d399,color:#e4e4ef
+  style V1OK fill:#1a3e2a,stroke:#34d399,color:#e4e4ef
+  style V2Fail fill:#3e2a1a,stroke:#fbbf24,color:#e4e4ef
+  style V1Err fill:#3e1a1a,stroke:#f87171,color:#e4e4ef
+  style CBSkip fill:#1a2e3e,stroke:#818cf8,color:#e4e4ef
+  style EB fill:#3e1a1a,stroke:#f87171,color:#e4e4ef
+</pre>
+</div>
+</section>
+
+<hr class="divider">
+
+<!-- 5. MAP DATA FLOW -->
+<section id="map-data">
+<h2>Map Data Flow <span class="badge">Persistent Map</span></h2>
+<p>Map stays mounted in layout. Data comes from V2 context OR independent /api/map-listings fetch.</p>
+<div class="diagram-container">
+<pre class="mermaid">
+flowchart TD
+  subgraph SSR["page.tsx (SSR)"]
+    V2Res["V2 search result"]
+    V2MDS["V2MapDataSetter<br/><small>Sets context: v2MapData + isV2Enabled</small>"]
+    V1RS["V1PathResetSetter<br/><small>Clears context: isV2Enabled=false</small>"]
+  end
+
+  subgraph Ctx["SearchV2DataContext"]
+    V2Data["v2MapData: GeoJSON + pins"]
+    V2Flag["isV2Enabled: boolean"]
+    DV["dataVersion: number<br/><small>Prevents stale data</small>"]
+  end
+
+  subgraph PMW["PersistentMapWrapper (1027 lines)"]
+    Check{isV2Enabled?}
+    UseV2["Use v2MapData from context<br/><small>Skip /api/map-listings fetch</small>"]
+    FetchV1["Fetch /api/map-listings<br/><small>Independent bounds-based fetch</small>"]
+    SC["Spatial Cache<br/><small>Skip fetch if bounds within cached region</small>"]
+  end
+
+  subgraph MapComp["Map.tsx (3139 lines)"]
+    Cluster["MapLibre Clustering<br/><small>≥50 listings → GeoJSON clusters</small>"]
+    Pins["Two-tier pins<br/><small>&lt;50 listings → primary + mini pins</small>"]
+    Popup["StackedListingPopup<br/><small>Multiple listings at same coords</small>"]
+  end
+
+  V2Res -->|V2 success| V2MDS
+  V2Res -->|V2 fail| V1RS
+  V2MDS --> V2Data
+  V2MDS --> V2Flag
+  V1RS --> V2Flag
+
+  V2Data --> Check
+  V2Flag --> Check
+  Check -->|Yes| UseV2
+  Check -->|No| SC
+  SC -->|Cache miss| FetchV1
+  SC -->|Cache hit| UseV2
+
+  UseV2 --> MapComp
+  FetchV1 --> MapComp
+
+  style SSR fill:#1a1a2e,stroke:#818cf8,color:#e4e4ef
+  style Ctx fill:#1a2e2a,stroke:#34d399,color:#e4e4ef
+  style PMW fill:#2e2a1a,stroke:#fbbf24,color:#e4e4ef
+  style MapComp fill:#2e1a2a,stroke:#f472b6,color:#e4e4ef
+</pre>
+</div>
+</section>
+
+<hr class="divider">
+
+<!-- 6. FILTER PIPELINE -->
+<section id="filter-pipeline">
+<h2>Filter Pipeline <span class="badge">URL → SQL</span></h2>
+<p>How a filter change flows from UI through URL to database and back</p>
+<div class="diagram-container">
+<pre class="mermaid">
+flowchart LR
+  subgraph UI["User Interface"]
+    SF["SearchForm<br/><small>1279 lines</small>"]
+    FM["FilterModal<br/><small>Full filter drawer</small>"]
+    CB2["CategoryBar<br/><small>Quick toggles</small>"]
+    SS["SortSelect<br/><small>5 options</small>"]
+    AFC["AppliedFilterChips<br/><small>Remove individual filters</small>"]
+  end
+
+  subgraph Batch["Batching Layer"]
+    UBF["useBatchedFilters<br/><small>Pending state before URL commit</small>"]
+    UDFC["useDebouncedFilterCount<br/><small>300ms debounce + 30s TTL cache</small>"]
+    UF["useFacets<br/><small>Price histogram + facet counts</small>"]
+  end
+
+  subgraph URL["URL State"]
+    NR["router.push(/search?...)<br/><small>via SearchTransitionContext</small>"]
+    SP["URLSearchParams<br/><small>q, minPrice, maxPrice, amenities,<br/>roomType, sort, minLat, maxLat...</small>"]
+  end
+
+  subgraph Parse["Parsing Layer"]
+    PSP["parseSearchParams()<br/><small>search-params.ts (760 lines)</small>"]
+    FS["filter-schema.ts<br/><small>Zod validation + normalization</small>"]
+    NLP["natural-language-parser<br/><small>'pet friendly room under $1000'</small>"]
+  end
+
+  subgraph Query["Query Layer"]
+    BWC["buildSearchDocWhereConditions()<br/><small>Parameterized $N SQL fragments</small>"]
+    BOB["buildOrderByClause()<br/><small>Sort + FTS ts_rank_cd tie-break</small>"]
+    SQL["SQL Query<br/><small>listing_search_docs + GIN indexes</small>"]
+  end
+
+  SF --> UBF
+  FM --> UBF
+  CB2 --> NR
+  SS --> NR
+  AFC --> NR
+  UBF --> NR
+  UBF --> UDFC
+  UBF --> UF
+
+  NR --> SP
+  SP --> PSP
+  SF --> NLP
+  NLP --> PSP
+  PSP --> FS
+  FS --> BWC
+  BWC --> BOB
+  BOB --> SQL
+
+  style UI fill:#1a1a2e,stroke:#818cf8,color:#e4e4ef
+  style Batch fill:#1a2a1a,stroke:#34d399,color:#e4e4ef
+  style URL fill:#2a2a1a,stroke:#fbbf24,color:#e4e4ef
+  style Parse fill:#2a1a2a,stroke:#f472b6,color:#e4e4ef
+  style Query fill:#1a2a2a,stroke:#34d399,color:#e4e4ef
+</pre>
+</div>
+</section>
+
+<hr class="divider">
+
+<!-- 7. LOAD MORE FLOW -->
+<section id="load-more">
+<h2>"Load More" Pagination Flow <span class="badge">Client-Side</span></h2>
+<p>Cursor-based infinite scroll with deduplication, 60-item cap, and degradation handling</p>
+<div class="diagram-container">
+<pre class="mermaid">
+flowchart TD
+  Click["User clicks 'Show more places'"] --> Guard{nextCursor exists?<br/>Not already loading?}
+  Guard -->|No| Stop["Do nothing"]
+  Guard -->|Yes| SA["Server Action: fetchMoreListings(cursor, rawParams)"]
+
+  SA --> RL{Rate limit<br/>check}
+  RL -->|Blocked| Err429["Throw 'Rate limited'"]
+  RL -->|OK| CB3{Circuit breaker<br/>searchV2}
+
+  CB3 -->|OPEN| V1Fall["V1 fallback:<br/>return {degraded: true}"]
+  CB3 -->|OK| V2Call["V2: executeSearchV2 with cursor"]
+
+  V2Call --> V2OK{V2 succeeded?}
+  V2OK -->|Yes| Return["Return {items, nextCursor, hasNextPage}"]
+  V2OK -->|No| V1Fall
+
+  Return --> Client["SearchResultsClient"]
+  V1Fall --> Client
+
+  Client --> DegCheck{result.degraded?}
+  DegCheck -->|Yes| ShowMsg["Show error:<br/>'Can't load more right now'<br/>Remove button"]
+  DegCheck -->|No| Dedup["Filter by seenIdsRef Set<br/><small>O(1) lookup per item</small>"]
+
+  Dedup --> Append["Append to extraListings"]
+  Append --> CapCheck{allListings.length<br/>≥ 60?}
+  CapCheck -->|Yes| CapMsg["Show: 'Refine your filters'<br/>Hide button"]
+  CapCheck -->|No| Ready["Show 'Show more places'<br/>with next cursor"]
+
+  Err429 --> FriendlyErr["'Too many requests —<br/>wait 30 seconds'"]
+
+  style Click fill:#1a1a2e,stroke:#818cf8,color:#e4e4ef
+  style ShowMsg fill:#3e2a1a,stroke:#fbbf24,color:#e4e4ef
+  style CapMsg fill:#2a2a1a,stroke:#fbbf24,color:#e4e4ef
+  style FriendlyErr fill:#3e1a1a,stroke:#f87171,color:#e4e4ef
+  style Ready fill:#1a3e1a,stroke:#34d399,color:#e4e4ef
+</pre>
+</div>
+</section>
+
+<hr class="divider">
+
+<!-- 8. MOBILE ARCHITECTURE -->
+<section id="mobile-arch">
+<h2>Mobile Architecture <span class="badge">Bottom Sheet + Map</span></h2>
+<p>Map fills the background. Draggable bottom sheet overlays results. 3 snap points.</p>
+<div class="diagram-container">
+<pre class="mermaid">
+flowchart TD
+  subgraph Viewport["📱 Mobile Viewport"]
+    direction TB
+    subgraph MapBG["Map Background (always visible)"]
+      MapGL["MapLibre GL<br/><small>Clusters + markers</small>"]
+    end
+
+    subgraph Sheet["MobileBottomSheet"]
+      Handle["Drag Handle<br/><small>role=slider, keyboard: ↑↓ arrows</small>"]
+      Content["Scrollable Content"]
+      PTR["PullToRefresh<br/><small>Only when EXPANDED</small>"]
+    end
+
+    FAB2["FloatingMapButton<br/><small>'Map' or 'List' toggle</small>"]
+  end
+
+  subgraph Snaps["3 Snap Points"]
+    S0["COLLAPSED (15vh)<br/><small>Just handle peek<br/>Map gets all touches</small>"]
+    S1["HALF (50vh)<br/><small>Default position<br/>See map + list</small>"]
+    S2["EXPANDED (85vh)<br/><small>Full list mode<br/>Body scroll locked</small>"]
+  end
+
+  subgraph Gestures["Gesture Handling"]
+    Drag["Touch drag on handle<br/><small>Rubber-band at edges</small>"]
+    Flick["Flick velocity > 0.4px/ms<br/><small>Snaps to next point</small>"]
+    ScrollDrag["Content scroll at top + drag down<br/><small>Collapses sheet</small>"]
+    Escape["Escape key<br/><small>Collapse to half</small>"]
+    PinTap["Map pin tapped<br/><small>Snap to half + scroll to card</small>"]
+  end
+
+  Handle --> Drag
+  Drag --> Flick
+  Content --> ScrollDrag
+  PinTap --> S1
+
+  S0 -.->|"FAB: 'List'"| S1
+  S1 -.->|"FAB: 'Map'"| S0
+  S1 -.->|"Drag up"| S2
+  S2 -.->|"Drag down / Escape"| S1
+
+  style Viewport fill:#1a1a2e,stroke:#818cf8,color:#e4e4ef
+  style Sheet fill:#1a2a2a,stroke:#34d399,color:#e4e4ef
+  style Snaps fill:#2a2a1a,stroke:#fbbf24,color:#e4e4ef
+  style Gestures fill:#2a1a2a,stroke:#f472b6,color:#e4e4ef
+</pre>
+</div>
+</section>
+
+<hr class="divider">
+
+<!-- 9. RANKING SYSTEM -->
+<section id="ranking">
+<h2>Ranking System <span class="badge">Map Pin Tiering</span></h2>
+<p>5 normalized signals (0-1) weighted into a composite score for map pin priority</p>
+<div class="diagram-container">
+<pre class="mermaid">
+flowchart LR
+  subgraph Signals["5 Ranking Signals (0-1 each)"]
+    Q["Quality (25%)<br/><small>Sigmoid of recommended_score<br/>midpoint=50, k=0.04</small>"]
+    R["Rating (25%)<br/><small>Bayesian average<br/>prior=3.5, minReviews=5</small>"]
+    P["Price (15%)<br/><small>Gaussian decay from median<br/>sigma=0.5</small>"]
+    RE["Recency (15%)<br/><small>Exponential decay<br/>halfLife=30 days</small>"]
+    G["Geo (20%)<br/><small>Haversine + exp decay<br/>halfDistance=5km</small>"]
+  end
+
+  subgraph Score["Composite Score"]
+    CS["score = Σ(weight × signal)<br/><small>Range: 0.0 - 1.0</small>"]
+  end
+
+  subgraph Tiering["Pin Classification"]
+    RM["buildRankMapFromScores()<br/><small>Sort by score descending</small>"]
+    TG["computeTieredGroups()"]
+    PR["Top 40: PRIMARY pins<br/><small>Price pill markers</small>"]
+    MI["Rest: MINI pins<br/><small>Small dot markers</small>"]
+  end
+
+  Q --> CS
+  R --> CS
+  P --> CS
+  RE --> CS
+  G --> CS
+  CS --> RM
+  RM --> TG
+  TG --> PR
+  TG --> MI
+
+  style Signals fill:#1a1a2e,stroke:#818cf8,color:#e4e4ef
+  style Score fill:#1a2e1a,stroke:#34d399,color:#e4e4ef
+  style Tiering fill:#2e2a1a,stroke:#fbbf24,color:#e4e4ef
+</pre>
+</div>
+</section>
+
+<hr class="divider">
+
+<!-- 10. SAFETY LAYERS -->
+<section id="safety">
+<h2>Safety &amp; Protection Layers <span class="badge">Defense in Depth</span></h2>
+<p>Every request passes through multiple validation, rate limiting, and sanitization layers</p>
+<div class="diagram-container">
+<pre class="mermaid">
+flowchart TD
+  Req["Incoming Request"] --> RL["Rate Limiting<br/><small>Redis burst+sustained<br/>DB fallback<br/>Client global throttle</small>"]
+  RL --> CB4["Circuit Breaker<br/><small>searchV2, redis, radar,<br/>email, geocode, postgis</small>"]
+  CB4 --> TO2["Timeout Protection<br/><small>withTimeout: DB=10s, Redis=1s,<br/>API=5s, LLM=30s</small>"]
+  TO2 --> Val["Input Validation<br/><small>Zod schemas<br/>filter-schema.ts<br/>search-params.ts</small>"]
+  Val --> SQL2["SQL Safety<br/><small>$N parameterized queries<br/>joinWhereClauseWithSecurityInvariant<br/>assertParameterizedWhereClause</small>"]
+  SQL2 --> StmtTO["Statement Timeout<br/><small>SET LOCAL statement_timeout = 5000<br/>Per-transaction</small>"]
+  StmtTO --> BoundsClamp["Bounds Clamping<br/><small>MAX_LAT_SPAN=10°<br/>clampBoundsToMaxSpan()</small>"]
+  BoundsClamp --> DB2[("PostgreSQL")]
+
+  DB2 --> Sanitize["Response Sanitization<br/><small>sanitizeMapListings()<br/>hasValidCoordinates()<br/>mapRawListingsToPublic()</small>"]
+  Sanitize --> PII["PII Redaction<br/><small>logger.ts redacts:<br/>emails, phones, addresses,<br/>JWTs, connection strings</small>"]
+  PII --> ErrSan["Error Sanitization<br/><small>sanitizeErrorMessage()<br/>No stack traces to client</small>"]
+  ErrSan --> Sentry2["Sentry Capture<br/><small>CircuitOpenErrors excluded<br/>Tags: component, path</small>"]
+  Sentry2 --> Res["Response to Client"]
+
+  style Req fill:#1a1a2e,stroke:#818cf8,color:#e4e4ef
+  style RL fill:#3e1a1a,stroke:#f87171,color:#e4e4ef
+  style CB4 fill:#3e1a1a,stroke:#f87171,color:#e4e4ef
+  style TO2 fill:#3e2a1a,stroke:#fbbf24,color:#e4e4ef
+  style Val fill:#2a2a1a,stroke:#fbbf24,color:#e4e4ef
+  style SQL2 fill:#1a3e1a,stroke:#34d399,color:#e4e4ef
+  style PII fill:#2e1a2a,stroke:#f472b6,color:#e4e4ef
+  style DB2 fill:#1a2e2a,stroke:#34d399,color:#e4e4ef
+</pre>
+</div>
+</section>
+
+<hr class="divider">
+
+<!-- 11. FILE INVENTORY -->
+<section id="files">
+<h2>Complete File Inventory <span class="badge">120+ files</span></h2>
+<p>Every file that powers the search page, organized by layer</p>
+
+<h3 style="color:var(--accent);margin:24px 0 12px;font-size:1rem;">Entry Points</h3>
+<div class="file-grid">
+  <div class="file-card"><div class="path">src/app/search/page.tsx</div><div class="lines">359 lines</div><div class="desc">SSR search page — V2/V1 fallback, metadata, bounds guard</div></div>
+  <div class="file-card"><div class="path">src/app/search/layout.tsx</div><div class="lines">77 lines</div><div class="desc">Persistent shell — 7 context providers, fixed header</div></div>
+  <div class="file-card"><div class="path">src/app/search/actions.ts</div><div class="lines">98 lines</div><div class="desc">Server action — fetchMoreListings with circuit breaker</div></div>
+  <div class="file-card"><div class="path">src/app/search/error.tsx</div><div class="lines">79 lines</div><div class="desc">Error boundary — retry + go home</div></div>
+  <div class="file-card"><div class="path">src/app/search/loading.tsx</div><div class="lines">6 lines</div><div class="desc">Skeleton placeholder during SSR</div></div>
+</div>
+
+<h3 style="color:var(--accent2);margin:24px 0 12px;font-size:1rem;">API Routes</h3>
+<div class="file-grid">
+  <div class="file-card"><div class="path">src/app/api/search/v2/route.ts</div><div class="desc">Unified search — list + map in one response</div></div>
+  <div class="file-card"><div class="path">src/app/api/search/facets/route.ts</div><div class="desc">Price histogram + facet counts for filter drawer</div></div>
+  <div class="file-card"><div class="path">src/app/api/search-count/route.ts</div><div class="desc">Lightweight count for area badge</div></div>
+  <div class="file-card"><div class="path">src/app/api/map-listings/route.ts</div><div class="desc">Map markers — CDN cached (s-maxage=60)</div></div>
+  <div class="file-card"><div class="path">src/app/api/nearby/route.ts</div><div class="desc">Nearby places via Radar API</div></div>
+  <div class="file-card"><div class="path">src/app/api/favorites/route.ts</div><div class="desc">Saved listings (heart button state)</div></div>
+</div>
+
+<h3 style="color:var(--accent3);margin:24px 0 12px;font-size:1rem;">Core Components</h3>
+<div class="file-grid">
+  <div class="file-card"><div class="path">src/components/SearchForm.tsx</div><div class="lines">1279 lines</div><div class="desc">Location autocomplete, NLP, all filters, price range</div></div>
+  <div class="file-card"><div class="path">src/components/Map.tsx</div><div class="lines">3139 lines</div><div class="desc">MapLibre GL — clustering, pins, popups, dark mode</div></div>
+  <div class="file-card"><div class="path">src/components/PersistentMapWrapper.tsx</div><div class="lines">1027 lines</div><div class="desc">Map data orchestration, spatial cache, V2 integration</div></div>
+  <div class="file-card"><div class="path">src/components/SearchHeaderWrapper.tsx</div><div class="lines">330 lines</div><div class="desc">Collapsible header, profile menu, Cmd+K</div></div>
+  <div class="file-card"><div class="path">src/components/search/SearchResultsClient.tsx</div><div class="lines">494 lines</div><div class="desc">Load More, dedup, 60-cap, favorites, split stays</div></div>
+  <div class="file-card"><div class="path">src/components/SearchLayoutView.tsx</div><div class="lines">92 lines</div><div class="desc">Split view orchestrator — list + map</div></div>
+  <div class="file-card"><div class="path">src/components/SearchViewToggle.tsx</div><div class="lines">170 lines</div><div class="desc">Desktop split / mobile bottom sheet routing</div></div>
+  <div class="file-card"><div class="path">src/components/LocationSearchInput.tsx</div><div class="lines">575 lines</div><div class="desc">Photon geocoding, autocomplete, IME support</div></div>
+  <div class="file-card"><div class="path">src/components/search/FilterModal.tsx</div><div class="lines">621 lines</div><div class="desc">Full filter drawer — all filter types</div></div>
+  <div class="file-card"><div class="path">src/components/search/MobileBottomSheet.tsx</div><div class="lines">547 lines</div><div class="desc">3 snap points, rubber-band, PTR</div></div>
+  <div class="file-card"><div class="path">src/components/search/CategoryBar.tsx</div><div class="lines">305 lines</div><div class="desc">Horizontal scrollable category toggles</div></div>
+  <div class="file-card"><div class="path">src/components/listings/ListingCard.tsx</div><div class="lines">444 lines</div><div class="desc">Card with carousel, rating, focus sync</div></div>
+</div>
+
+<h3 style="color:var(--accent4);margin:24px 0 12px;font-size:1rem;">Service Layer</h3>
+<div class="file-grid">
+  <div class="file-card"><div class="path">src/lib/search/search-v2-service.ts</div><div class="desc">V2 orchestrator — keyset, ranking, semantic</div></div>
+  <div class="file-card"><div class="path">src/lib/search/search-doc-queries.ts</div><div class="lines">1670 lines</div><div class="desc">All SQL queries, WHERE builder, ORDER BY, keyset cursor</div></div>
+  <div class="file-card"><div class="path">src/lib/search/cursor.ts</div><div class="lines">418 lines</div><div class="desc">Keyset cursor encode/decode, HMAC signing, Zod validation</div></div>
+  <div class="file-card"><div class="path">src/lib/search/ranking/score.ts</div><div class="desc">5 signals: quality, rating, price, recency, geo</div></div>
+  <div class="file-card"><div class="path">src/lib/search/ranking/rank.ts</div><div class="desc">Score map, stable sort, debug signals</div></div>
+  <div class="file-card"><div class="path">src/lib/search/natural-language-parser.ts</div><div class="desc">NLP: "pet friendly under $1000" → filters</div></div>
+  <div class="file-card"><div class="path">src/lib/search/transform.ts</div><div class="desc">Response → GeoJSON + pins + list items</div></div>
+  <div class="file-card"><div class="path">src/lib/data.ts</div><div class="desc">V1 data layer — Prisma queries, all filters</div></div>
+  <div class="file-card"><div class="path">src/lib/search-params.ts</div><div class="lines">760 lines</div><div class="desc">URL parsing, budget aliases, bounds derivation</div></div>
+  <div class="file-card"><div class="path">src/lib/filter-schema.ts</div><div class="lines">772 lines</div><div class="desc">Zod schemas, normalization, case-insensitive enums</div></div>
+  <div class="file-card"><div class="path">src/lib/near-matches.ts</div><div class="desc">Filter expansion for low result sets</div></div>
+  <div class="file-card"><div class="path">src/lib/circuit-breaker.ts</div><div class="desc">7 breakers: redis, radar, email, geocode, postgis, storage, searchV2</div></div>
+</div>
+
+<h3 style="color:var(--text-dim);margin:24px 0 12px;font-size:1rem;">Contexts &amp; Hooks</h3>
+<div class="file-grid">
+  <div class="file-card"><div class="path">src/contexts/MapBoundsContext.tsx</div><div class="lines">816 lines</div><div class="desc">Bounds, "moved" banner, area count, search-as-I-move</div></div>
+  <div class="file-card"><div class="path">src/contexts/ListingFocusContext.tsx</div><div class="lines">318 lines</div><div class="desc">Split context: hover/active sync, scroll requests</div></div>
+  <div class="file-card"><div class="path">src/contexts/SearchV2DataContext.tsx</div><div class="lines">272 lines</div><div class="desc">Split context: V2 map data + version guard</div></div>
+  <div class="file-card"><div class="path">src/contexts/SearchTransitionContext.tsx</div><div class="lines">164 lines</div><div class="desc">useTransition wrapper, slow detection (6s)</div></div>
+  <div class="file-card"><div class="path">src/hooks/useBatchedFilters.ts</div><div class="lines">399 lines</div><div class="desc">Pending filter state before URL commit</div></div>
+  <div class="file-card"><div class="path">src/hooks/useDebouncedFilterCount.ts</div><div class="lines">376 lines</div><div class="desc">300ms debounce + 30s TTL cache</div></div>
+  <div class="file-card"><div class="path">src/hooks/useFacets.ts</div><div class="lines">283 lines</div><div class="desc">Facet counts + price histogram fetch</div></div>
+  <div class="file-card"><div class="path">src/hooks/useRecentSearches.ts</div><div class="lines">290 lines</div><div class="desc">localStorage history with format migration</div></div>
+</div>
+</section>
+
+<div style="text-align:center;padding:48px 24px;color:var(--text-dim);font-size:0.8rem;">
+  Generated from complete codebase analysis — every file verified by direct read
+</div>
+
+<script>
+  mermaid.initialize({
+    startOnLoad: true,
+    theme: 'dark',
+    themeVariables: {
+      primaryColor: '#1a1a2e',
+      primaryTextColor: '#e4e4ef',
+      primaryBorderColor: '#818cf8',
+      lineColor: '#555570',
+      secondaryColor: '#1a2e1a',
+      tertiaryColor: '#2e1a1a',
+      fontFamily: 'Inter, system-ui, sans-serif',
+      fontSize: '13px',
+    },
+    flowchart: { curve: 'basis', padding: 16 },
+    sequence: { mirrorActors: false, messageAlign: 'left' },
+  });
+</script>
+</body>
+</html>

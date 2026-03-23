@@ -5,6 +5,11 @@ import { checkRateLimit, getClientIP, RATE_LIMITS } from "@/lib/rate-limit";
 import { logger, sanitizeErrorMessage } from "@/lib/logger";
 import { markListingDirty } from "@/lib/search/search-doc-dirty";
 
+// NOTE: No CSRF validation on this endpoint by design.
+// ListingViewTracker uses navigator.sendBeacon() which cannot set custom headers
+// or reliably send the Origin header. CSRF is not needed here — this endpoint
+// only increments a view counter and is rate-limited per IP/user.
+
 interface RouteContext {
   params: Promise<{ id: string }>;
 }
@@ -34,7 +39,14 @@ export async function POST(request: Request, { params }: RouteContext) {
       data: { viewCount: { increment: 1 } },
     });
 
-    markListingDirty(id, "view_count").catch(() => {});
+    markListingDirty(id, "view_count").catch((err) => {
+      logger.sync.warn("markListingDirty failed", {
+        route: "/api/listings/[id]/view",
+        listingId: id,
+        reason: "view_count",
+        error: err instanceof Error ? err.message : String(err),
+      });
+    });
 
     if (session?.user?.id) {
       await prisma.recentlyViewed.upsert({

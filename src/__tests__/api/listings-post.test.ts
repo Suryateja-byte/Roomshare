@@ -36,9 +36,7 @@ jest.mock("@/lib/geocoding", () => ({
   geocodeAddress: jest.fn(),
 }));
 
-jest.mock("@/lib/data", () => ({
-  getListings: jest.fn(),
-}));
+jest.mock("@/lib/data", () => ({}));
 
 jest.mock("@/lib/with-rate-limit", () => ({
   withRateLimit: jest.fn().mockResolvedValue(null),
@@ -706,6 +704,8 @@ describe("POST /api/listings — extended edge cases", () => {
     });
 
     it("allows listing creation when user has 9 active listings", async () => {
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      let capturedTx: any;
       (prisma.$transaction as jest.Mock).mockImplementation(
         async (callback) => {
           const tx = {
@@ -716,15 +716,26 @@ describe("POST /api/listings — extended edge cases", () => {
             },
             $executeRaw: jest.fn().mockResolvedValue(1),
           };
+          capturedTx = tx;
           return callback(tx);
         }
       );
 
       const response = await POST(makeRequest(validBody));
       expect(response.status).toBe(201);
+
+      // Verify pg_advisory_xact_lock is used to serialize concurrent creates
+      expect(capturedTx!.$executeRaw).toHaveBeenCalled();
+      const lockSql = capturedTx!.$executeRaw.mock.calls[0][0].join("");
+      expect(lockSql).toContain("pg_advisory_xact_lock");
     });
 
-    it("only one of two concurrent requests succeeds at the cap boundary", async () => {
+    // NOTE: This test uses predetermined mocks that execute sequentially in the JS event loop.
+    // It verifies the cap-check logic (count >= 10 → reject) but does NOT prove that
+    // pg_advisory_xact_lock prevents TOCTOU races under true concurrent load.
+    // True concurrency testing requires integration tests against a real database.
+    // The advisory lock assertion at the test above verifies the lock IS called.
+    it("rejects second request when advisory-lock-serialized count reaches cap", async () => {
       let callCount = 0;
       (prisma.$transaction as jest.Mock).mockImplementation(
         async (callback) => {

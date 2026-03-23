@@ -70,9 +70,9 @@ const updateListingSchema = z.object({
     .optional()
     .default([]),
   totalSlots: z.coerce.number().int().min(1).max(20),
-  address: z.string().trim().min(1).max(200),
-  city: z.string().trim().min(1).max(100),
-  state: z.string().trim().min(1).max(100),
+  address: z.string().trim().min(1).max(200).transform(sanitizeUnicode).refine(noHtmlTags, NO_HTML_MSG),
+  city: z.string().trim().min(1).max(100).transform(sanitizeUnicode).refine(noHtmlTags, NO_HTML_MSG),
+  state: z.string().trim().min(1).max(100).transform(sanitizeUnicode).refine(noHtmlTags, NO_HTML_MSG),
   zip: z.string().trim().min(1).max(20),
   moveInDate: z
     .union([
@@ -119,6 +119,14 @@ export async function DELETE(
     if (!session || !session.user || !session.user.id) {
       return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
     }
+
+    // Per-user rate limiting (after auth, complements IP-based rate limit above)
+    const userDeleteRateLimit = await withRateLimit(request, {
+      type: "deleteListing",
+      getIdentifier: () => `user:${session.user.id}`,
+      endpoint: "/api/listings/[id]/user",
+    });
+    if (userDeleteRateLimit) return userDeleteRateLimit;
 
     const { id } = await params;
 
@@ -292,6 +300,14 @@ export async function PATCH(
 
     const userId = session.user.id;
 
+    // Per-user rate limiting (after auth, complements IP-based rate limit above)
+    const userPatchRateLimit = await withRateLimit(request, {
+      type: "updateListing",
+      getIdentifier: () => `user:${userId}`,
+      endpoint: "/api/listings/[id]/user",
+    });
+    if (userPatchRateLimit) return userPatchRateLimit;
+
     const suspension = await checkSuspension(userId);
     if (suspension.suspended) {
       await logger.warn("Listing update blocked: account suspended", {
@@ -368,12 +384,8 @@ export async function PATCH(
       include: { location: true },
     });
 
-    if (!listing) {
+    if (!listing || listing.ownerId !== userId) {
       return NextResponse.json({ error: "Listing not found" }, { status: 404 });
-    }
-
-    if (listing.ownerId !== userId) {
-      return NextResponse.json({ error: "Forbidden" }, { status: 403 });
     }
 
     // Validate language codes
@@ -555,12 +567,8 @@ export async function PATCH(
                     FOR UPDATE
                 `;
 
-        if (!lockedListing) {
+        if (!lockedListing || lockedListing.ownerId !== userId) {
           throw new Error("NOT_FOUND");
-        }
-
-        if (lockedListing.ownerId !== userId) {
-          throw new Error("FORBIDDEN");
         }
 
         // Phase 3: Block mode changes when future ACCEPTED bookings exist (D5/D8)
@@ -666,9 +674,6 @@ export async function PATCH(
             { status: 404 }
           );
         }
-        if (error.message === "FORBIDDEN") {
-          return NextResponse.json({ error: "Forbidden" }, { status: 403 });
-        }
         if (error.message === "BOOKING_MODE_CONFLICT") {
           return NextResponse.json(
             {
@@ -723,10 +728,24 @@ export async function PATCH(
     }
 
     // Fire-and-forget: mark listing dirty for search doc refresh
-    markListingDirty(id, "listing_updated").catch(() => {});
+    markListingDirty(id, "listing_updated").catch((err) => {
+      logger.sync.warn("markListingDirty failed", {
+        route: "/api/listings/[id]",
+        method: "PATCH",
+        listingId: id,
+        error: err instanceof Error ? err.message : String(err),
+      });
+    });
 
     if (features.semanticSearch) {
-      syncListingEmbedding(id).catch(() => {});
+      syncListingEmbedding(id).catch((err) => {
+        logger.sync.warn("syncListingEmbedding failed", {
+          route: "/api/listings/[id]",
+          method: "PATCH",
+          listingId: id,
+          error: err instanceof Error ? err.message : String(err),
+        });
+      });
     }
 
     return NextResponse.json(result, { status: 200 });

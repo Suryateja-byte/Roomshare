@@ -84,7 +84,7 @@ describe("GET /api/listings/[id]/can-delete", () => {
     expect(data.error).toBe("Listing not found");
   });
 
-  it("returns 403 when user is not the owner", async () => {
+  it("returns 404 when user is not the owner", async () => {
     (prisma.listing.findUnique as jest.Mock).mockResolvedValue({
       ownerId: "other-user-456",
     });
@@ -92,8 +92,8 @@ describe("GET /api/listings/[id]/can-delete", () => {
     const response = await GET(createRequest(), routeContext);
     const data = await response.json();
 
-    expect(response.status).toBe(403);
-    expect(data.error).toBe("Forbidden");
+    expect(response.status).toBe(404);
+    expect(data.error).toBe("Listing not found");
   });
 
   it("returns canDelete: true when no active bookings", async () => {
