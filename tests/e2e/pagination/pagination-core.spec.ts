@@ -496,7 +496,7 @@ test.describe("Pagination Core", () => {
 
     // Verify text content matches expected pattern
     const capText = await capMsg.textContent();
-    expect(capText).toMatch(/Showing 60 results.*Refine/);
+    expect(capText).toMatch(/Showing 60 results.*adjust/i);
 
     // Verify the cap message is centered and has muted styling via computed styles
     const textAlign = await capMsg.evaluate(
