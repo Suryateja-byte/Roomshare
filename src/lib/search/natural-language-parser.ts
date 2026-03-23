@@ -88,8 +88,10 @@ const AMENITY_PATTERNS: { pattern: RegExp; value: string }[] = [
 
 const HOUSE_RULE_PATTERNS: { pattern: RegExp; value: string }[] = [
   {
+    // M1 FIX: Removed bare |dog|cat to prevent false positives on locations
+    // like "Dog River" or street names. Only match explicit pet-related phrases.
     pattern:
-      /\b(?:pet\s*(?:friendly|ok|allowed)?|pets?\s*(?:friendly|ok|allowed)|dog|cat)\b/i,
+      /\b(?:pet\s*(?:friendly|ok|allowed)|pets?\s*(?:friendly|ok|allowed)|dog\s*(?:friendly|ok|allowed)|cat\s*(?:friendly|ok|allowed))\b/i,
     value: "Pets allowed",
   },
   {
@@ -151,7 +153,8 @@ const STRIP_PATTERNS = [
   // Amenities
   /\b(?:wifi|wi-fi|internet|ac|air\s*condition(?:ing|ed)?|parking|garage|washer|laundry|dryer|kitchen|cook|gym|fitness|pool|swimming|furnished|furniture)\b/gi,
   // House rules
-  /\b(?:pet\s*(?:friendly|ok|allowed)?|pets?\s*(?:friendly|ok|allowed)|dog|cat|smoking\s*(?:ok|allowed)|smoker|couple[s']?\s*(?:ok|allowed|friendly)?|guest[s']?\s*(?:ok|allowed))\b/gi,
+  // M1 FIX: Removed bare |dog|cat from strip pattern (same as house rule pattern)
+  /\b(?:pet\s*(?:friendly|ok|allowed)|pets?\s*(?:friendly|ok|allowed)|dog\s*(?:friendly|ok|allowed)|cat\s*(?:friendly|ok|allowed)|smoking\s*(?:ok|allowed)|smoker|couple[s']?\s*(?:ok|allowed|friendly)?|guest[s']?\s*(?:ok|allowed))\b/gi,
   // Lease
   /\b(?:month[\s-]to[\s-]month|mtm|monthly|short[\s-]term|temporary|temp|flexible|flex|\d+\s*months?|yearly|annual)\b/gi,
   // Slots/spots/beds

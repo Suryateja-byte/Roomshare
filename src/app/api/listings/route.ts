@@ -41,7 +41,16 @@ export async function GET(request: Request) {
   try {
     const { searchParams } = new URL(request.url);
     const rawParams = buildRawParamsFromSearchParams(searchParams);
-    const { filterParams, requestedPage } = parseSearchParams(rawParams);
+    const { filterParams, requestedPage, boundsRequired } = parseSearchParams(rawParams);
+
+    // Block unbounded text searches before hitting DB (defense-in-depth).
+    // getListingsPaginated also rejects these, but checking here avoids the DB round-trip.
+    if (boundsRequired) {
+      return NextResponse.json(
+        { error: "Location required for text search" },
+        { status: 400, headers: { "Cache-Control": "private, no-store" } }
+      );
+    }
 
     const result = await getListingsPaginated({
       ...filterParams,
@@ -273,7 +282,7 @@ export async function POST(request: Request) {
       return NextResponse.json(
         {
           error: titleCheck.message ?? "Content policy violation",
-          field: "title",
+          fields: { title: titleCheck.message ?? "Content policy violation" },
         },
         { status: 400 }
       );
@@ -289,7 +298,10 @@ export async function POST(request: Request) {
         return NextResponse.json(
           {
             error: descriptionCheck.message ?? "Content policy violation",
-            field: "description",
+            fields: {
+              description:
+                descriptionCheck.message ?? "Content policy violation",
+            },
           },
           { status: 400 }
         );

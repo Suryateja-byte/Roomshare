@@ -41,8 +41,8 @@ import { useSearchTransitionSafe } from "@/contexts/SearchTransitionContext";
 import {
   useMapBounds,
   useMapMovedBanner,
-  useActivePanBounds,
 } from "@/contexts/MapBoundsContext";
+import { useActivePanBoundsSetter } from "@/contexts/ActivePanBoundsContext";
 import { MapMovedBanner } from "./map/MapMovedBanner";
 import { MapGestureHint } from "./map/MapGestureHint";
 import { MapEmptyState } from "./map/MapEmptyState";
@@ -617,7 +617,7 @@ export default function MapComponent({
     isProgrammaticMoveRef,
   } = useMapBounds();
 
-  const { setActivePanBounds } = useActivePanBounds();
+  const { setActivePanBounds } = useActivePanBoundsSetter();
 
   // Banner visibility from context
   const {
@@ -862,11 +862,12 @@ export default function MapComponent({
   );
 
   // Update unclustered listings when map moves (for rendering individual markers)
-  const updateUnclusteredListings = useCallback(() => {
-    if (!mapRef.current || !useClustering) return;
+  // H6 FIX: Returns count for success guard pattern in retry logic
+  const updateUnclusteredListings = useCallback((): number => {
+    if (!mapRef.current || !useClustering) return 0;
 
     const map = mapRef.current.getMap();
-    if (!map || !map.getSource("listings")) return;
+    if (!map || !map.getSource("listings")) return 0;
 
     // Query for unclustered points (points without cluster)
     const features = map.querySourceFeatures("listings", {
@@ -905,16 +906,17 @@ export default function MapComponent({
     });
 
     // P0 Issue #25: Guard against state update after unmount
-    if (!isMountedRef.current) return;
+    if (!isMountedRef.current) return 0;
 
     // CLUSTER FIX: Skip setting empty state during cluster expansion
     // querySourceFeatures returns [] before tiles load after flyTo
     // Only allow empty state if NOT expanding (normal pan/zoom to empty area)
     if (unique.length === 0 && isClusterExpandingRef.current) {
-      return; // Tiles not loaded yet, retry will happen on onIdle
+      return 0; // Tiles not loaded yet, retry will happen on onIdle
     }
 
     setUnclusteredListings(unique);
+    return unique.length;
   }, [imagesByListingId, useClustering]);
 
   // Defense-in-depth: retry updateUnclusteredListings when listings exist
@@ -923,6 +925,9 @@ export default function MapComponent({
     if (!isMapLoaded || !useClustering || listings.length === 0) return;
     if (unclusteredListings.length > 0) return;
 
+    // H6 FIX: Success guard pattern — stop retries once markers are found.
+    // Previous approach fired all 4 timeouts unconditionally; now each
+    // retry checks the return count and cancels remaining on success.
     const retryDelays = [200, 500, 1000, 2000];
     const timeouts: NodeJS.Timeout[] = [];
     let cancelled = false;
@@ -930,8 +935,12 @@ export default function MapComponent({
     for (const delay of retryDelays) {
       timeouts.push(
         setTimeout(() => {
-          if (!cancelled && isMountedRef.current) {
-            updateUnclusteredListings();
+          if (cancelled || !isMountedRef.current) return;
+          const count = updateUnclusteredListings();
+          if (count > 0) {
+            // Success — cancel remaining retries
+            cancelled = true;
+            timeouts.forEach(clearTimeout);
           }
         }, delay)
       );
@@ -2234,6 +2243,44 @@ export default function MapComponent({
     ]
   );
 
+  // H1 FIX: Stable handler lookups to avoid creating new closures per marker per render.
+  // Without this, each Marker's onClick/onPointerEnter creates a new function on every render,
+  // causing all 200 react-map-gl Markers to re-render even if only hover state changed.
+  const markerClickHandlers = useMemo(() => {
+    const handlers = new globalThis.Map<string, (e: { originalEvent: { stopPropagation: () => void } }) => void>();
+    for (const position of markerPositions) {
+      handlers.set(position.listing.id, (e) => {
+        e.originalEvent.stopPropagation();
+        handleMarkerClick(position.listing, { lng: position.lng, lat: position.lat });
+      });
+    }
+    return handlers;
+  }, [markerPositions, handleMarkerClick]);
+
+  const markerHoverHandlers = useMemo(() => {
+    const enter = new globalThis.Map<string, (e: React.PointerEvent) => void>();
+    const leave = new globalThis.Map<string, (e: React.PointerEvent) => void>();
+    for (const position of markerPositions) {
+      enter.set(position.listing.id, (e) => {
+        if (e.pointerType === "touch") return;
+        setHovered(position.listing.id, "map");
+        if (hoverScrollTimeoutRef.current) clearTimeout(hoverScrollTimeoutRef.current);
+        hoverScrollTimeoutRef.current = setTimeout(() => {
+          requestScrollTo(position.listing.id);
+        }, 300);
+      });
+      leave.set(position.listing.id, (e) => {
+        if (e.pointerType === "touch") return;
+        setHovered(null);
+        if (hoverScrollTimeoutRef.current) {
+          clearTimeout(hoverScrollTimeoutRef.current);
+          hoverScrollTimeoutRef.current = null;
+        }
+      });
+    }
+    return { enter, leave };
+  }, [markerPositions, setHovered, requestScrollTo]);
+
   return (
     <div
       className="w-full h-full overflow-hidden relative group"
@@ -2702,13 +2749,7 @@ export default function MapComponent({
             longitude={position.lng}
             latitude={position.lat}
             anchor="bottom"
-            onClick={(e) => {
-              e.originalEvent.stopPropagation();
-              handleMarkerClick(position.listing, {
-                lng: position.lng,
-                lat: position.lat,
-              });
-            }}
+            onClick={markerClickHandlers.get(position.listing.id)}
           >
             <div
               ref={(el) => {
@@ -2754,32 +2795,8 @@ export default function MapComponent({
                   current === position.listing.id ? null : current
                 );
               }}
-              onPointerEnter={(e) => {
-                // P1-FIX (#114): Don't trigger hover on touch devices.
-                // Touch fires pointerenter on tap, causing unintended scroll.
-                // Let the click handler manage touch interactions instead.
-                if (e.pointerType === "touch") return;
-
-                setHovered(position.listing.id, "map");
-                // Debounce scroll request to prevent list jumping as user scans markers
-                if (hoverScrollTimeoutRef.current) {
-                  clearTimeout(hoverScrollTimeoutRef.current);
-                }
-                hoverScrollTimeoutRef.current = setTimeout(() => {
-                  requestScrollTo(position.listing.id);
-                }, 300);
-              }}
-              onPointerLeave={(e) => {
-                // P1-FIX (#114): Skip hover cleanup for touch - wasn't activated
-                if (e.pointerType === "touch") return;
-
-                setHovered(null);
-                // Clear pending scroll request when hover ends
-                if (hoverScrollTimeoutRef.current) {
-                  clearTimeout(hoverScrollTimeoutRef.current);
-                  hoverScrollTimeoutRef.current = null;
-                }
-              }}
+              onPointerEnter={markerHoverHandlers.enter.get(position.listing.id)}
+              onPointerLeave={markerHoverHandlers.leave.get(position.listing.id)}
               onKeyDown={(e) => {
                 if (e.key === "Enter" || e.key === " ") {
                   e.preventDefault();

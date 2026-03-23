@@ -85,10 +85,7 @@ export function POILayer({ mapRef, isMapLoaded }: POILayerProps) {
     });
   }, []);
 
-  // Persist state changes
-  useEffect(() => {
-    saveActiveCategories(activeCategories);
-  }, [activeCategories]);
+  // EU-H: Removed redundant useEffect save — toggle handler at line 83 already persists.
 
   // Apply layer visibility when categories change
   useEffect(() => {

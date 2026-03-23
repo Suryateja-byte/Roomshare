@@ -18,6 +18,8 @@ export interface FetchMoreResult {
   hasNextPage: boolean;
   /** True when V2 is unavailable and V1 can't continue cursor pagination */
   degraded?: boolean;
+  /** True when request was rate limited — client should show friendly message */
+  rateLimited?: boolean;
 }
 
 export async function fetchMoreListings(
@@ -38,7 +40,7 @@ export async function fetchMoreListings(
       "/search"
     );
     if (!rateLimitResult.allowed) {
-      throw new Error("Rate limited");
+      return { items: [], nextCursor: null, hasNextPage: false, rateLimited: true };
     }
 
     // Embed cursor in rawParams for v2
@@ -90,8 +92,8 @@ export async function fetchMoreListings(
           Sentry.captureException(error, {
             tags: { component: "search-action", path: "fetchMoreListings-v2" },
           });
-          console.warn("[fetchMoreListings] V2 failed, falling back to v1", {
-            error: error instanceof Error ? error.message : "Unknown error",
+          logger.sync.warn("[fetchMoreListings] V2 failed, falling back to v1", {
+            error: sanitizeErrorMessage(error),
           });
         }
       }
@@ -100,7 +102,7 @@ export async function fetchMoreListings(
     // V1 fallback - cursor-based pagination not truly supported
     // Signal degradation to client so it can show a user-friendly message
     // instead of silently removing the "Load more" button
-    console.warn(
+    logger.sync.warn(
       "[fetchMoreListings] V1 fallback reached - cursor pagination not supported"
     );
     return { items: [], nextCursor: null, hasNextPage: false, degraded: true };

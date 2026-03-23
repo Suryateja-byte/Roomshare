@@ -353,7 +353,7 @@ describe("SearchResultsClient", () => {
       );
 
       // Should show refinement message instead of load more
-      expect(screen.getByText(/Refine your filters/i)).toBeInTheDocument();
+      expect(screen.getByText(/adjusting your filters/i)).toBeInTheDocument();
       expect(
         screen.queryByRole("button", { name: /show more/i })
       ).not.toBeInTheDocument();

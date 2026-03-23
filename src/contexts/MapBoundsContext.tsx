@@ -91,8 +91,7 @@ interface MapBoundsState {
   searchCurrentArea: () => void;
   /** Reset map view to URL bounds */
   resetToUrlBounds: () => void;
-  /** Active pan bounds updated continuously during map drag (for proactive fetching) */
-  activePanBounds: MapBoundsCoords | null;
+  // activePanBounds moved to dedicated ActivePanBoundsContext (F4-NEW perf fix)
 }
 
 interface MapAreaCount {
@@ -119,8 +118,7 @@ interface MapBoundsContextValue extends MapBoundsState, MapAreaCount {
   setSearchHandler: (handler: () => void) => void;
   /** Register reset handler (called by Map) */
   setResetHandler: (handler: () => void) => void;
-  /** Update active pan bounds (called by Map during drag) */
-  setActivePanBounds: (bounds: MapBoundsCoords | null) => void;
+  // setActivePanBounds moved to ActivePanBoundsContext (F4-NEW perf fix)
   /** Ref for synchronous programmatic move check (used in Mapbox event handlers) */
   isProgrammaticMoveRef: React.RefObject<boolean>;
 }
@@ -145,7 +143,7 @@ interface MapBoundsStateValue {
   locationConflict: boolean;
   areaCount: number | null;
   isAreaCountLoading: boolean;
-  activePanBounds: MapBoundsCoords | null;
+  // activePanBounds moved to dedicated ActivePanBoundsContext (F4-NEW perf fix)
 }
 
 /**
@@ -163,7 +161,7 @@ interface MapBoundsActionsValue {
   setCurrentMapBounds: (bounds: MapBoundsCoords | null) => void;
   setSearchHandler: (handler: () => void) => void;
   setResetHandler: (handler: () => void) => void;
-  setActivePanBounds: (bounds: MapBoundsCoords | null) => void;
+  // setActivePanBounds moved to ActivePanBoundsContext (F4-NEW perf fix)
   isProgrammaticMoveRef: React.RefObject<boolean>;
 }
 
@@ -185,7 +183,6 @@ const SSR_STATE_FALLBACK: MapBoundsStateValue = {
   locationConflict: false,
   areaCount: null,
   isAreaCountLoading: false,
-  activePanBounds: null,
 };
 
 /**
@@ -202,7 +199,6 @@ const SSR_ACTIONS_FALLBACK: MapBoundsActionsValue = {
   setCurrentMapBounds: () => {},
   setSearchHandler: () => {},
   setResetHandler: () => {},
-  setActivePanBounds: () => {},
   isProgrammaticMoveRef: { current: false },
 };
 
@@ -220,7 +216,6 @@ const SSR_FALLBACK: MapBoundsContextValue = {
   locationConflict: false,
   areaCount: null,
   isAreaCountLoading: false,
-  activePanBounds: null,
   searchCurrentArea: () => {},
   resetToUrlBounds: () => {},
   setHasUserMoved: () => {},
@@ -231,7 +226,6 @@ const SSR_FALLBACK: MapBoundsContextValue = {
   setCurrentMapBounds: () => {},
   setSearchHandler: () => {},
   setResetHandler: () => {},
-  setActivePanBounds: () => {},
   isProgrammaticMoveRef: { current: false },
 };
 
@@ -272,8 +266,7 @@ export function MapBoundsProvider({ children }: { children: React.ReactNode }) {
     useState<PointCoords | null>(null);
   const [currentMapBounds, setCurrentMapBoundsState] =
     useState<MapBoundsCoords | null>(null);
-  const [activePanBoundsState, setActivePanBoundsState] =
-    useState<MapBoundsCoords | null>(null);
+  // activePanBounds state moved to ActivePanBoundsContext (F4-NEW perf fix)
   // P1-FIX (#68): Use refs instead of state for handler storage.
   // Refs don't cause re-renders when updated and always hold the current handler.
   // This prevents stale closure issues where handlers capture outdated state.
@@ -430,9 +423,7 @@ export function MapBoundsProvider({ children }: { children: React.ReactNode }) {
     setCurrentMapBoundsState(bounds);
   }, []);
 
-  const setActivePanBounds = useCallback((bounds: MapBoundsCoords | null) => {
-    setActivePanBoundsState(bounds);
-  }, []);
+  // setActivePanBounds moved to ActivePanBoundsContext (F4-NEW perf fix)
 
   // Compute whether there's a location conflict
   // (map panned away from search location center)
@@ -460,6 +451,15 @@ export function MapBoundsProvider({ children }: { children: React.ReactNode }) {
   // Area count is enabled only when banner would show (toggle OFF + bounds dirty)
   const areaCountEnabled = hasUserMoved && boundsDirty && !searchAsMove;
 
+  // F4 FIX: Serialize bounds to string for stable effect dep.
+  // Object reference changes on every setCurrentMapBoundsState call even when values are the same.
+  const currentMapBoundsKey = currentMapBounds
+    ? `${currentMapBounds.minLat},${currentMapBounds.maxLat},${currentMapBounds.minLng},${currentMapBounds.maxLng}`
+    : null;
+  // Ref to read current bounds inside the effect without adding object to deps
+  const currentMapBoundsRef = useRef(currentMapBounds);
+  currentMapBoundsRef.current = currentMapBounds;
+
   useEffect(() => {
     // Cleanup debounce/abort
     if (areaCountDebounceRef.current) {
@@ -467,7 +467,8 @@ export function MapBoundsProvider({ children }: { children: React.ReactNode }) {
       areaCountDebounceRef.current = null;
     }
 
-    if (!areaCountEnabled || !currentMapBounds) {
+    const currentBounds = currentMapBoundsRef.current;
+    if (!areaCountEnabled || !currentBounds) {
       // Abort in-flight, reset state
       if (areaCountAbortRef.current) {
         areaCountAbortRef.current.abort();
@@ -483,7 +484,7 @@ export function MapBoundsProvider({ children }: { children: React.ReactNode }) {
     // sub-pixel map movements produce the same cache key. Without this, raw
     // IEEE 754 floats from MapLibre create unique keys on every moveEnd,
     // making the cache nearly useless during panning.
-    const boundsKey = `${currentMapBounds.minLat.toFixed(4)},${currentMapBounds.maxLat.toFixed(4)},${currentMapBounds.minLng.toFixed(4)},${currentMapBounds.maxLng.toFixed(4)}`;
+    const boundsKey = `${currentBounds.minLat.toFixed(4)},${currentBounds.maxLat.toFixed(4)},${currentBounds.minLng.toFixed(4)},${currentBounds.maxLng.toFixed(4)}`;
     // Canonical filter key (shared parser output) avoids stale cache hits from non-filter URL noise.
     const filterKey =
       buildCanonicalFilterParamsFromSearchParams(searchParams).toString();
@@ -516,10 +517,10 @@ export function MapBoundsProvider({ children }: { children: React.ReactNode }) {
 
       // Build URL from current URL params, overriding bounds with map bounds
       const params = new URLSearchParams(searchParams.toString());
-      params.set("minLat", String(currentMapBounds.minLat));
-      params.set("maxLat", String(currentMapBounds.maxLat));
-      params.set("minLng", String(currentMapBounds.minLng));
-      params.set("maxLng", String(currentMapBounds.maxLng));
+      params.set("minLat", String(currentBounds.minLat));
+      params.set("maxLat", String(currentBounds.maxLat));
+      params.set("minLng", String(currentBounds.minLng));
+      params.set("maxLng", String(currentBounds.maxLng));
       // Remove pagination params
       params.delete("page");
       params.delete("cursor");
@@ -588,7 +589,9 @@ export function MapBoundsProvider({ children }: { children: React.ReactNode }) {
       // P1 FIX: Reset loading state on cleanup to prevent orphaned loading indicator
       setIsAreaCountLoading(false);
     };
-  }, [areaCountEnabled, currentMapBounds, searchParams]);
+  // F4 FIX: Use serialized string key instead of object reference
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [areaCountEnabled, currentMapBoundsKey, searchParams]);
 
   // P2-FIX (#67): Cleanup on unmount to prevent state updates
   useEffect(() => {
@@ -610,7 +613,6 @@ export function MapBoundsProvider({ children }: { children: React.ReactNode }) {
       locationConflict,
       areaCount,
       isAreaCountLoading,
-      activePanBounds: activePanBoundsState,
     }),
     [
       hasUserMoved,
@@ -622,7 +624,6 @@ export function MapBoundsProvider({ children }: { children: React.ReactNode }) {
       locationConflict,
       areaCount,
       isAreaCountLoading,
-      activePanBoundsState,
     ]
   );
 
@@ -640,7 +641,6 @@ export function MapBoundsProvider({ children }: { children: React.ReactNode }) {
       setCurrentMapBounds,
       setSearchHandler,
       setResetHandler,
-      setActivePanBounds,
       isProgrammaticMoveRef,
     }),
     [
@@ -654,7 +654,6 @@ export function MapBoundsProvider({ children }: { children: React.ReactNode }) {
       setCurrentMapBounds,
       setSearchHandler,
       setResetHandler,
-      setActivePanBounds,
       isProgrammaticMoveRef,
     ]
   );
@@ -830,14 +829,6 @@ export function useSearchLocation(): {
  * Selector hook for active pan bounds.
  * Use for proactive fetching during dragging.
  */
-export function useActivePanBounds(): {
-  activePanBounds: MapBoundsCoords | null;
-  setActivePanBounds: (bounds: MapBoundsCoords | null) => void;
-} {
-  const { activePanBounds } = useMapBoundsState();
-  const { setActivePanBounds } = useMapBoundsActions();
-  return useMemo(
-    () => ({ activePanBounds, setActivePanBounds }),
-    [activePanBounds, setActivePanBounds]
-  );
-}
+// useActivePanBounds moved to ActivePanBoundsContext.tsx (F4-NEW perf fix)
+// Re-exported here for backward compatibility
+export { useActivePanBounds } from "./ActivePanBoundsContext";

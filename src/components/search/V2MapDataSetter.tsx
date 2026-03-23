@@ -9,13 +9,16 @@ interface V2MapDataSetterProps {
 }
 
 /**
- * Client component that injects v2 map data into SearchV2DataContext.
+ * INACTIVE: Not currently rendered in any production code path.
+ * V2 search LIST data works via executeSearchV2, but V2 MAP data
+ * (GeoJSON/pins via this component) is not yet wired into page.tsx.
+ * See TODO in page.tsx:436-438 for wiring instructions.
  *
- * Rendered by page.tsx when v2 mode is enabled. Runs on mount to set
+ * When activated, this component injects v2 map data into SearchV2DataContext.
+ * It would be rendered by page.tsx when v2 mode is enabled, setting
  * context data before PersistentMapWrapper reads it.
  *
- * This enables sibling component data sharing:
- * page.tsx → V2MapDataSetter → context → PersistentMapWrapper
+ * Data flow: page.tsx → V2MapDataSetter → context → PersistentMapWrapper
  */
 export function V2MapDataSetter({ data }: V2MapDataSetterProps) {
   const { setV2MapData, setIsV2Enabled } = useSearchV2Setters();

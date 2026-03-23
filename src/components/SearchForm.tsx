@@ -242,6 +242,9 @@ export default function SearchForm({
 
   // Debounce and submission state to prevent race conditions
   const [isSearching, setIsSearching] = useState(false);
+  // H4 FIX: Ref mirror of isSearching for stable handleSearch callback identity.
+  // Reading from ref inside the callback avoids isSearching in useCallback deps.
+  const isSearchingRef = useRef(false);
   const searchTimeoutRef = useRef<NodeJS.Timeout | null>(null);
   const lastSearchRef = useRef<string>(""); // Track last search to prevent duplicates
   // Navigation version counter - ensures only the latest search executes navigation
@@ -249,6 +252,8 @@ export default function SearchForm({
   const navigationVersionRef = useRef(0);
   // Track the isSearching reset timeout so it can be cleaned up on unmount
   const resetSearchingTimeoutRef = useRef<NodeJS.Timeout | null>(null);
+  // H4 FIX: Sync ref with state so handleSearch reads current value without dep
+  useEffect(() => { isSearchingRef.current = isSearching; }, [isSearching]);
 
   // Recent searches from canonical hook (handles localStorage, migration, enhanced format)
   const { recentSearches, saveRecentSearch, clearRecentSearches } =
@@ -535,6 +540,10 @@ export default function SearchForm({
         ? parseFloat(pending.maxPrice)
         : null;
 
+      // EU-D: Guard against NaN from invalid input (e.g., "abc" → NaN)
+      if (finalMinPrice !== null && !Number.isFinite(finalMinPrice)) finalMinPrice = null;
+      if (finalMaxPrice !== null && !Number.isFinite(finalMaxPrice)) finalMaxPrice = null;
+
       // Enforce non-negative values
       if (finalMinPrice !== null && finalMinPrice < 0) finalMinPrice = 0;
       if (finalMaxPrice !== null && finalMaxPrice < 0) finalMaxPrice = 0;
@@ -579,7 +588,8 @@ export default function SearchForm({
       const searchUrl = `/search?${params.toString()}`;
 
       // Prevent duplicate searches (same URL within debounce window)
-      if (searchUrl === lastSearchRef.current && isSearching) {
+      // H4 FIX: Read from ref instead of closure to avoid isSearching in deps
+      if (searchUrl === lastSearchRef.current && isSearchingRef.current) {
         return;
       }
 
@@ -643,7 +653,7 @@ export default function SearchForm({
       committed,
       selectedCoords,
       router,
-      isSearching,
+      // H4 FIX: isSearching removed — read from isSearchingRef.current instead
       saveRecentSearch,
       searchParams,
       transitionContext,

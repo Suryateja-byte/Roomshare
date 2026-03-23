@@ -50,6 +50,34 @@ const savedSearchFiltersSchema = z
   })
   .passthrough();
 
+/**
+ * Write-path schema: strips unknown fields to prevent arbitrary JSON from persisting.
+ * Used when saving NEW searches. Read path above keeps .passthrough() for backward compat.
+ */
+const savedSearchFiltersWriteSchema = z
+  .object({
+    query: z.string().optional(),
+    minPrice: z.number().optional(),
+    maxPrice: z.number().optional(),
+    roomType: z.string().optional(),
+    amenities: z.array(z.string()).optional(),
+    houseRules: z.array(z.string()).optional(),
+    languages: z.array(z.string()).optional(),
+    moveInDate: z.string().optional(),
+    leaseDuration: z.string().optional(),
+    genderPreference: z.string().optional(),
+    householdGender: z.string().optional(),
+    sort: z.string().optional(),
+    lat: z.number().optional(),
+    lng: z.number().optional(),
+    minLat: z.number().optional(),
+    maxLat: z.number().optional(),
+    minLng: z.number().optional(),
+    maxLng: z.number().optional(),
+    city: z.string().min(2).max(100).optional(),
+  })
+  .strip();
+
 /** Safely parse filters JSON from DB, falling back to empty object on invalid data. */
 function parseSavedSearchFilters(raw: unknown): SearchFilters {
   const result = savedSearchFiltersSchema.safeParse(raw);
@@ -109,14 +137,17 @@ export async function saveSearch(input: SaveSearchInput) {
     }
 
     // Validate filters before storing (prevents malicious/malformed data)
+    // Two-layer validation: validateSearchFilters checks values against allowlists,
+    // savedSearchFiltersWriteSchema.strip() removes unknown fields from JSON
     const validatedFilters = validateSearchFilters(input.filters);
+    const strippedFilters = savedSearchFiltersWriteSchema.parse(validatedFilters);
 
     const savedSearch = await prisma.savedSearch.create({
       data: {
         userId: session.user.id,
         name: nameValidation.data,
         query: validatedFilters.query,
-        filters: validatedFilters as Prisma.InputJsonValue,
+        filters: strippedFilters as Prisma.InputJsonValue,
         alertEnabled: input.alertEnabled ?? true,
         alertFrequency: input.alertFrequency ?? "DAILY",
       },

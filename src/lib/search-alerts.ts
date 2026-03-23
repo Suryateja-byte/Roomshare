@@ -4,8 +4,26 @@ import { prisma } from "./prisma";
 import { sendNotificationEmail } from "./email";
 import { Prisma } from "@prisma/client";
 import { buildSearchUrl, type SearchFilters } from "./search-utils";
+import { validateSearchFilters } from "./search-params";
 import { logger, sanitizeErrorMessage } from "./logger";
 import { parseLocalDate } from "./utils";
+
+/**
+ * Validate alert filters from DB. Uses validateSearchFilters for common fields
+ * (strips unknown/malicious values) + preserves `city` which alerts need for matching.
+ */
+function validateAlertFilters(raw: unknown): SearchFilters {
+  // Validate common filter fields (strips unknown fields)
+  const validated = validateSearchFilters(raw) as SearchFilters;
+  // Preserve city field for alert matching (not in FilterParams but used by alerts)
+  if (raw && typeof raw === "object" && "city" in raw) {
+    const city = (raw as Record<string, unknown>).city;
+    if (typeof city === "string" && city.length >= 2 && city.length <= 100) {
+      (validated as Record<string, unknown>).city = city.trim();
+    }
+  }
+  return validated;
+}
 
 // Type for new listing data used in instant alerts
 export interface NewListingForAlert {
@@ -137,7 +155,8 @@ export async function processSearchAlerts(): Promise<ProcessResult> {
             continue;
           }
 
-          const filters = savedSearch.filters as SearchFilters;
+          // S-02 FIX: Validate filters from DB instead of raw cast
+          const filters = validateAlertFilters(savedSearch.filters);
           const sinceDate = savedSearch.lastAlertAt || savedSearch.createdAt;
 
           // Build query to find new matching listings
@@ -489,7 +508,8 @@ export async function triggerInstantAlerts(
           continue;
         }
 
-        const filters = savedSearch.filters as SearchFilters;
+        // S-02 FIX: Validate filters from DB instead of raw cast
+        const filters = validateAlertFilters(savedSearch.filters);
 
         // Check if the new listing matches this saved search
         if (!matchesFilters(newListing, filters)) {

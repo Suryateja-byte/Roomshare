@@ -134,11 +134,10 @@ export function SearchV2DataProvider({ children }: { children: ReactNode }) {
     const boundsChanged =
       prevBoundsRef.current !== null && prevBoundsRef.current !== currentBounds;
 
-    // We no longer setV2MapDataInternal(null) here!
-    // Next.js searchParams ONLY update after the RSC transition commits.
-    // By the time this runs, V2MapDataSetter has ALREADY injected the *new* data.
-    // Clearing it here causes a fatal race condition that destroys the new map data.
-    // Only increment version to ensure strictly sequential data updates.
+    // Don't clear v2MapData here — only increment version.
+    // NOTE: V2MapDataSetter is currently INACTIVE (not rendered in production).
+    // When it is wired, clearing data here would race with V2MapDataSetter's injection.
+    // Version increment ensures strictly sequential data updates.
     if (filterChanged || boundsChanged) {
       const newVersion = dataVersionRef.current + 1;
       dataVersionRef.current = newVersion;
@@ -199,7 +198,7 @@ export function SearchV2DataProvider({ children }: { children: ReactNode }) {
  * PREFER using selector hooks below for better performance.
  *
  * Used by:
- * - V2MapDataSetter: to inject map data from page.tsx
+ * - V2MapDataSetter: to inject map data from page.tsx (INACTIVE — not rendered in production)
  * - PersistentMapWrapper: to read map data and skip v1 fetch
  */
 export function useSearchV2Data() {
@@ -212,8 +211,11 @@ export function useSearchV2Data() {
 // ============================================================================
 
 /**
- * TRUE selector: Only re-renders when v2MapData changes.
- * Components using this will NOT re-render when isV2Enabled or dataVersion changes.
+ * Selector: returns v2MapData from the state context.
+ * Re-renders when ANY SearchV2 state changes (v2MapData, isV2Enabled, dataVersion)
+ * because it reads from the shared SearchV2DataStateContext.
+ * However, v2MapData reference is stable between navigations (React useState identity),
+ * so downstream useMemo deps will correctly skip recomputation when data hasn't changed.
  */
 export function useV2MapData(): V2MapData | null {
   const { v2MapData } = useContext(SearchV2DataStateContext);

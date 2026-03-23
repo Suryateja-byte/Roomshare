@@ -106,8 +106,9 @@ describe("fetchMoreListings", () => {
       degraded: true,
     });
 
-    // Warning was logged for V2 failure
+    // Warning was logged for V2 failure (via logger.sync.warn: "[timestamp] [WARN]", message, metadata)
     expect(warnSpy).toHaveBeenCalledWith(
+      expect.stringContaining("[WARN]"),
       expect.stringContaining("[fetchMoreListings] V2 failed"),
       expect.objectContaining({ error: expect.stringContaining("timed out") })
     );

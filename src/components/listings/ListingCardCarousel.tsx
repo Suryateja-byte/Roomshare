@@ -23,6 +23,8 @@ interface ListingCardCarouselProps {
   maxImages?: number;
   /** Called when image fails to load */
   onImageError?: () => void;
+  /** Whether this card is above the fold and first image should load with priority */
+  priority?: boolean;
 }
 
 export default function ListingCardCarousel({
@@ -30,6 +32,7 @@ export default function ListingCardCarousel({
   alt,
   maxImages = 5,
   onImageError,
+  priority = false,
 }: ListingCardCarouselProps) {
   // Limit images to maxImages
   const displayImages = images.slice(0, maxImages);
@@ -190,7 +193,7 @@ export default function ListingCardCarousel({
                 sizes="(max-width: 768px) 100vw, (max-width: 1200px) 50vw, 33vw"
                 onError={index === 0 ? onImageError : undefined}
                 loading={index === 0 ? "eager" : "lazy"}
-                priority={index === 0}
+                priority={priority && index === 0}
               />
             ) : (
               <div className="w-full h-full bg-zinc-200 dark:bg-zinc-700 animate-pulse" />

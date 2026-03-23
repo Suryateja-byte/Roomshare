@@ -121,7 +121,9 @@ export function SearchTransitionProvider({
       navigateWithTransition,
       replaceWithTransition,
       startTransition,
-      retryLastNavigation: isSlowTransition ? retryLastNavigation : null,
+      // F9 FIX: Always include stable reference to avoid context identity change on slow transition toggle.
+      // Consumers should check isSlowTransition before showing retry UI.
+      retryLastNavigation,
     }),
     [
       isPending,

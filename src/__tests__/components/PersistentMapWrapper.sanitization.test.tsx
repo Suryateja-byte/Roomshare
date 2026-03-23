@@ -53,6 +53,10 @@ describe("v2MapDataToListings", () => {
         images: ["cover.jpg"],
         location: { lat: 30.2672, lng: -97.7431 },
         tier: "primary",
+        avgRating: 0,
+        reviewCount: 0,
+        recommendedScore: null,
+        createdAt: null,
       },
     ]);
   });

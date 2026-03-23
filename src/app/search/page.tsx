@@ -7,6 +7,7 @@ import {
 import SortSelect from "@/components/SortSelect";
 import SaveSearchButton from "@/components/SaveSearchButton";
 import { SearchResultsClient } from "@/components/search/SearchResultsClient";
+import { SearchResultsErrorBoundary } from "@/components/search/SearchResultsErrorBoundary";
 import Link from "next/link";
 import { Search } from "lucide-react";
 import {
@@ -409,20 +410,22 @@ export default async function SearchPage({ searchParams }: SearchPageProps) {
           </div>
         </div>
 
-        <SearchResultsClient
-          key={normalizedKeyString}
-          initialListings={listings}
-          initialNextCursor={initialNextCursor}
-          initialTotal={total}
-          savedListingIds={[]}
-          searchParamsString={searchParamsString}
-          filterParams={filterParams}
-          query={q ?? ""}
-          browseMode={browseMode}
-          hasConfirmedZeroResults={hasConfirmedZeroResults}
-          filterSuggestions={[]}
-          nearMatchExpansion={nearMatchExpansion}
-        />
+        <SearchResultsErrorBoundary>
+          <SearchResultsClient
+            key={normalizedKeyString}
+            initialListings={listings}
+            initialNextCursor={initialNextCursor}
+            initialTotal={total}
+            savedListingIds={[]}
+            searchParamsString={searchParamsString}
+            filterParams={filterParams}
+            query={q ?? ""}
+            browseMode={browseMode}
+            hasConfirmedZeroResults={hasConfirmedZeroResults}
+            filterSuggestions={[]}
+            nearMatchExpansion={nearMatchExpansion}
+          />
+        </SearchResultsErrorBoundary>
       </div>
     </div>
   );
@@ -430,6 +433,9 @@ export default async function SearchPage({ searchParams }: SearchPageProps) {
   return (
     <>
       {/* Keep the initial HTML list-first and let the persistent map fetch independently */}
+      {/* TODO: Wire V2MapDataSetter here when V2 map feature ships.
+          Currently V2MapDataSetter exists but has no render site — V2 map data path is dead code.
+          V1PathResetSetter runs on every render, keeping isV2Enabled=false. */}
       <V1PathResetSetter />
       {/* Wrap results with loading indicator for filter transitions */}
       <SearchResultsLoadingWrapper>{listContent}</SearchResultsLoadingWrapper>
