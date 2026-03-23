@@ -85,15 +85,21 @@ export async function logSafeMetrics(
     ...(resultCount !== undefined && !isBlocked && { count: resultCount }),
   };
 
-  // Fire-and-forget
+  // Fire-and-forget with timeout to prevent hanging connections
   try {
+    // L-18 FIX: AbortController with 5s timeout prevents indefinite fetch hang
+    const metricsAbort = new AbortController();
+    const metricsTimeout = setTimeout(() => metricsAbort.abort(), 5000);
     fetch("/api/metrics", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify(payload),
-    }).catch(() => {
-      // Silently ignore failures
-    });
+      signal: metricsAbort.signal,
+    })
+      .catch(() => {
+        // Silently ignore failures
+      })
+      .finally(() => clearTimeout(metricsTimeout));
   } catch {
     // Silently ignore
   }

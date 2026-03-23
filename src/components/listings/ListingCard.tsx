@@ -124,14 +124,19 @@ const PLACEHOLDER_IMAGES = [
   "https://images.unsplash.com/photo-1505691938895-1758d7feb511?auto=format&fit=crop&w=800&q=80",
 ];
 
+// HIGH-3 FIX: Module-level Intl.NumberFormat instance avoids reconstructing
+// the formatter on every render call (~10x faster than toLocaleString).
+const priceFormatter = new Intl.NumberFormat("en-US", {
+  maximumFractionDigits: 0,
+});
+
 // Format price with thousand separators for better readability
 function formatPrice(price: number): string {
   // Handle edge cases
   if (price === 0) return "Free";
   if (price < 0) return "$0";
   if (!Number.isFinite(price)) return "$0";
-  // Use locale string for proper formatting with commas
-  return `$${price.toLocaleString("en-US", { maximumFractionDigits: 0 })}`;
+  return `$${priceFormatter.format(price)}`;
 }
 
 interface ListingCardProps {

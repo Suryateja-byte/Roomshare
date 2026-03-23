@@ -55,10 +55,16 @@ export function BoundaryLayer({ query, isDarkMode }: BoundaryLayerProps) {
   const [geojson, setGeojson] = useState<BoundaryGeoJSON>(EMPTY_GEOJSON);
   const abortRef = useRef<AbortController | null>(null);
   const lastQueryRef = useRef<string | null>(null);
+  // MED-12 FIX: Debounce boundary fetch to prevent rapid Nominatim requests
+  const debounceRef = useRef<NodeJS.Timeout | null>(null);
 
   useEffect(() => {
-    // Cancel previous fetch
+    // Cancel previous fetch and debounce
     abortRef.current?.abort();
+    if (debounceRef.current) {
+      clearTimeout(debounceRef.current);
+      debounceRef.current = null;
+    }
 
     if (!query || query.trim().length < 2) {
       setGeojson(EMPTY_GEOJSON);
@@ -146,9 +152,16 @@ export function BoundaryLayer({ query, isDarkMode }: BoundaryLayerProps) {
       }
     };
 
-    fetchBoundary();
+    // MED-12 FIX: 300ms debounce prevents rapid Nominatim requests (rate limited to 1 req/sec)
+    debounceRef.current = setTimeout(fetchBoundary, 300);
 
-    return () => controller.abort();
+    return () => {
+      controller.abort();
+      if (debounceRef.current) {
+        clearTimeout(debounceRef.current);
+        debounceRef.current = null;
+      }
+    };
   }, [query]);
 
   const fillLayer = useMemo(

@@ -13,7 +13,10 @@ import { parseLocalDate } from "./utils";
  * (strips unknown/malicious values) + preserves `city` which alerts need for matching.
  */
 function validateAlertFilters(raw: unknown): SearchFilters {
-  // Validate common filter fields (strips unknown fields)
+  // Validate common filter fields (strips unknown fields).
+  // L-14 NOTE: The `as SearchFilters` cast is intentional — validateSearchFilters returns
+  // FilterParams which is a structural subset of SearchFilters. The city field (specific
+  // to SearchFilters) is manually preserved below. This avoids creating a separate validator.
   const validated = validateSearchFilters(raw) as SearchFilters;
   // Preserve city field for alert matching (not in FilterParams but used by alerts)
   if (raw && typeof raw === "object" && "city" in raw) {

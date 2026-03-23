@@ -1,6 +1,7 @@
 "use client";
 
 import React from "react";
+import * as Sentry from "@sentry/nextjs";
 
 interface Props {
   children: React.ReactNode;
@@ -23,6 +24,12 @@ export class MapErrorBoundary extends React.Component<Props, State> {
   }
 
   componentDidCatch(error: Error, errorInfo: React.ErrorInfo) {
+    // MED-2 FIX: Report map crashes to Sentry for production visibility.
+    // Previously only console.error — map crashes (esp. WebGL context loss) were invisible.
+    Sentry.captureException(error, {
+      tags: { component: "Map", boundary: "map" },
+      extra: { componentStack: errorInfo.componentStack },
+    });
     console.error("[Map] Render error caught by boundary:", error.message, {
       componentStack: errorInfo.componentStack,
     });

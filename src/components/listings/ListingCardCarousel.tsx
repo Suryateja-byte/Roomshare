@@ -11,7 +11,7 @@
  * - A11y: aria-labels, live region for index
  */
 
-import { useState, useRef, useCallback, useEffect } from "react";
+import React, { useState, useRef, useCallback, useEffect } from "react";
 import Image from "next/image";
 import { ChevronLeft, ChevronRight } from "lucide-react";
 import { cn } from "@/lib/utils";
@@ -27,7 +27,8 @@ interface ListingCardCarouselProps {
   priority?: boolean;
 }
 
-export default function ListingCardCarousel({
+// L-6 FIX: React.memo prevents unnecessary re-renders from parent
+function ListingCardCarousel({
   images,
   alt,
   maxImages = 5,
@@ -277,3 +278,5 @@ export default function ListingCardCarousel({
     </div>
   );
 }
+
+export default React.memo(ListingCardCarousel);

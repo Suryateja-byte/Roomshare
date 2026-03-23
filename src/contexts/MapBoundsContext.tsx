@@ -591,7 +591,11 @@ export function MapBoundsProvider({ children }: { children: React.ReactNode }) {
     };
   // F4 FIX: Use serialized string key instead of object reference
   // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [areaCountEnabled, currentMapBoundsKey, searchParams]);
+  // MED-1 FIX: Use serialized searchParams string instead of object reference.
+  // useSearchParams() returns a new URLSearchParams object on every render,
+  // causing this effect to re-run unnecessarily. The string is stable when params haven't changed.
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [areaCountEnabled, currentMapBoundsKey, searchParams.toString()]);
 
   // P2-FIX (#67): Cleanup on unmount to prevent state updates
   useEffect(() => {

@@ -193,6 +193,10 @@ export async function getMySavedSearches() {
 }
 
 export async function deleteSavedSearch(searchId: string) {
+  // L-11 FIX: Validate searchId format to prevent excessive DB work from garbage input
+  if (!searchId || typeof searchId !== "string" || searchId.length > 100) {
+    return { error: "Invalid search ID" };
+  }
   const session = await auth();
   if (!session?.user?.id) {
     return { error: "Unauthorized" };

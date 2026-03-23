@@ -360,6 +360,9 @@ export function useBatchedFilters(
     const filterKeys = [
       "minPrice",
       "maxPrice",
+      // HIGH-5 FIX: Clean up budget aliases so they don't persist alongside canonical params
+      "minBudget",
+      "maxBudget",
       "moveInDate",
       "leaseDuration",
       "roomType",

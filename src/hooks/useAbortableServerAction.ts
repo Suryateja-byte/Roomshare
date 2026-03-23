@@ -44,8 +44,8 @@ interface UseAbortableServerActionReturn<TParams, TResult> {
  * @example
  * ```tsx
  * const { execute, isLoading, data, error, cancel } = useAbortableServerAction({
- *     action: getListingsInBounds,
- *     onSuccess: (listings) => setListings(listings),
+ *     action: fetchMoreListings,
+ *     onSuccess: (result) => setListings(result.items),
  *     onError: (err) => console.error('Failed:', err),
  * });
  *

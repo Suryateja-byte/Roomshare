@@ -54,7 +54,8 @@ export async function fetchWithTimeout(
     if (existingSignal.aborted) {
       controller.abort();
     } else if (typeof existingSignal.addEventListener === "function") {
-      existingSignal.addEventListener("abort", () => controller.abort());
+      // L-17 FIX: { once: true } prevents listener leak if signal is long-lived/reused
+      existingSignal.addEventListener("abort", () => controller.abort(), { once: true });
     }
   }
 

@@ -14,6 +14,12 @@ const toggleFavoriteSchema = z.object({
 const favoritesQuerySchema = z.array(z.string().min(1).max(100)).max(60);
 
 export async function GET(request: Request) {
+  // L-12 FIX: Rate limit GET to prevent enumeration abuse
+  const rateLimitResponse = await withRateLimit(request, {
+    type: "savedListings",
+  });
+  if (rateLimitResponse) return rateLimitResponse;
+
   try {
     const session = await auth();
     if (!session?.user?.id) {

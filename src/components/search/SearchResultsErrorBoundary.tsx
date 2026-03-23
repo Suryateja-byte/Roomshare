@@ -1,6 +1,6 @@
 "use client";
 
-import { Component, type ReactNode } from "react";
+import React, { Component, type ReactNode } from "react";
 import { AlertCircle, RefreshCw } from "lucide-react";
 import * as Sentry from "@sentry/nextjs";
 
@@ -10,6 +10,9 @@ interface Props {
 
 interface State {
   hasError: boolean;
+  // L-16 FIX: retryKey forces full child remount on retry, preventing crash loops
+  // on persistent data-dependent errors (same pattern as MapErrorBoundary)
+  retryKey: number;
 }
 
 /**
@@ -23,10 +26,10 @@ interface State {
 export class SearchResultsErrorBoundary extends Component<Props, State> {
   constructor(props: Props) {
     super(props);
-    this.state = { hasError: false };
+    this.state = { hasError: false, retryKey: 0 };
   }
 
-  static getDerivedStateFromError(): State {
+  static getDerivedStateFromError(_error: Error): Partial<State> {
     return { hasError: true };
   }
 
@@ -51,7 +54,7 @@ export class SearchResultsErrorBoundary extends Component<Props, State> {
             We had trouble loading search results. Please try again.
           </p>
           <button
-            onClick={() => this.setState({ hasError: false })}
+            onClick={() => this.setState((prev) => ({ hasError: false, retryKey: prev.retryKey + 1 }))}
             className="inline-flex items-center gap-2 px-4 py-2 bg-zinc-900 dark:bg-white text-white dark:text-zinc-900 rounded-lg hover:bg-zinc-800 dark:hover:bg-zinc-100 transition-colors text-sm font-medium"
           >
             <RefreshCw className="w-4 h-4" />
@@ -61,6 +64,11 @@ export class SearchResultsErrorBoundary extends Component<Props, State> {
       );
     }
 
-    return this.props.children;
+    // L-16 FIX: Key forces full child remount on retry, preventing crash loops
+    return (
+      <React.Fragment key={this.state.retryKey}>
+        {this.props.children}
+      </React.Fragment>
+    );
   }
 }

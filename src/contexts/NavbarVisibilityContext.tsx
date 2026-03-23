@@ -42,11 +42,16 @@ export function NavbarVisibilityProvider({
   );
 }
 
+// HIGH-4 FIX: Module-level constant prevents new object on every render.
+// Without this, components using useNavbarVisibility() outside the provider
+// would get a new object reference each render, risking infinite loops in dep arrays.
+const NAVBAR_VISIBILITY_FALLBACK: NavbarVisibilityState = {
+  isHidden: false,
+  hide: () => {},
+  show: () => {},
+};
+
 export function useNavbarVisibility(): NavbarVisibilityState {
   const ctx = useContext(NavbarVisibilityContext);
-  if (!ctx) {
-    // Fallback for components outside provider — navbar always visible
-    return { isHidden: false, hide: () => {}, show: () => {} };
-  }
-  return ctx;
+  return ctx ?? NAVBAR_VISIBILITY_FALLBACK;
 }

@@ -21,7 +21,7 @@ import Map, {
 import type { LayerProps, MapSourceDataEvent } from "react-map-gl/maplibre";
 import type { GeoJSONSource, StyleSpecification } from "maplibre-gl";
 import "maplibre-gl/dist/maplibre-gl.css";
-import {
+import React, {
   useState,
   useMemo,
   useRef,
@@ -389,6 +389,290 @@ function getClusterCountLayerDark(textScale: number): LayerProps {
 // Zoom thresholds for two-tier pin display
 const ZOOM_DOTS_ONLY = 12; // Below: all pins are gray dots (no price)
 const ZOOM_TOP_N_PINS = 14; // 12-14: primary = price pins, mini = dots. 14+: all price pins
+
+// Module-level constant: prevent double-click zoom on markers
+const preventDoubleClickZoom = (e: React.MouseEvent) => {
+  e.stopPropagation();
+  e.preventDefault();
+};
+
+// ============================================================================
+// CRIT-1 FIX: Extracted memoized components replacing inline IIFEs
+// ============================================================================
+
+/**
+ * MarkerPinContent — renders dot or price pill for a single marker.
+ * React.memo with 4 primitive props ensures only markers whose visual state
+ * actually changed re-render their pin content. Returns fragment to preserve
+ * group-hover/marker CSS ancestry in the parent div.
+ */
+interface MarkerPinContentProps {
+  price: number;
+  tier: "primary" | "mini" | undefined;
+  currentZoom: number;
+  isHovered: boolean;
+}
+
+const MarkerPinContent = React.memo(function MarkerPinContent({
+  price,
+  tier,
+  currentZoom,
+  isHovered,
+}: MarkerPinContentProps) {
+  const isMini = tier === "mini";
+  const showAsDot =
+    currentZoom < ZOOM_DOTS_ONLY ||
+    (currentZoom < ZOOM_TOP_N_PINS && isMini);
+
+  if (showAsDot && !isHovered) {
+    return (
+      <>
+        <div
+          className={cn(
+            "w-3 h-3 rounded-full shadow-md transition-transform duration-200",
+            "bg-zinc-400 dark:bg-zinc-500 ring-2 ring-white dark:ring-zinc-900",
+            "group-hover/marker:scale-125"
+          )}
+        />
+        <div className="absolute left-1/2 -translate-x-1/2 -bottom-[1px] w-2 h-0.5 bg-zinc-950/20 dark:bg-zinc-950/40 rounded-full blur-[1px]" />
+      </>
+    );
+  }
+
+  return (
+    <>
+      <div
+        className={cn(
+          "shadow-lg font-semibold whitespace-nowrap relative transition-all duration-200",
+          "group-hover/marker:scale-105",
+          isMini && currentZoom >= ZOOM_TOP_N_PINS
+            ? "px-2 py-1 rounded-lg text-xs"
+            : "px-3 py-1.5 rounded-xl text-sm",
+          isHovered
+            ? "bg-white dark:bg-zinc-700 text-zinc-900 dark:text-white ring-2 ring-zinc-900 dark:ring-white scale-105"
+            : "bg-zinc-900 dark:bg-white text-white dark:text-zinc-900 group-hover/marker:bg-zinc-800 dark:group-hover/marker:bg-zinc-200"
+        )}
+      >
+        ${price}
+      </div>
+      <div
+        className={cn(
+          "absolute left-1/2 -translate-x-1/2 w-0 h-0 border-l-transparent border-r-transparent transition-colors",
+          isMini && currentZoom >= ZOOM_TOP_N_PINS
+            ? "-bottom-[4px] border-l-[5px] border-r-[5px] border-t-[5px]"
+            : "-bottom-[6px] border-l-[7px] border-r-[7px] border-t-[7px]",
+          isHovered
+            ? "border-t-white dark:border-t-zinc-700"
+            : "border-t-zinc-900 dark:border-t-white group-hover/marker:border-t-zinc-800 dark:group-hover/marker:border-t-zinc-200"
+        )}
+      />
+      <div
+        className={cn(
+          "absolute left-1/2 -translate-x-1/2 bg-zinc-950/20 dark:bg-zinc-950/40 rounded-full blur-[2px]",
+          isMini && currentZoom >= ZOOM_TOP_N_PINS
+            ? "-bottom-[2px] w-2 h-0.5"
+            : "-bottom-1 w-3 h-1"
+        )}
+      />
+    </>
+  );
+});
+
+/**
+ * MapMarkerItem — wraps a single react-map-gl Marker with its inner div,
+ * MarkerPinContent, pulse ring, and keyboard focus ring.
+ *
+ * React.memo on this component is the key CRIT-2 fix: when the parent
+ * MapComponent re-renders due to non-marker state (isSearching, areTilesLoading,
+ * etc.), all 200 MapMarkerItem instances bail out of rendering because none
+ * of their ~15 primitive/boolean/stable-callback props changed.
+ */
+interface MapMarkerItemProps {
+  listingId: string;
+  lng: number;
+  lat: number;
+  price: number;
+  title: string;
+  availableSlots: number;
+  tier: "primary" | "mini" | undefined;
+  currentZoom: number;
+  isHovered: boolean;
+  isActive: boolean;
+  isDimmed: boolean;
+  isKeyboardFocused: boolean;
+  onClickById: (id: string) => void;
+  onPointerEnter: (e: React.PointerEvent<HTMLDivElement>) => void;
+  onPointerLeave: (e: React.PointerEvent<HTMLDivElement>) => void;
+  onKeyboardNav: (e: ReactKeyboardEvent<HTMLDivElement>, id: string) => void;
+  onFocusChange: React.Dispatch<React.SetStateAction<string | null>>;
+  markerRefsMap: React.RefObject<globalThis.Map<string, HTMLDivElement>>;
+}
+
+const MapMarkerItem = React.memo(function MapMarkerItem({
+  listingId,
+  lng,
+  lat,
+  price,
+  title,
+  availableSlots,
+  tier,
+  currentZoom,
+  isHovered,
+  isActive,
+  isDimmed,
+  isKeyboardFocused,
+  onClickById,
+  onPointerEnter,
+  onPointerLeave,
+  onKeyboardNav,
+  onFocusChange,
+  markerRefsMap,
+}: MapMarkerItemProps) {
+  const handleClick = useCallback(
+    (e: { originalEvent: { stopPropagation: () => void } }) => {
+      e.originalEvent.stopPropagation();
+      onClickById(listingId);
+    },
+    [listingId, onClickById]
+  );
+
+  const refCallback = useCallback(
+    (el: HTMLDivElement | null) => {
+      if (el) {
+        markerRefsMap.current.set(listingId, el);
+        fixMarkerWrapperRole(el);
+      } else {
+        markerRefsMap.current.delete(listingId);
+      }
+    },
+    [listingId, markerRefsMap]
+  );
+
+  const handleFocus = useCallback(() => {
+    onFocusChange(listingId);
+  }, [listingId, onFocusChange]);
+
+  const handleBlur = useCallback(() => {
+    onFocusChange((current) => (current === listingId ? null : current));
+  }, [listingId, onFocusChange]);
+
+  const handleKeyDown = useCallback(
+    (e: ReactKeyboardEvent<HTMLDivElement>) => {
+      if (e.key === "Enter" || e.key === " ") {
+        e.preventDefault();
+        e.stopPropagation();
+        onClickById(listingId);
+      } else if (
+        ["ArrowUp", "ArrowDown", "ArrowLeft", "ArrowRight", "Home", "End"].includes(e.key)
+      ) {
+        onKeyboardNav(e, listingId);
+      }
+    },
+    [listingId, onClickById, onKeyboardNav]
+  );
+
+  const ariaLabel = `$${price}/month${title ? `, ${title}` : ""}${availableSlots > 0 ? `, ${availableSlots} spots available` : ", currently filled"}. Use arrow keys to navigate between markers.`;
+
+  return (
+    <Marker
+      longitude={lng}
+      latitude={lat}
+      anchor="bottom"
+      onClick={handleClick}
+    >
+      <div
+        ref={refCallback}
+        className={cn(
+          "relative cursor-pointer group/marker animate-[fadeIn_200ms_ease-out] motion-reduce:animate-none min-w-[44px] min-h-[44px] flex items-center justify-center",
+          "transition-all duration-200 [transition-timing-function:cubic-bezier(0.34,1.56,0.64,1)]",
+          isHovered && "scale-[1.15] z-50",
+          isActive && !isHovered && "z-40",
+          isDimmed && "opacity-60",
+          isKeyboardFocused && "z-50"
+        )}
+        data-listing-id={listingId}
+        data-testid={`map-pin-${tier || "primary"}-${listingId}`}
+        data-focus-state={
+          isHovered
+            ? "hovered"
+            : isActive
+              ? "active"
+              : isDimmed
+                ? "dimmed"
+                : "none"
+        }
+        role="button"
+        tabIndex={0}
+        aria-label={ariaLabel}
+        aria-describedby="map-marker-instructions"
+        onFocus={handleFocus}
+        onBlur={handleBlur}
+        onPointerEnter={onPointerEnter}
+        onPointerLeave={onPointerLeave}
+        onKeyDown={handleKeyDown}
+        onDoubleClick={preventDoubleClickZoom}
+      >
+        <MarkerPinContent
+          price={price}
+          tier={tier}
+          currentZoom={currentZoom}
+          isHovered={isHovered}
+        />
+        {/* Pulsing ring on hover/active for visibility on dense maps */}
+        {(isHovered || isActive) && (
+          <div
+            className={cn(
+              "absolute -inset-2 -top-2 rounded-full border-2 pointer-events-none motion-reduce:animate-none",
+              isHovered
+                ? "border-zinc-900 dark:border-white animate-ping opacity-40"
+                : "border-zinc-400 dark:border-zinc-500 animate-[pulse-ring_2s_ease-in-out_infinite] opacity-30"
+            )}
+          />
+        )}
+        {/* Keyboard focus ring - solid visible ring distinct from hover animation */}
+        {isKeyboardFocused && (
+          <div
+            className="absolute -inset-3 rounded-full border-[3px] border-blue-500 dark:border-blue-400 pointer-events-none shadow-[0_0_0_2px_rgba(59,130,246,0.3)]"
+            aria-hidden="true"
+          />
+        )}
+      </div>
+    </Marker>
+  );
+});
+
+/**
+ * ClusterHighlightMarker — renders an indigo dot when a hovered/active listing
+ * is inside a cluster (not visible as an individual marker).
+ */
+interface ClusterHighlightMarkerProps {
+  targetId: string | null;
+  markerPositionIds: Set<string>;
+  listings: Listing[];
+}
+
+const ClusterHighlightMarker = React.memo(function ClusterHighlightMarker({
+  targetId,
+  markerPositionIds,
+  listings,
+}: ClusterHighlightMarkerProps) {
+  if (!targetId) return null;
+  if (markerPositionIds.has(targetId)) return null;
+  const listing = listings.find((l) => l.id === targetId);
+  if (!listing) return null;
+  return (
+    <Marker
+      longitude={listing.location.lng}
+      latitude={listing.location.lat}
+      anchor="center"
+    >
+      <div className="pointer-events-none flex items-center justify-center">
+        <div className="w-4 h-4 rounded-full bg-indigo-500 border-2 border-white shadow-lg animate-pulse" />
+        <div className="absolute w-8 h-8 rounded-full border-2 border-indigo-400 animate-ping opacity-40" />
+      </div>
+    </Marker>
+  );
+});
 
 // Safe light-style fallback that avoids complex expression validation failures.
 const LIGHT_STYLE_FALLBACK: StyleSpecification = {
@@ -984,14 +1268,11 @@ export default function MapComponent({
       .join(",");
   }, [markersSource]);
 
-  // M4-MAP FIX: Use markersSourceKey directly in deps instead of void trick.
-  // The memo recalculates when the key changes (listing IDs change),
-  // but reads actual data from markersSource via the outer scope.
-  const markersSourceRef = useRef(markersSource);
-  markersSourceRef.current = markersSource;
-
+  // HIGH-1 FIX: Read markersSource via closure instead of ref.
+  // The ref-in-memo pattern was a React anti-pattern (stale data risk, React Compiler incompatible).
+  // markersSourceKey still controls when the memo recomputes (P2-FIX #150 preserved).
   const markerPositions = useMemo(() => {
-    const source = markersSourceRef.current;
+    const source = markersSource;
     const positions: MarkerPosition[] = [];
     const coordsCounts: Record<string, number> = {};
 
@@ -1043,6 +1324,17 @@ export default function MapComponent({
     // P2-FIX (#150): Depend on stable ID key instead of array reference
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [markersSourceKey]);
+
+  // CRIT-2 FIX: Synchronous ref for stable callback access to latest positions.
+  // Synchronous assignment (not useEffect) avoids timing issues between render and effect.
+  const markerPositionsRef = useRef(markerPositions);
+  markerPositionsRef.current = markerPositions;
+
+  // O(1) lookup Set for ClusterHighlightMarker — avoids O(n) .some() scan
+  const markerPositionIds = useMemo(
+    () => new Set(markerPositions.map((p) => p.listing.id)),
+    [markerPositions]
+  );
 
   // Render privacy circles from the same displayed marker positions to avoid
   // translucent "ghost clusters" when clustered/overlapping raw points split visually.
@@ -2243,43 +2535,49 @@ export default function MapComponent({
     ]
   );
 
-  // H1 FIX: Stable handler lookups to avoid creating new closures per marker per render.
-  // Without this, each Marker's onClick/onPointerEnter creates a new function on every render,
-  // causing all 200 react-map-gl Markers to re-render even if only hover state changed.
-  const markerClickHandlers = useMemo(() => {
-    const handlers = new globalThis.Map<string, (e: { originalEvent: { stopPropagation: () => void } }) => void>();
-    for (const position of markerPositions) {
-      handlers.set(position.listing.id, (e) => {
-        e.originalEvent.stopPropagation();
-        handleMarkerClick(position.listing, { lng: position.lng, lat: position.lat });
+  // CRIT-2 FIX: Stable callbacks replacing per-marker handler Maps.
+  // These callbacks use ref-based lookup to access listing data at call time,
+  // so they don't depend on markerPositions and never change when listings change.
+  const handleMarkerClickById = useCallback(
+    (listingId: string) => {
+      const position = markerPositionsRef.current.find(
+        (p) => p.listing.id === listingId
+      );
+      if (!position) return;
+      handleMarkerClick(position.listing, {
+        lng: position.lng,
+        lat: position.lat,
       });
-    }
-    return handlers;
-  }, [markerPositions, handleMarkerClick]);
+    },
+    [handleMarkerClick]
+  );
 
-  const markerHoverHandlers = useMemo(() => {
-    const enter = new globalThis.Map<string, (e: React.PointerEvent) => void>();
-    const leave = new globalThis.Map<string, (e: React.PointerEvent) => void>();
-    for (const position of markerPositions) {
-      enter.set(position.listing.id, (e) => {
-        if (e.pointerType === "touch") return;
-        setHovered(position.listing.id, "map");
-        if (hoverScrollTimeoutRef.current) clearTimeout(hoverScrollTimeoutRef.current);
-        hoverScrollTimeoutRef.current = setTimeout(() => {
-          requestScrollTo(position.listing.id);
-        }, 300);
-      });
-      leave.set(position.listing.id, (e) => {
-        if (e.pointerType === "touch") return;
-        setHovered(null);
-        if (hoverScrollTimeoutRef.current) {
-          clearTimeout(hoverScrollTimeoutRef.current);
-          hoverScrollTimeoutRef.current = null;
-        }
-      });
-    }
-    return { enter, leave };
-  }, [markerPositions, setHovered, requestScrollTo]);
+  const handleMarkerPointerEnter = useCallback(
+    (e: React.PointerEvent<HTMLDivElement>) => {
+      if (e.pointerType === "touch") return;
+      const listingId = e.currentTarget.dataset.listingId;
+      if (!listingId) return;
+      setHovered(listingId, "map");
+      if (hoverScrollTimeoutRef.current)
+        clearTimeout(hoverScrollTimeoutRef.current);
+      hoverScrollTimeoutRef.current = setTimeout(() => {
+        requestScrollTo(listingId);
+      }, 300);
+    },
+    [setHovered, requestScrollTo]
+  );
+
+  const handleMarkerPointerLeave = useCallback(
+    (e: React.PointerEvent<HTMLDivElement>) => {
+      if (e.pointerType === "touch") return;
+      setHovered(null);
+      if (hoverScrollTimeoutRef.current) {
+        clearTimeout(hoverScrollTimeoutRef.current);
+        hoverScrollTimeoutRef.current = null;
+      }
+    },
+    [setHovered]
+  );
 
   return (
     <div
@@ -2742,205 +3040,43 @@ export default function MapComponent({
           </Source>
         )}
 
-        {/* Individual price markers - shown for unclustered points or when not clustering */}
+        {/* CRIT-1/CRIT-2 FIX: Memoized MapMarkerItem replaces inline IIFEs and handler Maps.
+            Each MapMarkerItem receives only primitive/boolean/stable-callback props, so React.memo
+            can bail out when non-marker state changes (isSearching, areTilesLoading, etc.).
+            MarkerPinContent inside each item only re-renders when its 4 primitive props change. */}
         {markerPositions.map((position) => (
-          <Marker
+          <MapMarkerItem
             key={position.listing.id}
-            longitude={position.lng}
-            latitude={position.lat}
-            anchor="bottom"
-            onClick={markerClickHandlers.get(position.listing.id)}
-          >
-            <div
-              ref={(el) => {
-                if (el) {
-                  markerRefs.current.set(position.listing.id, el);
-                  fixMarkerWrapperRole(el);
-                } else {
-                  markerRefs.current.delete(position.listing.id);
-                }
-              }}
-              className={cn(
-                "relative cursor-pointer group/marker animate-[fadeIn_200ms_ease-out] motion-reduce:animate-none min-w-[44px] min-h-[44px] flex items-center justify-center",
-                // Spring easing for scale: cubic-bezier(0.34, 1.56, 0.64, 1)
-                "transition-all duration-200 [transition-timing-function:cubic-bezier(0.34,1.56,0.64,1)]",
-                hoveredId === position.listing.id && "scale-[1.15] z-50",
-                activeId === position.listing.id && !hoveredId && "z-40",
-                hoveredId && hoveredId !== position.listing.id && "opacity-60",
-                // Keyboard focus styling - distinct from hover
-                keyboardFocusedId === position.listing.id && "z-50"
-              )}
-              data-listing-id={position.listing.id}
-              data-testid={`map-pin-${position.listing.tier || "primary"}-${position.listing.id}`}
-              data-focus-state={
-                hoveredId === position.listing.id
-                  ? "hovered"
-                  : activeId === position.listing.id
-                    ? "active"
-                    : hoveredId && hoveredId !== position.listing.id
-                      ? "dimmed"
-                      : "none"
-              }
-              role="button"
-              tabIndex={0}
-              aria-label={`$${position.listing.price}/month${position.listing.title ? `, ${position.listing.title}` : ""}${position.listing.availableSlots > 0 ? `, ${position.listing.availableSlots} spots available` : ", currently filled"}. Use arrow keys to navigate between markers.`}
-              aria-describedby="map-marker-instructions"
-              onFocus={() => {
-                // Track keyboard focus state
-                setKeyboardFocusedId(position.listing.id);
-              }}
-              onBlur={() => {
-                // Clear keyboard focus when element loses focus
-                setKeyboardFocusedId((current) =>
-                  current === position.listing.id ? null : current
-                );
-              }}
-              onPointerEnter={markerHoverHandlers.enter.get(position.listing.id)}
-              onPointerLeave={markerHoverHandlers.leave.get(position.listing.id)}
-              onKeyDown={(e) => {
-                if (e.key === "Enter" || e.key === " ") {
-                  e.preventDefault();
-                  e.stopPropagation();
-                  handleMarkerClick(position.listing, {
-                    lng: position.lng,
-                    lat: position.lat,
-                  });
-                } else if (
-                  [
-                    "ArrowUp",
-                    "ArrowDown",
-                    "ArrowLeft",
-                    "ArrowRight",
-                    "Home",
-                    "End",
-                  ].includes(e.key)
-                ) {
-                  handleMarkerKeyboardNavigation(e, position.listing.id);
-                }
-              }}
-              // P1-FIX (#138): Prevent double-click zoom on marker content
-              onDoubleClick={(e) => {
-                e.stopPropagation();
-                e.preventDefault();
-              }}
-            >
-              {/* Zoom-based two-tier pin rendering:
-                                - Below zoom 12: all pins are gray dots (no price)
-                                - Zoom 12-14: primary = price pills, mini = gray dots
-                                - Above zoom 14: all pins show price pills */}
-              {(() => {
-                const isMini = position.listing.tier === "mini";
-                const showAsDot =
-                  currentZoom < ZOOM_DOTS_ONLY ||
-                  (currentZoom < ZOOM_TOP_N_PINS && isMini);
-                const isHovered = hoveredId === position.listing.id;
-
-                if (showAsDot && !isHovered) {
-                  // Gray dot marker (no price)
-                  return (
-                    <>
-                      <div
-                        className={cn(
-                          "w-3 h-3 rounded-full shadow-md transition-transform duration-200",
-                          "bg-zinc-400 dark:bg-zinc-500 ring-2 ring-white dark:ring-zinc-900",
-                          "group-hover/marker:scale-125"
-                        )}
-                      />
-                      {/* Small shadow under dot */}
-                      <div className="absolute left-1/2 -translate-x-1/2 -bottom-[1px] w-2 h-0.5 bg-zinc-950/20 dark:bg-zinc-950/40 rounded-full blur-[1px]" />
-                    </>
-                  );
-                }
-
-                // Price pill marker (full or mini size)
-                return (
-                  <>
-                    <div
-                      className={cn(
-                        "shadow-lg font-semibold whitespace-nowrap relative transition-all duration-200",
-                        "group-hover/marker:scale-105",
-                        isMini && currentZoom >= ZOOM_TOP_N_PINS
-                          ? "px-2 py-1 rounded-lg text-xs"
-                          : "px-3 py-1.5 rounded-xl text-sm",
-                        isHovered
-                          ? "bg-white dark:bg-zinc-700 text-zinc-900 dark:text-white ring-2 ring-zinc-900 dark:ring-white scale-105"
-                          : "bg-zinc-900 dark:bg-white text-white dark:text-zinc-900 group-hover/marker:bg-zinc-800 dark:group-hover/marker:bg-zinc-200"
-                      )}
-                    >
-                      ${position.listing.price}
-                    </div>
-                    {/* Pin tail/pointer */}
-                    <div
-                      className={cn(
-                        "absolute left-1/2 -translate-x-1/2 w-0 h-0 border-l-transparent border-r-transparent transition-colors",
-                        isMini && currentZoom >= ZOOM_TOP_N_PINS
-                          ? "-bottom-[4px] border-l-[5px] border-r-[5px] border-t-[5px]"
-                          : "-bottom-[6px] border-l-[7px] border-r-[7px] border-t-[7px]",
-                        isHovered
-                          ? "border-t-white dark:border-t-zinc-700"
-                          : "border-t-zinc-900 dark:border-t-white group-hover/marker:border-t-zinc-800 dark:group-hover/marker:border-t-zinc-200"
-                      )}
-                    />
-                    {/* Shadow under pin */}
-                    <div
-                      className={cn(
-                        "absolute left-1/2 -translate-x-1/2 bg-zinc-950/20 dark:bg-zinc-950/40 rounded-full blur-[2px]",
-                        isMini && currentZoom >= ZOOM_TOP_N_PINS
-                          ? "-bottom-[2px] w-2 h-0.5"
-                          : "-bottom-1 w-3 h-1"
-                      )}
-                    />
-                  </>
-                );
-              })()}
-              {/* Pulsing ring on hover/active for visibility on dense maps */}
-              {(hoveredId === position.listing.id ||
-                activeId === position.listing.id) && (
-                <div
-                  className={cn(
-                    "absolute -inset-2 -top-2 rounded-full border-2 pointer-events-none motion-reduce:animate-none",
-                    hoveredId === position.listing.id
-                      ? "border-zinc-900 dark:border-white animate-ping opacity-40"
-                      : "border-zinc-400 dark:border-zinc-500 animate-[pulse-ring_2s_ease-in-out_infinite] opacity-30"
-                  )}
-                />
-              )}
-              {/* Keyboard focus ring - solid visible ring distinct from hover animation */}
-              {keyboardFocusedId === position.listing.id && (
-                <div
-                  className="absolute -inset-3 rounded-full border-[3px] border-blue-500 dark:border-blue-400 pointer-events-none shadow-[0_0_0_2px_rgba(59,130,246,0.3)]"
-                  aria-hidden="true"
-                />
-              )}
-            </div>
-          </Marker>
+            listingId={position.listing.id}
+            lng={position.lng}
+            lat={position.lat}
+            price={position.listing.price}
+            title={position.listing.title}
+            availableSlots={position.listing.availableSlots}
+            tier={position.listing.tier}
+            currentZoom={currentZoom}
+            isHovered={hoveredId === position.listing.id}
+            isActive={activeId === position.listing.id}
+            isDimmed={!!hoveredId && hoveredId !== position.listing.id}
+            isKeyboardFocused={keyboardFocusedId === position.listing.id}
+            onClickById={handleMarkerClickById}
+            onPointerEnter={handleMarkerPointerEnter}
+            onPointerLeave={handleMarkerPointerLeave}
+            onKeyboardNav={handleMarkerKeyboardNavigation}
+            onFocusChange={setKeyboardFocusedId}
+            markerRefsMap={markerRefs}
+          />
         ))}
 
         {/* Cluster highlight: when a card is hovered/active but its marker is inside
-                    a cluster (not in markerPositions), render a highlight dot at the listing's
-                    coordinates so the user can see where it is on the map. */}
-        {(() => {
-          const targetId = hoveredId || activeId;
-          if (!targetId) return null;
-          // Skip if the marker is already visible (unclustered)
-          if (markerPositions.some((p) => p.listing.id === targetId))
-            return null;
-          const listing = listings.find((l) => l.id === targetId);
-          if (!listing) return null;
-          return (
-            <Marker
-              key={`cluster-highlight-${targetId}`}
-              longitude={listing.location.lng}
-              latitude={listing.location.lat}
-              anchor="center"
-            >
-              <div className="pointer-events-none flex items-center justify-center">
-                <div className="w-4 h-4 rounded-full bg-indigo-500 border-2 border-white shadow-lg animate-pulse" />
-                <div className="absolute w-8 h-8 rounded-full border-2 border-indigo-400 animate-ping opacity-40" />
-              </div>
-            </Marker>
-          );
-        })()}
+            a cluster (not in markerPositions), render a highlight dot at the listing's
+            coordinates so the user can see where it is on the map. */}
+        <ClusterHighlightMarker
+          key={hoveredId || activeId || "none"}
+          targetId={hoveredId || activeId}
+          markerPositionIds={markerPositionIds}
+          listings={listings}
+        />
 
         {selectedListing && (
           <Popup

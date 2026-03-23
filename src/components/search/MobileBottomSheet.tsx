@@ -86,6 +86,8 @@ export default function MobileBottomSheet({
   const [isDragging, setIsDragging] = useState(false);
   const dragOffsetRef = useRef(0);
   const viewportHeightRef = useRef(0);
+  // MED-11 FIX: RAF-throttle drag state updates to prevent 60 setState/sec during touch drag.
+  const dragRafRef = useRef<number | null>(null);
 
   const sheetRef = useRef<HTMLDivElement>(null);
   const contentRef = useRef<HTMLDivElement>(null);
@@ -201,8 +203,15 @@ export default function MobileBottomSheet({
       if (dy < 0) return; // Only allow downward drag from content
     }
 
-    setDragOffset(dy);
+    // MED-11 FIX: Update ref immediately (for touchEnd calculation) but
+    // throttle React state update to one per animation frame.
     dragOffsetRef.current = dy;
+    if (dragRafRef.current === null) {
+      dragRafRef.current = requestAnimationFrame(() => {
+        dragRafRef.current = null;
+        setDragOffset(dragOffsetRef.current);
+      });
+    }
   }, []);
 
   const handleTouchEnd = useCallback(() => {

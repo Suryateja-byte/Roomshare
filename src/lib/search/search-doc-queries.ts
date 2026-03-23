@@ -838,12 +838,16 @@ async function getSearchDocMapListingsInternal(
         availableSlots: l.availableSlots,
         images: l.primaryImage ? [l.primaryImage] : [],
         location: {
-          lat: l.lat,
-          lng: l.lng,
+          // MED-4 FIX: Explicit Number() conversion — PostgreSQL raw queries may return
+          // numeric/float8 columns as strings depending on column type.
+          lat: Number(l.lat),
+          lng: Number(l.lng),
         },
         avgRating: Number(l.avgRating) || 0,
         reviewCount: Number(l.reviewCount) || 0,
-        recommendedScore: l.recommendedScore != null ? Number(l.recommendedScore) || null : null,
+        // L-9 FIX: Use explicit null check instead of falsy coalescing.
+        // `Number(0) || null` falsely converts a valid score of 0 to null.
+        recommendedScore: l.recommendedScore != null ? Number(l.recommendedScore) : null,
         createdAt: l.createdAt ? new Date(l.createdAt) : null,
       }))
     );
