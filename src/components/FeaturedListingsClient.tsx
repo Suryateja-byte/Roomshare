@@ -64,7 +64,7 @@ export default function FeaturedListingsClient({
       <LazyMotion features={domAnimation}>
         <section
           data-testid="featured-listings-section"
-          className="py-24 md:py-32 bg-surface-container-lowest"
+          className="py-16 md:py-20 bg-surface-canvas"
         >
           <div className="max-w-7xl mx-auto px-4 sm:px-6">
             <m.div
@@ -110,7 +110,7 @@ export default function FeaturedListingsClient({
     <LazyMotion features={domAnimation}>
       <section
         data-testid="featured-listings-section"
-        className="py-24 md:py-32 bg-surface-container-lowest relative"
+        className="py-16 md:py-20 bg-surface-canvas relative"
       >
         <div className="max-w-7xl mx-auto px-4 sm:px-6 relative z-10">
           <m.div
@@ -123,14 +123,14 @@ export default function FeaturedListingsClient({
             <div className="max-w-2xl">
               <m.div
                 variants={fadeInUp}
-                className="inline-flex items-center gap-2 px-3 py-1.5 rounded-full border border-outline-variant/20/50 bg-surface-canvas text-on-surface-variant text-xs font-bold uppercase tracking-[0.15em] mb-6"
+                className="font-body text-xs font-bold uppercase tracking-[0.15em] text-on-surface-variant mb-6 flex items-center gap-2"
               >
                 <span className="w-1.5 h-1.5 rounded-full bg-primary"></span>
                 New Arrivals
               </m.div>
               <m.h2
                 variants={fadeInUp}
-                className="font-display text-3xl md:text-5xl font-medium tracking-tight text-on-surface mb-4"
+                className="font-display text-3xl md:text-5xl font-normal tracking-tight text-on-surface mb-4"
               >
                 Just listed.
               </m.h2>
@@ -171,7 +171,7 @@ export default function FeaturedListingsClient({
                 <ListingCard
                   listing={listing}
                   priority={index < 3}
-                  className="h-full border-outline-variant/20/50"
+                  className="h-full"
                 />
               </m.div>
             ))}
