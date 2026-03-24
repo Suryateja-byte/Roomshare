@@ -886,7 +886,7 @@ export default function SearchForm({
   // CLS fix: min-h matches Suspense fallback in SearchHeaderWrapper.tsx
   return (
     <div
-      className={`relative w-full mx-auto min-h-[56px] sm:min-h-[64px] ${isCompact ? "max-w-2xl" : "max-w-4xl"}`}
+      className={`relative w-full mx-auto min-h-[56px] sm:min-h-[64px] ${isCompact ? "max-w-2xl" : "max-w-5xl"}`}
     >
       <form
         ref={formRef}
@@ -1203,7 +1203,7 @@ export default function SearchForm({
       {showLocationWarning && !isCompact && !locationInputFocused && (
         <div
           id="location-warning"
-          className="absolute left-0 right-0 top-full mt-2 mx-auto max-w-4xl px-4 py-2 bg-amber-50 border border-amber-200 rounded-xl text-sm text-amber-800 flex items-center gap-2 pointer-events-none z-40 shadow-lg"
+          className="absolute left-0 right-0 top-full mt-2 mx-auto max-w-5xl px-4 py-2 bg-amber-50 border border-amber-200 rounded-xl text-sm text-amber-800 flex items-center gap-2 pointer-events-none z-40 shadow-lg"
         >
           <svg
             className="w-4 h-4 flex-shrink-0"
