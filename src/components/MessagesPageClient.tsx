@@ -777,7 +777,7 @@ export default function MessagesPageClient({
               onChange={(e) => setSearchQuery(e.target.value)}
               placeholder="Search conversations..."
               aria-label="Search conversations"
-              className="w-full bg-surface-canvas h-10 pl-10 rounded-xl text-sm text-on-surface placeholder:text-on-surface-variant outline-none focus-visible:ring-2 focus-visible:ring-primary/30 focus:bg-surface-container-high transition-colors"
+              className="w-full bg-surface-canvas h-10 pl-10 rounded-xl text-sm text-on-surface placeholder:text-on-surface-variant outline-none focus:bg-surface-container-high transition-colors"
             />
           </div>
         </div>
@@ -1194,7 +1194,7 @@ export default function MessagesPageClient({
                       isOffline ? "You're offline..." : "Type a message..."
                     }
                     maxLength={MESSAGE_MAX_LENGTH}
-                    className="flex-1 bg-transparent border-none outline-none focus-visible:ring-2 focus-visible:ring-primary/30 focus-visible:rounded py-3 px-2 text-on-surface placeholder:text-on-surface-variant"
+                    className="flex-1 bg-transparent border-none outline-none py-3 px-2 text-on-surface placeholder:text-on-surface-variant"
                   />
                   <button
                     type="submit"

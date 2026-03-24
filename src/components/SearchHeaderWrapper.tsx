@@ -440,7 +440,7 @@ export default function SearchHeaderWrapper() {
             </div>
 
             {/* Right Actions - User Profile / Auth */}
-            <div className="hidden lg:flex items-center gap-3 sm:gap-5 flex-shrink-0 ml-2">
+            <div className="hidden lg:flex items-center gap-2 flex-shrink-0 ml-2">
               <div className="flex items-center gap-1 pr-2">
                 <NotificationCenter />
                 <Link

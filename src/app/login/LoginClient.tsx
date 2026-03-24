@@ -223,7 +223,7 @@ function LoginForm() {
                   name="email"
                   required
                   autoComplete="email"
-                  className="block w-full pl-10 pr-3 py-2.5 bg-surface-container-lowest border border-outline-variant/20 rounded-lg text-on-surface placeholder-on-surface-variant focus:outline-none focus-visible:ring-2 focus-visible:ring-primary/30 focus-visible:border-primary text-sm font-medium transition-shadow duration-200 ease-in-out shadow-ambient-sm"
+                  className="block w-full pl-10 pr-3 py-2.5 bg-surface-container-lowest border border-outline-variant/20 rounded-lg text-on-surface placeholder-on-surface-variant focus:outline-none text-sm font-medium transition-shadow duration-200 ease-in-out shadow-ambient-sm"
                   placeholder="you@example.com"
                 />
               </div>
@@ -253,7 +253,7 @@ function LoginForm() {
                   name="password"
                   required
                   autoComplete="current-password"
-                  className="block w-full pl-10 pr-10 py-2.5 bg-surface-container-lowest border border-outline-variant/20 rounded-lg text-on-surface placeholder-on-surface-variant focus:outline-none focus-visible:ring-2 focus-visible:ring-primary/30 focus-visible:border-primary text-sm font-medium transition-shadow duration-200 ease-in-out shadow-ambient-sm"
+                  className="block w-full pl-10 pr-10 py-2.5 bg-surface-container-lowest border border-outline-variant/20 rounded-lg text-on-surface placeholder-on-surface-variant focus:outline-none text-sm font-medium transition-shadow duration-200 ease-in-out shadow-ambient-sm"
                   placeholder="••••••••"
                 />
                 <button

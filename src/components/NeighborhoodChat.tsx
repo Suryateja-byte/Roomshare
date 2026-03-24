@@ -1003,7 +1003,7 @@ export default function NeighborhoodChat({
                   placeholder="Ask anything..."
                   aria-label="Ask the AI assistant"
                   disabled={isLoading}
-                  className="w-full relative bg-transparent border-0 px-6 py-4 text-[15px] placeholder:text-on-surface-variant focus:ring-0 focus:outline-none focus-visible:ring-2 focus-visible:ring-primary/30 focus-visible:rounded-[28px] text-on-surface pr-12 rounded-[28px]"
+                  className="w-full relative bg-transparent border-0 px-6 py-4 text-[15px] placeholder:text-on-surface-variant focus:ring-0 focus:outline-none text-on-surface pr-12 rounded-[28px]"
                 />
                 <button
                   type="submit"
