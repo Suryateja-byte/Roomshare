@@ -307,7 +307,7 @@ export default function ReviewForm({
               <p
                 id="review-edit-error"
                 role="alert"
-                className="text-red-500 text-sm"
+                className="text-red-500 text-sm animate-error-in"
               >
                 {error}
               </p>
@@ -550,7 +550,7 @@ export default function ReviewForm({
         <p
           id="review-form-error"
           role="alert"
-          className="text-red-500 text-sm"
+          className="text-red-500 text-sm animate-error-in"
         >
           {error}
         </p>

@@ -173,6 +173,36 @@
   }
 }
 
+/* Booking success celebration */
+@keyframes booking-glow {
+  0% { box-shadow: 0 0 0 0 rgb(154 64 39 / 0.3); }
+  50% { box-shadow: 0 0 0 24px rgb(154 64 39 / 0); }
+  100% { box-shadow: 0 0 0 32px rgb(154 64 39 / 0); }
+}
+
+@keyframes booking-icon-spring {
+  0% { transform: scale(0); }
+  60% { transform: scale(1.2); }
+  80% { transform: scale(0.95); }
+  100% { transform: scale(1); }
+}
+
+/* Form error message entrance */
+@keyframes errorSlideIn {
+  from {
+    opacity: 0;
+    transform: translateY(-4px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+.animate-error-in {
+  animation: errorSlideIn 200ms var(--ease-warm-out) both;
+}
+
 /* Animation Utility Classes */
 .animate-fade-up {
   animation: fadeUp 0.8s var(--ease-editorial) forwards;

@@ -536,7 +536,7 @@ export default function LocationSearchInput({
               <p className="text-sm font-medium text-red-700">
                 Search unavailable
               </p>
-              <p className="text-xs text-red-500">{error}</p>
+              <p className="text-xs text-red-500 animate-error-in">{error}</p>
             </div>
           </div>
         </div>

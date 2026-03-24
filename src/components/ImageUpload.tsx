@@ -202,7 +202,7 @@ export default function ImageUpload({
         <p
           id="image-upload-error"
           role="alert"
-          className="text-sm text-red-500 mt-2"
+          className="text-sm text-red-500 mt-2 animate-error-in"
         >
           {error}
         </p>

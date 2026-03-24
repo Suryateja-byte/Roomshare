@@ -350,11 +350,15 @@ export default function ListingPageClient({
           <div className="flex justify-between items-end mb-6">
             <div className="flex flex-col gap-1">
               {/* Breadcrumb */}
-              <div className="flex items-center gap-2 text-sm text-on-surface-variant font-medium mb-1">
-                <span>{listing.location?.city || "Location"}</span>
-                <ChevronRight className="w-3 h-3" />
-                <span>Listings</span>
-              </div>
+              <nav aria-label="Breadcrumb" className="mb-1">
+                <ol className="flex items-center gap-1.5 text-sm text-on-surface-variant font-medium">
+                  <li><Link href="/" className="hover:text-on-surface transition-colors">Home</Link></li>
+                  <li aria-hidden="true"><ChevronRight className="w-3 h-3" /></li>
+                  <li><Link href="/search" className="hover:text-on-surface transition-colors">Search</Link></li>
+                  <li aria-hidden="true"><ChevronRight className="w-3 h-3" /></li>
+                  <li aria-current="page" className="text-on-surface font-semibold truncate max-w-[200px]">{listing.title}</li>
+                </ol>
+              </nav>
               {/* Title */}
               <h1 className="text-3xl md:text-4xl font-bold font-display tracking-tight text-on-surface">
                 {listing.title}
@@ -706,21 +710,29 @@ export default function ListingPageClient({
 
                 {/* Boost Visibility Card (Owner only) */}
                 {resolvedIsOwner && (
-                  <div className="bg-gradient-to-br from-primary/5 to-surface-container-lowest rounded-2xl p-5 border border-primary/10">
+                  <div className="bg-surface-container-high rounded-2xl p-5 border border-outline-variant/20">
                     <div className="flex gap-3">
-                      <div className="p-2 bg-primary/10 text-primary rounded-lg h-fit">
+                      <div className="p-2 bg-on-surface-variant/10 text-on-surface-variant rounded-lg h-fit">
                         <Zap className="w-4 h-4" />
                       </div>
                       <div>
                         <h4 className="font-semibold text-on-surface text-sm mb-1">
-                          Boost visibility
+                          Boost Visibility
                         </h4>
                         <p className="text-xs text-on-surface-variant leading-relaxed mb-3">
                           Get up to 3x more views by promoting this listing.
                         </p>
-                        <button className="text-xs font-semibold text-primary hover:text-primary/80">
-                          Promote now &rarr;
+                        <button
+                          disabled
+                          className="text-xs font-semibold text-on-surface-variant/60 cursor-not-allowed"
+                        >
+                          Coming Q3 2026
                         </button>
+                        <p className="text-xs text-on-surface-variant mt-1">
+                          <Link href="/notifications" className="underline underline-offset-2 hover:text-on-surface">
+                            Get notified
+                          </Link>
+                        </p>
                       </div>
                     </div>
                   </div>
@@ -728,20 +740,25 @@ export default function ListingPageClient({
 
                 {/* Guest Booking Card */}
                 {canRenderGuestControls && (
-                  <BookingForm
-                    listingId={listing.id}
-                    price={listing.price}
-                    ownerId={listing.ownerId}
-                    isOwner={resolvedIsOwner}
-                    isLoggedIn={resolvedIsLoggedIn}
-                    status={listing.status as "ACTIVE" | "PAUSED" | "RENTED"}
-                    bookedDates={bookedDates}
-                    holdEnabled={holdEnabled}
-                    totalSlots={listing.totalSlots}
-                    availableSlots={listing.availableSlots}
-                    bookingMode={listing.bookingMode}
-                    holdTtlMinutes={listing.holdTtlMinutes}
-                  />
+                  <>
+                    <BookingForm
+                      listingId={listing.id}
+                      price={listing.price}
+                      ownerId={listing.ownerId}
+                      isOwner={resolvedIsOwner}
+                      isLoggedIn={resolvedIsLoggedIn}
+                      status={listing.status as "ACTIVE" | "PAUSED" | "RENTED"}
+                      bookedDates={bookedDates}
+                      holdEnabled={holdEnabled}
+                      totalSlots={listing.totalSlots}
+                      availableSlots={listing.availableSlots}
+                      bookingMode={listing.bookingMode}
+                      holdTtlMinutes={listing.holdTtlMinutes}
+                    />
+                    <div className="[&>button]:bg-transparent [&>button]:border [&>button]:border-outline-variant/30 [&>button]:text-on-surface [&>button]:hover:bg-surface-container-high [&>button]:shadow-none">
+                      <ContactHostButton listingId={listing.id} />
+                    </div>
+                  </>
                 )}
               </div>
             </div>

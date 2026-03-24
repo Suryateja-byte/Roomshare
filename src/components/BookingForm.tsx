@@ -23,6 +23,7 @@ import {
   Info,
 } from "lucide-react";
 import Link from "next/link";
+import { toast } from "sonner";
 import { useNetworkStatus } from "@/hooks/useNetworkStatus";
 import { parseLocalDate, parseISODateAsLocal } from "@/lib/utils";
 import { SlotSelector } from "@/components/SlotSelector";
@@ -168,16 +169,14 @@ export default function BookingForm({
     return () => window.removeEventListener("beforeunload", handleBeforeUnload);
   }, [isLoading]);
 
-  // Handle Escape key for modal - prevent closing during submission
+  // Handle Escape key for modal - allow closing even during submission
   useEffect(() => {
     const handleKeyDown = (e: KeyboardEvent) => {
       if (e.key === "Escape" && showConfirmModal) {
+        setShowConfirmModal(false);
         if (isLoading) {
-          // Block escape during submission
-          e.preventDefault();
-          e.stopPropagation();
-        } else {
-          setShowConfirmModal(false);
+          // In-flight request continues; inform user
+          toast("Your booking may still be processing. Check your bookings page for status.", { duration: 5000 });
         }
       }
     };
@@ -480,7 +479,7 @@ export default function BookingForm({
     return (
       <div
         role="alert"
-        className={`rounded-xl p-4 ${
+        className={`rounded-xl p-4 animate-error-in ${
           errorType === "server" || errorType === "network" || errorType === "rate_limit"
             ? "bg-amber-50 border border-amber-200"
             : "bg-red-50 border border-red-200"
@@ -539,17 +538,20 @@ export default function BookingForm({
     );
   };
 
-  // Render success message
+  // Render success message with celebration
   const renderSuccessMessage = () => {
     if (!message.includes("success")) return null;
 
     return (
       <div className="rounded-xl p-4 bg-green-50 border border-green-200">
         <div className="flex items-center gap-3">
-          <div className="flex-shrink-0 w-8 h-8 rounded-full bg-green-100 flex items-center justify-center">
-            <CheckCircle className="w-4 h-4 text-green-600" />
+          <div className="relative flex-shrink-0 w-8 h-8">
+            <div className="absolute inset-0 rounded-full animate-[booking-glow_600ms_cubic-bezier(0.16,1,0.3,1)] motion-reduce:animate-none" />
+            <div className="relative w-8 h-8 rounded-full bg-green-100 flex items-center justify-center animate-[booking-icon-spring_400ms_cubic-bezier(0.34,1.56,0.64,1)] motion-reduce:animate-none">
+              <CheckCircle className="w-4 h-4 text-green-600" />
+            </div>
           </div>
-          <div className="flex-1">
+          <div className="flex-1 animate-[fadeUp_500ms_cubic-bezier(0.16,1,0.3,1)_200ms_both] motion-reduce:animate-none">
             <p className="text-sm font-medium text-green-800">
               {message}
             </p>
@@ -702,7 +704,7 @@ export default function BookingForm({
                 <p
                   id="startDate-error"
                   role="alert"
-                  className="text-xs text-red-500"
+                  className="text-xs text-red-500 animate-error-in"
                 >
                   {fieldErrors.startDate}
                 </p>
@@ -738,7 +740,7 @@ export default function BookingForm({
                 <p
                   id="endDate-error"
                   role="alert"
-                  className="text-xs text-red-500"
+                  className="text-xs text-red-500 animate-error-in"
                 >
                   {fieldErrors.endDate}
                 </p>
@@ -947,10 +949,15 @@ export default function BookingForm({
         createPortal(
           <FocusTrap active={showConfirmModal}>
             <div className="fixed inset-0 z-modal flex items-center justify-center p-4">
-              {/* Backdrop - disabled during loading to prevent accidental dismissal */}
+              {/* Backdrop */}
               <div
-                className={`absolute inset-0 bg-on-surface/50 backdrop-blur-sm ${isLoading ? "cursor-not-allowed" : "cursor-pointer"}`}
-                onClick={() => !isLoading && setShowConfirmModal(false)}
+                className="absolute inset-0 bg-on-surface/50 backdrop-blur-sm cursor-pointer"
+                onClick={() => {
+                  setShowConfirmModal(false);
+                  if (isLoading) {
+                    toast("Your booking may still be processing. Check your bookings page for status.", { duration: 5000 });
+                  }
+                }}
               />
 
               {/* Modal Content */}
@@ -1052,8 +1059,12 @@ export default function BookingForm({
                     type="button"
                     variant="outline"
                     className="flex-1 h-11"
-                    onClick={() => setShowConfirmModal(false)}
-                    disabled={isLoading}
+                    onClick={() => {
+                      setShowConfirmModal(false);
+                      if (isLoading) {
+                        toast("Your booking may still be processing. Check your bookings page for status.", { duration: 5000 });
+                      }
+                    }}
                   >
                     Cancel
                   </Button>
@@ -1070,7 +1081,7 @@ export default function BookingForm({
                           className="w-4 h-4 mr-2 animate-spin"
                           aria-hidden="true"
                         />
-                        Processing...
+                        Securing your booking...
                       </>
                     ) : (
                       "Confirm Booking"

@@ -394,6 +394,10 @@ export default async function SearchPage({ searchParams }: SearchPageProps) {
               {total === null ? "100+" : total}{" "}
               {total === 1 ? "place" : "places"} {q ? `in "${q}"` : "available"}
             </h1>
+            <div aria-live="polite" className="sr-only">
+              {total === null ? "More than 100" : total}{" "}
+              {total === 1 ? "place" : "places"} found
+            </div>
             <p className="text-sm md:text-base text-on-surface-variant font-light max-w-2xl">
               Find the perfect sanctuary. Curated spaces and compatible people.
             </p>
