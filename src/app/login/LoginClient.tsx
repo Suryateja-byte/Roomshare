@@ -79,8 +79,13 @@ function LoginForm() {
         setTurnstileToken("");
         setLoading(false);
       } else {
-        // Force full page reload to ensure fresh session from layout
-        window.location.href = "/";
+        // Redirect to callback URL if present (e.g., user was on /saved before login),
+        // otherwise go to homepage. Sanitize to prevent open-redirect attacks.
+        const callback = searchParams.get("callbackUrl") || "/";
+        const safeCallback = callback.startsWith("/") && !callback.startsWith("//")
+          ? callback
+          : "/";
+        window.location.href = safeCallback;
       }
     } catch (_err) {
       setError("We couldn\u2019t connect right now. Check your internet and try again.");
