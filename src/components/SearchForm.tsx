@@ -891,7 +891,7 @@ export default function SearchForm({
       <form
         ref={formRef}
         onSubmit={handleSearch}
-        className={`group relative flex flex-col md:flex-row md:items-center bg-surface-container-lowest backdrop-blur-2xl rounded-3xl md:rounded-full shadow-xl hover:shadow-2xl focus-within:shadow-2xl focus-within:ring-2 focus-within:ring-primary/20 transition-all duration-300 w-full ${isCompact ? "p-1" : "p-2"}`}
+        className={`group relative flex flex-col md:flex-row md:items-center bg-surface-container-lowest backdrop-blur-2xl rounded-3xl md:rounded-full shadow-xl hover:shadow-2xl focus-within:shadow-2xl focus-within:ring-2 focus-within:ring-primary/20 transition-all duration-300 w-full overflow-visible ${isCompact ? "p-1" : "p-2"}`}
         role="search"
       >
         {/* Semantic "What" Input — AI-powered natural language search */}

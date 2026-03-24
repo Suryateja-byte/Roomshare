@@ -461,7 +461,7 @@ export default function LocationSearchInput({
           ref={suggestionsRef}
           role="status"
           aria-live="polite"
-          className="absolute top-full left-0 right-0 mt-2 bg-surface-container-lowest backdrop-blur-xl rounded-2xl shadow-2xl overflow-hidden z-dropdown min-w-0 sm:min-w-[300px] animate-in fade-in-0 slide-in-from-top-2"
+          className="absolute top-full left-0 right-0 mt-2 bg-surface-container-lowest backdrop-blur-xl rounded-2xl shadow-2xl overflow-hidden z-[1300] min-w-0 sm:min-w-[300px] animate-in fade-in-0 slide-in-from-top-2"
         >
           <div className="px-4 py-3 text-sm text-on-surface-variant">
             Type at least {MIN_QUERY_LENGTH} characters to search
@@ -473,7 +473,7 @@ export default function LocationSearchInput({
       {showSuggestions && suggestions.length > 0 && !showTypeMoreHint && (
         <div
           ref={suggestionsRef}
-          className="absolute top-full left-0 right-0 mt-2 bg-surface-container-lowest backdrop-blur-xl rounded-2xl shadow-2xl overflow-hidden z-dropdown min-w-0 sm:min-w-[300px] animate-in fade-in-0 slide-in-from-top-2"
+          className="absolute top-full left-0 right-0 mt-2 bg-surface-container-lowest backdrop-blur-xl rounded-2xl shadow-2xl overflow-hidden z-[1300] min-w-0 sm:min-w-[300px] animate-in fade-in-0 slide-in-from-top-2"
         >
           <ul
             className="p-2"
@@ -526,7 +526,7 @@ export default function LocationSearchInput({
           ref={suggestionsRef}
           role="alert"
           aria-live="assertive"
-          className="absolute top-full left-0 right-0 mt-2 bg-surface-container-lowest backdrop-blur-xl rounded-2xl shadow-2xl overflow-hidden z-dropdown min-w-0 sm:min-w-[300px] animate-in fade-in-0 slide-in-from-top-2"
+          className="absolute top-full left-0 right-0 mt-2 bg-surface-container-lowest backdrop-blur-xl rounded-2xl shadow-2xl overflow-hidden z-[1300] min-w-0 sm:min-w-[300px] animate-in fade-in-0 slide-in-from-top-2"
         >
           <div className="p-4 flex items-center gap-3">
             <div className="p-2 rounded-full bg-red-100">
@@ -553,7 +553,7 @@ export default function LocationSearchInput({
             ref={suggestionsRef}
             role="status"
             aria-live="polite"
-            className="absolute top-full left-0 right-0 mt-2 bg-surface-container-lowest backdrop-blur-xl rounded-2xl shadow-2xl overflow-hidden z-dropdown min-w-0 sm:min-w-[300px] animate-in fade-in-0 slide-in-from-top-2"
+            className="absolute top-full left-0 right-0 mt-2 bg-surface-container-lowest backdrop-blur-xl rounded-2xl shadow-2xl overflow-hidden z-[1300] min-w-0 sm:min-w-[300px] animate-in fade-in-0 slide-in-from-top-2"
           >
             <div className="p-4 flex items-center gap-3">
               <div className="p-2 rounded-full bg-surface-container-high">
