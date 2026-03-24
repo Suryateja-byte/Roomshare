@@ -5,6 +5,7 @@ import { Heart } from "lucide-react";
 import { useRouter } from "next/navigation";
 import { cn } from "@/lib/utils";
 import { toast } from "sonner";
+import { triggerLightHaptic } from "@/lib/haptics";
 
 interface FavoriteButtonProps {
   listingId: string;
@@ -31,6 +32,7 @@ export default function FavoriteButton({
       if (isLoading) return;
 
       setIsLoading(true);
+      triggerLightHaptic();
       // Optimistic update with bounce animation on save
       const previousState = isSaved;
       const willSave = !isSaved;

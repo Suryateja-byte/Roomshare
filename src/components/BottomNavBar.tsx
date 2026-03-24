@@ -3,6 +3,7 @@
 import { useEffect, useRef, useState } from "react";
 import { usePathname } from "next/navigation";
 import { useSession } from "next-auth/react";
+import { triggerLightHaptic } from "@/lib/haptics";
 import Link from "next/link";
 import { Search, Heart, PlusCircle, MessageSquare, User } from "lucide-react";
 
@@ -106,6 +107,7 @@ export default function BottomNavBar() {
             <Link
               key={item.href}
               href={item.href}
+              onClick={() => triggerLightHaptic()}
               className={`
                 flex flex-col items-center justify-center
                 min-w-[44px] min-h-[44px] px-2 py-1

@@ -717,7 +717,7 @@ export default function NavbarClient({
               <X size={24} />
             </button>
           </div>
-          <div className="flex-1 flex flex-col items-center justify-center px-6 -mt-16 space-y-8">
+          <div className={`flex-1 flex flex-col items-center justify-center px-6 -mt-16 space-y-8 ${isMobileMenuOpen ? "menu-stagger" : ""}`}>
             <Link
               href="/search"
               className="font-display text-3xl font-medium text-on-surface hover:text-primary tracking-tight transition-colors duration-300"

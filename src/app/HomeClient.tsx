@@ -284,7 +284,7 @@ function FeatureCard({
       variants={fadeInUp}
       className="flex flex-col items-center text-center group bg-surface-container-lowest rounded-xl p-8 shadow-ambient-sm"
     >
-      <div className="mb-6 flex items-center justify-center w-12 h-12 rounded-full bg-primary/10 text-primary transition-colors">
+      <div className="mb-6 flex items-center justify-center w-12 h-12 rounded-full bg-primary/10 text-primary transition-all duration-300 group-hover:bg-primary group-hover:text-on-primary group-hover:scale-110">
         <Icon className="w-5 h-5" />
       </div>
       <h3 className="font-display text-lg font-medium mb-3 text-on-surface tracking-tight">
