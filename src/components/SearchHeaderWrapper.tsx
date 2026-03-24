@@ -33,7 +33,6 @@ import { useSession, signOut } from "next-auth/react";
 import { Button } from "@/components/ui/button";
 import UserAvatar from "@/components/UserAvatar";
 import NotificationCenter from "@/components/NotificationCenter";
-import ThemeToggle from "@/components/ThemeToggle";
 import SearchForm from "@/components/SearchForm";
 
 const MenuItem = ({
@@ -267,7 +266,6 @@ export default function SearchHeaderWrapper() {
                         href="/settings"
                         onClick={() => setIsProfileOpen(false)}
                       />
-                      <ThemeToggle variant="menu-item" />
                       <div className="h-px bg-zinc-100 dark:bg-white/5 my-2 mx-3"></div>
                       <MenuItem
                         icon={<LogOut size={16} />}

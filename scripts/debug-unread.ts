@@ -35,12 +35,12 @@ async function debugUnreadMessages() {
     console.log(`📊 Total conversations: ${conversations.length}\n`);
 
     let totalUnread = 0;
-    conversations.forEach(conv => {
+    conversations.forEach((conv: any) => {
         if (conv.messages.length > 0) {
             console.log(`Conversation ${conv.id}:`);
-            console.log(`  Participants: ${conv.participants.map(p => `${p.name} (${p.id})`).join(', ')}`);
+            console.log(`  Participants: ${conv.participants.map((p: any) => `${p.name} (${p.id})`).join(', ')}`);
             console.log(`  Unread messages: ${conv.messages.length}`);
-            conv.messages.forEach(msg => {
+            conv.messages.forEach((msg: any) => {
                 console.log(`    - Message ${msg.id}: "${msg.content.substring(0, 50)}..." (read: ${msg.read})`);
             });
             console.log('');

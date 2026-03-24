@@ -21,7 +21,6 @@ import {
 import { Button } from "@/components/ui/button";
 import UserAvatar from "@/components/UserAvatar";
 import NotificationCenter from "@/components/NotificationCenter";
-import ThemeToggle from "@/components/ThemeToggle";
 
 // --- Helper Components ---
 
@@ -644,12 +643,6 @@ export default function NavbarClient({
                       onClick={() => setIsProfileOpen(false)}
                       tabIndex={activeMenuIndex === 3 ? 0 : -1}
                       onMouseEnter={() => setActiveMenuIndex(3)}
-                    />
-                    <ThemeToggle
-                      variant="menu-item"
-                      onMenuItemMouseEnter={(offset) =>
-                        setActiveMenuIndex(4 + offset)
-                      }
                     />
                     <div
                       role="separator"

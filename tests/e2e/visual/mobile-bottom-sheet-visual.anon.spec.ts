@@ -8,7 +8,7 @@
 
 import { test, expect } from "../helpers";
 import { mockMapTileRequests } from "../helpers/map-mock-helpers";
-import { activateDarkMode } from "../helpers/dark-mode-helpers";
+
 import {
   setSheetSnap,
   waitForSheetAnimation,
@@ -124,62 +124,6 @@ test.describe("Mobile Bottom Sheet — Visual Regression", () => {
     });
   });
 
-  // -----------------------------------------------------------------------
-  // 6. Dark mode — half
-  // -----------------------------------------------------------------------
-  test("dark mode — half position", async ({ page }) => {
-    await activateDarkMode(page);
-
-    const sheetReady = await navigateToMobileSearch(page);
-    test.skip(!sheetReady, "Mobile sheet not visible");
-
-    await setSheetSnap(page, 1);
-    await waitForSheetAnimation(page);
-    await disableAnimations(page);
-
-    await expect(page).toHaveScreenshot("bottom-sheet-dark-half.png", {
-      ...SCREENSHOT_DEFAULTS.fullPage,
-      mask: [...defaultMasks(page), ...imageMasks(page)],
-    });
-  });
-
-  // -----------------------------------------------------------------------
-  // 7. Dark mode — collapsed
-  // -----------------------------------------------------------------------
-  test("dark mode — collapsed", async ({ page }) => {
-    await activateDarkMode(page);
-
-    const sheetReady = await navigateToMobileSearch(page);
-    test.skip(!sheetReady, "Mobile sheet not visible");
-
-    await setSheetSnap(page, 0);
-    await waitForSheetAnimation(page);
-    await disableAnimations(page);
-
-    await expect(page).toHaveScreenshot("bottom-sheet-dark-collapsed.png", {
-      ...SCREENSHOT_DEFAULTS.fullPage,
-      mask: [...defaultMasks(page), ...imageMasks(page)],
-    });
-  });
-
-  // -----------------------------------------------------------------------
-  // 8. Dark mode — expanded
-  // -----------------------------------------------------------------------
-  test("dark mode — expanded", async ({ page }) => {
-    await activateDarkMode(page);
-
-    const sheetReady = await navigateToMobileSearch(page);
-    test.skip(!sheetReady, "Mobile sheet not visible");
-
-    await setSheetSnap(page, 2);
-    await waitForSheetAnimation(page);
-    await disableAnimations(page);
-
-    await expect(page).toHaveScreenshot("bottom-sheet-dark-expanded.png", {
-      ...SCREENSHOT_DEFAULTS.fullPage,
-      mask: [...defaultMasks(page), ...imageMasks(page)],
-    });
-  });
 
   // -----------------------------------------------------------------------
   // 9. Pre-transition baseline (half)

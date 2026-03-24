@@ -15,7 +15,7 @@
  */
 
 import { useEffect, useRef, useCallback } from "react";
-import { useTheme } from "next-themes";
+
 import maplibregl from "maplibre-gl";
 import "maplibre-gl/dist/maplibre-gl.css";
 import "@/styles/nearby-map.css";
@@ -198,9 +198,8 @@ export default function NearbyPlacesMap({
   const listingMarkerRef = useRef<maplibregl.Marker | null>(null);
   const hasFitBoundsRef = useRef<boolean>(false);
 
-  // Get current theme for dark mode support
-  const { resolvedTheme } = useTheme();
-  const isDarkMode = resolvedTheme === "dark";
+  // Single warm theme — always use light map style
+  const isDarkMode = false;
 
   // Initialize map with OpenFreeMap Liberty tiles (matching search map)
   useEffect(() => {

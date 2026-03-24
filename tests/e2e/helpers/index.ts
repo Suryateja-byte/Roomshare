@@ -85,14 +85,7 @@ export {
   navigateWithMobileNav,
 } from "./mobile-auth-helpers";
 
-// Dark mode helpers for authenticated page dark mode tests
-export {
-  activateDarkMode,
-  assertDarkClassPresent,
-  getStoredTheme,
-  waitForAuthPageReady,
-  authPageMasks,
-} from "./dark-mode-helpers";
+
 
 // Session expiry helpers for mid-session auth token expiry testing
 export {

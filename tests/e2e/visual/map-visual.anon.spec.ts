@@ -8,7 +8,7 @@
 
 import { test, expect, SF_BOUNDS, waitForMapMarkers } from "../helpers";
 import { mockMapTileRequests } from "../helpers/map-mock-helpers";
-import { activateDarkMode } from "../helpers/dark-mode-helpers";
+
 import {
   setSheetSnap,
   waitForSheetAnimation,
@@ -257,20 +257,6 @@ test.describe("Map — Visual Regression", () => {
     });
   });
 
-  // -----------------------------------------------------------------------
-  // 8. Dark mode map panel
-  // -----------------------------------------------------------------------
-  test("dark mode map panel", async ({ page }) => {
-    await activateDarkMode(page);
-    await page.goto(searchUrl);
-    await page.waitForLoadState("domcontentloaded");
-    await disableAnimations(page);
-
-    await expect(page).toHaveScreenshot("map-dark-desktop.png", {
-      ...SCREENSHOT_DEFAULTS.fullPage,
-      mask: [page.locator(".maplibregl-canvas"), ...imageMasks(page)],
-    });
-  });
 
   // -----------------------------------------------------------------------
   // 9. Mobile map with sheet collapsed
