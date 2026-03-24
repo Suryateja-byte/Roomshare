@@ -1,6 +1,7 @@
 "use client";
 
 import { useState, useRef, useEffect, useCallback, useId } from "react";
+import { createPortal } from "react-dom";
 import { MapPin, Loader2, X, AlertCircle, SearchX } from "lucide-react";
 import { useDebounce } from "use-debounce";
 import {
@@ -78,6 +79,24 @@ export default function LocationSearchInput({
   const justSelectedRef = useRef(false);
 
   const listboxId = useId();
+
+  // Portal positioning: track the input's bounding rect so the dropdown
+  // can be rendered at document.body with correct coordinates.
+  const [dropdownPos, setDropdownPos] = useState<{ top: number; left: number; width: number } | null>(null);
+  const [isMounted, setIsMounted] = useState(false);
+
+  useEffect(() => { setIsMounted(true); }, []);
+
+  const updateDropdownPosition = useCallback(() => {
+    const container = containerRef.current;
+    if (!container) return;
+    const rect = container.getBoundingClientRect();
+    setDropdownPos({
+      top: rect.bottom + 8, // 8px gap (mt-2)
+      left: rect.left,
+      width: Math.max(rect.width, 300), // min 300px
+    });
+  }, []);
 
   const [debouncedValue] = useDebounce(value, 300);
 
@@ -403,6 +422,19 @@ export default function LocationSearchInput({
       (noResults && !error && !isLoading) ||
       showTypeMoreHint);
 
+  // Recalculate portal position when popup opens or on scroll/resize
+  useEffect(() => {
+    if (!isPopupOpen) return;
+    updateDropdownPosition();
+    const handleUpdate = () => updateDropdownPosition();
+    window.addEventListener("scroll", handleUpdate, true);
+    window.addEventListener("resize", handleUpdate);
+    return () => {
+      window.removeEventListener("scroll", handleUpdate, true);
+      window.removeEventListener("resize", handleUpdate);
+    };
+  }, [isPopupOpen, updateDropdownPosition]);
+
   return (
     <div ref={containerRef} className={`relative ${className}`}>
       <div className="relative">
@@ -455,121 +487,131 @@ export default function LocationSearchInput({
         </div>
       </div>
 
-      {/* Type more hint */}
-      {showSuggestions && showTypeMoreHint && !isLoading && (
-        <div
-          ref={suggestionsRef}
-          role="status"
-          aria-live="polite"
-          className="absolute top-full left-0 right-0 mt-2 bg-surface-container-lowest backdrop-blur-xl rounded-2xl shadow-2xl overflow-hidden z-[1300] min-w-0 sm:min-w-[300px] animate-in fade-in-0 slide-in-from-top-2"
-        >
-          <div className="px-4 py-3 text-sm text-on-surface-variant">
-            Type at least {MIN_QUERY_LENGTH} characters to search
-          </div>
-        </div>
-      )}
+      {/* All dropdown variants rendered via portal to escape header stacking context */}
+      {isMounted && dropdownPos && isPopupOpen && createPortal(
+        <>
+          {/* Type more hint */}
+          {showSuggestions && showTypeMoreHint && !isLoading && (
+            <div
+              ref={suggestionsRef}
+              role="status"
+              aria-live="polite"
+              className="fixed bg-surface-container-lowest backdrop-blur-xl rounded-2xl shadow-2xl overflow-hidden z-[9999] animate-in fade-in-0 slide-in-from-top-2"
+              style={{ top: dropdownPos.top, left: dropdownPos.left, width: dropdownPos.width }}
+            >
+              <div className="px-4 py-3 text-sm text-on-surface-variant">
+                Type at least {MIN_QUERY_LENGTH} characters to search
+              </div>
+            </div>
+          )}
 
-      {/* Suggestions dropdown */}
-      {showSuggestions && suggestions.length > 0 && !showTypeMoreHint && (
-        <div
-          ref={suggestionsRef}
-          className="absolute top-full left-0 right-0 mt-2 bg-surface-container-lowest backdrop-blur-xl rounded-2xl shadow-2xl overflow-hidden z-[1300] min-w-0 sm:min-w-[300px] animate-in fade-in-0 slide-in-from-top-2"
-        >
-          <ul
-            className="p-2"
-            role="listbox"
-            id={`${listboxId}-listbox`}
-            aria-label="Location suggestions"
-          >
-            {suggestions.map((suggestion, index) => (
-              <li
-                key={suggestion.id}
-                role="option"
-                id={`${listboxId}-option-${index}`}
-                aria-selected={index === selectedIndex}
+          {/* Suggestions dropdown */}
+          {showSuggestions && suggestions.length > 0 && !showTypeMoreHint && (
+            <div
+              ref={suggestionsRef}
+              className="fixed bg-surface-container-lowest backdrop-blur-xl rounded-2xl shadow-2xl overflow-hidden z-[9999] animate-in fade-in-0 slide-in-from-top-2"
+              style={{ top: dropdownPos.top, left: dropdownPos.left, width: dropdownPos.width }}
+            >
+              <ul
+                className="p-2"
+                role="listbox"
+                id={`${listboxId}-listbox`}
+                aria-label="Location suggestions"
               >
-                <button
-                  type="button"
-                  onClick={() => handleSelectSuggestion(suggestion)}
-                  className={`w-full px-3 py-2.5 flex items-start gap-3 rounded-xl transition-colors duration-150 text-left ${
-                    index === selectedIndex
-                      ? "bg-surface-container-high"
-                      : "hover:bg-surface-container-high/80"
-                  }`}
-                  tabIndex={-1}
-                >
-                  <MapPin
-                    className={`w-5 h-5 mt-0.5 flex-shrink-0 ${getPlaceTypeIcon(suggestion.place_type)}`}
-                  />
-                  <div className="flex-1 min-w-0">
-                    <p className="text-sm font-medium text-on-surface truncate">
-                      {suggestion.place_name.split(",")[0]}
+                {suggestions.map((suggestion, index) => (
+                  <li
+                    key={suggestion.id}
+                    role="option"
+                    id={`${listboxId}-option-${index}`}
+                    aria-selected={index === selectedIndex}
+                  >
+                    <button
+                      type="button"
+                      onClick={() => handleSelectSuggestion(suggestion)}
+                      className={`w-full px-3 py-2.5 flex items-start gap-3 rounded-xl transition-colors duration-150 text-left ${
+                        index === selectedIndex
+                          ? "bg-surface-container-high"
+                          : "hover:bg-surface-container-high/80"
+                      }`}
+                      tabIndex={-1}
+                    >
+                      <MapPin
+                        className={`w-5 h-5 mt-0.5 flex-shrink-0 ${getPlaceTypeIcon(suggestion.place_type)}`}
+                      />
+                      <div className="flex-1 min-w-0">
+                        <p className="text-sm font-medium text-on-surface truncate">
+                          {suggestion.place_name.split(",")[0]}
+                        </p>
+                        <p className="text-xs text-on-surface-variant truncate">
+                          {suggestion.place_name
+                            .split(",")
+                            .slice(1)
+                            .join(",")
+                            .trim()}
+                        </p>
+                      </div>
+                    </button>
+                  </li>
+                ))}
+              </ul>
+            </div>
+          )}
+
+          {/* Error state dropdown */}
+          {showSuggestions && error && !isLoading && !showTypeMoreHint && (
+            <div
+              ref={suggestionsRef}
+              role="alert"
+              aria-live="assertive"
+              className="fixed bg-surface-container-lowest backdrop-blur-xl rounded-2xl shadow-2xl overflow-hidden z-[9999] animate-in fade-in-0 slide-in-from-top-2"
+              style={{ top: dropdownPos.top, left: dropdownPos.left, width: dropdownPos.width }}
+            >
+              <div className="p-4 flex items-center gap-3">
+                <div className="p-2 rounded-full bg-red-100">
+                  <AlertCircle className="w-5 h-5 text-red-500" />
+                </div>
+                <div>
+                  <p className="text-sm font-medium text-red-700">
+                    Search unavailable
+                  </p>
+                  <p className="text-xs text-red-500 animate-error-in">{error}</p>
+                </div>
+              </div>
+            </div>
+          )}
+
+          {/* No results dropdown */}
+          {showSuggestions &&
+            noResults &&
+            !error &&
+            !isLoading &&
+            suggestions.length === 0 &&
+            !showTypeMoreHint && (
+              <div
+                ref={suggestionsRef}
+                role="status"
+                aria-live="polite"
+                className="fixed bg-surface-container-lowest backdrop-blur-xl rounded-2xl shadow-2xl overflow-hidden z-[9999] animate-in fade-in-0 slide-in-from-top-2"
+                style={{ top: dropdownPos.top, left: dropdownPos.left, width: dropdownPos.width }}
+              >
+                <div className="p-4 flex items-center gap-3">
+                  <div className="p-2 rounded-full bg-surface-container-high">
+                    <SearchX className="w-5 h-5 text-on-surface-variant" />
+                  </div>
+                  <div>
+                    <p className="text-sm font-medium text-on-surface-variant">
+                      No locations found
                     </p>
-                    <p className="text-xs text-on-surface-variant truncate">
-                      {suggestion.place_name
-                        .split(",")
-                        .slice(1)
-                        .join(",")
-                        .trim()}
+                    <p className="text-xs text-on-surface-variant">
+                      Try a different city or neighborhood name
                     </p>
                   </div>
-                </button>
-              </li>
-            ))}
-          </ul>
-        </div>
-      )}
-
-      {/* Error state dropdown */}
-      {showSuggestions && error && !isLoading && !showTypeMoreHint && (
-        <div
-          ref={suggestionsRef}
-          role="alert"
-          aria-live="assertive"
-          className="absolute top-full left-0 right-0 mt-2 bg-surface-container-lowest backdrop-blur-xl rounded-2xl shadow-2xl overflow-hidden z-[1300] min-w-0 sm:min-w-[300px] animate-in fade-in-0 slide-in-from-top-2"
-        >
-          <div className="p-4 flex items-center gap-3">
-            <div className="p-2 rounded-full bg-red-100">
-              <AlertCircle className="w-5 h-5 text-red-500" />
-            </div>
-            <div>
-              <p className="text-sm font-medium text-red-700">
-                Search unavailable
-              </p>
-              <p className="text-xs text-red-500 animate-error-in">{error}</p>
-            </div>
-          </div>
-        </div>
-      )}
-
-      {/* No results dropdown */}
-      {showSuggestions &&
-        noResults &&
-        !error &&
-        !isLoading &&
-        suggestions.length === 0 &&
-        !showTypeMoreHint && (
-          <div
-            ref={suggestionsRef}
-            role="status"
-            aria-live="polite"
-            className="absolute top-full left-0 right-0 mt-2 bg-surface-container-lowest backdrop-blur-xl rounded-2xl shadow-2xl overflow-hidden z-[1300] min-w-0 sm:min-w-[300px] animate-in fade-in-0 slide-in-from-top-2"
-          >
-            <div className="p-4 flex items-center gap-3">
-              <div className="p-2 rounded-full bg-surface-container-high">
-                <SearchX className="w-5 h-5 text-on-surface-variant" />
+                </div>
               </div>
-              <div>
-                <p className="text-sm font-medium text-on-surface-variant">
-                  No locations found
-                </p>
-                <p className="text-xs text-on-surface-variant">
-                  Try a different city or neighborhood name
-                </p>
-              </div>
-            </div>
-          </div>
-        )}
+            )}
+        </>,
+        document.body
+      )}
     </div>
   );
 }
