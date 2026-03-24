@@ -243,8 +243,8 @@ export default function NearbyPlacesPanel({
           className="
             w-14 h-14 mb-4
             flex items-center justify-center
-            bg-gradient-to-br from-blue-500 to-indigo-600
-            rounded-2xl shadow-lg shadow-blue-500/30
+            bg-gradient-to-br from-primary to-primary-container
+            rounded-lg shadow-ambient-lg shadow-primary/30
           "
         >
           <MapPin className="w-6 h-6 text-white" />

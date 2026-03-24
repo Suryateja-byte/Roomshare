@@ -222,9 +222,9 @@ function ImageCarouselInner({
         onClick={scrollPrev}
         className={`
           absolute left-1 top-1/2 -translate-y-1/2 z-10
-          min-w-[44px] min-h-[44px] rounded-full bg-white/90
+          min-w-[44px] min-h-[44px] rounded-full bg-surface-container-lowest/90
           flex items-center justify-center
-          shadow-md backdrop-blur-sm
+          shadow-ambient backdrop-blur-sm
           transition-all duration-200
           hover:bg-surface-container-lowest
           focus:outline-none focus:ring-2 focus:ring-primary/30
@@ -241,9 +241,9 @@ function ImageCarouselInner({
         onClick={scrollNext}
         className={`
           absolute right-1 top-1/2 -translate-y-1/2 z-10
-          min-w-[44px] min-h-[44px] rounded-full bg-white/90
+          min-w-[44px] min-h-[44px] rounded-full bg-surface-container-lowest/90
           flex items-center justify-center
-          shadow-md backdrop-blur-sm
+          shadow-ambient backdrop-blur-sm
           transition-all duration-200
           hover:bg-surface-container-lowest
           focus:outline-none focus:ring-2 focus:ring-primary/30

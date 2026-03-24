@@ -48,7 +48,7 @@ const EmptyState = React.forwardRef<HTMLDivElement, EmptyStateProps>(
             />
           </div>
         )}
-        <h3 className="text-lg font-semibold text-on-surface mb-1">
+        <h3 className="text-lg font-semibold text-on-surface font-display mb-1">
           {title}
         </h3>
         {description && (

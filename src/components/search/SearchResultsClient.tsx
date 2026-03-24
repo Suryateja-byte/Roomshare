@@ -501,7 +501,7 @@ export function SearchResultsClient({
                     ? "Loading more results"
                     : `Show more places. Currently showing ${allListings.length}${total !== null ? ` of ${total}` : ""} listings`
                 }
-                className="inline-flex items-center gap-2 px-6 py-3 rounded-full bg-primary hover:bg-primary text-white text-sm font-medium transition-colors disabled:opacity-50 touch-target shadow-sm"
+                className="inline-flex items-center gap-2 px-6 py-3 rounded-full bg-gradient-to-br from-primary to-primary-container hover:from-primary hover:to-primary text-on-primary text-sm font-medium transition-colors disabled:opacity-50 touch-target shadow-ambient-sm"
               >
                 {isLoadingMore ? (
                   <>

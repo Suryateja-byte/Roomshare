@@ -902,7 +902,7 @@ export default function SearchForm({
                 className={cn(
                 'w-full flex flex-col relative overflow-hidden whitespace-nowrap transition-opacity duration-300',
                 isCompact ? 'px-4 py-2' : 'px-4 py-2 md:px-6 md:py-2.5',
-                focusedField === 'what' ? 'md:bg-white/[0.03] md:rounded-2xl opacity-100' : (focusedField !== null ? 'opacity-50' : 'opacity-100'),
+                focusedField === 'what' ? 'md:bg-surface-container-lowest/[0.03] md:rounded-2xl opacity-100' : (focusedField !== null ? 'opacity-50' : 'opacity-100'),
             )}>
               <label
                 htmlFor="search-what"
@@ -957,7 +957,7 @@ export default function SearchForm({
           className={cn(
             "w-full flex flex-col relative group/input overflow-hidden whitespace-nowrap transition-opacity duration-300",
             isCompact ? "px-4 py-2" : "px-4 py-2 md:px-6 md:py-2.5",
-            focusedField === "where" ? "md:bg-white/[0.03] md:rounded-2xl opacity-100" : (focusedField !== null ? "opacity-50" : "opacity-100")
+            focusedField === "where" ? "md:bg-surface-container-lowest/[0.03] md:rounded-2xl opacity-100" : (focusedField !== null ? "opacity-50" : "opacity-100")
           )}
         >
           {!isCompact && (
@@ -1030,8 +1030,8 @@ export default function SearchForm({
 
           {/* Recent Searches Dropdown */}
           {showRecentSearches && recentSearches.length > 0 && (
-            <div className="absolute top-full left-0 right-0 mt-3 bg-white/95 backdrop-blur-xl rounded-2xl shadow-2xl border border-outline-variant/20/50 z-50 overflow-hidden animate-in fade-in slide-in-from-top-2 duration-300">
-              <div className="flex items-center justify-between px-5 py-3 border-b border-outline-variant/20/50">
+            <div className="absolute top-full left-0 right-0 mt-3 bg-surface-container-lowest/95 backdrop-blur-[20px] rounded-lg shadow-ambient z-50 overflow-hidden animate-in fade-in slide-in-from-top-2 duration-300">
+              <div className="flex items-center justify-between px-5 py-3 bg-surface-container-high/30">
                 <span className="text-[10px] font-bold text-on-surface-variant uppercase tracking-widest">
                   Recent Searches
                 </span>
@@ -1085,7 +1085,7 @@ export default function SearchForm({
           className={cn(
             "w-full flex flex-col overflow-hidden whitespace-nowrap transition-opacity duration-300",
             isCompact ? "px-4 py-2" : "px-4 py-2 md:px-6 md:py-2.5",
-            focusedField === "budget" ? "md:bg-white/[0.03] md:rounded-2xl opacity-100" : (focusedField !== null ? "opacity-50" : "opacity-100")
+            focusedField === "budget" ? "md:bg-surface-container-lowest/[0.03] md:rounded-2xl opacity-100" : (focusedField !== null ? "opacity-50" : "opacity-100")
           )}
         >
           {!isCompact && (
@@ -1163,7 +1163,7 @@ export default function SearchForm({
                 <SlidersHorizontal className="w-3.5 h-3.5" />
                 <span className="hidden sm:inline">Filters</span>
                 {activeFilterCount > 0 && (
-                  <span className="absolute -top-1 -right-1 w-4 h-4 rounded-full bg-primary text-white flex items-center justify-center text-[9px] font-bold shadow-sm shadow-indigo-600/30">
+                  <span className="absolute -top-1 -right-1 w-4 h-4 rounded-full bg-primary text-on-primary flex items-center justify-center text-[9px] font-bold shadow-ambient-sm">
                     {activeFilterCount}
                   </span>
                 )}
@@ -1181,7 +1181,7 @@ export default function SearchForm({
             disabled={isSearching}
             aria-label={isSearching ? "Searching" : "Search"}
             aria-busy={isSearching}
-            className={`rounded-full transition-all duration-500 hover:scale-105 active:scale-95 shadow-xl shadow-indigo-500/20 ${isCompact ? "h-10 w-10 p-0" : "h-12 w-full md:w-12 bg-primary hover:bg-primary"}`}
+            className={`rounded-full transition-all duration-500 hover:scale-105 active:scale-95 shadow-ambient-lg shadow-primary/20 ${isCompact ? "h-10 w-10 p-0" : "h-12 w-full md:w-12 bg-gradient-to-br from-primary to-primary-container hover:from-primary hover:to-primary"}`}
           >
             {isSearching ? (
               <Loader2 className="animate-spin w-5 h-5" />

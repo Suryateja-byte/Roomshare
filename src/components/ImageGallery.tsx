@@ -179,7 +179,7 @@ export default function ImageGallery({ images, title }: ImageGalleryProps) {
 
   // Container classes shared across all layouts
   const containerClasses =
-    "w-full h-[400px] md:h-[500px] rounded-3xl overflow-hidden shadow-sm bg-surface-container-high";
+    "w-full h-[400px] md:h-[500px] rounded-lg overflow-hidden shadow-ambient-sm bg-surface-container-high";
 
   // Render gallery based on image count
   const renderGallery = () => {
@@ -361,7 +361,7 @@ export default function ImageGallery({ images, title }: ImageGalleryProps) {
         {imageCount > 1 && (
           <button
             onClick={() => openLightbox(0)}
-            className="md:hidden absolute bottom-4 right-4 flex items-center gap-2 px-4 py-2 bg-white/90 backdrop-blur-sm rounded-full text-on-surface text-sm font-medium shadow-lg"
+            className="md:hidden absolute bottom-4 right-4 flex items-center gap-2 px-4 py-2 bg-surface-container-lowest/90 backdrop-blur-sm rounded-full text-on-surface text-sm font-medium shadow-ambient"
           >
             <Grid3X3 className="w-4 h-4" />
             View all {imageCount} photos

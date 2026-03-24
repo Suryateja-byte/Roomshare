@@ -15,7 +15,7 @@ const variantClasses = {
   destructive: "bg-red-100 text-red-700",
   info: "bg-blue-100 text-blue-700",
   purple:
-    "bg-primary/10 text-primary",
+    "bg-tertiary/10 text-tertiary",
   outline:
     "border border-outline-variant/20 text-on-surface-variant bg-transparent",
 };
@@ -27,7 +27,7 @@ const sizeClasses = {
 };
 
 const baseClasses =
-  "inline-flex items-center font-medium rounded-full transition-colors";
+  "inline-flex items-center font-medium rounded-full transition-colors uppercase tracking-[0.05em]";
 
 export interface BadgeProps extends React.HTMLAttributes<HTMLSpanElement> {
   variant?: keyof typeof variantClasses;

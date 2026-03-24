@@ -43,7 +43,7 @@ export default function ReviewList({
       {reviews.map((review) => (
         <div
           key={review.id}
-          className="border-b border-outline-variant/20 pb-6 last:border-0"
+          className="pb-6"
         >
           <div className="flex items-center justify-between mb-2">
             <div className="flex items-center gap-3">

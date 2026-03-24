@@ -45,8 +45,8 @@ const IconButton = ({
           data-testid="unread-badge"
           className="absolute top-1.5 right-1.5 flex h-2.5 w-2.5"
         >
-          <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-red-400 opacity-75"></span>
-          <span className="relative inline-flex rounded-full h-2.5 w-2.5 bg-red-500 border border-white"></span>
+          <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-primary opacity-75"></span>
+          <span className="relative inline-flex rounded-full h-2.5 w-2.5 bg-primary border border-surface-container-lowest"></span>
         </span>
       )}
     </>
@@ -110,7 +110,7 @@ const MenuItem = ({
         {text}
       </div>
       {badge && (
-        <span className="bg-surface-container-high text-on-surface-variant px-2 py-0.5 rounded-md text-xs font-bold">
+        <span className="bg-surface-container-high text-on-surface-variant px-2 py-0.5 rounded-lg text-xs font-bold">
           {badge}
         </span>
       )}
@@ -495,7 +495,7 @@ export default function NavbarClient({
     <header
       className={`fixed top-0 left-0 right-0 z-dropdown transition-all duration-500 ease-[cubic-bezier(0.16,1,0.3,1)] data-[anim-hidden=true]:-translate-y-full data-[anim-hidden=true]:opacity-0 data-[anim-hidden=true]:pointer-events-none data-[anim-hidden=true]:border-transparent ${
         isScrolled
-          ? "py-4 bg-white/95 backdrop-blur-md shadow-sm border-b border-outline-variant/20/50"
+          ? "py-4 glass-nav"
           : "py-6 bg-transparent"
       }`}
     >
@@ -507,10 +507,10 @@ export default function NavbarClient({
             href="/"
             className="flex items-center gap-2.5 cursor-pointer group flex-shrink-0"
           >
-            <div className="w-9 h-9 bg-on-surface rounded-xl flex items-center justify-center text-white font-bold text-xl transition-all duration-500 group-hover:rotate-[10deg] group-hover:scale-110 shadow-lg shadow-on-surface/10">
+            <div className="w-9 h-9 bg-on-surface rounded-lg flex items-center justify-center text-surface-container-lowest font-bold text-xl transition-all duration-500 group-hover:rotate-[10deg] group-hover:scale-110 shadow-ambient shadow-on-surface/10">
               R
             </div>
-            <span className="text-xl font-semibold tracking-[-0.03em] text-on-surface hidden sm:block">
+            <span className="text-xl font-display font-semibold tracking-[-0.03em] text-on-surface hidden sm:block">
               RoomShare
               <span className="text-primary">.</span>
             </span>
@@ -580,7 +580,7 @@ export default function NavbarClient({
                   <UserAvatar image={user.image} name={user.name} size="sm" />
                   <Menu
                     size={16}
-                    className={`transition-colors duration-300 ${isProfileOpen ? "text-white" : "text-on-surface-variant"}`}
+                    className={`transition-colors duration-300 ${isProfileOpen ? "text-on-surface" : "text-on-surface-variant"}`}
                   />
                 </button>
 
@@ -590,7 +590,7 @@ export default function NavbarClient({
                   role="menu"
                   aria-labelledby={menuButtonId}
                   onKeyDown={handleMenuKeyDown}
-                  className={`absolute right-0 mt-4 w-72 bg-white/95 backdrop-blur-xl rounded-[1.5rem] shadow-2xl shadow-on-surface/10 border border-outline-variant/20/50 overflow-hidden origin-top-right z-sticky transition-all duration-300 ease-[cubic-bezier(0.16,1,0.3,1)] ${
+                  className={`absolute right-0 mt-4 w-72 bg-surface-container-lowest/95 backdrop-blur-[20px] rounded-lg shadow-ambient shadow-on-surface/10 overflow-hidden origin-top-right z-sticky transition-all duration-300 ease-[cubic-bezier(0.16,1,0.3,1)] ${
                     isProfileOpen
                       ? "opacity-100 translate-y-0 visible scale-100"
                       : "opacity-0 -translate-y-4 invisible scale-95 pointer-events-none"
@@ -598,7 +598,7 @@ export default function NavbarClient({
                 >
                   <div
                     role="none"
-                    className="p-6 border-b border-outline-variant/20 bg-surface-canvas/50[0.02]"
+                    className="p-6 bg-surface-container-high/40"
                   >
                     <p className="font-semibold text-on-surface tracking-tight">
                       {user.name}
@@ -673,7 +673,7 @@ export default function NavbarClient({
                 <Button
                   asChild
                   size="sm"
-                  className="rounded-full px-6 h-10 shadow-lg shadow-on-surface/10"
+                  className="rounded-full px-6 h-10 shadow-ambient shadow-on-surface/10"
                 >
                   <Link href="/signup">Join</Link>
                 </Button>
@@ -697,7 +697,7 @@ export default function NavbarClient({
 
       {/* Mobile Menu - CSS animated with grid for height:auto animation */}
       <div
-        className={`lg:hidden bg-surface-container-lowest border-b border-outline-variant/20 overflow-hidden grid transition-all duration-300 ease-out ${
+        className={`lg:hidden bg-surface-container-lowest overflow-hidden grid transition-all duration-300 ease-out ${
           isMobileMenuOpen
             ? "grid-rows-[1fr] opacity-100"
             : "grid-rows-[0fr] opacity-0"
@@ -711,7 +711,7 @@ export default function NavbarClient({
         <div className="overflow-hidden">
           <div className="px-6 py-4 space-y-4">
             {user ? (
-              <div className="flex items-center gap-3 pb-4 border-b border-outline-variant/20">
+              <div className="flex items-center gap-3 pb-4">
                 <UserAvatar image={user.image} name={user.name} size="md" />
                 <div>
                   <p className="font-semibold text-on-surface">
@@ -752,7 +752,7 @@ export default function NavbarClient({
                   />
                   Messages
                   {currentUnreadCount > 0 && (
-                    <span className="ml-auto bg-red-500 text-white text-xs font-bold px-2 py-0.5 rounded-full">
+                    <span className="ml-auto bg-primary text-on-primary text-xs font-bold px-2 py-0.5 rounded-full">
                       {currentUnreadCount > 9 ? "9+" : currentUnreadCount}
                     </span>
                   )}
@@ -784,12 +784,12 @@ export default function NavbarClient({
               </>
             )}
 
-            <hr className="border-outline-variant/20" />
+            <div className="h-px bg-surface-container-high my-2" />
 
             <Button
               asChild
               variant="primary"
-              className="w-full flex items-center justify-center gap-2 px-5 py-3 rounded-xl h-auto shadow-lg shadow-on-surface/10"
+              className="w-full flex items-center justify-center gap-2 px-5 py-3 rounded-full h-auto shadow-ambient shadow-on-surface/10"
             >
               <Link
                 href="/listings/create"
@@ -830,7 +830,7 @@ export default function NavbarClient({
                   signOut({ callbackUrl: "/" });
                   setIsMobileMenuOpen(false);
                 }}
-                className="w-full flex items-center justify-center gap-2 text-red-600 py-3 font-medium hover:bg-red-50 rounded-xl mt-4"
+                className="w-full flex items-center justify-center gap-2 text-red-600 py-3 font-medium hover:bg-surface-container-high rounded-lg mt-4"
               >
                 <LogOut size={18} />
                 Log out

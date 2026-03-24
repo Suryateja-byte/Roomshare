@@ -181,7 +181,7 @@ export function DatePicker({
         id={id}
         aria-describedby={ariaDescribedBy}
         className={cn(
-          "w-full flex items-center justify-between gap-2 p-2.5 sm:p-3 rounded-xl",
+          "w-full flex items-center justify-between gap-2 p-2.5 sm:p-3 rounded-lg",
           "border border-outline-variant/20",
           "bg-surface-container-lowest",
           "text-sm touch-target text-left",
@@ -217,11 +217,11 @@ export function DatePicker({
         aria-describedby={ariaDescribedBy}
         aria-invalid={ariaInvalid}
         className={cn(
-          "w-full flex items-center justify-between gap-2 p-2.5 sm:p-3 rounded-xl",
+          "w-full flex items-center justify-between gap-2 p-2.5 sm:p-3 rounded-lg",
           "border border-outline-variant/20",
           "bg-surface-container-lowest",
           "hover:border-outline-variant/30",
-          "focus:outline-none focus:ring-2 focus:ring-primary/10",
+          "focus:outline-none focus:ring-2 focus:ring-primary/30",
           "transition-all duration-200",
           "text-sm touch-target text-left",
           className
@@ -264,10 +264,9 @@ export function DatePicker({
         <Popover.Content
           className={cn(
             "z-popover p-4",
-            "bg-surface-container-lowest/95 backdrop-blur-xl",
-            "rounded-xl",
-            "shadow-lg",
-            "border border-outline-variant/20",
+            "bg-surface-container-lowest/95 backdrop-blur-[20px]",
+            "rounded-lg",
+            "shadow-ambient",
             "animate-in fade-in-0",
             "data-[state=closed]:animate-out data-[state=closed]:fade-out-0",
             "data-[side=bottom]:slide-in-from-top-2",
@@ -281,7 +280,7 @@ export function DatePicker({
             <button
               type="button"
               onClick={handlePrevMonth}
-              className="p-2 hover:bg-surface-container-high rounded-xl transition-colors"
+              className="p-2 hover:bg-surface-container-high rounded-lg transition-colors"
               aria-label="Previous month"
             >
               <ChevronLeft className="w-4 h-4 text-on-surface-variant" />
@@ -292,7 +291,7 @@ export function DatePicker({
             <button
               type="button"
               onClick={handleNextMonth}
-              className="p-2 hover:bg-surface-container-high rounded-xl transition-colors"
+              className="p-2 hover:bg-surface-container-high rounded-lg transition-colors"
               aria-label="Next month"
             >
               <ChevronRight className="w-4 h-4 text-on-surface-variant" />
@@ -304,7 +303,7 @@ export function DatePicker({
             {DAYS.map((day) => (
               <div
                 key={day}
-                className="h-8 flex items-center justify-center text-xs font-medium text-on-surface-variant"
+                className="h-8 flex items-center justify-center text-xs font-medium text-on-surface-variant uppercase tracking-[0.05em]"
               >
                 {day}
               </div>
@@ -324,7 +323,7 @@ export function DatePicker({
                   disabled={day.isDisabled}
                   onClick={() => handleDateSelect(day.date)}
                   className={cn(
-                    "h-9 w-9 flex items-center justify-center text-sm rounded-xl transition-all duration-200",
+                    "h-9 w-9 flex items-center justify-center text-sm rounded-lg transition-all duration-200",
                     !day.isCurrentMonth && "text-on-surface-variant",
                     day.isCurrentMonth &&
                       !selected &&
@@ -336,7 +335,7 @@ export function DatePicker({
                       !selected &&
                       "ring-2 ring-on-surface/20",
                     selected &&
-                      "bg-on-surface text-white font-medium"
+                      "bg-primary text-on-primary font-medium"
                   )}
                 >
                   {day.date.getDate()}

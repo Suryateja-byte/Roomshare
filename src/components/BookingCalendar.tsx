@@ -142,7 +142,7 @@ export default function BookingCalendar({
   return (
     <div className="bg-surface-container-lowest rounded-2xl border border-outline-variant/20 overflow-hidden">
       {/* Header */}
-      <div className="px-6 py-4 border-b border-outline-variant/20 flex items-center justify-between">
+      <div className="px-6 py-4 bg-surface-container-high/30 flex items-center justify-between">
         <div className="flex items-center gap-4">
           <h2 className="text-lg font-semibold text-on-surface">
             {MONTHS[month]} {year}
@@ -178,7 +178,7 @@ export default function BookingCalendar({
           {/* Loading overlay */}
           {isLoading && (
             <div
-              className="absolute inset-0 bg-white/70 backdrop-blur-sm z-10 flex items-center justify-center rounded-lg"
+              className="absolute inset-0 bg-surface-container-lowest/70 backdrop-blur-sm z-10 flex items-center justify-center rounded-lg"
               role="status"
               aria-label="Loading bookings"
             >
@@ -261,7 +261,7 @@ export default function BookingCalendar({
           </div>
 
           {/* Legend */}
-          <div className="flex items-center gap-4 mt-4 pt-4 border-t border-outline-variant/20">
+          <div className="flex items-center gap-4 mt-4 pt-4">
             <div className="flex items-center gap-2 text-xs text-on-surface-variant">
               <span className="w-2 h-2 rounded-full bg-amber-400" />
               Pending
@@ -274,7 +274,7 @@ export default function BookingCalendar({
         </div>
 
         {/* Selected Date Details */}
-        <div className="w-full md:w-80 border-t md:border-t-0 md:border-l border-outline-variant/20 p-4">
+        <div className="w-full md:w-80 bg-surface-container-high/20 p-4">
           {selectedDate ? (
             <>
               <h3 className="font-semibold text-on-surface mb-4">

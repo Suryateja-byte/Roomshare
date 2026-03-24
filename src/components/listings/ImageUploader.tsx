@@ -460,7 +460,7 @@ export default function ImageUploader({
                       e.stopPropagation();
                       removeImage(image.id);
                     }}
-                    className="bg-white/90 hover:bg-red-500 hover:text-white text-on-surface-variant rounded-full p-1.5 min-w-[44px] min-h-[44px] flex items-center justify-center shadow-sm transition-all max-sm:opacity-100 sm:opacity-0 sm:group-hover:opacity-100 sm:translate-y-2 sm:group-hover:translate-y-0"
+                    className="bg-surface-container-lowest/90 hover:bg-red-500 hover:text-surface-container-lowest text-on-surface-variant rounded-full p-1.5 min-w-[44px] min-h-[44px] flex items-center justify-center shadow-ambient-sm transition-all max-sm:opacity-100 sm:opacity-0 sm:group-hover:opacity-100 sm:translate-y-2 sm:group-hover:translate-y-0"
                     aria-label="Remove image"
                   >
                     <X size={14} />
@@ -476,7 +476,7 @@ export default function ImageUploader({
                     e.stopPropagation();
                     setAsMain(image.id);
                   }}
-                  className="absolute bottom-2 left-2 px-2 py-1 bg-white/90 hover:bg-on-surface hover:text-white text-on-surface-variant text-xs font-medium rounded-md shadow-sm transition-all max-sm:opacity-100 sm:opacity-0 sm:group-hover:opacity-100"
+                  className="absolute bottom-2 left-2 px-2 py-1 bg-surface-container-lowest/90 hover:bg-on-surface hover:text-surface-container-lowest text-on-surface-variant text-xs font-medium rounded-lg shadow-ambient-sm transition-all max-sm:opacity-100 sm:opacity-0 sm:group-hover:opacity-100"
                   aria-label="Set as main photo"
                 >
                   Set as main

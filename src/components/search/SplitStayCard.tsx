@@ -124,10 +124,10 @@ function SplitStayHalf({
     <div
       className={cn(
         "relative transition-shadow",
-        isActive && "ring-2 ring-indigo-500 ring-inset",
+        isActive && "ring-2 ring-primary ring-inset",
         isHovered &&
           !isActive &&
-          "ring-1 ring-indigo-200 ring-inset"
+          "ring-1 ring-primary/20 ring-inset"
       )}
       onMouseEnter={() => {
         if (focusSourceRef.current === "map") return;

@@ -9,7 +9,7 @@ interface SlotBadgeProps {
 }
 
 const overlayBase =
-  "bg-white/90 backdrop-blur-sm shadow-sm rounded-md";
+  "bg-surface-container-lowest/90 backdrop-blur-sm shadow-ambient-sm rounded-lg";
 
 const overlayText = {
   success: "text-green-700",

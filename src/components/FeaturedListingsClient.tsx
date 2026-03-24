@@ -64,7 +64,7 @@ export default function FeaturedListingsClient({
       <LazyMotion features={domAnimation}>
         <section
           data-testid="featured-listings-section"
-          className="py-24 md:py-32 bg-surface-container-lowest border-t border-outline-variant/20"
+          className="py-24 md:py-32 bg-surface-container-lowest"
         >
           <div className="max-w-7xl mx-auto px-4 sm:px-6">
             <m.div
@@ -76,7 +76,7 @@ export default function FeaturedListingsClient({
             >
               <m.h2
                 variants={fadeInUp}
-                className="text-3xl md:text-5xl font-medium tracking-tight text-on-surface mb-6"
+                className="font-display text-3xl md:text-5xl font-medium tracking-tight text-on-surface mb-6"
               >
                 Be the first to share.
               </m.h2>
@@ -110,7 +110,7 @@ export default function FeaturedListingsClient({
     <LazyMotion features={domAnimation}>
       <section
         data-testid="featured-listings-section"
-        className="py-24 md:py-32 bg-surface-container-lowest border-t border-outline-variant/20 relative"
+        className="py-24 md:py-32 bg-surface-container-lowest relative"
       >
         <div className="max-w-7xl mx-auto px-4 sm:px-6 relative z-10">
           <m.div
@@ -130,7 +130,7 @@ export default function FeaturedListingsClient({
               </m.div>
               <m.h2
                 variants={fadeInUp}
-                className="text-3xl md:text-5xl font-medium tracking-tight text-on-surface mb-4"
+                className="font-display text-3xl md:text-5xl font-medium tracking-tight text-on-surface mb-4"
               >
                 Just listed.
               </m.h2>

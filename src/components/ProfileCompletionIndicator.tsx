@@ -150,7 +150,7 @@ export default function ProfileCompletionIndicator({
   return (
     <div className="bg-surface-container-lowest rounded-2xl border border-outline-variant/20 overflow-hidden">
       {/* Header */}
-      <div className="px-6 py-5 border-b border-outline-variant/20">
+      <div className="px-6 py-5 bg-surface-container-high/30">
         <div className="flex items-center justify-between mb-3">
           <h3 className="font-semibold text-on-surface">
             Complete Your Profile
@@ -184,7 +184,7 @@ export default function ProfileCompletionIndicator({
       </div>
 
       {/* Steps */}
-      <div className="divide-y divide-outline-variant/20">
+      <div className="space-y-0">
         {steps.map((step) => (
           <Link
             key={step.id}

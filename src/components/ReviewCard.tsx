@@ -96,7 +96,7 @@ export default function ReviewCard({
 
       {/* Response Section */}
       {review.response && !isEditingResponse && (
-        <div className="mt-4 pl-4 border-l-2 border-outline-variant/20">
+        <div className="mt-4 ml-2 p-4 bg-surface-container-high/40 rounded-lg">
           <div className="flex items-start justify-between gap-4">
             <div>
               <p className="text-sm font-semibold text-on-surface-variant mb-1">

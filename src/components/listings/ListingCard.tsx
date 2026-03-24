@@ -267,11 +267,11 @@ function ListingCardInner({
       }}
       onBlur={() => setHovered(null)}
       className={cn(
-        "relative rounded-xl transition-shadow",
-        isActive && "ring-2 ring-indigo-500 ring-offset-2",
+        "relative rounded-lg transition-shadow",
+        isActive && "ring-2 ring-primary ring-offset-2",
         isHovered &&
           !isActive &&
-          "shadow-md ring-1 ring-indigo-200",
+          "shadow-ambient ring-1 ring-primary/20",
         className
       )}
     >
@@ -284,7 +284,7 @@ function ListingCardInner({
               e.stopPropagation();
               setActive(listing.id);
             }}
-            className="relative p-1.5 rounded-full bg-white/80 backdrop-blur-sm shadow-sm hover:bg-surface-container-lowest transition-colors before:absolute before:inset-0 before:-m-[10px] before:content-['']"
+            className="relative p-1.5 rounded-full bg-surface-container-lowest/80 backdrop-blur-sm shadow-ambient-sm hover:bg-surface-container-lowest transition-colors before:absolute before:inset-0 before:-m-[10px] before:content-['']"
             aria-label="Show on map"
             title="Show on map"
           >
@@ -297,11 +297,11 @@ function ListingCardInner({
         href={`/listings/${listing.id}`}
         onClick={isDragging ? (e) => e.preventDefault() : undefined}
         className={cn(
-          "block group focus:outline-none focus-visible:ring-2 focus-visible:ring-primary/30 focus-visible:ring-offset-2 rounded-none sm:rounded-xl",
+          "block group focus:outline-none focus-visible:ring-2 focus-visible:ring-primary/30 focus-visible:ring-offset-2 rounded-none sm:rounded-lg",
           isDragging && "pointer-events-none"
         )}
       >
-        <div className="relative bg-surface-container-lowest flex flex-col rounded-none sm:rounded-2xl border border-outline-variant/20/50 overflow-hidden transition-all duration-500 ease-out group-hover:shadow-2xl group-hover:shadow-on-surface/10 group-hover:border-outline-variant/30">
+        <div className="relative bg-surface-container-lowest flex flex-col rounded-none sm:rounded-lg overflow-hidden transition-[transform,box-shadow] duration-500 ease-out shadow-ambient-sm group-hover:shadow-ambient-lg group-hover:shadow-on-surface/10 group-hover:-translate-y-1">
           {/* Image Area */}
           <div className="relative aspect-[16/10] sm:aspect-[4/3] overflow-hidden bg-surface-canvas">
             {/* Image Carousel or single image */}
@@ -342,13 +342,13 @@ function ListingCardInner({
                 overlay
               />
               {listing.totalSlots > 1 && (
-                <span className="inline-flex items-center font-medium px-2.5 py-1 text-xs bg-white/90 backdrop-blur-sm shadow-sm rounded-md text-primary">
+                <span className="inline-flex items-center font-medium px-2.5 py-1 text-xs bg-surface-container-lowest/90 backdrop-blur-sm shadow-ambient-sm rounded-lg text-primary">
                   Multi-Room
                 </span>
               )}
               {hasRating && (
                 <div
-                  className="inline-flex items-center gap-1 px-2 py-1 rounded-md text-[10px] font-bold bg-white/90 text-on-surface shadow-sm backdrop-blur-md"
+                  className="inline-flex items-center gap-1 px-2 py-1 rounded-lg text-[10px] font-bold bg-surface-container-lowest/90 text-on-surface shadow-ambient-sm backdrop-blur-md"
                   aria-label={`Rating ${avgRating!.toFixed(1)} out of 5`}
                 >
                   <Star className="w-3 h-3 text-amber-400 fill-amber-400" />
@@ -386,7 +386,7 @@ function ListingCardInner({
                 <>
                   <span
                     data-testid="listing-price"
-                    className="font-bold text-xl text-on-surface tracking-tight"
+                    className="font-display font-semibold text-xl text-on-surface tracking-tight"
                   >
                     {formatPrice(listing.price * estimatedMonths)}
                   </span>
@@ -398,7 +398,7 @@ function ListingCardInner({
                 <>
                   <span
                     data-testid="listing-price"
-                    className="font-bold text-xl text-on-surface tracking-tight"
+                    className="font-display font-semibold text-xl text-on-surface tracking-tight"
                   >
                     {formatPrice(listing.price)}
                   </span>
@@ -410,9 +410,6 @@ function ListingCardInner({
                 </>
               )}
             </div>
-
-            {/* Divider */}
-            <div className="h-px w-full bg-surface-container-high mb-5"></div>
 
             {/* Amenities & Languages - Simplified */}
             <div className="flex items-center justify-between gap-2 mt-auto">

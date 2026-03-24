@@ -83,7 +83,7 @@ export function SearchResultsLoadingWrapper({
           className="absolute inset-0 z-10 flex items-start justify-center pt-24 pointer-events-none"
           aria-hidden="true"
         >
-          <div className="flex items-center gap-2 px-4 py-2 bg-white/90 rounded-full shadow-lg border border-outline-variant/20/50 backdrop-blur-sm animate-in fade-in duration-200">
+          <div className="flex items-center gap-2 px-4 py-2 bg-surface-container-lowest/90 rounded-full shadow-ambient border border-outline-variant/20/50 backdrop-blur-sm animate-in fade-in duration-200">
             <Loader2 className="w-4 h-4 animate-spin text-on-surface-variant" />
             <span className="text-sm font-medium text-on-surface-variant">
               {isSlowTransition ? "Still loading..." : "Updating results..."}

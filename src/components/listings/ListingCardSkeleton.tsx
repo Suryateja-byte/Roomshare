@@ -4,12 +4,12 @@
  */
 export function ListingCardSkeleton() {
   return (
-    <div className="rounded-xl border border-outline-variant/20/60 overflow-hidden bg-surface-container-lowest animate-pulse">
+    <div className="rounded-lg shadow-ambient-sm overflow-hidden bg-surface-container-lowest animate-pulse">
       {/* Image area — matches ListingCard aspect-[16/10] sm:aspect-[4/3] */}
       <div className="relative aspect-[16/10] sm:aspect-[4/3] bg-surface-container-high">
         <div className="absolute inset-0 bg-gradient-to-r from-transparent via-surface-container-high/50 to-transparent bg-[length:200%_100%] animate-shimmer" />
         {/* Badge placeholder */}
-        <div className="absolute top-3 left-3 w-16 h-5 rounded-md bg-surface-container-high" />
+        <div className="absolute top-3 left-3 w-16 h-5 rounded-lg bg-surface-container-high" />
       </div>
 
       {/* Content area — matches min-h-[156px] of ListingCard */}

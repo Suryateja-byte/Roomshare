@@ -106,7 +106,7 @@ export default function CollapsedMobileSearch({
       {/* Main search area - tap to expand */}
       <button
         onClick={onExpand}
-        className="flex-1 flex items-center gap-3 h-12 px-4 bg-surface-container-lowest rounded-full shadow-sm border border-outline-variant/20 hover:shadow-md transition-shadow"
+        className="flex-1 flex items-center gap-3 h-12 px-4 bg-surface-container-lowest rounded-full shadow-ambient-sm border border-outline-variant/20 hover:shadow-ambient transition-shadow"
         aria-label="Expand search"
       >
         <Search className="w-5 h-5 text-on-surface-variant flex-shrink-0" />
@@ -132,13 +132,13 @@ export default function CollapsedMobileSearch({
       {onOpenFilters && (
         <button
           onClick={onOpenFilters}
-          className="relative flex items-center justify-center w-12 h-12 bg-surface-container-lowest rounded-full shadow-sm border border-outline-variant/20 hover:shadow-md transition-shadow"
+          className="relative flex items-center justify-center w-12 h-12 bg-surface-container-lowest rounded-full shadow-ambient-sm border border-outline-variant/20 hover:shadow-ambient transition-shadow"
           aria-label={`Filters${activeFilterCount > 0 ? ` (${activeFilterCount} active)` : ""}`}
           data-testid="mobile-filter-button"
         >
           <SlidersHorizontal className="w-5 h-5 text-on-surface-variant" />
           {activeFilterCount > 0 && (
-            <span className="absolute -top-1 -right-1 flex items-center justify-center min-w-[18px] h-[18px] px-1 text-[10px] font-bold rounded-full bg-on-surface text-white">
+            <span className="absolute -top-1 -right-1 flex items-center justify-center min-w-[18px] h-[18px] px-1 text-[10px] font-bold rounded-full bg-on-surface text-surface-container-lowest">
               {activeFilterCount}
             </span>
           )}

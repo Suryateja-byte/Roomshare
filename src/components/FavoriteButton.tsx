@@ -80,8 +80,8 @@ export default function FavoriteButton({
       aria-label={isSaved ? "Remove from saved" : "Save listing"}
       aria-pressed={isSaved}
       className={cn(
-        "p-2 rounded-full bg-white/90 backdrop-blur-sm hover:bg-surface-container-lowest transition-colors shadow-sm group min-w-[44px] min-h-[44px] flex items-center justify-center focus-visible:ring-2 focus-visible:ring-primary/30 focus-visible:ring-offset-2",
-        isSaved ? "text-red-500" : "text-on-surface-variant hover:text-red-500",
+        "p-2 rounded-full bg-surface-container-lowest/90 backdrop-blur-sm hover:bg-surface-container-lowest transition-colors shadow-ambient-sm group min-w-[44px] min-h-[44px] flex items-center justify-center focus-visible:ring-2 focus-visible:ring-primary/30 focus-visible:ring-offset-2",
+        isSaved ? "text-primary" : "text-on-surface-variant hover:text-primary",
         className
       )}
     >

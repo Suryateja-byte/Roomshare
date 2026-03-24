@@ -140,16 +140,16 @@ export default function NotificationCenter() {
       >
         <Bell className="w-5 h-5" />
         {unreadCount > 0 && (
-          <span className="absolute top-0 right-0 w-4 h-4 bg-red-500 text-white text-2xs font-bold flex items-center justify-center rounded-full">
+          <span className="absolute top-0 right-0 w-4 h-4 bg-primary text-on-primary text-2xs font-bold flex items-center justify-center rounded-full">
             {unreadCount > 9 ? "9+" : unreadCount}
           </span>
         )}
       </button>
 
       {isOpen && (
-        <div className="absolute right-0 mt-2 w-80 sm:w-96 bg-surface-container-lowest rounded-xl shadow-xl border border-outline-variant/20 overflow-hidden z-sticky animate-in fade-in zoom-in-95 duration-200">
+        <div className="absolute right-0 mt-2 w-80 sm:w-96 bg-surface-container-lowest/95 backdrop-blur-[20px] rounded-lg shadow-ambient overflow-hidden z-sticky animate-in fade-in zoom-in-95 duration-200">
           {/* Header */}
-          <div className="px-4 py-3 border-b border-outline-variant/20 flex items-center justify-between">
+          <div className="px-4 py-3 bg-surface-container-high/30 flex items-center justify-between">
             <h3 className="font-semibold text-on-surface">
               Notifications
             </h3>
@@ -191,7 +191,7 @@ export default function NotificationCenter() {
 
                 const content = (
                   <div
-                    className={`px-4 py-3 border-b border-outline-variant/20 hover:bg-surface-canvas transition-colors ${!notification.read ? "bg-blue-50/50" : ""}`}
+                    className={`px-4 py-3 hover:bg-surface-container-high transition-colors ${!notification.read ? "bg-primary/5" : ""}`}
                     onClick={() =>
                       !notification.read && handleMarkAsRead(notification.id)
                     }
@@ -214,7 +214,7 @@ export default function NotificationCenter() {
                         </p>
                       </div>
                       {!notification.read && (
-                        <div className="w-2 h-2 rounded-full bg-blue-500 shrink-0 mt-2" />
+                        <div className="w-2 h-2 rounded-full bg-primary shrink-0 mt-2" />
                       )}
                     </div>
                   </div>
@@ -239,7 +239,7 @@ export default function NotificationCenter() {
 
           {/* Footer */}
           {notifications.length > 0 && (
-            <div className="px-4 py-3 border-t border-outline-variant/20">
+            <div className="px-4 py-3 bg-surface-container-high/30">
               <Link href="/notifications" onClick={() => setIsOpen(false)}>
                 <Button variant="ghost" className="w-full text-sm">
                   View all notifications

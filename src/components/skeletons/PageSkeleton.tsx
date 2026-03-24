@@ -204,7 +204,7 @@ export function SearchResultsSkeleton({ count = 6 }: { count?: number }) {
       aria-label="Loading search results"
     >
       {/* Search Header Skeleton */}
-      <header className="w-full bg-white/80 backdrop-blur-xl border-b border-outline-variant/20">
+      <header className="w-full bg-surface-container-lowest/80 backdrop-blur-[20px]">
         <div className="w-full max-w-[1920px] mx-auto px-3 sm:px-4 md:px-6 py-3 sm:py-4">
           <Skeleton
             variant="rounded"

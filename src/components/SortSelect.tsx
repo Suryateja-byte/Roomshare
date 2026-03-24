@@ -111,7 +111,7 @@ export default function SortSelect({ currentSort }: SortSelectProps) {
         onClick={() => setMobileOpen(true)}
         className={`md:hidden flex items-center gap-1.5 px-3 py-2 min-h-[44px] rounded-full border text-sm font-medium transition-colors ${
           isNonDefault
-            ? "border-indigo-500 bg-primary text-white"
+            ? "border-primary bg-primary text-on-primary"
             : "border-outline-variant/20 text-on-surface-variant hover:bg-surface-container-high"
         }`}
         aria-label={`Sort: ${currentLabel}`}

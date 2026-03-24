@@ -882,7 +882,7 @@ export default function BookingForm({
       )}
 
       {isLoggedIn && (
-        <div className="mt-6 pt-6 border-t border-outline-variant/20 space-y-3">
+        <div className="mt-6 pt-6 space-y-3">
           <h4 className="text-sm font-semibold text-on-surface mb-3">
             Price breakdown
           </h4>

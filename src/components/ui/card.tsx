@@ -8,10 +8,10 @@ function cn(...inputs: ClassValue[]) {
 
 const variantClasses = {
   default: "bg-surface-container-lowest",
-  elevated: "bg-surface-container-lowest shadow-md",
-  glass: "glass-card",
+  elevated: "bg-surface-container-lowest shadow-ambient",
+  glass: "bg-surface-container-lowest/80 backdrop-blur-[20px]",
   interactive:
-    "bg-surface-container-lowest hover:-translate-y-0.5 hover:shadow-lg transition-all duration-200",
+    "bg-surface-container-lowest hover:-translate-y-1 hover:shadow-ambient-lg transition-[transform,box-shadow] duration-300",
 };
 
 const paddingClasses = {
@@ -22,8 +22,8 @@ const paddingClasses = {
 };
 
 const radiusClasses = {
-  default: "rounded-3xl",
-  lg: "rounded-3xl",
+  default: "rounded-lg",
+  lg: "rounded-lg",
 };
 
 const baseClasses = "overflow-hidden";
@@ -95,7 +95,7 @@ const CardTitle = React.forwardRef<
   <h3
     ref={ref}
     className={cn(
-      "text-lg font-semibold text-on-surface",
+      "text-lg font-semibold text-on-surface font-display",
       className
     )}
     {...props}

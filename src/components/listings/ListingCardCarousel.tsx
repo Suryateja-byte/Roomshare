@@ -218,7 +218,7 @@ function ListingCardCarousel({
             className="absolute left-0 top-1/2 -translate-y-1/2 min-w-[44px] min-h-[44px] flex items-center justify-center pointer-events-auto focus:outline-none focus-visible:ring-2 focus-visible:ring-offset-2 focus-visible:ring-blue-500"
             aria-label="Previous image"
           >
-            <span className="w-8 h-8 rounded-full bg-white/90 shadow-md flex items-center justify-center hover:bg-surface-container-lowest transition-colors">
+            <span className="w-8 h-8 rounded-full bg-surface-container-lowest/90 shadow-ambient flex items-center justify-center hover:bg-surface-container-lowest transition-colors">
               <ChevronLeft className="w-5 h-5 text-on-surface-variant" />
             </span>
           </button>
@@ -232,7 +232,7 @@ function ListingCardCarousel({
             className="absolute right-0 top-1/2 -translate-y-1/2 min-w-[44px] min-h-[44px] flex items-center justify-center pointer-events-auto focus:outline-none focus-visible:ring-2 focus-visible:ring-offset-2 focus-visible:ring-blue-500"
             aria-label="Next image"
           >
-            <span className="w-8 h-8 rounded-full bg-white/90 shadow-md flex items-center justify-center hover:bg-surface-container-lowest transition-colors">
+            <span className="w-8 h-8 rounded-full bg-surface-container-lowest/90 shadow-ambient flex items-center justify-center hover:bg-surface-container-lowest transition-colors">
               <ChevronRight className="w-5 h-5 text-on-surface-variant" />
             </span>
           </button>

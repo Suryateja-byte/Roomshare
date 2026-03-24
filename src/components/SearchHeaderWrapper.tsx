@@ -176,10 +176,10 @@ export default function SearchHeaderWrapper() {
               className="hidden md:flex items-center gap-2.5 cursor-pointer group flex-shrink-0 mr-2 md:mr-6"
               aria-label="RoomShare Home"
             >
-              <div className="w-9 h-9 bg-on-surface rounded-xl flex items-center justify-center text-white font-bold text-xl transition-all duration-500 group-hover:rotate-[10deg] group-hover:scale-110 shadow-lg shadow-on-surface/10">
+              <div className="w-9 h-9 bg-on-surface rounded-lg flex items-center justify-center text-surface-container-lowest font-bold text-xl transition-all duration-500 group-hover:rotate-[10deg] group-hover:scale-110 shadow-ambient shadow-on-surface/10">
                 R
               </div>
-              <span className="text-xl font-semibold tracking-[-0.03em] text-on-surface hidden lg:block">
+              <span className="text-xl font-display font-semibold tracking-[-0.03em] text-on-surface hidden lg:block">
                 RoomShare
                 <span className="text-primary">.</span>
               </span>
@@ -221,12 +221,12 @@ export default function SearchHeaderWrapper() {
                     <UserAvatar image={user.image} name={user.name} size="sm" />
                     <Menu
                       size={16}
-                      className={`transition-colors duration-300 ${isProfileOpen ? "text-white" : "text-on-surface-variant"}`}
+                      className={`transition-colors duration-300 ${isProfileOpen ? "text-on-surface" : "text-on-surface-variant"}`}
                     />
                   </button>
 
                   <div
-                    className={`absolute right-0 mt-4 w-72 bg-white/95 backdrop-blur-xl rounded-[1.5rem] shadow-2xl shadow-on-surface/10 border border-outline-variant/20/50 overflow-hidden origin-top-right z-[1200] transition-all duration-300 cubic-bezier(0.16, 1, 0.3, 1) ${
+                    className={`absolute right-0 mt-4 w-72 bg-surface-container-lowest/95 backdrop-blur-[20px] rounded-lg shadow-ambient shadow-on-surface/10 overflow-hidden origin-top-right z-[1200] transition-all duration-300 cubic-bezier(0.16, 1, 0.3, 1) ${
                       isProfileOpen
                         ? "opacity-100 translate-y-0 visible scale-100"
                         : "opacity-0 -translate-y-4 invisible scale-95 pointer-events-none"
@@ -290,7 +290,7 @@ export default function SearchHeaderWrapper() {
                   <Link href="/signup">
                     <Button
                       size="sm"
-                      className="rounded-full px-6 h-10 shadow-lg shadow-on-surface/10"
+                      className="rounded-full px-6 h-10 shadow-ambient shadow-on-surface/10"
                     >
                       Join
                     </Button>

@@ -668,7 +668,7 @@ const ClusterHighlightMarker = React.memo(function ClusterHighlightMarker({
     >
       <div className="pointer-events-none flex items-center justify-center">
         <div className="w-4 h-4 rounded-full bg-primary border-2 border-white shadow-lg animate-pulse" />
-        <div className="absolute w-8 h-8 rounded-full border-2 border-indigo-400 animate-ping opacity-40" />
+        <div className="absolute w-8 h-8 rounded-full border-2 border-primary animate-ping opacity-40" />
       </div>
     </Marker>
   );
@@ -2630,7 +2630,7 @@ export default function MapComponent({
           aria-label="Loading map tiles"
           aria-live="polite"
         >
-          <div className="flex items-center gap-2 bg-white/90 px-4 py-2 rounded-lg shadow-sm">
+          <div className="flex items-center gap-2 bg-surface-container-lowest/90 px-4 py-2 rounded-lg shadow-ambient-sm">
             <Loader2
               className="w-4 h-4 animate-spin text-on-surface-variant"
               aria-hidden="true"
@@ -2645,7 +2645,7 @@ export default function MapComponent({
       {/* Search-as-move loading indicator */}
       {isSearching && isMapLoaded && !areTilesLoading && (
         <div
-          className="absolute top-16 left-1/2 -translate-x-1/2 bg-white/90 px-3 py-2 rounded-lg shadow-sm flex items-center gap-2 z-10 pointer-events-none"
+          className="absolute top-16 left-1/2 -translate-x-1/2 bg-surface-container-lowest/90 px-3 py-2 rounded-lg shadow-ambient-sm flex items-center gap-2 z-10 pointer-events-none"
           role="status"
           aria-label="Searching area"
           aria-live="polite"
@@ -3250,7 +3250,7 @@ export default function MapComponent({
               { padding: 50, duration: 1000 }
             );
           }}
-          className="absolute bottom-4 right-4 z-[50] w-11 h-11 flex items-center justify-center bg-white/90 backdrop-blur-md rounded-full shadow-lg border border-outline-variant/20/50 hover:bg-surface-canvas transition-colors focus:outline-none focus-visible:ring-2 focus-visible:ring-primary/30 focus-visible:ring-offset-2"
+          className="absolute bottom-4 right-4 z-[50] w-11 h-11 flex items-center justify-center bg-surface-container-lowest/90 backdrop-blur-md rounded-full shadow-ambient border border-outline-variant/20/50 hover:bg-surface-canvas transition-colors focus:outline-none focus-visible:ring-2 focus-visible:ring-primary/30 focus-visible:ring-offset-2"
           aria-label="Fit all results in view"
           title="Fit all results"
         >
