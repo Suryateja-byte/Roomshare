@@ -43,6 +43,7 @@ export function Skeleton({
       className={`${baseClasses} ${variantClasses[variant]} ${animationClasses[animation]} ${className}`}
       style={computedStyle}
       aria-hidden="true"
+      aria-busy="true"
       role="presentation"
       {...props}
     />

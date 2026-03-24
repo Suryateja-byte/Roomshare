@@ -43,7 +43,7 @@ export default function ProfileCompletionBanner({
             {/* Progress bar */}
             <div className="w-full bg-on-primary/20 rounded-full h-2 mb-3">
               <div
-                className="bg-surface-container-lowest rounded-full h-2 transition-all duration-500"
+                className="bg-surface-container-lowest rounded-full h-2 transition-all duration-500 ease-[cubic-bezier(0.16,1,0.3,1)]"
                 style={{ width: `${completion.percentage}%` }}
               />
             </div>

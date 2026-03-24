@@ -369,7 +369,7 @@ function ListingCardInner({
                 {displayTitle}
               </h3>
               {!hasRating && (
-                <span className="text-[10px] uppercase font-bold text-primary flex-shrink-0 tracking-[0.1em]">
+                <span className="text-[10px] uppercase font-bold text-primary flex-shrink-0 tracking-[0.15em]">
                   New
                 </span>
               )}
