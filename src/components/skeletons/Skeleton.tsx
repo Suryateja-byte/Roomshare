@@ -28,7 +28,7 @@ export function Skeleton({
   const animationClasses = {
     pulse: "animate-pulse",
     shimmer:
-      "animate-shimmer bg-gradient-to-r from-surface-container-high via-surface-container-high to-surface-container-high bg-[length:200%_100%]",
+      "animate-shimmer bg-gradient-to-r from-surface-container-high via-surface-canvas to-surface-container-high bg-[length:200%_100%]",
     none: "",
   };
 

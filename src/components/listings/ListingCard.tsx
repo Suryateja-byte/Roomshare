@@ -301,7 +301,7 @@ function ListingCardInner({
           isDragging && "pointer-events-none"
         )}
       >
-        <div className="relative bg-surface-container-lowest flex flex-col rounded-none sm:rounded-lg overflow-hidden transition-[transform,box-shadow] duration-500 ease-out shadow-ambient-sm group-hover:shadow-ambient-lg group-hover:shadow-on-surface/10 group-hover:-translate-y-1">
+        <div className="relative bg-surface-container-lowest flex flex-col rounded-none sm:rounded-lg overflow-hidden transition-lift shadow-ambient-sm group-hover:shadow-ambient-lg group-hover:shadow-on-surface/10 group-hover:-translate-y-1">
           {/* Image Area */}
           <div className="relative aspect-[16/10] sm:aspect-[4/3] overflow-hidden bg-surface-canvas">
             {/* Image Carousel or single image */}

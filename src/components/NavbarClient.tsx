@@ -43,7 +43,7 @@ const IconButton = ({
           data-testid="unread-badge"
           className="absolute top-1.5 right-1.5 flex h-2.5 w-2.5"
         >
-          <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-primary opacity-75"></span>
+          <span className="animate-[pulse-ring_2s_ease-in-out_infinite] absolute inline-flex h-full w-full rounded-full bg-primary opacity-50"></span>
           <span className="relative inline-flex rounded-full h-2.5 w-2.5 bg-primary border border-surface-container-lowest"></span>
         </span>
       )}
