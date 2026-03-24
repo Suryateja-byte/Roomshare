@@ -44,20 +44,20 @@ export default async function CreateListingPage() {
   const profileCompletion = calculateProfileCompletion(user);
 
   return (
-    <div className="min-h-screen bg-zinc-50/50 font-sans selection:bg-zinc-900 selection:text-white">
+    <div className="min-h-screen bg-surface-canvas font-sans selection:bg-on-surface selection:text-white">
       <div className="max-w-3xl mx-auto px-4 sm:px-6 pt-8 sm:pt-12 mb-8 sm:mb-12">
         <Link
           href="/"
-          className="inline-flex items-center gap-2 text-sm text-zinc-400 hover:text-zinc-900 transition-colors mb-6 sm:mb-8 group"
+          className="inline-flex items-center gap-2 text-sm text-on-surface-variant hover:text-on-surface transition-colors mb-6 sm:mb-8 group"
         >
           <ArrowLeft className="w-4 h-4 group-hover:-translate-x-1 transition-transform" />
           Back to home
         </Link>
 
-        <h1 className="text-3xl sm:text-4xl md:text-5xl font-semibold text-zinc-900 tracking-tight mb-4 leading-tight">
+        <h1 className="text-3xl sm:text-4xl md:text-5xl font-semibold font-display text-on-surface tracking-tight mb-4 leading-tight">
           List your sanctuary.
         </h1>
-        <p className="text-base sm:text-lg text-zinc-500 font-light max-w-xl leading-relaxed">
+        <p className="text-base sm:text-lg text-on-surface-variant font-light max-w-xl leading-relaxed">
           Share your space with someone who fits your lifestyle. Tell us about
           your place, your vibe, and what you&apos;re looking for.
         </p>
@@ -72,7 +72,7 @@ export default async function CreateListingPage() {
           />
         )}
 
-        <div className="bg-white rounded-2xl sm:rounded-[2rem] p-6 sm:p-8 md:p-12 shadow-[0_8px_30px_rgb(0,0,0,0.04)] border border-zinc-100">
+        <div className="bg-surface-container-lowest rounded-2xl sm:rounded-[2rem] p-6 sm:p-8 md:p-12 shadow-ambient border border-outline-variant/20">
           <CreateListingForm enableWholeUnitMode={features.wholeUnitMode} />
         </div>
       </div>

@@ -24,14 +24,14 @@ export default function EditListingError({
   }, [error]);
 
   return (
-    <div className="min-h-[60vh] flex flex-col items-center justify-center px-4 py-16 text-center">
+    <div className="min-h-[60vh] flex flex-col items-center justify-center px-4 py-16 text-center bg-surface-canvas">
       <div className="w-20 h-20 bg-red-100 rounded-full flex items-center justify-center mb-6">
         <AlertTriangle className="w-10 h-10 text-red-600" />
       </div>
-      <h2 className="text-2xl font-bold text-zinc-900 mb-2">
+      <h2 className="text-2xl font-bold font-display text-on-surface mb-2">
         We couldn&apos;t load the editor
       </h2>
-      <p className="text-zinc-600 mb-6 max-w-md">
+      <p className="text-on-surface-variant mb-6 max-w-md">
         Something went wrong while loading the listing editor. This is usually
         temporary — please try again.
       </p>

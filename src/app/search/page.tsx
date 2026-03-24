@@ -160,20 +160,20 @@ export default async function SearchPage({ searchParams }: SearchPageProps) {
         <V1PathResetSetter />
         <div className="px-4 sm:px-6 py-8 sm:py-12 max-w-[840px] mx-auto">
           <div className="text-center py-12">
-            <div className="w-16 h-16 mx-auto mb-6 bg-amber-100 rounded-full flex items-center justify-center">
-              <Search className="w-8 h-8 text-amber-600" />
+            <div className="w-16 h-16 mx-auto mb-6 bg-primary/10 rounded-full flex items-center justify-center">
+              <Search className="w-8 h-8 text-primary" />
             </div>
-            <h1 className="text-2xl font-bold text-zinc-900 mb-3">
+            <h1 className="text-2xl font-display font-bold text-on-surface mb-3">
               Please select a location
             </h1>
-            <p className="text-zinc-600 max-w-md mx-auto mb-6">
+            <p className="text-on-surface-variant max-w-md mx-auto mb-6">
               To search for &ldquo;{q}&rdquo;, please select a location from the
               dropdown suggestions. This helps us find relevant listings in your
               area.
             </p>
             <Link
               href="/"
-              className="inline-flex items-center gap-2 px-4 py-2 bg-zinc-900 text-white rounded-lg hover:bg-zinc-800 transition-colors"
+              className="inline-flex items-center gap-2 px-4 py-2 bg-primary text-white rounded-lg hover:bg-primary/90 transition-colors"
             >
               <Search className="w-4 h-4" />
               Try a new search
@@ -203,10 +203,10 @@ export default async function SearchPage({ searchParams }: SearchPageProps) {
         <V1PathResetSetter />
         <div className="px-4 sm:px-6 py-8 sm:py-12 max-w-[840px] mx-auto">
           <div className="text-center py-12">
-            <h1 className="text-2xl font-bold text-zinc-900 mb-3">
+            <h1 className="text-2xl font-display font-bold text-on-surface mb-3">
               Too many requests
             </h1>
-            <p className="text-zinc-600 max-w-md mx-auto mb-6">
+            <p className="text-on-surface-variant max-w-md mx-auto mb-6">
               Please wait a moment before searching again.
             </p>
           </div>
@@ -389,12 +389,12 @@ export default async function SearchPage({ searchParams }: SearchPageProps) {
             <h1
               id="search-results-heading"
               tabIndex={-1}
-              className="text-2xl md:text-3xl font-semibold tracking-tight text-zinc-900 !outline-none mb-2"
+              className="text-2xl md:text-3xl font-display font-semibold tracking-tight text-on-surface !outline-none mb-2"
             >
               {total === null ? "100+" : total}{" "}
               {total === 1 ? "place" : "places"} {q ? `in "${q}"` : "available"}
             </h1>
-            <p className="text-sm md:text-base text-zinc-500 font-light max-w-2xl">
+            <p className="text-sm md:text-base text-on-surface-variant font-light max-w-2xl">
               Find the perfect sanctuary. Curated spaces and compatible people.
             </p>
             {browseMode && (

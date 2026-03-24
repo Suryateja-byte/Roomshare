@@ -56,10 +56,10 @@ const NearbyPlacesSection = dynamic(
   {
     ssr: false,
     loading: () => (
-      <div className="mt-8 pt-8 border-t border-zinc-200">
+      <div className="mt-8 pt-8">
         <div className="animate-pulse space-y-4">
-          <div className="h-6 bg-zinc-200 rounded w-40" />
-          <div className="h-[400px] bg-zinc-100 rounded-lg" />
+          <div className="h-6 bg-surface-container-high rounded-lg w-40" />
+          <div className="h-[400px] bg-surface-canvas rounded-lg" />
         </div>
       </div>
     ),
@@ -160,10 +160,10 @@ function StatusBadge({ status }: { status: string }) {
       label: "Rented",
     },
   }[status] || {
-    bg: "bg-zinc-50",
-    border: "border-zinc-200",
-    text: "text-zinc-600",
-    dot: "bg-zinc-500",
+    bg: "bg-surface-canvas",
+    border: "border-outline-variant/20",
+    text: "text-on-surface-variant",
+    dot: "bg-on-surface-variant",
     label: status,
   };
 
@@ -193,8 +193,8 @@ function InfoStat({
   children: React.ReactNode;
 }) {
   return (
-    <div className="flex items-center text-zinc-600 font-medium text-sm">
-      <Icon className="w-4 h-4 mr-2 text-zinc-400" />
+    <div className="flex items-center text-on-surface-variant font-medium text-sm">
+      <Icon className="w-4 h-4 mr-2 text-on-surface-variant" />
       {children}
     </div>
   );
@@ -203,11 +203,11 @@ function InfoStat({
 // Stat card for management sidebar
 function StatCard({ label, value }: { label: string; value: number | string }) {
   return (
-    <div className="bg-zinc-50 p-3 rounded-xl border border-zinc-100 text-center">
-      <span className="block text-2xl font-bold text-zinc-900">
+    <div className="bg-surface-canvas p-3 rounded-xl border border-outline-variant/20 text-center">
+      <span className="block text-2xl font-bold text-on-surface">
         {value}
       </span>
-      <span className="text-xs text-zinc-500 font-medium">
+      <span className="text-xs text-on-surface-variant font-medium">
         {label}
       </span>
     </div>
@@ -350,13 +350,13 @@ export default function ListingPageClient({
           <div className="flex justify-between items-end mb-6">
             <div className="flex flex-col gap-1">
               {/* Breadcrumb */}
-              <div className="flex items-center gap-2 text-sm text-zinc-500 font-medium mb-1">
+              <div className="flex items-center gap-2 text-sm text-on-surface-variant font-medium mb-1">
                 <span>{listing.location?.city || "Location"}</span>
                 <ChevronRight className="w-3 h-3" />
                 <span>Listings</span>
               </div>
               {/* Title */}
-              <h1 className="text-3xl md:text-4xl font-bold tracking-tight text-zinc-900">
+              <h1 className="text-3xl md:text-4xl font-bold font-display tracking-tight text-on-surface">
                 {listing.title}
               </h1>
             </div>
@@ -380,7 +380,7 @@ export default function ListingPageClient({
             {hasImages ? (
               <div className="relative group/gallery">
                 <ImageGallery images={listing.images} title={listing.title} />
-                <div className="absolute bottom-6 right-6 px-4 py-2 bg-white/90 backdrop-blur-md rounded-full text-xs font-bold uppercase tracking-wider text-zinc-900 shadow-lg flex items-center gap-2 pointer-events-none opacity-0 group-hover/gallery:opacity-100 transition-opacity">
+                <div className="absolute bottom-6 right-6 px-4 py-2 bg-surface-container-lowest/90 backdrop-blur-md rounded-full text-xs font-bold uppercase tracking-wider text-on-surface shadow-ambient flex items-center gap-2 pointer-events-none opacity-0 group-hover/gallery:opacity-100 transition-opacity">
                   <Maximize2 className="w-3 h-3" /> Click to enlarge
                 </div>
               </div>
@@ -394,7 +394,7 @@ export default function ListingPageClient({
             {/* Left Column: Details */}
             <div className="lg:col-span-2 space-y-12">
               {/* Quick Stats Bar */}
-              <div className="flex flex-wrap items-center gap-6 pb-8 border-b border-zinc-100">
+              <div className="flex flex-wrap items-center gap-6 pb-8">
                 {viewerReady && resolvedIsOwner && (
                   <>
                     <ListingStatusToggle
@@ -403,13 +403,13 @@ export default function ListingPageClient({
                         listing.status as "ACTIVE" | "PAUSED" | "RENTED"
                       }
                     />
-                    <div className="h-4 w-[1px] bg-zinc-200" />
+                    <div className="h-4 w-[1px] bg-outline-variant/20" />
                   </>
                 )}
                 {(!viewerReady || !resolvedIsOwner) && (
                   <>
                     <StatusBadge status={listing.status} />
-                    <div className="h-4 w-[1px] bg-zinc-200" />
+                    <div className="h-4 w-[1px] bg-outline-variant/20" />
                   </>
                 )}
                 <InfoStat icon={MapPin}>
@@ -422,16 +422,16 @@ export default function ListingPageClient({
                 {listing.bookingMode === "WHOLE_UNIT" && (
                   <Badge variant="purple">Whole Unit</Badge>
                 )}
-                <div className="h-4 w-[1px] bg-zinc-200" />
+                <div className="h-4 w-[1px] bg-outline-variant/20" />
                 <InfoStat icon={Bed}>Furnished</InfoStat>
               </div>
 
               {/* About */}
               <div className="space-y-4">
-                <h2 className="text-xl font-bold text-zinc-900">
+                <h2 className="text-xl font-bold font-display text-on-surface">
                   About this place
                 </h2>
-                <p className="text-zinc-500 leading-relaxed text-lg font-light whitespace-pre-line">
+                <p className="text-on-surface-variant leading-relaxed text-lg font-light whitespace-pre-line">
                   {listing.description}
                 </p>
               </div>
@@ -439,7 +439,7 @@ export default function ListingPageClient({
               {/* Amenities */}
               {listing.amenities.length > 0 && (
                 <div className="space-y-6">
-                  <h2 className="text-xl font-bold text-zinc-900">
+                  <h2 className="text-xl font-bold font-display text-on-surface">
                     What this place offers
                   </h2>
                   <div className="grid grid-cols-2 sm:grid-cols-2 gap-4">
@@ -448,19 +448,19 @@ export default function ListingPageClient({
                       return (
                         <div
                           key={i}
-                          className="flex items-center gap-4 p-4 rounded-2xl bg-zinc-50/50 hover:bg-white hover:shadow-lg transition-all duration-300"
+                          className="flex items-center gap-4 p-4 rounded-2xl bg-surface-canvas/50 hover:bg-surface-container-lowest hover:shadow-ambient transition-all duration-300"
                         >
-                          <div className="p-2 bg-white rounded-lg shadow-sm text-zinc-700">
+                          <div className="p-2 bg-primary/10 rounded-lg text-primary">
                             {AmenityIcon ? (
                               <AmenityIcon
                                 className="w-5 h-5"
                                 strokeWidth={1.5}
                               />
                             ) : (
-                              <div className="w-5 h-5 rounded-full bg-zinc-200" />
+                              <div className="w-5 h-5 rounded-full bg-surface-container-high" />
                             )}
                           </div>
-                          <span className="text-zinc-700 font-medium">
+                          <span className="text-on-surface-variant font-medium">
                             {amenity}
                           </span>
                         </div>
@@ -484,31 +484,31 @@ export default function ListingPageClient({
                 listing.genderPreference ||
                 listing.householdGender) && (
                 <div className="space-y-6">
-                  <h2 className="text-xl font-bold text-zinc-900">
+                  <h2 className="text-xl font-bold font-display text-on-surface">
                     Household Details
                   </h2>
                   <div className="grid grid-cols-1 sm:grid-cols-2 gap-6">
                     {listing.genderPreference && (
-                      <div className="p-5 rounded-2xl border border-zinc-100 bg-white shadow-sm">
-                        <p className="text-xs font-bold text-zinc-400 uppercase tracking-wider mb-2">
+                      <div className="p-5 rounded-2xl bg-surface-container-lowest shadow-ambient-sm">
+                        <p className="text-xs font-bold text-on-surface-variant uppercase tracking-wider mb-2">
                           Gender Preference
                         </p>
                         <div className="flex items-center gap-2">
-                          <div className="w-2 h-2 rounded-full bg-blue-500" />
-                          <span className="text-lg font-semibold text-zinc-900">
+                          <div className="w-2 h-2 rounded-full bg-primary" />
+                          <span className="text-lg font-semibold text-on-surface">
                             {formatGenderPreference(listing.genderPreference)}
                           </span>
                         </div>
                       </div>
                     )}
                     {listing.householdGender && (
-                      <div className="p-5 rounded-2xl border border-zinc-100 bg-white shadow-sm">
-                        <p className="text-xs font-bold text-zinc-400 uppercase tracking-wider mb-2">
+                      <div className="p-5 rounded-2xl bg-surface-container-lowest shadow-ambient-sm">
+                        <p className="text-xs font-bold text-on-surface-variant uppercase tracking-wider mb-2">
                           Current Household
                         </p>
                         <div className="flex items-center gap-2">
-                          <div className="w-2 h-2 rounded-full bg-purple-500" />
-                          <span className="text-lg font-semibold text-zinc-900">
+                          <div className="w-2 h-2 rounded-full bg-tertiary" />
+                          <span className="text-lg font-semibold text-on-surface">
                             {formatHouseholdGender(listing.householdGender)}
                           </span>
                         </div>
@@ -517,14 +517,14 @@ export default function ListingPageClient({
                   </div>
                   {listing.householdLanguages.length > 0 && (
                     <div>
-                      <p className="text-sm font-bold text-zinc-900 uppercase tracking-wider mb-3">
+                      <p className="text-sm font-bold text-on-surface uppercase tracking-wider mb-3">
                         Languages Spoken
                       </p>
                       <div className="flex flex-wrap gap-2">
                         {listing.householdLanguages.map((lang, i) => (
                           <span
                             key={i}
-                            className="px-4 py-1.5 bg-zinc-100 text-zinc-600 rounded-full text-sm font-medium border border-zinc-200"
+                            className="px-4 py-1.5 bg-surface-container-high text-on-surface-variant rounded-full text-sm font-medium"
                           >
                             {getLanguageName(lang)}
                           </span>
@@ -536,9 +536,9 @@ export default function ListingPageClient({
               )}
 
               {/* Host Section */}
-              <div className="pt-8 border-t border-zinc-100">
+              <div className="pt-8">
                 <div className="flex items-start gap-4">
-                  <div className="w-14 h-14 rounded-full overflow-hidden bg-zinc-100 flex-shrink-0 border-2 border-white shadow-lg">
+                  <div className="w-14 h-14 rounded-full overflow-hidden bg-surface-container-high flex-shrink-0 border-2 border-surface-container-lowest shadow-ambient">
                     <UserAvatar
                       image={listing.owner.image}
                       name={listing.owner.name}
@@ -551,11 +551,11 @@ export default function ListingPageClient({
                       href={`/users/${listing.ownerId}`}
                       className="hover:underline"
                     >
-                      <h3 className="text-lg font-bold text-zinc-900">
+                      <h3 className="text-lg font-bold font-display text-on-surface">
                         Hosted by {listing.owner.name || "User"}
                       </h3>
                     </Link>
-                    <p className="text-zinc-500 text-sm mb-2">
+                    <p className="text-on-surface-variant text-sm mb-2">
                       Joined in{" "}
                       {new Date(listing.owner.createdAt).getFullYear()}
                       {listing.owner.bio &&
@@ -563,18 +563,18 @@ export default function ListingPageClient({
                     </p>
                     <div className="flex gap-2 flex-wrap">
                       {listing.owner.isVerified && (
-                        <div className="flex items-center gap-1 text-xs font-medium text-zinc-500">
-                          <ShieldCheck className="w-3.5 h-3.5 text-zinc-900" />
+                        <div className="flex items-center gap-1 text-xs font-medium text-on-surface-variant">
+                          <ShieldCheck className="w-3.5 h-3.5 text-primary" />
                           Identity verified
                         </div>
                       )}
                       {listing.owner.isVerified && reviews.length >= 5 && (
                         <>
-                          <span className="text-zinc-300">
+                          <span className="text-outline-variant/20">
                             •
                           </span>
-                          <div className="flex items-center gap-1 text-xs font-medium text-zinc-500">
-                            <Star className="w-3.5 h-3.5 text-zinc-900" />
+                          <div className="flex items-center gap-1 text-xs font-medium text-on-surface-variant">
+                            <Star className="w-3.5 h-3.5 text-primary" />
                             Superhost
                           </div>
                         </>
@@ -591,9 +591,9 @@ export default function ListingPageClient({
 
               {/* Reviews Section */}
               <div className="space-y-6">
-                <h2 className="text-xl font-bold flex items-center gap-2 text-zinc-900">
+                <h2 className="text-xl font-bold font-display flex items-center gap-2 text-on-surface">
                   Reviews
-                  <span className="text-lg font-normal text-zinc-500">
+                  <span className="text-lg font-normal text-on-surface-variant">
                     ({reviews.length})
                   </span>
                 </h2>
@@ -615,9 +615,9 @@ export default function ListingPageClient({
 
               {/* Similar Listings Section */}
               {similarListings && similarListings.length > 0 && (
-                <div className="pt-8 border-t border-zinc-100">
+                <div className="pt-8">
                   <div className="space-y-6">
-                    <h2 className="text-xl font-bold text-zinc-900">
+                    <h2 className="text-xl font-bold font-display text-on-surface">
                       Similar listings
                     </h2>
                     <div className="grid grid-cols-1 sm:grid-cols-2 gap-6">
@@ -638,9 +638,9 @@ export default function ListingPageClient({
               <div className="sticky top-24 space-y-6">
                 {/* Owner Management Card */}
                 {resolvedIsOwner && (
-                  <div className="rounded-3xl bg-white p-6 shadow-2xl">
+                  <div className="rounded-3xl bg-surface-container-lowest p-6 shadow-ambient-lg">
                     <div className="flex items-center justify-between mb-6">
-                      <h3 className="text-lg font-bold text-zinc-900">
+                      <h3 className="text-lg font-bold font-display text-on-surface">
                         Manage Listing
                       </h3>
                       <span className="relative flex h-2 w-2">
@@ -661,10 +661,10 @@ export default function ListingPageClient({
 
                     {/* Price */}
                     <div className="mb-6 text-center">
-                      <span className="text-2xl font-bold text-zinc-900">
+                      <span className="text-2xl font-bold font-display text-on-surface">
                         ${listing.price?.toLocaleString()}
                       </span>
-                      <span className="text-sm text-zinc-500">
+                      <span className="text-sm text-on-surface-variant">
                         /mo
                       </span>
                     </div>
@@ -678,7 +678,7 @@ export default function ListingPageClient({
                     <div className="space-y-3">
                       <Link
                         href={`/listings/${listing.id}/edit`}
-                        className="w-full flex items-center justify-center gap-2 bg-zinc-900 hover:bg-zinc-800 text-white font-medium py-3.5 px-4 rounded-xl transition-all shadow-lg shadow-zinc-900/20 active:scale-[0.98]"
+                        className="w-full flex items-center justify-center gap-2 bg-gradient-to-br from-primary to-primary-container hover:opacity-90 text-white font-medium py-3.5 px-4 rounded-xl transition-all shadow-ambient active:scale-[0.98]"
                       >
                         <Pencil className="w-4 h-4" />
                         Edit Listing
@@ -686,7 +686,7 @@ export default function ListingPageClient({
                       <DeleteListingButton listingId={listing.id} />
                     </div>
 
-                    <div className="mt-6 pt-6 border-t border-zinc-100 text-center">
+                    <div className="mt-6 pt-6 text-center">
                       <button
                         onClick={() =>
                           window.open(
@@ -695,7 +695,7 @@ export default function ListingPageClient({
                             "noopener,noreferrer"
                           )
                         }
-                        className="text-xs text-zinc-400 hover:text-zinc-600 underline inline-flex items-center gap-1"
+                        className="text-xs text-on-surface-variant hover:text-on-surface underline inline-flex items-center gap-1"
                       >
                         <ExternalLink className="w-3 h-3" />
                         View listing as guest
@@ -706,19 +706,19 @@ export default function ListingPageClient({
 
                 {/* Boost Visibility Card (Owner only) */}
                 {resolvedIsOwner && (
-                  <div className="bg-gradient-to-br from-indigo-50 to-white rounded-2xl p-5 border border-indigo-100/50">
+                  <div className="bg-gradient-to-br from-primary/5 to-surface-container-lowest rounded-2xl p-5 border border-primary/10">
                     <div className="flex gap-3">
-                      <div className="p-2 bg-indigo-100 text-indigo-600 rounded-lg h-fit">
+                      <div className="p-2 bg-primary/10 text-primary rounded-lg h-fit">
                         <Zap className="w-4 h-4" />
                       </div>
                       <div>
-                        <h4 className="font-semibold text-zinc-900 text-sm mb-1">
+                        <h4 className="font-semibold text-on-surface text-sm mb-1">
                           Boost visibility
                         </h4>
-                        <p className="text-xs text-zinc-500 leading-relaxed mb-3">
+                        <p className="text-xs text-on-surface-variant leading-relaxed mb-3">
                           Get up to 3x more views by promoting this listing.
                         </p>
-                        <button className="text-xs font-semibold text-indigo-600 hover:text-indigo-700">
+                        <button className="text-xs font-semibold text-primary hover:text-primary/80">
                           Promote now &rarr;
                         </button>
                       </div>

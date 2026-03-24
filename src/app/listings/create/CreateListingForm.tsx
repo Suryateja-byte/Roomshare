@@ -616,20 +616,20 @@ export default function CreateListingForm({
                     className={`w-10 h-10 rounded-full flex items-center justify-center border-2 transition-all duration-300 ${
                       isComplete
                         ? "bg-green-50 border-green-500"
-                        : "bg-zinc-100 border-zinc-200"
+                        : "bg-surface-container-high border-outline-variant/20"
                     }`}
                   >
                     {isComplete ? (
                       <Check className="w-4 h-4 text-green-600" />
                     ) : (
-                      <Icon className="w-4 h-4 text-zinc-600" />
+                      <Icon className="w-4 h-4 text-on-surface-variant" />
                     )}
                   </div>
                   <span
                     className={`text-xs font-medium mt-2 text-center hidden sm:block transition-colors duration-300 ${
                       isComplete
                         ? "text-green-600"
-                        : "text-zinc-600"
+                        : "text-on-surface-variant"
                     }`}
                   >
                     {section.label}
@@ -638,7 +638,7 @@ export default function CreateListingForm({
                     className={`text-xs font-medium mt-2 text-center sm:hidden transition-colors duration-300 ${
                       isComplete
                         ? "text-green-600"
-                        : "text-zinc-600"
+                        : "text-on-surface-variant"
                     }`}
                   >
                     {index + 1}
@@ -650,7 +650,7 @@ export default function CreateListingForm({
                     className={`flex-1 h-0.5 mx-2 sm:mx-4 transition-colors duration-300 ${
                       isComplete
                         ? "bg-green-500"
-                        : "bg-zinc-200"
+                        : "bg-surface-container-high"
                     }`}
                   />
                 )}
@@ -659,7 +659,7 @@ export default function CreateListingForm({
           })}
         </div>
         <p
-          className="text-center text-sm text-zinc-500 mt-4"
+          className="text-center text-sm text-on-surface-variant mt-4"
           aria-live="polite"
         >
           {Object.values(sectionCompletion).filter(Boolean).length === 4
@@ -733,7 +733,7 @@ export default function CreateListingForm({
 
       {/* Auto-save status indicator */}
       {!showDraftBanner && savedAt && !loading && (
-        <div className="flex items-center justify-end gap-2 mb-4 text-xs text-zinc-500 animate-in fade-in duration-300">
+        <div className="flex items-center justify-end gap-2 mb-4 text-xs text-on-surface-variant animate-in fade-in duration-300">
           <CheckCircle className="w-3.5 h-3.5 text-green-500" />
           <span>Draft saved {formatTimeSince(savedAt)}</span>
         </div>
@@ -750,7 +750,7 @@ export default function CreateListingForm({
         <section className="space-y-6" aria-labelledby="section-basics">
           <h3
             id="section-basics"
-            className="text-lg font-semibold text-zinc-900 flex items-center gap-2"
+            className="text-lg font-semibold font-display text-on-surface flex items-center gap-2"
           >
             <Home className="w-4 h-4 flex-shrink-0" /> The Basics
           </h3>
@@ -789,7 +789,7 @@ export default function CreateListingForm({
               aria-describedby={
                 fieldErrors.description ? "description-error" : undefined
               }
-              className={`w-full bg-zinc-50 hover:bg-zinc-100 focus:bg-white border rounded-xl px-4 py-3 sm:py-3.5 text-zinc-900 placeholder:text-zinc-600 outline-none focus:ring-2 focus:ring-black/5 focus:border-zinc-900 transition-all duration-200 disabled:cursor-not-allowed disabled:opacity-60 resize-none leading-relaxed ${fieldErrors.description ? "border-red-500" : "border-zinc-200"}`}
+              className={`w-full bg-surface-canvas hover:bg-surface-container-high focus:bg-surface-container-lowest border rounded-xl px-4 py-3 sm:py-3.5 text-on-surface placeholder:text-on-surface-variant outline-none focus:ring-2 focus:ring-black/5 focus:border-on-surface transition-all duration-200 disabled:cursor-not-allowed disabled:opacity-60 resize-none leading-relaxed ${fieldErrors.description ? "border-red-500" : "border-outline-variant/20"}`}
               placeholder="What makes your place special? Describe the vibe, the light, and the lifestyle..."
               disabled={loading}
             />
@@ -855,15 +855,15 @@ export default function CreateListingForm({
           {/* Booking Mode Selector (behind feature flag) */}
           {enableWholeUnitMode && (
             <fieldset className="space-y-3" disabled={loading}>
-              <legend className="text-sm font-medium text-zinc-900">
+              <legend className="text-sm font-medium text-on-surface">
                 Booking Mode
               </legend>
               <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
                 <label
                   className={`flex items-start gap-3 p-4 rounded-xl border-2 cursor-pointer transition-all ${
                     bookingMode === "SHARED"
-                      ? "border-zinc-900 bg-zinc-50"
-                      : "border-zinc-200 hover:border-zinc-300"
+                      ? "border-on-surface bg-surface-canvas"
+                      : "border-outline-variant/20 hover:border-outline-variant/30"
                   }`}
                 >
                   <input
@@ -875,10 +875,10 @@ export default function CreateListingForm({
                     className="mt-0.5"
                   />
                   <div>
-                    <span className="text-sm font-medium text-zinc-900">
+                    <span className="text-sm font-medium text-on-surface">
                       Shared space (multiple tenants)
                     </span>
-                    <p className="text-xs text-zinc-500 mt-1">
+                    <p className="text-xs text-on-surface-variant mt-1">
                       Individual slots can be booked by different tenants.
                     </p>
                   </div>
@@ -886,8 +886,8 @@ export default function CreateListingForm({
                 <label
                   className={`flex items-start gap-3 p-4 rounded-xl border-2 cursor-pointer transition-all ${
                     bookingMode === "WHOLE_UNIT"
-                      ? "border-zinc-900 bg-zinc-50"
-                      : "border-zinc-200 hover:border-zinc-300"
+                      ? "border-on-surface bg-surface-canvas"
+                      : "border-outline-variant/20 hover:border-outline-variant/30"
                   }`}
                 >
                   <input
@@ -899,10 +899,10 @@ export default function CreateListingForm({
                     className="mt-0.5"
                   />
                   <div>
-                    <span className="text-sm font-medium text-zinc-900">
+                    <span className="text-sm font-medium text-on-surface">
                       Entire unit (one party)
                     </span>
-                    <p className="text-xs text-zinc-500 mt-1">
+                    <p className="text-xs text-on-surface-variant mt-1">
                       The entire unit is booked by a single party at a time.
                     </p>
                   </div>
@@ -913,13 +913,13 @@ export default function CreateListingForm({
           )}
         </section>
 
-        <div className="h-px bg-zinc-100 w-full"></div>
+        <div className="h-px bg-surface-container-high w-full"></div>
 
         {/* Section 2: Location */}
         <section className="space-y-6" aria-labelledby="section-location">
           <h3
             id="section-location"
-            className="text-lg font-semibold text-zinc-900 flex items-center gap-2"
+            className="text-lg font-semibold font-display text-on-surface flex items-center gap-2"
           >
             <MapPin className="w-4 h-4 flex-shrink-0" /> Location
           </h3>
@@ -1006,19 +1006,19 @@ export default function CreateListingForm({
           </div>
         </section>
 
-        <div className="h-px bg-zinc-100 w-full"></div>
+        <div className="h-px bg-surface-container-high w-full"></div>
 
         {/* Section 2.5: Photos */}
         <section className="space-y-6" aria-labelledby="section-photos">
           <h3
             id="section-photos"
-            className="text-lg font-semibold text-zinc-900 flex items-center gap-2"
+            className="text-lg font-semibold font-display text-on-surface flex items-center gap-2"
           >
             <Camera className="w-4 h-4 flex-shrink-0" /> Photos
           </h3>
           <div id="images">
             <Label>Upload Photos</Label>
-            <p className="text-xs text-zinc-400 mt-1 mb-4">
+            <p className="text-xs text-on-surface-variant mt-1 mb-4">
               At least one photo required to publish your listing
             </p>
             <ImageUploader
@@ -1034,13 +1034,13 @@ export default function CreateListingForm({
           </div>
         </section>
 
-        <div className="h-px bg-zinc-100 w-full"></div>
+        <div className="h-px bg-surface-container-high w-full"></div>
 
         {/* Section 3: Details */}
         <section className="space-y-6" aria-labelledby="section-details">
           <h3
             id="section-details"
-            className="text-lg font-semibold text-zinc-900 flex items-center gap-2"
+            className="text-lg font-semibold font-display text-on-surface flex items-center gap-2"
           >
             <List className="w-4 h-4 flex-shrink-0" /> Finer Details
           </h3>
@@ -1065,7 +1065,7 @@ export default function CreateListingForm({
               }
             />
             <FieldError field="amenities" fieldErrors={fieldErrors} />
-            <p className="text-xs text-zinc-400 mt-2">
+            <p className="text-xs text-on-surface-variant mt-2">
               Separate amenities with commas
             </p>
           </div>
@@ -1079,7 +1079,7 @@ export default function CreateListingForm({
               placeholder="Select move-in date"
               minDate={new Date().toISOString().split("T")[0]}
             />
-            <p className="text-xs text-zinc-400 mt-2">
+            <p className="text-xs text-on-surface-variant mt-2">
               When can tenants move in? (Optional)
             </p>
           </div>
@@ -1128,13 +1128,13 @@ export default function CreateListingForm({
 
           <div id="householdLanguages">
             <Label>Languages Spoken in the House</Label>
-            <p className="text-xs text-zinc-400 mt-1 mb-3">
+            <p className="text-xs text-on-surface-variant mt-1 mb-3">
               Select languages spoken by household members
             </p>
 
             {/* Selected languages shown at top */}
             {selectedLanguages.length > 0 && (
-              <div className="flex flex-wrap gap-2 mb-3 pb-3 border-b border-zinc-200">
+              <div className="flex flex-wrap gap-2 mb-3 pb-3 border-b border-outline-variant/20">
                 {selectedLanguages.map((code) => (
                   <button
                     key={code}
@@ -1143,7 +1143,7 @@ export default function CreateListingForm({
                     aria-label={`${getLanguageName(code)}, selected`}
                     onClick={() => toggleLanguage(code)}
                     disabled={loading}
-                    className="flex items-center gap-1 px-3 py-1.5 min-h-[44px] rounded-full text-sm font-medium bg-zinc-900 text-white disabled:cursor-not-allowed disabled:opacity-60"
+                    className="flex items-center gap-1 px-3 py-1.5 min-h-[44px] rounded-full text-sm font-medium bg-on-surface text-white disabled:cursor-not-allowed disabled:opacity-60"
                   >
                     {getLanguageName(code)}
                     <X className="w-3.5 h-3.5" />
@@ -1177,13 +1177,13 @@ export default function CreateListingForm({
                   aria-pressed="false"
                   onClick={() => toggleLanguage(code)}
                   disabled={loading}
-                  className="px-3 py-1.5 min-h-[44px] rounded-full text-sm font-medium transition-all duration-200 bg-zinc-100 text-zinc-600 hover:bg-zinc-200 disabled:cursor-not-allowed disabled:opacity-60"
+                  className="px-3 py-1.5 min-h-[44px] rounded-full text-sm font-medium transition-all duration-200 bg-surface-container-high text-on-surface-variant hover:bg-surface-container-high disabled:cursor-not-allowed disabled:opacity-60"
                 >
                   {getLanguageName(code)}
                 </button>
               ))}
               {unselectedLanguages.length === 0 && (
-                <p className="text-sm text-zinc-500">
+                <p className="text-sm text-on-surface-variant">
                   {languageSearch
                     ? "No languages found"
                     : "All languages selected"}
@@ -1200,7 +1200,7 @@ export default function CreateListingForm({
           <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
             <div>
               <Label htmlFor="genderPreference">Gender Preference</Label>
-              <p className="text-xs text-zinc-400 mt-1 mb-2">
+              <p className="text-xs text-on-surface-variant mt-1 mb-2">
                 Who can apply for this room?
               </p>
               <Select
@@ -1226,7 +1226,7 @@ export default function CreateListingForm({
             </div>
             <div>
               <Label htmlFor="householdGender">Household Gender</Label>
-              <p className="text-xs text-zinc-400 mt-1 mb-2">
+              <p className="text-xs text-on-surface-variant mt-1 mb-2">
                 Current household composition
               </p>
               <Select
@@ -1266,7 +1266,7 @@ export default function CreateListingForm({
               }
             />
             <FieldError field="houseRules" fieldErrors={fieldErrors} />
-            <p className="text-xs text-zinc-400 mt-2">
+            <p className="text-xs text-on-surface-variant mt-2">
               Separate rules with commas
             </p>
           </div>
@@ -1278,7 +1278,7 @@ export default function CreateListingForm({
             type="submit"
             disabled={loading || isAnyUploading}
             size="lg"
-            className="w-full rounded-xl shadow-xl shadow-zinc-900/10"
+            className="w-full rounded-xl shadow-xl shadow-on-surface/10"
           >
             {loading ? (
               <>
@@ -1297,7 +1297,7 @@ export default function CreateListingForm({
             )}
           </Button>
           {/* TODO: Create /community-guidelines page (terms page already exists) */}
-          <p className="text-center text-xs text-zinc-400 mt-4">
+          <p className="text-center text-xs text-on-surface-variant mt-4">
             By publishing, you agree to our{" "}
             <a href="/terms" className="underline hover:text-primary-700">
               Terms of Service
