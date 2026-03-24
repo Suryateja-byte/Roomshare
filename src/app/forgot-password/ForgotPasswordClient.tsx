@@ -54,16 +54,16 @@ export default function ForgotPasswordClient() {
 
   if (success) {
     return (
-      <div className="min-h-screen bg-zinc-50 flex items-center justify-center px-4">
+      <div className="min-h-screen bg-surface-canvas flex items-center justify-center px-4">
         <div className="w-full max-w-md">
-          <div className="bg-white rounded-2xl shadow-sm border border-zinc-100 p-8 text-center">
+          <div className="bg-surface-container-lowest rounded-lg shadow-ambient p-8 text-center">
             <div className="w-16 h-16 bg-green-100 rounded-full flex items-center justify-center mx-auto mb-6">
               <CheckCircle2 className="w-8 h-8 text-green-600" />
             </div>
-            <h1 className="text-2xl font-bold text-zinc-900 mb-2">
+            <h1 className="font-display text-2xl font-bold text-on-surface mb-2">
               Check your email
             </h1>
-            <p className="text-zinc-500 mb-6">
+            <p className="text-on-surface-variant mb-6">
               If an account exists for <strong>{email}</strong>, you will
               receive a password reset link shortly.
             </p>
@@ -90,22 +90,22 @@ export default function ForgotPasswordClient() {
   }
 
   return (
-    <div className="min-h-screen bg-zinc-50 flex items-center justify-center px-4">
+    <div className="min-h-screen bg-surface-canvas flex items-center justify-center px-4">
       <div className="w-full max-w-md">
-        <div className="bg-white rounded-2xl shadow-sm border border-zinc-100 p-8">
+        <div className="bg-surface-container-lowest rounded-lg shadow-ambient p-8">
           <Link
             href="/login"
-            className="inline-flex items-center gap-2 text-sm text-zinc-500 hover:text-zinc-900 transition-colors mb-6"
+            className="inline-flex items-center gap-2 text-sm text-on-surface-variant hover:text-on-surface transition-colors mb-6"
           >
             <ArrowLeft className="w-4 h-4" />
             Back to login
           </Link>
 
           <div className="mb-8">
-            <h1 className="text-2xl font-bold text-zinc-900 mb-2">
+            <h1 className="font-display text-2xl font-bold text-on-surface mb-2">
               Forgot password?
             </h1>
-            <p className="text-zinc-500">
+            <p className="text-on-surface-variant">
               No worries, we&apos;ll send you reset instructions.
             </p>
           </div>
@@ -114,7 +114,7 @@ export default function ForgotPasswordClient() {
             <div>
               <Label htmlFor="email">Email address</Label>
               <div className="relative mt-1">
-                <Mail className="absolute left-3 top-1/2 -translate-y-1/2 w-5 h-5 text-zinc-400" />
+                <Mail className="absolute left-3 top-1/2 -translate-y-1/2 w-5 h-5 text-on-surface-variant" />
                 <Input
                   id="email"
                   type="email"
@@ -129,7 +129,7 @@ export default function ForgotPasswordClient() {
             </div>
 
             {error && (
-              <div className="bg-red-50 border border-red-200 text-red-700 px-4 py-3 rounded-xl text-sm">
+              <div className="bg-red-50 border border-red-200 text-red-700 px-4 py-3 rounded-lg text-sm">
                 {error}
               </div>
             )}
@@ -181,11 +181,11 @@ export default function ForgotPasswordClient() {
             </Button>
           </form>
 
-          <p className="text-center text-sm text-zinc-500 mt-6">
+          <p className="text-center text-sm text-on-surface-variant mt-6">
             Remember your password?{" "}
             <Link
               href="/login"
-              className="text-zinc-900 font-medium hover:underline"
+              className="text-primary font-medium hover:underline underline-offset-4"
             >
               Log in
             </Link>

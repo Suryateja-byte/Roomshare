@@ -97,37 +97,37 @@ function SignUpForm() {
   };
 
   return (
-    <div className="min-h-screen flex bg-white font-sans selection:bg-zinc-900 selection:text-white">
+    <div className="min-h-screen flex bg-surface-canvas font-sans selection:bg-on-surface selection:text-surface-container-lowest">
       {/* Left Visual (Dark Theme) */}
-      <div className="hidden lg:flex w-1/2 bg-zinc-900 relative flex-col justify-between p-8 xl:p-12 text-white">
-        <div className="absolute inset-0 bg-[radial-gradient(circle_at_top_right,_var(--tw-gradient-stops))] from-zinc-800 to-black opacity-50"></div>
+      <div className="hidden lg:flex w-1/2 bg-gradient-to-br from-primary to-primary-container relative flex-col justify-between p-8 xl:p-12 text-white">
+        <div className="absolute inset-0 bg-[radial-gradient(circle_at_top_right,_var(--tw-gradient-stops))] from-primary/80 to-primary-container opacity-50"></div>
 
         {/* Logo */}
         <div className="relative z-10">
-          <span className="text-xl font-semibold tracking-tighter">
-            RoomShare<span className="text-indigo-500">.</span>
+          <span className="text-xl font-display font-semibold tracking-tighter">
+            RoomShare<span className="text-white/70">.</span>
           </span>
         </div>
 
         {/* Testimonial / Value Prop */}
         <div className="relative z-10 max-w-md">
-          <h2 className="text-2xl xl:text-3xl font-medium leading-tight">
+          <h2 className="font-display text-2xl xl:text-3xl font-medium leading-tight">
             &ldquo;Moved in two weeks after signing up. My roommate and I
             actually get along&nbsp;&mdash; that never happened on Craigslist.&rdquo;
           </h2>
           <div className="mt-8 flex items-center gap-4">
-            <div className="w-10 h-10 rounded-full bg-zinc-800 flex items-center justify-center border border-zinc-700">
+            <div className="w-10 h-10 rounded-full bg-white/10 flex items-center justify-center border border-white/20">
               <span className="font-medium text-sm">NK</span>
             </div>
             <div>
               <p className="font-medium text-white">Nina K.</p>
-              <p className="text-sm text-zinc-400">New York City</p>
+              <p className="text-sm text-white/60">New York City</p>
             </div>
           </div>
         </div>
 
         {/* Copyright */}
-        <p className="relative z-10 text-sm text-zinc-400">
+        <p className="relative z-10 text-sm text-white/60">
           © {new Date().getFullYear()} RoomShare Inc.
         </p>
       </div>
@@ -137,10 +137,10 @@ function SignUpForm() {
         <div className="w-full max-w-sm space-y-6 sm:space-y-8">
           {/* Header */}
           <div className="text-center lg:text-left">
-            <h1 className="text-2xl sm:text-3xl font-semibold text-zinc-900 tracking-tight">
+            <h1 className="font-display text-2xl sm:text-3xl font-semibold text-on-surface tracking-tight">
               Join RoomShare
             </h1>
-            <p className="text-zinc-500 mt-2 text-sm sm:text-base">
+            <p className="text-on-surface-variant mt-2 text-sm sm:text-base">
               Verified roommates, real listings, zero guesswork.
             </p>
           </div>
@@ -165,7 +165,7 @@ function SignUpForm() {
               }
             }}
             disabled={googleLoading}
-            className="w-full flex items-center justify-center gap-3 h-11 sm:h-12 rounded-lg border border-zinc-200 bg-white hover:bg-zinc-50 transition-colors font-medium text-zinc-700 shadow-sm disabled:opacity-60 disabled:cursor-not-allowed"
+            className="w-full flex items-center justify-center gap-3 h-11 sm:h-12 rounded-full border border-outline-variant/20 bg-surface-container-lowest hover:bg-surface-container-high transition-colors font-medium text-on-surface-variant shadow-ambient-sm disabled:opacity-60 disabled:cursor-not-allowed"
           >
             {googleLoading ? (
               <Loader2 className="w-5 h-5 animate-spin" />
@@ -195,10 +195,10 @@ function SignUpForm() {
           {/* Divider */}
           <div className="relative">
             <div className="absolute inset-0 flex items-center">
-              <div className="w-full border-t border-zinc-200"></div>
+              <div className="w-full border-t border-outline-variant/20"></div>
             </div>
             <div className="relative flex justify-center text-xs uppercase tracking-wider font-medium">
-              <span className="bg-white px-4 text-zinc-600">
+              <span className="bg-surface-canvas px-4 text-on-surface-variant">
                 or continue with email
               </span>
             </div>
@@ -210,13 +210,13 @@ function SignUpForm() {
             <div className="space-y-1">
               <label
                 htmlFor="name"
-                className="block text-xs font-semibold text-zinc-500 uppercase tracking-wide ml-0.5"
+                className="block text-xs font-semibold text-on-surface-variant uppercase tracking-wide ml-0.5"
               >
                 Full Name
               </label>
               <div className="relative">
                 <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
-                  <User className="h-5 w-5 text-zinc-400" strokeWidth={1.5} />
+                  <User className="h-5 w-5 text-on-surface-variant" strokeWidth={1.5} />
                 </div>
                 <input
                   id="name"
@@ -224,7 +224,7 @@ function SignUpForm() {
                   name="name"
                   required
                   autoComplete="name"
-                  className="block w-full pl-10 pr-3 py-2.5 bg-white border border-zinc-200 rounded-lg text-zinc-900 placeholder-zinc-400 focus:outline-none focus-visible:ring-2 focus-visible:ring-zinc-900/30 focus-visible:border-zinc-900 text-sm font-medium transition-shadow duration-200 ease-in-out shadow-sm"
+                  className="block w-full pl-10 pr-3 py-2.5 bg-surface-container-lowest border border-outline-variant/20 rounded-lg text-on-surface placeholder-on-surface-variant focus:outline-none focus-visible:ring-2 focus-visible:ring-primary/30 focus-visible:border-primary text-sm font-medium transition-shadow duration-200 ease-in-out shadow-ambient-sm"
                   placeholder="John Doe"
                 />
               </div>
@@ -234,13 +234,13 @@ function SignUpForm() {
             <div className="space-y-1">
               <label
                 htmlFor="email"
-                className="block text-xs font-semibold text-zinc-500 uppercase tracking-wide ml-0.5"
+                className="block text-xs font-semibold text-on-surface-variant uppercase tracking-wide ml-0.5"
               >
                 Email
               </label>
               <div className="relative">
                 <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
-                  <Mail className="h-5 w-5 text-zinc-400" strokeWidth={1.5} />
+                  <Mail className="h-5 w-5 text-on-surface-variant" strokeWidth={1.5} />
                 </div>
                 <input
                   id="email"
@@ -248,7 +248,7 @@ function SignUpForm() {
                   name="email"
                   required
                   autoComplete="email"
-                  className="block w-full pl-10 pr-3 py-2.5 bg-white border border-zinc-200 rounded-lg text-zinc-900 placeholder-zinc-400 focus:outline-none focus-visible:ring-2 focus-visible:ring-zinc-900/30 focus-visible:border-zinc-900 text-sm font-medium transition-shadow duration-200 ease-in-out shadow-sm"
+                  className="block w-full pl-10 pr-3 py-2.5 bg-surface-container-lowest border border-outline-variant/20 rounded-lg text-on-surface placeholder-on-surface-variant focus:outline-none focus-visible:ring-2 focus-visible:ring-primary/30 focus-visible:border-primary text-sm font-medium transition-shadow duration-200 ease-in-out shadow-ambient-sm"
                   placeholder="you@example.com"
                 />
               </div>
@@ -258,13 +258,13 @@ function SignUpForm() {
             <div className="space-y-1">
               <label
                 htmlFor="password"
-                className="block text-xs font-semibold text-zinc-500 uppercase tracking-wide ml-0.5"
+                className="block text-xs font-semibold text-on-surface-variant uppercase tracking-wide ml-0.5"
               >
                 Password
               </label>
               <div className="relative">
                 <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
-                  <Lock className="h-5 w-5 text-zinc-400" strokeWidth={1.5} />
+                  <Lock className="h-5 w-5 text-on-surface-variant" strokeWidth={1.5} />
                 </div>
                 <input
                   id="password"
@@ -274,13 +274,13 @@ function SignUpForm() {
                   autoComplete="new-password"
                   value={password}
                   onChange={(e) => setPassword(e.target.value)}
-                  className="block w-full pl-10 pr-10 py-2.5 bg-white border border-zinc-200 rounded-lg text-zinc-900 placeholder-zinc-400 focus:outline-none focus-visible:ring-2 focus-visible:ring-zinc-900/30 focus-visible:border-zinc-900 text-sm font-medium transition-shadow duration-200 ease-in-out shadow-sm"
+                  className="block w-full pl-10 pr-10 py-2.5 bg-surface-container-lowest border border-outline-variant/20 rounded-lg text-on-surface placeholder-on-surface-variant focus:outline-none focus-visible:ring-2 focus-visible:ring-primary/30 focus-visible:border-primary text-sm font-medium transition-shadow duration-200 ease-in-out shadow-ambient-sm"
                   placeholder="••••••••"
                 />
                 <button
                   type="button"
                   onClick={() => setShowPassword(!showPassword)}
-                  className="absolute inset-y-0 right-0 pr-3 flex items-center text-zinc-400 hover:text-zinc-600 transition-colors"
+                  className="absolute inset-y-0 right-0 pr-3 flex items-center text-on-surface-variant hover:text-on-surface transition-colors"
                   tabIndex={-1}
                   aria-label={showPassword ? "Hide password" : "Show password"}
                 >
@@ -298,13 +298,13 @@ function SignUpForm() {
             <div className="space-y-1">
               <label
                 htmlFor="confirmPassword"
-                className="block text-xs font-semibold text-zinc-500 uppercase tracking-wide ml-0.5"
+                className="block text-xs font-semibold text-on-surface-variant uppercase tracking-wide ml-0.5"
               >
                 Confirm Password
               </label>
               <div className="relative">
                 <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
-                  <Lock className="h-5 w-5 text-zinc-400" strokeWidth={1.5} />
+                  <Lock className="h-5 w-5 text-on-surface-variant" strokeWidth={1.5} />
                 </div>
                 <input
                   id="confirmPassword"
@@ -314,19 +314,19 @@ function SignUpForm() {
                   autoComplete="new-password"
                   value={confirmPassword}
                   onChange={(e) => setConfirmPassword(e.target.value)}
-                  className={`block w-full pl-10 pr-10 py-2.5 bg-white border rounded-lg text-zinc-900 placeholder-zinc-400 focus:outline-none focus-visible:ring-2 focus-visible:ring-zinc-900/30 focus-visible:border-zinc-900 text-sm font-medium transition-shadow duration-200 ease-in-out shadow-sm ${
+                  className={`block w-full pl-10 pr-10 py-2.5 bg-surface-container-lowest border rounded-lg text-on-surface placeholder-on-surface-variant focus:outline-none focus-visible:ring-2 focus-visible:ring-primary/30 focus-visible:border-primary text-sm font-medium transition-shadow duration-200 ease-in-out shadow-ambient-sm ${
                     confirmPassword && password !== confirmPassword
                       ? "border-red-400"
                       : confirmPassword && password === confirmPassword
                         ? "border-green-400"
-                        : "border-zinc-200"
+                        : "border-outline-variant/20"
                   }`}
                   placeholder="••••••••"
                 />
                 <button
                   type="button"
                   onClick={() => setShowConfirmPassword(!showConfirmPassword)}
-                  className="absolute inset-y-0 right-0 pr-3 flex items-center text-zinc-400 hover:text-zinc-600 transition-colors"
+                  className="absolute inset-y-0 right-0 pr-3 flex items-center text-on-surface-variant hover:text-on-surface transition-colors"
                   tabIndex={-1}
                   aria-label={
                     showConfirmPassword ? "Hide password" : "Show password"
@@ -358,23 +358,23 @@ function SignUpForm() {
                 type="checkbox"
                 checked={acceptedTerms}
                 onChange={(e) => setAcceptedTerms(e.target.checked)}
-                className="mt-1 h-4 w-4 rounded border-zinc-300 bg-white text-zinc-900 focus:ring-2 focus:ring-zinc-900 cursor-pointer"
+                className="mt-1 h-4 w-4 rounded border-outline-variant/20 bg-surface-container-lowest text-primary focus:ring-2 focus:ring-primary cursor-pointer"
               />
               <label
                 htmlFor="terms"
-                className="text-sm text-zinc-600 cursor-pointer"
+                className="text-sm text-on-surface-variant cursor-pointer"
               >
                 I agree to the{" "}
                 <Link
                   href="/terms"
-                  className="font-medium text-zinc-900 hover:underline"
+                  className="font-medium text-primary hover:underline underline-offset-4"
                 >
                   Terms of Service
                 </Link>{" "}
                 and{" "}
                 <Link
                   href="/privacy"
-                  className="font-medium text-zinc-900 hover:underline"
+                  className="font-medium text-primary hover:underline underline-offset-4"
                 >
                   Privacy Policy
                 </Link>
@@ -416,7 +416,7 @@ function SignUpForm() {
                 (!!process.env.NEXT_PUBLIC_TURNSTILE_SITE_KEY &&
                   !turnstileToken)
               }
-              className="w-full h-11 sm:h-12 rounded-lg shadow-sm hover:shadow-md transition-all"
+              className="w-full h-11 sm:h-12 rounded-lg shadow-ambient-sm hover:shadow-ambient transition-all"
             >
               {loading ? (
                 <Loader2 className="w-5 h-5 animate-spin" />
@@ -428,11 +428,11 @@ function SignUpForm() {
             </Button>
           </form>
 
-          <p className="text-center text-sm text-zinc-500">
+          <p className="text-center text-sm text-on-surface-variant">
             Already have an account?{" "}
             <Link
               href="/login"
-              className="font-semibold text-zinc-900 hover:underline"
+              className="font-semibold text-primary hover:underline underline-offset-4"
             >
               Sign in
             </Link>
@@ -447,8 +447,8 @@ export default function SignUpClient() {
   return (
     <Suspense
       fallback={
-        <div className="min-h-screen flex items-center justify-center bg-white">
-          <Loader2 className="w-8 h-8 animate-spin text-zinc-900" />
+        <div className="min-h-screen flex items-center justify-center bg-surface-canvas">
+          <Loader2 className="w-8 h-8 animate-spin text-on-surface" />
         </div>
       }
     >

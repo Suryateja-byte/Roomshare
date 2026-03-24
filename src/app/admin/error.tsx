@@ -22,10 +22,10 @@ export default function AdminError({
       <div className="w-20 h-20 bg-red-100 rounded-full flex items-center justify-center mb-6">
         <ShieldAlert className="w-10 h-10 text-red-600" />
       </div>
-      <h2 className="text-2xl font-bold text-zinc-900 mb-2">
+      <h2 className="text-2xl font-display font-bold text-on-surface mb-2">
         Admin panel error
       </h2>
-      <p className="text-zinc-600 mb-6 max-w-md">
+      <p className="text-on-surface-variant mb-6 max-w-md">
         We encountered an error while loading the admin panel. Please try again.
       </p>
       <div className="flex gap-3">

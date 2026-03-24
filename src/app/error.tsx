@@ -22,10 +22,7 @@ export default function Error({
     }
   }, [error]);
 
-  // Provide user-friendly message, avoid exposing technical details
   const getUserFriendlyMessage = () => {
-    // Don't show raw error messages to users - they're often technical
-    // Instead, provide helpful guidance
     return "We're having trouble loading this page. This is usually temporary — please try again in a moment.";
   };
 
@@ -34,10 +31,10 @@ export default function Error({
       <div className="w-20 h-20 bg-red-100 rounded-full flex items-center justify-center mb-6">
         <AlertTriangle className="w-10 h-10 text-red-600" />
       </div>
-      <h2 className="text-2xl font-bold text-zinc-900 mb-2">
+      <h2 className="font-display text-2xl font-bold text-on-surface mb-2">
         Unable to load this page
       </h2>
-      <p className="text-zinc-600 mb-6 max-w-md">
+      <p className="text-on-surface-variant mb-6 max-w-md">
         {getUserFriendlyMessage()}
       </p>
       <div className="flex flex-col sm:flex-row gap-3">
@@ -52,7 +49,7 @@ export default function Error({
           </Link>
         </Button>
       </div>
-      <p className="text-sm text-zinc-500 mt-6 max-w-sm">
+      <p className="text-sm text-on-surface-variant mt-6 max-w-sm">
         If this keeps happening, try refreshing your browser or checking your
         internet connection.
       </p>

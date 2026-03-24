@@ -28,10 +28,10 @@ export default function RecentlyViewedError({
       <div className="w-20 h-20 bg-red-100 rounded-full flex items-center justify-center mb-6">
         <AlertTriangle className="w-10 h-10 text-red-600" />
       </div>
-      <h2 className="text-2xl font-bold text-zinc-900 mb-2">
+      <h2 className="font-display text-2xl font-bold text-on-surface mb-2">
         Unable to load recently viewed
       </h2>
-      <p className="text-zinc-600 mb-6 max-w-md">
+      <p className="text-on-surface-variant mb-6 max-w-md">
         We had trouble loading your recently viewed listings. This is usually
         temporary — please try again.
       </p>

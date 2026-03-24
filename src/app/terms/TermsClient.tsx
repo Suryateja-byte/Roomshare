@@ -39,24 +39,24 @@ export default function TermsClient() {
   };
 
   return (
-    <div className="min-h-screen bg-white font-sans text-zinc-900 selection:bg-zinc-900 selection:text-white">
+    <div className="min-h-screen bg-surface-container-lowest font-sans text-on-surface selection:bg-on-surface selection:text-surface-container-lowest">
       {/* Hero */}
-      <div className="pt-32 pb-16 px-6 bg-zinc-50/50 border-b border-zinc-100">
+      <div className="pt-32 pb-16 px-6 bg-surface-canvas">
         <div className="container mx-auto max-w-4xl text-center">
-          <div className="inline-flex items-center justify-center p-3 bg-white rounded-2xl shadow-sm border border-zinc-100 mb-6">
+          <div className="inline-flex items-center justify-center p-3 bg-surface-container-lowest rounded-2xl shadow-ambient-sm mb-6">
             <Scale
-              className="w-8 h-8 text-zinc-900"
+              className="w-8 h-8 text-on-surface"
               strokeWidth={1.5}
             />
           </div>
-          <h1 className="text-4xl md:text-5xl font-bold tracking-tight mb-6">
+          <h1 className="font-display text-4xl md:text-5xl font-bold tracking-tight mb-6">
             Terms of Service
           </h1>
-          <p className="text-lg text-zinc-500 max-w-2xl mx-auto leading-relaxed">
+          <p className="text-lg text-on-surface-variant max-w-2xl mx-auto leading-relaxed">
             Please read these terms carefully. By using RoomShare, you agree to
             be bound by these conditions.
           </p>
-          <p className="text-xs font-medium text-zinc-400 mt-8 uppercase tracking-widest">
+          <p className="text-xs font-medium text-on-surface-variant mt-8 uppercase tracking-widest">
             Effective Date: December 14, 2025
           </p>
         </div>
@@ -66,18 +66,18 @@ export default function TermsClient() {
         {/* Sidebar Navigation */}
         <aside className="lg:w-64 flex-shrink-0 hidden lg:block">
           <div className="sticky top-32">
-            <h2 className="font-bold text-sm text-zinc-900 mb-4 uppercase tracking-wider pl-4">
+            <h2 className="font-bold text-sm text-on-surface mb-4 uppercase tracking-wider pl-4">
               Contents
             </h2>
-            <nav className="space-y-1 border-l border-zinc-100">
+            <nav className="space-y-1 border-l border-outline-variant/20">
               {SECTIONS.map((section) => (
                 <button
                   key={section.id}
                   onClick={() => scrollTo(section.id)}
                   className={`block w-full text-left px-4 py-2 text-sm transition-all border-l-2 -ml-[2px] ${
                     activeSection === section.id
-                      ? "border-zinc-900 text-zinc-900 font-medium"
-                      : "border-transparent text-zinc-500 hover:text-zinc-900 hover:border-zinc-300"
+                      ? "border-primary text-primary font-medium"
+                      : "border-transparent text-on-surface-variant hover:text-on-surface hover:border-outline-variant/40"
                   }`}
                 >
                   {section.label}
@@ -89,10 +89,10 @@ export default function TermsClient() {
 
         {/* Main Content */}
         <div className="flex-1 max-w-3xl prose prose-zinc prose-lg">
-          <div className="bg-zinc-50 p-6 rounded-2xl border border-zinc-100 mb-12 flex items-start gap-4 not-prose">
-            <AlertCircle className="w-6 h-6 text-zinc-900 shrink-0 mt-1" />
-            <p className="text-sm text-zinc-600 leading-relaxed m-0">
-              <strong className="text-zinc-900">Note:</strong>{" "}
+          <div className="bg-surface-canvas p-6 rounded-lg mb-12 flex items-start gap-4 not-prose">
+            <AlertCircle className="w-6 h-6 text-on-surface shrink-0 mt-1" />
+            <p className="text-sm text-on-surface-variant leading-relaxed m-0">
+              <strong className="text-on-surface">Note:</strong>{" "}
               These Terms include a class action waiver and a waiver of jury
               trials, and require binding arbitration on an individual basis to
               resolve disputes.
@@ -100,10 +100,10 @@ export default function TermsClient() {
           </div>
 
           <section id="acceptance" className="mb-16 scroll-mt-32">
-            <h2 className="text-2xl font-bold text-zinc-900 mb-4 flex items-center gap-3">
+            <h2 className="font-display text-2xl font-bold text-on-surface mb-4 flex items-center gap-3">
               1. Acceptance of Terms
             </h2>
-            <p className="text-zinc-600 leading-relaxed">
+            <p className="text-on-surface-variant leading-relaxed">
               By accessing or using the RoomShare website, mobile application,
               or any other services provided by RoomShare Inc. (collectively,
               the &quot;Service&quot;), you agree to be bound by these Terms of
@@ -113,10 +113,10 @@ export default function TermsClient() {
           </section>
 
           <section id="account" className="mb-16 scroll-mt-32">
-            <h2 className="text-2xl font-bold text-zinc-900 mb-6">
+            <h2 className="font-display text-2xl font-bold text-on-surface mb-6">
               2. User Accounts
             </h2>
-            <p className="text-zinc-600 mb-4 leading-relaxed">
+            <p className="text-on-surface-variant mb-4 leading-relaxed">
               To access certain features of the Service, you may be required to
               register for an account. You agree to provide accurate, current,
               and complete information during the registration process and to
@@ -124,20 +124,20 @@ export default function TermsClient() {
               complete.
             </p>
             <div className="grid grid-cols-1 md:grid-cols-2 gap-4 not-prose mt-6">
-              <div className="p-5 border border-zinc-100 rounded-xl bg-white hover:border-zinc-300 transition-colors">
-                <h3 className="font-bold text-zinc-900 mb-2">
+              <div className="p-5 border border-outline-variant/20 rounded-lg bg-surface-container-lowest hover:border-outline-variant/40 transition-colors">
+                <h3 className="font-bold text-on-surface mb-2">
                   Account Security
                 </h3>
-                <p className="text-sm text-zinc-500">
+                <p className="text-sm text-on-surface-variant">
                   You are responsible for safeguarding your password and for all
                   activities that occur under your account.
                 </p>
               </div>
-              <div className="p-5 border border-zinc-100 rounded-xl bg-white hover:border-zinc-300 transition-colors">
-                <h3 className="font-bold text-zinc-900 mb-2">
+              <div className="p-5 border border-outline-variant/20 rounded-lg bg-surface-container-lowest hover:border-outline-variant/40 transition-colors">
+                <h3 className="font-bold text-on-surface mb-2">
                   Verification
                 </h3>
-                <p className="text-sm text-zinc-500">
+                <p className="text-sm text-on-surface-variant">
                   We reserve the right to verify your identity through various
                   means, including government ID.
                 </p>
@@ -146,13 +146,13 @@ export default function TermsClient() {
           </section>
 
           <section id="conduct" className="mb-16 scroll-mt-32">
-            <h2 className="text-2xl font-bold text-zinc-900 mb-4">
+            <h2 className="font-display text-2xl font-bold text-on-surface mb-4">
               3. User Conduct
             </h2>
-            <p className="text-zinc-600 mb-4 leading-relaxed">
+            <p className="text-on-surface-variant mb-4 leading-relaxed">
               You agree not to use the Service to:
             </p>
-            <ul className="list-disc pl-5 space-y-2 text-zinc-600 marker:text-zinc-300">
+            <ul className="list-disc pl-5 space-y-2 text-on-surface-variant marker:text-on-surface-variant/30">
               <li>
                 Violate any local, state, national, or international law or
                 regulation.
@@ -172,10 +172,10 @@ export default function TermsClient() {
           </section>
 
           <section id="content" className="mb-16 scroll-mt-32">
-            <h2 className="text-2xl font-bold text-zinc-900 mb-4">
+            <h2 className="font-display text-2xl font-bold text-on-surface mb-4">
               4. User Content
             </h2>
-            <p className="text-zinc-600 leading-relaxed">
+            <p className="text-on-surface-variant leading-relaxed">
               You retain all rights in, and are solely responsible for, the User
               Content you post to RoomShare. By posting User Content, you grant
               RoomShare a non-exclusive, worldwide, royalty-free, irrevocable,
@@ -186,23 +186,23 @@ export default function TermsClient() {
           </section>
 
           <section id="third-party" className="mb-16 scroll-mt-32">
-            <h2 className="text-2xl font-bold text-zinc-900 mb-6 flex items-center gap-3">
-              <MapPin className="w-6 h-6 text-zinc-400" /> 5.
+            <h2 className="font-display text-2xl font-bold text-on-surface mb-6 flex items-center gap-3">
+              <MapPin className="w-6 h-6 text-on-surface-variant" /> 5.
               Third-Party Services
             </h2>
-            <div className="bg-zinc-50 rounded-2xl p-8 border border-zinc-100">
-              <h3 className="font-semibold text-zinc-900 text-base mb-3">
+            <div className="bg-surface-canvas rounded-lg p-8">
+              <h3 className="font-semibold text-on-surface text-base mb-3">
                 Google Maps Platform
               </h3>
-              <p className="text-zinc-600 leading-relaxed mb-4">
+              <p className="text-on-surface-variant leading-relaxed mb-4">
                 RoomShare integrates with Google Maps Platform to provide
                 neighborhood exploration features. By using these features, you
                 agree to be bound by Google&apos;s Terms of Service.
               </p>
-              <p className="text-zinc-600 leading-relaxed mb-4">
+              <p className="text-on-surface-variant leading-relaxed mb-4">
                 When you use the neighborhood exploration feature:
               </p>
-              <ul className="list-disc pl-5 space-y-2 text-zinc-600 marker:text-zinc-300 mb-4">
+              <ul className="list-disc pl-5 space-y-2 text-on-surface-variant marker:text-on-surface-variant/30 mb-4">
                 <li>
                   Location data is sent to Google to retrieve nearby place
                   information.
@@ -216,13 +216,13 @@ export default function TermsClient() {
                   required by their terms.
                 </li>
               </ul>
-              <p className="text-zinc-600 leading-relaxed">
+              <p className="text-on-surface-variant leading-relaxed">
                 You must also comply with Google&apos;s{" "}
                 <a
                   href="https://policies.google.com/terms"
                   target="_blank"
                   rel="noopener noreferrer"
-                  className="text-zinc-900 underline underline-offset-2 hover:no-underline"
+                  className="text-primary underline underline-offset-2 hover:no-underline"
                 >
                   Terms of Service
                 </a>{" "}
@@ -232,11 +232,11 @@ export default function TermsClient() {
           </section>
 
           <section id="termination" className="mb-16 scroll-mt-32">
-            <h2 className="text-2xl font-bold text-zinc-900 mb-4 flex items-center gap-2">
-              <Gavel className="w-6 h-6 text-zinc-400" /> 6.
+            <h2 className="font-display text-2xl font-bold text-on-surface mb-4 flex items-center gap-2">
+              <Gavel className="w-6 h-6 text-on-surface-variant" /> 6.
               Termination
             </h2>
-            <p className="text-zinc-600 leading-relaxed">
+            <p className="text-on-surface-variant leading-relaxed">
               We may terminate or suspend your account and bar access to the
               Service immediately, without prior notice or liability, under our
               sole discretion, for any reason whatsoever and without limitation,
@@ -245,10 +245,10 @@ export default function TermsClient() {
           </section>
 
           <section id="liability" className="mb-16 scroll-mt-32">
-            <h2 className="text-2xl font-bold text-zinc-900 mb-4">
+            <h2 className="font-display text-2xl font-bold text-on-surface mb-4">
               7. Limitation of Liability
             </h2>
-            <p className="text-zinc-600 leading-relaxed">
+            <p className="text-on-surface-variant leading-relaxed">
               In no event shall RoomShare, nor its directors, employees,
               partners, agents, suppliers, or affiliates, be liable for any
               indirect, incidental, special, consequential or punitive damages,
@@ -258,13 +258,13 @@ export default function TermsClient() {
           </section>
 
           <section id="changes" className="scroll-mt-32">
-            <h2 className="text-2xl font-bold text-zinc-900 mb-6">
+            <h2 className="font-display text-2xl font-bold text-on-surface mb-6">
               8. Changes to Terms
             </h2>
-            <div className="bg-zinc-50 rounded-2xl p-8 border border-zinc-100 flex gap-4">
-              <FileCheck className="w-8 h-8 text-zinc-900 shrink-0" />
+            <div className="bg-surface-canvas rounded-lg p-8 flex gap-4">
+              <FileCheck className="w-8 h-8 text-on-surface shrink-0" />
               <div>
-                <p className="text-zinc-600 text-sm leading-relaxed m-0">
+                <p className="text-on-surface-variant text-sm leading-relaxed m-0">
                   We reserve the right to modify or replace these Terms at any
                   time. If a revision is material, we will provide at least 30
                   days&apos; notice prior to any new terms taking effect. What
@@ -278,7 +278,7 @@ export default function TermsClient() {
       </div>
 
       {/* Footer Simple */}
-      <footer className="py-8 text-center text-xs text-zinc-400 border-t border-zinc-100 bg-zinc-50">
+      <footer className="py-8 text-center text-xs text-on-surface-variant bg-surface-canvas">
         © {new Date().getFullYear()} RoomShare Inc. All rights reserved.
       </footer>
     </div>

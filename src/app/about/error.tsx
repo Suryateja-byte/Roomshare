@@ -18,10 +18,10 @@ export default function AboutError({
 
   return (
     <div className="min-h-[40vh] flex flex-col items-center justify-center px-4 py-16 text-center">
-      <h2 className="text-xl font-bold text-zinc-900 mb-2">
+      <h2 className="text-xl font-bold text-on-surface mb-2">
         Unable to load this page
       </h2>
-      <p className="text-zinc-600 mb-6">
+      <p className="text-on-surface-variant mb-6">
         Something went wrong. Please try again.
       </p>
       <Button onClick={() => reset()} className="gap-2">

@@ -99,10 +99,10 @@ function ResetPasswordForm() {
   // Loading state while validating token
   if (isValidating) {
     return (
-      <div className="min-h-screen bg-zinc-50 flex items-center justify-center px-4">
+      <div className="min-h-screen bg-surface-canvas flex items-center justify-center px-4">
         <div className="text-center">
-          <Loader2 className="w-8 h-8 text-zinc-400 animate-spin mx-auto mb-4" />
-          <p className="text-zinc-500">Validating reset link...</p>
+          <Loader2 className="w-8 h-8 text-on-surface-variant animate-spin mx-auto mb-4" />
+          <p className="text-on-surface-variant">Validating reset link...</p>
         </div>
       </div>
     );
@@ -111,16 +111,16 @@ function ResetPasswordForm() {
   // No token or invalid token
   if (!token || !isValidToken) {
     return (
-      <div className="min-h-screen bg-zinc-50 flex items-center justify-center px-4">
+      <div className="min-h-screen bg-surface-canvas flex items-center justify-center px-4">
         <div className="w-full max-w-md">
-          <div className="bg-white rounded-2xl shadow-sm border border-zinc-100 p-8 text-center">
+          <div className="bg-surface-container-lowest rounded-lg shadow-ambient p-8 text-center">
             <div className="w-16 h-16 bg-red-100 rounded-full flex items-center justify-center mx-auto mb-6">
               <AlertCircle className="w-8 h-8 text-red-600" />
             </div>
-            <h1 className="text-2xl font-bold text-zinc-900 mb-2">
+            <h1 className="font-display text-2xl font-bold text-on-surface mb-2">
               Invalid Reset Link
             </h1>
-            <p className="text-zinc-500 mb-6">
+            <p className="text-on-surface-variant mb-6">
               {error || "This password reset link is invalid or has expired."}
             </p>
             <div className="space-y-3">
@@ -142,16 +142,16 @@ function ResetPasswordForm() {
   // Success state
   if (success) {
     return (
-      <div className="min-h-screen bg-zinc-50 flex items-center justify-center px-4">
+      <div className="min-h-screen bg-surface-canvas flex items-center justify-center px-4">
         <div className="w-full max-w-md">
-          <div className="bg-white rounded-2xl shadow-sm border border-zinc-100 p-8 text-center">
+          <div className="bg-surface-container-lowest rounded-lg shadow-ambient p-8 text-center">
             <div className="w-16 h-16 bg-green-100 rounded-full flex items-center justify-center mx-auto mb-6">
               <CheckCircle2 className="w-8 h-8 text-green-600" />
             </div>
-            <h1 className="text-2xl font-bold text-zinc-900 mb-2">
+            <h1 className="font-display text-2xl font-bold text-on-surface mb-2">
               Password Reset!
             </h1>
-            <p className="text-zinc-500 mb-6">
+            <p className="text-on-surface-variant mb-6">
               Your password has been successfully reset. You can now log in with
               your new password.
             </p>
@@ -166,22 +166,22 @@ function ResetPasswordForm() {
 
   // Reset password form
   return (
-    <div className="min-h-screen bg-zinc-50 flex items-center justify-center px-4">
+    <div className="min-h-screen bg-surface-canvas flex items-center justify-center px-4">
       <div className="w-full max-w-md">
-        <div className="bg-white rounded-2xl shadow-sm border border-zinc-100 p-8">
+        <div className="bg-surface-container-lowest rounded-lg shadow-ambient p-8">
           <Link
             href="/login"
-            className="inline-flex items-center gap-2 text-sm text-zinc-500 hover:text-zinc-900 transition-colors mb-6"
+            className="inline-flex items-center gap-2 text-sm text-on-surface-variant hover:text-on-surface transition-colors mb-6"
           >
             <ArrowLeft className="w-4 h-4" />
             Back to login
           </Link>
 
           <div className="mb-8">
-            <h1 className="text-2xl font-bold text-zinc-900 mb-2">
+            <h1 className="font-display text-2xl font-bold text-on-surface mb-2">
               Set new password
             </h1>
-            <p className="text-zinc-500">
+            <p className="text-on-surface-variant">
               Your new password must be at least 12 characters long.
             </p>
           </div>
@@ -190,7 +190,7 @@ function ResetPasswordForm() {
             <div>
               <Label htmlFor="password">New Password</Label>
               <div className="relative mt-1">
-                <Lock className="absolute left-3 top-1/2 -translate-y-1/2 w-5 h-5 text-zinc-400" />
+                <Lock className="absolute left-3 top-1/2 -translate-y-1/2 w-5 h-5 text-on-surface-variant" />
                 <Input
                   id="password"
                   type={showPassword ? "text" : "password"}
@@ -205,7 +205,7 @@ function ResetPasswordForm() {
                 <button
                   type="button"
                   onClick={() => setShowPassword(!showPassword)}
-                  className="absolute right-3 top-1/2 -translate-y-1/2 text-zinc-400 hover:text-zinc-600"
+                  className="absolute right-3 top-1/2 -translate-y-1/2 text-on-surface-variant hover:text-on-surface"
                 >
                   {showPassword ? (
                     <EyeOff className="w-5 h-5" />
@@ -219,7 +219,7 @@ function ResetPasswordForm() {
             <div>
               <Label htmlFor="confirmPassword">Confirm Password</Label>
               <div className="relative mt-1">
-                <Lock className="absolute left-3 top-1/2 -translate-y-1/2 w-5 h-5 text-zinc-400" />
+                <Lock className="absolute left-3 top-1/2 -translate-y-1/2 w-5 h-5 text-on-surface-variant" />
                 <Input
                   id="confirmPassword"
                   type={showPassword ? "text" : "password"}
@@ -235,7 +235,7 @@ function ResetPasswordForm() {
             </div>
 
             {error && (
-              <div className="bg-red-50 border border-red-200 text-red-700 px-4 py-3 rounded-xl text-sm">
+              <div className="bg-red-50 border border-red-200 text-red-700 px-4 py-3 rounded-lg text-sm">
                 {error}
               </div>
             )}
@@ -261,10 +261,10 @@ export default function ResetPasswordClient() {
   return (
     <Suspense
       fallback={
-        <div className="min-h-screen bg-zinc-50 flex items-center justify-center px-4">
+        <div className="min-h-screen bg-surface-canvas flex items-center justify-center px-4">
           <div className="text-center">
-            <Loader2 className="w-8 h-8 text-zinc-400 animate-spin mx-auto mb-4" />
-            <p className="text-zinc-500">Loading...</p>
+            <Loader2 className="w-8 h-8 text-on-surface-variant animate-spin mx-auto mb-4" />
+            <p className="text-on-surface-variant">Loading...</p>
           </div>
         </div>
       }

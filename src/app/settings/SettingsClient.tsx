@@ -195,33 +195,33 @@ export default function SettingsClient({
   return (
     <div className="space-y-8">
       {/* Notification Preferences */}
-      <section className="bg-white rounded-xl border border-zinc-200 overflow-hidden">
-        <div className="p-6 border-b border-zinc-100">
+      <section className="bg-surface-container-lowest rounded-lg border border-outline-variant/20 overflow-hidden">
+        <div className="p-6 pb-6">
           <div className="flex items-center gap-3">
-            <div className="p-2 bg-indigo-50 rounded-lg">
-              <Bell className="w-5 h-5 text-indigo-600" />
+            <div className="p-2 bg-primary/10 rounded-lg">
+              <Bell className="w-5 h-5 text-primary" />
             </div>
             <div>
-              <h2 className="text-lg font-semibold text-zinc-900">
+              <h2 className="font-display text-lg font-semibold text-on-surface">
                 Email Notifications
               </h2>
-              <p className="text-sm text-zinc-500">
+              <p className="text-sm text-on-surface-variant">
                 Choose what emails you want to receive
               </p>
             </div>
           </div>
         </div>
-        <div className="divide-y divide-zinc-100">
+        <div className="space-y-2">
           {notificationOptions.map((option) => (
             <div
               key={option.key}
-              className="p-4 flex items-center justify-between hover:bg-zinc-50"
+              className="p-4 flex items-center justify-between hover:bg-surface-container-high"
             >
               <div>
-                <p className="font-medium text-zinc-900">
+                <p className="font-medium text-on-surface">
                   {option.label}
                 </p>
-                <p className="text-sm text-zinc-500">
+                <p className="text-sm text-on-surface-variant">
                   {option.description}
                 </p>
               </div>
@@ -232,8 +232,8 @@ export default function SettingsClient({
                 aria-label={`Toggle ${option.label}`}
                 className={`relative w-11 h-6 rounded-full transition-colors ${
                   preferences[option.key]
-                    ? "bg-indigo-600"
-                    : "bg-zinc-300"
+                    ? "bg-primary"
+                    : "bg-surface-container-high"
                 }`}
               >
                 <span
@@ -245,11 +245,11 @@ export default function SettingsClient({
             </div>
           ))}
         </div>
-        <div className="p-4 bg-zinc-50 border-t border-zinc-100">
+        <div className="p-4 bg-surface-canvas pt-6">
           <button
             onClick={handleSavePreferences}
             disabled={saving}
-            className="flex items-center gap-2 px-4 py-2 bg-indigo-600 text-white rounded-lg hover:bg-indigo-700 disabled:opacity-60 transition-colors"
+            className="flex items-center gap-2 px-4 py-2 bg-primary text-white rounded-lg hover:bg-primary/90 disabled:opacity-60 transition-colors"
           >
             {saving ? (
               <Loader2 className="w-4 h-4 animate-spin" />
@@ -263,17 +263,17 @@ export default function SettingsClient({
 
       {/* Change Password */}
       {hasPassword && (
-        <section className="bg-white rounded-xl border border-zinc-200 overflow-hidden">
-          <div className="p-6 border-b border-zinc-100">
+        <section className="bg-surface-container-lowest rounded-lg border border-outline-variant/20 overflow-hidden">
+          <div className="p-6 pb-6">
             <div className="flex items-center gap-3">
               <div className="p-2 bg-amber-50 rounded-lg">
                 <Lock className="w-5 h-5 text-amber-600" />
               </div>
               <div>
-                <h2 className="text-lg font-semibold text-zinc-900">
+                <h2 className="font-display text-lg font-semibold text-on-surface">
                   Change Password
                 </h2>
-                <p className="text-sm text-zinc-500">
+                <p className="text-sm text-on-surface-variant">
                   Update your account password
                 </p>
               </div>
@@ -283,7 +283,7 @@ export default function SettingsClient({
             <div>
               <label
                 htmlFor="currentPassword"
-                className="block text-sm font-medium text-zinc-700 mb-1"
+                className="block text-sm font-medium text-on-surface-variant mb-1"
               >
                 Current Password
               </label>
@@ -292,14 +292,14 @@ export default function SettingsClient({
                 type="password"
                 value={currentPassword}
                 onChange={(e) => setCurrentPassword(e.target.value)}
-                className="w-full px-3 py-2 border border-zinc-300 rounded-lg focus:ring-2 focus:ring-zinc-900/20 focus:border-zinc-400"
+                className="w-full px-3 py-2 border border-outline-variant/20 rounded-lg focus:ring-2 focus:ring-primary/20 focus:border-primary"
                 required
               />
             </div>
             <div>
               <label
                 htmlFor="newPassword"
-                className="block text-sm font-medium text-zinc-700 mb-1"
+                className="block text-sm font-medium text-on-surface-variant mb-1"
               >
                 New Password
               </label>
@@ -308,7 +308,7 @@ export default function SettingsClient({
                 type="password"
                 value={newPassword}
                 onChange={(e) => setNewPassword(e.target.value)}
-                className="w-full px-3 py-2 border border-zinc-300 rounded-lg focus:ring-2 focus:ring-zinc-900/20 focus:border-zinc-400"
+                className="w-full px-3 py-2 border border-outline-variant/20 rounded-lg focus:ring-2 focus:ring-primary/20 focus:border-primary"
                 required
                 minLength={12}
               />
@@ -317,7 +317,7 @@ export default function SettingsClient({
             <div>
               <label
                 htmlFor="confirmPassword"
-                className="block text-sm font-medium text-zinc-700 mb-1"
+                className="block text-sm font-medium text-on-surface-variant mb-1"
               >
                 Confirm New Password
               </label>
@@ -326,7 +326,7 @@ export default function SettingsClient({
                 type="password"
                 value={confirmPassword}
                 onChange={(e) => setConfirmPassword(e.target.value)}
-                className="w-full px-3 py-2 border border-zinc-300 rounded-lg focus:ring-2 focus:ring-zinc-900/20 focus:border-zinc-400"
+                className="w-full px-3 py-2 border border-outline-variant/20 rounded-lg focus:ring-2 focus:ring-primary/20 focus:border-primary"
                 required
               />
             </div>
@@ -351,17 +351,17 @@ export default function SettingsClient({
       )}
 
       {/* Blocked Users */}
-      <section className="bg-white rounded-xl border border-zinc-200 overflow-hidden">
-        <div className="p-6 border-b border-zinc-100">
+      <section className="bg-surface-container-lowest rounded-lg border border-outline-variant/20 overflow-hidden">
+        <div className="p-6 pb-6">
           <div className="flex items-center gap-3">
-            <div className="p-2 bg-zinc-100 rounded-lg">
-              <Ban className="w-5 h-5 text-zinc-600" />
+            <div className="p-2 bg-surface-container-high rounded-lg">
+              <Ban className="w-5 h-5 text-on-surface-variant" />
             </div>
             <div>
-              <h2 className="text-lg font-semibold text-zinc-900">
+              <h2 className="font-display text-lg font-semibold text-on-surface">
                 Blocked Users
               </h2>
-              <p className="text-sm text-zinc-500">
+              <p className="text-sm text-on-surface-variant">
                 Manage users you have blocked
               </p>
             </div>
@@ -369,11 +369,11 @@ export default function SettingsClient({
         </div>
         <div className="p-6">
           {blockedUsers.length === 0 ? (
-            <p className="text-sm text-zinc-500 text-center py-4">
+            <p className="text-sm text-on-surface-variant text-center py-4">
               You haven&apos;t blocked anyone
             </p>
           ) : (
-            <ul className="divide-y divide-zinc-100">
+            <ul className="space-y-2">
               {blockedUsers.map((blocked) => (
                 <li
                   key={blocked.id}
@@ -386,10 +386,10 @@ export default function SettingsClient({
                       size="md"
                     />
                     <div>
-                      <p className="font-medium text-zinc-900">
+                      <p className="font-medium text-on-surface">
                         {blocked.user.name || "Unknown User"}
                       </p>
-                      <p className="text-sm text-zinc-500">
+                      <p className="text-sm text-on-surface-variant">
                         Blocked{" "}
                         {new Date(blocked.blockedAt).toLocaleDateString()}
                       </p>
@@ -398,7 +398,7 @@ export default function SettingsClient({
                   <button
                     onClick={() => handleUnblock(blocked.user.id)}
                     disabled={unblockingId === blocked.user.id}
-                    className="flex items-center gap-2 px-3 py-1.5 text-sm font-medium text-zinc-600 hover:text-zinc-900 hover:bg-zinc-100 rounded-lg transition-colors disabled:opacity-60"
+                    className="flex items-center gap-2 px-3 py-1.5 text-sm font-medium text-on-surface-variant hover:text-on-surface hover:bg-surface-container-high rounded-lg transition-colors disabled:opacity-60"
                   >
                     {unblockingId === blocked.user.id ? (
                       <Loader2 className="w-4 h-4 animate-spin" />
@@ -415,17 +415,17 @@ export default function SettingsClient({
       </section>
 
       {/* Delete Account */}
-      <section className="bg-white rounded-xl border border-red-200 overflow-hidden">
-        <div className="p-6 border-b border-red-100">
+      <section className="bg-surface-container-lowest rounded-lg border border-red-200 overflow-hidden">
+        <div className="p-6 pb-6">
           <div className="flex items-center gap-3">
             <div className="p-2 bg-red-50 rounded-lg">
               <Trash2 className="w-5 h-5 text-red-600" />
             </div>
             <div>
-              <h2 className="text-lg font-semibold text-zinc-900">
+              <h2 className="font-display text-lg font-semibold text-on-surface">
                 Delete Account
               </h2>
-              <p className="text-sm text-zinc-500">
+              <p className="text-sm text-on-surface-variant">
                 Permanently delete your account and all data
               </p>
             </div>
@@ -434,7 +434,7 @@ export default function SettingsClient({
         <div className="p-6">
           {!showDeleteConfirm ? (
             <div>
-              <p className="text-sm text-zinc-600 mb-4">
+              <p className="text-sm text-on-surface-variant mb-4">
                 Once you delete your account, there is no going back. All your
                 listings, messages, bookings, and reviews will be permanently
                 removed.
@@ -463,7 +463,7 @@ export default function SettingsClient({
               <div>
                 <label
                   htmlFor="deleteConfirmText"
-                  className="block text-sm font-medium text-zinc-700 mb-1"
+                  className="block text-sm font-medium text-on-surface-variant mb-1"
                 >
                   Type DELETE to confirm
                 </label>
@@ -472,7 +472,7 @@ export default function SettingsClient({
                   type="text"
                   value={deleteConfirmText}
                   onChange={(e) => setDeleteConfirmText(e.target.value)}
-                  className="w-full px-3 py-2 border border-zinc-300 rounded-lg focus:ring-2 focus:ring-red-500 focus:border-red-500"
+                  className="w-full px-3 py-2 border border-outline-variant/20 rounded-lg focus:ring-2 focus:ring-red-500 focus:border-red-500"
                   placeholder="DELETE"
                 />
               </div>
@@ -482,7 +482,7 @@ export default function SettingsClient({
                     setShowDeleteConfirm(false);
                     setDeleteConfirmText("");
                   }}
-                  className="px-4 py-2 border border-zinc-300 text-zinc-700 rounded-lg hover:bg-zinc-50 transition-colors"
+                  className="px-4 py-2 border border-outline-variant/20 text-on-surface-variant rounded-lg hover:bg-surface-container-high transition-colors"
                 >
                   Cancel
                 </button>

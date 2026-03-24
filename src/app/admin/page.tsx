@@ -115,7 +115,7 @@ export default async function AdminDashboard() {
       label: "Total Bookings",
       value: stats.bookingsCount,
       icon: Calendar,
-      color: "bg-indigo-500",
+      color: "bg-primary",
     },
     {
       label: "Messages Sent",
@@ -143,14 +143,14 @@ export default async function AdminDashboard() {
   ];
 
   return (
-    <div className="min-h-screen bg-zinc-50">
+    <div className="min-h-screen bg-surface-canvas">
       <div className="max-w-7xl mx-auto px-4 py-8">
         {/* Header */}
         <div className="mb-8">
-          <h1 className="text-3xl font-bold text-zinc-900">
+          <h1 className="text-3xl font-display font-bold text-on-surface">
             Admin Dashboard
           </h1>
-          <p className="text-zinc-500 mt-1">
+          <p className="text-on-surface-variant mt-1">
             Manage your RoomShare platform
           </p>
         </div>
@@ -160,7 +160,7 @@ export default async function AdminDashboard() {
           {statCards.map((stat) => (
             <div
               key={stat.label}
-              className={`bg-white rounded-xl p-6 border border-zinc-100 relative overflow-hidden ${
+              className={`bg-surface-container-lowest rounded-lg p-6 shadow-ambient-sm relative overflow-hidden ${
                 stat.alert ? "ring-2 ring-amber-400" : ""
               }`}
             >
@@ -172,10 +172,10 @@ export default async function AdminDashboard() {
               >
                 <stat.icon className="w-5 h-5 text-white" />
               </div>
-              <p className="text-2xl font-bold text-zinc-900">
+              <p className="text-2xl font-bold text-on-surface">
                 {stat.value.toLocaleString()}
               </p>
-              <p className="text-sm text-zinc-500">
+              <p className="text-sm text-on-surface-variant">
                 {stat.label}
               </p>
               {stat.alert && (
@@ -186,24 +186,24 @@ export default async function AdminDashboard() {
         </div>
 
         {/* Quick Actions */}
-        <div className="bg-white rounded-xl border border-zinc-100 overflow-hidden mb-8">
-          <div className="px-6 py-4 border-b border-zinc-100">
-            <h2 className="text-lg font-semibold text-zinc-900">
+        <div className="bg-surface-container-lowest rounded-lg shadow-ambient-sm overflow-hidden mb-8">
+          <div className="px-6 py-4 bg-surface-container-high">
+            <h2 className="text-lg font-display font-semibold text-on-surface">
               Quick Actions
             </h2>
           </div>
-          <div className="divide-y divide-zinc-100">
+          <div className="space-y-px">
             {adminLinks.map((link) => (
               <Link
                 key={link.href}
                 href={link.href}
-                className="flex items-center justify-between px-6 py-4 hover:bg-zinc-50 transition-colors"
+                className="flex items-center justify-between px-6 py-4 hover:bg-surface-container-high/50 transition-colors"
               >
                 <div className="flex items-center gap-3">
-                  <div className="w-10 h-10 bg-zinc-100 rounded-lg flex items-center justify-center">
-                    <link.icon className="w-5 h-5 text-zinc-600" />
+                  <div className="w-10 h-10 bg-surface-container-high rounded-lg flex items-center justify-center">
+                    <link.icon className="w-5 h-5 text-on-surface-variant" />
                   </div>
-                  <span className="font-medium text-zinc-900">
+                  <span className="font-medium text-on-surface">
                     {link.label}
                   </span>
                 </div>
@@ -218,13 +218,13 @@ export default async function AdminDashboard() {
         </div>
 
         {/* Recent Activity - Placeholder */}
-        <div className="bg-white rounded-xl border border-zinc-100 overflow-hidden">
-          <div className="px-6 py-4 border-b border-zinc-100">
-            <h2 className="text-lg font-semibold text-zinc-900">
+        <div className="bg-surface-container-lowest rounded-lg shadow-ambient-sm overflow-hidden">
+          <div className="px-6 py-4 bg-surface-container-high">
+            <h2 className="text-lg font-display font-semibold text-on-surface">
               Recent Activity
             </h2>
           </div>
-          <div className="p-6 text-center text-zinc-500">
+          <div className="p-6 text-center text-on-surface-variant">
             <p>Activity log coming soon</p>
           </div>
         </div>

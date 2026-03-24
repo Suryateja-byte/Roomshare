@@ -94,19 +94,19 @@ export default function SavedSearchList({
       {searches.map((search) => (
         <div
           key={search.id}
-          className="bg-white rounded-xl border border-zinc-100 overflow-hidden hover:border-zinc-200 transition-colors"
+          className="bg-surface-container-lowest rounded-lg border border-outline-variant/20 overflow-hidden hover:border-outline-variant/40 transition-colors"
         >
           <div className="p-5">
             <div className="flex items-start justify-between gap-4">
               <div className="flex-1 min-w-0">
-                <h3 className="font-semibold text-zinc-900 truncate">
+                <h3 className="font-semibold text-on-surface truncate">
                   {search.name}
                 </h3>
-                <p className="text-sm text-zinc-500 mt-1">
+                <p className="text-sm text-on-surface-variant mt-1">
                   {formatFilters(search.filters as SearchFilters)}
                 </p>
                 {search.query && (
-                  <p className="text-sm text-zinc-400 mt-1">
+                  <p className="text-sm text-on-surface-variant mt-1">
                     Search: &quot;{search.query}&quot;
                   </p>
                 )}
@@ -123,7 +123,7 @@ export default function SavedSearchList({
                   className={`p-2 rounded-lg transition-colors ${
                     search.alertEnabled
                       ? "bg-green-100 text-green-700 hover:bg-green-200"
-                      : "bg-zinc-100 text-zinc-400 hover:bg-zinc-200"
+                      : "bg-surface-container-high text-on-surface-variant hover:bg-surface-container-high/80"
                   }`}
                   title={
                     search.alertEnabled ? "Disable alerts" : "Enable alerts"
@@ -142,7 +142,7 @@ export default function SavedSearchList({
                 <button
                   onClick={() => handleDelete(search.id)}
                   disabled={loadingId === search.id}
-                  className="p-2 rounded-lg bg-zinc-100 text-zinc-400 hover:bg-red-100 hover:text-red-600 transition-colors"
+                  className="p-2 rounded-lg bg-surface-container-high text-on-surface-variant hover:bg-red-100 hover:text-red-600 transition-colors"
                   title="Delete search"
                 >
                   <Trash2 className="w-4 h-4" />
@@ -151,7 +151,7 @@ export default function SavedSearchList({
                 {/* Open Search */}
                 <Link
                   href={buildSearchUrl(search.filters as SearchFilters)}
-                  className="inline-flex items-center gap-2 px-4 py-2 bg-zinc-900 text-white rounded-lg text-sm font-medium hover:bg-zinc-800 transition-colors"
+                  className="inline-flex items-center gap-2 px-4 py-2 bg-primary text-on-primary rounded-lg text-sm font-medium hover:bg-primary/90 transition-colors"
                 >
                   View
                   <ExternalLink className="w-3.5 h-3.5" />
@@ -160,7 +160,7 @@ export default function SavedSearchList({
             </div>
 
             {/* Footer */}
-            <div className="flex items-center justify-between mt-4 pt-4 border-t border-zinc-100 text-xs text-zinc-400">
+            <div className="flex items-center justify-between mt-4 pt-4 pt-4 text-xs text-on-surface-variant">
               <span>
                 Created {new Date(search.createdAt).toLocaleDateString()}
               </span>

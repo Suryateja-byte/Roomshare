@@ -21,14 +21,14 @@ export default function ProfileError({
       <div className="w-20 h-20 bg-red-100 rounded-full flex items-center justify-center mb-6">
         <User className="w-10 h-10 text-red-600" />
       </div>
-      <h2 className="text-2xl font-bold text-zinc-900 mb-2">
+      <h2 className="font-display text-2xl font-bold text-on-surface mb-2">
         Unable to load your profile
       </h2>
-      <p className="text-zinc-600 mb-2 max-w-md">
+      <p className="text-on-surface-variant mb-2 max-w-md">
         We&apos;re having trouble loading your profile right now. This is
         usually temporary.
       </p>
-      <p className="text-sm text-zinc-500 mb-6 max-w-md">
+      <p className="text-sm text-on-surface-variant mb-6 max-w-md">
         Your profile information is safe — try refreshing the page in a moment.
       </p>
       <div className="flex flex-col sm:flex-row gap-3">

@@ -131,8 +131,8 @@ export default function VerificationList({
             onClick={() => setFilter(f)}
             className={`px-4 py-2 rounded-lg font-medium text-sm transition-colors ${
               filter === f
-                ? "bg-zinc-900 text-white"
-                : "bg-white text-zinc-600 hover:bg-zinc-50 border border-zinc-200"
+                ? "bg-on-surface text-white"
+                : "bg-surface-container-lowest text-on-surface-variant hover:bg-surface-container-high/50 border border-outline-variant/20"
             }`}
           >
             {f === "all" ? "All" : f.charAt(0) + f.slice(1).toLowerCase()}
@@ -148,8 +148,8 @@ export default function VerificationList({
       {/* Requests List */}
       <div className="space-y-4">
         {filteredRequests.length === 0 ? (
-          <div className="bg-white rounded-xl border border-zinc-100 p-12 text-center">
-            <p className="text-zinc-500">
+          <div className="bg-surface-container-lowest rounded-lg shadow-ambient-sm p-12 text-center">
+            <p className="text-on-surface-variant">
               No verification requests found
             </p>
           </div>
@@ -157,10 +157,10 @@ export default function VerificationList({
           filteredRequests.map((request) => (
             <div
               key={request.id}
-              className={`bg-white rounded-xl border overflow-hidden ${
+              className={`bg-surface-container-lowest rounded-lg shadow-ambient-sm overflow-hidden ${
                 request.status === "PENDING"
                   ? "border-amber-200"
-                  : "border-zinc-100"
+                  : "border-outline-variant/20"
               }`}
             >
               <div className="p-6">
@@ -173,10 +173,10 @@ export default function VerificationList({
                       size="lg"
                     />
                     <div>
-                      <h3 className="font-semibold text-zinc-900">
+                      <h3 className="font-semibold text-on-surface">
                         {request.user.name || "Unknown User"}
                       </h3>
-                      <p className="text-sm text-zinc-500">
+                      <p className="text-sm text-on-surface-variant">
                         {request.user.email}
                       </p>
                     </div>
@@ -206,10 +206,10 @@ export default function VerificationList({
                 </div>
 
                 {/* Document Info */}
-                <div className="mt-4 p-4 bg-zinc-50 rounded-lg">
+                <div className="mt-4 p-4 bg-surface-canvas rounded-lg">
                   <div className="flex items-center gap-2 mb-2">
                     {documentTypeIcons[request.documentType]}
-                    <span className="font-medium text-zinc-700">
+                    <span className="font-medium text-on-surface">
                       {documentTypeLabels[request.documentType] ||
                         request.documentType}
                     </span>
@@ -234,7 +234,7 @@ export default function VerificationList({
                       </a>
                     )}
                   </div>
-                  <p className="text-xs text-zinc-400 mt-2">
+                  <p className="text-xs text-on-surface-variant mt-2">
                     Submitted {new Date(request.createdAt).toLocaleString()}
                   </p>
                 </div>
@@ -258,7 +258,7 @@ export default function VerificationList({
                           value={rejectReason}
                           onChange={(e) => setRejectReason(e.target.value)}
                           placeholder="Reason for rejection..."
-                          className="flex-1 px-3 py-2 border border-zinc-200 bg-white text-zinc-900 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-zinc-200"
+                          className="flex-1 px-3 py-2 border border-outline-variant/20 bg-surface-container-lowest text-on-surface rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-primary/20"
                         />
                         <button
                           onClick={() => handleReject(request.id)}
@@ -276,7 +276,7 @@ export default function VerificationList({
                             setRejectingId(null);
                             setRejectReason("");
                           }}
-                          className="px-4 py-2 bg-zinc-100 text-zinc-600 rounded-lg text-sm font-medium hover:bg-zinc-200"
+                          className="px-4 py-2 bg-surface-container-high text-on-surface-variant rounded-lg text-sm font-medium hover:bg-surface-container-high/80"
                         >
                           Cancel
                         </button>

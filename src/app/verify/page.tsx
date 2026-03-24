@@ -22,18 +22,18 @@ export default async function VerifyPage() {
   const status = await getMyVerificationStatus();
 
   return (
-    <div className="min-h-screen bg-zinc-50 py-12">
+    <div className="min-h-screen bg-surface-canvas py-12">
       <div className="max-w-2xl mx-auto px-4">
-        <div className="bg-white rounded-2xl shadow-sm border border-zinc-100 overflow-hidden">
+        <div className="bg-surface-container-lowest rounded-lg shadow-ambient overflow-hidden">
           {/* Header */}
-          <div className="bg-gradient-to-r from-zinc-900 to-zinc-800 px-8 py-10 text-white">
+          <div className="bg-gradient-to-r from-primary to-primary-container px-8 py-10 text-white">
             <div className="flex items-center gap-4">
               <div className="w-16 h-16 bg-white/10 rounded-2xl flex items-center justify-center">
                 <ShieldCheck className="w-8 h-8" />
               </div>
               <div>
-                <h1 className="text-2xl font-bold">ID Verification</h1>
-                <p className="text-zinc-300 mt-1">
+                <h1 className="font-display text-2xl font-bold">ID Verification</h1>
+                <p className="text-white/70 mt-1">
                   Build trust by verifying your identity
                 </p>
               </div>
@@ -47,16 +47,16 @@ export default async function VerifyPage() {
                 <div className="w-20 h-20 bg-green-100 rounded-full flex items-center justify-center mx-auto mb-6">
                   <CheckCircle2 className="w-10 h-10 text-green-600" />
                 </div>
-                <h2 className="text-2xl font-bold text-zinc-900 mb-2">
+                <h2 className="font-display text-2xl font-bold text-on-surface mb-2">
                   You&apos;re Verified!
                 </h2>
-                <p className="text-zinc-600 mb-6">
+                <p className="text-on-surface-variant mb-6">
                   Your identity has been verified. You now have a verified badge
                   on your profile.
                 </p>
                 <Link
                   href="/profile"
-                  className="inline-flex items-center gap-2 bg-zinc-900 text-white px-6 py-3 rounded-xl font-medium hover:bg-zinc-800 transition-colors"
+                  className="inline-flex items-center gap-2 bg-primary text-white px-6 py-3 rounded-lg font-medium hover:bg-primary/90 transition-colors"
                 >
                   View Your Profile
                 </Link>
@@ -68,18 +68,18 @@ export default async function VerifyPage() {
                 <div className="w-20 h-20 bg-amber-100 rounded-full flex items-center justify-center mx-auto mb-6">
                   <Clock className="w-10 h-10 text-amber-600" />
                 </div>
-                <h2 className="text-2xl font-bold text-zinc-900 mb-2">
+                <h2 className="font-display text-2xl font-bold text-on-surface mb-2">
                   Verification Pending
                 </h2>
-                <p className="text-zinc-600 mb-6">
+                <p className="text-on-surface-variant mb-6">
                   We&apos;re reviewing your documents. This usually takes 1-2
                   business days. We&apos;ll notify you once your verification is
                   complete.
                 </p>
-                <div className="bg-zinc-50 rounded-xl p-4 inline-block">
-                  <p className="text-sm text-zinc-500">
+                <div className="bg-surface-container-high rounded-lg p-4 inline-block">
+                  <p className="text-sm text-on-surface-variant">
                     Request ID:{" "}
-                    <code className="text-zinc-700">
+                    <code className="text-on-surface">
                       {status.requestId}
                     </code>
                   </p>
@@ -93,14 +93,14 @@ export default async function VerifyPage() {
                   <div className="w-20 h-20 bg-red-100 rounded-full flex items-center justify-center mx-auto mb-6">
                     <XCircle className="w-10 h-10 text-red-600" />
                   </div>
-                  <h2 className="text-2xl font-bold text-zinc-900 mb-2">
+                  <h2 className="font-display text-2xl font-bold text-on-surface mb-2">
                     Verification Not Approved
                   </h2>
-                  <p className="text-zinc-600 mb-4">
+                  <p className="text-on-surface-variant mb-4">
                     Unfortunately, we couldn&apos;t verify your identity.
                   </p>
                   {status.reason && (
-                    <div className="bg-red-50 border border-red-100 rounded-xl p-4 max-w-md mx-auto">
+                    <div className="bg-red-50 border border-red-100 rounded-lg p-4 max-w-md mx-auto">
                       <p className="text-sm text-red-700">
                         <strong>Reason:</strong> {status.reason}
                       </p>
@@ -109,11 +109,11 @@ export default async function VerifyPage() {
                 </div>
 
                 {/* Tips for successful verification */}
-                <div className="bg-zinc-50 rounded-xl p-6 mb-8">
-                  <h3 className="font-semibold text-zinc-900 mb-3">
+                <div className="bg-surface-container-high rounded-lg p-6 mb-8">
+                  <h3 className="font-semibold text-on-surface mb-3">
                     Tips for a Successful Verification
                   </h3>
-                  <ul className="space-y-2 text-sm text-zinc-600">
+                  <ul className="space-y-2 text-sm text-on-surface-variant">
                     <li className="flex items-start gap-2">
                       <CheckCircle2 className="w-4 h-4 text-green-500 mt-0.5 flex-shrink-0" />
                       <span>
@@ -138,10 +138,10 @@ export default async function VerifyPage() {
                   </ul>
                 </div>
 
-                <div className="border-t border-zinc-100 pt-8">
+                <div className="pt-8">
                   {status.canResubmit ? (
                     <>
-                      <h3 className="text-lg font-semibold text-zinc-900 mb-4 text-center">
+                      <h3 className="text-lg font-semibold text-on-surface mb-4 text-center">
                         Try Again
                       </h3>
                       <VerificationForm />
@@ -151,17 +151,17 @@ export default async function VerifyPage() {
                       <div className="w-16 h-16 bg-amber-100 rounded-full flex items-center justify-center mx-auto mb-4">
                         <Clock className="w-8 h-8 text-amber-600" />
                       </div>
-                      <h3 className="text-lg font-semibold text-zinc-900 mb-2">
+                      <h3 className="text-lg font-semibold text-on-surface mb-2">
                         Cooldown Period Active
                       </h3>
-                      <p className="text-zinc-600 mb-4">
+                      <p className="text-on-surface-variant mb-4">
                         You can resubmit your verification in{" "}
                         <span className="font-bold text-amber-600">
                           {status.cooldownRemaining} hour
                           {status.cooldownRemaining !== 1 ? "s" : ""}
                         </span>
                       </p>
-                      <p className="text-sm text-zinc-500">
+                      <p className="text-sm text-on-surface-variant">
                         Use this time to review the tips above and prepare
                         better documents.
                       </p>
@@ -175,7 +175,7 @@ export default async function VerifyPage() {
               <div>
                 {/* Benefits */}
                 <div className="mb-8">
-                  <h2 className="text-lg font-semibold text-zinc-900 mb-4">
+                  <h2 className="text-lg font-semibold text-on-surface mb-4">
                     Why Get Verified?
                   </h2>
                   <div className="grid gap-4">
@@ -184,10 +184,10 @@ export default async function VerifyPage() {
                         <CheckCircle2 className="w-4 h-4 text-green-600" />
                       </div>
                       <div>
-                        <p className="font-medium text-zinc-900">
+                        <p className="font-medium text-on-surface">
                           Build Trust
                         </p>
-                        <p className="text-sm text-zinc-500">
+                        <p className="text-sm text-on-surface-variant">
                           Verified users get 3x more responses from hosts
                         </p>
                       </div>
@@ -197,10 +197,10 @@ export default async function VerifyPage() {
                         <CheckCircle2 className="w-4 h-4 text-green-600" />
                       </div>
                       <div>
-                        <p className="font-medium text-zinc-900">
+                        <p className="font-medium text-on-surface">
                           Stand Out
                         </p>
-                        <p className="text-sm text-zinc-500">
+                        <p className="text-sm text-on-surface-variant">
                           Get a verification badge on your profile
                         </p>
                       </div>
@@ -210,10 +210,10 @@ export default async function VerifyPage() {
                         <CheckCircle2 className="w-4 h-4 text-green-600" />
                       </div>
                       <div>
-                        <p className="font-medium text-zinc-900">
+                        <p className="font-medium text-on-surface">
                           Safer Community
                         </p>
-                        <p className="text-sm text-zinc-500">
+                        <p className="text-sm text-on-surface-variant">
                           Help make RoomShare a trusted platform for everyone
                         </p>
                       </div>
@@ -221,8 +221,8 @@ export default async function VerifyPage() {
                   </div>
                 </div>
 
-                <div className="border-t border-zinc-100 pt-8">
-                  <h2 className="text-lg font-semibold text-zinc-900 mb-4">
+                <div className="pt-8">
+                  <h2 className="text-lg font-semibold text-on-surface mb-4">
                     Submit Your Documents
                   </h2>
                   <VerificationForm />

@@ -144,14 +144,14 @@ export default function ListingList({
       {/* Search and Filters */}
       <div className="flex flex-col sm:flex-row gap-4 mb-6">
         <div className="relative flex-1">
-          <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-zinc-400" />
+          <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-on-surface-variant" />
           <input
             type="text"
             value={search}
             onChange={(e) => setSearch(e.target.value)}
             placeholder="Search by title or owner..."
             aria-label="Search listings by title or owner"
-            className="w-full pl-10 pr-4 py-2 border border-zinc-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-zinc-900/20"
+            className="w-full pl-10 pr-4 py-2 border border-outline-variant/20 rounded-lg focus:outline-none focus:ring-2 focus:ring-primary/20"
           />
         </div>
         <div className="flex gap-2">
@@ -161,8 +161,8 @@ export default function ListingList({
               onClick={() => setStatusFilter(f)}
               className={`px-4 py-2 rounded-lg font-medium text-sm transition-colors ${
                 statusFilter === f
-                  ? "bg-zinc-900 text-white"
-                  : "bg-white text-zinc-600 hover:bg-zinc-50 border border-zinc-200"
+                  ? "bg-on-surface text-white"
+                  : "bg-surface-container-lowest text-on-surface-variant hover:bg-surface-container-high/50 border border-outline-variant/20"
               }`}
             >
               {f === "all" ? "All" : statusConfig[f].label}
@@ -172,13 +172,13 @@ export default function ListingList({
       </div>
 
       {/* Stats */}
-      <div className="mb-4 text-sm text-zinc-500">
+      <div className="mb-4 text-sm text-on-surface-variant">
         Showing {filteredListings.length} of {totalListings} listings
       </div>
 
       {/* Listings Grid */}
       {filteredListings.length === 0 ? (
-        <div className="bg-white rounded-xl border border-zinc-100 p-12 text-center text-zinc-500">
+        <div className="bg-surface-container-lowest rounded-lg shadow-ambient-sm p-12 text-center text-on-surface-variant">
           No listings found matching your criteria
         </div>
       ) : (
@@ -189,15 +189,15 @@ export default function ListingList({
             return (
               <div
                 key={listing.id}
-                className={`bg-white rounded-xl border overflow-hidden ${
+                className={`bg-surface-container-lowest rounded-lg shadow-ambient-sm overflow-hidden ${
                   listing._count.reports > 0
                     ? "border-red-200"
-                    : "border-zinc-100"
+                    : "border-outline-variant/20"
                 }`}
               >
                 <div className="p-4 flex gap-4">
                   {/* Thumbnail */}
-                  <div className="relative w-24 h-24 rounded-lg overflow-hidden flex-shrink-0 bg-zinc-100">
+                  <div className="relative w-24 h-24 rounded-lg overflow-hidden flex-shrink-0 bg-surface-container-high">
                     {listing.images[0] ? (
                       <Image
                         src={listing.images[0]}
@@ -206,7 +206,7 @@ export default function ListingList({
                         className="object-cover"
                       />
                     ) : (
-                      <div className="w-full h-full flex items-center justify-center text-zinc-400">
+                      <div className="w-full h-full flex items-center justify-center text-on-surface-variant">
                         No image
                       </div>
                     )}
@@ -217,7 +217,7 @@ export default function ListingList({
                     <div className="flex items-start justify-between gap-4">
                       <div>
                         <div className="flex items-center gap-2">
-                          <h3 className="font-semibold text-zinc-900 truncate">
+                          <h3 className="font-semibold text-on-surface truncate">
                             {listing.title}
                           </h3>
                           <span
@@ -233,7 +233,7 @@ export default function ListingList({
                             </span>
                           )}
                         </div>
-                        <div className="flex items-center gap-4 mt-1 text-sm text-zinc-500">
+                        <div className="flex items-center gap-4 mt-1 text-sm text-on-surface-variant">
                           {listing.location && (
                             <span className="flex items-center gap-1">
                               <MapPin className="w-3 h-3" />
@@ -253,7 +253,7 @@ export default function ListingList({
                             {listing._count.bookings} bookings
                           </span>
                         </div>
-                        <p className="text-xs text-zinc-400 mt-1">
+                        <p className="text-xs text-on-surface-variant mt-1">
                           Owner: {listing.owner.name || "Unknown"} (
                           {listing.owner.email})
                         </p>
@@ -265,7 +265,7 @@ export default function ListingList({
                           href={`/listings/${listing.id}`}
                           target="_blank"
                           aria-label={`View listing: ${listing.title}`}
-                          className="p-2 hover:bg-zinc-100 rounded-lg text-zinc-500 hover:text-zinc-700"
+                          className="p-2 hover:bg-surface-container-high rounded-lg text-on-surface-variant hover:text-on-surface"
                         >
                           <ExternalLink className="w-4 h-4" />
                         </Link>
@@ -278,20 +278,20 @@ export default function ListingList({
                               )
                             }
                             aria-label={`Actions for ${listing.title}`}
-                            className="p-2 hover:bg-zinc-100 rounded-lg"
+                            className="p-2 hover:bg-surface-container-high rounded-lg"
                           >
-                            <MoreVertical className="w-5 h-5 text-zinc-400" />
+                            <MoreVertical className="w-5 h-5 text-on-surface-variant" />
                           </button>
 
                           {openMenuId === listing.id && (
-                            <div className="absolute right-0 top-full mt-1 w-48 bg-white rounded-lg shadow-lg border border-zinc-200 py-1 z-10">
+                            <div className="absolute right-0 top-full mt-1 w-48 bg-surface-container-lowest rounded-lg shadow-ambient-lg border border-outline-variant/20 py-1 z-10">
                               {listing.status !== "ACTIVE" && (
                                 <button
                                   onClick={() =>
                                     handleStatusChange(listing.id, "ACTIVE")
                                   }
                                   disabled={processingId === listing.id}
-                                  className="w-full px-4 py-2 text-left text-sm hover:bg-zinc-50 flex items-center gap-2 disabled:opacity-60"
+                                  className="w-full px-4 py-2 text-left text-sm hover:bg-surface-container-high/50 flex items-center gap-2 disabled:opacity-60"
                                 >
                                   {processingId === listing.id ? (
                                     <Loader2 className="w-4 h-4 animate-spin" />
@@ -307,7 +307,7 @@ export default function ListingList({
                                     handleStatusChange(listing.id, "PAUSED")
                                   }
                                   disabled={processingId === listing.id}
-                                  className="w-full px-4 py-2 text-left text-sm hover:bg-zinc-50 flex items-center gap-2 disabled:opacity-60"
+                                  className="w-full px-4 py-2 text-left text-sm hover:bg-surface-container-high/50 flex items-center gap-2 disabled:opacity-60"
                                 >
                                   {processingId === listing.id ? (
                                     <Loader2 className="w-4 h-4 animate-spin" />
@@ -323,7 +323,7 @@ export default function ListingList({
                                     handleStatusChange(listing.id, "RENTED")
                                   }
                                   disabled={processingId === listing.id}
-                                  className="w-full px-4 py-2 text-left text-sm hover:bg-zinc-50 flex items-center gap-2 disabled:opacity-60"
+                                  className="w-full px-4 py-2 text-left text-sm hover:bg-surface-container-high/50 flex items-center gap-2 disabled:opacity-60"
                                 >
                                   {processingId === listing.id ? (
                                     <Loader2 className="w-4 h-4 animate-spin" />
@@ -372,7 +372,7 @@ export default function ListingList({
                       </button>
                       <button
                         onClick={() => setDeleteConfirmId(null)}
-                        className="px-4 py-2 bg-white text-zinc-700 rounded-lg text-sm font-medium hover:bg-zinc-50 border border-zinc-200"
+                        className="px-4 py-2 bg-surface-container-lowest text-on-surface rounded-lg text-sm font-medium hover:bg-surface-container-high/50 border border-outline-variant/20"
                       >
                         Cancel
                       </button>

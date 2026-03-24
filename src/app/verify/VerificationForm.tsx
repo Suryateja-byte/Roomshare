@@ -96,7 +96,7 @@ export default function VerificationForm() {
     <form onSubmit={handleSubmit} className="space-y-6">
       {/* Document Type Selection */}
       <div>
-        <label className="block text-sm font-medium text-zinc-700 mb-3">
+        <label className="block text-sm font-medium text-on-surface-variant mb-3">
           Select Document Type
         </label>
         <div className="grid grid-cols-3 gap-3">
@@ -105,17 +105,17 @@ export default function VerificationForm() {
               key={type.value}
               type="button"
               onClick={() => setDocumentType(type.value)}
-              className={`flex flex-col items-center gap-2 p-4 rounded-xl border-2 transition-all ${
+              className={`flex flex-col items-center gap-2 p-4 rounded-lg border-2 transition-all ${
                 documentType === type.value
-                  ? "border-zinc-900 bg-zinc-50"
-                  : "border-zinc-200 hover:border-zinc-300"
+                  ? "border-primary bg-primary/5"
+                  : "border-outline-variant/20 hover:border-outline-variant/40"
               }`}
             >
               <span
                 className={
                   documentType === type.value
-                    ? "text-zinc-900"
-                    : "text-zinc-400"
+                    ? "text-primary"
+                    : "text-on-surface-variant"
                 }
               >
                 {type.icon}
@@ -123,8 +123,8 @@ export default function VerificationForm() {
               <span
                 className={`text-xs font-medium ${
                   documentType === type.value
-                    ? "text-zinc-900"
-                    : "text-zinc-500"
+                    ? "text-primary"
+                    : "text-on-surface-variant"
                 }`}
               >
                 {type.label}
@@ -136,7 +136,7 @@ export default function VerificationForm() {
 
       {/* Document Upload */}
       <div>
-        <label className="block text-sm font-medium text-zinc-700 mb-3">
+        <label className="block text-sm font-medium text-on-surface-variant mb-3">
           Upload {documentTypes.find((t) => t.value === documentType)?.label}
         </label>
         <div className="relative">
@@ -151,10 +151,10 @@ export default function VerificationForm() {
           />
           <label
             htmlFor="document-upload"
-            className={`flex flex-col items-center justify-center w-full h-40 border-2 border-dashed rounded-xl cursor-pointer transition-all ${
+            className={`flex flex-col items-center justify-center w-full h-40 border-2 border-dashed rounded-lg cursor-pointer transition-all ${
               documentUrl
                 ? "border-green-500 bg-green-50"
-                : "border-zinc-300 hover:border-zinc-400 bg-zinc-50"
+                : "border-outline-variant/30 hover:border-outline-variant/50 bg-surface-container-high"
             }`}
           >
             {documentUrl ? (
@@ -165,17 +165,17 @@ export default function VerificationForm() {
                 <span className="text-sm font-medium text-green-600">
                   Document uploaded
                 </span>
-                <span className="text-xs text-zinc-500 mt-1">
+                <span className="text-xs text-on-surface-variant mt-1">
                   Click to replace
                 </span>
               </>
             ) : (
               <>
-                <Upload className="w-8 h-8 text-zinc-400 mb-2" />
-                <span className="text-sm text-zinc-600">
+                <Upload className="w-8 h-8 text-on-surface-variant mb-2" />
+                <span className="text-sm text-on-surface-variant">
                   Click to upload
                 </span>
-                <span className="text-xs text-zinc-400 mt-1">
+                <span className="text-xs text-on-surface-variant mt-1">
                   PNG, JPG or PDF up to 10MB
                 </span>
               </>
@@ -186,13 +186,13 @@ export default function VerificationForm() {
 
       {/* Selfie Upload (Optional) */}
       <div>
-        <label className="block text-sm font-medium text-zinc-700 mb-1">
+        <label className="block text-sm font-medium text-on-surface-variant mb-1">
           Upload Selfie{" "}
-          <span className="text-zinc-400 font-normal">
+          <span className="text-on-surface-variant font-normal">
             (Optional)
           </span>
         </label>
-        <p className="text-xs text-zinc-500 mb-3">
+        <p className="text-xs text-on-surface-variant mb-3">
           A selfie helps us verify that you match the document
         </p>
         <div className="relative">
@@ -205,30 +205,30 @@ export default function VerificationForm() {
           />
           <label
             htmlFor="selfie-upload"
-            className={`flex items-center gap-4 w-full p-4 border-2 border-dashed rounded-xl cursor-pointer transition-all ${
+            className={`flex items-center gap-4 w-full p-4 border-2 border-dashed rounded-lg cursor-pointer transition-all ${
               selfieUrl
                 ? "border-green-500 bg-green-50"
-                : "border-zinc-300 hover:border-zinc-400 bg-zinc-50"
+                : "border-outline-variant/30 hover:border-outline-variant/50 bg-surface-container-high"
             }`}
           >
             <div
               className={`w-12 h-12 rounded-full flex items-center justify-center ${
                 selfieUrl
                   ? "bg-green-100"
-                  : "bg-zinc-100"
+                  : "bg-surface-container-high"
               }`}
             >
               <Camera
-                className={`w-6 h-6 ${selfieUrl ? "text-green-600" : "text-zinc-400"}`}
+                className={`w-6 h-6 ${selfieUrl ? "text-green-600" : "text-on-surface-variant"}`}
               />
             </div>
             <div>
               <span
-                className={`text-sm font-medium ${selfieUrl ? "text-green-600" : "text-zinc-600"}`}
+                className={`text-sm font-medium ${selfieUrl ? "text-green-600" : "text-on-surface-variant"}`}
               >
                 {selfieUrl ? "Selfie uploaded" : "Upload a selfie"}
               </span>
-              <span className="text-xs text-zinc-400 block">
+              <span className="text-xs text-on-surface-variant block">
                 {selfieUrl ? "Click to replace" : "Clear photo of your face"}
               </span>
             </div>
@@ -241,15 +241,15 @@ export default function VerificationForm() {
         <div
           id="verification-form-error"
           role="alert"
-          className="bg-red-50 border border-red-100 rounded-xl p-4"
+          className="bg-red-50 border border-red-100 rounded-lg p-4"
         >
           <p className="text-sm text-red-600">{error}</p>
         </div>
       )}
 
       {/* Privacy Notice */}
-      <div className="bg-zinc-50 rounded-xl p-4">
-        <p className="text-xs text-zinc-500">
+      <div className="bg-surface-container-high rounded-lg p-4">
+        <p className="text-xs text-on-surface-variant">
           Your documents are securely stored and will only be used for identity
           verification purposes. We follow strict privacy guidelines and will
           never share your documents with third parties.
@@ -260,7 +260,7 @@ export default function VerificationForm() {
       <button
         type="submit"
         disabled={isSubmitting || !documentUrl}
-        className="w-full bg-zinc-900 text-white py-3 px-6 rounded-xl font-medium hover:bg-zinc-800 disabled:opacity-60 disabled:cursor-not-allowed transition-all flex items-center justify-center gap-2"
+        className="w-full bg-primary text-white py-3 px-6 rounded-lg font-medium hover:bg-primary/90 disabled:opacity-60 disabled:cursor-not-allowed transition-all flex items-center justify-center gap-2"
       >
         {isSubmitting ? (
           <>

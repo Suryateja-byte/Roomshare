@@ -201,23 +201,23 @@ export default function EditProfileClient({ user }: EditProfileClientProps) {
   };
 
   return (
-    <div className="min-h-screen bg-zinc-50 pt-24 pb-20">
+    <div className="min-h-screen bg-surface-canvas pt-24 pb-20">
       <div className="max-w-3xl mx-auto px-4 sm:px-6 lg:px-8">
         {/* Header */}
         <div className="mb-8">
           <Link
             href="/profile"
-            className="inline-flex items-center gap-2 text-sm font-medium text-zinc-500 hover:text-zinc-900 transition-colors mb-4 group"
+            className="inline-flex items-center gap-2 text-sm font-medium text-on-surface-variant hover:text-on-surface transition-colors mb-4 group"
           >
             <ArrowLeft className="w-4 h-4 transition-transform group-hover:-translate-x-1" />
             Back to Profile
           </Link>
           <div className="flex items-center justify-between">
             <div>
-              <h1 className="text-3xl font-bold tracking-tight text-zinc-900">
+              <h1 className="font-display text-3xl font-bold tracking-tight text-on-surface">
                 Edit Profile
               </h1>
-              <p className="text-zinc-500 mt-2">
+              <p className="text-on-surface-variant mt-2">
                 Update your photo and personal details.
               </p>
             </div>
@@ -236,10 +236,10 @@ export default function EditProfileClient({ user }: EditProfileClientProps) {
           className="space-y-8"
         >
           {/* Section: Profile Photo */}
-          <div className="bg-white rounded-2xl p-6 md:p-8 shadow-sm border border-zinc-200">
+          <div className="bg-surface-container-lowest rounded-2xl p-6 md:p-8 shadow-ambient border border-outline-variant/20">
             <div className="flex flex-col md:flex-row gap-8 items-start">
               <div className="relative group">
-                <div className="w-28 h-28 rounded-full overflow-hidden bg-zinc-100 ring-4 ring-zinc-50 border border-zinc-200">
+                <div className="w-28 h-28 rounded-full overflow-hidden bg-surface-container-high ring-4 ring-surface-canvas border border-outline-variant/20">
                   {imageUrl || user.image ? (
                     /* eslint-disable-next-line @next/next/no-img-element -- profile image may be blob URL during upload */
                     <img
@@ -248,7 +248,7 @@ export default function EditProfileClient({ user }: EditProfileClientProps) {
                       className="w-full h-full object-cover transition-opacity group-hover:opacity-75"
                     />
                   ) : (
-                    <div className="w-full h-full flex items-center justify-center text-zinc-400 text-3xl font-medium">
+                    <div className="w-full h-full flex items-center justify-center text-on-surface-variant text-3xl font-medium">
                       {(name || user.name || "U").charAt(0).toUpperCase()}
                     </div>
                   )}
@@ -268,10 +268,10 @@ export default function EditProfileClient({ user }: EditProfileClientProps) {
               </div>
               <div className="flex-1 space-y-4">
                 <div>
-                  <h2 className="text-lg font-semibold text-zinc-900 mb-1">
+                  <h2 className="font-display text-lg font-semibold text-on-surface mb-1">
                     Profile Photo
                   </h2>
-                  <p className="text-sm text-zinc-500">
+                  <p className="text-sm text-on-surface-variant">
                     Accepts JPG, PNG or WEBP. Max size of 5MB.
                   </p>
                 </div>
@@ -288,7 +288,7 @@ export default function EditProfileClient({ user }: EditProfileClientProps) {
                     type="button"
                     onClick={() => fileInputRef.current?.click()}
                     disabled={isUploading}
-                    className="px-4 py-2 bg-zinc-900 hover:bg-zinc-800 text-white text-sm font-medium rounded-full transition-colors shadow-sm disabled:opacity-60 disabled:cursor-not-allowed inline-flex items-center gap-2"
+                    className="px-4 py-2 bg-primary hover:bg-primary/90 text-on-primary text-sm font-medium rounded-full transition-colors shadow-ambient-sm disabled:opacity-60 disabled:cursor-not-allowed inline-flex items-center gap-2"
                   >
                     {isUploading && (
                       <Loader2 className="w-4 h-4 animate-spin" />
@@ -300,7 +300,7 @@ export default function EditProfileClient({ user }: EditProfileClientProps) {
                       type="button"
                       onClick={() => setImageUrl("")}
                       disabled={isUploading}
-                      className="px-4 py-2 bg-white border border-zinc-200 hover:bg-zinc-50 text-zinc-700 text-sm font-medium rounded-full transition-colors disabled:opacity-60"
+                      className="px-4 py-2 bg-surface-container-lowest border border-outline-variant/20 hover:bg-surface-canvas text-on-surface-variant text-sm font-medium rounded-full transition-colors disabled:opacity-60"
                     >
                       Remove
                     </button>
@@ -311,9 +311,9 @@ export default function EditProfileClient({ user }: EditProfileClientProps) {
           </div>
 
           {/* Section: Personal Information */}
-          <div className="bg-white rounded-2xl p-6 md:p-8 shadow-sm border border-zinc-200 space-y-6">
-            <h2 className="text-lg font-semibold text-zinc-900 flex items-center gap-2">
-              <User className="w-5 h-5 text-zinc-400" />
+          <div className="bg-surface-container-lowest rounded-2xl p-6 md:p-8 shadow-ambient border border-outline-variant/20 space-y-6">
+            <h2 className="font-display text-lg font-semibold text-on-surface flex items-center gap-2">
+              <User className="w-5 h-5 text-on-surface-variant" />
               Personal Information
             </h2>
 
@@ -321,7 +321,7 @@ export default function EditProfileClient({ user }: EditProfileClientProps) {
               <div className="space-y-2">
                 <Label
                   htmlFor="fullName"
-                  className="block text-sm font-medium text-zinc-700"
+                  className="block text-sm font-medium text-on-surface-variant"
                 >
                   Full Name
                 </Label>
@@ -333,14 +333,14 @@ export default function EditProfileClient({ user }: EditProfileClientProps) {
                   placeholder="Your full name"
                   required
                   data-testid="profile-name-input"
-                  className="w-full px-4 py-2.5 rounded-xl border border-zinc-200 bg-zinc-50 text-zinc-900 focus:outline-none focus:ring-2 focus:ring-zinc-900 focus:bg-white transition-all placeholder:text-zinc-600"
+                  className="w-full px-4 py-2.5 rounded-xl border border-outline-variant/20 bg-surface-canvas text-on-surface focus:outline-none focus:ring-2 focus:ring-primary focus:bg-surface-container-lowest transition-all placeholder:text-on-surface-variant"
                 />
               </div>
 
               <div className="space-y-2">
                 <Label
                   htmlFor="email"
-                  className="block text-sm font-medium text-zinc-700"
+                  className="block text-sm font-medium text-on-surface-variant"
                 >
                   Email Address
                 </Label>
@@ -350,11 +350,11 @@ export default function EditProfileClient({ user }: EditProfileClientProps) {
                     id="email"
                     value={user.email || ""}
                     disabled
-                    className="w-full px-4 py-2.5 pr-11 rounded-xl border border-zinc-200 bg-zinc-100 text-zinc-500 cursor-not-allowed"
+                    className="w-full px-4 py-2.5 pr-11 rounded-xl border border-outline-variant/20 bg-surface-container-high text-on-surface-variant cursor-not-allowed"
                   />
-                  <Lock className="absolute right-4 w-4 h-4 text-zinc-400 pointer-events-none" />
+                  <Lock className="absolute right-4 w-4 h-4 text-on-surface-variant pointer-events-none" />
                 </div>
-                <p className="text-xs text-zinc-400">
+                <p className="text-xs text-on-surface-variant">
                   Contact support to change email.
                 </p>
               </div>
@@ -363,7 +363,7 @@ export default function EditProfileClient({ user }: EditProfileClientProps) {
             <div className="space-y-2">
               <Label
                 htmlFor="bio"
-                className="block text-sm font-medium text-zinc-700"
+                className="block text-sm font-medium text-on-surface-variant"
               >
                 Bio
               </Label>
@@ -374,10 +374,10 @@ export default function EditProfileClient({ user }: EditProfileClientProps) {
                 placeholder="Tell others a bit about yourself..."
                 rows={4}
                 maxLength={500}
-                className="w-full px-4 py-3 rounded-xl border border-zinc-200 bg-zinc-50 text-zinc-900 focus:outline-none focus:ring-2 focus:ring-zinc-900 focus:bg-white transition-all placeholder:text-zinc-600 resize-none"
+                className="w-full px-4 py-3 rounded-xl border border-outline-variant/20 bg-surface-canvas text-on-surface focus:outline-none focus:ring-2 focus:ring-primary focus:bg-surface-container-lowest transition-all placeholder:text-on-surface-variant resize-none"
               />
               <div className="flex justify-end">
-                <span className="text-xs text-zinc-400">
+                <span className="text-xs text-on-surface-variant">
                   {bio.length}/500 characters
                 </span>
               </div>
@@ -385,9 +385,9 @@ export default function EditProfileClient({ user }: EditProfileClientProps) {
           </div>
 
           {/* Section: Details & Preferences */}
-          <div className="bg-white rounded-2xl p-6 md:p-8 shadow-sm border border-zinc-200 space-y-6">
-            <h2 className="text-lg font-semibold text-zinc-900 flex items-center gap-2">
-              <MapPin className="w-5 h-5 text-zinc-400" />
+          <div className="bg-surface-container-lowest rounded-2xl p-6 md:p-8 shadow-ambient border border-outline-variant/20 space-y-6">
+            <h2 className="font-display text-lg font-semibold text-on-surface flex items-center gap-2">
+              <MapPin className="w-5 h-5 text-on-surface-variant" />
               Details & Preferences
             </h2>
 
@@ -395,25 +395,25 @@ export default function EditProfileClient({ user }: EditProfileClientProps) {
               <div className="space-y-2">
                 <Label
                   htmlFor="location"
-                  className="block text-sm font-medium text-zinc-700"
+                  className="block text-sm font-medium text-on-surface-variant"
                 >
                   Location
                 </Label>
                 <div className="relative flex items-center">
-                  <Globe className="absolute left-4 w-4 h-4 text-zinc-400 pointer-events-none z-10" />
+                  <Globe className="absolute left-4 w-4 h-4 text-on-surface-variant pointer-events-none z-10" />
                   <Input
                     type="text"
                     id="location"
                     value={countryOfOrigin}
                     onChange={(e) => setCountryOfOrigin(e.target.value)}
                     placeholder="e.g., United States"
-                    className="w-full !pl-11 pr-4 py-2.5 rounded-xl border border-zinc-200 bg-zinc-50 text-zinc-900 focus:outline-none focus:ring-2 focus:ring-zinc-900 focus:bg-white transition-all"
+                    className="w-full !pl-11 pr-4 py-2.5 rounded-xl border border-outline-variant/20 bg-surface-canvas text-on-surface focus:outline-none focus:ring-2 focus:ring-primary focus:bg-surface-container-lowest transition-all"
                   />
                 </div>
               </div>
 
               <div className="space-y-2">
-                <Label className="block text-sm font-medium text-zinc-700">
+                <Label className="block text-sm font-medium text-on-surface-variant">
                   Languages
                 </Label>
                 <div className="flex flex-wrap gap-2 p-1">
@@ -421,13 +421,13 @@ export default function EditProfileClient({ user }: EditProfileClientProps) {
                   {languages.map((lang) => (
                     <div
                       key={lang}
-                      className="inline-flex items-center gap-1.5 px-3 py-1.5 bg-zinc-100 text-zinc-700 rounded-full text-sm border border-zinc-200 group"
+                      className="inline-flex items-center gap-1.5 px-3 py-1.5 bg-surface-container-high text-on-surface-variant rounded-full text-sm border border-outline-variant/20 group"
                     >
                       <span>{lang}</span>
                       <button
                         type="button"
                         onClick={() => handleRemoveLanguage(lang)}
-                        className="text-zinc-400 hover:text-red-500 transition-colors"
+                        className="text-on-surface-variant hover:text-red-500 transition-colors"
                       >
                         <X className="w-3 h-3" />
                       </button>
@@ -460,7 +460,7 @@ export default function EditProfileClient({ user }: EditProfileClientProps) {
                         }}
                         placeholder="Type language..."
                         aria-label="Add a language"
-                        className="w-24 px-2 py-1 text-sm rounded-lg border border-zinc-300 bg-white focus:outline-none focus:ring-1 focus:ring-zinc-400"
+                        className="w-24 px-2 py-1 text-sm rounded-lg border border-outline-variant/20 bg-surface-container-lowest focus:outline-none focus:ring-1 focus:ring-primary"
                         autoFocus
                       />
                     </div>
@@ -468,7 +468,7 @@ export default function EditProfileClient({ user }: EditProfileClientProps) {
                     <button
                       type="button"
                       onClick={() => setShowLanguageInput(true)}
-                      className="inline-flex items-center gap-1.5 px-3 py-1.5 bg-white text-zinc-500 rounded-full text-sm border border-dashed border-zinc-300 hover:border-zinc-400 hover:text-zinc-700 transition-all"
+                      className="inline-flex items-center gap-1.5 px-3 py-1.5 bg-surface-container-lowest text-on-surface-variant rounded-full text-sm border border-dashed border-outline-variant/20 hover:border-outline-variant/40 hover:text-on-surface transition-all"
                     >
                       <Plus className="w-3 h-3" />
                       Add
@@ -479,7 +479,7 @@ export default function EditProfileClient({ user }: EditProfileClientProps) {
                 {/* Common Languages - show when no languages selected */}
                 {languages.length === 0 && (
                   <div className="pt-2">
-                    <p className="text-xs text-zinc-500 mb-2">
+                    <p className="text-xs text-on-surface-variant mb-2">
                       Suggestions:
                     </p>
                     <div className="flex flex-wrap gap-1.5">
@@ -488,7 +488,7 @@ export default function EditProfileClient({ user }: EditProfileClientProps) {
                           key={lang}
                           type="button"
                           onClick={() => handleAddLanguage(lang)}
-                          className="px-2 py-0.5 text-xs border border-zinc-200 rounded-full hover:bg-zinc-50 transition-colors"
+                          className="px-2 py-0.5 text-xs border border-outline-variant/20 rounded-full hover:bg-surface-canvas transition-colors"
                         >
                           {lang}
                         </button>
@@ -517,7 +517,7 @@ export default function EditProfileClient({ user }: EditProfileClientProps) {
             <Link href="/profile" className="w-full sm:w-auto">
               <button
                 type="button"
-                className="w-full sm:w-auto px-6 py-2.5 rounded-full border border-zinc-200 text-zinc-600 hover:bg-zinc-50 font-medium transition-all text-sm"
+                className="w-full sm:w-auto px-6 py-2.5 rounded-full border border-outline-variant/20 text-on-surface-variant hover:bg-surface-canvas font-medium transition-all text-sm"
               >
                 Cancel
               </button>
@@ -526,7 +526,7 @@ export default function EditProfileClient({ user }: EditProfileClientProps) {
               type="submit"
               disabled={isLoading}
               data-testid="profile-save-button"
-              className="w-full sm:w-auto px-8 py-2.5 rounded-full bg-zinc-900 hover:bg-zinc-800 text-white font-medium transition-all shadow-lg shadow-zinc-900/20 active:scale-[0.98] text-sm flex items-center justify-center gap-2 disabled:opacity-60 disabled:cursor-not-allowed"
+              className="w-full sm:w-auto px-8 py-2.5 rounded-full bg-primary hover:bg-primary/90 text-on-primary font-medium transition-all shadow-ambient shadow-primary/20 active:scale-[0.98] text-sm flex items-center justify-center gap-2 disabled:opacity-60 disabled:cursor-not-allowed"
             >
               <Save className="w-4 h-4" />
               {isLoading ? "Saving..." : "Save Changes"}
