@@ -330,28 +330,28 @@ export function NearbyPlacesCard({
   // C13 FIX: Enhanced skeleton UI during Google Maps script load
   if (status === "loading") {
     return (
-      <div className="bg-white dark:bg-zinc-800 rounded-[24px] shadow-lg shadow-zinc-200/50 dark:shadow-zinc-900/50 border border-zinc-100 dark:border-zinc-700 overflow-hidden">
+      <div className="bg-surface-container-lowest rounded-[24px] shadow-lg shadow-on-surface/50 border border-outline-variant/20 overflow-hidden">
         {/* Header skeleton */}
-        <div className="px-5 py-4 border-b border-zinc-50 dark:border-zinc-700">
+        <div className="px-5 py-4 border-b border-outline-variant/20">
           <div className="flex items-center gap-2">
-            <div className="w-6 h-6 rounded-full bg-zinc-100 dark:bg-zinc-700 animate-pulse" />
+            <div className="w-6 h-6 rounded-full bg-surface-container-high animate-pulse" />
             <div className="flex-1">
-              <div className="h-4 w-32 bg-zinc-100 dark:bg-zinc-700 rounded animate-pulse" />
+              <div className="h-4 w-32 bg-surface-container-high rounded animate-pulse" />
             </div>
           </div>
         </div>
         {/* Content skeleton - mimics place list items */}
-        <div className="p-4 bg-zinc-50/50 dark:bg-zinc-800/50 space-y-3">
+        <div className="p-4 bg-surface-canvas/50 space-y-3">
           {/* Place item skeletons */}
           {[1, 2, 3].map((i) => (
             <div key={i} className="flex items-start gap-3 p-2">
               {/* Place icon placeholder */}
-              <div className="w-10 h-10 rounded-lg bg-zinc-200 dark:bg-zinc-700 animate-pulse flex-shrink-0" />
+              <div className="w-10 h-10 rounded-lg bg-surface-container-high animate-pulse flex-shrink-0" />
               <div className="flex-1 space-y-2">
                 {/* Place name */}
-                <div className="h-4 w-3/4 bg-zinc-200 dark:bg-zinc-700 rounded animate-pulse" />
+                <div className="h-4 w-3/4 bg-surface-container-high rounded animate-pulse" />
                 {/* Place details */}
-                <div className="h-3 w-1/2 bg-zinc-100 dark:bg-zinc-700/50 rounded animate-pulse" />
+                <div className="h-3 w-1/2 bg-surface-container-high rounded animate-pulse" />
               </div>
             </div>
           ))}
@@ -362,10 +362,10 @@ export function NearbyPlacesCard({
             aria-label="Searching nearby places"
           >
             <Loader2
-              className="w-4 h-4 animate-spin text-zinc-400"
+              className="w-4 h-4 animate-spin text-on-surface-variant"
               aria-hidden="true"
             />
-            <span className="text-xs text-zinc-500 dark:text-zinc-400">
+            <span className="text-xs text-on-surface-variant">
               Searching nearby...
             </span>
           </div>
@@ -377,21 +377,21 @@ export function NearbyPlacesCard({
   // Render error state
   if (status === "error") {
     return (
-      <div className="bg-white dark:bg-zinc-800 rounded-[24px] p-5 shadow-lg shadow-zinc-200/50 dark:shadow-zinc-900/50 border border-red-100 dark:border-red-900/50">
+      <div className="bg-surface-container-lowest rounded-[24px] p-5 shadow-lg shadow-on-surface/50 border border-red-100">
         <div className="flex items-start gap-3">
-          <div className="w-6 h-6 rounded-full bg-red-50 dark:bg-red-900/30 flex items-center justify-center flex-shrink-0">
-            <AlertCircle className="w-3.5 h-3.5 text-red-500 dark:text-red-400" />
+          <div className="w-6 h-6 rounded-full bg-red-50 flex items-center justify-center flex-shrink-0">
+            <AlertCircle className="w-3.5 h-3.5 text-red-500" />
           </div>
           <div className="flex-1">
-            <p className="text-sm font-semibold text-red-700 dark:text-red-400">
+            <p className="text-sm font-semibold text-red-700">
               Unable to search places
             </p>
-            <p className="text-xs text-red-600/80 dark:text-red-400/70 mt-1">
+            <p className="text-xs text-red-600/80 mt-1">
               {errorMessage || "An unexpected error occurred"}
             </p>
             <button
               onClick={handleRetry}
-              className="mt-3 inline-flex items-center gap-1.5 text-xs font-medium text-zinc-600 dark:text-zinc-400 hover:text-zinc-900 dark:hover:text-zinc-200 transition-colors"
+              className="mt-3 inline-flex items-center gap-1.5 text-xs font-medium text-on-surface-variant hover:text-on-surface transition-colors"
             >
               <RefreshCw className="w-3 h-3" />
               Try again
@@ -405,16 +405,16 @@ export function NearbyPlacesCard({
   // C2 FIX: Render rate limited state (when LLM tool invoked but rate limit exceeded)
   if (status === "rate-limited") {
     return (
-      <div className="bg-white dark:bg-zinc-800 rounded-[24px] p-5 shadow-lg shadow-zinc-200/50 dark:shadow-zinc-900/50 border border-amber-100 dark:border-amber-900/50">
+      <div className="bg-surface-container-lowest rounded-[24px] p-5 shadow-lg shadow-on-surface/50 border border-amber-100">
         <div className="flex items-start gap-3">
-          <div className="w-6 h-6 rounded-full bg-amber-50 dark:bg-amber-900/30 flex items-center justify-center flex-shrink-0">
-            <AlertCircle className="w-3.5 h-3.5 text-amber-500 dark:text-amber-400" />
+          <div className="w-6 h-6 rounded-full bg-amber-50 flex items-center justify-center flex-shrink-0">
+            <AlertCircle className="w-3.5 h-3.5 text-amber-500" />
           </div>
           <div>
-            <p className="text-sm font-semibold text-amber-700 dark:text-amber-400">
+            <p className="text-sm font-semibold text-amber-700">
               Search limit reached
             </p>
-            <p className="text-xs text-amber-600/80 dark:text-amber-400/70 mt-1">
+            <p className="text-xs text-amber-600/80 mt-1">
               You&apos;ve used all {remainingSearches === 0 ? "your" : ""}{" "}
               nearby searches for this listing. Try asking the AI about the
               neighborhood instead!
@@ -432,16 +432,16 @@ export function NearbyPlacesCard({
     const wasExpanded = hasExpandedOnce || currentRadius > INITIAL_RADIUS;
 
     return (
-      <div className="bg-white dark:bg-zinc-800 rounded-[24px] p-5 shadow-lg shadow-zinc-200/50 dark:shadow-zinc-900/50 border border-zinc-100 dark:border-zinc-700">
+      <div className="bg-surface-container-lowest rounded-[24px] p-5 shadow-lg shadow-on-surface/50 border border-outline-variant/20">
         <div className="flex items-start gap-3">
-          <div className="w-6 h-6 rounded-full bg-zinc-100 dark:bg-zinc-700 flex items-center justify-center flex-shrink-0">
-            <MapPin className="w-3.5 h-3.5 text-zinc-400 dark:text-zinc-500" />
+          <div className="w-6 h-6 rounded-full bg-surface-container-high flex items-center justify-center flex-shrink-0">
+            <MapPin className="w-3.5 h-3.5 text-on-surface-variant" />
           </div>
           <div>
-            <p className="text-sm font-semibold text-zinc-700 dark:text-zinc-300">
+            <p className="text-sm font-semibold text-on-surface-variant">
               No places found nearby
             </p>
-            <p className="text-xs text-zinc-500 dark:text-zinc-400 mt-1">
+            <p className="text-xs text-on-surface-variant mt-1">
               We couldn&apos;t find any &quot;{queryText}&quot; within{" "}
               {radiusKm}km of this listing
               {wasExpanded && " (we expanded the search area)"}. Try a different
@@ -457,7 +457,7 @@ export function NearbyPlacesCard({
   return (
     <div
       ref={containerRef}
-      className="bg-white dark:bg-zinc-800 rounded-[24px] shadow-lg shadow-zinc-200/50 dark:shadow-zinc-900/50 border border-zinc-100 dark:border-zinc-700 overflow-hidden"
+      className="bg-surface-container-lowest rounded-[24px] shadow-lg shadow-on-surface/50 border border-outline-variant/20 overflow-hidden"
       // P3-B21 FIX: Accessibility - describe card purpose
       role="region"
       aria-label={`Nearby places search results for ${queryText}`}
@@ -465,18 +465,18 @@ export function NearbyPlacesCard({
       {/* Header - P2-01 FIX: Show query context for clarity */}
       {/* P3-B21 FIX: Added aria-label for header */}
       <header
-        className="px-5 py-4 border-b border-zinc-50 dark:border-zinc-700"
+        className="px-5 py-4 border-b border-outline-variant/20"
         aria-label="Search results header"
       >
         <div className="flex items-center gap-2">
           <div
-            className="w-6 h-6 rounded-full bg-blue-50 dark:bg-blue-900/30 flex items-center justify-center flex-shrink-0"
+            className="w-6 h-6 rounded-full bg-blue-50 flex items-center justify-center flex-shrink-0"
             aria-hidden="true"
           >
-            <MapPin className="w-3.5 h-3.5 text-blue-500 dark:text-blue-400" />
+            <MapPin className="w-3.5 h-3.5 text-blue-500" />
           </div>
           <div className="flex flex-col min-w-0">
-            <span className="text-sm font-semibold text-zinc-800 dark:text-zinc-200 tracking-tight truncate">
+            <span className="text-sm font-semibold text-on-surface tracking-tight truncate">
               {/* P2-01 FIX: Show what was searched for */}
               {normalizedIntent.includedTypes &&
               normalizedIntent.includedTypes.length > 1
@@ -484,7 +484,7 @@ export function NearbyPlacesCard({
                 : `Nearby "${queryText}"`}
             </span>
             {currentRadius > INITIAL_RADIUS && (
-              <span className="text-[10px] text-zinc-400 dark:text-zinc-500 tracking-wide">
+              <span className="text-[10px] text-on-surface-variant tracking-wide">
                 Expanded search radius ({(currentRadius / 1000).toFixed(1)}km)
               </span>
             )}
@@ -492,8 +492,8 @@ export function NearbyPlacesCard({
         </div>
         {/* P2-C3 FIX: Multi-brand warning */}
         {multiBrandDetected && (
-          <div className="mt-2 px-3 py-1.5 bg-amber-50 dark:bg-amber-900/20 border border-amber-100 dark:border-amber-800 rounded-lg">
-            <p className="text-[11px] text-amber-700 dark:text-amber-300 leading-snug">
+          <div className="mt-2 px-3 py-1.5 bg-amber-50 border border-amber-100 rounded-lg">
+            <p className="text-[11px] text-amber-700 leading-snug">
               <strong>Note:</strong> Results may not include all brands
               mentioned. Try searching for each brand separately for best
               results.
@@ -503,7 +503,7 @@ export function NearbyPlacesCard({
       </header>
 
       {/* Body: Places UI Kit Content */}
-      <div className="p-3 sm:p-4 bg-zinc-50/50 dark:bg-zinc-800/50">
+      <div className="p-3 sm:p-4 bg-surface-canvas/50">
         {/* Google UI */}
         <div ref={searchContainerRef} />
 

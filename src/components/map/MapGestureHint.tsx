@@ -34,13 +34,13 @@ export function MapGestureHint() {
 
   return (
     <div
-      className="absolute bottom-20 left-1/2 -translate-x-1/2 z-[50] bg-zinc-900/90 dark:bg-white/90 backdrop-blur-md text-white dark:text-zinc-900 rounded-2xl px-4 py-3 shadow-xl max-w-[260px] text-center animate-[fadeIn_300ms_ease-out] border border-white/10"
+      className="absolute bottom-20 left-1/2 -translate-x-1/2 z-[50] bg-on-surface/90 backdrop-blur-md text-white rounded-2xl px-4 py-3 shadow-xl max-w-[260px] text-center animate-[fadeIn_300ms_ease-out] border border-white/10"
       role="status"
       aria-live="polite"
     >
       <button
         onClick={dismiss}
-        className="absolute top-1 right-1 p-1 min-w-[44px] min-h-[44px] flex items-center justify-center text-white/60 dark:text-zinc-900/60 hover:text-white dark:hover:text-zinc-900"
+        className="absolute top-1 right-1 p-1 min-w-[44px] min-h-[44px] flex items-center justify-center text-white/60 hover:text-white"
         aria-label="Dismiss hint"
       >
         <X className="w-3.5 h-3.5" />

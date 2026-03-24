@@ -104,10 +104,10 @@ export function UserMarker({
       <button
         onClick={onToggleDropMode}
         className={cn(
-          "absolute bottom-4 left-4 z-[50] flex items-center justify-center gap-2 px-4 py-2.5 rounded-full shadow-lg border text-sm font-medium transition-all min-h-[44px] backdrop-blur-md focus:outline-none focus-visible:ring-2 focus-visible:ring-zinc-900/30 dark:focus-visible:ring-zinc-400/40 focus-visible:ring-offset-2",
+          "absolute bottom-4 left-4 z-[50] flex items-center justify-center gap-2 px-4 py-2.5 rounded-full shadow-lg border text-sm font-medium transition-all min-h-[44px] backdrop-blur-md focus:outline-none focus-visible:ring-2 focus-visible:ring-primary/30 focus-visible:ring-offset-2",
           isDropMode
             ? "bg-rose-500/90 text-white border-rose-500/90 ring-2 ring-rose-300/50"
-            : "bg-white/90 dark:bg-zinc-900/90 text-zinc-700 dark:text-zinc-300 border-zinc-200/50 dark:border-zinc-700/50 hover:bg-zinc-50 dark:hover:bg-zinc-800"
+            : "bg-white/90 text-on-surface-variant border-outline-variant/20/50 hover:bg-surface-canvas"
         )}
         aria-label={isDropMode ? "Cancel drop pin" : "Drop a pin on the map"}
         title={isDropMode ? "Cancel" : "Drop a pin"}
@@ -139,7 +139,7 @@ export function UserMarker({
             <div
               className={cn(
                 "w-8 h-8 rounded-full flex items-center justify-center shadow-lg",
-                "bg-rose-500 text-white ring-2 ring-white dark:ring-zinc-900"
+                "bg-rose-500 text-white ring-2 ring-white"
               )}
             >
               <MapPin className="w-4 h-4" />
@@ -152,15 +152,15 @@ export function UserMarker({
               className={cn(
                 "absolute top-full mt-2 px-2 py-1 rounded-md shadow-md text-xs whitespace-nowrap max-w-[200px] truncate",
                 isDarkMode
-                  ? "bg-zinc-800 text-zinc-200"
-                  : "bg-white text-zinc-800"
+                  ? "bg-on-surface text-on-surface-variant"
+                  : "bg-surface-container-lowest text-on-surface"
               )}
             >
               <div className="flex items-center gap-1">
                 {pin.address ? (
                   <span className="truncate">{pin.address.split(",")[0]}</span>
                 ) : (
-                  <span className="text-zinc-400">Custom pin</span>
+                  <span className="text-on-surface-variant">Custom pin</span>
                 )}
                 {/* P1-FIX (#97): Ensure 44px minimum touch target for WCAG 2.5.5.
                                     The visual icon is small (12px) but touch area is 44x44 via negative margin. */}
@@ -176,7 +176,7 @@ export function UserMarker({
                 </button>
               </div>
               {distance !== null && (
-                <div className="flex items-center gap-1 text-zinc-500 dark:text-zinc-400 mt-0.5">
+                <div className="flex items-center gap-1 text-on-surface-variant mt-0.5">
                   <Navigation className="w-3 h-3" />
                   <span>{formatDistance(distance)} to hovered listing</span>
                 </div>

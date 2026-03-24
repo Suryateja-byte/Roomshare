@@ -43,7 +43,7 @@ export default function ProfileCompletionBanner({
             {/* Progress bar */}
             <div className="w-full bg-white/20 rounded-full h-2 mb-3">
               <div
-                className="bg-white rounded-full h-2 transition-all duration-500"
+                className="bg-surface-container-lowest rounded-full h-2 transition-all duration-500"
                 style={{ width: `${completion.percentage}%` }}
               />
             </div>
@@ -70,7 +70,7 @@ export default function ProfileCompletionBanner({
         <div className="flex items-center gap-2">
           <Link
             href="/profile/edit"
-            className="flex items-center gap-1 px-3 py-1.5 bg-white text-indigo-600 rounded-lg text-sm font-medium hover:bg-white/90 transition-colors"
+            className="flex items-center gap-1 px-3 py-1.5 bg-surface-container-lowest text-primary rounded-lg text-sm font-medium hover:bg-white/90 transition-colors"
           >
             Complete
             <ChevronRight className="w-4 h-4" />

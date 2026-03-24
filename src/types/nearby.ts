@@ -132,184 +132,124 @@ export const RADIUS_OPTIONS = [
 // Category color configuration for premium UI
 export interface CategoryColorConfig {
   bg: string;
-  bgDark: string;
   icon: string;
-  iconDark: string;
   accent: string;
   markerBg: string;
   markerBorder: string;
-  markerBgDark: string;
-  markerBorderDark: string;
 }
 
 export const CATEGORY_COLORS: Record<string, CategoryColorConfig> = {
   // Grocery stores (valid Radar API category)
   grocery: {
     bg: "bg-orange-50",
-    bgDark: "dark:bg-orange-900/20",
     icon: "text-orange-600",
-    iconDark: "dark:text-orange-400",
     accent: "bg-orange-500",
     markerBg: "#fff7ed",
     markerBorder: "#ea580c",
-    markerBgDark: "#431407",
-    markerBorderDark: "#fb923c",
   },
   // Food-Grocery (valid Radar API category, same colors as grocery)
   "food-grocery": {
     bg: "bg-orange-50",
-    bgDark: "dark:bg-orange-900/20",
     icon: "text-orange-600",
-    iconDark: "dark:text-orange-400",
     accent: "bg-orange-500",
     markerBg: "#fff7ed",
     markerBorder: "#ea580c",
-    markerBgDark: "#431407",
-    markerBorderDark: "#fb923c",
   },
   // Supermarket (valid Radar API category, same colors as grocery)
   supermarket: {
     bg: "bg-orange-50",
-    bgDark: "dark:bg-orange-900/20",
     icon: "text-orange-600",
-    iconDark: "dark:text-orange-400",
     accent: "bg-orange-500",
     markerBg: "#fff7ed",
     markerBorder: "#ea580c",
-    markerBgDark: "#431407",
-    markerBorderDark: "#fb923c",
   },
   // Restaurants (valid Radar API category)
   restaurant: {
     bg: "bg-rose-50",
-    bgDark: "dark:bg-rose-900/20",
     icon: "text-rose-600",
-    iconDark: "dark:text-rose-400",
     accent: "bg-rose-500",
     markerBg: "#fff1f2",
     markerBorder: "#e11d48",
-    markerBgDark: "#4c0519",
-    markerBorderDark: "#fb7185",
   },
   // Food & Beverage (valid Radar API category, same colors as restaurant)
   "food-beverage": {
     bg: "bg-rose-50",
-    bgDark: "dark:bg-rose-900/20",
     icon: "text-rose-600",
-    iconDark: "dark:text-rose-400",
     accent: "bg-rose-500",
     markerBg: "#fff1f2",
     markerBorder: "#e11d48",
-    markerBgDark: "#4c0519",
-    markerBorderDark: "#fb7185",
   },
   // Shopping (valid Radar API category)
   shopping: {
     bg: "bg-purple-50",
-    bgDark: "dark:bg-purple-900/20",
     icon: "text-purple-600",
-    iconDark: "dark:text-purple-400",
     accent: "bg-purple-500",
     markerBg: "#faf5ff",
     markerBorder: "#9333ea",
-    markerBgDark: "#3b0764",
-    markerBorderDark: "#c084fc",
   },
   // Shopping-Retail (valid Radar API category, same colors as shopping)
   "shopping-retail": {
     bg: "bg-purple-50",
-    bgDark: "dark:bg-purple-900/20",
     icon: "text-purple-600",
-    iconDark: "dark:text-purple-400",
     accent: "bg-purple-500",
     markerBg: "#faf5ff",
     markerBorder: "#9333ea",
-    markerBgDark: "#3b0764",
-    markerBorderDark: "#c084fc",
   },
   // Gas stations (valid Radar API category)
   "gas-station": {
     bg: "bg-amber-50",
-    bgDark: "dark:bg-amber-900/20",
     icon: "text-amber-600",
-    iconDark: "dark:text-amber-400",
     accent: "bg-amber-500",
     markerBg: "#fffbeb",
     markerBorder: "#d97706",
-    markerBgDark: "#451a03",
-    markerBorderDark: "#fbbf24",
   },
   // Gym (valid Radar API category)
   gym: {
     bg: "bg-indigo-50",
-    bgDark: "dark:bg-indigo-900/20",
     icon: "text-indigo-600",
-    iconDark: "dark:text-indigo-400",
     accent: "bg-indigo-500",
     markerBg: "#eef2ff",
     markerBorder: "#4f46e5",
-    markerBgDark: "#1e1b4b",
-    markerBorderDark: "#a5b4fc",
   },
   // Fitness & Recreation (valid Radar API category, same colors as gym)
   "fitness-recreation": {
     bg: "bg-indigo-50",
-    bgDark: "dark:bg-indigo-900/20",
     icon: "text-indigo-600",
-    iconDark: "dark:text-indigo-400",
     accent: "bg-indigo-500",
     markerBg: "#eef2ff",
     markerBorder: "#4f46e5",
-    markerBgDark: "#1e1b4b",
-    markerBorderDark: "#a5b4fc",
   },
   // Health & Medicine (valid Radar API category)
   "health-medicine": {
     bg: "bg-emerald-50",
-    bgDark: "dark:bg-emerald-900/20",
     icon: "text-emerald-600",
-    iconDark: "dark:text-emerald-400",
     accent: "bg-emerald-500",
     markerBg: "#ecfdf5",
     markerBorder: "#059669",
-    markerBgDark: "#022c22",
-    markerBorderDark: "#34d399",
   },
   // Pharmacy (valid Radar API category, same colors as health-medicine)
   pharmacy: {
     bg: "bg-emerald-50",
-    bgDark: "dark:bg-emerald-900/20",
     icon: "text-emerald-600",
-    iconDark: "dark:text-emerald-400",
     accent: "bg-emerald-500",
     markerBg: "#ecfdf5",
     markerBorder: "#059669",
-    markerBgDark: "#022c22",
-    markerBorderDark: "#34d399",
   },
   // Drugstore (valid Radar API category, same colors as health-medicine)
   drugstore: {
     bg: "bg-emerald-50",
-    bgDark: "dark:bg-emerald-900/20",
     icon: "text-emerald-600",
-    iconDark: "dark:text-emerald-400",
     accent: "bg-emerald-500",
     markerBg: "#ecfdf5",
     markerBorder: "#059669",
-    markerBgDark: "#022c22",
-    markerBorderDark: "#34d399",
   },
   // Fallback for unknown categories
   default: {
     bg: "bg-zinc-50",
-    bgDark: "dark:bg-zinc-800",
     icon: "text-zinc-600",
-    iconDark: "dark:text-zinc-400",
     accent: "bg-zinc-500",
     markerBg: "#fafafa",
     markerBorder: "#71717a",
-    markerBgDark: "#27272a",
-    markerBorderDark: "#a1a1aa",
   },
 };
 

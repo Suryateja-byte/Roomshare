@@ -64,7 +64,7 @@ describe("FooterNavLink", () => {
     );
     const link = screen.getByRole("link", { name: "About" });
     expect(link.className).toContain("text-zinc-900");
-    expect(link.className).toContain("dark:text-white");
+    expect(link.className).toContain("text-zinc-900");
   });
 
   it("does not apply active styling when pathname differs", () => {
@@ -78,7 +78,7 @@ describe("FooterNavLink", () => {
       </FooterNavLink>
     );
     const link = screen.getByRole("link", { name: "About" });
-    expect(link.className).not.toContain("dark:text-white");
+    expect(link.className).not.toContain("text-zinc-900");
   });
 
   it("passes through custom className", () => {

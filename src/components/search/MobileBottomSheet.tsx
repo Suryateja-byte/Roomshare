@@ -353,7 +353,7 @@ export default function MobileBottomSheet({
             animate={{ opacity: 0.3 }}
             exit={{ opacity: 0 }}
             transition={{ duration: 0.2 }}
-            className="fixed inset-0 z-30 bg-black pointer-events-none md:hidden"
+            className="fixed inset-0 z-30 bg-on-surface pointer-events-none md:hidden"
             data-testid="sheet-overlay"
             aria-hidden="true"
           />
@@ -364,7 +364,7 @@ export default function MobileBottomSheet({
         ref={sheetRef}
         role="region"
         aria-label="Search results"
-        className="fixed bottom-0 left-0 right-0 flex flex-col bg-white dark:bg-zinc-900 rounded-t-2xl shadow-[0_-4px_24px_rgba(0,0,0,0.12)] dark:shadow-[0_-4px_24px_rgba(0,0,0,0.4)]"
+        className="fixed bottom-0 left-0 right-0 flex flex-col bg-surface-container-lowest rounded-t-2xl shadow-[0_-4px_24px_rgba(0,0,0,0.12)][0_-4px_24px_rgba(0,0,0,0.4)]"
         animate={
           isDragging
             ? { height: displayHeightPx }
@@ -453,19 +453,19 @@ export default function MobileBottomSheet({
                 setSnapIndex(2);
               }
             }}
-            className="w-12 h-1.5 rounded-full bg-zinc-300 dark:bg-zinc-600 mx-auto mb-2 cursor-pointer focus:outline-none focus-visible:ring-2 focus-visible:ring-zinc-900/30 dark:focus-visible:ring-zinc-400/40 focus-visible:ring-offset-2"
+            className="w-12 h-1.5 rounded-full bg-surface-container-high mx-auto mb-2 cursor-pointer focus:outline-none focus-visible:ring-2 focus-visible:ring-primary/30 focus-visible:ring-offset-2"
           />
 
           {/* Header content */}
           <div className="flex items-center justify-between">
             <span
               data-testid="sheet-header-text"
-              className="text-sm font-semibold text-zinc-900 dark:text-white"
+              className="text-sm font-semibold text-on-surface"
             >
               {headerText || "Search results"}
             </span>
             {isCollapsed && (
-              <span className="text-xs text-zinc-500 dark:text-zinc-500">
+              <span className="text-xs text-on-surface-variant">
                 Pull up for listings
               </span>
             )}
@@ -473,7 +473,7 @@ export default function MobileBottomSheet({
               <div className="flex items-center gap-1">
                 <button
                   onClick={() => setSnapIndex((prev) => (prev === 2 ? 1 : 2))}
-                  className="text-xs text-zinc-500 dark:text-zinc-400 hover:text-zinc-700 dark:hover:text-zinc-200 px-2 py-1 rounded transition-colors focus:outline-none focus-visible:ring-2 focus-visible:ring-zinc-900/30 dark:focus-visible:ring-zinc-400/40"
+                  className="text-xs text-on-surface-variant hover:text-on-surface-variant px-2 py-1 rounded transition-colors focus:outline-none focus-visible:ring-2 focus-visible:ring-primary/30"
                   aria-label={
                     isExpanded ? "Collapse results" : "Expand results"
                   }
@@ -483,7 +483,7 @@ export default function MobileBottomSheet({
                 {/* P2-FIX (#123): Visible close button to dismiss sheet */}
                 <button
                   onClick={() => setSnapIndex(0)}
-                  className="w-8 h-8 flex items-center justify-center text-zinc-500 hover:text-zinc-600 dark:hover:text-zinc-300 rounded-md transition-colors focus:outline-none focus-visible:ring-2 focus-visible:ring-zinc-900/30 dark:focus-visible:ring-zinc-400/40"
+                  className="w-8 h-8 flex items-center justify-center text-on-surface-variant hover:text-on-surface-variant rounded-md transition-colors focus:outline-none focus-visible:ring-2 focus-visible:ring-primary/30"
                   aria-label="Minimize results panel"
                 >
                   <X className="w-4 h-4" />

@@ -4,12 +4,12 @@ import { ListingCardSkeleton } from "./ListingCardSkeleton";
 export function PageSkeleton() {
   return (
     <div
-      className="min-h-screen bg-zinc-50 dark:bg-zinc-900"
+      className="min-h-screen bg-surface-canvas"
       aria-busy="true"
       aria-label="Loading page content"
     >
       {/* Header skeleton */}
-      <header className="border-b border-zinc-200 dark:border-zinc-700 bg-white dark:bg-zinc-800 px-4 py-3">
+      <header className="border-b border-outline-variant/20 bg-surface-container-lowest px-4 py-3">
         <div className="mx-auto flex max-w-7xl items-center justify-between">
           <Skeleton variant="rounded" width={120} height={32} />
           <div className="flex items-center gap-4">
@@ -42,12 +42,12 @@ export function PageSkeleton() {
 export function DashboardSkeleton() {
   return (
     <div
-      className="min-h-screen bg-zinc-50 dark:bg-zinc-900"
+      className="min-h-screen bg-surface-canvas"
       aria-busy="true"
       aria-label="Loading dashboard"
     >
       {/* Sidebar skeleton */}
-      <aside className="fixed left-0 top-0 hidden h-full w-64 border-r border-zinc-200 dark:border-zinc-700 bg-white dark:bg-zinc-800 p-4 lg:block">
+      <aside className="fixed left-0 top-0 hidden h-full w-64 border-r border-outline-variant/20 bg-surface-container-lowest p-4 lg:block">
         <Skeleton variant="rounded" width={140} height={32} className="mb-8" />
         <nav className="space-y-2">
           {Array.from({ length: 6 }).map((_, i) => (
@@ -59,7 +59,7 @@ export function DashboardSkeleton() {
       {/* Main content */}
       <div className="lg:ml-64">
         {/* Header */}
-        <header className="border-b border-zinc-200 dark:border-zinc-700 bg-white dark:bg-zinc-800 px-6 py-4">
+        <header className="border-b border-outline-variant/20 bg-surface-container-lowest px-6 py-4">
           <div className="flex items-center justify-between">
             <Skeleton variant="text" width={200} height={28} />
             <div className="flex items-center gap-4">
@@ -74,7 +74,7 @@ export function DashboardSkeleton() {
           {Array.from({ length: 4 }).map((_, i) => (
             <div
               key={i}
-              className="rounded-lg border border-zinc-200 dark:border-zinc-700 bg-white dark:bg-zinc-800 p-4"
+              className="rounded-lg border border-outline-variant/20 bg-surface-container-lowest p-4"
             >
               <Skeleton
                 variant="text"
@@ -88,8 +88,8 @@ export function DashboardSkeleton() {
         </div>
 
         {/* Table skeleton */}
-        <div className="mx-6 rounded-lg border border-zinc-200 dark:border-zinc-700 bg-white dark:bg-zinc-800">
-          <div className="border-b border-zinc-200 dark:border-zinc-700 p-4">
+        <div className="mx-6 rounded-lg border border-outline-variant/20 bg-surface-container-lowest">
+          <div className="border-b border-outline-variant/20 p-4">
             <Skeleton variant="text" width={150} height={24} />
           </div>
           <div className="p-4">
@@ -123,7 +123,7 @@ export function ProfileSkeleton() {
         {Array.from({ length: 3 }).map((_, i) => (
           <section
             key={i}
-            className="rounded-lg border border-zinc-200 dark:border-zinc-700 bg-white dark:bg-zinc-800 p-4"
+            className="rounded-lg border border-outline-variant/20 bg-surface-container-lowest p-4"
           >
             <Skeleton variant="text" width={120} height={20} className="mb-4" />
             <TextSkeleton lines={4} />
@@ -159,7 +159,7 @@ export function FormSkeleton() {
 
 export function ListingSkeleton() {
   return (
-    <div className="rounded-lg border border-zinc-200 dark:border-zinc-700 bg-white dark:bg-zinc-800 overflow-hidden">
+    <div className="rounded-lg border border-outline-variant/20 bg-surface-container-lowest overflow-hidden">
       <Skeleton variant="rectangular" height={200} />
       <div className="p-4 space-y-3">
         <Skeleton variant="text" width="80%" height={20} />
@@ -176,7 +176,7 @@ export function ListingSkeleton() {
 export function ListingGridSkeleton({ count = 6 }: { count?: number }) {
   return (
     <div
-      className="min-h-screen bg-zinc-50 dark:bg-zinc-900"
+      className="min-h-screen bg-surface-canvas"
       aria-busy="true"
       aria-label="Loading listings"
     >
@@ -198,13 +198,13 @@ export function ListingGridSkeleton({ count = 6 }: { count?: number }) {
 export function SearchResultsSkeleton({ count = 6 }: { count?: number }) {
   return (
     <div
-      className="h-screen flex flex-col bg-white dark:bg-zinc-950 overflow-hidden pt-[80px] sm:pt-[96px]"
+      className="h-screen flex flex-col bg-surface-container-lowest overflow-hidden pt-[80px] sm:pt-[96px]"
       role="status"
       aria-busy="true"
       aria-label="Loading search results"
     >
       {/* Search Header Skeleton */}
-      <header className="w-full bg-white/80 dark:bg-zinc-900/80 backdrop-blur-xl border-b border-zinc-100 dark:border-zinc-800">
+      <header className="w-full bg-white/80 backdrop-blur-xl border-b border-outline-variant/20">
         <div className="w-full max-w-[1920px] mx-auto px-3 sm:px-4 md:px-6 py-3 sm:py-4">
           <Skeleton
             variant="rounded"
@@ -215,7 +215,7 @@ export function SearchResultsSkeleton({ count = 6 }: { count?: number }) {
       </header>
 
       {/* Filter Bar Skeleton */}
-      <div className="w-full border-b border-zinc-100 dark:border-zinc-800 bg-white dark:bg-zinc-900">
+      <div className="w-full border-b border-outline-variant/20 bg-surface-container-lowest">
         <div className="max-w-[1400px] mx-auto px-4 sm:px-6 py-3">
           <div className="flex items-center gap-3">
             {/* Category tabs skeleton */}
@@ -224,7 +224,7 @@ export function SearchResultsSkeleton({ count = 6 }: { count?: number }) {
               <Skeleton variant="rounded" width={90} height={32} />
               <Skeleton variant="rounded" width={80} height={32} />
             </div>
-            <div className="h-8 w-px bg-zinc-200 dark:bg-zinc-700 hidden sm:block" />
+            <div className="h-8 w-px bg-surface-container-high hidden sm:block" />
             <div className="flex-1" />
             {/* More filters button */}
             <Skeleton
@@ -271,7 +271,7 @@ export function SearchResultsSkeleton({ count = 6 }: { count?: number }) {
 export function MessageListSkeleton() {
   return (
     <div
-      className="min-h-screen bg-zinc-50 dark:bg-zinc-900"
+      className="min-h-screen bg-surface-canvas"
       aria-busy="true"
       aria-label="Loading messages"
     >
@@ -283,7 +283,7 @@ export function MessageListSkeleton() {
           {Array.from({ length: 8 }).map((_, i) => (
             <div
               key={i}
-              className="flex items-center gap-4 p-4 bg-white dark:bg-zinc-800 rounded-lg border border-zinc-200 dark:border-zinc-700"
+              className="flex items-center gap-4 p-4 bg-surface-container-lowest rounded-lg border border-outline-variant/20"
             >
               <Skeleton variant="circular" width={48} height={48} />
               <div className="flex-1 space-y-2">
@@ -302,14 +302,14 @@ export function MessageListSkeleton() {
 export function ChatSkeleton() {
   return (
     <div
-      className="min-h-screen bg-zinc-50 dark:bg-zinc-900"
+      className="min-h-screen bg-surface-canvas"
       aria-busy="true"
       aria-label="Loading chat"
     >
       <div className="mx-auto max-w-4xl px-4 py-8">
-        <div className="bg-white dark:bg-zinc-800 rounded-lg border border-zinc-200 dark:border-zinc-700 overflow-hidden">
+        <div className="bg-surface-container-lowest rounded-lg border border-outline-variant/20 overflow-hidden">
           {/* Chat header */}
-          <div className="flex items-center gap-4 p-4 border-b border-zinc-200 dark:border-zinc-700">
+          <div className="flex items-center gap-4 p-4 border-b border-outline-variant/20">
             <Skeleton variant="circular" width={40} height={40} />
             <div className="space-y-1">
               <Skeleton variant="text" width={150} height={18} />
@@ -332,7 +332,7 @@ export function ChatSkeleton() {
             ))}
           </div>
           {/* Input */}
-          <div className="p-4 border-t border-zinc-200 dark:border-zinc-700">
+          <div className="p-4 border-t border-outline-variant/20">
             <Skeleton variant="rounded" height={44} />
           </div>
         </div>
@@ -344,7 +344,7 @@ export function ChatSkeleton() {
 export function AdminTableSkeleton() {
   return (
     <div
-      className="min-h-screen bg-zinc-50 dark:bg-zinc-900"
+      className="min-h-screen bg-surface-canvas"
       aria-busy="true"
       aria-label="Loading admin data"
     >
@@ -353,9 +353,9 @@ export function AdminTableSkeleton() {
           <Skeleton variant="text" width={200} height={32} />
           <Skeleton variant="rounded" width={120} height={40} />
         </div>
-        <div className="bg-white dark:bg-zinc-800 rounded-lg border border-zinc-200 dark:border-zinc-700 overflow-hidden">
+        <div className="bg-surface-container-lowest rounded-lg border border-outline-variant/20 overflow-hidden">
           {/* Table header */}
-          <div className="grid grid-cols-5 gap-4 p-4 border-b border-zinc-200 dark:border-zinc-700 bg-zinc-50 dark:bg-zinc-900">
+          <div className="grid grid-cols-5 gap-4 p-4 border-b border-outline-variant/20 bg-surface-canvas">
             {Array.from({ length: 5 }).map((_, i) => (
               <Skeleton key={i} variant="text" width="80%" height={14} />
             ))}
@@ -364,7 +364,7 @@ export function AdminTableSkeleton() {
           {Array.from({ length: 10 }).map((_, i) => (
             <div
               key={i}
-              className="grid grid-cols-5 gap-4 p-4 border-b border-zinc-100 dark:border-zinc-800"
+              className="grid grid-cols-5 gap-4 p-4 border-b border-outline-variant/20"
             >
               {Array.from({ length: 5 }).map((_, j) => (
                 <Skeleton
@@ -385,7 +385,7 @@ export function AdminTableSkeleton() {
 export function BookingsSkeleton() {
   return (
     <div
-      className="min-h-screen bg-zinc-50 dark:bg-zinc-900"
+      className="min-h-screen bg-surface-canvas"
       aria-busy="true"
       aria-label="Loading bookings"
     >
@@ -397,7 +397,7 @@ export function BookingsSkeleton() {
           {Array.from({ length: 5 }).map((_, i) => (
             <div
               key={i}
-              className="flex gap-4 p-4 bg-white dark:bg-zinc-800 rounded-lg border border-zinc-200 dark:border-zinc-700"
+              className="flex gap-4 p-4 bg-surface-container-lowest rounded-lg border border-outline-variant/20"
             >
               <Skeleton variant="rounded" width={120} height={80} />
               <div className="flex-1 space-y-2">
@@ -420,7 +420,7 @@ export function BookingsSkeleton() {
 export function SettingsSkeleton() {
   return (
     <div
-      className="min-h-screen bg-zinc-50 dark:bg-zinc-900"
+      className="min-h-screen bg-surface-canvas"
       aria-busy="true"
       aria-label="Loading settings"
     >
@@ -432,7 +432,7 @@ export function SettingsSkeleton() {
           {Array.from({ length: 4 }).map((_, i) => (
             <section
               key={i}
-              className="bg-white dark:bg-zinc-800 rounded-lg border border-zinc-200 dark:border-zinc-700 p-6"
+              className="bg-surface-container-lowest rounded-lg border border-outline-variant/20 p-6"
             >
               <Skeleton
                 variant="text"
@@ -462,7 +462,7 @@ export function SettingsSkeleton() {
 export function SavedSearchesSkeleton() {
   return (
     <div
-      className="min-h-screen bg-zinc-50 dark:bg-zinc-900"
+      className="min-h-screen bg-surface-canvas"
       aria-busy="true"
       aria-label="Loading saved searches"
     >
@@ -474,7 +474,7 @@ export function SavedSearchesSkeleton() {
           {Array.from({ length: 6 }).map((_, i) => (
             <div
               key={i}
-              className="flex items-center justify-between p-4 bg-white dark:bg-zinc-800 rounded-lg border border-zinc-200 dark:border-zinc-700"
+              className="flex items-center justify-between p-4 bg-surface-container-lowest rounded-lg border border-outline-variant/20"
             >
               <div className="space-y-2">
                 <Skeleton variant="text" width={180} height={18} />
@@ -495,7 +495,7 @@ export function SavedSearchesSkeleton() {
 export function NotificationsSkeleton() {
   return (
     <div
-      className="min-h-screen bg-zinc-50 dark:bg-zinc-900"
+      className="min-h-screen bg-surface-canvas"
       aria-busy="true"
       aria-label="Loading notifications"
     >
@@ -507,7 +507,7 @@ export function NotificationsSkeleton() {
           {Array.from({ length: 10 }).map((_, i) => (
             <div
               key={i}
-              className="flex items-start gap-3 p-4 bg-white dark:bg-zinc-800 rounded-lg border border-zinc-200 dark:border-zinc-700"
+              className="flex items-start gap-3 p-4 bg-surface-container-lowest rounded-lg border border-outline-variant/20"
             >
               <Skeleton variant="circular" width={40} height={40} />
               <div className="flex-1 space-y-2">

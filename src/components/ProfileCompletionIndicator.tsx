@@ -110,21 +110,21 @@ export default function ProfileCompletionIndicator({
 
   if (variant === "compact") {
     return (
-      <div className="bg-white dark:bg-zinc-900 rounded-xl border border-zinc-100 dark:border-zinc-800 p-4">
+      <div className="bg-surface-container-lowest rounded-xl border border-outline-variant/20 p-4">
         <div className="flex items-center justify-between mb-3">
-          <span className="text-sm font-medium text-zinc-900 dark:text-white">
+          <span className="text-sm font-medium text-on-surface">
             Profile Completion
           </span>
-          <span className="text-sm font-bold text-zinc-900 dark:text-white">
+          <span className="text-sm font-bold text-on-surface">
             {percentage}%
           </span>
         </div>
 
         {/* Progress Bar */}
-        <div className="h-2 bg-zinc-100 dark:bg-zinc-800 rounded-full overflow-hidden">
+        <div className="h-2 bg-surface-container-high rounded-full overflow-hidden">
           <div
             className={`h-full transition-all duration-500 ${
-              percentage === 100 ? "bg-green-500" : "bg-zinc-900 dark:bg-white"
+              percentage === 100 ? "bg-green-500" : "bg-on-surface"
             }`}
             style={{ width: `${percentage}%` }}
           />
@@ -134,7 +134,7 @@ export default function ProfileCompletionIndicator({
         {nextStep && (
           <Link
             href={nextStep.href}
-            className="flex items-center justify-between mt-3 text-sm text-zinc-600 dark:text-zinc-400 hover:text-zinc-900 dark:hover:text-white transition-colors"
+            className="flex items-center justify-between mt-3 text-sm text-on-surface-variant hover:text-on-surface transition-colors"
           >
             <span className="flex items-center gap-2">
               {nextStep.icon}
@@ -148,18 +148,18 @@ export default function ProfileCompletionIndicator({
   }
 
   return (
-    <div className="bg-white dark:bg-zinc-900 rounded-2xl border border-zinc-100 dark:border-zinc-800 overflow-hidden">
+    <div className="bg-surface-container-lowest rounded-2xl border border-outline-variant/20 overflow-hidden">
       {/* Header */}
-      <div className="px-6 py-5 border-b border-zinc-100 dark:border-zinc-800">
+      <div className="px-6 py-5 border-b border-outline-variant/20">
         <div className="flex items-center justify-between mb-3">
-          <h3 className="font-semibold text-zinc-900 dark:text-white">
+          <h3 className="font-semibold text-on-surface">
             Complete Your Profile
           </h3>
           <span
             className={`text-sm font-bold ${
               percentage === 100
-                ? "text-green-600 dark:text-green-400"
-                : "text-zinc-900 dark:text-white"
+                ? "text-green-600"
+                : "text-on-surface"
             }`}
           >
             {percentage}%
@@ -167,16 +167,16 @@ export default function ProfileCompletionIndicator({
         </div>
 
         {/* Progress Bar */}
-        <div className="h-2 bg-zinc-100 dark:bg-zinc-800 rounded-full overflow-hidden">
+        <div className="h-2 bg-surface-container-high rounded-full overflow-hidden">
           <div
             className={`h-full transition-all duration-500 ${
-              percentage === 100 ? "bg-green-500" : "bg-zinc-900 dark:bg-white"
+              percentage === 100 ? "bg-green-500" : "bg-on-surface"
             }`}
             style={{ width: `${percentage}%` }}
           />
         </div>
 
-        <p className="text-sm text-zinc-500 dark:text-zinc-400 mt-2">
+        <p className="text-sm text-on-surface-variant mt-2">
           {percentage === 100
             ? "Great job! Your profile is complete."
             : `${completedCount} of ${totalCount} steps completed`}
@@ -184,23 +184,23 @@ export default function ProfileCompletionIndicator({
       </div>
 
       {/* Steps */}
-      <div className="divide-y divide-zinc-100 dark:divide-zinc-800">
+      <div className="divide-y divide-outline-variant/20">
         {steps.map((step) => (
           <Link
             key={step.id}
             href={step.href}
             className={`flex items-center gap-4 px-6 py-4 transition-colors ${
               step.completed
-                ? "bg-zinc-50 dark:bg-zinc-800/50"
-                : "hover:bg-zinc-50 dark:hover:bg-zinc-800"
+                ? "bg-surface-canvas"
+                : "hover:bg-surface-canvas"
             }`}
           >
             {/* Status Icon */}
             <div
               className={`flex-shrink-0 w-8 h-8 rounded-full flex items-center justify-center ${
                 step.completed
-                  ? "bg-green-100 dark:bg-green-900/30 text-green-600 dark:text-green-400"
-                  : "bg-zinc-100 dark:bg-zinc-800 text-zinc-400 dark:text-zinc-500"
+                  ? "bg-green-100 text-green-600"
+                  : "bg-surface-container-high text-on-surface-variant"
               }`}
             >
               {step.completed ? (
@@ -215,20 +215,20 @@ export default function ProfileCompletionIndicator({
               <p
                 className={`font-medium ${
                   step.completed
-                    ? "text-zinc-500 dark:text-zinc-400 line-through"
-                    : "text-zinc-900 dark:text-white"
+                    ? "text-on-surface-variant line-through"
+                    : "text-on-surface"
                 }`}
               >
                 {step.label}
               </p>
-              <p className="text-sm text-zinc-500 dark:text-zinc-400 truncate">
+              <p className="text-sm text-on-surface-variant truncate">
                 {step.description}
               </p>
             </div>
 
             {/* Arrow for incomplete */}
             {!step.completed && (
-              <ChevronRight className="w-5 h-5 text-zinc-400 dark:text-zinc-500 flex-shrink-0" />
+              <ChevronRight className="w-5 h-5 text-on-surface-variant flex-shrink-0" />
             )}
           </Link>
         ))}

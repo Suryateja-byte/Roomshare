@@ -86,9 +86,9 @@ export function LazyImage({
       {/* Error fallback */}
       {hasError &&
         (fallback || (
-          <div className="absolute inset-0 flex items-center justify-center bg-zinc-100 ">
+          <div className="absolute inset-0 flex items-center justify-center bg-surface-container-high ">
             <svg
-              className="h-8 w-8 text-zinc-400"
+              className="h-8 w-8 text-on-surface-variant"
               fill="none"
               viewBox="0 0 24 24"
               stroke="currentColor"

@@ -42,19 +42,19 @@ export default function EmailVerificationBanner({
   if (!isVisible) return null;
 
   return (
-    <div className="fixed top-16 md:top-20 left-0 right-0 z-sticky bg-amber-50 dark:bg-amber-900/20 border-b border-amber-200 dark:border-amber-800">
+    <div className="fixed top-16 md:top-20 left-0 right-0 z-sticky bg-amber-50 border-b border-amber-200">
       <div className="max-w-7xl mx-auto px-4 py-3">
         <div className="flex items-center justify-between gap-4">
           <div className="flex items-center gap-3">
             <div className="flex-shrink-0">
-              <AlertTriangle className="w-5 h-5 text-amber-600 dark:text-amber-400" />
+              <AlertTriangle className="w-5 h-5 text-amber-600" />
             </div>
             <div className="flex-1">
-              <p className="text-sm text-amber-800 dark:text-amber-200">
+              <p className="text-sm text-amber-800">
                 <span className="font-medium">Verify your email</span> to unlock
                 all features like creating listings and sending messages.
                 {userEmail && (
-                  <span className="text-amber-600 dark:text-amber-400 ml-1">
+                  <span className="text-amber-600 ml-1">
                     (Sent to {userEmail})
                   </span>
                 )}
@@ -64,7 +64,7 @@ export default function EmailVerificationBanner({
 
           <div className="flex items-center gap-2">
             {resendSuccess ? (
-              <span className="flex items-center gap-1 text-sm text-green-600 dark:text-green-400 font-medium">
+              <span className="flex items-center gap-1 text-sm text-green-600 font-medium">
                 <CheckCircle className="w-4 h-4" />
                 Email sent!
               </span>
@@ -72,7 +72,7 @@ export default function EmailVerificationBanner({
               <button
                 onClick={handleResend}
                 disabled={isResending}
-                className="inline-flex items-center gap-1.5 px-3 py-1.5 text-sm font-medium text-amber-700 dark:text-amber-300 bg-amber-100 dark:bg-amber-800/50 hover:bg-amber-200 dark:hover:bg-amber-800 rounded-md transition-colors disabled:opacity-60 focus-visible:ring-2 focus-visible:ring-zinc-900/20 focus-visible:ring-offset-2"
+                className="inline-flex items-center gap-1.5 px-3 py-1.5 text-sm font-medium text-amber-700 bg-amber-100 hover:bg-amber-200 rounded-md transition-colors disabled:opacity-60 focus-visible:ring-2 focus-visible:ring-primary/30 focus-visible:ring-offset-2"
               >
                 {isResending ? (
                   <>
@@ -90,7 +90,7 @@ export default function EmailVerificationBanner({
 
             <button
               onClick={() => setIsVisible(false)}
-              className="p-1 text-amber-500 dark:text-amber-400 hover:text-amber-700 dark:hover:text-amber-300 transition-colors focus-visible:ring-2 focus-visible:ring-zinc-900/20 focus-visible:ring-offset-2 rounded-sm"
+              className="p-1 text-amber-500 hover:text-amber-700 transition-colors focus-visible:ring-2 focus-visible:ring-primary/30 focus-visible:ring-offset-2 rounded-sm"
               aria-label="Dismiss"
             >
               <X className="w-4 h-4" />
@@ -101,7 +101,7 @@ export default function EmailVerificationBanner({
         {error && (
           <p
             role="alert"
-            className="mt-2 text-sm text-red-600 dark:text-red-400"
+            className="mt-2 text-sm text-red-600"
           >
             {error}
           </p>

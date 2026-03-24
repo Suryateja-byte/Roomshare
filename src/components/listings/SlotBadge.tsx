@@ -9,12 +9,12 @@ interface SlotBadgeProps {
 }
 
 const overlayBase =
-  "bg-white/90 dark:bg-zinc-900/90 backdrop-blur-sm shadow-sm rounded-md";
+  "bg-white/90 backdrop-blur-sm shadow-sm rounded-md";
 
 const overlayText = {
-  success: "text-green-700 dark:text-green-400",
-  info: "text-blue-700 dark:text-blue-400",
-  destructive: "text-red-700 dark:text-red-400",
+  success: "text-green-700",
+  info: "text-blue-700",
+  destructive: "text-red-700",
 } as const;
 
 type StatusVariant = keyof typeof overlayText;

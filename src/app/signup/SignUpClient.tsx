@@ -97,7 +97,7 @@ function SignUpForm() {
   };
 
   return (
-    <div className="min-h-screen flex bg-white dark:bg-zinc-950 font-sans selection:bg-zinc-900 selection:text-white dark:selection:bg-white dark:selection:text-black">
+    <div className="min-h-screen flex bg-white font-sans selection:bg-zinc-900 selection:text-white">
       {/* Left Visual (Dark Theme) */}
       <div className="hidden lg:flex w-1/2 bg-zinc-900 relative flex-col justify-between p-8 xl:p-12 text-white">
         <div className="absolute inset-0 bg-[radial-gradient(circle_at_top_right,_var(--tw-gradient-stops))] from-zinc-800 to-black opacity-50"></div>
@@ -137,10 +137,10 @@ function SignUpForm() {
         <div className="w-full max-w-sm space-y-6 sm:space-y-8">
           {/* Header */}
           <div className="text-center lg:text-left">
-            <h1 className="text-2xl sm:text-3xl font-semibold text-zinc-900 dark:text-white tracking-tight">
+            <h1 className="text-2xl sm:text-3xl font-semibold text-zinc-900 tracking-tight">
               Join RoomShare
             </h1>
-            <p className="text-zinc-500 dark:text-zinc-400 mt-2 text-sm sm:text-base">
+            <p className="text-zinc-500 mt-2 text-sm sm:text-base">
               Verified roommates, real listings, zero guesswork.
             </p>
           </div>
@@ -165,7 +165,7 @@ function SignUpForm() {
               }
             }}
             disabled={googleLoading}
-            className="w-full flex items-center justify-center gap-3 h-11 sm:h-12 rounded-lg border border-zinc-200 dark:border-zinc-700 bg-white dark:bg-zinc-800 hover:bg-zinc-50 dark:hover:bg-zinc-700 transition-colors font-medium text-zinc-700 dark:text-white shadow-sm disabled:opacity-60 disabled:cursor-not-allowed"
+            className="w-full flex items-center justify-center gap-3 h-11 sm:h-12 rounded-lg border border-zinc-200 bg-white hover:bg-zinc-50 transition-colors font-medium text-zinc-700 shadow-sm disabled:opacity-60 disabled:cursor-not-allowed"
           >
             {googleLoading ? (
               <Loader2 className="w-5 h-5 animate-spin" />
@@ -195,10 +195,10 @@ function SignUpForm() {
           {/* Divider */}
           <div className="relative">
             <div className="absolute inset-0 flex items-center">
-              <div className="w-full border-t border-zinc-200 dark:border-zinc-700"></div>
+              <div className="w-full border-t border-zinc-200"></div>
             </div>
             <div className="relative flex justify-center text-xs uppercase tracking-wider font-medium">
-              <span className="bg-white dark:bg-zinc-950 px-4 text-zinc-600 dark:text-zinc-400">
+              <span className="bg-white px-4 text-zinc-600">
                 or continue with email
               </span>
             </div>
@@ -210,7 +210,7 @@ function SignUpForm() {
             <div className="space-y-1">
               <label
                 htmlFor="name"
-                className="block text-xs font-semibold text-zinc-500 dark:text-zinc-400 uppercase tracking-wide ml-0.5"
+                className="block text-xs font-semibold text-zinc-500 uppercase tracking-wide ml-0.5"
               >
                 Full Name
               </label>
@@ -224,7 +224,7 @@ function SignUpForm() {
                   name="name"
                   required
                   autoComplete="name"
-                  className="block w-full pl-10 pr-3 py-2.5 bg-white dark:bg-zinc-800 border border-zinc-200 dark:border-zinc-700 rounded-lg text-zinc-900 dark:text-white placeholder-zinc-400 dark:placeholder-zinc-500 focus:outline-none focus-visible:ring-2 focus-visible:ring-zinc-900/30 dark:focus-visible:ring-zinc-400/40 focus-visible:border-zinc-900 dark:focus-visible:border-zinc-500 text-sm font-medium transition-shadow duration-200 ease-in-out shadow-sm"
+                  className="block w-full pl-10 pr-3 py-2.5 bg-white border border-zinc-200 rounded-lg text-zinc-900 placeholder-zinc-400 focus:outline-none focus-visible:ring-2 focus-visible:ring-zinc-900/30 focus-visible:border-zinc-900 text-sm font-medium transition-shadow duration-200 ease-in-out shadow-sm"
                   placeholder="John Doe"
                 />
               </div>
@@ -234,7 +234,7 @@ function SignUpForm() {
             <div className="space-y-1">
               <label
                 htmlFor="email"
-                className="block text-xs font-semibold text-zinc-500 dark:text-zinc-400 uppercase tracking-wide ml-0.5"
+                className="block text-xs font-semibold text-zinc-500 uppercase tracking-wide ml-0.5"
               >
                 Email
               </label>
@@ -248,7 +248,7 @@ function SignUpForm() {
                   name="email"
                   required
                   autoComplete="email"
-                  className="block w-full pl-10 pr-3 py-2.5 bg-white dark:bg-zinc-800 border border-zinc-200 dark:border-zinc-700 rounded-lg text-zinc-900 dark:text-white placeholder-zinc-400 dark:placeholder-zinc-500 focus:outline-none focus-visible:ring-2 focus-visible:ring-zinc-900/30 dark:focus-visible:ring-zinc-400/40 focus-visible:border-zinc-900 dark:focus-visible:border-zinc-500 text-sm font-medium transition-shadow duration-200 ease-in-out shadow-sm"
+                  className="block w-full pl-10 pr-3 py-2.5 bg-white border border-zinc-200 rounded-lg text-zinc-900 placeholder-zinc-400 focus:outline-none focus-visible:ring-2 focus-visible:ring-zinc-900/30 focus-visible:border-zinc-900 text-sm font-medium transition-shadow duration-200 ease-in-out shadow-sm"
                   placeholder="you@example.com"
                 />
               </div>
@@ -258,7 +258,7 @@ function SignUpForm() {
             <div className="space-y-1">
               <label
                 htmlFor="password"
-                className="block text-xs font-semibold text-zinc-500 dark:text-zinc-400 uppercase tracking-wide ml-0.5"
+                className="block text-xs font-semibold text-zinc-500 uppercase tracking-wide ml-0.5"
               >
                 Password
               </label>
@@ -274,13 +274,13 @@ function SignUpForm() {
                   autoComplete="new-password"
                   value={password}
                   onChange={(e) => setPassword(e.target.value)}
-                  className="block w-full pl-10 pr-10 py-2.5 bg-white dark:bg-zinc-800 border border-zinc-200 dark:border-zinc-700 rounded-lg text-zinc-900 dark:text-white placeholder-zinc-400 dark:placeholder-zinc-500 focus:outline-none focus-visible:ring-2 focus-visible:ring-zinc-900/30 dark:focus-visible:ring-zinc-400/40 focus-visible:border-zinc-900 dark:focus-visible:border-zinc-500 text-sm font-medium transition-shadow duration-200 ease-in-out shadow-sm"
+                  className="block w-full pl-10 pr-10 py-2.5 bg-white border border-zinc-200 rounded-lg text-zinc-900 placeholder-zinc-400 focus:outline-none focus-visible:ring-2 focus-visible:ring-zinc-900/30 focus-visible:border-zinc-900 text-sm font-medium transition-shadow duration-200 ease-in-out shadow-sm"
                   placeholder="••••••••"
                 />
                 <button
                   type="button"
                   onClick={() => setShowPassword(!showPassword)}
-                  className="absolute inset-y-0 right-0 pr-3 flex items-center text-zinc-400 hover:text-zinc-600 dark:hover:text-zinc-300 transition-colors"
+                  className="absolute inset-y-0 right-0 pr-3 flex items-center text-zinc-400 hover:text-zinc-600 transition-colors"
                   tabIndex={-1}
                   aria-label={showPassword ? "Hide password" : "Show password"}
                 >
@@ -298,7 +298,7 @@ function SignUpForm() {
             <div className="space-y-1">
               <label
                 htmlFor="confirmPassword"
-                className="block text-xs font-semibold text-zinc-500 dark:text-zinc-400 uppercase tracking-wide ml-0.5"
+                className="block text-xs font-semibold text-zinc-500 uppercase tracking-wide ml-0.5"
               >
                 Confirm Password
               </label>
@@ -314,19 +314,19 @@ function SignUpForm() {
                   autoComplete="new-password"
                   value={confirmPassword}
                   onChange={(e) => setConfirmPassword(e.target.value)}
-                  className={`block w-full pl-10 pr-10 py-2.5 bg-white dark:bg-zinc-800 border rounded-lg text-zinc-900 dark:text-white placeholder-zinc-400 dark:placeholder-zinc-500 focus:outline-none focus-visible:ring-2 focus-visible:ring-zinc-900/30 dark:focus-visible:ring-zinc-400/40 focus-visible:border-zinc-900 dark:focus-visible:border-zinc-500 text-sm font-medium transition-shadow duration-200 ease-in-out shadow-sm ${
+                  className={`block w-full pl-10 pr-10 py-2.5 bg-white border rounded-lg text-zinc-900 placeholder-zinc-400 focus:outline-none focus-visible:ring-2 focus-visible:ring-zinc-900/30 focus-visible:border-zinc-900 text-sm font-medium transition-shadow duration-200 ease-in-out shadow-sm ${
                     confirmPassword && password !== confirmPassword
-                      ? "border-red-400 dark:border-red-500"
+                      ? "border-red-400"
                       : confirmPassword && password === confirmPassword
-                        ? "border-green-400 dark:border-green-500"
-                        : "border-zinc-200 dark:border-zinc-700"
+                        ? "border-green-400"
+                        : "border-zinc-200"
                   }`}
                   placeholder="••••••••"
                 />
                 <button
                   type="button"
                   onClick={() => setShowConfirmPassword(!showConfirmPassword)}
-                  className="absolute inset-y-0 right-0 pr-3 flex items-center text-zinc-400 hover:text-zinc-600 dark:hover:text-zinc-300 transition-colors"
+                  className="absolute inset-y-0 right-0 pr-3 flex items-center text-zinc-400 hover:text-zinc-600 transition-colors"
                   tabIndex={-1}
                   aria-label={
                     showConfirmPassword ? "Hide password" : "Show password"
@@ -340,12 +340,12 @@ function SignUpForm() {
                 </button>
               </div>
               {confirmPassword && password !== confirmPassword && (
-                <p className="text-xs text-red-500 dark:text-red-400 mt-1 ml-0.5">
+                <p className="text-xs text-red-500 mt-1 ml-0.5">
                   Passwords don&apos;t match
                 </p>
               )}
               {confirmPassword && password === confirmPassword && (
-                <p className="text-xs text-green-500 dark:text-green-400 mt-1 ml-0.5">
+                <p className="text-xs text-green-500 mt-1 ml-0.5">
                   Passwords match
                 </p>
               )}
@@ -358,23 +358,23 @@ function SignUpForm() {
                 type="checkbox"
                 checked={acceptedTerms}
                 onChange={(e) => setAcceptedTerms(e.target.checked)}
-                className="mt-1 h-4 w-4 rounded border-zinc-300 dark:border-zinc-600 bg-white dark:bg-zinc-800 text-zinc-900 dark:text-white focus:ring-2 focus:ring-zinc-900 dark:focus:ring-zinc-400 cursor-pointer"
+                className="mt-1 h-4 w-4 rounded border-zinc-300 bg-white text-zinc-900 focus:ring-2 focus:ring-zinc-900 cursor-pointer"
               />
               <label
                 htmlFor="terms"
-                className="text-sm text-zinc-600 dark:text-zinc-400 cursor-pointer"
+                className="text-sm text-zinc-600 cursor-pointer"
               >
                 I agree to the{" "}
                 <Link
                   href="/terms"
-                  className="font-medium text-zinc-900 dark:text-white hover:underline"
+                  className="font-medium text-zinc-900 hover:underline"
                 >
                   Terms of Service
                 </Link>{" "}
                 and{" "}
                 <Link
                   href="/privacy"
-                  className="font-medium text-zinc-900 dark:text-white hover:underline"
+                  className="font-medium text-zinc-900 hover:underline"
                 >
                   Privacy Policy
                 </Link>
@@ -393,7 +393,7 @@ function SignUpForm() {
             />
 
             {turnstileError && (
-              <p className="text-sm text-red-600 dark:text-red-400">
+              <p className="text-sm text-red-600">
                 Security check failed.{" "}
                 <button
                   type="button"
@@ -428,11 +428,11 @@ function SignUpForm() {
             </Button>
           </form>
 
-          <p className="text-center text-sm text-zinc-500 dark:text-zinc-400">
+          <p className="text-center text-sm text-zinc-500">
             Already have an account?{" "}
             <Link
               href="/login"
-              className="font-semibold text-zinc-900 dark:text-white hover:underline"
+              className="font-semibold text-zinc-900 hover:underline"
             >
               Sign in
             </Link>
@@ -447,8 +447,8 @@ export default function SignUpClient() {
   return (
     <Suspense
       fallback={
-        <div className="min-h-screen flex items-center justify-center bg-white dark:bg-zinc-950">
-          <Loader2 className="w-8 h-8 animate-spin text-zinc-900 dark:text-white" />
+        <div className="min-h-screen flex items-center justify-center bg-white">
+          <Loader2 className="w-8 h-8 animate-spin text-zinc-900" />
         </div>
       }
     >

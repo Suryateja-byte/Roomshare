@@ -50,9 +50,9 @@ const notificationColors: Record<NotificationType, string> = {
   BOOKING_REQUEST: "bg-blue-100 text-blue-600",
   BOOKING_ACCEPTED: "bg-green-100 text-green-600",
   BOOKING_REJECTED: "bg-red-100 text-red-600",
-  BOOKING_CANCELLED: "bg-zinc-100 text-zinc-600",
+  BOOKING_CANCELLED: "bg-surface-container-high text-on-surface-variant",
   BOOKING_HOLD_REQUEST: "bg-amber-100 text-amber-600",
-  BOOKING_EXPIRED: "bg-zinc-100 text-zinc-600",
+  BOOKING_EXPIRED: "bg-surface-container-high text-on-surface-variant",
   BOOKING_HOLD_EXPIRED: "bg-amber-100 text-amber-600",
   NEW_MESSAGE: "bg-purple-100 text-purple-600",
   NEW_REVIEW: "bg-yellow-100 text-yellow-600",
@@ -135,7 +135,7 @@ export default function NotificationCenter() {
     <div className="relative" ref={menuRef}>
       <button
         onClick={() => setIsOpen(!isOpen)}
-        className="relative p-2 min-w-[44px] min-h-[44px] flex items-center justify-center text-zinc-600 hover:text-zinc-900 dark:text-zinc-400 dark:hover:text-white hover:bg-zinc-100 dark:hover:bg-zinc-800 rounded-full transition-all"
+        className="relative p-2 min-w-[44px] min-h-[44px] flex items-center justify-center text-on-surface-variant hover:text-on-surface hover:bg-surface-container-high rounded-full transition-all"
         aria-label="Notifications"
       >
         <Bell className="w-5 h-5" />
@@ -147,16 +147,16 @@ export default function NotificationCenter() {
       </button>
 
       {isOpen && (
-        <div className="absolute right-0 mt-2 w-80 sm:w-96 bg-white dark:bg-zinc-900 rounded-xl shadow-xl border border-zinc-100 dark:border-zinc-800 overflow-hidden z-sticky animate-in fade-in zoom-in-95 duration-200">
+        <div className="absolute right-0 mt-2 w-80 sm:w-96 bg-surface-container-lowest rounded-xl shadow-xl border border-outline-variant/20 overflow-hidden z-sticky animate-in fade-in zoom-in-95 duration-200">
           {/* Header */}
-          <div className="px-4 py-3 border-b border-zinc-100 dark:border-zinc-800 flex items-center justify-between">
-            <h3 className="font-semibold text-zinc-900 dark:text-white">
+          <div className="px-4 py-3 border-b border-outline-variant/20 flex items-center justify-between">
+            <h3 className="font-semibold text-on-surface">
               Notifications
             </h3>
             {unreadCount > 0 && (
               <button
                 onClick={handleMarkAllAsRead}
-                className="text-xs text-zinc-500 hover:text-zinc-900 dark:hover:text-white flex items-center gap-1 transition-colors"
+                className="text-xs text-on-surface-variant hover:text-on-surface flex items-center gap-1 transition-colors"
               >
                 <CheckCheck className="w-3 h-3" />
                 Mark all read
@@ -167,18 +167,18 @@ export default function NotificationCenter() {
           {/* Notifications List */}
           <div className="max-h-96 overflow-y-auto">
             {isLoading && notifications.length === 0 ? (
-              <div className="p-8 text-center text-zinc-400 dark:text-zinc-500">
+              <div className="p-8 text-center text-on-surface-variant">
                 Loading...
               </div>
             ) : notifications.length === 0 ? (
               <div className="p-8 text-center">
-                <div className="w-16 h-16 bg-zinc-100 dark:bg-zinc-800 rounded-full flex items-center justify-center mx-auto mb-4">
-                  <Bell className="w-8 h-8 text-zinc-300 dark:text-zinc-600" />
+                <div className="w-16 h-16 bg-surface-container-high rounded-full flex items-center justify-center mx-auto mb-4">
+                  <Bell className="w-8 h-8 text-on-surface-variant" />
                 </div>
-                <h4 className="font-medium text-zinc-900 dark:text-white mb-1">
+                <h4 className="font-medium text-on-surface mb-1">
                   You&apos;re all caught up!
                 </h4>
-                <p className="text-zinc-500 dark:text-zinc-400 text-sm">
+                <p className="text-on-surface-variant text-sm">
                   No new notifications at the moment.
                 </p>
               </div>
@@ -187,11 +187,11 @@ export default function NotificationCenter() {
                 const Icon = notificationIcons[notification.type] || Bell;
                 const colorClass =
                   notificationColors[notification.type] ||
-                  "bg-zinc-100 text-zinc-600";
+                  "bg-surface-container-high text-on-surface-variant";
 
                 const content = (
                   <div
-                    className={`px-4 py-3 border-b border-zinc-50 dark:border-zinc-800 hover:bg-zinc-50 dark:hover:bg-zinc-800 transition-colors ${!notification.read ? "bg-blue-50/50 dark:bg-blue-900/20" : ""}`}
+                    className={`px-4 py-3 border-b border-outline-variant/20 hover:bg-surface-canvas transition-colors ${!notification.read ? "bg-blue-50/50" : ""}`}
                     onClick={() =>
                       !notification.read && handleMarkAsRead(notification.id)
                     }
@@ -202,14 +202,14 @@ export default function NotificationCenter() {
                       </div>
                       <div className="flex-1 min-w-0">
                         <p
-                          className={`text-sm ${!notification.read ? "font-semibold" : "font-medium"} text-zinc-900 dark:text-white truncate`}
+                          className={`text-sm ${!notification.read ? "font-semibold" : "font-medium"} text-on-surface truncate`}
                         >
                           {notification.title}
                         </p>
-                        <p className="text-xs text-zinc-500 dark:text-zinc-400 line-clamp-2 mt-0.5">
+                        <p className="text-xs text-on-surface-variant line-clamp-2 mt-0.5">
                           {notification.message}
                         </p>
-                        <p className="text-2xs text-zinc-400 dark:text-zinc-500 mt-1">
+                        <p className="text-2xs text-on-surface-variant mt-1">
                           {formatTimeAgo(notification.createdAt)}
                         </p>
                       </div>
@@ -239,7 +239,7 @@ export default function NotificationCenter() {
 
           {/* Footer */}
           {notifications.length > 0 && (
-            <div className="px-4 py-3 border-t border-zinc-100 dark:border-zinc-800">
+            <div className="px-4 py-3 border-t border-outline-variant/20">
               <Link href="/notifications" onClick={() => setIsOpen(false)}>
                 <Button variant="ghost" className="w-full text-sm">
                   View all notifications

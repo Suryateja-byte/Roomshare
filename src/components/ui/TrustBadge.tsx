@@ -12,7 +12,7 @@ export function TrustBadge({ avgRating, reviewCount = 0 }: TrustBadgeProps) {
   if (rating < 4.9 || reviewCount < 5) return null;
 
   return (
-    <span className="inline-flex items-center gap-1 px-2.5 py-1 rounded-md text-2xs font-bold uppercase tracking-wide bg-gradient-to-r from-amber-100 to-yellow-50 dark:from-amber-900/60 dark:to-yellow-900/40 text-amber-800 dark:text-amber-200 shadow-sm border border-amber-200/60 dark:border-amber-700/40">
+    <span className="inline-flex items-center gap-1 px-2.5 py-1 rounded-md text-2xs font-bold uppercase tracking-wide bg-gradient-to-r from-amber-100 to-yellow-50 text-amber-800 shadow-sm border border-amber-200/60">
       <svg
         className="w-3 h-3"
         viewBox="0 0 16 16"

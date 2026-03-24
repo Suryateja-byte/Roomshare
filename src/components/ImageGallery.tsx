@@ -40,12 +40,12 @@ function ImageWithFallback({
     return (
       <div
         className={cn(
-          "flex flex-col items-center justify-center bg-zinc-100 dark:bg-zinc-800",
+          "flex flex-col items-center justify-center bg-surface-container-high",
           className
         )}
       >
-        <ImageOff className="w-8 h-8 text-zinc-400 dark:text-zinc-500 mb-2" />
-        <span className="text-xs text-zinc-500 dark:text-zinc-400">
+        <ImageOff className="w-8 h-8 text-on-surface-variant mb-2" />
+        <span className="text-xs text-on-surface-variant">
           Image unavailable
         </span>
       </div>
@@ -104,7 +104,7 @@ function GalleryItem({
         priority={priority}
         sizes={sizes}
       />
-      <div className="absolute inset-0 bg-black/5 group-hover/item:bg-black/0 transition-colors duration-500 ease-out" />
+      <div className="absolute inset-0 bg-on-surface/5 group-hover/item:bg-on-surface/0 transition-colors duration-500 ease-out" />
       {overlay}
     </div>
   );
@@ -179,7 +179,7 @@ export default function ImageGallery({ images, title }: ImageGalleryProps) {
 
   // Container classes shared across all layouts
   const containerClasses =
-    "w-full h-[400px] md:h-[500px] rounded-3xl overflow-hidden shadow-sm dark:shadow-none bg-zinc-100 dark:bg-zinc-900";
+    "w-full h-[400px] md:h-[500px] rounded-3xl overflow-hidden shadow-sm bg-surface-container-high";
 
   // Render gallery based on image count
   const renderGallery = () => {
@@ -189,10 +189,10 @@ export default function ImageGallery({ images, title }: ImageGalleryProps) {
         <div
           className={cn(
             containerClasses,
-            "flex flex-col items-center justify-center text-zinc-400 dark:text-zinc-600 bg-zinc-50 dark:bg-zinc-900"
+            "flex flex-col items-center justify-center text-on-surface-variant bg-surface-canvas"
           )}
         >
-          <div className="p-6 rounded-full bg-zinc-100 dark:bg-zinc-800 mb-4">
+          <div className="p-6 rounded-full bg-surface-container-high mb-4">
             <ImageIcon className="w-10 h-10" />
           </div>
           <p className="font-medium text-lg">No photos added yet</p>
@@ -347,8 +347,8 @@ export default function ImageGallery({ images, title }: ImageGalleryProps) {
             sizes="25vw"
             overlay={
               imageCount > 4 ? (
-                <div className="absolute inset-0 bg-black/50 hover:bg-black/40 transition-colors flex items-center justify-center">
-                  <span className="text-white font-medium text-sm border border-white/50 bg-black/20 backdrop-blur-md px-3 py-1 rounded-full">
+                <div className="absolute inset-0 bg-on-surface/50 hover:bg-on-surface/40 transition-colors flex items-center justify-center">
+                  <span className="text-white font-medium text-sm border border-white/50 bg-on-surface/20 backdrop-blur-md px-3 py-1 rounded-full">
                     +{imageCount - 4} more
                   </span>
                 </div>
@@ -361,7 +361,7 @@ export default function ImageGallery({ images, title }: ImageGalleryProps) {
         {imageCount > 1 && (
           <button
             onClick={() => openLightbox(0)}
-            className="md:hidden absolute bottom-4 right-4 flex items-center gap-2 px-4 py-2 bg-white/90 backdrop-blur-sm rounded-full text-zinc-900 text-sm font-medium shadow-lg"
+            className="md:hidden absolute bottom-4 right-4 flex items-center gap-2 px-4 py-2 bg-white/90 backdrop-blur-sm rounded-full text-on-surface text-sm font-medium shadow-lg"
           >
             <Grid3X3 className="w-4 h-4" />
             View all {imageCount} photos
@@ -379,7 +379,7 @@ export default function ImageGallery({ images, title }: ImageGalleryProps) {
       {/* Lightbox Modal */}
       {lightboxOpen && (
         <div
-          className="fixed inset-0 z-modal bg-black/95 flex flex-col"
+          className="fixed inset-0 z-modal bg-on-surface/95 flex flex-col"
           onClick={closeLightbox}
         >
           {/* Header */}
@@ -500,7 +500,7 @@ export default function ImageGallery({ images, title }: ImageGalleryProps) {
           )}
 
           {/* Keyboard hint */}
-          <div className="text-center text-zinc-500 text-xs pb-3">
+          <div className="text-center text-on-surface-variant text-xs pb-3">
             Use ← → arrow keys to navigate • Esc to close
           </div>
         </div>

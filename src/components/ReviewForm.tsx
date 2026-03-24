@@ -209,15 +209,15 @@ export default function ReviewForm({
   // Show login prompt for logged-out users
   if (!isLoggedIn) {
     return (
-      <div className="bg-zinc-50 dark:bg-zinc-900 p-6 rounded-xl border border-zinc-100 dark:border-zinc-800">
+      <div className="bg-surface-canvas p-6 rounded-xl border border-outline-variant/20">
         <div className="text-center py-4">
           <div className="w-12 h-12 mx-auto mb-3 rounded-full bg-primary/10 flex items-center justify-center">
             <LogIn className="w-6 h-6 text-primary" />
           </div>
-          <h3 className="font-semibold text-lg text-zinc-900 dark:text-white mb-2">
+          <h3 className="font-semibold text-lg text-on-surface mb-2">
             Sign in to leave a review
           </h3>
-          <p className="text-sm text-zinc-600 dark:text-zinc-400 mb-4">
+          <p className="text-sm text-on-surface-variant mb-4">
             Share your experience with others
           </p>
           <Link href="/login">
@@ -234,15 +234,15 @@ export default function ReviewForm({
   // Show "booking required" message for logged-in users without booking history
   if (listingId && hasBookingHistory === false) {
     return (
-      <div className="bg-zinc-50 dark:bg-zinc-900 p-6 rounded-xl border border-zinc-100 dark:border-zinc-800">
+      <div className="bg-surface-canvas p-6 rounded-xl border border-outline-variant/20">
         <div className="text-center py-4">
-          <div className="w-12 h-12 mx-auto mb-3 rounded-full bg-amber-100 dark:bg-amber-900/30 flex items-center justify-center">
-            <Calendar className="w-6 h-6 text-amber-600 dark:text-amber-400" />
+          <div className="w-12 h-12 mx-auto mb-3 rounded-full bg-amber-100 flex items-center justify-center">
+            <Calendar className="w-6 h-6 text-amber-600" />
           </div>
-          <h3 className="font-semibold text-lg text-zinc-900 dark:text-white mb-2">
+          <h3 className="font-semibold text-lg text-on-surface mb-2">
             Booking required
           </h3>
-          <p className="text-sm text-zinc-600 dark:text-zinc-400">
+          <p className="text-sm text-on-surface-variant">
             You can leave a review after making a booking request for this
             listing
           </p>
@@ -256,8 +256,8 @@ export default function ReviewForm({
     // Edit mode
     if (isEditing) {
       return (
-        <div className="bg-zinc-50 dark:bg-zinc-900 p-6 rounded-xl border border-zinc-100 dark:border-zinc-800">
-          <h3 className="font-semibold text-zinc-900 dark:text-white mb-4 flex items-center gap-2">
+        <div className="bg-surface-canvas p-6 rounded-xl border border-outline-variant/20">
+          <h3 className="font-semibold text-on-surface mb-4 flex items-center gap-2">
             <Edit3 className="w-4 h-4" />
             Edit Your Review
           </h3>
@@ -271,14 +271,14 @@ export default function ReviewForm({
                   onClick={() => setRating(star)}
                   onMouseEnter={() => setHoveredRating(star)}
                   onMouseLeave={() => setHoveredRating(0)}
-                  className="focus:outline-none focus-visible:ring-2 focus-visible:ring-zinc-900/30 dark:focus-visible:ring-zinc-400/40 focus-visible:rounded transition-transform hover:scale-110"
+                  className="focus:outline-none focus-visible:ring-2 focus-visible:ring-primary/30 focus-visible:rounded transition-transform hover:scale-110"
                 >
                   <Star
                     className={cn(
                       "w-6 h-6 transition-colors",
                       star <= (hoveredRating || rating)
                         ? "fill-yellow-400 text-yellow-400"
-                        : "text-zinc-300 dark:text-zinc-600"
+                        : "text-on-surface-variant"
                     )}
                   />
                 </button>
@@ -292,7 +292,7 @@ export default function ReviewForm({
                 onChange={(e) => setComment(e.target.value)}
                 maxLength={COMMENT_MAX_LENGTH}
                 rows={3}
-                className="w-full px-4 py-3 bg-white dark:bg-zinc-800 border border-zinc-200 dark:border-zinc-700 rounded-xl text-zinc-900 dark:text-white placeholder:text-zinc-600 dark:placeholder:text-zinc-300"
+                className="w-full px-4 py-3 bg-surface-container-lowest border border-outline-variant/20 rounded-xl text-on-surface placeholder:text-on-surface-variant"
                 placeholder="Update your review..."
                 aria-describedby={error ? "review-edit-error" : undefined}
                 aria-invalid={!!error}
@@ -352,13 +352,13 @@ export default function ReviewForm({
 
     // View mode with edit/delete buttons
     return (
-      <div className="bg-zinc-50 dark:bg-zinc-900 p-6 rounded-xl border border-zinc-100 dark:border-zinc-800">
+      <div className="bg-surface-canvas p-6 rounded-xl border border-outline-variant/20">
         <div className="flex items-start gap-4">
-          <div className="w-10 h-10 rounded-full bg-green-100 dark:bg-green-900/30 flex items-center justify-center flex-shrink-0">
-            <CheckCircle2 className="w-5 h-5 text-green-600 dark:text-green-400" />
+          <div className="w-10 h-10 rounded-full bg-green-100 flex items-center justify-center flex-shrink-0">
+            <CheckCircle2 className="w-5 h-5 text-green-600" />
           </div>
           <div className="flex-1 min-w-0">
-            <h3 className="font-semibold text-zinc-900 dark:text-white mb-1">
+            <h3 className="font-semibold text-on-surface mb-1">
               Your Review
             </h3>
             <div className="flex items-center gap-1 mb-2">
@@ -369,21 +369,21 @@ export default function ReviewForm({
                     "w-4 h-4",
                     star <= rating
                       ? "fill-yellow-400 text-yellow-400"
-                      : "text-zinc-300 dark:text-zinc-600"
+                      : "text-on-surface-variant"
                   )}
                 />
               ))}
-              <span className="text-xs text-zinc-500 dark:text-zinc-400 ml-2">
+              <span className="text-xs text-on-surface-variant ml-2">
                 {new Date(existingReview.createdAt).toLocaleDateString()}
               </span>
             </div>
-            <p className="text-sm text-zinc-600 dark:text-zinc-400">
+            <p className="text-sm text-on-surface-variant">
               &ldquo;{comment}&rdquo;
             </p>
           </div>
         </div>
         {/* Edit/Delete actions */}
-        <div className="flex gap-2 mt-4 pt-4 border-t border-zinc-200 dark:border-zinc-700">
+        <div className="flex gap-2 mt-4 pt-4 border-t border-outline-variant/20">
           <Button
             variant="outline"
             size="sm"
@@ -399,7 +399,7 @@ export default function ReviewForm({
             onClick={() => setShowDeleteDialog(true)}
             disabled={isDeleting}
             aria-busy={isDeleting}
-            className="flex-1 text-red-600 dark:text-red-400 hover:bg-red-50 dark:hover:bg-red-900/20 border-red-200 dark:border-red-800"
+            className="flex-1 text-red-600 hover:bg-red-50 border-red-200"
           >
             {isDeleting ? (
               <Loader2 className="w-4 h-4 animate-spin" aria-hidden="true" />
@@ -417,8 +417,8 @@ export default function ReviewForm({
           <AlertDialogContent>
             <AlertDialogHeader>
               <div className="flex items-center gap-3 mb-2">
-                <div className="w-10 h-10 rounded-full bg-red-100 dark:bg-red-900/30 flex items-center justify-center">
-                  <AlertTriangle className="w-5 h-5 text-red-600 dark:text-red-400" />
+                <div className="w-10 h-10 rounded-full bg-red-100 flex items-center justify-center">
+                  <AlertTriangle className="w-5 h-5 text-red-600" />
                 </div>
                 <AlertDialogTitle>Delete your review?</AlertDialogTitle>
               </div>
@@ -427,14 +427,14 @@ export default function ReviewForm({
                   You&apos;re about to delete your {existingReview.rating}-star
                   review:
                 </span>
-                <span className="block italic text-zinc-600 dark:text-zinc-300">
+                <span className="block italic text-on-surface-variant">
                   &ldquo;
                   {existingReview.comment.length > 100
                     ? existingReview.comment.slice(0, 100) + "..."
                     : existingReview.comment}
                   &rdquo;
                 </span>
-                <span className="block text-sm text-red-600 dark:text-red-400 mt-2">
+                <span className="block text-sm text-red-600 mt-2">
                   This action cannot be undone.
                 </span>
               </AlertDialogDescription>
@@ -463,15 +463,15 @@ export default function ReviewForm({
   // Show "already reviewed" without details (fallback)
   if (hasExistingReview) {
     return (
-      <div className="bg-zinc-50 dark:bg-zinc-900 p-6 rounded-xl border border-zinc-100 dark:border-zinc-800">
+      <div className="bg-surface-canvas p-6 rounded-xl border border-outline-variant/20">
         <div className="text-center py-4">
-          <div className="w-12 h-12 mx-auto mb-3 rounded-full bg-green-100 dark:bg-green-900/30 flex items-center justify-center">
-            <CheckCircle2 className="w-6 h-6 text-green-600 dark:text-green-400" />
+          <div className="w-12 h-12 mx-auto mb-3 rounded-full bg-green-100 flex items-center justify-center">
+            <CheckCircle2 className="w-6 h-6 text-green-600" />
           </div>
-          <h3 className="font-semibold text-lg text-zinc-900 dark:text-white mb-2">
+          <h3 className="font-semibold text-lg text-on-surface mb-2">
             Thanks for your review!
           </h3>
-          <p className="text-sm text-zinc-600 dark:text-zinc-400">
+          <p className="text-sm text-on-surface-variant">
             You&apos;ve already shared your experience
           </p>
         </div>
@@ -482,15 +482,15 @@ export default function ReviewForm({
   return (
     <form
       onSubmit={handleSubmit}
-      className="space-y-4 bg-zinc-50 dark:bg-zinc-900 p-6 rounded-xl border border-zinc-100 dark:border-zinc-800"
+      className="space-y-4 bg-surface-canvas p-6 rounded-xl border border-outline-variant/20"
     >
-      <h3 className="font-semibold text-lg text-zinc-900 dark:text-white">
+      <h3 className="font-semibold text-lg text-on-surface">
         Write a Review
       </h3>
 
       {/* Success state */}
       {isSubmitted && (
-        <div className="flex items-center gap-2 p-3 rounded-lg bg-green-50 dark:bg-green-900/20 text-green-700 dark:text-green-400 text-sm animate-in fade-in slide-in-from-top-2">
+        <div className="flex items-center gap-2 p-3 rounded-lg bg-green-50 text-green-700 text-sm animate-in fade-in slide-in-from-top-2">
           <CheckCircle2 className="w-5 h-5 flex-shrink-0" />
           <span>Your review has been submitted!</span>
         </div>
@@ -501,7 +501,7 @@ export default function ReviewForm({
           <button
             key={star}
             type="button"
-            className="focus:outline-none focus-visible:ring-2 focus-visible:ring-zinc-900/30 dark:focus-visible:ring-zinc-400/40 focus-visible:rounded transition-transform hover:scale-110"
+            className="focus:outline-none focus-visible:ring-2 focus-visible:ring-primary/30 focus-visible:rounded transition-transform hover:scale-110"
             onMouseEnter={() => setHoveredRating(star)}
             onMouseLeave={() => setHoveredRating(0)}
             onClick={() => setRating(star)}
@@ -511,13 +511,13 @@ export default function ReviewForm({
                 "w-6 h-6",
                 (hoveredRating ? star <= hoveredRating : star <= rating)
                   ? "fill-yellow-400 text-yellow-400"
-                  : "text-zinc-300 dark:text-zinc-600"
+                  : "text-on-surface-variant"
               )}
             />
           </button>
         ))}
         {rating > 0 && (
-          <span className="ml-2 text-sm text-zinc-500 dark:text-zinc-400 self-center">
+          <span className="ml-2 text-sm text-on-surface-variant self-center">
             {rating === 1 && "Poor"}
             {rating === 2 && "Fair"}
             {rating === 3 && "Good"}
@@ -534,7 +534,7 @@ export default function ReviewForm({
           placeholder="Share your experience..."
           aria-label="Write your review"
           maxLength={COMMENT_MAX_LENGTH}
-          className="w-full min-h-[100px] p-3 rounded-lg border border-zinc-200 dark:border-zinc-700 focus:outline-none focus-visible:ring-2 focus-visible:ring-zinc-900/30 dark:focus-visible:ring-zinc-400/40 resize-y bg-white dark:bg-zinc-800 text-zinc-900 dark:text-white placeholder:text-zinc-500 dark:placeholder:text-zinc-400"
+          className="w-full min-h-[100px] p-3 rounded-lg border border-outline-variant/20 focus:outline-none focus-visible:ring-2 focus-visible:ring-primary/30 resize-y bg-surface-container-lowest text-on-surface placeholder:text-on-surface-variant"
           disabled={isSubmitting}
           aria-describedby={error ? "review-form-error" : undefined}
           aria-invalid={!!error}
@@ -550,7 +550,7 @@ export default function ReviewForm({
         <p
           id="review-form-error"
           role="alert"
-          className="text-red-500 dark:text-red-400 text-sm"
+          className="text-red-500 text-sm"
         >
           {error}
         </p>

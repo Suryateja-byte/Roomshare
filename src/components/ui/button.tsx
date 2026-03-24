@@ -9,14 +9,14 @@ function cn(...inputs: ClassValue[]) {
 
 const variantClasses = {
   primary:
-    "bg-zinc-900 text-white hover:bg-zinc-800 shadow-sm hover:shadow-md focus-visible:ring-zinc-900/30 dark:bg-white dark:text-zinc-900 dark:hover:bg-zinc-100 dark:focus-visible:ring-zinc-400/40",
+    "bg-on-surface text-white hover:bg-on-surface/90 shadow-sm hover:shadow-md focus-visible:ring-primary/30",
   outline:
-    "border border-zinc-200 bg-transparent hover:bg-zinc-50 text-zinc-900 focus-visible:ring-zinc-900/30 dark:border-zinc-700 dark:text-white dark:hover:bg-zinc-800 dark:focus-visible:ring-zinc-400/40",
-  // P2-8: Improved contrast - zinc-600 (7:1) vs zinc-500's borderline 4.5:1, dark zinc-300 (7.6:1) vs zinc-400's failing 4.2:1
+    "border border-outline-variant/20 bg-transparent hover:bg-surface-canvas text-on-surface focus-visible:ring-primary/30",
+  // P2-8: Improved contrast
   ghost:
-    "text-zinc-600 hover:text-zinc-900 hover:bg-zinc-100 focus-visible:ring-zinc-900/30 dark:text-zinc-300 dark:hover:text-white dark:hover:bg-zinc-800 dark:focus-visible:ring-zinc-400/40",
+    "text-on-surface-variant hover:text-on-surface hover:bg-surface-container-high focus-visible:ring-primary/30",
   white:
-    "bg-white text-zinc-900 hover:bg-zinc-50 shadow-sm border border-zinc-100 focus-visible:ring-zinc-900/30 dark:bg-zinc-800 dark:text-white dark:hover:bg-zinc-700 dark:border-zinc-700 dark:focus-visible:ring-zinc-400/40",
+    "bg-surface-container-lowest text-on-surface hover:bg-surface-canvas shadow-sm border border-surface-container-high focus-visible:ring-primary/30",
   destructive:
     "bg-red-600 text-white hover:bg-red-700 shadow-sm focus-visible:ring-red-600/30",
   success:
@@ -24,16 +24,16 @@ const variantClasses = {
   warning:
     "bg-amber-500 text-white hover:bg-amber-600 shadow-sm focus-visible:ring-amber-500/30",
   accent:
-    "bg-indigo-600 text-white hover:bg-indigo-700 shadow-sm shadow-indigo-500/20 focus-visible:ring-indigo-600/30",
+    "bg-primary text-white hover:bg-primary/90 shadow-sm shadow-primary/20 focus-visible:ring-primary/30",
   "accent-ghost":
-    "text-indigo-600 dark:text-indigo-400 hover:bg-indigo-100 dark:hover:bg-indigo-950 focus-visible:ring-indigo-600/30",
+    "text-primary hover:bg-primary/10 focus-visible:ring-primary/30",
   secondary:
-    "bg-zinc-100 dark:bg-zinc-800 text-zinc-900 dark:text-white hover:bg-zinc-200 dark:hover:bg-zinc-700 focus-visible:ring-zinc-900/30 dark:focus-visible:ring-zinc-400/40",
-  // P2-8: Improved contrast - zinc-300 provides better visibility on dark backgrounds
+    "bg-surface-container-high text-on-surface hover:bg-surface-container-high/80 focus-visible:ring-primary/30",
+  // P2-8: Improved contrast
   "ghost-inverse":
     "text-zinc-300 hover:text-white hover:bg-white/10 focus-visible:ring-white/30",
   filter:
-    "border border-zinc-200 bg-white text-zinc-600 hover:bg-zinc-50 data-[active=true]:bg-zinc-900 data-[active=true]:text-white data-[active=true]:border-zinc-900 focus-visible:ring-zinc-900/30 dark:border-zinc-700 dark:bg-zinc-800 dark:text-zinc-300 dark:hover:bg-zinc-700 dark:data-[active=true]:bg-white dark:data-[active=true]:text-zinc-900 dark:data-[active=true]:border-white dark:focus-visible:ring-zinc-400/40",
+    "border border-outline-variant/20 bg-surface-container-lowest text-on-surface-variant hover:bg-surface-canvas data-[active=true]:bg-on-surface data-[active=true]:text-white data-[active=true]:border-on-surface focus-visible:ring-primary/30",
 };
 
 const sizeClasses = {

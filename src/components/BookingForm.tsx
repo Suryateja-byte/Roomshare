@@ -482,30 +482,30 @@ export default function BookingForm({
         role="alert"
         className={`rounded-xl p-4 ${
           errorType === "server" || errorType === "network" || errorType === "rate_limit"
-            ? "bg-amber-50 dark:bg-amber-900/20 border border-amber-200 dark:border-amber-800"
-            : "bg-red-50 dark:bg-red-900/20 border border-red-200 dark:border-red-800"
+            ? "bg-amber-50 border border-amber-200"
+            : "bg-red-50 border border-red-200"
         }`}
       >
         <div className="flex items-start gap-3">
           <div
             className={`flex-shrink-0 w-8 h-8 rounded-full flex items-center justify-center ${
               errorType === "server" || errorType === "network" || errorType === "rate_limit"
-                ? "bg-amber-100 dark:bg-amber-900/50"
-                : "bg-red-100 dark:bg-red-900/50"
+                ? "bg-amber-100"
+                : "bg-red-100"
             }`}
           >
             {errorType === "server" || errorType === "network" || errorType === "rate_limit" ? (
-              <AlertTriangle className="w-4 h-4 text-amber-600 dark:text-amber-400" />
+              <AlertTriangle className="w-4 h-4 text-amber-600" />
             ) : (
-              <XCircle className="w-4 h-4 text-red-600 dark:text-red-400" />
+              <XCircle className="w-4 h-4 text-red-600" />
             )}
           </div>
           <div className="flex-1 min-w-0">
             <p
               className={`text-sm font-medium ${
                 errorType === "server" || errorType === "network" || errorType === "rate_limit"
-                  ? "text-amber-800 dark:text-amber-200"
-                  : "text-red-800 dark:text-red-200"
+                  ? "text-amber-800"
+                  : "text-red-800"
               }`}
             >
               {message}
@@ -516,7 +516,7 @@ export default function BookingForm({
               <button
                 type="button"
                 onClick={handleRetry}
-                className="mt-2 inline-flex items-center gap-1.5 px-3 py-1.5 text-xs font-medium bg-amber-600 hover:bg-amber-700 text-white rounded-lg transition-colors focus-visible:ring-2 focus-visible:ring-zinc-900/20 focus-visible:ring-offset-2"
+                className="mt-2 inline-flex items-center gap-1.5 px-3 py-1.5 text-xs font-medium bg-amber-600 hover:bg-amber-700 text-white rounded-lg transition-colors focus-visible:ring-2 focus-visible:ring-primary/30 focus-visible:ring-offset-2"
               >
                 <RefreshCw className="w-3 h-3" />
                 Try Again
@@ -544,16 +544,16 @@ export default function BookingForm({
     if (!message.includes("success")) return null;
 
     return (
-      <div className="rounded-xl p-4 bg-green-50 dark:bg-green-900/20 border border-green-200 dark:border-green-800">
+      <div className="rounded-xl p-4 bg-green-50 border border-green-200">
         <div className="flex items-center gap-3">
-          <div className="flex-shrink-0 w-8 h-8 rounded-full bg-green-100 dark:bg-green-900/50 flex items-center justify-center">
-            <CheckCircle className="w-4 h-4 text-green-600 dark:text-green-400" />
+          <div className="flex-shrink-0 w-8 h-8 rounded-full bg-green-100 flex items-center justify-center">
+            <CheckCircle className="w-4 h-4 text-green-600" />
           </div>
           <div className="flex-1">
-            <p className="text-sm font-medium text-green-800 dark:text-green-200">
+            <p className="text-sm font-medium text-green-800">
               {message}
             </p>
-            <p className="text-xs text-green-600 dark:text-green-400 mt-0.5">
+            <p className="text-xs text-green-600 mt-0.5">
               Redirecting to your bookings...
             </p>
           </div>
@@ -563,13 +563,13 @@ export default function BookingForm({
   };
 
   return (
-    <div className="bg-white dark:bg-zinc-900 rounded-3xl shadow-xl p-6 sticky top-24">
+    <div className="bg-surface-container-lowest rounded-3xl shadow-xl p-6 sticky top-24">
       <div className="flex justify-between items-end mb-6">
         <div>
-          <span className="text-3xl font-bold text-zinc-900 dark:text-white">
+          <span className="text-3xl font-bold text-on-surface">
             ${price}
           </span>
-          <span className="text-zinc-500 dark:text-zinc-400"> / month</span>
+          <span className="text-on-surface-variant"> / month</span>
         </div>
         <div
           className={`flex items-center gap-1 text-sm font-medium ${availabilityConfig[status].colorClass}`}
@@ -583,10 +583,10 @@ export default function BookingForm({
 
       {/* Booked Dates Display */}
       {bookedDates.length > 0 && (
-        <div className="mb-4 p-4 rounded-xl bg-zinc-50 dark:bg-zinc-800/50 border border-zinc-100 dark:border-zinc-700">
+        <div className="mb-4 p-4 rounded-xl bg-surface-canvas border border-outline-variant/20">
           <div className="flex items-center gap-2 mb-3">
-            <Calendar className="w-4 h-4 text-zinc-500 dark:text-zinc-400" />
-            <h4 className="text-sm font-semibold text-zinc-700 dark:text-zinc-300">
+            <Calendar className="w-4 h-4 text-on-surface-variant" />
+            <h4 className="text-sm font-semibold text-on-surface-variant">
               Booked Periods
             </h4>
           </div>
@@ -597,9 +597,9 @@ export default function BookingForm({
               return (
                 <div
                   key={index}
-                  className="flex items-center justify-between text-xs px-3 py-2 bg-red-50 dark:bg-red-900/20 rounded-lg border border-red-100 dark:border-red-800"
+                  className="flex items-center justify-between text-xs px-3 py-2 bg-red-50 rounded-lg border border-red-100"
                 >
-                  <span className="text-red-700 dark:text-red-300 font-medium">
+                  <span className="text-red-700 font-medium">
                     {start.toLocaleDateString("en-US", {
                       month: "short",
                       day: "numeric",
@@ -611,14 +611,14 @@ export default function BookingForm({
                       year: "numeric",
                     })}
                   </span>
-                  <span className="text-red-500 dark:text-red-400 text-2xs uppercase font-bold">
+                  <span className="text-red-500 text-2xs uppercase font-bold">
                     Booked
                   </span>
                 </div>
               );
             })}
           </div>
-          <p className="text-2xs text-zinc-500 dark:text-zinc-400 mt-2 flex items-center gap-1">
+          <p className="text-2xs text-on-surface-variant mt-2 flex items-center gap-1">
             <Info className="w-3 h-3" />
             Select dates that don&apos;t overlap with booked periods
           </p>
@@ -627,17 +627,17 @@ export default function BookingForm({
 
       {/* Offline Banner */}
       {isOffline && (
-        <div className="mb-4 p-4 rounded-xl bg-zinc-100 dark:bg-zinc-800 flex items-center gap-3">
-          <WifiOff className="w-5 h-5 text-zinc-500 dark:text-zinc-400 flex-shrink-0" />
-          <p className="text-sm text-zinc-600 dark:text-zinc-400">
+        <div className="mb-4 p-4 rounded-xl bg-surface-container-high flex items-center gap-3">
+          <WifiOff className="w-5 h-5 text-on-surface-variant flex-shrink-0" />
+          <p className="text-sm text-on-surface-variant">
             You&apos;re offline. Please check your connection to book.
           </p>
         </div>
       )}
 
       {status !== "ACTIVE" && (
-        <div className="mb-4 p-4 rounded-xl bg-zinc-100 dark:bg-zinc-800 text-center">
-          <p className="text-sm text-zinc-600 dark:text-zinc-400">
+        <div className="mb-4 p-4 rounded-xl bg-surface-container-high text-center">
+          <p className="text-sm text-on-surface-variant">
             {status === "PAUSED"
               ? "This listing is temporarily unavailable. Check back later!"
               : "This room is currently rented out."}
@@ -647,14 +647,14 @@ export default function BookingForm({
 
       {/* Login Gate for logged-out users */}
       {!isLoggedIn && status === "ACTIVE" && (
-        <div className="mb-4 p-6 rounded-xl bg-gradient-to-br from-primary/5 to-primary/10 dark:from-primary/10 dark:to-primary/20 border border-primary/20 text-center">
+        <div className="mb-4 p-6 rounded-xl bg-gradient-to-br from-primary/5 to-primary/10 border border-primary/20 text-center">
           <div className="w-12 h-12 mx-auto mb-3 rounded-full bg-primary/10 flex items-center justify-center">
             <LogIn className="w-6 h-6 text-primary" />
           </div>
-          <h3 className="font-semibold text-zinc-900 dark:text-white mb-2">
+          <h3 className="font-semibold text-on-surface mb-2">
             Sign in to book this room
           </h3>
-          <p className="text-sm text-zinc-600 dark:text-zinc-400 mb-4">
+          <p className="text-sm text-on-surface-variant mb-4">
             Create an account or sign in to request a booking
           </p>
           <Link href="/login">
@@ -675,7 +675,7 @@ export default function BookingForm({
             <div className="space-y-1">
               <label
                 htmlFor="booking-start-date"
-                className="text-xs font-semibold text-zinc-500 dark:text-zinc-400 uppercase"
+                className="text-xs font-semibold text-on-surface-variant uppercase"
               >
                 Check-in
               </label>
@@ -711,7 +711,7 @@ export default function BookingForm({
             <div className="space-y-1">
               <label
                 htmlFor="booking-end-date"
-                className="text-xs font-semibold text-zinc-500 dark:text-zinc-400 uppercase"
+                className="text-xs font-semibold text-on-surface-variant uppercase"
               >
                 Check-out
               </label>
@@ -751,8 +751,8 @@ export default function BookingForm({
             className="flex items-center justify-center gap-1 group cursor-help"
             title={`Minimum stay: ${MIN_BOOKING_DAYS} days`}
           >
-            <Info className="w-3.5 h-3.5 text-zinc-400 dark:text-zinc-500 group-hover:text-zinc-600 dark:group-hover:text-zinc-300 transition-colors" />
-            <span className="text-xs text-zinc-400 dark:text-zinc-500 group-hover:text-zinc-600 dark:group-hover:text-zinc-300 transition-colors">
+            <Info className="w-3.5 h-3.5 text-on-surface-variant group-hover:text-on-surface-variant transition-colors" />
+            <span className="text-xs text-on-surface-variant group-hover:text-on-surface-variant transition-colors">
               {MIN_BOOKING_DAYS} day minimum
             </span>
           </div>
@@ -761,9 +761,9 @@ export default function BookingForm({
           {dateConflict?.overlaps && (
             <div
               role="alert"
-              className="rounded-xl p-3 bg-red-50 dark:bg-red-900/20 border border-red-200 dark:border-red-800"
+              className="rounded-xl p-3 bg-red-50 border border-red-200"
             >
-              <p className="text-xs text-red-700 dark:text-red-300 font-medium">
+              <p className="text-xs text-red-700 font-medium">
                 ⚠️ Selected dates overlap with an existing booking
               </p>
             </div>
@@ -784,8 +784,8 @@ export default function BookingForm({
             <div
               className={`text-sm text-center p-2 rounded-lg ${
                 bookingInfo.isValid
-                  ? "bg-green-50 dark:bg-green-900/20 text-green-700 dark:text-green-400"
-                  : "bg-amber-50 dark:bg-amber-900/20 text-amber-700 dark:text-amber-400"
+                  ? "bg-green-50 text-green-700"
+                  : "bg-amber-50 text-amber-700"
               }`}
             >
               {bookingInfo.diffDays} days selected
@@ -875,64 +875,64 @@ export default function BookingForm({
               ? renderSuccessMessage()
               : renderErrorBanner())}
 
-          <p className="text-center text-xs text-zinc-500 dark:text-zinc-400">
+          <p className="text-center text-xs text-on-surface-variant">
             You won&apos;t be charged yet
           </p>
         </form>
       )}
 
       {isLoggedIn && (
-        <div className="mt-6 pt-6 border-t border-zinc-100 dark:border-zinc-800 space-y-3">
-          <h4 className="text-sm font-semibold text-zinc-900 dark:text-white mb-3">
+        <div className="mt-6 pt-6 border-t border-outline-variant/20 space-y-3">
+          <h4 className="text-sm font-semibold text-on-surface mb-3">
             Price breakdown
           </h4>
 
           {/* Daily rate calculation when dates are selected */}
           {bookingInfo && bookingInfo.diffDays > 0 ? (
             <>
-              <div className="flex justify-between text-zinc-500 dark:text-zinc-400 text-sm">
+              <div className="flex justify-between text-on-surface-variant text-sm">
                 <span className="flex items-center gap-1">
                   ${(price / 30).toFixed(2)}/day
-                  <span className="text-zinc-400 dark:text-zinc-500">×</span>
+                  <span className="text-on-surface-variant">×</span>
                   {bookingInfo.diffDays} days
                 </span>
                 <span>${bookingInfo.totalPrice.toFixed(2)}</span>
               </div>
-              <div className="flex justify-between text-zinc-500 dark:text-zinc-400 text-sm">
+              <div className="flex justify-between text-on-surface-variant text-sm">
                 <span>Service fee</span>
-                <span className="text-green-600 dark:text-green-400">Free</span>
+                <span className="text-green-600">Free</span>
               </div>
-              <div className="flex justify-between text-zinc-400 dark:text-zinc-500 text-xs">
+              <div className="flex justify-between text-on-surface-variant text-xs">
                 <span>Security deposit</span>
                 <span>Handled separately</span>
               </div>
             </>
           ) : (
             <>
-              <div className="flex justify-between text-zinc-500 dark:text-zinc-400 text-sm">
+              <div className="flex justify-between text-on-surface-variant text-sm">
                 <span>Monthly rent</span>
                 <span>${price}</span>
               </div>
-              <div className="flex justify-between text-zinc-500 dark:text-zinc-400 text-sm">
+              <div className="flex justify-between text-on-surface-variant text-sm">
                 <span>Daily rate</span>
                 <span>${(price / 30).toFixed(2)}/day</span>
               </div>
-              <div className="flex justify-between text-zinc-500 dark:text-zinc-400 text-sm">
+              <div className="flex justify-between text-on-surface-variant text-sm">
                 <span>Service fee</span>
-                <span className="text-green-600 dark:text-green-400">Free</span>
+                <span className="text-green-600">Free</span>
               </div>
             </>
           )}
 
-          <div className="h-px bg-zinc-100 dark:bg-zinc-800 my-2" />
+          <div className="h-px bg-surface-container-high my-2" />
 
-          <div className="flex justify-between font-bold text-lg text-zinc-900 dark:text-white">
+          <div className="flex justify-between font-bold text-lg text-on-surface">
             <span>Total</span>
             <span>${bookingInfo?.totalPrice.toFixed(2) || price}</span>
           </div>
 
           {bookingInfo && bookingInfo.diffDays > 0 && (
-            <p className="text-xs text-zinc-400 dark:text-zinc-500 text-center">
+            <p className="text-xs text-on-surface-variant text-center">
               {Math.ceil(bookingInfo.diffDays / 30)} month
               {Math.ceil(bookingInfo.diffDays / 30) !== 1 ? "s" : ""} stay
             </p>
@@ -949,7 +949,7 @@ export default function BookingForm({
             <div className="fixed inset-0 z-modal flex items-center justify-center p-4">
               {/* Backdrop - disabled during loading to prevent accidental dismissal */}
               <div
-                className={`absolute inset-0 bg-black/50 backdrop-blur-sm ${isLoading ? "cursor-not-allowed" : "cursor-pointer"}`}
+                className={`absolute inset-0 bg-on-surface/50 backdrop-blur-sm ${isLoading ? "cursor-not-allowed" : "cursor-pointer"}`}
                 onClick={() => !isLoading && setShowConfirmModal(false)}
               />
 
@@ -958,23 +958,23 @@ export default function BookingForm({
                 role="dialog"
                 aria-modal="true"
                 aria-labelledby="booking-confirm-title"
-                className="relative bg-white dark:bg-zinc-900 rounded-3xl shadow-2xl max-w-md w-full p-6 animate-in zoom-in-95 fade-in duration-200"
+                className="relative bg-surface-container-lowest rounded-3xl shadow-2xl max-w-md w-full p-6 animate-in zoom-in-95 fade-in duration-200"
               >
                 <h3
                   id="booking-confirm-title"
-                  className="text-xl font-bold text-zinc-900 dark:text-white mb-4"
+                  className="text-xl font-bold text-on-surface mb-4"
                 >
                   Confirm Your Booking Request
                 </h3>
 
                 <div className="space-y-4">
                   {/* Dates Summary */}
-                  <div className="bg-zinc-50 dark:bg-zinc-800/50 rounded-xl p-4 space-y-3">
+                  <div className="bg-surface-canvas rounded-xl p-4 space-y-3">
                     <div className="flex justify-between items-center">
-                      <span className="text-sm text-zinc-500 dark:text-zinc-400">
+                      <span className="text-sm text-on-surface-variant">
                         Check-in
                       </span>
-                      <span className="text-sm font-semibold text-zinc-900 dark:text-white">
+                      <span className="text-sm font-semibold text-on-surface">
                         {parseLocalDate(startDate).toLocaleDateString("en-US", {
                           weekday: "short",
                           month: "short",
@@ -984,10 +984,10 @@ export default function BookingForm({
                       </span>
                     </div>
                     <div className="flex justify-between items-center">
-                      <span className="text-sm text-zinc-500 dark:text-zinc-400">
+                      <span className="text-sm text-on-surface-variant">
                         Check-out
                       </span>
-                      <span className="text-sm font-semibold text-zinc-900 dark:text-white">
+                      <span className="text-sm font-semibold text-on-surface">
                         {parseLocalDate(endDate).toLocaleDateString("en-US", {
                           weekday: "short",
                           month: "short",
@@ -996,12 +996,12 @@ export default function BookingForm({
                         })}
                       </span>
                     </div>
-                    <div className="h-px bg-zinc-200 dark:bg-zinc-700" />
+                    <div className="h-px bg-surface-container-high" />
                     <div className="flex justify-between items-center">
-                      <span className="text-sm text-zinc-500 dark:text-zinc-400">
+                      <span className="text-sm text-on-surface-variant">
                         Duration
                       </span>
-                      <span className="text-sm font-semibold text-zinc-900 dark:text-white">
+                      <span className="text-sm font-semibold text-on-surface">
                         {bookingInfo.diffDays} days (
                         {Math.ceil(bookingInfo.diffDays / 30)} month
                         {Math.ceil(bookingInfo.diffDays / 30) !== 1 ? "s" : ""})
@@ -1010,27 +1010,27 @@ export default function BookingForm({
                   </div>
 
                   {/* Price Summary */}
-                  <div className="bg-primary/5 dark:bg-primary/10 rounded-xl p-4 space-y-2">
+                  <div className="bg-primary/5 rounded-xl p-4 space-y-2">
                     <div className="flex justify-between items-center text-sm">
-                      <span className="text-zinc-600 dark:text-zinc-400">
+                      <span className="text-on-surface-variant">
                         ${(price / 30).toFixed(2)}/day × {bookingInfo.diffDays}{" "}
                         days
                       </span>
-                      <span className="text-zinc-900 dark:text-white">
+                      <span className="text-on-surface">
                         ${bookingInfo.totalPrice.toFixed(2)}
                       </span>
                     </div>
                     <div className="flex justify-between items-center text-sm">
-                      <span className="text-zinc-600 dark:text-zinc-400">
+                      <span className="text-on-surface-variant">
                         Service fee
                       </span>
-                      <span className="text-green-600 dark:text-green-400">
+                      <span className="text-green-600">
                         Free
                       </span>
                     </div>
                     <div className="h-px bg-primary/20" />
                     <div className="flex justify-between items-center">
-                      <span className="font-bold text-zinc-900 dark:text-white">
+                      <span className="font-bold text-on-surface">
                         Total
                       </span>
                       <span className="text-xl font-bold text-primary">
@@ -1040,7 +1040,7 @@ export default function BookingForm({
                   </div>
 
                   {/* Notice */}
-                  <p className="text-xs text-zinc-500 dark:text-zinc-400 text-center">
+                  <p className="text-xs text-on-surface-variant text-center">
                     By confirming, you&apos;re sending a booking request to the
                     host. You won&apos;t be charged until the host accepts.
                   </p>

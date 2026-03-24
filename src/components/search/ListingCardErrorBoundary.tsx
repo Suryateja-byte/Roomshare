@@ -42,9 +42,9 @@ export class ListingCardErrorBoundary extends Component<Props, State> {
   render() {
     if (this.state.hasError) {
       return (
-        <div className="rounded-xl border border-zinc-200 dark:border-zinc-800 bg-zinc-50 dark:bg-zinc-900/50 p-6 flex flex-col items-center justify-center min-h-[200px]">
-          <AlertCircle className="w-5 h-5 text-zinc-400 mb-2" />
-          <p className="text-sm text-zinc-500 dark:text-zinc-400 text-center">
+        <div className="rounded-xl border border-outline-variant/20 bg-surface-canvas p-6 flex flex-col items-center justify-center min-h-[200px]">
+          <AlertCircle className="w-5 h-5 text-on-surface-variant mb-2" />
+          <p className="text-sm text-on-surface-variant text-center">
             Unable to load this listing
           </p>
         </div>

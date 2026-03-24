@@ -114,12 +114,12 @@ export function ServiceWorkerRegistration({
   return (
     <div
       role="alert"
-      className="fixed bottom-4 left-4 right-4 z-50 mx-auto max-w-md rounded-lg border border-zinc-200 bg-white p-4 shadow-lg "
+      className="fixed bottom-4 left-4 right-4 z-50 mx-auto max-w-md rounded-lg border border-outline-variant/20 bg-surface-container-lowest p-4 shadow-lg "
     >
       <div className="flex items-start gap-3">
         <div className="flex-shrink-0">
           <svg
-            className="h-5 w-5 text-zinc-600 "
+            className="h-5 w-5 text-on-surface-variant "
             fill="none"
             viewBox="0 0 24 24"
             stroke="currentColor"
@@ -134,22 +134,22 @@ export function ServiceWorkerRegistration({
           </svg>
         </div>
         <div className="flex-1">
-          <h3 className="text-sm font-medium text-zinc-900 ">
+          <h3 className="text-sm font-medium text-on-surface ">
             Update available
           </h3>
-          <p className="mt-1 text-sm text-zinc-600 ">
+          <p className="mt-1 text-sm text-on-surface-variant ">
             A new version of the app is available.
           </p>
           <div className="mt-3 flex gap-2">
             <button
               onClick={handleUpdate}
-              className="rounded-md bg-zinc-900 px-3 py-1.5 text-xs font-medium text-white transition-colors hover:bg-zinc-800 focus:outline-none focus-visible:ring-2 focus-visible:ring-zinc-500 focus-visible:ring-offset-2 "
+              className="rounded-md bg-on-surface px-3 py-1.5 text-xs font-medium text-white transition-colors hover:bg-on-surface focus:outline-none focus-visible:ring-2 focus-visible:ring-primary/30 focus-visible:ring-offset-2 "
             >
               Update now
             </button>
             <button
               onClick={() => setUpdateAvailable(false)}
-              className="rounded-md px-3 py-1.5 text-xs font-medium text-zinc-600 transition-colors hover:bg-zinc-100 focus:outline-none focus-visible:ring-2 focus-visible:ring-zinc-500 focus-visible:ring-offset-2 "
+              className="rounded-md px-3 py-1.5 text-xs font-medium text-on-surface-variant transition-colors hover:bg-surface-container-high focus:outline-none focus-visible:ring-2 focus-visible:ring-primary/30 focus-visible:ring-offset-2 "
             >
               Later
             </button>

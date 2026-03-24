@@ -46,14 +46,14 @@ const IconButton = ({
           className="absolute top-1.5 right-1.5 flex h-2.5 w-2.5"
         >
           <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-red-400 opacity-75"></span>
-          <span className="relative inline-flex rounded-full h-2.5 w-2.5 bg-red-500 border border-white dark:border-zinc-900"></span>
+          <span className="relative inline-flex rounded-full h-2.5 w-2.5 bg-red-500 border border-white"></span>
         </span>
       )}
     </>
   );
 
   const className =
-    "p-2.5 min-w-[44px] min-h-[44px] flex items-center justify-center text-zinc-500 dark:text-zinc-400 hover:text-zinc-900 dark:hover:text-white hover:bg-zinc-100 dark:hover:bg-zinc-800 rounded-full transition-all relative focus-visible:ring-2 focus-visible:ring-zinc-900/20 focus-visible:ring-offset-2";
+    "p-2.5 min-w-[44px] min-h-[44px] flex items-center justify-center text-on-surface-variant hover:text-on-surface hover:bg-surface-container-high rounded-full transition-all relative focus-visible:ring-2 focus-visible:ring-primary/30 focus-visible:ring-offset-2";
 
   if (href) {
     return (
@@ -91,10 +91,10 @@ const MenuItem = ({
   tabIndex?: number;
   onMouseEnter?: () => void;
 }) => {
-  const className = `w-full flex items-center justify-between px-4 py-2.5 rounded-xl text-sm font-medium transition-colors focus-visible:ring-2 focus-visible:ring-zinc-900/20 focus-visible:ring-offset-2 dark:focus-visible:ring-zinc-400/40 ${
+  const className = `w-full flex items-center justify-between px-4 py-2.5 rounded-xl text-sm font-medium transition-colors focus-visible:ring-2 focus-visible:ring-primary/30 focus-visible:ring-offset-2 ${
     danger
-      ? "text-red-600 dark:text-red-500 hover:bg-red-50 dark:hover:bg-red-950/30"
-      : "text-zinc-700 dark:text-zinc-300 hover:bg-zinc-100 dark:hover:bg-zinc-800 hover:text-zinc-900 dark:hover:text-white"
+      ? "text-red-600 hover:bg-red-50"
+      : "text-on-surface-variant hover:bg-surface-container-high hover:text-on-surface"
   }`;
 
   const content = (
@@ -102,7 +102,7 @@ const MenuItem = ({
       <div className="flex items-center gap-3">
         <span
           className={
-            danger ? "text-red-500" : "text-zinc-400 dark:text-zinc-500"
+            danger ? "text-red-500" : "text-on-surface-variant"
           }
         >
           {icon}
@@ -110,7 +110,7 @@ const MenuItem = ({
         {text}
       </div>
       {badge && (
-        <span className="bg-zinc-100 dark:bg-zinc-800 text-zinc-600 dark:text-zinc-300 px-2 py-0.5 rounded-md text-xs font-bold">
+        <span className="bg-surface-container-high text-on-surface-variant px-2 py-0.5 rounded-md text-xs font-bold">
           {badge}
         </span>
       )}
@@ -495,7 +495,7 @@ export default function NavbarClient({
     <header
       className={`fixed top-0 left-0 right-0 z-dropdown transition-all duration-500 ease-[cubic-bezier(0.16,1,0.3,1)] data-[anim-hidden=true]:-translate-y-full data-[anim-hidden=true]:opacity-0 data-[anim-hidden=true]:pointer-events-none data-[anim-hidden=true]:border-transparent ${
         isScrolled
-          ? "py-4 bg-white/95 dark:bg-zinc-950/95 backdrop-blur-md shadow-sm border-b border-zinc-200/50 dark:border-zinc-800/50"
+          ? "py-4 bg-white/95 backdrop-blur-md shadow-sm border-b border-outline-variant/20/50"
           : "py-6 bg-transparent"
       }`}
     >
@@ -507,12 +507,12 @@ export default function NavbarClient({
             href="/"
             className="flex items-center gap-2.5 cursor-pointer group flex-shrink-0"
           >
-            <div className="w-9 h-9 bg-zinc-900 dark:bg-white rounded-xl flex items-center justify-center text-white dark:text-zinc-900 font-bold text-xl transition-all duration-500 group-hover:rotate-[10deg] group-hover:scale-110 shadow-lg shadow-zinc-900/10 dark:shadow-white/5">
+            <div className="w-9 h-9 bg-on-surface rounded-xl flex items-center justify-center text-white font-bold text-xl transition-all duration-500 group-hover:rotate-[10deg] group-hover:scale-110 shadow-lg shadow-on-surface/10">
               R
             </div>
-            <span className="text-xl font-semibold tracking-[-0.03em] text-zinc-900 dark:text-white hidden sm:block">
+            <span className="text-xl font-semibold tracking-[-0.03em] text-on-surface hidden sm:block">
               RoomShare
-              <span className="text-indigo-600 dark:text-indigo-400">.</span>
+              <span className="text-primary">.</span>
             </span>
           </Link>
 
@@ -520,10 +520,10 @@ export default function NavbarClient({
           <div className="hidden lg:flex flex-1 items-center justify-center gap-1">
             <Link
               href="/search"
-              className={`text-sm font-medium px-5 py-2 rounded-full transition-all duration-300 focus-visible:ring-2 focus-visible:ring-zinc-900/20 focus-visible:ring-offset-2 dark:focus-visible:ring-zinc-400/40 ${
+              className={`text-sm font-medium px-5 py-2 rounded-full transition-all duration-300 focus-visible:ring-2 focus-visible:ring-primary/30 focus-visible:ring-offset-2 ${
                 pathname === "/search"
-                  ? "text-zinc-900 dark:text-white bg-zinc-100 dark:bg-white/10"
-                  : "text-zinc-500 dark:text-zinc-400 hover:text-zinc-900 dark:hover:text-white hover:bg-zinc-100 dark:hover:bg-white/5"
+                  ? "text-on-surface bg-surface-container-high"
+                  : "text-on-surface-variant hover:text-on-surface hover:bg-surface-container-high"
               }`}
               aria-current={pathname === "/search" ? "page" : undefined}
             >
@@ -531,10 +531,10 @@ export default function NavbarClient({
             </Link>
             <Link
               href="/about"
-              className={`text-sm font-medium px-5 py-2 rounded-full transition-all duration-300 focus-visible:ring-2 focus-visible:ring-zinc-900/20 focus-visible:ring-offset-2 dark:focus-visible:ring-zinc-400/40 ${
+              className={`text-sm font-medium px-5 py-2 rounded-full transition-all duration-300 focus-visible:ring-2 focus-visible:ring-primary/30 focus-visible:ring-offset-2 ${
                 pathname === "/about"
-                  ? "text-zinc-900 dark:text-white bg-zinc-100 dark:bg-white/10"
-                  : "text-zinc-500 dark:text-zinc-400 hover:text-zinc-900 dark:hover:text-white hover:bg-zinc-100 dark:hover:bg-white/5"
+                  ? "text-on-surface bg-surface-container-high"
+                  : "text-on-surface-variant hover:text-on-surface hover:bg-surface-container-high"
               }`}
               aria-current={pathname === "/about" ? "page" : undefined}
             >
@@ -568,8 +568,8 @@ export default function NavbarClient({
                   onKeyDown={handleTriggerKeyDown}
                   className={`group flex items-center gap-2 p-1 pl-1.5 pr-1 min-h-[40px] rounded-full transition-all duration-300 ${
                     isProfileOpen
-                      ? "bg-zinc-100 dark:bg-zinc-800"
-                      : "hover:bg-zinc-50 dark:hover:bg-zinc-800"
+                      ? "bg-surface-container-high"
+                      : "hover:bg-surface-canvas"
                   }`}
                   aria-expanded={isProfileOpen}
                   aria-haspopup="menu"
@@ -580,7 +580,7 @@ export default function NavbarClient({
                   <UserAvatar image={user.image} name={user.name} size="sm" />
                   <Menu
                     size={16}
-                    className={`transition-colors duration-300 ${isProfileOpen ? "text-white dark:text-zinc-900" : "text-zinc-500 dark:text-zinc-400"}`}
+                    className={`transition-colors duration-300 ${isProfileOpen ? "text-white" : "text-on-surface-variant"}`}
                   />
                 </button>
 
@@ -590,7 +590,7 @@ export default function NavbarClient({
                   role="menu"
                   aria-labelledby={menuButtonId}
                   onKeyDown={handleMenuKeyDown}
-                  className={`absolute right-0 mt-4 w-72 bg-white/95 dark:bg-zinc-900/95 backdrop-blur-xl rounded-[1.5rem] shadow-2xl shadow-zinc-900/10 dark:shadow-black/60 border border-zinc-200/50 dark:border-white/5 overflow-hidden origin-top-right z-sticky transition-all duration-300 ease-[cubic-bezier(0.16,1,0.3,1)] ${
+                  className={`absolute right-0 mt-4 w-72 bg-white/95 backdrop-blur-xl rounded-[1.5rem] shadow-2xl shadow-on-surface/10 border border-outline-variant/20/50 overflow-hidden origin-top-right z-sticky transition-all duration-300 ease-[cubic-bezier(0.16,1,0.3,1)] ${
                     isProfileOpen
                       ? "opacity-100 translate-y-0 visible scale-100"
                       : "opacity-0 -translate-y-4 invisible scale-95 pointer-events-none"
@@ -598,12 +598,12 @@ export default function NavbarClient({
                 >
                   <div
                     role="none"
-                    className="p-6 border-b border-zinc-100 dark:border-white/5 bg-zinc-50/50 dark:bg-white/[0.02]"
+                    className="p-6 border-b border-outline-variant/20 bg-surface-canvas/50[0.02]"
                   >
-                    <p className="font-semibold text-zinc-900 dark:text-white tracking-tight">
+                    <p className="font-semibold text-on-surface tracking-tight">
                       {user.name}
                     </p>
-                    <p className="text-xs text-zinc-400 truncate mt-0.5">
+                    <p className="text-xs text-on-surface-variant truncate mt-0.5">
                       {user.email}
                     </p>
                   </div>
@@ -634,7 +634,7 @@ export default function NavbarClient({
                     />
                     <div
                       role="separator"
-                      className="h-px bg-zinc-100 dark:bg-white/5 my-2 mx-3"
+                      className="h-px bg-surface-container-high my-2 mx-3"
                     ></div>
                     <MenuItem
                       icon={<Settings size={16} />}
@@ -646,7 +646,7 @@ export default function NavbarClient({
                     />
                     <div
                       role="separator"
-                      className="h-px bg-zinc-100 dark:bg-white/5 my-2 mx-3"
+                      className="h-px bg-surface-container-high my-2 mx-3"
                     ></div>
                     <MenuItem
                       icon={<LogOut size={16} />}
@@ -666,14 +666,14 @@ export default function NavbarClient({
               <div className="flex items-center gap-1.5">
                 <Link
                   href="/login"
-                  className="text-sm font-medium text-zinc-600 dark:text-zinc-400 hover:text-zinc-900 dark:hover:text-white px-4 py-2 transition-all duration-300 rounded-full hover:bg-zinc-100 dark:hover:bg-white/5"
+                  className="text-sm font-medium text-on-surface-variant hover:text-on-surface px-4 py-2 transition-all duration-300 rounded-full hover:bg-surface-container-high"
                 >
                   Log in
                 </Link>
                 <Button
                   asChild
                   size="sm"
-                  className="rounded-full px-6 h-10 shadow-lg shadow-zinc-900/10"
+                  className="rounded-full px-6 h-10 shadow-lg shadow-on-surface/10"
                 >
                   <Link href="/signup">Join</Link>
                 </Button>
@@ -684,7 +684,7 @@ export default function NavbarClient({
             <div className="lg:hidden flex items-center">
               <button
                 onClick={() => setIsMobileMenuOpen(!isMobileMenuOpen)}
-                className="text-zinc-900 dark:text-white p-2 transition-colors hover:bg-zinc-100 dark:hover:bg-white/5 rounded-full focus-visible:ring-2 focus-visible:ring-zinc-900/20 focus-visible:ring-offset-2 dark:focus-visible:ring-zinc-400/40"
+                className="text-on-surface p-2 transition-colors hover:bg-surface-container-high rounded-full focus-visible:ring-2 focus-visible:ring-primary/30 focus-visible:ring-offset-2"
                 aria-label={isMobileMenuOpen ? "Close menu" : "Open menu"}
                 aria-expanded={isMobileMenuOpen}
               >
@@ -697,7 +697,7 @@ export default function NavbarClient({
 
       {/* Mobile Menu - CSS animated with grid for height:auto animation */}
       <div
-        className={`lg:hidden bg-white dark:bg-zinc-950 border-b border-zinc-200 dark:border-white/5 overflow-hidden grid transition-all duration-300 ease-out ${
+        className={`lg:hidden bg-surface-container-lowest border-b border-outline-variant/20 overflow-hidden grid transition-all duration-300 ease-out ${
           isMobileMenuOpen
             ? "grid-rows-[1fr] opacity-100"
             : "grid-rows-[0fr] opacity-0"
@@ -711,15 +711,15 @@ export default function NavbarClient({
         <div className="overflow-hidden">
           <div className="px-6 py-4 space-y-4">
             {user ? (
-              <div className="flex items-center gap-3 pb-4 border-b border-zinc-100 dark:border-zinc-800">
+              <div className="flex items-center gap-3 pb-4 border-b border-outline-variant/20">
                 <UserAvatar image={user.image} name={user.name} size="md" />
                 <div>
-                  <p className="font-semibold text-zinc-900 dark:text-white">
+                  <p className="font-semibold text-on-surface">
                     {user.name}
                   </p>
                   <Link
                     href="/profile"
-                    className="text-xs text-zinc-500 dark:text-zinc-400 hover:text-zinc-700 dark:hover:text-zinc-300"
+                    className="text-xs text-on-surface-variant hover:text-on-surface-variant"
                     onClick={() => setIsMobileMenuOpen(false)}
                   >
                     View Profile
@@ -730,11 +730,11 @@ export default function NavbarClient({
 
             <Link
               href="/search"
-              className="flex items-center gap-3 py-3 text-base font-medium text-zinc-700 dark:text-zinc-300 hover:text-zinc-900 dark:hover:text-white hover:bg-zinc-50 dark:hover:bg-zinc-800 rounded-lg px-2"
+              className="flex items-center gap-3 py-3 text-base font-medium text-on-surface-variant hover:text-on-surface hover:bg-surface-canvas rounded-lg px-2"
               onClick={() => setIsMobileMenuOpen(false)}
               aria-current={pathname === "/search" ? "page" : undefined}
             >
-              <Search size={20} className="text-zinc-400 dark:text-zinc-500" />{" "}
+              <Search size={20} className="text-on-surface-variant" />{" "}
               Find a Room
             </Link>
 
@@ -742,13 +742,13 @@ export default function NavbarClient({
               <>
                 <Link
                   href="/messages"
-                  className="flex items-center gap-3 py-3 text-base font-medium text-zinc-700 dark:text-zinc-300 hover:text-zinc-900 dark:hover:text-white hover:bg-zinc-50 dark:hover:bg-zinc-800 rounded-lg px-2"
+                  className="flex items-center gap-3 py-3 text-base font-medium text-on-surface-variant hover:text-on-surface hover:bg-surface-canvas rounded-lg px-2"
                   onClick={() => setIsMobileMenuOpen(false)}
                   aria-current={pathname === "/messages" ? "page" : undefined}
                 >
                   <MessageSquare
                     size={20}
-                    className="text-zinc-400 dark:text-zinc-500"
+                    className="text-on-surface-variant"
                   />
                   Messages
                   {currentUnreadCount > 0 && (
@@ -759,37 +759,37 @@ export default function NavbarClient({
                 </Link>
                 <Link
                   href="/bookings"
-                  className="flex items-center gap-3 py-3 text-base font-medium text-zinc-700 dark:text-zinc-300 hover:text-zinc-900 dark:hover:text-white hover:bg-zinc-50 dark:hover:bg-zinc-800 rounded-lg px-2"
+                  className="flex items-center gap-3 py-3 text-base font-medium text-on-surface-variant hover:text-on-surface hover:bg-surface-canvas rounded-lg px-2"
                   onClick={() => setIsMobileMenuOpen(false)}
                   aria-current={pathname === "/bookings" ? "page" : undefined}
                 >
                   <Calendar
                     size={20}
-                    className="text-zinc-400 dark:text-zinc-500"
+                    className="text-on-surface-variant"
                   />{" "}
                   Bookings
                 </Link>
                 <Link
                   href="/saved"
-                  className="flex items-center gap-3 py-3 text-base font-medium text-zinc-700 dark:text-zinc-300 hover:text-zinc-900 dark:hover:text-white hover:bg-zinc-50 dark:hover:bg-zinc-800 rounded-lg px-2"
+                  className="flex items-center gap-3 py-3 text-base font-medium text-on-surface-variant hover:text-on-surface hover:bg-surface-canvas rounded-lg px-2"
                   onClick={() => setIsMobileMenuOpen(false)}
                   aria-current={pathname === "/saved" ? "page" : undefined}
                 >
                   <Heart
                     size={20}
-                    className="text-zinc-400 dark:text-zinc-500"
+                    className="text-on-surface-variant"
                   />{" "}
                   Saved Listings
                 </Link>
               </>
             )}
 
-            <hr className="border-zinc-100 dark:border-zinc-800" />
+            <hr className="border-outline-variant/20" />
 
             <Button
               asChild
               variant="primary"
-              className="w-full flex items-center justify-center gap-2 px-5 py-3 rounded-xl h-auto shadow-lg shadow-zinc-900/10 dark:shadow-white/10"
+              className="w-full flex items-center justify-center gap-2 px-5 py-3 rounded-xl h-auto shadow-lg shadow-on-surface/10"
             >
               <Link
                 href="/listings/create"
@@ -804,7 +804,7 @@ export default function NavbarClient({
               <div className="flex flex-col gap-2 pt-2">
                 <Link
                   href="/login"
-                  className="w-full text-center text-zinc-600 dark:text-zinc-400 py-3 font-medium hover:text-zinc-900 dark:hover:text-white"
+                  className="w-full text-center text-on-surface-variant py-3 font-medium hover:text-on-surface"
                   onClick={() => setIsMobileMenuOpen(false)}
                 >
                   Log In
@@ -830,7 +830,7 @@ export default function NavbarClient({
                   signOut({ callbackUrl: "/" });
                   setIsMobileMenuOpen(false);
                 }}
-                className="w-full flex items-center justify-center gap-2 text-red-600 dark:text-red-500 py-3 font-medium hover:bg-red-50 dark:hover:bg-red-950/30 rounded-xl mt-4"
+                className="w-full flex items-center justify-center gap-2 text-red-600 py-3 font-medium hover:bg-red-50 rounded-xl mt-4"
               >
                 <LogOut size={18} />
                 Log out

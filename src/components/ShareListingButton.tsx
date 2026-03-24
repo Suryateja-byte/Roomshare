@@ -43,7 +43,7 @@ export default function ShareListingButton({
       name: "Copy Link",
       icon: copied ? Check : LinkIcon,
       action: handleCopyLink,
-      color: copied ? "text-green-600" : "text-zinc-600",
+      color: copied ? "text-green-600" : "text-on-surface-variant",
     },
     {
       name: "Twitter",
@@ -79,7 +79,7 @@ export default function ShareListingButton({
         );
         setIsOpen(false);
       },
-      color: "text-zinc-600",
+      color: "text-on-surface-variant",
     },
   ];
 
@@ -122,8 +122,8 @@ export default function ShareListingButton({
           />
 
           {/* Dropdown */}
-          <div className="absolute right-0 mt-2 w-48 bg-white rounded-xl shadow-xl border border-zinc-100 py-2 z-50 animate-in fade-in zoom-in-95 duration-200">
-            <p className="px-4 py-2 text-xs font-semibold text-zinc-400 uppercase tracking-wider">
+          <div className="absolute right-0 mt-2 w-48 bg-surface-container-lowest rounded-xl shadow-xl border border-outline-variant/20 py-2 z-50 animate-in fade-in zoom-in-95 duration-200">
+            <p className="px-4 py-2 text-xs font-semibold text-on-surface-variant uppercase tracking-wider">
               Share this listing
             </p>
             {shareOptions.map((option) => {
@@ -132,10 +132,10 @@ export default function ShareListingButton({
                 <button
                   key={option.name}
                   onClick={option.action}
-                  className="w-full flex items-center gap-3 px-4 py-2 text-left hover:bg-zinc-50 transition-colors"
+                  className="w-full flex items-center gap-3 px-4 py-2 text-left hover:bg-surface-canvas transition-colors"
                 >
                   <Icon className={`w-4 h-4 ${option.color}`} />
-                  <span className="text-sm text-zinc-700">{option.name}</span>
+                  <span className="text-sm text-on-surface-variant">{option.name}</span>
                 </button>
               );
             })}

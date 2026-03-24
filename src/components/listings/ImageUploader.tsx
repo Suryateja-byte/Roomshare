@@ -335,8 +335,8 @@ export default function ImageUploader({
           aria-label="Upload photos. Click or drag and drop."
           className={`relative border-2 border-dashed rounded-xl p-8 text-center transition-all cursor-pointer group ${
             isDragging
-              ? "border-zinc-900 dark:border-white bg-zinc-50 dark:bg-zinc-800 scale-[1.01]"
-              : "border-zinc-300 dark:border-zinc-600 hover:border-zinc-400 dark:hover:border-zinc-500 hover:bg-zinc-50 dark:hover:bg-zinc-800 bg-white dark:bg-zinc-900"
+              ? "border-outline-variant/20 bg-surface-canvas scale-[1.01]"
+              : "border-outline-variant/30 hover:border-outline-variant/30 hover:bg-surface-canvas bg-surface-container-lowest"
           }`}
           onDragOver={onDragOver}
           onDragLeave={onDragLeave}
@@ -361,21 +361,21 @@ export default function ImageUploader({
 
           <div className="flex flex-col items-center justify-center space-y-3 pointer-events-none">
             <div
-              className={`p-4 rounded-full transition-colors ${isDragging ? "bg-zinc-200 dark:bg-zinc-700" : "bg-zinc-100 dark:bg-zinc-800 group-hover:bg-zinc-200 dark:group-hover:bg-zinc-700"}`}
+              className={`p-4 rounded-full transition-colors ${isDragging ? "bg-surface-container-high" : "bg-surface-container-high group-hover:bg-surface-container-high"}`}
             >
               <Upload
                 size={32}
-                className={`transition-colors ${isDragging ? "text-zinc-600 dark:text-zinc-300" : "text-zinc-400 dark:text-zinc-500 group-hover:text-zinc-500 dark:group-hover:text-zinc-400"}`}
+                className={`transition-colors ${isDragging ? "text-on-surface-variant" : "text-on-surface-variant group-hover:text-on-surface-variant"}`}
               />
             </div>
             <div className="space-y-1">
-              <p className="text-sm font-semibold text-zinc-700 dark:text-zinc-300">
-                <span className="text-zinc-900 dark:text-white">
+              <p className="text-sm font-semibold text-on-surface-variant">
+                <span className="text-on-surface">
                   Click to upload
                 </span>{" "}
                 or drag and drop
               </p>
-              <p className="text-xs text-zinc-500 dark:text-zinc-400">
+              <p className="text-xs text-on-surface-variant">
                 JPEG, PNG, WebP or GIF (max 5MB each)
               </p>
             </div>
@@ -387,7 +387,7 @@ export default function ImageUploader({
       {sizeError && (
         <p
           role="alert"
-          className="mt-2 text-sm text-red-600 dark:text-red-400 flex items-center gap-1.5"
+          className="mt-2 text-sm text-red-600 flex items-center gap-1.5"
         >
           <AlertCircle className="w-4 h-4 flex-shrink-0" />
           {sizeError}
@@ -402,7 +402,7 @@ export default function ImageUploader({
           {images.map((image, index) => (
             <div
               key={image.id}
-              className="group relative aspect-square rounded-xl overflow-hidden border border-zinc-200 dark:border-zinc-700 bg-zinc-100 dark:bg-zinc-800 shadow-sm"
+              className="group relative aspect-square rounded-xl overflow-hidden border border-outline-variant/20 bg-surface-container-high shadow-sm"
             >
               {/* eslint-disable-next-line @next/next/no-img-element -- blob URL preview not compatible with next/image */}
               <img
@@ -413,7 +413,7 @@ export default function ImageUploader({
 
               {/* Uploading Overlay */}
               {image.isUploading && (
-                <div className="absolute inset-0 flex items-center justify-center bg-black/30">
+                <div className="absolute inset-0 flex items-center justify-center bg-on-surface/30">
                   <Loader2 className="w-8 h-8 text-white animate-spin" />
                 </div>
               )}
@@ -446,21 +446,21 @@ export default function ImageUploader({
 
               {/* Main badge */}
               {index === 0 && (
-                <span className="absolute top-2 left-2 px-2 py-1 bg-zinc-900 text-white text-xs font-medium rounded-md">
+                <span className="absolute top-2 left-2 px-2 py-1 bg-on-surface text-white text-xs font-medium rounded-md">
                   Main
                 </span>
               )}
 
               {/* Overlay with Delete Button + Set as Main */}
               {!image.isUploading && (
-                <div className="absolute inset-0 bg-black/0 group-hover:bg-black/10 transition-colors flex items-start justify-end p-2">
+                <div className="absolute inset-0 bg-on-surface/0 group-hover:bg-on-surface/10 transition-colors flex items-start justify-end p-2">
                   <button
                     type="button"
                     onClick={(e) => {
                       e.stopPropagation();
                       removeImage(image.id);
                     }}
-                    className="bg-white/90 hover:bg-red-500 hover:text-white text-zinc-600 rounded-full p-1.5 min-w-[44px] min-h-[44px] flex items-center justify-center shadow-sm transition-all max-sm:opacity-100 sm:opacity-0 sm:group-hover:opacity-100 sm:translate-y-2 sm:group-hover:translate-y-0"
+                    className="bg-white/90 hover:bg-red-500 hover:text-white text-on-surface-variant rounded-full p-1.5 min-w-[44px] min-h-[44px] flex items-center justify-center shadow-sm transition-all max-sm:opacity-100 sm:opacity-0 sm:group-hover:opacity-100 sm:translate-y-2 sm:group-hover:translate-y-0"
                     aria-label="Remove image"
                   >
                     <X size={14} />
@@ -476,7 +476,7 @@ export default function ImageUploader({
                     e.stopPropagation();
                     setAsMain(image.id);
                   }}
-                  className="absolute bottom-2 left-2 px-2 py-1 bg-white/90 hover:bg-zinc-900 hover:text-white text-zinc-600 text-xs font-medium rounded-md shadow-sm transition-all max-sm:opacity-100 sm:opacity-0 sm:group-hover:opacity-100"
+                  className="absolute bottom-2 left-2 px-2 py-1 bg-white/90 hover:bg-on-surface hover:text-white text-on-surface-variant text-xs font-medium rounded-md shadow-sm transition-all max-sm:opacity-100 sm:opacity-0 sm:group-hover:opacity-100"
                   aria-label="Set as main photo"
                 >
                   Set as main
@@ -490,7 +490,7 @@ export default function ImageUploader({
             <button
               type="button"
               onClick={() => fileInputRef.current?.click()}
-              className="flex flex-col items-center justify-center aspect-square rounded-xl border border-dashed border-zinc-300 dark:border-zinc-600 bg-zinc-50 dark:bg-zinc-800 text-zinc-400 dark:text-zinc-500 hover:bg-zinc-100 dark:hover:bg-zinc-700 hover:text-zinc-500 dark:hover:text-zinc-400 hover:border-zinc-400 dark:hover:border-zinc-500 transition-all"
+              className="flex flex-col items-center justify-center aspect-square rounded-xl border border-dashed border-outline-variant/30 bg-surface-canvas text-on-surface-variant hover:bg-surface-container-high hover:text-on-surface-variant hover:border-outline-variant/30 transition-all"
             >
               <Plus size={24} />
               <span className="text-xs mt-1 font-medium">Add more</span>
@@ -504,7 +504,7 @@ export default function ImageUploader({
         <div className="mt-3 space-y-2">
           <div className="flex items-center justify-between">
             <div className="flex items-center gap-3">
-              <p className="text-xs text-zinc-500 dark:text-zinc-400">
+              <p className="text-xs text-on-surface-variant">
                 {images.length} of {maxImages} images
                 {isAnyUploading && " (uploading...)"}
               </p>
@@ -512,7 +512,7 @@ export default function ImageUploader({
                 <button
                   type="button"
                   onClick={cancelUploads}
-                  className="text-xs text-red-500 hover:text-red-600 dark:text-red-400 dark:hover:text-red-300 font-medium"
+                  className="text-xs text-red-500 hover:text-red-600 font-medium"
                 >
                   Cancel uploads
                 </button>
@@ -537,7 +537,7 @@ export default function ImageUploader({
             !isAnyUploading && (
               <div className="text-xs space-y-1">
                 {successfulImages.length > 0 && (
-                  <p className="text-green-600 dark:text-green-400 flex items-center gap-1">
+                  <p className="text-green-600 flex items-center gap-1">
                     <span className="w-1.5 h-1.5 rounded-full bg-green-500" />
                     {successfulImages.length} image
                     {successfulImages.length !== 1 ? "s" : ""} uploaded
@@ -545,7 +545,7 @@ export default function ImageUploader({
                   </p>
                 )}
                 {failedImages.length > 0 && (
-                  <p className="text-red-600 dark:text-red-400 flex items-center gap-1">
+                  <p className="text-red-600 flex items-center gap-1">
                     <span className="w-1.5 h-1.5 rounded-full bg-red-500" />
                     {failedImages.length} image
                     {failedImages.length !== 1 ? "s" : ""} failed to upload

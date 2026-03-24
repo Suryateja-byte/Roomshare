@@ -77,7 +77,7 @@ function FieldError({
     <p
       id={`${field}-error`}
       role="alert"
-      className="text-red-500 dark:text-red-400 text-xs mt-1"
+      className="text-red-500 text-xs mt-1"
     >
       {fieldErrors[field]}
     </p>
@@ -615,21 +615,21 @@ export default function CreateListingForm({
                   <div
                     className={`w-10 h-10 rounded-full flex items-center justify-center border-2 transition-all duration-300 ${
                       isComplete
-                        ? "bg-green-50 dark:bg-green-900/30 border-green-500 dark:border-green-400"
-                        : "bg-zinc-100 dark:bg-zinc-800 border-zinc-200 dark:border-zinc-700"
+                        ? "bg-green-50 border-green-500"
+                        : "bg-zinc-100 border-zinc-200"
                     }`}
                   >
                     {isComplete ? (
-                      <Check className="w-4 h-4 text-green-600 dark:text-green-400" />
+                      <Check className="w-4 h-4 text-green-600" />
                     ) : (
-                      <Icon className="w-4 h-4 text-zinc-600 dark:text-zinc-400" />
+                      <Icon className="w-4 h-4 text-zinc-600" />
                     )}
                   </div>
                   <span
                     className={`text-xs font-medium mt-2 text-center hidden sm:block transition-colors duration-300 ${
                       isComplete
-                        ? "text-green-600 dark:text-green-400"
-                        : "text-zinc-600 dark:text-zinc-400"
+                        ? "text-green-600"
+                        : "text-zinc-600"
                     }`}
                   >
                     {section.label}
@@ -637,8 +637,8 @@ export default function CreateListingForm({
                   <span
                     className={`text-xs font-medium mt-2 text-center sm:hidden transition-colors duration-300 ${
                       isComplete
-                        ? "text-green-600 dark:text-green-400"
-                        : "text-zinc-600 dark:text-zinc-400"
+                        ? "text-green-600"
+                        : "text-zinc-600"
                     }`}
                   >
                     {index + 1}
@@ -649,8 +649,8 @@ export default function CreateListingForm({
                   <div
                     className={`flex-1 h-0.5 mx-2 sm:mx-4 transition-colors duration-300 ${
                       isComplete
-                        ? "bg-green-500 dark:bg-green-400"
-                        : "bg-zinc-200 dark:bg-zinc-700"
+                        ? "bg-green-500"
+                        : "bg-zinc-200"
                     }`}
                   />
                 )}
@@ -659,7 +659,7 @@ export default function CreateListingForm({
           })}
         </div>
         <p
-          className="text-center text-sm text-zinc-500 dark:text-zinc-400 mt-4"
+          className="text-center text-sm text-zinc-500 mt-4"
           aria-live="polite"
         >
           {Object.values(sectionCompletion).filter(Boolean).length === 4
@@ -672,15 +672,15 @@ export default function CreateListingForm({
       {showDraftBanner && savedAt && (
         <div
           role="status"
-          className="bg-blue-50 dark:bg-blue-900/20 border border-blue-100 dark:border-blue-800 px-4 py-4 rounded-xl mb-8 flex items-center justify-between gap-4"
+          className="bg-blue-50 border border-blue-100 px-4 py-4 rounded-xl mb-8 flex items-center justify-between gap-4"
         >
           <div className="flex items-center gap-3">
-            <FileText className="w-5 h-5 text-blue-600 dark:text-blue-400 flex-shrink-0" />
+            <FileText className="w-5 h-5 text-blue-600 flex-shrink-0" />
             <div>
-              <p className="text-sm font-medium text-blue-900 dark:text-blue-100">
+              <p className="text-sm font-medium text-blue-900">
                 You have a saved draft
               </p>
-              <p className="text-xs text-blue-600 dark:text-blue-400">
+              <p className="text-xs text-blue-600">
                 Last saved {formatTimeSince(savedAt)}
               </p>
             </div>
@@ -691,7 +691,7 @@ export default function CreateListingForm({
               variant="outline"
               size="sm"
               onClick={discardDraft}
-              className="text-blue-700 dark:text-blue-300 border-blue-200 dark:border-blue-700 hover:bg-blue-100 dark:hover:bg-blue-900/50"
+              className="text-blue-700 border-blue-200 hover:bg-blue-100"
             >
               Start Fresh
             </Button>
@@ -713,7 +713,7 @@ export default function CreateListingForm({
           tabIndex={-1}
           role="alert"
           data-testid="form-error-banner"
-          className="bg-red-50 dark:bg-red-900/20 border border-red-100 dark:border-red-800 text-red-600 dark:text-red-400 px-4 py-4 rounded-xl mb-8 text-sm outline-none"
+          className="bg-red-50 border border-red-100 text-red-600 px-4 py-4 rounded-xl mb-8 text-sm outline-none"
         >
           {error}
         </div>
@@ -733,7 +733,7 @@ export default function CreateListingForm({
 
       {/* Auto-save status indicator */}
       {!showDraftBanner && savedAt && !loading && (
-        <div className="flex items-center justify-end gap-2 mb-4 text-xs text-zinc-500 dark:text-zinc-400 animate-in fade-in duration-300">
+        <div className="flex items-center justify-end gap-2 mb-4 text-xs text-zinc-500 animate-in fade-in duration-300">
           <CheckCircle className="w-3.5 h-3.5 text-green-500" />
           <span>Draft saved {formatTimeSince(savedAt)}</span>
         </div>
@@ -750,7 +750,7 @@ export default function CreateListingForm({
         <section className="space-y-6" aria-labelledby="section-basics">
           <h3
             id="section-basics"
-            className="text-lg font-semibold text-zinc-900 dark:text-white flex items-center gap-2"
+            className="text-lg font-semibold text-zinc-900 flex items-center gap-2"
           >
             <Home className="w-4 h-4 flex-shrink-0" /> The Basics
           </h3>
@@ -769,7 +769,7 @@ export default function CreateListingForm({
               aria-invalid={!!fieldErrors.title}
               aria-describedby={fieldErrors.title ? "title-error" : undefined}
               className={
-                fieldErrors.title ? "border-red-500 dark:border-red-500" : ""
+                fieldErrors.title ? "border-red-500" : ""
               }
             />
             <FieldError field="title" fieldErrors={fieldErrors} />
@@ -789,7 +789,7 @@ export default function CreateListingForm({
               aria-describedby={
                 fieldErrors.description ? "description-error" : undefined
               }
-              className={`w-full bg-zinc-50 dark:bg-zinc-800 hover:bg-zinc-100 dark:hover:bg-zinc-700 focus:bg-white dark:focus:bg-zinc-800 border rounded-xl px-4 py-3 sm:py-3.5 text-zinc-900 dark:text-white placeholder:text-zinc-600 dark:placeholder:text-zinc-300 outline-none focus:ring-2 focus:ring-black/5 dark:focus:ring-white/10 focus:border-zinc-900 dark:focus:border-zinc-500 transition-all duration-200 disabled:cursor-not-allowed disabled:opacity-60 resize-none leading-relaxed ${fieldErrors.description ? "border-red-500 dark:border-red-500" : "border-zinc-200 dark:border-zinc-700"}`}
+              className={`w-full bg-zinc-50 hover:bg-zinc-100 focus:bg-white border rounded-xl px-4 py-3 sm:py-3.5 text-zinc-900 placeholder:text-zinc-600 outline-none focus:ring-2 focus:ring-black/5 focus:border-zinc-900 transition-all duration-200 disabled:cursor-not-allowed disabled:opacity-60 resize-none leading-relaxed ${fieldErrors.description ? "border-red-500" : "border-zinc-200"}`}
               placeholder="What makes your place special? Describe the vibe, the light, and the lifestyle..."
               disabled={loading}
             />
@@ -819,7 +819,7 @@ export default function CreateListingForm({
                 aria-invalid={!!fieldErrors.price}
                 aria-describedby={fieldErrors.price ? "price-error" : undefined}
                 className={
-                  fieldErrors.price ? "border-red-500 dark:border-red-500" : ""
+                  fieldErrors.price ? "border-red-500" : ""
                 }
               />
               <FieldError field="price" fieldErrors={fieldErrors} />
@@ -844,7 +844,7 @@ export default function CreateListingForm({
                 }
                 className={
                   fieldErrors.totalSlots
-                    ? "border-red-500 dark:border-red-500"
+                    ? "border-red-500"
                     : ""
                 }
               />
@@ -855,15 +855,15 @@ export default function CreateListingForm({
           {/* Booking Mode Selector (behind feature flag) */}
           {enableWholeUnitMode && (
             <fieldset className="space-y-3" disabled={loading}>
-              <legend className="text-sm font-medium text-zinc-900 dark:text-white">
+              <legend className="text-sm font-medium text-zinc-900">
                 Booking Mode
               </legend>
               <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
                 <label
                   className={`flex items-start gap-3 p-4 rounded-xl border-2 cursor-pointer transition-all ${
                     bookingMode === "SHARED"
-                      ? "border-zinc-900 dark:border-white bg-zinc-50 dark:bg-zinc-800"
-                      : "border-zinc-200 dark:border-zinc-700 hover:border-zinc-300 dark:hover:border-zinc-600"
+                      ? "border-zinc-900 bg-zinc-50"
+                      : "border-zinc-200 hover:border-zinc-300"
                   }`}
                 >
                   <input
@@ -875,10 +875,10 @@ export default function CreateListingForm({
                     className="mt-0.5"
                   />
                   <div>
-                    <span className="text-sm font-medium text-zinc-900 dark:text-white">
+                    <span className="text-sm font-medium text-zinc-900">
                       Shared space (multiple tenants)
                     </span>
-                    <p className="text-xs text-zinc-500 dark:text-zinc-400 mt-1">
+                    <p className="text-xs text-zinc-500 mt-1">
                       Individual slots can be booked by different tenants.
                     </p>
                   </div>
@@ -886,8 +886,8 @@ export default function CreateListingForm({
                 <label
                   className={`flex items-start gap-3 p-4 rounded-xl border-2 cursor-pointer transition-all ${
                     bookingMode === "WHOLE_UNIT"
-                      ? "border-zinc-900 dark:border-white bg-zinc-50 dark:bg-zinc-800"
-                      : "border-zinc-200 dark:border-zinc-700 hover:border-zinc-300 dark:hover:border-zinc-600"
+                      ? "border-zinc-900 bg-zinc-50"
+                      : "border-zinc-200 hover:border-zinc-300"
                   }`}
                 >
                   <input
@@ -899,10 +899,10 @@ export default function CreateListingForm({
                     className="mt-0.5"
                   />
                   <div>
-                    <span className="text-sm font-medium text-zinc-900 dark:text-white">
+                    <span className="text-sm font-medium text-zinc-900">
                       Entire unit (one party)
                     </span>
-                    <p className="text-xs text-zinc-500 dark:text-zinc-400 mt-1">
+                    <p className="text-xs text-zinc-500 mt-1">
                       The entire unit is booked by a single party at a time.
                     </p>
                   </div>
@@ -913,13 +913,13 @@ export default function CreateListingForm({
           )}
         </section>
 
-        <div className="h-px bg-zinc-100 dark:bg-zinc-800 w-full"></div>
+        <div className="h-px bg-zinc-100 w-full"></div>
 
         {/* Section 2: Location */}
         <section className="space-y-6" aria-labelledby="section-location">
           <h3
             id="section-location"
-            className="text-lg font-semibold text-zinc-900 dark:text-white flex items-center gap-2"
+            className="text-lg font-semibold text-zinc-900 flex items-center gap-2"
           >
             <MapPin className="w-4 h-4 flex-shrink-0" /> Location
           </h3>
@@ -940,7 +940,7 @@ export default function CreateListingForm({
                 fieldErrors.address ? "address-error" : undefined
               }
               className={
-                fieldErrors.address ? "border-red-500 dark:border-red-500" : ""
+                fieldErrors.address ? "border-red-500" : ""
               }
             />
             <FieldError field="address" fieldErrors={fieldErrors} />
@@ -960,7 +960,7 @@ export default function CreateListingForm({
                 aria-invalid={!!fieldErrors.city}
                 aria-describedby={fieldErrors.city ? "city-error" : undefined}
                 className={
-                  fieldErrors.city ? "border-red-500 dark:border-red-500" : ""
+                  fieldErrors.city ? "border-red-500" : ""
                 }
               />
               <FieldError field="city" fieldErrors={fieldErrors} />
@@ -979,7 +979,7 @@ export default function CreateListingForm({
                 aria-invalid={!!fieldErrors.state}
                 aria-describedby={fieldErrors.state ? "state-error" : undefined}
                 className={
-                  fieldErrors.state ? "border-red-500 dark:border-red-500" : ""
+                  fieldErrors.state ? "border-red-500" : ""
                 }
               />
               <FieldError field="state" fieldErrors={fieldErrors} />
@@ -998,7 +998,7 @@ export default function CreateListingForm({
                 aria-invalid={!!fieldErrors.zip}
                 aria-describedby={fieldErrors.zip ? "zip-error" : undefined}
                 className={
-                  fieldErrors.zip ? "border-red-500 dark:border-red-500" : ""
+                  fieldErrors.zip ? "border-red-500" : ""
                 }
               />
               <FieldError field="zip" fieldErrors={fieldErrors} />
@@ -1006,19 +1006,19 @@ export default function CreateListingForm({
           </div>
         </section>
 
-        <div className="h-px bg-zinc-100 dark:bg-zinc-800 w-full"></div>
+        <div className="h-px bg-zinc-100 w-full"></div>
 
         {/* Section 2.5: Photos */}
         <section className="space-y-6" aria-labelledby="section-photos">
           <h3
             id="section-photos"
-            className="text-lg font-semibold text-zinc-900 dark:text-white flex items-center gap-2"
+            className="text-lg font-semibold text-zinc-900 flex items-center gap-2"
           >
             <Camera className="w-4 h-4 flex-shrink-0" /> Photos
           </h3>
           <div id="images">
             <Label>Upload Photos</Label>
-            <p className="text-xs text-zinc-400 dark:text-zinc-500 mt-1 mb-4">
+            <p className="text-xs text-zinc-400 mt-1 mb-4">
               At least one photo required to publish your listing
             </p>
             <ImageUploader
@@ -1034,13 +1034,13 @@ export default function CreateListingForm({
           </div>
         </section>
 
-        <div className="h-px bg-zinc-100 dark:bg-zinc-800 w-full"></div>
+        <div className="h-px bg-zinc-100 w-full"></div>
 
         {/* Section 3: Details */}
         <section className="space-y-6" aria-labelledby="section-details">
           <h3
             id="section-details"
-            className="text-lg font-semibold text-zinc-900 dark:text-white flex items-center gap-2"
+            className="text-lg font-semibold text-zinc-900 flex items-center gap-2"
           >
             <List className="w-4 h-4 flex-shrink-0" /> Finer Details
           </h3>
@@ -1060,12 +1060,12 @@ export default function CreateListingForm({
               }
               className={
                 fieldErrors.amenities
-                  ? "border-red-500 dark:border-red-500"
+                  ? "border-red-500"
                   : ""
               }
             />
             <FieldError field="amenities" fieldErrors={fieldErrors} />
-            <p className="text-xs text-zinc-400 dark:text-zinc-500 mt-2">
+            <p className="text-xs text-zinc-400 mt-2">
               Separate amenities with commas
             </p>
           </div>
@@ -1079,7 +1079,7 @@ export default function CreateListingForm({
               placeholder="Select move-in date"
               minDate={new Date().toISOString().split("T")[0]}
             />
-            <p className="text-xs text-zinc-400 dark:text-zinc-500 mt-2">
+            <p className="text-xs text-zinc-400 mt-2">
               When can tenants move in? (Optional)
             </p>
           </div>
@@ -1128,13 +1128,13 @@ export default function CreateListingForm({
 
           <div id="householdLanguages">
             <Label>Languages Spoken in the House</Label>
-            <p className="text-xs text-zinc-400 dark:text-zinc-500 mt-1 mb-3">
+            <p className="text-xs text-zinc-400 mt-1 mb-3">
               Select languages spoken by household members
             </p>
 
             {/* Selected languages shown at top */}
             {selectedLanguages.length > 0 && (
-              <div className="flex flex-wrap gap-2 mb-3 pb-3 border-b border-zinc-200 dark:border-zinc-700">
+              <div className="flex flex-wrap gap-2 mb-3 pb-3 border-b border-zinc-200">
                 {selectedLanguages.map((code) => (
                   <button
                     key={code}
@@ -1143,7 +1143,7 @@ export default function CreateListingForm({
                     aria-label={`${getLanguageName(code)}, selected`}
                     onClick={() => toggleLanguage(code)}
                     disabled={loading}
-                    className="flex items-center gap-1 px-3 py-1.5 min-h-[44px] rounded-full text-sm font-medium bg-zinc-900 dark:bg-white text-white dark:text-zinc-900 disabled:cursor-not-allowed disabled:opacity-60"
+                    className="flex items-center gap-1 px-3 py-1.5 min-h-[44px] rounded-full text-sm font-medium bg-zinc-900 text-white disabled:cursor-not-allowed disabled:opacity-60"
                   >
                     {getLanguageName(code)}
                     <X className="w-3.5 h-3.5" />
@@ -1177,13 +1177,13 @@ export default function CreateListingForm({
                   aria-pressed="false"
                   onClick={() => toggleLanguage(code)}
                   disabled={loading}
-                  className="px-3 py-1.5 min-h-[44px] rounded-full text-sm font-medium transition-all duration-200 bg-zinc-100 dark:bg-zinc-800 text-zinc-600 dark:text-zinc-300 hover:bg-zinc-200 dark:hover:bg-zinc-700 disabled:cursor-not-allowed disabled:opacity-60"
+                  className="px-3 py-1.5 min-h-[44px] rounded-full text-sm font-medium transition-all duration-200 bg-zinc-100 text-zinc-600 hover:bg-zinc-200 disabled:cursor-not-allowed disabled:opacity-60"
                 >
                   {getLanguageName(code)}
                 </button>
               ))}
               {unselectedLanguages.length === 0 && (
-                <p className="text-sm text-zinc-500 dark:text-zinc-400">
+                <p className="text-sm text-zinc-500">
                   {languageSearch
                     ? "No languages found"
                     : "All languages selected"}
@@ -1200,7 +1200,7 @@ export default function CreateListingForm({
           <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
             <div>
               <Label htmlFor="genderPreference">Gender Preference</Label>
-              <p className="text-xs text-zinc-400 dark:text-zinc-500 mt-1 mb-2">
+              <p className="text-xs text-zinc-400 mt-1 mb-2">
                 Who can apply for this room?
               </p>
               <Select
@@ -1226,7 +1226,7 @@ export default function CreateListingForm({
             </div>
             <div>
               <Label htmlFor="householdGender">Household Gender</Label>
-              <p className="text-xs text-zinc-400 dark:text-zinc-500 mt-1 mb-2">
+              <p className="text-xs text-zinc-400 mt-1 mb-2">
                 Current household composition
               </p>
               <Select
@@ -1261,12 +1261,12 @@ export default function CreateListingForm({
               }
               className={
                 fieldErrors.houseRules
-                  ? "border-red-500 dark:border-red-500"
+                  ? "border-red-500"
                   : ""
               }
             />
             <FieldError field="houseRules" fieldErrors={fieldErrors} />
-            <p className="text-xs text-zinc-400 dark:text-zinc-500 mt-2">
+            <p className="text-xs text-zinc-400 mt-2">
               Separate rules with commas
             </p>
           </div>
@@ -1297,7 +1297,7 @@ export default function CreateListingForm({
             )}
           </Button>
           {/* TODO: Create /community-guidelines page (terms page already exists) */}
-          <p className="text-center text-xs text-zinc-400 dark:text-zinc-500 mt-4">
+          <p className="text-center text-xs text-zinc-400 mt-4">
             By publishing, you agree to our{" "}
             <a href="/terms" className="underline hover:text-primary-700">
               Terms of Service

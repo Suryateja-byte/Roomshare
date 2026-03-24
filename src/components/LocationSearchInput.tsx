@@ -385,7 +385,7 @@ export default function LocationSearchInput({
     if (placeTypes.includes("locality")) return "text-blue-500";
     if (placeTypes.includes("place")) return "text-green-500";
     if (placeTypes.includes("region")) return "text-purple-500";
-    return "text-zinc-500";
+    return "text-on-surface-variant";
   };
 
   // Show "type more" hint when user has typed but not enough characters
@@ -419,7 +419,7 @@ export default function LocationSearchInput({
           onCompositionStart={handleCompositionStart}
           onCompositionEnd={handleCompositionEnd}
           placeholder={placeholder}
-          className="w-full bg-transparent border-none p-0 text-zinc-900 dark:text-white placeholder:text-zinc-500 dark:placeholder:text-zinc-400 focus:ring-0 focus:outline-none focus-visible:ring-2 focus-visible:ring-zinc-900/30 dark:focus-visible:ring-zinc-400/40 focus-visible:rounded text-base md:text-sm truncate pr-8"
+          className="w-full bg-transparent border-none p-0 text-on-surface placeholder:text-on-surface-variant focus:ring-0 focus:outline-none focus-visible:ring-2 focus-visible:ring-primary/30 focus-visible:rounded text-base md:text-sm truncate pr-8"
           autoComplete="off"
           // ARIA combobox attributes for screen reader accessibility
           role="combobox"
@@ -439,17 +439,17 @@ export default function LocationSearchInput({
         <div className="absolute right-0 top-1/2 -translate-y-1/2">
           {isLoading ? (
             <Loader2
-              className="w-4 h-4 text-zinc-500 animate-spin"
+              className="w-4 h-4 text-on-surface-variant animate-spin"
               aria-hidden="true"
             />
           ) : value ? (
             <button
               type="button"
               onClick={handleClear}
-              className="p-1 min-w-[44px] min-h-[44px] flex items-center justify-center hover:bg-zinc-100 dark:hover:bg-zinc-700 rounded-full transition-colors"
+              className="p-1 min-w-[44px] min-h-[44px] flex items-center justify-center hover:bg-surface-container-high rounded-full transition-colors"
               aria-label="Clear search"
             >
-              <X className="w-3 h-3 text-zinc-500" />
+              <X className="w-3 h-3 text-on-surface-variant" />
             </button>
           ) : null}
         </div>
@@ -461,9 +461,9 @@ export default function LocationSearchInput({
           ref={suggestionsRef}
           role="status"
           aria-live="polite"
-          className="absolute top-full left-0 right-0 mt-2 bg-white dark:bg-zinc-900 backdrop-blur-xl rounded-2xl shadow-2xl overflow-hidden z-dropdown min-w-0 sm:min-w-[300px] animate-in fade-in-0 slide-in-from-top-2"
+          className="absolute top-full left-0 right-0 mt-2 bg-surface-container-lowest backdrop-blur-xl rounded-2xl shadow-2xl overflow-hidden z-dropdown min-w-0 sm:min-w-[300px] animate-in fade-in-0 slide-in-from-top-2"
         >
-          <div className="px-4 py-3 text-sm text-zinc-500 dark:text-zinc-400">
+          <div className="px-4 py-3 text-sm text-on-surface-variant">
             Type at least {MIN_QUERY_LENGTH} characters to search
           </div>
         </div>
@@ -473,7 +473,7 @@ export default function LocationSearchInput({
       {showSuggestions && suggestions.length > 0 && !showTypeMoreHint && (
         <div
           ref={suggestionsRef}
-          className="absolute top-full left-0 right-0 mt-2 bg-white dark:bg-zinc-900 backdrop-blur-xl rounded-2xl shadow-2xl overflow-hidden z-dropdown min-w-0 sm:min-w-[300px] animate-in fade-in-0 slide-in-from-top-2"
+          className="absolute top-full left-0 right-0 mt-2 bg-surface-container-lowest backdrop-blur-xl rounded-2xl shadow-2xl overflow-hidden z-dropdown min-w-0 sm:min-w-[300px] animate-in fade-in-0 slide-in-from-top-2"
         >
           <ul
             className="p-2"
@@ -493,8 +493,8 @@ export default function LocationSearchInput({
                   onClick={() => handleSelectSuggestion(suggestion)}
                   className={`w-full px-3 py-2.5 flex items-start gap-3 rounded-xl transition-colors duration-150 text-left ${
                     index === selectedIndex
-                      ? "bg-zinc-100 dark:bg-zinc-800"
-                      : "hover:bg-zinc-100/80 dark:hover:bg-zinc-800/80"
+                      ? "bg-surface-container-high"
+                      : "hover:bg-surface-container-high/80"
                   }`}
                   tabIndex={-1}
                 >
@@ -502,10 +502,10 @@ export default function LocationSearchInput({
                     className={`w-5 h-5 mt-0.5 flex-shrink-0 ${getPlaceTypeIcon(suggestion.place_type)}`}
                   />
                   <div className="flex-1 min-w-0">
-                    <p className="text-sm font-medium text-zinc-900 dark:text-white truncate">
+                    <p className="text-sm font-medium text-on-surface truncate">
                       {suggestion.place_name.split(",")[0]}
                     </p>
-                    <p className="text-xs text-zinc-500 dark:text-zinc-400 truncate">
+                    <p className="text-xs text-on-surface-variant truncate">
                       {suggestion.place_name
                         .split(",")
                         .slice(1)
@@ -526,17 +526,17 @@ export default function LocationSearchInput({
           ref={suggestionsRef}
           role="alert"
           aria-live="assertive"
-          className="absolute top-full left-0 right-0 mt-2 bg-white dark:bg-zinc-900 backdrop-blur-xl rounded-2xl shadow-2xl overflow-hidden z-dropdown min-w-0 sm:min-w-[300px] animate-in fade-in-0 slide-in-from-top-2"
+          className="absolute top-full left-0 right-0 mt-2 bg-surface-container-lowest backdrop-blur-xl rounded-2xl shadow-2xl overflow-hidden z-dropdown min-w-0 sm:min-w-[300px] animate-in fade-in-0 slide-in-from-top-2"
         >
           <div className="p-4 flex items-center gap-3">
-            <div className="p-2 rounded-full bg-red-100 dark:bg-red-900/30">
-              <AlertCircle className="w-5 h-5 text-red-500 dark:text-red-400" />
+            <div className="p-2 rounded-full bg-red-100">
+              <AlertCircle className="w-5 h-5 text-red-500" />
             </div>
             <div>
-              <p className="text-sm font-medium text-red-700 dark:text-red-300">
+              <p className="text-sm font-medium text-red-700">
                 Search unavailable
               </p>
-              <p className="text-xs text-red-500 dark:text-red-400">{error}</p>
+              <p className="text-xs text-red-500">{error}</p>
             </div>
           </div>
         </div>
@@ -553,17 +553,17 @@ export default function LocationSearchInput({
             ref={suggestionsRef}
             role="status"
             aria-live="polite"
-            className="absolute top-full left-0 right-0 mt-2 bg-white dark:bg-zinc-900 backdrop-blur-xl rounded-2xl shadow-2xl overflow-hidden z-dropdown min-w-0 sm:min-w-[300px] animate-in fade-in-0 slide-in-from-top-2"
+            className="absolute top-full left-0 right-0 mt-2 bg-surface-container-lowest backdrop-blur-xl rounded-2xl shadow-2xl overflow-hidden z-dropdown min-w-0 sm:min-w-[300px] animate-in fade-in-0 slide-in-from-top-2"
           >
             <div className="p-4 flex items-center gap-3">
-              <div className="p-2 rounded-full bg-zinc-100 dark:bg-zinc-800">
-                <SearchX className="w-5 h-5 text-zinc-400 dark:text-zinc-500" />
+              <div className="p-2 rounded-full bg-surface-container-high">
+                <SearchX className="w-5 h-5 text-on-surface-variant" />
               </div>
               <div>
-                <p className="text-sm font-medium text-zinc-700 dark:text-zinc-300">
+                <p className="text-sm font-medium text-on-surface-variant">
                   No locations found
                 </p>
-                <p className="text-xs text-zinc-500 dark:text-zinc-400">
+                <p className="text-xs text-on-surface-variant">
                   Try a different city or neighborhood name
                 </p>
               </div>

@@ -195,33 +195,33 @@ export default function SettingsClient({
   return (
     <div className="space-y-8">
       {/* Notification Preferences */}
-      <section className="bg-white dark:bg-zinc-900 rounded-xl border border-zinc-200 dark:border-zinc-800 overflow-hidden">
-        <div className="p-6 border-b border-zinc-100 dark:border-zinc-800">
+      <section className="bg-white rounded-xl border border-zinc-200 overflow-hidden">
+        <div className="p-6 border-b border-zinc-100">
           <div className="flex items-center gap-3">
-            <div className="p-2 bg-indigo-50 dark:bg-indigo-900/30 rounded-lg">
-              <Bell className="w-5 h-5 text-indigo-600 dark:text-indigo-400" />
+            <div className="p-2 bg-indigo-50 rounded-lg">
+              <Bell className="w-5 h-5 text-indigo-600" />
             </div>
             <div>
-              <h2 className="text-lg font-semibold text-zinc-900 dark:text-white">
+              <h2 className="text-lg font-semibold text-zinc-900">
                 Email Notifications
               </h2>
-              <p className="text-sm text-zinc-500 dark:text-zinc-400">
+              <p className="text-sm text-zinc-500">
                 Choose what emails you want to receive
               </p>
             </div>
           </div>
         </div>
-        <div className="divide-y divide-zinc-100 dark:divide-zinc-800">
+        <div className="divide-y divide-zinc-100">
           {notificationOptions.map((option) => (
             <div
               key={option.key}
-              className="p-4 flex items-center justify-between hover:bg-zinc-50 dark:hover:bg-zinc-800"
+              className="p-4 flex items-center justify-between hover:bg-zinc-50"
             >
               <div>
-                <p className="font-medium text-zinc-900 dark:text-white">
+                <p className="font-medium text-zinc-900">
                   {option.label}
                 </p>
-                <p className="text-sm text-zinc-500 dark:text-zinc-400">
+                <p className="text-sm text-zinc-500">
                   {option.description}
                 </p>
               </div>
@@ -233,7 +233,7 @@ export default function SettingsClient({
                 className={`relative w-11 h-6 rounded-full transition-colors ${
                   preferences[option.key]
                     ? "bg-indigo-600"
-                    : "bg-zinc-300 dark:bg-zinc-600"
+                    : "bg-zinc-300"
                 }`}
               >
                 <span
@@ -245,7 +245,7 @@ export default function SettingsClient({
             </div>
           ))}
         </div>
-        <div className="p-4 bg-zinc-50 dark:bg-zinc-800 border-t border-zinc-100 dark:border-zinc-800">
+        <div className="p-4 bg-zinc-50 border-t border-zinc-100">
           <button
             onClick={handleSavePreferences}
             disabled={saving}
@@ -263,17 +263,17 @@ export default function SettingsClient({
 
       {/* Change Password */}
       {hasPassword && (
-        <section className="bg-white dark:bg-zinc-900 rounded-xl border border-zinc-200 dark:border-zinc-800 overflow-hidden">
-          <div className="p-6 border-b border-zinc-100 dark:border-zinc-800">
+        <section className="bg-white rounded-xl border border-zinc-200 overflow-hidden">
+          <div className="p-6 border-b border-zinc-100">
             <div className="flex items-center gap-3">
-              <div className="p-2 bg-amber-50 dark:bg-amber-900/30 rounded-lg">
-                <Lock className="w-5 h-5 text-amber-600 dark:text-amber-400" />
+              <div className="p-2 bg-amber-50 rounded-lg">
+                <Lock className="w-5 h-5 text-amber-600" />
               </div>
               <div>
-                <h2 className="text-lg font-semibold text-zinc-900 dark:text-white">
+                <h2 className="text-lg font-semibold text-zinc-900">
                   Change Password
                 </h2>
-                <p className="text-sm text-zinc-500 dark:text-zinc-400">
+                <p className="text-sm text-zinc-500">
                   Update your account password
                 </p>
               </div>
@@ -283,7 +283,7 @@ export default function SettingsClient({
             <div>
               <label
                 htmlFor="currentPassword"
-                className="block text-sm font-medium text-zinc-700 dark:text-zinc-300 mb-1"
+                className="block text-sm font-medium text-zinc-700 mb-1"
               >
                 Current Password
               </label>
@@ -292,14 +292,14 @@ export default function SettingsClient({
                 type="password"
                 value={currentPassword}
                 onChange={(e) => setCurrentPassword(e.target.value)}
-                className="w-full px-3 py-2 border border-zinc-300 dark:border-zinc-600 dark:bg-zinc-800 dark:text-white rounded-lg focus:ring-2 focus:ring-zinc-900/20 dark:focus:ring-zinc-400/20 focus:border-zinc-400"
+                className="w-full px-3 py-2 border border-zinc-300 rounded-lg focus:ring-2 focus:ring-zinc-900/20 focus:border-zinc-400"
                 required
               />
             </div>
             <div>
               <label
                 htmlFor="newPassword"
-                className="block text-sm font-medium text-zinc-700 dark:text-zinc-300 mb-1"
+                className="block text-sm font-medium text-zinc-700 mb-1"
               >
                 New Password
               </label>
@@ -308,7 +308,7 @@ export default function SettingsClient({
                 type="password"
                 value={newPassword}
                 onChange={(e) => setNewPassword(e.target.value)}
-                className="w-full px-3 py-2 border border-zinc-300 dark:border-zinc-600 dark:bg-zinc-800 dark:text-white rounded-lg focus:ring-2 focus:ring-zinc-900/20 dark:focus:ring-zinc-400/20 focus:border-zinc-400"
+                className="w-full px-3 py-2 border border-zinc-300 rounded-lg focus:ring-2 focus:ring-zinc-900/20 focus:border-zinc-400"
                 required
                 minLength={12}
               />
@@ -317,7 +317,7 @@ export default function SettingsClient({
             <div>
               <label
                 htmlFor="confirmPassword"
-                className="block text-sm font-medium text-zinc-700 dark:text-zinc-300 mb-1"
+                className="block text-sm font-medium text-zinc-700 mb-1"
               >
                 Confirm New Password
               </label>
@@ -326,7 +326,7 @@ export default function SettingsClient({
                 type="password"
                 value={confirmPassword}
                 onChange={(e) => setConfirmPassword(e.target.value)}
-                className="w-full px-3 py-2 border border-zinc-300 dark:border-zinc-600 dark:bg-zinc-800 dark:text-white rounded-lg focus:ring-2 focus:ring-zinc-900/20 dark:focus:ring-zinc-400/20 focus:border-zinc-400"
+                className="w-full px-3 py-2 border border-zinc-300 rounded-lg focus:ring-2 focus:ring-zinc-900/20 focus:border-zinc-400"
                 required
               />
             </div>
@@ -351,17 +351,17 @@ export default function SettingsClient({
       )}
 
       {/* Blocked Users */}
-      <section className="bg-white dark:bg-zinc-900 rounded-xl border border-zinc-200 dark:border-zinc-800 overflow-hidden">
-        <div className="p-6 border-b border-zinc-100 dark:border-zinc-800">
+      <section className="bg-white rounded-xl border border-zinc-200 overflow-hidden">
+        <div className="p-6 border-b border-zinc-100">
           <div className="flex items-center gap-3">
-            <div className="p-2 bg-zinc-100 dark:bg-zinc-800 rounded-lg">
-              <Ban className="w-5 h-5 text-zinc-600 dark:text-zinc-400" />
+            <div className="p-2 bg-zinc-100 rounded-lg">
+              <Ban className="w-5 h-5 text-zinc-600" />
             </div>
             <div>
-              <h2 className="text-lg font-semibold text-zinc-900 dark:text-white">
+              <h2 className="text-lg font-semibold text-zinc-900">
                 Blocked Users
               </h2>
-              <p className="text-sm text-zinc-500 dark:text-zinc-400">
+              <p className="text-sm text-zinc-500">
                 Manage users you have blocked
               </p>
             </div>
@@ -369,11 +369,11 @@ export default function SettingsClient({
         </div>
         <div className="p-6">
           {blockedUsers.length === 0 ? (
-            <p className="text-sm text-zinc-500 dark:text-zinc-400 text-center py-4">
+            <p className="text-sm text-zinc-500 text-center py-4">
               You haven&apos;t blocked anyone
             </p>
           ) : (
-            <ul className="divide-y divide-zinc-100 dark:divide-zinc-800">
+            <ul className="divide-y divide-zinc-100">
               {blockedUsers.map((blocked) => (
                 <li
                   key={blocked.id}
@@ -386,10 +386,10 @@ export default function SettingsClient({
                       size="md"
                     />
                     <div>
-                      <p className="font-medium text-zinc-900 dark:text-white">
+                      <p className="font-medium text-zinc-900">
                         {blocked.user.name || "Unknown User"}
                       </p>
-                      <p className="text-sm text-zinc-500 dark:text-zinc-400">
+                      <p className="text-sm text-zinc-500">
                         Blocked{" "}
                         {new Date(blocked.blockedAt).toLocaleDateString()}
                       </p>
@@ -398,7 +398,7 @@ export default function SettingsClient({
                   <button
                     onClick={() => handleUnblock(blocked.user.id)}
                     disabled={unblockingId === blocked.user.id}
-                    className="flex items-center gap-2 px-3 py-1.5 text-sm font-medium text-zinc-600 hover:text-zinc-900 hover:bg-zinc-100 dark:text-zinc-400 dark:hover:text-white dark:hover:bg-zinc-800 rounded-lg transition-colors disabled:opacity-60"
+                    className="flex items-center gap-2 px-3 py-1.5 text-sm font-medium text-zinc-600 hover:text-zinc-900 hover:bg-zinc-100 rounded-lg transition-colors disabled:opacity-60"
                   >
                     {unblockingId === blocked.user.id ? (
                       <Loader2 className="w-4 h-4 animate-spin" />
@@ -415,17 +415,17 @@ export default function SettingsClient({
       </section>
 
       {/* Delete Account */}
-      <section className="bg-white dark:bg-zinc-900 rounded-xl border border-red-200 dark:border-red-800 overflow-hidden">
-        <div className="p-6 border-b border-red-100 dark:border-red-800">
+      <section className="bg-white rounded-xl border border-red-200 overflow-hidden">
+        <div className="p-6 border-b border-red-100">
           <div className="flex items-center gap-3">
-            <div className="p-2 bg-red-50 dark:bg-red-900/30 rounded-lg">
-              <Trash2 className="w-5 h-5 text-red-600 dark:text-red-400" />
+            <div className="p-2 bg-red-50 rounded-lg">
+              <Trash2 className="w-5 h-5 text-red-600" />
             </div>
             <div>
-              <h2 className="text-lg font-semibold text-zinc-900 dark:text-white">
+              <h2 className="text-lg font-semibold text-zinc-900">
                 Delete Account
               </h2>
-              <p className="text-sm text-zinc-500 dark:text-zinc-400">
+              <p className="text-sm text-zinc-500">
                 Permanently delete your account and all data
               </p>
             </div>
@@ -434,7 +434,7 @@ export default function SettingsClient({
         <div className="p-6">
           {!showDeleteConfirm ? (
             <div>
-              <p className="text-sm text-zinc-600 dark:text-zinc-400 mb-4">
+              <p className="text-sm text-zinc-600 mb-4">
                 Once you delete your account, there is no going back. All your
                 listings, messages, bookings, and reviews will be permanently
                 removed.
@@ -448,13 +448,13 @@ export default function SettingsClient({
             </div>
           ) : (
             <div className="space-y-4">
-              <div className="p-4 bg-red-50 dark:bg-red-900/30 rounded-lg flex gap-3">
-                <AlertTriangle className="w-5 h-5 text-red-600 dark:text-red-400 flex-shrink-0 mt-0.5" />
+              <div className="p-4 bg-red-50 rounded-lg flex gap-3">
+                <AlertTriangle className="w-5 h-5 text-red-600 flex-shrink-0 mt-0.5" />
                 <div>
-                  <p className="font-medium text-red-900 dark:text-red-400">
+                  <p className="font-medium text-red-900">
                     This action cannot be undone
                   </p>
-                  <p className="text-sm text-red-700 dark:text-red-400 mt-1">
+                  <p className="text-sm text-red-700 mt-1">
                     This will permanently delete your account ({userEmail}) and
                     all associated data.
                   </p>
@@ -463,7 +463,7 @@ export default function SettingsClient({
               <div>
                 <label
                   htmlFor="deleteConfirmText"
-                  className="block text-sm font-medium text-zinc-700 dark:text-zinc-300 mb-1"
+                  className="block text-sm font-medium text-zinc-700 mb-1"
                 >
                   Type DELETE to confirm
                 </label>
@@ -472,7 +472,7 @@ export default function SettingsClient({
                   type="text"
                   value={deleteConfirmText}
                   onChange={(e) => setDeleteConfirmText(e.target.value)}
-                  className="w-full px-3 py-2 border border-zinc-300 dark:border-zinc-600 dark:bg-zinc-800 dark:text-white rounded-lg focus:ring-2 focus:ring-red-500 focus:border-red-500"
+                  className="w-full px-3 py-2 border border-zinc-300 rounded-lg focus:ring-2 focus:ring-red-500 focus:border-red-500"
                   placeholder="DELETE"
                 />
               </div>
@@ -482,7 +482,7 @@ export default function SettingsClient({
                     setShowDeleteConfirm(false);
                     setDeleteConfirmText("");
                   }}
-                  className="px-4 py-2 border border-zinc-300 dark:border-zinc-600 text-zinc-700 dark:text-zinc-300 rounded-lg hover:bg-zinc-50 dark:hover:bg-zinc-800 transition-colors"
+                  className="px-4 py-2 border border-zinc-300 text-zinc-700 rounded-lg hover:bg-zinc-50 transition-colors"
                 >
                   Cancel
                 </button>

@@ -753,12 +753,12 @@ export default function NeighborhoodChat({
               className={cn(
                 "px-5 py-3 text-[15px] leading-relaxed relative transition-all duration-200",
                 isUser
-                  ? "bg-zinc-900 dark:bg-zinc-700 text-white rounded-[24px] rounded-tr-md shadow-lg shadow-zinc-900/10"
+                  ? "bg-on-surface text-white rounded-[24px] rounded-tr-md shadow-lg shadow-on-surface/10"
                   : item.kind === "policy-refusal"
-                    ? "bg-amber-50 dark:bg-amber-900/20 border border-amber-100 dark:border-amber-800 text-amber-900 dark:text-amber-200 rounded-[24px] rounded-tl-md"
+                    ? "bg-amber-50 border border-amber-100 text-amber-900 rounded-[24px] rounded-tl-md"
                     : item.kind === "rate-limit" || item.kind === "debounce"
-                      ? "bg-zinc-100 dark:bg-zinc-800 text-zinc-600 dark:text-zinc-400 rounded-[24px] rounded-tl-md"
-                      : "bg-white dark:bg-zinc-800 text-zinc-800 dark:text-zinc-200 rounded-[24px] rounded-tl-md shadow-sm border border-zinc-100 dark:border-zinc-700"
+                      ? "bg-surface-container-high text-on-surface-variant rounded-[24px] rounded-tl-md"
+                      : "bg-surface-container-lowest text-on-surface rounded-[24px] rounded-tl-md shadow-sm border border-outline-variant/20"
               )}
             >
               {/* P1-04 FIX: Show live countdown for debounce messages */}
@@ -793,8 +793,8 @@ export default function NeighborhoodChat({
           "shadow-[0_8px_40px_-12px_rgba(0,0,0,0.3)]",
           "transition-all duration-300",
           isOpen
-            ? "bg-white dark:bg-zinc-800 text-zinc-900 dark:text-white rotate-90"
-            : "bg-zinc-900 dark:bg-zinc-800 text-white hover:bg-black dark:hover:bg-zinc-700"
+            ? "bg-surface-container-lowest text-on-surface rotate-90"
+            : "bg-on-surface text-white hover:bg-on-surface"
         )}
         aria-label={isOpen ? "Close chat" : "Open AI Assistant"}
       >
@@ -817,16 +817,16 @@ export default function NeighborhoodChat({
               "fixed bottom-24 right-6 z-[9999]",
               "w-[400px] max-w-[calc(100vw-32px)]",
               "h-[600px] max-h-[calc(100vh-120px)]",
-              "bg-white/80 dark:bg-zinc-900/80 backdrop-blur-2xl",
-              "supports-[backdrop-filter]:bg-white/60 dark:supports-[backdrop-filter]:bg-zinc-900/60",
+              "bg-white/80 backdrop-blur-2xl",
+              "supports-[backdrop-filter]:bg-white/60[backdrop-filter]:bg-on-surface/60",
               "rounded-[32px]",
               "shadow-[0_40px_80px_-20px_rgba(0,0,0,0.15),0_0_0_1px_rgba(255,255,255,0.4)]",
-              "dark:shadow-[0_40px_80px_-20px_rgba(0,0,0,0.4),0_0_0_1px_rgba(255,255,255,0.1)]",
-              "flex flex-col overflow-hidden ring-1 ring-black/5 dark:ring-white/5"
+              "",
+              "flex flex-col overflow-hidden ring-1 ring-black/5"
             )}
           >
             {/* Top gradient overlay */}
-            <div className="absolute top-0 left-0 right-0 h-20 bg-gradient-to-b from-white/90 dark:from-zinc-900/90 to-transparent z-20 pointer-events-none" />
+            <div className="absolute top-0 left-0 right-0 h-20 bg-gradient-to-b from-white/90 to-transparent z-20 pointer-events-none" />
 
             {/* Minimal Header */}
             <div className="px-6 pt-6 pb-2 flex items-center justify-between z-30">
@@ -840,13 +840,13 @@ export default function NeighborhoodChat({
                       : "bg-emerald-500 shadow-[0_0_10px_rgba(16,185,129,0.4)]"
                   )}
                 />
-                <span className="font-semibold text-sm text-zinc-900 dark:text-zinc-100 tracking-tight">
+                <span className="font-semibold text-sm text-on-surface tracking-tight">
                   Concierge
                 </span>
               </div>
 
               {remainingSearches < RATE_LIMIT_CONFIG.maxSearchesPerListing && (
-                <span className="text-[10px] font-medium text-zinc-400 dark:text-zinc-500 bg-zinc-100 dark:bg-zinc-800 px-2 py-1 rounded-full tracking-wide uppercase">
+                <span className="text-[10px] font-medium text-on-surface-variant bg-surface-container-high px-2 py-1 rounded-full tracking-wide uppercase">
                   {remainingSearches} left
                 </span>
               )}
@@ -854,7 +854,7 @@ export default function NeighborhoodChat({
 
             {/* P2-B23 FIX: Offline banner */}
             {isOffline && (
-              <div className="mx-6 mb-2 px-3 py-2 bg-amber-50 dark:bg-amber-900/20 border border-amber-100 dark:border-amber-800 rounded-lg text-xs text-amber-700 dark:text-amber-300 text-center z-30">
+              <div className="mx-6 mb-2 px-3 py-2 bg-amber-50 border border-amber-100 rounded-lg text-xs text-amber-700 text-center z-30">
                 You&apos;re offline. Some features may be unavailable.
               </div>
             )}
@@ -872,7 +872,7 @@ export default function NeighborhoodChat({
               <div className="min-h-full flex flex-col justify-end pt-12 pb-4">
                 {/* Date separator */}
                 <div className="w-full flex justify-center mb-8">
-                  <span className="text-[10px] font-medium text-zinc-400 dark:text-zinc-500 tracking-widest uppercase">
+                  <span className="text-[10px] font-medium text-on-surface-variant tracking-widest uppercase">
                     Today
                   </span>
                 </div>
@@ -889,17 +889,17 @@ export default function NeighborhoodChat({
                     role="status"
                     aria-label="Loading response"
                   >
-                    <div className="bg-white/50 dark:bg-zinc-800/50 border border-zinc-100/50 dark:border-zinc-700/50 px-4 py-3 rounded-2xl rounded-tl-sm shadow-sm flex gap-1 items-center">
+                    <div className="bg-white/50 border border-outline-variant/20/50 px-4 py-3 rounded-2xl rounded-tl-sm shadow-sm flex gap-1 items-center">
                       <div
-                        className="w-1.5 h-1.5 bg-zinc-300 dark:bg-zinc-500 rounded-full animate-bounce [animation-delay:-0.3s]"
+                        className="w-1.5 h-1.5 bg-surface-container-high rounded-full animate-bounce [animation-delay:-0.3s]"
                         aria-hidden="true"
                       />
                       <div
-                        className="w-1.5 h-1.5 bg-zinc-300 dark:bg-zinc-500 rounded-full animate-bounce [animation-delay:-0.15s]"
+                        className="w-1.5 h-1.5 bg-surface-container-high rounded-full animate-bounce [animation-delay:-0.15s]"
                         aria-hidden="true"
                       />
                       <div
-                        className="w-1.5 h-1.5 bg-zinc-300 dark:bg-zinc-500 rounded-full animate-bounce"
+                        className="w-1.5 h-1.5 bg-surface-container-high rounded-full animate-bounce"
                         aria-hidden="true"
                       />
                       <span className="sr-only">Assistant is typing</span>
@@ -916,7 +916,7 @@ export default function NeighborhoodChat({
                   >
                     <button
                       onClick={retryLastMessage}
-                      className="text-xs text-amber-600 dark:text-amber-400 hover:text-amber-700 dark:hover:text-amber-300 font-medium bg-amber-50 dark:bg-amber-900/20 px-3 py-1.5 rounded-full transition-colors"
+                      className="text-xs text-amber-600 hover:text-amber-700 font-medium bg-amber-50 px-3 py-1.5 rounded-full transition-colors"
                     >
                       Response timed out. Tap to retry.
                     </button>
@@ -934,18 +934,18 @@ export default function NeighborhoodChat({
                         className="flex justify-center mb-4"
                       >
                         {errorInfo.isRateLimit ? (
-                          <div className="text-xs text-amber-600 dark:text-amber-400 font-medium bg-amber-50 dark:bg-amber-900/20 px-3 py-1.5 rounded-full">
+                          <div className="text-xs text-amber-600 font-medium bg-amber-50 px-3 py-1.5 rounded-full">
                             {errorInfo.message}
                           </div>
                         ) : errorInfo.isFairHousing ? (
                           // C4 FIX: Fair Housing policy errors - no retry button (not transient)
-                          <div className="text-xs text-amber-600 dark:text-amber-400 font-medium bg-amber-50 dark:bg-amber-900/20 px-4 py-2 rounded-2xl max-w-[280px] text-center leading-relaxed">
+                          <div className="text-xs text-amber-600 font-medium bg-amber-50 px-4 py-2 rounded-2xl max-w-[280px] text-center leading-relaxed">
                             {errorInfo.message}
                           </div>
                         ) : (
                           <button
                             onClick={retryLastMessage}
-                            className="text-xs text-red-500 dark:text-red-400 hover:text-red-600 dark:hover:text-red-300 font-medium bg-red-50 dark:bg-red-900/20 px-3 py-1.5 rounded-full transition-colors"
+                            className="text-xs text-red-500 hover:text-red-600 font-medium bg-red-50 px-3 py-1.5 rounded-full transition-colors"
                           >
                             {errorInfo.message}
                           </button>
@@ -973,13 +973,13 @@ export default function NeighborhoodChat({
                       onClick={() => handleChipClick(q.text)}
                       className={cn(
                         "whitespace-nowrap px-4 py-2 rounded-full text-xs font-medium",
-                        "bg-white/50 dark:bg-zinc-800/50 hover:bg-white dark:hover:bg-zinc-700",
-                        "text-zinc-600 dark:text-zinc-300",
-                        "border border-zinc-100 dark:border-zinc-700 shadow-sm",
+                        "bg-white/50 hover:bg-surface-container-lowest",
+                        "text-on-surface-variant",
+                        "border border-outline-variant/20 shadow-sm",
                         "transition-all duration-300 hover:shadow-md hover:scale-[1.02]",
                         "flex items-center gap-2",
                         // B10 FIX: Keyboard focus indicators
-                        "focus-visible:ring-2 focus-visible:ring-zinc-400 focus-visible:ring-offset-2 focus-visible:outline-none"
+                        "focus-visible:ring-2 focus-visible:ring-primary/30 focus-visible:ring-offset-2 focus-visible:outline-none"
                       )}
                     >
                       <span>{q.emoji}</span>
@@ -991,9 +991,9 @@ export default function NeighborhoodChat({
             </AnimatePresence>
 
             {/* Input Area */}
-            <div className="p-4 bg-gradient-to-t from-white/90 dark:from-zinc-900/90 via-white/50 dark:via-zinc-900/50 to-transparent">
+            <div className="p-4 bg-gradient-to-t from-white/90 via-white/50 to-transparent">
               <form onSubmit={onSubmit} className="relative group">
-                <div className="absolute inset-0 bg-white dark:bg-zinc-800 rounded-[28px] shadow-sm group-focus-within:shadow-md transition-shadow duration-300" />
+                <div className="absolute inset-0 bg-surface-container-lowest rounded-[28px] shadow-sm group-focus-within:shadow-md transition-shadow duration-300" />
                 <input
                   ref={inputRef}
                   value={input}
@@ -1003,7 +1003,7 @@ export default function NeighborhoodChat({
                   placeholder="Ask anything..."
                   aria-label="Ask the AI assistant"
                   disabled={isLoading}
-                  className="w-full relative bg-transparent border-0 px-6 py-4 text-[15px] placeholder:text-zinc-500 dark:placeholder:text-zinc-400 focus:ring-0 focus:outline-none focus-visible:ring-2 focus-visible:ring-zinc-900/30 dark:focus-visible:ring-zinc-400/40 focus-visible:rounded-[28px] text-zinc-900 dark:text-zinc-100 pr-12 rounded-[28px]"
+                  className="w-full relative bg-transparent border-0 px-6 py-4 text-[15px] placeholder:text-on-surface-variant focus:ring-0 focus:outline-none focus-visible:ring-2 focus-visible:ring-primary/30 focus-visible:rounded-[28px] text-on-surface pr-12 rounded-[28px]"
                 />
                 <button
                   type="submit"
@@ -1011,16 +1011,16 @@ export default function NeighborhoodChat({
                   className={cn(
                     "absolute right-2 top-1/2 -translate-y-1/2",
                     "w-10 h-10 rounded-full flex items-center justify-center",
-                    "bg-zinc-900 dark:bg-zinc-700 text-white transition-all duration-300",
+                    "bg-on-surface text-white transition-all duration-300",
                     "disabled:opacity-0 disabled:scale-75",
-                    "hover:scale-105 active:scale-95 hover:bg-black dark:hover:bg-zinc-600"
+                    "hover:scale-105 active:scale-95 hover:bg-on-surface"
                   )}
                 >
                   <ArrowUp className="w-5 h-5" strokeWidth={2} />
                 </button>
               </form>
               <div className="text-center mt-3">
-                <p className="text-[10px] text-zinc-300 dark:text-zinc-600 font-medium tracking-widest uppercase">
+                <p className="text-[10px] text-on-surface-variant font-medium tracking-widest uppercase">
                   AI Concierge
                 </p>
               </div>

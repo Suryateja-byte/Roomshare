@@ -215,12 +215,12 @@ export default function NearbyPlacesPanel({
   if (status === "loading") {
     return (
       <div className="p-4 sm:p-6 animate-pulse space-y-4">
-        <div className="h-12 bg-zinc-100 dark:bg-zinc-800 rounded-2xl" />
+        <div className="h-12 bg-surface-container-high rounded-2xl" />
         <div className="flex gap-2 overflow-x-auto hide-scrollbar">
           {[1, 2, 3, 4].map((i) => (
             <div
               key={i}
-              className="h-10 w-28 flex-shrink-0 bg-zinc-100 dark:bg-zinc-800 rounded-full"
+              className="h-10 w-28 flex-shrink-0 bg-surface-container-high rounded-full"
             />
           ))}
         </div>
@@ -235,8 +235,8 @@ export default function NearbyPlacesPanel({
         className="
           flex flex-col items-center justify-center
           h-full py-16 px-6 text-center
-          bg-gradient-to-br from-zinc-50 to-zinc-100
-          dark:from-zinc-800/50 dark:to-zinc-900/50
+          bg-gradient-to-br from-surface-canvas to-surface-container-high
+         
         "
       >
         <div
@@ -244,15 +244,15 @@ export default function NearbyPlacesPanel({
             w-14 h-14 mb-4
             flex items-center justify-center
             bg-gradient-to-br from-blue-500 to-indigo-600
-            rounded-2xl shadow-lg shadow-blue-500/30 dark:shadow-blue-500/20
+            rounded-2xl shadow-lg shadow-blue-500/30
           "
         >
           <MapPin className="w-6 h-6 text-white" />
         </div>
-        <h3 className="text-lg font-semibold text-zinc-900 dark:text-white">
+        <h3 className="text-lg font-semibold text-on-surface">
           Explore nearby places
         </h3>
-        <p className="text-sm text-zinc-500 dark:text-zinc-400 mt-1 mb-4 max-w-xs">
+        <p className="text-sm text-on-surface-variant mt-1 mb-4 max-w-xs">
           Sign in to discover restaurants, stores, and services near this
           listing
         </p>
@@ -269,16 +269,16 @@ export default function NearbyPlacesPanel({
   return (
     <div className="flex flex-col h-full">
       {/* Search & Filters (Sticky Header) */}
-      <div className="p-4 sm:p-6 space-y-4 shadow-sm z-20 bg-white dark:bg-zinc-900 relative flex-shrink-0">
+      <div className="p-4 sm:p-6 space-y-4 shadow-sm z-20 bg-surface-container-lowest relative flex-shrink-0">
         {/* Search Input */}
         <div className="relative group">
           <div className="relative">
             <Search
               className="
                 absolute left-4 top-1/2 -translate-y-1/2
-                w-4 h-4 text-zinc-400
+                w-4 h-4 text-on-surface-variant
                 transition-colors duration-200
-                group-focus-within:text-zinc-900 dark:group-focus-within:text-white
+                group-focus-within:text-on-surface
               "
             />
             <input
@@ -298,13 +298,13 @@ export default function NearbyPlacesPanel({
               aria-label="Search nearby places"
               className="
                 w-full pl-11 pr-10 py-2.5
-                bg-zinc-50 dark:bg-zinc-800
+                bg-surface-canvas
                 border border-transparent
-                focus:bg-white dark:focus:bg-zinc-800
-                focus:border-zinc-300 dark:focus:border-zinc-700
+                focus:bg-surface-container-lowest
+                focus:border-outline-variant/30
                 rounded-xl
-                text-zinc-900 dark:text-white text-sm
-                placeholder:text-zinc-600 dark:placeholder:text-zinc-300
+                text-on-surface text-sm
+                placeholder:text-on-surface-variant
                 focus:outline-none
                 transition-all duration-200
                 disabled:opacity-60 disabled:cursor-not-allowed
@@ -320,10 +320,10 @@ export default function NearbyPlacesPanel({
                   absolute right-2 top-1/2 -translate-y-1/2
                   w-7 h-7
                   flex items-center justify-center
-                  bg-zinc-900 dark:bg-white
-                  text-white dark:text-zinc-900
+                  bg-on-surface
+                  text-white
                   rounded-lg
-                  hover:bg-zinc-800 dark:hover:bg-zinc-100
+                  hover:bg-on-surface
                   disabled:opacity-60
                   transition-colors
                 "
@@ -337,7 +337,7 @@ export default function NearbyPlacesPanel({
         {/* Category Chips - Horizontal Scroll with fade masks */}
         <div className="relative -mx-4 sm:-mx-6">
           {/* Left fade mask */}
-          <div className="absolute left-0 top-0 bottom-1 w-4 sm:w-6 bg-gradient-to-r from-white dark:from-zinc-900 to-transparent z-10 pointer-events-none" />
+          <div className="absolute left-0 top-0 bottom-1 w-4 sm:w-6 bg-gradient-to-r from-white to-transparent z-10 pointer-events-none" />
 
           {/* Scrollable chips container */}
           <div className="flex gap-2 overflow-x-auto hide-scrollbar pb-1 px-4 sm:px-6 scroll-smooth">
@@ -358,8 +358,8 @@ export default function NearbyPlacesPanel({
                     transition-all duration-200 ease-out
                     ${
                       isSelected
-                        ? "bg-zinc-900 dark:bg-white border-zinc-900 dark:border-white text-white dark:text-zinc-900"
-                        : "bg-white dark:bg-zinc-900 border-zinc-200 dark:border-zinc-700 text-zinc-600 dark:text-zinc-400 hover:border-zinc-300 dark:hover:border-zinc-600"
+                        ? "bg-on-surface border-outline-variant/20 text-white"
+                        : "bg-surface-container-lowest border-outline-variant/20 text-on-surface-variant hover:border-outline-variant/30"
                     }
                     disabled:opacity-60 disabled:cursor-not-allowed
                   `}
@@ -372,15 +372,15 @@ export default function NearbyPlacesPanel({
           </div>
 
           {/* Right fade mask */}
-          <div className="absolute right-0 top-0 bottom-1 w-4 sm:w-6 bg-gradient-to-l from-white dark:from-zinc-900 to-transparent z-10 pointer-events-none" />
+          <div className="absolute right-0 top-0 bottom-1 w-4 sm:w-6 bg-gradient-to-l from-white to-transparent z-10 pointer-events-none" />
         </div>
 
         {/* Results Header & Radius Selector */}
         <div className="flex items-center justify-between pt-2">
-          <span className="text-xs font-semibold uppercase tracking-wider text-zinc-400">
+          <span className="text-xs font-semibold uppercase tracking-wider text-on-surface-variant">
             Results ({places.length})
           </span>
-          <div className="flex bg-zinc-100 dark:bg-zinc-800 rounded-lg p-0.5">
+          <div className="flex bg-surface-container-high rounded-lg p-0.5">
             {RADIUS_OPTIONS.map((option) => (
               <button
                 key={option.label}
@@ -393,8 +393,8 @@ export default function NearbyPlacesPanel({
                   transition-all duration-200
                   ${
                     selectedRadius === option.meters
-                      ? "bg-white dark:bg-zinc-600 shadow-sm text-zinc-900 dark:text-white"
-                      : "text-zinc-500 dark:text-zinc-400 hover:text-zinc-900 dark:hover:text-zinc-200"
+                      ? "bg-surface-container-lowest shadow-sm text-on-surface"
+                      : "text-on-surface-variant hover:text-on-surface"
                   }
                   disabled:opacity-60 disabled:cursor-not-allowed
                 `}
@@ -408,7 +408,7 @@ export default function NearbyPlacesPanel({
 
       {/* Results Area - Scrollable */}
       <div
-        className="flex-1 overflow-y-auto hide-scrollbar p-4 sm:px-6 space-y-3 bg-zinc-50/50 dark:bg-zinc-900/50 pb-24 lg:pb-4"
+        className="flex-1 overflow-y-auto hide-scrollbar p-4 sm:px-6 space-y-3 bg-surface-canvas/50 pb-24 lg:pb-4"
         tabIndex={0}
         role="region"
         aria-busy={isLoading}
@@ -421,13 +421,13 @@ export default function NearbyPlacesPanel({
             {[1, 2, 3].map((i) => (
               <div
                 key={i}
-                className="flex items-start gap-4 p-4 rounded-2xl bg-white dark:bg-zinc-800/40"
+                className="flex items-start gap-4 p-4 rounded-2xl bg-surface-container-lowest"
               >
-                <div className="w-12 h-12 rounded-xl bg-zinc-200 dark:bg-zinc-700 animate-pulse" />
+                <div className="w-12 h-12 rounded-xl bg-surface-container-high animate-pulse" />
                 <div className="flex-1 space-y-2">
-                  <div className="h-4 w-3/4 rounded-lg bg-zinc-200 dark:bg-zinc-700 animate-pulse" />
-                  <div className="h-3 w-1/2 rounded-lg bg-zinc-200 dark:bg-zinc-700 animate-pulse" />
-                  <div className="h-3 w-1/4 rounded-lg bg-zinc-200 dark:bg-zinc-700 animate-pulse" />
+                  <div className="h-4 w-3/4 rounded-lg bg-surface-container-high animate-pulse" />
+                  <div className="h-3 w-1/2 rounded-lg bg-surface-container-high animate-pulse" />
+                  <div className="h-3 w-1/4 rounded-lg bg-surface-container-high animate-pulse" />
                 </div>
               </div>
             ))}
@@ -439,7 +439,7 @@ export default function NearbyPlacesPanel({
           <div
             role="status"
             aria-live="polite"
-            className="flex items-start gap-3 p-4 bg-red-50 dark:bg-red-900/20 text-red-600 dark:text-red-400 rounded-2xl"
+            className="flex items-start gap-3 p-4 bg-red-50 text-red-600 rounded-2xl"
           >
             <AlertCircle
               className="w-5 h-5 flex-shrink-0 mt-0.5"
@@ -448,7 +448,7 @@ export default function NearbyPlacesPanel({
             <div>
               <p className="text-sm font-medium">{error}</p>
               {errorDetails && (
-                <p className="text-xs text-red-500 dark:text-red-400/80 mt-1">
+                <p className="text-xs text-red-500 mt-1">
                   {errorDetails}
                 </p>
               )}
@@ -461,10 +461,10 @@ export default function NearbyPlacesPanel({
           <>
             {places.length === 0 ? (
               <div className="flex flex-col items-center justify-center py-12 text-center">
-                <div className="w-12 h-12 mb-3 bg-zinc-100 dark:bg-zinc-800 rounded-full flex items-center justify-center">
-                  <MapPin className="w-5 h-5 text-zinc-400" />
+                <div className="w-12 h-12 mb-3 bg-surface-container-high rounded-full flex items-center justify-center">
+                  <MapPin className="w-5 h-5 text-on-surface-variant" />
                 </div>
-                <p className="text-zinc-900 dark:text-zinc-100 font-medium text-sm">
+                <p className="text-on-surface font-medium text-sm">
                   No places found
                   {searchQuery.trim() && (
                     <span className="font-normal">
@@ -473,7 +473,7 @@ export default function NearbyPlacesPanel({
                     </span>
                   )}
                 </p>
-                <p className="text-xs text-zinc-500 dark:text-zinc-400 mt-1">
+                <p className="text-xs text-on-surface-variant mt-1">
                   Try a different search or category
                 </p>
               </div>
@@ -497,7 +497,7 @@ export default function NearbyPlacesPanel({
                         flex items-center gap-3
                         p-3 rounded-xl
                         bg-transparent
-                        hover:bg-zinc-100 dark:hover:bg-zinc-800
+                        hover:bg-surface-container-high
                         transition-all duration-200
                         cursor-pointer
                         border border-transparent
@@ -505,27 +505,27 @@ export default function NearbyPlacesPanel({
                       "
                     >
                       {/* Minimal Icon */}
-                      <div className="w-10 h-10 rounded-xl bg-zinc-100 dark:bg-zinc-800/50 flex items-center justify-center flex-shrink-0 text-zinc-500 dark:text-zinc-400 group-hover:bg-white dark:group-hover:bg-zinc-700 transition-colors">
+                      <div className="w-10 h-10 rounded-xl bg-surface-container-high flex items-center justify-center flex-shrink-0 text-on-surface-variant group-hover:bg-surface-container-lowest transition-colors">
                         <Icon className="w-5 h-5" />
                       </div>
 
                       {/* Content */}
                       <div className="flex-1 min-w-0">
                         <div className="flex justify-between items-center mb-0.5">
-                          <h4 className="font-semibold text-zinc-900 dark:text-white text-sm truncate pr-2">
+                          <h4 className="font-semibold text-on-surface text-sm truncate pr-2">
                             {place.name}
                           </h4>
-                          <span className="text-xs font-medium text-zinc-400 dark:text-zinc-500 whitespace-nowrap bg-zinc-50 dark:bg-zinc-800/50 px-1.5 py-0.5 rounded-md group-hover:bg-white dark:group-hover:bg-zinc-700 transition-colors">
+                          <span className="text-xs font-medium text-on-surface-variant whitespace-nowrap bg-surface-canvas px-1.5 py-0.5 rounded-md group-hover:bg-surface-container-lowest transition-colors">
                             {place.distanceMiles.toFixed(1)} mi
                           </span>
                         </div>
-                        <p className="text-xs text-zinc-500 dark:text-zinc-400 truncate">
+                        <p className="text-xs text-on-surface-variant truncate">
                           {place.address} {place.chain && `• ${place.chain}`}
                         </p>
                       </div>
 
                       {/* Arrow */}
-                      <ArrowRight className="w-4 h-4 text-zinc-300 dark:text-zinc-600 opacity-0 -translate-x-2 group-hover:opacity-100 group-hover:translate-x-0 transition-all duration-200" />
+                      <ArrowRight className="w-4 h-4 text-on-surface-variant opacity-0 -translate-x-2 group-hover:opacity-100 group-hover:translate-x-0 transition-all duration-200" />
                     </a>
                   );
                 })}
@@ -538,14 +538,14 @@ export default function NearbyPlacesPanel({
         {!isLoading && !error && !hasSearched && (
           <div className="flex flex-col items-center justify-center py-12 text-center">
             <div className="relative w-16 h-16 mb-4 flex items-center justify-center">
-              <div className="absolute inset-0 bg-gradient-to-br from-zinc-200 to-zinc-300 dark:from-zinc-700 dark:to-zinc-800 rounded-2xl" />
-              <div className="absolute inset-1 bg-white dark:bg-zinc-900 rounded-xl" />
-              <Search className="relative w-6 h-6 text-zinc-400 dark:text-zinc-500" />
+              <div className="absolute inset-0 bg-gradient-to-br from-surface-container-high to-surface-container-high rounded-2xl" />
+              <div className="absolute inset-1 bg-surface-container-lowest rounded-xl" />
+              <Search className="relative w-6 h-6 text-on-surface-variant" />
             </div>
-            <p className="text-zinc-500 dark:text-zinc-400 font-medium">
+            <p className="text-on-surface-variant font-medium">
               Discover what&apos;s nearby
             </p>
-            <p className="text-sm text-zinc-400 dark:text-zinc-500 mt-1">
+            <p className="text-sm text-on-surface-variant mt-1">
               Select a category or search to explore
             </p>
           </div>

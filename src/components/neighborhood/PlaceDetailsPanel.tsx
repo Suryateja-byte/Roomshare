@@ -144,7 +144,7 @@ export function PlaceDetailsPanel({
     <>
       {/* Backdrop */}
       <div
-        className="fixed inset-0 bg-black/40 z-40 animate-in fade-in duration-200"
+        className="fixed inset-0 bg-on-surface/40 z-40 animate-in fade-in duration-200"
         onClick={onClose}
         aria-hidden="true"
       />

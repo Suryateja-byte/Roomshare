@@ -69,7 +69,7 @@ export default function UserMenu({ user }: UserMenuProps) {
         aria-label="User menu"
         aria-expanded={isOpen}
         aria-haspopup="menu"
-        className="flex items-center gap-2 p-1 pr-3 min-h-[44px] rounded-full border border-border hover:bg-accent transition-colors focus-visible:ring-2 focus-visible:ring-zinc-900/30 dark:focus-visible:ring-zinc-400/40"
+        className="flex items-center gap-2 p-1 pr-3 min-h-[44px] rounded-full border border-border hover:bg-accent transition-colors focus-visible:ring-2 focus-visible:ring-primary/30"
       >
         <div className="w-8 h-8 rounded-full bg-gradient-primary flex items-center justify-center text-white font-bold">
           {user.name?.[0]?.toUpperCase() || "U"}
@@ -98,7 +98,7 @@ export default function UserMenu({ user }: UserMenuProps) {
                 href="/profile"
                 role="menuitem"
                 tabIndex={0}
-                className="flex items-center gap-2 px-3 py-2 text-sm rounded-lg hover:bg-accent transition-colors focus-visible:ring-2 focus-visible:ring-zinc-900/30 dark:focus-visible:ring-zinc-400/40 focus-visible:outline-none"
+                className="flex items-center gap-2 px-3 py-2 text-sm rounded-lg hover:bg-accent transition-colors focus-visible:ring-2 focus-visible:ring-primary/30 focus-visible:outline-none"
                 onClick={close}
               >
                 <UserIcon className="w-4 h-4" />
@@ -108,7 +108,7 @@ export default function UserMenu({ user }: UserMenuProps) {
                 role="menuitem"
                 tabIndex={0}
                 onClick={() => signOut({ callbackUrl: "/" })}
-                className="w-full flex items-center gap-2 px-3 py-2 text-sm rounded-lg hover:bg-red-500/10 text-red-500 transition-colors focus-visible:ring-2 focus-visible:ring-zinc-900/30 dark:focus-visible:ring-zinc-400/40 focus-visible:outline-none"
+                className="w-full flex items-center gap-2 px-3 py-2 text-sm rounded-lg hover:bg-red-500/10 text-red-500 transition-colors focus-visible:ring-2 focus-visible:ring-primary/30 focus-visible:outline-none"
               >
                 <LogOut className="w-4 h-4" />
                 Sign out

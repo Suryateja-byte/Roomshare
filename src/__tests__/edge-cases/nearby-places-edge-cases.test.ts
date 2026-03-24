@@ -223,14 +223,10 @@ describe("Category E: Nearby Places Cross-Feature Edge Cases", () => {
     it("should provide all required color properties", () => {
       Object.values(CATEGORY_COLORS).forEach((colorConfig) => {
         expect(colorConfig).toHaveProperty("bg");
-        expect(colorConfig).toHaveProperty("bgDark");
         expect(colorConfig).toHaveProperty("icon");
-        expect(colorConfig).toHaveProperty("iconDark");
         expect(colorConfig).toHaveProperty("accent");
         expect(colorConfig).toHaveProperty("markerBg");
         expect(colorConfig).toHaveProperty("markerBorder");
-        expect(colorConfig).toHaveProperty("markerBgDark");
-        expect(colorConfig).toHaveProperty("markerBorderDark");
       });
     });
 

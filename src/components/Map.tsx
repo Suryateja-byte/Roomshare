@@ -430,11 +430,11 @@ const MarkerPinContent = React.memo(function MarkerPinContent({
         <div
           className={cn(
             "w-3 h-3 rounded-full shadow-md transition-transform duration-200",
-            "bg-zinc-400 dark:bg-zinc-500 ring-2 ring-white dark:ring-zinc-900",
+            "bg-surface-container-high ring-2 ring-white",
             "group-hover/marker:scale-125"
           )}
         />
-        <div className="absolute left-1/2 -translate-x-1/2 -bottom-[1px] w-2 h-0.5 bg-zinc-950/20 dark:bg-zinc-950/40 rounded-full blur-[1px]" />
+        <div className="absolute left-1/2 -translate-x-1/2 -bottom-[1px] w-2 h-0.5 bg-on-surface/20 rounded-full blur-[1px]" />
       </>
     );
   }
@@ -449,8 +449,8 @@ const MarkerPinContent = React.memo(function MarkerPinContent({
             ? "px-2 py-1 rounded-lg text-xs"
             : "px-3 py-1.5 rounded-xl text-sm",
           isHovered
-            ? "bg-white dark:bg-zinc-700 text-zinc-900 dark:text-white ring-2 ring-zinc-900 dark:ring-white scale-105"
-            : "bg-zinc-900 dark:bg-white text-white dark:text-zinc-900 group-hover/marker:bg-zinc-800 dark:group-hover/marker:bg-zinc-200"
+            ? "bg-surface-container-lowest text-on-surface ring-2 ring-primary/30 scale-105"
+            : "bg-on-surface text-white group-hover/marker:bg-on-surface"
         )}
       >
         ${price}
@@ -462,13 +462,13 @@ const MarkerPinContent = React.memo(function MarkerPinContent({
             ? "-bottom-[4px] border-l-[5px] border-r-[5px] border-t-[5px]"
             : "-bottom-[6px] border-l-[7px] border-r-[7px] border-t-[7px]",
           isHovered
-            ? "border-t-white dark:border-t-zinc-700"
-            : "border-t-zinc-900 dark:border-t-white group-hover/marker:border-t-zinc-800 dark:group-hover/marker:border-t-zinc-200"
+            ? "border-t-white"
+            : "border-t-on-surface group-hover/marker:border-t-on-surface"
         )}
       />
       <div
         className={cn(
-          "absolute left-1/2 -translate-x-1/2 bg-zinc-950/20 dark:bg-zinc-950/40 rounded-full blur-[2px]",
+          "absolute left-1/2 -translate-x-1/2 bg-on-surface/20 rounded-full blur-[2px]",
           isMini && currentZoom >= ZOOM_TOP_N_PINS
             ? "-bottom-[2px] w-2 h-0.5"
             : "-bottom-1 w-3 h-1"
@@ -624,15 +624,15 @@ const MapMarkerItem = React.memo(function MapMarkerItem({
             className={cn(
               "absolute -inset-2 -top-2 rounded-full border-2 pointer-events-none motion-reduce:animate-none",
               isHovered
-                ? "border-zinc-900 dark:border-white animate-ping opacity-40"
-                : "border-zinc-400 dark:border-zinc-500 animate-[pulse-ring_2s_ease-in-out_infinite] opacity-30"
+                ? "border-outline-variant/20 animate-ping opacity-40"
+                : "border-outline-variant/30 animate-[pulse-ring_2s_ease-in-out_infinite] opacity-30"
             )}
           />
         )}
         {/* Keyboard focus ring - solid visible ring distinct from hover animation */}
         {isKeyboardFocused && (
           <div
-            className="absolute -inset-3 rounded-full border-[3px] border-blue-500 dark:border-blue-400 pointer-events-none shadow-[0_0_0_2px_rgba(59,130,246,0.3)]"
+            className="absolute -inset-3 rounded-full border-[3px] border-blue-500 pointer-events-none shadow-[0_0_0_2px_rgba(59,130,246,0.3)]"
             aria-hidden="true"
           />
         )}
@@ -667,7 +667,7 @@ const ClusterHighlightMarker = React.memo(function ClusterHighlightMarker({
       anchor="center"
     >
       <div className="pointer-events-none flex items-center justify-center">
-        <div className="w-4 h-4 rounded-full bg-indigo-500 border-2 border-white shadow-lg animate-pulse" />
+        <div className="w-4 h-4 rounded-full bg-primary border-2 border-white shadow-lg animate-pulse" />
         <div className="absolute w-8 h-8 rounded-full border-2 border-indigo-400 animate-ping opacity-40" />
       </div>
     </Marker>
@@ -2589,14 +2589,14 @@ export default function MapComponent({
     >
       {isWebglContextLost && (
         <div
-          className="absolute inset-0 bg-zinc-950/70 z-30 flex items-center justify-center pointer-events-none"
+          className="absolute inset-0 bg-on-surface/70 z-30 flex items-center justify-center pointer-events-none"
           role="status"
           aria-live="assertive"
           aria-label="Map paused"
         >
           <div className="text-center px-4">
             <p className="text-sm font-medium text-white">Map paused</p>
-            <p className="text-xs text-zinc-200 mt-1">
+            <p className="text-xs text-on-surface-variant mt-1">
               Recovering map context...
             </p>
           </div>
@@ -2606,16 +2606,16 @@ export default function MapComponent({
       {/* Initial loading skeleton */}
       {!isMapLoaded && (
         <div
-          className="absolute inset-0 bg-zinc-100 dark:bg-zinc-800 z-20 flex items-center justify-center"
+          className="absolute inset-0 bg-surface-container-high z-20 flex items-center justify-center"
           role="status"
           aria-label="Loading map"
         >
           <div className="flex flex-col items-center gap-3">
             <MapPin
-              className="w-10 h-10 text-zinc-300 dark:text-zinc-600 animate-pulse"
+              className="w-10 h-10 text-on-surface-variant animate-pulse"
               aria-hidden="true"
             />
-            <span className="text-sm text-zinc-500 dark:text-zinc-400">
+            <span className="text-sm text-on-surface-variant">
               Loading map...
             </span>
           </div>
@@ -2630,12 +2630,12 @@ export default function MapComponent({
           aria-label="Loading map tiles"
           aria-live="polite"
         >
-          <div className="flex items-center gap-2 bg-white/90 dark:bg-zinc-800/90 px-4 py-2 rounded-lg shadow-sm">
+          <div className="flex items-center gap-2 bg-white/90 px-4 py-2 rounded-lg shadow-sm">
             <Loader2
-              className="w-4 h-4 animate-spin text-zinc-600 dark:text-zinc-300"
+              className="w-4 h-4 animate-spin text-on-surface-variant"
               aria-hidden="true"
             />
-            <span className="text-sm text-zinc-600 dark:text-zinc-300">
+            <span className="text-sm text-on-surface-variant">
               Loading tiles...
             </span>
           </div>
@@ -2645,16 +2645,16 @@ export default function MapComponent({
       {/* Search-as-move loading indicator */}
       {isSearching && isMapLoaded && !areTilesLoading && (
         <div
-          className="absolute top-16 left-1/2 -translate-x-1/2 bg-white/90 dark:bg-zinc-800/90 px-3 py-2 rounded-lg shadow-sm flex items-center gap-2 z-10 pointer-events-none"
+          className="absolute top-16 left-1/2 -translate-x-1/2 bg-white/90 px-3 py-2 rounded-lg shadow-sm flex items-center gap-2 z-10 pointer-events-none"
           role="status"
           aria-label="Searching area"
           aria-live="polite"
         >
           <Loader2
-            className="w-4 h-4 animate-spin text-zinc-600 dark:text-zinc-300"
+            className="w-4 h-4 animate-spin text-on-surface-variant"
             aria-hidden="true"
           />
-          <span className="text-sm text-zinc-600 dark:text-zinc-300">
+          <span className="text-sm text-on-surface-variant">
             Searching area...
           </span>
         </div>
@@ -3088,7 +3088,7 @@ export default function MapComponent({
             maxWidth="320px"
             className={`z-[60] [&_.maplibregl-popup-content]:rounded-xl [&_.maplibregl-popup-content]:p-0 [&_.maplibregl-popup-content]:!bg-transparent [&_.maplibregl-popup-content]:!shadow-none [&_.maplibregl-popup-close-button]:hidden ${
               isDarkMode
-                ? "[&_.maplibregl-popup-tip]:border-t-zinc-900"
+                ? "[&_.maplibregl-popup-tip]:border-t-on-surface"
                 : "[&_.maplibregl-popup-tip]:border-t-white"
             }`}
           >
@@ -3096,13 +3096,13 @@ export default function MapComponent({
             <div
               className={`w-[280px] overflow-hidden rounded-xl ${
                 isDarkMode
-                  ? "bg-zinc-900 shadow-[0_10px_40px_-10px_rgba(0,0,0,0.5)]"
-                  : "bg-white shadow-[0_10px_40px_-10px_rgba(0,0,0,0.15)]"
+                  ? "bg-on-surface shadow-[0_10px_40px_-10px_rgba(0,0,0,0.5)]"
+                  : "bg-surface-container-lowest shadow-[0_10px_40px_-10px_rgba(0,0,0,0.15)]"
               }`}
             >
               {/* Image Thumbnail - optimized with next/image */}
               <div
-                className={`aspect-[16/9] relative overflow-hidden ${isDarkMode ? "bg-zinc-800" : "bg-zinc-100"}`}
+                className={`aspect-[16/9] relative overflow-hidden ${isDarkMode ? "bg-on-surface" : "bg-surface-container-high"}`}
               >
                 {selectedListing.images && selectedListing.images[0] ? (
                   <Image
@@ -3115,7 +3115,7 @@ export default function MapComponent({
                 ) : (
                   <div className="w-full h-full flex items-center justify-center">
                     <Home
-                      className={`w-10 h-10 ${isDarkMode ? "text-zinc-600" : "text-zinc-300"}`}
+                      className={`w-10 h-10 ${isDarkMode ? "text-on-surface-variant" : "text-on-surface-variant"}`}
                     />
                   </div>
                 )}
@@ -3125,7 +3125,7 @@ export default function MapComponent({
                     variant="ghost"
                     size="icon"
                     onClick={() => setSelectedListing(null)}
-                    className="rounded-full bg-zinc-950/50 hover:bg-zinc-950/70 text-white hover:text-white border-none"
+                    className="rounded-full bg-on-surface/50 hover:bg-on-surface/70 text-white hover:text-white border-none"
                     aria-label="Close listing preview"
                   >
                     <X className="w-4 h-4" />
@@ -3137,7 +3137,7 @@ export default function MapComponent({
                     className={`inline-flex px-2 py-0.5 rounded-md text-2xs font-semibold uppercase ${
                       selectedListing.availableSlots > 0
                         ? "bg-emerald-500 text-white"
-                        : "bg-zinc-900 text-white"
+                        : "bg-on-surface text-white"
                     }`}
                   >
                     {selectedListing.availableSlots > 0
@@ -3150,18 +3150,18 @@ export default function MapComponent({
               {/* Content */}
               <div className="p-3">
                 <h3
-                  className={`font-semibold text-sm line-clamp-1 mb-1 ${isDarkMode ? "text-white" : "text-zinc-900"}`}
+                  className={`font-semibold text-sm line-clamp-1 mb-1 ${isDarkMode ? "text-white" : "text-on-surface"}`}
                 >
                   {selectedListing.title}
                 </h3>
                 <p className="mb-3">
                   <span
-                    className={`text-lg font-bold ${isDarkMode ? "text-white" : "text-zinc-900"}`}
+                    className={`text-lg font-bold ${isDarkMode ? "text-white" : "text-on-surface"}`}
                   >
                     ${selectedListing.price}
                   </span>
                   <span
-                    className={`text-sm ${isDarkMode ? "text-zinc-400" : "text-zinc-500"}`}
+                    className={`text-sm ${isDarkMode ? "text-on-surface-variant" : "text-on-surface-variant"}`}
                   >
                     /month
                   </span>
@@ -3175,8 +3175,8 @@ export default function MapComponent({
                       size="sm"
                       className={`w-full h-9 text-xs-plus font-medium rounded-lg ${
                         isDarkMode
-                          ? "bg-white text-zinc-900 hover:bg-zinc-200"
-                          : "bg-zinc-900 text-white hover:bg-zinc-800"
+                          ? "bg-surface-container-lowest text-on-surface hover:bg-surface-container-high"
+                          : "bg-on-surface text-white hover:bg-on-surface"
                       }`}
                     >
                       View Details
@@ -3205,15 +3205,15 @@ export default function MapComponent({
           role="switch"
           aria-checked={searchAsMove}
           onClick={() => setSearchAsMove(!searchAsMove)}
-          className={`flex items-center gap-2 px-4 py-2.5 rounded-full shadow-lg border text-sm font-medium transition-all select-none focus:outline-none focus-visible:ring-2 focus-visible:ring-zinc-900/30 dark:focus-visible:ring-zinc-400/40 focus-visible:ring-offset-2 backdrop-blur-md ${
+          className={`flex items-center gap-2 px-4 py-2.5 rounded-full shadow-lg border text-sm font-medium transition-all select-none focus:outline-none focus-visible:ring-2 focus-visible:ring-primary/30 focus-visible:ring-offset-2 backdrop-blur-md ${
             searchAsMove
-              ? "bg-white/95 text-zinc-900 border-white/20 dark:bg-zinc-900/95 dark:text-white dark:border-zinc-800/50 ring-2 ring-green-500/50 dark:ring-green-400/30"
-              : "bg-zinc-900/90 text-white border-white/10 dark:bg-zinc-800/90 dark:text-zinc-100 hover:bg-zinc-800 dark:hover:bg-zinc-700"
+              ? "bg-white/95 text-on-surface border-white/20 ring-2 ring-green-500/50"
+              : "bg-on-surface/90 text-white border-white/10 hover:bg-on-surface"
           }`}
         >
           <div
             data-testid="search-toggle-indicator"
-            className={`w-3 h-3 rounded-full transition-colors ${searchAsMove ? "bg-green-500 dark:bg-green-400 shadow-[0_0_8px_rgba(34,197,94,0.6)]" : "bg-zinc-500 dark:bg-zinc-500"}`}
+            className={`w-3 h-3 rounded-full transition-colors ${searchAsMove ? "bg-green-500 shadow-[0_0_8px_rgba(34,197,94,0.6)]" : "bg-on-surface-variant"}`}
           />
           Search as I move
         </button>
@@ -3250,11 +3250,11 @@ export default function MapComponent({
               { padding: 50, duration: 1000 }
             );
           }}
-          className="absolute bottom-4 right-4 z-[50] w-11 h-11 flex items-center justify-center bg-white/90 dark:bg-zinc-900/90 backdrop-blur-md rounded-full shadow-lg border border-zinc-200/50 dark:border-zinc-700/50 hover:bg-zinc-50 dark:hover:bg-zinc-800 transition-colors focus:outline-none focus-visible:ring-2 focus-visible:ring-zinc-900/30 dark:focus-visible:ring-zinc-400/40 focus-visible:ring-offset-2"
+          className="absolute bottom-4 right-4 z-[50] w-11 h-11 flex items-center justify-center bg-white/90 backdrop-blur-md rounded-full shadow-lg border border-outline-variant/20/50 hover:bg-surface-canvas transition-colors focus:outline-none focus-visible:ring-2 focus-visible:ring-primary/30 focus-visible:ring-offset-2"
           aria-label="Fit all results in view"
           title="Fit all results"
         >
-          <Maximize2 className="w-4 h-4 text-zinc-700 dark:text-zinc-300" />
+          <Maximize2 className="w-4 h-4 text-on-surface-variant" />
         </button>
       )}
 
@@ -3275,9 +3275,9 @@ export default function MapComponent({
         <div
           role="status"
           aria-live="polite"
-          className="absolute bottom-20 left-1/2 -translate-x-1/2 z-[50] bg-blue-50/90 dark:bg-blue-950/80 backdrop-blur-md border border-blue-200/50 dark:border-blue-900/50 rounded-full px-4 py-2 shadow-lg pointer-events-none"
+          className="absolute bottom-20 left-1/2 -translate-x-1/2 z-[50] bg-blue-50/90 backdrop-blur-md border border-blue-200/50 rounded-full px-4 py-2 shadow-lg pointer-events-none"
         >
-          <p className="text-xs text-blue-800 dark:text-blue-200 font-medium">
+          <p className="text-xs text-blue-800 font-medium">
             {viewportInfoMessage}
           </p>
         </div>

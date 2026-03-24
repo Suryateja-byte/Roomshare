@@ -263,14 +263,14 @@ function MapErrorBanner({
     <div
       role="alert"
       aria-live="polite"
-      className="absolute top-4 left-4 right-4 z-50 bg-amber-50 dark:bg-amber-950/50 border border-amber-200 dark:border-amber-800 rounded-lg p-3 flex items-center justify-between gap-2"
+      className="absolute top-4 left-4 right-4 z-50 bg-amber-50 border border-amber-200 rounded-lg p-3 flex items-center justify-between gap-2"
     >
-      <span className="text-sm text-amber-700 dark:text-amber-300 block">
+      <span className="text-sm text-amber-700 block">
         {message}
       </span>
       <button
         onClick={onRetry}
-        className="text-sm font-medium text-amber-800 dark:text-amber-200 hover:underline flex-shrink-0"
+        className="text-sm font-medium text-amber-800 hover:underline flex-shrink-0"
       >
         Retry
       </button>
@@ -285,9 +285,9 @@ function MapInfoBanner({ message }: { message: string }) {
     <div
       role="status"
       aria-live="polite"
-      className="absolute top-4 left-4 right-4 z-50 bg-blue-50 dark:bg-blue-950/50 border border-blue-200 dark:border-blue-800 rounded-lg p-3"
+      className="absolute top-4 left-4 right-4 z-50 bg-blue-50 border border-blue-200 rounded-lg p-3"
     >
-      <span className="text-sm text-blue-700 dark:text-blue-300 block">
+      <span className="text-sm text-blue-700 block">
         {message}
       </span>
     </div>
@@ -297,8 +297,8 @@ function MapInfoBanner({ message }: { message: string }) {
 // Loading placeholder for lazy map component
 function MapLoadingPlaceholder() {
   return (
-    <div className="w-full h-full bg-zinc-100 dark:bg-zinc-800 animate-pulse flex items-center justify-center">
-      <div className="text-zinc-400 dark:text-zinc-500 text-sm">
+    <div className="w-full h-full bg-surface-container-high animate-pulse flex items-center justify-center">
+      <div className="text-on-surface-variant text-sm">
         Loading map...
       </div>
     </div>
@@ -314,8 +314,8 @@ function MapTransitionOverlay() {
       role="status"
       aria-label="Updating map results"
     >
-      <span className="inline-flex items-center gap-1.5 px-3 py-1.5 bg-white dark:bg-zinc-800 rounded-full shadow-md border border-zinc-200 dark:border-zinc-700 text-xs font-medium text-zinc-500 dark:text-zinc-400">
-        <span className="w-1.5 h-1.5 rounded-full bg-zinc-400 dark:bg-zinc-500 animate-pulse" />
+      <span className="inline-flex items-center gap-1.5 px-3 py-1.5 bg-surface-container-lowest rounded-full shadow-md border border-outline-variant/20 text-xs font-medium text-on-surface-variant">
+        <span className="w-1.5 h-1.5 rounded-full bg-surface-container-high animate-pulse" />
         Updating...
       </span>
     </div>
@@ -330,7 +330,7 @@ function MapDataLoadingBar() {
       role="status"
       aria-label="Loading map data"
     >
-      <div className="h-full bg-zinc-900/80 dark:bg-white/80 animate-[shimmer_1.5s_ease-in-out_infinite] origin-left" />
+      <div className="h-full bg-on-surface/80 animate-[shimmer_1.5s_ease-in-out_infinite] origin-left" />
       <style jsx>{`
         @keyframes shimmer {
           0% {

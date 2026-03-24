@@ -88,15 +88,15 @@ export function MapEmptyState({ onZoomOut, searchParams }: MapEmptyStateProps) {
   };
 
   return (
-    <div className="absolute bottom-20 left-1/2 -translate-x-1/2 z-10 bg-white dark:bg-zinc-800 rounded-xl shadow-lg border border-zinc-200 dark:border-zinc-700 px-5 py-4 max-w-[320px] text-center pointer-events-auto">
+    <div className="absolute bottom-20 left-1/2 -translate-x-1/2 z-10 bg-surface-container-lowest rounded-xl shadow-lg border border-outline-variant/20 px-5 py-4 max-w-[320px] text-center pointer-events-auto">
       <MapPin
-        className="w-8 h-8 text-zinc-300 dark:text-zinc-600 mx-auto mb-2"
+        className="w-8 h-8 text-on-surface-variant mx-auto mb-2"
         aria-hidden="true"
       />
-      <p className="text-sm font-medium text-zinc-700 dark:text-zinc-300 mb-1">
+      <p className="text-sm font-medium text-on-surface-variant mb-1">
         No listings in this area
       </p>
-      <p className="text-xs text-zinc-500 dark:text-zinc-400 mb-3">
+      <p className="text-xs text-on-surface-variant mb-3">
         Try zooming out or adjusting your filters
       </p>
 
@@ -110,13 +110,13 @@ export function MapEmptyState({ onZoomOut, searchParams }: MapEmptyStateProps) {
             <span
               key={chip.id}
               data-testid="filter-chip"
-              className="inline-flex items-center px-2 py-0.5 rounded-full text-[11px] font-medium bg-zinc-100 dark:bg-zinc-700 text-zinc-600 dark:text-zinc-300"
+              className="inline-flex items-center px-2 py-0.5 rounded-full text-[11px] font-medium bg-surface-container-high text-on-surface-variant"
             >
               {chip.label}
             </span>
           ))}
           {overflowCount > 0 && (
-            <span className="inline-flex items-center px-2 py-0.5 rounded-full text-[11px] font-medium bg-zinc-100 dark:bg-zinc-700 text-zinc-500 dark:text-zinc-400">
+            <span className="inline-flex items-center px-2 py-0.5 rounded-full text-[11px] font-medium bg-surface-container-high text-on-surface-variant">
               +{overflowCount} more
             </span>
           )}
@@ -133,7 +133,7 @@ export function MapEmptyState({ onZoomOut, searchParams }: MapEmptyStateProps) {
             <button
               key={`${suggestion.type}-${i}`}
               data-testid="suggestion-pill"
-              className="inline-flex items-center gap-1 px-2.5 py-1 rounded-full text-[11px] font-medium bg-indigo-50 dark:bg-indigo-950/40 text-indigo-700 dark:text-indigo-300 hover:bg-indigo-100 dark:hover:bg-indigo-950/60 transition-colors"
+              className="inline-flex items-center gap-1 px-2.5 py-1 rounded-full text-[11px] font-medium bg-primary text-primary hover:bg-primary transition-colors"
               onClick={() => handleRemoveSuggestion(suggestion)}
             >
               <X className="w-3 h-3" aria-hidden="true" />

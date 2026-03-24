@@ -43,7 +43,7 @@ export default function HomeClient() {
 
   return (
     <LazyMotion features={domAnimation}>
-      <div className="flex flex-col bg-white dark:bg-zinc-950 text-zinc-900 dark:text-zinc-50 font-sans selection:bg-zinc-900 selection:text-white dark:selection:bg-white dark:selection:text-zinc-900">
+      <div className="flex flex-col bg-white text-zinc-900 font-sans selection:bg-zinc-900 selection:text-white">
         {/* Hero Section */}
         <section className="relative pt-32 pb-24 md:pt-40 md:pb-24 min-h-screen flex flex-col justify-center overflow-x-hidden">
           <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 w-full z-10">
@@ -59,7 +59,7 @@ export default function HomeClient() {
                 >
                   <m.div
                     variants={fadeInUp}
-                    className="inline-flex items-center gap-2 px-3 py-1.5 rounded-full border border-zinc-200/50 dark:border-zinc-800 bg-zinc-50 dark:bg-zinc-900/50 text-zinc-500 dark:text-zinc-400 text-xs font-bold uppercase tracking-[0.15em] mb-8"
+                    className="inline-flex items-center gap-2 px-3 py-1.5 rounded-full border border-zinc-200/50 bg-zinc-50 text-zinc-500 text-xs font-bold uppercase tracking-[0.15em] mb-8"
                   >
                     <span className="w-1.5 h-1.5 rounded-full bg-indigo-500"></span>
                     Now in 12 cities
@@ -67,7 +67,7 @@ export default function HomeClient() {
 
                   <m.h1
                     variants={fadeInUp}
-                    className="text-5xl md:text-7xl lg:text-[5.5rem] font-medium tracking-tighter text-zinc-900 dark:text-white mb-6 leading-[1.05]"
+                    className="text-5xl md:text-7xl lg:text-[5.5rem] font-medium tracking-tighter text-zinc-900 mb-6 leading-[1.05]"
                   >
                     Love where <br className="hidden md:block" />
                     you live.
@@ -75,7 +75,7 @@ export default function HomeClient() {
 
                   <m.p
                     variants={fadeInUp}
-                    className="text-lg md:text-xl text-zinc-500 dark:text-zinc-400 mb-10 max-w-2xl mx-auto font-light leading-relaxed"
+                    className="text-lg md:text-xl text-zinc-500 mb-10 max-w-2xl mx-auto font-light leading-relaxed"
                   >
                     Verified roommates. Real listings. People who actually
                     show up to the tour.
@@ -88,7 +88,7 @@ export default function HomeClient() {
                   >
                     <Suspense
                       fallback={
-                        <div className="h-16 animate-pulse bg-zinc-100 dark:bg-zinc-900 rounded-2xl" />
+                        <div className="h-16 animate-pulse bg-zinc-100 rounded-2xl" />
                       }
                     >
                       <SearchForm />
@@ -103,7 +103,7 @@ export default function HomeClient() {
                       <span className="text-zinc-400">New here?</span>
                       <Link
                         href="/signup"
-                        className="font-medium text-zinc-900 dark:text-white hover:underline underline-offset-4 transition-colors"
+                        className="font-medium text-zinc-900 hover:underline underline-offset-4 transition-colors"
                       >
                         Create an account
                       </Link>
@@ -118,7 +118,7 @@ export default function HomeClient() {
                   initial={{ opacity: 0, y: 40 }}
                   animate={{ opacity: 1, y: 0 }}
                   transition={{ duration: 0.8, delay: 0.2, ease: [0.16, 1, 0.3, 1] }}
-                  className="relative aspect-[21/9] rounded-[2rem] overflow-hidden bg-zinc-100 dark:bg-zinc-900 shadow-2xl shadow-zinc-900/20"
+                  className="relative aspect-[21/9] rounded-[2rem] overflow-hidden bg-zinc-100 shadow-2xl shadow-zinc-900/20"
                 >
                   <Image
                     src="https://images.unsplash.com/photo-1522708323590-d24dbb6b0267?ixlib=rb-4.0.3&auto=format&fit=crop&w=2340&q=80"
@@ -140,7 +140,7 @@ export default function HomeClient() {
         <ScrollAnimation />
 
         {/* Features Section */}
-        <section className="py-24 md:py-32 bg-zinc-50 dark:bg-zinc-900/20">
+        <section className="py-24 md:py-32 bg-zinc-50">
           <div className="max-w-7xl mx-auto px-4 sm:px-6">
             <m.div
               initial="hidden"
@@ -151,13 +151,13 @@ export default function HomeClient() {
             >
               <m.h2
                 variants={fadeInUp}
-                className="text-3xl md:text-5xl font-medium tracking-tight text-zinc-900 dark:text-white mb-6"
+                className="text-3xl md:text-5xl font-medium tracking-tight text-zinc-900 mb-6"
               >
                 Why people switch to RoomShare.
               </m.h2>
               <m.p
                 variants={fadeInUp}
-                className="text-zinc-500 dark:text-zinc-400 text-lg font-light max-w-xl mx-auto"
+                className="text-zinc-500 text-lg font-light max-w-xl mx-auto"
               >
                 Less guesswork. Less ghosting. More &ldquo;I actually like
                 living here.&rdquo;
@@ -191,7 +191,7 @@ export default function HomeClient() {
         </section>
 
         {/* CTA Section */}
-        <section className="py-24 md:py-32 bg-white dark:bg-zinc-950 text-center">
+        <section className="py-24 md:py-32 bg-white text-center">
           <m.div
             initial={{ opacity: 0, y: 20 }}
             whileInView={{ opacity: 1, y: 0 }}
@@ -199,10 +199,10 @@ export default function HomeClient() {
             transition={{ duration: 0.6, ease: [0.16, 1, 0.3, 1] }}
             className="max-w-3xl mx-auto px-4 sm:px-6"
           >
-            <h2 className="text-4xl md:text-5xl lg:text-6xl font-medium tracking-tight mb-6 text-zinc-900 dark:text-white">
+            <h2 className="text-4xl md:text-5xl lg:text-6xl font-medium tracking-tight mb-6 text-zinc-900">
               Your next roommate is already here.
             </h2>
-            <p className="text-lg text-zinc-500 dark:text-zinc-400 mb-10 max-w-xl mx-auto font-light">
+            <p className="text-lg text-zinc-500 mb-10 max-w-xl mx-auto font-light">
               Takes 2 minutes to set up a profile. Then start browsing rooms tonight.
             </p>
 
@@ -218,7 +218,7 @@ export default function HomeClient() {
                 asChild
                 variant="outline"
                 size="lg"
-                className="group w-full sm:w-auto rounded-full px-8 h-12 text-base font-medium gap-2 border-zinc-200 dark:border-zinc-800 hover:bg-zinc-50 dark:hover:bg-zinc-900"
+                className="group w-full sm:w-auto rounded-full px-8 h-12 text-base font-medium gap-2 border-zinc-200 hover:bg-zinc-50"
               >
                 <Link href="/search">
                   See Rooms Near You{" "}
@@ -250,13 +250,13 @@ function FeatureCard({
       variants={fadeInUp}
       className="flex flex-col items-center text-center group"
     >
-      <div className="mb-6 flex items-center justify-center w-12 h-12 rounded-full bg-zinc-100 dark:bg-zinc-900 text-zinc-900 dark:text-white transition-colors group-hover:bg-indigo-50 dark:group-hover:bg-indigo-950/50 group-hover:text-indigo-600 dark:group-hover:text-indigo-400">
+      <div className="mb-6 flex items-center justify-center w-12 h-12 rounded-full bg-zinc-100 text-zinc-900 transition-colors group-hover:bg-indigo-50 group-hover:text-indigo-600">
         <Icon className="w-5 h-5" />
       </div>
-      <h3 className="text-lg font-medium mb-3 text-zinc-900 dark:text-white tracking-tight">
+      <h3 className="text-lg font-medium mb-3 text-zinc-900 tracking-tight">
         {title}
       </h3>
-      <p className="text-zinc-500 dark:text-zinc-400 font-light leading-relaxed">
+      <p className="text-zinc-500 font-light leading-relaxed">
         {description}
       </p>
     </m.div>

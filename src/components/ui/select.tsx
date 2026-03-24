@@ -20,16 +20,13 @@ const SelectTrigger = React.forwardRef<
     ref={ref}
     className={cn(
       "flex h-11 sm:h-12 w-full items-center justify-between",
-      "rounded-xl border border-zinc-200 dark:border-zinc-700",
-      "bg-white dark:bg-zinc-800",
+      "rounded-xl border border-outline-variant/20",
+      "bg-surface-container-lowest",
       "px-3 py-2.5 sm:py-3 text-sm",
-      "text-zinc-900 dark:text-white",
-      // P2-8: Improved contrast for WCAG AA compliance
-      // Light: zinc-600 (7:1) vs zinc-400's failing 3.5:1
-      // Dark: zinc-300 (7.6:1) vs zinc-500's failing 2.8:1
-      "placeholder:text-zinc-600 dark:placeholder:text-zinc-300",
-      "hover:border-zinc-300 dark:hover:border-zinc-600",
-      "focus:outline-none focus:ring-2 focus:ring-zinc-900/30 dark:focus:ring-zinc-400/40",
+      "text-on-surface",
+      "placeholder:text-on-surface-variant",
+      "hover:border-outline-variant/30",
+      "focus:outline-none focus:ring-2 focus:ring-primary/30",
       "disabled:cursor-not-allowed disabled:opacity-60",
       "transition-all duration-200",
       "[&>span]:line-clamp-1",
@@ -39,7 +36,7 @@ const SelectTrigger = React.forwardRef<
   >
     {children}
     <SelectPrimitive.Icon asChild>
-      <ChevronDown className="h-4 w-4 text-zinc-500 dark:text-zinc-400 transition-transform duration-200 group-data-[state=open]:rotate-180" />
+      <ChevronDown className="h-4 w-4 text-on-surface-variant transition-transform duration-200 group-data-[state=open]:rotate-180" />
     </SelectPrimitive.Icon>
   </SelectPrimitive.Trigger>
 ));
@@ -90,10 +87,10 @@ const SelectContent = React.forwardRef<
       className={cn(
         "relative z-popover max-h-96 min-w-[8rem] overflow-hidden",
         "rounded-xl",
-        "bg-white/95 dark:bg-zinc-900/95 backdrop-blur-xl",
-        "border border-zinc-200/80 dark:border-zinc-700/80",
-        "shadow-lg dark:shadow-xl",
-        "text-zinc-900 dark:text-white",
+        "bg-surface-container-lowest/95 backdrop-blur-xl",
+        "border border-outline-variant/20",
+        "shadow-lg",
+        "text-on-surface",
         "data-[state=open]:animate-in data-[state=closed]:animate-out",
         "data-[state=closed]:fade-out-0 data-[state=open]:fade-in-0",
         "data-[side=bottom]:slide-in-from-top-2 data-[side=left]:slide-in-from-right-2",
@@ -142,11 +139,11 @@ const SelectItem = React.forwardRef<
     className={cn(
       "relative flex w-full cursor-pointer select-none items-center",
       "rounded-xl py-2.5 pl-9 pr-3 text-sm",
-      "text-zinc-700 dark:text-zinc-300",
+      "text-on-surface-variant",
       "outline-none transition-colors duration-150",
-      "hover:bg-zinc-100/80 dark:hover:bg-zinc-800/80",
-      "focus:bg-zinc-100 dark:focus:bg-zinc-800",
-      "data-[state=checked]:text-zinc-900 dark:data-[state=checked]:text-white",
+      "hover:bg-surface-container-high/80",
+      "focus:bg-surface-container-high",
+      "data-[state=checked]:text-on-surface",
       "data-[state=checked]:font-medium",
       "data-[disabled]:pointer-events-none data-[disabled]:opacity-60",
       className
@@ -155,7 +152,7 @@ const SelectItem = React.forwardRef<
   >
     <span className="absolute left-3 flex h-4 w-4 items-center justify-center">
       <SelectPrimitive.ItemIndicator>
-        <Check className="h-4 w-4 text-zinc-900 dark:text-white" />
+        <Check className="h-4 w-4 text-on-surface" />
       </SelectPrimitive.ItemIndicator>
     </span>
 

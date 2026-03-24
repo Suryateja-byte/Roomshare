@@ -32,7 +32,7 @@ export default function ReviewList({
 
   if (reviews.length === 0) {
     return (
-      <div className="text-center py-8 text-zinc-500 dark:text-zinc-400">
+      <div className="text-center py-8 text-on-surface-variant">
         No reviews yet. Be the first to leave one!
       </div>
     );
@@ -43,7 +43,7 @@ export default function ReviewList({
       {reviews.map((review) => (
         <div
           key={review.id}
-          className="border-b border-zinc-100 dark:border-zinc-800 pb-6 last:border-0"
+          className="border-b border-outline-variant/20 pb-6 last:border-0"
         >
           <div className="flex items-center justify-between mb-2">
             <div className="flex items-center gap-3">
@@ -53,10 +53,10 @@ export default function ReviewList({
                 size="md"
               />
               <div>
-                <h4 className="font-medium text-zinc-900 dark:text-white">
+                <h4 className="font-medium text-on-surface">
                   {review.author.name || "Anonymous"}
                 </h4>
-                <p className="text-xs text-zinc-500 dark:text-zinc-400">
+                <p className="text-xs text-on-surface-variant">
                   {new Date(review.createdAt).toLocaleDateString(undefined, {
                     year: "numeric",
                     month: "long",
@@ -73,23 +73,23 @@ export default function ReviewList({
                     "w-4 h-4",
                     star <= review.rating
                       ? "fill-yellow-400 text-yellow-400"
-                      : "text-zinc-200 dark:text-zinc-600"
+                      : "text-on-surface-variant"
                   )}
                 />
               ))}
             </div>
           </div>
-          <p className="text-zinc-600 dark:text-zinc-300 leading-relaxed pl-[52px]">
+          <p className="text-on-surface-variant leading-relaxed pl-[52px]">
             {review.comment}
           </p>
 
           {/* Existing response */}
           {review.response && (
-            <div className="ml-[52px] mt-3 p-3 bg-zinc-50 dark:bg-zinc-800 rounded-lg border border-zinc-100 dark:border-zinc-700">
-              <p className="text-xs font-medium text-zinc-500 dark:text-zinc-400 mb-1">
+            <div className="ml-[52px] mt-3 p-3 bg-surface-canvas rounded-lg border border-outline-variant/20">
+              <p className="text-xs font-medium text-on-surface-variant mb-1">
                 Host response
               </p>
-              <p className="text-sm text-zinc-700 dark:text-zinc-300">
+              <p className="text-sm text-on-surface-variant">
                 {review.response.content}
               </p>
             </div>
@@ -100,7 +100,7 @@ export default function ReviewList({
             <div className="ml-[52px] mt-2">
               <button
                 onClick={() => setRespondingTo(review.id)}
-                className="inline-flex items-center gap-1.5 text-sm text-zinc-500 hover:text-zinc-900 dark:hover:text-white transition-colors"
+                className="inline-flex items-center gap-1.5 text-sm text-on-surface-variant hover:text-on-surface transition-colors"
               >
                 <MessageSquare className="w-3.5 h-3.5" />
                 Respond

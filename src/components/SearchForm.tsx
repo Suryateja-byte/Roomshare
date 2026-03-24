@@ -891,7 +891,7 @@ export default function SearchForm({
       <form
         ref={formRef}
         onSubmit={handleSearch}
-        className={`group relative flex flex-col md:flex-row md:items-center bg-white dark:bg-zinc-900 backdrop-blur-2xl rounded-3xl md:rounded-full shadow-xl hover:shadow-2xl transition-all duration-300 w-full ${isCompact ? "p-1" : "p-2"}`}
+        className={`group relative flex flex-col md:flex-row md:items-center bg-surface-container-lowest backdrop-blur-2xl rounded-3xl md:rounded-full shadow-xl hover:shadow-2xl transition-all duration-300 w-full ${isCompact ? "p-1" : "p-2"}`}
         role="search"
       >
         {/* Semantic "What" Input — AI-powered natural language search */}
@@ -907,7 +907,7 @@ export default function SearchForm({
               <label
                 htmlFor="search-what"
                 className={cn(
-                  "text-[10px] font-bold text-indigo-500 dark:text-indigo-400 uppercase tracking-[0.15em] mb-1 flex items-center gap-1.5 transition-opacity duration-200",
+                  "text-[10px] font-bold text-primary uppercase tracking-[0.15em] mb-1 flex items-center gap-1.5 transition-opacity duration-200",
                   focusedField !== null &&
                     focusedField !== "what" &&
                     "md:opacity-0"
@@ -915,7 +915,7 @@ export default function SearchForm({
               >
                 <Sparkles className="w-3 h-3" />
                 What
-                <span className="text-[8px] font-bold text-indigo-500 bg-indigo-50 dark:bg-indigo-950/50 dark:text-indigo-400 px-1.5 py-0.5 rounded tracking-wider">
+                <span className="text-[8px] font-bold text-primary bg-primary px-1.5 py-0.5 rounded tracking-wider">
                   AI
                 </span>
               </label>
@@ -928,14 +928,14 @@ export default function SearchForm({
                   onFocus={() => handleFieldFocus("what")}
                   onBlur={handleFieldBlur}
                   placeholder="Describe your ideal room..."
-                  className="w-full bg-transparent border-none p-0 text-base md:text-sm font-medium text-zinc-900 dark:text-white placeholder:text-zinc-500 dark:placeholder:text-zinc-400 focus:ring-0 focus:outline-none focus-visible:ring-2 focus-visible:ring-zinc-900/30 dark:focus-visible:ring-zinc-400/40 focus-visible:rounded"
+                  className="w-full bg-transparent border-none p-0 text-base md:text-sm font-medium text-on-surface placeholder:text-on-surface-variant focus:ring-0 focus:outline-none focus-visible:ring-2 focus-visible:ring-primary/30 focus-visible:rounded"
                   autoComplete="off"
                 />
                 {whatQuery && (
                   <button
                     type="button"
                     onClick={() => setWhatQuery("")}
-                    className="flex-shrink-0 p-1 rounded-full text-zinc-300 hover:text-zinc-600 dark:hover:text-white transition-colors"
+                    className="flex-shrink-0 p-1 rounded-full text-on-surface-variant hover:text-on-surface-variant transition-colors"
                     aria-label="Clear search description"
                   >
                     <X className="w-3.5 h-3.5" />
@@ -945,7 +945,7 @@ export default function SearchForm({
             </div>
             {/* Divider between What and Where */}
             <div
-              className="hidden md:block w-px h-8 bg-zinc-100 dark:bg-white/5 mx-1"
+              className="hidden md:block w-px h-8 bg-surface-container-high mx-1"
               aria-hidden="true"
             ></div>
           </>
@@ -964,7 +964,7 @@ export default function SearchForm({
             <label
               htmlFor="search-location"
               className={cn(
-                "text-[10px] font-bold text-zinc-500 dark:text-zinc-400 uppercase tracking-[0.15em] mb-1 transition-opacity duration-200",
+                "text-[10px] font-bold text-on-surface-variant uppercase tracking-[0.15em] mb-1 transition-opacity duration-200",
                 focusedField !== null &&
                   focusedField !== "where" &&
                   "md:opacity-0"
@@ -1016,7 +1016,7 @@ export default function SearchForm({
               type="button"
               onClick={handleUseMyLocation}
               disabled={geoLoading}
-              className="flex-shrink-0 p-1.5 rounded-full text-zinc-300 hover:text-zinc-900 dark:hover:text-white transition-colors disabled:opacity-50"
+              className="flex-shrink-0 p-1.5 rounded-full text-on-surface-variant hover:text-on-surface transition-colors disabled:opacity-50"
               aria-label="Use my current location"
               title="Use my current location"
             >
@@ -1030,9 +1030,9 @@ export default function SearchForm({
 
           {/* Recent Searches Dropdown */}
           {showRecentSearches && recentSearches.length > 0 && (
-            <div className="absolute top-full left-0 right-0 mt-3 bg-white/95 dark:bg-zinc-900/95 backdrop-blur-xl rounded-2xl shadow-2xl border border-zinc-200/50 dark:border-white/5 z-50 overflow-hidden animate-in fade-in slide-in-from-top-2 duration-300">
-              <div className="flex items-center justify-between px-5 py-3 border-b border-zinc-100/50 dark:border-white/5">
-                <span className="text-[10px] font-bold text-zinc-500 uppercase tracking-widest">
+            <div className="absolute top-full left-0 right-0 mt-3 bg-white/95 backdrop-blur-xl rounded-2xl shadow-2xl border border-outline-variant/20/50 z-50 overflow-hidden animate-in fade-in slide-in-from-top-2 duration-300">
+              <div className="flex items-center justify-between px-5 py-3 border-b border-outline-variant/20/50">
+                <span className="text-[10px] font-bold text-on-surface-variant uppercase tracking-widest">
                   Recent Searches
                 </span>
                 <Button
@@ -1044,7 +1044,7 @@ export default function SearchForm({
                     e.stopPropagation();
                     clearRecentSearches();
                   }}
-                  className="h-auto py-1 px-2 text-[10px] font-bold uppercase tracking-wider text-zinc-500 hover:text-red-500"
+                  className="h-auto py-1 px-2 text-[10px] font-bold uppercase tracking-wider text-on-surface-variant hover:text-red-500"
                 >
                   Clear
                 </Button>
@@ -1059,10 +1059,10 @@ export default function SearchForm({
                         e.stopPropagation();
                         selectRecentSearch(search);
                       }}
-                      className="w-full flex items-center gap-4 px-5 py-3 hover:bg-zinc-50 dark:hover:bg-white/[0.02] text-left transition-colors"
+                      className="w-full flex items-center gap-4 px-5 py-3 hover:bg-surface-canvas[0.02] text-left transition-colors"
                     >
-                      <Clock className="w-4 h-4 text-zinc-300 flex-shrink-0" />
-                      <span className="text-sm font-medium text-zinc-600 dark:text-zinc-300 truncate">
+                      <Clock className="w-4 h-4 text-on-surface-variant flex-shrink-0" />
+                      <span className="text-sm font-medium text-on-surface-variant truncate">
                         {search.location}
                       </span>
                     </button>
@@ -1075,7 +1075,7 @@ export default function SearchForm({
 
         {/* Divider */}
         <div
-          className="hidden md:block w-px h-8 bg-zinc-100 dark:bg-white/5 mx-1"
+          className="hidden md:block w-px h-8 bg-surface-container-high mx-1"
           aria-hidden="true"
         ></div>
 
@@ -1091,7 +1091,7 @@ export default function SearchForm({
           {!isCompact && (
             <label
               className={cn(
-                "text-[10px] font-bold text-zinc-500 dark:text-zinc-400 uppercase tracking-[0.15em] mb-1 transition-opacity duration-200",
+                "text-[10px] font-bold text-on-surface-variant uppercase tracking-[0.15em] mb-1 transition-opacity duration-200",
                 focusedField !== null &&
                   focusedField !== "budget" &&
                   "md:opacity-0"
@@ -1102,7 +1102,7 @@ export default function SearchForm({
           )}
           <div className="flex items-center gap-2">
             <div className="flex items-center gap-1 flex-1">
-              <span className="text-zinc-500 text-xs">$</span>
+              <span className="text-on-surface-variant text-xs">$</span>
               <input
                 id="search-budget-min"
                 aria-label="Minimum budget"
@@ -1113,14 +1113,14 @@ export default function SearchForm({
                 onFocus={() => handleFieldFocus("budget")}
                 onBlur={handleFieldBlur}
                 placeholder="Min"
-                className={`w-full bg-transparent border-none p-0 text-base md:text-sm font-medium text-zinc-900 dark:text-white placeholder:text-zinc-500 dark:placeholder:text-zinc-400 focus:ring-0 focus:outline-none focus-visible:ring-2 focus-visible:ring-zinc-900/30 dark:focus-visible:ring-zinc-400/40 focus-visible:rounded appearance-none [-moz-appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none`}
+                className={`w-full bg-transparent border-none p-0 text-base md:text-sm font-medium text-on-surface placeholder:text-on-surface-variant focus:ring-0 focus:outline-none focus-visible:ring-2 focus-visible:ring-primary/30 focus-visible:rounded appearance-none [-moz-appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none`}
                 min="0"
                 step="50"
               />
             </div>
-            <span className="text-zinc-200 dark:text-zinc-800 text-xs">—</span>
+            <span className="text-on-surface-variant text-xs">—</span>
             <div className="flex items-center gap-1 flex-1">
-              <span className="text-zinc-500 text-xs">$</span>
+              <span className="text-on-surface-variant text-xs">$</span>
               <input
                 id="search-budget-max"
                 aria-label="Maximum budget"
@@ -1131,7 +1131,7 @@ export default function SearchForm({
                 onFocus={() => handleFieldFocus("budget")}
                 onBlur={handleFieldBlur}
                 placeholder="Max"
-                className={`w-full bg-transparent border-none p-0 text-base md:text-sm font-medium text-zinc-900 dark:text-white placeholder:text-zinc-500 dark:placeholder:text-zinc-400 focus:ring-0 focus:outline-none focus-visible:ring-2 focus-visible:ring-zinc-900/30 dark:focus-visible:ring-zinc-400/40 focus-visible:rounded appearance-none [-moz-appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none`}
+                className={`w-full bg-transparent border-none p-0 text-base md:text-sm font-medium text-on-surface placeholder:text-on-surface-variant focus:ring-0 focus:outline-none focus-visible:ring-2 focus-visible:ring-primary/30 focus-visible:rounded appearance-none [-moz-appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none`}
                 min="0"
                 step="50"
               />
@@ -1143,7 +1143,7 @@ export default function SearchForm({
         {!isCompact && (
           <>
             <div
-              className="hidden md:block w-px h-8 bg-zinc-100 dark:bg-zinc-700 mx-1"
+              className="hidden md:block w-px h-8 bg-surface-container-high mx-1"
               aria-hidden="true"
             ></div>
             <div className="flex items-center px-3">
@@ -1156,14 +1156,14 @@ export default function SearchForm({
                 aria-controls={showFilters ? "search-filters" : undefined}
                 className={`relative flex items-center gap-2 h-10 px-4 rounded-full text-xs font-bold uppercase tracking-wider transition-all duration-300 ${
                   activeFilterCount > 0
-                    ? "bg-indigo-50 dark:bg-indigo-950/30 text-indigo-600 dark:text-indigo-400"
-                    : "text-zinc-500 dark:text-zinc-400 hover:text-zinc-900 dark:hover:text-white hover:bg-zinc-100 dark:hover:bg-zinc-700"
+                    ? "bg-primary text-primary"
+                    : "text-on-surface-variant hover:text-on-surface hover:bg-surface-container-high"
                 }`}
               >
                 <SlidersHorizontal className="w-3.5 h-3.5" />
                 <span className="hidden sm:inline">Filters</span>
                 {activeFilterCount > 0 && (
-                  <span className="absolute -top-1 -right-1 w-4 h-4 rounded-full bg-indigo-600 text-white flex items-center justify-center text-[9px] font-bold shadow-sm shadow-indigo-600/30">
+                  <span className="absolute -top-1 -right-1 w-4 h-4 rounded-full bg-primary text-white flex items-center justify-center text-[9px] font-bold shadow-sm shadow-indigo-600/30">
                     {activeFilterCount}
                   </span>
                 )}
@@ -1181,7 +1181,7 @@ export default function SearchForm({
             disabled={isSearching}
             aria-label={isSearching ? "Searching" : "Search"}
             aria-busy={isSearching}
-            className={`rounded-full transition-all duration-500 hover:scale-105 active:scale-95 shadow-xl shadow-indigo-500/20 ${isCompact ? "h-10 w-10 p-0" : "h-12 w-full md:w-12 bg-indigo-600 hover:bg-indigo-700 dark:bg-indigo-500 dark:hover:bg-indigo-600"}`}
+            className={`rounded-full transition-all duration-500 hover:scale-105 active:scale-95 shadow-xl shadow-indigo-500/20 ${isCompact ? "h-10 w-10 p-0" : "h-12 w-full md:w-12 bg-primary hover:bg-primary"}`}
           >
             {isSearching ? (
               <Loader2 className="animate-spin w-5 h-5" />
@@ -1203,7 +1203,7 @@ export default function SearchForm({
       {showLocationWarning && !isCompact && !locationInputFocused && (
         <div
           id="location-warning"
-          className="absolute left-0 right-0 top-full mt-2 mx-auto max-w-4xl px-4 py-2 bg-amber-50 dark:bg-amber-900/20 border border-amber-200 dark:border-amber-800 rounded-xl text-sm text-amber-800 dark:text-amber-400 flex items-center gap-2 pointer-events-none z-40 shadow-lg"
+          className="absolute left-0 right-0 top-full mt-2 mx-auto max-w-4xl px-4 py-2 bg-amber-50 border border-amber-200 rounded-xl text-sm text-amber-800 flex items-center gap-2 pointer-events-none z-40 shadow-lg"
         >
           <svg
             className="w-4 h-4 flex-shrink-0"

@@ -271,7 +271,7 @@ function ListingCardInner({
         isActive && "ring-2 ring-indigo-500 ring-offset-2",
         isHovered &&
           !isActive &&
-          "shadow-md ring-1 ring-indigo-200 dark:ring-indigo-800",
+          "shadow-md ring-1 ring-indigo-200",
         className
       )}
     >
@@ -284,11 +284,11 @@ function ListingCardInner({
               e.stopPropagation();
               setActive(listing.id);
             }}
-            className="relative p-1.5 rounded-full bg-white/80 dark:bg-zinc-800/80 backdrop-blur-sm shadow-sm hover:bg-white dark:hover:bg-zinc-700 transition-colors before:absolute before:inset-0 before:-m-[10px] before:content-['']"
+            className="relative p-1.5 rounded-full bg-white/80 backdrop-blur-sm shadow-sm hover:bg-surface-container-lowest transition-colors before:absolute before:inset-0 before:-m-[10px] before:content-['']"
             aria-label="Show on map"
             title="Show on map"
           >
-            <MapPin className="w-3.5 h-3.5 text-zinc-600 dark:text-zinc-300" />
+            <MapPin className="w-3.5 h-3.5 text-on-surface-variant" />
           </button>
         )}
         <FavoriteButton listingId={listing.id} initialIsSaved={isSaved} />
@@ -297,13 +297,13 @@ function ListingCardInner({
         href={`/listings/${listing.id}`}
         onClick={isDragging ? (e) => e.preventDefault() : undefined}
         className={cn(
-          "block group focus:outline-none focus-visible:ring-2 focus-visible:ring-zinc-900/30 dark:focus-visible:ring-zinc-400/40 focus-visible:ring-offset-2 dark:focus-visible:ring-offset-zinc-950 rounded-none sm:rounded-xl",
+          "block group focus:outline-none focus-visible:ring-2 focus-visible:ring-primary/30 focus-visible:ring-offset-2 rounded-none sm:rounded-xl",
           isDragging && "pointer-events-none"
         )}
       >
-        <div className="relative bg-white dark:bg-zinc-900 flex flex-col rounded-none sm:rounded-2xl border border-zinc-200/50 dark:border-white/5 overflow-hidden transition-all duration-500 ease-out group-hover:shadow-2xl group-hover:shadow-zinc-900/10 dark:group-hover:shadow-black/40 group-hover:border-zinc-300 dark:group-hover:border-white/10">
+        <div className="relative bg-surface-container-lowest flex flex-col rounded-none sm:rounded-2xl border border-outline-variant/20/50 overflow-hidden transition-all duration-500 ease-out group-hover:shadow-2xl group-hover:shadow-on-surface/10 group-hover:border-outline-variant/30">
           {/* Image Area */}
-          <div className="relative aspect-[16/10] sm:aspect-[4/3] overflow-hidden bg-zinc-50 dark:bg-zinc-800">
+          <div className="relative aspect-[16/10] sm:aspect-[4/3] overflow-hidden bg-surface-canvas">
             {/* Image Carousel or single image */}
             <ImageCarousel
               images={displayImages}
@@ -319,12 +319,12 @@ function ListingCardInner({
 
             {/* Empty state overlay - Intentional waiting state */}
             {showImagePlaceholder && (
-              <div className="absolute inset-0 bg-zinc-50 dark:bg-zinc-800 flex flex-col items-center justify-center pointer-events-none">
+              <div className="absolute inset-0 bg-surface-canvas flex flex-col items-center justify-center pointer-events-none">
                 <Home
-                  className="w-8 h-8 text-zinc-300 dark:text-zinc-600 mb-2"
+                  className="w-8 h-8 text-on-surface-variant mb-2"
                   strokeWidth={1}
                 />
-                <span className="text-[10px] text-zinc-400 dark:text-zinc-500 font-medium uppercase tracking-[0.2em]">
+                <span className="text-[10px] text-on-surface-variant font-medium uppercase tracking-[0.2em]">
                   No Photos
                 </span>
               </div>
@@ -342,13 +342,13 @@ function ListingCardInner({
                 overlay
               />
               {listing.totalSlots > 1 && (
-                <span className="inline-flex items-center font-medium px-2.5 py-1 text-xs bg-white/90 dark:bg-zinc-900/90 backdrop-blur-sm shadow-sm rounded-md text-indigo-700 dark:text-indigo-400">
+                <span className="inline-flex items-center font-medium px-2.5 py-1 text-xs bg-white/90 backdrop-blur-sm shadow-sm rounded-md text-primary">
                   Multi-Room
                 </span>
               )}
               {hasRating && (
                 <div
-                  className="inline-flex items-center gap-1 px-2 py-1 rounded-md text-[10px] font-bold bg-white/90 dark:bg-zinc-900/90 text-zinc-900 dark:text-white shadow-sm backdrop-blur-md"
+                  className="inline-flex items-center gap-1 px-2 py-1 rounded-md text-[10px] font-bold bg-white/90 text-on-surface shadow-sm backdrop-blur-md"
                   aria-label={`Rating ${avgRating!.toFixed(1)} out of 5`}
                 >
                   <Star className="w-3 h-3 text-amber-400 fill-amber-400" />
@@ -363,20 +363,20 @@ function ListingCardInner({
             {/* Title and Rating Row */}
             <div className="flex justify-between items-start gap-4 mb-1">
               <h3
-                className="font-semibold text-base text-zinc-900 dark:text-white line-clamp-1 leading-tight tracking-tight"
+                className="font-semibold text-base text-on-surface line-clamp-1 leading-tight tracking-tight"
                 title={displayTitle}
               >
                 {displayTitle}
               </h3>
               {!hasRating && (
-                <span className="text-[10px] uppercase font-bold text-indigo-600 dark:text-indigo-400 flex-shrink-0 tracking-[0.1em]">
+                <span className="text-[10px] uppercase font-bold text-primary flex-shrink-0 tracking-[0.1em]">
                   New
                 </span>
               )}
             </div>
 
             {/* Location */}
-            <p className="text-sm text-zinc-500 dark:text-zinc-400 mb-4 font-light">
+            <p className="text-sm text-on-surface-variant mb-4 font-light">
               {formatLocation(listing.location.city, listing.location.state)}
             </p>
 
@@ -386,11 +386,11 @@ function ListingCardInner({
                 <>
                   <span
                     data-testid="listing-price"
-                    className="font-bold text-xl text-zinc-900 dark:text-white tracking-tight"
+                    className="font-bold text-xl text-on-surface tracking-tight"
                   >
                     {formatPrice(listing.price * estimatedMonths)}
                   </span>
-                  <span className="text-zinc-400 dark:text-zinc-500 text-xs ml-1 uppercase tracking-wider font-medium">
+                  <span className="text-on-surface-variant text-xs ml-1 uppercase tracking-wider font-medium">
                     total
                   </span>
                 </>
@@ -398,12 +398,12 @@ function ListingCardInner({
                 <>
                   <span
                     data-testid="listing-price"
-                    className="font-bold text-xl text-zinc-900 dark:text-white tracking-tight"
+                    className="font-bold text-xl text-on-surface tracking-tight"
                   >
                     {formatPrice(listing.price)}
                   </span>
                   {listing.price > 0 && (
-                    <span className="text-zinc-400 dark:text-zinc-500 text-xs ml-1 uppercase tracking-wider font-medium">
+                    <span className="text-on-surface-variant text-xs ml-1 uppercase tracking-wider font-medium">
                       / mo
                     </span>
                   )}
@@ -412,7 +412,7 @@ function ListingCardInner({
             </div>
 
             {/* Divider */}
-            <div className="h-px w-full bg-zinc-100 dark:bg-white/5 mb-5"></div>
+            <div className="h-px w-full bg-surface-container-high mb-5"></div>
 
             {/* Amenities & Languages - Simplified */}
             <div className="flex items-center justify-between gap-2 mt-auto">
@@ -420,7 +420,7 @@ function ListingCardInner({
                 {listing.amenities.slice(0, 2).map((amenity) => (
                   <span
                     key={amenity}
-                    className="text-[10px] font-medium text-zinc-500 dark:text-zinc-400 truncate"
+                    className="text-[10px] font-medium text-on-surface-variant truncate"
                   >
                     • {amenity}
                   </span>
@@ -430,8 +430,8 @@ function ListingCardInner({
               {listing.householdLanguages &&
                 listing.householdLanguages.length > 0 && (
                   <div className="flex items-center gap-1 flex-shrink-0 ml-auto">
-                    <Globe className="w-3 h-3 text-zinc-400" />
-                    <span className="text-[10px] font-medium text-zinc-400">
+                    <Globe className="w-3 h-3 text-on-surface-variant" />
+                    <span className="text-[10px] font-medium text-on-surface-variant">
                       {getLanguageName(listing.householdLanguages[0])}
                       {listing.householdLanguages.length > 1 &&
                         ` +${listing.householdLanguages.length - 1}`}

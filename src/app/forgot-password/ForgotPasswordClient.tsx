@@ -146,7 +146,7 @@ export default function ForgotPasswordClient() {
             />
 
             {turnstileError && (
-              <p className="text-sm text-red-600 dark:text-red-400">
+              <p className="text-sm text-red-600">
                 Security check failed.{" "}
                 <button
                   type="button"

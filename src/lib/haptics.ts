@@ -44,8 +44,8 @@ export const HAPTIC_CLASSES = {
   tap: "active:scale-[0.97] transition-transform duration-75",
   /** Subtle background flash on press — good for list items */
   flash:
-    "active:bg-zinc-100/50 dark:active:bg-zinc-800/50 transition-colors duration-75",
+    "active:bg-zinc-100/50 transition-colors duration-75",
   /** Combined tap + flash for primary interactive elements */
   interactive:
-    "active:scale-[0.97] active:bg-zinc-100/50 dark:active:bg-zinc-800/50 transition-all duration-75",
+    "active:scale-[0.97] active:bg-zinc-100/50 transition-all duration-75",
 } as const;

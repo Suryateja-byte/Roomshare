@@ -6,15 +6,15 @@ export default function NotFound() {
   return (
     <div className="min-h-[70vh] flex flex-col items-center justify-center text-center px-4">
       <div className="space-y-6 max-w-md">
-        <div className="w-24 h-24 bg-zinc-100 dark:bg-zinc-800/50 rounded-full flex items-center justify-center mx-auto mb-6">
-          <Home className="w-10 h-10 text-zinc-600 dark:text-zinc-400" />
+        <div className="w-24 h-24 bg-zinc-100 rounded-full flex items-center justify-center mx-auto mb-6">
+          <Home className="w-10 h-10 text-zinc-600" />
         </div>
 
-        <h1 className="text-4xl font-bold tracking-tight text-zinc-900 dark:text-white">
+        <h1 className="text-4xl font-bold tracking-tight text-zinc-900">
           This page packed up and moved out
         </h1>
 
-        <p className="text-lg text-zinc-600 dark:text-zinc-400">
+        <p className="text-lg text-zinc-600">
           The page you&apos;re looking for was removed or never existed.
           Let&apos;s get you somewhere better.
         </p>

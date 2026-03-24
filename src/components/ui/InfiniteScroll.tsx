@@ -64,7 +64,7 @@ export function InfiniteScroll({
 
   const defaultLoader = (
     <div className="flex items-center justify-center py-8">
-      <div className="flex items-center gap-2 text-zinc-500 ">
+      <div className="flex items-center gap-2 text-on-surface-variant ">
         <svg
           className="h-5 w-5 animate-spin"
           fill="none"
@@ -91,7 +91,7 @@ export function InfiniteScroll({
   );
 
   const defaultEndMessage = (
-    <div className="py-8 text-center text-sm text-zinc-500 ">
+    <div className="py-8 text-center text-sm text-on-surface-variant ">
       You&apos;ve reached the end
     </div>
   );

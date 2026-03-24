@@ -126,7 +126,7 @@ export default function UserList({
             onChange={(e) => setSearch(e.target.value)}
             placeholder="Search by name or email..."
             aria-label="Search users by name or email"
-            className="w-full pl-10 pr-4 py-2 border border-zinc-200 dark:border-zinc-700 dark:bg-zinc-800 dark:text-white rounded-lg focus:outline-none focus:ring-2 focus:ring-zinc-900/20 dark:focus:ring-zinc-400/20"
+            className="w-full pl-10 pr-4 py-2 border border-zinc-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-zinc-900/20"
           />
         </div>
         <div className="flex gap-2">

@@ -19,7 +19,7 @@ export function SlotSelector({
     <div className="flex items-center gap-3">
       <label
         htmlFor="slot-selector"
-        className="text-sm font-medium text-zinc-700 dark:text-zinc-300"
+        className="text-sm font-medium text-on-surface-variant"
       >
         Slots
       </label>
@@ -29,7 +29,7 @@ export function SlotSelector({
           aria-label="Decrease slots"
           disabled={disabled || value <= min}
           onClick={() => onChange(Math.max(min, value - 1))}
-          className="px-3 py-2 text-zinc-600 hover:bg-zinc-100 disabled:opacity-40 disabled:cursor-not-allowed dark:text-zinc-400 dark:hover:bg-zinc-800"
+          className="px-3 py-2 text-on-surface-variant hover:bg-surface-container-high disabled:opacity-40 disabled:cursor-not-allowed"
         >
           &minus;
         </button>
@@ -48,19 +48,19 @@ export function SlotSelector({
             const v = parseInt(e.target.value, 10);
             if (!isNaN(v)) onChange(Math.min(max, Math.max(min, v)));
           }}
-          className="w-12 text-center border-x py-2 text-sm [appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none dark:bg-zinc-900 dark:border-zinc-700"
+          className="w-12 text-center border-x py-2 text-sm [appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none"
         />
         <button
           type="button"
           aria-label="Increase slots"
           disabled={disabled || value >= max}
           onClick={() => onChange(Math.min(max, value + 1))}
-          className="px-3 py-2 text-zinc-600 hover:bg-zinc-100 disabled:opacity-40 disabled:cursor-not-allowed dark:text-zinc-400 dark:hover:bg-zinc-800"
+          className="px-3 py-2 text-on-surface-variant hover:bg-surface-container-high disabled:opacity-40 disabled:cursor-not-allowed"
         >
           +
         </button>
       </div>
-      <span className="text-xs text-zinc-500">{max} available</span>
+      <span className="text-xs text-on-surface-variant">{max} available</span>
     </div>
   );
 }

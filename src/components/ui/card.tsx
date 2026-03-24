@@ -7,11 +7,11 @@ function cn(...inputs: ClassValue[]) {
 }
 
 const variantClasses = {
-  default: "bg-white dark:bg-zinc-900",
-  elevated: "bg-white dark:bg-zinc-900 shadow-md",
+  default: "bg-surface-container-lowest",
+  elevated: "bg-surface-container-lowest shadow-md",
   glass: "glass-card",
   interactive:
-    "bg-white dark:bg-zinc-900 hover:-translate-y-0.5 hover:shadow-lg transition-all duration-200",
+    "bg-surface-container-lowest hover:-translate-y-0.5 hover:shadow-lg transition-all duration-200",
 };
 
 const paddingClasses = {
@@ -95,7 +95,7 @@ const CardTitle = React.forwardRef<
   <h3
     ref={ref}
     className={cn(
-      "text-lg font-semibold text-zinc-900 dark:text-white",
+      "text-lg font-semibold text-on-surface",
       className
     )}
     {...props}
@@ -109,7 +109,7 @@ const CardDescription = React.forwardRef<
 >(({ className, ...props }, ref) => (
   <p
     ref={ref}
-    className={cn("text-sm text-zinc-500 dark:text-zinc-400", className)}
+    className={cn("text-sm text-on-surface-variant", className)}
     {...props}
   />
 ));
