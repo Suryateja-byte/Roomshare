@@ -111,7 +111,7 @@ function SignUpForm() {
   };
 
   return (
-    <div className="min-h-screen flex bg-surface-canvas font-sans selection:bg-on-surface selection:text-surface-container-lowest">
+    <div className="min-h-screen flex bg-surface-canvas font-body selection:bg-on-surface selection:text-surface-container-lowest">
       {/* Left Visual (Dark Theme) */}
       <div className="hidden lg:flex w-1/2 bg-gradient-to-br from-primary to-primary-container relative flex-col justify-between p-8 xl:p-12 text-white">
         <div className="absolute inset-0 bg-[radial-gradient(circle_at_top_right,_var(--tw-gradient-stops))] from-primary/80 to-primary-container opacity-50"></div>
@@ -428,7 +428,7 @@ function SignUpForm() {
                 (!!process.env.NEXT_PUBLIC_TURNSTILE_SITE_KEY &&
                   !turnstileToken)
               }
-              className="w-full h-11 sm:h-12 rounded-lg shadow-ambient-sm hover:shadow-ambient transition-all"
+              className="w-full h-11 sm:h-12 rounded-full shadow-ambient-sm hover:shadow-ambient transition-all"
             >
               {loading ? (
                 <Loader2 className="w-5 h-5 animate-spin" />

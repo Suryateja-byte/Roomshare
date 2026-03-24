@@ -44,7 +44,7 @@ export default async function CreateListingPage() {
   const profileCompletion = calculateProfileCompletion(user);
 
   return (
-    <div className="min-h-screen bg-surface-canvas font-sans selection:bg-on-surface selection:text-white">
+    <div className="min-h-screen bg-surface-canvas font-body selection:bg-on-surface selection:text-white">
       <div className="max-w-3xl mx-auto px-4 sm:px-6 pt-8 sm:pt-12 mb-8 sm:mb-12">
         <Link
           href="/"

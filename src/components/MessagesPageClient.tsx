@@ -724,7 +724,7 @@ export default function MessagesPageClient({
   return (
     <div
       data-testid="messages-page"
-      className="fixed inset-0 z-40 bg-surface-container-lowest flex overflow-hidden font-sans selection:bg-on-surface selection:text-white pt-[80px]"
+      className="fixed inset-0 z-40 bg-surface-container-lowest flex overflow-hidden font-body selection:bg-on-surface selection:text-white pt-[80px]"
     >
       {/* Sidebar */}
       <div

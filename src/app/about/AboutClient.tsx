@@ -56,7 +56,7 @@ const TeamMember = ({ name, role, image }: TeamMemberProps) => (
 
 export default function AboutClient() {
   return (
-    <div className="min-h-screen bg-surface-container-lowest font-sans selection:bg-on-surface selection:text-surface-container-lowest">
+    <div className="min-h-screen bg-surface-canvas font-body selection:bg-on-surface selection:text-surface-container-lowest">
       <div>
         {/* Hero Section */}
         <section className="relative pt-20 pb-32 px-6 overflow-hidden">

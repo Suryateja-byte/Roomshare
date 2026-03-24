@@ -88,7 +88,7 @@ export default function UserMenu({ user }: UserMenuProps) {
             role="menu"
             aria-label="User menu"
             onKeyDown={handleMenuKeyDown}
-            className="absolute right-0 mt-2 w-48 bg-background border border-border rounded-xl shadow-xl z-50 animate-in fade-in zoom-in-95 duration-200"
+            className="absolute right-0 mt-2 w-48 bg-surface-canvas border border-border rounded-xl shadow-xl z-50 animate-in fade-in zoom-in-95 duration-200"
           >
             <div className="p-2 space-y-1">
               <div className="px-3 py-2 text-xs text-muted-foreground border-b border-border mb-1">

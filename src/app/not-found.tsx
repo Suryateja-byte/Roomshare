@@ -6,8 +6,8 @@ export default function NotFound() {
   return (
     <div className="min-h-[70vh] flex flex-col items-center justify-center text-center px-4">
       <div className="space-y-6 max-w-md">
-        <div className="w-24 h-24 bg-surface-container-high rounded-full flex items-center justify-center mx-auto mb-6">
-          <Home className="w-10 h-10 text-on-surface-variant" />
+        <div className="w-24 h-24 bg-primary/10 rounded-full flex items-center justify-center mx-auto mb-6">
+          <Home className="w-10 h-10 text-primary" />
         </div>
 
         <h1 className="font-display text-4xl font-bold tracking-tight text-on-surface">

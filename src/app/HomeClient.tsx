@@ -287,7 +287,7 @@ function FeatureCard({
       <div className="mb-6 flex items-center justify-center w-12 h-12 rounded-full bg-primary/10 text-primary transition-colors">
         <Icon className="w-5 h-5" />
       </div>
-      <h3 className="text-lg font-medium mb-3 text-on-surface tracking-tight">
+      <h3 className="font-display text-lg font-medium mb-3 text-on-surface tracking-tight">
         {title}
       </h3>
       <p className="text-on-surface-variant font-light leading-relaxed">

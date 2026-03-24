@@ -336,7 +336,7 @@ export default function ListingPageClient({
   }, [listing.id, resolvedIsLoggedIn, resolvedIsOwner, sessionStatus]);
 
   return (
-    <div className="min-h-screen bg-background pb-20">
+    <div className="min-h-screen bg-surface-canvas pb-20">
       <ListingViewTracker listingId={listing.id} ownerId={listing.ownerId} />
 
       {/* Real-time freshness check for non-owners */}

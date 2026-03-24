@@ -3,7 +3,7 @@ import { Skeleton } from "@/components/skeletons/Skeleton";
 export default function Loading() {
   return (
     <div
-      className="min-h-screen bg-background py-12"
+      className="min-h-screen bg-surface-canvas py-12"
       aria-busy="true"
       aria-label="Loading edit listing form"
     >
