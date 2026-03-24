@@ -11,11 +11,9 @@ import {
   MessageSquare,
   Menu,
   X,
-  Search,
   User,
   LogOut,
   Settings,
-  Calendar,
   Heart,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
@@ -695,12 +693,12 @@ export default function NavbarClient({
         </div>
       </div>
 
-      {/* Mobile Menu - CSS animated with grid for height:auto animation */}
+      {/* Mobile Menu - Full-screen glassmorphism overlay */}
       <div
-        className={`lg:hidden bg-surface-container-lowest overflow-hidden grid transition-all duration-300 ease-out ${
+        className={`lg:hidden fixed inset-0 z-modal bg-surface-canvas/80 backdrop-blur-[20px] transition-all duration-300 ${
           isMobileMenuOpen
-            ? "grid-rows-[1fr] opacity-100"
-            : "grid-rows-[0fr] opacity-0"
+            ? "opacity-100 visible"
+            : "opacity-0 invisible pointer-events-none"
         }`}
         role="dialog"
         aria-modal={isMobileMenuOpen}
@@ -708,33 +706,24 @@ export default function NavbarClient({
         aria-hidden={!isMobileMenuOpen}
         inert={!isMobileMenuOpen || undefined}
       >
-        <div className="overflow-hidden">
-          <div className="px-6 py-4 space-y-4">
-            {user ? (
-              <div className="flex items-center gap-3 pb-4">
-                <UserAvatar image={user.image} name={user.name} size="md" />
-                <div>
-                  <p className="font-semibold text-on-surface">
-                    {user.name}
-                  </p>
-                  <Link
-                    href="/profile"
-                    className="text-xs text-on-surface-variant hover:text-on-surface-variant"
-                    onClick={() => setIsMobileMenuOpen(false)}
-                  >
-                    View Profile
-                  </Link>
-                </div>
-              </div>
-            ) : null}
-
+        <div className="flex flex-col h-full">
+          {/* Close button */}
+          <div className="flex justify-end p-6">
+            <button
+              onClick={() => setIsMobileMenuOpen(false)}
+              className="text-on-surface p-2 hover:bg-surface-container-high rounded-full transition-colors min-w-[44px] min-h-[44px] flex items-center justify-center"
+              aria-label="Close menu"
+            >
+              <X size={24} />
+            </button>
+          </div>
+          <div className="flex-1 flex flex-col items-center justify-center px-6 -mt-16 space-y-8">
             <Link
               href="/search"
-              className="flex items-center gap-3 py-3 text-base font-medium text-on-surface-variant hover:text-on-surface hover:bg-surface-canvas rounded-lg px-2"
+              className="font-display text-3xl font-medium text-on-surface hover:text-primary tracking-tight transition-colors duration-300"
               onClick={() => setIsMobileMenuOpen(false)}
               aria-current={pathname === "/search" ? "page" : undefined}
             >
-              <Search size={20} className="text-on-surface-variant" />{" "}
               Find a Room
             </Link>
 
@@ -742,86 +731,60 @@ export default function NavbarClient({
               <>
                 <Link
                   href="/messages"
-                  className="flex items-center gap-3 py-3 text-base font-medium text-on-surface-variant hover:text-on-surface hover:bg-surface-canvas rounded-lg px-2"
+                  className="font-display text-3xl font-medium text-on-surface hover:text-primary tracking-tight transition-colors duration-300 relative"
                   onClick={() => setIsMobileMenuOpen(false)}
-                  aria-current={pathname === "/messages" ? "page" : undefined}
                 >
-                  <MessageSquare
-                    size={20}
-                    className="text-on-surface-variant"
-                  />
                   Messages
                   {currentUnreadCount > 0 && (
-                    <span className="ml-auto bg-primary text-on-primary text-xs font-bold px-2 py-0.5 rounded-full">
+                    <span className="absolute -top-1 -right-6 bg-primary text-on-primary text-xs font-bold w-5 h-5 flex items-center justify-center rounded-full font-body">
                       {currentUnreadCount > 9 ? "9+" : currentUnreadCount}
                     </span>
                   )}
                 </Link>
                 <Link
                   href="/bookings"
-                  className="flex items-center gap-3 py-3 text-base font-medium text-on-surface-variant hover:text-on-surface hover:bg-surface-canvas rounded-lg px-2"
+                  className="font-display text-3xl font-medium text-on-surface hover:text-primary tracking-tight transition-colors duration-300"
                   onClick={() => setIsMobileMenuOpen(false)}
-                  aria-current={pathname === "/bookings" ? "page" : undefined}
                 >
-                  <Calendar
-                    size={20}
-                    className="text-on-surface-variant"
-                  />{" "}
                   Bookings
                 </Link>
                 <Link
                   href="/saved"
-                  className="flex items-center gap-3 py-3 text-base font-medium text-on-surface-variant hover:text-on-surface hover:bg-surface-canvas rounded-lg px-2"
+                  className="font-display text-3xl font-medium text-on-surface hover:text-primary tracking-tight transition-colors duration-300"
                   onClick={() => setIsMobileMenuOpen(false)}
-                  aria-current={pathname === "/saved" ? "page" : undefined}
                 >
-                  <Heart
-                    size={20}
-                    className="text-on-surface-variant"
-                  />{" "}
-                  Saved Listings
+                  Saved
+                </Link>
+                <Link
+                  href="/profile"
+                  className="font-display text-3xl font-medium text-on-surface hover:text-primary tracking-tight transition-colors duration-300"
+                  onClick={() => setIsMobileMenuOpen(false)}
+                >
+                  Profile
                 </Link>
               </>
             )}
 
-            <div className="h-px bg-surface-container-high my-2" />
-
             <Button
               asChild
-              variant="primary"
-              className="w-full flex items-center justify-center gap-2 px-5 py-3 rounded-full h-auto shadow-ambient shadow-on-surface/10"
+              className="rounded-full px-10 h-14 text-lg shadow-ambient mt-4"
             >
               <Link
-                href="/listings/create"
+                href={user ? "/listings/create" : "/signup"}
                 onClick={() => setIsMobileMenuOpen(false)}
               >
-                <Plus size={18} />
-                List a Room
+                {user ? "List a Room" : "Join RoomShare"}
               </Link>
             </Button>
 
             {!user && (
-              <div className="flex flex-col gap-2 pt-2">
-                <Link
-                  href="/login"
-                  className="w-full text-center text-on-surface-variant py-3 font-medium hover:text-on-surface"
-                  onClick={() => setIsMobileMenuOpen(false)}
-                >
-                  Log In
-                </Link>
-                <Button
-                  asChild
-                  variant="secondary"
-                  className="w-full py-3 rounded-xl h-auto"
-                >
-                  <Link
-                    href="/signup"
-                    onClick={() => setIsMobileMenuOpen(false)}
-                  >
-                    Sign Up
-                  </Link>
-                </Button>
-              </div>
+              <Link
+                href="/login"
+                className="text-on-surface-variant hover:text-on-surface font-medium transition-colors"
+                onClick={() => setIsMobileMenuOpen(false)}
+              >
+                Already have an account? Log in
+              </Link>
             )}
 
             {user && (
@@ -830,9 +793,8 @@ export default function NavbarClient({
                   signOut({ callbackUrl: "/" });
                   setIsMobileMenuOpen(false);
                 }}
-                className="w-full flex items-center justify-center gap-2 text-red-600 py-3 font-medium hover:bg-surface-container-high rounded-lg mt-4"
+                className="text-on-surface-variant hover:text-primary font-medium transition-colors mt-4"
               >
-                <LogOut size={18} />
                 Log out
               </button>
             )}

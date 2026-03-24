@@ -13,6 +13,7 @@ import { ServiceWorkerRegistration } from "@/components/ServiceWorkerRegistratio
 import EmailVerificationWrapper from "@/components/EmailVerificationWrapper";
 import SuspensionBannerWrapper from "@/components/SuspensionBannerWrapper";
 import CustomScrollContainer from "@/components/ui/CustomScrollContainer";
+import BottomNavBar from "@/components/BottomNavBar";
 import { WebVitals } from "@/components/WebVitals";
 
 const newsreader = Newsreader({
@@ -112,12 +113,15 @@ export default async function RootLayout({
               </NavbarWrapper>
               <EmailVerificationWrapper />
               <SuspensionBannerWrapper />
-              <MainLayout>{children}</MainLayout>
+              <MainLayout>
+                <div className="pb-20 md:pb-0">{children}</div>
+              </MainLayout>
               <FooterWrapper>
                 <Footer />
               </FooterWrapper>
             </div>
           </CustomScrollContainer>
+          <BottomNavBar />
           <OfflineIndicator />
           <ServiceWorkerRegistration />
           <WebVitals />
