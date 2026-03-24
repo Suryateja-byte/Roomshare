@@ -88,7 +88,7 @@ export default function AboutClient() {
                 sizes="(max-width: 768px) 100vw, (max-width: 1600px) 90vw, 1600px"
                 className="object-cover"
               />
-              <div className="absolute inset-0 bg-black/10"></div>
+              <div className="absolute inset-0 bg-on-surface/10"></div>
             </div>
           </div>
         </section>

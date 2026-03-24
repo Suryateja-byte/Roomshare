@@ -257,7 +257,7 @@ export default function EditProfileClient({ user }: EditProfileClientProps) {
                   type="button"
                   onClick={() => fileInputRef.current?.click()}
                   disabled={isUploading}
-                  className="absolute inset-0 flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity bg-black/20 rounded-full cursor-pointer disabled:cursor-wait"
+                  className="absolute inset-0 flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity bg-on-surface/20 rounded-full cursor-pointer disabled:cursor-wait"
                 >
                   {isUploading ? (
                     <Loader2 className="w-8 h-8 text-white drop-shadow-md animate-spin" />

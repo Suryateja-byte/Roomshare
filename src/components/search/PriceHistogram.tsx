@@ -45,8 +45,8 @@ export function PriceHistogram({
                 marginLeft: barGap / 2,
                 marginRight: barGap / 2,
                 backgroundColor: inRange
-                  ? "var(--color-zinc-900, #18181b)"
-                  : "var(--color-zinc-200, #e4e4e7)",
+                  ? "var(--color-on-surface, #1b1c19)"
+                  : "var(--color-surface-container-high, #eae8e3)",
               }}
             />
           );

@@ -205,19 +205,19 @@ export const CATEGORY_COLORS: Record<string, CategoryColorConfig> = {
   },
   // Gym (valid Radar API category)
   gym: {
-    bg: "bg-indigo-50",
-    icon: "text-indigo-600",
-    accent: "bg-indigo-500",
-    markerBg: "#eef2ff",
-    markerBorder: "#4f46e5",
+    bg: "bg-primary/10",
+    icon: "text-primary",
+    accent: "bg-primary",
+    markerBg: "#f5ebe3",
+    markerBorder: "#9a4027",
   },
   // Fitness & Recreation (valid Radar API category, same colors as gym)
   "fitness-recreation": {
-    bg: "bg-indigo-50",
-    icon: "text-indigo-600",
-    accent: "bg-indigo-500",
-    markerBg: "#eef2ff",
-    markerBorder: "#4f46e5",
+    bg: "bg-primary/10",
+    icon: "text-primary",
+    accent: "bg-primary",
+    markerBg: "#f5ebe3",
+    markerBorder: "#9a4027",
   },
   // Health & Medicine (valid Radar API category)
   "health-medicine": {
@@ -245,11 +245,11 @@ export const CATEGORY_COLORS: Record<string, CategoryColorConfig> = {
   },
   // Fallback for unknown categories
   default: {
-    bg: "bg-zinc-50",
-    icon: "text-zinc-600",
-    accent: "bg-zinc-500",
-    markerBg: "#fafafa",
-    markerBorder: "#71717a",
+    bg: "bg-surface-canvas",
+    icon: "text-on-surface-variant",
+    accent: "bg-on-surface-variant",
+    markerBg: "#fbf9f4",
+    markerBorder: "#4a4941",
   },
 };
 

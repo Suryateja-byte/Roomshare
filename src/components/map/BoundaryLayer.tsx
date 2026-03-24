@@ -32,7 +32,7 @@ function getBoundaryFillLayer(isDarkMode: boolean): LayerProps {
     id: "boundary-fill",
     type: "fill",
     paint: {
-      "fill-color": isDarkMode ? "#a1a1aa" : "#3f3f46", // zinc-400 / zinc-700
+      "fill-color": "#4a4941", // on-surface-variant
       "fill-opacity": 0.08,
     },
   };
@@ -43,7 +43,7 @@ function getBoundaryLineLayer(isDarkMode: boolean): LayerProps {
     id: "boundary-line",
     type: "line",
     paint: {
-      "line-color": isDarkMode ? "#a1a1aa" : "#71717a", // zinc-400 / zinc-500
+      "line-color": "#4a4941", // on-surface-variant
       "line-width": 1.5,
       "line-opacity": 0.3,
       "line-dasharray": [4, 2],
