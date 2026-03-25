@@ -445,9 +445,15 @@ export default function SearchForm({
         setIsSearching(true);
         setShowFilters(false);
         const searchUrl = `/search?${current.toString()}`;
-        startTransition(() => {
+        // STABILIZATION FIX: Use transitionContext for consistency with the normal
+        // search path (lines 634-638). Previously used raw startTransition which
+        // bypassed SearchTransitionContext, so the loading overlay never appeared
+        // during NLP-triggered navigations on the Search Page.
+        if (transitionContext) {
+          transitionContext.navigateWithTransition(searchUrl);
+        } else {
           router.push(searchUrl);
-        });
+        }
         return;
       }
 

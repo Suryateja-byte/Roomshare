@@ -49,7 +49,7 @@ export default function SuggestedSearches() {
           {recentSearches.map((search) => (
             <Link
               key={search.location}
-              href={`/search?q=${encodeURIComponent(search.location)}`}
+              href={`/search?q=${encodeURIComponent(search.location)}${search.coords ? `&lat=${search.coords.lat}&lng=${search.coords.lng}` : ""}`}
               className="inline-flex items-center gap-1.5 px-3 py-2 rounded-full bg-surface-container-high hover:bg-surface-container-high text-sm text-on-surface-variant transition-colors"
             >
               <MapPin className="w-3.5 h-3.5 text-on-surface-variant" />
