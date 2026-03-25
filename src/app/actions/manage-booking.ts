@@ -90,6 +90,13 @@ export async function updateBookingStatus(
       return { error: "Only the listing owner can accept or reject bookings" };
     }
 
+    // Design note: All transactions in this file use READ COMMITTED (Prisma default)
+    // + FOR UPDATE on the Listing row. FOR UPDATE serializes all booking operations
+    // for the same listing. The capacity SUM query runs inside the lock scope, ensuring
+    // it always sees the latest committed state. SERIALIZABLE is not needed here
+    // (unlike createBooking/createHold which run the duplicate check before acquiring
+    // the lock). See booking.ts for the SERIALIZABLE pattern.
+
     // Phase 4: Check-on-read inline expiry (defense-in-depth, D9)
     // If sweeper lags, reading an expired HELD booking auto-expires it
     if (

@@ -14,6 +14,7 @@ jest.mock("@/lib/prisma", () => ({
 import {
   getActiveBookingsForListing,
   hasActiveAcceptedBookings,
+  hasNonTerminalBookings,
   getActiveAcceptedBookingsCount,
 } from "@/lib/booking-utils";
 import { prisma } from "@/lib/prisma";
@@ -49,7 +50,7 @@ describe("booking-utils", () => {
   });
 
   describe("getActiveBookingsForListing", () => {
-    it("returns PENDING, ACCEPTED, and HELD bookings", async () => {
+    it("returns active bookings", async () => {
       (prisma.booking.findMany as jest.Mock).mockResolvedValue(mockBookings);
 
       const result = await getActiveBookingsForListing("listing-123");
@@ -59,24 +60,27 @@ describe("booking-utils", () => {
         expect.objectContaining({
           where: expect.objectContaining({
             listingId: "listing-123",
-            status: { in: ["PENDING", "ACCEPTED", "HELD"] },
           }),
         })
       );
     });
 
-    it("filters bookings with future end dates", async () => {
+    it("uses OR filter to separate HELD from PENDING/ACCEPTED", async () => {
       (prisma.booking.findMany as jest.Mock).mockResolvedValue(mockBookings);
 
       await getActiveBookingsForListing("listing-123");
 
-      expect(prisma.booking.findMany).toHaveBeenCalledWith(
-        expect.objectContaining({
-          where: expect.objectContaining({
-            endDate: { gte: expect.any(Date) },
-          }),
-        })
-      );
+      const call = (prisma.booking.findMany as jest.Mock).mock.calls[0][0];
+      expect(call.where.OR).toBeDefined();
+      expect(call.where.OR).toHaveLength(2);
+      // PENDING/ACCEPTED filtered by endDate
+      expect(call.where.OR[0].status).toEqual({
+        in: ["PENDING", "ACCEPTED"],
+      });
+      expect(call.where.OR[0].endDate).toEqual({ gte: expect.any(Date) });
+      // HELD filtered by heldUntil (not endDate)
+      expect(call.where.OR[1].status).toBe("HELD");
+      expect(call.where.OR[1].heldUntil).toEqual({ gt: expect.any(Date) });
     });
 
     it("includes tenant data", async () => {
@@ -102,55 +106,45 @@ describe("booking-utils", () => {
     });
   });
 
-  describe("hasActiveAcceptedBookings", () => {
-    it("returns true when accepted booking exists", async () => {
+  describe("hasNonTerminalBookings", () => {
+    it("returns true when non-terminal booking exists", async () => {
       (prisma.booking.count as jest.Mock).mockResolvedValue(1);
 
-      const result = await hasActiveAcceptedBookings("listing-123");
+      const result = await hasNonTerminalBookings("listing-123");
 
       expect(result).toBe(true);
     });
 
-    it("returns false when no accepted bookings", async () => {
+    it("returns false when no non-terminal bookings", async () => {
       (prisma.booking.count as jest.Mock).mockResolvedValue(0);
 
-      const result = await hasActiveAcceptedBookings("listing-123");
+      const result = await hasNonTerminalBookings("listing-123");
 
       expect(result).toBe(false);
     });
 
-    it("only counts bookings with future end dates", async () => {
+    it("uses OR filter: PENDING/ACCEPTED by endDate, HELD by heldUntil", async () => {
       (prisma.booking.count as jest.Mock).mockResolvedValue(0);
 
-      await hasActiveAcceptedBookings("listing-123");
+      await hasNonTerminalBookings("listing-123");
 
-      expect(prisma.booking.count).toHaveBeenCalledWith(
-        expect.objectContaining({
-          where: expect.objectContaining({
-            endDate: { gte: expect.any(Date) },
-          }),
-        })
-      );
-    });
-
-    it("counts ACCEPTED and HELD status bookings", async () => {
-      (prisma.booking.count as jest.Mock).mockResolvedValue(0);
-
-      await hasActiveAcceptedBookings("listing-123");
-
-      expect(prisma.booking.count).toHaveBeenCalledWith(
-        expect.objectContaining({
-          where: expect.objectContaining({
-            status: { in: ["ACCEPTED", "HELD"] },
-          }),
-        })
-      );
+      const call = (prisma.booking.count as jest.Mock).mock.calls[0][0];
+      expect(call.where.OR).toBeDefined();
+      expect(call.where.OR).toHaveLength(2);
+      // PENDING/ACCEPTED filtered by endDate
+      expect(call.where.OR[0].status).toEqual({
+        in: ["PENDING", "ACCEPTED"],
+      });
+      expect(call.where.OR[0].endDate).toEqual({ gte: expect.any(Date) });
+      // HELD filtered by heldUntil (excludes ghost holds)
+      expect(call.where.OR[1].status).toBe("HELD");
+      expect(call.where.OR[1].heldUntil).toEqual({ gt: expect.any(Date) });
     });
 
     it("filters by listing ID", async () => {
       (prisma.booking.count as jest.Mock).mockResolvedValue(0);
 
-      await hasActiveAcceptedBookings("listing-456");
+      await hasNonTerminalBookings("listing-456");
 
       expect(prisma.booking.count).toHaveBeenCalledWith(
         expect.objectContaining({
@@ -159,6 +153,10 @@ describe("booking-utils", () => {
           }),
         })
       );
+    });
+
+    it("hasActiveAcceptedBookings is an alias for hasNonTerminalBookings", () => {
+      expect(hasActiveAcceptedBookings).toBe(hasNonTerminalBookings);
     });
   });
 
@@ -193,32 +191,20 @@ describe("booking-utils", () => {
       );
     });
 
-    it("counts ACCEPTED and HELD status", async () => {
+    it("uses OR filter: ACCEPTED by endDate, HELD by heldUntil", async () => {
       (prisma.booking.count as jest.Mock).mockResolvedValue(0);
 
       await getActiveAcceptedBookingsCount("listing-123");
 
-      expect(prisma.booking.count).toHaveBeenCalledWith(
-        expect.objectContaining({
-          where: expect.objectContaining({
-            status: { in: ["ACCEPTED", "HELD"] },
-          }),
-        })
-      );
-    });
-
-    it("only counts future end dates", async () => {
-      (prisma.booking.count as jest.Mock).mockResolvedValue(0);
-
-      await getActiveAcceptedBookingsCount("listing-123");
-
-      expect(prisma.booking.count).toHaveBeenCalledWith(
-        expect.objectContaining({
-          where: expect.objectContaining({
-            endDate: { gte: expect.any(Date) },
-          }),
-        })
-      );
+      const call = (prisma.booking.count as jest.Mock).mock.calls[0][0];
+      expect(call.where.OR).toBeDefined();
+      expect(call.where.OR).toHaveLength(2);
+      // ACCEPTED filtered by endDate
+      expect(call.where.OR[0].status).toEqual({ in: ["ACCEPTED"] });
+      expect(call.where.OR[0].endDate).toEqual({ gte: expect.any(Date) });
+      // HELD filtered by heldUntil
+      expect(call.where.OR[1].status).toBe("HELD");
+      expect(call.where.OR[1].heldUntil).toEqual({ gt: expect.any(Date) });
     });
   });
 
@@ -228,9 +214,9 @@ describe("booking-utils", () => {
         new Error("Connection refused")
       );
 
-      await expect(
-        getActiveBookingsForListing("listing-123")
-      ).rejects.toThrow("Connection refused");
+      await expect(getActiveBookingsForListing("listing-123")).rejects.toThrow(
+        "Connection refused"
+      );
     });
 
     it("propagates database errors from count", async () => {
@@ -238,9 +224,9 @@ describe("booking-utils", () => {
         new Error("Connection refused")
       );
 
-      await expect(
-        hasActiveAcceptedBookings("listing-123")
-      ).rejects.toThrow("Connection refused");
+      await expect(hasNonTerminalBookings("listing-123")).rejects.toThrow(
+        "Connection refused"
+      );
     });
 
     it("propagates database errors from getActiveAcceptedBookingsCount", async () => {

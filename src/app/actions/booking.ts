@@ -171,12 +171,12 @@ async function executeBookingTransaction(
     listing.bookingMode === "WHOLE_UNIT" ? listing.totalSlots : slotsRequested;
 
   // Phase 2: Sum slotsRequested for accurate capacity check
-  // PENDING bookings don't occupy slots yet - only ACCEPTED ones do
+  // Count ACCEPTED bookings AND active HELD bookings (not yet expired)
   const overlappingAcceptedSlots = await tx.$queryRaw<[{ total: bigint }]>`
         SELECT COALESCE(SUM("slotsRequested"), 0) AS total
         FROM "Booking"
         WHERE "listingId" = ${listingId}
-        AND "status" = 'ACCEPTED'
+        AND ("status" = 'ACCEPTED' OR ("status" = 'HELD' AND "heldUntil" > NOW()))
         AND "startDate" <= ${endDate}
         AND "endDate" >= ${startDate}
     `;
@@ -802,7 +802,7 @@ async function executeHoldTransaction(
   const totalPrice = Math.round(diffDays * pricePerDay * 100) / 100;
 
   // Use per-listing TTL with fallback to global default
-  const ttlMinutes = listing.holdTtlMinutes || HOLD_TTL_MINUTES;
+  const ttlMinutes = listing.holdTtlMinutes ?? HOLD_TTL_MINUTES;
   const heldUntil = new Date(Date.now() + ttlMinutes * 60 * 1000);
 
   // Create the booking with HELD status

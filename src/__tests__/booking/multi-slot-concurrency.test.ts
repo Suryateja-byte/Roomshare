@@ -422,17 +422,14 @@ describe("Hold + booking competing for last slots", () => {
   /**
    * Scenario:
    *
-   * (a) createBooking only counts ACCEPTED in the SUM — so a HELD booking
-   *     does NOT block a concurrent createBooking capacity-check.
-   *     The PENDING booking is created successfully.
+   * createBooking now counts ACCEPTED + active HELD in its capacity SUM.
+   * This means a HELD booking blocks concurrent createBooking requests,
+   * preventing misleading PENDING bookings for over-committed listings.
    *
-   * (b) When the host tries to ACCEPT that PENDING booking, the
-   *     updateBookingStatus capacity check includes ACCEPTED + active HELD.
-   *     If the HELD booking's slots + requested slots exceed totalSlots,
-   *     the accept fails with CAPACITY_EXCEEDED.
+   * Expired holds (heldUntil < NOW) are excluded from the SUM, so
+   * capacity becomes available again when holds expire.
    *
-   * This validates the two-layer defense: createBooking permits PENDING,
-   * but the ACCEPT gate is stricter and correctly blocks over-commitment.
+   * The ACCEPT gate also includes HELD, providing defense-in-depth.
    */
 
   const tenantSession = { user: { id: TENANT_ID_A, email: "a@test.com" } };
@@ -448,14 +445,38 @@ describe("Hold + booking competing for last slots", () => {
     });
   });
 
-  it("createBooking ignores HELD slots — PENDING booking is created despite hold", async () => {
+  it("createBooking counts active HELD slots — rejects when holds fill capacity", async () => {
     (auth as jest.Mock).mockResolvedValue(tenantSession);
 
     (prisma.$transaction as jest.Mock).mockImplementation(async (callback) => {
-      // Only ACCEPTED counted: 0. Request 3 slots → 0+3=3 ≤ 5, succeeds.
-      // The hold (3 slots, status HELD) is invisible to createBooking's SUM.
+      // SUM now includes ACCEPTED + active HELD: 3 held slots.
+      // Request 3 more → 3+3=6 > 5 → fails with capacity error.
       const tx = makeBookingTx({
-        usedSlots: BigInt(0), // SUM of ACCEPTED only
+        usedSlots: BigInt(3), // SUM of ACCEPTED + active HELD
+      });
+      return callback(tx);
+    });
+
+    const result = await createBooking(
+      LISTING_ID,
+      futureStart,
+      futureEnd,
+      1000,
+      3
+    );
+
+    expect(result.success).toBe(false);
+    expect(result.error).toContain("Not enough available slots");
+  });
+
+  it("createBooking succeeds when HELD bookings have expired (heldUntil < NOW)", async () => {
+    (auth as jest.Mock).mockResolvedValue(tenantSession);
+
+    (prisma.$transaction as jest.Mock).mockImplementation(async (callback) => {
+      // Expired holds are excluded from SUM by the heldUntil > NOW() filter.
+      // Only ACCEPTED slots counted: 0. Request 3 → 0+3=3 ≤ 5, succeeds.
+      const tx = makeBookingTx({
+        usedSlots: BigInt(0), // Expired holds excluded from SUM
         createdBooking: {
           id: "booking-pending",
           listingId: LISTING_ID,

@@ -203,6 +203,7 @@ describe("manage-booking — WHOLE_UNIT mode (Phase 3)", () => {
             booking: {
               updateMany: jest.fn().mockResolvedValue({ count: 1 }),
             },
+            bookingAuditLog: { create: jest.fn().mockResolvedValue({}) },
           };
           return callback(tx);
         }
@@ -238,6 +239,7 @@ describe("manage-booking — WHOLE_UNIT mode (Phase 3)", () => {
                 },
               ])
               .mockResolvedValueOnce([{ total: BigInt(4) }]), // 4 slots used by first booking
+            bookingAuditLog: { create: jest.fn().mockResolvedValue({}) },
           };
           return callback(tx);
         }
@@ -270,6 +272,7 @@ describe("manage-booking — WHOLE_UNIT mode (Phase 3)", () => {
             booking: {
               updateMany: jest.fn().mockResolvedValue({ count: 1 }),
             },
+            bookingAuditLog: { create: jest.fn().mockResolvedValue({}) },
           };
           return callback(tx);
         }
@@ -309,6 +312,7 @@ describe("manage-booking — WHOLE_UNIT mode (Phase 3)", () => {
             booking: {
               updateMany: jest.fn().mockResolvedValue({ count: 1 }),
             },
+            bookingAuditLog: { create: jest.fn().mockResolvedValue({}) },
           };
           return callback(tx);
         }
@@ -341,6 +345,7 @@ describe("manage-booking — WHOLE_UNIT mode (Phase 3)", () => {
             booking: {
               updateMany: jest.fn().mockResolvedValue({ count: 1 }),
             },
+            bookingAuditLog: { create: jest.fn().mockResolvedValue({}) },
           };
           return callback(tx);
         }
@@ -381,6 +386,7 @@ describe("manage-booking — WHOLE_UNIT mode (Phase 3)", () => {
             booking: {
               updateMany: jest.fn().mockResolvedValue({ count: 1 }),
             },
+            bookingAuditLog: { create: jest.fn().mockResolvedValue({}) },
           };
           return callback(tx);
         }
@@ -417,6 +423,7 @@ describe("manage-booking — WHOLE_UNIT mode (Phase 3)", () => {
             },
             $queryRaw: jest.fn().mockResolvedValue([]), // FOR UPDATE lock on Listing
             $executeRaw: mockTxExecuteRaw,
+            bookingAuditLog: { create: jest.fn().mockResolvedValue({}) },
           };
           return callback(tx);
         }
@@ -476,6 +483,7 @@ describe("manage-booking — WHOLE_UNIT mode (Phase 3)", () => {
             booking: {
               updateMany: jest.fn().mockResolvedValue({ count: 1 }),
             },
+            bookingAuditLog: { create: jest.fn().mockResolvedValue({}) },
           };
           return callback(tx);
         }
@@ -512,6 +520,7 @@ describe("manage-booking — WHOLE_UNIT mode (Phase 3)", () => {
             booking: {
               updateMany: jest.fn().mockResolvedValue({ count: 1 }),
             },
+            bookingAuditLog: { create: jest.fn().mockResolvedValue({}) },
           };
           return callback(tx);
         }
@@ -595,6 +604,7 @@ describe("manage-booking — WHOLE_UNIT mode (Phase 3)", () => {
             booking: {
               updateMany: jest.fn().mockResolvedValue({ count: 1 }),
             },
+            bookingAuditLog: { create: jest.fn().mockResolvedValue({}) },
           };
           return callback(tx);
         }
