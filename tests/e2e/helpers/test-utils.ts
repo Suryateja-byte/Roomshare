@@ -232,6 +232,37 @@ export async function waitForStable(
   });
 }
 
+/**
+ * Wait for Next.js streaming SSR hydration to complete.
+ *
+ * Next.js streaming SSR (for routes with loading.tsx) works by:
+ * 1. Sending the loading skeleton inline as an initial HTML chunk
+ * 2. Appending resolved content in `<div hidden id="S:X">` elements
+ * 3. Running `$RC` swap scripts to replace the skeleton with content
+ * 4. Removing the hidden divs after React hydration completes
+ *
+ * During the swap window, content exists in BOTH the visible DOM and the
+ * hidden div. Playwright's `locator()` matches ALL elements regardless of
+ * the `hidden` attribute, causing strict mode violations when selectors
+ * like `#bio` or `#currentPassword` resolve to 2 elements.
+ *
+ * This helper waits for all streaming SSR hidden divs to be removed,
+ * ensuring a single copy of each element exists in the DOM.
+ */
+export async function waitForHydration(
+  page: Page,
+  options?: { timeout?: number }
+): Promise<void> {
+  const timeout = options?.timeout ?? 10_000;
+  await page.waitForFunction(
+    () => document.querySelectorAll('div[hidden][id^="S:"]').length === 0,
+    { timeout }
+  ).catch(() => {
+    // If streaming divs never appeared (e.g., no loading.tsx on this route),
+    // or if they were already cleaned up, this is fine — proceed silently.
+  });
+}
+
 // ---------------------------------------------------------------------------
 // Map Wait Helpers (replacements for waitForTimeout in map tests)
 // ---------------------------------------------------------------------------

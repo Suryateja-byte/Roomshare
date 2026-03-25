@@ -23,6 +23,7 @@ export {
   SF_BOUNDS,
   A11Y_CONFIG,
   waitForStable,
+  waitForHydration,
   waitForMapMarkers,
   waitForMapReady,
   waitForDebounceAndResponse,

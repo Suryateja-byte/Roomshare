@@ -1,4 +1,4 @@
-import { test, expect } from "../helpers";
+import { test, expect, waitForHydration } from "../helpers";
 
 test.use({ viewport: { width: 390, height: 844 } });
 test.use({ storageState: "playwright/.auth/user.json" });
@@ -7,6 +7,7 @@ test.describe("Mobile Notifications", () => {
   test.beforeEach(async ({ page }) => {
     await page.goto("/notifications");
     await page.waitForLoadState("domcontentloaded");
+    await waitForHydration(page);
   });
 
   test("MN-01: Notifications page renders in mobile layout", async ({

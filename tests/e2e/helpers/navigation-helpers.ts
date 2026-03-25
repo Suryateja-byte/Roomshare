@@ -1,5 +1,5 @@
 import { Page, expect } from "@playwright/test";
-import { selectors, timeouts } from "./test-utils";
+import { selectors, timeouts, waitForHydration } from "./test-utils";
 
 /**
  * Wait for page to be ready - more reliable than domcontentloaded
@@ -16,6 +16,11 @@ async function waitForPageReady(
   const selector = options?.selector ?? 'main, [role="main"], #__next';
 
   await page.waitForLoadState("domcontentloaded");
+
+  // Wait for Next.js streaming SSR hidden divs to be swapped and removed.
+  // This prevents Playwright strict mode violations from duplicate elements
+  // that exist in both the visible DOM and hidden streaming containers.
+  await waitForHydration(page, { timeout });
 
   try {
     await page.locator(selector).first().waitFor({

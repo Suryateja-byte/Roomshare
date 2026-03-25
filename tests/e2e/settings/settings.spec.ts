@@ -9,7 +9,7 @@
  * Run: pnpm playwright test tests/e2e/settings/settings.spec.ts --project=chromium
  */
 
-import { test, expect, timeouts } from "../helpers";
+import { test, expect, timeouts, waitForHydration } from "../helpers";
 import AxeBuilder from "@axe-core/playwright";
 import { A11Y_CONFIG } from "../helpers/test-utils";
 
@@ -38,6 +38,7 @@ test.describe("Settings — Read-only", () => {
     const page = await context.newPage();
 
     await page.goto(SETTINGS_URL, { waitUntil: "domcontentloaded" });
+    await waitForHydration(page);
 
     // Should redirect to login with callbackUrl
     await expect(page).toHaveURL(/\/login/, {
@@ -49,6 +50,7 @@ test.describe("Settings — Read-only", () => {
 
   test("ST-02: settings page renders all 4 sections", async ({ page }) => {
     await page.goto(SETTINGS_URL, { waitUntil: "domcontentloaded" });
+    await waitForHydration(page);
 
     // Wait for the page heading
     await expect(page.getByRole("heading", { name: "Settings" })).toBeVisible({
@@ -89,6 +91,7 @@ test.describe("Settings — Read-only", () => {
 
   test("ST-06: Save Preferences button is present", async ({ page }) => {
     await page.goto(SETTINGS_URL, { waitUntil: "domcontentloaded" });
+    await waitForHydration(page);
 
     await expect(
       page.getByRole("heading", { name: "Email Notifications" })
@@ -101,6 +104,7 @@ test.describe("Settings — Read-only", () => {
 
   test("ST-11: blocked users section visible", async ({ page }) => {
     await page.goto(SETTINGS_URL, { waitUntil: "domcontentloaded" });
+    await waitForHydration(page);
 
     await expect(
       page.getByRole("heading", { name: "Blocked Users" })
@@ -119,6 +123,7 @@ test.describe("Settings — Read-only", () => {
 
   test("ST-13: Delete My Account button is visible", async ({ page }) => {
     await page.goto(SETTINGS_URL, { waitUntil: "domcontentloaded" });
+    await waitForHydration(page);
 
     await expect(
       page.getByRole("heading", { name: "Delete Account" })
@@ -135,6 +140,7 @@ test.describe("Settings — Read-only", () => {
     page,
   }) => {
     await page.goto(SETTINGS_URL, { waitUntil: "domcontentloaded" });
+    await waitForHydration(page);
 
     await expect(
       page.getByRole("heading", { name: "Email Notifications" })
@@ -166,6 +172,7 @@ test.describe("Settings — Read-only", () => {
 
   test("ST-17: axe-core a11y scan passes", async ({ page }) => {
     await page.goto(SETTINGS_URL, { waitUntil: "domcontentloaded" });
+    await waitForHydration(page);
 
     await expect(page.getByRole("heading", { name: "Settings" })).toBeVisible({
       timeout: timeouts.navigation,
@@ -209,6 +216,7 @@ test.describe("Settings — Notification Preferences", () => {
     page,
   }) => {
     await page.goto(SETTINGS_URL, { waitUntil: "domcontentloaded" });
+    await waitForHydration(page);
 
     await expect(
       page.getByRole("heading", { name: "Email Notifications" })
@@ -243,6 +251,7 @@ test.describe("Settings — Notification Preferences", () => {
     page,
   }) => {
     await page.goto(SETTINGS_URL, { waitUntil: "domcontentloaded" });
+    await waitForHydration(page);
 
     await expect(
       page.getByRole("heading", { name: "Email Notifications" })
@@ -287,6 +296,7 @@ test.describe("Settings — Notification Preferences", () => {
 
   test("ST-05: toggle 3 switches and save atomically", async ({ page }) => {
     await page.goto(SETTINGS_URL, { waitUntil: "domcontentloaded" });
+    await waitForHydration(page);
 
     await expect(
       page.getByRole("heading", { name: "Email Notifications" })
@@ -324,6 +334,7 @@ test.describe("Settings — Notification Preferences", () => {
     page,
   }) => {
     await page.goto(SETTINGS_URL, { waitUntil: "domcontentloaded" });
+    await waitForHydration(page);
 
     await expect(
       page.getByRole("heading", { name: "Email Notifications" })
@@ -396,6 +407,7 @@ test.describe("Settings — Password Change", () => {
     page,
   }) => {
     await page.goto(SETTINGS_URL, { waitUntil: "domcontentloaded" });
+    await waitForHydration(page);
 
     // Check if Change Password section exists (user may be OAuth-only)
     const changePasswordHeading = page.getByRole("heading", {
@@ -425,6 +437,7 @@ test.describe("Settings — Password Change", () => {
 
   test("ST-08: wrong current password shows error", async ({ page }) => {
     await page.goto(SETTINGS_URL, { waitUntil: "domcontentloaded" });
+    await waitForHydration(page);
 
     const changePasswordHeading = page.getByRole("heading", {
       name: "Change Password",
@@ -464,6 +477,7 @@ test.describe("Settings — Password Change", () => {
     page,
   }) => {
     await page.goto(SETTINGS_URL, { waitUntil: "domcontentloaded" });
+    await waitForHydration(page);
 
     const changePasswordHeading = page.getByRole("heading", {
       name: "Change Password",
@@ -508,6 +522,7 @@ test.describe("Settings — Password Change", () => {
     page,
   }) => {
     await page.goto(SETTINGS_URL, { waitUntil: "domcontentloaded" });
+    await waitForHydration(page);
 
     const changePasswordHeading = page.getByRole("heading", {
       name: "Change Password",
@@ -558,6 +573,7 @@ test.describe("Settings — Account Deletion", () => {
     page,
   }) => {
     await page.goto(SETTINGS_URL, { waitUntil: "domcontentloaded" });
+    await waitForHydration(page);
 
     await expect(
       page.getByRole("heading", { name: "Delete Account" })
@@ -596,6 +612,7 @@ test.describe("Settings — Account Deletion", () => {
     page,
   }) => {
     await page.goto(SETTINGS_URL, { waitUntil: "domcontentloaded" });
+    await waitForHydration(page);
 
     await expect(
       page.getByRole("heading", { name: "Delete Account" })
@@ -651,6 +668,7 @@ test.describe("Settings — Blocked Users", () => {
     page,
   }) => {
     await page.goto(SETTINGS_URL, { waitUntil: "domcontentloaded" });
+    await waitForHydration(page);
 
     await expect(
       page.getByRole("heading", { name: "Blocked Users" })
