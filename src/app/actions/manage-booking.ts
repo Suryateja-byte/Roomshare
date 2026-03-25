@@ -126,8 +126,11 @@ export async function updateBookingStatus(
                         `;
           }
         });
-      } catch {
-        // Sweeper will handle it — swallow error silently
+      } catch (err) {
+        logger.sync.debug("Inline expiry failed (sweeper will handle)", {
+          bookingId: booking.id,
+          error: err instanceof Error ? err.message : "Unknown",
+        });
       }
       // Always return error regardless of whether expiry succeeded
       return { error: "This hold has expired." };

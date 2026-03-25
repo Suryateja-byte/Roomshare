@@ -19,58 +19,73 @@ The booking state machine is implemented in `src/lib/booking-state-machine.ts` a
 
 ### States
 
-| State | Description | Terminal |
-|---|---|---|
-| `PENDING` | Tenant has submitted a booking request. Awaiting host decision. | No |
-| `ACCEPTED` | Host has accepted the booking. Slot is occupied. | No |
-| `REJECTED` | Host has rejected the booking. May include a rejection reason. | Yes |
-| `CANCELLED` | Tenant has cancelled the booking. | Yes |
+| State | Description | Terminal | Occupies Slot |
+|---|---|---|---|
+| `PENDING` | Tenant has submitted a booking request. Awaiting host decision. | No | No |
+| `ACCEPTED` | Host has accepted the booking. Slot is occupied. | No | Yes |
+| `REJECTED` | Host has rejected the booking. May include a rejection reason. | Yes | No |
+| `CANCELLED` | Tenant has cancelled the booking. | Yes | No (restored if was ACCEPTED/HELD) |
+| `HELD` | Tenant has placed a soft hold. Slot is reserved with a time limit (`heldUntil`). | No | Yes |
+| `EXPIRED` | System expired a HELD booking after `heldUntil` passed. | Yes | No (restored on expiry) |
 
 ### Valid Transitions
 
 ```typescript
+// Source: src/lib/booking-state-machine.ts
 VALID_TRANSITIONS = {
-  PENDING:  ['ACCEPTED', 'REJECTED', 'CANCELLED'],
-  ACCEPTED: ['CANCELLED'],
-  REJECTED: [],   // terminal
-  CANCELLED: [],  // terminal
+  PENDING:   ['ACCEPTED', 'REJECTED', 'CANCELLED'],
+  ACCEPTED:  ['CANCELLED'],
+  REJECTED:  [],   // terminal
+  CANCELLED: [],   // terminal
+  HELD:      ['ACCEPTED', 'REJECTED', 'CANCELLED', 'EXPIRED'],
+  EXPIRED:   [],   // terminal
 };
 ```
+
+Note: HELD is an **entry state** — bookings enter HELD via `createHold`, not via transition from PENDING. There is no PENDING → HELD transition.
 
 ### State Diagram
 
 ```mermaid
 stateDiagram-v2
-    [*] --> PENDING: Tenant submits booking
+    [*] --> PENDING: Tenant submits booking (createBooking)
+    [*] --> HELD: Tenant places hold (createHold)
 
     PENDING --> ACCEPTED: Host accepts
     PENDING --> REJECTED: Host rejects
     PENDING --> CANCELLED: Tenant cancels
 
+    HELD --> ACCEPTED: Host accepts (before expiry)
+    HELD --> REJECTED: Host rejects
+    HELD --> CANCELLED: Tenant cancels
+    HELD --> EXPIRED: System (sweeper or inline expiry)
+
     ACCEPTED --> CANCELLED: Tenant cancels
 
     REJECTED --> [*]
     CANCELLED --> [*]
+    EXPIRED --> [*]
 
     note right of PENDING
         Awaiting host decision.
         Does NOT occupy a slot.
     end note
 
+    note right of HELD
+        Slot is reserved (decremented).
+        Time-limited: auto-expires at heldUntil.
+        Sweeper cron + inline expiry (defense-in-depth).
+    end note
+
     note right of ACCEPTED
-        Slot is decremented.
+        Slot is occupied.
         If cancelled, slot is restored.
     end note
 
-    note right of REJECTED
+    note right of EXPIRED
         Terminal state.
-        May include rejectionReason.
-    end note
-
-    note right of CANCELLED
-        Terminal state.
-        If was ACCEPTED, slot is
-        restored atomically.
+        Slot restored on expiry.
+        Set by sweeper cron or inline expiry.
     end note
 ```
 
@@ -78,31 +93,49 @@ stateDiagram-v2
 
 | Transition | Who Can Perform | Enforcement |
 |---|---|---|
-| PENDING --> ACCEPTED | Listing owner only | `isOwner` check in `manage-booking.ts` |
-| PENDING --> REJECTED | Listing owner only | `isOwner` check in `manage-booking.ts` |
-| PENDING --> CANCELLED | Tenant only | `isTenant` check in `manage-booking.ts` |
-| ACCEPTED --> CANCELLED | Tenant only | `isTenant` check in `manage-booking.ts` |
+| PENDING → ACCEPTED | Listing owner only | `isOwner` check in `manage-booking.ts` |
+| PENDING → REJECTED | Listing owner only | `isOwner` check in `manage-booking.ts` |
+| PENDING → CANCELLED | Tenant only | `isTenant` check in `manage-booking.ts` |
+| HELD → ACCEPTED | Listing owner only | `isOwner` check + hold not expired |
+| HELD → REJECTED | Listing owner only | `isOwner` check in `manage-booking.ts` |
+| HELD → CANCELLED | Tenant only | `isTenant` check in `manage-booking.ts` |
+| HELD → EXPIRED | System only | Sweeper cron (`/api/cron/sweep-expired-holds`) or inline expiry |
+| ACCEPTED → CANCELLED | Tenant only | `isTenant` check in `manage-booking.ts` |
 
 ### Slot Management
 
-When a booking is **accepted**:
-1. Listing row is locked with `SELECT ... FOR UPDATE`
-2. Overlapping ACCEPTED bookings are counted for capacity check
-3. `availableSlots` is decremented by 1 within the same transaction
+**When a hold is created** (`createHold`):
+1. Listing row is locked with `SELECT ... FOR UPDATE` (SERIALIZABLE isolation)
+2. Overlapping ACCEPTED + active HELD bookings are counted for capacity check
+3. `availableSlots` is decremented by `slotsRequested` within the same transaction
 
-When an **accepted** booking is **cancelled**:
-1. Booking status is updated to CANCELLED within a transaction
-2. `availableSlots` is incremented by 1 within the same transaction
+**When a booking is accepted** (PENDING → ACCEPTED):
+1. Listing row is locked with `SELECT ... FOR UPDATE`
+2. Overlapping ACCEPTED + active HELD bookings are counted for capacity check
+3. `availableSlots` is decremented by `slotsRequested` within the same transaction
+
+**When a hold is accepted** (HELD → ACCEPTED):
+1. No slot change — slots were already reserved at hold creation
+
+**When an ACCEPTED or HELD booking is cancelled/expired**:
+1. Booking status is updated within a transaction
+2. `availableSlots` is incremented by `slotsRequested` (with LEAST clamp to prevent exceeding totalSlots)
 3. Both operations use optimistic locking (version check)
+
+**Hold expiry** (two mechanisms, defense-in-depth):
+1. **Sweeper cron** (`/api/cron/sweep-expired-holds`): Runs periodically, transitions expired HELD → EXPIRED, restores slots
+2. **Inline expiry**: When any `updateBookingStatus` call reads a HELD booking with `heldUntil < now()`, it attempts auto-expiry before processing
 
 ### Notifications Triggered
 
 | Transition | Notification Type | Recipient | Email |
 |---|---|---|---|
-| --> PENDING | `BOOKING_REQUEST` | Host | bookingRequest template |
-| --> ACCEPTED | `BOOKING_ACCEPTED` | Tenant | bookingAccepted template |
-| --> REJECTED | `BOOKING_REJECTED` | Tenant | bookingRejected template |
-| --> CANCELLED | `BOOKING_CANCELLED` | Host | (in-app only) |
+| → PENDING | `BOOKING_REQUEST` | Host | bookingRequest template |
+| → HELD | `BOOKING_HOLD_REQUEST` | Host | bookingHoldRequest template |
+| → ACCEPTED | `BOOKING_ACCEPTED` | Tenant | bookingAccepted template |
+| → REJECTED | `BOOKING_REJECTED` | Tenant | bookingRejected template |
+| → CANCELLED | `BOOKING_CANCELLED` | Host | (in-app only) |
+| → EXPIRED | `BOOKING_HOLD_EXPIRED` | Tenant | (in-app only; email template exists but not wired) |
 
 ### Related Code
 
@@ -163,7 +196,7 @@ stateDiagram-v2
 | Action | Who Can Perform | Enforcement |
 |---|---|---|
 | Any status change | Listing owner only | Ownership check: `listing.ownerId !== session.user.id` |
-| Delete listing | Owner, only if no active accepted bookings | `hasActiveAcceptedBookings()` check |
+| Delete listing | Owner, only if no non-terminal bookings | `hasNonTerminalBookings()` check (alias: `hasActiveAcceptedBookings`) |
 
 ### Side Effects
 
@@ -174,7 +207,7 @@ When listing status changes:
 ### Related Code
 
 - Status transitions: `src/app/actions/listing-status.ts`
-- Deletion guard: `src/lib/booking-utils.ts` (`hasActiveAcceptedBookings`)
+- Deletion guard: `src/lib/booking-utils.ts` (`hasNonTerminalBookings`)
 - Status check API: `src/app/api/listings/[id]/status/route.ts`
 - Freshness check UI: `src/components/ListingFreshnessCheck.tsx`
 
@@ -429,11 +462,14 @@ This prevents race conditions where a host changes the price while a tenant is s
 
 ### Capacity Management
 
-Slot capacity is enforced at booking acceptance (not creation):
+Slot capacity is enforced at both creation and acceptance:
 - PENDING bookings do NOT occupy slots
-- Only ACCEPTED bookings with overlapping dates count toward capacity
-- Capacity check: `overlappingAcceptedCount + 1 <= listing.totalSlots`
-- Slot decrement/increment happens atomically within the same transaction as the booking status update
+- ACCEPTED bookings with overlapping dates occupy slots
+- Active HELD bookings (heldUntil > now) occupy slots
+- Capacity check at booking creation: `SUM(ACCEPTED + active HELD) + requested <= totalSlots`
+- Capacity check at acceptance: same formula (defense-in-depth)
+- Slot decrement/increment happens atomically within the same transaction
+- The reconciler cron (`/api/cron/reconcile-slots`) corrects drift weekly, filtering by endDate to free past-date slots
 
 ### Suspension Enforcement
 

@@ -2,8 +2,18 @@
  * Tests for BookingForm component
  */
 
-import { render, screen, fireEvent } from "@testing-library/react";
+import { render, screen, fireEvent, waitFor, act } from "@testing-library/react";
+import React from "react";
 import BookingForm from "@/components/BookingForm";
+
+// Mock createPortal to render inline (needed for confirmation modal)
+jest.mock("react-dom", () => {
+  const actual = jest.requireActual("react-dom");
+  return {
+    ...actual,
+    createPortal: (node: React.ReactNode) => node,
+  };
+});
 
 // Mock dependencies
 const mockPush = jest.fn();
@@ -23,7 +33,45 @@ jest.mock("@/app/actions/booking", () => ({
   createHold: jest.fn(),
 }));
 
-import { createBooking } from "@/app/actions/booking";
+// Mock DatePicker as a simple input so we can set dates via fireEvent.change
+jest.mock("@/components/ui/date-picker", () => ({
+  DatePicker: ({
+    value,
+    onChange,
+    placeholder,
+    id,
+  }: {
+    value: string;
+    onChange: (v: string) => void;
+    placeholder?: string;
+    id?: string;
+    minDate?: string;
+    className?: string;
+    "aria-describedby"?: string;
+    "aria-invalid"?: boolean;
+  }) => (
+    <input
+      data-testid={`date-picker-${id}`}
+      id={id}
+      type="date"
+      value={value}
+      onChange={(e) => onChange(e.target.value)}
+      placeholder={placeholder}
+    />
+  ),
+}));
+
+// Mock FocusTrap to just render children (needed for confirmation modal)
+jest.mock("@/components/ui/FocusTrap", () => ({
+  FocusTrap: ({
+    children,
+  }: {
+    children: React.ReactNode;
+    active?: boolean;
+  }) => <div data-testid="focus-trap">{children}</div>,
+}));
+
+import { createBooking, createHold } from "@/app/actions/booking";
 
 describe("BookingForm", () => {
   const defaultProps = {
@@ -263,6 +311,272 @@ describe("BookingForm", () => {
       render(<BookingForm {...defaultProps} holdEnabled={true} />);
 
       expect(screen.getByText(/Place Hold \(15 min\)/)).toBeInTheDocument();
+    });
+  });
+
+  describe("submission flow", () => {
+    // Helper: compute future dates that satisfy the 30-day minimum
+    const futureStart = (() => {
+      const d = new Date();
+      d.setDate(d.getDate() + 7);
+      return d.toISOString().split("T")[0];
+    })();
+    const futureEnd = (() => {
+      const d = new Date();
+      d.setDate(d.getDate() + 45); // 38 days from start, well over 30-day minimum
+      return d.toISOString().split("T")[0];
+    })();
+
+    /** Set both date inputs and click "Request to Book" to open the confirm modal */
+    async function fillDatesAndSubmit() {
+      const startInput = screen.getByTestId("date-picker-booking-start-date");
+      const endInput = screen.getByTestId("date-picker-booking-end-date");
+
+      await act(async () => {
+        fireEvent.change(startInput, { target: { value: futureStart } });
+      });
+      await act(async () => {
+        fireEvent.change(endInput, { target: { value: futureEnd } });
+      });
+
+      const submitButton = screen.getByRole("button", {
+        name: /request to book/i,
+      });
+      await act(async () => {
+        fireEvent.click(submitButton);
+      });
+    }
+
+    it("happy path: calls createBooking with correct args on confirm", async () => {
+      (createBooking as jest.Mock).mockResolvedValue({
+        success: true,
+        bookingId: "booking-abc",
+      });
+
+      render(<BookingForm {...defaultProps} />);
+      await fillDatesAndSubmit();
+
+      // Confirmation modal should appear
+      const confirmButton = screen.getByRole("button", {
+        name: /confirm booking/i,
+      });
+      expect(confirmButton).toBeInTheDocument();
+
+      await act(async () => {
+        fireEvent.click(confirmButton);
+      });
+
+      await waitFor(() => {
+        expect(createBooking).toHaveBeenCalledTimes(1);
+      });
+
+      // Verify args: listingId, startDate (Date), endDate (Date), price, slots, idempotencyKey
+      const callArgs = (createBooking as jest.Mock).mock.calls[0];
+      expect(callArgs[0]).toBe("listing-123");
+      expect(callArgs[1]).toBeInstanceOf(Date);
+      expect(callArgs[2]).toBeInstanceOf(Date);
+      expect(callArgs[3]).toBe(1500);
+
+      // Success message should appear
+      await waitFor(() => {
+        expect(screen.getByText(/request sent successfully/i)).toBeInTheDocument();
+      });
+    });
+
+    it("shows capacity error when not enough slots available", async () => {
+      (createBooking as jest.Mock).mockResolvedValue({
+        success: false,
+        error: "Not enough available slots. 0 of 1 slots available.",
+      });
+
+      render(<BookingForm {...defaultProps} />);
+      await fillDatesAndSubmit();
+
+      const confirmButton = screen.getByRole("button", {
+        name: /confirm booking/i,
+      });
+      await act(async () => {
+        fireEvent.click(confirmButton);
+      });
+
+      await waitFor(() => {
+        expect(
+          screen.getByText(/not enough available slots/i)
+        ).toBeInTheDocument();
+      });
+    });
+
+    it("shows price changed message when price has changed", async () => {
+      (createBooking as jest.Mock).mockResolvedValue({
+        success: false,
+        code: "PRICE_CHANGED",
+        currentPrice: 1200,
+        error: "Price has changed",
+      });
+
+      render(<BookingForm {...defaultProps} />);
+      await fillDatesAndSubmit();
+
+      const confirmButton = screen.getByRole("button", {
+        name: /confirm booking/i,
+      });
+      await act(async () => {
+        fireEvent.click(confirmButton);
+      });
+
+      await waitFor(() => {
+        expect(
+          screen.getByText(/listing price has changed to \$1200\/month/i)
+        ).toBeInTheDocument();
+      });
+    });
+
+    it("shows auth error when session expired", async () => {
+      (createBooking as jest.Mock).mockResolvedValue({
+        success: false,
+        code: "SESSION_EXPIRED",
+        error: "You must be logged in",
+      });
+
+      render(<BookingForm {...defaultProps} />);
+      await fillDatesAndSubmit();
+
+      const confirmButton = screen.getByRole("button", {
+        name: /confirm booking/i,
+      });
+      await act(async () => {
+        fireEvent.click(confirmButton);
+      });
+
+      await waitFor(() => {
+        expect(
+          screen.getByText(/session has expired/i)
+        ).toBeInTheDocument();
+      });
+    });
+
+    it("shows generic error on network/thrown error", async () => {
+      (createBooking as jest.Mock).mockRejectedValue(
+        new Error("Network failure")
+      );
+
+      render(<BookingForm {...defaultProps} />);
+      await fillDatesAndSubmit();
+
+      const confirmButton = screen.getByRole("button", {
+        name: /confirm booking/i,
+      });
+      await act(async () => {
+        fireEvent.click(confirmButton);
+      });
+
+      await waitFor(() => {
+        expect(
+          screen.getByText(/unexpected error occurred/i)
+        ).toBeInTheDocument();
+      });
+    });
+
+    it("shows rate limit message when rate limited", async () => {
+      (createBooking as jest.Mock).mockResolvedValue({
+        success: false,
+        error: "Too many requests. Rate limit exceeded.",
+      });
+
+      render(<BookingForm {...defaultProps} />);
+      await fillDatesAndSubmit();
+
+      const confirmButton = screen.getByRole("button", {
+        name: /confirm booking/i,
+      });
+      await act(async () => {
+        fireEvent.click(confirmButton);
+      });
+
+      await waitFor(() => {
+        expect(
+          screen.getByText(/too many booking requests/i)
+        ).toBeInTheDocument();
+      });
+    });
+
+    it("hold happy path: calls createHold when hold button clicked", async () => {
+      (createHold as jest.Mock).mockResolvedValue({
+        success: true,
+        bookingId: "hold-abc",
+        heldUntil: new Date(Date.now() + 15 * 60 * 1000).toISOString(),
+        holdTtlMinutes: 15,
+      });
+
+      render(<BookingForm {...defaultProps} holdEnabled={true} />);
+
+      const startInput = screen.getByTestId("date-picker-booking-start-date");
+      const endInput = screen.getByTestId("date-picker-booking-end-date");
+
+      await act(async () => {
+        fireEvent.change(startInput, { target: { value: futureStart } });
+      });
+      await act(async () => {
+        fireEvent.change(endInput, { target: { value: futureEnd } });
+      });
+
+      const holdButton = screen.getByRole("button", {
+        name: /place hold/i,
+      });
+      await act(async () => {
+        fireEvent.click(holdButton);
+      });
+
+      await waitFor(() => {
+        expect(createHold).toHaveBeenCalledTimes(1);
+      });
+
+      const callArgs = (createHold as jest.Mock).mock.calls[0];
+      expect(callArgs[0]).toBe("listing-123");
+      expect(callArgs[1]).toBeInstanceOf(Date);
+      expect(callArgs[2]).toBeInstanceOf(Date);
+      expect(callArgs[3]).toBe(1500);
+
+      await waitFor(() => {
+        expect(
+          screen.getByText(/hold placed successfully/i)
+        ).toBeInTheDocument();
+      });
+    });
+
+    it("debounce: double-click confirm does not double-submit", async () => {
+      let resolveBooking: (value: { success: boolean; bookingId: string }) => void;
+      (createBooking as jest.Mock).mockImplementation(
+        () =>
+          new Promise((resolve) => {
+            resolveBooking = resolve;
+          })
+      );
+
+      render(<BookingForm {...defaultProps} />);
+      await fillDatesAndSubmit();
+
+      const confirmButton = screen.getByRole("button", {
+        name: /confirm booking/i,
+      });
+
+      // Click confirm twice rapidly
+      await act(async () => {
+        fireEvent.click(confirmButton);
+      });
+      await act(async () => {
+        fireEvent.click(confirmButton);
+      });
+
+      // Resolve the pending promise
+      await act(async () => {
+        resolveBooking!({ success: true, bookingId: "booking-abc" });
+      });
+
+      await waitFor(() => {
+        // Should only have been called once due to debounce protection
+        expect(createBooking).toHaveBeenCalledTimes(1);
+      });
     });
   });
 });
