@@ -22,22 +22,22 @@ const strengthConfig: Record<
 > = {
   weak: {
     label: "Weak",
-    color: "text-red-600 dark:text-red-400",
+    color: "text-red-600",
     bgColor: "bg-red-500",
   },
   fair: {
     label: "Fair",
-    color: "text-amber-600 dark:text-amber-400",
+    color: "text-amber-600",
     bgColor: "bg-amber-500",
   },
   good: {
     label: "Good",
-    color: "text-blue-600 dark:text-blue-400",
+    color: "text-blue-600",
     bgColor: "bg-blue-500",
   },
   strong: {
     label: "Strong",
-    color: "text-green-600 dark:text-green-400",
+    color: "text-green-600",
     bgColor: "bg-green-500",
   },
 };
@@ -95,14 +95,14 @@ export default function PasswordStrengthMeter({
       {/* Strength Bar */}
       <div className="space-y-1">
         <div className="flex items-center justify-between text-xs">
-          <span className="text-zinc-500 dark:text-zinc-400">
+          <span className="text-on-surface-variant">
             Password strength
           </span>
           <span className={cn("font-medium", config.color)}>
             {config.label}
           </span>
         </div>
-        <div className="h-1.5 bg-zinc-200 dark:bg-zinc-700 rounded-full overflow-hidden">
+        <div className="h-1.5 bg-surface-container-high rounded-full overflow-hidden">
           <div
             className={cn(
               "h-full rounded-full transition-all duration-300",
@@ -121,8 +121,8 @@ export default function PasswordStrengthMeter({
             className={cn(
               "flex items-center gap-1.5 text-xs transition-colors",
               check.passed
-                ? "text-green-600 dark:text-green-400"
-                : "text-zinc-400 dark:text-zinc-500"
+                ? "text-green-600"
+                : "text-on-surface-variant"
             )}
           >
             {check.passed ? (

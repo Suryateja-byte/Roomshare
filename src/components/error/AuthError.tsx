@@ -24,13 +24,13 @@ export default function AuthError({
 
   return (
     <div className="min-h-[60vh] flex flex-col items-center justify-center px-4 py-16 text-center">
-      <div className="w-20 h-20 bg-red-100 dark:bg-red-900/30 rounded-full flex items-center justify-center mb-6">
-        <AlertTriangle className="w-10 h-10 text-red-600 dark:text-red-400" />
+      <div className="w-20 h-20 bg-red-100 rounded-full flex items-center justify-center mb-6">
+        <AlertTriangle className="w-10 h-10 text-red-600" />
       </div>
-      <h2 className="text-2xl font-bold text-zinc-900 dark:text-white mb-2">
+      <h2 className="text-2xl font-bold text-on-surface mb-2">
         Something went wrong
       </h2>
-      <p className="text-zinc-600 dark:text-zinc-400 mb-6 max-w-md">
+      <p className="text-on-surface-variant mb-6 max-w-md">
         We had trouble loading this page. This is usually temporary — please try
         again in a moment.
       </p>

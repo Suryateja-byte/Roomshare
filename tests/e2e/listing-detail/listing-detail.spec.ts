@@ -110,7 +110,7 @@ test.describe("LD: Page Load & Content (Visitor)", () => {
     // Contact Host button is only rendered after session hydration (viewerReady).
     // On Mobile Chrome this can be slower — use a generous explicit timeout.
     await expect(
-      page.getByRole("button", { name: /Contact Host/i })
+      page.getByRole("button", { name: /Contact Host/i }).first()
     ).toBeVisible({ timeout: 45_000 });
     await expect(page.getByText("Identity verified")).toBeVisible();
   });
@@ -404,8 +404,9 @@ test.describe("LD: Owner View", () => {
     const found = await goToListing(page, nav, "Sunny Mission Room");
     test.skip(!found, "Listing not found");
 
-    await expect(page.getByText("Boost visibility")).toBeVisible();
-    await expect(page.getByText("Promote now")).toBeVisible();
+    await expect(page.getByText("Boost Visibility")).toBeVisible();
+    // "Promote now" was replaced with a disabled "Coming Q3 2026" button
+    await expect(page.getByText("Coming Q3 2026")).toBeVisible();
   });
 });
 

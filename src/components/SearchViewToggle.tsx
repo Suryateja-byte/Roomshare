@@ -135,12 +135,12 @@ export default function SearchViewToggle({
         {/* Right Panel: Map View (45%) */}
         {renderMapInDesktop && (
           <div className="w-[45%] h-full relative p-4 lg:p-6">
-            <div className="w-full h-full relative rounded-2xl overflow-hidden border border-zinc-200/80 dark:border-zinc-800/80 shadow-2xl bg-zinc-100 dark:bg-zinc-900">
+            <div className="w-full h-full relative rounded-2xl overflow-hidden border border-outline-variant/20/80 shadow-2xl bg-surface-container-high">
               {/* Desktop Hide Map Button */}
               <button
                 onClick={onToggle}
                 disabled={isLoading}
-                className="absolute top-4 right-4 z-[50] h-11 inline-flex items-center gap-1.5 px-4 bg-zinc-900/90 dark:bg-zinc-800/90 backdrop-blur-md text-white dark:text-zinc-100 rounded-full shadow-lg border border-white/10 hover:bg-zinc-800 dark:hover:bg-zinc-700 text-sm font-medium transition-colors disabled:opacity-60"
+                className="absolute top-4 right-4 z-[50] h-11 inline-flex items-center gap-1.5 px-4 bg-on-surface/90 backdrop-blur-md text-white rounded-full shadow-lg border border-white/10 hover:bg-on-surface text-sm font-medium transition-colors disabled:opacity-60"
                 aria-label="Hide map"
               >
                 <MapPinOff className="w-4 h-4" />
@@ -156,7 +156,7 @@ export default function SearchViewToggle({
           <button
             onClick={onToggle}
             disabled={isLoading}
-            className="fixed bottom-6 right-6 z-[50] flex items-center gap-2 px-5 py-3 bg-zinc-900/90 dark:bg-white/90 backdrop-blur-md text-white dark:text-zinc-900 rounded-full shadow-xl shadow-zinc-900/30 dark:shadow-black/20 hover:bg-zinc-800 dark:hover:bg-zinc-100 active:scale-[0.98] transition-all duration-200 disabled:opacity-60 border border-white/10"
+            className="fixed bottom-6 right-6 z-[50] flex items-center gap-2 px-5 py-3 bg-on-surface/90 backdrop-blur-md text-white rounded-full shadow-xl shadow-on-surface/30 hover:bg-on-surface active:scale-[0.98] transition-all duration-200 disabled:opacity-60 border border-white/10"
             aria-label="Show map"
           >
             <Map className="w-4 h-4" />

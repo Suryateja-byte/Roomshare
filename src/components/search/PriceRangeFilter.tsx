@@ -67,10 +67,10 @@ export function PriceRangeFilter({
   return (
     <div className="space-y-2">
       <div className="flex items-center justify-between">
-        <label className="text-sm font-semibold text-zinc-900 dark:text-white">
+        <label className="text-sm font-semibold text-on-surface">
           Price Range
         </label>
-        <span className="text-sm text-zinc-600 dark:text-zinc-400">
+        <span className="text-sm text-on-surface-variant">
           {rangeLabel}
         </span>
       </div>
@@ -97,15 +97,15 @@ export function PriceRangeFilter({
           onValueCommit={handleValueCommit}
           aria-label="Price range"
         >
-          <Slider.Track className="relative h-1 w-full rounded-full bg-zinc-200 dark:bg-zinc-700">
-            <Slider.Range className="absolute h-full rounded-full bg-zinc-900 dark:bg-white" />
+          <Slider.Track className="relative h-1 w-full rounded-full bg-surface-container-high">
+            <Slider.Range className="absolute h-full rounded-full bg-on-surface" />
           </Slider.Track>
           <Slider.Thumb
-            className="block w-6 h-6 bg-white border-2 border-zinc-900 dark:border-white rounded-full shadow-md hover:shadow-lg focus:outline-none focus:ring-2 focus:ring-zinc-900/20 dark:focus:ring-white/20 cursor-grab active:cursor-grabbing transition-shadow"
+            className="block w-6 h-6 bg-surface-container-lowest border-2 border-outline-variant/20 rounded-full shadow-md hover:shadow-lg focus:outline-none focus:ring-2 focus:ring-primary/30 cursor-grab active:cursor-grabbing transition-shadow"
             aria-label="Minimum price"
           />
           <Slider.Thumb
-            className="block w-6 h-6 bg-white border-2 border-zinc-900 dark:border-white rounded-full shadow-md hover:shadow-lg focus:outline-none focus:ring-2 focus:ring-zinc-900/20 dark:focus:ring-white/20 cursor-grab active:cursor-grabbing transition-shadow"
+            className="block w-6 h-6 bg-surface-container-lowest border-2 border-outline-variant/20 rounded-full shadow-md hover:shadow-lg focus:outline-none focus:ring-2 focus:ring-primary/30 cursor-grab active:cursor-grabbing transition-shadow"
             aria-label="Maximum price"
           />
         </Slider.Root>

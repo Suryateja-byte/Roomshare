@@ -161,7 +161,7 @@ export default function SaveSearchButton({
         ref={triggerButtonRef}
         onClick={handleOpen}
         aria-label="Save search"
-        className={`inline-flex items-center gap-2 h-11 text-sm font-medium text-zinc-500 dark:text-zinc-400 hover:text-zinc-900 dark:hover:text-white transition-colors whitespace-nowrap ${className}`}
+        className={`inline-flex items-center gap-2 h-11 text-sm font-medium text-on-surface-variant hover:text-on-surface transition-colors whitespace-nowrap ${className}`}
       >
         <Bookmark className="w-4 h-4" aria-hidden="true" />
         <span className="hidden sm:inline" aria-hidden="true">
@@ -175,21 +175,21 @@ export default function SaveSearchButton({
           <div className="fixed inset-0 z-[1000] flex items-center justify-center p-4">
             {/* Backdrop */}
             <div
-              className="absolute inset-0 bg-black/50"
+              className="absolute inset-0 bg-on-surface/50"
               onClick={() => setIsOpen(false)}
               aria-hidden="true"
             />
 
             {/* Modal Content */}
             <div
-              className="relative bg-white dark:bg-zinc-900 rounded-2xl shadow-xl max-w-md w-full p-6"
+              className="relative bg-surface-container-lowest rounded-2xl shadow-xl max-w-md w-full p-6"
               role="dialog"
               aria-modal="true"
               aria-labelledby="save-search-dialog-title"
             >
               <button
                 onClick={() => setIsOpen(false)}
-                className="absolute top-4 right-4 p-2 min-h-[44px] min-w-[44px] flex items-center justify-center text-zinc-500 dark:text-zinc-400 hover:text-zinc-600 dark:hover:text-zinc-300 rounded-full hover:bg-zinc-100 dark:hover:bg-zinc-800 transition-colors"
+                className="absolute top-4 right-4 p-2 min-h-[44px] min-w-[44px] flex items-center justify-center text-on-surface-variant hover:text-on-surface-variant rounded-full hover:bg-surface-container-high transition-colors"
                 aria-label="Close save search dialog"
               >
                 <X className="w-5 h-5" />
@@ -197,7 +197,7 @@ export default function SaveSearchButton({
 
               <h2
                 id="save-search-dialog-title"
-                className="text-xl font-bold text-zinc-900 dark:text-white mb-4"
+                className="text-xl font-bold text-on-surface mb-4"
               >
                 Save This Search
               </h2>
@@ -205,7 +205,7 @@ export default function SaveSearchButton({
               <div className="space-y-4">
                 {/* Search Name */}
                 <div>
-                  <label htmlFor="save-search-name" className="block text-sm font-medium text-zinc-700 dark:text-zinc-300 mb-1">
+                  <label htmlFor="save-search-name" className="block text-sm font-medium text-on-surface-variant mb-1">
                     Search Name
                   </label>
                   <input
@@ -214,26 +214,26 @@ export default function SaveSearchButton({
                     value={name}
                     onChange={(e) => setName(e.target.value)}
                     placeholder="e.g., Downtown apartments under $1500"
-                    className="w-full px-4 py-2.5 border border-zinc-200 dark:border-zinc-700 dark:bg-zinc-800 rounded-lg focus:outline-none focus-visible:ring-2 focus-visible:ring-zinc-900/30 dark:focus-visible:ring-zinc-400/40 dark:text-white"
+                    className="w-full px-4 py-2.5 border border-outline-variant/20 rounded-lg focus:outline-none focus-visible:ring-2 focus-visible:ring-primary/30"
                     aria-describedby={error ? "save-search-error" : undefined}
                     aria-invalid={!!error}
                   />
                 </div>
 
                 {/* Alert Toggle */}
-                <div className="p-4 bg-zinc-50 dark:bg-zinc-800 rounded-xl space-y-4">
+                <div className="p-4 bg-surface-canvas rounded-xl space-y-4">
                   <div className="flex items-center justify-between">
                     <div className="flex items-center gap-3">
                       {alertEnabled ? (
-                        <Bell className="w-5 h-5 text-zinc-600" />
+                        <Bell className="w-5 h-5 text-on-surface-variant" />
                       ) : (
-                        <BellOff className="w-5 h-5 text-zinc-500" />
+                        <BellOff className="w-5 h-5 text-on-surface-variant" />
                       )}
                       <div>
-                        <p className="font-medium text-zinc-900 dark:text-white">
+                        <p className="font-medium text-on-surface">
                           Email Alerts
                         </p>
-                        <p className="text-xs text-zinc-500">
+                        <p className="text-xs text-on-surface-variant">
                           Get notified when new listings match
                         </p>
                       </div>
@@ -246,13 +246,13 @@ export default function SaveSearchButton({
                       aria-label="Email alerts"
                       className={`relative inline-flex h-6 w-11 items-center rounded-full transition-colors ${
                         alertEnabled
-                          ? "bg-indigo-500"
-                          : "bg-zinc-200 dark:bg-zinc-700"
+                          ? "bg-primary"
+                          : "bg-surface-container-high"
                       }`}
                     >
                       <span
                         aria-hidden="true"
-                        className={`inline-block h-4 w-4 transform rounded-full bg-white transition-transform ${
+                        className={`inline-block h-4 w-4 transform rounded-full bg-surface-container-lowest transition-transform ${
                           alertEnabled ? "translate-x-6" : "translate-x-1"
                         }`}
                       />
@@ -261,8 +261,8 @@ export default function SaveSearchButton({
 
                   {/* Alert Frequency */}
                   {alertEnabled && (
-                    <div className="pt-3 border-t border-zinc-200 dark:border-zinc-700">
-                      <label className="block text-sm font-medium text-zinc-700 dark:text-zinc-300 mb-2">
+                    <div className="pt-3 border-t border-outline-variant/20">
+                      <label className="block text-sm font-medium text-on-surface-variant mb-2">
                         Alert Frequency
                       </label>
                       <div className="flex gap-2">
@@ -274,8 +274,8 @@ export default function SaveSearchButton({
                               onClick={() => setAlertFrequency(freq)}
                               className={`flex-1 px-3 py-2 rounded-lg text-sm font-medium transition-colors ${
                                 alertFrequency === freq
-                                  ? "bg-zinc-900 text-white"
-                                  : "bg-white dark:bg-zinc-800 border border-zinc-200 dark:border-zinc-700 text-zinc-600 dark:text-zinc-300 hover:bg-zinc-100 dark:hover:bg-zinc-700"
+                                  ? "bg-on-surface text-white"
+                                  : "bg-surface-container-lowest border border-outline-variant/20 text-on-surface-variant hover:bg-surface-container-high"
                               }`}
                             >
                               {freq === "INSTANT"
@@ -288,7 +288,7 @@ export default function SaveSearchButton({
                         )}
                       </div>
                       {alertFrequency === "INSTANT" && (
-                        <p className="mt-2 text-xs text-zinc-500">
+                        <p className="mt-2 text-xs text-on-surface-variant">
                           Get notified immediately when a new listing matches
                           your search
                         </p>
@@ -302,7 +302,7 @@ export default function SaveSearchButton({
                   <p
                     id="save-search-error"
                     role="alert"
-                    className="text-sm text-red-600 dark:text-red-400"
+                    className="text-sm text-red-600"
                   >
                     {error}
                   </p>
@@ -312,14 +312,14 @@ export default function SaveSearchButton({
                 <div className="flex gap-3 pt-2">
                   <button
                     onClick={() => setIsOpen(false)}
-                    className="flex-1 px-4 py-2.5 border border-zinc-200 rounded-lg font-medium text-zinc-700 hover:bg-zinc-50 transition-colors"
+                    className="flex-1 px-4 py-2.5 border border-outline-variant/20 rounded-lg font-medium text-on-surface-variant hover:bg-surface-canvas transition-colors"
                   >
                     Cancel
                   </button>
                   <button
                     onClick={handleSave}
                     disabled={isLoading}
-                    className="flex-1 px-4 py-2.5 bg-zinc-900 text-white rounded-lg font-medium hover:bg-zinc-800 disabled:opacity-60 transition-colors flex items-center justify-center gap-2"
+                    className="flex-1 px-4 py-2.5 bg-on-surface text-white rounded-lg font-medium hover:bg-on-surface disabled:opacity-60 transition-colors flex items-center justify-center gap-2"
                   >
                     {isLoading ? (
                       <>

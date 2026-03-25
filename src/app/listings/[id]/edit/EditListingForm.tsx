@@ -219,7 +219,7 @@ export default function EditListingForm({
   const FieldError = ({ field }: { field: string }) => {
     if (!fieldErrors[field]) return null;
     return (
-      <p className="text-red-500 dark:text-red-400 text-xs mt-1 flex items-center gap-1">
+      <p className="text-red-500 text-xs mt-1 flex items-center gap-1">
         <AlertCircle className="w-3 h-3" />
         {fieldErrors[field]}
       </p>
@@ -525,18 +525,18 @@ export default function EditListingForm({
       </Link>
 
       {error && (
-        <div className="bg-red-50 dark:bg-red-900/20 border border-red-100 dark:border-red-800 px-4 py-4 rounded-xl mb-8">
+        <div className="bg-red-50 border border-red-100 px-4 py-4 rounded-xl mb-8">
           <div className="flex items-start justify-between gap-4">
             <div className="flex items-start gap-3">
-              <AlertCircle className="w-5 h-5 text-red-600 dark:text-red-400 flex-shrink-0 mt-0.5" />
+              <AlertCircle className="w-5 h-5 text-red-600 flex-shrink-0 mt-0.5" />
               <div>
-                <p className="text-sm font-medium text-red-900 dark:text-red-100">
+                <p className="text-sm font-medium text-red-900">
                   Failed to save changes
                 </p>
-                <p className="text-sm text-red-600 dark:text-red-400 mt-1">
+                <p className="text-sm text-red-600 mt-1">
                   {error}
                 </p>
-                <p className="text-xs text-red-500 dark:text-red-500 mt-2">
+                <p className="text-xs text-red-500 mt-2">
                   Your changes have been saved locally and won&apos;t be lost.
                 </p>
               </div>
@@ -547,7 +547,7 @@ export default function EditListingForm({
               size="sm"
               onClick={handleRetry}
               disabled={loading}
-              className="flex-shrink-0 text-red-700 dark:text-red-300 border-red-200 dark:border-red-700 hover:bg-red-100 dark:hover:bg-red-900/50"
+              className="flex-shrink-0 text-red-700 border-red-200 hover:bg-red-100"
             >
               <RefreshCcw className="w-4 h-4 mr-1" />
               Retry
@@ -558,14 +558,14 @@ export default function EditListingForm({
 
       {/* Draft Resume Banner */}
       {showDraftBanner && savedAt && (
-        <div className="bg-blue-50 dark:bg-blue-900/20 border border-blue-100 dark:border-blue-800 px-4 py-4 rounded-xl mb-8 flex items-center justify-between gap-4">
+        <div className="bg-blue-50 border border-blue-100 px-4 py-4 rounded-xl mb-8 flex items-center justify-between gap-4">
           <div className="flex items-center gap-3">
-            <FileText className="w-5 h-5 text-blue-600 dark:text-blue-400 flex-shrink-0" />
+            <FileText className="w-5 h-5 text-blue-600 flex-shrink-0" />
             <div>
-              <p className="text-sm font-medium text-blue-900 dark:text-blue-100">
+              <p className="text-sm font-medium text-blue-900">
                 You have unsaved edits
               </p>
-              <p className="text-xs text-blue-600 dark:text-blue-400">
+              <p className="text-xs text-blue-600">
                 Last saved {formatTimeSince(savedAt)}
               </p>
             </div>
@@ -576,7 +576,7 @@ export default function EditListingForm({
               variant="outline"
               size="sm"
               onClick={discardDraft}
-              className="text-blue-700 dark:text-blue-300 border-blue-200 dark:border-blue-700 hover:bg-blue-100 dark:hover:bg-blue-900/50"
+              className="text-blue-700 border-blue-200 hover:bg-blue-100"
             >
               Discard
             </Button>
@@ -606,7 +606,7 @@ export default function EditListingForm({
 
       {/* Auto-save status indicator */}
       {!showDraftBanner && savedAt && formModified && !loading && (
-        <div className="flex items-center justify-end gap-2 mb-4 text-xs text-zinc-500 dark:text-zinc-400 animate-in fade-in duration-300">
+        <div className="flex items-center justify-end gap-2 mb-4 text-xs text-on-surface-variant animate-in fade-in duration-300">
           <CheckCircle className="w-3.5 h-3.5 text-green-500" />
           <span>Draft saved {formatTimeSince(savedAt)}</span>
         </div>
@@ -621,7 +621,7 @@ export default function EditListingForm({
       >
         {/* Section 1: The Basics */}
         <div className="space-y-6">
-          <h3 className="text-lg font-semibold text-zinc-900 dark:text-white mb-6 flex items-center gap-2">
+          <h3 className="text-lg font-semibold font-display text-on-surface mb-6 flex items-center gap-2">
             <Home className="w-4 h-4" /> The Basics
           </h3>
 
@@ -648,7 +648,7 @@ export default function EditListingForm({
               required
               rows={5}
               maxLength={1000}
-              className="w-full bg-zinc-50 dark:bg-zinc-800 hover:bg-zinc-100 dark:hover:bg-zinc-700 focus:bg-white dark:focus:bg-zinc-800 border border-zinc-200 dark:border-zinc-700 rounded-xl px-4 py-3.5 text-zinc-900 dark:text-white placeholder:text-zinc-600 dark:placeholder:text-zinc-300 outline-none focus:ring-2 focus:ring-black/5 dark:focus:ring-white/10 focus:border-zinc-900 dark:focus:border-zinc-500 transition-all duration-200 disabled:cursor-not-allowed disabled:opacity-60 resize-none leading-relaxed"
+              className="w-full bg-surface-canvas hover:bg-surface-container-high focus:bg-surface-container-lowest border border-outline-variant/20 rounded-xl px-4 py-3.5 text-on-surface placeholder:text-on-surface-variant outline-none focus:ring-2 focus:ring-black/5 focus:border-on-surface transition-all duration-200 disabled:cursor-not-allowed disabled:opacity-60 resize-none leading-relaxed"
               placeholder="What makes your place special? Describe the vibe, the light, and the lifestyle..."
               disabled={loading}
               value={description}
@@ -694,16 +694,16 @@ export default function EditListingForm({
           </div>
         </div>
 
-        <div className="h-px bg-zinc-100 dark:bg-zinc-800 w-full"></div>
+        <div className="h-px bg-surface-container-high w-full"></div>
 
         {/* Section 2: Photos */}
         <div className="space-y-6">
-          <h3 className="text-lg font-semibold text-zinc-900 dark:text-white mb-6 flex items-center gap-2">
+          <h3 className="text-lg font-semibold font-display text-on-surface mb-6 flex items-center gap-2">
             <ImageIcon className="w-4 h-4" /> Photos
           </h3>
 
           <div id="images" className="space-y-2">
-            <p className="text-sm text-zinc-500 dark:text-zinc-400">
+            <p className="text-sm text-on-surface-variant">
               Add photos of your space to attract potential roommates. The first
               image will be used as the main photo.
             </p>
@@ -716,24 +716,24 @@ export default function EditListingForm({
             <FieldError field="images" />
 
             {images.length === 0 && (
-              <p className="text-sm text-yellow-600 dark:text-yellow-400 mt-2">
+              <p className="text-sm text-yellow-600 mt-2">
                 At least one photo is required for your listing
               </p>
             )}
 
             {isAnyImageUploading && (
-              <p className="text-sm text-blue-600 dark:text-blue-400 mt-2">
+              <p className="text-sm text-blue-600 mt-2">
                 Please wait for image uploads to complete before saving...
               </p>
             )}
           </div>
         </div>
 
-        <div className="h-px bg-zinc-100 dark:bg-zinc-800 w-full"></div>
+        <div className="h-px bg-surface-container-high w-full"></div>
 
         {/* Section 3: Location */}
         <div className="space-y-6">
-          <h3 className="text-lg font-semibold text-zinc-900 dark:text-white mb-6 flex items-center gap-2">
+          <h3 className="text-lg font-semibold font-display text-on-surface mb-6 flex items-center gap-2">
             <MapPin className="w-4 h-4" /> Location
           </h3>
 
@@ -790,11 +790,11 @@ export default function EditListingForm({
           </div>
         </div>
 
-        <div className="h-px bg-zinc-100 dark:bg-zinc-800 w-full"></div>
+        <div className="h-px bg-surface-container-high w-full"></div>
 
         {/* Section 3: Details */}
         <div className="space-y-6">
-          <h3 className="text-lg font-semibold text-zinc-900 dark:text-white mb-6 flex items-center gap-2">
+          <h3 className="text-lg font-semibold font-display text-on-surface mb-6 flex items-center gap-2">
             <List className="w-4 h-4" /> Finer Details
           </h3>
 
@@ -807,7 +807,7 @@ export default function EditListingForm({
               placeholder="Wifi, Gym, Washer/Dryer, Roof Deck..."
               disabled={loading}
             />
-            <p className="text-xs text-zinc-400 dark:text-zinc-500 mt-2 pl-1">
+            <p className="text-xs text-on-surface-variant mt-2 pl-1">
               Separate amenities with commas
             </p>
           </div>
@@ -820,7 +820,7 @@ export default function EditListingForm({
               onChange={setMoveInDate}
               placeholder="Select move-in date"
             />
-            <p className="text-xs text-zinc-400 dark:text-zinc-500 mt-2 pl-1">
+            <p className="text-xs text-on-surface-variant mt-2 pl-1">
               When can tenants move in? (Optional)
             </p>
           </div>
@@ -870,15 +870,15 @@ export default function EditListingForm({
           {/* Booking Mode Selector (behind feature flag) */}
           {enableWholeUnitMode && (
             <fieldset className="space-y-3" disabled={loading}>
-              <legend className="text-sm font-medium text-zinc-900 dark:text-white">
+              <legend className="text-sm font-medium text-on-surface">
                 Booking Mode
               </legend>
               <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
                 <label
                   className={`flex items-start gap-3 p-4 rounded-xl border-2 cursor-pointer transition-all ${
                     bookingMode === "SHARED"
-                      ? "border-zinc-900 dark:border-white bg-zinc-50 dark:bg-zinc-800"
-                      : "border-zinc-200 dark:border-zinc-700 hover:border-zinc-300 dark:hover:border-zinc-600"
+                      ? "border-on-surface bg-surface-canvas"
+                      : "border-outline-variant/20 hover:border-outline-variant/30"
                   }`}
                 >
                   <input
@@ -890,10 +890,10 @@ export default function EditListingForm({
                     className="mt-0.5"
                   />
                   <div>
-                    <span className="text-sm font-medium text-zinc-900 dark:text-white">
+                    <span className="text-sm font-medium text-on-surface">
                       Shared space (multiple tenants)
                     </span>
-                    <p className="text-xs text-zinc-500 dark:text-zinc-400 mt-1">
+                    <p className="text-xs text-on-surface-variant mt-1">
                       Individual slots can be booked by different tenants.
                     </p>
                   </div>
@@ -901,8 +901,8 @@ export default function EditListingForm({
                 <label
                   className={`flex items-start gap-3 p-4 rounded-xl border-2 cursor-pointer transition-all ${
                     bookingMode === "WHOLE_UNIT"
-                      ? "border-zinc-900 dark:border-white bg-zinc-50 dark:bg-zinc-800"
-                      : "border-zinc-200 dark:border-zinc-700 hover:border-zinc-300 dark:hover:border-zinc-600"
+                      ? "border-on-surface bg-surface-canvas"
+                      : "border-outline-variant/20 hover:border-outline-variant/30"
                   }`}
                 >
                   <input
@@ -914,10 +914,10 @@ export default function EditListingForm({
                     className="mt-0.5"
                   />
                   <div>
-                    <span className="text-sm font-medium text-zinc-900 dark:text-white">
+                    <span className="text-sm font-medium text-on-surface">
                       Entire unit (one party)
                     </span>
-                    <p className="text-xs text-zinc-500 dark:text-zinc-400 mt-1">
+                    <p className="text-xs text-on-surface-variant mt-1">
                       The entire unit is booked by a single party at a time.
                     </p>
                   </div>
@@ -929,20 +929,20 @@ export default function EditListingForm({
 
           <div id="householdLanguages">
             <Label>Languages Spoken in the House</Label>
-            <p className="text-xs text-zinc-400 dark:text-zinc-500 mt-1 mb-3">
+            <p className="text-xs text-on-surface-variant mt-1 mb-3">
               Select languages spoken by household members
             </p>
 
             {/* Selected languages shown at top */}
             {selectedLanguages.length > 0 && (
-              <div className="flex flex-wrap gap-2 mb-3 pb-3 border-b border-zinc-200 dark:border-zinc-700">
+              <div className="flex flex-wrap gap-2 mb-3 pb-3 border-b border-outline-variant/20">
                 {selectedLanguages.map((code) => (
                   <button
                     key={code}
                     type="button"
                     onClick={() => toggleLanguage(code)}
                     disabled={loading}
-                    className="flex items-center gap-1 px-3 py-1.5 rounded-full text-sm font-medium bg-zinc-900 dark:bg-white text-white dark:text-zinc-900 disabled:cursor-not-allowed disabled:opacity-60"
+                    className="flex items-center gap-1 px-3 py-1.5 rounded-full text-sm font-medium bg-on-surface text-white disabled:cursor-not-allowed disabled:opacity-60"
                   >
                     {getLanguageName(code)}
                     <X className="w-3.5 h-3.5" />
@@ -971,7 +971,7 @@ export default function EditListingForm({
                     type="button"
                     onClick={() => toggleLanguage(code)}
                     disabled={loading}
-                    className="px-3 py-1.5 rounded-full text-sm font-medium transition-all duration-200 bg-zinc-100 dark:bg-zinc-800 text-zinc-600 dark:text-zinc-300 hover:bg-zinc-200 dark:hover:bg-zinc-700 disabled:cursor-not-allowed disabled:opacity-60"
+                    className="px-3 py-1.5 rounded-full text-sm font-medium transition-all duration-200 bg-surface-container-high text-on-surface-variant hover:bg-surface-container-high disabled:cursor-not-allowed disabled:opacity-60"
                   >
                     {getLanguageName(code)}
                   </button>
@@ -979,7 +979,7 @@ export default function EditListingForm({
               {filteredLanguages.filter(
                 (code) => !selectedLanguages.includes(code)
               ).length === 0 && (
-                <p className="text-sm text-zinc-500 dark:text-zinc-400">
+                <p className="text-sm text-on-surface-variant">
                   {languageSearch
                     ? "No languages found"
                     : "All languages selected"}
@@ -992,7 +992,7 @@ export default function EditListingForm({
           <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
             <div>
               <Label htmlFor="genderPreference">Gender Preference</Label>
-              <p className="text-xs text-zinc-400 dark:text-zinc-500 mt-1 mb-2">
+              <p className="text-xs text-on-surface-variant mt-1 mb-2">
                 Who can apply for this room?
               </p>
               <Select
@@ -1018,7 +1018,7 @@ export default function EditListingForm({
             </div>
             <div>
               <Label htmlFor="householdGender">Household Gender</Label>
-              <p className="text-xs text-zinc-400 dark:text-zinc-500 mt-1 mb-2">
+              <p className="text-xs text-on-surface-variant mt-1 mb-2">
                 Current household composition
               </p>
               <Select
@@ -1044,7 +1044,7 @@ export default function EditListingForm({
               id="houseRules"
               name="houseRules"
               rows={3}
-              className="w-full bg-zinc-50 dark:bg-zinc-800 hover:bg-zinc-100 dark:hover:bg-zinc-700 focus:bg-white dark:focus:bg-zinc-800 border border-zinc-200 dark:border-zinc-700 rounded-xl px-4 py-3.5 text-zinc-900 dark:text-white placeholder:text-zinc-600 dark:placeholder:text-zinc-300 outline-none focus:ring-2 focus:ring-black/5 dark:focus:ring-white/10 focus:border-zinc-900 dark:focus:border-zinc-500 transition-all duration-200 disabled:cursor-not-allowed disabled:opacity-60 resize-none"
+              className="w-full bg-surface-canvas hover:bg-surface-container-high focus:bg-surface-container-lowest border border-outline-variant/20 rounded-xl px-4 py-3.5 text-on-surface placeholder:text-on-surface-variant outline-none focus:ring-2 focus:ring-black/5 focus:border-on-surface transition-all duration-200 disabled:cursor-not-allowed disabled:opacity-60 resize-none"
               placeholder="No smoking, quiet hours after 10pm, no pets..."
               disabled={loading}
               defaultValue={listing.houseRules.join(", ")}
@@ -1068,7 +1068,7 @@ export default function EditListingForm({
             type="submit"
             disabled={loading || isAnyImageUploading || images.length === 0}
             size="lg"
-            className="flex-1 h-14 rounded-xl shadow-xl shadow-zinc-900/10 text-lg"
+            className="flex-1 h-14 rounded-xl shadow-xl shadow-on-surface/10 text-lg"
             data-testid="listing-save-button"
           >
             {loading ? (

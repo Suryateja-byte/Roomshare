@@ -14,7 +14,7 @@ import { Skeleton } from "./Skeleton";
  */
 export function ListingCardSkeleton() {
   return (
-    <div className="bg-white dark:bg-zinc-900 rounded-xl border border-zinc-200/60 dark:border-zinc-800 overflow-hidden">
+    <div className="bg-surface-container-lowest rounded-xl border border-outline-variant/20/60 overflow-hidden">
       {/* Image placeholder - matches ListingCard aspect-[16/10] sm:aspect-[4/3] */}
       <Skeleton
         variant="rectangular"

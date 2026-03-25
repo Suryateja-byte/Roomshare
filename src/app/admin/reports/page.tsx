@@ -70,19 +70,19 @@ export default async function AdminReportsPage() {
   ]);
 
   return (
-    <div className="min-h-screen bg-zinc-50">
+    <div className="min-h-screen bg-surface-canvas">
       <div className="max-w-7xl mx-auto px-4 py-8">
         {/* Header */}
         <div className="mb-8">
           <Link
             href="/admin"
-            className="inline-flex items-center gap-2 text-zinc-600 hover:text-zinc-900 mb-4"
+            className="inline-flex items-center gap-2 text-on-surface-variant hover:text-on-surface mb-4"
           >
             <ArrowLeft className="w-4 h-4" />
             Back to Dashboard
           </Link>
           <div className="flex items-center gap-3">
-            <div className="p-3 bg-red-100 rounded-xl relative">
+            <div className="p-3 bg-red-100 rounded-lg relative">
               <Flag className="w-6 h-6 text-red-600" />
               {openReportsCount > 0 && (
                 <span className="absolute -top-1 -right-1 w-5 h-5 bg-red-500 text-white text-xs font-bold rounded-full flex items-center justify-center">
@@ -91,10 +91,10 @@ export default async function AdminReportsPage() {
               )}
             </div>
             <div>
-              <h1 className="text-2xl font-bold text-zinc-900">
+              <h1 className="text-2xl font-display font-bold text-on-surface">
                 Reports Management
               </h1>
-              <p className="text-zinc-500">Review and resolve user reports</p>
+              <p className="text-on-surface-variant">Review and resolve user reports</p>
             </div>
           </div>
         </div>

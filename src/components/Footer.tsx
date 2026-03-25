@@ -4,7 +4,7 @@ import ComingSoonButton from "./ComingSoonButton";
 
 export default function Footer() {
   return (
-    <footer className="bg-white dark:bg-zinc-950 pt-24 pb-12 overflow-hidden">
+    <footer className="bg-surface-container-high pt-24 pb-12 overflow-hidden">
       <div className="max-w-7xl mx-auto px-6 sm:px-8">
         <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-6 gap-12 md:gap-16 mb-20">
           {/* Brand Section */}
@@ -13,29 +13,29 @@ export default function Footer() {
               href="/"
               className="inline-flex items-center gap-2.5 mb-6 group"
             >
-              <div className="w-8 h-8 bg-zinc-900 dark:bg-white rounded-lg flex items-center justify-center text-white dark:text-zinc-900 font-bold text-lg group-hover:scale-110 transition-transform shadow-lg shadow-zinc-900/10">
+              <div className="w-8 h-8 bg-on-surface rounded-lg flex items-center justify-center text-surface-container-lowest font-bold text-lg group-hover:scale-110 transition-transform shadow-ambient shadow-on-surface/10">
                 R
               </div>
-              <span className="font-semibold text-lg tracking-[-0.03em] text-zinc-900 dark:text-white">
+              <span className="font-display font-semibold text-lg tracking-[-0.03em] text-on-surface">
                 RoomShare
-                <span className="text-indigo-600 dark:text-indigo-400">.</span>
+                <span className="text-primary">.</span>
               </span>
             </Link>
-            <p className="text-zinc-500 dark:text-zinc-400 text-sm font-light leading-relaxed max-w-xs">
+            <p className="text-on-surface-variant text-sm font-light leading-relaxed max-w-xs">
               Find your people, not just a place.
             </p>
           </div>
 
           {/* Platform Links */}
           <nav aria-label="Platform">
-            <h2 className="font-semibold text-zinc-900 dark:text-white mb-6 text-xs uppercase tracking-[0.2em]">
+            <h2 className="font-body uppercase tracking-[0.2em] text-xs text-on-surface-variant mb-6">
               Platform
             </h2>
-            <ul className="flex flex-col gap-4 text-sm text-zinc-500 dark:text-zinc-400 font-light">
+            <ul className="flex flex-col gap-4 text-sm text-on-surface-variant font-light">
               <li>
                 <FooterNavLink
                   href="/search"
-                  className="hover:text-zinc-900 dark:hover:text-white transition-colors"
+                  className="hover:text-primary transition-colors"
                 >
                   Browse
                 </FooterNavLink>
@@ -43,13 +43,13 @@ export default function Footer() {
               <li>
                 <FooterNavLink
                   href="/listings/create"
-                  className="hover:text-zinc-900 dark:hover:text-white transition-colors"
+                  className="hover:text-primary transition-colors"
                 >
                   List a Room
                 </FooterNavLink>
               </li>
               <li>
-                <ComingSoonButton className="hover:text-zinc-900 dark:hover:text-white transition-colors text-left">
+                <ComingSoonButton className="hover:text-on-surface transition-colors text-left">
                   Safety
                 </ComingSoonButton>
               </li>
@@ -58,25 +58,25 @@ export default function Footer() {
 
           {/* Company Links */}
           <nav aria-label="Company">
-            <h2 className="font-semibold text-zinc-900 dark:text-white mb-6 text-xs uppercase tracking-[0.2em]">
+            <h2 className="font-body uppercase tracking-[0.2em] text-xs text-on-surface-variant mb-6">
               Company
             </h2>
-            <ul className="flex flex-col gap-4 text-sm text-zinc-500 dark:text-zinc-400 font-light">
+            <ul className="flex flex-col gap-4 text-sm text-on-surface-variant font-light">
               <li>
                 <FooterNavLink
                   href="/about"
-                  className="hover:text-zinc-900 dark:hover:text-white transition-colors"
+                  className="hover:text-primary transition-colors"
                 >
                   About
                 </FooterNavLink>
               </li>
               <li>
-                <ComingSoonButton className="hover:text-zinc-900 dark:hover:text-white transition-colors text-left">
+                <ComingSoonButton className="hover:text-on-surface transition-colors text-left">
                   Careers
                 </ComingSoonButton>
               </li>
               <li>
-                <ComingSoonButton className="hover:text-zinc-900 dark:hover:text-white transition-colors text-left">
+                <ComingSoonButton className="hover:text-on-surface transition-colors text-left">
                   Blog
                 </ComingSoonButton>
               </li>
@@ -85,17 +85,17 @@ export default function Footer() {
 
           {/* Support — no real links, only placeholders */}
           <nav aria-label="Support">
-            <h2 className="font-semibold text-zinc-900 dark:text-white mb-6 text-xs uppercase tracking-[0.2em]">
+            <h2 className="font-body uppercase tracking-[0.2em] text-xs text-on-surface-variant mb-6">
               Support
             </h2>
-            <ul className="flex flex-col gap-4 text-sm text-zinc-500 dark:text-zinc-400 font-light">
+            <ul className="flex flex-col gap-4 text-sm text-on-surface-variant font-light">
               <li>
-                <ComingSoonButton className="hover:text-zinc-900 dark:hover:text-white transition-colors text-left">
+                <ComingSoonButton className="hover:text-on-surface transition-colors text-left">
                   Help Center
                 </ComingSoonButton>
               </li>
               <li>
-                <ComingSoonButton className="hover:text-zinc-900 dark:hover:text-white transition-colors text-left">
+                <ComingSoonButton className="hover:text-on-surface transition-colors text-left">
                   Contact
                 </ComingSoonButton>
               </li>
@@ -104,17 +104,17 @@ export default function Footer() {
 
           {/* Legal — no real links, only placeholders */}
           <nav aria-label="Legal">
-            <h2 className="font-semibold text-zinc-900 dark:text-white mb-6 text-xs uppercase tracking-[0.2em]">
+            <h2 className="font-body uppercase tracking-[0.2em] text-xs text-on-surface-variant mb-6">
               Legal
             </h2>
-            <ul className="flex flex-col gap-4 text-sm text-zinc-500 dark:text-zinc-400 font-light">
+            <ul className="flex flex-col gap-4 text-sm text-on-surface-variant font-light">
               <li>
-                <ComingSoonButton className="hover:text-zinc-900 dark:hover:text-white transition-colors text-left">
+                <ComingSoonButton className="hover:text-on-surface transition-colors text-left">
                   Privacy
                 </ComingSoonButton>
               </li>
               <li>
-                <ComingSoonButton className="hover:text-zinc-900 dark:hover:text-white transition-colors text-left">
+                <ComingSoonButton className="hover:text-on-surface transition-colors text-left">
                   Terms
                 </ComingSoonButton>
               </li>
@@ -124,17 +124,17 @@ export default function Footer() {
 
         {/* Bottom Bar */}
         <div className="pt-10 flex flex-col sm:flex-row items-center justify-between gap-6">
-          <p className="text-[10px] font-bold text-zinc-400 dark:text-zinc-500 uppercase tracking-[0.2em] order-2 sm:order-1">
+          <p className="text-[10px] font-bold text-on-surface-variant uppercase tracking-[0.2em] order-2 sm:order-1">
             © {new Date().getFullYear()} RoomShare Inc.
           </p>
           <div className="flex items-center gap-8 order-1 sm:order-2">
-            <ComingSoonButton className="text-[10px] font-bold text-zinc-400 hover:text-zinc-900 dark:hover:text-white uppercase tracking-[0.2em] transition-colors">
+            <ComingSoonButton className="text-[10px] font-bold text-on-surface-variant hover:text-on-surface uppercase tracking-[0.2em] transition-colors">
               Instagram
             </ComingSoonButton>
-            <ComingSoonButton className="text-[10px] font-bold text-zinc-400 hover:text-zinc-900 dark:hover:text-white uppercase tracking-[0.2em] transition-colors">
+            <ComingSoonButton className="text-[10px] font-bold text-on-surface-variant hover:text-on-surface uppercase tracking-[0.2em] transition-colors">
               X
             </ComingSoonButton>
-            <ComingSoonButton className="text-[10px] font-bold text-zinc-400 hover:text-zinc-900 dark:hover:text-white uppercase tracking-[0.2em] transition-colors">
+            <ComingSoonButton className="text-[10px] font-bold text-on-surface-variant hover:text-on-surface uppercase tracking-[0.2em] transition-colors">
               LinkedIn
             </ComingSoonButton>
           </div>

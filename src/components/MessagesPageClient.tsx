@@ -724,16 +724,16 @@ export default function MessagesPageClient({
   return (
     <div
       data-testid="messages-page"
-      className="fixed inset-0 z-40 bg-white dark:bg-zinc-950 flex overflow-hidden font-sans selection:bg-zinc-900 selection:text-white dark:selection:bg-white dark:selection:text-black pt-[80px]"
+      className="fixed inset-0 z-40 bg-surface-container-lowest flex overflow-hidden font-body selection:bg-on-surface selection:text-white pt-[80px]"
     >
       {/* Sidebar */}
       <div
-        className={`w-full md:w-[400px] flex flex-col border-r border-zinc-100 dark:border-zinc-800 bg-white dark:bg-zinc-950 ${activeId ? "hidden md:flex" : "flex"}`}
+        className={`w-full md:w-[400px] flex flex-col border-r border-outline-variant/20 bg-surface-container-lowest ${activeId ? "hidden md:flex" : "flex"}`}
       >
-        <div className="p-6 border-b border-zinc-50 dark:border-zinc-800">
+        <div className="p-6 border-b border-outline-variant/20">
           <div className="flex justify-between items-center mb-6">
             <div className="flex items-center gap-3">
-              <h1 className="text-2xl font-bold tracking-tight text-zinc-900 dark:text-white">
+              <h1 className="text-2xl font-bold tracking-tight text-on-surface">
                 Messages
               </h1>
               {totalUnread > 0 && (
@@ -745,10 +745,10 @@ export default function MessagesPageClient({
             <DropdownMenu>
               <DropdownMenuTrigger asChild>
                 <button
-                  className="p-2 min-w-[44px] min-h-[44px] flex items-center justify-center hover:bg-zinc-50 dark:hover:bg-zinc-800 rounded-full"
+                  className="p-2 min-w-[44px] min-h-[44px] flex items-center justify-center hover:bg-surface-canvas rounded-full"
                   aria-label="More options"
                 >
-                  <MoreVertical className="w-5 h-5 text-zinc-600 dark:text-zinc-400" />
+                  <MoreVertical className="w-5 h-5 text-on-surface-variant" />
                 </button>
               </DropdownMenuTrigger>
               <DropdownMenuContent align="end">
@@ -771,13 +771,13 @@ export default function MessagesPageClient({
             </DropdownMenu>
           </div>
           <div className="relative">
-            <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-zinc-400 dark:text-zinc-500" />
+            <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-on-surface-variant" />
             <input
               value={searchQuery}
               onChange={(e) => setSearchQuery(e.target.value)}
               placeholder="Search conversations..."
               aria-label="Search conversations"
-              className="w-full bg-zinc-50 dark:bg-zinc-900 h-10 pl-10 rounded-xl text-sm text-zinc-900 dark:text-white placeholder:text-zinc-500 dark:placeholder:text-zinc-400 outline-none focus-visible:ring-2 focus-visible:ring-zinc-900/30 dark:focus-visible:ring-zinc-400/40 focus:bg-zinc-100 dark:focus:bg-zinc-800 transition-colors"
+              className="w-full bg-surface-canvas h-10 pl-10 rounded-xl text-sm text-on-surface placeholder:text-on-surface-variant outline-none focus:bg-surface-container-high transition-colors"
             />
           </div>
         </div>
@@ -791,7 +791,7 @@ export default function MessagesPageClient({
                 key={c.id}
                 data-testid="conversation-item"
                 onClick={() => setActiveId(c.id)}
-                className={`px-6 py-4 flex gap-4 cursor-pointer transition-colors border-l-4 ${activeId === c.id ? "bg-zinc-50 dark:bg-zinc-900 border-zinc-900 dark:border-white" : "bg-white dark:bg-zinc-950 border-transparent hover:bg-zinc-50 dark:hover:bg-zinc-900"}`}
+                className={`px-6 py-4 flex gap-4 cursor-pointer transition-colors border-l-4 ${activeId === c.id ? "bg-surface-canvas border-outline-variant/20" : "bg-surface-container-lowest border-transparent hover:bg-surface-canvas"}`}
               >
                 <div className="relative">
                   <UserAvatar
@@ -800,7 +800,7 @@ export default function MessagesPageClient({
                     size="lg"
                   />
                   {hasUnread && (
-                    <span className="absolute -top-1 -right-1 min-w-[20px] h-5 px-1.5 bg-red-500 text-white text-xs font-bold rounded-full flex items-center justify-center shadow-sm">
+                    <span className="absolute -top-1 -right-1 min-w-[20px] h-5 px-1.5 bg-primary text-on-primary text-xs font-bold rounded-full flex items-center justify-center shadow-ambient-sm">
                       {c.unreadCount! > 99 ? "99+" : c.unreadCount}
                     </span>
                   )}
@@ -808,12 +808,12 @@ export default function MessagesPageClient({
                 <div className="flex-1 min-w-0">
                   <div className="flex justify-between items-baseline mb-1">
                     <h3
-                      className={`font-semibold text-sm truncate ${hasUnread ? "text-zinc-900 dark:text-white" : activeId === c.id ? "text-zinc-900 dark:text-white" : "text-zinc-700 dark:text-zinc-300"}`}
+                      className={`font-semibold text-sm truncate ${hasUnread ? "text-on-surface" : activeId === c.id ? "text-on-surface" : "text-on-surface-variant"}`}
                     >
                       {other?.name || "Unknown User"}
                     </h3>
                     <span
-                      className={`text-2xs ${hasUnread ? "text-red-500 font-semibold" : "text-zinc-400 dark:text-zinc-500"}`}
+                      className={`text-2xs ${hasUnread ? "text-red-500 font-semibold" : "text-on-surface-variant"}`}
                     >
                       {lastMsg
                         ? new Date(lastMsg.createdAt).toLocaleTimeString([], {
@@ -824,7 +824,7 @@ export default function MessagesPageClient({
                     </span>
                   </div>
                   <p
-                    className={`text-sm truncate ${hasUnread ? "text-zinc-900 dark:text-white font-medium" : "text-zinc-500 dark:text-zinc-400"}`}
+                    className={`text-sm truncate ${hasUnread ? "text-on-surface font-medium" : "text-on-surface-variant"}`}
                   >
                     {lastMsg
                       ? lastMsg.senderId === currentUserId
@@ -832,7 +832,7 @@ export default function MessagesPageClient({
                         : lastMsg.content
                       : "No messages yet"}
                   </p>
-                  <p className="text-xs text-zinc-400 dark:text-zinc-500 mt-1">
+                  <p className="text-xs text-on-surface-variant mt-1">
                     {c.listing.title}
                   </p>
                 </div>
@@ -842,25 +842,25 @@ export default function MessagesPageClient({
           {filteredConversations.length === 0 && (
             <div className="p-8 text-center">
               {searchQuery.trim() ? (
-                <p className="text-zinc-500 dark:text-zinc-400">
+                <p className="text-on-surface-variant">
                   No conversations match your search
                 </p>
               ) : (
                 <div className="space-y-4">
-                  <div className="w-16 h-16 mx-auto rounded-full bg-zinc-100 dark:bg-zinc-800 flex items-center justify-center">
-                    <MessageSquare className="w-8 h-8 text-zinc-400 dark:text-zinc-500" />
+                  <div className="w-16 h-16 mx-auto rounded-full bg-surface-container-high flex items-center justify-center">
+                    <MessageSquare className="w-8 h-8 text-on-surface-variant" />
                   </div>
                   <div>
-                    <h3 className="font-semibold text-zinc-900 dark:text-white mb-1">
+                    <h3 className="font-semibold text-on-surface mb-1">
                       No conversations yet
                     </h3>
-                    <p className="text-sm text-zinc-500 dark:text-zinc-400 mb-4">
+                    <p className="text-sm text-on-surface-variant mb-4">
                       Start chatting by contacting a listing host
                     </p>
                   </div>
                   <Link
                     href="/search"
-                    className="inline-flex items-center justify-center px-6 py-2.5 bg-zinc-900 dark:bg-white text-white dark:text-zinc-900 rounded-full font-medium text-sm hover:bg-zinc-800 dark:hover:bg-zinc-200 transition-colors"
+                    className="inline-flex items-center justify-center px-6 py-2.5 bg-on-surface text-white rounded-full font-medium text-sm hover:bg-on-surface transition-colors"
                   >
                     Browse Listings
                   </Link>
@@ -873,18 +873,18 @@ export default function MessagesPageClient({
 
       {/* Chat Area */}
       <div
-        className={`flex-1 flex flex-col bg-white dark:bg-zinc-950 ${!activeId ? "hidden md:flex" : "flex"}`}
+        className={`flex-1 flex flex-col bg-surface-container-lowest ${!activeId ? "hidden md:flex" : "flex"}`}
       >
         {activeId && activeConversation ? (
           <>
             {/* Header */}
-            <header className="h-[72px] px-6 flex items-center justify-between border-b border-zinc-100 dark:border-zinc-800">
+            <header className="h-[72px] px-6 flex items-center justify-between border-b border-outline-variant/20">
               <div className="flex items-center gap-3">
                 <button
                   data-testid="back-button"
                   aria-label="Back to conversations"
                   onClick={() => setActiveId(null)}
-                  className="md:hidden p-2 -ml-2 text-zinc-500 dark:text-zinc-400"
+                  className="md:hidden p-2 -ml-2 text-on-surface-variant"
                 >
                   <ArrowLeft className="w-5 h-5" />
                 </button>
@@ -898,11 +898,11 @@ export default function MessagesPageClient({
                   />
                   <div>
                     <span
-                      className={`font-bold block ${isBlocked ? "text-zinc-500 dark:text-zinc-400" : "text-zinc-900 dark:text-white"}`}
+                      className={`font-bold block ${isBlocked ? "text-on-surface-variant" : "text-on-surface"}`}
                     >
                       {otherParticipant?.name || "Unknown User"}
                     </span>
-                    <span className="text-xs text-zinc-500 dark:text-zinc-400">
+                    <span className="text-xs text-on-surface-variant">
                       {isBlocked
                         ? blockStatus === "blocker"
                           ? "Blocked"
@@ -917,10 +917,10 @@ export default function MessagesPageClient({
               <DropdownMenu>
                 <DropdownMenuTrigger asChild>
                   <button
-                    className="p-2 min-w-[44px] min-h-[44px] flex items-center justify-center hover:bg-zinc-100 dark:hover:bg-zinc-800 rounded-full transition-colors"
+                    className="p-2 min-w-[44px] min-h-[44px] flex items-center justify-center hover:bg-surface-container-high rounded-full transition-colors"
                     aria-label="More options"
                   >
-                    <MoreVertical className="w-5 h-5 text-zinc-600 dark:text-zinc-400" />
+                    <MoreVertical className="w-5 h-5 text-on-surface-variant" />
                   </button>
                 </DropdownMenuTrigger>
                 <DropdownMenuContent align="end">
@@ -928,7 +928,7 @@ export default function MessagesPageClient({
                     <DropdownMenuItem
                       onClick={handleUnblock}
                       disabled={isUnblocking}
-                      className="text-zinc-700 dark:text-zinc-300"
+                      className="text-on-surface-variant"
                     >
                       <ShieldOff className="w-4 h-4 mr-2" />
                       {isUnblocking ? "Unblocking..." : "Unblock User"}
@@ -937,7 +937,7 @@ export default function MessagesPageClient({
                     blockStatus !== "blocked" && (
                       <DropdownMenuItem
                         onClick={() => setShowBlockDialog(true)}
-                        className="text-red-600 dark:text-red-400"
+                        className="text-red-600"
                       >
                         <Ban className="w-4 h-4 mr-2" />
                         Block User
@@ -946,7 +946,7 @@ export default function MessagesPageClient({
                   )}
                   <DropdownMenuItem
                     onClick={() => setShowDeleteConversationDialog(true)}
-                    className="text-red-600 dark:text-red-400"
+                    className="text-red-600"
                   >
                     <Trash2 className="w-4 h-4 mr-2" />
                     Delete Conversation
@@ -1037,7 +1037,7 @@ export default function MessagesPageClient({
                   aria-label="Loading messages"
                 >
                   <div
-                    className="animate-spin rounded-full h-6 w-6 border-b-2 border-zinc-900 dark:border-white"
+                    className="animate-spin rounded-full h-6 w-6 border-b-2 border-outline-variant/20"
                     aria-hidden="true"
                   ></div>
                 </div>
@@ -1062,13 +1062,13 @@ export default function MessagesPageClient({
                                                 max-w-[70%] px-5 py-2.5 text-sm leading-relaxed shadow-sm
                                                 ${
                                                   m.senderId === currentUserId
-                                                    ? "bg-zinc-900 dark:bg-white text-white dark:text-zinc-900 rounded-2xl rounded-tr-sm"
-                                                    : "bg-zinc-100 dark:bg-zinc-800 text-zinc-900 dark:text-white rounded-2xl rounded-tl-sm"
+                                                    ? "bg-on-surface text-white rounded-2xl rounded-tr-sm"
+                                                    : "bg-surface-container-high text-on-surface rounded-2xl rounded-tl-sm"
                                                 }
                                                 ${m.status === "sending" ? "opacity-70" : ""}
                                                 ${
                                                   m.status === "failed"
-                                                    ? "!bg-red-100 dark:!bg-red-900/30 !text-red-900 dark:!text-red-100 border-2 border-red-500 cursor-pointer hover:border-red-600"
+                                                    ? "!bg-red-100 !text-red-900 border-2 border-red-500 cursor-pointer hover:border-red-600"
                                                     : ""
                                                 }
                                             `}
@@ -1077,7 +1077,7 @@ export default function MessagesPageClient({
                       {m.status === "failed" && (
                         <div
                           data-testid="retry-button"
-                          className="flex items-center gap-1 mt-2 text-red-600 dark:text-red-400 text-xs"
+                          className="flex items-center gap-1 mt-2 text-red-600 text-xs"
                         >
                           <AlertCircle className="w-3 h-3" />
                           <span>Failed to send. Tap to retry</span>
@@ -1088,7 +1088,7 @@ export default function MessagesPageClient({
                         m.status !== "failed" &&
                         m.status !== "sending" && (
                           <div
-                            className={`flex items-center justify-end gap-1 mt-1 text-2xs ${m.read ? "text-blue-400" : "text-white/50 dark:text-zinc-600"}`}
+                            className={`flex items-center justify-end gap-1 mt-1 text-2xs ${m.read ? "text-blue-400" : "text-white/50"}`}
                           >
                             <CheckCheck className="w-3 h-3" />
                             <span>{m.read ? "Read" : "Delivered"}</span>
@@ -1103,19 +1103,19 @@ export default function MessagesPageClient({
               {typingUsers.length > 0 && (
                 <div
                   data-testid="typing-indicator"
-                  className="flex items-center gap-2 text-sm text-zinc-500 dark:text-zinc-400"
+                  className="flex items-center gap-2 text-sm text-on-surface-variant"
                 >
                   <div className="flex gap-1">
                     <span
-                      className="w-2 h-2 bg-zinc-400 rounded-full animate-bounce"
+                      className="w-2 h-2 bg-surface-container-high rounded-full animate-bounce"
                       style={{ animationDelay: "0ms" }}
                     />
                     <span
-                      className="w-2 h-2 bg-zinc-400 rounded-full animate-bounce"
+                      className="w-2 h-2 bg-surface-container-high rounded-full animate-bounce"
                       style={{ animationDelay: "150ms" }}
                     />
                     <span
-                      className="w-2 h-2 bg-zinc-400 rounded-full animate-bounce"
+                      className="w-2 h-2 bg-surface-container-high rounded-full animate-bounce"
                       style={{ animationDelay: "300ms" }}
                     />
                   </div>
@@ -1138,7 +1138,7 @@ export default function MessagesPageClient({
                     });
                     setShowScrollToBottom(false);
                   }}
-                  className="fixed bottom-28 right-8 z-10 flex items-center gap-2 px-4 py-2 bg-zinc-900 dark:bg-white text-white dark:text-zinc-900 rounded-full shadow-lg hover:bg-zinc-800 dark:hover:bg-zinc-100 transition-all animate-in fade-in slide-in-from-bottom-2 duration-200"
+                  className="fixed bottom-28 right-8 z-10 flex items-center gap-2 px-4 py-2 bg-on-surface text-white rounded-full shadow-lg hover:bg-on-surface transition-all animate-in fade-in slide-in-from-bottom-2 duration-200"
                   aria-label="Scroll to latest messages"
                 >
                   <ArrowDown className="w-4 h-4" />
@@ -1161,7 +1161,7 @@ export default function MessagesPageClient({
               <div className="p-4 md:p-6 space-y-2">
                 {/* Offline Banner */}
                 {isOffline && (
-                  <div className="px-4 py-2 bg-zinc-100 dark:bg-zinc-800 rounded-xl flex items-center gap-2 text-sm text-zinc-600 dark:text-zinc-400">
+                  <div className="px-4 py-2 bg-surface-container-high rounded-xl flex items-center gap-2 text-sm text-on-surface-variant">
                     <WifiOff className="w-4 h-4" />
                     <span>
                       You&apos;re offline. Messages will be sent when you
@@ -1171,7 +1171,7 @@ export default function MessagesPageClient({
                 )}
                 <form
                   onSubmit={handleSend}
-                  className="flex items-end gap-2 bg-zinc-50 dark:bg-zinc-900 p-2 rounded-[2rem] border border-zinc-100 dark:border-zinc-800 focus-within:bg-white dark:focus-within:bg-zinc-800 focus-within:shadow-lg transition-all"
+                  className="flex items-end gap-2 bg-surface-canvas p-2 rounded-[2rem] border border-outline-variant/20 focus-within:bg-surface-container-lowest focus-within:shadow-lg transition-all"
                 >
                   <button
                     type="button"
@@ -1181,7 +1181,7 @@ export default function MessagesPageClient({
                           "File sharing feature is currently in development.",
                       })
                     }
-                    className="min-w-[44px] min-h-[44px] flex items-center justify-center text-zinc-400 dark:text-zinc-500 hover:text-zinc-600 dark:hover:text-zinc-300"
+                    className="min-w-[44px] min-h-[44px] flex items-center justify-center text-on-surface-variant hover:text-on-surface-variant"
                     aria-label="Attachments coming soon"
                   >
                     <Paperclip className="w-5 h-5" />
@@ -1194,13 +1194,13 @@ export default function MessagesPageClient({
                       isOffline ? "You're offline..." : "Type a message..."
                     }
                     maxLength={MESSAGE_MAX_LENGTH}
-                    className="flex-1 bg-transparent border-none outline-none focus-visible:ring-2 focus-visible:ring-zinc-900/30 dark:focus-visible:ring-zinc-400/40 focus-visible:rounded py-3 px-2 text-zinc-900 dark:text-white placeholder:text-zinc-500 dark:placeholder:text-zinc-400"
+                    className="flex-1 bg-transparent border-none outline-none py-3 px-2 text-on-surface placeholder:text-on-surface-variant"
                   />
                   <button
                     type="submit"
                     data-testid="send-button"
                     disabled={!input.trim() || isOffline}
-                    className="min-w-[44px] min-h-[44px] bg-zinc-900 dark:bg-white text-white dark:text-zinc-900 rounded-full flex items-center justify-center hover:bg-zinc-800 dark:hover:bg-zinc-200 disabled:opacity-60 transition-all"
+                    className="min-w-[44px] min-h-[44px] bg-on-surface text-white rounded-full flex items-center justify-center hover:bg-on-surface disabled:opacity-60 transition-all"
                     aria-label="Send message"
                   >
                     <Send className="w-4 h-4 ml-0.5" />
@@ -1217,7 +1217,7 @@ export default function MessagesPageClient({
             )}
           </>
         ) : (
-          <div className="flex-1 flex items-center justify-center text-zinc-400 dark:text-zinc-500">
+          <div className="flex-1 flex items-center justify-center text-on-surface-variant">
             Select a conversation
           </div>
         )}

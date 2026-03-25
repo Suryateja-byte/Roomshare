@@ -56,8 +56,8 @@ export function FilterChip({
     <span
       className={cn(
         "inline-flex items-center gap-1.5 px-3 py-1.5",
-        "bg-indigo-50 dark:bg-indigo-950/50 border border-indigo-200 dark:border-indigo-800",
-        "text-sm text-indigo-700 dark:text-indigo-300",
+        "bg-primary border border-primary/20",
+        "text-sm text-primary",
         "rounded-full",
         "transition-colors duration-150",
         "group/chip",
@@ -77,8 +77,8 @@ export function FilterChip({
             "min-w-[1.25rem] px-1 py-0.5",
             "text-xs font-semibold",
             "rounded-full",
-            "bg-emerald-100 dark:bg-emerald-900/50",
-            "text-emerald-700 dark:text-emerald-300",
+            "bg-emerald-100",
+            "text-emerald-700",
             impactDelta
               ? "opacity-100"
               : "opacity-0 group-hover/chip:opacity-100",
@@ -112,10 +112,10 @@ export function FilterChip({
           // Visual appearance: compact rounded button
           "relative flex items-center justify-center",
           "w-4 h-4 rounded-full",
-          "text-zinc-500 dark:text-zinc-400",
-          "hover:bg-zinc-200 dark:hover:bg-zinc-700",
-          "hover:text-zinc-700 dark:hover:text-zinc-200",
-          "focus:outline-none focus-visible:ring-2 focus-visible:ring-zinc-400",
+          "text-on-surface-variant",
+          "hover:bg-surface-container-high",
+          "hover:text-on-surface-variant",
+          "focus:outline-none focus-visible:ring-2 focus-visible:ring-primary/30",
           "transition-colors duration-150",
           "disabled:opacity-60 disabled:cursor-not-allowed",
           // WCAG: 44x44px minimum touch target via pseudo-element (16px + 14px*2 = 44px)

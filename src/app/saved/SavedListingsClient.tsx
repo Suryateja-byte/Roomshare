@@ -101,15 +101,15 @@ export default function SavedListingsClient({
   };
 
   return (
-    <div className="min-h-screen bg-zinc-50/50 dark:bg-zinc-950 pt-20 pb-20">
+    <div className="min-h-screen bg-surface-canvas pt-20 pb-20">
       <div className="container mx-auto max-w-6xl px-6 py-10">
         {/* Header */}
         <div className="flex items-center justify-between mb-8">
           <div>
-            <h1 className="text-3xl font-bold text-zinc-900 dark:text-white tracking-tight">
+            <h1 className="font-display text-3xl font-bold text-on-surface tracking-tight">
               Saved Listings
             </h1>
-            <p className="text-zinc-500 dark:text-zinc-400 mt-1">
+            <p className="text-on-surface-variant mt-1">
               {listings.length} {listings.length === 1 ? "place" : "places"}{" "}
               saved
             </p>
@@ -120,7 +120,7 @@ export default function SavedListingsClient({
                 <select
                   value={sortOption}
                   onChange={(e) => setSortOption(e.target.value as SortOption)}
-                  className="appearance-none pl-3 pr-8 py-2 bg-white dark:bg-zinc-900 border border-zinc-200 dark:border-zinc-700 rounded-full text-sm font-medium text-zinc-700 dark:text-zinc-300 hover:border-zinc-300 dark:hover:border-zinc-600 focus:outline-none focus:ring-2 focus:ring-zinc-900 dark:focus:ring-white cursor-pointer"
+                  className="appearance-none pl-3 pr-8 py-2 bg-surface-container-lowest border border-outline-variant/20 rounded-full text-sm font-medium text-on-surface-variant hover:border-outline-variant/40 focus:outline-none focus:ring-2 focus:ring-primary cursor-pointer"
                 >
                   {sortOptions.map((option) => (
                     <option key={option.value} value={option.value}>
@@ -128,12 +128,12 @@ export default function SavedListingsClient({
                     </option>
                   ))}
                 </select>
-                <ArrowUpDown className="absolute right-3 top-1/2 -translate-y-1/2 w-3.5 h-3.5 text-zinc-400 pointer-events-none" />
+                <ArrowUpDown className="absolute right-3 top-1/2 -translate-y-1/2 w-3.5 h-3.5 text-on-surface-variant pointer-events-none" />
               </div>
             )}
             <Link
               href="/search"
-              className="inline-flex items-center gap-2 px-4 py-2 bg-zinc-900 text-white dark:bg-white dark:text-zinc-900 rounded-full text-sm font-medium hover:bg-zinc-800 dark:hover:bg-zinc-200 transition-colors"
+              className="inline-flex items-center gap-2 px-4 py-2 bg-primary text-on-primary rounded-full text-sm font-medium hover:bg-primary/90 transition-colors"
             >
               <Search className="w-4 h-4" />
               Find more
@@ -142,18 +142,18 @@ export default function SavedListingsClient({
         </div>
 
         {listings.length === 0 ? (
-          <div className="bg-white dark:bg-zinc-900 rounded-2xl border border-zinc-100 dark:border-zinc-800 shadow-sm p-12 text-center">
-            <Heart className="w-16 h-16 text-zinc-200 dark:text-zinc-700 mx-auto mb-4" />
-            <h3 className="text-lg font-semibold text-zinc-900 dark:text-white mb-2">
+          <div className="bg-surface-container-lowest rounded-2xl border border-outline-variant/20 shadow-ambient-sm p-12 text-center">
+            <Heart className="w-16 h-16 text-on-surface-variant/30 mx-auto mb-4" />
+            <h3 className="font-display text-lg font-semibold text-on-surface mb-2">
               No saved listings yet
             </h3>
-            <p className="text-zinc-500 dark:text-zinc-400 max-w-sm mx-auto mb-6">
+            <p className="text-on-surface-variant max-w-sm mx-auto mb-6">
               When you find a place you like, tap the heart icon to save it here
               for later.
             </p>
             <Link
               href="/search"
-              className="inline-flex items-center gap-2 px-6 py-3 bg-zinc-900 text-white dark:bg-white dark:text-zinc-900 rounded-full font-medium hover:bg-zinc-800 dark:hover:bg-zinc-200 transition-colors"
+              className="inline-flex items-center gap-2 px-6 py-3 bg-primary text-on-primary rounded-full font-medium hover:bg-primary/90 transition-colors"
             >
               <Search className="w-4 h-4" />
               Start exploring
@@ -164,13 +164,13 @@ export default function SavedListingsClient({
             {sortedListings.map((listing) => (
               <div
                 key={listing.id}
-                className={`bg-white dark:bg-zinc-900 rounded-2xl border border-zinc-100 dark:border-zinc-800 shadow-sm overflow-hidden group transition-all ${
+                className={`bg-surface-container-lowest rounded-2xl border border-outline-variant/20 shadow-ambient-sm overflow-hidden group transition-all ${
                   removingId === listing.id ? "opacity-50 scale-95" : ""
                 }`}
               >
                 {/* Image */}
                 <Link href={`/listings/${listing.id}`}>
-                  <div className="relative aspect-[4/3] bg-zinc-100 dark:bg-zinc-800 overflow-hidden">
+                  <div className="relative aspect-[4/3] bg-surface-container-high overflow-hidden">
                     {(() => {
                       const hasImage =
                         listing.images &&
@@ -204,14 +204,14 @@ export default function SavedListingsClient({
                             }
                           />
                           {showPlaceholder && (
-                            <div className="absolute inset-0 bg-gradient-to-br from-zinc-100 to-zinc-150 dark:from-zinc-800 dark:to-zinc-850 flex flex-col items-center justify-center">
-                              <div className="w-14 h-14 rounded-2xl bg-zinc-200/80 dark:bg-zinc-700/80 flex items-center justify-center mb-2">
+                            <div className="absolute inset-0 bg-gradient-to-br from-surface-container-high to-surface-container-high/80 flex flex-col items-center justify-center">
+                              <div className="w-14 h-14 rounded-2xl bg-surface-container-high flex items-center justify-center mb-2">
                                 <Home
-                                  className="w-7 h-7 text-zinc-400 dark:text-zinc-500"
+                                  className="w-7 h-7 text-on-surface-variant"
                                   strokeWidth={1.5}
                                 />
                               </div>
-                              <span className="text-xs text-zinc-400 dark:text-zinc-500 font-medium uppercase tracking-wider">
+                              <span className="text-xs text-on-surface-variant font-medium uppercase tracking-wider">
                                 No Photos
                               </span>
                             </div>
@@ -226,40 +226,40 @@ export default function SavedListingsClient({
                 {/* Content */}
                 <div className="p-4">
                   <Link href={`/listings/${listing.id}`}>
-                    <h3 className="font-semibold text-zinc-900 dark:text-white line-clamp-1 hover:underline">
+                    <h3 className="font-semibold text-on-surface line-clamp-1 hover:underline">
                       {listing.title}
                     </h3>
                   </Link>
                   {listing.location && (
-                    <p className="text-sm text-zinc-500 dark:text-zinc-400 flex items-center gap-1 mt-1">
+                    <p className="text-sm text-on-surface-variant flex items-center gap-1 mt-1">
                       <MapPin className="w-3 h-3" />
                       {listing.location.city}, {listing.location.state}
                     </p>
                   )}
                   <div className="flex items-center justify-between mt-3">
-                    <p className="font-semibold text-zinc-900 dark:text-white">
+                    <p className="font-semibold text-on-surface">
                       ${listing.price.toLocaleString()}
-                      <span className="text-zinc-400 font-normal text-sm">
+                      <span className="text-on-surface-variant font-normal text-sm">
                         /mo
                       </span>
                     </p>
-                    <p className="text-xs text-zinc-400">
+                    <p className="text-xs text-on-surface-variant">
                       Saved {formatDate(listing.savedAt)}
                     </p>
                   </div>
 
                   {/* Actions */}
-                  <div className="flex items-center gap-2 mt-4 pt-4 border-t border-zinc-100 dark:border-zinc-800">
+                  <div className="flex items-center gap-2 mt-4 pt-4 pt-4">
                     <Link
                       href={`/listings/${listing.id}`}
-                      className="flex-1 text-center py-2 text-sm font-medium text-zinc-600 hover:text-zinc-900 hover:bg-zinc-50 dark:text-zinc-400 dark:hover:text-white dark:hover:bg-zinc-800 rounded-lg transition-colors"
+                      className="flex-1 text-center py-2 text-sm font-medium text-on-surface-variant hover:text-on-surface hover:bg-surface-canvas rounded-lg transition-colors"
                     >
                       View details
                     </Link>
                     <button
                       onClick={() => handleRemove(listing.id)}
                       disabled={removingId === listing.id}
-                      className="p-2 text-zinc-400 hover:text-red-600 hover:bg-red-50 dark:hover:bg-red-900/30 rounded-lg transition-colors disabled:opacity-60"
+                      className="p-2 text-on-surface-variant hover:text-red-600 hover:bg-red-50 rounded-lg transition-colors disabled:opacity-60"
                       title="Remove from saved"
                     >
                       <Trash2 className="w-4 h-4" />

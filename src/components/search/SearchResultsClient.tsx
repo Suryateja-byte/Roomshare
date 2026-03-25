@@ -368,15 +368,15 @@ export function SearchResultsClient({
       {hasConfirmedZeroResults ? (
         <div
           data-testid="empty-state"
-          className="flex flex-col items-center justify-center py-12 sm:py-20 border-2 border-dashed border-zinc-100 dark:border-zinc-800 rounded-2xl sm:rounded-3xl bg-zinc-50/50 dark:bg-zinc-900/50"
+          className="flex flex-col items-center justify-center py-12 sm:py-20 border-2 border-dashed border-outline-variant/20 rounded-2xl sm:rounded-3xl bg-surface-canvas/50"
         >
-          <div className="w-14 h-14 sm:w-16 sm:h-16 rounded-full bg-white dark:bg-zinc-800 flex items-center justify-center shadow-sm mb-4">
-            <Search className="w-5 h-5 sm:w-6 sm:h-6 text-zinc-500" />
+          <div className="w-14 h-14 sm:w-16 sm:h-16 rounded-full bg-surface-container-lowest flex items-center justify-center shadow-sm mb-4">
+            <Search className="w-5 h-5 sm:w-6 sm:h-6 text-on-surface-variant" />
           </div>
-          <h2 className="text-base sm:text-lg font-semibold text-zinc-900 dark:text-white mb-2">
+          <h2 className="text-base sm:text-lg font-semibold text-on-surface mb-2">
             No matches found
           </h2>
-          <p className="text-zinc-500 dark:text-zinc-400 text-sm max-w-xs text-center px-4">
+          <p className="text-on-surface-variant text-sm max-w-xs text-center px-4">
             Try adjusting your filters, expanding your price range, or
             searching a nearby area.
             {query ? ` No results for "${query}".` : ""}
@@ -395,7 +395,7 @@ export function SearchResultsClient({
           ) : (
             <Link
               href={`/search?${clearAllFilters(new URLSearchParams(searchParamsString))}`}
-              className="mt-6 px-4 py-2.5 rounded-full border border-zinc-200 dark:border-zinc-700 bg-transparent hover:bg-zinc-50 dark:hover:bg-zinc-800 text-zinc-900 dark:text-white text-sm font-medium transition-colors touch-target"
+              className="mt-6 px-4 py-2.5 rounded-full border border-outline-variant/20 bg-transparent hover:bg-surface-canvas text-on-surface text-sm font-medium transition-colors touch-target"
             >
               Clear all filters
             </Link>
@@ -409,7 +409,7 @@ export function SearchResultsClient({
           {/* Price toggle */}
           {allListings.length > 0 && (
             <div className="flex items-center justify-between mb-4">
-              <p className="text-sm text-zinc-500 dark:text-zinc-400">
+              <p className="text-sm text-on-surface-variant">
                 {total !== null
                   ? `${total} ${total === 1 ? "place" : "places"}${query ? ` in ${query}` : ""}`
                   : `100+ places${query ? ` in ${query}` : ""}`}
@@ -442,7 +442,7 @@ export function SearchResultsClient({
                     <>
                       <NearMatchSeparator nearMatchCount={nearMatchCount} />
                       {nearMatchExpansion && (
-                        <p className="col-span-full text-sm text-amber-600 dark:text-amber-400 -mt-2 mb-2">
+                        <p className="col-span-full text-sm text-amber-600 -mt-2 mb-2">
                           {nearMatchExpansion}
                         </p>
                       )}
@@ -465,7 +465,7 @@ export function SearchResultsClient({
           {/* Split stay suggestions for long durations */}
           {splitStayPairs.length > 0 && (
             <div className="mt-8">
-              <h3 className="text-sm font-medium text-zinc-700 dark:text-zinc-300 mb-3">
+              <h3 className="text-sm font-medium text-on-surface-variant mb-3">
                 Split your stay
               </h3>
               <div className="grid grid-cols-1 gap-4">
@@ -488,7 +488,7 @@ export function SearchResultsClient({
           {/* Load more section with progress indicator */}
           {isHydrated && nextCursor && !reachedCap && !isDegraded && (
             <div className="flex flex-col items-center mt-8 mb-4 gap-2">
-              <p className="text-xs text-zinc-500 dark:text-zinc-500">
+              <p className="text-xs text-on-surface-variant">
                 Showing {allListings.length} of{" "}
                 {total !== null ? `~${total}` : "100+"} listings
               </p>
@@ -501,7 +501,7 @@ export function SearchResultsClient({
                     ? "Loading more results"
                     : `Show more places. Currently showing ${allListings.length}${total !== null ? ` of ${total}` : ""} listings`
                 }
-                className="inline-flex items-center gap-2 px-6 py-3 rounded-full bg-indigo-500 hover:bg-indigo-600 text-white text-sm font-medium transition-colors disabled:opacity-50 touch-target shadow-sm"
+                className="inline-flex items-center gap-2 px-6 py-3 rounded-full bg-gradient-to-br from-primary to-primary-container hover:from-primary hover:to-primary text-on-primary text-sm font-medium transition-colors disabled:opacity-50 touch-target shadow-ambient-sm"
               >
                 {isLoadingMore ? (
                   <>
@@ -520,7 +520,7 @@ export function SearchResultsClient({
 
           {/* Cap reached — nudge user to refine */}
           {reachedCap && nextCursor && (
-            <p className="text-center text-sm text-zinc-500 dark:text-zinc-400 mt-6">
+            <p className="text-center text-sm text-on-surface-variant mt-6">
               Showing {allListings.length} results.{" "}
               Try adjusting your filters or zooming into a specific area to find
               more relevant listings.
@@ -530,7 +530,7 @@ export function SearchResultsClient({
           {/* Load error */}
           {loadError && (
             <div className="flex justify-center mt-4" role="alert">
-              <p className="text-sm text-red-600 dark:text-red-400">
+              <p className="text-sm text-red-600">
                 {loadError}{" "}
                 <button
                   onClick={handleLoadMore}
@@ -546,14 +546,14 @@ export function SearchResultsClient({
           {!nextCursor &&
             allListings.length > 0 &&
             extraListings.length > 0 && (
-              <p className="text-center text-sm text-zinc-500 dark:text-zinc-500 mt-8">
+              <p className="text-center text-sm text-on-surface-variant mt-8">
                 You&apos;ve seen all {allListings.length} results
               </p>
             )}
 
           {/* Contextual footer */}
           {allListings.length > 0 && (
-            <p className="text-center text-xs text-zinc-500 dark:text-zinc-500 mt-6 pb-4">
+            <p className="text-center text-xs text-on-surface-variant mt-6 pb-4">
               {total === null ? "100+" : total} places
               {query ? ` in ${query}` : ""}
             </p>

@@ -463,10 +463,10 @@ describe("FilterModal", () => {
 
       const applyBtn = screen.getByTestId("filter-modal-apply");
       expect(applyBtn.className).toContain("bg-amber-500");
-      expect(applyBtn.className).not.toContain("bg-indigo-500");
+      expect(applyBtn.className).not.toContain("bg-primary");
     });
 
-    it("apply button keeps indigo bg when count > 0", () => {
+    it("apply button keeps primary bg when count > 0", () => {
       render(
         <FilterModal
           {...makeProps({
@@ -478,7 +478,7 @@ describe("FilterModal", () => {
       );
 
       const applyBtn = screen.getByTestId("filter-modal-apply");
-      expect(applyBtn.className).toContain("bg-indigo-500");
+      expect(applyBtn.className).toContain("bg-primary");
       expect(applyBtn.className).not.toContain("bg-amber-500");
     });
 

@@ -30,77 +30,77 @@ const actionConfig: Record<
   USER_SUSPENDED: {
     icon: User,
     label: "User Suspended",
-    color: "text-red-500 bg-red-100 dark:bg-red-900/30",
+    color: "text-red-500 bg-red-100",
   },
   USER_UNSUSPENDED: {
     icon: User,
     label: "User Unsuspended",
-    color: "text-green-500 bg-green-100 dark:bg-green-900/30",
+    color: "text-green-500 bg-green-100",
   },
   USER_DELETED: {
     icon: User,
     label: "User Deleted",
-    color: "text-red-500 bg-red-100 dark:bg-red-900/30",
+    color: "text-red-500 bg-red-100",
   },
   USER_VERIFIED: {
     icon: Shield,
     label: "User Verified",
-    color: "text-green-500 bg-green-100 dark:bg-green-900/30",
+    color: "text-green-500 bg-green-100",
   },
   USER_UNVERIFIED: {
     icon: Shield,
     label: "Verification Removed",
-    color: "text-amber-500 bg-amber-100 dark:bg-amber-900/30",
+    color: "text-amber-500 bg-amber-100",
   },
   LISTING_DELETED: {
     icon: Home,
     label: "Listing Deleted",
-    color: "text-red-500 bg-red-100 dark:bg-red-900/30",
+    color: "text-red-500 bg-red-100",
   },
   LISTING_HIDDEN: {
     icon: Home,
     label: "Listing Hidden",
-    color: "text-amber-500 bg-amber-100 dark:bg-amber-900/30",
+    color: "text-amber-500 bg-amber-100",
   },
   LISTING_RENTED: {
     icon: Home,
     label: "Listing Rented",
-    color: "text-blue-500 bg-blue-100 dark:bg-blue-900/30",
+    color: "text-blue-500 bg-blue-100",
   },
   LISTING_RESTORED: {
     icon: Home,
     label: "Listing Restored",
-    color: "text-green-500 bg-green-100 dark:bg-green-900/30",
+    color: "text-green-500 bg-green-100",
   },
   REPORT_RESOLVED: {
     icon: Flag,
     label: "Report Resolved",
-    color: "text-green-500 bg-green-100 dark:bg-green-900/30",
+    color: "text-green-500 bg-green-100",
   },
   REPORT_DISMISSED: {
     icon: Flag,
     label: "Report Dismissed",
-    color: "text-zinc-500 bg-zinc-100 dark:bg-zinc-900/30",
+    color: "text-on-surface-variant bg-surface-container-high",
   },
   VERIFICATION_APPROVED: {
     icon: FileCheck,
     label: "Verification Approved",
-    color: "text-green-500 bg-green-100 dark:bg-green-900/30",
+    color: "text-green-500 bg-green-100",
   },
   VERIFICATION_REJECTED: {
     icon: FileCheck,
     label: "Verification Rejected",
-    color: "text-red-500 bg-red-100 dark:bg-red-900/30",
+    color: "text-red-500 bg-red-100",
   },
   ADMIN_GRANTED: {
     icon: Shield,
     label: "Admin Access Granted",
-    color: "text-purple-500 bg-purple-100 dark:bg-purple-900/30",
+    color: "text-purple-500 bg-purple-100",
   },
   ADMIN_REVOKED: {
     icon: Shield,
     label: "Admin Access Revoked",
-    color: "text-amber-500 bg-amber-100 dark:bg-amber-900/30",
+    color: "text-amber-500 bg-amber-100",
   },
 };
 
@@ -164,42 +164,42 @@ export default async function AuditLogPage({ searchParams }: PageProps) {
   const actionTypes = Object.keys(actionConfig);
 
   return (
-    <div className="min-h-screen bg-zinc-50 dark:bg-zinc-950">
+    <div className="min-h-screen bg-surface-canvas">
       <div className="max-w-7xl mx-auto px-4 py-8">
         {/* Header */}
         <div className="flex items-center justify-between mb-8">
           <div>
-            <div className="flex items-center gap-2 text-sm text-zinc-500 dark:text-zinc-400 mb-2">
+            <div className="flex items-center gap-2 text-sm text-on-surface-variant mb-2">
               <Link
                 href="/admin"
-                className="hover:text-zinc-700 dark:hover:text-zinc-300"
+                className="hover:text-on-surface"
               >
                 Admin
               </Link>
               <span>/</span>
               <span>Audit Log</span>
             </div>
-            <h1 className="text-3xl font-bold text-zinc-900 dark:text-white">
+            <h1 className="text-3xl font-display font-bold text-on-surface">
               Audit Log
             </h1>
-            <p className="text-zinc-500 dark:text-zinc-400 mt-1">
+            <p className="text-on-surface-variant mt-1">
               Track all administrative actions taken on the platform
             </p>
           </div>
         </div>
 
         {/* Filters */}
-        <div className="bg-white dark:bg-zinc-900 rounded-xl border border-zinc-100 dark:border-zinc-800 p-4 mb-6">
+        <div className="bg-surface-container-lowest rounded-lg border border-outline-variant/20 p-4 mb-6">
           <div className="flex flex-wrap items-center gap-2">
-            <span className="text-sm font-medium text-zinc-700 dark:text-zinc-300">
+            <span className="text-sm font-medium text-on-surface">
               Filter by action:
             </span>
             <Link
               href="/admin/audit"
               className={`px-3 py-1.5 rounded-lg text-sm font-medium transition-colors ${
                 !actionFilter
-                  ? "bg-zinc-900 dark:bg-white text-white dark:text-zinc-900"
-                  : "bg-zinc-100 dark:bg-zinc-800 text-zinc-600 dark:text-zinc-400 hover:bg-zinc-200 dark:hover:bg-zinc-700"
+                  ? "bg-on-surface text-white"
+                  : "bg-surface-container-high text-on-surface-variant hover:bg-surface-container-high/80"
               }`}
             >
               All
@@ -210,8 +210,8 @@ export default async function AuditLogPage({ searchParams }: PageProps) {
                 href={`/admin/audit?action=${action}`}
                 className={`px-3 py-1.5 rounded-lg text-sm font-medium transition-colors ${
                   actionFilter === action
-                    ? "bg-zinc-900 dark:bg-white text-white dark:text-zinc-900"
-                    : "bg-zinc-100 dark:bg-zinc-800 text-zinc-600 dark:text-zinc-400 hover:bg-zinc-200 dark:hover:bg-zinc-700"
+                    ? "bg-on-surface text-white"
+                    : "bg-surface-container-high text-on-surface-variant hover:bg-surface-container-high/80"
                 }`}
               >
                 {actionConfig[action]?.label || action}
@@ -221,24 +221,24 @@ export default async function AuditLogPage({ searchParams }: PageProps) {
         </div>
 
         {/* Audit Log Table */}
-        <div className="bg-white dark:bg-zinc-900 rounded-xl border border-zinc-100 dark:border-zinc-800 overflow-hidden">
+        <div className="bg-surface-container-lowest rounded-lg border border-outline-variant/20 overflow-hidden">
           <div className="overflow-x-auto">
             <table className="w-full">
               <thead>
-                <tr className="border-b border-zinc-100 dark:border-zinc-800">
-                  <th className="px-6 py-4 text-left text-xs font-semibold text-zinc-500 dark:text-zinc-400 uppercase tracking-wider">
+                <tr className="bg-surface-container-high">
+                  <th className="px-6 py-4 text-left text-xs font-semibold text-on-surface-variant uppercase tracking-wider">
                     Action
                   </th>
-                  <th className="px-6 py-4 text-left text-xs font-semibold text-zinc-500 dark:text-zinc-400 uppercase tracking-wider">
+                  <th className="px-6 py-4 text-left text-xs font-semibold text-on-surface-variant uppercase tracking-wider">
                     Admin
                   </th>
-                  <th className="px-6 py-4 text-left text-xs font-semibold text-zinc-500 dark:text-zinc-400 uppercase tracking-wider">
+                  <th className="px-6 py-4 text-left text-xs font-semibold text-on-surface-variant uppercase tracking-wider">
                     Target
                   </th>
-                  <th className="px-6 py-4 text-left text-xs font-semibold text-zinc-500 dark:text-zinc-400 uppercase tracking-wider">
+                  <th className="px-6 py-4 text-left text-xs font-semibold text-on-surface-variant uppercase tracking-wider">
                     Details
                   </th>
-                  <th className="px-6 py-4 text-left text-xs font-semibold text-zinc-500 dark:text-zinc-400 uppercase tracking-wider">
+                  <th className="px-6 py-4 text-left text-xs font-semibold text-on-surface-variant uppercase tracking-wider">
                     <div className="flex items-center gap-1">
                       <Clock className="w-3.5 h-3.5" />
                       Time
@@ -246,12 +246,12 @@ export default async function AuditLogPage({ searchParams }: PageProps) {
                   </th>
                 </tr>
               </thead>
-              <tbody className="divide-y divide-zinc-100 dark:divide-zinc-800">
+              <tbody>
                 {result.logs.length === 0 ? (
                   <tr>
                     <td
                       colSpan={5}
-                      className="px-6 py-12 text-center text-zinc-500 dark:text-zinc-400"
+                      className="px-6 py-12 text-center text-on-surface-variant"
                     >
                       No audit logs found
                     </td>
@@ -261,14 +261,14 @@ export default async function AuditLogPage({ searchParams }: PageProps) {
                     const config = actionConfig[log.action] || {
                       icon: Shield,
                       label: log.action,
-                      color: "text-zinc-500 bg-zinc-100 dark:bg-zinc-800",
+                      color: "text-on-surface-variant bg-surface-container-high",
                     };
                     const ActionIcon = config.icon;
 
                     return (
                       <tr
                         key={log.id}
-                        className="hover:bg-zinc-50 dark:hover:bg-zinc-800/50"
+                        className="hover:bg-surface-container-high/50"
                       >
                         <td className="px-6 py-4">
                           <div className="flex items-center gap-3">
@@ -277,7 +277,7 @@ export default async function AuditLogPage({ searchParams }: PageProps) {
                             >
                               <ActionIcon className="w-4 h-4" />
                             </div>
-                            <span className="font-medium text-zinc-900 dark:text-white text-sm">
+                            <span className="font-medium text-on-surface text-sm">
                               {config.label}
                             </span>
                           </div>
@@ -293,32 +293,32 @@ export default async function AuditLogPage({ searchParams }: PageProps) {
                                 className="rounded-full"
                               />
                             ) : (
-                              <div className="w-6 h-6 bg-zinc-200 dark:bg-zinc-700 rounded-full flex items-center justify-center">
-                                <User className="w-3 h-3 text-zinc-500" />
+                              <div className="w-6 h-6 bg-surface-container-high rounded-full flex items-center justify-center">
+                                <User className="w-3 h-3 text-on-surface-variant" />
                               </div>
                             )}
-                            <span className="text-sm text-zinc-700 dark:text-zinc-300">
+                            <span className="text-sm text-on-surface">
                               {log.admin.name || `Admin ${log.admin.id.substring(0, 8)}`}
                             </span>
                           </div>
                         </td>
                         <td className="px-6 py-4">
                           <div className="text-sm">
-                            <span className="text-zinc-500 dark:text-zinc-400">
+                            <span className="text-on-surface-variant">
                               {log.targetType}:
                             </span>{" "}
-                            <span className="text-zinc-700 dark:text-zinc-300 font-mono text-xs">
+                            <span className="text-on-surface font-mono text-xs">
                               {log.targetId.substring(0, 8)}...
                             </span>
                           </div>
                         </td>
                         <td className="px-6 py-4">
-                          <p className="text-sm text-zinc-500 dark:text-zinc-400 max-w-xs truncate">
+                          <p className="text-sm text-on-surface-variant max-w-xs truncate">
                             {formatDetails(log.details) || "-"}
                           </p>
                         </td>
                         <td className="px-6 py-4">
-                          <span className="text-sm text-zinc-500 dark:text-zinc-400 whitespace-nowrap">
+                          <span className="text-sm text-on-surface-variant whitespace-nowrap">
                             {formatDate(log.createdAt)}
                           </span>
                         </td>
@@ -332,8 +332,8 @@ export default async function AuditLogPage({ searchParams }: PageProps) {
 
           {/* Pagination */}
           {result.pagination.totalPages > 1 && (
-            <div className="flex items-center justify-between px-6 py-4 border-t border-zinc-100 dark:border-zinc-800">
-              <p className="text-sm text-zinc-500 dark:text-zinc-400">
+            <div className="flex items-center justify-between px-6 py-4 border-t border-outline-variant/20">
+              <p className="text-sm text-on-surface-variant">
                 Showing {(page - 1) * result.pagination.limit + 1} to{" "}
                 {Math.min(
                   page * result.pagination.limit,
@@ -344,26 +344,26 @@ export default async function AuditLogPage({ searchParams }: PageProps) {
               <div className="flex items-center gap-2">
                 <Link
                   href={`/admin/audit?page=${page - 1}${actionFilter ? `&action=${actionFilter}` : ""}`}
-                  className={`p-2 rounded-lg border border-zinc-200 dark:border-zinc-700 ${
+                  className={`p-2 rounded-lg border border-outline-variant/20 ${
                     page <= 1
                       ? "opacity-50 pointer-events-none"
-                      : "hover:bg-zinc-100 dark:hover:bg-zinc-800"
+                      : "hover:bg-surface-container-high"
                   }`}
                 >
-                  <ChevronLeft className="w-4 h-4 text-zinc-600 dark:text-zinc-400" />
+                  <ChevronLeft className="w-4 h-4 text-on-surface-variant" />
                 </Link>
-                <span className="px-3 py-1 text-sm font-medium text-zinc-700 dark:text-zinc-300">
+                <span className="px-3 py-1 text-sm font-medium text-on-surface">
                   Page {page} of {result.pagination.totalPages}
                 </span>
                 <Link
                   href={`/admin/audit?page=${page + 1}${actionFilter ? `&action=${actionFilter}` : ""}`}
-                  className={`p-2 rounded-lg border border-zinc-200 dark:border-zinc-700 ${
+                  className={`p-2 rounded-lg border border-outline-variant/20 ${
                     page >= result.pagination.totalPages
                       ? "opacity-50 pointer-events-none"
-                      : "hover:bg-zinc-100 dark:hover:bg-zinc-800"
+                      : "hover:bg-surface-container-high"
                   }`}
                 >
-                  <ChevronRight className="w-4 h-4 text-zinc-600 dark:text-zinc-400" />
+                  <ChevronRight className="w-4 h-4 text-on-surface-variant" />
                 </Link>
               </div>
             </div>

@@ -7,7 +7,7 @@ function SimpleSkeleton({ className }: { className?: string }) {
 
 export default function ListingLoading() {
   return (
-    <div className="min-h-screen bg-background pb-20">
+    <div className="min-h-screen bg-surface-canvas pb-20">
       {/* Hero Gallery Skeleton */}
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 pt-6">
         <div className="grid grid-cols-1 md:grid-cols-4 gap-4 h-[400px] md:h-[500px] rounded-3xl overflow-hidden">
@@ -91,7 +91,7 @@ export default function ListingLoading() {
           {/* Sidebar Skeleton */}
           <div className="lg:w-[380px]">
             <div className="sticky top-24">
-              <div className="bg-white dark:bg-zinc-800 rounded-2xl shadow-lg border border-border/50 p-6 space-y-6">
+              <div className="bg-surface-container-lowest rounded-2xl shadow-ambient border border-outline-variant/20 p-6 space-y-6">
                 <div className="flex justify-between items-end">
                   <SimpleSkeleton className="h-10 w-32" />
                   <SimpleSkeleton className="h-5 w-24" />

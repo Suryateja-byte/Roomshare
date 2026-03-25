@@ -21,24 +21,24 @@ export default function ProfileWarningBanner({
   if (percentage >= 60) return null;
 
   return (
-    <div className="mb-6 bg-amber-50 dark:bg-amber-950/30 border border-amber-200 dark:border-amber-800 rounded-xl p-4">
+    <div className="mb-6 bg-amber-50 border border-amber-200 rounded-xl p-4">
       <div className="flex items-start gap-3">
-        <div className="flex-shrink-0 p-2 bg-amber-100 dark:bg-amber-900/50 rounded-lg">
-          <User className="w-5 h-5 text-amber-600 dark:text-amber-400" />
+        <div className="flex-shrink-0 p-2 bg-amber-100 rounded-lg">
+          <User className="w-5 h-5 text-amber-600" />
         </div>
         <div className="flex-1 min-w-0">
           <div className="flex items-start justify-between gap-2">
             <div>
-              <h3 className="text-sm font-semibold text-amber-900 dark:text-amber-200">
+              <h3 className="text-sm font-semibold text-amber-900">
                 Complete your profile for better results
               </h3>
-              <p className="text-sm text-amber-700 dark:text-amber-400 mt-0.5">
+              <p className="text-sm text-amber-700 mt-0.5">
                 Listings from complete profiles get 3x more inquiries.
               </p>
             </div>
             <button
               onClick={() => setIsDismissed(true)}
-              className="flex-shrink-0 p-1 text-amber-500 hover:text-amber-700 dark:text-amber-400 dark:hover:text-amber-300 transition-colors"
+              className="flex-shrink-0 p-1 text-amber-500 hover:text-amber-700 transition-colors"
               aria-label="Dismiss"
             >
               <X className="w-4 h-4" />
@@ -48,16 +48,16 @@ export default function ProfileWarningBanner({
           {/* Progress bar */}
           <div className="mt-3">
             <div className="flex items-center justify-between text-xs mb-1">
-              <span className="text-amber-600 dark:text-amber-400">
+              <span className="text-amber-600">
                 Profile {percentage}% complete
               </span>
-              <span className="text-amber-500 dark:text-amber-500">
+              <span className="text-amber-500">
                 {missing.length} items remaining
               </span>
             </div>
-            <div className="w-full bg-amber-200 dark:bg-amber-900 rounded-full h-1.5">
+            <div className="w-full bg-amber-200 rounded-full h-1.5">
               <div
-                className="h-1.5 rounded-full bg-amber-500 dark:bg-amber-400 transition-all"
+                className="h-1.5 rounded-full bg-amber-500 transition-all"
                 style={{ width: `${percentage}%` }}
               />
             </div>
@@ -68,13 +68,13 @@ export default function ProfileWarningBanner({
             {missing.slice(0, 2).map((item, index) => (
               <span
                 key={index}
-                className="inline-flex items-center text-xs px-2 py-0.5 bg-amber-100 dark:bg-amber-900/50 text-amber-700 dark:text-amber-300 rounded-full"
+                className="inline-flex items-center text-xs px-2 py-0.5 bg-amber-100 text-amber-700 rounded-full"
               >
                 {item}
               </span>
             ))}
             {missing.length > 2 && (
-              <span className="text-xs text-amber-500 dark:text-amber-500">
+              <span className="text-xs text-amber-500">
                 +{missing.length - 2} more
               </span>
             )}
@@ -83,7 +83,7 @@ export default function ProfileWarningBanner({
           {/* CTA */}
           <Link
             href="/profile/edit"
-            className="inline-flex items-center gap-1 mt-3 text-sm font-medium text-amber-700 dark:text-amber-300 hover:text-amber-900 dark:hover:text-amber-200 transition-colors"
+            className="inline-flex items-center gap-1 mt-3 text-sm font-medium text-amber-700 hover:text-amber-900 transition-colors"
           >
             Complete profile
             <ChevronRight className="w-4 h-4" />

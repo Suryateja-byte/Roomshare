@@ -89,8 +89,8 @@ export default function ListingStatusToggle({
           />
 
           {/* Dropdown */}
-          <div className="absolute left-0 mt-2 w-56 bg-white dark:bg-zinc-900 rounded-xl shadow-xl border border-zinc-100 dark:border-zinc-700 py-2 z-50 animate-in fade-in zoom-in-95 duration-200">
-            <p className="px-4 py-2 text-xs font-semibold text-zinc-400 dark:text-zinc-500 uppercase tracking-wider">
+          <div className="absolute left-0 mt-2 w-56 bg-surface-container-lowest rounded-xl shadow-xl border border-outline-variant/20 py-2 z-50 animate-in fade-in zoom-in-95 duration-200">
+            <p className="px-4 py-2 text-xs font-semibold text-on-surface-variant uppercase tracking-wider">
               Listing Status
             </p>
             {(Object.keys(statusConfig) as ListingStatus[]).map((statusKey) => {
@@ -102,21 +102,21 @@ export default function ListingStatusToggle({
                 <button
                   key={statusKey}
                   onClick={() => handleStatusChange(statusKey)}
-                  className={`w-full flex items-center gap-3 px-4 py-3 text-left hover:bg-zinc-50 dark:hover:bg-zinc-800 transition-colors ${isSelected ? "bg-zinc-50 dark:bg-zinc-800" : ""}`}
+                  className={`w-full flex items-center gap-3 px-4 py-3 text-left hover:bg-surface-canvas transition-colors ${isSelected ? "bg-surface-canvas" : ""}`}
                 >
                   <div className={`p-2 rounded-lg ${itemConfig.color}`}>
                     <ItemIcon className="w-4 h-4" />
                   </div>
                   <div className="flex-1">
-                    <p className="font-medium text-sm text-zinc-900 dark:text-zinc-100">
+                    <p className="font-medium text-sm text-on-surface">
                       {itemConfig.label}
                     </p>
-                    <p className="text-xs text-zinc-500 dark:text-zinc-400">
+                    <p className="text-xs text-on-surface-variant">
                       {itemConfig.description}
                     </p>
                   </div>
                   {isSelected && (
-                    <div className="w-2 h-2 rounded-full bg-zinc-900 dark:bg-zinc-100" />
+                    <div className="w-2 h-2 rounded-full bg-on-surface" />
                   )}
                 </button>
               );

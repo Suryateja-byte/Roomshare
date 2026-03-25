@@ -32,16 +32,16 @@ export default function NearbyPlacesSection({
   return (
     <section
       id="nearby-places"
-      className="mt-12 pt-8 border-t border-zinc-100 dark:border-zinc-800"
+      className="mt-12 pt-8 border-t border-outline-variant/20"
     >
       {/* Minimal Section Header */}
       <div className="flex items-center justify-between mb-6 px-1 sm:px-0">
         <div>
-          <h2 className="text-xl font-bold text-zinc-900 dark:text-white flex items-center gap-2">
+          <h2 className="text-xl font-bold text-on-surface flex items-center gap-2">
             <MapPin className="w-5 h-5" />
             Nearby Places
           </h2>
-          <p className="text-zinc-500 dark:text-zinc-400 mt-1">
+          <p className="text-on-surface-variant mt-1">
             Discover convenience at your doorstep
           </p>
         </div>
@@ -52,9 +52,9 @@ export default function NearbyPlacesSection({
         className="
           relative w-full
           h-[60vh] sm:h-[550px] lg:h-[600px]
-          bg-white dark:bg-zinc-900
+          bg-surface-container-lowest
           rounded-2xl
-          border border-zinc-200/80 dark:border-zinc-800/80
+          border border-outline-variant/20/80
           shadow-2xl
           overflow-hidden
           lg:flex lg:flex-row
@@ -67,8 +67,8 @@ export default function NearbyPlacesSection({
             absolute inset-0 z-30
             lg:static lg:z-auto lg:w-[400px]
             flex flex-col
-            border-b lg:border-b-0 lg:border-r border-zinc-200 dark:border-zinc-800
-            bg-white dark:bg-zinc-900
+            border-b lg:border-b-0 lg:border-r border-outline-variant/20
+            bg-surface-container-lowest
             transition-all duration-300 ease-out
             ${
               viewMode === "list"
@@ -86,7 +86,7 @@ export default function NearbyPlacesSection({
         </div>
 
         {/* Right Panel: Map */}
-        <div className="w-full h-full absolute inset-0 z-10 lg:static lg:flex-1 bg-zinc-50 dark:bg-zinc-900">
+        <div className="w-full h-full absolute inset-0 z-10 lg:static lg:flex-1 bg-surface-canvas">
           <NearbyPlacesMap
             listingLat={listingLat}
             listingLng={listingLng}
@@ -100,7 +100,7 @@ export default function NearbyPlacesSection({
         <div className="absolute bottom-6 left-1/2 -translate-x-1/2 z-40 lg:hidden">
           <button
             onClick={() => setViewMode(viewMode === "list" ? "map" : "list")}
-            className="flex items-center gap-2 px-5 py-2.5 bg-zinc-900 dark:bg-white text-white dark:text-zinc-900 rounded-full shadow-xl shadow-zinc-900/20 font-semibold text-sm transform transition-transform active:scale-95 hover:scale-105"
+            className="flex items-center gap-2 px-5 py-2.5 bg-on-surface text-white rounded-full shadow-xl shadow-on-surface/20 font-semibold text-sm transform transition-transform active:scale-95 hover:scale-105"
           >
             <span>{viewMode === "list" ? "Map" : "List"}</span>
             {viewMode === "list" ? (

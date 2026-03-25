@@ -45,22 +45,22 @@ export function MapMovedBanner({
 
   if (variant === "map") {
     return (
-      <div className="absolute top-16 left-1/2 -translate-x-1/2 z-[50] flex items-center gap-2 bg-zinc-900/90 dark:bg-white/90 backdrop-blur-md rounded-full shadow-lg px-2 py-1.5 border border-white/10">
+      <div className="absolute top-16 left-1/2 -translate-x-1/2 z-[50] flex items-center gap-2 bg-on-surface/90 backdrop-blur-md rounded-full shadow-lg px-2 py-1.5 border border-white/10">
         <button
           onClick={onSearch}
           disabled={isSearchLoading}
-          className="text-sm font-medium text-white dark:text-zinc-900 hover:text-indigo-400 dark:hover:text-indigo-600 disabled:opacity-50 disabled:cursor-not-allowed h-11 px-4 inline-flex items-center gap-2 rounded-full focus:outline-none focus-visible:ring-2 focus-visible:ring-zinc-900/30 dark:focus-visible:ring-zinc-400/40 focus-visible:ring-offset-2 transition-colors"
+          className="text-sm font-medium text-white hover:text-primary disabled:opacity-50 disabled:cursor-not-allowed h-11 px-4 inline-flex items-center gap-2 rounded-full focus:outline-none focus-visible:ring-2 focus-visible:ring-primary/30 focus-visible:ring-offset-2 transition-colors"
         >
           {isSearchLoading && (
             <Loader2 className="w-3.5 h-3.5 animate-spin" aria-hidden="true" />
           )}
           {label}
         </button>
-        <div className="w-[1px] h-6 bg-white/20 dark:bg-zinc-900/20" />
+        <div className="w-[1px] h-6 bg-white/20" />
         <button
           onClick={onReset}
           aria-label="Reset map view"
-          className="p-1 w-11 h-11 inline-flex items-center justify-center text-zinc-400 hover:text-white dark:hover:text-zinc-900 rounded-full focus:outline-none focus-visible:ring-2 focus-visible:ring-zinc-900/30 dark:focus-visible:ring-zinc-400/40 focus-visible:ring-offset-2 transition-colors"
+          className="p-1 w-11 h-11 inline-flex items-center justify-center text-on-surface-variant hover:text-white rounded-full focus:outline-none focus-visible:ring-2 focus-visible:ring-primary/30 focus-visible:ring-offset-2 transition-colors"
         >
           <X className="h-4 w-4" />
         </button>
@@ -70,8 +70,8 @@ export function MapMovedBanner({
 
   // List variant
   return (
-    <div className="bg-amber-50 dark:bg-amber-950/30 border-b border-amber-200 dark:border-amber-800 px-4 py-2 flex items-center justify-between">
-      <div className="flex items-center gap-2 text-amber-800 dark:text-amber-200">
+    <div className="bg-amber-50 border-b border-amber-200 px-4 py-2 flex items-center justify-between">
+      <div className="flex items-center gap-2 text-amber-800">
         <MapPin className="lucide-map-pin h-4 w-4" />
         <span className="text-sm">Map moved — results not updated</span>
       </div>
@@ -79,7 +79,7 @@ export function MapMovedBanner({
         <button
           onClick={onSearch}
           disabled={isSearchLoading}
-          className="text-sm font-medium text-amber-700 dark:text-amber-300 hover:text-amber-800 dark:hover:text-amber-200 disabled:opacity-50 disabled:cursor-not-allowed h-11 px-2 inline-flex items-center gap-1.5 rounded-md focus:outline-none focus-visible:ring-2 focus-visible:ring-amber-500 focus-visible:ring-offset-2"
+          className="text-sm font-medium text-amber-700 hover:text-amber-800 disabled:opacity-50 disabled:cursor-not-allowed h-11 px-2 inline-flex items-center gap-1.5 rounded-md focus:outline-none focus-visible:ring-2 focus-visible:ring-amber-500 focus-visible:ring-offset-2"
         >
           {isSearchLoading && (
             <Loader2 className="w-3.5 h-3.5 animate-spin" aria-hidden="true" />
@@ -89,7 +89,7 @@ export function MapMovedBanner({
         <button
           onClick={onReset}
           aria-label="Reset map view"
-          className="p-1 w-11 h-11 inline-flex items-center justify-center text-amber-500 hover:text-amber-700 dark:hover:text-amber-300 rounded-md focus:outline-none focus-visible:ring-2 focus-visible:ring-amber-500 focus-visible:ring-offset-2"
+          className="p-1 w-11 h-11 inline-flex items-center justify-center text-amber-500 hover:text-amber-700 rounded-md focus:outline-none focus-visible:ring-2 focus-visible:ring-amber-500 focus-visible:ring-offset-2"
         >
           <X className="h-4 w-4" />
         </button>

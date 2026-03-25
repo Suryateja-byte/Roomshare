@@ -2,7 +2,11 @@
  * Haptic feedback utilities for mobile interactions.
  *
  * Uses navigator.vibrate() when available, with no-op fallback.
- * Combine with CSS micro-animations for visual feedback.
+ * Haptic vibrations fire regardless of prefers-reduced-motion
+ * (different sensory channel from visual motion).
+ *
+ * Visual CSS classes are decoupled and gated behind
+ * motion-safe: prefix to respect prefers-reduced-motion.
  */
 
 /**
@@ -35,17 +39,18 @@ export function triggerMediumHaptic(): void {
 
 /**
  * CSS class names for haptic-style visual feedback.
- * Apply these to interactive elements for micro-animation feedback.
+ * Visual effects are gated behind motion-safe: to respect
+ * prefers-reduced-motion preferences.
  *
  * Usage: <button className={`${HAPTIC_CLASSES.tap} other-classes`}>
  */
 export const HAPTIC_CLASSES = {
   /** Quick scale-down on press — good for buttons, cards */
-  tap: "active:scale-[0.97] transition-transform duration-75",
+  tap: "motion-safe:active:scale-[0.97] transition-transform duration-75",
   /** Subtle background flash on press — good for list items */
   flash:
-    "active:bg-zinc-100/50 dark:active:bg-zinc-800/50 transition-colors duration-75",
+    "motion-safe:active:bg-surface-container-high/50 transition-colors duration-75",
   /** Combined tap + flash for primary interactive elements */
   interactive:
-    "active:scale-[0.97] active:bg-zinc-100/50 dark:active:bg-zinc-800/50 transition-all duration-75",
+    "motion-safe:active:scale-[0.97] motion-safe:active:bg-surface-container-high/50 transition-all duration-75",
 } as const;

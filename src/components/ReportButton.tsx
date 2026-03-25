@@ -88,7 +88,7 @@ export default function ReportButton({ listingId }: ReportButtonProps) {
       <Button
         variant="ghost"
         size="sm"
-        className="text-zinc-500 hover:text-red-600 gap-2"
+        className="text-on-surface-variant hover:text-red-600 gap-2"
       >
         <Flag className="w-4 h-4" />
         <span className="text-xs">Report this listing</span>
@@ -102,7 +102,7 @@ export default function ReportButton({ listingId }: ReportButtonProps) {
         <Button
           variant="ghost"
           size="sm"
-          className="text-zinc-500 hover:text-red-600 gap-2"
+          className="text-on-surface-variant hover:text-red-600 gap-2"
         >
           <Flag className="w-4 h-4" />
           <span className="text-xs">Report this listing</span>
@@ -123,7 +123,7 @@ export default function ReportButton({ listingId }: ReportButtonProps) {
         ) : (
           <div className="grid gap-4 py-4">
             {error && (
-              <div className="bg-red-50 dark:bg-red-900/20 border border-red-200 dark:border-red-800 text-red-700 dark:text-red-300 px-4 py-3 rounded-lg text-sm">
+              <div className="bg-red-50 border border-red-200 text-red-700 px-4 py-3 rounded-lg text-sm">
                 {error}
               </div>
             )}

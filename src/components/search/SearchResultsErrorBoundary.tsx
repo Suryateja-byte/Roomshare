@@ -44,18 +44,18 @@ export class SearchResultsErrorBoundary extends Component<Props, State> {
     if (this.state.hasError) {
       return (
         <div className="flex flex-col items-center justify-center py-16 px-4">
-          <div className="w-14 h-14 rounded-full bg-red-50 dark:bg-red-900/30 flex items-center justify-center mb-4">
-            <AlertCircle className="w-6 h-6 text-red-500 dark:text-red-400" />
+          <div className="w-14 h-14 rounded-full bg-red-50 flex items-center justify-center mb-4">
+            <AlertCircle className="w-6 h-6 text-red-500" />
           </div>
-          <h2 className="text-lg font-semibold text-zinc-900 dark:text-white mb-2">
+          <h2 className="text-lg font-semibold text-on-surface mb-2">
             Something went wrong
           </h2>
-          <p className="text-sm text-zinc-500 dark:text-zinc-400 text-center max-w-sm mb-6">
+          <p className="text-sm text-on-surface-variant text-center max-w-sm mb-6">
             We had trouble loading search results. Please try again.
           </p>
           <button
             onClick={() => this.setState((prev) => ({ hasError: false, retryKey: prev.retryKey + 1 }))}
-            className="inline-flex items-center gap-2 px-4 py-2 bg-zinc-900 dark:bg-white text-white dark:text-zinc-900 rounded-lg hover:bg-zinc-800 dark:hover:bg-zinc-100 transition-colors text-sm font-medium"
+            className="inline-flex items-center gap-2 px-4 py-2 bg-on-surface text-white rounded-lg hover:bg-on-surface transition-colors text-sm font-medium"
           >
             <RefreshCw className="w-4 h-4" />
             Try again

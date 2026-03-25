@@ -342,7 +342,7 @@ export default function ScrollAnimation() {
   if (reducedMotion) {
     return (
       <section
-        className="relative py-24 md:py-32 bg-zinc-50 dark:bg-zinc-950"
+        className="relative py-24 md:py-32 bg-surface-canvas"
         aria-label="A person entering their new home"
       >
         <div className="max-w-7xl mx-auto px-4 sm:px-6">
@@ -369,11 +369,11 @@ export default function ScrollAnimation() {
   if (failed) {
     return (
       <section
-        className="relative py-24 md:py-32 bg-zinc-950"
+        className="relative py-24 md:py-32 bg-on-surface"
         aria-label="A person entering their new home"
       >
         <div className="max-w-7xl mx-auto px-4 sm:px-6">
-          <div className="relative aspect-video rounded-3xl overflow-hidden bg-zinc-900">
+          <div className="relative aspect-video rounded-3xl overflow-hidden bg-on-surface">
             <div className="absolute inset-0 flex items-center justify-center">
               <p className="text-white text-3xl md:text-5xl font-medium tracking-tight text-center drop-shadow-lg">
                 Love where you live.
@@ -396,15 +396,15 @@ export default function ScrollAnimation() {
       {/* Full-bleed dark overlay — entire viewport goes dark during animation */}
       <m.div
         style={{ opacity: bgOpacity }}
-        className="fixed inset-0 bg-zinc-950 pointer-events-none z-0"
+        className="fixed inset-0 bg-on-surface pointer-events-none z-0"
         aria-hidden="true"
       />
 
       {/* Sticky canvas container */}
-      <div className="sticky top-0 h-screen-safe w-full overflow-hidden bg-zinc-950">
+      <div className="sticky top-0 h-screen-safe w-full overflow-hidden bg-on-surface">
         {/* Poster / loading state — visible before frames are ready */}
         {!ready && !failed && (
-          <div className="absolute inset-0 z-20 bg-zinc-950">
+          <div className="absolute inset-0 z-20 bg-on-surface">
             {isNearViewport && (
               <div
                 className="absolute inset-0 flex flex-col items-center justify-center z-10"
@@ -415,7 +415,7 @@ export default function ScrollAnimation() {
                 aria-label="Loading animation frames"
               >
                 <div className="relative w-16 h-16 mb-6">
-                  <div className="absolute inset-0 rounded-full border-2 border-zinc-800" />
+                  <div className="absolute inset-0 rounded-full border-2 border-outline-variant/20" />
                   <svg
                     className="absolute inset-0 -rotate-90"
                     viewBox="0 0 64 64"
@@ -428,14 +428,14 @@ export default function ScrollAnimation() {
                       stroke="currentColor"
                       strokeWidth="2"
                       strokeDasharray={`${progress * 188.5} 188.5`}
-                      className="text-indigo-500 transition-all duration-150"
+                      className="text-primary transition-all duration-150"
                     />
                   </svg>
                 </div>
-                <p className="text-xs font-bold uppercase tracking-[0.2em] text-zinc-500">
+                <p className="text-xs font-bold uppercase tracking-[0.2em] text-on-surface-variant">
                   Loading experience
                 </p>
-                <p className="text-sm font-medium text-zinc-400 mt-2 tabular-nums">
+                <p className="text-sm font-medium text-on-surface-variant mt-2 tabular-nums">
                   {Math.round(progress * 100)}%
                 </p>
               </div>
@@ -495,7 +495,7 @@ export default function ScrollAnimation() {
               Scroll to explore
             </span>
             <div className="w-5 h-8 rounded-full border border-white/20 relative">
-              <div className="absolute top-1.5 left-1/2 -translate-x-1/2 w-0.5 h-1.5 bg-indigo-400 rounded-full animate-bounce" />
+              <div className="absolute top-1.5 left-1/2 -translate-x-1/2 w-0.5 h-1.5 bg-primary rounded-full animate-bounce" />
             </div>
           </m.div>
         )}

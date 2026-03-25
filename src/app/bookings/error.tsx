@@ -18,17 +18,17 @@ export default function BookingsError({
 
   return (
     <div className="min-h-[60vh] flex flex-col items-center justify-center px-4 py-16 text-center">
-      <div className="w-20 h-20 bg-red-100 dark:bg-red-900/30 rounded-full flex items-center justify-center mb-6">
-        <Calendar className="w-10 h-10 text-red-600 dark:text-red-400" />
+      <div className="w-20 h-20 bg-red-100 rounded-full flex items-center justify-center mb-6">
+        <Calendar className="w-10 h-10 text-red-600" />
       </div>
-      <h2 className="text-2xl font-bold text-zinc-900 dark:text-white mb-2">
+      <h2 className="font-display text-2xl font-bold text-on-surface mb-2">
         Unable to load your bookings
       </h2>
-      <p className="text-zinc-600 dark:text-zinc-400 mb-2 max-w-md">
+      <p className="text-on-surface-variant mb-2 max-w-md">
         We&apos;re having trouble loading your bookings right now. This is
         usually temporary.
       </p>
-      <p className="text-sm text-zinc-500 dark:text-zinc-500 mb-6 max-w-md">
+      <p className="text-sm text-on-surface-variant mb-6 max-w-md">
         Your bookings are safe — try refreshing the page in a moment.
       </p>
       <div className="flex flex-col sm:flex-row gap-3">

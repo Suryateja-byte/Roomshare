@@ -16,14 +16,6 @@ import {
   fireEvent,
 } from "@testing-library/react";
 
-// Mock next-themes
-const mockResolvedTheme = jest.fn().mockReturnValue("light");
-jest.mock("next-themes", () => ({
-  useTheme: () => ({
-    resolvedTheme: mockResolvedTheme(),
-    theme: mockResolvedTheme(),
-  }),
-}));
 
 // Mock MapLibre GL JS
 const mockMarkerRemove = jest.fn();
@@ -129,7 +121,6 @@ describe("NearbyPlacesMap - Marker/Popup DOM & Events", () => {
   beforeEach(() => {
     jest.clearAllMocks();
     createdMarkers.length = 0;
-    mockResolvedTheme.mockReturnValue("light");
   });
 
   // Trigger map 'load' event to initialize markers
@@ -655,31 +646,4 @@ describe("NearbyPlacesMap - Marker/Popup DOM & Events", () => {
     });
   });
 
-  describe("Theme Support", () => {
-    it("recreates map when theme changes", () => {
-      const places = [createMockPlace("place-1")];
-
-      const { rerender } = render(
-        <NearbyPlacesMap
-          listingLat={listingLat}
-          listingLng={listingLng}
-          places={places}
-        />
-      );
-
-      // Change theme
-      mockResolvedTheme.mockReturnValue("dark");
-
-      rerender(
-        <NearbyPlacesMap
-          listingLat={listingLat}
-          listingLng={listingLng}
-          places={places}
-        />
-      );
-
-      // Map should be removed and recreated for new theme
-      expect(mockMapRemove).toHaveBeenCalled();
-    });
-  });
 });

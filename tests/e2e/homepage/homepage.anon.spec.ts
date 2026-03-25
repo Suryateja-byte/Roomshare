@@ -22,19 +22,17 @@ test.describe("Homepage — Anonymous User", () => {
   test("HP-01: Hero section renders with heading and search CTA", async ({
     page,
   }) => {
-    // The hero has heading text "Love where you live."
+    // The hero has heading text "Finding Your People, Not Just a Place"
     const heading = page.getByRole("heading", { level: 1 });
     await expect(heading).toBeVisible({ timeout: 15000 });
-    await expect(heading).toContainText(/love where/i);
+    await expect(heading).toContainText(/finding.*people/i);
 
     // Check for the tagline subheading text
     await expect(
       page
         .getByText(/verified roommates/i)
         .or(page.getByText(/real listings/i))
-        .or(page.getByText(/curated spaces/i))
-        .or(page.getByText(/compatible people/i))
-        .or(page.getByText(/sanctuary/i))
+        .or(page.getByText(/actually show up/i))
         .first()
     ).toBeVisible();
 
@@ -62,12 +60,12 @@ test.describe("Homepage — Anonymous User", () => {
   test("HP-03: Features section visible with feature cards", async ({
     page,
   }) => {
-    // Features section heading
+    // Features section heading — renamed to "Cozy Spaces, Real People"
     await expect(
       page
-        .getByText(/why people switch/i)
-        .or(page.getByText(/everything you need/i))
-        .or(page.getByText(/verified trust/i))
+        .getByText(/cozy spaces/i)
+        .or(page.getByText(/why roomshare/i))
+        .or(page.getByText(/real people/i))
         .first()
     ).toBeVisible({ timeout: 10000 });
 
@@ -77,9 +75,6 @@ test.describe("Homepage — Anonymous User", () => {
         .getByText(/no catfishing/i)
         .or(page.getByText(/matched on what matters/i))
         .or(page.getByText(/filters that actually/i))
-        .or(page.getByText(/instant match/i))
-        .or(page.getByText(/lifestyle fit/i))
-        .or(page.getByText(/verified trust/i))
         .first()
     ).toBeVisible();
   });

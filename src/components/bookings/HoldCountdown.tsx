@@ -23,16 +23,16 @@ function formatCountdown(ms: number): string {
 
 function getUrgencyColor(remainingMs: number, ttlMs: number): string {
   if (remainingMs <= 0) {
-    return "text-zinc-400 dark:text-zinc-500";
+    return "text-on-surface-variant";
   }
   const ratio = remainingMs / ttlMs;
   if (ratio > 0.5) {
-    return "text-green-600 dark:text-green-400";
+    return "text-green-600";
   }
   if (remainingMs > 2 * 60 * 1000) {
-    return "text-amber-600 dark:text-amber-400";
+    return "text-amber-600";
   }
-  return "text-red-600 dark:text-red-400 animate-pulse";
+  return "text-red-600 animate-pulse";
 }
 
 export default function HoldCountdown({
@@ -79,7 +79,7 @@ export default function HoldCountdown({
 
   if (remainingMs <= 0) {
     return (
-      <span className="inline-flex items-center gap-1 text-xs font-medium text-zinc-400 dark:text-zinc-500">
+      <span className="inline-flex items-center gap-1 text-xs font-medium text-on-surface-variant">
         <Clock className="w-3 h-3" />
         Hold expired
       </span>

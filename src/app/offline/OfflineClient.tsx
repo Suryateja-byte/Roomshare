@@ -6,18 +6,18 @@ import { Button } from "@/components/ui/button";
 export default function OfflineClient() {
   return (
     <main
-      className="flex min-h-screen flex-col items-center justify-center bg-zinc-50 dark:bg-zinc-950 p-8"
+      className="flex min-h-screen flex-col items-center justify-center bg-surface-canvas p-8"
     >
       {/* Offline icon */}
-      <div className="mb-6 rounded-full bg-zinc-200 dark:bg-zinc-800 p-4">
-        <WifiOff className="h-12 w-12 text-zinc-500 dark:text-zinc-400" />
+      <div className="mb-6 rounded-full bg-surface-container-high p-4">
+        <WifiOff className="h-12 w-12 text-on-surface-variant" />
       </div>
 
-      <h1 className="mb-2 text-2xl font-bold text-zinc-900 dark:text-white">
+      <h1 className="font-display mb-2 text-2xl font-bold text-on-surface">
         You&apos;re offline
       </h1>
 
-      <p className="mb-8 max-w-md text-center text-zinc-600 dark:text-zinc-400">
+      <p className="mb-8 max-w-md text-center text-on-surface-variant">
         It looks like you&apos;ve lost your internet connection. Some features
         may be unavailable until you&apos;re back online.
       </p>
@@ -32,7 +32,7 @@ export default function OfflineClient() {
           Try again
         </Button>
 
-        <p className="text-sm text-zinc-500 dark:text-zinc-400">
+        <p className="text-sm text-on-surface-variant">
           We&apos;ll automatically reconnect when you&apos;re back online.
         </p>
       </div>

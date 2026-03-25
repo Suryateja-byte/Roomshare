@@ -324,7 +324,7 @@ describe("ReviewCard", () => {
       expect(container.firstChild).toHaveClass("py-8");
     });
 
-    it("response has border-left styling", () => {
+    it("response has background styling", () => {
       const reviewWithResponse = {
         ...baseReview,
         response: {
@@ -334,7 +334,7 @@ describe("ReviewCard", () => {
         },
       };
       const { container } = render(<ReviewCard review={reviewWithResponse} />);
-      const responseDiv = container.querySelector(".border-l-2");
+      const responseDiv = container.querySelector(".rounded-lg");
       expect(responseDiv).toBeInTheDocument();
     });
   });

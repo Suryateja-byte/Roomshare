@@ -40,7 +40,7 @@ export function DatePills({ suggestions }: DatePillsProps) {
 
   return (
     <div className="mb-4">
-      <p className="text-xs text-zinc-500 dark:text-zinc-400 mb-2">
+      <p className="text-xs text-on-surface-variant mb-2">
         Flexible dates? Try these for lower prices:
       </p>
       <div className="flex gap-2 overflow-x-auto pb-1 -mx-1 px-1 scrollbar-none">
@@ -49,12 +49,12 @@ export function DatePills({ suggestions }: DatePillsProps) {
             key={suggestion.params}
             type="button"
             onClick={() => handleSelect(suggestion.params)}
-            className="flex-shrink-0 inline-flex items-center gap-1.5 px-3 py-1.5 rounded-full border border-zinc-200 dark:border-zinc-700 bg-white dark:bg-zinc-900 hover:bg-zinc-50 dark:hover:bg-zinc-800 text-sm transition-colors"
+            className="flex-shrink-0 inline-flex items-center gap-1.5 px-3 py-1.5 rounded-full border border-outline-variant/20 bg-surface-container-lowest hover:bg-surface-canvas text-sm transition-colors"
           >
-            <span className="text-zinc-700 dark:text-zinc-300 whitespace-nowrap">
+            <span className="text-on-surface-variant whitespace-nowrap">
               {suggestion.label}
             </span>
-            <span className="text-xs text-green-600 dark:text-green-400 font-medium whitespace-nowrap">
+            <span className="text-xs text-green-600 font-medium whitespace-nowrap">
               ~$
               {suggestion.avgPrice.toLocaleString("en-US", {
                 maximumFractionDigits: 0,

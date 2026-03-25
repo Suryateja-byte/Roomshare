@@ -163,15 +163,15 @@ export default function DeleteListingButton({
     return (
       <div className="space-y-3">
         {hasWarnings && (
-          <div className="p-3 border border-amber-500/50 rounded-lg bg-amber-50 dark:bg-amber-900/20 space-y-2">
+          <div className="p-3 border border-amber-500/50 rounded-lg bg-amber-50 space-y-2">
             <div className="flex items-start gap-2">
-              <AlertTriangle className="w-5 h-5 text-amber-600 dark:text-amber-500 flex-shrink-0 mt-0.5" />
-              <p className="text-sm font-medium text-amber-700 dark:text-amber-400">
+              <AlertTriangle className="w-5 h-5 text-amber-600 flex-shrink-0 mt-0.5" />
+              <p className="text-sm font-medium text-amber-700">
                 This will affect active users
               </p>
             </div>
 
-            <ul className="text-sm text-amber-600 dark:text-amber-400 space-y-1.5 ml-7">
+            <ul className="text-sm text-amber-600 space-y-1.5 ml-7">
               {deletionInfo!.pendingBookings > 0 && (
                 <li className="flex items-center gap-2">
                   <Calendar className="w-4 h-4" />

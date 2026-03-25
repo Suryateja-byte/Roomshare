@@ -28,26 +28,26 @@ export default async function SettingsPage() {
   }
 
   return (
-    <div className="min-h-screen bg-zinc-50 dark:bg-zinc-950">
+    <div className="min-h-screen bg-surface-canvas">
       <div className="max-w-2xl mx-auto px-4 py-8">
         {/* Header */}
         <div className="mb-8">
           <Link
             href="/profile"
-            className="inline-flex items-center gap-2 text-zinc-600 hover:text-zinc-900 dark:text-zinc-400 dark:hover:text-white mb-4"
+            className="inline-flex items-center gap-2 text-on-surface-variant hover:text-on-surface mb-4"
           >
             <ArrowLeft className="w-4 h-4" />
             Back to Profile
           </Link>
           <div className="flex items-center gap-3">
-            <div className="p-3 bg-indigo-100 dark:bg-indigo-900/30 rounded-xl">
-              <Settings className="w-6 h-6 text-indigo-600 dark:text-indigo-400" />
+            <div className="p-3 bg-primary/10 rounded-xl">
+              <Settings className="w-6 h-6 text-primary" />
             </div>
             <div>
-              <h1 className="text-2xl font-bold text-zinc-900 dark:text-white">
+              <h1 className="font-display text-2xl font-bold text-on-surface">
                 Settings
               </h1>
-              <p className="text-zinc-500 dark:text-zinc-400">
+              <p className="text-on-surface-variant">
                 Manage your account preferences
               </p>
             </div>
