@@ -134,7 +134,7 @@ export async function DELETE(
     // to prevent TOCTOU race between check and delete
     let _listingTitle: string | null = null;
     let listingImages: string[] = [];
-    let pendingBookings: { id: string; tenantId: string }[] = [];
+    let pendingBookings: { id: string; tenantId: string | null }[] = [];
 
     try {
       await prisma.$transaction(async (tx) => {
