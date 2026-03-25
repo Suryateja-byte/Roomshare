@@ -105,8 +105,9 @@ test.describe("LD: Page Load & Content (Visitor)", () => {
     const found = await goToListing(page, nav, "Reviewer Nob Hill");
     test.skip(!found, "Listing not found");
 
-    await expect(page.getByText(/Hosted by/).first()).toBeVisible();
-    await expect(page.getByText("E2E Reviewer")).toBeVisible();
+    await expect(
+      page.getByText(/Hosted by E2E Reviewer/)
+    ).toBeVisible();
     // Contact Host button is only rendered after session hydration (viewerReady).
     // On Mobile Chrome this can be slower — use a generous explicit timeout.
     await expect(
@@ -507,7 +508,9 @@ test.describe("LD: Reviews", () => {
     }
 
     // Reviewer name — skip if not present (seed data may vary)
-    const reviewerName = page.getByText("E2E Reviewer");
+    // Use .first() because the seed user "E2E Reviewer" may appear in both
+    // the host section ("Hosted by E2E Reviewer") and the review list.
+    const reviewerName = page.getByText("E2E Reviewer").first();
     const hasReviewer = await reviewerName
       .isVisible({ timeout: 5000 })
       .catch(() => false);
