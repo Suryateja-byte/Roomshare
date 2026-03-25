@@ -105,7 +105,7 @@ describe("GET /api/cron/reconcile-slots", () => {
 
     const response = await GET(createRequest("Bearer valid"));
     const data = await response.json();
-    expect(data.driftCount).toBe(0);
+    expect(data.drifted).toBe(0);
   });
 
   it("skips when advisory lock not acquired", async () => {

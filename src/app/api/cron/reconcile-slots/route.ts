@@ -46,12 +46,13 @@ export async function GET(request: NextRequest) {
         }
 
         // Detect drift using SUM(slotsRequested), not COUNT
+        // Date-aware: only count bookings with future endDate (past bookings no longer consume slots)
         const driftRows = await tx.$queryRaw<DriftRow[]>`
         SELECT
           l.id,
           l."availableSlots" AS actual,
           l."totalSlots" - COALESCE(SUM(b."slotsRequested") FILTER (
-            WHERE b.status = 'ACCEPTED'
+            WHERE (b.status = 'ACCEPTED' AND b."endDate" >= NOW())
             OR (b.status = 'HELD' AND b."heldUntil" > NOW())
           ), 0) AS expected
         FROM "Listing" l
@@ -59,7 +60,7 @@ export async function GET(request: NextRequest) {
         WHERE l.status = 'ACTIVE'
         GROUP BY l.id
         HAVING l."availableSlots" != l."totalSlots" - COALESCE(SUM(b."slotsRequested") FILTER (
-          WHERE b.status = 'ACCEPTED'
+          WHERE (b.status = 'ACCEPTED' AND b."endDate" >= NOW())
           OR (b.status = 'HELD' AND b."heldUntil" > NOW())
         ), 0)
       `;
