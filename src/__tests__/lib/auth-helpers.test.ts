@@ -369,7 +369,7 @@ describe("checkSuspension", () => {
 
     expect(prisma.user.findUnique).toHaveBeenCalledWith({
       where: { id: "user-789" },
-      select: { isSuspended: true },
+      select: { isSuspended: true, passwordChangedAt: true },
     });
   });
 

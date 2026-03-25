@@ -98,7 +98,10 @@ describe("Reset Password API", () => {
       expect(data.message).toBe("Password has been reset successfully");
       expect(prisma.user.update).toHaveBeenCalledWith({
         where: { id: "user-123" },
-        data: { password: "hashed_password" },
+        data: {
+          password: "hashed_password",
+          passwordChangedAt: expect.any(Date),
+        },
       });
       expect(prisma.passwordResetToken.findUnique).toHaveBeenCalledWith({
         where: { tokenHash: hashToken(VALID_TOKEN) },
