@@ -26,7 +26,7 @@ describe("Button", () => {
     it("renders primary variant by default", () => {
       render(<Button>Primary</Button>);
       const button = screen.getByRole("button");
-      expect(button).toHaveClass("bg-zinc-900");
+      expect(button).toHaveClass("bg-gradient-to-br");
     });
 
     it("renders outline variant", () => {
@@ -39,13 +39,13 @@ describe("Button", () => {
     it("renders ghost variant", () => {
       render(<Button variant="ghost">Ghost</Button>);
       const button = screen.getByRole("button");
-      expect(button).toHaveClass("text-zinc-600");
+      expect(button).toHaveClass("text-on-surface-variant");
     });
 
     it("renders white variant", () => {
       render(<Button variant="white">White</Button>);
       const button = screen.getByRole("button");
-      expect(button).toHaveClass("bg-white");
+      expect(button).toHaveClass("bg-surface-container-lowest");
     });
 
     it("renders destructive variant", () => {

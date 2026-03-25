@@ -57,14 +57,13 @@ describe("FooterNavLink", () => {
     render(
       <FooterNavLink
         href="/about"
-        className="hover:text-zinc-900 transition-colors"
+        className="hover:text-on-surface transition-colors"
       >
         About
       </FooterNavLink>
     );
     const link = screen.getByRole("link", { name: "About" });
-    expect(link.className).toContain("text-zinc-900");
-    expect(link.className).toContain("text-zinc-900");
+    expect(link.className).toContain("text-on-surface");
   });
 
   it("does not apply active styling when pathname differs", () => {
@@ -72,13 +71,15 @@ describe("FooterNavLink", () => {
     render(
       <FooterNavLink
         href="/about"
-        className="hover:text-zinc-900 transition-colors"
+        className="hover:text-on-surface transition-colors"
       >
         About
       </FooterNavLink>
     );
     const link = screen.getByRole("link", { name: "About" });
-    expect(link.className).not.toContain("text-zinc-900");
+    // When not active, the component does not add text-on-surface (only hover has it in className)
+    // The component adds " text-on-surface" only when isActive, so check it's not added as a separate class
+    expect(link.className).not.toContain(" text-on-surface");
   });
 
   it("passes through custom className", () => {
