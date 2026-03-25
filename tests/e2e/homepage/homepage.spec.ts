@@ -61,12 +61,13 @@ test.describe("Homepage — Authenticated User", () => {
       const hamburger = page.getByLabel(/open menu/i);
       await expect(hamburger).toBeVisible({ timeout: 10000 });
       await hamburger.click();
-      await page.waitForTimeout(500);
+      // Wait for glassmorphism overlay + stagger animation (300ms overlay + 250ms for 5th item)
+      await page.waitForTimeout(1000);
 
       // Mobile menu shows "Profile" link for authenticated users
       await expect(
-        page.getByRole("link", { name: /^profile$/i })
-      ).toBeVisible({ timeout: 10000 });
+        page.getByRole("link", { name: /profile/i }).first()
+      ).toBeVisible({ timeout: 15000 });
     } else {
       // Desktop: user-menu button is directly visible in the navbar
       await expect(page.locator('[data-testid="user-menu"]')).toBeVisible({

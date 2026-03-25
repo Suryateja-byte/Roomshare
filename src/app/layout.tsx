@@ -114,7 +114,7 @@ export default async function RootLayout({
               <EmailVerificationWrapper />
               <SuspensionBannerWrapper />
               <MainLayout>
-                <div className="pb-20 md:pb-0">{children}</div>
+                {children}
               </MainLayout>
               <FooterWrapper>
                 <Footer />
