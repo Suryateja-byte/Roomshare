@@ -94,7 +94,7 @@ export async function POST(request: NextRequest) {
       }
       await tx.user.update({
         where: { id: user.id },
-        data: { password: hashedPassword },
+        data: { password: hashedPassword, passwordChangedAt: new Date() },
       });
     });
 

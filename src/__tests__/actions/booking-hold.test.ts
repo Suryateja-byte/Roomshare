@@ -1012,15 +1012,15 @@ describe("createHold", () => {
   // 15. Hold TTL edge cases
   // ─────────────────────────────────────────────────────────────
   describe("hold TTL edge cases", () => {
-    it("holdTtlMinutes=0 falls back to HOLD_TTL_MINUTES (falsy 0 uses || default)", async () => {
-      // listing.holdTtlMinutes=0 is falsy, so `0 || HOLD_TTL_MINUTES` resolves to HOLD_TTL_MINUTES (15)
-      // i.e. TTL=0 is treated the same as null/undefined — the global default takes effect
-      const zeroTtlListing = { ...mockListing, holdTtlMinutes: 0 };
+    it("holdTtlMinutes=5 (minimum allowed by DB CHECK) uses per-listing TTL", async () => {
+      // DB CHECK constraint enforces holdTtlMinutes >= 5, so 0 is impossible.
+      // Test the minimum allowed value to verify ?? operator uses the listing value.
+      const minTtlListing = { ...mockListing, holdTtlMinutes: 5 };
       let capturedCreateData: Record<string, unknown> | null = null;
 
       (prisma.$transaction as jest.Mock).mockImplementation(
         async (callback: unknown) => {
-          const tx = buildMockTx({ listing: zeroTtlListing });
+          const tx = buildMockTx({ listing: minTtlListing });
           tx.booking.create = jest
             .fn()
             .mockImplementation((args: { data: Record<string, unknown> }) => {
@@ -1042,8 +1042,8 @@ describe("createHold", () => {
       expect(result.success).toBe(true);
       expect(capturedCreateData).not.toBeNull();
       const heldUntil = capturedCreateData!.heldUntil as Date;
-      // 0 is falsy → falls back to HOLD_TTL_MINUTES (15 min), same as null
-      const expectedHeldUntil = Date.now() + HOLD_TTL_MINUTES * 60 * 1000;
+      // holdTtlMinutes=5 → heldUntil should be ~5 minutes from now
+      const expectedHeldUntil = Date.now() + 5 * 60 * 1000;
       expect(Math.abs(heldUntil.getTime() - expectedHeldUntil)).toBeLessThan(
         5000
       );

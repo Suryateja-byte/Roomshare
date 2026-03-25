@@ -134,7 +134,7 @@ export async function DELETE(
     // to prevent TOCTOU race between check and delete
     let _listingTitle: string | null = null;
     let listingImages: string[] = [];
-    let pendingBookings: { id: string; tenantId: string }[] = [];
+    let pendingBookings: { id: string; tenantId: string | null }[] = [];
 
     try {
       await prisma.$transaction(async (tx) => {
@@ -182,8 +182,10 @@ export async function DELETE(
         // Batch-create notifications for tenants with pending bookings
         if (pendingBookings.length > 0) {
           await tx.notification.createMany({
-            data: pendingBookings.map((booking) => ({
-              userId: booking.tenantId,
+            data: pendingBookings
+              .filter((booking) => booking.tenantId != null)
+              .map((booking) => ({
+              userId: booking.tenantId!,
               type: "BOOKING_CANCELLED",
               title: "Booking Request Cancelled",
               message: `Your pending booking request for "${listing.title}" has been cancelled because the host removed the listing.`,
@@ -203,8 +205,10 @@ export async function DELETE(
         });
         if (heldBookings.length > 0) {
           await tx.notification.createMany({
-            data: heldBookings.map((booking) => ({
-              userId: booking.tenantId,
+            data: heldBookings
+              .filter((booking) => booking.tenantId != null)
+              .map((booking) => ({
+              userId: booking.tenantId!,
               type: "BOOKING_HOLD_EXPIRED",
               title: "Hold Cancelled",
               message: `Your hold on "${listing.title}" has been cancelled because the host removed the listing.`,

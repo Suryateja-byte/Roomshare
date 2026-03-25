@@ -46,6 +46,7 @@ model User {
   emailVerified           DateTime?
   image                   String?
   password                String?
+  passwordChangedAt       DateTime?              // H-1: session invalidation on password change
   bio                     String?
   countryOfOrigin         String?
   languages               String[]
@@ -189,7 +190,7 @@ enum ListingStatus {
 model Booking {
   id              String        @id @default(cuid())
   listingId       String
-  tenantId        String
+  tenantId        String?
   startDate       DateTime
   endDate         DateTime
   status          BookingStatus @default(PENDING)
@@ -202,8 +203,8 @@ model Booking {
   createdAt       DateTime      @default(now())
   updatedAt       DateTime      @updatedAt
 
-  listing          Listing          @relation(fields: [listingId], references: [id], onDelete: Cascade)
-  tenant           User             @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  listing          Listing          @relation(fields: [listingId], references: [id], onDelete: Restrict)
+  tenant           User?            @relation(fields: [tenantId], references: [id], onDelete: SetNull)
   bookingAuditLogs BookingAuditLog[]
 
   // Duplicate prevention: partial unique index in raw SQL migration (allows re-application after EXPIRED/REJECTED/CANCELLED)
@@ -399,17 +400,17 @@ model ReviewResponse {
 // Booking Audit Trail - Immutable append-only log of booking state transitions
 model BookingAuditLog {
   id             String   @id @default(cuid())
-  bookingId      String
+  bookingId      String?  // H-2: nullable for orphaned audit records after user/booking deletion
   action         String   // CREATED, HELD, ACCEPTED, REJECTED, CANCELLED, EXPIRED
   previousStatus String?  // null for CREATED
   newStatus      String
   actorId        String?  // null for system actions (cron sweeper)
   actorType      String   @default("USER") // USER, HOST, SYSTEM, ADMIN
   details        Json?    // slotsRequested, rejectionReason, heldUntil, version, etc.
-  ipAddress      String?
+  ipAddress      String?  // GDPR: if populated in future, must be scrubbed in deleteAccount()
   createdAt      DateTime @default(now())
 
-  booking Booking @relation(fields: [bookingId], references: [id], onDelete: Cascade)
+  booking Booking? @relation(fields: [bookingId], references: [id], onDelete: SetNull)
   actor   User?   @relation("BookingAuditActor", fields: [actorId], references: [id], onDelete: SetNull)
 
   @@index([bookingId])

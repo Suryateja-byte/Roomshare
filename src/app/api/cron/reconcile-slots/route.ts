@@ -12,7 +12,6 @@ import { prisma } from "@/lib/prisma";
 import { Prisma } from "@prisma/client";
 import { logger } from "@/lib/logger";
 import { validateCronAuth } from "@/lib/cron-auth";
-import { features } from "@/lib/env";
 import { markListingsDirty } from "@/lib/search/search-doc-dirty";
 import * as Sentry from "@sentry/nextjs";
 import { RECONCILER_ADVISORY_LOCK_KEY } from "@/lib/hold-constants";
@@ -30,12 +29,8 @@ export async function GET(request: NextRequest) {
     const authError = validateCronAuth(request);
     if (authError) return authError;
 
-    if (!features.bookingAudit) {
-      return NextResponse.json({
-        skipped: true,
-        reason: "ENABLE_BOOKING_AUDIT is off",
-      });
-    }
+    // Slot reconciliation always runs — it is a safety net for availableSlots
+    // drift and must not be gated behind the audit feature flag.
 
     const startTime = Date.now();
 
@@ -51,12 +46,13 @@ export async function GET(request: NextRequest) {
         }
 
         // Detect drift using SUM(slotsRequested), not COUNT
+        // Date-aware: only count bookings with future endDate (past bookings no longer consume slots)
         const driftRows = await tx.$queryRaw<DriftRow[]>`
         SELECT
           l.id,
           l."availableSlots" AS actual,
           l."totalSlots" - COALESCE(SUM(b."slotsRequested") FILTER (
-            WHERE b.status = 'ACCEPTED'
+            WHERE (b.status = 'ACCEPTED' AND b."endDate" >= NOW())
             OR (b.status = 'HELD' AND b."heldUntil" > NOW())
           ), 0) AS expected
         FROM "Listing" l
@@ -64,7 +60,7 @@ export async function GET(request: NextRequest) {
         WHERE l.status = 'ACTIVE'
         GROUP BY l.id
         HAVING l."availableSlots" != l."totalSlots" - COALESCE(SUM(b."slotsRequested") FILTER (
-          WHERE b.status = 'ACCEPTED'
+          WHERE (b.status = 'ACCEPTED' AND b."endDate" >= NOW())
           OR (b.status = 'HELD' AND b."heldUntil" > NOW())
         ), 0)
       `;

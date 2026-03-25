@@ -90,6 +90,13 @@ export async function updateBookingStatus(
       return { error: "Only the listing owner can accept or reject bookings" };
     }
 
+    // Design note: All transactions in this file use READ COMMITTED (Prisma default)
+    // + FOR UPDATE on the Listing row. FOR UPDATE serializes all booking operations
+    // for the same listing. The capacity SUM query runs inside the lock scope, ensuring
+    // it always sees the latest committed state. SERIALIZABLE is not needed here
+    // (unlike createBooking/createHold which run the duplicate check before acquiring
+    // the lock). See booking.ts for the SERIALIZABLE pattern.
+
     // Phase 4: Check-on-read inline expiry (defense-in-depth, D9)
     // If sweeper lags, reading an expired HELD booking auto-expires it
     if (
@@ -119,8 +126,11 @@ export async function updateBookingStatus(
                         `;
           }
         });
-      } catch {
-        // Sweeper will handle it — swallow error silently
+      } catch (err) {
+        logger.sync.debug("Inline expiry failed (sweeper will handle)", {
+          bookingId: booking.id,
+          error: err instanceof Error ? err.message : "Unknown",
+        });
       }
       // Always return error regardless of whether expiry succeeded
       return { error: "This hold has expired." };
@@ -365,16 +375,19 @@ export async function updateBookingStatus(
       }
 
       // Notify tenant of acceptance (outside transaction for performance)
+      // Guard: tenant may be null if they deleted their account (SetNull FK)
       try {
-        await createInternalNotification({
-          userId: booking.tenant.id,
-          type: "BOOKING_ACCEPTED",
-          title: "Booking Accepted!",
-          message: `Your booking for "${booking.listing.title}" has been accepted`,
-          link: "/bookings",
-        });
+        if (booking.tenant) {
+          await createInternalNotification({
+            userId: booking.tenant.id,
+            type: "BOOKING_ACCEPTED",
+            title: "Booking Accepted!",
+            message: `Your booking for "${booking.listing.title}" has been accepted`,
+            link: "/bookings",
+          });
+        }
 
-        if (booking.tenant.email) {
+        if (booking.tenant?.email) {
           await sendNotificationEmailWithPreference(
             "bookingAccepted",
             booking.tenant.id,
@@ -480,18 +493,20 @@ export async function updateBookingStatus(
         ? ` Reason: ${rejectionReason.trim()}`
         : "";
 
-      // Notify tenant of rejection
+      // Notify tenant of rejection (guard: tenant may be null if account deleted)
       try {
-        await createInternalNotification({
-          userId: booking.tenant.id,
-          type: "BOOKING_REJECTED",
-          title: "Booking Not Accepted",
-          message: `Your booking for "${booking.listing.title}" was not accepted.${reasonText}`,
-          link: "/bookings",
-        });
+        if (booking.tenant) {
+          await createInternalNotification({
+            userId: booking.tenant.id,
+            type: "BOOKING_REJECTED",
+            title: "Booking Not Accepted",
+            message: `Your booking for "${booking.listing.title}" was not accepted.${reasonText}`,
+            link: "/bookings",
+          });
+        }
 
         // Send email to tenant (respecting preferences)
-        if (booking.tenant.email) {
+        if (booking.tenant?.email) {
           await sendNotificationEmailWithPreference(
             "bookingRejected",
             booking.tenant.id,
@@ -628,7 +643,7 @@ export async function updateBookingStatus(
           userId: booking.listing.ownerId,
           type: "BOOKING_CANCELLED",
           title: "Booking Cancelled",
-          message: `${booking.tenant.name || "A tenant"} cancelled their booking for "${booking.listing.title}"`,
+          message: `${booking.tenant?.name || "A tenant"} cancelled their booking for "${booking.listing.title}"`,
           link: "/bookings",
         });
       } catch (notificationError) {

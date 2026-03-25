@@ -266,7 +266,7 @@ describe("Suspension Middleware", () => {
 
       expect(prisma.user.findUnique).toHaveBeenCalledWith({
         where: { id: "user-456" },
-        select: { isSuspended: true },
+        select: { isSuspended: true, passwordChangedAt: true },
       });
     });
 
@@ -409,7 +409,7 @@ describe("Suspension Middleware", () => {
       expect(result).toBeNull();
       expect(prisma.user.findUnique).toHaveBeenCalledWith({
         where: { id: "user-sec-3" },
-        select: { isSuspended: true },
+        select: { isSuspended: true, passwordChangedAt: true },
       });
     });
   });

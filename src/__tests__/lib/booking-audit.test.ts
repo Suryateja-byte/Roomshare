@@ -55,8 +55,8 @@ describe("logBookingAudit", () => {
     });
   });
 
-  it("no-ops when features.bookingAudit is false", async () => {
-    (features as any).bookingAudit = false;
+  it("always writes audit log regardless of feature flag (audit never disabled)", async () => {
+    // Feature flag removed — audit trail must always be active.
     const tx = createMockTx();
     await logBookingAudit(tx, {
       bookingId: "booking-1",
@@ -67,7 +67,7 @@ describe("logBookingAudit", () => {
       actorType: "HOST",
     });
 
-    expect(tx.bookingAuditLog.create).not.toHaveBeenCalled();
+    expect(tx.bookingAuditLog.create).toHaveBeenCalled();
   });
 
   it("passes tx (not prisma) to create — transaction isolation", async () => {

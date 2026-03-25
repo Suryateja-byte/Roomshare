@@ -171,6 +171,9 @@ describe("createBooking", () => {
             findFirst: jest.fn().mockResolvedValue(null),
             create: jest.fn().mockResolvedValue(mockBooking),
           },
+          bookingAuditLog: {
+            create: jest.fn().mockResolvedValue({}),
+          },
         };
         return callback(tx);
       }
