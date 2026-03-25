@@ -133,8 +133,10 @@ test.describe("LD: Page Load & Content (Visitor)", () => {
     test.skip(!found, "Listing not found");
 
     await expect(page.getByRole("heading", { name: /Reviews/ })).toBeVisible();
-    // Count in parentheses — could be (0) or higher
-    await expect(page.getByText(/\(\d+\)/)).toBeVisible();
+    // Count in parentheses — could be (0) or higher.
+    // Use .first() because the review count "(N)" may appear in multiple
+    // places on the page (e.g., heading + sidebar summary).
+    await expect(page.getByText(/\(\d+\)/).first()).toBeVisible();
   });
 });
 

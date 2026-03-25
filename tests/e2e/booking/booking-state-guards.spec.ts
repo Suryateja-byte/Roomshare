@@ -739,8 +739,9 @@ test.describe("Booking State Guards: Terminal States @critical @booking @securit
         .first()
         .waitFor({ state: "visible", timeout: 15_000 });
 
-      // Scan ALL booking items for an "Expire" button
-      const expireButtons = page.getByRole("button", { name: /expire/i });
+      // Scan ALL booking items for an "Expire" action button.
+      // Use exact match to exclude "Expired" status filter buttons.
+      const expireButtons = page.getByRole("button", { name: /^expire$/i });
       expect(await expireButtons.count()).toBe(0);
 
       // Also check sent tab
@@ -755,7 +756,7 @@ test.describe("Booking State Guards: Terminal States @critical @booking @securit
         .waitFor({ state: "visible", timeout: 10_000 })
         .catch(() => {});
 
-      const expireButtonsSent = page.getByRole("button", { name: /expire/i });
+      const expireButtonsSent = page.getByRole("button", { name: /^expire$/i });
       expect(await expireButtonsSent.count()).toBe(0);
     } finally {
       if (bookingId) {

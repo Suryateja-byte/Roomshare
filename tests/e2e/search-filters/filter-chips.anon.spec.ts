@@ -336,10 +336,12 @@ test.describe("Active Filter Chips", () => {
   });
 
   // 10. Clear all preserves bounds and sort
+  // Note: "Clear all" button only appears when chips.length > 1,
+  // so we must provide at least 2 filter params (roomType + amenities).
   test(`${tags.core} - clear all preserves non-filter params (bounds, sort)`, async ({
     page,
   }) => {
-    await page.goto(`${SEARCH_URL}&roomType=Private+Room&sort=price_asc`);
+    await page.goto(`${SEARCH_URL}&roomType=Private+Room&amenities=Wifi&sort=price_asc`);
     await page.waitForLoadState("domcontentloaded");
     await page.waitForLoadState("domcontentloaded").catch(() => {});
 
@@ -369,7 +371,8 @@ test.describe("Active Filter Chips", () => {
     // Sort should be preserved
     expect(getUrlParam(page, "sort")).toBe("price_asc");
 
-    // Filter should be gone
+    // Filters should be gone
     expect(getUrlParam(page, "roomType")).toBeNull();
+    expect(getUrlParam(page, "amenities")).toBeNull();
   });
 });
