@@ -300,7 +300,7 @@ export default function BookingCalendar({
                       <div className="flex items-center gap-2 mb-1">
                         <User className="w-3.5 h-3.5" />
                         <span className="font-medium text-sm">
-                          {booking.tenant.name || "Guest"}
+                          {booking.tenant?.name || "Guest"}
                         </span>
                       </div>
                       <div className="flex items-center gap-2 text-xs opacity-75">

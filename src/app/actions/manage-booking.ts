@@ -372,16 +372,19 @@ export async function updateBookingStatus(
       }
 
       // Notify tenant of acceptance (outside transaction for performance)
+      // Guard: tenant may be null if they deleted their account (SetNull FK)
       try {
-        await createInternalNotification({
-          userId: booking.tenant.id,
-          type: "BOOKING_ACCEPTED",
-          title: "Booking Accepted!",
-          message: `Your booking for "${booking.listing.title}" has been accepted`,
-          link: "/bookings",
-        });
+        if (booking.tenant) {
+          await createInternalNotification({
+            userId: booking.tenant.id,
+            type: "BOOKING_ACCEPTED",
+            title: "Booking Accepted!",
+            message: `Your booking for "${booking.listing.title}" has been accepted`,
+            link: "/bookings",
+          });
+        }
 
-        if (booking.tenant.email) {
+        if (booking.tenant?.email) {
           await sendNotificationEmailWithPreference(
             "bookingAccepted",
             booking.tenant.id,
@@ -487,18 +490,20 @@ export async function updateBookingStatus(
         ? ` Reason: ${rejectionReason.trim()}`
         : "";
 
-      // Notify tenant of rejection
+      // Notify tenant of rejection (guard: tenant may be null if account deleted)
       try {
-        await createInternalNotification({
-          userId: booking.tenant.id,
-          type: "BOOKING_REJECTED",
-          title: "Booking Not Accepted",
-          message: `Your booking for "${booking.listing.title}" was not accepted.${reasonText}`,
-          link: "/bookings",
-        });
+        if (booking.tenant) {
+          await createInternalNotification({
+            userId: booking.tenant.id,
+            type: "BOOKING_REJECTED",
+            title: "Booking Not Accepted",
+            message: `Your booking for "${booking.listing.title}" was not accepted.${reasonText}`,
+            link: "/bookings",
+          });
+        }
 
         // Send email to tenant (respecting preferences)
-        if (booking.tenant.email) {
+        if (booking.tenant?.email) {
           await sendNotificationEmailWithPreference(
             "bookingRejected",
             booking.tenant.id,
@@ -635,7 +640,7 @@ export async function updateBookingStatus(
           userId: booking.listing.ownerId,
           type: "BOOKING_CANCELLED",
           title: "Booking Cancelled",
-          message: `${booking.tenant.name || "A tenant"} cancelled their booking for "${booking.listing.title}"`,
+          message: `${booking.tenant?.name || "A tenant"} cancelled their booking for "${booking.listing.title}"`,
           link: "/bookings",
         });
       } catch (notificationError) {
