@@ -110,7 +110,7 @@ test.describe("LD: Page Load & Content (Visitor)", () => {
     // Contact Host button is only rendered after session hydration (viewerReady).
     // On Mobile Chrome this can be slower — use a generous explicit timeout.
     await expect(
-      page.getByRole("button", { name: /Contact Host/i })
+      page.getByRole("button", { name: /Contact Host/i }).first()
     ).toBeVisible({ timeout: 45_000 });
     await expect(page.getByText("Identity verified")).toBeVisible();
   });

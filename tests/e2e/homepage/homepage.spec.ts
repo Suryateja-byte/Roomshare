@@ -63,9 +63,9 @@ test.describe("Homepage — Authenticated User", () => {
       await hamburger.click();
       await page.waitForTimeout(500);
 
-      // Mobile menu shows "View Profile" link for authenticated users
+      // Mobile menu shows "Profile" link for authenticated users
       await expect(
-        page.getByRole("link", { name: /view profile/i })
+        page.getByRole("link", { name: /^profile$/i })
       ).toBeVisible({ timeout: 10000 });
     } else {
       // Desktop: user-menu button is directly visible in the navbar

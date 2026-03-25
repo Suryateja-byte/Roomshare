@@ -81,7 +81,9 @@ export default function BottomNavBar() {
     return () => scrollContainer.removeEventListener("scroll", handleScroll);
   }, []);
 
-  if (!session?.user) return null;
+  // Don't render on search page — it has its own bottom sheet and floating buttons
+  const isSearchPage = pathname.startsWith("/search");
+  if (!session?.user || isSearchPage) return null;
 
   return (
     <nav
