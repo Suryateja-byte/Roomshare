@@ -404,8 +404,9 @@ test.describe("LD: Owner View", () => {
     const found = await goToListing(page, nav, "Sunny Mission Room");
     test.skip(!found, "Listing not found");
 
-    await expect(page.getByText("Boost visibility")).toBeVisible();
-    await expect(page.getByText("Promote now")).toBeVisible();
+    await expect(page.getByText("Boost Visibility")).toBeVisible();
+    // "Promote now" was replaced with a disabled "Coming Q3 2026" button
+    await expect(page.getByText("Coming Q3 2026")).toBeVisible();
   });
 });
 
