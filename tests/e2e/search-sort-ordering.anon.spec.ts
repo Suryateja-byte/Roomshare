@@ -909,7 +909,7 @@ test.describe("Group 6: Sort Edge Cases", () => {
     // Let the sort-selection navigation settle before overriding —
     // avoids NS_BINDING_ABORTED on Firefox when two navigations race.
     await page.waitForLoadState("domcontentloaded").catch(() => {});
-    await expect.poll(() => page.url().includes("sort="), { timeout: 5_000, message: "URL to contain sort param" }).toBe(true).catch(() => {});
+    await page.waitForURL(/sort=/, { timeout: 5_000 }).catch(() => {});
 
     // Override via URL navigation (use longer timeout for potentially slow navigation)
     await page.goto(`/search?sort=price_desc&${boundsQS}`, {

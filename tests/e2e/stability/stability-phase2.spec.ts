@@ -79,8 +79,10 @@ test.describe("Stability Phase 2: Edge Cases @stability", () => {
       const confirmBtn = modal.getByRole("button", { name: /confirm/i });
       await confirmBtn.click();
       // INTENTIONAL: deliberate small gap between rapid-fire clicks to test double-click protection
-      await confirmBtn.click({ force: true, delay: 100 }).catch(() => {});
-      await confirmBtn.click({ force: true, delay: 100 }).catch(() => {});
+      await page.waitForTimeout(100);
+      await confirmBtn.click({ force: true }).catch(() => {});
+      await page.waitForTimeout(100);
+      await confirmBtn.click({ force: true }).catch(() => {});
 
       // Wait for outcome
       await page

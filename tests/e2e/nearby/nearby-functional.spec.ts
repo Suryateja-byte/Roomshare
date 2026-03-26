@@ -265,7 +265,7 @@ test.describe("Nearby Places — Functional Core @nearby", () => {
     await nearby.waitForResults();
 
     // Wait for markers to render on map
-    await expect.poll(() => nearby.placeMarkers.count(), { timeout: 5000 }).toBeGreaterThan(0).catch(() => {});
+    await nearby.placeMarkers.first().waitFor({ state: 'attached', timeout: 5000 }).catch(() => {});
 
     const mapVisible = await nearby.isMapVisible();
     if (mapVisible) {
@@ -281,7 +281,7 @@ test.describe("Nearby Places — Functional Core @nearby", () => {
 
     await nearby.selectCategory("Grocery");
     await nearby.waitForResults();
-    await expect.poll(() => nearby.placeMarkers.count(), { timeout: 5000 }).toBeGreaterThan(0).catch(() => {});
+    await nearby.placeMarkers.first().waitFor({ state: 'attached', timeout: 5000 }).catch(() => {});
 
     const mapVisible = await nearby.isMapVisible();
     if (mapVisible) {

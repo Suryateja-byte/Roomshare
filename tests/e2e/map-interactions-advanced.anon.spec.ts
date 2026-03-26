@@ -759,7 +759,8 @@ test.describe("Map Interactions Advanced (Stories 5-8)", () => {
           boundsUpdated = true;
           break;
         }
-        await page.evaluate(() => new Promise(r => setTimeout(r, 500))); // polling delay inside retry loop
+        // INTENTIONAL: polling delay inside retry loop
+        await page.waitForTimeout(500);
       }
       if (!boundsUpdated) {
         test.skip(
