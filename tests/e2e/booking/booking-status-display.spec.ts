@@ -57,11 +57,11 @@ test.describe("Booking Status Display @booking @auth", () => {
 
       // Switch to Sent tab
       await sentBtn.click();
-      await page.waitForTimeout(1_000);
+      await expect(page.getByRole("heading", { name: /my bookings/i, level: 1 })).toBeVisible({ timeout: 10_000 });
 
       // Switch back to Received tab
       await receivedBtn.click();
-      await page.waitForTimeout(1_000);
+      await expect(page.getByRole("heading", { name: /my bookings/i, level: 1 })).toBeVisible({ timeout: 10_000 });
 
       // Page still intact after tab switching
       await expect(
@@ -291,7 +291,7 @@ test.describe("Booking Status Display @booking @auth", () => {
           await heldFilter.isVisible({ timeout: 3_000 }).catch(() => false)
         ) {
           await heldFilter.click();
-          await page.waitForTimeout(1_000);
+          await expect(page.locator('[data-testid="booking-item"]').first()).toBeVisible({ timeout: 10_000 }).catch(() => {});
           const retryCountdown = bookingItem
             .locator("span, div")
             .filter({ hasText: /\d{1,2}:\d{2}/ })
@@ -329,7 +329,7 @@ test.describe("Booking Status Display @booking @auth", () => {
       });
 
       // Wait for hydration
-      await page.waitForTimeout(2_000);
+      await expect(page.getByRole("button", { name: /received/i }).first()).toBeVisible({ timeout: 15_000 });
 
       // Check the Received tab first (default)
       const receivedBtn = page

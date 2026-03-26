@@ -31,7 +31,7 @@ test.describe("Homepage — Authenticated User", () => {
       .getByRole("link", { name: /sign up free/i });
 
     // Allow page to fully render, then verify sign-up is absent
-    await page.waitForTimeout(2000);
+    await page.waitForLoadState("networkidle").catch(() => {});
     await expect(signUpButton).toBeHidden();
   });
 
@@ -61,8 +61,6 @@ test.describe("Homepage — Authenticated User", () => {
       const hamburger = page.getByLabel(/open menu/i);
       await expect(hamburger).toBeVisible({ timeout: 10000 });
       await hamburger.click();
-      // Wait for glassmorphism overlay + stagger animation (300ms overlay + 250ms for 5th item)
-      await page.waitForTimeout(1000);
 
       // Mobile menu shows "Profile" link for authenticated users
       await expect(
@@ -87,7 +85,6 @@ test.describe("Homepage — Authenticated User", () => {
       const hamburger = page.getByLabel(/open menu/i);
       await expect(hamburger).toBeVisible({ timeout: 10000 });
       await hamburger.click();
-      await page.waitForTimeout(500);
     }
 
     // The navbar (or mobile menu) has a "List a Room" button/link

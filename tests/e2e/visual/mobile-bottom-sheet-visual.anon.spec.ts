@@ -98,7 +98,7 @@ test.describe("Mobile Bottom Sheet — Visual Regression", () => {
     // Navigate with bounds that have no seeded data — sheet may not appear
     await page.goto("/search?minLat=0.1&maxLat=0.2&minLng=0.1&maxLng=0.2");
     await page.waitForLoadState("domcontentloaded");
-    await page.waitForTimeout(3000);
+    await page.waitForLoadState("networkidle").catch(() => {});
     await disableAnimations(page);
 
     await expect(page).toHaveScreenshot("bottom-sheet-empty-results.png", {

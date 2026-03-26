@@ -443,7 +443,7 @@ test.describe("Map persistence: Map state recovery", () => {
     // Listing URLs may start with /listings/c or just /listings/
     // Scope to visible container to avoid matching hidden mobile/desktop duplicates
     // Wait for listing cards to render after SSR hydration
-    await page.waitForTimeout(3_000);
+    await page.locator('[data-testid="listing-card"]').first().waitFor({ state: 'attached', timeout: 10_000 }).catch(() => {});
     const container = page.locator('[data-testid="search-results-container"]');
     const hasContainer = (await container.count()) > 0;
     const listingLink = hasContainer
@@ -455,7 +455,7 @@ test.describe("Map persistence: Map state recovery", () => {
           .first();
     if ((await listingLink.count()) === 0) {
       // Wait longer for SSR hydration to produce listing cards
-      await page.waitForTimeout(8_000);
+      await listingLink.waitFor({ state: 'attached', timeout: 15_000 }).catch(() => {});
       if ((await listingLink.count()) === 0) {
         test.skip(true, "No listing links found");
         return;

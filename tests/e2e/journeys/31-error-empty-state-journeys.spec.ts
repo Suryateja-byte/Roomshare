@@ -312,7 +312,7 @@ test.describe("Error & Empty State Journeys", () => {
       await submitBtn.click();
 
       // Wait for validation to fire
-      await page.waitForTimeout(1000);
+      await page.waitForLoadState("domcontentloaded");
 
       // Should show validation errors — check multiple mechanisms
       const hasFieldErrors =
@@ -352,7 +352,7 @@ test.describe("Error & Empty State Journeys", () => {
         .getByRole("button", { name: /sign up|create|register|join/i })
         .first();
       await submitBtn.click();
-      await page.waitForTimeout(1000);
+      await page.waitForLoadState("domcontentloaded");
 
       // Should stay on signup page — password is required
       expect(page.url()).toContain("/signup");
@@ -440,7 +440,7 @@ test.describe("Error & Empty State Journeys", () => {
           timeout: 30000,
         });
 
-        // Wait a moment for any deferred scripts to execute
+        // INTENTIONAL: measurement window — allow time for any injected XSS scripts to execute
         await page.waitForTimeout(1000);
 
         // Remove dialog listener

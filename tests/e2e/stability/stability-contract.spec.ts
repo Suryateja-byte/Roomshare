@@ -108,14 +108,12 @@ test.describe("Stability Contract: Slot Accounting @stability @core", () => {
       });
 
       // Wait for bookings page to render
-      await page.waitForTimeout(2_000);
+      await page.waitForLoadState("networkidle").catch(() => {});
 
       // Switch to Sent tab — click directly on the text
       const sentTab = page.getByRole("button", { name: /sent/i }).first();
       await sentTab.waitFor({ state: "visible", timeout: 15_000 });
       await sentTab.click();
-      // Wait for tab content to refresh
-      await page.waitForTimeout(2_000);
 
       // Verify we're on the Sent tab (check for booking or empty state)
       const bookingItem = page.locator('[data-testid="booking-item"]').first();
@@ -143,8 +141,13 @@ test.describe("Stability Contract: Slot Accounting @stability @core", () => {
         );
       await confirmBtn.first().click();
 
-      // Wait for cancellation to take effect
-      await page.waitForTimeout(2_000);
+      // Wait for cancellation to take effect — look for cancelled state or toast
+      await page
+        .getByText(/cancelled|canceled/i)
+        .or(page.locator('[data-sonner-toast]'))
+        .first()
+        .waitFor({ state: "visible", timeout: 10_000 })
+        .catch(() => {});
 
       // Step 6: Verify slots restored — navigate back to listing
       await page.goto(listingUrl!, {
@@ -219,7 +222,7 @@ test.describe("Stability Contract: Gap Coverage @stability", () => {
 
       // Press browser back
       await page.goBack({ waitUntil: "domcontentloaded", timeout: 90_000 });
-      await page.waitForTimeout(1_500);
+      await page.waitForLoadState("networkidle").catch(() => {});
 
       // Verify guard is active — at least one of:
       // a) "already submitted" / success message still shown

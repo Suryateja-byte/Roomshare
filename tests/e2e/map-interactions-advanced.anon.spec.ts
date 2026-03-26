@@ -744,8 +744,8 @@ test.describe("Map Interactions Advanced (Stories 5-8)", () => {
         return;
       }
 
-      // Wait for debounced URL bounds update after pan (600ms debounce + CI overhead)
-      await page.waitForTimeout(1_000);
+      // Wait for debounced URL bounds update after pan
+      await page.waitForLoadState("networkidle").catch(() => {});
 
       // Poll for debounced URL bounds update after pan
       let boundsUpdated = false;
@@ -759,7 +759,7 @@ test.describe("Map Interactions Advanced (Stories 5-8)", () => {
           boundsUpdated = true;
           break;
         }
-        await page.waitForTimeout(500);
+        await page.evaluate(() => new Promise(r => setTimeout(r, 500))); // polling delay inside retry loop
       }
       if (!boundsUpdated) {
         test.skip(

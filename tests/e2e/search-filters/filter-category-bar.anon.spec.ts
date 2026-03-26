@@ -60,7 +60,6 @@ test.describe("Category Bar", () => {
   }) => {
     await page.goto(SEARCH_URL);
     await page.waitForLoadState("domcontentloaded");
-    await page.waitForTimeout(3_000);
 
     const bar = categoryBar(page);
     await expect(bar).toBeVisible({ timeout: timeouts.action });
@@ -85,7 +84,7 @@ test.describe("Category Bar", () => {
   }) => {
     await page.goto(SEARCH_URL);
     await page.waitForLoadState("domcontentloaded");
-    await page.waitForTimeout(3_000);
+    await expect(categoryBar(page)).toBeVisible({ timeout: timeouts.action });
 
     const furnishedBtn = categoryButton(page, "Furnished");
     const btnVisible = await furnishedBtn
@@ -132,7 +131,7 @@ test.describe("Category Bar", () => {
     // Start with Furnished already active in the URL
     await page.goto(`${SEARCH_URL}&amenities=Furnished`);
     await page.waitForLoadState("domcontentloaded");
-    await page.waitForTimeout(3_000);
+    await expect(categoryBar(page)).toBeVisible({ timeout: timeouts.action });
 
     const furnishedBtn = categoryButton(page, "Furnished");
     const btnVisible = await furnishedBtn
@@ -184,7 +183,6 @@ test.describe("Category Bar", () => {
 
     await page.goto(SEARCH_URL);
     await page.waitForLoadState("domcontentloaded");
-    await page.waitForTimeout(3_000);
 
     const bar = categoryBar(page);
     await expect(bar).toBeVisible({ timeout: timeouts.action });
@@ -228,7 +226,6 @@ test.describe("Category Bar", () => {
   }) => {
     await page.goto(SEARCH_URL);
     await page.waitForLoadState("domcontentloaded");
-    await page.waitForTimeout(3_000);
 
     const bar = categoryBar(page);
     await expect(bar).toBeVisible({ timeout: timeouts.action });
@@ -315,7 +312,7 @@ test.describe("Category Bar", () => {
     // Start on "page 2" with a cursor param
     await page.goto(`${SEARCH_URL}&page=2`);
     await page.waitForLoadState("domcontentloaded");
-    await page.waitForTimeout(3_000);
+    await expect(categoryBar(page)).toBeVisible({ timeout: timeouts.action });
 
     const furnishedBtn = categoryButton(page, "Furnished");
     const btnVisible = await furnishedBtn

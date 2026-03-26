@@ -113,7 +113,6 @@ test.describe("Mobile UX — Bottom Sheet (4.1)", () => {
 
     // Wait for sheet animation to fully settle before measuring
     await waitForSheetAnimation(page);
-    await page.waitForTimeout(500);
 
     const expandBtn = sheet.locator('button[aria-label="Expand results"]');
     if (await expandBtn.isVisible({ timeout: 5000 }).catch(() => false)) {
@@ -198,11 +197,10 @@ test.describe("Mobile UX — Floating Map Button (4.2)", () => {
       timeout: 30_000,
     });
 
-    await page.waitForTimeout(1000);
+    await page.waitForLoadState("networkidle").catch(() => {});
     const mapBtn = page.locator('button[aria-label="Show map"]');
     if (await mapBtn.isVisible().catch(() => false)) {
       await mapBtn.click();
-      await page.waitForTimeout(1000);
 
       // After clicking "Show map", should now show "Show list"
       const listBtn = page.locator('button[aria-label="Show list"]');
@@ -215,7 +213,6 @@ test.describe("Mobile UX — Floating Map Button (4.2)", () => {
       // Click back
       if (listVisible) {
         await listBtn.click();
-        await page.waitForTimeout(1000);
 
         // Should show "Show map" again
         const mapBtnAgain = page.locator('button[aria-label="Show map"]');

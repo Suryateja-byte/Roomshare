@@ -120,7 +120,7 @@ test.describe("J2: Search With Text Query", () => {
         hasListings = true;
         break;
       }
-      await page.waitForTimeout(500);
+      await page.waitForLoadState("domcontentloaded").catch(() => {});
     }
 
     // If still neither, the page may be in browse mode without explicit empty state — pass gracefully
@@ -274,7 +274,7 @@ test.describe("J7: Auth — Login Redirect (Authenticated)", () => {
     await page.goto("/login");
     await page.waitForLoadState("domcontentloaded");
     // Give client-side redirect time to fire
-    await page.waitForTimeout(2000);
+    await page.waitForLoadState("networkidle").catch(() => {});
 
     // Authenticated users should be redirected to home or dashboard
     // In CI, the session may have expired so the user stays on /login
@@ -294,7 +294,7 @@ test.describe("J8: Auth — Signup Redirect (Authenticated)", () => {
     await page.goto("/signup");
     await page.waitForLoadState("domcontentloaded");
     // Give client-side redirect time to fire
-    await page.waitForTimeout(2000);
+    await page.waitForLoadState("networkidle").catch(() => {});
 
     // Authenticated users should be redirected to home or dashboard
     // In CI, the session may have expired so the user stays on /signup

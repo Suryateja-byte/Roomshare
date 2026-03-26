@@ -58,7 +58,7 @@ test.describe("Filter Reset", () => {
       `${SEARCH_URL}&minPrice=500&amenities=Wifi&roomType=Private+Room`
     );
     await page.waitForLoadState("domcontentloaded");
-    await page.waitForTimeout(3_000);
+    await expect(searchResultsContainer(page)).toBeVisible({ timeout: 30_000 });
 
     // Open the filter modal
     const btn = filtersButton(page);
@@ -112,7 +112,7 @@ test.describe("Filter Reset", () => {
     // Navigate with extreme price filter that should yield zero results
     await page.goto(`${SEARCH_URL}&minPrice=99999&maxPrice=100000`);
     await page.waitForLoadState("domcontentloaded");
-    await page.waitForTimeout(5_000);
+    await expect(searchResultsContainer(page)).toBeVisible({ timeout: 30_000 });
 
     // Look for a "Clear all filters" or "clear filters" link in the page body
     // (typically rendered inside the empty state / zero-results component)
@@ -230,7 +230,7 @@ test.describe("Filter Reset", () => {
     // Start with extreme filter that should yield zero or very few results
     await page.goto(`${SEARCH_URL}&minPrice=99999&maxPrice=100000`);
     await page.waitForLoadState("domcontentloaded");
-    await page.waitForTimeout(5_000);
+    await expect(searchResultsContainer(page)).toBeVisible({ timeout: 30_000 });
 
     const container = searchResultsContainer(page);
 

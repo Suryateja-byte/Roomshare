@@ -91,7 +91,8 @@ test.describe("Homepage — Anonymous User", () => {
     const section = page.locator('[data-testid="featured-listings-section"]');
     await section.waitFor({ state: "attached", timeout: 20_000 });
     await section.scrollIntoViewIfNeeded();
-    await page.waitForTimeout(500);
+    // Wait for IntersectionObserver to fire after scroll
+    await page.evaluate(() => new Promise(r => requestAnimationFrame(() => requestAnimationFrame(r))));
 
     await expect(
       page

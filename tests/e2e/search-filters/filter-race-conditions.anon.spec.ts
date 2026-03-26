@@ -48,7 +48,7 @@ test.describe("Filter Race Conditions", () => {
     await rapidClick(wifiToggle, 5, 150);
 
     // Let React batched state settle after rapid clicks
-    await page.waitForTimeout(2000);
+    await expect(wifiToggle).toBeVisible({ timeout: 3_000 });
 
     // Verify button is still interactive (not broken by rapid clicks)
     await expect(wifiToggle).toBeVisible();
@@ -58,7 +58,7 @@ test.describe("Filter Race Conditions", () => {
     const currentState = await wifiToggle.getAttribute("aria-pressed");
     if (currentState !== "true") {
       await wifiToggle.click();
-      await page.waitForTimeout(500);
+      await expect(wifiToggle).toHaveAttribute("aria-pressed", "true", { timeout: 3_000 });
     }
 
     // Now assert the known state
@@ -155,8 +155,8 @@ test.describe("Filter Race Conditions", () => {
     }
     await loadMoreButton.click();
 
-    // Brief wait to ensure the server action POST is dispatched
-    await page.waitForTimeout(200);
+    // Wait for the server action POST to be dispatched
+    await page.waitForResponse(resp => resp.url().includes("/search") && resp.request().method() === "POST", { timeout: 5_000 }).catch(() => {});
 
     // While loading, navigate to new URL with filter (interrupts in-flight load)
     await page.goto(buildSearchUrl({ amenities: "Parking" }));

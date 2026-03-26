@@ -53,7 +53,7 @@ test.describe("Tap target sizes", () => {
   }) => {
     await page.goto("/");
     await page.waitForLoadState("domcontentloaded");
-    await page.waitForTimeout(500);
+    await page.waitForLoadState("networkidle").catch(() => {});
 
     const tooSmall = await page.evaluate(() => {
       const interactive = document.querySelectorAll(
@@ -327,8 +327,6 @@ test.describe("No hover-only interactions", () => {
     await toggleBtn.tap();
 
     // Should toggle between map and list views
-    // Wait for any view transition
-    await page.waitForTimeout(500);
 
     // The button label should have changed
     const newToggle = page.locator(mobileSelectors.floatingToggle).first();
@@ -807,7 +805,7 @@ test.describe("iOS auto-zoom prevention", () => {
       page,
     }) => {
       await page.goto(fp.url, { waitUntil: "domcontentloaded" });
-      await page.waitForTimeout(500);
+      await page.waitForLoadState("networkidle").catch(() => {});
 
       const smallInputs = await page.evaluate(() => {
         const inputs = document.querySelectorAll(
@@ -864,7 +862,7 @@ test.describe("Form submit button tap targets", () => {
       page,
     }) => {
       await page.goto(fp.url, { waitUntil: "domcontentloaded" });
-      await page.waitForTimeout(500);
+      await page.waitForLoadState("networkidle").catch(() => {});
 
       // Find submit buttons (type="submit" or primary action buttons)
       const submitBtn = page

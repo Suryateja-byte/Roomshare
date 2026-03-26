@@ -210,8 +210,11 @@ test.describe("UI Flow API Depth", () => {
       );
       await page.waitForLoadState("domcontentloaded");
 
-      // Wait for any search-count responses
-      await page.waitForTimeout(3000);
+      // Wait for search-count API responses
+      await page.waitForResponse(
+        (resp) => resp.url().includes("/api/search-count"),
+        { timeout: 10_000 }
+      ).catch(() => {});
 
       // Check captured responses
       for (const resp of countResponses) {

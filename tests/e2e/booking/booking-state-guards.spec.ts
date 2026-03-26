@@ -339,7 +339,7 @@ test.describe("Booking State Guards: Terminal States @critical @booking @securit
               )
             );
           await confirmBtn.first().click();
-          await tenantPage.waitForTimeout(2_000);
+          await expect(tenantPage.locator('[role="alertdialog"]')).not.toBeVisible({ timeout: 10_000 });
         }
 
         await tenantCtx.close();
@@ -649,7 +649,7 @@ test.describe("Booking State Guards: Terminal States @critical @booking @securit
           await expiredFilter.isVisible({ timeout: 3_000 }).catch(() => false)
         ) {
           await expiredFilter.click();
-          await page.waitForTimeout(1_000);
+          await expect(page.locator('[data-testid="booking-item"]').first()).toBeVisible({ timeout: 10_000 }).catch(() => {});
 
           const retryBadge = page.getByText("Expired").first();
           const retryVisible = await retryBadge

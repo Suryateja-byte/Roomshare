@@ -34,7 +34,7 @@ test.describe("Session Expiry: Polling Components", () => {
     await page.waitForLoadState("domcontentloaded");
 
     // Wait for initial navbar load
-    await page.waitForTimeout(2000);
+    await expect(page.locator('nav, [data-testid="navbar"]').first()).toBeVisible({ timeout: 10_000 }).catch(() => {});
 
     // Expire session
     await expireSession(page);

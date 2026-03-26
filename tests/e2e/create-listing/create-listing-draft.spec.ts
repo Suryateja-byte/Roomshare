@@ -32,8 +32,11 @@ test.describe("Create Listing — Draft Persistence", () => {
       totalSlots: "2",
     });
 
-    // Wait for 500ms debounce + buffer
-    await page.waitForTimeout(800);
+    // Wait for debounced save to localStorage
+    await expect(async () => {
+      const draft = await page.evaluate(() => localStorage.getItem("listing-draft"));
+      expect(draft).not.toBeNull();
+    }).toPass({ timeout: 5000 });
 
     // Verify localStorage was written
     const draftBeforeNav = await page.evaluate(() =>
@@ -148,7 +151,7 @@ test.describe("Create Listing — Draft Persistence", () => {
     await createPage.uploadTestImage();
 
     // Wait for upload to complete
-    await page.waitForTimeout(500);
+    await createPage.waitForUploadComplete();
 
     // Submit form
     await createPage.submit();
@@ -216,8 +219,11 @@ test.describe("Create Listing — Draft Persistence", () => {
       totalSlots: "1",
     });
 
-    // Wait for debounce
-    await page.waitForTimeout(800);
+    // Wait for debounced save to localStorage
+    await expect(async () => {
+      const draft = await page.evaluate(() => localStorage.getItem("listing-draft"));
+      expect(draft).not.toBeNull();
+    }).toPass({ timeout: 5000 });
 
     // Verify that a beforeunload handler is registered by checking if the
     // useFormPersistence hook set up the listener. We detect this by dispatching

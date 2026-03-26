@@ -104,7 +104,7 @@ test.describe("20 Critical Search Page Journeys", () => {
       .or(page.locator('button:has-text("Private")'));
 
     if (await privateTab.first().isVisible()) {
-      await page.waitForTimeout(1000); // hydration settle
+      await page.waitForLoadState("networkidle").catch(() => {});
       // Try clicking the tab — if requestSubmit doesn't fire in CI, fall back to URL nav
       try {
         await privateTab.first().click();
@@ -608,7 +608,6 @@ test.describe("20 Critical Search Page Journeys", () => {
     ) {
       await expect(mapToggle.first()).toBeEnabled({ timeout: 10000 });
       await mapToggle.first().click();
-      await page.waitForTimeout(1500); // Map init time
 
       // Map should be visible
       const map = page.locator(selectors.map);
@@ -623,7 +622,6 @@ test.describe("20 Critical Search Page Journeys", () => {
           .or(mapToggle.first());
         if (await hideMapBtn.isVisible()) {
           await hideMapBtn.click();
-          await page.waitForTimeout(500);
         }
       }
     }

@@ -112,7 +112,7 @@ test.describe("Create Listing — Visual Regression Tests", () => {
 
     // Submit empty form to trigger validation errors
     await clp.submit();
-    await page.waitForTimeout(500);
+    await page.waitForSelector('[role="alert"], [aria-invalid="true"], .text-destructive, :invalid', { timeout: 5000 }).catch(() => {});
     await disableAnimations(page);
     await page.waitForLoadState("domcontentloaded");
 
@@ -134,7 +134,7 @@ test.describe("Create Listing — Visual Regression Tests", () => {
     await clp.goto();
 
     await clp.submit();
-    await page.waitForTimeout(500);
+    await page.waitForSelector('[role="alert"], [aria-invalid="true"], .text-destructive, :invalid', { timeout: 5000 }).catch(() => {});
     await disableAnimations(page);
     await page.waitForLoadState("domcontentloaded");
 
@@ -179,7 +179,7 @@ test.describe("Create Listing — Visual Regression Tests", () => {
     await clp.goto();
     await clp.mockImageUpload();
     await clp.uploadTestImage();
-    await page.waitForTimeout(500);
+    await clp.waitForUploadComplete();
     await disableAnimations(page);
     await page.waitForLoadState("domcontentloaded");
 
@@ -214,7 +214,7 @@ test.describe("Create Listing — Visual Regression Tests", () => {
 
     // Tab out to trigger progress update
     await page.keyboard.press("Tab");
-    await page.waitForTimeout(300);
+    await expect(clp.progressSection.or(page.locator('[data-testid="progress"]'))).toBeVisible({ timeout: 5000 }).catch(() => {});
     await page.waitForLoadState("domcontentloaded");
 
     // Capture just the progress section area

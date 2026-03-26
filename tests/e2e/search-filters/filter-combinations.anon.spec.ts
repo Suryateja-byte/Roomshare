@@ -229,7 +229,6 @@ test.describe("Filter Combinations", () => {
     const wifiBtn = amenitiesGroup.getByRole("button", { name: /^Wifi/i });
     if (await wifiBtn.isVisible({ timeout: 5_000 }).catch(() => false)) {
       await wifiBtn.click();
-      await page.waitForTimeout(500); // let Apply button count settle
 
       // Apply filters (handles modal close + URL settle)
       await applyFilters(page);

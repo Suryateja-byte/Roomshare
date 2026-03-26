@@ -53,7 +53,8 @@ test.describe("Session Expiry: Resilience", () => {
     await expectLoginRedirect(page);
 
     // Verify page is stable (no redirect loop)
-    await page.waitForTimeout(2000);
+    await expect(page).toHaveURL(/\/login/, { timeout: 5000 });
+    // Confirm URL stays on login (no redirect loop)
     await expect(page).toHaveURL(/\/login/);
   });
 

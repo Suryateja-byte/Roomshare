@@ -67,7 +67,7 @@ test.describe("Web Vitals Budget", () => {
 
     await page.goto("/");
     await page.waitForLoadState("load");
-    // Allow time for layout to settle (fonts, images, async content)
+    // INTENTIONAL: CLS measurement settle window — allow layout shifts from fonts, images, async content to complete
     await page.waitForTimeout(5000);
 
     const cls = await page.evaluate(
@@ -151,6 +151,7 @@ test.describe("Web Vitals Budget", () => {
 
     await page.goto("/search");
     await page.waitForLoadState("load");
+    // INTENTIONAL: CLS measurement settle window — allow layout shifts from fonts, images, async content to complete
     await page.waitForTimeout(5000);
 
     const cls = await page.evaluate(

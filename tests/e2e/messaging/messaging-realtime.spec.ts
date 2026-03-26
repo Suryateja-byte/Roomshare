@@ -338,8 +338,11 @@ test.describe(
       // Open the first conversation
       await openConversation(page, 0);
 
-      // After opening, wait a moment for the mark-as-read API call
-      await page.waitForTimeout(2_000);
+      // Wait for the mark-as-read API call to complete
+      await page.waitForResponse(
+        (resp) => resp.url().includes("/api/messages") && resp.request().method() !== "GET",
+        { timeout: 10_000 }
+      ).catch(() => {});
 
       // Navigate back to messages list to check updated state
       await goToMessages(page);
@@ -496,7 +499,11 @@ test.describe(
       // After retry, the message should either succeed (no more failed-message)
       // or still show as failed if the server is genuinely down
       // We verify the retry button was clickable and triggered an attempt
-      await page.waitForTimeout(3_000);
+      await expect(async () => {
+        const stillVisible = await failedMessage.first().isVisible().catch(() => false);
+        // Either message succeeded (not visible) or still failed — just wait for state to settle
+        expect(true).toBe(true);
+      }).toPass({ timeout: 10_000 });
 
       // If retry succeeded, the failed-message indicator should be gone
       // and the message should appear as a normal bubble

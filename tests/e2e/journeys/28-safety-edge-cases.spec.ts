@@ -170,7 +170,8 @@ test.describe("J46: XSS Prevention", () => {
     page.on("dialog", () => {
       alertFired = true;
     });
-    await page.waitForTimeout(1000); // intentional: allow time for any injected script to execute
+    // INTENTIONAL: measurement window — allow time for any injected script to execute
+    await page.waitForTimeout(1000);
     expect(alertFired).toBeFalsy();
 
     // Step 3: If the query text is displayed, it should be escaped

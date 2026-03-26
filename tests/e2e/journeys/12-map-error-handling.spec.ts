@@ -477,7 +477,7 @@ test.describe("Map Error Handling", () => {
           maxLat: bounds.maxLat.toString(),
         });
         await page.goto(`/search?${params.toString()}`);
-        // deliberate sub-debounce delay for rapid pan test
+        // INTENTIONAL: deliberate sub-debounce delay for rapid pan test
         await page.waitForTimeout(200);
       }
 

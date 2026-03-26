@@ -99,8 +99,8 @@ test.describe("Nearby Places — Functional Core @nearby", () => {
 
     await nearby.searchInput.fill("C");
     await nearby.searchInput.press("Enter");
-    // Brief wait to ensure no request fires
-    await page.waitForTimeout(500);
+    // Wait a tick to ensure no request fires
+    await page.evaluate(() => new Promise(r => requestAnimationFrame(() => requestAnimationFrame(r))));
 
     expect(apiCalled).toBe(false);
   });
@@ -264,8 +264,8 @@ test.describe("Nearby Places — Functional Core @nearby", () => {
     await nearby.selectCategory("Grocery");
     await nearby.waitForResults();
 
-    // Wait a bit for markers to render on map
-    await page.waitForTimeout(500);
+    // Wait for markers to render on map
+    await expect.poll(() => nearby.placeMarkers.count(), { timeout: 5000 }).toBeGreaterThan(0).catch(() => {});
 
     const mapVisible = await nearby.isMapVisible();
     if (mapVisible) {
@@ -281,7 +281,7 @@ test.describe("Nearby Places — Functional Core @nearby", () => {
 
     await nearby.selectCategory("Grocery");
     await nearby.waitForResults();
-    await page.waitForTimeout(500);
+    await expect.poll(() => nearby.placeMarkers.count(), { timeout: 5000 }).toBeGreaterThan(0).catch(() => {});
 
     const mapVisible = await nearby.isMapVisible();
     if (mapVisible) {
@@ -319,9 +319,8 @@ test.describe("Nearby Places — Functional Core @nearby", () => {
 
       await nearby.selectCategory("Grocery");
       await nearby.waitForResults();
-      await page.waitForTimeout(500);
 
-      await expect(nearby.fitAll).toBeVisible();
+      await expect(nearby.fitAll).toBeVisible({ timeout: 5000 });
     }
   });
 

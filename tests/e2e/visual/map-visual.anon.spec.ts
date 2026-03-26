@@ -122,8 +122,11 @@ test.describe("Map — Visual Regression", () => {
     await page.waitForFunction(() => !!(window as any).__e2eMapRef, null, {
       timeout: 15_000,
     });
-    // Let initial auto-fly settle
-    await page.waitForTimeout(2000);
+    // Let initial auto-fly settle — wait for map idle
+    await page.waitForFunction(() => {
+      const map = (window as any).__e2eMapRef;
+      return map && !map.isMoving() && !map.isZooming();
+    }, null, { timeout: 10_000 }).catch(() => {});
 
     // Turn OFF "search as I move" so panning triggers the banner
     const toggle = page.getByRole("switch", { name: /search as i move/i });
@@ -144,7 +147,10 @@ test.describe("Map — Visual Regression", () => {
       if (fn) fn(200, 0);
     });
     // Wait for moveend + React state update
-    await page.waitForTimeout(2000);
+    await page.waitForFunction(() => {
+      const map = (window as any).__e2eMapRef;
+      return map && !map.isMoving();
+    }, null, { timeout: 10_000 }).catch(() => {});
 
     // Scope to the map region — the list panel also has a "Search this area"
     // banner (list variant) that comes first in DOM order but is hidden on desktop
@@ -238,7 +244,7 @@ test.describe("Map — Visual Regression", () => {
     await page.waitForLoadState("domcontentloaded");
 
     // Wait for the fallback to render (loading fallback or context lost overlay)
-    await page.waitForTimeout(3000);
+    await page.locator('[role="region"][aria-label*="map"]').or(page.locator('[data-testid="map-loading-fallback"]')).or(page.locator('.maplibregl-map')).first().waitFor({ state: 'visible', timeout: 10_000 }).catch(() => {});
     await disableAnimations(page);
 
     // The map region should show a fallback state

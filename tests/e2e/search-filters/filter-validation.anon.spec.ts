@@ -56,7 +56,8 @@ test.describe("Filter Validation & Security", () => {
       `${SEARCH_URL}&amenities=${encodeURIComponent("<script>alert('xss')</script>")}`
     );
     await page.waitForLoadState("domcontentloaded");
-    await page.waitForTimeout(3_000);
+    // Wait for page to fully render before checking for XSS artifacts
+    await expect(searchResultsContainer(page)).toBeVisible({ timeout: 30_000 });
 
     // No alert dialog should have been triggered
     expect(scriptExecuted).toHaveLength(0);
@@ -87,7 +88,7 @@ test.describe("Filter Validation & Security", () => {
       `${SEARCH_URL}&roomType=InvalidType&genderPreference=WRONG&householdGender=BAD`
     );
     await page.waitForLoadState("domcontentloaded");
-    await page.waitForTimeout(3_000);
+    await expect(searchResultsContainer(page)).toBeVisible({ timeout: 30_000 });
 
     // No filter chips should appear for invalid values
     const region = appliedFiltersRegion(page);
@@ -218,7 +219,7 @@ test.describe("Filter Validation & Security", () => {
   }) => {
     await page.goto(`${SEARCH_URL}&amenities=Wifi,Wifi,Wifi`);
     await page.waitForLoadState("domcontentloaded");
-    await page.waitForTimeout(3_000);
+    await expect(searchResultsContainer(page)).toBeVisible({ timeout: 30_000 });
 
     // Page renders
 
@@ -245,7 +246,7 @@ test.describe("Filter Validation & Security", () => {
   }) => {
     await page.goto(`${SEARCH_URL}&amenities=wifi,PARKING`);
     await page.waitForLoadState("domcontentloaded");
-    await page.waitForTimeout(3_000);
+    await expect(searchResultsContainer(page)).toBeVisible({ timeout: 30_000 });
 
 
     const region = appliedFiltersRegion(page);

@@ -28,7 +28,7 @@ test.describe("Admin Boundary — Regular User", () => {
     await page.waitForLoadState("domcontentloaded");
 
     // Wait for any redirect to settle after hydration
-    await page.waitForTimeout(2000);
+    await expect(page).not.toHaveURL(/^[^?]*\/admin(?:\/|$)/, { timeout: 15_000 }).catch(() => {});
 
     // Regular user should be redirected away from admin
     // (either to /login, home, or shown a 403/unauthorized message)
