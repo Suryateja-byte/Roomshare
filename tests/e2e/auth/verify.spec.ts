@@ -9,7 +9,7 @@
  * Runs on all 5 authenticated projects (chromium, firefox, webkit, Mobile Chrome, Mobile Safari).
  */
 
-import { test, expect, timeouts } from "../helpers";
+import { test, expect, timeouts, waitForHydration } from "../helpers";
 
 test.beforeEach(async () => {
   test.slow();
@@ -40,6 +40,7 @@ test.describe("VF: Page Structure", () => {
   test("VF-02  page header renders with title", async ({ page }) => {
     await page.goto("/verify");
     await page.waitForLoadState("domcontentloaded");
+    await waitForHydration(page);
 
     await expect(
       page.getByRole("heading", { name: /ID Verification/i })
@@ -57,6 +58,7 @@ test.describe("VF: Verified State", () => {
   test("VF-03  verified user sees badge and profile link", async ({ page }) => {
     await page.goto("/verify");
     await page.waitForLoadState("domcontentloaded");
+    await waitForHydration(page);
 
     await expect(
       page.getByRole("heading", { name: /You're Verified/i })
@@ -67,6 +69,7 @@ test.describe("VF: Verified State", () => {
   test("VF-04  profile link navigates to /profile", async ({ page }) => {
     await page.goto("/verify");
     await page.waitForLoadState("domcontentloaded");
+    await waitForHydration(page);
 
     await expect(
       page.getByRole("heading", { name: /You're Verified/i })

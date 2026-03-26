@@ -135,9 +135,9 @@ test.describe("House Rules Filter", () => {
     const regionVisible = await filtersRegion.isVisible().catch(() => false);
 
     if (regionVisible) {
-      const petsChip = filtersRegion.locator("text=/Pets allowed/i").first();
+      const petsChip = filtersRegion.getByText(/Pets allowed/i).first();
       const couplesChip = filtersRegion
-        .locator("text=/Couples allowed/i")
+        .getByText(/Couples allowed/i)
         .first();
       await expect(petsChip).toBeVisible({ timeout: 10_000 });
       await expect(couplesChip).toBeVisible({ timeout: 10_000 });

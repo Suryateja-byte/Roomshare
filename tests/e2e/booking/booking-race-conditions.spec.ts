@@ -208,6 +208,8 @@ async function submitBooking(
 // ─── Test Suite ──────────────────────────────────────────────────────────────
 
 test.describe("Booking Race Conditions @race", () => {
+  test.describe.configure({ mode: 'serial' });
+
   test.beforeEach(async () => {
     test.slow(); // 3x timeout for race condition tests
   });

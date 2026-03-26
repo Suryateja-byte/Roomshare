@@ -44,7 +44,7 @@ function getStyleButton(
 async function waitForSearchPage(page: import("@playwright/test").Page) {
   await page.goto(SEARCH_URL);
   await page.waitForLoadState("domcontentloaded");
-  await page.waitForSelector("button", { timeout: timeouts.navigation });
+  await page.locator("button").first().waitFor({ state: "visible", timeout: timeouts.navigation });
   // Wait for map and controls to initialize
   await waitForMapReady(page);
 }

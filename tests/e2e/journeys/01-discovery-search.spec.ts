@@ -299,6 +299,15 @@ test.describe("Discovery & Search Journeys", () => {
 
   test.describe("J005: Sort search results", () => {
     test(`${tags.anon} - Sort by price and date`, async ({ page, nav }) => {
+      // SortSelect uses Radix UI Select (desktop) and custom bottom sheet
+      // (mobile). selectOption() only works on native <select>, so skip on
+      // mobile viewports where the Radix/custom component is used.
+      const viewport = page.viewportSize();
+      test.skip(
+        !!viewport && viewport.width < 768,
+        "Desktop-only: SortSelect is a Radix UI component, not a native <select>"
+      );
+
       await nav.goToSearch({ bounds: SF_BOUNDS });
       await page.waitForLoadState("domcontentloaded");
 

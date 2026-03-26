@@ -38,7 +38,7 @@ test.describe("Filter Dead-Ends & Edge Cases", () => {
     const container = searchResultsContainer(page);
 
     // Check for zero-results state
-    const zeroResultsHeading = container.locator("text=/No.*match/i").first();
+    const zeroResultsHeading = container.getByText(/No.*match/i).first();
     await expect(zeroResultsHeading).toBeVisible({ timeout: 10000 });
 
     // Verify recovery paths are available
@@ -111,13 +111,13 @@ test.describe("Filter Dead-Ends & Edge Cases", () => {
     // Check for results, empty state, or graceful error page
     const hasCards = (await scopedCards(page).count()) > 0;
     const hasEmptyState = await container
-      .locator("text=/No.*match/i")
+      .getByText(/No.*match/i)
       .first()
       .isVisible()
       .catch(() => false);
     // Backend may reject inverted price range with a user-friendly error
     const hasErrorState = await container
-      .locator("text=/Unable to load/i")
+      .getByText(/Unable to load/i)
       .first()
       .isVisible()
       .catch(() => false);

@@ -14,7 +14,6 @@
  *  RT-A06  Touch targets >= 44px on mobile viewport
  */
 
-import AxeBuilder from "@axe-core/playwright";
 import {
   test,
   expect,
@@ -25,42 +24,12 @@ import {
   sendMessage,
 } from "./messaging-helpers";
 import { A11Y_CONFIG } from "../helpers";
+import { runAxeScan, logViolations } from "../helpers/a11y-helpers";
 
 // ---------------------------------------------------------------------------
 // Config
 // ---------------------------------------------------------------------------
 test.use({ storageState: "playwright/.auth/user.json" });
-
-/** Shared axe scan runner using A11Y_CONFIG defaults */
-async function runAxeScan(
-  page: import("@playwright/test").Page,
-  extraExcludes: string[] = [],
-  disabledRules: string[] = []
-) {
-  let builder = new AxeBuilder({ page }).withTags([...A11Y_CONFIG.tags]);
-
-  for (const sel of [...A11Y_CONFIG.globalExcludes, ...extraExcludes]) {
-    builder = builder.exclude(sel);
-  }
-
-  if (disabledRules.length > 0) {
-    builder = builder.disableRules(disabledRules);
-  }
-
-  return builder.analyze();
-}
-
-// eslint-disable-next-line @typescript-eslint/no-explicit-any
-function logViolations(label: string, violations: any[]) {
-  if (violations.length > 0) {
-    console.log(`[axe-messaging] ${label}: ${violations.length} violation(s)`);
-    violations.forEach((v) => {
-      console.log(
-        `  - ${v.id} (${v.impact}): ${v.description} [${v.nodes.length} node(s)]`
-      );
-    });
-  }
-}
 
 // ---------------------------------------------------------------------------
 // Tests
@@ -101,11 +70,10 @@ test.describe(
         .waitFor({ state: "attached", timeout: 15_000 })
         .catch(() => {});
 
-      const results = await runAxeScan(
-        page,
-        [],
-        [...A11Y_CONFIG.knownExclusions]
-      );
+      const results = await runAxeScan(page, {
+        includeCIDefaults: false,
+        disabledRules: [...A11Y_CONFIG.knownExclusions],
+      });
       logViolations("Messages Page", results.violations);
       expect(results.violations).toHaveLength(0);
     });
@@ -133,11 +101,10 @@ test.describe(
         .waitFor({ state: "attached", timeout: 10_000 })
         .catch(() => {});
 
-      const results = await runAxeScan(
-        page,
-        [],
-        [...A11Y_CONFIG.knownExclusions]
-      );
+      const results = await runAxeScan(page, {
+        includeCIDefaults: false,
+        disabledRules: [...A11Y_CONFIG.knownExclusions],
+      });
       logViolations("Chat Window", results.violations);
       expect(results.violations).toHaveLength(0);
     });

@@ -1,4 +1,5 @@
 import { Page } from "@playwright/test";
+import { pollForMarkers } from "./sync-helpers";
 
 /**
  * Pin Tiering E2E Test Helpers
@@ -148,8 +149,8 @@ export async function setupPinTieringMock(page: Page): Promise<{
       const mapCanvas = page.locator(".maplibregl-canvas:visible").first();
       await mapCanvas.waitFor({ state: "visible", timeout: 30000 });
 
-      // Brief pause for React to complete marker rendering
-      await page.waitForTimeout(500);
+      // Wait for map markers to render after programmatic zoom
+      await pollForMarkers(page, 1, 10_000);
     },
   };
 }

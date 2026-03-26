@@ -9,42 +9,13 @@
  */
 
 import { test, expect } from "@playwright/test";
-import AxeBuilder from "@axe-core/playwright";
-import { A11Y_CONFIG } from "../helpers/test-utils";
+import {
+  runAxeScan,
+  filterViolations,
+  logViolations,
+} from "../helpers/a11y-helpers";
 
 test.use({ storageState: "playwright/.auth/user.json" });
-
-/** Helper: run axe scan with shared config */
-async function runAxeScan(
-  page: import("@playwright/test").Page,
-  extraExcludes: string[] = [],
-  disabledRules: string[] = []
-) {
-  let builder = new AxeBuilder({ page }).withTags([...A11Y_CONFIG.tags]);
-
-  for (const selector of [...A11Y_CONFIG.globalExcludes, ...extraExcludes]) {
-    builder = builder.exclude(selector);
-  }
-
-  if (disabledRules.length > 0) {
-    builder = builder.disableRules(disabledRules);
-  }
-
-  return builder.analyze();
-}
-
-/** Helper: log violations for debugging */
-// eslint-disable-next-line @typescript-eslint/no-explicit-any
-function logViolations(label: string, violations: any[]) {
-  if (violations.length > 0) {
-    console.log(`[axe] ${label}: ${violations.length} violation(s)`);
-    violations.forEach((v) => {
-      console.log(
-        `  - ${v.id} (${v.impact}): ${v.description} [${v.nodes.length} node(s)]`
-      );
-    });
-  }
-}
 
 test.describe("axe-core Page Audit — Authenticated Pages", () => {
   test.beforeEach(async () => {
@@ -56,13 +27,8 @@ test.describe("axe-core Page Audit — Authenticated Pages", () => {
       await page.goto("/bookings");
       await page.waitForLoadState("domcontentloaded");
 
-      const results = await runAxeScan(page);
-      const violations = results.violations.filter(
-        (v) =>
-          !A11Y_CONFIG.knownExclusions.includes(
-            v.id as (typeof A11Y_CONFIG.knownExclusions)[number]
-          )
-      );
+      const results = await runAxeScan(page, { includeCIDefaults: false });
+      const violations = filterViolations(results.violations, []);
 
       logViolations("Bookings", violations);
       expect(violations).toHaveLength(0);
@@ -72,13 +38,8 @@ test.describe("axe-core Page Audit — Authenticated Pages", () => {
       await page.goto("/messages");
       await page.waitForLoadState("domcontentloaded");
 
-      const results = await runAxeScan(page);
-      const violations = results.violations.filter(
-        (v) =>
-          !A11Y_CONFIG.knownExclusions.includes(
-            v.id as (typeof A11Y_CONFIG.knownExclusions)[number]
-          )
-      );
+      const results = await runAxeScan(page, { includeCIDefaults: false });
+      const violations = filterViolations(results.violations, []);
 
       logViolations("Messages", violations);
       expect(violations).toHaveLength(0);
@@ -90,13 +51,8 @@ test.describe("axe-core Page Audit — Authenticated Pages", () => {
       await page.goto("/profile");
       await page.waitForLoadState("domcontentloaded");
 
-      const results = await runAxeScan(page);
-      const violations = results.violations.filter(
-        (v) =>
-          !A11Y_CONFIG.knownExclusions.includes(
-            v.id as (typeof A11Y_CONFIG.knownExclusions)[number]
-          )
-      );
+      const results = await runAxeScan(page, { includeCIDefaults: false });
+      const violations = filterViolations(results.violations, []);
 
       logViolations("Profile", violations);
       expect(violations).toHaveLength(0);
@@ -106,13 +62,8 @@ test.describe("axe-core Page Audit — Authenticated Pages", () => {
       await page.goto("/settings");
       await page.waitForLoadState("domcontentloaded");
 
-      const results = await runAxeScan(page);
-      const violations = results.violations.filter(
-        (v) =>
-          !A11Y_CONFIG.knownExclusions.includes(
-            v.id as (typeof A11Y_CONFIG.knownExclusions)[number]
-          )
-      );
+      const results = await runAxeScan(page, { includeCIDefaults: false });
+      const violations = filterViolations(results.violations, []);
 
       logViolations("Settings", violations);
       expect(violations).toHaveLength(0);
@@ -124,13 +75,8 @@ test.describe("axe-core Page Audit — Authenticated Pages", () => {
       await page.goto("/notifications");
       await page.waitForLoadState("domcontentloaded");
 
-      const results = await runAxeScan(page);
-      const violations = results.violations.filter(
-        (v) =>
-          !A11Y_CONFIG.knownExclusions.includes(
-            v.id as (typeof A11Y_CONFIG.knownExclusions)[number]
-          )
-      );
+      const results = await runAxeScan(page, { includeCIDefaults: false });
+      const violations = filterViolations(results.violations, []);
 
       logViolations("Notifications", violations);
       expect(violations).toHaveLength(0);
@@ -142,13 +88,8 @@ test.describe("axe-core Page Audit — Authenticated Pages", () => {
       await page.goto("/saved");
       await page.waitForLoadState("domcontentloaded");
 
-      const results = await runAxeScan(page);
-      const violations = results.violations.filter(
-        (v) =>
-          !A11Y_CONFIG.knownExclusions.includes(
-            v.id as (typeof A11Y_CONFIG.knownExclusions)[number]
-          )
-      );
+      const results = await runAxeScan(page, { includeCIDefaults: false });
+      const violations = filterViolations(results.violations, []);
 
       logViolations("Saved", violations);
       expect(violations).toHaveLength(0);
@@ -160,13 +101,8 @@ test.describe("axe-core Page Audit — Authenticated Pages", () => {
       await page.goto("/saved-searches");
       await page.waitForLoadState("domcontentloaded");
 
-      const results = await runAxeScan(page);
-      const violations = results.violations.filter(
-        (v) =>
-          !A11Y_CONFIG.knownExclusions.includes(
-            v.id as (typeof A11Y_CONFIG.knownExclusions)[number]
-          )
-      );
+      const results = await runAxeScan(page, { includeCIDefaults: false });
+      const violations = filterViolations(results.violations, []);
 
       logViolations("Saved Searches", violations);
       expect(violations).toHaveLength(0);
@@ -178,13 +114,8 @@ test.describe("axe-core Page Audit — Authenticated Pages", () => {
       await page.goto("/recently-viewed");
       await page.waitForLoadState("domcontentloaded");
 
-      const results = await runAxeScan(page);
-      const violations = results.violations.filter(
-        (v) =>
-          !A11Y_CONFIG.knownExclusions.includes(
-            v.id as (typeof A11Y_CONFIG.knownExclusions)[number]
-          )
-      );
+      const results = await runAxeScan(page, { includeCIDefaults: false });
+      const violations = filterViolations(results.violations, []);
 
       logViolations("Recently Viewed", violations);
       expect(violations).toHaveLength(0);
@@ -199,13 +130,8 @@ test.describe("axe-core Page Audit — Authenticated Pages", () => {
       await page.waitForLoadState("domcontentloaded");
 
       // The date picker and select components may have Radix-specific a11y issues
-      const results = await runAxeScan(page, [], ["select-name"]);
-      const violations = results.violations.filter(
-        (v) =>
-          !A11Y_CONFIG.knownExclusions.includes(
-            v.id as (typeof A11Y_CONFIG.knownExclusions)[number]
-          )
-      );
+      const results = await runAxeScan(page, { includeCIDefaults: false, disabledRules: ["select-name"] });
+      const violations = filterViolations(results.violations, []);
 
       logViolations("Create Listing", violations);
       expect(violations).toHaveLength(0);

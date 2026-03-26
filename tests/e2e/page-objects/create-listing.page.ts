@@ -271,8 +271,10 @@ export class CreateListingPage {
   async uploadMultipleImages(count: number) {
     for (let i = 0; i < count; i++) {
       await this.uploadTestImage("valid-photo.jpg");
-      // Wait for each upload to show preview
-      await this.page.waitForTimeout(300);
+      // Wait for each upload to show its preview image before uploading the next
+      await expect(
+        this.page.locator(`img[alt="Preview ${i + 1}"]`)
+      ).toBeVisible({ timeout: 10_000 });
     }
   }
 

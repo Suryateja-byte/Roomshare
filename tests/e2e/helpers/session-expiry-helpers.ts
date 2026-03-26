@@ -45,6 +45,11 @@ export async function expireSession(
   }
 
   if (triggerRefetch) {
+    // Set up response waiter before dispatching events
+    const sessionResponse = page.waitForResponse(
+      (resp) => resp.url().includes("/api/auth/session"),
+      { timeout: 10_000 }
+    );
     // Dispatch both focus and visibilitychange to maximize chance of triggering
     // SessionProvider's refetchOnWindowFocus. Playwright's synthetic events may not
     // always trigger the same listeners as real user interactions.
@@ -56,7 +61,8 @@ export async function expireSession(
       });
       document.dispatchEvent(new Event("visibilitychange"));
     });
-    await page.waitForTimeout(1000);
+    // Wait for SessionProvider to actually refetch the session endpoint
+    await sessionResponse;
   }
 }
 

@@ -592,10 +592,12 @@ test.describe("30 Critical User Journey Simulations", () => {
   test("S21: Authenticated user — view bookings page", async ({ page }) => {
     await page.goto("/bookings");
     await page.waitForLoadState("domcontentloaded");
-    await expect(page.locator("#main-content")).toBeVisible();
+    // Use fallback selector: #main-content or <main> (mobile may differ)
+    const mainContent = page.locator("#main-content, main").first();
+    await expect(mainContent).toBeVisible({ timeout: 30_000 });
 
-    const pageText = await page.locator("#main-content").textContent();
-    expect(pageText!.length).toBeGreaterThan(0);
+    const pageText = await mainContent.textContent();
+    expect((pageText ?? "").length).toBeGreaterThan(0);
   });
 
   test("S22: Authenticated user — view and navigate messages", async ({

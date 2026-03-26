@@ -1,7 +1,7 @@
 /**
  * Test Helpers API — E2E-only route for stability test DB operations.
  *
- * Gated by E2E_TEST_HELPERS=true. Returns 404 in production or when disabled.
+ * Gated by E2E_TEST_HELPERS=true + E2E_TEST_SECRET auth header. Returns 404 when disabled.
  * Provides read queries and test-specific mutations that cannot be done through UI
  * (e.g., creating an already-expired hold for expiry tests).
  */
@@ -11,10 +11,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
 
 function isEnabled(): boolean {
-  return (
-    process.env.E2E_TEST_HELPERS === "true" &&
-    process.env.NODE_ENV !== "production"
-  );
+  return process.env.E2E_TEST_HELPERS === "true";
 }
 
 function isAuthorized(request: NextRequest): boolean {

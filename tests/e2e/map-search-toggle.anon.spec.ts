@@ -62,7 +62,8 @@ async function waitForSearchPage(page: Page) {
   await page.goto(SEARCH_URL);
   await page.waitForLoadState("domcontentloaded");
   // Wait for toggle to be visible (indicates map UI is ready)
-  await page.waitForSelector(toggleSelectors.searchAsMoveToggle, {
+  await page.locator(toggleSelectors.searchAsMoveToggle).waitFor({
+    state: "visible",
     timeout: 30_000,
   });
   // Wait for map to be fully loaded and idle

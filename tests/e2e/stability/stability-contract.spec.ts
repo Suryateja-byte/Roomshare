@@ -334,7 +334,10 @@ test.describe("Stability Contract: Gap Coverage @stability", () => {
           bookingIds: [holdBookingId],
           listingId: listing.id,
           resetSlots: true,
-        }).catch(() => {});
+        }).catch((err) => {
+          // Log cleanup failure but don't mask test result (FINDING-003)
+          console.warn(`TEST-GAP-02 cleanup failed: ${err?.message ?? err}`);
+        });
       }
       await ctx.close();
     }
@@ -386,7 +389,8 @@ test.describe("Stability Contract: Gap Coverage @stability", () => {
         // we can still check the error message quality.
         const alert = page.locator('[role="alert"]').first();
         const visible = await alert
-          .isVisible({ timeout: 3_000 })
+          .waitFor({ state: "visible", timeout: 3_000 })
+          .then(() => true)
           .catch(() => false);
         if (visible) {
           const text = (await alert.textContent()) || "";
@@ -416,7 +420,8 @@ test.describe("Stability Contract: Gap Coverage @stability", () => {
         const errorEl = alert.or(toast);
 
         const errorVisible = await errorEl
-          .isVisible({ timeout: 5_000 })
+          .waitFor({ state: "visible", timeout: 5_000 })
+          .then(() => true)
           .catch(() => false);
         if (errorVisible) {
           const errorText = (await errorEl.textContent()) || "";

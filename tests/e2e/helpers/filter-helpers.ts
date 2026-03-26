@@ -250,7 +250,7 @@ export async function clickFiltersButton(page: Page): Promise<void> {
     // already true, re-clicking is a no-op. Press Escape to reset state
     // to false (via useKeyboardShortcuts), then re-click for a real transition.
     await page.keyboard.press("Escape");
-    await page.waitForTimeout(2_000);
+    await expect(dialog).not.toBeVisible({ timeout: 5_000 });
     await btn.click({ force: true });
     await expect(dialog).toBeVisible({ timeout: 15_000 });
   }
@@ -299,7 +299,7 @@ export async function openFilterModal(page: Page): Promise<Locator> {
     // already true, re-clicking is a no-op. Press Escape to reset state
     // to false (via useKeyboardShortcuts), then re-click for a real transition.
     await page.keyboard.press("Escape");
-    await page.waitForTimeout(2_000);
+    await expect(dialog).not.toBeVisible({ timeout: 5_000 });
     await btn.click({ force: true });
     await expect(dialog).toBeVisible({ timeout: 15_000 });
   }
@@ -368,7 +368,9 @@ export async function applyFilters(
   try {
     await btn.click({ timeout: 5_000 });
   } catch {
-    await page.waitForTimeout(500);
+    // Button may be temporarily obscured by Radix overlay during re-render;
+    // wait for it to be stable before force-clicking.
+    await expect(btn).toBeVisible({ timeout: 5_000 });
     await btn.click({ force: true, timeout: 15_000 });
   }
 
@@ -498,24 +500,21 @@ export async function selectDropdownOption(
  */
 export async function waitForUrlStable(
   page: Page,
-  settleMs = 500,
-  timeout = 30_000
+  _settleMs = 500,
+  timeout = 10_000
 ): Promise<string> {
-  const start = Date.now();
   let lastUrl = page.url();
-  let lastChangeTime = Date.now();
-
-  while (Date.now() - start < timeout) {
-    await page.waitForTimeout(100);
-    const currentUrl = page.url();
-    if (currentUrl !== lastUrl) {
-      lastUrl = currentUrl;
-      lastChangeTime = Date.now();
-    }
-    if (Date.now() - lastChangeTime >= settleMs) {
-      return lastUrl;
-    }
-  }
+  await expect
+    .poll(
+      () => {
+        const currentUrl = page.url();
+        const stable = currentUrl === lastUrl;
+        lastUrl = currentUrl;
+        return stable;
+      },
+      { timeout, message: "URL did not stabilize" }
+    )
+    .toBe(true);
   return lastUrl;
 }
 
@@ -531,6 +530,7 @@ export async function rapidClick(
   for (let i = 0; i < count; i++) {
     await locator.click({ force: true });
     if (i < count - 1 && intervalMs > 0) {
+      // INTENTIONAL: simulating rapid user clicks at controlled interval
       await locator.page().waitForTimeout(intervalMs);
     }
   }

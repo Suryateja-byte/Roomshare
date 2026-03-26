@@ -7,7 +7,7 @@
  * that can't be done through the UI (e.g., creating expired holds).
  */
 
-import type { Page, TestInfo } from "@playwright/test";
+import { expect, type Page, type TestInfo } from "@playwright/test";
 
 // ─── Test API Client ────────────────────────────────────────────
 
@@ -236,21 +236,31 @@ export async function navigateToBookingsTab(
   page: Page,
   tab: "sent" | "received"
 ): Promise<void> {
-  // Wait for page hydration
-  await page.waitForTimeout(2_000);
-
+  // Wait for page hydration — tab button must be visible
   const tabBtn = page
     .getByRole("button", { name: new RegExp(tab, "i") })
     .first();
   await tabBtn.waitFor({ state: "visible", timeout: 15_000 });
   await tabBtn.click();
-  await page.waitForTimeout(1_500);
+  // Wait for tab panel content to render after tab switch
+  await expect(
+    page
+      .locator('[data-testid="booking-item"]')
+      .or(page.locator("text=No bookings"))
+      .or(page.locator('[role="tabpanel"]'))
+      .first()
+  ).toBeVisible({ timeout: 15_000 });
 
   // Click "All" filter to show all status bookings (page may have a filter active)
   const allFilter = page.getByRole("button", { name: /^all$/i }).first();
   if (await allFilter.isVisible({ timeout: 3_000 }).catch(() => false)) {
     await allFilter.click();
-    await page.waitForTimeout(1_000);
+    // Wait for filtered list to update after clicking "All"
+    await expect(
+      page
+        .locator('[data-testid="booking-item"]')
+        .or(page.locator("text=No bookings"))
+    ).toBeVisible({ timeout: 10_000 });
   }
 }
 
@@ -380,8 +390,9 @@ export async function selectStabilityDates(
   const nextMonthBtnStart = page.locator('button[aria-label="Next month"]');
   await nextMonthBtnStart.waitFor({ state: "visible", timeout: 10_000 });
   for (let i = 0; i < monthOffset; i++) {
-    await nextMonthBtnStart.dispatchEvent("click");
-    await page.waitForTimeout(250);
+    await nextMonthBtnStart.click();
+    // Wait for the calendar to re-render after month navigation
+    await nextMonthBtnStart.waitFor({ state: "visible", timeout: 10_000 });
   }
 
   const day1Start = page
@@ -391,8 +402,9 @@ export async function selectStabilityDates(
     .filter({ hasText: /^1$/ })
     .first();
   await day1Start.waitFor({ state: "visible", timeout: 5_000 });
-  await day1Start.dispatchEvent("click");
-  await page.waitForTimeout(500);
+  await day1Start.click();
+  // Wait for start date to be selected (popover closes or date input updates)
+  await expect(startTrigger).not.toHaveText("", { timeout: 5_000 });
 
   // --- End date ---
   const endTrigger = page.locator("#booking-end-date");
@@ -401,14 +413,15 @@ export async function selectStabilityDates(
     .locator("#booking-end-date[data-state]")
     .waitFor({ state: "attached", timeout: 10_000 });
   await endTrigger.click();
-  await page.waitForTimeout(300);
-
+  // Wait for end date popover to open
   const nextMonthBtnEnd = page.locator('button[aria-label="Next month"]');
   await nextMonthBtnEnd.waitFor({ state: "visible", timeout: 10_000 });
+
   // End date picker opens at CURRENT month, navigate monthOffset + 2 to land after start
   for (let i = 0; i < monthOffset + 2; i++) {
-    await nextMonthBtnEnd.dispatchEvent("click");
-    await page.waitForTimeout(250);
+    await nextMonthBtnEnd.click();
+    // Wait for the calendar to re-render after month navigation
+    await nextMonthBtnEnd.waitFor({ state: "visible", timeout: 10_000 });
   }
 
   const day1End = page
@@ -418,8 +431,9 @@ export async function selectStabilityDates(
     .filter({ hasText: /^1$/ })
     .first();
   await day1End.waitFor({ state: "visible", timeout: 5_000 });
-  await day1End.dispatchEvent("click");
-  await page.waitForTimeout(500);
+  await day1End.click();
+  // Wait for end date to be selected (popover closes or date input updates)
+  await expect(endTrigger).not.toHaveText("", { timeout: 5_000 });
 }
 
 // ─── UI Interaction Helpers ─────────────────────────────────────

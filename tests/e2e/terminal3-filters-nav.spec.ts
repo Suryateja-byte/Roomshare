@@ -5,18 +5,9 @@
  * Uses chromium-anon project to avoid auth dependency.
  */
 
-import { test as base, expect } from "@playwright/test";
+import { test, expect, SF_BOUNDS } from "./helpers/test-utils";
 
-const SF_BOUNDS = {
-  minLat: 37.7,
-  maxLat: 37.85,
-  minLng: -122.52,
-  maxLng: -122.35,
-};
 const boundsQS = `minLat=${SF_BOUNDS.minLat}&maxLat=${SF_BOUNDS.maxLat}&minLng=${SF_BOUNDS.minLng}&maxLng=${SF_BOUNDS.maxLng}`;
-
-// Use base test without auth fixtures
-const test = base;
 
 // Helper: wait for search page content to load
 async function waitForSearchPage(page: import("@playwright/test").Page) {

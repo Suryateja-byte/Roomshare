@@ -27,10 +27,7 @@
 
 import { test, expect, tags } from "../helpers/test-utils";
 import {
-  SEARCH_URL,
   waitForSearchReady,
-  filtersButton,
-  filterDialog,
   applyButton,
   openFilterModal,
   toggleAmenity,
@@ -117,11 +114,6 @@ async function prevent429s(page: import("@playwright/test").Page) {
     } as typeof fetch;
   });
 }
-
-// Suppress unused-import lint (used by other spec files sharing this helper module)
-void SEARCH_URL;
-void filtersButton;
-void filterDialog;
 
 // ---------------------------------------------------------------------------
 // Tests

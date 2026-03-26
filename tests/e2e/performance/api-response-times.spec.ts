@@ -14,7 +14,7 @@ test.describe("API Response Time Budgets", () => {
 
   test.describe("Search API", () => {
     // CI runners are slower — use generous budget (40-shard CI adds contention)
-    const budget = process.env.CI ? 12000 : 3000;
+    const budget = process.env.CI ? 6000 : 3000;
 
     test("/api/search responds under budget", async ({ page }) => {
       const searchUrl = `/search?minLat=${SF_BOUNDS.minLat}&maxLat=${SF_BOUNDS.maxLat}&minLng=${SF_BOUNDS.minLng}&maxLng=${SF_BOUNDS.maxLng}`;
@@ -30,17 +30,16 @@ test.describe("API Response Time Budgets", () => {
 
       await page.goto(searchUrl);
       const response = await responsePromise.catch(() => null);
+      test.skip(!response, "Response not captured — skipping metric validation");
 
-      if (response) {
-        const timing = response.request().timing();
-        const totalTime = timing.responseEnd;
+      const timing = response!.request().timing();
+      const totalTime = timing.responseEnd;
 
-        expect(response.status()).toBeLessThan(500);
-        expect(
-          totalTime,
-          `Search API took ${totalTime.toFixed(0)}ms, budget is ${budget}ms`
-        ).toBeLessThan(budget);
-      }
+      expect(response!.status()).toBeLessThan(500);
+      expect(
+        totalTime,
+        `Search API took ${totalTime.toFixed(0)}ms, budget is ${budget}ms`
+      ).toBeLessThan(budget);
     });
 
     test("/api/search with filters responds under budget", async ({ page }) => {
@@ -56,24 +55,23 @@ test.describe("API Response Time Budgets", () => {
 
       await page.goto(searchUrl);
       const response = await responsePromise.catch(() => null);
+      test.skip(!response, "Response not captured — skipping metric validation");
 
-      if (response) {
-        const timing = response.request().timing();
-        const totalTime = timing.responseEnd;
+      const timing = response!.request().timing();
+      const totalTime = timing.responseEnd;
 
-        expect(response.status()).toBeLessThan(500);
-        expect(
-          totalTime,
-          `Filtered search took ${totalTime.toFixed(0)}ms, budget is ${budget}ms`
-        ).toBeLessThan(budget);
-      }
+      expect(response!.status()).toBeLessThan(500);
+      expect(
+        totalTime,
+        `Filtered search took ${totalTime.toFixed(0)}ms, budget is ${budget}ms`
+      ).toBeLessThan(budget);
     });
   });
 
   test.describe("Listing Detail API", () => {
     test("/api/listings/[id] responds under budget", async ({ page }) => {
       // CI runners are slower — use generous budget (40-shard CI adds contention)
-      const budget = process.env.CI ? 8000 : 2000;
+      const budget = process.env.CI ? 4000 : 2000;
 
       // First get a listing ID
       await page.goto(
@@ -101,23 +99,22 @@ test.describe("API Response Time Budgets", () => {
 
       await page.goto(`/listings/${listingId}`);
       const response = await responsePromise.catch(() => null);
+      test.skip(!response, "Response not captured — skipping metric validation");
 
-      if (response) {
-        const timing = response.request().timing();
-        const totalTime = timing.responseEnd;
+      const timing = response!.request().timing();
+      const totalTime = timing.responseEnd;
 
-        expect(response.status()).toBeLessThan(500);
-        expect(
-          totalTime,
-          `Listing detail API took ${totalTime.toFixed(0)}ms, budget is ${budget}ms`
-        ).toBeLessThan(budget);
-      }
+      expect(response!.status()).toBeLessThan(500);
+      expect(
+        totalTime,
+        `Listing detail API took ${totalTime.toFixed(0)}ms, budget is ${budget}ms`
+      ).toBeLessThan(budget);
     });
   });
 
   test.describe("Static page load budgets", () => {
     // CI runners are slower — use generous budget (40-shard CI adds contention)
-    const budget = process.env.CI ? 20000 : 8000;
+    const budget = process.env.CI ? 16000 : 8000;
 
     for (const route of ["/", "/login", "/signup", "/about"]) {
       test(`${route} DOMContentLoaded under budget`, async ({ page }) => {

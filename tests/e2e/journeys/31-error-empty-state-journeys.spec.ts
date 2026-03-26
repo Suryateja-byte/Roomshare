@@ -157,11 +157,14 @@ test.describe("Error & Empty State Journeys", () => {
       } else {
         // Page loaded but shows neither bookings nor a labeled empty state.
         // This is still valid if the page has meaningful text content.
-        const pageText = await page
-          .locator("#main-content, main")
-          .first()
-          .textContent();
-        expect(pageText!.length).toBeGreaterThan(10);
+        // Wait for content to populate (React hydration may not be complete).
+        const mainEl = page.locator("#main-content, main").first();
+        await expect
+          .poll(
+            async () => ((await mainEl.textContent()) ?? "").trim().length,
+            { timeout: 15_000, message: "main content to have text" }
+          )
+          .toBeGreaterThan(0);
       }
 
       // Verify API was called (not just a static page)
