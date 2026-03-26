@@ -105,8 +105,10 @@ test.describe("LD: Page Load & Content (Visitor)", () => {
     const found = await goToListing(page, nav, "Reviewer Nob Hill");
     test.skip(!found, "Listing not found");
 
+    // .first() avoids strict mode violation — "E2E Reviewer" appears in both
+    // the host section and the reviews section when the reviewer has reviews
     await expect(
-      page.getByText(/Hosted by E2E Reviewer/)
+      page.getByText(/Hosted by E2E Reviewer/).first()
     ).toBeVisible();
     // Contact Host button is only rendered after session hydration (viewerReady).
     // On Mobile Chrome this can be slower — use a generous explicit timeout.
