@@ -473,12 +473,15 @@ test.describe("Stability Phase 2: Concurrency @stability @concurrency", () => {
       await Promise.all([waitOutcome(pageA), waitOutcome(pageB)]);
 
       // Primary invariant: no unhandled 500 errors shown to users
+      // Use error-scoped selectors to avoid false positives from prices (e.g. "$1500")
       const error500A = await pageA
-        .getByText(/500|internal server/i)
+        .locator('[role="alert"]')
+        .getByText(/internal server error/i)
         .isVisible()
         .catch(() => false);
       const error500B = await pageB
-        .getByText(/500|internal server/i)
+        .locator('[role="alert"]')
+        .getByText(/internal server error/i)
         .isVisible()
         .catch(() => false);
       expect(error500A).toBe(false);
