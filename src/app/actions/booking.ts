@@ -476,16 +476,32 @@ export async function createBooking(
       // BUG-001 FIX: withIdempotency throws on serialization exhaustion or
       // non-retryable DB errors. Catch and return gracefully instead of
       // letting it propagate as a 500 Internal Server Error.
+      const isSerialization =
+        error &&
+        typeof error === "object" &&
+        (("code" in error && error.code === "P2034") ||
+          ("message" in error &&
+            typeof (error as { message?: string }).message === "string" &&
+            (error as { message: string }).message.includes("40001")));
       logger.sync.error("Booking idempotency transaction failed", {
         action: "createBooking",
         error: error instanceof Error ? error.message : "Unknown error",
         listingId,
         userId,
+        isSerialization,
       });
+      if (isSerialization) {
+        return {
+          success: false,
+          error:
+            "Booking could not be completed due to high demand. Please try again.",
+          code: "CONFLICT",
+        };
+      }
       return {
         success: false,
-        error: "Booking could not be completed due to high demand. Please try again.",
-        code: "CONFLICT",
+        error: "Something went wrong while processing your booking. Please try again.",
+        code: "SERVER_ERROR",
       };
     }
 
@@ -1064,16 +1080,32 @@ export async function createHold(
       // BUG-001 FIX: withIdempotency throws on serialization exhaustion or
       // non-retryable DB errors. Catch and return gracefully instead of
       // letting it propagate as a 500 Internal Server Error.
+      const isSerialization =
+        error &&
+        typeof error === "object" &&
+        (("code" in error && error.code === "P2034") ||
+          ("message" in error &&
+            typeof (error as { message?: string }).message === "string" &&
+            (error as { message: string }).message.includes("40001")));
       logger.sync.error("Hold idempotency transaction failed", {
         action: "createHold",
         error: error instanceof Error ? error.message : "Unknown error",
         listingId,
         userId,
+        isSerialization,
       });
+      if (isSerialization) {
+        return {
+          success: false,
+          error:
+            "Hold could not be placed due to high demand. Please try again.",
+          code: "CONFLICT",
+        };
+      }
       return {
         success: false,
-        error: "Hold could not be placed due to high demand. Please try again.",
-        code: "CONFLICT",
+        error: "Something went wrong while placing your hold. Please try again.",
+        code: "SERVER_ERROR",
       };
     }
 
