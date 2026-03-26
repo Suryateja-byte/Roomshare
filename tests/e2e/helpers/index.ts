@@ -88,6 +88,16 @@ export {
 
 
 
+// Shared axe-core a11y scan helpers (runAxeScan, filterViolations, logViolations)
+export {
+  runAxeScan,
+  filterViolations,
+  logViolations,
+  CI_EXTRA_EXCLUDES,
+  CI_DISABLED_RULES,
+  CI_ACCEPTABLE_VIOLATIONS,
+} from "./a11y-helpers";
+
 // Session expiry helpers for mid-session auth token expiry testing
 export {
   expireSession,

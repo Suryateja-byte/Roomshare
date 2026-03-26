@@ -9,6 +9,7 @@
 import { test, expect, tags, selectors, timeouts, SF_BOUNDS } from "../helpers";
 
 test.describe("Booking Journeys", () => {
+  test.describe.configure({ mode: 'serial' });
   test.use({ storageState: "playwright/.auth/user.json" });
 
   test.beforeEach(async () => {

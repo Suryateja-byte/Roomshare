@@ -71,7 +71,7 @@ test.describe("CLS Audit — All Pages < 0.1", () => {
   // CI environments may have significantly higher CLS due to font loading,
   // uncached images, slower rendering, and headless browser differences
   const isCI = !!process.env.CI;
-  const CLS_BUDGET = isCI ? 0.75 : 0.1;
+  const CLS_BUDGET = isCI ? 0.2 : 0.1;
   const SETTLE_MS = 5000;
 
   // ────────────────────────────────────────────────────────
@@ -252,7 +252,7 @@ test.describe("CLS Audit — All Pages < 0.1", () => {
 
     const totalEarlyCls = earlyShifts.reduce((sum, e) => sum + e.value, 0);
     // CI may have higher font-swap CLS due to slower rendering and font cache misses
-    const fontSwapBudget = isCI ? 0.75 : 0.05;
+    const fontSwapBudget = isCI ? 0.1 : 0.05;
     expect(
       totalEarlyCls,
       `Font swap CLS: ${totalEarlyCls.toFixed(4)} from ${earlyShifts.length} shifts (budget: ${fontSwapBudget})`

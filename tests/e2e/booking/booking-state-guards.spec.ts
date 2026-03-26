@@ -30,6 +30,7 @@ const REVIEWER_EMAIL = "e2e-reviewer@roomshare.dev";
 // ─── Last-Slot Oversell Prevention ──────────────────────────────
 
 test.describe("Booking State Guards: Oversell Prevention @critical @booking @security", () => {
+  test.describe.configure({ mode: 'serial' });
   /**
    * TEST-SG-01: Last-slot oversell prevention at accept time
    *
@@ -247,6 +248,7 @@ test.describe("Booking State Guards: Oversell Prevention @critical @booking @sec
 // ─── Terminal State Tests ───────────────────────────────────────
 
 test.describe("Booking State Guards: Terminal States @critical @booking @security", () => {
+  test.describe.configure({ mode: 'serial' });
   /**
    * TEST-SG-02: CANCELLED booking shows no action buttons
    *

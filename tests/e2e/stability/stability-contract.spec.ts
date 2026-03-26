@@ -334,7 +334,10 @@ test.describe("Stability Contract: Gap Coverage @stability", () => {
           bookingIds: [holdBookingId],
           listingId: listing.id,
           resetSlots: true,
-        }).catch(() => {});
+        }).catch((err) => {
+          // Log cleanup failure but don't mask test result (FINDING-003)
+          console.warn(`TEST-GAP-02 cleanup failed: ${err?.message ?? err}`);
+        });
       }
       await ctx.close();
     }

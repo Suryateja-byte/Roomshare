@@ -9,87 +9,12 @@
  */
 
 import { test, expect } from "@playwright/test";
-import AxeBuilder from "@axe-core/playwright";
-import { A11Y_CONFIG, selectors } from "../helpers/test-utils";
-
-/**
- * Extra selectors to exclude from axe scans in CI (third-party widgets, map controls).
- */
-const CI_EXTRA_EXCLUDES = [
-  ".maplibregl-ctrl-group",
-  ".maplibregl-ctrl-group",
-  "[data-sonner-toast]",
-  "[data-radix-popper-content-wrapper]",
-] as const;
-
-/**
- * Rules disabled globally to reduce CI false positives from framework/third-party markup.
- */
-const CI_DISABLED_RULES = [
-  "aria-hidden-focus",
-  "region",
-  "link-in-text-block",
-] as const;
-
-/**
- * Additional rule IDs that are acceptable in CI headless environments.
- */
-const CI_ACCEPTABLE_VIOLATIONS = [
-  "heading-order",
-  "landmark-unique",
-  "landmark-one-main",
-  "page-has-heading-one",
-  "duplicate-id",
-  "duplicate-id-aria",
-] as const;
-
-/** Helper: run axe scan with shared config */
-async function runAxeScan(
-  page: import("@playwright/test").Page,
-  extraExcludes: string[] = [],
-  disabledRules: string[] = []
-) {
-  let builder = new AxeBuilder({ page }).withTags([...A11Y_CONFIG.tags]);
-
-  for (const selector of [
-    ...A11Y_CONFIG.globalExcludes,
-    ...CI_EXTRA_EXCLUDES,
-    ...extraExcludes,
-  ]) {
-    builder = builder.exclude(selector);
-  }
-
-  const allDisabledRules = [...CI_DISABLED_RULES, ...disabledRules];
-  if (allDisabledRules.length > 0) {
-    builder = builder.disableRules([...allDisabledRules]);
-  }
-
-  return builder.analyze();
-}
-
-/** Filter out known exclusions AND CI-acceptable violations */
-// eslint-disable-next-line @typescript-eslint/no-explicit-any
-function filterViolations(violations: any[]): any[] {
-  return violations.filter(
-    (v: any) =>
-      !A11Y_CONFIG.knownExclusions.includes(
-        v.id as (typeof A11Y_CONFIG.knownExclusions)[number]
-      ) && !(CI_ACCEPTABLE_VIOLATIONS as readonly string[]).includes(v.id)
-  );
-}
-
-/** Helper: log violations for debugging */
-// eslint-disable-next-line @typescript-eslint/no-explicit-any
-function logViolations(label: string, violations: any[]) {
-  if (violations.length > 0) {
-    console.log(`[axe] ${label}: ${violations.length} violation(s)`);
-    violations.forEach((v) => {
-      console.log(
-        `  - ${v.id} (${v.impact}): ${v.description} [${v.nodes.length} node(s)]`
-      );
-    });
-  }
-}
+import { selectors } from "../helpers/test-utils";
+import {
+  runAxeScan,
+  filterViolations,
+  logViolations,
+} from "../helpers/a11y-helpers";
 
 test.describe("axe-core Page Audit — Anonymous Pages", () => {
   test.beforeEach(async () => {

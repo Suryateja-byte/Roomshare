@@ -23,7 +23,7 @@ const breakpoints = [
 // Pages that can be tested without auth (public routes)
 const publicPages = [
   { name: "homepage", url: "/" },
-  { name: "search", url: "/search?swLat=37.7&swLng=-122.5&neLat=37.8&neLng=-122.4" },
+  { name: "search", url: "/search?minLat=37.7&minLng=-122.5&maxLat=37.8&maxLng=-122.4" },
   { name: "about", url: "/about" },
   { name: "login", url: "/login" },
   { name: "signup", url: "/signup" },
@@ -204,7 +204,7 @@ for (const bp of breakpoints) {
 
 // Search page specific responsive tests
 test.describe("search page responsive layout", () => {
-  const searchUrl = "/search?swLat=37.7&swLng=-122.5&neLat=37.8&neLng=-122.4";
+  const searchUrl = "/search?minLat=37.7&minLng=-122.5&maxLat=37.8&maxLng=-122.4";
 
   test.describe("mobile (375px)", () => {
     test.use({ viewport: { width: 375, height: 812 } });

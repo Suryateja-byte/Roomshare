@@ -6,74 +6,11 @@
  */
 
 import { test, expect } from "@playwright/test";
-import AxeBuilder from "@axe-core/playwright";
-import { A11Y_CONFIG } from "../helpers/test-utils";
-
-const CI_EXTRA_EXCLUDES = [
-  ".maplibregl-ctrl-group",
-  "[data-sonner-toast]",
-  "[data-radix-popper-content-wrapper]",
-] as const;
-
-const CI_DISABLED_RULES = [
-  "aria-hidden-focus",
-  "region",
-  "link-in-text-block",
-] as const;
-
-const CI_ACCEPTABLE_VIOLATIONS = [
-  "heading-order",
-  "landmark-unique",
-  "landmark-one-main",
-  "page-has-heading-one",
-  "duplicate-id",
-  "duplicate-id-aria",
-] as const;
-
-async function runAxeScan(
-  page: import("@playwright/test").Page,
-  extraExcludes: string[] = [],
-  disabledRules: string[] = []
-) {
-  let builder = new AxeBuilder({ page }).withTags([...A11Y_CONFIG.tags]);
-
-  for (const selector of [
-    ...A11Y_CONFIG.globalExcludes,
-    ...CI_EXTRA_EXCLUDES,
-    ...extraExcludes,
-  ]) {
-    builder = builder.exclude(selector);
-  }
-
-  const allDisabledRules = [...CI_DISABLED_RULES, ...disabledRules];
-  if (allDisabledRules.length > 0) {
-    builder = builder.disableRules([...allDisabledRules]);
-  }
-
-  return builder.analyze();
-}
-
-// eslint-disable-next-line @typescript-eslint/no-explicit-any
-function filterViolations(violations: any[]): any[] {
-  return violations.filter(
-    (v: any) =>
-      !A11Y_CONFIG.knownExclusions.includes(
-        v.id as (typeof A11Y_CONFIG.knownExclusions)[number]
-      ) && !(CI_ACCEPTABLE_VIOLATIONS as readonly string[]).includes(v.id)
-  );
-}
-
-// eslint-disable-next-line @typescript-eslint/no-explicit-any
-function logViolations(label: string, violations: any[]) {
-  if (violations.length > 0) {
-    console.log(`[axe-gap] ${label}: ${violations.length} violation(s)`);
-    violations.forEach((v) => {
-      console.log(
-        `  - ${v.id} (${v.impact}): ${v.description} [${v.nodes.length} node(s)]`
-      );
-    });
-  }
-}
+import {
+  runAxeScan,
+  filterViolations,
+  logViolations,
+} from "../helpers/a11y-helpers";
 
 test.describe("axe-core Gap Coverage — Admin Pages", () => {
   test.use({ storageState: "playwright/.auth/admin.json" });
