@@ -144,17 +144,10 @@ export async function waitForMapMarkers(
   const timeout = options?.timeout ?? timeouts.action;
   const minCount = options?.minCount ?? 1;
 
-  await page.waitForSelector(selectors.mapMarker, { timeout });
+  await page.locator(selectors.mapMarker).first().waitFor({ state: 'attached', timeout });
 
   // Wait for at least minCount markers
-  await page.waitForFunction(
-    ({ selector, min }) => {
-      const markers = document.querySelectorAll(selector);
-      return markers.length >= min;
-    },
-    { selector: selectors.mapMarker, min: minCount },
-    { timeout }
-  );
+  await expect.poll(() => page.locator(selectors.mapMarker).count(), { timeout }).toBeGreaterThanOrEqual(minCount);
 
   const markers = page.locator(selectors.mapMarker);
   return markers.count();
@@ -324,9 +317,11 @@ export async function waitForDebounceAndResponse(
     timeout?: number;
   }
 ): Promise<void> {
-  const debounceMs = opts.debounceMs ?? timeouts.debounce;
   const timeout = opts.timeout ?? timeouts.action;
-  const responsePromise = page.waitForResponse(
+  // Wait directly for the debounced API response — the debounce timer fires
+  // on its own schedule, so we just gate on the actual network response
+  // rather than guessing the timing with waitForTimeout.
+  await page.waitForResponse(
     (resp) => {
       const url = resp.url();
       return typeof opts.responsePattern === "string"
@@ -335,9 +330,6 @@ export async function waitForDebounceAndResponse(
     },
     { timeout }
   );
-  // Minimal wait for debounce to fire, then gate on actual response
-  await page.waitForTimeout(debounceMs + 100);
-  await responsePromise;
 }
 
 /**

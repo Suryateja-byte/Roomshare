@@ -71,7 +71,9 @@ test.describe("CLS Audit — All Pages < 0.1", () => {
   // CI environments may have significantly higher CLS due to font loading,
   // uncached images, slower rendering, and headless browser differences
   const isCI = !!process.env.CI;
-  const CLS_BUDGET = isCI ? 0.75 : 0.1;
+  // CI CLS is consistently 0.39-0.50 due to font loading, uncached images, headless rendering
+  // 0.55 accommodates measured CI baseline (~0.50) with 10% margin while catching regressions
+  const CLS_BUDGET = isCI ? 0.55 : 0.1;
   const SETTLE_MS = 5000;
 
   // ────────────────────────────────────────────────────────
@@ -82,7 +84,7 @@ test.describe("CLS Audit — All Pages < 0.1", () => {
     await setupClsObserver(page);
     await page.goto("/");
     await page.waitForLoadState("networkidle");
-    await page.waitForTimeout(SETTLE_MS);
+    await page.waitForTimeout(SETTLE_MS); // INTENTIONAL: CLS measurement settle window
 
     const cls = await readCls(page);
     if (cls >= CLS_BUDGET) {
@@ -101,7 +103,7 @@ test.describe("CLS Audit — All Pages < 0.1", () => {
     await setupClsObserver(page);
     await page.goto(searchUrl);
     await page.waitForLoadState("networkidle");
-    await page.waitForTimeout(SETTLE_MS);
+    await page.waitForTimeout(SETTLE_MS); // INTENTIONAL: CLS measurement settle window
 
     const cls = await readCls(page);
     if (cls >= CLS_BUDGET) {
@@ -119,7 +121,7 @@ test.describe("CLS Audit — All Pages < 0.1", () => {
     await setupClsObserver(page);
     await page.goto("/about");
     await page.waitForLoadState("networkidle");
-    await page.waitForTimeout(SETTLE_MS);
+    await page.waitForTimeout(SETTLE_MS); // INTENTIONAL: CLS measurement settle window
 
     const cls = await readCls(page);
     if (cls >= CLS_BUDGET) {
@@ -137,7 +139,7 @@ test.describe("CLS Audit — All Pages < 0.1", () => {
     await setupClsObserver(page);
     await page.goto("/login");
     await page.waitForLoadState("networkidle");
-    await page.waitForTimeout(SETTLE_MS);
+    await page.waitForTimeout(SETTLE_MS); // INTENTIONAL: CLS measurement settle window
 
     const cls = await readCls(page);
     if (cls >= CLS_BUDGET) {
@@ -155,7 +157,7 @@ test.describe("CLS Audit — All Pages < 0.1", () => {
     await setupClsObserver(page);
     await page.goto("/signup");
     await page.waitForLoadState("networkidle");
-    await page.waitForTimeout(SETTLE_MS);
+    await page.waitForTimeout(SETTLE_MS); // INTENTIONAL: CLS measurement settle window
 
     const cls = await readCls(page);
     if (cls >= CLS_BUDGET) {
@@ -186,7 +188,7 @@ test.describe("CLS Audit — All Pages < 0.1", () => {
     await setupClsObserver(page);
     await page.goto(`/listings/${listingId}`);
     await page.waitForLoadState("networkidle");
-    await page.waitForTimeout(SETTLE_MS);
+    await page.waitForTimeout(SETTLE_MS); // INTENTIONAL: CLS measurement settle window
 
     const cls = await readCls(page);
     if (cls >= CLS_BUDGET) {
@@ -244,7 +246,7 @@ test.describe("CLS Audit — All Pages < 0.1", () => {
     await setupClsObserver(page);
     await page.goto("/");
     // Font swap typically happens within first 1-2 seconds
-    await page.waitForTimeout(3000);
+    await page.waitForTimeout(3000); // INTENTIONAL: CLS measurement window for font-swap detection
 
     const entries = await readClsEntries(page);
     // Filter for potential font-related shifts (usually very small)
@@ -252,7 +254,8 @@ test.describe("CLS Audit — All Pages < 0.1", () => {
 
     const totalEarlyCls = earlyShifts.reduce((sum, e) => sum + e.value, 0);
     // CI may have higher font-swap CLS due to slower rendering and font cache misses
-    const fontSwapBudget = isCI ? 0.75 : 0.05;
+    // CI font swap CLS measured at 0.50 — font loading in headless causes large shifts
+    const fontSwapBudget = isCI ? 0.55 : 0.05;
     expect(
       totalEarlyCls,
       `Font swap CLS: ${totalEarlyCls.toFixed(4)} from ${earlyShifts.length} shifts (budget: ${fontSwapBudget})`

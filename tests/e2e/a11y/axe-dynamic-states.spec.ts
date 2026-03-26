@@ -10,8 +10,11 @@
  */
 
 import { test, expect } from "@playwright/test";
-import AxeBuilder from "@axe-core/playwright";
-import { A11Y_CONFIG } from "../helpers/test-utils";
+import {
+  runAxeScan,
+  filterViolations,
+  logViolations,
+} from "../helpers/a11y-helpers";
 import {
   filtersButton,
   filterDialog,
@@ -19,89 +22,13 @@ import {
 } from "../helpers/filter-helpers";
 
 /**
- * Known axe rule IDs that fire on third-party or framework-generated markup
- * we cannot fix (e.g. map controls, mobile nav with aria-hidden + focusable links).
- * Disabled globally for dynamic-state scans to reduce false positives.
- *
- * - aria-hidden-focus: map controls and mobile nav with aria-hidden + focusable links
- * - region: third-party widgets (map, toasts) may sit outside landmark regions
- * - link-in-text-block: inline links styled identically to surrounding text (design choice)
+ * Extra disabled rules specific to dynamic-state scans (on top of the shared
+ * CI_DISABLED_RULES from a11y-helpers).
  */
-const DYNAMIC_STATE_DISABLED_RULES = [
-  "aria-hidden-focus",
-  "region",
-  "link-in-text-block",
+const DYNAMIC_EXTRA_DISABLED_RULES = [
   "aria-prohibited-attr",
   "button-name",
-] as const;
-
-/** Extra selectors to exclude from axe scans in CI (third-party widgets, map controls) */
-const CI_EXTRA_EXCLUDES = [
-  ".maplibregl-ctrl-group",
-  ".maplibregl-ctrl-group",
-  "[data-sonner-toast]",
-  "[data-radix-popper-content-wrapper]",
-] as const;
-
-/** Helper: run axe scan with shared config */
-async function runAxeScan(
-  page: import("@playwright/test").Page,
-  extraExcludes: string[] = [],
-  disabledRules: string[] = []
-) {
-  let builder = new AxeBuilder({ page }).withTags([...A11Y_CONFIG.tags]);
-
-  for (const selector of [
-    ...A11Y_CONFIG.globalExcludes,
-    ...CI_EXTRA_EXCLUDES,
-    ...extraExcludes,
-  ]) {
-    builder = builder.exclude(selector);
-  }
-
-  const allDisabledRules = [...DYNAMIC_STATE_DISABLED_RULES, ...disabledRules];
-  if (allDisabledRules.length > 0) {
-    builder = builder.disableRules([...allDisabledRules]);
-  }
-
-  return builder.analyze();
-}
-
-/**
- * Additional rule IDs that are acceptable in CI headless environments.
- * These typically fire on framework/third-party markup or headless rendering artifacts.
- */
-const CI_ACCEPTABLE_VIOLATIONS = [
-  "heading-order", // heading hierarchy from layout + page combo in SSR
-  "landmark-unique", // duplicate nav landmarks from SSR + hydration
-  "landmark-one-main", // transient state during Suspense boundary resolution
-  "page-has-heading-one", // heading may not render before Suspense resolves
-  "duplicate-id", // Radix UI portals can duplicate IDs during hydration
-  "duplicate-id-aria", // Same Radix UI portal issue
-] as const;
-
-// eslint-disable-next-line @typescript-eslint/no-explicit-any
-function logViolations(label: string, violations: any[]) {
-  if (violations.length > 0) {
-    console.log(`[axe-dynamic] ${label}: ${violations.length} violation(s)`);
-    violations.forEach((v) => {
-      console.log(
-        `  - ${v.id} (${v.impact}): ${v.description} [${v.nodes.length} node(s)]`
-      );
-    });
-  }
-}
-
-/** Filter out known exclusions AND CI-acceptable violations */
-// eslint-disable-next-line @typescript-eslint/no-explicit-any
-function filterViolations(violations: any[]): any[] {
-  return violations.filter(
-    (v) =>
-      !A11Y_CONFIG.knownExclusions.includes(
-        v.id as (typeof A11Y_CONFIG.knownExclusions)[number]
-      ) && !(CI_ACCEPTABLE_VIOLATIONS as readonly string[]).includes(v.id)
-  );
-}
+];
 
 test.describe("axe-core — Dynamic UI States", () => {
   test.beforeEach(async () => {
@@ -127,7 +54,7 @@ test.describe("axe-core — Dynamic UI States", () => {
         const modal = filterDialog(page);
         await expect(modal).toBeVisible({ timeout: 10_000 });
 
-        const results = await runAxeScan(page);
+        const results = await runAxeScan(page, { disabledRules: DYNAMIC_EXTRA_DISABLED_RULES });
         const violations = filterViolations(results.violations);
 
         logViolations("Filter Modal Open", violations);
@@ -182,7 +109,7 @@ test.describe("axe-core — Dynamic UI States", () => {
             // Some forms may not show errors immediately
           });
 
-        const results = await runAxeScan(page);
+        const results = await runAxeScan(page, { disabledRules: DYNAMIC_EXTRA_DISABLED_RULES });
         const violations = filterViolations(results.violations);
 
         logViolations("Login Validation Errors", violations);
@@ -255,7 +182,7 @@ test.describe("axe-core — Dynamic UI States", () => {
           .toBeVisible({ timeout: 5000 })
           .catch(() => {});
 
-        const results = await runAxeScan(page);
+        const results = await runAxeScan(page, { disabledRules: DYNAMIC_EXTRA_DISABLED_RULES });
         const violations = filterViolations(results.violations);
 
         logViolations("Signup Validation Errors", violations);
@@ -296,7 +223,7 @@ test.describe("axe-core — Dynamic UI States", () => {
         .waitFor({ state: "attached", timeout: 30_000 })
         .catch(() => {});
 
-      const results = await runAxeScan(page);
+      const results = await runAxeScan(page, { disabledRules: DYNAMIC_EXTRA_DISABLED_RULES });
       const violations = filterViolations(results.violations);
 
       logViolations("Search No Results", violations);
@@ -315,7 +242,7 @@ test.describe("axe-core — Dynamic UI States", () => {
       // Wait for network to settle — bottom sheet + map + search results must load
       await page.waitForLoadState("networkidle").catch(() => {});
 
-      const results = await runAxeScan(page);
+      const results = await runAxeScan(page, { disabledRules: DYNAMIC_EXTRA_DISABLED_RULES });
       const violations = filterViolations(results.violations);
 
       logViolations("Mobile Search + Sheet", violations);
@@ -330,7 +257,7 @@ test.describe("axe-core — Dynamic UI States", () => {
       await page.waitForLoadState("domcontentloaded");
       await page.waitForLoadState("networkidle").catch(() => {});
 
-      const results = await runAxeScan(page);
+      const results = await runAxeScan(page, { disabledRules: DYNAMIC_EXTRA_DISABLED_RULES });
       const violations = filterViolations(results.violations);
 
       logViolations("Homepage Dark Mode", violations);
@@ -343,7 +270,7 @@ test.describe("axe-core — Dynamic UI States", () => {
       await page.waitForLoadState("domcontentloaded");
       await page.waitForLoadState("networkidle").catch(() => {});
 
-      const results = await runAxeScan(page);
+      const results = await runAxeScan(page, { disabledRules: DYNAMIC_EXTRA_DISABLED_RULES });
       const violations = filterViolations(results.violations);
 
       logViolations("Search Dark Mode", violations);

@@ -2,12 +2,13 @@
  * Semantic Search Resilience E2E Tests
  *
  * Validates that search gracefully degrades when backend subsystems
- * have issues. These tests verify the *observable behavior* from E2E:
- * search always works, never crashes, returns results via FTS fallback.
+ * have issues. Each test uses `page.route()` to intercept client-side
+ * /api/search/v2 requests and simulate failures (503, 401, 500).
  *
- * Note: Actual failure injection (Gemini down, SQL errors) is tested
- * at the unit/integration layer. E2E tests verify the user-facing
- * resilience contract.
+ * Since the initial page load uses SSR (server-side executeSearchV2),
+ * the route intercepts affect client-side re-fetches (Load More,
+ * filter changes). The tests verify the user-facing resilience
+ * contract: the page renders SSR results and does not crash.
  *
  * Scenarios: SS-40, SS-41, SS-42, SS-55
  * Run: pnpm playwright test tests/e2e/semantic-search/semantic-search-resilience.anon.spec.ts
@@ -87,9 +88,23 @@ test.describe("Semantic Search - Resilience", () => {
       }
     });
 
+    // Inject failure: intercept client-side /api/search/v2 calls with 503
+    // to simulate Gemini/embedding service being down.
+    // SSR page load uses the server-side service directly (not interceptable),
+    // so this tests that client-side fetch failures (Load More, re-fetches)
+    // degrade gracefully — the page still shows SSR results without crashing.
+    await page.route("**/api/search/v2*", (route) =>
+      route.fulfill({
+        status: 503,
+        contentType: "application/json",
+        body: JSON.stringify({ error: "Service Unavailable" }),
+      })
+    );
+
     await page.goto(`/search?q=cozy+room+near+campus&${boundsQS}`);
     await waitForSearchOutcome(page);
 
+    // SSR results should still be visible despite API route being intercepted
     const errorBoundary = page.locator(
       'text=/something went wrong/i, [data-testid="error-boundary"]'
     );
@@ -112,6 +127,17 @@ test.describe("Semantic Search - Resilience", () => {
         consoleErrors.push(msg.text());
       }
     });
+
+    // Inject failure: intercept client-side /api/search/v2 with 401
+    // to simulate Gemini API key being invalid or expired.
+    // The page should show SSR results and not crash on auth failures.
+    await page.route("**/api/search/v2*", (route) =>
+      route.fulfill({
+        status: 401,
+        contentType: "application/json",
+        body: JSON.stringify({ error: "Unauthorized: Invalid API key" }),
+      })
+    );
 
     await page.goto(`/search?q=affordable+room+in+sf&${boundsQS}`);
     await waitForSearchOutcome(page);
@@ -136,6 +162,17 @@ test.describe("Semantic Search - Resilience", () => {
       }
     });
 
+    // Inject failure: intercept client-side /api/search/v2 with 500
+    // to simulate a SQL function error (e.g. search_listings_semantic fails).
+    // The page should still render SSR results and not show an error boundary.
+    await page.route("**/api/search/v2*", (route) =>
+      route.fulfill({
+        status: 500,
+        contentType: "application/json",
+        body: JSON.stringify({ error: "Failed to fetch search results" }),
+      })
+    );
+
     await page.goto(`/search?q=spacious+apartment&${boundsQS}`);
     await waitForSearchOutcome(page);
 
@@ -146,6 +183,19 @@ test.describe("Semantic Search - Resilience", () => {
   test(`SS-55: search degrades gracefully when GEMINI_API_KEY is missing`, async ({
     page,
   }) => {
+    // Inject failure: intercept client-side /api/search/v2 with 503 and
+    // a body mimicking the error when GEMINI_API_KEY is not configured.
+    // The page should still render SSR results (or empty state) without crashing.
+    await page.route("**/api/search/v2*", (route) =>
+      route.fulfill({
+        status: 503,
+        contentType: "application/json",
+        body: JSON.stringify({
+          error: "Search temporarily unavailable",
+        }),
+      })
+    );
+
     await page.goto(`/search?q=cozy+room&sort=recommended&${boundsQS}`);
     await waitForSearchOutcome(page);
 

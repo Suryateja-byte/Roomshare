@@ -42,7 +42,8 @@ test.describe("Filter Modal — Visual Regression", () => {
       .first();
 
     const isVisible = await filterButton
-      .isVisible({ timeout: 5000 })
+      .waitFor({ state: "visible", timeout: 5000 })
+      .then(() => true)
       .catch(() => false);
     test.skip(!isVisible, "Filter button not found");
 
@@ -65,7 +66,8 @@ test.describe("Filter Modal — Visual Regression", () => {
       .first();
 
     const isVisible = await filterButton
-      .isVisible({ timeout: 5000 })
+      .waitFor({ state: "visible", timeout: 5000 })
+      .then(() => true)
       .catch(() => false);
     test.skip(!isVisible, "Filter button not found");
 
@@ -82,10 +84,10 @@ test.describe("Filter Modal — Visual Regression", () => {
       .locator('input[name*="max" i], input[placeholder*="max" i]')
       .first();
 
-    if (await minPrice.isVisible({ timeout: 2000 }).catch(() => false)) {
+    if (await minPrice.waitFor({ state: "visible", timeout: 2000 }).then(() => true).catch(() => false)) {
       await minPrice.fill("500");
     }
-    if (await maxPrice.isVisible({ timeout: 2000 }).catch(() => false)) {
+    if (await maxPrice.waitFor({ state: "visible", timeout: 2000 }).then(() => true).catch(() => false)) {
       await maxPrice.fill("2000");
     }
 
@@ -106,7 +108,8 @@ test.describe("Filter Modal — Visual Regression", () => {
       .first();
 
     const isVisible = await filterButton
-      .isVisible({ timeout: 5000 })
+      .waitFor({ state: "visible", timeout: 5000 })
+      .then(() => true)
       .catch(() => false);
     test.skip(!isVisible, "Filter button not found on mobile");
 

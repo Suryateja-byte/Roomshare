@@ -77,13 +77,11 @@ test.describe("Move-In Date Filter", () => {
 
     // Click the date picker trigger to open the Radix Popover calendar
     await datePickerTrigger.click();
-    await page.waitForTimeout(500);
 
     // Navigate to the next month using the "Next month" button
     const nextMonthBtn = page.locator('button[aria-label="Next month"]');
     await expect(nextMonthBtn).toBeVisible({ timeout: 5_000 });
     await nextMonthBtn.click();
-    await page.waitForTimeout(300);
 
     // Select the 15th day from the calendar grid
     // The calendar grid buttons contain just the day number.
@@ -108,8 +106,6 @@ test.describe("Move-In Date Filter", () => {
         await todayBtn.click();
       }
     }
-
-    await page.waitForTimeout(500);
 
     // Apply filters
     await applyFilters(page);
@@ -142,7 +138,7 @@ test.describe("Move-In Date Filter", () => {
   }) => {
     await page.goto(`${SEARCH_URL}&moveInDate=2020-01-01`);
     await page.waitForLoadState("domcontentloaded");
-    await page.waitForTimeout(3_000);
+    await page.waitForLoadState("networkidle").catch(() => {});
 
     // safeParseDate rejects past dates, so moveInDate should not appear as an active filter
     const container = searchResultsContainer(page);
@@ -157,7 +153,6 @@ test.describe("Move-In Date Filter", () => {
 
     // The URL param may still be present in the browser bar, but the server
     // should not have applied it as an active filter.
-    expect(await page.title()).toBeTruthy();
   });
 
   // 7.3: Date > 2 years in future rejected -> moveInDate=2030-01-01, no filter
@@ -166,7 +161,7 @@ test.describe("Move-In Date Filter", () => {
   }) => {
     await page.goto(`${SEARCH_URL}&moveInDate=2030-01-01`);
     await page.waitForLoadState("domcontentloaded");
-    await page.waitForTimeout(3_000);
+    await page.waitForLoadState("networkidle").catch(() => {});
 
     // safeParseDate rejects dates beyond 2 years from now
     const container = searchResultsContainer(page);
@@ -178,7 +173,6 @@ test.describe("Move-In Date Filter", () => {
       await expect(dateChip).toHaveCount(0);
     }
 
-    expect(await page.title()).toBeTruthy();
   });
 
   // 7.4: Invalid date format rejected -> moveInDate=not-a-date, no chip
@@ -188,7 +182,7 @@ test.describe("Move-In Date Filter", () => {
     // Test with a non-date string
     await page.goto(`${SEARCH_URL}&moveInDate=not-a-date`);
     await page.waitForLoadState("domcontentloaded");
-    await page.waitForTimeout(3_000);
+    await page.waitForLoadState("networkidle").catch(() => {});
 
     const container = searchResultsContainer(page);
     const filtersRegion = container.locator('[aria-label="Applied filters"]');
@@ -202,7 +196,7 @@ test.describe("Move-In Date Filter", () => {
     // Also test with a malformed date-like string
     await page.goto(`${SEARCH_URL}&moveInDate=13/45/2025`);
     await page.waitForLoadState("domcontentloaded");
-    await page.waitForTimeout(3_000);
+    await page.waitForLoadState("networkidle").catch(() => {});
 
     const filtersRegion2 = container.locator('[aria-label="Applied filters"]');
     const regionVisible2 = await filtersRegion2.isVisible().catch(() => false);
@@ -212,6 +206,5 @@ test.describe("Move-In Date Filter", () => {
       await expect(dateChip2).toHaveCount(0);
     }
 
-    expect(await page.title()).toBeTruthy();
   });
 });

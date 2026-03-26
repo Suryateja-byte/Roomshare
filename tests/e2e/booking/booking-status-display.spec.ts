@@ -23,6 +23,7 @@ const USER2_EMAIL = "e2e-other@roomshare.dev";
 const USER2_STATE = "playwright/.auth/user2.json";
 
 test.describe("Booking Status Display @booking @auth", () => {
+  test.describe.configure({ mode: 'serial' });
   /**
    * Test 1: Bookings page renders with Sent/Received tabs
    * Verifies page heading, tab buttons, and tab switching work.

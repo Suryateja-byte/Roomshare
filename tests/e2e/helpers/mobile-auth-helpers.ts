@@ -1,4 +1,4 @@
-import { type Page } from "@playwright/test";
+import { type Page, expect } from "@playwright/test";
 
 /**
  * Set up mobile viewport for authenticated tests.
@@ -25,7 +25,11 @@ export async function navigateWithMobileNav(
   if (await hamburger.isVisible({ timeout: 3000 }).catch(() => false)) {
     await hamburger.click();
     // Wait for mobile menu to appear
-    await page.waitForTimeout(300);
+    const mobileMenu = page
+      .getByRole("navigation")
+      .or(page.locator('[data-testid="mobile-menu"]'))
+      .or(page.locator('[role="menu"]'));
+    await expect(mobileMenu.first()).toBeVisible({ timeout: 5000 });
 
     // Try to find and click the nav link
     const navLink = page

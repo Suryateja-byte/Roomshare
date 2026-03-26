@@ -139,7 +139,7 @@ test.describe("mobile forms (375px viewport)", () => {
   test.describe("login form", () => {
     test("inputs prevent iOS auto-zoom (font-size >= 16px)", async ({ page }) => {
       await page.goto("/login", { waitUntil: "domcontentloaded" });
-      await page.waitForTimeout(300);
+      await page.waitForLoadState("networkidle").catch(() => {});
       const issues = await checkInputFontSizes(page);
       // Known issue: shadcn/ui defaults to text-sm (14px). Log as warning.
       // When CSS fix is applied, this assertion will start passing.
@@ -151,28 +151,28 @@ test.describe("mobile forms (375px viewport)", () => {
 
     test("email field has correct input type", async ({ page }) => {
       await page.goto("/login", { waitUntil: "domcontentloaded" });
-      await page.waitForTimeout(300);
+      await page.waitForLoadState("networkidle").catch(() => {});
       const issues = await checkInputTypes(page);
       expect(issues).toEqual([]);
     });
 
     test("all inputs have labels", async ({ page }) => {
       await page.goto("/login", { waitUntil: "domcontentloaded" });
-      await page.waitForTimeout(300);
+      await page.waitForLoadState("networkidle").catch(() => {});
       const issues = await checkLabels(page);
       expect(issues).toEqual([]);
     });
 
     test("submit button is reachable", async ({ page }) => {
       await page.goto("/login", { waitUntil: "domcontentloaded" });
-      await page.waitForTimeout(300);
+      await page.waitForLoadState("networkidle").catch(() => {});
       const issues = await checkSubmitButtons(page);
       expect(issues).toEqual([]);
     });
 
     test("form fits within viewport", async ({ page }) => {
       await page.goto("/login", { waitUntil: "domcontentloaded" });
-      await page.waitForTimeout(300);
+      await page.waitForLoadState("networkidle").catch(() => {});
 
       const formOverflow = await page.evaluate(() => {
         const form = document.querySelector("form");
@@ -197,7 +197,7 @@ test.describe("mobile forms (375px viewport)", () => {
   test.describe("signup form", () => {
     test("inputs prevent iOS auto-zoom (font-size >= 16px)", async ({ page }) => {
       await page.goto("/signup", { waitUntil: "domcontentloaded" });
-      await page.waitForTimeout(300);
+      await page.waitForLoadState("networkidle").catch(() => {});
       const issues = await checkInputFontSizes(page);
       if (issues.length > 0) {
         console.warn("[signup] iOS auto-zoom risk:", issues);
@@ -207,28 +207,28 @@ test.describe("mobile forms (375px viewport)", () => {
 
     test("email field has correct input type", async ({ page }) => {
       await page.goto("/signup", { waitUntil: "domcontentloaded" });
-      await page.waitForTimeout(300);
+      await page.waitForLoadState("networkidle").catch(() => {});
       const issues = await checkInputTypes(page);
       expect(issues).toEqual([]);
     });
 
     test("all inputs have labels", async ({ page }) => {
       await page.goto("/signup", { waitUntil: "domcontentloaded" });
-      await page.waitForTimeout(300);
+      await page.waitForLoadState("networkidle").catch(() => {});
       const issues = await checkLabels(page);
       expect(issues).toEqual([]);
     });
 
     test("submit button is reachable", async ({ page }) => {
       await page.goto("/signup", { waitUntil: "domcontentloaded" });
-      await page.waitForTimeout(300);
+      await page.waitForLoadState("networkidle").catch(() => {});
       const issues = await checkSubmitButtons(page);
       expect(issues).toEqual([]);
     });
 
     test("password fields show toggle visibility button", async ({ page }) => {
       await page.goto("/signup", { waitUntil: "domcontentloaded" });
-      await page.waitForTimeout(300);
+      await page.waitForLoadState("networkidle").catch(() => {});
 
       const passwordFields = page.locator('input[type="password"]');
       const count = await passwordFields.count();
@@ -249,7 +249,7 @@ test.describe("mobile forms (375px viewport)", () => {
   test.describe("forgot password form", () => {
     test("inputs prevent iOS auto-zoom (font-size >= 16px)", async ({ page }) => {
       await page.goto("/forgot-password", { waitUntil: "domcontentloaded" });
-      await page.waitForTimeout(300);
+      await page.waitForLoadState("networkidle").catch(() => {});
       const issues = await checkInputFontSizes(page);
       if (issues.length > 0) {
         console.warn("[forgot-password] iOS auto-zoom risk:", issues);
@@ -259,14 +259,14 @@ test.describe("mobile forms (375px viewport)", () => {
 
     test("email field has correct input type", async ({ page }) => {
       await page.goto("/forgot-password", { waitUntil: "domcontentloaded" });
-      await page.waitForTimeout(300);
+      await page.waitForLoadState("networkidle").catch(() => {});
       const issues = await checkInputTypes(page);
       expect(issues).toEqual([]);
     });
 
     test("submit button is reachable", async ({ page }) => {
       await page.goto("/forgot-password", { waitUntil: "domcontentloaded" });
-      await page.waitForTimeout(300);
+      await page.waitForLoadState("networkidle").catch(() => {});
       const issues = await checkSubmitButtons(page);
       expect(issues).toEqual([]);
     });
@@ -277,7 +277,7 @@ test.describe("mobile forms (375px viewport)", () => {
   test.describe("search form", () => {
     test("search input is usable on mobile", async ({ page }) => {
       await page.goto("/", { waitUntil: "domcontentloaded" });
-      await page.waitForTimeout(500);
+      await page.waitForLoadState("networkidle").catch(() => {});
 
       // Find search input
       const searchInput = page.locator(
@@ -307,7 +307,7 @@ test.describe("mobile forms (375px viewport)", () => {
   for (const formPage of formPages) {
     test(`${formPage.name}: error messages visible after empty submit`, async ({ page }) => {
       await page.goto(formPage.url, { waitUntil: "domcontentloaded" });
-      await page.waitForTimeout(300);
+      await page.waitForLoadState("networkidle").catch(() => {});
 
       // Try submitting empty form
       const submitBtn = page.locator(
@@ -316,7 +316,8 @@ test.describe("mobile forms (375px viewport)", () => {
 
       if ((await submitBtn.count()) > 0) {
         await submitBtn.click();
-        await page.waitForTimeout(500);
+        // Wait for validation error messages to appear
+        await page.waitForLoadState("domcontentloaded").catch(() => {});
 
         // Check that error messages (if any) are visible and not clipped
         const errorMessages = page.locator(
@@ -342,7 +343,7 @@ test.describe("mobile forms (375px viewport)", () => {
 
     test(`${formPage.name}: no horizontal scroll after interacting with form`, async ({ page }) => {
       await page.goto(formPage.url, { waitUntil: "domcontentloaded" });
-      await page.waitForTimeout(300);
+      await page.waitForLoadState("networkidle").catch(() => {});
 
       // Focus on first input to trigger any zoom/layout shift
       const firstInput = page.locator(
@@ -351,7 +352,7 @@ test.describe("mobile forms (375px viewport)", () => {
 
       if ((await firstInput.count()) > 0) {
         await firstInput.focus();
-        await page.waitForTimeout(300);
+        await expect(firstInput).toBeFocused();
 
         const hasHScroll = await page.evaluate(() => {
           return document.documentElement.scrollWidth > document.documentElement.clientWidth;
@@ -378,7 +379,7 @@ test.describe("form rendering across breakpoints", () => {
 
       test("login form inputs are full-width", async ({ page }) => {
         await page.goto("/login", { waitUntil: "domcontentloaded" });
-        await page.waitForTimeout(300);
+        await page.waitForLoadState("networkidle").catch(() => {});
 
         const inputs = page.locator(
           'input:not([type="hidden"]):not([type="submit"]):not([type="checkbox"]):visible'
@@ -396,7 +397,7 @@ test.describe("form rendering across breakpoints", () => {
 
       test("signup form inputs are full-width", async ({ page }) => {
         await page.goto("/signup", { waitUntil: "domcontentloaded" });
-        await page.waitForTimeout(300);
+        await page.waitForLoadState("networkidle").catch(() => {});
 
         const inputs = page.locator(
           'input:not([type="hidden"]):not([type="submit"]):not([type="checkbox"]):visible'

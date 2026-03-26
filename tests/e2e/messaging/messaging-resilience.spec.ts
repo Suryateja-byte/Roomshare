@@ -107,13 +107,13 @@ test.describe("Messaging: Resilience", { tag: [tags.auth] }, () => {
 
     // Go offline briefly
     await network.goOffline();
-    await page.waitForTimeout(2000);
+    await page.waitForTimeout(2000); // INTENTIONAL: simulating offline duration — no event to wait for
 
     // Come back online
     await network.goOnline();
 
     // Wait for at least one polling cycle to pass
-    await page.waitForTimeout(POLL_INTERVAL.messagesPage + 2000);
+    await page.waitForTimeout(POLL_INTERVAL.messagesPage + 2000); // INTENTIONAL: must wait for polling cycle duration — no event signals poll completion
 
     // Verify the page is still functional — the input should be visible and interactable
     const input = page.locator(MSG_SELECTORS.messageInput);
@@ -169,8 +169,12 @@ test.describe("Messaging: Resilience", { tag: [tags.auth] }, () => {
     const testMsg = `Error test ${Date.now()}`;
     await sendMessage(page, testMsg);
 
-    // Wait for error handling
-    await page.waitForTimeout(3000);
+    // Wait for error indicator to appear after failed send
+    const errorIndicator = page.locator(MSG_SELECTORS.failedMessage)
+      .or(page.locator(selectors.toast))
+      .or(page.locator('[role="alert"]'))
+      .or(page.getByText(/failed|error|could not|try again/i));
+    await errorIndicator.first().waitFor({ state: "visible", timeout: 10_000 }).catch(() => {});
 
     // Expect failed-message indicator, error toast, or any error text in the message area
     const failedMessage = page.locator(MSG_SELECTORS.failedMessage);
@@ -237,8 +241,11 @@ test.describe("Messaging: Resilience", { tag: [tags.auth] }, () => {
     const testMsg = `Rate limit test ${Date.now()}`;
     await sendMessage(page, testMsg);
 
-    // Wait for error handling
-    await page.waitForTimeout(3000);
+    // Wait for error indicator to appear after rate-limited send
+    const rateLimitIndicator = page.locator(MSG_SELECTORS.failedMessage)
+      .or(page.locator(selectors.toast))
+      .or(page.locator('[role="alert"]'));
+    await rateLimitIndicator.first().waitFor({ state: "visible", timeout: 10_000 }).catch(() => {});
 
     // Expect rate limit feedback — either toast, failed message, or inline error
     const failedMessage = page.locator(MSG_SELECTORS.failedMessage);
@@ -300,8 +307,11 @@ test.describe("Messaging: Resilience", { tag: [tags.auth] }, () => {
     const testMsg = `Forbidden test ${Date.now()}`;
     await sendMessage(page, testMsg);
 
-    // Wait for error handling
-    await page.waitForTimeout(3000);
+    // Wait for error indicator to appear after forbidden send
+    const forbiddenIndicator = page.locator(MSG_SELECTORS.failedMessage)
+      .or(page.locator(selectors.toast))
+      .or(page.locator('[role="alert"]'));
+    await forbiddenIndicator.first().waitFor({ state: "visible", timeout: 10_000 }).catch(() => {});
 
     // Expect error state — toast, failed message, inline error, or redirect
     const failedMessage = page.locator(MSG_SELECTORS.failedMessage);
@@ -418,7 +428,7 @@ test.describe("Messaging: Resilience", { tag: [tags.auth] }, () => {
     if (!isDisabled) {
       // If the button is not disabled, click it and verify no message is sent
       await sendButton.click();
-      await page.waitForTimeout(1500);
+      await page.waitForLoadState("domcontentloaded").catch(() => {});
     }
 
     // Verify no new message bubble was added
@@ -433,7 +443,7 @@ test.describe("Messaging: Resilience", { tag: [tags.auth] }, () => {
     const isDisabledEmpty = await sendButton.isDisabled().catch(() => false);
     if (!isDisabledEmpty) {
       await sendButton.click();
-      await page.waitForTimeout(1000);
+      await page.waitForLoadState("domcontentloaded").catch(() => {});
     }
 
     const finalCount = await page.locator(MSG_SELECTORS.messageBubble).count();
@@ -466,11 +476,9 @@ test.describe("Messaging: Resilience", { tag: [tags.auth] }, () => {
     const overLimitText = "A".repeat(CHAR_LIMITS.messagesPage + 100);
     await input.fill(overLimitText);
 
-    // Wait for character counter to appear
-    await page.waitForTimeout(500);
-
     // Check for character counter visibility
     const charCounter = page.locator(MSG_SELECTORS.charCounter);
+    await charCounter.waitFor({ state: "visible", timeout: 5_000 }).catch(() => {});
     const counterVisible = await charCounter.isVisible().catch(() => false);
 
     // Check if input has maxLength attribute that enforces the limit
@@ -513,7 +521,7 @@ test.describe("Messaging: Resilience", { tag: [tags.auth] }, () => {
     await sendMessage(page, xssPayload);
 
     // Wait for the message to be processed and displayed
-    await page.waitForTimeout(3000);
+    await page.waitForLoadState("networkidle").catch(() => {});
 
     // Check that the raw text is displayed as plain text (escaped/sanitized)
     // The message content should be visible as text, not executed as HTML
@@ -553,7 +561,8 @@ test.describe("Messaging: Resilience", { tag: [tags.auth] }, () => {
     page.on("dialog", () => {
       dialogTriggered = true;
     });
-    await page.waitForTimeout(500);
+    // Brief wait to allow any XSS dialog to fire
+    await page.evaluate(() => new Promise(r => requestAnimationFrame(r)));
     expect(dialogTriggered).toBe(false);
   });
 
@@ -592,11 +601,11 @@ test.describe("Messaging: Resilience", { tag: [tags.auth] }, () => {
       await expect(sendButton).toBeEnabled({ timeout: 5_000 });
       await sendButton.click();
       // Minimal delay between sends — simulate rapid clicking
-      await page.waitForTimeout(200);
+      await page.waitForTimeout(200); // INTENTIONAL: simulating rapid-fire user clicks — must be short real-time delay
     }
 
-    // Wait for all messages to be processed (including any polling cycles)
-    await page.waitForTimeout(5000);
+    // Wait for all messages to be processed
+    await page.waitForLoadState("networkidle").catch(() => {});
 
     // Count only messages matching our unique text — immune to polling deduplication
     // Each unique message (e.g. "Rapid fire ... #1") should appear at most once

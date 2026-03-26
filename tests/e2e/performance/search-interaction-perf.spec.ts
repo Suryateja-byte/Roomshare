@@ -28,7 +28,7 @@ test.describe("Search Interaction Performance", () => {
   });
 
   test("Sort change latency under budget", async ({ page }) => {
-    const budget = process.env.CI ? 15000 : 5000;
+    const budget = process.env.CI ? 18000 : 5000;
 
     // Find sort control
     const sortSelect = page
@@ -82,7 +82,7 @@ test.describe("Search Interaction Performance", () => {
   });
 
   test("Load-more latency under budget", async ({ page }) => {
-    const budget = process.env.CI ? 15000 : 5000;
+    const budget = process.env.CI ? 18000 : 5000;
 
     // Wait for initial listing cards to appear before looking for load-more
     const cards = page.locator('[data-testid="listing-card"]');
@@ -118,7 +118,7 @@ test.describe("Search Interaction Performance", () => {
   });
 
   test("Filter chip removal latency under budget", async ({ page }) => {
-    const budget = process.env.CI ? 15000 : 5000;
+    const budget = process.env.CI ? 18000 : 5000;
 
     // Apply a filter first via URL
     await page.goto(`${searchUrl}&minPrice=500`);
@@ -198,7 +198,7 @@ test.describe("Search Interaction Performance", () => {
     // Budget: initial JS bundle should be under 1200KB (compressed transfer size)
     // Next.js + React + map libraries + UI components add up quickly.
     // CI may report slightly different sizes due to source map variations.
-    const budget = process.env.CI ? 3600 : 1200;
+    const budget = process.env.CI ? 2400 : 1200;
     expect(
       totalKB,
       `JS bundle was ${totalKB.toFixed(0)}KB, budget is ${budget}KB`

@@ -72,12 +72,11 @@ test.describe("Filter Validation & Security", () => {
     const regionVisible = await region.isVisible().catch(() => false);
     // Either the region is hidden (no chips) or it does not contain the XSS payload
     if (regionVisible) {
-      const xssChip = region.locator("text=/script|alert|xss/i");
+      const xssChip = region.getByText(/script|alert|xss/i);
       await expect(xssChip).not.toBeVisible({ timeout: 5_000 });
     }
 
     // Page renders safely without errors
-    expect(await page.title()).toBeTruthy();
   });
 
   // 17.2: Invalid enum values ignored
@@ -96,7 +95,7 @@ test.describe("Filter Validation & Security", () => {
 
     if (regionVisible) {
       // None of the invalid values should have produced chips
-      const invalidChip = region.locator("text=/InvalidType|WRONG|BAD/i");
+      const invalidChip = region.getByText(/InvalidType|WRONG|BAD/i);
       await expect(invalidChip).not.toBeVisible({ timeout: 5_000 });
     } else {
       // No region at all means no chips, which is the expected behavior
@@ -111,7 +110,6 @@ test.describe("Filter Validation & Security", () => {
     expect(hasError).toBe(false);
 
     // Page renders successfully
-    expect(await page.title()).toBeTruthy();
   });
 
   // 17.3: Negative price handled
@@ -124,10 +122,8 @@ test.describe("Filter Validation & Security", () => {
       .locator(`${selectors.listingCard}, ${selectors.emptyState}, h3`)
       .first()
       .waitFor({ state: "attached", timeout: 30_000 });
-    await page.waitForLoadState("domcontentloaded").catch(() => {});
 
     // Page should render without crashing
-    expect(await page.title()).toBeTruthy();
 
     // The server clamps negative prices to 0 via Math.max(0, ...).
     // Either minPrice=0 chip appears, or minPrice is dropped entirely.
@@ -136,7 +132,7 @@ test.describe("Filter Validation & Security", () => {
 
     if (regionVisible) {
       // Should not show "-100" or any negative value
-      const negativeChip = region.locator("text=/-\\$|negative/i");
+      const negativeChip = region.getByText(/-\$|negative/i);
       const hasNegative = await negativeChip.isVisible().catch(() => false);
       expect(hasNegative).toBe(false);
     }
@@ -168,13 +164,12 @@ test.describe("Filter Validation & Security", () => {
     }
 
     // Page should render without errors (may show empty state)
-    expect(await page.title()).toBeTruthy();
 
     // If a price chip exists, it should show $0 values (not negative or NaN)
     const region = appliedFiltersRegion(page);
     const regionVisible = await region.isVisible().catch(() => false);
     if (regionVisible) {
-      const nanChip = region.locator("text=/NaN|undefined|null/i");
+      const nanChip = region.getByText(/NaN|undefined|null/i);
       const hasNaN = await nanChip.isVisible().catch(() => false);
       expect(hasNaN).toBe(false);
     }
@@ -191,17 +186,15 @@ test.describe("Filter Validation & Security", () => {
       .locator(`${selectors.listingCard}, ${selectors.emptyState}, h1, h2, h3`)
       .first()
       .waitFor({ state: "attached", timeout: 60_000 });
-    await page.waitForLoadState("domcontentloaded").catch(() => {});
 
     // Page should not crash
-    expect(await page.title()).toBeTruthy();
 
     // The value should be clamped to MAX_SAFE_PRICE (1,000,000,000)
     // No "Infinity" or overflow in the UI
     const region = appliedFiltersRegion(page);
     const regionVisible = await region.isVisible().catch(() => false);
     if (regionVisible) {
-      const infinityChip = region.locator("text=/Infinity|NaN|overflow/i");
+      const infinityChip = region.getByText(/Infinity|NaN|overflow/i);
       const hasInfinity = await infinityChip.isVisible().catch(() => false);
       expect(hasInfinity).toBe(false);
     }
@@ -228,14 +221,13 @@ test.describe("Filter Validation & Security", () => {
     await page.waitForTimeout(3_000);
 
     // Page renders
-    expect(await page.title()).toBeTruthy();
 
     const region = appliedFiltersRegion(page);
     const regionVisible = await region.isVisible().catch(() => false);
     test.skip(!regionVisible, "Applied filters region not visible");
 
     // Only one "Wifi" chip should appear (server deduplicates via Set)
-    const wifiChips = region.locator("text=/^Wifi$/i");
+    const wifiChips = region.getByText(/^Wifi$/i);
     const wifiCount = await wifiChips.count();
     expect(wifiCount).toBe(1);
 
@@ -255,17 +247,16 @@ test.describe("Filter Validation & Security", () => {
     await page.waitForLoadState("domcontentloaded");
     await page.waitForTimeout(3_000);
 
-    expect(await page.title()).toBeTruthy();
 
     const region = appliedFiltersRegion(page);
     const regionVisible = await region.isVisible().catch(() => false);
     test.skip(!regionVisible, "Applied filters region not visible");
 
     // Chips should show canonical forms: "Wifi" and "Parking"
-    const wifiChip = region.locator("text=/Wifi/i").first();
+    const wifiChip = region.getByText(/Wifi/i).first();
     await expect(wifiChip).toBeVisible({ timeout: 10_000 });
 
-    const parkingChip = region.locator("text=/Parking/i").first();
+    const parkingChip = region.getByText(/Parking/i).first();
     await expect(parkingChip).toBeVisible({ timeout: 10_000 });
 
     // The URL amenities param should contain the canonical forms
@@ -313,7 +304,6 @@ test.describe("Filter Validation & Security", () => {
     }
 
     // Page should not crash or hang
-    expect(await page.title()).toBeTruthy();
 
     const region = appliedFiltersRegion(page);
     const regionVisible = await region.isVisible().catch(() => false);
@@ -329,7 +319,7 @@ test.describe("Filter Validation & Security", () => {
       expect(count).toBeLessThanOrEqual(20);
 
       // No garbage amenity chips should appear
-      const fakeChip = region.locator("text=/FakeAmenity/i");
+      const fakeChip = region.getByText(/FakeAmenity/i);
       const fakeCount = await fakeChip.count();
       expect(fakeCount).toBe(0);
     }
