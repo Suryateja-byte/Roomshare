@@ -160,7 +160,7 @@ test.describe("Session Expiry: Form Submissions", () => {
     await nextMonthBtn.waitFor({ state: "visible", timeout: 10_000 });
     for (let i = 0; i < 2; i++) {
       await nextMonthBtn.dispatchEvent("click");
-      await page.waitForTimeout(250);
+      await nextMonthBtn.waitFor({ state: "visible", timeout: 5_000 });
     }
 
     const startDayBtn = page
@@ -171,7 +171,7 @@ test.describe("Session Expiry: Form Submissions", () => {
       .first();
     await startDayBtn.waitFor({ state: "visible", timeout: 5_000 });
     await startDayBtn.dispatchEvent("click");
-    await page.waitForTimeout(500);
+    await expect(page.locator('[data-radix-popper-content-wrapper]')).not.toBeVisible({ timeout: 5_000 }).catch(() => {});
 
     // --- End date (4 months ahead) ---
     const endDateTrigger = page.locator("#booking-end-date");
@@ -179,13 +179,13 @@ test.describe("Session Expiry: Form Submissions", () => {
       .locator("#booking-end-date[data-state]")
       .waitFor({ state: "visible", timeout: 10_000 });
     await endDateTrigger.click({ force: true });
-    await page.waitForTimeout(300);
+    await expect(page.locator('[data-radix-popper-content-wrapper]')).toBeVisible({ timeout: 5_000 });
 
     const nextMonthBtnEnd = page.locator('button[aria-label="Next month"]');
     await nextMonthBtnEnd.waitFor({ state: "visible", timeout: 10_000 });
     for (let i = 0; i < 4; i++) {
       await nextMonthBtnEnd.dispatchEvent("click");
-      await page.waitForTimeout(250);
+      await nextMonthBtnEnd.waitFor({ state: "visible", timeout: 5_000 });
     }
 
     const endDayBtn = page
@@ -196,7 +196,7 @@ test.describe("Session Expiry: Form Submissions", () => {
       .first();
     await endDayBtn.waitFor({ state: "visible", timeout: 5_000 });
     await endDayBtn.dispatchEvent("click");
-    await page.waitForTimeout(500);
+    await expect(page.locator('[data-radix-popper-content-wrapper]')).not.toBeVisible({ timeout: 5_000 }).catch(() => {});
 
     // Expire session AFTER dates are selected (before booking attempt)
     await expireSession(page);

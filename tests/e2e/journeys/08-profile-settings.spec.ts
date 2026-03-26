@@ -387,7 +387,7 @@ test.describe("Profile & Settings Journeys", () => {
       if (await connectedSection.isVisible().catch(() => false)) {
         // Should show OAuth providers (Google, GitHub, etc.)
         const providers = page.locator('[data-testid="oauth-provider"]');
-        await page.waitForTimeout(1000);
+        await page.waitForLoadState("networkidle").catch(() => {});
       }
     });
   });
@@ -443,7 +443,7 @@ test.describe("Profile & Settings Journeys", () => {
       await nav.goToSettings();
       await page.waitForLoadState("domcontentloaded");
       // Wait for any client-side redirects to settle (CI can be slow)
-      await page.waitForTimeout(2000);
+      await page.waitForLoadState("networkidle").catch(() => {});
 
       // Check we weren't redirected to login or signup
       const currentUrl = page.url();
@@ -463,7 +463,7 @@ test.describe("Profile & Settings Journeys", () => {
         .waitFor({ state: "visible", timeout: 30000 })
         .catch(() => {});
       // Extra wait for hydration in CI
-      await page.waitForTimeout(1000);
+      await page.waitForLoadState("networkidle").catch(() => {});
 
       const deleteButton = page.getByRole("button", {
         name: /delete.*account/i,

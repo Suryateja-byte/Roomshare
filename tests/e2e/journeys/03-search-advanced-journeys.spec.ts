@@ -263,7 +263,7 @@ test.describe("30 Advanced Search Page Journeys", () => {
       .getByRole("button", { name: /private/i })
       .or(page.locator('button:has-text("Private")'));
     if (await privateTab.first().isVisible()) {
-      await page.waitForTimeout(1000);
+      await page.waitForLoadState("networkidle").catch(() => {});
       try {
         await privateTab.first().click();
         await expect
@@ -420,7 +420,7 @@ test.describe("30 Advanced Search Page Journeys", () => {
 
     // Submit form — wait for hydration before clicking submit
     const searchBtn = page.locator('button[type="submit"]').first();
-    await page.waitForTimeout(1000); // hydration settle
+    await expect(searchBtn).toBeEnabled({ timeout: 10_000 });
     await searchBtn.click();
 
     // Wait for navigation — prices should be swapped in URL
@@ -573,7 +573,7 @@ test.describe("30 Advanced Search Page Journeys", () => {
       timeout: 30000,
     });
 
-    // Verify no script execution — no alert dialogs should have fired
+    // INTENTIONAL: measurement window — allow time for any injected scripts to execute
     await page.waitForTimeout(1000);
     expect(alerts).toHaveLength(0);
 
@@ -1043,7 +1043,7 @@ test.describe("30 Advanced Search Page Journeys", () => {
       .getByRole("button", { name: /private/i })
       .or(page.locator('button:has-text("Private")'));
     if (await privateTab.first().isVisible()) {
-      await page.waitForTimeout(1000);
+      await page.waitForLoadState("networkidle").catch(() => {});
       try {
         await privateTab.first().click();
         await expect
@@ -1321,7 +1321,7 @@ test.describe("30 Advanced Search Page Journeys", () => {
       .isVisible({ timeout: 5000 })
       .catch(() => false);
     if (tabVisible) {
-      await page.waitForTimeout(1000);
+      await page.waitForLoadState("networkidle").catch(() => {});
       try {
         await privateTab.first().click();
         await expect
@@ -1398,7 +1398,8 @@ test.describe("30 Advanced Search Page Journeys", () => {
     for (let i = 0; i < Math.min(tabCount, 4); i++) {
       if (await tabs.nth(i).isVisible()) {
         await tabs.nth(i).click();
-        await page.waitForTimeout(100); // Small gap between clicks
+        // INTENTIONAL: small gap between rapid clicks to simulate real user behavior
+        await page.waitForTimeout(100);
       }
     }
 

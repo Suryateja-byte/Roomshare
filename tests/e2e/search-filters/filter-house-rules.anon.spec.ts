@@ -151,7 +151,7 @@ test.describe("House Rules Filter", () => {
     // Start with two house rules applied
     await page.goto(`${SEARCH_URL}&houseRules=Pets+allowed,Smoking+allowed`);
     await page.waitForLoadState("domcontentloaded");
-    await page.waitForTimeout(2_000);
+    await expect(searchResultsContainer(page)).toBeVisible({ timeout: 30_000 });
 
     await openFilterModal(page);
 
@@ -167,8 +167,6 @@ test.describe("House Rules Filter", () => {
 
     // Deselect "Smoking allowed"
     await smokingBtn.click();
-    await page.waitForTimeout(300);
-
     // Smoking should no longer be pressed
     await expect(smokingBtn).toHaveAttribute("aria-pressed", "false");
     // Pets should still be pressed

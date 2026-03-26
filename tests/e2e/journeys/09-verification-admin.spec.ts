@@ -20,7 +20,7 @@ test.describe("Verification Journeys", () => {
       await page.goto("/verify");
       await page.waitForLoadState("domcontentloaded");
       // Wait for any client-side redirects to settle (CI can be slow)
-      await page.waitForTimeout(2000);
+      await page.waitForLoadState("networkidle").catch(() => {});
 
       // Check we weren't redirected to login (auth session expired in CI)
       const currentUrl = page.url();
@@ -63,7 +63,7 @@ test.describe("Verification Journeys", () => {
       await page.goto("/verify");
       await page.waitForLoadState("domcontentloaded");
       // Wait for any client-side redirects to settle (CI can be slow)
-      await page.waitForTimeout(2000);
+      await page.waitForLoadState("networkidle").catch(() => {});
 
       // Check we weren't redirected to login (auth session expired in CI)
       const currentUrl = page.url();
@@ -105,7 +105,7 @@ test.describe("Verification Journeys", () => {
       await page.goto("/verify");
       await page.waitForLoadState("domcontentloaded");
       // Wait for any client-side redirects to settle (CI can be slow)
-      await page.waitForTimeout(2000);
+      await page.waitForLoadState("networkidle").catch(() => {});
 
       // Check we weren't redirected to login (auth session expired in CI)
       const currentUrl = page.url();
@@ -144,7 +144,7 @@ test.describe("Verification Journeys", () => {
       await page.goto("/verify");
       await page.waitForLoadState("domcontentloaded");
       // Wait for any client-side redirects to settle (CI can be slow)
-      await page.waitForTimeout(2000);
+      await page.waitForLoadState("networkidle").catch(() => {});
 
       // Check we weren't redirected to login (auth session expired in CI)
       const verifyUrl = page.url();

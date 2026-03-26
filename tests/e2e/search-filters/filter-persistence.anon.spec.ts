@@ -97,8 +97,6 @@ test.describe("Filter State Persistence", () => {
 
     // Step 2: Navigate away — click a listing card to go to a detail page
     const container = searchResultsContainer(page);
-    // Wait longer for listing cards to render (CI can be slow with SSR hydration)
-    await page.waitForTimeout(3_000);
     const listingCard = container.locator(selectors.listingCard).first();
     const hasListing = await listingCard
       .isVisible({ timeout: 15_000 })

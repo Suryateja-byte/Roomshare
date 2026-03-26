@@ -717,7 +717,7 @@ test.describe("Pagination Core", () => {
     await expect(busyBtn).toBeVisible({ timeout: 3_000 });
 
     // Loading state should persist during the 5-second delay.
-    // Wait 3 seconds and verify button is still in loading state.
+    // INTENTIONAL: wait 3s then verify button is still in loading state (not prematurely resolved).
     await page.waitForTimeout(3_000);
     await expect(busyBtn).toBeVisible();
     await expect(busyBtn).toBeDisabled();

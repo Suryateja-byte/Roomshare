@@ -146,7 +146,7 @@ async function mobileNavigate(
   if (browserName === "webkit") {
     // WebKit needs extra time after navigation for layout recalculation
     // when transitioning from a desktop device descriptor viewport to mobile.
-    await page.waitForTimeout(1_000);
+    await page.waitForLoadState("domcontentloaded");
   }
 
   await waitForMobileCards(page);
@@ -359,8 +359,8 @@ test.describe("Group 1: Desktop Sort Interaction", () => {
         .not.toBe(hlBefore);
     } else {
       // data-highlighted not present (modal={false} variant) — fall back
-      // to a brief pause so Radix can process the event.
-      await page.waitForTimeout(500);
+      // to waiting for any option to gain highlight.
+      await expect(listbox.locator('[role="option"][data-highlighted]')).toBeVisible({ timeout: 3_000 }).catch(() => {});
     }
 
     // Enter selects the focused option
@@ -499,7 +499,8 @@ test.describe("Group 3: Sort + Pagination", () => {
 
     if (hasLoadMore) {
       await loadMore.click();
-      await page.waitForTimeout(2_000);
+      // Wait for new cards to load after load-more click
+      await expect(loadMore).not.toHaveAttribute("aria-busy", "true", { timeout: 10_000 }).catch(() => {});
       const countBeforeSort = await page
         .locator(DESKTOP)
         .locator(CARDS)
@@ -908,7 +909,7 @@ test.describe("Group 6: Sort Edge Cases", () => {
     // Let the sort-selection navigation settle before overriding —
     // avoids NS_BINDING_ABORTED on Firefox when two navigations race.
     await page.waitForLoadState("domcontentloaded").catch(() => {});
-    await page.waitForTimeout(500);
+    await page.waitForURL(/sort=/, { timeout: 5_000 }).catch(() => {});
 
     // Override via URL navigation (use longer timeout for potentially slow navigation)
     await page.goto(`/search?sort=price_desc&${boundsQS}`, {

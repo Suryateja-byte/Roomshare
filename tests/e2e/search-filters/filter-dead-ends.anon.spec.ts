@@ -311,7 +311,6 @@ test.describe("Filter Dead-Ends & Edge Cases", () => {
 
     // Dismiss any open autocomplete dropdown that may overlay the chips region
     await page.keyboard.press("Escape");
-    await page.waitForTimeout(300);
     await page.locator("body").click({ position: { x: 0, y: 0 }, force: true });
 
     // Click "Clear all" button in chips region

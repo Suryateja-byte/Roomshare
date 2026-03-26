@@ -180,7 +180,7 @@ test.describe("Focus Management: search-results-heading", () => {
     });
 
     // Wait for any potential (incorrect) focus effect to fire
-    await page.waitForTimeout(1_500);
+    await page.waitForLoadState("domcontentloaded");
 
     // Focus should NOT have moved to heading — bounds are stripped from filterParamsKey
     const focusAfterBoundsChange = await getFocusedElementId(page);
@@ -195,7 +195,7 @@ test.describe("Focus Management: search-results-heading", () => {
     await waitForSearchReady(page);
 
     // Wait for any effects to settle
-    await page.waitForTimeout(1_000);
+    await page.waitForLoadState("domcontentloaded");
 
     // Focus should NOT be on the heading (isInitialMount skips first render)
     const focusId = await getFocusedElementId(page);

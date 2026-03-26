@@ -91,8 +91,8 @@ test.describe("Search V2 UI Integration", () => {
       console.log("Map canvas not visible - may be missing Mapbox token");
     }
 
-    // Wait briefly for any additional errors to surface
-    await page.waitForTimeout(2000);
+    // Wait for any pending network activity to complete
+    await page.waitForLoadState("networkidle").catch(() => {});
 
     // No fatal map errors (filter out common non-critical warnings)
     // This assertion is valid regardless of whether map loaded
@@ -150,7 +150,7 @@ test.describe("Search V2 UI Integration", () => {
     await expect(heading).toBeVisible({ timeout: 30000 });
 
     // Wait for any delayed map requests to fire
-    await page.waitForTimeout(5000);
+    await page.waitForLoadState("networkidle").catch(() => {});
 
     // Map-listings calls (if any) should use the correct bounds from the URL
     for (const url of mapListingsRequests) {

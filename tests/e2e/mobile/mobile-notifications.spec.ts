@@ -140,7 +140,7 @@ test.describe("Mobile Notifications", () => {
 
     // Tap the unread filter and verify it activates
     await unreadButton.click();
-    await page.waitForTimeout(300);
+    await page.evaluate(() => new Promise(r => requestAnimationFrame(() => requestAnimationFrame(r))));
 
     // The unread button should now be active (has active styling)
     // Verify the page still renders correctly
@@ -163,7 +163,7 @@ test.describe("Mobile Notifications", () => {
         .first();
       if (await unreadButton.isVisible({ timeout: 3000 }).catch(() => false)) {
         await unreadButton.click();
-        await page.waitForTimeout(500);
+        await page.evaluate(() => new Promise(r => requestAnimationFrame(() => requestAnimationFrame(r))));
       }
     }
 

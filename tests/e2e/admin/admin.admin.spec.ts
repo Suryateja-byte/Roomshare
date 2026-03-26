@@ -318,7 +318,7 @@ test.describe("ADM: Auth Guards", () => {
   test("ADM-23: Regular user redirected from /admin", async ({ page }) => {
     await page.goto("/admin");
     await page.waitForLoadState("domcontentloaded");
-    await page.waitForTimeout(3000);
+    await expect(page).not.toHaveURL(/\/admin/, { timeout: 15_000 });
 
     // Non-admin user should be redirected away from /admin
     expect(page.url()).not.toContain("/admin");
@@ -329,7 +329,7 @@ test.describe("ADM: Auth Guards", () => {
   }) => {
     await page.goto("/admin/users");
     await page.waitForLoadState("domcontentloaded");
-    await page.waitForTimeout(3000);
+    await expect(page).not.toHaveURL(/\/admin/, { timeout: 15_000 });
 
     // Non-admin user should be redirected away from /admin
     expect(page.url()).not.toContain("/admin");

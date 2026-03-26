@@ -351,7 +351,7 @@ test.describe("1.x: Map + List Scroll Sync", () => {
         cardBecameActive = true;
         break;
       }
-      await page.waitForTimeout(250);
+      await page.waitForTimeout(250); // polling delay inside retry loop
     }
 
     if (!cardBecameActive) {
@@ -370,7 +370,7 @@ test.describe("1.x: Map + List Scroll Sync", () => {
         cardInViewport = true;
         break;
       }
-      await page.waitForTimeout(300);
+      await page.waitForTimeout(300); // polling delay inside retry loop
     }
     if (!cardInViewport) {
       test.skip(

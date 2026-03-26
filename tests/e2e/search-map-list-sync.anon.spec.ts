@@ -1408,7 +1408,7 @@ test.describe("Map-List Synchronization", () => {
       }
 
       // INTENTIONAL: verifying ring persists after 1.5s (old impl had auto-clear)
-      await page.waitForTimeout(1500);
+      await page.waitForTimeout(1500); // INTENTIONAL: persistence check — ring must survive 1.5s
 
       // Ring should STILL be present
       const cardState = await getCardState(page, listingId);
@@ -1503,7 +1503,7 @@ test.describe("Map-List Synchronization", () => {
       }
 
       // INTENTIONAL: debounce verification — must wait past 300ms debounce window to count scroll events
-      await page.waitForTimeout(500);
+      await page.waitForTimeout(500); // INTENTIONAL: debounce verification timing
 
       // The scroll container should have received at most 1 scroll event
       // (the debounced one from the last hovered marker)

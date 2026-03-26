@@ -180,7 +180,7 @@ test.describe("Accessibility & Performance", () => {
       await page.setViewportSize({ width: 320, height: 568 });
       await nav.goToSearch({ bounds: SF_BOUNDS });
       await page.waitForLoadState("domcontentloaded");
-      await page.waitForTimeout(2000);
+      await page.waitForLoadState("networkidle").catch(() => {});
 
       const hasHorizontalScroll = await page.evaluate(
         () =>

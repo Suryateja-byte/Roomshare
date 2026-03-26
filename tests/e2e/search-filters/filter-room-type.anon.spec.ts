@@ -111,7 +111,6 @@ test.describe("Room Type Filter", () => {
 
     // Click the "All" tab (CategoryTabs renders button with text "All" and aria-pressed)
     // Wait for hydration — tabs may not be interactive immediately
-    await page.waitForTimeout(2_000);
     const allTab = page
       .locator("button[aria-pressed]")
       .filter({ hasText: /^All$/i });

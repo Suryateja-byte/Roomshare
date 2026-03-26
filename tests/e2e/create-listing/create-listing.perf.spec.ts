@@ -72,7 +72,7 @@ test.describe("Create Listing — Performance Tests", () => {
     await page.goto("/listings/create");
     await page.waitForLoadState("load");
 
-    // Wait for page to settle
+    // INTENTIONAL: CLS measurement settle window — allow layout shifts to complete before reading metric
     await page.waitForTimeout(3000);
 
     // Read CLS from the page

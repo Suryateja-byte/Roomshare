@@ -76,8 +76,8 @@ test.describe("Pagination Browse Mode", () => {
       clickCount++;
 
       // Wait for new cards to appear or button to disappear
-      await page.waitForTimeout(3_000).catch(() => {
-        /* timeout is acceptable */
+      await expect(loadMoreBtn).toBeEnabled({ timeout: 10_000 }).catch(() => {
+        /* button may have disappeared (cap reached) */
       });
     }
 

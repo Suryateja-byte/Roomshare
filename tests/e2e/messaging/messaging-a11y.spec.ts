@@ -301,10 +301,11 @@ test.describe(
 
       // Check if input is auto-focused (allow a brief settling period)
       let isFocused = false;
-      for (let attempt = 0; attempt < 5; attempt++) {
-        isFocused = await input.evaluate((el) => document.activeElement === el);
-        if (isFocused) break;
-        await page.waitForTimeout(200);
+      try {
+        await expect(input).toBeFocused({ timeout: 3000 });
+        isFocused = true;
+      } catch {
+        isFocused = false;
       }
 
       if (!isFocused) {

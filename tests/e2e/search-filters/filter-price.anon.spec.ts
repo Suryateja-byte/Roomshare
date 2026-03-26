@@ -40,14 +40,13 @@ async function setInlineMinPrice(page: Page, value: string) {
   const input = page.locator("#search-budget-min");
   await input.waitFor({ state: "visible", timeout: 30_000 });
   await input.click();
-  // Brief settle for React controlled input to stabilize after focus
-  await page.waitForTimeout(300);
+  await expect(input).toBeFocused({ timeout: 3_000 });
   await input.clear();
   if (value) {
     await input.pressSequentially(value, { delay: 50 });
   }
   await input.blur();
-  await page.waitForTimeout(200);
+  await expect(input).not.toBeFocused({ timeout: 3_000 });
 }
 
 /** Fill the inline budget max input */
@@ -55,14 +54,13 @@ async function setInlineMaxPrice(page: Page, value: string) {
   const input = page.locator("#search-budget-max");
   await input.waitFor({ state: "visible", timeout: 30_000 });
   await input.click();
-  // Brief settle for React controlled input to stabilize after focus
-  await page.waitForTimeout(300);
+  await expect(input).toBeFocused({ timeout: 3_000 });
   await input.clear();
   if (value) {
     await input.pressSequentially(value, { delay: 50 });
   }
   await input.blur();
-  await page.waitForTimeout(200);
+  await expect(input).not.toBeFocused({ timeout: 3_000 });
 }
 
 /** Submit the search form to commit inline price changes */

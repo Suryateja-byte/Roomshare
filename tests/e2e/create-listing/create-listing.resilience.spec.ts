@@ -49,7 +49,7 @@ test.describe("Create Listing – Resilience", () => {
     await cp.mockImageUpload();
     await cp.uploadTestImage();
     // Wait for image preview to render
-    await page.waitForTimeout(500);
+    await cp.waitForUploadComplete();
     return cp;
   }
 
@@ -170,7 +170,7 @@ test.describe("Create Listing – Resilience", () => {
     // Mock image upload so it doesn't depend on real upload infra
     await createPage.mockImageUpload();
     await createPage.uploadTestImage();
-    await page.waitForTimeout(500);
+    await createPage.waitForUploadComplete();
 
     const response = await createPage.submitAndWaitForResponse();
 
@@ -252,7 +252,9 @@ test.describe("Create Listing – Resilience", () => {
     await createPage.submitButton.dblclick();
 
     // Give time for any duplicate requests to fire
-    await page.waitForTimeout(1000);
+    await expect(async () => {
+      expect(getCallCount()).toBeGreaterThanOrEqual(1);
+    }).toPass({ timeout: 5000 });
 
     // Only one API call should have been made
     expect(getCallCount()).toBe(1);

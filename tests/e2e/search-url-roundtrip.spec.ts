@@ -340,8 +340,8 @@ test.describe("Search URL Param Round-Trip (P0)", () => {
     if (hasLoadMore) {
       await loadMoreBtn.click();
 
-      // Wait a bit for the load to complete
-      await page.waitForTimeout(3_000);
+      // Wait for load-more to complete
+      await expect(loadMoreBtn).toBeEnabled({ timeout: 10_000 }).catch(() => {});
 
       // cursor should NEVER appear in the URL
       await assertUrlExcludesParams(page, [
@@ -355,7 +355,7 @@ test.describe("Search URL Param Round-Trip (P0)", () => {
     const hasLoadMore2 = await loadMoreBtn.isVisible().catch(() => false);
     if (hasLoadMore2) {
       await loadMoreBtn.click();
-      await page.waitForTimeout(3_000);
+      await expect(loadMoreBtn).toBeEnabled({ timeout: 10_000 }).catch(() => {});
       await assertUrlExcludesParams(page, [
         "cursor",
         "cursorStack",
@@ -390,7 +390,7 @@ test.describe("Search URL Param Round-Trip (P0)", () => {
 
     if (hasLoadMore) {
       await loadMoreBtn.click();
-      await page.waitForTimeout(3_000);
+      await expect(loadMoreBtn).toBeEnabled({ timeout: 10_000 }).catch(() => {});
 
       // Still no pagination state in URL
       await assertUrlExcludesParams(page, [

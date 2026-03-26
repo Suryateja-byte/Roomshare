@@ -268,7 +268,6 @@ test.describe("Discovery & Search Journeys", () => {
           .catch(() => false)
       ) {
         await mapToggle.first().click();
-        await page.waitForTimeout(2000); // Map initialization takes time
 
         // Wait for map to render — Mapbox GL adds .maplibregl-map class, or use role="region" aria-label
         const map = page
@@ -279,7 +278,7 @@ test.describe("Discovery & Search Journeys", () => {
         // Check for markers
         const markers = page.locator(selectors.mapMarker);
         // May or may not have markers depending on listings
-        await page.waitForTimeout(2000);
+        await page.waitForLoadState("networkidle").catch(() => {});
 
         // Try clicking a marker if visible
         if ((await markers.count()) > 0) {

@@ -207,8 +207,11 @@ test.describe("Search P0 Smoke Suite", () => {
         await clearAllBtn
           .first()
           .click({ force: browserName === "webkit", timeout: 5_000 });
-        // Allow soft navigation to propagate (WebKit is slower on Next.js client nav)
-        await page.waitForTimeout(2_000);
+        // Wait for soft navigation to propagate
+        await expect.poll(() => {
+          const url = page.url();
+          return !url.includes("maxPrice=") && !url.includes("roomType=");
+        }, { timeout: 10_000, message: "URL to clear filter params" }).toBe(true);
         // Verify the button disappears or URL updates (proving the click worked)
         const url = page.url();
         expect(!url.includes("maxPrice=") && !url.includes("roomType=")).toBe(
@@ -680,11 +683,11 @@ test.describe("Search P0 Smoke Suite", () => {
 
     // Tablet (768px)
     await page.setViewportSize({ width: 768, height: 1024 });
-    await page.waitForTimeout(500); // Let media queries settle
+    await page.waitForLoadState("domcontentloaded");
 
     // Mobile (390px) -- bottom sheet should be visible, map visible behind
     await page.setViewportSize({ width: 390, height: 844 });
-    await page.waitForTimeout(500); // Let media queries settle
+    await page.waitForLoadState("domcontentloaded");
 
     // On mobile, bottom sheet region should exist
     await expect(mobileSheet).toBeAttached({ timeout: 10_000 });

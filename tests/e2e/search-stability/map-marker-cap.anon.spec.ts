@@ -92,7 +92,7 @@ test.describe("Map Marker Cap (MAX_MAP_MARKERS=200)", () => {
     }
 
     // Wait for markers to appear (or for the map to settle with no markers)
-    await page.waitForTimeout(3_000);
+    await page.waitForLoadState("networkidle", { timeout: 10_000 }).catch(() => {});
 
     // Count all map markers (visible and hidden -- the cap applies to total)
     const markerCount = await page.locator(".maplibregl-marker").count();
@@ -121,7 +121,7 @@ test.describe("Map Marker Cap (MAX_MAP_MARKERS=200)", () => {
 
     // Wait for map to fully render
     await waitForMapRef(page);
-    await page.waitForTimeout(3_000);
+    await page.waitForLoadState("networkidle", { timeout: 10_000 }).catch(() => {});
 
     // Check for DOM limit or performance-related console errors
     const domLimitErrors = consoleErrors.filter(
@@ -151,7 +151,7 @@ test.describe("Map Marker Cap (MAX_MAP_MARKERS=200)", () => {
     }
 
     // Wait for data to load
-    await page.waitForTimeout(3_000);
+    await page.waitForLoadState("networkidle", { timeout: 10_000 }).catch(() => {});
 
     // Query the GeoJSON source for total features
     const featureCount = await page.evaluate(() => {

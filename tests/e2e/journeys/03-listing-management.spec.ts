@@ -187,7 +187,7 @@ test.describe("Listing Management Journeys", () => {
         await statusButton.click();
 
         // Wait for status to update
-        await page.waitForTimeout(1000);
+        await page.waitForLoadState("networkidle").catch(() => {});
 
         // Button text or status should change
         const newText = await statusButton.textContent();
@@ -311,8 +311,8 @@ test.describe("Listing Management Journeys", () => {
       if (await submitButton.isVisible().catch(() => false)) {
         await submitButton.click();
 
-        // Should show geocoding error or address validation
-        await page.waitForTimeout(5000); // Geocoding can be slow
+        // Should show geocoding error or address validation — geocoding can be slow
+        await page.waitForLoadState("networkidle").catch(() => {});
       }
 
       // Either stays on page with error, or successful if geocoding is lenient

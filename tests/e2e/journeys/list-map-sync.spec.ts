@@ -491,7 +491,7 @@ test.describe("List <-> Map Sync", () => {
     // Click the marker using evaluate-based click
     await clickMarkerViaEvaluate(marker);
 
-    // scroll animation settle -- no event-based alternative for scroll burst detection
+    // INTENTIONAL: scroll animation settle — no event-based alternative for scroll burst detection
     await page.waitForTimeout(500);
 
     // Get the scroll burst count
@@ -566,7 +566,7 @@ test.describe("List <-> Map Sync", () => {
       return;
     }
 
-    // deliberate delay: verifies active ring does NOT auto-clear after 1s (the old behavior)
+    // INTENTIONAL: deliberate delay verifies active ring does NOT auto-clear after 1s (the old behavior)
     await page.waitForTimeout(1500);
 
     // The ring should STILL be present (activeId persists)
@@ -641,7 +641,7 @@ test.describe("List <-> Map Sync", () => {
 
     // Click marker FIRST time using evaluate-based click
     await clickMarkerViaEvaluate(marker);
-    // scroll animation settle -- needed before checking scroll burst count
+    // INTENTIONAL: scroll animation settle — needed before checking scroll burst count
     await page.waitForTimeout(600);
 
     const firstBurstCount = await getScrollBurstCount(page);
@@ -660,7 +660,7 @@ test.describe("List <-> Map Sync", () => {
 
     // Click marker SECOND time (same marker) using evaluate-based click
     await clickMarkerViaEvaluate(marker);
-    // scroll animation settle -- needed before checking scroll burst count
+    // INTENTIONAL: scroll animation settle — needed before checking scroll burst count
     await page.waitForTimeout(600);
 
     const secondBurstCount = await getScrollBurstCount(page);
@@ -893,12 +893,12 @@ test.describe("List <-> Map Sync", () => {
     );
     await expect(activeCard.first()).toBeVisible({ timeout: timeouts.action });
 
-    // scroll animation settle -- no event-based alternative for scroll burst detection
+    // INTENTIONAL: scroll animation settle — no event-based alternative for scroll burst detection
     await page.waitForTimeout(500);
     const burstCount = await getScrollBurstCount(page);
     expect(burstCount).toBeLessThanOrEqual(1);
 
-    // deliberate delay: verifies active ring does NOT auto-clear after 1s
+    // INTENTIONAL: deliberate delay verifies active ring does NOT auto-clear after 1s
     await page.waitForTimeout(1500);
     await expect(activeCard.first()).toBeVisible();
 

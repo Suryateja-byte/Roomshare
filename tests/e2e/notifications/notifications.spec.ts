@@ -324,7 +324,7 @@ test.describe("Notifications", () => {
       await unreadFilter.click();
 
       // Wait for filter to apply
-      await page.waitForTimeout(500);
+      await expect(page.getByTestId("filter-tabs")).toBeVisible({ timeout: 5000 });
 
       const unreadCount = await page.getByTestId("notification-item").count();
 
@@ -365,7 +365,7 @@ test.describe("Notifications", () => {
       // Switch to Unread filter
       const filterTabs = page.getByTestId("filter-tabs");
       await filterTabs.getByText(/^Unread/).click();
-      await page.waitForTimeout(500);
+      await expect(filterTabs).toBeVisible({ timeout: 5000 });
 
       const unreadBefore = await page.getByTestId("notification-item").count();
       test.skip(unreadBefore === 0, "No unread notifications for filter test");
@@ -390,7 +390,7 @@ test.describe("Notifications", () => {
       // Make sure we're on "All" filter
       const filterTabs = page.getByTestId("filter-tabs");
       await filterTabs.getByText("All").click();
-      await page.waitForTimeout(300);
+      await expect(filterTabs).toBeVisible({ timeout: 5000 });
 
       const hasItems = await page
         .getByTestId("notification-item")
@@ -427,12 +427,12 @@ test.describe("Notifications", () => {
 
       // Switch to Unread first
       await filterTabs.getByText(/^Unread/).click();
-      await page.waitForTimeout(500);
+      await expect(filterTabs).toBeVisible({ timeout: 5000 });
       const unreadCount = await page.getByTestId("notification-item").count();
 
       // Switch to All
       await filterTabs.getByText("All").click();
-      await page.waitForTimeout(500);
+      await expect(filterTabs).toBeVisible({ timeout: 5000 });
       const allCount = await page.getByTestId("notification-item").count();
 
       // All count should be >= unread count
@@ -495,7 +495,7 @@ test.describe("Notifications", () => {
       // Switch to Unread filter
       const filterTabs = page.getByTestId("filter-tabs");
       await filterTabs.getByText(/^Unread/).click();
-      await page.waitForTimeout(500);
+      await expect(filterTabs).toBeVisible({ timeout: 5000 });
 
       // No notification items should be visible
       await expect(page.getByTestId("notification-item")).toHaveCount(0, {

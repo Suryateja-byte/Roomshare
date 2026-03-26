@@ -273,7 +273,7 @@ async function selectBookingDates(
   await nextMonthBtnStart.waitFor({ state: "visible", timeout: 10_000 });
   for (let i = 0; i < startMonths; i++) {
     await nextMonthBtnStart.click();
-    await page.waitForTimeout(250);
+    await expect(nextMonthBtnStart).toBeVisible({ timeout: 5_000 });
   }
 
   // Select day 1 from the calendar (unique, always exists)
@@ -286,7 +286,9 @@ async function selectBookingDates(
   await startDayBtn.waitFor({ state: "visible", timeout: 5_000 });
   // dispatchEvent works even when portal lands outside viewport (mobile)
   await startDayBtn.dispatchEvent("click");
-  await page.waitForTimeout(500);
+
+  // Wait for popover to close after date selection
+  await page.locator('[data-radix-popper-content-wrapper]').waitFor({ state: "hidden", timeout: 5_000 }).catch(() => {});
 
   // --- End date ---
   const endDateTrigger = page.locator("#booking-end-date");
@@ -295,7 +297,6 @@ async function selectBookingDates(
     .locator("#booking-end-date[data-state]")
     .waitFor({ state: "attached", timeout: 10_000 });
   await endDateTrigger.click();
-  await page.waitForTimeout(300);
 
   const nextMonthBtnEnd = page.locator('button[aria-label="Next month"]');
   await nextMonthBtnEnd.waitFor({ state: "visible", timeout: 10_000 });
@@ -303,7 +304,7 @@ async function selectBookingDates(
   // Navigate startMonths + 2 from current month to land 2 months after start date.
   for (let i = 0; i < startMonths + 2; i++) {
     await nextMonthBtnEnd.click();
-    await page.waitForTimeout(250);
+    await expect(nextMonthBtnEnd).toBeVisible({ timeout: 5_000 });
   }
 
   // Select day 1 for end date
@@ -315,7 +316,9 @@ async function selectBookingDates(
     .first();
   await endDayBtn.waitFor({ state: "visible", timeout: 5_000 });
   await endDayBtn.dispatchEvent("click");
-  await page.waitForTimeout(500);
+
+  // Wait for popover to close after date selection
+  await page.locator('[data-radix-popper-content-wrapper]').waitFor({ state: "hidden", timeout: 5_000 }).catch(() => {});
 }
 
 test.describe("J24: Double-Booking Prevention", () => {

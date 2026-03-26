@@ -77,7 +77,7 @@ test.describe("Booking Journeys", () => {
         await contactButton.click();
 
         // May open modal or navigate to messages
-        await page.waitForTimeout(1000);
+        await page.waitForLoadState("domcontentloaded");
       }
     });
 
@@ -297,7 +297,7 @@ test.describe("Booking Journeys", () => {
           .first();
         if (await nextMonth.isVisible().catch(() => false)) {
           await nextMonth.click();
-          await page.waitForTimeout(500);
+          await expect(nextMonth).toBeVisible({ timeout: 5_000 });
         }
       }
     });

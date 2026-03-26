@@ -105,7 +105,8 @@ test.describe("Core Web Vitals — Anonymous Pages", () => {
       await setupClsObserver(page);
       await page.goto("/");
       await page.waitForLoadState("load");
-      await page.waitForTimeout(3000); // Settle window
+      // INTENTIONAL: CLS measurement settle window — allow layout shifts to complete before reading metric
+      await page.waitForTimeout(3000);
 
       const cls = await readCls(page);
       expect(
@@ -152,6 +153,7 @@ test.describe("Core Web Vitals — Anonymous Pages", () => {
       await setupClsObserver(page);
       await page.goto(searchUrl);
       await page.waitForLoadState("load");
+      // INTENTIONAL: CLS measurement settle window — allow layout shifts to complete before reading metric
       await page.waitForTimeout(3000);
 
       const cls = await readCls(page);
@@ -194,6 +196,7 @@ test.describe("Core Web Vitals — Anonymous Pages", () => {
       await setupClsObserver(page);
       await page.goto("/login");
       await page.waitForLoadState("load");
+      // INTENTIONAL: CLS measurement settle window — allow layout shifts to complete before reading metric
       await page.waitForTimeout(3000);
 
       const cls = await readCls(page);
@@ -248,6 +251,7 @@ test.describe("Core Web Vitals — Anonymous Pages", () => {
 
       await page.goto(`/listings/${listingId}`);
       await page.waitForLoadState("load");
+      // INTENTIONAL: CLS measurement settle window — allow layout shifts to complete before reading metric
       await page.waitForTimeout(3000);
 
       const cls = await readCls(page);

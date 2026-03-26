@@ -78,6 +78,7 @@ test.describe("Stability Phase 2: Edge Cases @stability", () => {
       // Rapid-fire 3 clicks on confirm
       const confirmBtn = modal.getByRole("button", { name: /confirm/i });
       await confirmBtn.click();
+      // INTENTIONAL: deliberate small gap between rapid-fire clicks to test double-click protection
       await page.waitForTimeout(100);
       await confirmBtn.click({ force: true }).catch(() => {});
       await page.waitForTimeout(100);
@@ -346,7 +347,12 @@ test.describe("Stability Phase 2: Business Logic @stability @core", () => {
           dialog.locator('button.bg-destructive, button[class*="destructive"]')
         );
       await confirmBtn.first().click();
-      await page.waitForTimeout(2_000);
+
+      // Wait for cancellation to process — booking item should show cancelled state or disappear
+      await expect(async () => {
+        const slotsAfterCancel = await getSlotInfoViaApi(page, listing.id);
+        expect(slotsAfterCancel.availableSlots).toBe(slotsBefore.availableSlots + 1);
+      }).toPass({ timeout: 10_000 });
 
       // Verify slots restored
       const slotsAfter = await getSlotInfoViaApi(page, listing.id);
@@ -570,9 +576,11 @@ test.describe("Stability Phase 2: Concurrency @stability @concurrency", () => {
       // Race: both click simultaneously
       await Promise.all([acceptBtn.click(), cancelBtn.click()]);
 
-      // Wait for both outcomes
-      await hostPage.waitForTimeout(3_000);
-      await tenantPage.waitForTimeout(3_000);
+      // Wait for both pages to reflect the outcome
+      await Promise.all([
+        hostPage.waitForLoadState("networkidle").catch(() => {}),
+        tenantPage.waitForLoadState("networkidle").catch(() => {}),
+      ]);
 
       // Check DB: booking should be in exactly one state
       const bookingResult = await testApi<{ status: string; version: number }>(
@@ -692,7 +700,6 @@ test.describe("Stability Phase 2: Completeness @stability", () => {
         const heldFilter = page.getByRole("button", { name: /held/i }).first();
         if (await heldFilter.waitFor({ state: "visible", timeout: 3_000 }).then(() => true).catch(() => false)) {
           await heldFilter.click();
-          await page.waitForTimeout(1_000);
           const retryCountdown = page
             .locator("span, div")
             .filter({ hasText: /\d{1,2}:\d{2}/ })

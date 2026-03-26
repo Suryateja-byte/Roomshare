@@ -330,20 +330,26 @@ test.describe("Create Listing — Functional Tests", () => {
 
       // Fill basics: title + description(>=10 chars) + price + totalSlots
       await clp.fillBasics(data);
-      await page.waitForTimeout(500); // debounce for progress update
+      await expect(async () => {
+        const count = await clp.getCompletedStepCount();
+        expect(count).toBeGreaterThanOrEqual(2);
+      }).toPass({ timeout: 5000 });
       const afterBasics = await clp.getCompletedStepCount();
       expect(afterBasics).toBeGreaterThanOrEqual(2); // +The Basics
 
       // Fill location: address + city + state + zip
       await clp.fillLocation(data);
-      await page.waitForTimeout(500);
+      await expect(async () => {
+        const count = await clp.getCompletedStepCount();
+        expect(count).toBeGreaterThanOrEqual(3);
+      }).toPass({ timeout: 5000 });
       const afterLocation = await clp.getCompletedStepCount();
       expect(afterLocation).toBeGreaterThanOrEqual(3); // +Location
 
       // Upload an image -> Photos section complete
       await clp.mockImageUpload();
       await clp.uploadTestImage();
-      await page.waitForTimeout(800);
+      await clp.waitForUploadComplete();
       const afterPhotos = await clp.getCompletedStepCount();
       expect(afterPhotos).toBe(4); // All 4 sections complete
     });
