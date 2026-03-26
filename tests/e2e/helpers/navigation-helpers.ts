@@ -248,7 +248,12 @@ export function navigationHelpers(page: Page) {
 
       if (await userMenuButton.isVisible()) {
         await userMenuButton.click();
-        await page.waitForTimeout(200);
+        // Wait for menu panel to be visible after click
+        const menuPanel = page
+          .getByRole("menu")
+          .or(page.locator('[role="menubar"]'))
+          .or(page.locator('[data-testid="user-menu-panel"]'));
+        await expect(menuPanel.first()).toBeVisible({ timeout: 5_000 });
       }
 
       // Click the menu item
@@ -328,7 +333,10 @@ export function navigationHelpers(page: Page) {
       await page.evaluate(() => {
         window.scrollTo(0, document.body.scrollHeight);
       });
-      await page.waitForTimeout(500);
+      // Wait for scroll and any triggered rendering to settle
+      await page.evaluate(
+        () => new Promise((r) => requestAnimationFrame(() => requestAnimationFrame(r)))
+      );
     },
 
     /**
@@ -338,7 +346,10 @@ export function navigationHelpers(page: Page) {
       await page.evaluate(() => {
         window.scrollTo(0, 0);
       });
-      await page.waitForTimeout(200);
+      // Wait for scroll and any triggered rendering to settle
+      await page.evaluate(
+        () => new Promise((r) => requestAnimationFrame(() => requestAnimationFrame(r)))
+      );
     },
 
     /**

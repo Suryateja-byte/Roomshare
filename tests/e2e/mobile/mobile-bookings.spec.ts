@@ -35,7 +35,7 @@ test.describe("Mobile Bookings", () => {
     const sentTab = page.getByRole("button", { name: /sent/i }).first();
     if (await sentTab.isVisible({ timeout: 5000 }).catch(() => false)) {
       await sentTab.click();
-      await page.waitForTimeout(500);
+      await expect(page.locator('[data-testid="booking-item"]').first().or(page.getByText(/no booking/i).first())).toBeVisible({ timeout: 5000 }).catch(() => {});
     }
 
     const bookingCard = page.locator('[data-testid="booking-item"]').first();
@@ -46,7 +46,7 @@ test.describe("Mobile Bookings", () => {
         .first();
       if (await receivedTab.isVisible({ timeout: 3000 }).catch(() => false)) {
         await receivedTab.click();
-        await page.waitForTimeout(500);
+        await expect(page.locator('[data-testid="booking-item"]').first().or(page.getByText(/no booking/i).first())).toBeVisible({ timeout: 5000 }).catch(() => {});
       }
     }
 
@@ -86,7 +86,7 @@ test.describe("Mobile Bookings", () => {
     const sentTab = page.getByRole("button", { name: /sent/i }).first();
     if (await sentTab.isVisible({ timeout: 5000 }).catch(() => false)) {
       await sentTab.click();
-      await page.waitForTimeout(500);
+      await expect(page.locator('[data-testid="booking-item"]').first().or(page.getByText(/no booking/i).first())).toBeVisible({ timeout: 5000 }).catch(() => {});
     }
 
     let card = page.locator('[data-testid="booking-item"]').first();
@@ -96,7 +96,7 @@ test.describe("Mobile Bookings", () => {
         .first();
       if (await receivedTab.isVisible({ timeout: 3000 }).catch(() => false)) {
         await receivedTab.click();
-        await page.waitForTimeout(500);
+        await expect(page.locator('[data-testid="booking-item"]').first().or(page.getByText(/no booking/i).first())).toBeVisible({ timeout: 5000 }).catch(() => {});
       }
       card = page.locator('[data-testid="booking-item"]').first();
     }
@@ -143,7 +143,7 @@ test.describe("Mobile Bookings", () => {
         await cancelledFilter.isVisible({ timeout: 3000 }).catch(() => false)
       ) {
         await cancelledFilter.click();
-        await page.waitForTimeout(500);
+        await page.waitForLoadState("domcontentloaded").catch(() => {});
         const filteredCards = await page
           .locator('[data-testid="booking-item"]')
           .count();
@@ -207,7 +207,7 @@ test.describe("Mobile Bookings", () => {
     const sentTab = page.getByRole("button", { name: /sent/i }).first();
     if (await sentTab.isVisible({ timeout: 5000 }).catch(() => false)) {
       await sentTab.click();
-      await page.waitForTimeout(500);
+      await expect(page.locator('[data-testid="booking-item"]').first().or(page.getByText(/no booking/i).first())).toBeVisible({ timeout: 5000 }).catch(() => {});
     }
 
     const cancelButton = page
@@ -261,7 +261,7 @@ test.describe("Mobile Bookings", () => {
     const sentTab = page.getByRole("button", { name: /sent/i }).first();
     if (await sentTab.isVisible({ timeout: 5000 }).catch(() => false)) {
       await sentTab.click();
-      await page.waitForTimeout(500);
+      await expect(page.locator('[data-testid="booking-item"]').first().or(page.getByText(/no booking/i).first())).toBeVisible({ timeout: 5000 }).catch(() => {});
     }
 
     let card = page.locator('[data-testid="booking-item"]').first();
@@ -271,7 +271,7 @@ test.describe("Mobile Bookings", () => {
         .first();
       if (await receivedTab.isVisible({ timeout: 3000 }).catch(() => false)) {
         await receivedTab.click();
-        await page.waitForTimeout(500);
+        await expect(page.locator('[data-testid="booking-item"]').first().or(page.getByText(/no booking/i).first())).toBeVisible({ timeout: 5000 }).catch(() => {});
       }
       card = page.locator('[data-testid="booking-item"]').first();
     }

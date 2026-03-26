@@ -40,7 +40,7 @@ for (const bp of breakpoints) {
       test(`no horizontal scroll on ${page.name}`, async ({ page: p }) => {
         await p.goto(page.url, { waitUntil: "domcontentloaded" });
         // Wait for layout to settle
-        await p.waitForTimeout(500);
+        await p.waitForLoadState("networkidle").catch(() => {});
 
         const hasHorizontalScroll = await p.evaluate(() => {
           return document.documentElement.scrollWidth > document.documentElement.clientWidth;
@@ -50,7 +50,7 @@ for (const bp of breakpoints) {
 
       test(`no element overflows viewport on ${page.name}`, async ({ page: p }) => {
         await p.goto(page.url, { waitUntil: "domcontentloaded" });
-        await p.waitForTimeout(500);
+        await p.waitForLoadState("networkidle").catch(() => {});
 
         // Find elements that extend beyond viewport width.
         // Elements visually clipped by an overflow-hidden ancestor are excluded —
@@ -107,7 +107,7 @@ for (const bp of breakpoints) {
     // Navigation accessibility varies by breakpoint
     test("navigation is accessible", async ({ page: p }) => {
       await p.goto("/", { waitUntil: "domcontentloaded" });
-      await p.waitForTimeout(300);
+      await p.waitForLoadState("networkidle").catch(() => {});
 
       if (bp.width < 768) {
         // Mobile: should have a hamburger/menu button OR collapsed nav
@@ -135,7 +135,7 @@ for (const bp of breakpoints) {
     // Text readability: no text smaller than 12px
     test("text is readable (min font size 12px)", async ({ page: p }) => {
       await p.goto("/", { waitUntil: "domcontentloaded" });
-      await p.waitForTimeout(300);
+      await p.waitForLoadState("networkidle").catch(() => {});
 
       const tinyTextElements = await p.evaluate(() => {
         const elements = document.querySelectorAll(
@@ -171,7 +171,7 @@ for (const bp of breakpoints) {
     // Images should have proper sizing (no broken aspect ratios from missing width/height)
     test("images have proper dimensions", async ({ page: p }) => {
       await p.goto("/", { waitUntil: "domcontentloaded" });
-      await p.waitForTimeout(500);
+      await p.waitForLoadState("networkidle").catch(() => {});
 
       const brokenImages = await p.evaluate(() => {
         const images = document.querySelectorAll("img:not([aria-hidden='true'])");
@@ -211,7 +211,7 @@ test.describe("search page responsive layout", () => {
 
     test("shows mobile bottom sheet or list view", async ({ page }) => {
       await page.goto(searchUrl, { waitUntil: "domcontentloaded" });
-      await page.waitForTimeout(1000);
+      await page.waitForLoadState("networkidle").catch(() => {});
 
       // On mobile, either bottom sheet or list is visible
       const bottomSheet = page.locator('[data-testid="mobile-bottom-sheet"], [role="region"]');
@@ -225,7 +225,7 @@ test.describe("search page responsive layout", () => {
 
     test("map is not hidden on mobile", async ({ page }) => {
       await page.goto(searchUrl, { waitUntil: "domcontentloaded" });
-      await page.waitForTimeout(1000);
+      await page.waitForLoadState("networkidle").catch(() => {});
 
       // Per CLAUDE.md: "Map is always visible on mobile"
       const mapContainer = page.locator('[data-testid="map"], .mapboxgl-map, .maplibregl-map, [class*="map"]');
@@ -239,7 +239,7 @@ test.describe("search page responsive layout", () => {
 
     test("shows split view (list + map side by side)", async ({ page }) => {
       await page.goto(searchUrl, { waitUntil: "domcontentloaded" });
-      await page.waitForTimeout(1000);
+      await page.waitForLoadState("networkidle").catch(() => {});
 
       // Desktop should show list and map side by side
       const hasNoHScroll = await page.evaluate(() => {
@@ -258,7 +258,7 @@ test.describe("listing detail responsive", () => {
     test("listing page renders without overflow", async ({ page }) => {
       // Visit homepage to find a visible listing link (not hidden menu items)
       await page.goto("/", { waitUntil: "domcontentloaded" });
-      await page.waitForTimeout(1000);
+      await page.waitForLoadState("networkidle").catch(() => {});
       const listingLink = page
         .locator('[data-testid="listing-card"] a[href*="/listings/"]')
         .or(page.locator('main a[href^="/listings/"]:visible'))
@@ -268,7 +268,7 @@ test.describe("listing detail responsive", () => {
       if (hasLink) {
         await listingLink.click();
         await page.waitForLoadState("domcontentloaded");
-        await page.waitForTimeout(500);
+        await page.waitForLoadState("networkidle").catch(() => {});
 
         const hasHScroll = await page.evaluate(() => {
           return document.documentElement.scrollWidth > document.documentElement.clientWidth;
@@ -285,7 +285,7 @@ test.describe("listing detail responsive", () => {
 
     test("listing page layout adapts at tablet", async ({ page }) => {
       await page.goto("/", { waitUntil: "domcontentloaded" });
-      await page.waitForTimeout(1000);
+      await page.waitForLoadState("networkidle").catch(() => {});
       const listingLink = page
         .locator('[data-testid="listing-card"] a[href*="/listings/"]')
         .or(page.locator('main a[href^="/listings/"]:visible'))
@@ -295,7 +295,7 @@ test.describe("listing detail responsive", () => {
       if (hasLink) {
         await listingLink.click();
         await page.waitForLoadState("domcontentloaded");
-        await page.waitForTimeout(500);
+        await page.waitForLoadState("networkidle").catch(() => {});
 
         const hasHScroll = await page.evaluate(() => {
           return document.documentElement.scrollWidth > document.documentElement.clientWidth;

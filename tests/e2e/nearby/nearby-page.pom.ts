@@ -200,9 +200,13 @@ export class NearbyPlacesPage {
    * Wait for search results to finish loading (aria-busy transitions to false).
    */
   async waitForResults(): Promise<void> {
-    // Intentional: brief pause for loading indicator to appear before waiting for it to disappear
-    await this.page.waitForTimeout(100);
-    // Then wait for loading to finish
+    // Wait for loading to start (aria-busy="true") then finish (aria-busy="false").
+    // If loading already completed before we check, go straight to the "false" assertion.
+    await expect(this.resultsArea).toHaveAttribute("aria-busy", "true", {
+      timeout: 2_000,
+    }).catch(() => {
+      // Loading may have already completed — proceed to wait for "false"
+    });
     await expect(this.resultsArea).toHaveAttribute("aria-busy", "false", {
       timeout: 15_000,
     });

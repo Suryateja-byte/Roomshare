@@ -84,7 +84,7 @@ test.describe("CLS Audit — All Pages < 0.1", () => {
     await setupClsObserver(page);
     await page.goto("/");
     await page.waitForLoadState("networkidle");
-    await page.waitForTimeout(SETTLE_MS);
+    await page.waitForTimeout(SETTLE_MS); // INTENTIONAL: CLS measurement settle window
 
     const cls = await readCls(page);
     if (cls >= CLS_BUDGET) {
@@ -103,7 +103,7 @@ test.describe("CLS Audit — All Pages < 0.1", () => {
     await setupClsObserver(page);
     await page.goto(searchUrl);
     await page.waitForLoadState("networkidle");
-    await page.waitForTimeout(SETTLE_MS);
+    await page.waitForTimeout(SETTLE_MS); // INTENTIONAL: CLS measurement settle window
 
     const cls = await readCls(page);
     if (cls >= CLS_BUDGET) {
@@ -121,7 +121,7 @@ test.describe("CLS Audit — All Pages < 0.1", () => {
     await setupClsObserver(page);
     await page.goto("/about");
     await page.waitForLoadState("networkidle");
-    await page.waitForTimeout(SETTLE_MS);
+    await page.waitForTimeout(SETTLE_MS); // INTENTIONAL: CLS measurement settle window
 
     const cls = await readCls(page);
     if (cls >= CLS_BUDGET) {
@@ -139,7 +139,7 @@ test.describe("CLS Audit — All Pages < 0.1", () => {
     await setupClsObserver(page);
     await page.goto("/login");
     await page.waitForLoadState("networkidle");
-    await page.waitForTimeout(SETTLE_MS);
+    await page.waitForTimeout(SETTLE_MS); // INTENTIONAL: CLS measurement settle window
 
     const cls = await readCls(page);
     if (cls >= CLS_BUDGET) {
@@ -157,7 +157,7 @@ test.describe("CLS Audit — All Pages < 0.1", () => {
     await setupClsObserver(page);
     await page.goto("/signup");
     await page.waitForLoadState("networkidle");
-    await page.waitForTimeout(SETTLE_MS);
+    await page.waitForTimeout(SETTLE_MS); // INTENTIONAL: CLS measurement settle window
 
     const cls = await readCls(page);
     if (cls >= CLS_BUDGET) {
@@ -188,7 +188,7 @@ test.describe("CLS Audit — All Pages < 0.1", () => {
     await setupClsObserver(page);
     await page.goto(`/listings/${listingId}`);
     await page.waitForLoadState("networkidle");
-    await page.waitForTimeout(SETTLE_MS);
+    await page.waitForTimeout(SETTLE_MS); // INTENTIONAL: CLS measurement settle window
 
     const cls = await readCls(page);
     if (cls >= CLS_BUDGET) {
@@ -246,7 +246,7 @@ test.describe("CLS Audit — All Pages < 0.1", () => {
     await setupClsObserver(page);
     await page.goto("/");
     // Font swap typically happens within first 1-2 seconds
-    await page.waitForTimeout(3000);
+    await page.waitForTimeout(3000); // INTENTIONAL: CLS measurement window for font-swap detection
 
     const entries = await readClsEntries(page);
     // Filter for potential font-related shifts (usually very small)

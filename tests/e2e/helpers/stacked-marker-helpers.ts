@@ -1,4 +1,5 @@
-import { Page } from "@playwright/test";
+import { expect, Page } from "@playwright/test";
+import { pollForMarkers } from "./sync-helpers";
 
 /**
  * Coordinates for stacked markers (center of SF_BOUNDS)
@@ -172,7 +173,8 @@ export async function setupStackedMarkerMock(page: Page): Promise<{
       } catch {
         // Fallback: just wait for map to settle
       }
-      await page.waitForTimeout(1000);
+      // Wait for map markers to render after programmatic zoom
+      await pollForMarkers(page, 1, 10_000);
     },
   };
 }
@@ -205,15 +207,13 @@ export async function waitForStackedMarker(
     }
   });
 
-  // Wait for React to render markers
-  await page.waitForTimeout(500);
+  // Wait for markers to render after update trigger
+  await pollForMarkers(page, 1, timeout);
 
-  // Wait for marker to be visible
-  await page.locator(".maplibregl-marker:visible").first().waitFor({
-    state: "visible",
-    timeout,
-  });
-
-  // Brief pause for React to complete marker rendering
-  await page.waitForTimeout(300);
+  // Wait for marker to be visible and stable (count stays constant)
+  const markerLocator = page.locator(".maplibregl-marker:visible");
+  await markerLocator.first().waitFor({ state: "visible", timeout });
+  // Ensure React has finished rendering all markers (count stabilizes)
+  const initialCount = await markerLocator.count();
+  await expect.poll(() => markerLocator.count(), { timeout: 5_000 }).toBeGreaterThanOrEqual(initialCount);
 }

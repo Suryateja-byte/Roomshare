@@ -324,9 +324,11 @@ export async function waitForDebounceAndResponse(
     timeout?: number;
   }
 ): Promise<void> {
-  const debounceMs = opts.debounceMs ?? timeouts.debounce;
   const timeout = opts.timeout ?? timeouts.action;
-  const responsePromise = page.waitForResponse(
+  // Wait directly for the debounced API response — the debounce timer fires
+  // on its own schedule, so we just gate on the actual network response
+  // rather than guessing the timing with waitForTimeout.
+  await page.waitForResponse(
     (resp) => {
       const url = resp.url();
       return typeof opts.responsePattern === "string"
@@ -335,9 +337,6 @@ export async function waitForDebounceAndResponse(
     },
     { timeout }
   );
-  // Minimal wait for debounce to fire, then gate on actual response
-  await page.waitForTimeout(debounceMs + 100);
-  await responsePromise;
 }
 
 /**

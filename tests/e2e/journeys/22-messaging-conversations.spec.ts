@@ -46,7 +46,7 @@ test.describe("J25: Send Message in Conversation", () => {
       return;
     }
 
-    await page.waitForTimeout(2000);
+    await page.waitForLoadState("networkidle").catch(() => {});
 
     // Step 2: Check for existing conversations (sidebar has conversation previews)
     const conversationItem = page
@@ -59,7 +59,8 @@ test.describe("J25: Send Message in Conversation", () => {
 
     // Step 3: Click first conversation
     await conversationItem.first().click({ timeout: 30000 });
-    await page.waitForTimeout(1500);
+    // Wait for message input to appear (conversation loaded)
+    await page.getByPlaceholder(/message|type|write/i).or(page.locator('[data-testid="message-input"]')).first().waitFor({ state: "visible", timeout: 10_000 }).catch(() => {});
 
     // Step 4: Type and send a message
     const msgInput = page
@@ -82,7 +83,8 @@ test.describe("J25: Send Message in Conversation", () => {
       .or(page.locator('[data-testid="send-button"]'))
       .or(page.locator('button[type="submit"]'));
     await sendBtn.first().click({ timeout: 30000 });
-    await page.waitForTimeout(2000);
+    // Wait for sent message to appear
+    await page.getByText(testMsg).last().waitFor({ state: "visible", timeout: 10_000 }).catch(() => {});
 
     // Step 5: Verify message appears in thread
     // TODO: add data-testid="sent-message" to ChatWindow sent message bubbles
@@ -101,7 +103,7 @@ test.describe("J26: Start Conversation from Listing", () => {
   }) => {
     // Step 1: Find a listing NOT owned by test user
     await nav.goToSearch({ q: "Reviewer Nob Hill", bounds: SF_BOUNDS });
-    await page.waitForTimeout(2000);
+    await page.waitForLoadState("networkidle").catch(() => {});
 
     const cards = searchResultsContainer(page).locator(selectors.listingCard);
     test.skip(
@@ -132,7 +134,8 @@ test.describe("J26: Start Conversation from Listing", () => {
     test.skip(!canContact, "No contact host button — skipping");
 
     await contactBtn.first().click();
-    await page.waitForTimeout(1500);
+    // Wait for message dialog/form to appear
+    await page.getByPlaceholder(/message|type|write/i).or(page.locator("textarea")).or(page.locator('[data-testid="message-input"]')).first().waitFor({ state: "visible", timeout: 10_000 }).catch(() => {});
 
     // Step 4: Type a message in the dialog/form/page
     const msgInput = page
@@ -158,7 +161,7 @@ test.describe("J26: Start Conversation from Listing", () => {
           .catch(() => false)
       ) {
         await sendBtn.first().click();
-        await page.waitForTimeout(2000);
+        await page.waitForLoadState("networkidle").catch(() => {});
       }
     }
 
@@ -194,7 +197,7 @@ test.describe("J27: Empty Messages Inbox", () => {
       return;
     }
 
-    await page.waitForTimeout(2000);
+    await page.waitForLoadState("networkidle").catch(() => {});
 
     // Step 2: Page should load without errors
     await expect(page.locator("body")).toBeVisible();

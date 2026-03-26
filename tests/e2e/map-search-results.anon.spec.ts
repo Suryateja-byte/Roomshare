@@ -438,7 +438,7 @@ test.describe("Search as I move: Toggle behavior", () => {
     }
 
     // Negative assertion: wait past debounce window to verify no search is triggered
-    await page.waitForTimeout(MAP_SEARCH_DEBOUNCE_MS + 500); // debounce wait
+    await page.waitForTimeout(MAP_SEARCH_DEBOUNCE_MS + 500); // INTENTIONAL: negative assertion — must wait past debounce to prove URL stays unchanged
 
     // URL should NOT have changed
     expect(page.url()).toBe(initialUrl);
@@ -544,7 +544,7 @@ test.describe("Search as I move: Toggle behavior", () => {
     const initialUrl = page.url();
     await simulateMapPan(page, 100, 50);
     // Negative assertion: wait past debounce window to verify no search is triggered
-    await page.waitForTimeout(MAP_SEARCH_DEBOUNCE_MS + 500); // debounce wait
+    await page.waitForTimeout(MAP_SEARCH_DEBOUNCE_MS + 500); // INTENTIONAL: negative assertion — must wait past debounce to prove URL stays unchanged
     expect(page.url()).toBe(initialUrl);
 
     // Turn ON again
@@ -613,8 +613,8 @@ test.describe("Search as I move: Result synchronization", () => {
       return;
     }
 
-    // Wait for debounce to fire, then for network activity to settle
-    await page.waitForTimeout(MAP_SEARCH_DEBOUNCE_MS + 100); // debounce wait: 600ms search-as-I-move debounce
+    // Wait for debounce to fire and network activity to settle
+    await page.waitForResponse(resp => resp.url().includes("/search") && resp.status() === 200).catch(() => {});
     await page.waitForLoadState("domcontentloaded").catch(() => {});
 
     // Page should still be functional (not crashed)
@@ -651,8 +651,8 @@ test.describe("Search as I move: Result synchronization", () => {
 
     // Pan the map
     await simulateMapPan(page, 100, 50);
-    // Wait for debounce to fire, then for network activity to settle
-    await page.waitForTimeout(MAP_SEARCH_DEBOUNCE_MS + 100); // debounce wait: 600ms search-as-I-move debounce
+    // Wait for debounce to fire and network activity to settle
+    await page.waitForResponse(resp => resp.url().includes("/search") && resp.status() === 200).catch(() => {});
     await page.waitForLoadState("domcontentloaded").catch(() => {});
 
     // Get E2E marker count
@@ -704,11 +704,11 @@ test.describe("Search as I move: Result synchronization", () => {
 
     // Perform two rapid pans (second should cancel first)
     await simulateMapPan(page, 50, 25);
-    await page.waitForTimeout(200); // Sub-debounce: intentionally less than 600ms to test cancellation
+    await page.waitForTimeout(200); // INTENTIONAL: sub-debounce timing to test cancellation behavior
     await simulateMapPan(page, 50, 25);
 
-    // Wait for debounce to fire, then for network activity to settle
-    await page.waitForTimeout(MAP_SEARCH_DEBOUNCE_MS + 100); // debounce wait: 600ms search-as-I-move debounce
+    // Wait for debounce to fire and network activity to settle
+    await page.waitForResponse(resp => resp.url().includes("/search") && resp.status() === 200).catch(() => {});
     await page.waitForLoadState("domcontentloaded").catch(() => {});
 
     // Page should be functional (no stale response issues)
@@ -745,11 +745,11 @@ test.describe("Search as I move: Result synchronization", () => {
     // Rapid sequence of pans (each < debounce interval apart)
     for (let i = 0; i < 4; i++) {
       await simulateMapPan(page, 30, 15);
-      await page.waitForTimeout(100); // Sub-debounce: intentionally less than 600ms to test coalescing
+      await page.waitForTimeout(100); // INTENTIONAL: sub-debounce timing to test coalescing behavior
     }
 
-    // Wait for debounce to fire, then for network activity to settle
-    await page.waitForTimeout(MAP_SEARCH_DEBOUNCE_MS + 100); // debounce wait: 600ms search-as-I-move debounce
+    // Wait for debounce to fire and network activity to settle
+    await page.waitForResponse(resp => resp.url().includes("map-listings") && resp.status() === 200).catch(() => {});
     await page.waitForLoadState("domcontentloaded").catch(() => {});
 
     // Should have at most 2 API calls despite 4 pans
@@ -862,12 +862,11 @@ test.describe("Search as I move: Debounce and performance", () => {
     // Perform 5 rapid pans within debounce window
     for (let i = 0; i < 5; i++) {
       await simulateMapPan(page, 20 * (i + 1), 10 * (i + 1));
-      await page.waitForTimeout(50); // Sub-debounce: intentionally less than 600ms to test coalescing
+      await page.waitForTimeout(50); // INTENTIONAL: sub-debounce timing to test coalescing behavior
     }
 
-    // Wait for debounce to fire, then for network activity to settle
-    await page.waitForTimeout(MAP_SEARCH_DEBOUNCE_MS + 100); // debounce wait: 600ms search-as-I-move debounce
-    await page.waitForLoadState("domcontentloaded").catch(() => {});
+    // Wait for debounce to fire and network activity to settle
+    await page.waitForTimeout(MAP_SEARCH_DEBOUNCE_MS + 100); // INTENTIONAL: debounce verification — must wait past 600ms debounce window to count URL changes
 
     // Should see at most a few URL changes (not 5)
     // The debounce coalesces rapid moves
@@ -916,15 +915,17 @@ test.describe("Search as I move: Debounce and performance", () => {
       test.skip(true, "Map pan failed");
       return;
     }
-    await page.waitForTimeout(AREA_COUNT_DEBOUNCE_MS + 100); // debounce wait: ensure previous pan's debounce fires before next pan
+    // Wait for debounce to fire and search-count API to respond
+    await page.waitForResponse(resp => resp.url().includes("search-count")).catch(() => {});
 
     await simulateMapPan(page, 50, 25);
-    await page.waitForTimeout(AREA_COUNT_DEBOUNCE_MS + 100); // debounce wait: ensure previous pan's debounce fires before next pan
+    // Wait for debounce to fire and search-count API to respond
+    await page.waitForResponse(resp => resp.url().includes("search-count")).catch(() => {});
 
     await simulateMapPan(page, 50, 25);
 
-    // Wait for debounce to fire, then for network activity to settle
-    await page.waitForTimeout(AREA_COUNT_DEBOUNCE_MS + 100); // debounce wait: 600ms area count debounce
+    // Wait for final debounce to fire and network activity to settle
+    await page.waitForResponse(resp => resp.url().includes("search-count")).catch(() => {});
     await page.waitForLoadState("domcontentloaded").catch(() => {});
 
     // If multiple requests were in-flight, earlier ones should have been aborted
