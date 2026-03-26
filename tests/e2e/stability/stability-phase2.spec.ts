@@ -381,11 +381,9 @@ test.describe("Stability Phase 2: Concurrency @stability @concurrency", () => {
    * TEST-201: Two Users Simultaneous Booking — No Crash
    * Invariant: SI-09 — serializable isolation handles concurrent writes
    */
-  // FINDING-004: Unskipped, but concurrent booking triggers 500 error on one request
-  // APP BUG: When two users book simultaneously, one gets a 500 Internal Server Error
-  // instead of a graceful "slot taken" message. Logged in BUGS_FOUND.md.
-  // Using test.fixme until the app-level race condition is fixed.
-  test.fixme("TEST-201: Two users booking simultaneously — both complete without crash", async ({
+  // BUG-001 FIXED: withIdempotency now catches serialization exhaustion and returns
+  // { success: false, code: "CONFLICT" } instead of throwing a 500.
+  test("TEST-201: Two users booking simultaneously — both complete without crash", async ({
     browser,
   }, testInfo) => {
     test.slow();
@@ -465,7 +463,7 @@ test.describe("Stability Phase 2: Concurrency @stability @concurrency", () => {
         await p
           .waitForFunction(
             () =>
-              /request sent|booking confirmed|submitted|already have|error|failed|slots/i.test(
+              /request sent|booking confirmed|submitted|already have|error|failed|slots|could not be completed|high demand|something went wrong/i.test(
                 document.body.innerText
               ),
             { timeout: 60_000 }
@@ -475,12 +473,15 @@ test.describe("Stability Phase 2: Concurrency @stability @concurrency", () => {
       await Promise.all([waitOutcome(pageA), waitOutcome(pageB)]);
 
       // Primary invariant: no unhandled 500 errors shown to users
+      // Use error-scoped selectors to avoid false positives from prices (e.g. "$1500")
       const error500A = await pageA
-        .getByText(/500|internal server/i)
+        .locator('[role="alert"]')
+        .getByText(/internal server error/i)
         .isVisible()
         .catch(() => false);
       const error500B = await pageB
-        .getByText(/500|internal server/i)
+        .locator('[role="alert"]')
+        .getByText(/internal server error/i)
         .isVisible()
         .catch(() => false);
       expect(error500A).toBe(false);

@@ -232,6 +232,7 @@ export default function BookingForm({
   const categorizeError = (result: BookingResult): ErrorType => {
     if (result.code === "SESSION_EXPIRED") return "auth";
     if (result.code === "PRICE_CHANGED") return "validation";
+    if (result.code === "CONFLICT") return "server";
     if (result.fieldErrors && Object.keys(result.fieldErrors).length > 0)
       return "validation";
 
@@ -419,6 +420,11 @@ export default function BookingForm({
         if (result.code === "PRICE_CHANGED" && result.currentPrice != null) {
           setMessage(
             `The listing price has changed to $${result.currentPrice}/month. Please review and try again.`
+          );
+        } else if (result.code === "CONFLICT") {
+          setMessage(
+            result.error ||
+              "Could not be completed due to high demand. Please try again."
           );
         } else if (errType === "rate_limit") {
           setMessage(
