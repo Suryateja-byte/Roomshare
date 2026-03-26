@@ -381,11 +381,9 @@ test.describe("Stability Phase 2: Concurrency @stability @concurrency", () => {
    * TEST-201: Two Users Simultaneous Booking — No Crash
    * Invariant: SI-09 — serializable isolation handles concurrent writes
    */
-  // FINDING-004: Unskipped, but concurrent booking triggers 500 error on one request
-  // APP BUG: When two users book simultaneously, one gets a 500 Internal Server Error
-  // instead of a graceful "slot taken" message. Logged in BUGS_FOUND.md.
-  // Using test.fixme until the app-level race condition is fixed.
-  test.fixme("TEST-201: Two users booking simultaneously — both complete without crash", async ({
+  // BUG-001 FIXED: withIdempotency now catches serialization exhaustion and returns
+  // { success: false, code: "CONFLICT" } instead of throwing a 500.
+  test("TEST-201: Two users booking simultaneously — both complete without crash", async ({
     browser,
   }, testInfo) => {
     test.slow();
