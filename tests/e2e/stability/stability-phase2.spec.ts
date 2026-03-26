@@ -463,7 +463,7 @@ test.describe("Stability Phase 2: Concurrency @stability @concurrency", () => {
         await p
           .waitForFunction(
             () =>
-              /request sent|booking confirmed|submitted|already have|error|failed|slots/i.test(
+              /request sent|booking confirmed|submitted|already have|error|failed|slots|could not be completed|high demand/i.test(
                 document.body.innerText
               ),
             { timeout: 60_000 }
