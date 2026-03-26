@@ -57,7 +57,7 @@ test.describe("Recommended Filters", () => {
     );
 
     // "Try:" label should be visible
-    await expect(row.locator("text=Try:")).toBeVisible({ timeout: 10_000 });
+    await expect(row.getByText("Try:")).toBeVisible({ timeout: 10_000 });
 
     // Count suggestion pill buttons inside the row
     const pills = row.locator("button");
@@ -142,7 +142,7 @@ test.describe("Recommended Filters", () => {
     const region = appliedFiltersRegion(page);
     const regionVisible = await region.isVisible().catch(() => false);
     if (regionVisible) {
-      await expect(region.locator("text=/Furnished/i").first()).toBeVisible({
+      await expect(region.getByText(/Furnished/i).first()).toBeVisible({
         timeout: 10_000,
       });
     }

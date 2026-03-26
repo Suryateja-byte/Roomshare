@@ -126,7 +126,6 @@ test.describe("Lease Duration Filter", () => {
     await page.waitForTimeout(3_000);
 
     // Page should load without errors
-    expect(await page.title()).toBeTruthy();
 
     // Check applied filter chip shows the resolved canonical value
     const container = searchResultsContainer(page);

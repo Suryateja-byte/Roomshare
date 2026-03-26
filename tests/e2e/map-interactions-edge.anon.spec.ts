@@ -68,7 +68,7 @@ const BENIGN_ERROR_PATTERNS = [
 async function waitForSearchPage(page: Page, url = SEARCH_URL) {
   await page.goto(url);
   await page.waitForLoadState("domcontentloaded");
-  await page.waitForSelector("button", { timeout: timeouts.navigation });
+  await page.locator("button").first().waitFor({ state: "visible", timeout: timeouts.navigation });
   await waitForMapReady(page);
 }
 

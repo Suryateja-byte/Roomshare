@@ -269,7 +269,7 @@ test.describe("Gender & Language Filters", () => {
     await languageSearch.fill("zzzzzz");
 
     // "No languages found" message should appear in the available languages area
-    const noResultsMsg = dialog.locator("text=No languages found");
+    const noResultsMsg = dialog.getByText("No languages found");
     await expect(noResultsMsg).toBeVisible({ timeout: 3_000 });
   });
 
@@ -353,7 +353,7 @@ test.describe("Gender & Language Filters", () => {
 
     // With all languages selected and no search term, the available languages area
     // should show "All languages selected" (since filteredLanguages minus selected = 0)
-    const allSelectedMsg = dialog.locator("text=All languages selected");
+    const allSelectedMsg = dialog.getByText("All languages selected");
     await expect(allSelectedMsg).toBeVisible({ timeout: 5_000 });
   });
 });

@@ -490,7 +490,8 @@ test.describe("LD: Reviews", () => {
       .filter({ hasText: /review/i });
     const hasReviewsSection = await reviewsSection
       .first()
-      .isVisible({ timeout: 5000 })
+      .waitFor({ state: "visible", timeout: 5000 })
+      .then(() => true)
       .catch(() => false);
     if (!hasReviewsSection) {
       test.skip(
@@ -503,7 +504,8 @@ test.describe("LD: Reviews", () => {
     // Review count — soft assertion since seed data may vary
     const reviewCount = page.getByText(/\(\d+\)/).first();
     const hasCount = await reviewCount
-      .isVisible({ timeout: 5000 })
+      .waitFor({ state: "visible", timeout: 5000 })
+      .then(() => true)
       .catch(() => false);
     if (hasCount) {
       await expect(reviewCount).toBeVisible();
@@ -514,7 +516,8 @@ test.describe("LD: Reviews", () => {
     // the host section ("Hosted by E2E Reviewer") and the review list.
     const reviewerName = page.getByText("E2E Reviewer").first();
     const hasReviewer = await reviewerName
-      .isVisible({ timeout: 5000 })
+      .waitFor({ state: "visible", timeout: 5000 })
+      .then(() => true)
       .catch(() => false);
     test.skip(
       !hasReviewer,

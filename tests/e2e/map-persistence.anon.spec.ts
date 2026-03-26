@@ -46,7 +46,7 @@ const SEARCH_URL = `/search?${boundsQS}`;
 async function waitForSearchPage(page: Page, url = SEARCH_URL) {
   await page.goto(url);
   await page.waitForLoadState("domcontentloaded");
-  await page.waitForSelector("button", { timeout: 30_000 });
+  await page.locator("button").first().waitFor({ state: "visible", timeout: 30_000 });
   await waitForMapReady(page);
 }
 

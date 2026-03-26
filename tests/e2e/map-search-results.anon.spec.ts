@@ -59,7 +59,8 @@ const toggleSelectors = {
 async function waitForSearchPage(page: Page) {
   await page.goto(SEARCH_URL);
   await page.waitForLoadState("domcontentloaded");
-  await page.waitForSelector(toggleSelectors.searchAsMoveToggle, {
+  await page.locator(toggleSelectors.searchAsMoveToggle).waitFor({
+    state: "visible",
     timeout: 30_000,
   });
   await waitForMapReady(page);

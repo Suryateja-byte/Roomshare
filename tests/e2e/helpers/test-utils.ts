@@ -144,17 +144,10 @@ export async function waitForMapMarkers(
   const timeout = options?.timeout ?? timeouts.action;
   const minCount = options?.minCount ?? 1;
 
-  await page.waitForSelector(selectors.mapMarker, { timeout });
+  await page.locator(selectors.mapMarker).first().waitFor({ state: 'attached', timeout });
 
   // Wait for at least minCount markers
-  await page.waitForFunction(
-    ({ selector, min }) => {
-      const markers = document.querySelectorAll(selector);
-      return markers.length >= min;
-    },
-    { selector: selectors.mapMarker, min: minCount },
-    { timeout }
-  );
+  await expect.poll(() => page.locator(selectors.mapMarker).count(), { timeout }).toBeGreaterThanOrEqual(minCount);
 
   const markers = page.locator(selectors.mapMarker);
   return markers.count();

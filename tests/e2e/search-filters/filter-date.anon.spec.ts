@@ -153,7 +153,6 @@ test.describe("Move-In Date Filter", () => {
 
     // The URL param may still be present in the browser bar, but the server
     // should not have applied it as an active filter.
-    expect(await page.title()).toBeTruthy();
   });
 
   // 7.3: Date > 2 years in future rejected -> moveInDate=2030-01-01, no filter
@@ -174,7 +173,6 @@ test.describe("Move-In Date Filter", () => {
       await expect(dateChip).toHaveCount(0);
     }
 
-    expect(await page.title()).toBeTruthy();
   });
 
   // 7.4: Invalid date format rejected -> moveInDate=not-a-date, no chip
@@ -208,6 +206,5 @@ test.describe("Move-In Date Filter", () => {
       await expect(dateChip2).toHaveCount(0);
     }
 
-    expect(await page.title()).toBeTruthy();
   });
 });

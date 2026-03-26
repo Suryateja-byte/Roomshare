@@ -435,8 +435,8 @@ test.describe("Stability Phase 2: Concurrency @stability @concurrency", () => {
         .first();
 
       // Both buttons must be visible (skip if listing is owned by either user)
-      const btnAVisible = await bookBtnA.isVisible({ timeout: 10_000 }).catch(() => false);
-      const btnBVisible = await bookBtnB.isVisible({ timeout: 10_000 }).catch(() => false);
+      const btnAVisible = await bookBtnA.waitFor({ state: "visible", timeout: 10_000 }).then(() => true).catch(() => false);
+      const btnBVisible = await bookBtnB.waitFor({ state: "visible", timeout: 10_000 }).then(() => true).catch(() => false);
       if (!btnAVisible || !btnBVisible) {
         test.skip(true, "Request to Book button not visible for both users (owner view or date selection failed)");
         return;
@@ -553,10 +553,12 @@ test.describe("Stability Phase 2: Concurrency @stability @concurrency", () => {
         .first();
 
       const acceptVisible = await acceptBtn
-        .isVisible({ timeout: 10_000 })
+        .waitFor({ state: "visible", timeout: 10_000 })
+        .then(() => true)
         .catch(() => false);
       const cancelVisible = await cancelBtn
-        .isVisible({ timeout: 10_000 })
+        .waitFor({ state: "visible", timeout: 10_000 })
+        .then(() => true)
         .catch(() => false);
 
       if (!acceptVisible || !cancelVisible) {
@@ -661,7 +663,8 @@ test.describe("Stability Phase 2: Completeness @stability", () => {
         .filter({ hasText: /\d{1,2}:\d{2}/ })
         .first();
       const countdownVisible = await countdown
-        .isVisible({ timeout: 10_000 })
+        .waitFor({ state: "visible", timeout: 10_000 })
+        .then(() => true)
         .catch(() => false);
 
       if (countdownVisible) {
@@ -686,7 +689,7 @@ test.describe("Stability Phase 2: Completeness @stability", () => {
       } else {
         // HoldCountdown not visible — might need "Held" filter
         const heldFilter = page.getByRole("button", { name: /held/i }).first();
-        if (await heldFilter.isVisible({ timeout: 3_000 }).catch(() => false)) {
+        if (await heldFilter.waitFor({ state: "visible", timeout: 3_000 }).then(() => true).catch(() => false)) {
           await heldFilter.click();
           await page.waitForTimeout(1_000);
           const retryCountdown = page
@@ -694,7 +697,8 @@ test.describe("Stability Phase 2: Completeness @stability", () => {
             .filter({ hasText: /\d{1,2}:\d{2}/ })
             .first();
           const retryVisible = await retryCountdown
-            .isVisible({ timeout: 5_000 })
+            .waitFor({ state: "visible", timeout: 5_000 })
+            .then(() => true)
             .catch(() => false);
           expect(retryVisible).toBe(true);
         }

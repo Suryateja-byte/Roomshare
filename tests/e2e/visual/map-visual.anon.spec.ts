@@ -91,7 +91,8 @@ test.describe("Map — Visual Regression", () => {
 
     const marker = page.locator(".maplibregl-marker").first();
     const isVisible = await marker
-      .isVisible({ timeout: 5000 })
+      .waitFor({ state: "visible", timeout: 5000 })
+      .then(() => true)
       .catch(() => false);
     test.skip(!isVisible, "No markers visible");
 
@@ -248,7 +249,8 @@ test.describe("Map — Visual Regression", () => {
       .or(page.locator(".maplibregl-map").first());
 
     const isVisible = await mapRegion
-      .isVisible({ timeout: 5000 })
+      .waitFor({ state: "visible", timeout: 5000 })
+      .then(() => true)
       .catch(() => false);
     test.skip(!isVisible, "Map region not found for webgl fallback");
 
