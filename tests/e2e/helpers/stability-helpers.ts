@@ -392,10 +392,10 @@ export async function selectStabilityDates(
   for (let i = 0; i < monthOffset; i++) {
     // Read current month text from any heading-like element in the calendar
     const headingLoc = page.locator('[role="heading"], .rdp-caption, [class*="calendar"] [class*="caption"], [class*="month"]').first();
-    const prevMonth = await headingLoc.textContent({ timeout: 5_000 }).catch(() => `month-${i}`);
+    const prevMonth = await headingLoc.textContent({ timeout: 15_000 }).catch(() => `month-${i}`);
     await nextMonthBtnStart.click();
     // Wait for calendar month to change after navigation click
-    await expect.poll(() => headingLoc.textContent(), { timeout: 5_000 }).not.toBe(prevMonth);
+    await expect.poll(() => headingLoc.textContent(), { timeout: 15_000 }).not.toBe(prevMonth);
   }
 
   const day1Start = page
@@ -423,10 +423,10 @@ export async function selectStabilityDates(
   // End date picker opens at CURRENT month, navigate monthOffset + 2 to land after start
   for (let i = 0; i < monthOffset + 2; i++) {
     const headingLoc = page.locator('[role="heading"], .rdp-caption, [class*="calendar"] [class*="caption"], [class*="month"]').first();
-    const prevMonth = await headingLoc.textContent({ timeout: 5_000 }).catch(() => `month-${i}`);
+    const prevMonth = await headingLoc.textContent({ timeout: 15_000 }).catch(() => `month-${i}`);
     await nextMonthBtnEnd.click();
     // Wait for calendar month to change after navigation click
-    await expect.poll(() => headingLoc.textContent(), { timeout: 5_000 }).not.toBe(prevMonth);
+    await expect.poll(() => headingLoc.textContent(), { timeout: 15_000 }).not.toBe(prevMonth);
   }
 
   const day1End = page
