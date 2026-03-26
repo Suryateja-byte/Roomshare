@@ -275,6 +275,7 @@ test.describe("Signup Form", () => {
       page
         .getByText(/passwords don.t match/i)
         .or(page.getByText(/password/i).and(page.getByRole("alert")))
+        .first()
     ).toBeVisible({ timeout: 10_000 });
   });
 });
