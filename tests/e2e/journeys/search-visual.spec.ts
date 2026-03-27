@@ -39,7 +39,7 @@ test.describe("Search Visual Regression", () => {
     );
     await expect(listingCards.first()).toBeVisible({ timeout: 30000 });
 
-    // Wait for content to stabilize
+    // INTENTIONAL: measurement window — content stabilization for screenshot comparison
     await page.waitForTimeout(1000);
 
     // Take screenshot of the listings panel only (mask the map)
@@ -70,7 +70,7 @@ test.describe("Search Visual Regression", () => {
     );
     await expect(listingCards.first()).toBeVisible({ timeout: 30000 });
 
-    // Wait for content to stabilize
+    // INTENTIONAL: measurement window — content stabilization for screenshot comparison
     await page.waitForTimeout(1000);
 
     // Mobile view shows list by default, no map visible
@@ -111,7 +111,7 @@ test.describe("Search Visual Regression", () => {
     );
     await expect(listingCards.first()).toBeVisible({ timeout: 30000 });
 
-    // Wait for images to load
+    // INTENTIONAL: measurement window — wait for images to fully load for screenshot comparison
     await page.waitForTimeout(2000);
 
     // Screenshot first listing card
@@ -131,7 +131,7 @@ test.describe("Search Visual Regression", () => {
     const emptyState = page.getByText(/no matches found/i).first();
     await expect(emptyState).toBeVisible({ timeout: 30000 });
 
-    // Wait for content to stabilize
+    // INTENTIONAL: measurement window — content stabilization for screenshot comparison
     await page.waitForTimeout(1000);
 
     // Screenshot the empty state (mask the map)

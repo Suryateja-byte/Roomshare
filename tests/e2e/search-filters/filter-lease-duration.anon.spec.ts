@@ -90,12 +90,9 @@ test.describe("Lease Duration Filter", () => {
     // Start with a lease duration already applied
     await page.goto(`${SEARCH_URL}&leaseDuration=6+months`);
     await page.waitForLoadState("domcontentloaded");
-    await page.waitForTimeout(2_000);
+    await expect(searchResultsContainer(page)).toBeVisible({ timeout: 30_000 });
 
     expect(getUrlParam(page, "leaseDuration")).toBe("6 months");
-
-    // Wait for map settle before opening modal
-    await page.waitForTimeout(1_000);
     await openFilterModal(page);
 
     // Select "Any" to clear the lease duration
@@ -123,10 +120,9 @@ test.describe("Lease Duration Filter", () => {
     // Navigate with the "mtm" alias
     await page.goto(`${SEARCH_URL}&leaseDuration=mtm`);
     await page.waitForLoadState("domcontentloaded");
-    await page.waitForTimeout(3_000);
+    await expect(searchResultsContainer(page)).toBeVisible({ timeout: 30_000 });
 
     // Page should load without errors
-    expect(await page.title()).toBeTruthy();
 
     // Check applied filter chip shows the resolved canonical value
     const container = searchResultsContainer(page);

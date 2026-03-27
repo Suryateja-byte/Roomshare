@@ -166,7 +166,7 @@ test.describe("Authentication Journeys", () => {
       // (may need to click submit to trigger validation)
       if (!buttonDisabled && !errorVisible) {
         await submitButton.click();
-        await page.waitForTimeout(500);
+        await page.waitForLoadState("domcontentloaded");
         // After clicking submit, check for any error message related to password
         const passwordError = page.getByText(/password/i).first();
         const alertError = page.locator('[role="alert"]').first();
@@ -442,7 +442,7 @@ test.describe("Authentication Journeys", () => {
           navigatedAway = true;
           break;
         }
-        await page.waitForTimeout(500);
+        await page.waitForLoadState("domcontentloaded").catch(() => {});
       }
       if (!navigatedAway) {
         test.skip(
@@ -513,7 +513,7 @@ test.describe("Authentication Journeys", () => {
           .click();
 
         // Wait for the error response or form to be re-interactable
-        await page.waitForTimeout(1000);
+        await page.waitForLoadState("domcontentloaded");
 
         // Wait for form to be ready for next iteration (button re-enabled)
         await expect(

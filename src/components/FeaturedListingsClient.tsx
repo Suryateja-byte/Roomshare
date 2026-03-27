@@ -40,11 +40,11 @@ interface FeaturedListingsClientProps {
 }
 
 const fadeInUp: Variants = {
-  hidden: { opacity: 0, y: 10 },
+  hidden: { opacity: 0, y: 20 },
   visible: {
     opacity: 1,
     y: 0,
-    transition: { duration: 0.5, ease: [0.16, 1, 0.3, 1] },
+    transition: { duration: 0.6, ease: [0.25, 0.1, 0.25, 1.0] },
   },
 };
 
@@ -52,7 +52,7 @@ const staggerContainer: Variants = {
   hidden: { opacity: 0 },
   visible: {
     opacity: 1,
-    transition: { staggerChildren: 0.05 },
+    transition: { staggerChildren: 0.1 },
   },
 };
 
@@ -64,7 +64,7 @@ export default function FeaturedListingsClient({
       <LazyMotion features={domAnimation}>
         <section
           data-testid="featured-listings-section"
-          className="py-24 md:py-32 bg-white dark:bg-zinc-950 border-t border-zinc-100 dark:border-zinc-800/50"
+          className="py-16 md:py-20 bg-surface-canvas"
         >
           <div className="max-w-7xl mx-auto px-4 sm:px-6">
             <m.div
@@ -76,13 +76,13 @@ export default function FeaturedListingsClient({
             >
               <m.h2
                 variants={fadeInUp}
-                className="text-3xl md:text-5xl font-medium tracking-tight text-zinc-900 dark:text-white mb-6"
+                className="font-display text-3xl md:text-5xl font-medium tracking-tight text-on-surface mb-6"
               >
                 Be the first to share.
               </m.h2>
               <m.p
                 variants={fadeInUp}
-                className="text-zinc-500 dark:text-zinc-400 text-lg font-light max-w-xl mx-auto mb-10"
+                className="text-on-surface-variant text-lg font-light max-w-xl mx-auto mb-10"
               >
                 No rooms listed in this area yet. Share your space and find the
                 perfect roommate today.
@@ -110,7 +110,7 @@ export default function FeaturedListingsClient({
     <LazyMotion features={domAnimation}>
       <section
         data-testid="featured-listings-section"
-        className="py-24 md:py-32 bg-white dark:bg-zinc-950 border-t border-zinc-100 dark:border-zinc-800/50 relative"
+        className="py-16 md:py-20 bg-surface-canvas relative"
       >
         <div className="max-w-7xl mx-auto px-4 sm:px-6 relative z-10">
           <m.div
@@ -123,20 +123,20 @@ export default function FeaturedListingsClient({
             <div className="max-w-2xl">
               <m.div
                 variants={fadeInUp}
-                className="inline-flex items-center gap-2 px-3 py-1.5 rounded-full border border-zinc-200/50 dark:border-zinc-800 bg-zinc-50 dark:bg-zinc-900/50 text-zinc-600 dark:text-zinc-400 text-xs font-bold uppercase tracking-[0.2em] mb-6"
+                className="font-body text-xs font-bold uppercase tracking-[0.15em] text-on-surface-variant mb-6 flex items-center gap-2"
               >
-                <span className="w-1.5 h-1.5 rounded-full bg-green-500"></span>
+                <span className="w-1.5 h-1.5 rounded-full bg-primary"></span>
                 New Arrivals
               </m.div>
               <m.h2
                 variants={fadeInUp}
-                className="text-3xl md:text-5xl font-medium tracking-tight text-zinc-900 dark:text-white mb-4"
+                className="font-display text-3xl md:text-5xl font-normal tracking-tight text-on-surface mb-4"
               >
                 Just listed.
               </m.h2>
               <m.p
                 variants={fadeInUp}
-                className="text-zinc-500 dark:text-zinc-400 text-lg font-light"
+                className="text-on-surface-variant text-lg font-light"
               >
                 Fresh rooms from verified hosts — updated daily.
               </m.p>
@@ -146,7 +146,7 @@ export default function FeaturedListingsClient({
               <Button
                 asChild
                 variant="ghost"
-                className="group rounded-full text-zinc-600 dark:text-zinc-400 hover:text-zinc-900 dark:hover:text-white hover:bg-zinc-100 dark:hover:bg-zinc-900 px-6 gap-2"
+                className="group rounded-full text-on-surface-variant hover:text-on-surface hover:bg-surface-container-high px-6 gap-2"
               >
                 <Link href="/search">
                   See All Listings{" "}
@@ -171,7 +171,7 @@ export default function FeaturedListingsClient({
                 <ListingCard
                   listing={listing}
                   priority={index < 3}
-                  className="h-full border-zinc-200/50 dark:border-zinc-800"
+                  className="h-full"
                 />
               </m.div>
             ))}
@@ -188,7 +188,7 @@ export default function FeaturedListingsClient({
               asChild
               variant="outline"
               size="lg"
-              className="group w-full rounded-full border-zinc-200 dark:border-zinc-800 hover:bg-zinc-50 dark:hover:bg-zinc-900"
+              className="group w-full rounded-full border-outline-variant/20 hover:bg-surface-canvas"
             >
               <Link href="/search" className="w-full">
                 Explore All Listings

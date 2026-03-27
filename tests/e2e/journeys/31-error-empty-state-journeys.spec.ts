@@ -157,11 +157,14 @@ test.describe("Error & Empty State Journeys", () => {
       } else {
         // Page loaded but shows neither bookings nor a labeled empty state.
         // This is still valid if the page has meaningful text content.
-        const pageText = await page
-          .locator("#main-content, main")
-          .first()
-          .textContent();
-        expect(pageText!.length).toBeGreaterThan(10);
+        // Wait for content to populate (React hydration may not be complete).
+        const mainEl = page.locator("#main-content, main").first();
+        await expect
+          .poll(
+            async () => ((await mainEl.textContent()) ?? "").trim().length,
+            { timeout: 15_000, message: "main content to have text" }
+          )
+          .toBeGreaterThan(0);
       }
 
       // Verify API was called (not just a static page)
@@ -309,7 +312,7 @@ test.describe("Error & Empty State Journeys", () => {
       await submitBtn.click();
 
       // Wait for validation to fire
-      await page.waitForTimeout(1000);
+      await page.waitForLoadState("domcontentloaded");
 
       // Should show validation errors — check multiple mechanisms
       const hasFieldErrors =
@@ -349,7 +352,7 @@ test.describe("Error & Empty State Journeys", () => {
         .getByRole("button", { name: /sign up|create|register|join/i })
         .first();
       await submitBtn.click();
-      await page.waitForTimeout(1000);
+      await page.waitForLoadState("domcontentloaded");
 
       // Should stay on signup page — password is required
       expect(page.url()).toContain("/signup");
@@ -437,7 +440,7 @@ test.describe("Error & Empty State Journeys", () => {
           timeout: 30000,
         });
 
-        // Wait a moment for any deferred scripts to execute
+        // INTENTIONAL: measurement window — allow time for any injected XSS scripts to execute
         await page.waitForTimeout(1000);
 
         // Remove dialog listener

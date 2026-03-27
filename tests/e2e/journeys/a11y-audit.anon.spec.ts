@@ -242,8 +242,8 @@ test.describe("Accessibility Audit (axe-core)", () => {
 
       for (let i = 0; i < 10; i++) {
         await page.keyboard.press("Tab");
-        // Intentional: pacing between Tab presses for focus ring evaluation
-        await page.waitForTimeout(100);
+        // Brief pause for focus ring to render after Tab press
+        await page.evaluate(() => new Promise(r => requestAnimationFrame(r)));
 
         const focused = page.locator(":focus");
         const isVisible = await focused.isVisible().catch(() => false);
@@ -302,7 +302,7 @@ test.describe("Accessibility Audit (axe-core)", () => {
       if (skipLinkVisible) {
         // Verify it works
         await page.keyboard.press("Enter");
-        await page.waitForTimeout(300);
+        await page.waitForLoadState("domcontentloaded").catch(() => {});
 
         // Focus should move to main content
         const mainContent = page.locator("main, #main, #content");
@@ -329,8 +329,8 @@ test.describe("Accessibility Audit (axe-core)", () => {
       let foundFilterButton = false;
       for (let i = 0; i < 15; i++) {
         await page.keyboard.press("Tab");
-        // Intentional: pacing between Tab presses for focus ring evaluation
-        await page.waitForTimeout(100);
+        // Brief pause for focus ring to render after Tab press
+        await page.evaluate(() => new Promise(r => requestAnimationFrame(r)));
 
         const focused = page.locator(":focus");
         const text = await focused.textContent().catch(() => "");
@@ -346,7 +346,8 @@ test.describe("Accessibility Audit (axe-core)", () => {
 
           // Activate with Enter
           await page.keyboard.press("Enter");
-          await page.waitForTimeout(500);
+          // Wait for filter panel to open
+          await page.locator('[role="dialog"], [role="listbox"], [data-state="open"]').first().waitFor({ state: "visible", timeout: 3_000 }).catch(() => {});
 
           // Should open filter panel/dropdown
           const filterPanel = page.locator(
@@ -356,7 +357,6 @@ test.describe("Accessibility Audit (axe-core)", () => {
 
           // Close with Escape
           await page.keyboard.press("Escape");
-          await page.waitForTimeout(300);
 
           break;
         }
@@ -379,7 +379,7 @@ test.describe("Accessibility Audit (axe-core)", () => {
 
       if (await modalTrigger.isVisible()) {
         await modalTrigger.click();
-        await page.waitForTimeout(500);
+        await page.locator('[role="dialog"]').first().waitFor({ state: "visible", timeout: 5_000 }).catch(() => {});
 
         // Check if modal opened
         const modal = page.locator('[role="dialog"]');
@@ -392,8 +392,8 @@ test.describe("Accessibility Audit (axe-core)", () => {
 
           for (let i = 0; i < tabCount; i++) {
             await page.keyboard.press("Tab");
-            // Intentional: pacing between Tab presses for focus ring evaluation
-            await page.waitForTimeout(100);
+            // Brief pause for focus ring to render after Tab press
+            await page.evaluate(() => new Promise(r => requestAnimationFrame(r)));
 
             const focused = page.locator(":focus");
             const isInModal = await focused
@@ -552,7 +552,8 @@ test.describe("Accessibility Audit (axe-core)", () => {
 
       if (await submitButton.isVisible()) {
         await submitButton.click();
-        await page.waitForTimeout(1000);
+        // Wait for validation errors to appear
+        await page.locator('[role="alert"], [aria-live], .error, [class*="error"]').first().waitFor({ state: "visible", timeout: 5_000 }).catch(() => {});
 
         // Check if any error messages exist
         const errorMessages = page.locator(
@@ -653,7 +654,7 @@ test.describe("Accessibility Audit (axe-core)", () => {
       await page.goto("/search");
       await page.waitForLoadState("domcontentloaded");
       // Wait for React hydration to complete — aria-live regions are in client components
-      await page.waitForTimeout(2000);
+      await page.waitForLoadState("networkidle").catch(() => {});
 
       // Check for aria-live regions or loading indicators with proper ARIA
       const liveRegions = page.locator(

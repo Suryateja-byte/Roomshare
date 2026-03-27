@@ -40,9 +40,6 @@ test.describe("Mobile Filter Experience", () => {
 
     // Open filter modal
     await openFilterModal(page);
-    // Wait for hydration after modal opens
-    await page.waitForTimeout(1_000);
-
     // Verify dialog is visible
     const dialog = filterDialog(page);
     await expect(dialog).toBeVisible();
@@ -82,9 +79,6 @@ test.describe("Mobile Filter Experience", () => {
 
     // Open filter modal
     await openFilterModal(page);
-    // Wait for hydration after modal opens
-    await page.waitForTimeout(1_000);
-
     // Toggle Wifi amenity
     await toggleAmenity(page, "Wifi");
 
@@ -123,9 +117,6 @@ test.describe("Mobile Filter Experience", () => {
 
     // Open filter modal
     await openFilterModal(page);
-    // Wait for hydration after modal opens
-    await page.waitForTimeout(1_000);
-
     const dialog = filterDialog(page);
     await expect(dialog).toBeVisible();
 
@@ -156,9 +147,6 @@ test.describe("Mobile Filter Experience", () => {
         el;
       scrollEl.scrollTop = scrollEl.scrollHeight;
     });
-
-    // Wait for scroll to complete
-    await page.waitForTimeout(300);
 
     // Look for house rules group (should be visible after scrolling)
     const houseRules = page.locator('[aria-label="Select house rules"]');
@@ -225,9 +213,6 @@ test.describe("Mobile Filter Experience", () => {
 
     // Open filter modal
     await openFilterModal(page);
-    // Wait for hydration after modal opens
-    await page.waitForTimeout(1_000);
-
     const dialog = filterDialog(page);
     await expect(dialog).toBeVisible();
 

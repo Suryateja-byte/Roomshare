@@ -54,7 +54,7 @@ jobs:
           CONTAINER_ID=$(docker ps -q --filter "ancestor=postgis/postgis:16-3.4")
           docker exec "$CONTAINER_ID" bash -c "apt-get update && apt-get install -y postgresql-16-pgvector && rm -rf /var/lib/apt/lists/*"
 
-      - uses: pnpm/action-setup@v4
+      - uses: pnpm/action-setup@v5
         with:
           version: 9
 
@@ -75,7 +75,7 @@ jobs:
 
       - name: Cache Playwright browsers
         id: playwright-cache
-        uses: actions/cache@v4
+        uses: actions/cache@v5
         with:
           path: ~/.cache/ms-playwright
           key: playwright-${{ runner.os }}-${{ steps.pw-version.outputs.version }}

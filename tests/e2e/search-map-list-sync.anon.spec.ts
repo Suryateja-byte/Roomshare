@@ -116,7 +116,7 @@ async function clickMarkerByListingId(
     expect(result).toBe("ok");
 
     // Wait for React state propagation + easeTo animation before checking card state
-    await page.waitForTimeout(500);
+    await page.evaluate(() => new Promise(r => requestAnimationFrame(() => requestAnimationFrame(r))));
 
     // Verify the click triggered handleMarkerClick → setActive(listingId)
     const cardState = await getCardState(page, listingId);
@@ -319,7 +319,7 @@ test.describe("Map-List Synchronization", () => {
         .textContent()
         .catch(() => null);
       const seconds = parseInt(retryText?.match(/\d+/)?.[0] || "10");
-      await page.waitForTimeout((seconds + 1) * 1000);
+      await page.waitForTimeout((seconds + 1) * 1000); // INTENTIONAL: server-specified rate-limit retry delay
       await page.goto(SEARCH_URL);
       await page.waitForLoadState("domcontentloaded");
     }
@@ -338,8 +338,8 @@ test.describe("Map-List Synchronization", () => {
     // Zoom in to expand clusters into individual markers
     await zoomToExpandClusters(page);
 
-    // Brief stabilization — let Mapbox finish rendering markers after zoom
-    await page.waitForTimeout(500);
+    // Wait for Mapbox to finish rendering markers after zoom
+    await waitForMapReady(page);
   });
 
   // =========================================================================
@@ -819,8 +819,8 @@ test.describe("Map-List Synchronization", () => {
 
       // Wait for map and content to settle after filter change
       await waitForMapReady(page);
-      // Wait for search results to load (either cards appear or "no results" state settles)
-      await page.waitForTimeout(2000);
+      // Wait for search results to load
+      await page.waitForLoadState("networkidle").catch(() => {});
 
       // Cards should have updated (may be fewer or zero due to filter)
       const filteredCardCount = await page
@@ -1407,8 +1407,8 @@ test.describe("Map-List Synchronization", () => {
         return;
       }
 
-      // Intentional delay: verifying ring persists after 1.5s (old impl had auto-clear)
-      await page.waitForTimeout(1500);
+      // INTENTIONAL: verifying ring persists after 1.5s (old impl had auto-clear)
+      await page.waitForTimeout(1500); // INTENTIONAL: persistence check — ring must survive 1.5s
 
       // Ring should STILL be present
       const cardState = await getCardState(page, listingId);
@@ -1489,9 +1489,9 @@ test.describe("Map-List Synchronization", () => {
       // First two use fire-and-forget dispatch to maintain rapid timing.
       // Last one uses verified hover to ensure at least one handler fires.
       await hoverMarkerFast(page, hid0!);
-      await page.waitForTimeout(50); // debounce test: intentionally faster than 300ms debounce
+      await page.waitForTimeout(50); // INTENTIONAL: sub-debounce timing to test 300ms debounce coalescing
       await hoverMarkerFast(page, hid1!);
-      await page.waitForTimeout(50); // debounce test: intentionally faster than 300ms debounce
+      await page.waitForTimeout(50); // INTENTIONAL: sub-debounce timing to test 300ms debounce coalescing
       try {
         await hoverMarkerByListingId(page, hid2!);
       } catch {
@@ -1502,8 +1502,8 @@ test.describe("Map-List Synchronization", () => {
         return;
       }
 
-      // debounce wait: allow 300ms debounce timer to fire + buffer
-      await page.waitForTimeout(500);
+      // INTENTIONAL: debounce verification — must wait past 300ms debounce window to count scroll events
+      await page.waitForTimeout(500); // INTENTIONAL: debounce verification timing
 
       // The scroll container should have received at most 1 scroll event
       // (the debounced one from the last hovered marker)

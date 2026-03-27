@@ -32,8 +32,8 @@ export function FilterPill({
         transition-all duration-200 whitespace-nowrap
         ${
           variant === "active"
-            ? "bg-zinc-900 dark:bg-white text-white dark:text-zinc-900 hover:bg-zinc-700 dark:hover:bg-zinc-200"
-            : "bg-zinc-100 dark:bg-zinc-800 text-zinc-700 dark:text-zinc-300 hover:bg-zinc-200 dark:hover:bg-zinc-700"
+            ? "bg-on-surface text-white hover:bg-on-surface"
+            : "bg-surface-container-high text-on-surface-variant hover:bg-surface-container-high"
         }
       `}
       aria-label={`Remove ${displayText} filter`}

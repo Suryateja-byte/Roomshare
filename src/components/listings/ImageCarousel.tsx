@@ -222,38 +222,38 @@ function ImageCarouselInner({
         onClick={scrollPrev}
         className={`
           absolute left-1 top-1/2 -translate-y-1/2 z-10
-          min-w-[44px] min-h-[44px] rounded-full bg-white/90 dark:bg-zinc-800/90
+          min-w-[44px] min-h-[44px] rounded-full bg-surface-container-lowest/90
           flex items-center justify-center
-          shadow-md backdrop-blur-sm
+          shadow-ambient backdrop-blur-sm
           transition-all duration-200
-          hover:bg-white dark:hover:bg-zinc-700
-          focus:outline-none focus:ring-2 focus:ring-zinc-900 dark:focus:ring-white
+          hover:bg-surface-container-lowest
+          focus:outline-none focus:ring-2 focus:ring-primary/30
           ${showControls ? "opacity-100 translate-x-0 pointer-events-auto" : "opacity-0 -translate-x-2 pointer-events-none"}
         `}
         aria-label="Previous image"
         aria-hidden={!showControls}
         tabIndex={showControls ? 0 : -1}
       >
-        <ChevronLeft className="w-5 h-5 text-zinc-700 dark:text-zinc-200" />
+        <ChevronLeft className="w-5 h-5 text-on-surface-variant" />
       </button>
 
       <button
         onClick={scrollNext}
         className={`
           absolute right-1 top-1/2 -translate-y-1/2 z-10
-          min-w-[44px] min-h-[44px] rounded-full bg-white/90 dark:bg-zinc-800/90
+          min-w-[44px] min-h-[44px] rounded-full bg-surface-container-lowest/90
           flex items-center justify-center
-          shadow-md backdrop-blur-sm
+          shadow-ambient backdrop-blur-sm
           transition-all duration-200
-          hover:bg-white dark:hover:bg-zinc-700
-          focus:outline-none focus:ring-2 focus:ring-zinc-900 dark:focus:ring-white
+          hover:bg-surface-container-lowest
+          focus:outline-none focus:ring-2 focus:ring-primary/30
           ${showControls ? "opacity-100 translate-x-0 pointer-events-auto" : "opacity-0 translate-x-2 pointer-events-none"}
         `}
         aria-label="Next image"
         aria-hidden={!showControls}
         tabIndex={showControls ? 0 : -1}
       >
-        <ChevronRight className="w-5 h-5 text-zinc-700 dark:text-zinc-200" />
+        <ChevronRight className="w-5 h-5 text-on-surface-variant" />
       </button>
 
       {/* Navigation Dots — max 5 visible, window shifts with selection */}
@@ -278,7 +278,7 @@ function ImageCarouselInner({
                 <span
                   className={`block rounded-full transition-all duration-200 ${
                     index === selectedIndex
-                      ? "bg-white w-2.5 h-1.5"
+                      ? "bg-surface-container-lowest w-2.5 h-1.5"
                       : "bg-white/60 w-1.5 h-1.5"
                   }`}
                 />
@@ -304,7 +304,7 @@ function ImageCarouselInner({
               <span
                 className={`block rounded-full transition-all duration-200 ${
                   index === selectedIndex
-                    ? "bg-white w-2.5 h-1.5"
+                    ? "bg-surface-container-lowest w-2.5 h-1.5"
                     : index === visibleIndices[0] ||
                         index === visibleIndices[MAX_DOTS - 1]
                       ? "bg-white/40 w-1 h-1"

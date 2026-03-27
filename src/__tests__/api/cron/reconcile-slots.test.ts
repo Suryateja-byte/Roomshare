@@ -61,7 +61,6 @@ jest.mock("next/server", () => ({
 import { GET } from "@/app/api/cron/reconcile-slots/route";
 import { prisma } from "@/lib/prisma";
 import { validateCronAuth } from "@/lib/cron-auth";
-import { features } from "@/lib/env";
 import { markListingsDirty } from "@/lib/search/search-doc-dirty";
 import * as Sentry from "@sentry/nextjs";
 import { NextRequest } from "next/server";
@@ -79,7 +78,6 @@ describe("GET /api/cron/reconcile-slots", () => {
   beforeEach(() => {
     jest.clearAllMocks();
     (validateCronAuth as jest.Mock).mockReturnValue(null);
-    (features as any).bookingAudit = true;
   });
 
   it("returns 401 without valid CRON_SECRET", async () => {
@@ -93,13 +91,21 @@ describe("GET /api/cron/reconcile-slots", () => {
     expect(response.status).toBe(401);
   });
 
-  it("returns skipped when feature flag off", async () => {
-    (features as any).bookingAudit = false;
+  it("runs unconditionally regardless of feature flags", async () => {
+    // Reconciler is no longer gated by ENABLE_BOOKING_AUDIT.
+    // It must always run to correct availableSlots drift.
+    (prisma.$transaction as jest.Mock).mockImplementation(async (fn: any) => {
+      return fn({
+        $queryRaw: jest
+          .fn()
+          .mockResolvedValueOnce([{ locked: true }])
+          .mockResolvedValueOnce([]),
+      });
+    });
 
     const response = await GET(createRequest("Bearer valid"));
     const data = await response.json();
-    expect(data.skipped).toBe(true);
-    expect(data.reason).toBe("ENABLE_BOOKING_AUDIT is off");
+    expect(data.drifted).toBe(0);
   });
 
   it("skips when advisory lock not acquired", async () => {

@@ -9,6 +9,7 @@
 import { test, expect, tags, selectors, timeouts, SF_BOUNDS } from "../helpers";
 
 test.describe("Booking Journeys", () => {
+  test.describe.configure({ mode: 'serial' });
   test.use({ storageState: "playwright/.auth/user.json" });
 
   test.beforeEach(async () => {
@@ -76,7 +77,7 @@ test.describe("Booking Journeys", () => {
         await contactButton.click();
 
         // May open modal or navigate to messages
-        await page.waitForTimeout(1000);
+        await page.waitForLoadState("domcontentloaded");
       }
     });
 
@@ -296,7 +297,7 @@ test.describe("Booking Journeys", () => {
           .first();
         if (await nextMonth.isVisible().catch(() => false)) {
           await nextMonth.click();
-          await page.waitForTimeout(500);
+          await expect(nextMonth).toBeVisible({ timeout: 5_000 });
         }
       }
     });

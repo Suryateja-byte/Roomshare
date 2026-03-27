@@ -1,4 +1,4 @@
-import { test, expect } from "../helpers";
+import { test, expect, waitForHydration } from "../helpers";
 
 test.use({ viewport: { width: 390, height: 844 } });
 test.use({ storageState: "playwright/.auth/user.json" });
@@ -7,6 +7,7 @@ test.describe("Mobile Profile", () => {
   test("MP-01: Profile page renders with user info", async ({ page }) => {
     await page.goto("/profile");
     await page.waitForLoadState("domcontentloaded");
+    await waitForHydration(page);
 
     // Wait for profile page to load
     await expect(
@@ -28,6 +29,7 @@ test.describe("Mobile Profile", () => {
   test("MP-02: Edit profile link visible and navigates", async ({ page }) => {
     await page.goto("/profile");
     await page.waitForLoadState("domcontentloaded");
+    await waitForHydration(page);
 
     await expect(
       page.locator('[data-testid="profile-page"]').first()
@@ -47,6 +49,7 @@ test.describe("Mobile Profile", () => {
     // Click navigates to /profile/edit
     await editButton.click();
     await page.waitForLoadState("domcontentloaded");
+    await waitForHydration(page);
     await page.waitForURL(/\/profile\/edit/, { timeout: 10000 });
     expect(page.url()).toContain("/profile/edit");
   });
@@ -56,6 +59,7 @@ test.describe("Mobile Profile", () => {
   }) => {
     await page.goto("/profile/edit");
     await page.waitForLoadState("domcontentloaded");
+    await waitForHydration(page);
 
     // Wait for the edit form to appear
     await expect(page.locator('[data-testid="edit-profile-form"]')).toBeVisible(
@@ -72,6 +76,7 @@ test.describe("Mobile Profile", () => {
   test("MP-04: Form inputs are full-width on mobile", async ({ page }) => {
     await page.goto("/profile/edit");
     await page.waitForLoadState("domcontentloaded");
+    await waitForHydration(page);
 
     await expect(page.locator('[data-testid="edit-profile-form"]')).toBeVisible(
       { timeout: 15000 }
@@ -95,6 +100,7 @@ test.describe("Mobile Profile", () => {
   }) => {
     await page.goto("/profile/edit");
     await page.waitForLoadState("domcontentloaded");
+    await waitForHydration(page);
 
     // Skip if redirected to login
     if (page.url().includes("/login") || page.url().includes("/signin")) {
@@ -137,6 +143,7 @@ test.describe("Mobile Profile", () => {
   test("MP-06: Profile image/avatar displays correctly", async ({ page }) => {
     await page.goto("/profile");
     await page.waitForLoadState("domcontentloaded");
+    await waitForHydration(page);
 
     await expect(
       page.locator('[data-testid="profile-page"]').first()

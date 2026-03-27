@@ -144,17 +144,10 @@ export async function waitForMapMarkers(
   const timeout = options?.timeout ?? timeouts.action;
   const minCount = options?.minCount ?? 1;
 
-  await page.waitForSelector(selectors.mapMarker, { timeout });
+  await page.locator(selectors.mapMarker).first().waitFor({ state: 'attached', timeout });
 
   // Wait for at least minCount markers
-  await page.waitForFunction(
-    ({ selector, min }) => {
-      const markers = document.querySelectorAll(selector);
-      return markers.length >= min;
-    },
-    { selector: selectors.mapMarker, min: minCount },
-    { timeout }
-  );
+  await expect.poll(() => page.locator(selectors.mapMarker).count(), { timeout }).toBeGreaterThanOrEqual(minCount);
 
   const markers = page.locator(selectors.mapMarker);
   return markers.count();
@@ -232,6 +225,37 @@ export async function waitForStable(
   });
 }
 
+/**
+ * Wait for Next.js streaming SSR hydration to complete.
+ *
+ * Next.js streaming SSR (for routes with loading.tsx) works by:
+ * 1. Sending the loading skeleton inline as an initial HTML chunk
+ * 2. Appending resolved content in `<div hidden id="S:X">` elements
+ * 3. Running `$RC` swap scripts to replace the skeleton with content
+ * 4. Removing the hidden divs after React hydration completes
+ *
+ * During the swap window, content exists in BOTH the visible DOM and the
+ * hidden div. Playwright's `locator()` matches ALL elements regardless of
+ * the `hidden` attribute, causing strict mode violations when selectors
+ * like `#bio` or `#currentPassword` resolve to 2 elements.
+ *
+ * This helper waits for all streaming SSR hidden divs to be removed,
+ * ensuring a single copy of each element exists in the DOM.
+ */
+export async function waitForHydration(
+  page: Page,
+  options?: { timeout?: number }
+): Promise<void> {
+  const timeout = options?.timeout ?? 10_000;
+  await page.waitForFunction(
+    () => document.querySelectorAll('div[hidden][id^="S:"]').length === 0,
+    { timeout }
+  ).catch(() => {
+    // If streaming divs never appeared (e.g., no loading.tsx on this route),
+    // or if they were already cleaned up, this is fine — proceed silently.
+  });
+}
+
 // ---------------------------------------------------------------------------
 // Map Wait Helpers (replacements for waitForTimeout in map tests)
 // ---------------------------------------------------------------------------
@@ -293,9 +317,11 @@ export async function waitForDebounceAndResponse(
     timeout?: number;
   }
 ): Promise<void> {
-  const debounceMs = opts.debounceMs ?? timeouts.debounce;
   const timeout = opts.timeout ?? timeouts.action;
-  const responsePromise = page.waitForResponse(
+  // Wait directly for the debounced API response — the debounce timer fires
+  // on its own schedule, so we just gate on the actual network response
+  // rather than guessing the timing with waitForTimeout.
+  await page.waitForResponse(
     (resp) => {
       const url = resp.url();
       return typeof opts.responsePattern === "string"
@@ -304,9 +330,6 @@ export async function waitForDebounceAndResponse(
     },
     { timeout }
   );
-  // Minimal wait for debounce to fire, then gate on actual response
-  await page.waitForTimeout(debounceMs + 100);
-  await responsePromise;
 }
 
 /**

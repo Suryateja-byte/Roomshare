@@ -6,6 +6,7 @@ import {
   MAX_QUERY_LENGTH,
   LAT_OFFSET_DEGREES,
 } from "./constants";
+import type { SortOption, FilterParams, FilterCriteria } from "./search-types";
 import {
   VALID_BOOKING_MODES,
   VALID_AMENITIES,
@@ -35,36 +36,9 @@ export {
 // Re-export for backward compatibility
 export { MAX_SAFE_PRICE, MAX_SAFE_PAGE, MAX_ARRAY_ITEMS };
 
-export type SortOption =
-  | "recommended"
-  | "price_asc"
-  | "price_desc"
-  | "newest"
-  | "rating";
-
-export interface FilterParams {
-  query?: string;
-  minPrice?: number;
-  maxPrice?: number;
-  amenities?: string[];
-  moveInDate?: string;
-  leaseDuration?: string;
-  houseRules?: string[];
-  roomType?: string;
-  languages?: string[];
-  genderPreference?: string;
-  householdGender?: string;
-  bookingMode?: string;
-  bounds?: {
-    minLat: number;
-    maxLat: number;
-    minLng: number;
-    maxLng: number;
-  };
-  minAvailableSlots?: number;
-  sort?: SortOption;
-  nearMatches?: boolean;
-}
+// Canonical type definitions live in search-types.ts (single source of truth).
+// Re-exported here for consumers that import from search-params.
+export type { SortOption, FilterParams, FilterCriteria };
 
 /**
  * Returns true if any narrowing filter is active (excludes query, bounds, sort, nearMatches).
@@ -119,7 +93,7 @@ export interface ParsedSearchParams {
   q?: string;
   requestedPage: number;
   sortOption: SortOption;
-  filterParams: FilterParams;
+  filterParams: FilterCriteria;
   /**
    * True when a text query exists but no geographic bounds were provided.
    * This indicates an unbounded search that would cause full-table scans.

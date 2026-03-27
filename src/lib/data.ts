@@ -305,281 +305,6 @@ export function sortListings(
   return results;
 }
 
-// Maximum results to return for performance (prevents memory issues on wide map bounds)
-const MAX_RESULTS_CAP = 500;
-
-/**
- * @deprecated Use getListingsPaginated() or SearchDoc queries instead.
- * This function has no pagination and may return unbounded results.
- *
- * P0 #15 fix: All filters pushed to SQL WHERE clauses instead of JS post-filtering.
- */
-export async function getListings(
-  params: FilterParams = {}
-): Promise<ListingData[]> {
-  const {
-    query,
-    minPrice,
-    maxPrice,
-    amenities,
-    moveInDate,
-    leaseDuration,
-    houseRules,
-    roomType,
-    languages,
-    genderPreference,
-    householdGender,
-    bounds,
-    minAvailableSlots,
-    sort = "recommended",
-  } = params;
-
-  try {
-    // Build dynamic WHERE conditions — all filtering at SQL level
-    const slotThreshold = Math.max(minAvailableSlots ?? 1, 1);
-    const conditions: string[] = [
-      `l."availableSlots" >= $1`,
-      "l.status = 'ACTIVE'",
-      "ST_X(loc.coords::geometry) IS NOT NULL",
-      "ST_Y(loc.coords::geometry) IS NOT NULL",
-      "NOT (ST_X(loc.coords::geometry) = 0 AND ST_Y(loc.coords::geometry) = 0)",
-      "ST_Y(loc.coords::geometry) BETWEEN -90 AND 90",
-      "ST_X(loc.coords::geometry) BETWEEN -180 AND 180",
-    ];
-    const queryParams: (string | number | boolean | null | Date | string[])[] =
-      [slotThreshold];
-    let paramIndex = 2;
-
-    // Geographic bounds filter (SQL level)
-    if (bounds) {
-      conditions.push(`ST_Y(loc.coords::geometry) >= $${paramIndex++}`);
-      queryParams.push(bounds.minLat);
-      conditions.push(`ST_Y(loc.coords::geometry) <= $${paramIndex++}`);
-      queryParams.push(bounds.maxLat);
-      if (crossesAntimeridian(bounds.minLng, bounds.maxLng)) {
-        conditions.push(
-          `(ST_X(loc.coords::geometry) >= $${paramIndex++} OR ST_X(loc.coords::geometry) <= $${paramIndex++})`
-        );
-        queryParams.push(bounds.minLng);
-        queryParams.push(bounds.maxLng);
-      } else {
-        conditions.push(`ST_X(loc.coords::geometry) >= $${paramIndex++}`);
-        queryParams.push(bounds.minLng);
-        conditions.push(`ST_X(loc.coords::geometry) <= $${paramIndex++}`);
-        queryParams.push(bounds.maxLng);
-      }
-    }
-
-    // Text search filter (SQL level)
-    if (query && isValidQuery(query)) {
-      const sanitizedQuery = sanitizeSearchQuery(query);
-      if (sanitizedQuery) {
-        const searchPattern = `%${sanitizedQuery}%`;
-        conditions.push(`(
-          LOWER(l.title) LIKE LOWER($${paramIndex}) OR
-          LOWER(l.description) LIKE LOWER($${paramIndex}) OR
-          LOWER(loc.city) LIKE LOWER($${paramIndex}) OR
-          LOWER(loc.state) LIKE LOWER($${paramIndex})
-        )`);
-        queryParams.push(searchPattern);
-        paramIndex++;
-      }
-    }
-
-    // Price filters (SQL level)
-    if (minPrice !== undefined && minPrice !== null) {
-      conditions.push(`l.price >= $${paramIndex++}`);
-      queryParams.push(minPrice);
-    }
-    if (maxPrice !== undefined && maxPrice !== null) {
-      conditions.push(`l.price <= $${paramIndex++}`);
-      queryParams.push(maxPrice);
-    }
-
-    // Amenities filter (SQL level, AND logic with partial match)
-    if (amenities?.length) {
-      const normalizedAmenities = amenities
-        .map((a) => a.trim().toLowerCase())
-        .filter(Boolean);
-      if (normalizedAmenities.length > 0) {
-        conditions.push(`NOT EXISTS (
-          SELECT 1 FROM unnest($${paramIndex++}::text[]) AS search_term
-          WHERE NOT EXISTS (
-            SELECT 1 FROM unnest(l.amenities) AS la
-            WHERE LOWER(la) LIKE '%' || search_term || '%'
-          )
-        )`);
-        queryParams.push(normalizedAmenities);
-      }
-    }
-
-    // Move-in date filter (SQL level)
-    if (moveInDate) {
-      conditions.push(
-        `(l."moveInDate" IS NULL OR l."moveInDate" <= $${paramIndex++})`
-      );
-      queryParams.push(parseDateOnly(moveInDate));
-    }
-
-    // Lease duration filter (SQL level)
-    if (leaseDuration) {
-      conditions.push(`LOWER(l."leaseDuration") = LOWER($${paramIndex++})`);
-      queryParams.push(leaseDuration);
-    }
-
-    // House rules filter (SQL level, AND logic)
-    if (houseRules?.length) {
-      const normalizedRules = houseRules
-        .map((r) => r.trim().toLowerCase())
-        .filter(Boolean);
-      if (normalizedRules.length > 0) {
-        conditions.push(
-          `ARRAY(SELECT LOWER(x) FROM unnest(l."houseRules") AS x WHERE x IS NOT NULL) @> $${paramIndex++}::text[]`
-        );
-        queryParams.push(normalizedRules);
-      }
-    }
-
-    // Room type filter (SQL level)
-    if (roomType) {
-      conditions.push(`LOWER(l."roomType") = LOWER($${paramIndex++})`);
-      queryParams.push(roomType);
-    }
-
-    // Languages filter (SQL level, OR logic with GIN index)
-    if (languages?.length) {
-      const normalized = languages
-        .map((l) => l.trim().toLowerCase())
-        .filter(Boolean);
-      if (normalized.length > 0) {
-        conditions.push(`l."household_languages" && $${paramIndex++}::text[]`);
-        queryParams.push(normalized);
-      }
-    }
-
-    // Gender preference filter (SQL level)
-    if (genderPreference) {
-      conditions.push(`LOWER(l."genderPreference") = LOWER($${paramIndex++})`);
-      queryParams.push(genderPreference);
-    }
-
-    // Household gender filter (SQL level)
-    if (householdGender) {
-      conditions.push(`LOWER(l."householdGender") = LOWER($${paramIndex++})`);
-      queryParams.push(householdGender);
-    }
-
-    const whereClause = conditions.join(" AND ");
-
-    // Build ORDER BY clause based on sort option
-    let orderByClause: string;
-    switch (sort) {
-      case "price_asc":
-        orderByClause = 'l.price ASC, l."createdAt" DESC';
-        break;
-      case "price_desc":
-        orderByClause = 'l.price DESC, l."createdAt" DESC';
-        break;
-      case "newest":
-        orderByClause = 'l."createdAt" DESC, l.id ASC';
-        break;
-      case "rating":
-        orderByClause =
-          'COALESCE(AVG(r.rating), 0) DESC, COUNT(r.id) DESC, l."createdAt" DESC';
-        break;
-      case "recommended":
-      default:
-        orderByClause =
-          '(COALESCE(AVG(r.rating), 0) * 20 + l."viewCount" * 0.1 + COUNT(r.id) * 5) DESC, l."createdAt" DESC';
-        break;
-    }
-
-    // SECURITY AUDIT: $queryRawUnsafe with parameterized $N placeholders.
-    // All user-supplied values in queryParams — no direct interpolation.
-    // whereClause/orderByClause use hard-coded SQL. MAX_RESULTS_CAP is a constant.
-    const sqlQuery = `
-      SELECT
-          l.id,
-          l.title,
-          l.description,
-          l.price,
-          l.images,
-          l."availableSlots",
-          l."totalSlots",
-          l.amenities,
-          l."houseRules",
-          l."household_languages",
-          l."primary_home_language",
-          l."genderPreference",
-          l."householdGender",
-          l."leaseDuration",
-          l."roomType",
-          l."moveInDate",
-          l."ownerId",
-          l."createdAt",
-          l."viewCount",
-          loc.address,
-          loc.city,
-          loc.state,
-          loc.zip,
-          ST_X(loc.coords::geometry) as lng,
-          ST_Y(loc.coords::geometry) as lat,
-          COALESCE(AVG(r.rating), 0) as avg_rating,
-          COUNT(r.id) as review_count
-      FROM "Listing" l
-      JOIN "Location" loc ON l.id = loc."listingId"
-      LEFT JOIN "Review" r ON l.id = r."listingId"
-      WHERE ${whereClause}
-      GROUP BY l.id, loc.id
-      ORDER BY ${orderByClause}
-      LIMIT ${MAX_RESULTS_CAP}
-    `;
-
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any -- Raw SQL query returns untyped rows; mapped to ListingData below
-    const listings = await queryWithTimeout<any>(sqlQuery, queryParams);
-
-    return listings.map((l) => ({
-      id: l.id,
-      title: l.title,
-      description: l.description,
-      price: Number(l.price),
-      images: l.images || [],
-      availableSlots: l.availableSlots,
-      totalSlots: l.totalSlots,
-      amenities: l.amenities || [],
-      houseRules: l.houseRules || [],
-      householdLanguages: l.household_languages || [],
-      primaryHomeLanguage: l.primary_home_language,
-      genderPreference: l.genderPreference,
-      householdGender: l.householdGender,
-      leaseDuration: l.leaseDuration,
-      roomType: l.roomType,
-      moveInDate: l.moveInDate ? new Date(l.moveInDate) : undefined,
-      createdAt: l.createdAt ? new Date(l.createdAt) : new Date(),
-      viewCount: Number(l.viewCount) || 0,
-      avgRating: Number(l.avg_rating) || 0,
-      reviewCount: Number(l.review_count) || 0,
-      location: {
-        address: l.address,
-        city: l.city,
-        state: l.state,
-        zip: l.zip,
-        lat: Number(l.lat) || 0,
-        lng: Number(l.lng) || 0,
-      },
-    }));
-  } catch (error) {
-    const dataError = wrapDatabaseError(error, "getListings");
-    dataError.log({
-      operation: "getListings",
-      hasQuery: !!params.query,
-      hasBounds: !!params.bounds,
-      sortOption: params.sort,
-    });
-    throw dataError;
-  }
-}
-
 // MapListingData — see @/lib/search-types
 
 // Maximum map markers to return (prevents UI performance issues)
@@ -787,9 +512,16 @@ export async function getMapListings(
             l."availableSlots",
             l.images,
             ST_X(loc.coords::geometry) as lng,
-            ST_Y(loc.coords::geometry) as lat
+            ST_Y(loc.coords::geometry) as lat,
+            COALESCE(r.avg_rating, 0) as "avgRating",
+            COALESCE(r.review_count, 0) as "reviewCount"
         FROM "Listing" l
         JOIN "Location" loc ON l.id = loc."listingId"
+        LEFT JOIN (
+            SELECT "listingId", AVG(rating)::float8 as avg_rating, COUNT(*)::int as review_count
+            FROM "Review"
+            GROUP BY "listingId"
+        ) r ON r."listingId" = l.id
         WHERE ${whereClause}
         ORDER BY l."createdAt" DESC
         LIMIT ${MAX_MAP_MARKERS}
@@ -810,6 +542,8 @@ export async function getMapListings(
           lat: l.lat,
           lng: l.lng,
         },
+        avgRating: Number(l.avgRating) || 0,
+        reviewCount: Number(l.reviewCount) || 0,
       }))
     );
   } catch (error) {

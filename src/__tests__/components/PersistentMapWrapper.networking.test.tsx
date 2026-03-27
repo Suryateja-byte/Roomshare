@@ -538,6 +538,118 @@ describe("PersistentMapWrapper - Networking & Race Conditions (P1-7)", () => {
       });
     });
 
+    it("429 retry uses fresh abort signal — not stale from original request (P0-#1)", async () => {
+      // Bug: retry closure captured the original caller's signal. If that signal
+      // was aborted (e.g., user panned during retry delay), the retry fetch would
+      // immediately fail with AbortError, leaving the map empty with no error.
+      // Fix: retry creates a fresh AbortController so it's not affected by
+      // prior abort cycles.
+      mockFetch
+        .mockResolvedValueOnce({
+          ok: false,
+          status: 429,
+          headers: new Headers({ "Retry-After": "2" }),
+          json: async () => ({ error: "Too many requests" }),
+        })
+        .mockResolvedValueOnce({
+          ok: true,
+          status: 200,
+          headers: new Headers(),
+          json: async () => ({
+            listings: [
+              {
+                id: "retry-ok",
+                title: "Retry Listing",
+                price: 500,
+                location: { lat: 37.7, lng: -122.4 },
+              },
+            ],
+          }),
+        });
+
+      const { container } = render(
+        <PersistentMapWrapper shouldRenderMap={true} />
+      );
+
+      // Trigger initial fetch
+      await act(async () => {
+        jest.advanceTimersByTime(MAP_FETCH_DEBOUNCE_MS);
+      });
+
+      // First call returned 429
+      expect(mockFetch).toHaveBeenCalledTimes(1);
+
+      // Loading bar should be visible during retry delay
+      expect(
+        container.querySelector(
+          '[role="status"][aria-label="Loading map data"]'
+        )
+      ).toBeInTheDocument();
+
+      // Advance past retry delay — retry fires with fresh signal
+      await act(async () => {
+        jest.advanceTimersByTime(2500);
+      });
+
+      // Retry call made (total 2 calls)
+      expect(mockFetch).toHaveBeenCalledTimes(2);
+
+      // The retry fetch must NOT have been passed an already-aborted signal.
+      // Verify the second fetch's signal was not aborted at call time.
+      const secondCallOptions = mockFetch.mock.calls[1]?.[1] as
+        | { signal?: AbortSignal }
+        | undefined;
+      expect(secondCallOptions?.signal?.aborted).toBe(false);
+
+      // After successful retry, loading bar should be gone
+      await waitFor(() => {
+        expect(
+          container.querySelector(
+            '[role="status"][aria-label="Loading map data"]'
+          )
+        ).not.toBeInTheDocument();
+      });
+    });
+
+    it("search and pan effects use separate abort controllers — pan does not clobber search (P1-#4)", async () => {
+      // Track all fetch signals to verify they're independent
+      const fetchCalls: { url: string; aborted: boolean }[] = [];
+      mockFetch.mockImplementation(
+        (url: string, options?: { signal?: AbortSignal }) => {
+          fetchCalls.push({
+            url,
+            aborted: options?.signal?.aborted ?? false,
+          });
+          return Promise.resolve({
+            ok: true,
+            status: 200,
+            headers: new Headers(),
+            json: async () => ({
+              listings: [
+                {
+                  id: "1",
+                  title: "Test",
+                  price: 1000,
+                  location: { lat: 37.7, lng: -122.4 },
+                },
+              ],
+            }),
+          });
+        }
+      );
+
+      render(<PersistentMapWrapper shouldRenderMap={true} />);
+
+      // Trigger search fetch via debounce
+      await act(async () => {
+        jest.advanceTimersByTime(MAP_FETCH_DEBOUNCE_MS);
+      });
+
+      // First fetch should NOT have an aborted signal
+      expect(fetchCalls.length).toBeGreaterThanOrEqual(1);
+      expect(fetchCalls[0].aborted).toBe(false);
+    });
+
     it("clears error on successful retry", async () => {
       // First request fails
       mockFetch

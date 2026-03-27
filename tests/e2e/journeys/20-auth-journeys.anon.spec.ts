@@ -44,8 +44,7 @@ test.describe("J7: Login Page (Unauthenticated)", () => {
 
     // Submit empty form — should stay on login page
     await submitBtn.first().click();
-    await page.waitForTimeout(500);
-    await expect(page).toHaveURL(/login/);
+    await expect(page).toHaveURL(/login/, { timeout: 5000 });
   });
 
   test("has link to signup page", async ({ page }) => {

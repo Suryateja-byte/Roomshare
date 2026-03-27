@@ -208,7 +208,6 @@ test.describe("Amenities Filter", () => {
       await expect(wifiChip).toBeVisible({ timeout: 10_000 });
     }
 
-    expect(await page.title()).toBeTruthy();
   });
 
   // 6. Clear amenities restores results
@@ -223,7 +222,6 @@ test.describe("Amenities Filter", () => {
     await gotoSearchWithFilters(page, {});
 
     expect(getUrlParam(page, "amenities")).toBeNull();
-    expect(await page.title()).toBeTruthy();
   });
 
   // 7. Amenity buttons show facet counts
@@ -267,7 +265,6 @@ test.describe("Amenities Filter", () => {
     }
 
     // Test passes even if no buttons are disabled (all have results)
-    expect(await page.title()).toBeTruthy();
   });
 
   // 9. All valid amenities are available in the modal

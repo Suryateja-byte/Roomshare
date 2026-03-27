@@ -85,7 +85,8 @@ async function getSnapIndex(
 async function waitForSheetAnimation(
   page: import("@playwright/test").Page
 ): Promise<void> {
-  await page.waitForTimeout(500);
+  // Animations are disabled by fixture; wait for double rAF to let layout settle
+  await page.evaluate(() => new Promise(r => requestAnimationFrame(() => requestAnimationFrame(r))));
 }
 
 /**
@@ -145,7 +146,7 @@ async function dragHandle(
   const presses = Math.abs(deltaY) >= 300 ? 2 : 1;
   for (let i = 0; i < presses; i++) {
     await page.keyboard.press(key);
-    if (i < presses - 1) await page.waitForTimeout(100);
+    if (i < presses - 1) await page.evaluate(() => new Promise(r => requestAnimationFrame(r)));
   }
 
   await waitForSheetAnimation(page);
@@ -351,8 +352,8 @@ test.describe("Mobile Bottom Sheet - Expanded Drag Down (7.3)", () => {
     await content.evaluate((el) => {
       el.scrollTop = 100;
     });
-    // Intentional: DOM scroll mutation settling time
-    await page.waitForTimeout(100);
+    // Wait for DOM scroll mutation to settle
+    await page.evaluate(() => new Promise(r => requestAnimationFrame(r)));
 
     // Verify scroll was applied
     const scrollTop = await content.evaluate((el) => el.scrollTop);
@@ -584,7 +585,6 @@ test.describe("Mobile Bottom Sheet - State Preservation (7.6)", () => {
       // force: true because on mobile the filter button may be partially
       // obscured by the expanded bottom sheet
       await filterBtn.first().click({ force: true });
-      await page.waitForTimeout(500);
 
       // Close filter modal if opened
       const closeBtn = page.locator(
@@ -593,7 +593,7 @@ test.describe("Mobile Bottom Sheet - State Preservation (7.6)", () => {
       try {
         await expect(closeBtn.first()).toBeVisible({ timeout: 2000 });
         await closeBtn.first().click();
-        await page.waitForTimeout(500);
+        await expect(closeBtn.first()).toBeHidden({ timeout: 3000 }).catch(() => {});
       } catch {
         // Filter modal may not have opened
       }

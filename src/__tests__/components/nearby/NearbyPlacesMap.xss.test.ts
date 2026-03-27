@@ -54,17 +54,17 @@ describe("XSS Security Tests", () => {
       const input = 'He said "hello"';
       const escaped = escapeHtml(input);
 
-      // Quotes in text content are safe - they're only dangerous in attribute values
-      // The function preserves quotes since they don't create XSS vulnerabilities in text
-      expect(escaped).toBe('He said "hello"');
+      // L-5 FIX: Regex-based escaping now escapes double quotes too (more secure).
+      expect(escaped).toBe('He said &quot;hello&quot;');
     });
 
     it("handles single quotes in text content", () => {
       const input = "It's a test";
       const escaped = escapeHtml(input);
 
-      // Quotes in text content are safe - they're only dangerous in attribute values
-      expect(escaped).toBe("It's a test");
+      // L-5 FIX: Regex-based escaping now escapes single quotes too (more secure than DOM textContent).
+      // This is stricter than the previous DOM-based approach but prevents attribute-context XSS.
+      expect(escaped).toBe("It&#039;s a test");
     });
 
     it("escapes less-than and greater-than signs", () => {

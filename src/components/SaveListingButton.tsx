@@ -81,7 +81,7 @@ export default function SaveListingButton({
         <Loader2 className="w-4 h-4 animate-spin" />
       ) : (
         <Heart
-          className={`w-4 h-4 transition-colors ${isSaved ? "fill-red-500 text-red-500" : ""}`}
+          className={`w-4 h-4 transition-colors ${isSaved ? "fill-primary text-primary" : ""}`}
         />
       )}
     </Button>

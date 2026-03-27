@@ -15,7 +15,9 @@ import { useSearchParams } from "next/navigation";
 import type { BatchedFilterValues } from "./useBatchedFilters";
 import type { FacetsResponse } from "@/app/api/search/facets/route";
 import { rateLimitedFetch, RateLimitError } from "@/lib/rate-limit-client";
+import * as Sentry from "@sentry/nextjs";
 import { createTTLCache } from "./createTTLCache";
+import { setRateLimited } from "./useRateLimitStatus";
 
 const facetsCache = createTTLCache<FacetsResponse>(100);
 const CACHE_TTL_MS = 30_000;
@@ -39,6 +41,8 @@ export interface UseFacetsReturn {
   facets: FacetsResponse | null;
   isLoading: boolean;
   error: Error | null;
+  /** P1-5: Whether the server requires bounds before returning facet data */
+  boundsRequired: boolean;
 }
 
 /**
@@ -50,7 +54,9 @@ function generateFacetsCacheKey(
   searchParams: URLSearchParams
 ): string {
   const parts = [
-    // Exclude minPrice/maxPrice intentionally
+    // Include price so non-price facet counts update after price changes (#19)
+    `minPrice=${pending.minPrice}`,
+    `maxPrice=${pending.maxPrice}`,
     `roomType=${pending.roomType}`,
     `leaseDuration=${pending.leaseDuration}`,
     `moveInDate=${pending.moveInDate}`,
@@ -129,6 +135,8 @@ export function useFacets({
   const [facets, setFacets] = useState<FacetsResponse | null>(null);
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState<Error | null>(null);
+  // P1-5: Track boundsRequired from facets response
+  const [boundsRequired, setBoundsRequired] = useState(false);
 
   const abortControllerRef = useRef<AbortController | null>(null);
   const debounceTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
@@ -171,24 +179,6 @@ export function useFacets({
       });
 
       if (!response.ok) {
-        // Known/expected case: backend asks for location bounds with text query.
-        // Keep UI functional by returning empty facets instead of surfacing an error.
-        if (response.status === 400) {
-          try {
-            const errorBody = await response.json();
-            if (errorBody?.boundsRequired === true) {
-              facetsCache.set(cacheKey, EMPTY_FACETS, ERROR_FALLBACK_TTL_MS);
-              if (!abortController.signal.aborted) {
-                setFacets(EMPTY_FACETS);
-                setIsLoading(false);
-              }
-              return;
-            }
-          } catch {
-            // Ignore body parse errors and continue with generic handling below.
-          }
-        }
-
         // Graceful degradation for transient backend failures (500/timeout/etc).
         // Facets should not block core search/filter UI interactions.
         if (response.status >= 500) {
@@ -202,6 +192,12 @@ export function useFacets({
 
         // Graceful degradation for unexpected status codes (404, 403, etc.)
         // Facets are supplementary — never block the filter UI.
+        // Breadcrumb gives context when a real error IS captured later in Sentry.
+        Sentry.addBreadcrumb({
+          category: "search.facets",
+          message: `Facets returned ${response.status}`,
+          level: "warning",
+        });
         console.warn(
           `[useFacets] Unexpected status ${response.status}, returning empty facets`
         );
@@ -220,16 +216,21 @@ export function useFacets({
       }
       const validData = data as FacetsResponse;
 
-      facetsCache.set(cacheKey, validData, CACHE_TTL_MS);
+      // P1-5: Read boundsRequired from 200 response (server no longer returns 400 for this)
+      const isBoundsRequired = data.boundsRequired === true;
+
+      facetsCache.set(cacheKey, validData, isBoundsRequired ? ERROR_FALLBACK_TTL_MS : CACHE_TTL_MS);
 
       if (!abortController.signal.aborted) {
         setFacets(validData);
+        setBoundsRequired(isBoundsRequired);
         setIsLoading(false);
       }
     } catch (err) {
       if (err instanceof Error && err.name === "AbortError") return;
       if (err instanceof RateLimitError) {
         if (!abortController.signal.aborted) setIsLoading(false);
+        setRateLimited(err.retryAfterMs);
         return;
       }
       console.error("[useFacets] Error:", err);
@@ -276,5 +277,13 @@ export function useFacets({
     // cacheKey already captures filter+location state, so fetchFacets changes are covered.
   }, [cacheKey, isDrawerOpen, fetchFacets]);
 
-  return { facets, isLoading, error };
+  // EU-E: Reset boundsRequired when drawer closes to prevent stale state
+  // on next open (e.g., user adds location between opens)
+  useEffect(() => {
+    if (!isDrawerOpen) {
+      setBoundsRequired(false);
+    }
+  }, [isDrawerOpen]);
+
+  return { facets, isLoading, error, boundsRequired };
 }

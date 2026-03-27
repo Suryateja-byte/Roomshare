@@ -198,12 +198,35 @@ export const dataHelpers = {
    * Note: Implement based on your cleanup strategy (API calls, database reset, etc.)
    */
   async cleanup(page: Page, testPrefix: string): Promise<void> {
-    // This is a placeholder - implement based on your cleanup strategy
-    // Options:
-    // 1. Call cleanup API endpoint
-    // 2. Delete via admin UI
-    // 3. Database cleanup script
-    console.log(`[E2E] Cleanup requested for prefix: ${testPrefix}`);
+    try {
+      const response = await page.request.post("/api/test-helpers", {
+        data: {
+          action: "cleanupTestBookings",
+          params: { resetSlots: true },
+        },
+        headers: {
+          Authorization: `Bearer ${process.env.E2E_TEST_SECRET}`,
+        },
+        timeout: 30_000,
+      });
+
+      if (response.ok()) {
+        const body = await response.json().catch(() => null);
+        const deleted = body?.deleted ?? 0;
+        console.log(
+          `[E2E] Cleanup for prefix "${testPrefix}": ${deleted} booking(s) deleted`
+        );
+      } else {
+        console.warn(
+          `[E2E] Cleanup returned ${response.status()} for prefix "${testPrefix}"`
+        );
+      }
+    } catch (err) {
+      console.warn(
+        `[E2E] Cleanup failed for prefix "${testPrefix}":`,
+        err instanceof Error ? err.message : err
+      );
+    }
   },
 
   /**

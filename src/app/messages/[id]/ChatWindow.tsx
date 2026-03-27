@@ -720,12 +720,12 @@ export default function ChatWindow({
   return (
     <div
       data-testid="chat-window"
-      className="flex flex-col h-full bg-zinc-50 dark:bg-zinc-950"
+      className="flex flex-col h-full bg-surface-canvas"
     >
       {/* Header */}
       <div
         data-testid="chat-header"
-        className="px-6 py-4 bg-white dark:bg-zinc-900 border-b border-zinc-100 dark:border-zinc-800 flex items-center gap-3"
+        className="px-6 py-4 bg-surface-container-lowest flex items-center gap-3"
       >
         <div className={`relative ${isBlocked ? "opacity-50 grayscale" : ""}`}>
           <UserAvatar
@@ -736,13 +736,13 @@ export default function ChatWindow({
           {transportMode === "realtime" && isOnline && !isBlocked && (
             <span
               data-testid="online-status"
-              className="absolute bottom-0 right-0 w-3 h-3 bg-green-500 rounded-full border-2 border-white dark:border-zinc-900"
+              className="absolute bottom-0 right-0 w-3 h-3 bg-green-500 rounded-full border-2 border-white"
             />
           )}
         </div>
         <div className="flex-1">
           <h3
-            className={`font-semibold ${isBlocked ? "text-zinc-500 dark:text-zinc-400" : "text-zinc-900 dark:text-white"}`}
+            className={`font-semibold ${isBlocked ? "text-on-surface-variant" : "text-on-surface"}`}
           >
             {otherUserName || "Chat"}
           </h3>
@@ -750,10 +750,10 @@ export default function ChatWindow({
             data-testid="connection-status"
             className={`text-xs ${
               isBlocked
-                ? "text-zinc-400 dark:text-zinc-500"
+                ? "text-on-surface-variant"
                 : otherUserTyping
-                  ? "text-green-600 dark:text-green-400 font-medium"
-                  : "text-zinc-500 dark:text-zinc-400"
+                  ? "text-green-600 font-medium"
+                  : "text-on-surface-variant"
             }`}
           >
             {isBlocked
@@ -768,10 +768,10 @@ export default function ChatWindow({
         <DropdownMenu>
           <DropdownMenuTrigger asChild>
             <button
-              className="p-2 min-w-[44px] min-h-[44px] flex items-center justify-center hover:bg-zinc-100 dark:hover:bg-zinc-800 rounded-full transition-colors"
+              className="p-2 min-w-[44px] min-h-[44px] flex items-center justify-center hover:bg-surface-container-high rounded-full transition-colors"
               aria-label="More options"
             >
-              <MoreVertical className="w-5 h-5 text-zinc-600 dark:text-zinc-400" />
+              <MoreVertical className="w-5 h-5 text-on-surface-variant" />
             </button>
           </DropdownMenuTrigger>
           <DropdownMenuContent align="end">
@@ -779,7 +779,7 @@ export default function ChatWindow({
               <DropdownMenuItem
                 onClick={handleUnblock}
                 disabled={isUnblocking}
-                className="text-zinc-700 dark:text-zinc-300"
+                className="text-on-surface-variant"
               >
                 <ShieldOff className="w-4 h-4 mr-2" />
                 {isUnblocking ? "Unblocking..." : "Unblock User"}
@@ -788,7 +788,7 @@ export default function ChatWindow({
               blockStatus !== "blocked" && (
                 <DropdownMenuItem
                   onClick={() => setShowBlockDialog(true)}
-                  className="text-red-600 dark:text-red-400"
+                  className="text-red-600"
                 >
                   <Ban className="w-4 h-4 mr-2" />
                   Block User
@@ -831,7 +831,7 @@ export default function ChatWindow({
           <div key={date}>
             {/* Date separator */}
             <div className="flex items-center justify-center my-4">
-              <div className="px-3 py-1 bg-zinc-200 dark:bg-zinc-700 rounded-full text-xs text-zinc-600 dark:text-zinc-300">
+              <div className="px-3 py-1 bg-surface-container-high rounded-full text-xs text-on-surface-variant">
                 {date}
               </div>
             </div>
@@ -867,9 +867,9 @@ export default function ChatWindow({
                       className={`max-w-[70%] rounded-2xl px-4 py-2.5 ${
                         isMe
                           ? msg.failed
-                            ? "bg-red-900/80 dark:bg-red-100 text-white dark:text-red-900 rounded-br-md border-2 border-red-500"
-                            : "bg-zinc-900 dark:bg-white text-white dark:text-zinc-900 rounded-br-md"
-                          : "bg-white dark:bg-zinc-800 text-zinc-900 dark:text-white border border-zinc-200 dark:border-zinc-700 rounded-bl-md"
+                            ? "bg-red-900/80 text-white rounded-br-md border-2 border-red-500"
+                            : "bg-primary text-on-primary rounded-br-md"
+                          : "bg-surface-container-high text-on-surface rounded-bl-md"
                       } ${isOptimistic && !msg.failed ? "opacity-70" : ""}`}
                     >
                       <p className="text-sm leading-relaxed">{msg.content}</p>
@@ -877,7 +877,7 @@ export default function ChatWindow({
                         className={`flex items-center gap-1 mt-1 ${isMe ? "justify-end" : ""}`}
                       >
                         <span
-                          className={`text-2xs ${isMe ? (msg.failed ? "text-red-300 dark:text-red-700" : "text-zinc-400 dark:text-zinc-500") : "text-zinc-400 dark:text-zinc-500"}`}
+                          className={`text-2xs ${isMe ? (msg.failed ? "text-red-300" : "text-on-surface-variant/60") : "text-on-surface-variant/60"}`}
                         >
                           {new Date(msg.createdAt).toLocaleTimeString([], {
                             hour: "2-digit",
@@ -888,8 +888,8 @@ export default function ChatWindow({
                           <span
                             className={
                               msg.failed
-                                ? "text-red-400 dark:text-red-600"
-                                : "text-zinc-400 dark:text-zinc-500"
+                                ? "text-red-400"
+                                : "text-on-surface-variant/60"
                             }
                           >
                             {msg.failed ? (
@@ -911,7 +911,7 @@ export default function ChatWindow({
                             data-testid="retry-button"
                             onClick={() => handleRetry(msg)}
                             disabled={isSending || isOffline}
-                            className="flex items-center gap-1 text-xs text-white dark:text-red-900 hover:text-red-200 dark:hover:text-red-700 disabled:opacity-60 transition-colors"
+                            className="flex items-center gap-1 text-xs text-white hover:text-red-200 disabled:opacity-60 transition-colors"
                           >
                             <RotateCw className="w-3 h-3" />
                             Retry
@@ -919,7 +919,7 @@ export default function ChatWindow({
                           <span className="text-red-400/50">|</span>
                           <button
                             onClick={() => handleDeleteFailed(msg.id)}
-                            className="text-xs text-white dark:text-red-900 hover:text-red-200 dark:hover:text-red-700 transition-colors"
+                            className="text-xs text-white hover:text-red-200 transition-colors"
                           >
                             Delete
                           </button>
@@ -944,18 +944,18 @@ export default function ChatWindow({
               name={otherUserName}
               className="w-8 h-8"
             />
-            <div className="bg-white dark:bg-zinc-800 border border-zinc-200 dark:border-zinc-700 rounded-2xl rounded-bl-md px-4 py-3">
+            <div className="bg-surface-container-high rounded-2xl rounded-bl-md px-4 py-3">
               <div className="flex gap-1">
                 <span
-                  className="w-2 h-2 bg-zinc-400 dark:bg-zinc-500 rounded-full animate-bounce"
+                  className="w-2 h-2 bg-on-surface-variant rounded-full animate-bounce"
                   style={{ animationDelay: "0ms" }}
                 />
                 <span
-                  className="w-2 h-2 bg-zinc-400 dark:bg-zinc-500 rounded-full animate-bounce"
+                  className="w-2 h-2 bg-on-surface-variant rounded-full animate-bounce"
                   style={{ animationDelay: "150ms" }}
                 />
                 <span
-                  className="w-2 h-2 bg-zinc-400 dark:bg-zinc-500 rounded-full animate-bounce"
+                  className="w-2 h-2 bg-on-surface-variant rounded-full animate-bounce"
                   style={{ animationDelay: "300ms" }}
                 />
               </div>
@@ -975,10 +975,10 @@ export default function ChatWindow({
           isUnblocking={isUnblocking}
         />
       ) : (
-        <div className="px-6 py-4 bg-white dark:bg-zinc-900 border-t border-zinc-100 dark:border-zinc-800 space-y-2">
+        <div className="px-6 py-4 bg-surface-container-lowest space-y-2">
           {/* Offline banner */}
           {isOffline && (
-            <div className="flex items-center gap-2 p-2 rounded-lg bg-zinc-100 dark:bg-zinc-800 text-sm text-zinc-600 dark:text-zinc-400">
+            <div className="flex items-center gap-2 p-2 rounded-lg bg-surface-container-high text-sm text-on-surface-variant">
               <WifiOff className="w-4 h-4 flex-shrink-0" />
               <span>
                 You&apos;re offline. Messages will send when reconnected.
@@ -1003,7 +1003,7 @@ export default function ChatWindow({
                 isOffline ? "You're offline..." : "Type a message..."
               }
               maxLength={MESSAGE_MAX_LENGTH}
-              className="flex-1 bg-zinc-100 dark:bg-zinc-800 border-0 rounded-full px-5 py-3 text-sm text-zinc-900 dark:text-white placeholder:text-zinc-500 dark:placeholder:text-zinc-400 focus:outline-none focus-visible:ring-2 focus-visible:ring-zinc-900/30 dark:focus-visible:ring-zinc-400/40 transition-all"
+              className="flex-1 bg-surface-container-high border-0 rounded-full px-5 py-3 text-sm text-on-surface placeholder:text-on-surface-variant focus:outline-none focus-visible:ring-2 focus-visible:ring-primary/30 transition-all"
               disabled={isSending}
             />
             <button
@@ -1012,7 +1012,7 @@ export default function ChatWindow({
               disabled={
                 !input.trim() || isSending || isRateLimited || isOffline
               }
-              className="w-11 h-11 bg-zinc-900 dark:bg-white text-white dark:text-zinc-900 rounded-full flex items-center justify-center hover:bg-zinc-800 dark:hover:bg-zinc-200 disabled:opacity-60 disabled:cursor-not-allowed transition-all active:scale-95"
+              className="w-11 h-11 bg-primary text-on-primary rounded-full flex items-center justify-center hover:bg-primary/90 disabled:opacity-60 disabled:cursor-not-allowed transition-all active:scale-95"
             >
               {isSending ? (
                 <Loader2 className="w-5 h-5 animate-spin" />

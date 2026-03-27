@@ -11,39 +11,12 @@
  */
 
 import { test, expect } from "@playwright/test";
-import AxeBuilder from "@axe-core/playwright";
-import { A11Y_CONFIG, selectors } from "../helpers/test-utils";
-
-/** Helper: run axe scan with shared config */
-async function runAxeScan(
-  page: import("@playwright/test").Page,
-  extraExcludes: string[] = [],
-  disabledRules: string[] = []
-) {
-  let builder = new AxeBuilder({ page }).withTags([...A11Y_CONFIG.tags]);
-
-  for (const selector of [...A11Y_CONFIG.globalExcludes, ...extraExcludes]) {
-    builder = builder.exclude(selector);
-  }
-
-  if (disabledRules.length > 0) {
-    builder = builder.disableRules(disabledRules);
-  }
-
-  return builder.analyze();
-}
-
-// eslint-disable-next-line @typescript-eslint/no-explicit-any
-function logViolations(label: string, violations: any[]) {
-  if (violations.length > 0) {
-    console.log(`[axe-listing] ${label}: ${violations.length} violation(s)`);
-    violations.forEach((v) => {
-      console.log(
-        `  - ${v.id} (${v.impact}): ${v.description} [${v.nodes.length} node(s)]`
-      );
-    });
-  }
-}
+import { selectors } from "../helpers/test-utils";
+import {
+  runAxeScan,
+  filterViolations,
+  logViolations,
+} from "../helpers/a11y-helpers";
 
 /** Navigate to the first available listing detail page */
 async function navigateToListing(
@@ -74,13 +47,8 @@ test.describe("Listing Detail — Accessibility Deep-Dive", () => {
       const found = await navigateToListing(page);
       test.skip(!found, "No listings available");
 
-      const results = await runAxeScan(page);
-      const violations = results.violations.filter(
-        (v) =>
-          !A11Y_CONFIG.knownExclusions.includes(
-            v.id as (typeof A11Y_CONFIG.knownExclusions)[number]
-          )
-      );
+      const results = await runAxeScan(page, { includeCIDefaults: false });
+      const violations = filterViolations(results.violations, []);
 
       logViolations("Listing Detail Full Page", violations);
       expect(violations).toHaveLength(0);
@@ -91,13 +59,8 @@ test.describe("Listing Detail — Accessibility Deep-Dive", () => {
       const found = await navigateToListing(page);
       test.skip(!found, "No listings available");
 
-      const results = await runAxeScan(page);
-      const violations = results.violations.filter(
-        (v) =>
-          !A11Y_CONFIG.knownExclusions.includes(
-            v.id as (typeof A11Y_CONFIG.knownExclusions)[number]
-          )
-      );
+      const results = await runAxeScan(page, { includeCIDefaults: false });
+      const violations = filterViolations(results.violations, []);
 
       logViolations("Listing Detail Dark Mode", violations);
       expect(violations).toHaveLength(0);
@@ -108,13 +71,8 @@ test.describe("Listing Detail — Accessibility Deep-Dive", () => {
       const found = await navigateToListing(page);
       test.skip(!found, "No listings available");
 
-      const results = await runAxeScan(page);
-      const violations = results.violations.filter(
-        (v) =>
-          !A11Y_CONFIG.knownExclusions.includes(
-            v.id as (typeof A11Y_CONFIG.knownExclusions)[number]
-          )
-      );
+      const results = await runAxeScan(page, { includeCIDefaults: false });
+      const violations = filterViolations(results.violations, []);
 
       logViolations("Listing Detail Mobile", violations);
       expect(violations).toHaveLength(0);

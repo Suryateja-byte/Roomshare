@@ -26,14 +26,14 @@ export default function RadarAttribution({
         z-[1000]
         inline-flex items-center gap-1.5
         px-2.5 py-1.5
-        bg-white/95 dark:bg-zinc-900/95
+        bg-white/95
         backdrop-blur-md
-        border border-zinc-200/50 dark:border-zinc-700/50
+        border border-outline-variant/20/50
         rounded-lg
-        shadow-lg shadow-black/5 dark:shadow-black/30
-        text-xs font-medium text-zinc-600 dark:text-zinc-400
-        hover:text-zinc-900 dark:hover:text-zinc-200
-        hover:border-zinc-300 dark:hover:border-zinc-600
+        shadow-lg shadow-black/5
+        text-xs font-medium text-on-surface-variant
+        hover:text-on-surface
+        hover:border-outline-variant/30
         transition-all duration-200
         pointer-events-auto
         ${className}

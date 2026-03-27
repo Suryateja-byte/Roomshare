@@ -28,6 +28,7 @@ import {
   useRef,
   useEffect,
 } from "react";
+import { usePathname } from "next/navigation";
 
 /** One-shot scroll request with nonce for deduplication */
 export interface ScrollRequest {
@@ -213,6 +214,12 @@ export function ListingFocusProvider({
     if (focusSourceTimeoutRef.current)
       clearTimeout(focusSourceTimeoutRef.current);
   }, []);
+
+  // Clear focus state on route changes to prevent stale hover/active IDs
+  const pathname = usePathname();
+  useEffect(() => {
+    clearFocus();
+  }, [pathname, clearFocus]);
 
   // Split memos: state changes frequently, actions are stable
   const stateValue = useMemo<ListingFocusStateValue>(

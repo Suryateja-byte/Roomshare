@@ -35,6 +35,7 @@ import {
 import { safeMark } from "@/lib/perf";
 // Import canonical allowlists from shared parsing module
 import { VALID_AMENITIES, VALID_HOUSE_RULES } from "@/lib/search-params";
+import { clearAllFilters } from "@/components/filters/filter-chip-utils";
 import { useSearchTransitionSafe } from "@/contexts/SearchTransitionContext";
 import { useMobileSearch } from "@/contexts/MobileSearchContext";
 import { cn } from "@/lib/utils";
@@ -213,6 +214,17 @@ export default function SearchForm({
   // Language search filter state
   const [languageSearch, setLanguageSearch] = useState("");
 
+  // P2-9 FIX: Reset language search text when filter drawer closes.
+  // Without this, typing "Spa" in language search, closing the drawer,
+  // then reopening would show "Spa" still filtering the language list.
+  // Uses useEffect instead of adding resets to each close handler
+  // to catch ALL close paths (onClose, onApply, Escape key, future paths).
+  useEffect(() => {
+    if (!showFilters) {
+      setLanguageSearch("");
+    }
+  }, [showFilters]);
+
   // Get all language codes from canonical list
   const LANGUAGE_CODES = Object.keys(SUPPORTED_LANGUAGES) as LanguageCode[];
 
@@ -230,6 +242,9 @@ export default function SearchForm({
 
   // Debounce and submission state to prevent race conditions
   const [isSearching, setIsSearching] = useState(false);
+  // H4 FIX: Ref mirror of isSearching for stable handleSearch callback identity.
+  // Reading from ref inside the callback avoids isSearching in useCallback deps.
+  const isSearchingRef = useRef(false);
   const searchTimeoutRef = useRef<NodeJS.Timeout | null>(null);
   const lastSearchRef = useRef<string>(""); // Track last search to prevent duplicates
   // Navigation version counter - ensures only the latest search executes navigation
@@ -237,6 +252,8 @@ export default function SearchForm({
   const navigationVersionRef = useRef(0);
   // Track the isSearching reset timeout so it can be cleaned up on unmount
   const resetSearchingTimeoutRef = useRef<NodeJS.Timeout | null>(null);
+  // H4 FIX: Sync ref with state so handleSearch reads current value without dep
+  useEffect(() => { isSearchingRef.current = isSearching; }, [isSearching]);
 
   // Recent searches from canonical hook (handles localStorage, migration, enhanced format)
   const { recentSearches, saveRecentSearch, clearRecentSearches } =
@@ -523,6 +540,10 @@ export default function SearchForm({
         ? parseFloat(pending.maxPrice)
         : null;
 
+      // EU-D: Guard against NaN from invalid input (e.g., "abc" → NaN)
+      if (finalMinPrice !== null && !Number.isFinite(finalMinPrice)) finalMinPrice = null;
+      if (finalMaxPrice !== null && !Number.isFinite(finalMaxPrice)) finalMaxPrice = null;
+
       // Enforce non-negative values
       if (finalMinPrice !== null && finalMinPrice < 0) finalMinPrice = 0;
       if (finalMaxPrice !== null && finalMaxPrice < 0) finalMaxPrice = 0;
@@ -553,9 +574,12 @@ export default function SearchForm({
       if (committed.leaseDuration)
         params.set("leaseDuration", committed.leaseDuration);
       if (committed.roomType) params.set("roomType", committed.roomType);
-      committed.amenities.forEach((a) => params.append("amenities", a));
-      committed.houseRules.forEach((r) => params.append("houseRules", r));
-      committed.languages.forEach((l) => params.append("languages", l));
+      if (committed.amenities.length > 0)
+        params.set("amenities", committed.amenities.join(","));
+      if (committed.houseRules.length > 0)
+        params.set("houseRules", committed.houseRules.join(","));
+      if (committed.languages.length > 0)
+        params.set("languages", committed.languages.join(","));
       if (committed.genderPreference)
         params.set("genderPreference", committed.genderPreference);
       if (committed.householdGender)
@@ -564,7 +588,8 @@ export default function SearchForm({
       const searchUrl = `/search?${params.toString()}`;
 
       // Prevent duplicate searches (same URL within debounce window)
-      if (searchUrl === lastSearchRef.current && isSearching) {
+      // H4 FIX: Read from ref instead of closure to avoid isSearching in deps
+      if (searchUrl === lastSearchRef.current && isSearchingRef.current) {
         return;
       }
 
@@ -628,7 +653,7 @@ export default function SearchForm({
       committed,
       selectedCoords,
       router,
-      isSearching,
+      // H4 FIX: isSearching removed — read from isSearchingRef.current instead
       saveRecentSearch,
       searchParams,
       transitionContext,
@@ -682,13 +707,11 @@ export default function SearchForm({
     [setPending]
   );
 
-  // Clear all filters and reset to defaults
-  // INP optimization: Batch state updates in startTransition
+  // Clear all filters but preserve location, bounds, and sort (#15)
+  // Matches AppliedFilterChips "Clear all" behavior via shared clearAllFilters()
   const handleClearAllFilters = useCallback(() => {
     startTransition(() => {
-      setLocation("");
       setWhatQuery("");
-      setSelectedCoords(null);
       setPending({
         minPrice: "",
         maxPrice: "",
@@ -703,13 +726,17 @@ export default function SearchForm({
         minSlots: "",
       });
     });
-    // Navigate to clean search page (outside transition - navigation is user-facing)
+    // Navigate preserving location, bounds, and sort — only clear filter params
+    const preserved = clearAllFilters(
+      new URLSearchParams(searchParams.toString())
+    );
+    const searchUrl = `/search${preserved ? `?${preserved}` : ""}`;
     if (transitionContext) {
-      transitionContext.navigateWithTransition("/search");
+      transitionContext.navigateWithTransition(searchUrl);
     } else {
-      router.push("/search");
+      router.push(searchUrl);
     }
-  }, [transitionContext, router, setPending]);
+  }, [transitionContext, router, setPending, searchParams]);
 
   // Count active filters for badge - use COMMITTED (URL) state, not pending
   // This ensures the badge updates instantly when chips are removed
@@ -835,22 +862,12 @@ export default function SearchForm({
     },
   ]);
 
-  // Prevent body scroll when drawer is open
-  useEffect(() => {
-    if (showFilters) {
-      document.body.style.overflow = "hidden";
-      return () => {
-        document.body.style.overflow = "";
-      };
-    }
-  }, [showFilters]);
+  // Body scroll lock for filter drawer is handled by FilterModal's useBodyScrollLock(isOpen).
+  // No duplicate lock needed here.
 
   const isCompact = variant === "compact";
-  const minMoveInDate = new Date(
-    Date.now() - new Date().getTimezoneOffset() * 60000
-  )
-    .toISOString()
-    .split("T")[0];
+  // 'en-CA' locale returns YYYY-MM-DD format in local timezone, safe across DST transitions
+  const minMoveInDate = new Date().toLocaleDateString("en-CA");
 
   // Compute inline flex styles for focus-triggered expansion.
   // Uses inline styles instead of Tailwind classes because Tailwind v4
@@ -869,29 +886,28 @@ export default function SearchForm({
   // CLS fix: min-h matches Suspense fallback in SearchHeaderWrapper.tsx
   return (
     <div
-      className={`relative w-full mx-auto min-h-[56px] sm:min-h-[64px] ${isCompact ? "max-w-2xl" : "max-w-4xl"}`}
+      className={`relative w-full mx-auto min-h-[56px] sm:min-h-[64px] ${isCompact ? "max-w-2xl" : "max-w-5xl"}`}
     >
       <form
         ref={formRef}
         onSubmit={handleSearch}
-        className={`group relative flex flex-col md:flex-row md:items-center bg-white dark:bg-zinc-900 backdrop-blur-2xl rounded-3xl md:rounded-full shadow-xl hover:shadow-2xl transition-all duration-300 w-full ${isCompact ? "p-1" : "p-2"}`}
+        className={`group relative flex flex-col md:flex-row md:items-center bg-surface-container-lowest backdrop-blur-2xl rounded-3xl md:rounded-full shadow-xl hover:shadow-2xl focus-within:shadow-2xl transition-all duration-300 w-full ${isCompact ? "p-1" : "p-2"}`}
         role="search"
       >
         {/* Semantic "What" Input — AI-powered natural language search */}
         {semanticSearchEnabled && !isCompact && (
           <>
             <div
-              style={getFieldFlex("what")}
-              className={cn(
-                "w-full flex flex-col relative",
-                isCompact ? "px-4 py-2" : "px-6 py-2.5",
-                focusedField === "what" && "md:bg-white/[0.03] md:rounded-2xl"
-              )}
-            >
+                style={getFieldFlex('what')}
+                className={cn(
+                'w-full flex flex-col relative overflow-hidden whitespace-nowrap transition-opacity duration-300',
+                isCompact ? 'px-4 py-2' : 'px-4 py-2 md:px-6 md:py-2.5',
+                focusedField === 'what' ? 'md:bg-surface-container-lowest/[0.03] md:rounded-2xl opacity-100' : (focusedField !== null ? 'opacity-50' : 'opacity-100'),
+            )}>
               <label
                 htmlFor="search-what"
                 className={cn(
-                  "text-[10px] font-bold text-indigo-500 dark:text-indigo-400 uppercase tracking-[0.15em] mb-1 flex items-center gap-1.5 transition-opacity duration-200",
+                  "text-[10px] font-bold text-primary uppercase tracking-[0.15em] mb-1 flex items-center gap-1.5 transition-opacity duration-200",
                   focusedField !== null &&
                     focusedField !== "what" &&
                     "md:opacity-0"
@@ -899,7 +915,7 @@ export default function SearchForm({
               >
                 <Sparkles className="w-3 h-3" />
                 What
-                <span className="text-[8px] font-bold text-indigo-500 bg-indigo-50 dark:bg-indigo-950/50 dark:text-indigo-400 px-1.5 py-0.5 rounded tracking-wider">
+                <span className="text-[8px] font-bold text-primary bg-primary px-1.5 py-0.5 rounded tracking-wider">
                   AI
                 </span>
               </label>
@@ -912,14 +928,14 @@ export default function SearchForm({
                   onFocus={() => handleFieldFocus("what")}
                   onBlur={handleFieldBlur}
                   placeholder="Describe your ideal room..."
-                  className="w-full bg-transparent border-none p-0 text-base md:text-sm font-medium text-zinc-900 dark:text-white placeholder:text-zinc-500 dark:placeholder:text-zinc-400 focus:ring-0 focus:outline-none focus-visible:ring-2 focus-visible:ring-zinc-900/30 dark:focus-visible:ring-zinc-400/40 focus-visible:rounded"
+                  className="w-full bg-transparent border-none p-0 text-base md:text-sm font-medium text-on-surface placeholder:text-on-surface-variant focus:ring-0 focus:outline-none"
                   autoComplete="off"
                 />
                 {whatQuery && (
                   <button
                     type="button"
                     onClick={() => setWhatQuery("")}
-                    className="flex-shrink-0 p-1 rounded-full text-zinc-300 hover:text-zinc-600 dark:hover:text-white transition-colors"
+                    className="flex-shrink-0 p-1 rounded-full text-on-surface-variant hover:text-on-surface-variant transition-colors"
                     aria-label="Clear search description"
                   >
                     <X className="w-3.5 h-3.5" />
@@ -929,7 +945,7 @@ export default function SearchForm({
             </div>
             {/* Divider between What and Where */}
             <div
-              className="hidden md:block w-px h-8 bg-zinc-100 dark:bg-white/5 mx-1"
+              className="hidden md:block w-px h-8 bg-surface-container-high mx-1"
               aria-hidden="true"
             ></div>
           </>
@@ -939,16 +955,16 @@ export default function SearchForm({
         <div
           style={getFieldFlex("where")}
           className={cn(
-            "w-full flex flex-col relative group/input",
-            isCompact ? "px-4 py-2" : "px-6 py-2.5",
-            focusedField === "where" && "md:bg-white/[0.03] md:rounded-2xl"
+            "w-full flex flex-col relative group/input overflow-hidden whitespace-nowrap transition-opacity duration-300",
+            isCompact ? "px-4 py-2" : "px-4 py-2 md:px-6 md:py-2.5",
+            focusedField === "where" ? "md:bg-surface-container-lowest/[0.03] md:rounded-2xl opacity-100" : (focusedField !== null ? "opacity-50" : "opacity-100")
           )}
         >
           {!isCompact && (
             <label
               htmlFor="search-location"
               className={cn(
-                "text-[10px] font-bold text-zinc-500 dark:text-zinc-400 uppercase tracking-[0.15em] mb-1 transition-opacity duration-200",
+                "text-[10px] font-bold text-on-surface-variant uppercase tracking-[0.15em] mb-1 transition-opacity duration-200",
                 focusedField !== null &&
                   focusedField !== "where" &&
                   "md:opacity-0"
@@ -1000,7 +1016,7 @@ export default function SearchForm({
               type="button"
               onClick={handleUseMyLocation}
               disabled={geoLoading}
-              className="flex-shrink-0 p-1.5 rounded-full text-zinc-300 hover:text-zinc-900 dark:hover:text-white transition-colors disabled:opacity-50"
+              className="flex-shrink-0 p-1.5 rounded-full text-on-surface-variant hover:text-on-surface transition-colors disabled:opacity-50"
               aria-label="Use my current location"
               title="Use my current location"
             >
@@ -1014,9 +1030,9 @@ export default function SearchForm({
 
           {/* Recent Searches Dropdown */}
           {showRecentSearches && recentSearches.length > 0 && (
-            <div className="absolute top-full left-0 right-0 mt-3 bg-white/95 dark:bg-zinc-900/95 backdrop-blur-xl rounded-2xl shadow-2xl border border-zinc-200/50 dark:border-white/5 z-50 overflow-hidden animate-in fade-in slide-in-from-top-2 duration-300">
-              <div className="flex items-center justify-between px-5 py-3 border-b border-zinc-100/50 dark:border-white/5">
-                <span className="text-[10px] font-bold text-zinc-500 uppercase tracking-widest">
+            <div className="absolute top-full left-0 right-0 mt-3 bg-surface-container-lowest/95 backdrop-blur-[20px] rounded-lg shadow-ambient z-50 overflow-hidden animate-in fade-in slide-in-from-top-2 duration-300">
+              <div className="flex items-center justify-between px-5 py-3 bg-surface-container-high/30">
+                <span className="text-[10px] font-bold text-on-surface-variant uppercase tracking-widest">
                   Recent Searches
                 </span>
                 <Button
@@ -1028,7 +1044,7 @@ export default function SearchForm({
                     e.stopPropagation();
                     clearRecentSearches();
                   }}
-                  className="h-auto py-1 px-2 text-[10px] font-bold uppercase tracking-wider text-zinc-500 hover:text-red-500"
+                  className="h-auto py-1 px-2 text-[10px] font-bold uppercase tracking-wider text-on-surface-variant hover:text-red-500"
                 >
                   Clear
                 </Button>
@@ -1043,10 +1059,10 @@ export default function SearchForm({
                         e.stopPropagation();
                         selectRecentSearch(search);
                       }}
-                      className="w-full flex items-center gap-4 px-5 py-3 hover:bg-zinc-50 dark:hover:bg-white/[0.02] text-left transition-colors"
+                      className="w-full flex items-center gap-4 px-5 py-3 hover:bg-surface-canvas[0.02] text-left transition-colors"
                     >
-                      <Clock className="w-4 h-4 text-zinc-300 flex-shrink-0" />
-                      <span className="text-sm font-medium text-zinc-600 dark:text-zinc-300 truncate">
+                      <Clock className="w-4 h-4 text-on-surface-variant flex-shrink-0" />
+                      <span className="text-sm font-medium text-on-surface-variant truncate">
                         {search.location}
                       </span>
                     </button>
@@ -1059,7 +1075,7 @@ export default function SearchForm({
 
         {/* Divider */}
         <div
-          className="hidden md:block w-px h-8 bg-zinc-100 dark:bg-white/5 mx-1"
+          className="hidden md:block w-px h-8 bg-surface-container-high mx-1"
           aria-hidden="true"
         ></div>
 
@@ -1067,15 +1083,15 @@ export default function SearchForm({
         <div
           style={getFieldFlex("budget")}
           className={cn(
-            "w-full flex flex-col",
-            isCompact ? "px-4 py-2" : "px-6 py-2.5",
-            focusedField === "budget" && "md:bg-white/[0.03] md:rounded-2xl"
+            "w-full flex flex-col overflow-hidden whitespace-nowrap transition-opacity duration-300",
+            isCompact ? "px-4 py-2" : "px-4 py-2 md:px-6 md:py-2.5",
+            focusedField === "budget" ? "md:bg-surface-container-lowest/[0.03] md:rounded-2xl opacity-100" : (focusedField !== null ? "opacity-50" : "opacity-100")
           )}
         >
           {!isCompact && (
             <label
               className={cn(
-                "text-[10px] font-bold text-zinc-500 dark:text-zinc-400 uppercase tracking-[0.15em] mb-1 transition-opacity duration-200",
+                "text-[10px] font-bold text-on-surface-variant uppercase tracking-[0.15em] mb-1 transition-opacity duration-200",
                 focusedField !== null &&
                   focusedField !== "budget" &&
                   "md:opacity-0"
@@ -1086,7 +1102,7 @@ export default function SearchForm({
           )}
           <div className="flex items-center gap-2">
             <div className="flex items-center gap-1 flex-1">
-              <span className="text-zinc-500 text-xs">$</span>
+              <span className="text-on-surface-variant text-xs">$</span>
               <input
                 id="search-budget-min"
                 aria-label="Minimum budget"
@@ -1097,14 +1113,14 @@ export default function SearchForm({
                 onFocus={() => handleFieldFocus("budget")}
                 onBlur={handleFieldBlur}
                 placeholder="Min"
-                className={`w-full bg-transparent border-none p-0 text-base md:text-sm font-medium text-zinc-900 dark:text-white placeholder:text-zinc-500 dark:placeholder:text-zinc-400 focus:ring-0 focus:outline-none focus-visible:ring-2 focus-visible:ring-zinc-900/30 dark:focus-visible:ring-zinc-400/40 focus-visible:rounded appearance-none [-moz-appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none`}
+                className={`w-full bg-transparent border-none p-0 text-base md:text-sm font-medium text-on-surface placeholder:text-on-surface-variant focus:ring-0 focus:outline-none appearance-none [-moz-appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none`}
                 min="0"
                 step="50"
               />
             </div>
-            <span className="text-zinc-200 dark:text-zinc-800 text-xs">—</span>
+            <span className="text-on-surface-variant text-xs">—</span>
             <div className="flex items-center gap-1 flex-1">
-              <span className="text-zinc-500 text-xs">$</span>
+              <span className="text-on-surface-variant text-xs">$</span>
               <input
                 id="search-budget-max"
                 aria-label="Maximum budget"
@@ -1115,7 +1131,7 @@ export default function SearchForm({
                 onFocus={() => handleFieldFocus("budget")}
                 onBlur={handleFieldBlur}
                 placeholder="Max"
-                className={`w-full bg-transparent border-none p-0 text-base md:text-sm font-medium text-zinc-900 dark:text-white placeholder:text-zinc-500 dark:placeholder:text-zinc-400 focus:ring-0 focus:outline-none focus-visible:ring-2 focus-visible:ring-zinc-900/30 dark:focus-visible:ring-zinc-400/40 focus-visible:rounded appearance-none [-moz-appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none`}
+                className={`w-full bg-transparent border-none p-0 text-base md:text-sm font-medium text-on-surface placeholder:text-on-surface-variant focus:ring-0 focus:outline-none appearance-none [-moz-appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none`}
                 min="0"
                 step="50"
               />
@@ -1127,7 +1143,7 @@ export default function SearchForm({
         {!isCompact && (
           <>
             <div
-              className="hidden md:block w-px h-8 bg-zinc-100 dark:bg-zinc-700 mx-1"
+              className="hidden md:block w-px h-8 bg-surface-container-high mx-1"
               aria-hidden="true"
             ></div>
             <div className="flex items-center px-3">
@@ -1140,14 +1156,14 @@ export default function SearchForm({
                 aria-controls={showFilters ? "search-filters" : undefined}
                 className={`relative flex items-center gap-2 h-10 px-4 rounded-full text-xs font-bold uppercase tracking-wider transition-all duration-300 ${
                   activeFilterCount > 0
-                    ? "bg-indigo-50 dark:bg-indigo-950/30 text-indigo-600 dark:text-indigo-400"
-                    : "text-zinc-500 dark:text-zinc-400 hover:text-zinc-900 dark:hover:text-white hover:bg-zinc-100 dark:hover:bg-zinc-700"
+                    ? "bg-primary text-primary"
+                    : "text-on-surface-variant hover:text-on-surface hover:bg-surface-container-high"
                 }`}
               >
                 <SlidersHorizontal className="w-3.5 h-3.5" />
                 <span className="hidden sm:inline">Filters</span>
                 {activeFilterCount > 0 && (
-                  <span className="absolute -top-1 -right-1 w-4 h-4 rounded-full bg-indigo-600 text-white flex items-center justify-center text-[9px] font-bold shadow-sm shadow-indigo-600/30">
+                  <span className="absolute -top-1 -right-1 w-4 h-4 rounded-full bg-primary text-on-primary flex items-center justify-center text-[9px] font-bold shadow-ambient-sm">
                     {activeFilterCount}
                   </span>
                 )}
@@ -1165,7 +1181,7 @@ export default function SearchForm({
             disabled={isSearching}
             aria-label={isSearching ? "Searching" : "Search"}
             aria-busy={isSearching}
-            className={`rounded-full transition-all duration-500 hover:scale-105 active:scale-95 shadow-xl shadow-indigo-500/20 ${isCompact ? "h-10 w-10 p-0" : "h-12 w-full md:w-12 bg-indigo-600 hover:bg-indigo-700 dark:bg-indigo-500 dark:hover:bg-indigo-600"}`}
+            className={`rounded-full transition-all duration-500 hover:scale-105 active:scale-95 shadow-ambient-lg shadow-primary/20 ${isCompact ? "h-10 w-10 p-0" : "h-12 w-full md:w-12 bg-gradient-to-br from-primary to-primary-container hover:from-primary hover:to-primary"}`}
           >
             {isSearching ? (
               <Loader2 className="animate-spin w-5 h-5" />
@@ -1187,7 +1203,7 @@ export default function SearchForm({
       {showLocationWarning && !isCompact && !locationInputFocused && (
         <div
           id="location-warning"
-          className="absolute left-0 right-0 top-full mt-2 mx-auto max-w-4xl px-4 py-2 bg-amber-50 dark:bg-amber-900/20 border border-amber-200 dark:border-amber-800 rounded-xl text-sm text-amber-800 dark:text-amber-400 flex items-center gap-2 pointer-events-none z-40 shadow-lg"
+          className="absolute left-0 right-0 top-full mt-2 mx-auto max-w-5xl px-4 py-2 bg-amber-50 border border-amber-200 rounded-xl text-sm text-amber-800 flex items-center gap-2 pointer-events-none z-40 shadow-lg"
         >
           <svg
             className="w-4 h-4 flex-shrink-0"

@@ -116,10 +116,9 @@ test.describe("Nearby Places — Resilience @nearby", () => {
 
     // Search while "offline" (request aborted)
     await nearby.selectCategory("Grocery");
-    await page.waitForTimeout(1000);
 
     // Error should appear (fetch failed → catch block)
-    await expect(nearby.errorState).toBeVisible();
+    await expect(nearby.errorState).toBeVisible({ timeout: 5000 });
 
     // "Recover" — next request succeeds
     shouldFail = false;
@@ -260,10 +259,9 @@ test.describe("Nearby Places — Resilience @nearby", () => {
     await nearby.scrollToSection();
 
     await nearby.selectCategory("Grocery");
-    await page.waitForTimeout(1000);
 
     // Should show error, not crash
-    await expect(nearby.errorState).toBeVisible();
+    await expect(nearby.errorState).toBeVisible({ timeout: 5000 });
   });
 
   // --------------------------------------------------------------------------

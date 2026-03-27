@@ -144,7 +144,7 @@ export function PlaceDetailsPanel({
     <>
       {/* Backdrop */}
       <div
-        className="fixed inset-0 bg-black/40 z-40 animate-in fade-in duration-200"
+        className="fixed inset-0 bg-on-surface/40 z-40 animate-in fade-in duration-200"
         onClick={onClose}
         aria-hidden="true"
       />
@@ -154,7 +154,7 @@ export function PlaceDetailsPanel({
         ref={panelRef}
         className={`
           fixed right-0 top-0 bottom-0 w-full max-w-md
-          bg-background border-l shadow-2xl z-50
+          bg-surface-canvas border-l shadow-2xl z-50
           animate-in slide-in-from-right duration-300
           flex flex-col
           ${className}

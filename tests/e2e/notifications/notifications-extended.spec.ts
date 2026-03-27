@@ -9,7 +9,7 @@
  * - Resilience + a11y
  */
 
-import { test, expect, timeouts } from "../helpers";
+import { test, expect, timeouts, waitForHydration } from "../helpers";
 
 // ─── Block 1: Read-only extended tests ───────────────────────────────────────
 test.describe("NX: Notifications Extended Read-only", () => {
@@ -23,6 +23,7 @@ test.describe("NX: Notifications Extended Read-only", () => {
   test("NX-05  notification types have distinct icons", async ({ page }) => {
     await page.goto("/notifications");
     await page.waitForLoadState("domcontentloaded");
+    await waitForHydration(page);
 
     // Notifications may have been deleted by NX-02 in the serial block
     try {
@@ -56,6 +57,7 @@ test.describe("NX: Notifications Extended Read-only", () => {
   }) => {
     await page.goto("/notifications");
     await page.waitForLoadState("domcontentloaded");
+    await waitForHydration(page);
 
     // Notifications may have been deleted by NX-02 in the serial block
     try {
@@ -103,6 +105,7 @@ test.describe("NX: Notifications Extended Read-only", () => {
   test("NX-10  notification items are keyboard navigable", async ({ page }) => {
     await page.goto("/notifications");
     await page.waitForLoadState("domcontentloaded");
+    await waitForHydration(page);
 
     // Notifications may have been deleted by NX-02 in the serial block
     try {
@@ -144,6 +147,7 @@ test.describe("NX: Notifications Mutations", () => {
   }) => {
     await page.goto("/notifications");
     await page.waitForLoadState("domcontentloaded");
+    await waitForHydration(page);
 
     await expect(page.getByTestId("notification-item").first()).toBeVisible({
       timeout: timeouts.action,
@@ -199,6 +203,7 @@ test.describe("NX: Notifications Mutations", () => {
   }) => {
     await page.goto("/notifications");
     await page.waitForLoadState("domcontentloaded");
+    await waitForHydration(page);
 
     await expect(page.getByTestId("notification-item").first()).toBeVisible({
       timeout: timeouts.action,
@@ -236,6 +241,7 @@ test.describe("NX: Notifications Mutations", () => {
   test("NX-01  delete all shows confirmation dialog", async ({ page }) => {
     await page.goto("/notifications");
     await page.waitForLoadState("domcontentloaded");
+    await waitForHydration(page);
 
     await expect(page.getByTestId("notifications-page")).toBeVisible({
       timeout: timeouts.navigation,
@@ -272,6 +278,7 @@ test.describe("NX: Notifications Mutations", () => {
   test("NX-03  cancel delete all keeps notifications", async ({ page }) => {
     await page.goto("/notifications");
     await page.waitForLoadState("domcontentloaded");
+    await waitForHydration(page);
 
     await expect(page.getByTestId("notification-item").first()).toBeVisible({
       timeout: timeouts.action,
@@ -307,6 +314,7 @@ test.describe("NX: Notifications Mutations", () => {
   test("NX-09  failed delete keeps notification in list", async ({ page }) => {
     await page.goto("/notifications");
     await page.waitForLoadState("domcontentloaded");
+    await waitForHydration(page);
 
     await expect(page.getByTestId("notification-item").first()).toBeVisible({
       timeout: timeouts.action,
@@ -353,6 +361,7 @@ test.describe("NX: Notifications Mutations", () => {
   }) => {
     await page.goto("/notifications");
     await page.waitForLoadState("domcontentloaded");
+    await waitForHydration(page);
 
     const itemCount = await page.getByTestId("notification-item").count();
     if (itemCount === 0) {
@@ -389,6 +398,7 @@ test.describe("NX: Notifications Mutations", () => {
   }) => {
     await page.goto("/notifications");
     await page.waitForLoadState("domcontentloaded");
+    await waitForHydration(page);
 
     await expect(page.getByTestId("notifications-page")).toBeVisible({
       timeout: timeouts.navigation,

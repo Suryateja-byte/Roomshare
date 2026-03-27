@@ -145,8 +145,8 @@ test.describe("Create Listing — Image Upload", () => {
     // Try to upload a .txt file
     await createPage.uploadTestImage("invalid-type.txt");
 
-    // Wait briefly, then confirm no image was added
-    await page.waitForTimeout(1000);
+    // Confirm no image was added (wait for any async processing to settle)
+    await expect(page.locator('img[alt^="Preview"]')).toHaveCount(0, { timeout: 5000 });
     const previewsAfter = await page.locator('img[alt^="Preview"]').count();
     expect(previewsAfter).toBe(0);
 
@@ -249,7 +249,7 @@ test.describe("Create Listing — Image Upload", () => {
     for (let i = 0; i < 10; i++) {
       await createPage.uploadTestImage("valid-photo.jpg");
       // Wait for each preview to register
-      await page.waitForTimeout(500);
+      await expect(page.locator('img[alt^="Preview"]')).toHaveCount(i + 1, { timeout: 10000 });
     }
 
     // Wait for all 10 to appear

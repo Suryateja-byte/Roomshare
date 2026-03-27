@@ -76,12 +76,12 @@ describe("HoldCountdown", () => {
     expect(span?.className).toContain("pulse");
   });
 
-  it("shows grey for expired hold", () => {
+  it("shows muted color for expired hold", () => {
     const heldUntil = new Date(Date.now() - 1000).toISOString();
     const { container } = render(<HoldCountdown heldUntil={heldUntil} />);
 
     const span = container.querySelector("span");
-    expect(span?.className).toContain("zinc");
+    expect(span?.className).toContain("text-on-surface-variant");
   });
 
   it("updates countdown every second", () => {

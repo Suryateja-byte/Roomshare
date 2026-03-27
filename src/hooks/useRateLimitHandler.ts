@@ -5,6 +5,8 @@ import { useState, useCallback } from "react";
 interface RateLimitResult {
   error?: string;
   retryAfter?: number;
+  /** MED-7 FIX: Structured error code for reliable detection */
+  code?: string;
 }
 
 interface UseRateLimitHandlerReturn {
@@ -39,10 +41,11 @@ export function useRateLimitHandler(): UseRateLimitHandlerReturn {
   const [retryAfter, setRetryAfter] = useState(0);
 
   const handleError = useCallback((result: RateLimitResult): boolean => {
-    // Check if this is a rate limit error
+    // MED-7 FIX: Use structured code field instead of fragile string matching.
+    // Falls back to retryAfter presence for backward compat with endpoints
+    // that haven't adopted the code field yet.
     const isRateLimitError =
-      result.error?.toLowerCase().includes("too many requests") ||
-      result.error?.toLowerCase().includes("rate limit") ||
+      result.code === "RATE_LIMITED" ||
       result.retryAfter !== undefined;
 
     if (isRateLimitError) {

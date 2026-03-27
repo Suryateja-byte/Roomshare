@@ -1,11 +1,13 @@
 "use client";
 
-import { useState, useCallback, useRef, useMemo, useEffect } from "react";
+import { useState, useCallback, useRef, useMemo, useEffect, Fragment } from "react";
 import { safeMark, safeMeasure } from "@/lib/perf";
 import { Search, Loader2 } from "lucide-react";
 import Link from "next/link";
 import { Suspense } from "react";
 import ListingCard from "@/components/listings/ListingCard";
+import { ListingCardErrorBoundary } from "@/components/search/ListingCardErrorBoundary";
+import NearMatchSeparator from "@/components/listings/NearMatchSeparator";
 import ZeroResultsSuggestions from "@/components/ZeroResultsSuggestions";
 import SuggestedSearches from "@/components/search/SuggestedSearches";
 import { fetchMoreListings } from "@/app/search/actions";
@@ -35,7 +37,8 @@ interface SearchResultsClientProps {
   browseMode: boolean;
   hasConfirmedZeroResults: boolean;
   filterSuggestions: FilterSuggestion[];
-  sortOption: string;
+  /** Description of near-match expansion (e.g., "Showing rooms within $200 of your budget") */
+  nearMatchExpansion?: string;
 }
 
 export function SearchResultsClient({
@@ -49,6 +52,7 @@ export function SearchResultsClient({
   browseMode,
   hasConfirmedZeroResults,
   filterSuggestions,
+  nearMatchExpansion,
 }: SearchResultsClientProps) {
   const [isHydrated, setIsHydrated] = useState(false);
   const [extraListings, setExtraListings] = useState<ListingData[]>([]);
@@ -57,9 +61,16 @@ export function SearchResultsClient({
   );
   const [isLoadingMore, setIsLoadingMore] = useState(false);
   const isLoadingRef = useRef(false);
+  // F2 FIX: Ref for total count avoids allListings in handleLoadMore deps
+  const totalCountRef = useRef(initialListings.length);
   const [loadError, setLoadError] = useState<string | null>(null);
+  const [isDegraded, setIsDegraded] = useState(false);
   const [loadMoreAnnouncement, setLoadMoreAnnouncement] = useState("");
   const [showTotalPrice, setShowTotalPrice] = useState(false);
+  // Effective value: suppress total price display until sessionStorage is read.
+  // isHydrated and showTotalPrice are set in the same batched useEffect,
+  // so they update in one render — no intermediate flicker.
+  const effectiveShowTotalPrice = isHydrated && showTotalPrice;
   const [resolvedSavedListingIds, setResolvedSavedListingIds] =
     useState(savedListingIds);
   const [resolvedFilterSuggestions, setResolvedFilterSuggestions] =
@@ -79,6 +90,9 @@ export function SearchResultsClient({
   const seenIdsRef = useRef<Set<string>>(
     new Set(initialListings.map((l) => l.id))
   );
+  // Track which listing IDs have already had favorites fetched (#16)
+  // Prevents refetching favorites for all IDs on every "Load More"
+  const fetchedFavIdsRef = useRef<Set<string>>(new Set());
 
   // Derive a stable fingerprint of the initial data to detect server-side changes
   const initialDataFingerprint = useMemo(
@@ -97,6 +111,7 @@ export function SearchResultsClient({
       setNextCursor(initialNextCursor);
       setLoadMoreAnnouncement("");
       seenIdsRef.current = new Set(initialListings.map((l) => l.id));
+      fetchedFavIdsRef.current = new Set(); // Reset favorites tracking on new search
     }
   }, [initialDataFingerprint, initialNextCursor, initialListings]);
 
@@ -104,7 +119,18 @@ export function SearchResultsClient({
     () => [...initialListings, ...extraListings],
     [initialListings, extraListings]
   );
+  // F8 FIX: Stable string key for effects that depend on listing IDs, not array reference
+  const allListingIdsKey = useMemo(
+    () => allListings.map((l) => l.id).join(","),
+    [allListings]
+  );
   const reachedCap = allListings.length >= MAX_ACCUMULATED;
+
+  // Near-match items are appended at the end by expandWithNearMatches
+  const nearMatchCount = useMemo(
+    () => allListings.filter((l) => l.isNearMatch).length,
+    [allListings]
+  );
 
   // O(1) lookup for saved listing IDs instead of O(n) .includes()
   const savedIdsSet = useMemo(
@@ -165,25 +191,50 @@ export function SearchResultsClient({
     isLoadingRef.current = true;
     setIsLoadingMore(true);
     setLoadError(null);
+    setIsDegraded(false);
     safeMark("load-more-start");
 
     try {
       const result = await fetchMoreListings(nextCursor, rawParams);
+
+      // M14 FIX: Handle rate limit via discriminated field (not string matching)
+      if (result.rateLimited) {
+        setLoadError("Too many requests — please wait 30 seconds and try again.");
+        return;
+      }
+
+      // V2 unavailable — show error with working retry (cursor preserved for circuit breaker recovery)
+      if (result.degraded) {
+        setIsDegraded(true);
+        setLoadError("Can't load more right now. Try again in a moment.");
+        return;
+      }
+
       safeMark("load-more-end");
       safeMeasure("load-more", "load-more-start", "load-more-end");
+      setIsDegraded(false);
+
+      // Defensive guard: ensure items is an array (protects against malformed server responses)
+      const items = Array.isArray(result.items) ? result.items : [];
 
       // Deduplicate by ID
-      const dedupedItems = result.items.filter((item) => {
+      const dedupedItems = items.filter((item) => {
         if (seenIdsRef.current.has(item.id)) return false;
         seenIdsRef.current.add(item.id);
         return true;
       });
 
-      setExtraListings((prev) => [...prev, ...dedupedItems]);
+      setExtraListings((prev) => {
+        const next = [...prev, ...dedupedItems];
+        // F2 FIX: Update ref inside setState for deterministic count
+        totalCountRef.current = initialListings.length + next.length;
+        return next;
+      });
       setNextCursor(result.nextCursor);
 
       // Announce to screen readers (after state update)
-      const newCount = allListings.length + dedupedItems.length;
+      // F2 FIX: Use ref for count instead of stale allListings closure
+      const newCount = totalCountRef.current;
       const totalLabel = initialTotal !== null ? ` of ~${initialTotal}` : "";
       setLoadMoreAnnouncement(
         `Loaded ${dedupedItems.length} more listing${dedupedItems.length === 1 ? "" : "s"}, showing ${newCount}${totalLabel}`
@@ -202,19 +253,27 @@ export function SearchResultsClient({
       isLoadingRef.current = false;
       setIsLoadingMore(false);
     }
-  }, [nextCursor, rawParams, allListings, initialTotal]);
+  // F2 FIX: Removed allListings dep — count read from totalCountRef instead
+  }, [nextCursor, rawParams, initialTotal, initialListings.length]);
 
   const total = initialTotal;
 
   useEffect(() => {
-    const listingIds = allListings.map((listing) => listing.id);
-    if (listingIds.length === 0) {
+    const allIds = allListings.map((listing) => listing.id);
+    if (allIds.length === 0) {
       setResolvedSavedListingIds([]);
       return;
     }
 
+    // Only fetch favorites for IDs we haven't fetched yet (#16)
+    // This prevents refetching all 60 IDs on every "Load More"
+    const newIds = allIds.filter((id) => !fetchedFavIdsRef.current.has(id));
+    if (newIds.length === 0) {
+      return; // All IDs already fetched — nothing to do
+    }
+
     const controller = new AbortController();
-    const idsParam = listingIds.join(",");
+    const idsParam = newIds.join(",");
 
     void (async () => {
       try {
@@ -232,7 +291,18 @@ export function SearchResultsClient({
 
         const data = (await response.json()) as { savedIds?: string[] };
         if (Array.isArray(data.savedIds)) {
-          setResolvedSavedListingIds(data.savedIds);
+          // Mark these IDs as fetched
+          for (const id of newIds) {
+            fetchedFavIdsRef.current.add(id);
+          }
+          // Merge new saved IDs with existing ones (no duplicates)
+          setResolvedSavedListingIds((prev) => {
+            const merged = new Set(prev);
+            for (const id of data.savedIds!) {
+              merged.add(id);
+            }
+            return Array.from(merged);
+          });
         }
       } catch (error) {
         if ((error as Error).name !== "AbortError") {
@@ -242,7 +312,10 @@ export function SearchResultsClient({
     })();
 
     return () => controller.abort();
-  }, [allListings]);
+  // F8 FIX: Use stable ID key instead of allListings array reference
+  // Prevents unnecessary effect cycles when allListings recreates with same IDs
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [allListingIdsKey]);
 
   useEffect(() => {
     if (!hasConfirmedZeroResults) {
@@ -253,9 +326,16 @@ export function SearchResultsClient({
     let cancelled = false;
 
     void (async () => {
-      const suggestions = await getFilterSuggestions(filterParams);
-      if (!cancelled) {
-        setResolvedFilterSuggestions(suggestions);
+      try {
+        const suggestions = await getFilterSuggestions(filterParams);
+        if (!cancelled) {
+          setResolvedFilterSuggestions(suggestions);
+        }
+      } catch {
+        // Network error or server action failure — silently degrade
+        if (!cancelled) {
+          setResolvedFilterSuggestions([]);
+        }
       }
     })();
 
@@ -288,15 +368,15 @@ export function SearchResultsClient({
       {hasConfirmedZeroResults ? (
         <div
           data-testid="empty-state"
-          className="flex flex-col items-center justify-center py-12 sm:py-20 border-2 border-dashed border-zinc-100 dark:border-zinc-800 rounded-2xl sm:rounded-3xl bg-zinc-50/50 dark:bg-zinc-900/50"
+          className="flex flex-col items-center justify-center py-12 sm:py-20 border-2 border-dashed border-outline-variant/20 rounded-2xl sm:rounded-3xl bg-surface-canvas/50"
         >
-          <div className="w-14 h-14 sm:w-16 sm:h-16 rounded-full bg-white dark:bg-zinc-800 flex items-center justify-center shadow-sm mb-4">
-            <Search className="w-5 h-5 sm:w-6 sm:h-6 text-zinc-500" />
+          <div className="w-14 h-14 sm:w-16 sm:h-16 rounded-full bg-surface-container-lowest flex items-center justify-center shadow-sm mb-4">
+            <Search className="w-5 h-5 sm:w-6 sm:h-6 text-on-surface-variant" />
           </div>
-          <h2 className="text-base sm:text-lg font-semibold text-zinc-900 dark:text-white mb-2">
+          <h2 className="text-base sm:text-lg font-semibold text-on-surface mb-2">
             No matches found
           </h2>
-          <p className="text-zinc-500 dark:text-zinc-400 text-sm max-w-xs text-center px-4">
+          <p className="text-on-surface-variant text-sm max-w-xs text-center px-4">
             Try adjusting your filters, expanding your price range, or
             searching a nearby area.
             {query ? ` No results for "${query}".` : ""}
@@ -315,7 +395,7 @@ export function SearchResultsClient({
           ) : (
             <Link
               href={`/search?${clearAllFilters(new URLSearchParams(searchParamsString))}`}
-              className="mt-6 px-4 py-2.5 rounded-full border border-zinc-200 dark:border-zinc-700 bg-transparent hover:bg-zinc-50 dark:hover:bg-zinc-800 text-zinc-900 dark:text-white text-sm font-medium transition-colors touch-target"
+              className="mt-6 px-4 py-2.5 rounded-full border border-outline-variant/20 bg-transparent hover:bg-surface-canvas text-on-surface text-sm font-medium transition-colors touch-target"
             >
               Clear all filters
             </Link>
@@ -329,14 +409,14 @@ export function SearchResultsClient({
           {/* Price toggle */}
           {allListings.length > 0 && (
             <div className="flex items-center justify-between mb-4">
-              <p className="text-sm text-zinc-500 dark:text-zinc-400">
+              <p className="text-sm text-on-surface-variant">
                 {total !== null
                   ? `${total} ${total === 1 ? "place" : "places"}${query ? ` in ${query}` : ""}`
                   : `100+ places${query ? ` in ${query}` : ""}`}
               </p>
               {estimatedMonths > 1 && (
                 <TotalPriceToggle
-                  showTotal={showTotalPrice}
+                  showTotal={effectiveShowTotalPrice}
                   onToggle={setShowTotalPrice}
                 />
               )}
@@ -350,41 +430,65 @@ export function SearchResultsClient({
             aria-busy={isLoadingMore}
             className="grid grid-cols-1 sm:grid-cols-2 gap-4 sm:gap-x-6 sm:gap-y-8"
           >
-            {allListings.map((listing, index) => (
-              <ListingCard
-                key={listing.id}
-                listing={listing}
-                isSaved={savedIdsSet.has(listing.id)}
-                priority={index === 0}
-                showTotalPrice={showTotalPrice}
-                estimatedMonths={estimatedMonths}
-              />
-            ))}
+            {allListings.map((listing, index) => {
+              // Insert separator before the first near-match item
+              const isFirstNearMatch =
+                listing.isNearMatch &&
+                (index === 0 || !allListings[index - 1]?.isNearMatch);
+
+              return (
+                <Fragment key={listing.id}>
+                  {isFirstNearMatch && nearMatchCount > 0 && (
+                    <>
+                      <NearMatchSeparator nearMatchCount={nearMatchCount} />
+                      {nearMatchExpansion && (
+                        <p className="col-span-full text-sm text-amber-600 -mt-2 mb-2">
+                          {nearMatchExpansion}
+                        </p>
+                      )}
+                    </>
+                  )}
+                  <ListingCardErrorBoundary listingId={listing.id}>
+                    <ListingCard
+                      listing={listing}
+                      isSaved={savedIdsSet.has(listing.id)}
+                      priority={index === 0}
+                      showTotalPrice={effectiveShowTotalPrice}
+                      estimatedMonths={estimatedMonths}
+                    />
+                  </ListingCardErrorBoundary>
+                </Fragment>
+              );
+            })}
           </div>
 
           {/* Split stay suggestions for long durations */}
           {splitStayPairs.length > 0 && (
             <div className="mt-8">
-              <h3 className="text-sm font-medium text-zinc-700 dark:text-zinc-300 mb-3">
+              <h3 className="text-sm font-medium text-on-surface-variant mb-3">
                 Split your stay
               </h3>
               <div className="grid grid-cols-1 gap-4">
                 {splitStayPairs.map((pair) => (
-                  <SplitStayCard
+                  <ListingCardErrorBoundary
                     key={`${pair.first.id}-${pair.second.id}`}
-                    pair={pair}
-                    showTotalPrice={showTotalPrice}
-                    estimatedMonths={estimatedMonths}
-                  />
+                    listingId={`split-${pair.first.id}-${pair.second.id}`}
+                  >
+                    <SplitStayCard
+                      pair={pair}
+                      showTotalPrice={effectiveShowTotalPrice}
+                      estimatedMonths={estimatedMonths}
+                    />
+                  </ListingCardErrorBoundary>
                 ))}
               </div>
             </div>
           )}
 
           {/* Load more section with progress indicator */}
-          {isHydrated && nextCursor && !reachedCap && (
+          {isHydrated && nextCursor && !reachedCap && !isDegraded && (
             <div className="flex flex-col items-center mt-8 mb-4 gap-2">
-              <p className="text-xs text-zinc-500 dark:text-zinc-500">
+              <p className="text-xs text-on-surface-variant">
                 Showing {allListings.length} of{" "}
                 {total !== null ? `~${total}` : "100+"} listings
               </p>
@@ -397,7 +501,7 @@ export function SearchResultsClient({
                     ? "Loading more results"
                     : `Show more places. Currently showing ${allListings.length}${total !== null ? ` of ${total}` : ""} listings`
                 }
-                className="inline-flex items-center gap-2 px-6 py-3 rounded-full bg-indigo-500 hover:bg-indigo-600 text-white text-sm font-medium transition-colors disabled:opacity-50 touch-target shadow-sm"
+                className="inline-flex items-center gap-2 px-6 py-3 rounded-full bg-gradient-to-br from-primary to-primary-container hover:from-primary hover:to-primary text-on-primary text-sm font-medium transition-colors disabled:opacity-50 touch-target shadow-ambient-sm"
               >
                 {isLoadingMore ? (
                   <>
@@ -416,16 +520,17 @@ export function SearchResultsClient({
 
           {/* Cap reached — nudge user to refine */}
           {reachedCap && nextCursor && (
-            <p className="text-center text-sm text-zinc-500 dark:text-zinc-400 mt-6">
-              Showing {allListings.length} results. Refine your filters to
-              narrow down.
+            <p className="text-center text-sm text-on-surface-variant mt-6">
+              Showing {allListings.length} results.{" "}
+              Try adjusting your filters or zooming into a specific area to find
+              more relevant listings.
             </p>
           )}
 
           {/* Load error */}
           {loadError && (
             <div className="flex justify-center mt-4" role="alert">
-              <p className="text-sm text-red-600 dark:text-red-400">
+              <p className="text-sm text-red-600">
                 {loadError}{" "}
                 <button
                   onClick={handleLoadMore}
@@ -441,14 +546,14 @@ export function SearchResultsClient({
           {!nextCursor &&
             allListings.length > 0 &&
             extraListings.length > 0 && (
-              <p className="text-center text-sm text-zinc-500 dark:text-zinc-500 mt-8">
+              <p className="text-center text-sm text-on-surface-variant mt-8">
                 You&apos;ve seen all {allListings.length} results
               </p>
             )}
 
           {/* Contextual footer */}
           {allListings.length > 0 && (
-            <p className="text-center text-xs text-zinc-500 dark:text-zinc-500 mt-6 pb-4">
+            <p className="text-center text-xs text-on-surface-variant mt-6 pb-4">
               {total === null ? "100+" : total} places
               {query ? ` in ${query}` : ""}
             </p>

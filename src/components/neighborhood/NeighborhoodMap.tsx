@@ -326,16 +326,16 @@ export function NeighborhoodMap({
       {/* Loading state */}
       {!isMapLoaded && (
         <div
-          className="absolute inset-0 bg-zinc-100 dark:bg-zinc-800 z-20 flex items-center justify-center"
+          className="absolute inset-0 bg-surface-container-high z-20 flex items-center justify-center"
           role="status"
           aria-label="Loading map"
         >
           <div className="flex flex-col items-center gap-3">
             <MapPin
-              className="w-10 h-10 text-zinc-300 dark:text-zinc-600 animate-pulse"
+              className="w-10 h-10 text-on-surface-variant animate-pulse"
               aria-hidden="true"
             />
-            <span className="text-sm text-zinc-500 dark:text-zinc-400">
+            <span className="text-sm text-on-surface-variant">
               Loading map...
             </span>
           </div>
@@ -422,7 +422,7 @@ export function NeighborhoodMap({
                 ${
                   selectedPlaceId === poi.placeId
                     ? "bg-primary ring-2 ring-primary/30"
-                    : "bg-red-500 dark:bg-red-400"
+                    : "bg-red-500"
                 }
               `}
               role="button"
@@ -439,7 +439,7 @@ export function NeighborhoodMap({
                 }
               }}
             >
-              <div className="w-2 h-2 rounded-full bg-white" />
+              <div className="w-2 h-2 rounded-full bg-surface-container-lowest" />
             </div>
           </Marker>
         ))}
@@ -468,14 +468,14 @@ export function NeighborhoodMap({
             closeOnClick={false}
             className={`z-50 [&_.maplibregl-popup-content]:rounded-lg [&_.maplibregl-popup-content]:p-0 ${
               isDarkMode
-                ? "[&_.maplibregl-popup-tip]:border-t-zinc-800"
+                ? "[&_.maplibregl-popup-tip]:border-t-on-surface"
                 : "[&_.maplibregl-popup-tip]:border-t-white"
             }`}
             maxWidth="250px"
           >
             <div
               className={`p-3 rounded-lg ${
-                isDarkMode ? "bg-zinc-800 text-white" : "bg-white text-zinc-900"
+                isDarkMode ? "bg-on-surface text-white" : "bg-surface-container-lowest text-on-surface"
               }`}
             >
               <h4 className="font-medium text-sm">{popupPoi.name}</h4>
@@ -512,8 +512,8 @@ export function NeighborhoodMap({
         <div
           className={`absolute bottom-4 left-4 p-2 rounded-lg text-xs ${
             isDarkMode
-              ? "bg-zinc-800/90 text-white"
-              : "bg-white/90 text-zinc-900"
+              ? "bg-on-surface/90 text-white"
+              : "bg-white/90 text-on-surface"
           } shadow-sm`}
           role="region"
           aria-label="Map legend showing walking time zones"

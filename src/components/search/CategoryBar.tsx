@@ -206,6 +206,8 @@ export function CategoryBar() {
     // Reset pagination
     params.delete("cursor");
     params.delete("page");
+    params.delete("cursorStack");
+    params.delete("pageNumber");
 
     startTransition(() => {
       const qs = params.toString();
@@ -215,7 +217,7 @@ export function CategoryBar() {
 
   return (
     <nav
-      className="relative border-b border-zinc-100 dark:border-zinc-800/50 bg-white dark:bg-zinc-950"
+      className="relative border-b border-outline-variant/20 bg-surface-container-lowest"
       aria-label="Category filters"
     >
       {/* Left arrow */}
@@ -223,17 +225,17 @@ export function CategoryBar() {
         <button
           type="button"
           onClick={() => scroll("left")}
-          className="absolute left-0 top-1/2 -translate-y-1/2 z-20 hidden md:flex items-center justify-center w-8 h-8 bg-white dark:bg-zinc-900 border border-zinc-200 dark:border-zinc-700 rounded-full shadow-sm hover:shadow-md transition-shadow ml-2"
+          className="absolute left-0 top-1/2 -translate-y-1/2 z-20 hidden md:flex items-center justify-center w-8 h-8 bg-surface-container-lowest border border-outline-variant/20 rounded-full shadow-sm hover:shadow-md transition-shadow ml-2"
           aria-label="Scroll categories left"
         >
-          <ChevronLeft className="w-4 h-4 text-zinc-900 dark:text-white" />
+          <ChevronLeft className="w-4 h-4 text-on-surface" />
         </button>
       )}
 
       {/* Fade left edge */}
       {canScrollLeft && (
         <div
-          className="absolute left-0 top-0 bottom-0 w-16 bg-gradient-to-r from-white dark:from-zinc-950 to-transparent pointer-events-none z-10"
+          className="absolute left-0 top-0 bottom-0 w-16 bg-gradient-to-r from-white to-transparent pointer-events-none z-10"
           aria-hidden="true"
         />
       )}
@@ -259,8 +261,8 @@ export function CategoryBar() {
                 transition-all duration-200 flex-shrink-0 border-b-2
                 ${
                   isActive
-                    ? "border-zinc-900 dark:border-white text-zinc-900 dark:text-white"
-                    : "border-transparent text-zinc-500 dark:text-zinc-400 hover:text-zinc-900 dark:hover:text-white hover:border-zinc-300 dark:hover:border-zinc-700"
+                    ? "border-outline-variant/20 text-on-surface"
+                    : "border-transparent text-on-surface-variant hover:text-on-surface hover:border-outline-variant/30"
                 }
                 disabled:opacity-60 disabled:cursor-not-allowed
               `}
@@ -279,7 +281,7 @@ export function CategoryBar() {
       {/* Fade right edge */}
       {canScrollRight && (
         <div
-          className="absolute right-0 top-0 bottom-0 w-16 bg-gradient-to-l from-white dark:from-zinc-950 to-transparent pointer-events-none z-10"
+          className="absolute right-0 top-0 bottom-0 w-16 bg-gradient-to-l from-white to-transparent pointer-events-none z-10"
           aria-hidden="true"
         />
       )}
@@ -289,10 +291,10 @@ export function CategoryBar() {
         <button
           type="button"
           onClick={() => scroll("right")}
-          className="absolute right-0 top-1/2 -translate-y-1/2 z-20 hidden md:flex items-center justify-center w-8 h-8 bg-white dark:bg-zinc-900 border border-zinc-200 dark:border-zinc-700 rounded-full shadow-sm hover:shadow-md transition-shadow mr-2"
+          className="absolute right-0 top-1/2 -translate-y-1/2 z-20 hidden md:flex items-center justify-center w-8 h-8 bg-surface-container-lowest border border-outline-variant/20 rounded-full shadow-sm hover:shadow-md transition-shadow mr-2"
           aria-label="Scroll categories right"
         >
-          <ChevronRight className="w-4 h-4 text-zinc-900 dark:text-white" />
+          <ChevronRight className="w-4 h-4 text-on-surface" />
         </button>
       )}
     </nav>

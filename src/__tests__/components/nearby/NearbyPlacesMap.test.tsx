@@ -103,10 +103,6 @@ jest.mock("maplibre-gl", () => ({
   LngLatBounds: jest.fn(() => mockLngLatBoundsInstance),
 }));
 
-// Mock next-themes
-jest.mock("next-themes", () => ({
-  useTheme: jest.fn(() => ({ resolvedTheme: "light" })),
-}));
 
 // Mock CSS imports
 jest.mock("maplibre-gl/dist/maplibre-gl.css", () => ({}));
@@ -114,7 +110,7 @@ jest.mock("@/styles/nearby-map.css", () => ({}));
 
 import NearbyPlacesMap from "@/components/nearby/NearbyPlacesMap";
 import maplibregl from "maplibre-gl";
-import { useTheme } from "next-themes";
+
 
 describe("NearbyPlacesMap - Smoke Tests", () => {
   const defaultProps = {
@@ -535,30 +531,6 @@ describe("NearbyPlacesMap - Smoke Tests", () => {
     });
   });
 
-  describe("Theme Support", () => {
-    it("recreates map when theme changes", async () => {
-      const { rerender } = render(<NearbyPlacesMap {...defaultProps} />);
-
-      await act(async () => {
-        await new Promise((resolve) => setTimeout(resolve, 10));
-      });
-
-      const initialMapCalls = (maplibregl.Map as jest.Mock).mock.calls.length;
-
-      // Change theme
-      (useTheme as jest.Mock).mockReturnValue({ resolvedTheme: "dark" });
-
-      rerender(<NearbyPlacesMap {...defaultProps} />);
-
-      await act(async () => {
-        await new Promise((resolve) => setTimeout(resolve, 10));
-      });
-
-      // Map should be recreated
-      const finalMapCalls = (maplibregl.Map as jest.Mock).mock.calls.length;
-      expect(finalMapCalls).toBeGreaterThan(initialMapCalls);
-    });
-  });
 
   describe("Popup XSS Prevention", () => {
     it("escapes HTML in popup content", async () => {

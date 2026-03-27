@@ -11,8 +11,15 @@ import {
   getClientIPFromHeaders,
   RATE_LIMITS,
 } from "@/lib/rate-limit";
+// Basic listingId format check — rejects empty/absurdly long strings
+const isReasonableId = (id: string) =>
+  typeof id === "string" && id.length >= 1 && id.length <= 100 && /^[\w-]+$/.test(id);
 
 export async function toggleSaveListing(listingId: string) {
+  if (!isReasonableId(listingId)) {
+    return { error: "Invalid listing ID format", saved: false };
+  }
+
   const session = await auth();
 
   if (!session?.user?.id) {
@@ -36,27 +43,33 @@ export async function toggleSaveListing(listingId: string) {
   }
 
   try {
-    // P2 fix: atomic toggle — single deleteMany instead of find+delete
-    // deleteMany returns count; if 0 deleted → record didn't exist → create
-    const { count } = await prisma.savedListing.deleteMany({
-      where: {
-        userId: session.user.id,
-        listingId,
-      },
-    });
-
-    let saved: boolean;
-    if (count > 0) {
-      saved = false; // was saved, now removed
-    } else {
-      await prisma.savedListing.create({
-        data: {
-          userId: session.user.id,
-          listingId,
+    // Atomic toggle via transaction — prevents race condition on double-click
+    // where two concurrent requests both see count=0 and both try to create
+    const saved = await prisma.$transaction(async (tx) => {
+      const existing = await tx.savedListing.findUnique({
+        where: {
+          userId_listingId: {
+            userId: session.user.id,
+            listingId,
+          },
         },
       });
-      saved = true; // newly saved
-    }
+
+      if (existing) {
+        await tx.savedListing.delete({
+          where: { id: existing.id },
+        });
+        return false; // was saved, now removed
+      } else {
+        await tx.savedListing.create({
+          data: {
+            userId: session.user.id,
+            listingId,
+          },
+        });
+        return true; // newly saved
+      }
+    });
 
     revalidatePath(`/listings/${listingId}`);
     revalidatePath("/saved");
@@ -72,6 +85,10 @@ export async function toggleSaveListing(listingId: string) {
 }
 
 export async function isListingSaved(listingId: string) {
+  if (!isReasonableId(listingId)) {
+    return { saved: false };
+  }
+
   const session = await auth();
 
   if (!session?.user?.id) {
@@ -141,7 +158,7 @@ export async function getSavedListings() {
   } catch (_error) {
     logger.sync.error("Failed to get saved listings", {
       action: "getSavedListings",
-      userId: session.user.id,
+      userId: session.user.id.slice(0, 8) + "...",
       error: _error instanceof Error ? _error.message : "Unknown error",
     });
     return [];
@@ -149,6 +166,10 @@ export async function getSavedListings() {
 }
 
 export async function removeSavedListing(listingId: string) {
+  if (!isReasonableId(listingId)) {
+    return { error: "Invalid listing ID format" };
+  }
+
   const session = await auth();
 
   if (!session?.user?.id) {

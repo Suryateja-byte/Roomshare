@@ -85,7 +85,12 @@ test.describe("Reviews Journeys", () => {
             .locator('[data-testid="review-card"]')
             .count();
           await loadMore.click();
-          await page.waitForTimeout(1000);
+
+          // Wait for new reviews to load
+          await expect(async () => {
+            const newCount = await page.locator('[data-testid="review-card"]').count();
+            expect(newCount).toBeGreaterThanOrEqual(initialCount);
+          }).toPass({ timeout: 10_000 });
 
           // Should load more reviews
           const newCount = await page
@@ -189,7 +194,6 @@ test.describe("Reviews Journeys", () => {
           await stars.nth(3).click();
 
           // Verify selection (aria-checked, class change, etc.)
-          await page.waitForTimeout(500);
         }
       }
     });
@@ -394,7 +398,7 @@ test.describe("Reviews Journeys", () => {
       if (await ratingFilter.isVisible().catch(() => false)) {
         // @ts-expect-error - Playwright accepts RegExp for label matching at runtime
         await ratingFilter.selectOption({ label: /5 star/i });
-        await page.waitForTimeout(1000);
+        await page.waitForLoadState("networkidle").catch(() => {});
 
         // All visible reviews should be 5-star
       }
@@ -419,7 +423,7 @@ test.describe("Reviews Journeys", () => {
       if (await sortSelect.isVisible().catch(() => false)) {
         // @ts-expect-error - Playwright accepts RegExp for label matching at runtime
         await sortSelect.selectOption({ label: /newest|recent/i });
-        await page.waitForTimeout(1000);
+        await page.waitForLoadState("networkidle").catch(() => {});
       }
     });
   });

@@ -43,7 +43,7 @@ test.describe("J42: Filter Refinement Chain", () => {
     const container1 = searchResultsContainer(page);
     const cards1 = container1.locator(selectors.listingCard);
     // Allow DOM to settle after search API response
-    await page.waitForTimeout(500);
+    await page.waitForLoadState("networkidle").catch(() => {});
     const count1 = await cards1.count();
 
     // Step 2: Add room type filter via URL (most reliable)
@@ -63,7 +63,7 @@ test.describe("J42: Filter Refinement Chain", () => {
     // Count narrowed results — wait for DOM to settle
     const container2 = searchResultsContainer(page);
     const cards2 = container2.locator(selectors.listingCard);
-    await page.waitForTimeout(500);
+    await page.waitForLoadState("networkidle").catch(() => {});
     const count2 = await cards2.count();
 
     // Narrowed results should be <= initial (or both near 0).

@@ -222,7 +222,7 @@ test.describe("2.5: Pagination progress indicator", () => {
 
     // Look for "X+ stays" footer text — scroll to bottom to trigger render
     await page.evaluate(() => window.scrollTo(0, document.body.scrollHeight));
-    await page.waitForTimeout(500);
+    await page.evaluate(() => new Promise(r => requestAnimationFrame(() => requestAnimationFrame(r))));
     const footer = page.getByText(/\d+\+?\s+stays/i);
     const footerCount = await footer.count();
     // Footer may not render if component hasn't loaded yet

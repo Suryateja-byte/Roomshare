@@ -13,7 +13,7 @@ const PAGE_WEIGHT_BUDGET_KB = 500;
 const routes = [
   { url: "/", name: "homepage" },
   { url: "/about", name: "about" },
-  { url: "/search?swLat=37.7&swLng=-122.5&neLat=37.8&neLng=-122.4", name: "search" },
+  { url: "/search?minLat=37.7&minLng=-122.5&maxLat=37.8&maxLng=-122.4", name: "search" },
 ];
 
 for (const route of routes) {

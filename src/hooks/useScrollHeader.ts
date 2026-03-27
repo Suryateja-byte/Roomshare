@@ -55,11 +55,16 @@ export function useScrollHeader({
       currentScrollY <= threshold ||
       (isScrollingUp && lastScrollY.current - currentScrollY > 20);
 
-    setState((prev) => ({
-      isCollapsed: shouldExpand ? false : isCollapsed || prev.isCollapsed,
-      scrollY: currentScrollY,
-      isScrollingUp,
-    }));
+    // L-2 FIX: Only call setState when values actually changed.
+    // Previously created a new object on every scroll tick, causing re-renders
+    // even when isCollapsed and isScrollingUp hadn't changed.
+    setState((prev) => {
+      const newCollapsed = shouldExpand ? false : isCollapsed || prev.isCollapsed;
+      if (prev.isCollapsed === newCollapsed && prev.isScrollingUp === isScrollingUp && prev.scrollY === currentScrollY) {
+        return prev; // Bail out — no re-render
+      }
+      return { isCollapsed: newCollapsed, scrollY: currentScrollY, isScrollingUp };
+    });
 
     lastScrollY.current = currentScrollY;
     ticking.current = false;

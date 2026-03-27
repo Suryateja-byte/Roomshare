@@ -7,11 +7,13 @@ import {
 import SortSelect from "@/components/SortSelect";
 import SaveSearchButton from "@/components/SaveSearchButton";
 import { SearchResultsClient } from "@/components/search/SearchResultsClient";
+import { SearchResultsErrorBoundary } from "@/components/search/SearchResultsErrorBoundary";
 import Link from "next/link";
 import { Search } from "lucide-react";
 import {
   parseSearchParams,
   buildRawParamsFromSearchParams,
+  buildCanonicalFilterParamsFromSearchParams,
 } from "@/lib/search-params";
 import { executeSearchV2 } from "@/lib/search/search-v2-service";
 import { V1PathResetSetter } from "@/components/search/V1PathResetSetter";
@@ -22,7 +24,11 @@ import { RecommendedFilters } from "@/components/search/RecommendedFilters";
 import { features } from "@/lib/env";
 import { withTimeout, DEFAULT_TIMEOUTS } from "@/lib/timeout-wrapper";
 import { DEFAULT_PAGE_SIZE } from "@/lib/constants";
-import { sanitizeErrorMessage } from "@/lib/logger";
+import { logger, sanitizeErrorMessage } from "@/lib/logger";
+import { circuitBreakers, isCircuitOpenError } from "@/lib/circuit-breaker";
+import { checkServerComponentRateLimit } from "@/lib/with-rate-limit";
+import { headers } from "next/headers";
+import * as Sentry from "@sentry/nextjs";
 import type { Metadata } from "next";
 
 type SearchPageSearchParams = {
@@ -154,24 +160,55 @@ export default async function SearchPage({ searchParams }: SearchPageProps) {
         <V1PathResetSetter />
         <div className="px-4 sm:px-6 py-8 sm:py-12 max-w-[840px] mx-auto">
           <div className="text-center py-12">
-            <div className="w-16 h-16 mx-auto mb-6 bg-amber-100 dark:bg-amber-900/30 rounded-full flex items-center justify-center">
-              <Search className="w-8 h-8 text-amber-600 dark:text-amber-400" />
+            <div className="w-16 h-16 mx-auto mb-6 bg-primary/10 rounded-full flex items-center justify-center">
+              <Search className="w-8 h-8 text-primary" />
             </div>
-            <h1 className="text-2xl font-bold text-zinc-900 dark:text-white mb-3">
+            <h1 className="text-2xl font-display font-bold text-on-surface mb-3">
               Please select a location
             </h1>
-            <p className="text-zinc-600 dark:text-zinc-400 max-w-md mx-auto mb-6">
+            <p className="text-on-surface-variant max-w-md mx-auto mb-6">
               To search for &ldquo;{q}&rdquo;, please select a location from the
               dropdown suggestions. This helps us find relevant listings in your
               area.
             </p>
             <Link
               href="/"
-              className="inline-flex items-center gap-2 px-4 py-2 bg-zinc-900 dark:bg-white text-white dark:text-zinc-900 rounded-lg hover:bg-zinc-800 dark:hover:bg-zinc-100 transition-colors"
+              className="inline-flex items-center gap-2 px-4 py-2 bg-primary text-white rounded-lg hover:bg-primary/90 transition-colors"
             >
               <Search className="w-4 h-4" />
               Try a new search
             </Link>
+          </div>
+        </div>
+      </>
+    );
+  }
+
+  // P0-2 FIX: Rate limit SSR search to prevent bot-driven DB connection pool exhaustion.
+  // This is the only search path that previously lacked rate limiting:
+  // - API routes have withRateLimitRedis
+  // - Server actions have checkServerComponentRateLimit
+  // - SSR page had nothing — bots could hammer /search with varying params
+  // Uses dedicated "search-ssr" bucket (120/min) separate from "search" (60/min for server actions)
+  // to prevent map panning (which generates SSR at 800ms intervals) from exhausting Load More budget.
+  const headersList = await headers();
+  const ssrRateLimit = await checkServerComponentRateLimit(
+    headersList,
+    "search-ssr",
+    "/search"
+  );
+  if (!ssrRateLimit.allowed) {
+    return (
+      <>
+        <V1PathResetSetter />
+        <div className="px-4 sm:px-6 py-8 sm:py-12 max-w-[840px] mx-auto">
+          <div className="text-center py-12">
+            <h1 className="text-2xl font-display font-bold text-on-surface mb-3">
+              Too many requests
+            </h1>
+            <p className="text-on-surface-variant max-w-md mx-auto mb-6">
+              Please wait a moment before searching again.
+            </p>
           </div>
         </div>
       </>
@@ -209,17 +246,30 @@ export default async function SearchPage({ searchParams }: SearchPageProps) {
         )
       );
 
-      // P0 FIX: Add timeout protection to prevent SSR hangs
+      // P0 FIX: Circuit breaker + timeout protection to prevent SSR hangs
+      // Circuit breaker skips V2 entirely after 3 consecutive failures (saves 10s/request during outage)
       // V1 fallback (catch block below) IS the retry mechanism — no withRetry needed
-      const v2Result = await withTimeout(
-        executeSearchV2({
-          rawParams: rawParamsForV2,
-          limit: DEFAULT_PAGE_SIZE,
-          includeMap: false,
-        }),
-        DEFAULT_TIMEOUTS.DATABASE,
-        "SSR-executeSearchV2"
-      );
+      // P0-1 FIX: Throw on V2 error-returns so circuit breaker correctly tracks failures.
+      // Previously, executeSearchV2 swallowed errors into { error: "..." } return values,
+      // which resolved the promise successfully — the circuit breaker never saw failures.
+      const v2Result = await circuitBreakers.searchV2.execute(async () => {
+        const result = await withTimeout(
+          executeSearchV2({
+            rawParams: rawParamsForV2,
+            limit: DEFAULT_PAGE_SIZE,
+            includeMap: false,
+          }),
+          DEFAULT_TIMEOUTS.DATABASE,
+          "SSR-executeSearchV2"
+        );
+        // Let unboundedSearch pass through — it's intentional, not a failure
+        if (result.unboundedSearch) return result;
+        // Throw on actual V2 failures so circuit breaker tracks them
+        if (!result.response || result.error) {
+          throw new Error(result.error || "V2 search returned no response");
+        }
+        return result;
+      });
 
       // V2 returned valid data - use it
       if (v2Result.response && v2Result.paginatedResult) {
@@ -227,20 +277,23 @@ export default async function SearchPage({ searchParams }: SearchPageProps) {
         usedV2 = true;
         paginatedResult = v2Result.paginatedResult;
         v2NextCursor = v2Result.response.list.nextCursor ?? null;
-      } else if (v2Result.error) {
-        // V2 returned error without throwing - log it before falling through to V1
-        const sanitized = sanitizeErrorMessage(v2Result.error);
-        console.warn("[search/page] V2 returned error:", sanitized);
       }
     } catch (err) {
       // V2 failed - will fall back to v1 below
-      const sanitized = sanitizeErrorMessage(err);
-      console.warn(
-        "[search/page] V2 orchestration failed, falling back to v1:",
-        {
-          error: sanitized,
-        }
-      );
+      if (isCircuitOpenError(err)) {
+        // Circuit open — skip V2 entirely, no timeout delay
+        logger.sync.info("[search/page] V2 circuit open, using V1 fallback");
+      } else {
+        // Unexpected V2 failure — capture for monitoring
+        Sentry.captureException(err, {
+          tags: { component: "search-ssr", path: "v2-fallback" },
+          extra: { hasV2Override: v2Override },
+        });
+        logger.sync.warn(
+          "[search/page] V2 orchestration failed, falling back to v1",
+          { error: sanitizeErrorMessage(err) }
+        );
+      }
     }
   }
 
@@ -270,6 +323,12 @@ export default async function SearchPage({ searchParams }: SearchPageProps) {
   // whereas 0 means "confirmed zero results"
   const total = rawTotal;
 
+  // Extract near-match expansion description for UI disclosure
+  const nearMatchExpansion =
+    "nearMatchExpansion" in paginatedResult
+      ? paginatedResult.nearMatchExpansion
+      : undefined;
+
   // Only show zero-results UI when we have confirmed zero results (total === 0)
   // Not when total is null (unknown count, >100 results)
   const hasConfirmedZeroResults = total !== null && total === 0;
@@ -287,6 +346,29 @@ export default async function SearchPage({ searchParams }: SearchPageProps) {
     }
   }
   const searchParamsString = apiParams.toString();
+
+  // P2-11 FIX: Build normalized key for SearchResultsClient's React key.
+  // Raw searchParamsString is kept for API calls (backward compatible).
+  // Normalized key prevents unnecessary remounts when URL has non-canonical values
+  // (e.g., roomType=PRIVATE vs roomType=Private+Room from manual URL editing).
+  // Uses buildCanonicalFilterParamsFromSearchParams (validated, sorted, aliased)
+  // plus sort and quantized bounds (which the canonical builder excludes).
+  const normalizedKey = buildCanonicalFilterParamsFromSearchParams(
+    new URLSearchParams(searchParamsString)
+  );
+  if (sortOption !== "recommended") {
+    normalizedKey.set("sort", sortOption);
+  }
+  if (filterParams.bounds) {
+    // Quantize to 3 decimal places (~100m precision) to avoid micro-remounts
+    // from sub-pixel map pans. Aligns with BOUNDS_EPSILON = 0.001 in constants.ts.
+    normalizedKey.set("minLat", filterParams.bounds.minLat.toFixed(3));
+    normalizedKey.set("maxLat", filterParams.bounds.maxLat.toFixed(3));
+    normalizedKey.set("minLng", filterParams.bounds.minLng.toFixed(3));
+    normalizedKey.set("maxLng", filterParams.bounds.maxLng.toFixed(3));
+  }
+  normalizedKey.sort();
+  const normalizedKeyString = normalizedKey.toString();
 
   // Extract nextCursor: prefer V2 response cursor, fallback to paginatedResult for keyset path
   const initialNextCursor =
@@ -307,16 +389,20 @@ export default async function SearchPage({ searchParams }: SearchPageProps) {
             <h1
               id="search-results-heading"
               tabIndex={-1}
-              className="text-2xl md:text-3xl font-semibold tracking-tight text-zinc-900 dark:text-white !outline-none mb-2"
+              className="text-2xl md:text-3xl font-display font-semibold tracking-tight text-on-surface !outline-none mb-2"
             >
               {total === null ? "100+" : total}{" "}
               {total === 1 ? "place" : "places"} {q ? `in "${q}"` : "available"}
             </h1>
-            <p className="text-sm md:text-base text-zinc-500 dark:text-zinc-400 font-light max-w-2xl">
+            <div aria-live="polite" className="sr-only">
+              {total === null ? "More than 100" : total}{" "}
+              {total === 1 ? "place" : "places"} found
+            </div>
+            <p className="text-sm md:text-base text-on-surface-variant font-light max-w-2xl">
               Find the perfect sanctuary. Curated spaces and compatible people.
             </p>
             {browseMode && (
-              <p className="text-sm text-amber-600 dark:text-amber-400 mt-2">
+              <p className="text-sm text-amber-600 mt-2">
                 Showing top listings. Select a location for more results.
               </p>
             )}
@@ -328,20 +414,22 @@ export default async function SearchPage({ searchParams }: SearchPageProps) {
           </div>
         </div>
 
-        <SearchResultsClient
-          key={searchParamsString}
-          initialListings={listings}
-          initialNextCursor={initialNextCursor}
-          initialTotal={total}
-          savedListingIds={[]}
-          searchParamsString={searchParamsString}
-          filterParams={filterParams}
-          query={q ?? ""}
-          browseMode={browseMode}
-          hasConfirmedZeroResults={hasConfirmedZeroResults}
-          filterSuggestions={[]}
-          sortOption={sortOption}
-        />
+        <SearchResultsErrorBoundary>
+          <SearchResultsClient
+            key={normalizedKeyString}
+            initialListings={listings}
+            initialNextCursor={initialNextCursor}
+            initialTotal={total}
+            savedListingIds={[]}
+            searchParamsString={searchParamsString}
+            filterParams={filterParams}
+            query={q ?? ""}
+            browseMode={browseMode}
+            hasConfirmedZeroResults={hasConfirmedZeroResults}
+            filterSuggestions={[]}
+            nearMatchExpansion={nearMatchExpansion}
+          />
+        </SearchResultsErrorBoundary>
       </div>
     </div>
   );
@@ -349,6 +437,9 @@ export default async function SearchPage({ searchParams }: SearchPageProps) {
   return (
     <>
       {/* Keep the initial HTML list-first and let the persistent map fetch independently */}
+      {/* TODO: Wire V2MapDataSetter here when V2 map feature ships.
+          Currently V2MapDataSetter exists but has no render site — V2 map data path is dead code.
+          V1PathResetSetter runs on every render, keeping isV2Enabled=false. */}
       <V1PathResetSetter />
       {/* Wrap results with loading indicator for filter transitions */}
       <SearchResultsLoadingWrapper>{listContent}</SearchResultsLoadingWrapper>

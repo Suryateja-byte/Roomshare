@@ -180,6 +180,7 @@ describe("createBooking — slotsRequested validation (Phase 2)", () => {
             count: jest.fn().mockResolvedValue(0),
             create: jest.fn().mockResolvedValue(mockBooking),
           },
+          bookingAuditLog: { create: jest.fn().mockResolvedValue({}) },
         };
         return callback(tx);
       }

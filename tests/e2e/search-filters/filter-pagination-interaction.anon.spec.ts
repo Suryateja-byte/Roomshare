@@ -273,7 +273,7 @@ test.describe("Filter + Pagination Interactions", () => {
           reachedCap = true;
           break;
         }
-        await page.waitForTimeout(300); // Small delay between clicks for stability
+        await page.waitForLoadState("domcontentloaded"); // Wait for page to settle between clicks
       } else {
         // Final click may remove the button (cap reached) — wait for cap message instead
         const capMsg = searchResultsContainer(page).locator(

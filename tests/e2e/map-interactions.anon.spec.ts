@@ -75,10 +75,10 @@ async function waitForSearchPage(page: Page, url = SEARCH_URL) {
   await page.goto(url);
   await page.waitForLoadState("domcontentloaded");
   // Wait for any button to indicate page hydration, then try the toggle
-  await page.waitForSelector("button", { timeout: 30_000 });
+  await page.locator("button").first().waitFor({ state: "visible", timeout: 30_000 });
   // The "Search as I move" toggle may not render without WebGL -- don't fail here
   await page
-    .waitForSelector(sel.searchAsMoveToggle, { timeout: 10_000 })
+    .locator(sel.searchAsMoveToggle).waitFor({ state: "visible", timeout: 10_000 })
     .catch(() => {});
   await waitForMapReady(page);
 }
@@ -351,7 +351,7 @@ test.describe("1.x: Map + List Scroll Sync", () => {
         cardBecameActive = true;
         break;
       }
-      await page.waitForTimeout(250);
+      await page.waitForTimeout(250); // polling delay inside retry loop
     }
 
     if (!cardBecameActive) {
@@ -370,7 +370,7 @@ test.describe("1.x: Map + List Scroll Sync", () => {
         cardInViewport = true;
         break;
       }
-      await page.waitForTimeout(300);
+      await page.waitForTimeout(300); // polling delay inside retry loop
     }
     if (!cardInViewport) {
       test.skip(

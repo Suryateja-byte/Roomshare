@@ -387,7 +387,7 @@ test.describe("Profile & Settings Journeys", () => {
       if (await connectedSection.isVisible().catch(() => false)) {
         // Should show OAuth providers (Google, GitHub, etc.)
         const providers = page.locator('[data-testid="oauth-provider"]');
-        await page.waitForTimeout(1000);
+        await page.waitForLoadState("networkidle").catch(() => {});
       }
     });
   });
@@ -443,7 +443,7 @@ test.describe("Profile & Settings Journeys", () => {
       await nav.goToSettings();
       await page.waitForLoadState("domcontentloaded");
       // Wait for any client-side redirects to settle (CI can be slow)
-      await page.waitForTimeout(2000);
+      await page.waitForLoadState("networkidle").catch(() => {});
 
       // Check we weren't redirected to login or signup
       const currentUrl = page.url();
@@ -463,7 +463,7 @@ test.describe("Profile & Settings Journeys", () => {
         .waitFor({ state: "visible", timeout: 30000 })
         .catch(() => {});
       // Extra wait for hydration in CI
-      await page.waitForTimeout(1000);
+      await page.waitForLoadState("networkidle").catch(() => {});
 
       const deleteButton = page.getByRole("button", {
         name: /delete.*account/i,
@@ -506,39 +506,10 @@ test.describe("Profile & Settings Journeys", () => {
   });
 
   test.describe("J075-J076: Theme and preferences", () => {
-    test(`${tags.auth} - Toggle dark mode`, async ({ page, nav }) => {
-      await nav.goToSettings();
-
-      // Check we weren't redirected to login
-      if (page.url().includes("/login")) {
-        test.skip(true, "Auth session expired - redirected to login");
-        return;
-      }
-
-      // Find theme toggle
-      const themeToggle = page
-        .getByRole("button", { name: /dark.*mode|theme/i })
-        .or(page.getByLabel(/dark.*mode|theme/i))
-        .or(page.locator('[data-testid="theme-toggle"]'))
-        .first();
-
-      if (await themeToggle.isVisible().catch(() => false)) {
-        // Get initial theme
-        const html = page.locator("html");
-        const initialDark =
-          (await html.getAttribute("class").then((c) => c?.includes("dark"))) ||
-          false;
-
-        // Toggle
-        await themeToggle.click();
-        await page.waitForTimeout(500);
-
-        // Theme should change
-        const newDark =
-          (await html.getAttribute("class").then((c) => c?.includes("dark"))) ||
-          false;
-        // May or may not change depending on implementation
-      }
+    // ThemeToggle component was removed in the Editorial Living Room redesign.
+    // Skip this test until a replacement theme switcher is implemented.
+    test.skip(`${tags.auth} - Toggle dark mode`, async () => {
+      // ThemeToggle was deleted — no theme toggle exists on the settings page.
     });
 
     test(`${tags.auth} - Language preference`, async ({ page, nav }) => {

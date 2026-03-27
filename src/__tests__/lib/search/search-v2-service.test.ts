@@ -26,6 +26,9 @@ jest.mock("@/lib/logger", () => ({
       warn: jest.fn(),
     },
   },
+  sanitizeErrorMessage: jest.fn(
+    (error: unknown) => error instanceof Error ? error.message : "Unknown error"
+  ),
 }));
 
 // Mock next/cache (used by search-doc-queries via unstable_cache)

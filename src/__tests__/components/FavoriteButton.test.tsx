@@ -31,13 +31,13 @@ describe("FavoriteButton", () => {
       render(<FavoriteButton listingId="listing-123" />);
       const button = screen.getByRole("button");
       expect(button).toBeInTheDocument();
-      expect(button).toHaveClass("text-zinc-400");
+      expect(button).toHaveClass("text-on-surface-variant");
     });
 
     it("renders saved state when initialIsSaved is true", () => {
       render(<FavoriteButton listingId="listing-123" initialIsSaved={true} />);
       const button = screen.getByRole("button");
-      expect(button).toHaveClass("text-red-500");
+      expect(button).toHaveClass("text-primary");
     });
 
     it("renders heart icon", () => {
@@ -68,7 +68,7 @@ describe("FavoriteButton", () => {
       await userEvent.click(button);
 
       await waitFor(() => {
-        expect(button).toHaveClass("text-red-500");
+        expect(button).toHaveClass("text-primary");
       });
     });
 
@@ -85,7 +85,7 @@ describe("FavoriteButton", () => {
       await userEvent.click(button);
 
       await waitFor(() => {
-        expect(button).toHaveClass("text-zinc-400");
+        expect(button).toHaveClass("text-on-surface-variant");
       });
     });
 
@@ -248,7 +248,7 @@ describe("FavoriteButton", () => {
       await userEvent.click(button);
 
       await waitFor(() => {
-        expect(button).toHaveClass("text-zinc-400");
+        expect(button).toHaveClass("text-on-surface-variant");
       });
     });
 
@@ -264,7 +264,7 @@ describe("FavoriteButton", () => {
       await userEvent.click(button);
 
       await waitFor(() => {
-        expect(button).toHaveClass("text-zinc-400");
+        expect(button).toHaveClass("text-on-surface-variant");
       });
     });
 
@@ -279,7 +279,7 @@ describe("FavoriteButton", () => {
       await userEvent.click(button);
 
       await waitFor(() => {
-        expect(button).toHaveClass("text-zinc-400");
+        expect(button).toHaveClass("text-on-surface-variant");
       });
 
       consoleSpy.mockRestore();
@@ -301,7 +301,7 @@ describe("FavoriteButton", () => {
       await userEvent.click(button);
 
       // Should immediately show as saved (optimistic)
-      expect(button).toHaveClass("text-red-500");
+      expect(button).toHaveClass("text-primary");
 
       // Now resolve the API call
       resolvePromise!({
@@ -311,7 +311,7 @@ describe("FavoriteButton", () => {
       });
 
       await waitFor(() => {
-        expect(button).toHaveClass("text-red-500");
+        expect(button).toHaveClass("text-primary");
       });
     });
   });

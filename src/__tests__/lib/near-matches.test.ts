@@ -79,31 +79,28 @@ describe("near-matches", () => {
     });
 
     describe("date expansion", () => {
-      it("should expand moveInDate by 7 days earlier", () => {
-        // Use a date far in the future to avoid "past date" logic
-        const params: FilterParams = { moveInDate: "2030-06-15" };
+      it("should expand moveInDate by 7 days later", () => {
+        const params: FilterParams = { moveInDate: "2027-06-15" };
         const result = expandFiltersForNearMatches(params);
 
         expect(result.expandedDimension).toBe("date");
-        expect(result.expanded.moveInDate).toBe("2030-06-08"); // 7 days earlier
+        expect(result.expanded.moveInDate).toBe("2027-06-22"); // 7 days later
       });
 
-      it("should not expand date to past dates", () => {
-        // If moveInDate is within 7 days of today, expansion should clamp to today
-        // Use the same timezone-aware logic as the implementation
-        const today = new Date();
-        today.setHours(0, 0, 0, 0);
-
-        const threeDaysFromNow = new Date(today);
-        threeDaysFromNow.setDate(threeDaysFromNow.getDate() + 3);
-        const dateStr = threeDaysFromNow.toISOString().split("T")[0];
+      it("should cap expansion at 2 years in the future", () => {
+        // If moveInDate is close to the 2-year limit, expansion should clamp
+        const maxDate = new Date();
+        maxDate.setFullYear(maxDate.getFullYear() + 2);
+        // Set moveInDate to 3 days before the 2-year limit
+        const nearLimit = new Date(maxDate);
+        nearLimit.setDate(nearLimit.getDate() - 3);
+        const dateStr = nearLimit.toISOString().split("T")[0];
 
         const params: FilterParams = { moveInDate: dateStr };
         const result = expandFiltersForNearMatches(params);
 
-        // The expanded date should be today (clamped), not 3 days ago
-        // Use the same format as the implementation
-        const expectedDate = today.toISOString().split("T")[0];
+        // The expanded date should be capped at the 2-year limit
+        const expectedDate = maxDate.toISOString().split("T")[0];
         expect(result.expanded.moveInDate).toBe(expectedDate);
       });
 

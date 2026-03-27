@@ -31,7 +31,7 @@ test.describe("Homepage — Authenticated User", () => {
       .getByRole("link", { name: /sign up free/i });
 
     // Allow page to fully render, then verify sign-up is absent
-    await page.waitForTimeout(2000);
+    await page.waitForLoadState("networkidle").catch(() => {});
     await expect(signUpButton).toBeHidden();
   });
 
@@ -61,12 +61,11 @@ test.describe("Homepage — Authenticated User", () => {
       const hamburger = page.getByLabel(/open menu/i);
       await expect(hamburger).toBeVisible({ timeout: 10000 });
       await hamburger.click();
-      await page.waitForTimeout(500);
 
-      // Mobile menu shows "View Profile" link for authenticated users
+      // Mobile menu shows "Profile" link for authenticated users
       await expect(
-        page.getByRole("link", { name: /view profile/i })
-      ).toBeVisible({ timeout: 10000 });
+        page.getByRole("link", { name: /profile/i }).first()
+      ).toBeVisible({ timeout: 15000 });
     } else {
       // Desktop: user-menu button is directly visible in the navbar
       await expect(page.locator('[data-testid="user-menu"]')).toBeVisible({
@@ -86,7 +85,6 @@ test.describe("Homepage — Authenticated User", () => {
       const hamburger = page.getByLabel(/open menu/i);
       await expect(hamburger).toBeVisible({ timeout: 10000 });
       await hamburger.click();
-      await page.waitForTimeout(500);
     }
 
     // The navbar (or mobile menu) has a "List a Room" button/link

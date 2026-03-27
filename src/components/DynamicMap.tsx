@@ -12,21 +12,25 @@ export type {
 } from "@/components/Map";
 
 // M2-MAP FIX: Detect WebGL support before mounting the map
+// EU-H: Cache result at module level — WebGL support doesn't change during session
+let cachedWebGLSupport: boolean | null = null;
 function hasWebGLSupport(): boolean {
+  if (cachedWebGLSupport !== null) return cachedWebGLSupport;
   try {
     const canvas = document.createElement("canvas");
-    return !!(canvas.getContext("webgl") || canvas.getContext("webgl2"));
+    cachedWebGLSupport = !!(canvas.getContext("webgl") || canvas.getContext("webgl2"));
   } catch {
-    return false;
+    cachedWebGLSupport = false;
   }
+  return cachedWebGLSupport;
 }
 
 // Dynamic import for Map component - defers maplibre-gl bundle until needed
 const MapComponent = dynamic(() => import("@/components/Map"), {
   ssr: false,
   loading: () => (
-    <div className="w-full h-full bg-zinc-100 dark:bg-zinc-800 animate-pulse flex items-center justify-center">
-      <div className="text-zinc-400 dark:text-zinc-500 text-sm">
+    <div className="w-full h-full bg-surface-container-high animate-pulse flex items-center justify-center">
+      <div className="text-on-surface-variant text-sm">
         Loading map...
       </div>
     </div>
@@ -38,12 +42,12 @@ type DynamicMapProps = ComponentProps<typeof MapComponent>;
 // Fallback UI when WebGL is not available
 function WebGLFallback() {
   return (
-    <div className="w-full h-full bg-zinc-100 dark:bg-zinc-800 flex items-center justify-center p-6">
+    <div className="w-full h-full bg-surface-container-high flex items-center justify-center p-6">
       <div className="text-center max-w-sm">
-        <p className="text-zinc-600 dark:text-zinc-400 font-medium mb-2">
+        <p className="text-on-surface-variant font-medium mb-2">
           Map unavailable
         </p>
-        <p className="text-zinc-500 dark:text-zinc-500 text-sm">
+        <p className="text-on-surface-variant text-sm">
           Your browser does not support WebGL, which is required for the
           interactive map. Try updating your browser or enabling hardware
           acceleration.
@@ -74,8 +78,8 @@ export default function DynamicMap(props: DynamicMapProps) {
   // Still checking
   if (webglSupported === null) {
     return (
-      <div className="w-full h-full bg-zinc-100 dark:bg-zinc-800 animate-pulse flex items-center justify-center">
-        <div className="text-zinc-400 dark:text-zinc-500 text-sm">
+      <div className="w-full h-full bg-surface-container-high animate-pulse flex items-center justify-center">
+        <div className="text-on-surface-variant text-sm">
           Loading map...
         </div>
       </div>

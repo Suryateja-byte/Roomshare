@@ -23,6 +23,7 @@ export {
   SF_BOUNDS,
   A11Y_CONFIG,
   waitForStable,
+  waitForHydration,
   waitForMapMarkers,
   waitForMapReady,
   waitForDebounceAndResponse,
@@ -85,14 +86,17 @@ export {
   navigateWithMobileNav,
 } from "./mobile-auth-helpers";
 
-// Dark mode helpers for authenticated page dark mode tests
+
+
+// Shared axe-core a11y scan helpers (runAxeScan, filterViolations, logViolations)
 export {
-  activateDarkMode,
-  assertDarkClassPresent,
-  getStoredTheme,
-  waitForAuthPageReady,
-  authPageMasks,
-} from "./dark-mode-helpers";
+  runAxeScan,
+  filterViolations,
+  logViolations,
+  CI_EXTRA_EXCLUDES,
+  CI_DISABLED_RULES,
+  CI_ACCEPTABLE_VIOLATIONS,
+} from "./a11y-helpers";
 
 // Session expiry helpers for mid-session auth token expiry testing
 export {

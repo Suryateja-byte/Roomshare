@@ -160,7 +160,12 @@ export const authHelpers = {
         .catch(() => false);
       if (hamburgerVisible) {
         await hamburger.first().click();
-        await page.waitForTimeout(500);
+        // Wait for mobile menu to be visible after hamburger click
+        const menu = page
+          .getByRole("navigation")
+          .or(page.locator('[data-testid="mobile-menu"]'))
+          .or(page.locator('[role="menu"]'));
+        await expect(menu.first()).toBeVisible({ timeout: 5000 });
       }
     }
 
@@ -170,11 +175,9 @@ export const authHelpers = {
 
     // Wait for the button to be attached and visible
     await userMenuButton.waitFor({ state: "visible", timeout: 30000 });
-    // The button has transition-all duration-300 which causes Playwright's
-    // stability check to fail in CI (element detected as "not stable").
-    // Use evaluate to dispatch click directly, bypassing actionability checks.
-    await page.waitForTimeout(500);
-    await userMenuButton.evaluate((el: HTMLElement) => el.click());
+    // The _disableAnimations fixture sets transition-duration: 0s !important,
+    // so the button's transition-all duration-300 no longer causes instability.
+    await userMenuButton.click();
 
     // Click logout option
     const logoutOption = page

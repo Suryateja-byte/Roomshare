@@ -8,7 +8,7 @@
 
 import { test, expect, SF_BOUNDS, waitForMapMarkers } from "../helpers";
 import { mockMapTileRequests } from "../helpers/map-mock-helpers";
-import { activateDarkMode } from "../helpers/dark-mode-helpers";
+
 import {
   setSheetSnap,
   waitForSheetAnimation,
@@ -91,7 +91,8 @@ test.describe("Map — Visual Regression", () => {
 
     const marker = page.locator(".maplibregl-marker").first();
     const isVisible = await marker
-      .isVisible({ timeout: 5000 })
+      .waitFor({ state: "visible", timeout: 5000 })
+      .then(() => true)
       .catch(() => false);
     test.skip(!isVisible, "No markers visible");
 
@@ -121,8 +122,11 @@ test.describe("Map — Visual Regression", () => {
     await page.waitForFunction(() => !!(window as any).__e2eMapRef, null, {
       timeout: 15_000,
     });
-    // Let initial auto-fly settle
-    await page.waitForTimeout(2000);
+    // Let initial auto-fly settle — wait for map idle
+    await page.waitForFunction(() => {
+      const map = (window as any).__e2eMapRef;
+      return map && !map.isMoving() && !map.isZooming();
+    }, null, { timeout: 10_000 }).catch(() => {});
 
     // Turn OFF "search as I move" so panning triggers the banner
     const toggle = page.getByRole("switch", { name: /search as i move/i });
@@ -143,7 +147,10 @@ test.describe("Map — Visual Regression", () => {
       if (fn) fn(200, 0);
     });
     // Wait for moveend + React state update
-    await page.waitForTimeout(2000);
+    await page.waitForFunction(() => {
+      const map = (window as any).__e2eMapRef;
+      return map && !map.isMoving();
+    }, null, { timeout: 10_000 }).catch(() => {});
 
     // Scope to the map region — the list panel also has a "Search this area"
     // banner (list variant) that comes first in DOM order but is hidden on desktop
@@ -237,7 +244,7 @@ test.describe("Map — Visual Regression", () => {
     await page.waitForLoadState("domcontentloaded");
 
     // Wait for the fallback to render (loading fallback or context lost overlay)
-    await page.waitForTimeout(3000);
+    await page.locator('[role="region"][aria-label*="map"]').or(page.locator('[data-testid="map-loading-fallback"]')).or(page.locator('.maplibregl-map')).first().waitFor({ state: 'visible', timeout: 10_000 }).catch(() => {});
     await disableAnimations(page);
 
     // The map region should show a fallback state
@@ -248,7 +255,8 @@ test.describe("Map — Visual Regression", () => {
       .or(page.locator(".maplibregl-map").first());
 
     const isVisible = await mapRegion
-      .isVisible({ timeout: 5000 })
+      .waitFor({ state: "visible", timeout: 5000 })
+      .then(() => true)
       .catch(() => false);
     test.skip(!isVisible, "Map region not found for webgl fallback");
 
@@ -257,20 +265,6 @@ test.describe("Map — Visual Regression", () => {
     });
   });
 
-  // -----------------------------------------------------------------------
-  // 8. Dark mode map panel
-  // -----------------------------------------------------------------------
-  test("dark mode map panel", async ({ page }) => {
-    await activateDarkMode(page);
-    await page.goto(searchUrl);
-    await page.waitForLoadState("domcontentloaded");
-    await disableAnimations(page);
-
-    await expect(page).toHaveScreenshot("map-dark-desktop.png", {
-      ...SCREENSHOT_DEFAULTS.fullPage,
-      mask: [page.locator(".maplibregl-canvas"), ...imageMasks(page)],
-    });
-  });
 
   // -----------------------------------------------------------------------
   // 9. Mobile map with sheet collapsed

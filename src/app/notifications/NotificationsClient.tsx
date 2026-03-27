@@ -65,9 +65,9 @@ const notificationColors: Record<NotificationType, string> = {
   BOOKING_REQUEST: "bg-blue-100 text-blue-600",
   BOOKING_ACCEPTED: "bg-green-100 text-green-600",
   BOOKING_REJECTED: "bg-red-100 text-red-600",
-  BOOKING_CANCELLED: "bg-zinc-100 text-zinc-600",
+  BOOKING_CANCELLED: "bg-surface-container-high text-on-surface-variant",
   BOOKING_HOLD_REQUEST: "bg-amber-100 text-amber-600",
-  BOOKING_EXPIRED: "bg-zinc-100 text-zinc-600",
+  BOOKING_EXPIRED: "bg-surface-container-high text-on-surface-variant",
   BOOKING_HOLD_EXPIRED: "bg-amber-100 text-amber-600",
   NEW_MESSAGE: "bg-purple-100 text-purple-600",
   NEW_REVIEW: "bg-yellow-100 text-yellow-600",
@@ -171,16 +171,16 @@ export default function NotificationsClient({
   return (
     <div
       data-testid="notifications-page"
-      className="min-h-screen bg-zinc-50/50 dark:bg-zinc-950 pt-24 pb-20"
+      className="min-h-screen bg-surface-canvas pt-24 pb-20"
     >
       <div className="container mx-auto max-w-3xl px-6 py-10">
         {/* Header */}
         <div className="flex items-center justify-between mb-8">
           <div>
-            <h1 className="text-3xl font-bold text-zinc-900 dark:text-white tracking-tight">
+            <h1 className="font-display text-3xl font-bold text-on-surface tracking-tight">
               Notifications
             </h1>
-            <p className="text-zinc-500 dark:text-zinc-400 mt-1">
+            <p className="text-on-surface-variant mt-1">
               {unreadCount > 0
                 ? `You have ${unreadCount} unread notification${unreadCount !== 1 ? "s" : ""}`
                 : "All caught up!"}
@@ -200,7 +200,7 @@ export default function NotificationsClient({
             <Button
               variant="outline"
               onClick={() => setShowDeleteAllDialog(true)}
-              className="text-red-600 dark:text-red-400 border-red-200 dark:border-red-800 hover:bg-red-50 dark:hover:bg-red-900/20"
+              className="text-red-600 border-red-200 hover:bg-red-50"
             >
               <Trash2 className="w-4 h-4 mr-2" />
               Delete all
@@ -214,8 +214,8 @@ export default function NotificationsClient({
             onClick={() => setFilter("all")}
             className={`px-4 py-2 rounded-lg text-sm font-medium transition-colors ${
               filter === "all"
-                ? "bg-zinc-900 text-white dark:bg-white dark:text-zinc-900"
-                : "bg-white dark:bg-zinc-800 border border-zinc-200 dark:border-zinc-700 text-zinc-600 dark:text-zinc-300 hover:bg-zinc-50 dark:hover:bg-zinc-700"
+                ? "bg-primary text-on-primary"
+                : "bg-surface-container-lowest border border-outline-variant/20 text-on-surface-variant hover:bg-surface-canvas"
             }`}
           >
             All
@@ -224,8 +224,8 @@ export default function NotificationsClient({
             onClick={() => setFilter("unread")}
             className={`px-4 py-2 rounded-lg text-sm font-medium transition-colors ${
               filter === "unread"
-                ? "bg-zinc-900 text-white dark:bg-white dark:text-zinc-900"
-                : "bg-white dark:bg-zinc-800 border border-zinc-200 dark:border-zinc-700 text-zinc-600 dark:text-zinc-300 hover:bg-zinc-50 dark:hover:bg-zinc-700"
+                ? "bg-primary text-on-primary"
+                : "bg-surface-container-lowest border border-outline-variant/20 text-on-surface-variant hover:bg-surface-canvas"
             }`}
           >
             Unread ({unreadCount})
@@ -233,34 +233,34 @@ export default function NotificationsClient({
         </div>
 
         {/* Notifications List */}
-        <div className="bg-white dark:bg-zinc-900 rounded-2xl border border-zinc-100 dark:border-zinc-800 shadow-sm overflow-hidden">
+        <div className="bg-surface-container-lowest rounded-2xl border border-outline-variant/20 shadow-ambient-sm overflow-hidden">
           {filteredNotifications.length === 0 ? (
             <div className="p-12 text-center">
-              <Bell className="w-16 h-16 text-zinc-200 dark:text-zinc-700 mx-auto mb-4" />
-              <h3 className="text-lg font-semibold text-zinc-900 dark:text-white mb-2">
+              <Bell className="w-16 h-16 text-on-surface-variant/30 mx-auto mb-4" />
+              <h3 className="font-display text-lg font-semibold text-on-surface mb-2">
                 {filter === "unread"
                   ? "No unread notifications"
                   : "No notifications yet"}
               </h3>
-              <p className="text-zinc-500 dark:text-zinc-400">
+              <p className="text-on-surface-variant">
                 {filter === "unread"
                   ? "You're all caught up!"
                   : "When you get notifications, they'll show up here."}
               </p>
             </div>
           ) : (
-            <div className="divide-y divide-zinc-100">
+            <div className="space-y-1">
               {filteredNotifications.map((notification) => {
                 const Icon = notificationIcons[notification.type] || Bell;
                 const colorClass =
                   notificationColors[notification.type] ||
-                  "bg-zinc-100 text-zinc-600";
+                  "bg-surface-container-high text-on-surface-variant";
 
                 return (
                   <div
                     key={notification.id}
                     data-testid="notification-item"
-                    className={`p-4 hover:bg-zinc-50 dark:hover:bg-zinc-800 transition-colors ${!notification.read ? "bg-blue-50/30 dark:bg-blue-900/20" : ""}`}
+                    className={`p-4 hover:bg-surface-container-high transition-colors ${!notification.read ? "bg-blue-50/30" : ""}`}
                   >
                     <div className="flex gap-4">
                       <div className={`p-3 rounded-xl ${colorClass} shrink-0`}>
@@ -270,22 +270,22 @@ export default function NotificationsClient({
                         {notification.link ? (
                           <Link href={notification.link}>
                             <h4
-                              className={`text-sm ${!notification.read ? "font-semibold" : "font-medium"} text-zinc-900 dark:text-white hover:underline`}
+                              className={`text-sm ${!notification.read ? "font-semibold" : "font-medium"} text-on-surface hover:underline`}
                             >
                               {notification.title}
                             </h4>
                           </Link>
                         ) : (
                           <h4
-                            className={`text-sm ${!notification.read ? "font-semibold" : "font-medium"} text-zinc-900 dark:text-white`}
+                            className={`text-sm ${!notification.read ? "font-semibold" : "font-medium"} text-on-surface`}
                           >
                             {notification.title}
                           </h4>
                         )}
-                        <p className="text-sm text-zinc-500 dark:text-zinc-400 mt-1">
+                        <p className="text-sm text-on-surface-variant mt-1">
                           {notification.message}
                         </p>
-                        <p className="text-xs text-zinc-400 dark:text-zinc-500 mt-2">
+                        <p className="text-xs text-on-surface-variant mt-2">
                           {formatDate(notification.createdAt)}
                         </p>
                       </div>
@@ -294,7 +294,7 @@ export default function NotificationsClient({
                           <button
                             data-testid="mark-read-button"
                             onClick={() => handleMarkAsRead(notification.id)}
-                            className="p-2 text-zinc-400 hover:text-zinc-600 dark:hover:text-zinc-300 hover:bg-zinc-100 dark:hover:bg-zinc-700 rounded-lg transition-colors"
+                            className="p-2 text-on-surface-variant hover:text-on-surface hover:bg-surface-container-high rounded-lg transition-colors"
                             title="Mark as read"
                           >
                             <Check className="w-4 h-4" />
@@ -303,7 +303,7 @@ export default function NotificationsClient({
                         <button
                           data-testid="delete-button"
                           onClick={() => handleDelete(notification.id)}
-                          className="p-2 text-zinc-400 hover:text-red-600 hover:bg-red-50 dark:hover:bg-red-900/30 rounded-lg transition-colors"
+                          className="p-2 text-on-surface-variant hover:text-red-600 hover:bg-red-50 rounded-lg transition-colors"
                           title="Delete"
                         >
                           <Trash2 className="w-4 h-4" />
@@ -346,8 +346,8 @@ export default function NotificationsClient({
           <AlertDialogContent>
             <AlertDialogHeader>
               <div className="flex items-center gap-3 mb-2">
-                <div className="w-10 h-10 rounded-full bg-red-100 dark:bg-red-900/30 flex items-center justify-center">
-                  <AlertTriangle className="w-5 h-5 text-red-600 dark:text-red-400" />
+                <div className="w-10 h-10 rounded-full bg-red-100 flex items-center justify-center">
+                  <AlertTriangle className="w-5 h-5 text-red-600" />
                 </div>
                 <AlertDialogTitle>Delete all notifications?</AlertDialogTitle>
               </div>

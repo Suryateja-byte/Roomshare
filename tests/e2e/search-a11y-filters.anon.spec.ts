@@ -119,8 +119,8 @@ test.describe("Search A11y: Filter Modal Accessibility", () => {
 
       for (let i = 0; i < TAB_COUNT; i++) {
         await page.keyboard.press("Tab");
-        // Intentional: pacing between Tab presses for focus ring observation
-        await page.waitForTimeout(50);
+        // INTENTIONAL: pacing between Tab presses for focus ring observation
+        await page.waitForTimeout(50); // INTENTIONAL: focus trap pacing
 
         const isInModal = await page.evaluate(() => {
           const el = document.activeElement;
@@ -162,10 +162,8 @@ test.describe("Search A11y: Filter Modal Accessibility", () => {
         // Fallback: press Escape
         await page.keyboard.press("Escape");
       }
-      await page.waitForTimeout(300);
-
       // Modal should be closed
-      await expect(modal).not.toBeVisible();
+      await expect(modal).not.toBeVisible({ timeout: 5_000 });
 
       // Focus should return to or near the trigger button
       const focusedTag = await page.evaluate(
@@ -331,9 +329,8 @@ test.describe("Search A11y: Filter Modal Accessibility", () => {
 
       // If no chip region visible after hydration, skip gracefully
       if (!regionVisible) {
-        // Wait a bit more for client hydration, then re-check
-        await page.waitForTimeout(3000);
-        const retryVisible = await chipRegion.isVisible().catch(() => false);
+        // Wait for client hydration, then re-check
+        const retryVisible = await chipRegion.isVisible({ timeout: 10_000 }).catch(() => false);
         if (!retryVisible) {
           console.log(
             "Info: Applied filters region not visible - cannot verify chip aria-labels"

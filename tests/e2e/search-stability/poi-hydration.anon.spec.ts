@@ -162,7 +162,7 @@ test.describe("POI Layer Hydration Safety", () => {
 
     // Wait for map and POI layer to fully render
     await waitForMapRef(page);
-    await page.waitForTimeout(3_000);
+    await page.waitForLoadState("networkidle", { timeout: 10_000 }).catch(() => {});
 
     // Check for hydration-related warnings/errors
     const hydrationIssues = consoleMessages.filter(({ text }) => {

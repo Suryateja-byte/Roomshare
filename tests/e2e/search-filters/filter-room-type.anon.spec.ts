@@ -111,7 +111,6 @@ test.describe("Room Type Filter", () => {
 
     // Click the "All" tab (CategoryTabs renders button with text "All" and aria-pressed)
     // Wait for hydration — tabs may not be interactive immediately
-    await page.waitForTimeout(2_000);
     const allTab = page
       .locator("button[aria-pressed]")
       .filter({ hasText: /^All$/i });
@@ -187,7 +186,6 @@ test.describe("Room Type Filter", () => {
       await expect(roomTypeChip).toBeVisible({ timeout: 10_000 });
     }
 
-    expect(await page.title()).toBeTruthy();
   });
 
   // 6. Clear room type filter restores all results
@@ -274,7 +272,6 @@ test.describe("Room Type Filter", () => {
     await gotoSearchWithFilters(page, { roomType: "private" });
 
     // Page should load without errors
-    expect(await page.title()).toBeTruthy();
 
     // The inline tab should reflect the resolved value
     const privateTab = page

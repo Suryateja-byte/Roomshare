@@ -80,7 +80,7 @@ test.describe("Messaging Journeys", () => {
         await contactButton.click();
 
         // Should open message modal or navigate to messages
-        await page.waitForTimeout(1000);
+        await page.waitForLoadState("domcontentloaded");
 
         const messageInput = page
           .getByPlaceholder(/message|type.*here/i)
@@ -278,7 +278,7 @@ test.describe("Messaging Journeys", () => {
         return;
       }
 
-      // Wait for polling interval (5 seconds + buffer)
+      // INTENTIONAL: wait for polling interval to verify page stays responsive after poll cycle
       await page.waitForTimeout(timeouts.polling);
 
       // Page should still be responsive and not error
@@ -336,7 +336,7 @@ test.describe("Messaging Journeys", () => {
 
         // Go back and check if marked read
         await nav.goToMessages();
-        await page.waitForTimeout(1000);
+        await page.waitForLoadState("networkidle").catch(() => {});
 
         // Same conversation should no longer be marked unread
       }
@@ -482,7 +482,7 @@ test.describe("Messaging Journeys", () => {
           await sendButton.click();
 
           // Should show offline/retry indicator
-          await page.waitForTimeout(2000);
+          await page.waitForLoadState("domcontentloaded").catch(() => {});
         }
       }
 

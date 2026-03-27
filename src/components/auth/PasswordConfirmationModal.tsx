@@ -79,8 +79,8 @@ export function PasswordConfirmationModal({
       <DialogContent className="sm:max-w-md">
         <DialogHeader>
           <div className="flex items-center gap-3">
-            <div className="flex h-10 w-10 items-center justify-center rounded-full bg-red-100 dark:bg-red-900/30">
-              <ShieldAlert className="h-5 w-5 text-red-600 dark:text-red-400" />
+            <div className="flex h-10 w-10 items-center justify-center rounded-full bg-red-100">
+              <ShieldAlert className="h-5 w-5 text-red-600" />
             </div>
             <DialogTitle className="text-xl">{title}</DialogTitle>
           </div>
@@ -90,9 +90,9 @@ export function PasswordConfirmationModal({
         <div className="space-y-4 py-4">
           {hasPassword ? (
             <>
-              <div className="flex items-start gap-3 p-3 rounded-lg bg-amber-50 dark:bg-amber-900/20 border border-amber-200 dark:border-amber-800">
-                <AlertTriangle className="h-5 w-5 text-amber-600 dark:text-amber-400 flex-shrink-0 mt-0.5" />
-                <p className="text-sm text-amber-700 dark:text-amber-300">
+              <div className="flex items-start gap-3 p-3 rounded-lg bg-amber-50 border border-amber-200">
+                <AlertTriangle className="h-5 w-5 text-amber-600 flex-shrink-0 mt-0.5" />
+                <p className="text-sm text-amber-700">
                   For your security, please enter your password to confirm this
                   action.
                 </p>
@@ -101,13 +101,13 @@ export function PasswordConfirmationModal({
               <div className="space-y-2">
                 <label
                   htmlFor="confirm-password"
-                  className="block text-sm font-medium text-zinc-700 dark:text-zinc-300"
+                  className="block text-sm font-medium text-on-surface-variant"
                 >
                   Password
                 </label>
                 <div className="relative">
                   <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
-                    <Lock className="h-4 w-4 text-zinc-400" />
+                    <Lock className="h-4 w-4 text-on-surface-variant" />
                   </div>
                   <input
                     id="confirm-password"
@@ -123,22 +123,22 @@ export function PasswordConfirmationModal({
                       }
                     }}
                     placeholder="Enter your password"
-                    className="block w-full pl-10 pr-3 py-2.5 bg-white dark:bg-zinc-800 border border-zinc-300 dark:border-zinc-600 rounded-lg text-zinc-900 dark:text-white placeholder-zinc-400 focus:outline-none focus:ring-2 focus:ring-red-500 dark:focus:ring-red-400 focus:border-transparent text-sm"
+                    className="block w-full pl-10 pr-3 py-2.5 bg-surface-container-lowest border border-outline-variant/30 rounded-lg text-on-surface placeholder-on-surface-variant focus:outline-none focus:ring-2 focus:ring-red-500 focus:border-transparent text-sm"
                     autoComplete="current-password"
                     disabled={isLoading}
                   />
                 </div>
                 {error && (
-                  <p className="text-sm text-red-600 dark:text-red-400">
+                  <p className="text-sm text-red-600">
                     {error}
                   </p>
                 )}
               </div>
             </>
           ) : (
-            <div className="flex items-start gap-3 p-3 rounded-lg bg-blue-50 dark:bg-blue-900/20 border border-blue-200 dark:border-blue-800">
-              <Lock className="h-5 w-5 text-blue-600 dark:text-blue-400 flex-shrink-0 mt-0.5" />
-              <p className="text-sm text-blue-700 dark:text-blue-300">
+            <div className="flex items-start gap-3 p-3 rounded-lg bg-blue-50 border border-blue-200">
+              <Lock className="h-5 w-5 text-blue-600 flex-shrink-0 mt-0.5" />
+              <p className="text-sm text-blue-700">
                 You signed in with Google, so no password is required. Click
                 confirm to proceed.
               </p>

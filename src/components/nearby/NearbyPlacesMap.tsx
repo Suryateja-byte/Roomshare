@@ -15,7 +15,7 @@
  */
 
 import { useEffect, useRef, useCallback } from "react";
-import { useTheme } from "next-themes";
+
 import maplibregl from "maplibre-gl";
 import "maplibre-gl/dist/maplibre-gl.css";
 import "@/styles/nearby-map.css";
@@ -67,7 +67,7 @@ function getCategoryIconPath(category: string): string {
 
 // OpenFreeMap tile style URLs (matching search map)
 const OPENFREEMAP_STYLE_LIGHT = "https://tiles.openfreemap.org/styles/liberty";
-const OPENFREEMAP_STYLE_DARK = "/map-styles/liberty-dark.json";
+
 
 /**
  * Create a custom home marker element using safe DOM methods
@@ -89,7 +89,7 @@ function createHomeMarkerElement(): HTMLDivElement {
   // Inner visual marker - scales on hover via group-hover
   const container = document.createElement("div");
   container.className =
-    "w-10 h-10 bg-zinc-900 rounded-full shadow-xl flex items-center justify-center transition-transform duration-200 ease-out group-hover:scale-110";
+    "w-10 h-10 bg-on-surface rounded-full shadow-xl flex items-center justify-center transition-transform duration-200 ease-out group-hover:scale-110";
 
   const svg = document.createElementNS("http://www.w3.org/2000/svg", "svg");
   svg.setAttribute("width", "20");
@@ -131,7 +131,6 @@ function createHomeMarkerElement(): HTMLDivElement {
  */
 function createPOIMarkerElement(
   category: string,
-  isDark: boolean
 ): HTMLDivElement {
   const colors = getCategoryColors(category);
   const iconPath = getCategoryIconPath(category);
@@ -146,12 +145,8 @@ function createPOIMarkerElement(
   const container = document.createElement("div");
   container.className =
     "w-8 h-8 rounded-full shadow-lg flex items-center justify-center border-2 transition-all duration-200 ease-out group-hover:scale-110 group-active:scale-95";
-  container.style.backgroundColor = isDark
-    ? colors.markerBgDark
-    : colors.markerBg;
-  container.style.borderColor = isDark
-    ? colors.markerBorderDark
-    : colors.markerBorder;
+  container.style.backgroundColor = colors.markerBg;
+  container.style.borderColor = colors.markerBorder;
 
   // Create SVG icon inside the marker
   const svg = document.createElementNS("http://www.w3.org/2000/svg", "svg");
@@ -161,7 +156,7 @@ function createPOIMarkerElement(
   svg.setAttribute("fill", "none");
   svg.setAttribute(
     "stroke",
-    isDark ? colors.markerBorderDark : colors.markerBorder
+    colors.markerBorder
   );
   svg.setAttribute("stroke-width", "1.5");
   svg.setAttribute("stroke-linecap", "round");
@@ -198,17 +193,13 @@ export default function NearbyPlacesMap({
   const listingMarkerRef = useRef<maplibregl.Marker | null>(null);
   const hasFitBoundsRef = useRef<boolean>(false);
 
-  // Get current theme for dark mode support
-  const { resolvedTheme } = useTheme();
-  const isDarkMode = resolvedTheme === "dark";
+  // Single warm theme — always use light map style
 
   // Initialize map with OpenFreeMap Liberty tiles (matching search map)
   useEffect(() => {
     if (!mapContainerRef.current) return;
 
-    const styleUrl = isDarkMode
-      ? OPENFREEMAP_STYLE_DARK
-      : OPENFREEMAP_STYLE_LIGHT;
+    const styleUrl = OPENFREEMAP_STYLE_LIGHT;
 
     const map = new maplibregl.Map({
       container: mapContainerRef.current,
@@ -248,7 +239,7 @@ export default function NearbyPlacesMap({
       listingMarkerRef.current = null;
       hasFitBoundsRef.current = false; // Reset for new map instance
     };
-  }, [listingLat, listingLng, isDarkMode]); // Re-create map when theme changes
+  }, [listingLat, listingLng]); // Re-create map when theme changes
 
   // Update POI markers when places change
   const updateMarkers = useCallback(
@@ -283,7 +274,7 @@ export default function NearbyPlacesMap({
       newPlaces.forEach((place) => {
         if (!existingMarkerMap.has(place.id)) {
           // Create new marker with category icon and theme-aware colors
-          const markerEl = createPOIMarkerElement(place.category, isDarkMode);
+          const markerEl = createPOIMarkerElement(place.category);
           markerEl.dataset.placeId = place.id; // Track by ID
 
           const marker = new maplibregl.Marker({ element: markerEl })
@@ -333,7 +324,7 @@ export default function NearbyPlacesMap({
         hasFitBoundsRef.current = true;
       }
     },
-    [listingLat, listingLng, isDarkMode]
+    [listingLat, listingLng]
   );
 
   // Update markers when places change
@@ -402,14 +393,14 @@ export default function NearbyPlacesMap({
           onClick={handleZoomIn}
           className="
             min-w-[44px] min-h-[44px]
-            bg-white/90 dark:bg-zinc-900/90 backdrop-blur-md
-            rounded-full shadow-lg border border-zinc-200/50 dark:border-zinc-700/50
+            bg-white/90 backdrop-blur-md
+            rounded-full shadow-lg border border-outline-variant/20/50
             flex items-center justify-center
-            text-zinc-700 dark:text-zinc-200
-            hover:bg-white dark:hover:bg-zinc-800
+            text-on-surface-variant
+            hover:bg-surface-container-lowest
             active:scale-95
             transition-all duration-200
-            focus:outline-none focus-visible:ring-2 focus-visible:ring-zinc-900/30 dark:focus-visible:ring-zinc-400/40 focus-visible:ring-offset-2
+            focus:outline-none focus-visible:ring-2 focus-visible:ring-primary/30 focus-visible:ring-offset-2
           "
           aria-label="Zoom in"
         >
@@ -419,14 +410,14 @@ export default function NearbyPlacesMap({
           onClick={handleZoomOut}
           className="
             min-w-[44px] min-h-[44px]
-            bg-white/90 dark:bg-zinc-900/90 backdrop-blur-md
-            rounded-full shadow-lg border border-zinc-200/50 dark:border-zinc-700/50
+            bg-white/90 backdrop-blur-md
+            rounded-full shadow-lg border border-outline-variant/20/50
             flex items-center justify-center
-            text-zinc-700 dark:text-zinc-200
-            hover:bg-white dark:hover:bg-zinc-800
+            text-on-surface-variant
+            hover:bg-surface-container-lowest
             active:scale-95
             transition-all duration-200
-            focus:outline-none focus-visible:ring-2 focus-visible:ring-zinc-900/30 dark:focus-visible:ring-zinc-400/40 focus-visible:ring-offset-2
+            focus:outline-none focus-visible:ring-2 focus-visible:ring-primary/30 focus-visible:ring-offset-2
           "
           aria-label="Zoom out"
         >
@@ -436,15 +427,15 @@ export default function NearbyPlacesMap({
           onClick={handleResetView}
           className="
             min-w-[44px] min-h-[44px]
-            bg-zinc-900/90 dark:bg-white/90 backdrop-blur-md
+            bg-on-surface/90 backdrop-blur-md
             rounded-full shadow-lg
             flex items-center justify-center
-            text-white dark:text-zinc-900
-            hover:bg-zinc-900 dark:hover:bg-white
+            text-white
+            hover:bg-on-surface
             active:scale-95
             transition-all duration-200
             mt-1
-            focus:outline-none focus-visible:ring-2 focus-visible:ring-zinc-900/30 dark:focus-visible:ring-zinc-400/40 focus-visible:ring-offset-2
+            focus:outline-none focus-visible:ring-2 focus-visible:ring-primary/30 focus-visible:ring-offset-2
           "
           aria-label="Reset to listing location"
         >
@@ -455,15 +446,15 @@ export default function NearbyPlacesMap({
             onClick={handleFitAllMarkers}
             className="
               min-w-[44px] min-h-[44px]
-              bg-white/90 dark:bg-zinc-900/90 backdrop-blur-md
-              rounded-full shadow-lg border border-zinc-200/50 dark:border-zinc-700/50
+              bg-white/90 backdrop-blur-md
+              rounded-full shadow-lg border border-outline-variant/20/50
               flex items-center justify-center
-              text-zinc-700 dark:text-zinc-200
-              hover:bg-white dark:hover:bg-zinc-800
+              text-on-surface-variant
+              hover:bg-surface-container-lowest
               active:scale-95
               transition-all duration-200
               mt-1
-              focus:outline-none focus-visible:ring-2 focus-visible:ring-zinc-900/30 dark:focus-visible:ring-zinc-400/40 focus-visible:ring-offset-2
+              focus:outline-none focus-visible:ring-2 focus-visible:ring-primary/30 focus-visible:ring-offset-2
             "
             aria-label="Fit all markers in view"
           >

@@ -24,7 +24,7 @@
  *    Block 1 (read-only) finishes entirely before Block 2 (mutations).
  */
 
-import { test, expect, timeouts } from "../helpers";
+import { test, expect, timeouts, waitForHydration } from "../helpers";
 
 // Outer serial wrapper: ensures read-only block completes before mutations.
 // Without this, fullyParallel=true lets Playwright interleave tests from
@@ -64,6 +64,7 @@ test.describe("Notifications", () => {
     test("NF-02  auth user sees Notifications heading", async ({ page }) => {
       await page.goto("/notifications");
       await page.waitForLoadState("domcontentloaded");
+      await waitForHydration(page);
 
       await expect(page.getByTestId("notifications-page").first()).toBeVisible({
         timeout: timeouts.navigation,
@@ -78,6 +79,7 @@ test.describe("Notifications", () => {
     test("NF-03  notification items are rendered", async ({ page }) => {
       await page.goto("/notifications");
       await page.waitForLoadState("domcontentloaded");
+      await waitForHydration(page);
 
       // Wait for the page shell to render
       await expect(page.getByTestId("notifications-page").first()).toBeVisible({
@@ -99,6 +101,7 @@ test.describe("Notifications", () => {
         // Retry once: reload helps if SSR had a transient session error
         await page.reload();
         await page.waitForLoadState("domcontentloaded");
+      await waitForHydration(page);
         await expect(page.getByTestId("notifications-page").first()).toBeVisible({
           timeout: timeouts.action,
         });
@@ -125,6 +128,7 @@ test.describe("Notifications", () => {
     }) => {
       await page.goto("/notifications");
       await page.waitForLoadState("domcontentloaded");
+      await waitForHydration(page);
 
       const hasItems = await page
         .getByTestId("notification-item")
@@ -156,6 +160,7 @@ test.describe("Notifications", () => {
     test("NF-05  read notifications lack unread styling", async ({ page }) => {
       await page.goto("/notifications");
       await page.waitForLoadState("domcontentloaded");
+      await waitForHydration(page);
 
       const hasItems = await page
         .getByTestId("notification-item")
@@ -188,6 +193,7 @@ test.describe("Notifications", () => {
     }) => {
       await page.goto("/notifications");
       await page.waitForLoadState("domcontentloaded");
+      await waitForHydration(page);
 
       const hasItems = await page
         .getByTestId("notification-item")
@@ -221,6 +227,7 @@ test.describe("Notifications", () => {
     }) => {
       await page.goto("/notifications");
       await page.waitForLoadState("domcontentloaded");
+      await waitForHydration(page);
 
       const hasItems = await page
         .getByTestId("notification-item")
@@ -270,6 +277,7 @@ test.describe("Notifications", () => {
     test("NF-07  mark single notification as read", async ({ page }) => {
       await page.goto("/notifications");
       await page.waitForLoadState("domcontentloaded");
+      await waitForHydration(page);
 
       const hasItems = await page
         .getByTestId("notification-item")
@@ -299,6 +307,7 @@ test.describe("Notifications", () => {
     }) => {
       await page.goto("/notifications");
       await page.waitForLoadState("domcontentloaded");
+      await waitForHydration(page);
 
       const hasItems = await page
         .getByTestId("notification-item")
@@ -315,7 +324,7 @@ test.describe("Notifications", () => {
       await unreadFilter.click();
 
       // Wait for filter to apply
-      await page.waitForTimeout(500);
+      await expect(page.getByTestId("filter-tabs")).toBeVisible({ timeout: 5000 });
 
       const unreadCount = await page.getByTestId("notification-item").count();
 
@@ -344,6 +353,7 @@ test.describe("Notifications", () => {
     }) => {
       await page.goto("/notifications");
       await page.waitForLoadState("domcontentloaded");
+      await waitForHydration(page);
 
       const hasItems = await page
         .getByTestId("notification-item")
@@ -355,7 +365,7 @@ test.describe("Notifications", () => {
       // Switch to Unread filter
       const filterTabs = page.getByTestId("filter-tabs");
       await filterTabs.getByText(/^Unread/).click();
-      await page.waitForTimeout(500);
+      await expect(filterTabs).toBeVisible({ timeout: 5000 });
 
       const unreadBefore = await page.getByTestId("notification-item").count();
       test.skip(unreadBefore === 0, "No unread notifications for filter test");
@@ -375,11 +385,12 @@ test.describe("Notifications", () => {
     test("NF-09  delete notification reduces count", async ({ page }) => {
       await page.goto("/notifications");
       await page.waitForLoadState("domcontentloaded");
+      await waitForHydration(page);
 
       // Make sure we're on "All" filter
       const filterTabs = page.getByTestId("filter-tabs");
       await filterTabs.getByText("All").click();
-      await page.waitForTimeout(300);
+      await expect(filterTabs).toBeVisible({ timeout: 5000 });
 
       const hasItems = await page
         .getByTestId("notification-item")
@@ -406,6 +417,7 @@ test.describe("Notifications", () => {
     test("NF-11  all filter shows all notifications", async ({ page }) => {
       await page.goto("/notifications");
       await page.waitForLoadState("domcontentloaded");
+      await waitForHydration(page);
 
       await expect(page.getByTestId("notifications-page").first()).toBeVisible({
         timeout: timeouts.navigation,
@@ -415,12 +427,12 @@ test.describe("Notifications", () => {
 
       // Switch to Unread first
       await filterTabs.getByText(/^Unread/).click();
-      await page.waitForTimeout(500);
+      await expect(filterTabs).toBeVisible({ timeout: 5000 });
       const unreadCount = await page.getByTestId("notification-item").count();
 
       // Switch to All
       await filterTabs.getByText("All").click();
-      await page.waitForTimeout(500);
+      await expect(filterTabs).toBeVisible({ timeout: 5000 });
       const allCount = await page.getByTestId("notification-item").count();
 
       // All count should be >= unread count
@@ -433,6 +445,7 @@ test.describe("Notifications", () => {
     }) => {
       await page.goto("/notifications");
       await page.waitForLoadState("domcontentloaded");
+      await waitForHydration(page);
 
       await expect(page.getByTestId("notifications-page").first()).toBeVisible({
         timeout: timeouts.navigation,
@@ -465,6 +478,7 @@ test.describe("Notifications", () => {
     }) => {
       await page.goto("/notifications");
       await page.waitForLoadState("domcontentloaded");
+      await waitForHydration(page);
 
       await expect(page.getByTestId("notifications-page").first()).toBeVisible({
         timeout: timeouts.navigation,
@@ -481,7 +495,7 @@ test.describe("Notifications", () => {
       // Switch to Unread filter
       const filterTabs = page.getByTestId("filter-tabs");
       await filterTabs.getByText(/^Unread/).click();
-      await page.waitForTimeout(500);
+      await expect(filterTabs).toBeVisible({ timeout: 5000 });
 
       // No notification items should be visible
       await expect(page.getByTestId("notification-item")).toHaveCount(0, {

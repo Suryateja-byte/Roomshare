@@ -136,6 +136,97 @@ describe("MapBoundsContext", () => {
 
       expect(result.current.isProgrammaticMove).toBe(false);
     });
+
+    it("should handle overlapping programmatic moves correctly (P2-16)", () => {
+      const wrapper = createWrapper();
+      const { result } = renderHook(() => useMapBounds(), { wrapper });
+
+      // Start two overlapping programmatic moves
+      act(() => {
+        result.current.setProgrammaticMove(true);
+      });
+      act(() => {
+        result.current.setProgrammaticMove(true);
+      });
+
+      expect(result.current.isProgrammaticMove).toBe(true);
+
+      // First moveEnd clears one
+      act(() => {
+        result.current.setProgrammaticMove(false);
+      });
+
+      // Flag should STILL be true (second move still in progress)
+      expect(result.current.isProgrammaticMove).toBe(true);
+
+      // Verify hasUserMoved is still guarded
+      act(() => {
+        result.current.setHasUserMoved(true);
+      });
+      expect(result.current.hasUserMoved).toBe(false);
+
+      // Second moveEnd clears the other
+      act(() => {
+        result.current.setProgrammaticMove(false);
+      });
+
+      // Now both done — flag should be false
+      expect(result.current.isProgrammaticMove).toBe(false);
+    });
+
+    it("should not go below zero on extra setProgrammaticMove(false) calls", () => {
+      const wrapper = createWrapper();
+      const { result } = renderHook(() => useMapBounds(), { wrapper });
+
+      // Call false without prior true — should stay at 0, not go negative
+      act(() => {
+        result.current.setProgrammaticMove(false);
+      });
+      act(() => {
+        result.current.setProgrammaticMove(false);
+      });
+
+      expect(result.current.isProgrammaticMove).toBe(false);
+
+      // setHasUserMoved should still work (counter is 0, not negative)
+      act(() => {
+        result.current.setHasUserMoved(true);
+      });
+      expect(result.current.hasUserMoved).toBe(true);
+    });
+
+    it("should force-clear all overlapping moves on safety timeout", () => {
+      const wrapper = createWrapper();
+      const { result } = renderHook(() => useMapBounds(), { wrapper });
+
+      // Start three overlapping programmatic moves
+      act(() => {
+        result.current.setProgrammaticMove(true);
+      });
+      act(() => {
+        result.current.setProgrammaticMove(true);
+      });
+      act(() => {
+        result.current.setProgrammaticMove(true);
+      });
+
+      expect(result.current.isProgrammaticMove).toBe(true);
+
+      // Only one moveEnd fires (other two animations were cancelled)
+      act(() => {
+        result.current.setProgrammaticMove(false);
+      });
+
+      // Counter is 2 — still active
+      expect(result.current.isProgrammaticMove).toBe(true);
+
+      // Safety timeout fires — force-clears ALL
+      act(() => {
+        jest.advanceTimersByTime(2600);
+      });
+
+      expect(result.current.isProgrammaticMove).toBe(false);
+    });
   });
 
   describe("banner visibility logic", () => {

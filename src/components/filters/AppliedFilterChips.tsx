@@ -59,7 +59,7 @@ export function AppliedFilterChips({
 
   return (
     <div
-      className="relative px-4 py-2 border-b border-zinc-100 dark:border-zinc-800 bg-white dark:bg-zinc-950"
+      className="relative px-4 py-2 border-b border-outline-variant/20 bg-surface-container-lowest"
       role="region"
       aria-label="Applied filters"
     >
@@ -67,25 +67,24 @@ export function AppliedFilterChips({
       <div className="flex items-center gap-2 overflow-x-auto scrollbar-hide">
         {/* Filter chips */}
         <div className="flex items-center gap-2 flex-nowrap">
-          {chips.map((chip, i) => (
+          {chips.map((chip) => (
             <FilterChipWithImpact
               key={chip.id}
               chip={chip}
               onRemove={() => handleRemove(chip)}
               isRemoving={isPending}
               currentCount={currentCount}
-              index={i}
             />
           ))}
         </div>
 
         {/* Clear All button - only show when multiple filters */}
-        {chips.length >= 1 && (
+        {chips.length > 1 && (
           <button
             type="button"
             onClick={handleClearAll}
             disabled={isPending}
-            className="flex-shrink-0 flex items-center gap-1.5 px-3 py-1.5 min-h-[44px] text-sm font-medium text-zinc-600 dark:text-zinc-400 hover:text-zinc-900 dark:hover:text-zinc-100 hover:bg-zinc-100 dark:hover:bg-zinc-800 rounded-full transition-colors disabled:opacity-60 disabled:cursor-not-allowed"
+            className="flex-shrink-0 flex items-center gap-1.5 px-3 py-1.5 min-h-[44px] text-sm font-medium text-on-surface-variant hover:text-on-surface hover:bg-surface-container-high rounded-full transition-colors disabled:opacity-60 disabled:cursor-not-allowed"
             aria-label="Clear all filters"
           >
             <X className="w-3.5 h-3.5" aria-hidden="true" />
@@ -96,7 +95,7 @@ export function AppliedFilterChips({
 
       {/* Right fade edge (visible when content overflows) */}
       <div
-        className="absolute right-0 top-0 bottom-0 w-8 bg-gradient-to-l from-white dark:from-zinc-950 to-transparent pointer-events-none md:hidden"
+        className="absolute right-0 top-0 bottom-0 w-8 bg-gradient-to-l from-white to-transparent pointer-events-none md:hidden"
         aria-hidden="true"
       />
     </div>

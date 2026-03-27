@@ -181,9 +181,9 @@ export function DatePicker({
         id={id}
         aria-describedby={ariaDescribedBy}
         className={cn(
-          "w-full flex items-center justify-between gap-2 p-2.5 sm:p-3 rounded-xl",
-          "border border-zinc-200 dark:border-zinc-700",
-          "bg-white dark:bg-zinc-800",
+          "w-full flex items-center justify-between gap-2 p-2.5 sm:p-3 rounded-lg",
+          "border border-outline-variant/20",
+          "bg-surface-container-lowest",
           "text-sm touch-target text-left",
           className
         )}
@@ -191,8 +191,8 @@ export function DatePicker({
         <span
           className={cn(
             value
-              ? "text-zinc-900 dark:text-white"
-              : "text-zinc-400 dark:text-zinc-500"
+              ? "text-on-surface"
+              : "text-on-surface-variant"
           )}
         >
           {value ? formatDisplayDate(value) : placeholder}
@@ -200,10 +200,10 @@ export function DatePicker({
         <div className="flex items-center gap-1">
           {value && (
             <span className="p-0.5">
-              <X className="w-3.5 h-3.5 text-zinc-400" />
+              <X className="w-3.5 h-3.5 text-on-surface-variant" />
             </span>
           )}
-          <Calendar className="w-4 h-4 text-zinc-400" />
+          <Calendar className="w-4 h-4 text-on-surface-variant" />
         </div>
       </button>
     );
@@ -217,11 +217,11 @@ export function DatePicker({
         aria-describedby={ariaDescribedBy}
         aria-invalid={ariaInvalid}
         className={cn(
-          "w-full flex items-center justify-between gap-2 p-2.5 sm:p-3 rounded-xl",
-          "border border-zinc-200 dark:border-zinc-700",
-          "bg-white dark:bg-zinc-800",
-          "hover:border-zinc-300 dark:hover:border-zinc-600",
-          "focus:outline-none focus:ring-2 focus:ring-zinc-900/10 dark:focus:ring-zinc-400/20",
+          "w-full flex items-center justify-between gap-2 p-2.5 sm:p-3 rounded-lg",
+          "border border-outline-variant/20",
+          "bg-surface-container-lowest",
+          "hover:border-outline-variant/30",
+          "focus:outline-none focus:ring-2 focus:ring-primary/30",
           "transition-all duration-200",
           "text-sm touch-target text-left",
           className
@@ -230,8 +230,8 @@ export function DatePicker({
         <span
           className={cn(
             value
-              ? "text-zinc-900 dark:text-white"
-              : "text-zinc-400 dark:text-zinc-500"
+              ? "text-on-surface"
+              : "text-on-surface-variant"
           )}
         >
           {value ? formatDisplayDate(value) : placeholder}
@@ -251,12 +251,12 @@ export function DatePicker({
                   handleClear();
                 }
               }}
-              className="p-0.5 hover:bg-zinc-100 dark:hover:bg-zinc-700 rounded transition-colors"
+              className="p-0.5 hover:bg-surface-container-high rounded transition-colors"
             >
-              <X className="w-3.5 h-3.5 text-zinc-400" />
+              <X className="w-3.5 h-3.5 text-on-surface-variant" />
             </span>
           )}
-          <Calendar className="w-4 h-4 text-zinc-400" />
+          <Calendar className="w-4 h-4 text-on-surface-variant" />
         </div>
       </Popover.Trigger>
 
@@ -264,10 +264,9 @@ export function DatePicker({
         <Popover.Content
           className={cn(
             "z-popover p-4",
-            "bg-white/95 dark:bg-zinc-900/95 backdrop-blur-xl",
-            "rounded-xl",
-            "shadow-lg dark:shadow-xl",
-            "border border-zinc-200/80 dark:border-zinc-700/80",
+            "bg-surface-container-lowest/95 backdrop-blur-[20px]",
+            "rounded-lg",
+            "shadow-ambient",
             "animate-in fade-in-0",
             "data-[state=closed]:animate-out data-[state=closed]:fade-out-0",
             "data-[side=bottom]:slide-in-from-top-2",
@@ -281,21 +280,21 @@ export function DatePicker({
             <button
               type="button"
               onClick={handlePrevMonth}
-              className="p-2 hover:bg-zinc-100 dark:hover:bg-zinc-800 rounded-xl transition-colors"
+              className="p-2 hover:bg-surface-container-high rounded-lg transition-colors"
               aria-label="Previous month"
             >
-              <ChevronLeft className="w-4 h-4 text-zinc-600 dark:text-zinc-400" />
+              <ChevronLeft className="w-4 h-4 text-on-surface-variant" />
             </button>
-            <span className="text-sm font-semibold text-zinc-900 dark:text-white">
+            <span className="text-sm font-semibold text-on-surface">
               {MONTHS[viewDate.getMonth()]} {viewDate.getFullYear()}
             </span>
             <button
               type="button"
               onClick={handleNextMonth}
-              className="p-2 hover:bg-zinc-100 dark:hover:bg-zinc-800 rounded-xl transition-colors"
+              className="p-2 hover:bg-surface-container-high rounded-lg transition-colors"
               aria-label="Next month"
             >
-              <ChevronRight className="w-4 h-4 text-zinc-600 dark:text-zinc-400" />
+              <ChevronRight className="w-4 h-4 text-on-surface-variant" />
             </button>
           </div>
 
@@ -304,7 +303,7 @@ export function DatePicker({
             {DAYS.map((day) => (
               <div
                 key={day}
-                className="h-8 flex items-center justify-center text-xs font-medium text-zinc-500 dark:text-zinc-400"
+                className="h-8 flex items-center justify-center text-xs font-medium text-on-surface-variant uppercase tracking-[0.05em]"
               >
                 {day}
               </div>
@@ -324,19 +323,19 @@ export function DatePicker({
                   disabled={day.isDisabled}
                   onClick={() => handleDateSelect(day.date)}
                   className={cn(
-                    "h-9 w-9 flex items-center justify-center text-sm rounded-xl transition-all duration-200",
-                    !day.isCurrentMonth && "text-zinc-400 dark:text-zinc-500",
+                    "h-9 w-9 flex items-center justify-center text-sm rounded-lg transition-all duration-200",
+                    !day.isCurrentMonth && "text-on-surface-variant",
                     day.isCurrentMonth &&
                       !selected &&
                       !day.isDisabled &&
-                      "text-zinc-900 dark:text-white hover:bg-zinc-100 dark:hover:bg-zinc-800",
+                      "text-on-surface hover:bg-surface-container-high",
                     day.isDisabled &&
-                      "text-zinc-400 dark:text-zinc-500 cursor-not-allowed",
+                      "text-on-surface-variant cursor-not-allowed",
                     todayDate &&
                       !selected &&
-                      "ring-2 ring-zinc-900/20 dark:ring-white/20",
+                      "ring-2 ring-on-surface/20",
                     selected &&
-                      "bg-zinc-900 dark:bg-white text-white dark:text-zinc-900 font-medium"
+                      "bg-primary text-on-primary font-medium"
                   )}
                 >
                   {day.date.getDate()}
@@ -346,18 +345,18 @@ export function DatePicker({
           </div>
 
           {/* Footer */}
-          <div className="flex items-center justify-between mt-4 pt-3 border-t border-zinc-100 dark:border-zinc-800">
+          <div className="flex items-center justify-between mt-4 pt-3 border-t border-surface-container-high">
             <button
               type="button"
               onClick={handleClear}
-              className="text-sm font-medium text-zinc-500 dark:text-zinc-400 hover:text-zinc-900 dark:hover:text-white transition-colors"
+              className="text-sm font-medium text-on-surface-variant hover:text-on-surface transition-colors"
             >
               Clear
             </button>
             <button
               type="button"
               onClick={handleToday}
-              className="text-sm font-medium text-zinc-900 dark:text-white hover:text-zinc-600 dark:hover:text-zinc-300 transition-colors"
+              className="text-sm font-medium text-on-surface hover:text-on-surface-variant transition-colors"
             >
               Today
             </button>

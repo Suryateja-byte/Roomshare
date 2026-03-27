@@ -168,21 +168,33 @@ test.describe("J36: Block a User", () => {
       await page.waitForLoadState("domcontentloaded");
     }
 
-    // Step 5: Verify block happened — toast or unblock button should appear
-    // Allow extra time for mobile where UI feedback may be delayed
+    // Step 5: Verify block happened — unblock button, toast, or "blocked" text
+    // CI runners are slow; use generous timeouts and multiple fallback signals
     const unblockBtn = page.getByRole("button", { name: /unblock/i });
     const isBlocked = await unblockBtn
-      .waitFor({ state: "visible", timeout: 5000 })
+      .waitFor({ state: "visible", timeout: 15_000 })
       .then(() => true)
       .catch(() => false);
     const hasToast = isBlocked
       ? false
       : await page
           .locator(selectors.toast)
-          .waitFor({ state: "visible", timeout: 5000 })
+          .first()
+          .waitFor({ state: "visible", timeout: 10_000 })
           .then(() => true)
           .catch(() => false);
-    expect(hasToast || isBlocked).toBeTruthy();
+    const hasBlockedText = (isBlocked || hasToast)
+      ? false
+      : await page
+          .getByText(/blocked|block successful/i)
+          .first()
+          .waitFor({ state: "visible", timeout: 5_000 })
+          .then(() => true)
+          .catch(() => false);
+    expect(
+      hasToast || isBlocked || hasBlockedText,
+      "Block action did not produce any visible feedback (unblock button, toast, or blocked text)"
+    ).toBeTruthy();
 
     // Clean up: unblock
     if (isBlocked) {

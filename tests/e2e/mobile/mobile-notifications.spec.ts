@@ -1,4 +1,4 @@
-import { test, expect } from "../helpers";
+import { test, expect, waitForHydration } from "../helpers";
 
 test.use({ viewport: { width: 390, height: 844 } });
 test.use({ storageState: "playwright/.auth/user.json" });
@@ -7,6 +7,7 @@ test.describe("Mobile Notifications", () => {
   test.beforeEach(async ({ page }) => {
     await page.goto("/notifications");
     await page.waitForLoadState("domcontentloaded");
+    await waitForHydration(page);
   });
 
   test("MN-01: Notifications page renders in mobile layout", async ({
@@ -139,7 +140,7 @@ test.describe("Mobile Notifications", () => {
 
     // Tap the unread filter and verify it activates
     await unreadButton.click();
-    await page.waitForTimeout(300);
+    await page.evaluate(() => new Promise(r => requestAnimationFrame(() => requestAnimationFrame(r))));
 
     // The unread button should now be active (has active styling)
     // Verify the page still renders correctly
@@ -162,7 +163,7 @@ test.describe("Mobile Notifications", () => {
         .first();
       if (await unreadButton.isVisible({ timeout: 3000 }).catch(() => false)) {
         await unreadButton.click();
-        await page.waitForTimeout(500);
+        await page.evaluate(() => new Promise(r => requestAnimationFrame(() => requestAnimationFrame(r))));
       }
     }
 

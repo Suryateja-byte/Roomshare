@@ -256,17 +256,23 @@ export const createListingSchema = z.object({
     .string()
     .trim()
     .min(1, "Address is required")
-    .max(200, "Address must be 200 characters or less"),
+    .max(200, "Address must be 200 characters or less")
+    .transform(sanitizeUnicode)
+    .refine(noHtmlTags, NO_HTML_MSG),
   city: z
     .string()
     .trim()
     .min(1, "City is required")
-    .max(100, "City must be 100 characters or less"),
+    .max(100, "City must be 100 characters or less")
+    .transform(sanitizeUnicode)
+    .refine(noHtmlTags, NO_HTML_MSG),
   state: z
     .string()
     .trim()
     .min(1, "State is required")
-    .max(50, "State must be 50 characters or less"),
+    .max(50, "State must be 50 characters or less")
+    .transform(sanitizeUnicode)
+    .refine(noHtmlTags, NO_HTML_MSG),
   zip: z
     .string()
     .trim()
@@ -297,6 +303,19 @@ export const createListingApiSchema = createListingSchema.extend({
 });
 
 export type CreateListingApiInput = z.infer<typeof createListingApiSchema>;
+
+/**
+ * Client-side validation schema — validates enum fields without image URL host check.
+ * Used in CreateListingForm for pre-submit validation with better error messages.
+ * Does NOT validate images (validated separately) or languages (validated separately).
+ */
+export const createListingClientSchema = createListingSchema.extend({
+  leaseDuration: listingLeaseDurationSchema,
+  roomType: listingRoomTypeSchema,
+  genderPreference: listingGenderPreferenceSchema,
+  householdGender: listingHouseholdGenderSchema,
+  bookingMode: listingBookingModeSchema,
+});
 
 // Booking validation schema with industry-standard 30-day minimum
 export const createBookingSchema = z

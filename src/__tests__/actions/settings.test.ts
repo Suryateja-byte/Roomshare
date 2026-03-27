@@ -208,7 +208,9 @@ describe("settings actions", () => {
       const result = await changePassword("oldpass", "12345");
 
       expect(result.success).toBe(false);
-      expect(result.error).toBe("Password must be between 12 and 128 characters");
+      expect(result.error).toBe(
+        "Password must be between 12 and 128 characters"
+      );
     });
 
     it("returns error when user has no password (OAuth account)", async () => {
@@ -277,7 +279,7 @@ describe("settings actions", () => {
 
       expect(prisma.user.update).toHaveBeenCalledWith({
         where: { id: "user-123" },
-        data: { password: "newhashed" },
+        data: { password: "newhashed", passwordChangedAt: expect.any(Date) },
       });
       expect(result.success).toBe(true);
     });

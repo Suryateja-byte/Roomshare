@@ -71,7 +71,7 @@ test.describe("Create Listing — Accessibility Tests", () => {
     await clp.submit();
 
     // Wait for validation messages to render
-    await page.waitForTimeout(500);
+    await page.waitForSelector('[role="alert"], [aria-invalid="true"], .text-destructive, :invalid', { timeout: 5000 }).catch(() => {});
 
     const results = await new AxeBuilder({ page })
       .withTags(["wcag2a", "wcag2aa"])
@@ -90,7 +90,7 @@ test.describe("Create Listing — Accessibility Tests", () => {
     await clp.uploadTestImage();
 
     // Wait for upload preview to render
-    await page.waitForTimeout(500);
+    await expect(page.locator('img[alt^="Preview"]').first()).toBeVisible({ timeout: 10000 });
 
     const results = await new AxeBuilder({ page })
       .withTags(["wcag2a", "wcag2aa"])
@@ -110,7 +110,7 @@ test.describe("Create Listing — Accessibility Tests", () => {
     const startFresh = page.getByRole("button", { name: "Start Fresh" });
     if (await startFresh.isVisible({ timeout: 2000 }).catch(() => false)) {
       await startFresh.click();
-      await page.waitForTimeout(300);
+      await expect(startFresh).not.toBeVisible({ timeout: 5000 });
     }
 
     // Open the move-in date picker popover (button trigger)
@@ -185,7 +185,7 @@ test.describe("Create Listing — Accessibility Tests", () => {
     const data = validData();
     await clp.fillRequiredFields(data);
     await clp.uploadTestImage();
-    await page.waitForTimeout(500);
+    await clp.waitForUploadComplete();
 
     // Focus the submit button and press Enter
     await clp.submitButton.focus();
@@ -218,11 +218,11 @@ test.describe("Create Listing — Accessibility Tests", () => {
     // Fill image to avoid client-side image block, leave required text fields empty
     await clp.mockImageUpload();
     await clp.uploadTestImage();
-    await page.waitForTimeout(300);
+    await clp.waitForUploadComplete();
 
     // Submit the form
     await clp.submit();
-    await page.waitForTimeout(500);
+    await expect(clp.errorBanner.or(clp.titleInput)).toBeVisible({ timeout: 5000 });
 
     // After validation failure, focus should move to the first error field
     // or the error banner should be visible for screen readers

@@ -5,18 +5,9 @@
  * Uses chromium-anon project to avoid auth dependency.
  */
 
-import { test as base, expect } from "@playwright/test";
+import { test, expect, SF_BOUNDS } from "./helpers/test-utils";
 
-const SF_BOUNDS = {
-  minLat: 37.7,
-  maxLat: 37.85,
-  minLng: -122.52,
-  maxLng: -122.35,
-};
 const boundsQS = `minLat=${SF_BOUNDS.minLat}&maxLat=${SF_BOUNDS.maxLat}&minLng=${SF_BOUNDS.minLng}&maxLng=${SF_BOUNDS.maxLng}`;
-
-// Use base test without auth fixtures
-const test = base;
 
 // Helper: wait for search page content to load
 async function waitForSearchPage(page: import("@playwright/test").Page) {
@@ -120,7 +111,6 @@ test.describe("3.5: Sort Options", () => {
 
     if (visible) {
       await sortEl.click();
-      await page.waitForTimeout(500);
     }
     // Page loads without error = pass
     expect(await page.title()).toBeTruthy();
@@ -135,7 +125,11 @@ test.describe("3.6: Applied Filter Chips", () => {
     await page.goto(`/search?${boundsQS}&roomType=Private+Room`, {
       waitUntil: "domcontentloaded",
     });
-    await page.waitForTimeout(5000);
+    // Wait for listings or empty state to confirm page loaded
+    await page
+      .locator('h3, a[href^="/listings/"]')
+      .first()
+      .waitFor({ state: "attached", timeout: 30_000 });
 
     // Check if applied filters region or Private Room text appears
     const filtersRegion = page.locator('[aria-label="Applied filters"]');
@@ -156,7 +150,11 @@ test.describe("3.6: Applied Filter Chips", () => {
       `/search?${boundsQS}&roomType=Private+Room&amenities=Wifi`,
       { waitUntil: "domcontentloaded" }
     );
-    await page.waitForTimeout(5000);
+    // Wait for listings or empty state to confirm page loaded
+    await page
+      .locator('h3, a[href^="/listings/"]')
+      .first()
+      .waitFor({ state: "attached", timeout: 30_000 });
 
     const clearAll = page.locator(
       'button[aria-label="Clear all filters"], button:has-text("Clear all")'
@@ -199,7 +197,7 @@ test.describe("3.7: Natural Language Search", () => {
     expect(url.searchParams.get("amenities")).toBe("Furnished");
 
     // Page renders without errors
-    await page.waitForTimeout(3000);
+    await page.waitForLoadState("domcontentloaded");
     expect(await page.title()).toBeTruthy();
   });
 
@@ -209,7 +207,7 @@ test.describe("3.7: Natural Language Search", () => {
     await page.goto(`/search?${boundsQS}`, {
       waitUntil: "domcontentloaded",
     });
-    await page.waitForTimeout(3000);
+    await page.waitForLoadState("networkidle").catch(() => {});
 
     const searchInput = page
       .locator(
@@ -221,7 +219,7 @@ test.describe("3.7: Natural Language Search", () => {
 
     await searchInput.fill("Austin TX");
     await page.keyboard.press("Enter");
-    await page.waitForTimeout(2000);
+    await page.waitForLoadState("domcontentloaded");
 
     const url = new URL(page.url());
     expect(url.searchParams.has("maxPrice")).toBe(false);

@@ -9,22 +9,20 @@ import {
 /**
  * V1PathResetSetter - Resets V2 context state when V1 fallback path runs.
  *
- * This component is the mirror of V2MapDataSetter. While V2MapDataSetter
- * signals "v2 mode active" when v2 search succeeds, this component signals
- * "v1 mode active" when v2 fails and v1 fallback runs.
+ * This component signals "v1 mode active" by resetting V2 context state.
+ * It renders on EVERY page load (both V1 and V2 paths) at page.tsx:433.
  *
- * Problem it solves:
- * - SearchV2DataContext state persists at layout level (across page navigations)
- * - When v2 fails, V2MapDataSetter doesn't render (no v2 data)
- * - But isV2Enabled stays true from previous successful v2 search
- * - PersistentMapWrapper's race guard loops forever waiting for v2 data
+ * NOTE: V2MapDataSetter (the v2 success path counterpart) exists but is
+ * NOT currently rendered anywhere in production code. The V2 map data path
+ * is dead code — V2 search LIST data works via executeSearchV2, but V2 MAP
+ * data (GeoJSON/pins) is never injected into context. When V2 map feature
+ * ships, V2MapDataSetter should be wired into page.tsx.
  *
- * Solution:
- * - When v1 path runs, this component explicitly resets:
- *   - isV2Enabled = false (stops race guard from waiting)
- *   - v2MapData = null (clears stale data)
+ * What this component does:
+ * - Sets isV2Enabled = false (tells PersistentMapWrapper to use V1 fetch)
+ * - Sets v2MapData = null with version guard (prevents race with V2MapDataSetter if wired)
  *
- * @see V2MapDataSetter for the v2 success path equivalent
+ * @see V2MapDataSetter for the v2 success path (currently unrendered)
  * @see PersistentMapWrapper for the race guard that depends on this state
  */
 export function V1PathResetSetter() {

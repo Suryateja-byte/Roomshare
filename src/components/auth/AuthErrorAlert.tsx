@@ -10,20 +10,20 @@ interface AuthErrorAlertProps {
 const severityStyles = {
   error: {
     container:
-      "bg-red-50 dark:bg-red-900/20 border-red-200 dark:border-red-800",
-    text: "text-red-700 dark:text-red-400",
+      "bg-red-50 border-red-200",
+    text: "text-red-700",
     icon: AlertCircle,
   },
   warning: {
     container:
-      "bg-amber-50 dark:bg-amber-900/20 border-amber-200 dark:border-amber-800",
-    text: "text-amber-700 dark:text-amber-400",
+      "bg-amber-50 border-amber-200",
+    text: "text-amber-700",
     icon: AlertTriangle,
   },
   info: {
     container:
-      "bg-blue-50 dark:bg-blue-900/20 border-blue-200 dark:border-blue-800",
-    text: "text-blue-700 dark:text-blue-400",
+      "bg-blue-50 border-blue-200",
+    text: "text-blue-700",
     icon: Info,
   },
 };

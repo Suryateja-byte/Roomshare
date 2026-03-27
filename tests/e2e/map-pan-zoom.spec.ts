@@ -33,7 +33,7 @@ const AREA_COUNT_DEBOUNCE_MS = 600;
 async function waitForSearchPage(page: import("@playwright/test").Page) {
   await page.goto(SEARCH_URL);
   await page.waitForLoadState("domcontentloaded");
-  await page.waitForSelector("button", { timeout: 30_000 });
+  await page.locator("button").first().waitFor({ state: "visible", timeout: 30_000 });
   await waitForMapReady(page);
 }
 

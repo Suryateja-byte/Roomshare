@@ -135,16 +135,16 @@ export default function ListingFreshnessCheck({
   if (isDeleted) {
     return (
       <div className="fixed top-20 left-0 right-0 z-50 mx-4 sm:mx-auto sm:max-w-lg animate-in slide-in-from-top-4 fade-in duration-300">
-        <div className="bg-red-50 dark:bg-red-950 border border-red-200 dark:border-red-800 rounded-xl p-4 shadow-lg">
+        <div className="bg-red-50 border border-red-200 rounded-xl p-4 shadow-lg">
           <div className="flex items-start gap-3">
-            <div className="flex-shrink-0 w-10 h-10 bg-red-100 dark:bg-red-900 rounded-full flex items-center justify-center">
-              <AlertTriangle className="w-5 h-5 text-red-600 dark:text-red-400" />
+            <div className="flex-shrink-0 w-10 h-10 bg-red-100 rounded-full flex items-center justify-center">
+              <AlertTriangle className="w-5 h-5 text-red-600" />
             </div>
             <div className="flex-1">
-              <h3 className="font-semibold text-red-900 dark:text-red-100">
+              <h3 className="font-semibold text-red-900">
                 Listing No Longer Available
               </h3>
-              <p className="text-sm text-red-700 dark:text-red-300 mt-1">
+              <p className="text-sm text-red-700 mt-1">
                 This listing has been removed by the host.
               </p>
               <button
@@ -164,16 +164,16 @@ export default function ListingFreshnessCheck({
   if (isUnavailable) {
     return (
       <div className="fixed top-20 left-0 right-0 z-50 mx-4 sm:mx-auto sm:max-w-lg animate-in slide-in-from-top-4 fade-in duration-300">
-        <div className="bg-amber-50 dark:bg-amber-950 border border-amber-200 dark:border-amber-800 rounded-xl p-4 shadow-lg">
+        <div className="bg-amber-50 border border-amber-200 rounded-xl p-4 shadow-lg">
           <div className="flex items-start gap-3">
-            <div className="flex-shrink-0 w-10 h-10 bg-amber-100 dark:bg-amber-900 rounded-full flex items-center justify-center">
-              <AlertTriangle className="w-5 h-5 text-amber-600 dark:text-amber-400" />
+            <div className="flex-shrink-0 w-10 h-10 bg-amber-100 rounded-full flex items-center justify-center">
+              <AlertTriangle className="w-5 h-5 text-amber-600" />
             </div>
             <div className="flex-1">
-              <h3 className="font-semibold text-amber-900 dark:text-amber-100">
+              <h3 className="font-semibold text-amber-900">
                 Listing Currently Unavailable
               </h3>
-              <p className="text-sm text-amber-700 dark:text-amber-300 mt-1">
+              <p className="text-sm text-amber-700 mt-1">
                 The host has paused or marked this listing as rented.
               </p>
               <button

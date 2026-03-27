@@ -28,6 +28,7 @@ import {
   sanitizeSearchQuery,
   isValidQuery,
   crossesAntimeridian,
+  hasValidCoordinates,
 } from "@/lib/search-types";
 import { sanitizeMapListings } from "@/lib/maps/sanitize-map-listings";
 import {
@@ -66,6 +67,10 @@ interface MapListingRaw {
   primaryImage: string | null;
   lat: number | string;
   lng: number | string;
+  avgRating: number | string | null;
+  reviewCount: number | string | null;
+  recommendedScore: number | string | null;
+  createdAt: string | null;
 }
 
 /** Raw row shape from paginated listings query */
@@ -206,7 +211,7 @@ function createSearchDocCountCacheKey(params: FilterParams): string {
  * @param startParamIndex - Starting parameter index for SQL placeholders
  * @returns Object with WHERE clause fragment and params
  */
-function buildKeysetWhereClause(
+export function buildKeysetWhereClause(
   cursor: KeysetCursor,
   sort: SortOption,
   startParamIndex: number
@@ -227,6 +232,10 @@ function buildKeysetWhereClause(
       const dateParam = nextParam();
       const idParam = nextParam();
       const cursorScore = cursor.k[0] !== null ? parseFloat(cursor.k[0]) : null;
+      // Defense-in-depth: reject NaN cursor values (e.g., from DB NaN in float8 column)
+      if (cursorScore !== null && !Number.isFinite(cursorScore)) {
+        return { clause: "FALSE", params: [], nextParamIndex: startParamIndex };
+      }
       params.push(cursorScore, cursor.k[1], cursor.id);
 
       if (cursorScore === null) {
@@ -270,6 +279,9 @@ function buildKeysetWhereClause(
       const idParam = nextParam();
 
       const cursorPrice = cursor.k[0] !== null ? parseFloat(cursor.k[0]) : null;
+      if (cursorPrice !== null && !Number.isFinite(cursorPrice)) {
+        return { clause: "FALSE", params: [], nextParamIndex: startParamIndex };
+      }
       params.push(cursorPrice, cursor.k[1], cursor.id);
 
       // Handle NULL cursor price separately to avoid SQL comparison issues (d.price = NULL always false)
@@ -302,6 +314,9 @@ function buildKeysetWhereClause(
       const idParam = nextParam();
 
       const cursorPrice = cursor.k[0] !== null ? parseFloat(cursor.k[0]) : null;
+      if (cursorPrice !== null && !Number.isFinite(cursorPrice)) {
+        return { clause: "FALSE", params: [], nextParamIndex: startParamIndex };
+      }
       params.push(cursorPrice, cursor.k[1], cursor.id);
 
       // Handle NULL cursor price separately to avoid SQL comparison issues
@@ -338,6 +353,12 @@ function buildKeysetWhereClause(
         cursor.k[0] !== null ? parseFloat(cursor.k[0]) : null;
       const cursorCount =
         cursor.k[1] !== null ? parseInt(cursor.k[1], 10) : null;
+      if (
+        (cursorRating !== null && !Number.isFinite(cursorRating)) ||
+        (cursorCount !== null && !Number.isFinite(cursorCount))
+      ) {
+        return { clause: "FALSE", params: [], nextParamIndex: startParamIndex };
+      }
       params.push(cursorRating, cursorCount, cursor.k[2], cursor.id);
 
       // Handle NULL cursor values separately to avoid SQL comparison issues
@@ -351,11 +372,18 @@ function buildKeysetWhereClause(
           )
         )`;
       } else if (cursorCount === null) {
-        // Cursor has rating but NULL review_count (within the same rating, NULLs come last)
-        // Only compare tie-breaker columns within the NULL review_count group
+        // Cursor has rating but NULL review_count.
+        // ORDER BY uses review_count DESC — PostgreSQL default is NULLS FIRST for DESC,
+        // so NULL counts sort BEFORE non-NULL counts within the same rating.
+        // "After cursor" means:
+        //   1. Lower rating (always after in DESC)
+        //   2. NULL rating (NULLS LAST)
+        //   3. Same rating, non-NULL count (ALL — they sort after NULLs in DESC NULLS FIRST)
+        //   4. Same rating, NULL count, later by date/id tiebreaker
         clause = `(
           (d.avg_rating < ${ratingParam}::float8)
           OR (d.avg_rating IS NULL)
+          OR (d.avg_rating = ${ratingParam}::float8 AND d.review_count IS NOT NULL)
           OR (d.avg_rating = ${ratingParam}::float8 AND d.review_count IS NULL AND d.listing_created_at < ${dateParam}::timestamptz)
           OR (d.avg_rating = ${ratingParam}::float8 AND d.review_count IS NULL AND d.listing_created_at = ${dateParam}::timestamptz AND d.id > ${idParam})
         )`;
@@ -519,16 +547,15 @@ export function buildSearchDocWhereConditions(
     }
   }
 
-  // Amenities filter (AND logic) - uses partial matching (LIKE) for consistency
-  // UI sends 'Pool' but DB may have 'Pool Access'; GIN index not used here
+  // Amenities filter (AND logic) - exact containment using GIN index (#40)
+  // VALID_AMENITIES are 9 exact values enforced by schema validation (schemas.ts:216-223).
+  // All stored lowercased in amenities_lower. Uses @> for GIN index performance.
   if (amenities?.length) {
     const normalizedAmenities = amenities
       .map((a) => a.trim().toLowerCase())
       .filter(Boolean);
     if (normalizedAmenities.length > 0) {
-      conditions.push(
-        `NOT EXISTS (SELECT 1 FROM unnest($${paramIndex++}::text[]) AS search_term WHERE NOT EXISTS (SELECT 1 FROM unnest(d.amenities_lower) AS la WHERE la LIKE '%' || search_term || '%'))`
-      );
+      conditions.push(`d.amenities_lower @> $${paramIndex++}::text[]`);
       params.push(normalizedAmenities);
     }
   }
@@ -694,32 +721,35 @@ export async function getSearchDocLimitedCount(
  * Shared by all paginated listing queries to avoid duplication.
  */
 function mapRawListingsToPublic(listings: ListingRaw[]): ListingData[] {
-  return listings.map((l) => ({
-    id: l.id,
-    title: l.title,
-    description: l.description,
-    price: Number(l.price),
-    images: l.images || [],
-    availableSlots: l.availableSlots,
-    totalSlots: l.totalSlots,
-    amenities: l.amenities || [],
-    houseRules: l.houseRules || [],
-    householdLanguages: l.householdLanguages || [],
-    primaryHomeLanguage: l.primaryHomeLanguage,
-    leaseDuration: l.leaseDuration,
-    roomType: l.roomType,
-    moveInDate: l.moveInDate ? new Date(l.moveInDate) : undefined,
-    createdAt: l.createdAt ? new Date(l.createdAt) : new Date(),
-    viewCount: Number(l.viewCount) || 0,
-    avgRating: Number(l.avgRating) || 0,
-    reviewCount: Number(l.reviewCount) || 0,
-    location: {
-      city: l.city,
-      state: l.state,
-      lat: Number(l.lat) || 0,
-      lng: Number(l.lng) || 0,
-    },
-  }));
+  return listings
+    .filter((l) => hasValidCoordinates(Number(l.lat), Number(l.lng)))
+    .map((l) => ({
+      id: l.id,
+      title: l.title,
+      description: l.description,
+      price: Number(l.price),
+      images: l.images || [],
+      availableSlots: l.availableSlots,
+      totalSlots: l.totalSlots,
+      amenities: l.amenities || [],
+      houseRules: l.houseRules || [],
+      householdLanguages: l.householdLanguages || [],
+      primaryHomeLanguage: l.primaryHomeLanguage,
+      leaseDuration: l.leaseDuration,
+      roomType: l.roomType,
+      moveInDate: l.moveInDate && !isNaN(new Date(l.moveInDate).getTime())
+        ? new Date(l.moveInDate) : undefined,
+      createdAt: l.createdAt ? new Date(l.createdAt) : new Date(),
+      viewCount: Number(l.viewCount) || 0,
+      avgRating: Number(l.avgRating) || 0,
+      reviewCount: Number(l.reviewCount) || 0,
+      location: {
+        city: l.city,
+        state: l.state,
+        lat: Number(l.lat),
+        lng: Number(l.lng),
+      },
+    }));
 }
 
 // ============================================
@@ -777,7 +807,11 @@ async function getSearchDocMapListingsInternal(
       d.available_slots as "availableSlots",
       d.images[1] as "primaryImage",
       d.lat,
-      d.lng
+      d.lng,
+      d.avg_rating as "avgRating",
+      d.review_count as "reviewCount",
+      d.recommended_score as "recommendedScore",
+      d.listing_created_at as "createdAt"
     FROM listing_search_docs d
     WHERE ${whereClause}
     ORDER BY ${orderByClause}
@@ -804,9 +838,17 @@ async function getSearchDocMapListingsInternal(
         availableSlots: l.availableSlots,
         images: l.primaryImage ? [l.primaryImage] : [],
         location: {
-          lat: l.lat,
-          lng: l.lng,
+          // MED-4 FIX: Explicit Number() conversion — PostgreSQL raw queries may return
+          // numeric/float8 columns as strings depending on column type.
+          lat: Number(l.lat),
+          lng: Number(l.lng),
         },
+        avgRating: Number(l.avgRating) || 0,
+        reviewCount: Number(l.reviewCount) || 0,
+        // L-9 FIX: Use explicit null check instead of falsy coalescing.
+        // `Number(0) || null` falsely converts a valid score of 0 to null.
+        recommendedScore: l.recommendedScore != null ? Number(l.recommendedScore) : null,
+        createdAt: l.createdAt ? new Date(l.createdAt) : null,
       }))
     );
 
@@ -881,9 +923,11 @@ async function expandWithNearMatches(
     .filter((item) => !exactIds.has(item.id))
     .slice(0, LOW_RESULTS_THRESHOLD)
     .map((item) => {
-      const availableFromStr = item.moveInDate
-        ? item.moveInDate.toISOString().split("T")[0]
-        : null;
+      // EU-C: Guard against Invalid Date before calling toISOString()
+      const availableFromStr =
+        item.moveInDate && !isNaN(item.moveInDate.getTime())
+          ? item.moveInDate.toISOString().split("T")[0]
+          : null;
       const isNearMatchResult = isNearMatch(
         { price: item.price, available_from: availableFromStr },
         params,
@@ -1023,8 +1067,10 @@ async function getSearchDocListingsPaginatedInternal(
       items.length > 0 &&
       safePage === 1
     ) {
+      // Route through cached wrapper so near-match expansion benefits from
+      // unstable_cache (60s TTL) instead of hitting DB on every cache miss (#34)
       const result = await expandWithNearMatches(items, params, (p) =>
-        getSearchDocListingsPaginatedInternal(p)
+        getSearchDocListingsPaginated(p)
       );
       items = result.items;
       nearMatchCount = result.nearMatchCount;
@@ -1233,7 +1279,20 @@ export async function getSearchDocListingsWithKeyset(
     // Near matches are only shown on page 1 which uses offset-based pagination
 
     // Hybrid count - use cached count for consistency
-    const limitedCount = await getSearchDocLimitedCount(params);
+    // Wrapped in try/catch: count is informational only (for UI pagination).
+    // If it fails, return null (UI shows "100+") rather than discarding valid listings.
+    let limitedCount: number | null = null;
+    try {
+      limitedCount = await getSearchDocLimitedCount(params);
+    } catch (countError) {
+      logger.sync.warn(
+        "[getSearchDocListingsWithKeyset] Count query failed, using null",
+        {
+          error:
+            countError instanceof Error ? countError.message : "Unknown",
+        }
+      );
+    }
     const total = limitedCount;
     const totalPages =
       limitedCount !== null ? Math.ceil(limitedCount / limit) : null;
@@ -1388,8 +1447,9 @@ export async function getSearchDocListingsFirstPage(
       items.length < LOW_RESULTS_THRESHOLD &&
       items.length > 0
     ) {
+      // Route through cached offset wrapper instead of uncached self-recursion (#34)
       const result = await expandWithNearMatches(items, params, (p) =>
-        getSearchDocListingsFirstPage(p)
+        getSearchDocListingsPaginated(p)
       );
       items = result.items;
       nearMatchCount = result.nearMatchCount;
@@ -1607,7 +1667,9 @@ export async function semanticSearchQuery(
 export function mapSemanticRowsToListingData(
   rows: SemanticSearchRow[]
 ): ListingData[] {
-  return rows.map((row) => ({
+  return rows
+    .filter((row) => hasValidCoordinates(row.lat, row.lng))
+    .map((row) => ({
     id: row.id,
     title: row.title,
     description: row.description,
@@ -1624,14 +1686,19 @@ export function mapSemanticRowsToListingData(
     genderPreference: row.gender_preference ?? undefined,
     householdGender: row.household_gender ?? undefined,
     moveInDate: row.move_in_date ?? undefined,
-    ownerId: row.owner_id,
+    // ownerId intentionally omitted — @deprecated, S3 security fix (types/listing.ts:28)
+    // Match mapRawListingsToPublic: include rating/review/view/createdAt fields
+    // for ListingCard rendering (star ratings, review counts, recency)
+    avgRating: Number(row.avg_rating) || 0,
+    reviewCount: Number(row.review_count) || 0,
+    viewCount: Number(row.view_count) || 0,
+    createdAt: row.listing_created_at ?? new Date(),
     location: {
-      address: row.address,
+      // address and zip intentionally omitted — "only included in listing detail, not search" (search-types.ts:37)
       city: row.city,
       state: row.state,
-      zip: row.zip,
-      lat: row.lat ?? 0,
-      lng: row.lng ?? 0,
+      lat: row.lat!,
+      lng: row.lng!,
     },
   }));
 }

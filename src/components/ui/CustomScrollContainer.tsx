@@ -145,7 +145,7 @@ const CustomScrollContainer = ({
 
   return (
     <ScrollContainerContext.Provider value={containerRef}>
-      <div className="relative w-full h-screen overflow-hidden bg-background">
+      <div className="relative w-full h-screen overflow-hidden bg-surface-canvas">
         {/* Hide Native Scrollbar */}
         <style>{`
                 .custom-scroll-hide::-webkit-scrollbar { display: none; }
@@ -182,11 +182,11 @@ const CustomScrollContainer = ({
               className={`
                             absolute right-0 w-1.5 rounded-full
                             pointer-events-auto cursor-grab active:cursor-grabbing
-                            bg-zinc-400/60 dark:bg-zinc-500/60
-                            hover:bg-zinc-500/80 dark:hover:bg-zinc-400/80
+                            bg-outline-variant
+                            hover:bg-outline-variant/80
                             hover:w-2
                             transition-all duration-150
-                            ${isDragging ? "bg-zinc-600 dark:bg-zinc-300 w-2" : ""}
+                            ${isDragging ? "bg-on-surface-variant/80 w-2" : ""}
                         `}
             />
           </div>

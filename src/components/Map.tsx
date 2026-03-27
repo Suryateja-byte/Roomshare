@@ -21,7 +21,7 @@ import Map, {
 import type { LayerProps, MapSourceDataEvent } from "react-map-gl/maplibre";
 import type { GeoJSONSource, StyleSpecification } from "maplibre-gl";
 import "maplibre-gl/dist/maplibre-gl.css";
-import {
+import React, {
   useState,
   useMemo,
   useRef,
@@ -41,8 +41,8 @@ import { useSearchTransitionSafe } from "@/contexts/SearchTransitionContext";
 import {
   useMapBounds,
   useMapMovedBanner,
-  useActivePanBounds,
 } from "@/contexts/MapBoundsContext";
+import { useActivePanBoundsSetter } from "@/contexts/ActivePanBoundsContext";
 import { MapMovedBanner } from "./map/MapMovedBanner";
 import { MapGestureHint } from "./map/MapGestureHint";
 import { MapEmptyState } from "./map/MapEmptyState";
@@ -390,6 +390,290 @@ function getClusterCountLayerDark(textScale: number): LayerProps {
 const ZOOM_DOTS_ONLY = 12; // Below: all pins are gray dots (no price)
 const ZOOM_TOP_N_PINS = 14; // 12-14: primary = price pins, mini = dots. 14+: all price pins
 
+// Module-level constant: prevent double-click zoom on markers
+const preventDoubleClickZoom = (e: React.MouseEvent) => {
+  e.stopPropagation();
+  e.preventDefault();
+};
+
+// ============================================================================
+// CRIT-1 FIX: Extracted memoized components replacing inline IIFEs
+// ============================================================================
+
+/**
+ * MarkerPinContent — renders dot or price pill for a single marker.
+ * React.memo with 4 primitive props ensures only markers whose visual state
+ * actually changed re-render their pin content. Returns fragment to preserve
+ * group-hover/marker CSS ancestry in the parent div.
+ */
+interface MarkerPinContentProps {
+  price: number;
+  tier: "primary" | "mini" | undefined;
+  currentZoom: number;
+  isHovered: boolean;
+}
+
+const MarkerPinContent = React.memo(function MarkerPinContent({
+  price,
+  tier,
+  currentZoom,
+  isHovered,
+}: MarkerPinContentProps) {
+  const isMini = tier === "mini";
+  const showAsDot =
+    currentZoom < ZOOM_DOTS_ONLY ||
+    (currentZoom < ZOOM_TOP_N_PINS && isMini);
+
+  if (showAsDot && !isHovered) {
+    return (
+      <>
+        <div
+          className={cn(
+            "w-3 h-3 rounded-full shadow-md transition-transform duration-200",
+            "bg-surface-container-high ring-2 ring-white",
+            "group-hover/marker:scale-125"
+          )}
+        />
+        <div className="absolute left-1/2 -translate-x-1/2 -bottom-[1px] w-2 h-0.5 bg-on-surface/20 rounded-full blur-[1px]" />
+      </>
+    );
+  }
+
+  return (
+    <>
+      <div
+        className={cn(
+          "shadow-lg font-semibold whitespace-nowrap relative transition-all duration-200",
+          "group-hover/marker:scale-105",
+          isMini && currentZoom >= ZOOM_TOP_N_PINS
+            ? "px-2 py-1 rounded-lg text-xs"
+            : "px-3 py-1.5 rounded-xl text-sm",
+          isHovered
+            ? "bg-surface-container-lowest text-on-surface ring-2 ring-primary/30 scale-105"
+            : "bg-on-surface text-white group-hover/marker:bg-on-surface"
+        )}
+      >
+        ${price}
+      </div>
+      <div
+        className={cn(
+          "absolute left-1/2 -translate-x-1/2 w-0 h-0 border-l-transparent border-r-transparent transition-colors",
+          isMini && currentZoom >= ZOOM_TOP_N_PINS
+            ? "-bottom-[4px] border-l-[5px] border-r-[5px] border-t-[5px]"
+            : "-bottom-[6px] border-l-[7px] border-r-[7px] border-t-[7px]",
+          isHovered
+            ? "border-t-white"
+            : "border-t-on-surface group-hover/marker:border-t-on-surface"
+        )}
+      />
+      <div
+        className={cn(
+          "absolute left-1/2 -translate-x-1/2 bg-on-surface/20 rounded-full blur-[2px]",
+          isMini && currentZoom >= ZOOM_TOP_N_PINS
+            ? "-bottom-[2px] w-2 h-0.5"
+            : "-bottom-1 w-3 h-1"
+        )}
+      />
+    </>
+  );
+});
+
+/**
+ * MapMarkerItem — wraps a single react-map-gl Marker with its inner div,
+ * MarkerPinContent, pulse ring, and keyboard focus ring.
+ *
+ * React.memo on this component is the key CRIT-2 fix: when the parent
+ * MapComponent re-renders due to non-marker state (isSearching, areTilesLoading,
+ * etc.), all 200 MapMarkerItem instances bail out of rendering because none
+ * of their ~15 primitive/boolean/stable-callback props changed.
+ */
+interface MapMarkerItemProps {
+  listingId: string;
+  lng: number;
+  lat: number;
+  price: number;
+  title: string;
+  availableSlots: number;
+  tier: "primary" | "mini" | undefined;
+  currentZoom: number;
+  isHovered: boolean;
+  isActive: boolean;
+  isDimmed: boolean;
+  isKeyboardFocused: boolean;
+  onClickById: (id: string) => void;
+  onPointerEnter: (e: React.PointerEvent<HTMLDivElement>) => void;
+  onPointerLeave: (e: React.PointerEvent<HTMLDivElement>) => void;
+  onKeyboardNav: (e: ReactKeyboardEvent<HTMLDivElement>, id: string) => void;
+  onFocusChange: React.Dispatch<React.SetStateAction<string | null>>;
+  markerRefsMap: React.RefObject<globalThis.Map<string, HTMLDivElement>>;
+}
+
+const MapMarkerItem = React.memo(function MapMarkerItem({
+  listingId,
+  lng,
+  lat,
+  price,
+  title,
+  availableSlots,
+  tier,
+  currentZoom,
+  isHovered,
+  isActive,
+  isDimmed,
+  isKeyboardFocused,
+  onClickById,
+  onPointerEnter,
+  onPointerLeave,
+  onKeyboardNav,
+  onFocusChange,
+  markerRefsMap,
+}: MapMarkerItemProps) {
+  const handleClick = useCallback(
+    (e: { originalEvent: { stopPropagation: () => void } }) => {
+      e.originalEvent.stopPropagation();
+      onClickById(listingId);
+    },
+    [listingId, onClickById]
+  );
+
+  const refCallback = useCallback(
+    (el: HTMLDivElement | null) => {
+      if (el) {
+        markerRefsMap.current.set(listingId, el);
+        fixMarkerWrapperRole(el);
+      } else {
+        markerRefsMap.current.delete(listingId);
+      }
+    },
+    [listingId, markerRefsMap]
+  );
+
+  const handleFocus = useCallback(() => {
+    onFocusChange(listingId);
+  }, [listingId, onFocusChange]);
+
+  const handleBlur = useCallback(() => {
+    onFocusChange((current) => (current === listingId ? null : current));
+  }, [listingId, onFocusChange]);
+
+  const handleKeyDown = useCallback(
+    (e: ReactKeyboardEvent<HTMLDivElement>) => {
+      if (e.key === "Enter" || e.key === " ") {
+        e.preventDefault();
+        e.stopPropagation();
+        onClickById(listingId);
+      } else if (
+        ["ArrowUp", "ArrowDown", "ArrowLeft", "ArrowRight", "Home", "End"].includes(e.key)
+      ) {
+        onKeyboardNav(e, listingId);
+      }
+    },
+    [listingId, onClickById, onKeyboardNav]
+  );
+
+  const ariaLabel = `$${price}/month${title ? `, ${title}` : ""}${availableSlots > 0 ? `, ${availableSlots} spots available` : ", currently filled"}. Use arrow keys to navigate between markers.`;
+
+  return (
+    <Marker
+      longitude={lng}
+      latitude={lat}
+      anchor="bottom"
+      onClick={handleClick}
+    >
+      <div
+        ref={refCallback}
+        className={cn(
+          "relative cursor-pointer group/marker animate-[fadeIn_200ms_ease-out] motion-reduce:animate-none min-w-[44px] min-h-[44px] flex items-center justify-center",
+          "transition-all duration-200 [transition-timing-function:cubic-bezier(0.34,1.56,0.64,1)]",
+          isHovered && "scale-[1.15] z-50",
+          isActive && !isHovered && "z-40",
+          isDimmed && "opacity-60",
+          isKeyboardFocused && "z-50"
+        )}
+        data-listing-id={listingId}
+        data-testid={`map-pin-${tier || "primary"}-${listingId}`}
+        data-focus-state={
+          isHovered
+            ? "hovered"
+            : isActive
+              ? "active"
+              : isDimmed
+                ? "dimmed"
+                : "none"
+        }
+        role="button"
+        tabIndex={0}
+        aria-label={ariaLabel}
+        aria-describedby="map-marker-instructions"
+        onFocus={handleFocus}
+        onBlur={handleBlur}
+        onPointerEnter={onPointerEnter}
+        onPointerLeave={onPointerLeave}
+        onKeyDown={handleKeyDown}
+        onDoubleClick={preventDoubleClickZoom}
+      >
+        <MarkerPinContent
+          price={price}
+          tier={tier}
+          currentZoom={currentZoom}
+          isHovered={isHovered}
+        />
+        {/* Pulsing ring on hover/active for visibility on dense maps */}
+        {(isHovered || isActive) && (
+          <div
+            className={cn(
+              "absolute -inset-2 -top-2 rounded-full border-2 pointer-events-none motion-reduce:animate-none",
+              isHovered
+                ? "border-outline-variant/20 animate-ping opacity-40"
+                : "border-outline-variant/30 animate-[pulse-ring_2s_ease-in-out_infinite] opacity-30"
+            )}
+          />
+        )}
+        {/* Keyboard focus ring - solid visible ring distinct from hover animation */}
+        {isKeyboardFocused && (
+          <div
+            className="absolute -inset-3 rounded-full border-[3px] border-blue-500 pointer-events-none shadow-[0_0_0_2px_rgba(59,130,246,0.3)]"
+            aria-hidden="true"
+          />
+        )}
+      </div>
+    </Marker>
+  );
+});
+
+/**
+ * ClusterHighlightMarker — renders an indigo dot when a hovered/active listing
+ * is inside a cluster (not visible as an individual marker).
+ */
+interface ClusterHighlightMarkerProps {
+  targetId: string | null;
+  markerPositionIds: Set<string>;
+  listings: Listing[];
+}
+
+const ClusterHighlightMarker = React.memo(function ClusterHighlightMarker({
+  targetId,
+  markerPositionIds,
+  listings,
+}: ClusterHighlightMarkerProps) {
+  if (!targetId) return null;
+  if (markerPositionIds.has(targetId)) return null;
+  const listing = listings.find((l) => l.id === targetId);
+  if (!listing) return null;
+  return (
+    <Marker
+      longitude={listing.location.lng}
+      latitude={listing.location.lat}
+      anchor="center"
+    >
+      <div className="pointer-events-none flex items-center justify-center">
+        <div className="w-4 h-4 rounded-full bg-primary border-2 border-white shadow-lg animate-pulse" />
+        <div className="absolute w-8 h-8 rounded-full border-2 border-primary animate-ping opacity-40" />
+      </div>
+    </Marker>
+  );
+});
+
 // Safe light-style fallback that avoids complex expression validation failures.
 const LIGHT_STYLE_FALLBACK: StyleSpecification = {
   version: 8,
@@ -617,7 +901,7 @@ export default function MapComponent({
     isProgrammaticMoveRef,
   } = useMapBounds();
 
-  const { setActivePanBounds } = useActivePanBounds();
+  const { setActivePanBounds } = useActivePanBoundsSetter();
 
   // Banner visibility from context
   const {
@@ -862,11 +1146,12 @@ export default function MapComponent({
   );
 
   // Update unclustered listings when map moves (for rendering individual markers)
-  const updateUnclusteredListings = useCallback(() => {
-    if (!mapRef.current || !useClustering) return;
+  // H6 FIX: Returns count for success guard pattern in retry logic
+  const updateUnclusteredListings = useCallback((): number => {
+    if (!mapRef.current || !useClustering) return 0;
 
     const map = mapRef.current.getMap();
-    if (!map || !map.getSource("listings")) return;
+    if (!map || !map.getSource("listings")) return 0;
 
     // Query for unclustered points (points without cluster)
     const features = map.querySourceFeatures("listings", {
@@ -905,16 +1190,17 @@ export default function MapComponent({
     });
 
     // P0 Issue #25: Guard against state update after unmount
-    if (!isMountedRef.current) return;
+    if (!isMountedRef.current) return 0;
 
     // CLUSTER FIX: Skip setting empty state during cluster expansion
     // querySourceFeatures returns [] before tiles load after flyTo
     // Only allow empty state if NOT expanding (normal pan/zoom to empty area)
     if (unique.length === 0 && isClusterExpandingRef.current) {
-      return; // Tiles not loaded yet, retry will happen on onIdle
+      return 0; // Tiles not loaded yet, retry will happen on onIdle
     }
 
     setUnclusteredListings(unique);
+    return unique.length;
   }, [imagesByListingId, useClustering]);
 
   // Defense-in-depth: retry updateUnclusteredListings when listings exist
@@ -923,6 +1209,9 @@ export default function MapComponent({
     if (!isMapLoaded || !useClustering || listings.length === 0) return;
     if (unclusteredListings.length > 0) return;
 
+    // H6 FIX: Success guard pattern — stop retries once markers are found.
+    // Previous approach fired all 4 timeouts unconditionally; now each
+    // retry checks the return count and cancels remaining on success.
     const retryDelays = [200, 500, 1000, 2000];
     const timeouts: NodeJS.Timeout[] = [];
     let cancelled = false;
@@ -930,8 +1219,12 @@ export default function MapComponent({
     for (const delay of retryDelays) {
       timeouts.push(
         setTimeout(() => {
-          if (!cancelled && isMountedRef.current) {
-            updateUnclusteredListings();
+          if (cancelled || !isMountedRef.current) return;
+          const count = updateUnclusteredListings();
+          if (count > 0) {
+            // Success — cancel remaining retries
+            cancelled = true;
+            timeouts.forEach(clearTimeout);
           }
         }, delay)
       );
@@ -975,14 +1268,11 @@ export default function MapComponent({
       .join(",");
   }, [markersSource]);
 
-  // M4-MAP FIX: Use markersSourceKey directly in deps instead of void trick.
-  // The memo recalculates when the key changes (listing IDs change),
-  // but reads actual data from markersSource via the outer scope.
-  const markersSourceRef = useRef(markersSource);
-  markersSourceRef.current = markersSource;
-
+  // HIGH-1 FIX: Read markersSource via closure instead of ref.
+  // The ref-in-memo pattern was a React anti-pattern (stale data risk, React Compiler incompatible).
+  // markersSourceKey still controls when the memo recomputes (P2-FIX #150 preserved).
   const markerPositions = useMemo(() => {
-    const source = markersSourceRef.current;
+    const source = markersSource;
     const positions: MarkerPosition[] = [];
     const coordsCounts: Record<string, number> = {};
 
@@ -1034,6 +1324,17 @@ export default function MapComponent({
     // P2-FIX (#150): Depend on stable ID key instead of array reference
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [markersSourceKey]);
+
+  // CRIT-2 FIX: Synchronous ref for stable callback access to latest positions.
+  // Synchronous assignment (not useEffect) avoids timing issues between render and effect.
+  const markerPositionsRef = useRef(markerPositions);
+  markerPositionsRef.current = markerPositions;
+
+  // O(1) lookup Set for ClusterHighlightMarker — avoids O(n) .some() scan
+  const markerPositionIds = useMemo(
+    () => new Set(markerPositions.map((p) => p.listing.id)),
+    [markerPositions]
+  );
 
   // Render privacy circles from the same displayed marker positions to avoid
   // translucent "ghost clusters" when clustered/overlapping raw points split visually.
@@ -1535,6 +1836,10 @@ export default function MapComponent({
       if (programmaticClearTimeoutRef.current) {
         clearTimeout(programmaticClearTimeoutRef.current);
       }
+      if (onMoveThrottleRef.current) {
+        clearTimeout(onMoveThrottleRef.current);
+        onMoveThrottleRef.current = null;
+      }
       if (hoverScrollTimeoutRef.current) {
         clearTimeout(hoverScrollTimeoutRef.current);
       }
@@ -1795,7 +2100,17 @@ export default function MapComponent({
   useEffect(() => {
     if (!activeId || activeId === lastMapActiveRef.current) return;
     const listing = listings.find((l) => l.id === activeId);
-    if (!listing) return;
+    if (!listing) {
+      // UX-12 FIX: Show info message when listing isn't in the map's dataset.
+      // This happens when "Show on Map" is clicked for a listing loaded via
+      // "Load more" that's beyond the map's 200-marker cap or outside the
+      // current padded viewport.
+      setViewportInfoMessage("This listing is outside the current map view");
+      setTimeout(() => {
+        if (isMountedRef.current) setViewportInfoMessage(null);
+      }, 3000);
+      return;
+    }
     setSelectedListing(listing);
     setProgrammaticMove(true);
     // Safety: clear programmatic flag if moveEnd doesn't fire
@@ -1873,6 +2188,12 @@ export default function MapComponent({
       // Skip search/dirty logic during programmatic moves (auto-fly, card click, cluster expand)
       let skipCenterDedup = false;
       if (isProgrammaticMoveRef.current) {
+        // Clear the safety timeout before clearing the flag — prevents orphaned
+        // timeout from firing after a new programmatic move starts (#32)
+        if (programmaticClearTimeoutRef.current) {
+          clearTimeout(programmaticClearTimeoutRef.current);
+          programmaticClearTimeoutRef.current = null;
+        }
         setProgrammaticMove(false); // Clear immediately on moveend instead of waiting for timeout
         setActivePanBounds(null); // Clear active pan bounds
         // CLUSTER FIX: Don't clear isClusterExpandingRef here - wait for onIdle
@@ -2012,7 +2333,7 @@ export default function MapComponent({
   useEffect(() => {
     if (!mapRef.current) return;
     patchMapPrototypeAddLayer(mapRef.current.getMap());
-  });
+  }, [isMapLoaded]);
 
   useEffect(() => {
     if (isDarkMode) return;
@@ -2214,6 +2535,50 @@ export default function MapComponent({
     ]
   );
 
+  // CRIT-2 FIX: Stable callbacks replacing per-marker handler Maps.
+  // These callbacks use ref-based lookup to access listing data at call time,
+  // so they don't depend on markerPositions and never change when listings change.
+  const handleMarkerClickById = useCallback(
+    (listingId: string) => {
+      const position = markerPositionsRef.current.find(
+        (p) => p.listing.id === listingId
+      );
+      if (!position) return;
+      handleMarkerClick(position.listing, {
+        lng: position.lng,
+        lat: position.lat,
+      });
+    },
+    [handleMarkerClick]
+  );
+
+  const handleMarkerPointerEnter = useCallback(
+    (e: React.PointerEvent<HTMLDivElement>) => {
+      if (e.pointerType === "touch") return;
+      const listingId = e.currentTarget.dataset.listingId;
+      if (!listingId) return;
+      setHovered(listingId, "map");
+      if (hoverScrollTimeoutRef.current)
+        clearTimeout(hoverScrollTimeoutRef.current);
+      hoverScrollTimeoutRef.current = setTimeout(() => {
+        requestScrollTo(listingId);
+      }, 300);
+    },
+    [setHovered, requestScrollTo]
+  );
+
+  const handleMarkerPointerLeave = useCallback(
+    (e: React.PointerEvent<HTMLDivElement>) => {
+      if (e.pointerType === "touch") return;
+      setHovered(null);
+      if (hoverScrollTimeoutRef.current) {
+        clearTimeout(hoverScrollTimeoutRef.current);
+        hoverScrollTimeoutRef.current = null;
+      }
+    },
+    [setHovered]
+  );
+
   return (
     <div
       className="w-full h-full overflow-hidden relative group"
@@ -2224,14 +2589,14 @@ export default function MapComponent({
     >
       {isWebglContextLost && (
         <div
-          className="absolute inset-0 bg-zinc-950/70 z-30 flex items-center justify-center pointer-events-none"
+          className="absolute inset-0 bg-on-surface/70 z-30 flex items-center justify-center pointer-events-none"
           role="status"
           aria-live="assertive"
           aria-label="Map paused"
         >
           <div className="text-center px-4">
             <p className="text-sm font-medium text-white">Map paused</p>
-            <p className="text-xs text-zinc-200 mt-1">
+            <p className="text-xs text-on-surface-variant mt-1">
               Recovering map context...
             </p>
           </div>
@@ -2241,16 +2606,16 @@ export default function MapComponent({
       {/* Initial loading skeleton */}
       {!isMapLoaded && (
         <div
-          className="absolute inset-0 bg-zinc-100 dark:bg-zinc-800 z-20 flex items-center justify-center"
+          className="absolute inset-0 bg-surface-container-high z-20 flex items-center justify-center"
           role="status"
           aria-label="Loading map"
         >
           <div className="flex flex-col items-center gap-3">
             <MapPin
-              className="w-10 h-10 text-zinc-300 dark:text-zinc-600 animate-pulse"
+              className="w-10 h-10 text-on-surface-variant animate-pulse"
               aria-hidden="true"
             />
-            <span className="text-sm text-zinc-500 dark:text-zinc-400">
+            <span className="text-sm text-on-surface-variant">
               Loading map...
             </span>
           </div>
@@ -2265,12 +2630,12 @@ export default function MapComponent({
           aria-label="Loading map tiles"
           aria-live="polite"
         >
-          <div className="flex items-center gap-2 bg-white/90 dark:bg-zinc-800/90 px-4 py-2 rounded-lg shadow-sm">
+          <div className="flex items-center gap-2 bg-surface-container-lowest/90 px-4 py-2 rounded-lg shadow-ambient-sm">
             <Loader2
-              className="w-4 h-4 animate-spin text-zinc-600 dark:text-zinc-300"
+              className="w-4 h-4 animate-spin text-on-surface-variant"
               aria-hidden="true"
             />
-            <span className="text-sm text-zinc-600 dark:text-zinc-300">
+            <span className="text-sm text-on-surface-variant">
               Loading tiles...
             </span>
           </div>
@@ -2280,16 +2645,16 @@ export default function MapComponent({
       {/* Search-as-move loading indicator */}
       {isSearching && isMapLoaded && !areTilesLoading && (
         <div
-          className="absolute top-16 left-1/2 -translate-x-1/2 bg-white/90 dark:bg-zinc-800/90 px-3 py-2 rounded-lg shadow-sm flex items-center gap-2 z-10 pointer-events-none"
+          className="absolute top-16 left-1/2 -translate-x-1/2 bg-surface-container-lowest/90 px-3 py-2 rounded-lg shadow-ambient-sm flex items-center gap-2 z-10 pointer-events-none"
           role="status"
           aria-label="Searching area"
           aria-live="polite"
         >
           <Loader2
-            className="w-4 h-4 animate-spin text-zinc-600 dark:text-zinc-300"
+            className="w-4 h-4 animate-spin text-on-surface-variant"
             aria-hidden="true"
           />
-          <span className="text-sm text-zinc-600 dark:text-zinc-300">
+          <span className="text-sm text-on-surface-variant">
             Searching area...
           </span>
         </div>
@@ -2675,235 +3040,43 @@ export default function MapComponent({
           </Source>
         )}
 
-        {/* Individual price markers - shown for unclustered points or when not clustering */}
+        {/* CRIT-1/CRIT-2 FIX: Memoized MapMarkerItem replaces inline IIFEs and handler Maps.
+            Each MapMarkerItem receives only primitive/boolean/stable-callback props, so React.memo
+            can bail out when non-marker state changes (isSearching, areTilesLoading, etc.).
+            MarkerPinContent inside each item only re-renders when its 4 primitive props change. */}
         {markerPositions.map((position) => (
-          <Marker
+          <MapMarkerItem
             key={position.listing.id}
-            longitude={position.lng}
-            latitude={position.lat}
-            anchor="bottom"
-            onClick={(e) => {
-              e.originalEvent.stopPropagation();
-              handleMarkerClick(position.listing, {
-                lng: position.lng,
-                lat: position.lat,
-              });
-            }}
-          >
-            <div
-              ref={(el) => {
-                if (el) {
-                  markerRefs.current.set(position.listing.id, el);
-                  fixMarkerWrapperRole(el);
-                } else {
-                  markerRefs.current.delete(position.listing.id);
-                }
-              }}
-              className={cn(
-                "relative cursor-pointer group/marker animate-[fadeIn_200ms_ease-out] motion-reduce:animate-none min-w-[44px] min-h-[44px] flex items-center justify-center",
-                // Spring easing for scale: cubic-bezier(0.34, 1.56, 0.64, 1)
-                "transition-all duration-200 [transition-timing-function:cubic-bezier(0.34,1.56,0.64,1)]",
-                hoveredId === position.listing.id && "scale-[1.15] z-50",
-                activeId === position.listing.id && !hoveredId && "z-40",
-                hoveredId && hoveredId !== position.listing.id && "opacity-60",
-                // Keyboard focus styling - distinct from hover
-                keyboardFocusedId === position.listing.id && "z-50"
-              )}
-              data-listing-id={position.listing.id}
-              data-testid={`map-pin-${position.listing.tier || "primary"}-${position.listing.id}`}
-              data-focus-state={
-                hoveredId === position.listing.id
-                  ? "hovered"
-                  : activeId === position.listing.id
-                    ? "active"
-                    : hoveredId && hoveredId !== position.listing.id
-                      ? "dimmed"
-                      : "none"
-              }
-              role="button"
-              tabIndex={0}
-              aria-label={`$${position.listing.price}/month${position.listing.title ? `, ${position.listing.title}` : ""}${position.listing.availableSlots > 0 ? `, ${position.listing.availableSlots} spots available` : ", currently filled"}. Use arrow keys to navigate between markers.`}
-              aria-describedby="map-marker-instructions"
-              onFocus={() => {
-                // Track keyboard focus state
-                setKeyboardFocusedId(position.listing.id);
-              }}
-              onBlur={() => {
-                // Clear keyboard focus when element loses focus
-                setKeyboardFocusedId((current) =>
-                  current === position.listing.id ? null : current
-                );
-              }}
-              onPointerEnter={(e) => {
-                // P1-FIX (#114): Don't trigger hover on touch devices.
-                // Touch fires pointerenter on tap, causing unintended scroll.
-                // Let the click handler manage touch interactions instead.
-                if (e.pointerType === "touch") return;
-
-                setHovered(position.listing.id, "map");
-                // Debounce scroll request to prevent list jumping as user scans markers
-                if (hoverScrollTimeoutRef.current) {
-                  clearTimeout(hoverScrollTimeoutRef.current);
-                }
-                hoverScrollTimeoutRef.current = setTimeout(() => {
-                  requestScrollTo(position.listing.id);
-                }, 300);
-              }}
-              onPointerLeave={(e) => {
-                // P1-FIX (#114): Skip hover cleanup for touch - wasn't activated
-                if (e.pointerType === "touch") return;
-
-                setHovered(null);
-                // Clear pending scroll request when hover ends
-                if (hoverScrollTimeoutRef.current) {
-                  clearTimeout(hoverScrollTimeoutRef.current);
-                  hoverScrollTimeoutRef.current = null;
-                }
-              }}
-              onKeyDown={(e) => {
-                if (e.key === "Enter" || e.key === " ") {
-                  e.preventDefault();
-                  e.stopPropagation();
-                  handleMarkerClick(position.listing, {
-                    lng: position.lng,
-                    lat: position.lat,
-                  });
-                } else if (
-                  [
-                    "ArrowUp",
-                    "ArrowDown",
-                    "ArrowLeft",
-                    "ArrowRight",
-                    "Home",
-                    "End",
-                  ].includes(e.key)
-                ) {
-                  handleMarkerKeyboardNavigation(e, position.listing.id);
-                }
-              }}
-              // P1-FIX (#138): Prevent double-click zoom on marker content
-              onDoubleClick={(e) => {
-                e.stopPropagation();
-                e.preventDefault();
-              }}
-            >
-              {/* Zoom-based two-tier pin rendering:
-                                - Below zoom 12: all pins are gray dots (no price)
-                                - Zoom 12-14: primary = price pills, mini = gray dots
-                                - Above zoom 14: all pins show price pills */}
-              {(() => {
-                const isMini = position.listing.tier === "mini";
-                const showAsDot =
-                  currentZoom < ZOOM_DOTS_ONLY ||
-                  (currentZoom < ZOOM_TOP_N_PINS && isMini);
-                const isHovered = hoveredId === position.listing.id;
-
-                if (showAsDot && !isHovered) {
-                  // Gray dot marker (no price)
-                  return (
-                    <>
-                      <div
-                        className={cn(
-                          "w-3 h-3 rounded-full shadow-md transition-transform duration-200",
-                          "bg-zinc-400 dark:bg-zinc-500 ring-2 ring-white dark:ring-zinc-900",
-                          "group-hover/marker:scale-125"
-                        )}
-                      />
-                      {/* Small shadow under dot */}
-                      <div className="absolute left-1/2 -translate-x-1/2 -bottom-[1px] w-2 h-0.5 bg-zinc-950/20 dark:bg-zinc-950/40 rounded-full blur-[1px]" />
-                    </>
-                  );
-                }
-
-                // Price pill marker (full or mini size)
-                return (
-                  <>
-                    <div
-                      className={cn(
-                        "shadow-lg font-semibold whitespace-nowrap relative transition-all duration-200",
-                        "group-hover/marker:scale-105",
-                        isMini && currentZoom >= ZOOM_TOP_N_PINS
-                          ? "px-2 py-1 rounded-lg text-xs"
-                          : "px-3 py-1.5 rounded-xl text-sm",
-                        isHovered
-                          ? "bg-white dark:bg-zinc-700 text-zinc-900 dark:text-white ring-2 ring-zinc-900 dark:ring-white scale-105"
-                          : "bg-zinc-900 dark:bg-white text-white dark:text-zinc-900 group-hover/marker:bg-zinc-800 dark:group-hover/marker:bg-zinc-200"
-                      )}
-                    >
-                      ${position.listing.price}
-                    </div>
-                    {/* Pin tail/pointer */}
-                    <div
-                      className={cn(
-                        "absolute left-1/2 -translate-x-1/2 w-0 h-0 border-l-transparent border-r-transparent transition-colors",
-                        isMini && currentZoom >= ZOOM_TOP_N_PINS
-                          ? "-bottom-[4px] border-l-[5px] border-r-[5px] border-t-[5px]"
-                          : "-bottom-[6px] border-l-[7px] border-r-[7px] border-t-[7px]",
-                        isHovered
-                          ? "border-t-white dark:border-t-zinc-700"
-                          : "border-t-zinc-900 dark:border-t-white group-hover/marker:border-t-zinc-800 dark:group-hover/marker:border-t-zinc-200"
-                      )}
-                    />
-                    {/* Shadow under pin */}
-                    <div
-                      className={cn(
-                        "absolute left-1/2 -translate-x-1/2 bg-zinc-950/20 dark:bg-zinc-950/40 rounded-full blur-[2px]",
-                        isMini && currentZoom >= ZOOM_TOP_N_PINS
-                          ? "-bottom-[2px] w-2 h-0.5"
-                          : "-bottom-1 w-3 h-1"
-                      )}
-                    />
-                  </>
-                );
-              })()}
-              {/* Pulsing ring on hover/active for visibility on dense maps */}
-              {(hoveredId === position.listing.id ||
-                activeId === position.listing.id) && (
-                <div
-                  className={cn(
-                    "absolute -inset-2 -top-2 rounded-full border-2 pointer-events-none motion-reduce:animate-none",
-                    hoveredId === position.listing.id
-                      ? "border-zinc-900 dark:border-white animate-ping opacity-40"
-                      : "border-zinc-400 dark:border-zinc-500 animate-[pulse-ring_2s_ease-in-out_infinite] opacity-30"
-                  )}
-                />
-              )}
-              {/* Keyboard focus ring - solid visible ring distinct from hover animation */}
-              {keyboardFocusedId === position.listing.id && (
-                <div
-                  className="absolute -inset-3 rounded-full border-[3px] border-blue-500 dark:border-blue-400 pointer-events-none shadow-[0_0_0_2px_rgba(59,130,246,0.3)]"
-                  aria-hidden="true"
-                />
-              )}
-            </div>
-          </Marker>
+            listingId={position.listing.id}
+            lng={position.lng}
+            lat={position.lat}
+            price={position.listing.price}
+            title={position.listing.title}
+            availableSlots={position.listing.availableSlots}
+            tier={position.listing.tier}
+            currentZoom={currentZoom}
+            isHovered={hoveredId === position.listing.id}
+            isActive={activeId === position.listing.id}
+            isDimmed={!!hoveredId && hoveredId !== position.listing.id}
+            isKeyboardFocused={keyboardFocusedId === position.listing.id}
+            onClickById={handleMarkerClickById}
+            onPointerEnter={handleMarkerPointerEnter}
+            onPointerLeave={handleMarkerPointerLeave}
+            onKeyboardNav={handleMarkerKeyboardNavigation}
+            onFocusChange={setKeyboardFocusedId}
+            markerRefsMap={markerRefs}
+          />
         ))}
 
         {/* Cluster highlight: when a card is hovered/active but its marker is inside
-                    a cluster (not in markerPositions), render a highlight dot at the listing's
-                    coordinates so the user can see where it is on the map. */}
-        {(() => {
-          const targetId = hoveredId || activeId;
-          if (!targetId) return null;
-          // Skip if the marker is already visible (unclustered)
-          if (markerPositions.some((p) => p.listing.id === targetId))
-            return null;
-          const listing = listings.find((l) => l.id === targetId);
-          if (!listing) return null;
-          return (
-            <Marker
-              key={`cluster-highlight-${targetId}`}
-              longitude={listing.location.lng}
-              latitude={listing.location.lat}
-              anchor="center"
-            >
-              <div className="pointer-events-none flex items-center justify-center">
-                <div className="w-4 h-4 rounded-full bg-indigo-500 border-2 border-white shadow-lg animate-pulse" />
-                <div className="absolute w-8 h-8 rounded-full border-2 border-indigo-400 animate-ping opacity-40" />
-              </div>
-            </Marker>
-          );
-        })()}
+            a cluster (not in markerPositions), render a highlight dot at the listing's
+            coordinates so the user can see where it is on the map. */}
+        <ClusterHighlightMarker
+          key={hoveredId || activeId || "none"}
+          targetId={hoveredId || activeId}
+          markerPositionIds={markerPositionIds}
+          listings={listings}
+        />
 
         {selectedListing && (
           <Popup
@@ -2915,7 +3088,7 @@ export default function MapComponent({
             maxWidth="320px"
             className={`z-[60] [&_.maplibregl-popup-content]:rounded-xl [&_.maplibregl-popup-content]:p-0 [&_.maplibregl-popup-content]:!bg-transparent [&_.maplibregl-popup-content]:!shadow-none [&_.maplibregl-popup-close-button]:hidden ${
               isDarkMode
-                ? "[&_.maplibregl-popup-tip]:border-t-zinc-900"
+                ? "[&_.maplibregl-popup-tip]:border-t-on-surface"
                 : "[&_.maplibregl-popup-tip]:border-t-white"
             }`}
           >
@@ -2923,13 +3096,13 @@ export default function MapComponent({
             <div
               className={`w-[280px] overflow-hidden rounded-xl ${
                 isDarkMode
-                  ? "bg-zinc-900 shadow-[0_10px_40px_-10px_rgba(0,0,0,0.5)]"
-                  : "bg-white shadow-[0_10px_40px_-10px_rgba(0,0,0,0.15)]"
+                  ? "bg-on-surface shadow-[0_10px_40px_-10px_rgba(0,0,0,0.5)]"
+                  : "bg-surface-container-lowest shadow-[0_10px_40px_-10px_rgba(0,0,0,0.15)]"
               }`}
             >
               {/* Image Thumbnail - optimized with next/image */}
               <div
-                className={`aspect-[16/9] relative overflow-hidden ${isDarkMode ? "bg-zinc-800" : "bg-zinc-100"}`}
+                className={`aspect-[16/9] relative overflow-hidden ${isDarkMode ? "bg-on-surface" : "bg-surface-container-high"}`}
               >
                 {selectedListing.images && selectedListing.images[0] ? (
                   <Image
@@ -2942,7 +3115,7 @@ export default function MapComponent({
                 ) : (
                   <div className="w-full h-full flex items-center justify-center">
                     <Home
-                      className={`w-10 h-10 ${isDarkMode ? "text-zinc-600" : "text-zinc-300"}`}
+                      className={`w-10 h-10 ${isDarkMode ? "text-on-surface-variant" : "text-on-surface-variant"}`}
                     />
                   </div>
                 )}
@@ -2952,7 +3125,7 @@ export default function MapComponent({
                     variant="ghost"
                     size="icon"
                     onClick={() => setSelectedListing(null)}
-                    className="rounded-full bg-zinc-950/50 hover:bg-zinc-950/70 text-white hover:text-white border-none"
+                    className="rounded-full bg-on-surface/50 hover:bg-on-surface/70 text-white hover:text-white border-none"
                     aria-label="Close listing preview"
                   >
                     <X className="w-4 h-4" />
@@ -2964,7 +3137,7 @@ export default function MapComponent({
                     className={`inline-flex px-2 py-0.5 rounded-md text-2xs font-semibold uppercase ${
                       selectedListing.availableSlots > 0
                         ? "bg-emerald-500 text-white"
-                        : "bg-zinc-900 text-white"
+                        : "bg-on-surface text-white"
                     }`}
                   >
                     {selectedListing.availableSlots > 0
@@ -2977,18 +3150,18 @@ export default function MapComponent({
               {/* Content */}
               <div className="p-3">
                 <h3
-                  className={`font-semibold text-sm line-clamp-1 mb-1 ${isDarkMode ? "text-white" : "text-zinc-900"}`}
+                  className={`font-semibold text-sm line-clamp-1 mb-1 ${isDarkMode ? "text-white" : "text-on-surface"}`}
                 >
                   {selectedListing.title}
                 </h3>
                 <p className="mb-3">
                   <span
-                    className={`text-lg font-bold ${isDarkMode ? "text-white" : "text-zinc-900"}`}
+                    className={`text-lg font-bold ${isDarkMode ? "text-white" : "text-on-surface"}`}
                   >
                     ${selectedListing.price}
                   </span>
                   <span
-                    className={`text-sm ${isDarkMode ? "text-zinc-400" : "text-zinc-500"}`}
+                    className={`text-sm ${isDarkMode ? "text-on-surface-variant" : "text-on-surface-variant"}`}
                   >
                     /month
                   </span>
@@ -3002,8 +3175,8 @@ export default function MapComponent({
                       size="sm"
                       className={`w-full h-9 text-xs-plus font-medium rounded-lg ${
                         isDarkMode
-                          ? "bg-white text-zinc-900 hover:bg-zinc-200"
-                          : "bg-zinc-900 text-white hover:bg-zinc-800"
+                          ? "bg-surface-container-lowest text-on-surface hover:bg-surface-container-high"
+                          : "bg-on-surface text-white hover:bg-on-surface"
                       }`}
                     >
                       View Details
@@ -3032,15 +3205,15 @@ export default function MapComponent({
           role="switch"
           aria-checked={searchAsMove}
           onClick={() => setSearchAsMove(!searchAsMove)}
-          className={`flex items-center gap-2 px-4 py-2.5 rounded-full shadow-lg border text-sm font-medium transition-all select-none focus:outline-none focus-visible:ring-2 focus-visible:ring-zinc-900/30 dark:focus-visible:ring-zinc-400/40 focus-visible:ring-offset-2 backdrop-blur-md ${
+          className={`flex items-center gap-2 px-4 py-2.5 rounded-full shadow-lg border text-sm font-medium transition-all select-none focus:outline-none focus-visible:ring-2 focus-visible:ring-primary/30 focus-visible:ring-offset-2 backdrop-blur-md ${
             searchAsMove
-              ? "bg-white/95 text-zinc-900 border-white/20 dark:bg-zinc-900/95 dark:text-white dark:border-zinc-800/50 ring-2 ring-green-500/50 dark:ring-green-400/30"
-              : "bg-zinc-900/90 text-white border-white/10 dark:bg-zinc-800/90 dark:text-zinc-100 hover:bg-zinc-800 dark:hover:bg-zinc-700"
+              ? "bg-white/95 text-on-surface border-white/20 ring-2 ring-green-500/50"
+              : "bg-on-surface/90 text-white border-white/10 hover:bg-on-surface"
           }`}
         >
           <div
             data-testid="search-toggle-indicator"
-            className={`w-3 h-3 rounded-full transition-colors ${searchAsMove ? "bg-green-500 dark:bg-green-400 shadow-[0_0_8px_rgba(34,197,94,0.6)]" : "bg-zinc-500 dark:bg-zinc-500"}`}
+            className={`w-3 h-3 rounded-full transition-colors ${searchAsMove ? "bg-green-500 shadow-[0_0_8px_rgba(34,197,94,0.6)]" : "bg-on-surface-variant"}`}
           />
           Search as I move
         </button>
@@ -3077,11 +3250,11 @@ export default function MapComponent({
               { padding: 50, duration: 1000 }
             );
           }}
-          className="absolute bottom-4 right-4 z-[50] w-11 h-11 flex items-center justify-center bg-white/90 dark:bg-zinc-900/90 backdrop-blur-md rounded-full shadow-lg border border-zinc-200/50 dark:border-zinc-700/50 hover:bg-zinc-50 dark:hover:bg-zinc-800 transition-colors focus:outline-none focus-visible:ring-2 focus-visible:ring-zinc-900/30 dark:focus-visible:ring-zinc-400/40 focus-visible:ring-offset-2"
+          className="absolute bottom-4 right-4 z-[50] w-11 h-11 flex items-center justify-center bg-surface-container-lowest/90 backdrop-blur-md rounded-full shadow-ambient border border-outline-variant/20/50 hover:bg-surface-canvas transition-colors focus:outline-none focus-visible:ring-2 focus-visible:ring-primary/30 focus-visible:ring-offset-2"
           aria-label="Fit all results in view"
           title="Fit all results"
         >
-          <Maximize2 className="w-4 h-4 text-zinc-700 dark:text-zinc-300" />
+          <Maximize2 className="w-4 h-4 text-on-surface-variant" />
         </button>
       )}
 
@@ -3102,9 +3275,9 @@ export default function MapComponent({
         <div
           role="status"
           aria-live="polite"
-          className="absolute bottom-20 left-1/2 -translate-x-1/2 z-[50] bg-blue-50/90 dark:bg-blue-950/80 backdrop-blur-md border border-blue-200/50 dark:border-blue-900/50 rounded-full px-4 py-2 shadow-lg pointer-events-none"
+          className="absolute bottom-20 left-1/2 -translate-x-1/2 z-[50] bg-blue-50/90 backdrop-blur-md border border-blue-200/50 rounded-full px-4 py-2 shadow-lg pointer-events-none"
         >
-          <p className="text-xs text-blue-800 dark:text-blue-200 font-medium">
+          <p className="text-xs text-blue-800 font-medium">
             {viewportInfoMessage}
           </p>
         </div>

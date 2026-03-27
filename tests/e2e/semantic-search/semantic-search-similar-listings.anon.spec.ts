@@ -342,7 +342,8 @@ test.describe("Semantic Search - Similar Listings", () => {
 
     // Mobile viewport
     await page.setViewportSize({ width: 375, height: 667 });
-    await page.waitForTimeout(500); // Allow layout reflow
+    // Allow layout reflow after viewport resize
+    await page.evaluate(() => new Promise(r => requestAnimationFrame(() => requestAnimationFrame(r))));
 
     // Heading should still be visible
     await expect(similarListingsHeading(page)).toBeVisible();

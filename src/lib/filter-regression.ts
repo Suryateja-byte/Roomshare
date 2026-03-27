@@ -138,7 +138,12 @@ export function exportScenarios(): string {
  * Import scenarios from JSON fixtures
  */
 export function importScenarios(json: string): void {
-  const scenarios: FilterScenario[] = JSON.parse(json);
+  const parsed = JSON.parse(json);
+  // L-10 FIX: Validate JSON structure before casting to FilterScenario[]
+  if (!Array.isArray(parsed)) {
+    throw new Error("importScenarios: expected JSON array");
+  }
+  const scenarios: FilterScenario[] = parsed;
   scenarios.forEach((s) => storeScenario(s));
 }
 

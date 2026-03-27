@@ -148,7 +148,7 @@ test.describe("Near Matches & Low Results Guidance", () => {
       expect(ariaLabel).toMatch(/\d+\s+near\s+match/i);
 
       // Verify it contains text about near matches
-      const separatorText = separator.locator("text=/near match/i");
+      const separatorText = separator.getByText(/near match/i);
       await expect(separatorText).toBeVisible();
     } else {
       // This is acceptable — may need specific data to trigger near matches
@@ -283,11 +283,10 @@ test.describe("Near Matches & Low Results Guidance", () => {
       await page.waitForLoadState("domcontentloaded");
       // Wait for either listing cards or the zero-results heading to appear
       await page
-        .locator("text=/No.*match|No listing/i")
+        .getByText(/No.*match|No listing/i)
         .or(page.locator('a[href^="/listings/"]'))
         .first()
         .waitFor({ state: "attached", timeout: 30_000 });
-      await page.waitForLoadState("domcontentloaded").catch(() => {});
 
       const cardCount = await scopedCards(page).count();
 

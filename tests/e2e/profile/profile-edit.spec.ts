@@ -7,7 +7,7 @@
  * - Profile mutations (PE-04, PE-05, PE-09, PE-10, PE-11, PE-12) — serial
  */
 
-import { test, expect, timeouts } from "../helpers";
+import { test, expect, timeouts, waitForHydration } from "../helpers";
 import AxeBuilder from "@axe-core/playwright";
 import { A11Y_CONFIG } from "../helpers/test-utils";
 
@@ -45,6 +45,7 @@ test.describe("Profile View — Read-only", () => {
   }) => {
     await page.goto("/profile");
     await page.waitForLoadState("domcontentloaded");
+    await waitForHydration(page);
     await expect(page.getByTestId("profile-page").first()).toBeVisible({
       timeout: timeouts.navigation,
     });
@@ -64,6 +65,7 @@ test.describe("Profile View — Read-only", () => {
   }) => {
     await page.goto("/profile");
     await page.waitForLoadState("domcontentloaded");
+    await waitForHydration(page);
     await expect(page.getByTestId("profile-page").first()).toBeVisible({
       timeout: timeouts.navigation,
     });
@@ -107,6 +109,7 @@ test.describe("Profile Edit — Form Assertions", () => {
   test("PE-07: empty name shows validation error", async ({ page }) => {
     await page.goto("/profile/edit");
     await page.waitForLoadState("domcontentloaded");
+    await waitForHydration(page);
     await expect(page.getByTestId("edit-profile-form").first()).toBeVisible({
       timeout: timeouts.navigation,
     });
@@ -132,6 +135,7 @@ test.describe("Profile Edit — Form Assertions", () => {
   test("PE-06: bio character counter reflects limit", async ({ page }) => {
     await page.goto("/profile/edit");
     await page.waitForLoadState("domcontentloaded");
+    await waitForHydration(page);
     await expect(page.getByTestId("edit-profile-form").first()).toBeVisible({
       timeout: timeouts.navigation,
     });
@@ -165,6 +169,7 @@ test.describe("Profile Edit — Form Assertions", () => {
     // First, note the original name on the profile page
     await page.goto("/profile");
     await page.waitForLoadState("domcontentloaded");
+    await waitForHydration(page);
     await expect(page.getByTestId("profile-page").first()).toBeVisible({
       timeout: timeouts.navigation,
     });
@@ -173,6 +178,7 @@ test.describe("Profile Edit — Form Assertions", () => {
     // Navigate to edit page
     await page.goto("/profile/edit");
     await page.waitForLoadState("domcontentloaded");
+    await waitForHydration(page);
     await expect(page.getByTestId("edit-profile-form").first()).toBeVisible({
       timeout: timeouts.navigation,
     });
@@ -210,6 +216,7 @@ test.describe("Profile Edit — Form Assertions", () => {
   test("PE-14: axe-core a11y scan on edit form", async ({ page }) => {
     await page.goto("/profile/edit");
     await page.waitForLoadState("domcontentloaded");
+    await waitForHydration(page);
     await expect(page.getByTestId("edit-profile-form").first()).toBeVisible({
       timeout: timeouts.navigation,
     });
@@ -249,6 +256,7 @@ test.describe("Profile Edit — Form Assertions", () => {
   }) => {
     await page.goto("/profile/edit");
     await page.waitForLoadState("domcontentloaded");
+    await waitForHydration(page);
     await expect(page.getByTestId("edit-profile-form").first()).toBeVisible({
       timeout: timeouts.navigation,
     });
@@ -335,6 +343,7 @@ test.describe.serial("Profile Edit — Mutations", () => {
     // Note original name from profile page
     await page.goto("/profile");
     await page.waitForLoadState("domcontentloaded");
+    await waitForHydration(page);
     await expect(page.getByTestId("profile-page").first()).toBeVisible({
       timeout: timeouts.navigation,
     });
@@ -345,6 +354,7 @@ test.describe.serial("Profile Edit — Mutations", () => {
     // Go to edit form
     await page.goto("/profile/edit");
     await page.waitForLoadState("domcontentloaded");
+    await waitForHydration(page);
     await expect(page.getByTestId("edit-profile-form").first()).toBeVisible({
       timeout: timeouts.navigation,
     });
@@ -390,6 +400,7 @@ test.describe.serial("Profile Edit — Mutations", () => {
     // RESTORE original name
     await page.goto("/profile/edit");
     await page.waitForLoadState("domcontentloaded");
+    await waitForHydration(page);
     await expect(page.getByTestId("edit-profile-form").first()).toBeVisible({
       timeout: timeouts.navigation,
     });
@@ -420,6 +431,7 @@ test.describe.serial("Profile Edit — Mutations", () => {
 
     await page.goto("/profile/edit");
     await page.waitForLoadState("domcontentloaded");
+    await waitForHydration(page);
     await expect(page.getByTestId("edit-profile-form").first()).toBeVisible({
       timeout: timeouts.navigation,
     });
@@ -452,6 +464,7 @@ test.describe.serial("Profile Edit — Mutations", () => {
     // RESTORE original bio
     await page.goto("/profile/edit");
     await page.waitForLoadState("domcontentloaded");
+    await waitForHydration(page);
     await expect(page.getByTestId("edit-profile-form").first()).toBeVisible({
       timeout: timeouts.navigation,
     });
@@ -472,6 +485,7 @@ test.describe.serial("Profile Edit — Mutations", () => {
   test("PE-09: changes persist after reload", async ({ page }) => {
     await page.goto("/profile");
     await page.waitForLoadState("domcontentloaded");
+    await waitForHydration(page);
     await expect(page.getByTestId("profile-page").first()).toBeVisible({
       timeout: timeouts.navigation,
     });
@@ -485,6 +499,7 @@ test.describe.serial("Profile Edit — Mutations", () => {
     // Reload the page
     await page.reload();
     await page.waitForLoadState("domcontentloaded");
+    await waitForHydration(page);
     await expect(page.getByTestId("profile-page").first()).toBeVisible({
       timeout: timeouts.navigation,
     });
@@ -501,6 +516,7 @@ test.describe.serial("Profile Edit — Mutations", () => {
 
     await page.goto("/profile/edit");
     await page.waitForLoadState("domcontentloaded");
+    await waitForHydration(page);
     await expect(page.getByTestId("edit-profile-form").first()).toBeVisible({
       timeout: timeouts.navigation,
     });
@@ -570,6 +586,7 @@ test.describe.serial("Profile Edit — Mutations", () => {
 
     await page.goto("/profile/edit");
     await page.waitForLoadState("domcontentloaded");
+    await waitForHydration(page);
     await expect(page.getByTestId("edit-profile-form").first()).toBeVisible({
       timeout: timeouts.navigation,
     });
@@ -657,6 +674,7 @@ test.describe.serial("Profile Edit — Mutations", () => {
   }) => {
     await page.goto("/profile/edit");
     await page.waitForLoadState("domcontentloaded");
+    await waitForHydration(page);
     await expect(page.getByTestId("edit-profile-form").first()).toBeVisible({
       timeout: timeouts.navigation,
     });

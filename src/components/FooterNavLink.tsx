@@ -21,7 +21,7 @@ export default function FooterNavLink({
     <Link
       href={href}
       aria-current={isActive ? "page" : undefined}
-      className={`${className}${isActive ? " text-zinc-900 dark:text-white" : ""}`}
+      className={`${className}${isActive ? " text-on-surface" : ""}`}
     >
       {children}
     </Link>

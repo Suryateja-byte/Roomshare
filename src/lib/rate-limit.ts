@@ -252,7 +252,10 @@ export const RATE_LIMITS = {
   createReport: { limit: 10, windowMs: 24 * 60 * 60 * 1000 }, // 10 per day
   uploadDelete: { limit: 20, windowMs: 60 * 60 * 1000 }, // 20 per hour
   // Search page rate limit (supports search-as-move interactions while limiting abuse)
-  search: { limit: 60, windowMs: 60 * 1000 }, // 60 per minute
+  search: { limit: 60, windowMs: 60 * 1000 }, // 60 per minute (server actions: fetchMoreListings)
+  // P0-2 FIX: Dedicated SSR rate limit — separate from "search" to prevent map panning
+  // (which generates SSR at 800ms intervals = 75/min) from exhausting Load More budget.
+  "search-ssr": { limit: 120, windowMs: 60 * 1000 }, // 120 per minute (SSR page renders)
   // Nearby places search (Radar API)
   nearbySearch: { limit: 30, windowMs: 60 * 1000 }, // 30 per minute
   // P1-05: Rate limit for reviews GET endpoint
@@ -266,7 +269,6 @@ export const RATE_LIMITS = {
   // Server action rate limits
   viewCount: { limit: 60, windowMs: 60 * 1000 }, // 60 per minute (prevent view gaming)
   filterSuggestions: { limit: 30, windowMs: 60 * 1000 }, // 30 per minute
-  getListingsInBounds: { limit: 60, windowMs: 60 * 1000 }, // 60 per minute
   chatSendMessage: { limit: 100, windowMs: 60 * 60 * 1000 }, // 100 per hour
   chatStartConversation: { limit: 20, windowMs: 60 * 60 * 1000 }, // 20 per hour
   savedListings: { limit: 60, windowMs: 60 * 60 * 1000 }, // 60 per hour

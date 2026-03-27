@@ -149,7 +149,7 @@ test.describe("Search Loading States", () => {
       }
 
       // Wait for results to settle
-      await page.waitForTimeout(3000);
+      await waitForResults(page);
     } else {
       console.log("Info: No recommended filter pills available");
     }
@@ -266,7 +266,7 @@ test.describe("Search Loading States", () => {
       }
 
       // Wait for loading to complete (button goes back to non-busy or disappears)
-      await page.waitForTimeout(5000);
+      await expect(loadMoreButton).not.toHaveAttribute("aria-busy", "true", { timeout: 10_000 }).catch(() => {});
     } else {
       console.log(
         "Info: No load-more button visible (results fit in one page)"
@@ -288,7 +288,7 @@ test.describe("Search Loading States", () => {
 
     // During the slow load, some loading indicator should be present
     // Next.js loading.tsx provides a Suspense fallback
-    await page.waitForTimeout(500);
+    await page.waitForLoadState("domcontentloaded");
 
     const hasLoadingState = await page.evaluate(() => {
       // Check for any loading indicators in the DOM
@@ -429,13 +429,12 @@ test.describe("Search Loading States", () => {
       await firstPill.click();
 
       // Do not wait — immediately verify page is transitioning
-      await page.waitForTimeout(200);
+      await page.waitForLoadState("domcontentloaded");
 
       // The SearchTransitionProvider uses startTransition to manage concurrent updates
       // The last navigation should win
 
       // Wait for results to settle
-      await page.waitForTimeout(5000);
       await waitForResults(page);
 
       // Verify results are showing (not stuck in loading)

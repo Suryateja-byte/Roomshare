@@ -6,6 +6,7 @@ import type { SortOption } from "@/lib/data";
 import { useSearchTransitionSafe } from "@/contexts/SearchTransitionContext";
 import { ArrowUpDown, Check } from "lucide-react";
 import { FocusTrap } from "@/components/ui/FocusTrap";
+import { useBodyScrollLock } from "@/hooks/useBodyScrollLock";
 import {
   Select,
   SelectContent,
@@ -33,6 +34,7 @@ export default function SortSelect({ currentSort }: SortSelectProps) {
   const router = useRouter();
   const searchParams = useSearchParams();
   const transitionContext = useSearchTransitionSafe();
+  useBodyScrollLock(mobileOpen);
 
   // Prevent hydration mismatch from Radix UI generating different IDs on server vs client
   useEffect(() => {
@@ -83,17 +85,17 @@ export default function SortSelect({ currentSort }: SortSelectProps) {
   // Render placeholder during SSR to prevent hydration mismatch
   if (!mounted) {
     return (
-      <div className="flex items-center gap-2 text-xs font-medium text-zinc-500 dark:text-zinc-400">
+      <div className="flex items-center gap-2 text-xs font-medium text-on-surface-variant">
         <button
           type="button"
-          className="md:hidden flex items-center gap-1.5 px-3 py-2 min-h-[44px] rounded-full border border-zinc-200 dark:border-zinc-700 text-sm font-medium text-zinc-700 dark:text-zinc-300"
+          className="md:hidden flex items-center gap-1.5 px-3 py-2 min-h-[44px] rounded-full border border-outline-variant/20 text-sm font-medium text-on-surface-variant"
         >
           <ArrowUpDown className="w-4 h-4" />
           <span className="hidden sm:inline">Sort</span>
         </button>
         <div className="hidden md:flex items-center gap-2">
           <span>Sort by:</span>
-          <div className="h-9 min-w-[140px] px-3 py-1.5 text-zinc-900 dark:text-white font-semibold text-xs flex items-center">
+          <div className="h-9 min-w-[140px] px-3 py-1.5 text-on-surface font-semibold text-xs flex items-center">
             {currentLabel}
           </div>
         </div>
@@ -109,8 +111,8 @@ export default function SortSelect({ currentSort }: SortSelectProps) {
         onClick={() => setMobileOpen(true)}
         className={`md:hidden flex items-center gap-1.5 px-3 py-2 min-h-[44px] rounded-full border text-sm font-medium transition-colors ${
           isNonDefault
-            ? "border-indigo-500 bg-indigo-500 text-white"
-            : "border-zinc-200 dark:border-zinc-700 text-zinc-700 dark:text-zinc-300 hover:bg-zinc-100 dark:hover:bg-zinc-800"
+            ? "border-primary bg-primary text-on-primary"
+            : "border-outline-variant/20 text-on-surface-variant hover:bg-surface-container-high"
         }`}
         aria-label={`Sort: ${currentLabel}`}
       >
@@ -128,20 +130,20 @@ export default function SortSelect({ currentSort }: SortSelectProps) {
         >
           {/* Backdrop */}
           <div
-            className="absolute inset-0 bg-black/40"
+            className="absolute inset-0 bg-on-surface/40"
             onClick={() => setMobileOpen(false)}
             aria-hidden="true"
           />
           {/* Sheet */}
           <FocusTrap active={mobileOpen}>
-            <div className="absolute bottom-0 left-0 right-0 bg-white dark:bg-zinc-900 rounded-t-2xl shadow-xl animate-in slide-in-from-bottom duration-200">
+            <div className="absolute bottom-0 left-0 right-0 bg-surface-container-lowest rounded-t-2xl shadow-xl animate-in slide-in-from-bottom duration-200">
               <div className="flex justify-center py-3">
-                <div className="w-10 h-1 bg-zinc-300 dark:bg-zinc-600 rounded-full" />
+                <div className="w-10 h-1 bg-surface-container-high rounded-full" />
               </div>
               <div className="px-4 pb-2">
                 <h3
                   id="sort-sheet-title"
-                  className="text-lg font-semibold text-zinc-900 dark:text-white"
+                  className="text-lg font-semibold text-on-surface"
                 >
                   Sort by
                 </h3>
@@ -156,13 +158,13 @@ export default function SortSelect({ currentSort }: SortSelectProps) {
                       onClick={() => handleSortChange(option.value)}
                       className={`flex items-center justify-between w-full px-4 py-3.5 min-h-[44px] rounded-xl text-sm font-medium transition-colors ${
                         isActive
-                          ? "bg-indigo-50 dark:bg-indigo-950/50 text-indigo-700 dark:text-indigo-300"
-                          : "text-zinc-700 dark:text-zinc-300 hover:bg-zinc-50 dark:hover:bg-zinc-800/50"
+                          ? "bg-primary text-primary"
+                          : "text-on-surface-variant hover:bg-surface-canvas"
                       }`}
                     >
                       <span>{option.label}</span>
                       {isActive && (
-                        <Check className="w-4 h-4 text-zinc-900 dark:text-white" />
+                        <Check className="w-4 h-4 text-on-surface" />
                       )}
                     </button>
                   );
@@ -176,7 +178,7 @@ export default function SortSelect({ currentSort }: SortSelectProps) {
       )}
 
       {/* Desktop sort dropdown */}
-      <div className="hidden md:flex items-center gap-2 text-xs font-medium text-zinc-500 dark:text-zinc-400">
+      <div className="hidden md:flex items-center gap-2 text-xs font-medium text-on-surface-variant">
         <span>Sort by:</span>
         <Select
           value={currentSort}
@@ -186,10 +188,10 @@ export default function SortSelect({ currentSort }: SortSelectProps) {
         >
           <SelectTrigger
             aria-label="Sort by"
-            className={`h-9 w-auto min-w-[140px] border-none bg-transparent hover:bg-zinc-100 dark:hover:bg-zinc-800 px-3 py-1.5 font-semibold text-xs focus:ring-0 ${
+            className={`h-9 w-auto min-w-[140px] border-none bg-transparent hover:bg-surface-container-high px-3 py-1.5 font-semibold text-xs focus:ring-0 ${
               isNonDefault
-                ? "text-zinc-900 dark:text-white"
-                : "text-zinc-600 dark:text-zinc-400"
+                ? "text-on-surface"
+                : "text-on-surface-variant"
             }`}
           >
             <SelectValue placeholder="Recommended">{currentLabel}</SelectValue>

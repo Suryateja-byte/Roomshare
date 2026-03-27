@@ -139,13 +139,11 @@ test.describe("Gender & Language Filters", () => {
 
     // Search for "Span" and select Spanish
     await languageSearch.fill("Span");
-    await page.waitForTimeout(300);
 
     const availableGroup = dialog.locator('[aria-label="Available languages"]');
     const spanishBtn = availableGroup.getByRole("button", { name: /spanish/i });
     await expect(spanishBtn).toBeVisible({ timeout: 3_000 });
     await spanishBtn.click();
-    await page.waitForTimeout(300);
 
     // Spanish should now appear in the "Selected languages" group
     const selectedGroup = dialog.locator('[aria-label="Selected languages"]');
@@ -158,12 +156,10 @@ test.describe("Gender & Language Filters", () => {
     // Clear search and search for "Fre" to find French
     await languageSearch.clear();
     await languageSearch.fill("Fre");
-    await page.waitForTimeout(300);
 
     const frenchBtn = availableGroup.getByRole("button", { name: /french/i });
     await expect(frenchBtn).toBeVisible({ timeout: 3_000 });
     await frenchBtn.click();
-    await page.waitForTimeout(300);
 
     // Both should be in the selected group
     const selectedFrench = selectedGroup.getByRole("button", {
@@ -208,7 +204,7 @@ test.describe("Gender & Language Filters", () => {
     // Start with Spanish and French applied
     await page.goto(`${SEARCH_URL}&languages=es,fr`);
     await page.waitForLoadState("domcontentloaded");
-    await page.waitForTimeout(2_000);
+    await page.waitForLoadState("networkidle").catch(() => {});
 
     const dialog = await openFilterModal(page);
 
@@ -228,7 +224,6 @@ test.describe("Gender & Language Filters", () => {
     });
     await expect(selectedSpanish).toBeVisible({ timeout: 3_000 });
     await selectedSpanish.click();
-    await page.waitForTimeout(300);
 
     // Apply
     await applyFilters(page);
@@ -272,10 +267,9 @@ test.describe("Gender & Language Filters", () => {
 
     // Type a nonsense string that matches no language
     await languageSearch.fill("zzzzzz");
-    await page.waitForTimeout(300);
 
     // "No languages found" message should appear in the available languages area
-    const noResultsMsg = dialog.locator("text=No languages found");
+    const noResultsMsg = dialog.getByText("No languages found");
     await expect(noResultsMsg).toBeVisible({ timeout: 3_000 });
   });
 
@@ -347,7 +341,7 @@ test.describe("Gender & Language Filters", () => {
 
     await page.goto(`${SEARCH_URL}&languages=${languagesParam}`);
     await page.waitForLoadState("domcontentloaded");
-    await page.waitForTimeout(2_000);
+    await page.waitForLoadState("networkidle").catch(() => {});
 
     const dialog = await openFilterModal(page);
 
@@ -359,7 +353,7 @@ test.describe("Gender & Language Filters", () => {
 
     // With all languages selected and no search term, the available languages area
     // should show "All languages selected" (since filteredLanguages minus selected = 0)
-    const allSelectedMsg = dialog.locator("text=All languages selected");
+    const allSelectedMsg = dialog.getByText("All languages selected");
     await expect(allSelectedMsg).toBeVisible({ timeout: 5_000 });
   });
 });

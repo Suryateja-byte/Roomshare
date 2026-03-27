@@ -1,7 +1,6 @@
 import "server-only";
 
 import { Prisma, BookingStatus } from "@prisma/client";
-import { features } from "@/lib/env";
 
 export type BookingAuditAction =
   | "CREATED"
@@ -43,7 +42,7 @@ function stripPii(
 
 /**
  * Insert an audit row inside the calling transaction.
- * No-ops when ENABLE_BOOKING_AUDIT is off.
+ * Always enabled — audit trail must never be silently disabled.
  * Errors propagate — rolling back the parent TX (no unaudited transitions).
  */
 export async function logBookingAudit(
@@ -60,8 +59,6 @@ export async function logBookingAudit(
     ipAddress?: string | null;
   }
 ): Promise<void> {
-  if (!features.bookingAudit) return;
-
   await tx.bookingAuditLog.create({
     data: {
       bookingId: params.bookingId,

@@ -54,12 +54,12 @@ describe("SlotBadge", () => {
 
   // -- Overlay mode --
 
-  it("applies neutral glass bg + rounded-md in overlay mode", () => {
+  it("applies neutral glass bg + rounded-lg in overlay mode", () => {
     render(<SlotBadge availableSlots={1} totalSlots={1} overlay />);
     const badge = screen.getByTestId("slot-badge");
-    expect(badge.className).toContain("bg-white/90");
+    expect(badge.className).toContain("bg-surface-container-lowest/90");
     expect(badge.className).toContain("backdrop-blur-sm");
-    expect(badge.className).toContain("rounded-md");
+    expect(badge.className).toContain("rounded-lg");
   });
 
   it("applies green text color for available overlay", () => {

@@ -1,6 +1,7 @@
 "use client";
 
-import { useRef, useState, useEffect, useCallback } from "react";
+import { useRef, useState, useEffect, useCallback, useMemo } from "react";
+import { useSearchParams } from "next/navigation";
 import { Map, MapPinOff } from "lucide-react";
 import MobileBottomSheet from "./search/MobileBottomSheet";
 import FloatingMapButton from "./search/FloatingMapButton";
@@ -33,10 +34,34 @@ export default function SearchViewToggle({
   const [hasMounted, setHasMounted] = useState(false);
   const [mobileSnap, setMobileSnap] = useState(1); // 0=collapsed, 1=half, 2=expanded
   const { activeId } = useListingFocus();
+  const searchParams = useSearchParams();
 
   useEffect(() => {
     setHasMounted(true);
   }, []);
+
+  // Compute a key from filter/sort/query params only — excludes geographic bounds.
+  // Same pattern as SearchResultsLoadingWrapper.tsx:33-48.
+  const filterParamsKey = useMemo(() => {
+    const filterOnly = new URLSearchParams(searchParams.toString());
+    for (const k of ["minLat", "maxLat", "minLng", "maxLng", "lat", "lng", "zoom"]) {
+      filterOnly.delete(k);
+    }
+    filterOnly.sort();
+    return filterOnly.toString();
+  }, [searchParams]);
+
+  // Reset bottom sheet to half-open when search results change (filter/sort/query).
+  // Prevents the sheet staying collapsed after the user navigates to a new search.
+  // Skips initial mount (mobileSnap is already 1) and bounds-only changes (map pans).
+  const isInitialFilterKey = useRef(true);
+  useEffect(() => {
+    if (isInitialFilterKey.current) {
+      isInitialFilterKey.current = false;
+      return;
+    }
+    setMobileSnap(1);
+  }, [filterParamsKey]);
 
   // When a map pin is tapped (activeId changes) on mobile, snap sheet to half
   useEffect(() => {
@@ -110,12 +135,12 @@ export default function SearchViewToggle({
         {/* Right Panel: Map View (45%) */}
         {renderMapInDesktop && (
           <div className="w-[45%] h-full relative p-4 lg:p-6">
-            <div className="w-full h-full relative rounded-2xl overflow-hidden border border-zinc-200/80 dark:border-zinc-800/80 shadow-2xl bg-zinc-100 dark:bg-zinc-900">
+            <div className="w-full h-full relative rounded-2xl overflow-hidden border border-outline-variant/20/80 shadow-2xl bg-surface-container-high">
               {/* Desktop Hide Map Button */}
               <button
                 onClick={onToggle}
                 disabled={isLoading}
-                className="absolute top-4 right-4 z-[50] h-11 inline-flex items-center gap-1.5 px-4 bg-zinc-900/90 dark:bg-zinc-800/90 backdrop-blur-md text-white dark:text-zinc-100 rounded-full shadow-lg border border-white/10 hover:bg-zinc-800 dark:hover:bg-zinc-700 text-sm font-medium transition-colors disabled:opacity-60"
+                className="absolute top-4 right-4 z-[50] h-11 inline-flex items-center gap-1.5 px-4 bg-on-surface/90 backdrop-blur-md text-white rounded-full shadow-lg border border-white/10 hover:bg-on-surface text-sm font-medium transition-colors disabled:opacity-60"
                 aria-label="Hide map"
               >
                 <MapPinOff className="w-4 h-4" />
@@ -131,7 +156,7 @@ export default function SearchViewToggle({
           <button
             onClick={onToggle}
             disabled={isLoading}
-            className="fixed bottom-6 right-6 z-[50] flex items-center gap-2 px-5 py-3 bg-zinc-900/90 dark:bg-white/90 backdrop-blur-md text-white dark:text-zinc-900 rounded-full shadow-xl shadow-zinc-900/30 dark:shadow-black/20 hover:bg-zinc-800 dark:hover:bg-zinc-100 active:scale-[0.98] transition-all duration-200 disabled:opacity-60 border border-white/10"
+            className="fixed bottom-6 right-6 z-[50] flex items-center gap-2 px-5 py-3 bg-on-surface/90 backdrop-blur-md text-white rounded-full shadow-xl shadow-on-surface/30 hover:bg-on-surface active:scale-[0.98] transition-all duration-200 disabled:opacity-60 border border-white/10"
             aria-label="Show map"
           >
             <Map className="w-4 h-4" />

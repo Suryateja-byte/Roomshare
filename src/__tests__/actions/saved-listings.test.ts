@@ -3,20 +3,26 @@
  */
 
 // Mock dependencies before imports
-jest.mock("@/lib/prisma", () => ({
-  prisma: {
-    savedListing: {
-      findUnique: jest.fn(),
-      findMany: jest.fn(),
-      create: jest.fn(),
-      delete: jest.fn(),
-      deleteMany: jest.fn(),
+jest.mock("@/lib/prisma", () => {
+  const savedListingModel = {
+    findUnique: jest.fn(),
+    findMany: jest.fn(),
+    create: jest.fn(),
+    delete: jest.fn(),
+    deleteMany: jest.fn(),
+  };
+  return {
+    prisma: {
+      savedListing: savedListingModel,
+      user: {
+        findUnique: jest.fn(),
+      },
+      $transaction: jest.fn((fn: (tx: unknown) => Promise<unknown>) =>
+        fn({ savedListing: savedListingModel })
+      ),
     },
-    user: {
-      findUnique: jest.fn(),
-    },
-  },
-}));
+  };
+});
 
 jest.mock("@/auth", () => ({
   auth: jest.fn(),
@@ -103,24 +109,33 @@ describe("saved-listings actions", () => {
 
     describe("toggle behavior", () => {
       it("unsaves listing when already saved", async () => {
-        // deleteMany returns count > 0 → listing existed → now removed
-        (prisma.savedListing.deleteMany as jest.Mock).mockResolvedValue({
-          count: 1,
+        // findUnique returns record → listing is saved → delete it
+        (prisma.savedListing.findUnique as jest.Mock).mockResolvedValue({
+          id: "saved-1",
+          userId: "user-123",
+          listingId: "listing-456",
         });
+        (prisma.savedListing.delete as jest.Mock).mockResolvedValue({});
 
         const result = await toggleSaveListing("listing-456");
 
         expect(result.saved).toBe(false);
-        expect(prisma.savedListing.deleteMany).toHaveBeenCalledWith({
-          where: { userId: "user-123", listingId: "listing-456" },
+        expect(prisma.savedListing.findUnique).toHaveBeenCalledWith({
+          where: {
+            userId_listingId: {
+              userId: "user-123",
+              listingId: "listing-456",
+            },
+          },
+        });
+        expect(prisma.savedListing.delete).toHaveBeenCalledWith({
+          where: { id: "saved-1" },
         });
       });
 
       it("saves listing when not saved", async () => {
-        // deleteMany returns count 0 → listing didn't exist → create it
-        (prisma.savedListing.deleteMany as jest.Mock).mockResolvedValue({
-          count: 0,
-        });
+        // findUnique returns null → listing not saved → create it
+        (prisma.savedListing.findUnique as jest.Mock).mockResolvedValue(null);
         (prisma.savedListing.create as jest.Mock).mockResolvedValue(
           mockSavedListing
         );
@@ -133,10 +148,19 @@ describe("saved-listings actions", () => {
         });
       });
 
+      it("wraps toggle in $transaction for atomicity", async () => {
+        (prisma.savedListing.findUnique as jest.Mock).mockResolvedValue(null);
+        (prisma.savedListing.create as jest.Mock).mockResolvedValue(
+          mockSavedListing
+        );
+
+        await toggleSaveListing("listing-456");
+
+        expect(prisma.$transaction).toHaveBeenCalledTimes(1);
+      });
+
       it("revalidates listing path when saving", async () => {
-        (prisma.savedListing.deleteMany as jest.Mock).mockResolvedValue({
-          count: 0,
-        });
+        (prisma.savedListing.findUnique as jest.Mock).mockResolvedValue(null);
         (prisma.savedListing.create as jest.Mock).mockResolvedValue(
           mockSavedListing
         );
@@ -148,9 +172,12 @@ describe("saved-listings actions", () => {
       });
 
       it("revalidates paths when unsaving", async () => {
-        (prisma.savedListing.deleteMany as jest.Mock).mockResolvedValue({
-          count: 1,
+        (prisma.savedListing.findUnique as jest.Mock).mockResolvedValue({
+          id: "saved-1",
+          userId: "user-123",
+          listingId: "listing-456",
         });
+        (prisma.savedListing.delete as jest.Mock).mockResolvedValue({});
 
         await toggleSaveListing("listing-456");
 
@@ -161,7 +188,7 @@ describe("saved-listings actions", () => {
 
     describe("error handling", () => {
       it("returns error on database failure", async () => {
-        (prisma.savedListing.deleteMany as jest.Mock).mockRejectedValue(
+        (prisma.$transaction as jest.Mock).mockRejectedValue(
           new Error("DB Error")
         );
 

@@ -12,6 +12,10 @@ import {
   RATE_LIMITS,
   getClientIPFromHeaders,
 } from "@/lib/rate-limit";
+// Basic listingId format check — rejects empty/absurdly long strings
+// without being as strict as CUID/UUID validation (allows test IDs)
+const isReasonableId = (id: string) =>
+  typeof id === "string" && id.length >= 1 && id.length <= 100 && /^[\w-]+$/.test(id);
 
 export type ListingStatus = "ACTIVE" | "PAUSED" | "RENTED";
 
@@ -21,6 +25,11 @@ export async function updateListingStatus(
   listingId: string,
   status: ListingStatus
 ) {
+  // Validate listingId format to avoid unnecessary DB round-trips
+  if (!isReasonableId(listingId)) {
+    return { error: "Invalid listing ID format" };
+  }
+
   // Runtime Zod validation for defense-in-depth
   const parsed = statusSchema.safeParse(status);
   if (!parsed.success) {
@@ -75,14 +84,21 @@ export async function updateListingStatus(
       });
 
       return { success: true } as const;
-    });
+    }, { timeout: 10000 });
 
     if ("error" in result) {
       return result;
     }
 
     // Side effects OUTSIDE transaction (no locks held)
-    markListingDirty(listingId, "status_changed").catch(() => {});
+    markListingDirty(listingId, "status_changed").catch((err) => {
+      logger.sync.warn("markListingDirty failed", {
+        action: "updateListingStatus",
+        listingId,
+        reason: "status_changed",
+        error: err instanceof Error ? err.message : String(err),
+      });
+    });
 
     revalidatePath(`/listings/${listingId}`);
     revalidatePath("/profile");
@@ -101,6 +117,10 @@ export async function updateListingStatus(
 }
 
 export async function incrementViewCount(listingId: string) {
+  if (!isReasonableId(listingId)) {
+    return { error: "Invalid listing ID format" };
+  }
+
   const session = await auth();
   let identifier: string;
   if (session?.user?.id) {
@@ -127,7 +147,14 @@ export async function incrementViewCount(listingId: string) {
       data: { viewCount: { increment: 1 } },
     });
     // Fire-and-forget: mark listing dirty for search doc refresh
-    markListingDirty(listingId, "view_count").catch(() => {});
+    markListingDirty(listingId, "view_count").catch((err) => {
+      logger.sync.warn("markListingDirty failed", {
+        action: "incrementViewCount",
+        listingId,
+        reason: "view_count",
+        error: err instanceof Error ? err.message : String(err),
+      });
+    });
     return { success: true };
   } catch (error) {
     logger.sync.error("Failed to increment view count", {
@@ -205,7 +232,7 @@ export async function trackRecentlyViewed(listingId: string) {
     logger.sync.error("Failed to track recently viewed", {
       action: "trackRecentlyViewed",
       listingId,
-      userId: session.user.id,
+      userId: session.user.id.slice(0, 8) + "...",
       error: error instanceof Error ? error.message : "Unknown error",
     });
     return { error: "Failed to track recently viewed" };
@@ -262,7 +289,7 @@ export async function getRecentlyViewed(limit: number = 10) {
   } catch (error) {
     logger.sync.error("Failed to fetch recently viewed", {
       action: "getRecentlyViewed",
-      userId: session.user.id,
+      userId: session.user.id.slice(0, 8) + "...",
       limit,
       error: error instanceof Error ? error.message : "Unknown error",
     });

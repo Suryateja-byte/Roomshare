@@ -57,16 +57,16 @@ const MONTHS = [
 
 const statusColors = {
   PENDING:
-    "bg-amber-100 dark:bg-amber-900/30 text-amber-700 dark:text-amber-400 border-amber-200 dark:border-amber-800",
+    "bg-amber-100 text-amber-700 border-amber-200",
   ACCEPTED:
-    "bg-green-100 dark:bg-green-900/30 text-green-700 dark:text-green-400 border-green-200 dark:border-green-800",
+    "bg-green-100 text-green-700 border-green-200",
   REJECTED:
-    "bg-red-100 dark:bg-red-900/30 text-red-700 dark:text-red-400 border-red-200 dark:border-red-800",
+    "bg-red-100 text-red-700 border-red-200",
   CANCELLED:
-    "bg-zinc-100 dark:bg-zinc-800 text-zinc-500 dark:text-zinc-400 border-zinc-200 dark:border-zinc-700",
-  HELD: "bg-blue-100 dark:bg-blue-900/30 text-blue-700 dark:text-blue-400 border-blue-200 dark:border-blue-800",
+    "bg-surface-container-high text-on-surface-variant border-outline-variant/20",
+  HELD: "bg-blue-100 text-blue-700 border-blue-200",
   EXPIRED:
-    "bg-orange-100 dark:bg-orange-900/30 text-orange-700 dark:text-orange-400 border-orange-200 dark:border-orange-800",
+    "bg-orange-100 text-orange-700 border-orange-200",
 };
 
 export default function BookingCalendar({
@@ -140,16 +140,16 @@ export default function BookingCalendar({
     : [];
 
   return (
-    <div className="bg-white dark:bg-zinc-900 rounded-2xl border border-zinc-100 dark:border-zinc-800 overflow-hidden">
+    <div className="bg-surface-container-lowest rounded-2xl border border-outline-variant/20 overflow-hidden">
       {/* Header */}
-      <div className="px-6 py-4 border-b border-zinc-100 dark:border-zinc-800 flex items-center justify-between">
+      <div className="px-6 py-4 bg-surface-container-high/30 flex items-center justify-between">
         <div className="flex items-center gap-4">
-          <h2 className="text-lg font-semibold text-zinc-900 dark:text-white">
+          <h2 className="text-lg font-semibold text-on-surface">
             {MONTHS[month]} {year}
           </h2>
           <button
             onClick={goToToday}
-            className="text-sm text-zinc-500 dark:text-zinc-400 hover:text-zinc-900 dark:hover:text-white transition-colors focus-visible:ring-2 focus-visible:ring-zinc-900/20 focus-visible:ring-offset-2 rounded-sm"
+            className="text-sm text-on-surface-variant hover:text-on-surface transition-colors focus-visible:ring-2 focus-visible:ring-primary/30 focus-visible:ring-offset-2 rounded-sm"
           >
             Today
           </button>
@@ -157,17 +157,17 @@ export default function BookingCalendar({
         <div className="flex items-center gap-2">
           <button
             onClick={goToPreviousMonth}
-            className="p-2 min-w-[44px] min-h-[44px] flex items-center justify-center hover:bg-zinc-100 dark:hover:bg-zinc-800 rounded-lg transition-colors focus-visible:ring-2 focus-visible:ring-zinc-900/20 focus-visible:ring-offset-2"
+            className="p-2 min-w-[44px] min-h-[44px] flex items-center justify-center hover:bg-surface-container-high rounded-lg transition-colors focus-visible:ring-2 focus-visible:ring-primary/30 focus-visible:ring-offset-2"
             aria-label="Previous month"
           >
-            <ChevronLeft className="w-5 h-5 text-zinc-600 dark:text-zinc-400" />
+            <ChevronLeft className="w-5 h-5 text-on-surface-variant" />
           </button>
           <button
             onClick={goToNextMonth}
-            className="p-2 min-w-[44px] min-h-[44px] flex items-center justify-center hover:bg-zinc-100 dark:hover:bg-zinc-800 rounded-lg transition-colors focus-visible:ring-2 focus-visible:ring-zinc-900/20 focus-visible:ring-offset-2"
+            className="p-2 min-w-[44px] min-h-[44px] flex items-center justify-center hover:bg-surface-container-high rounded-lg transition-colors focus-visible:ring-2 focus-visible:ring-primary/30 focus-visible:ring-offset-2"
             aria-label="Next month"
           >
-            <ChevronRight className="w-5 h-5 text-zinc-600 dark:text-zinc-400" />
+            <ChevronRight className="w-5 h-5 text-on-surface-variant" />
           </button>
         </div>
       </div>
@@ -178,16 +178,16 @@ export default function BookingCalendar({
           {/* Loading overlay */}
           {isLoading && (
             <div
-              className="absolute inset-0 bg-white/70 dark:bg-zinc-900/70 backdrop-blur-sm z-10 flex items-center justify-center rounded-lg"
+              className="absolute inset-0 bg-surface-container-lowest/70 backdrop-blur-sm z-10 flex items-center justify-center rounded-lg"
               role="status"
               aria-label="Loading bookings"
             >
               <div className="flex flex-col items-center gap-2">
                 <Loader2
-                  className="w-8 h-8 text-zinc-400 animate-spin"
+                  className="w-8 h-8 text-on-surface-variant animate-spin"
                   aria-hidden="true"
                 />
-                <span className="text-sm text-zinc-500 dark:text-zinc-400">
+                <span className="text-sm text-on-surface-variant">
                   Loading bookings...
                 </span>
               </div>
@@ -199,7 +199,7 @@ export default function BookingCalendar({
             {DAYS.map((day) => (
               <div
                 key={day}
-                className="text-center text-xs font-medium text-zinc-500 dark:text-zinc-400 py-2"
+                className="text-center text-xs font-medium text-on-surface-variant py-2"
               >
                 {day}
               </div>
@@ -230,12 +230,12 @@ export default function BookingCalendar({
                 <button
                   key={day}
                   onClick={() => setSelectedDate(new Date(year, month, day))}
-                  className={`aspect-square p-1 rounded-lg relative transition-all focus-visible:ring-2 focus-visible:ring-zinc-900/20 focus-visible:ring-offset-2 ${
-                    isToday(day) ? "ring-2 ring-zinc-900 dark:ring-white" : ""
+                  className={`aspect-square p-1 rounded-lg relative transition-all focus-visible:ring-2 focus-visible:ring-primary/30 focus-visible:ring-offset-2 ${
+                    isToday(day) ? "ring-2 ring-primary/30" : ""
                   } ${
                     isSelected
-                      ? "bg-zinc-900 dark:bg-white text-white dark:text-zinc-900"
-                      : "text-zinc-900 dark:text-white hover:bg-zinc-50 dark:hover:bg-zinc-800"
+                      ? "bg-on-surface text-white"
+                      : "text-on-surface hover:bg-surface-canvas"
                   }`}
                 >
                   <span
@@ -261,12 +261,12 @@ export default function BookingCalendar({
           </div>
 
           {/* Legend */}
-          <div className="flex items-center gap-4 mt-4 pt-4 border-t border-zinc-100 dark:border-zinc-800">
-            <div className="flex items-center gap-2 text-xs text-zinc-500 dark:text-zinc-400">
+          <div className="flex items-center gap-4 mt-4 pt-4">
+            <div className="flex items-center gap-2 text-xs text-on-surface-variant">
               <span className="w-2 h-2 rounded-full bg-amber-400" />
               Pending
             </div>
-            <div className="flex items-center gap-2 text-xs text-zinc-500 dark:text-zinc-400">
+            <div className="flex items-center gap-2 text-xs text-on-surface-variant">
               <span className="w-2 h-2 rounded-full bg-green-500" />
               Accepted
             </div>
@@ -274,10 +274,10 @@ export default function BookingCalendar({
         </div>
 
         {/* Selected Date Details */}
-        <div className="w-full md:w-80 border-t md:border-t-0 md:border-l border-zinc-100 dark:border-zinc-800 p-4">
+        <div className="w-full md:w-80 bg-surface-container-high/20 p-4">
           {selectedDate ? (
             <>
-              <h3 className="font-semibold text-zinc-900 dark:text-white mb-4">
+              <h3 className="font-semibold text-on-surface mb-4">
                 {selectedDate.toLocaleDateString("en-US", {
                   weekday: "long",
                   month: "long",
@@ -286,7 +286,7 @@ export default function BookingCalendar({
               </h3>
 
               {selectedDateBookings.length === 0 ? (
-                <p className="text-sm text-zinc-500 dark:text-zinc-400">
+                <p className="text-sm text-on-surface-variant">
                   No bookings on this day
                 </p>
               ) : (
@@ -300,7 +300,7 @@ export default function BookingCalendar({
                       <div className="flex items-center gap-2 mb-1">
                         <User className="w-3.5 h-3.5" />
                         <span className="font-medium text-sm">
-                          {booking.tenant.name || "Guest"}
+                          {booking.tenant?.name || "Guest"}
                         </span>
                       </div>
                       <div className="flex items-center gap-2 text-xs opacity-75">
@@ -324,7 +324,7 @@ export default function BookingCalendar({
             </>
           ) : (
             <div className="text-center py-8">
-              <p className="text-sm text-zinc-500 dark:text-zinc-400">
+              <p className="text-sm text-on-surface-variant">
                 Select a date to view bookings
               </p>
             </div>

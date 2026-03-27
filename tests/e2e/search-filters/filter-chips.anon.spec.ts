@@ -45,16 +45,15 @@ test.describe("Active Filter Chips", () => {
   }) => {
     await page.goto(`${SEARCH_URL}&roomType=Private+Room&amenities=Wifi`);
     await page.waitForLoadState("domcontentloaded");
-    await page.waitForLoadState("domcontentloaded").catch(() => {});
 
     const region = appliedFiltersRegion(page);
     await expect(region).toBeVisible({ timeout: 10_000 });
 
     // Should display chips for both filters
-    const privateRoomChip = region.locator("text=/Private Room/i").first();
+    const privateRoomChip = region.getByText(/Private Room/i).first();
     await expect(privateRoomChip).toBeVisible({ timeout: 10_000 });
 
-    const wifiChip = region.locator("text=/Wifi/i").first();
+    const wifiChip = region.getByText(/Wifi/i).first();
     await expect(wifiChip).toBeVisible({ timeout: 10_000 });
   });
 
@@ -64,7 +63,6 @@ test.describe("Active Filter Chips", () => {
   }) => {
     await page.goto(`${SEARCH_URL}&roomType=Private+Room&amenities=Wifi`);
     await page.waitForLoadState("domcontentloaded");
-    await page.waitForLoadState("domcontentloaded").catch(() => {});
 
     const region = appliedFiltersRegion(page);
     const regionVisible = await region.isVisible().catch(() => false);
@@ -104,7 +102,6 @@ test.describe("Active Filter Chips", () => {
       `${SEARCH_URL}&roomType=Private+Room&amenities=Wifi,Parking&maxPrice=2000`
     );
     await page.waitForLoadState("domcontentloaded");
-    await page.waitForLoadState("domcontentloaded").catch(() => {});
 
     const region = appliedFiltersRegion(page);
     const regionVisible = await region.isVisible().catch(() => false);
@@ -149,27 +146,25 @@ test.describe("Active Filter Chips", () => {
     // Start with one filter
     await page.goto(`${SEARCH_URL}&roomType=Private+Room`);
     await page.waitForLoadState("domcontentloaded");
-    await page.waitForLoadState("domcontentloaded").catch(() => {});
 
     const region = appliedFiltersRegion(page);
     const regionVisible = await region.isVisible().catch(() => false);
     test.skip(!regionVisible, "Applied filters region not visible");
 
     // Verify Private Room chip
-    await expect(region.locator("text=/Private Room/i").first()).toBeVisible({
+    await expect(region.getByText(/Private Room/i).first()).toBeVisible({
       timeout: 10_000,
     });
 
     // Navigate with a different filter
     await page.goto(`${SEARCH_URL}&amenities=Furnished`);
     await page.waitForLoadState("domcontentloaded");
-    await page.waitForLoadState("domcontentloaded").catch(() => {});
 
     // Private Room chip should be gone, Furnished should appear
     await expect(
-      region.locator("text=/Private Room/i").first()
+      region.getByText(/Private Room/i).first()
     ).not.toBeVisible({ timeout: 10_000 });
-    await expect(region.locator("text=/Furnished/i").first()).toBeVisible({
+    await expect(region.getByText(/Furnished/i).first()).toBeVisible({
       timeout: 10_000,
     });
   });
@@ -182,29 +177,28 @@ test.describe("Active Filter Chips", () => {
       `${SEARCH_URL}&roomType=Private+Room&maxPrice=2000&amenities=Wifi,AC`
     );
     await page.waitForLoadState("domcontentloaded");
-    await page.waitForLoadState("domcontentloaded").catch(() => {});
 
     const region = appliedFiltersRegion(page);
     const regionVisible = await region.isVisible().catch(() => false);
     test.skip(!regionVisible, "Applied filters region not visible");
 
     // Room type should display "Private Room" (not raw URL value)
-    await expect(region.locator("text=/Private Room/i").first()).toBeVisible({
+    await expect(region.getByText(/Private Room/i).first()).toBeVisible({
       timeout: 10_000,
     });
 
     // Price should display formatted (e.g., "Max $2,000" not "maxPrice=2000")
-    const priceChip = region.locator("text=/\\$2,000|Max.*2000/i").first();
+    const priceChip = region.getByText(/\$2,000|Max.*2000/i).first();
     const priceVisible = await priceChip.isVisible().catch(() => false);
     if (priceVisible) {
       await expect(priceChip).toBeVisible();
     }
 
     // Individual amenity chips
-    await expect(region.locator("text=/Wifi/i").first()).toBeVisible({
+    await expect(region.getByText(/Wifi/i).first()).toBeVisible({
       timeout: 10_000,
     });
-    await expect(region.locator("text=/AC/i").first()).toBeVisible({
+    await expect(region.getByText(/AC/i).first()).toBeVisible({
       timeout: 10_000,
     });
   });
@@ -215,7 +209,6 @@ test.describe("Active Filter Chips", () => {
   }) => {
     await page.goto(`${SEARCH_URL}&amenities=Wifi,Parking`);
     await page.waitForLoadState("domcontentloaded");
-    await page.waitForLoadState("domcontentloaded").catch(() => {});
 
     const region = appliedFiltersRegion(page);
     const regionVisible = await region.isVisible().catch(() => false);
@@ -260,7 +253,6 @@ test.describe("Active Filter Chips", () => {
   }) => {
     await page.goto(SEARCH_URL);
     await page.waitForLoadState("domcontentloaded");
-    await page.waitForLoadState("domcontentloaded").catch(() => {});
 
     // The applied filters region should not be visible (component returns null)
     const region = appliedFiltersRegion(page);
@@ -274,22 +266,21 @@ test.describe("Active Filter Chips", () => {
   }) => {
     await page.goto(`${SEARCH_URL}&minPrice=500&maxPrice=2000`);
     await page.waitForLoadState("domcontentloaded");
-    await page.waitForLoadState("domcontentloaded").catch(() => {});
 
     const region = appliedFiltersRegion(page);
     const regionVisible = await region.isVisible().catch(() => false);
     test.skip(!regionVisible, "Applied filters region not visible");
 
     // Should show a single combined price chip like "$500 - $2,000"
-    const priceChip = region.locator("text=/\\$500.*\\$2,000/i").first();
+    const priceChip = region.getByText(/\$500.*\$2,000/i).first();
     const singleChip = await priceChip.isVisible().catch(() => false);
 
     if (singleChip) {
       await expect(priceChip).toBeVisible();
     } else {
       // May show as two separate chips "Min $500" and "Max $2,000"
-      const minChip = region.locator("text=/Min.*\\$500|\\$500/i").first();
-      const maxChip = region.locator("text=/Max.*\\$2,000|\\$2,000/i").first();
+      const minChip = region.getByText(/Min.*\$500|\$500/i).first();
+      const maxChip = region.getByText(/Max.*\$2,000|\$2,000/i).first();
       const hasMin = await minChip.isVisible().catch(() => false);
       const hasMax = await maxChip.isVisible().catch(() => false);
       expect(hasMin || hasMax).toBe(true);
@@ -302,7 +293,6 @@ test.describe("Active Filter Chips", () => {
   }) => {
     await page.goto(`${SEARCH_URL}&minPrice=500&maxPrice=2000`);
     await page.waitForLoadState("domcontentloaded");
-    await page.waitForLoadState("domcontentloaded").catch(() => {});
 
     const region = appliedFiltersRegion(page);
     const regionVisible = await region.isVisible().catch(() => false);
@@ -336,12 +326,13 @@ test.describe("Active Filter Chips", () => {
   });
 
   // 10. Clear all preserves bounds and sort
+  // Note: "Clear all" button only appears when chips.length > 1,
+  // so we must provide at least 2 filter params (roomType + amenities).
   test(`${tags.core} - clear all preserves non-filter params (bounds, sort)`, async ({
     page,
   }) => {
-    await page.goto(`${SEARCH_URL}&roomType=Private+Room&sort=price_asc`);
+    await page.goto(`${SEARCH_URL}&roomType=Private+Room&amenities=Wifi&sort=price_asc`);
     await page.waitForLoadState("domcontentloaded");
-    await page.waitForLoadState("domcontentloaded").catch(() => {});
 
     const region = appliedFiltersRegion(page);
     const regionVisible = await region.isVisible().catch(() => false);
@@ -369,7 +360,8 @@ test.describe("Active Filter Chips", () => {
     // Sort should be preserved
     expect(getUrlParam(page, "sort")).toBe("price_asc");
 
-    // Filter should be gone
+    // Filters should be gone
     expect(getUrlParam(page, "roomType")).toBeNull();
+    expect(getUrlParam(page, "amenities")).toBeNull();
   });
 });

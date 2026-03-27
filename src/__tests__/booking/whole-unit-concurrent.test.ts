@@ -205,6 +205,7 @@ describe("WHOLE_UNIT concurrent race conditions (Phase 3)", () => {
             booking: {
               updateMany: jest.fn().mockResolvedValue({ count: 1 }),
             },
+            bookingAuditLog: { create: jest.fn().mockResolvedValue({}) },
           };
           return callback(tx);
         }
@@ -234,6 +235,7 @@ describe("WHOLE_UNIT concurrent race conditions (Phase 3)", () => {
                 },
               ])
               .mockResolvedValueOnce([{ total: BigInt(4) }]), // 4 slots used by booking A
+            bookingAuditLog: { create: jest.fn().mockResolvedValue({}) },
           };
           return callback(tx);
         }
@@ -285,6 +287,7 @@ describe("WHOLE_UNIT concurrent race conditions (Phase 3)", () => {
             booking: {
               updateMany: jest.fn().mockResolvedValue({ count: 1 }),
             },
+            bookingAuditLog: { create: jest.fn().mockResolvedValue({}) },
           };
           return callback(tx);
         }
@@ -319,6 +322,7 @@ describe("WHOLE_UNIT concurrent race conditions (Phase 3)", () => {
             booking: {
               updateMany: jest.fn().mockResolvedValue({ count: 1 }),
             },
+            bookingAuditLog: { create: jest.fn().mockResolvedValue({}) },
           };
           return callback(tx);
         }

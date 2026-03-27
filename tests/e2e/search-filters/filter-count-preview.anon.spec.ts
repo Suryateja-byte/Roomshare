@@ -27,10 +27,7 @@
 
 import { test, expect, tags } from "../helpers/test-utils";
 import {
-  SEARCH_URL,
   waitForSearchReady,
-  filtersButton,
-  filterDialog,
   applyButton,
   openFilterModal,
   toggleAmenity,
@@ -118,11 +115,6 @@ async function prevent429s(page: import("@playwright/test").Page) {
   });
 }
 
-// Suppress unused-import lint (used by other spec files sharing this helper module)
-void SEARCH_URL;
-void filtersButton;
-void filterDialog;
-
 // ---------------------------------------------------------------------------
 // Tests
 // ---------------------------------------------------------------------------
@@ -147,9 +139,6 @@ test.describe("Filter Count Preview", () => {
 
     await waitForSearchReady(page);
     await openFilterModal(page);
-    // Wait for hydration to complete before interacting with amenity buttons
-    await page.waitForTimeout(1_000);
-
     // Toggle an amenity to make the filter state dirty
     await toggleAmenity(page, "Wifi");
 
@@ -206,9 +195,6 @@ test.describe("Filter Count Preview", () => {
 
     await waitForSearchReady(page);
     await openFilterModal(page);
-    // Wait for hydration to complete before interacting with amenity buttons
-    await page.waitForTimeout(1_000);
-
     // Toggle an amenity to trigger the count fetch
     await toggleAmenity(page, "Wifi");
 
@@ -231,9 +217,6 @@ test.describe("Filter Count Preview", () => {
 
     await waitForSearchReady(page);
     await openFilterModal(page);
-    // Wait for hydration to complete before interacting with amenity buttons
-    await page.waitForTimeout(1_000);
-
     // Toggle a filter to make dirty
     await toggleAmenity(page, "Parking");
 
@@ -256,9 +239,6 @@ test.describe("Filter Count Preview", () => {
     // Navigate WITH bounds (required for the Filters button to render)
     await waitForSearchReady(page);
     await openFilterModal(page);
-    // Wait for hydration to complete before interacting with amenity buttons
-    await page.waitForTimeout(1_000);
-
     // Toggle a filter to trigger count evaluation
     await toggleAmenity(page, "Wifi");
 
@@ -300,9 +280,6 @@ test.describe("Filter Count Preview", () => {
 
     await waitForSearchReady(page);
     await openFilterModal(page);
-    // Wait for hydration to complete before interacting with amenity buttons
-    await page.waitForTimeout(1_000);
-
     // Rapidly toggle 3 amenities within ~200ms (faster than the 300ms debounce)
     const group = amenitiesGroup(page);
 

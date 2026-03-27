@@ -171,12 +171,12 @@ async function executeBookingTransaction(
     listing.bookingMode === "WHOLE_UNIT" ? listing.totalSlots : slotsRequested;
 
   // Phase 2: Sum slotsRequested for accurate capacity check
-  // PENDING bookings don't occupy slots yet - only ACCEPTED ones do
+  // Count ACCEPTED bookings AND active HELD bookings (not yet expired)
   const overlappingAcceptedSlots = await tx.$queryRaw<[{ total: bigint }]>`
         SELECT COALESCE(SUM("slotsRequested"), 0) AS total
         FROM "Booking"
         WHERE "listingId" = ${listingId}
-        AND "status" = 'ACCEPTED'
+        AND ("status" = 'ACCEPTED' OR ("status" = 'HELD' AND "heldUntil" > NOW()))
         AND "startDate" <= ${endDate}
         AND "endDate" >= ${startDate}
     `;
@@ -454,22 +454,56 @@ export async function createBooking(
   // P0-04 FIX: Use withIdempotency wrapper for atomic idempotency handling
   // This ensures idempotency key is claimed BEFORE transaction runs, not after
   if (idempotencyKey) {
-    const idempotencyResult = await withIdempotency<InternalBookingResult>(
-      idempotencyKey,
-      userId,
-      "createBooking",
-      requestBody,
-      async (tx) =>
-        executeBookingTransaction(
-          tx,
-          userId,
-          listingId,
-          startDate,
-          endDate,
-          pricePerMonth,
-          slotsRequested
-        )
-    );
+    let idempotencyResult: Awaited<ReturnType<typeof withIdempotency<InternalBookingResult>>>;
+    try {
+      idempotencyResult = await withIdempotency<InternalBookingResult>(
+        idempotencyKey,
+        userId,
+        "createBooking",
+        requestBody,
+        async (tx) =>
+          executeBookingTransaction(
+            tx,
+            userId,
+            listingId,
+            startDate,
+            endDate,
+            pricePerMonth,
+            slotsRequested
+          )
+      );
+    } catch (error) {
+      // BUG-001 FIX: withIdempotency throws on serialization exhaustion or
+      // non-retryable DB errors. Catch and return gracefully instead of
+      // letting it propagate as a 500 Internal Server Error.
+      const isSerialization =
+        error &&
+        typeof error === "object" &&
+        (("code" in error && error.code === "P2034") ||
+          ("message" in error &&
+            typeof (error as { message?: string }).message === "string" &&
+            (error as { message: string }).message.includes("40001")));
+      logger.sync.error("Booking idempotency transaction failed", {
+        action: "createBooking",
+        error: error instanceof Error ? error.message : "Unknown error",
+        listingId,
+        userId,
+        isSerialization,
+      });
+      if (isSerialization) {
+        return {
+          success: false,
+          error:
+            "Booking could not be completed due to high demand. Please try again.",
+          code: "CONFLICT",
+        };
+      }
+      return {
+        success: false,
+        error: "Something went wrong while processing your booking. Please try again.",
+        code: "SERVER_ERROR",
+      };
+    }
 
     // Handle idempotency wrapper errors (400 for hash mismatch, 500 for lock failure)
     if (!idempotencyResult.success) {
@@ -802,7 +836,7 @@ async function executeHoldTransaction(
   const totalPrice = Math.round(diffDays * pricePerDay * 100) / 100;
 
   // Use per-listing TTL with fallback to global default
-  const ttlMinutes = listing.holdTtlMinutes || HOLD_TTL_MINUTES;
+  const ttlMinutes = listing.holdTtlMinutes ?? HOLD_TTL_MINUTES;
   const heldUntil = new Date(Date.now() + ttlMinutes * 60 * 1000);
 
   // Create the booking with HELD status
@@ -1024,22 +1058,56 @@ export async function createHold(
 
   // Idempotency path
   if (idempotencyKey) {
-    const idempotencyResult = await withIdempotency<InternalHoldResult>(
-      idempotencyKey,
-      userId,
-      "createHold",
-      requestBody,
-      async (tx) =>
-        executeHoldTransaction(
-          tx,
-          userId,
-          listingId,
-          startDate,
-          endDate,
-          pricePerMonth,
-          slotsRequested
-        )
-    );
+    let idempotencyResult: Awaited<ReturnType<typeof withIdempotency<InternalHoldResult>>>;
+    try {
+      idempotencyResult = await withIdempotency<InternalHoldResult>(
+        idempotencyKey,
+        userId,
+        "createHold",
+        requestBody,
+        async (tx) =>
+          executeHoldTransaction(
+            tx,
+            userId,
+            listingId,
+            startDate,
+            endDate,
+            pricePerMonth,
+            slotsRequested
+          )
+      );
+    } catch (error) {
+      // BUG-001 FIX: withIdempotency throws on serialization exhaustion or
+      // non-retryable DB errors. Catch and return gracefully instead of
+      // letting it propagate as a 500 Internal Server Error.
+      const isSerialization =
+        error &&
+        typeof error === "object" &&
+        (("code" in error && error.code === "P2034") ||
+          ("message" in error &&
+            typeof (error as { message?: string }).message === "string" &&
+            (error as { message: string }).message.includes("40001")));
+      logger.sync.error("Hold idempotency transaction failed", {
+        action: "createHold",
+        error: error instanceof Error ? error.message : "Unknown error",
+        listingId,
+        userId,
+        isSerialization,
+      });
+      if (isSerialization) {
+        return {
+          success: false,
+          error:
+            "Hold could not be placed due to high demand. Please try again.",
+          code: "CONFLICT",
+        };
+      }
+      return {
+        success: false,
+        error: "Something went wrong while placing your hold. Please try again.",
+        code: "SERVER_ERROR",
+      };
+    }
 
     if (!idempotencyResult.success) {
       logger.sync.warn("Idempotency check failed", {

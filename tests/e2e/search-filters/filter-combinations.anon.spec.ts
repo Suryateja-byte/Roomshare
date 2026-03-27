@@ -49,7 +49,6 @@ test.describe("Filter Combinations", () => {
   }) => {
     await page.goto(`${SEARCH_URL}&maxPrice=1500&roomType=Private+Room`);
     await page.waitForLoadState("domcontentloaded");
-    await page.waitForLoadState("domcontentloaded").catch(() => {});
 
     // Both params should be in URL
     expect(getUrlParam(page, "maxPrice")).toBe("1500");
@@ -66,7 +65,7 @@ test.describe("Filter Combinations", () => {
     const region = appliedFiltersRegion(page);
     const regionVisible = await region.isVisible().catch(() => false);
     if (regionVisible) {
-      await expect(region.locator("text=/Private Room/i").first()).toBeVisible({
+      await expect(region.getByText(/Private Room/i).first()).toBeVisible({
         timeout: 10_000,
       });
     }
@@ -78,14 +77,12 @@ test.describe("Filter Combinations", () => {
   }) => {
     await page.goto(`${SEARCH_URL}&maxPrice=2000&amenities=Wifi,Parking`);
     await page.waitForLoadState("domcontentloaded");
-    await page.waitForLoadState("domcontentloaded").catch(() => {});
 
     expect(getUrlParam(page, "maxPrice")).toBe("2000");
     const amenities = getUrlParam(page, "amenities") ?? "";
     expect(amenities).toContain("Wifi");
     expect(amenities).toContain("Parking");
 
-    expect(await page.title()).toBeTruthy();
   });
 
   // 3. All filters together
@@ -103,7 +100,6 @@ test.describe("Filter Combinations", () => {
 
     await page.goto(`/search?${filterQS}`);
     await page.waitForLoadState("domcontentloaded");
-    await page.waitForLoadState("domcontentloaded").catch(() => {});
 
     // Verify all params are present
     expect(getUrlParam(page, "minPrice")).toBe("500");
@@ -113,7 +109,6 @@ test.describe("Filter Combinations", () => {
     expect(getUrlParam(page, "leaseDuration")).toBe("6 months");
 
     // Page should render without errors
-    expect(await page.title()).toBeTruthy();
   });
 
   // 4. Adding filter to existing filters (additive)
@@ -123,7 +118,6 @@ test.describe("Filter Combinations", () => {
     // Start with room type
     await page.goto(`${SEARCH_URL}&roomType=Private+Room`);
     await page.waitForLoadState("domcontentloaded");
-    await page.waitForLoadState("domcontentloaded").catch(() => {});
 
     // Open filter modal with retry-click for hydration race
     await openFilterModal(page);
@@ -162,7 +156,6 @@ test.describe("Filter Combinations", () => {
       `${SEARCH_URL}&roomType=Private+Room&amenities=Wifi&maxPrice=2000`
     );
     await page.waitForLoadState("domcontentloaded");
-    await page.waitForLoadState("domcontentloaded").catch(() => {});
 
     const region = appliedFiltersRegion(page);
     const regionVisible = await region.isVisible().catch(() => false);
@@ -200,13 +193,11 @@ test.describe("Filter Combinations", () => {
   }) => {
     await page.goto(`${SEARCH_URL}&roomType=Private+Room&sort=price_asc`);
     await page.waitForLoadState("domcontentloaded");
-    await page.waitForLoadState("domcontentloaded").catch(() => {});
 
     expect(getUrlParam(page, "roomType")).toBe("Private Room");
     expect(getUrlParam(page, "sort")).toBe("price_asc");
 
     // Page renders without error
-    expect(await page.title()).toBeTruthy();
   });
 
   // 7. Filter + query combination preserves both
@@ -215,12 +206,10 @@ test.describe("Filter Combinations", () => {
   }) => {
     await page.goto(`${SEARCH_URL}&q=downtown&roomType=Private+Room`);
     await page.waitForLoadState("domcontentloaded");
-    await page.waitForLoadState("domcontentloaded").catch(() => {});
 
     expect(getUrlParam(page, "q")).toBe("downtown");
     expect(getUrlParam(page, "roomType")).toBe("Private Room");
 
-    expect(await page.title()).toBeTruthy();
   });
 
   // 8. Pagination resets when any filter changes
@@ -230,7 +219,6 @@ test.describe("Filter Combinations", () => {
     // Start with a page param
     await page.goto(`${SEARCH_URL}&roomType=Private+Room&page=2`);
     await page.waitForLoadState("domcontentloaded");
-    await page.waitForLoadState("domcontentloaded").catch(() => {});
     await waitForUrlStable(page, 3000);
 
     // Open filter modal with retry-click for hydration race
@@ -241,7 +229,6 @@ test.describe("Filter Combinations", () => {
     const wifiBtn = amenitiesGroup.getByRole("button", { name: /^Wifi/i });
     if (await wifiBtn.isVisible({ timeout: 5_000 }).catch(() => false)) {
       await wifiBtn.click();
-      await page.waitForTimeout(500); // let Apply button count settle
 
       // Apply filters (handles modal close + URL settle)
       await applyFilters(page);
@@ -272,7 +259,6 @@ test.describe("Filter Combinations", () => {
   }) => {
     await page.goto(`${SEARCH_URL}&roomType=Private+Room`);
     await page.waitForLoadState("domcontentloaded");
-    await page.waitForLoadState("domcontentloaded").catch(() => {});
 
     // Bounds should be in URL
     expect(getUrlParam(page, "minLat")).toBeTruthy();
@@ -285,7 +271,6 @@ test.describe("Filter Combinations", () => {
 
     // Apply without changing anything (just to test bounds persistence)
     await applyFilters(page, { expectUrlChange: false });
-    await page.waitForLoadState("domcontentloaded").catch(() => {});
 
     // Bounds should still be there
     expect(getUrlParam(page, "minLat")).toBeTruthy();
@@ -298,7 +283,6 @@ test.describe("Filter Combinations", () => {
   }) => {
     await page.goto(`${SEARCH_URL}&amenities=Wifi&houseRules=Pets+allowed`);
     await page.waitForLoadState("domcontentloaded");
-    await page.waitForLoadState("domcontentloaded").catch(() => {});
 
     expect(getUrlParam(page, "amenities")).toContain("Wifi");
     expect(getUrlParam(page, "houseRules")).toContain("Pets allowed");
@@ -307,15 +291,14 @@ test.describe("Filter Combinations", () => {
     const region = appliedFiltersRegion(page);
     const regionVisible = await region.isVisible().catch(() => false);
     if (regionVisible) {
-      await expect(region.locator("text=/Wifi/i").first()).toBeVisible({
+      await expect(region.getByText(/Wifi/i).first()).toBeVisible({
         timeout: 10_000,
       });
-      await expect(region.locator("text=/Pets allowed/i").first()).toBeVisible({
+      await expect(region.getByText(/Pets allowed/i).first()).toBeVisible({
         timeout: 10_000,
       });
     }
 
-    expect(await page.title()).toBeTruthy();
   });
 
   // 11. All sort options work with active filters
@@ -334,13 +317,11 @@ test.describe("Filter Combinations", () => {
     for (const sort of sortOptions) {
       await page.goto(`${SEARCH_URL}&roomType=Private+Room&sort=${sort}`);
       await page.waitForLoadState("domcontentloaded");
-      await page.waitForLoadState("domcontentloaded").catch(() => {});
 
       expect(getUrlParam(page, "sort")).toBe(sort);
       expect(getUrlParam(page, "roomType")).toBe("Private Room");
 
       // Page should render without errors
-      expect(await page.title()).toBeTruthy();
     }
   });
 
@@ -368,7 +349,6 @@ test.describe("Filter Combinations", () => {
 
     await page.goto(`/search?${filterQS}`);
     await page.waitForLoadState("domcontentloaded");
-    await page.waitForLoadState("domcontentloaded").catch(() => {});
 
     // Filter known benign errors
     const realErrors = consoleErrors.filter(

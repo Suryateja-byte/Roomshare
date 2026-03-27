@@ -169,7 +169,7 @@ describe("Listings API IDOR Protection", () => {
   });
 
   describe("PATCH /api/listings/[id]", () => {
-    it("returns 403 when non-owner tries to update listing", async () => {
+    it("returns 404 when non-owner tries to update listing", async () => {
       (auth as jest.Mock).mockResolvedValue(attackerSession);
       (prisma.listing.findUnique as jest.Mock).mockResolvedValue(mockListing);
 
@@ -188,9 +188,9 @@ describe("Listings API IDOR Protection", () => {
         params: Promise.resolve({ id: "listing-abc" }),
       });
 
-      expect(response.status).toBe(403);
+      expect(response.status).toBe(404);
       const body = await response.json();
-      expect(body.error).toBe("Forbidden");
+      expect(body.error).toBe("Listing not found");
 
       // Verify update was NOT called
       expect(prisma.listing.update).not.toHaveBeenCalled();
@@ -232,10 +232,13 @@ describe("Listings API IDOR Protection", () => {
       expect(response.status).toBe(200);
       expect(prisma.$transaction).toHaveBeenCalled();
       expect(queryRawMock).toHaveBeenCalled();
+      // Verify FOR UPDATE lock is used for ownership recheck
+      const sqlStrings = queryRawMock.mock.calls[0][0].join("");
+      expect(sqlStrings).toContain("FOR UPDATE");
       expect(updateMock).toHaveBeenCalled();
     });
 
-    it("returns 403 when transaction lock recheck finds ownership changed", async () => {
+    it("returns 404 when transaction lock recheck finds ownership changed", async () => {
       (auth as jest.Mock).mockResolvedValue(ownerSession);
       (prisma.listing.findUnique as jest.Mock).mockResolvedValue(mockListing);
       const queryRawMock = jest
@@ -266,9 +269,9 @@ describe("Listings API IDOR Protection", () => {
         params: Promise.resolve({ id: "listing-abc" }),
       });
 
-      expect(response.status).toBe(403);
+      expect(response.status).toBe(404);
       const body = await response.json();
-      expect(body.error).toBe("Forbidden");
+      expect(body.error).toBe("Listing not found");
       expect(prisma.$transaction).toHaveBeenCalled();
       expect(queryRawMock).toHaveBeenCalled();
       expect(updateMock).not.toHaveBeenCalled();
@@ -358,7 +361,7 @@ describe("Listings API IDOR Protection", () => {
   });
 
   describe("DELETE /api/listings/[id]", () => {
-    it("returns 403 when non-owner tries to delete listing", async () => {
+    it("returns 404 when non-owner tries to delete listing", async () => {
       (auth as jest.Mock).mockResolvedValue(attackerSession);
       // Transaction callback runs: $queryRaw returns listing owned by owner-123,
       // but session user is attacker-456, so it throws NOT_FOUND_OR_UNAUTHORIZED.
@@ -555,7 +558,7 @@ describe("Listings API IDOR Protection", () => {
       });
 
       // Should still check ownership of listing-abc (from URL), not body
-      expect(response.status).toBe(403);
+      expect(response.status).toBe(404);
     });
   });
 });

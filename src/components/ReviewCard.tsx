@@ -62,10 +62,10 @@ export default function ReviewCard({
             size="md"
           />
           <div>
-            <p className="font-semibold text-zinc-900 dark:text-white">
+            <p className="font-semibold text-on-surface">
               {review.author.name || "Anonymous"}
             </p>
-            <p className="text-xs text-zinc-500 dark:text-zinc-400">
+            <p className="text-xs text-on-surface-variant">
               {new Date(review.createdAt).toLocaleDateString("en-US", {
                 month: "long",
                 year: "numeric",
@@ -82,7 +82,7 @@ export default function ReviewCard({
               className={`w-4 h-4 ${
                 star <= review.rating
                   ? "text-amber-400 fill-amber-400"
-                  : "text-zinc-200 dark:text-zinc-600"
+                  : "text-on-surface-variant"
               }`}
             />
           ))}
@@ -90,22 +90,22 @@ export default function ReviewCard({
       </div>
 
       {/* Review Content */}
-      <p className="mt-4 text-zinc-600 dark:text-zinc-300 leading-relaxed">
+      <p className="mt-4 text-on-surface-variant leading-relaxed">
         {review.comment}
       </p>
 
       {/* Response Section */}
       {review.response && !isEditingResponse && (
-        <div className="mt-4 pl-4 border-l-2 border-zinc-200 dark:border-zinc-700">
+        <div className="mt-4 ml-2 p-4 bg-surface-container-high/40 rounded-lg">
           <div className="flex items-start justify-between gap-4">
             <div>
-              <p className="text-sm font-semibold text-zinc-700 dark:text-zinc-300 mb-1">
+              <p className="text-sm font-semibold text-on-surface-variant mb-1">
                 Host Response
               </p>
-              <p className="text-sm text-zinc-600 dark:text-zinc-400">
+              <p className="text-sm text-on-surface-variant">
                 {review.response.content}
               </p>
-              <p className="text-xs text-zinc-400 dark:text-zinc-500 mt-2">
+              <p className="text-xs text-on-surface-variant mt-2">
                 {new Date(review.response.createdAt).toLocaleDateString()}
               </p>
             </div>
@@ -116,7 +116,7 @@ export default function ReviewCard({
                   variant="ghost"
                   size="icon"
                   onClick={() => setIsEditingResponse(true)}
-                  className="text-zinc-400 dark:text-zinc-500 hover:text-zinc-600 dark:hover:text-zinc-300"
+                  className="text-on-surface-variant hover:text-on-surface-variant"
                   aria-label="Edit response"
                 >
                   <Edit2 className="w-4 h-4" />
@@ -126,7 +126,7 @@ export default function ReviewCard({
                   size="icon"
                   onClick={handleDeleteResponse}
                   disabled={isDeleting}
-                  className="text-zinc-400 dark:text-zinc-500 hover:text-red-600 dark:hover:text-red-400 hover:bg-red-50 dark:hover:bg-red-900/20"
+                  className="text-on-surface-variant hover:text-red-600 hover:bg-red-50"
                   aria-label="Delete response"
                 >
                   <Trash2 className="w-4 h-4" />
@@ -143,7 +143,7 @@ export default function ReviewCard({
           variant="ghost"
           size="sm"
           onClick={() => setShowResponseForm(true)}
-          className="mt-4 text-zinc-500 dark:text-zinc-400"
+          className="mt-4 text-on-surface-variant"
         >
           <MessageSquare className="w-4 h-4 mr-2" />
           Respond to this review

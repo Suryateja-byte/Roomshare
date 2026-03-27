@@ -99,16 +99,23 @@ export function expandFiltersForNearMatches(
     const { expandDays } = NEAR_MATCH_RULES.date;
     const originalDate = new Date(params.moveInDate);
 
-    // Expand by moving the date back by expandDays
-    // (allows listings available slightly later than requested)
-    const expandedDate = new Date(originalDate);
-    expandedDate.setDate(expandedDate.getDate() - expandDays);
+    // Defense-in-depth: skip expansion if date string is invalid
+    // (producer at search-doc-queries.ts already guards, but malformed data could arrive via other paths)
+    if (isNaN(originalDate.getTime())) {
+      return { expanded: params, expandedDimension: null, expansionDescription: null };
+    }
 
-    // Don't expand to dates in the past
-    const today = new Date();
-    today.setHours(0, 0, 0, 0);
-    if (expandedDate < today) {
-      expandedDate.setTime(today.getTime());
+    // Expand by moving the date forward by expandDays
+    // This relaxes the SQL filter (move_in_date <= $N) to include
+    // listings available up to 7 days after the user's target date
+    const expandedDate = new Date(originalDate);
+    expandedDate.setDate(expandedDate.getDate() + expandDays);
+
+    // Cap expansion to 2 years in the future (matches safeParseDate validation)
+    const maxDate = new Date();
+    maxDate.setFullYear(maxDate.getFullYear() + 2);
+    if (expandedDate > maxDate) {
+      expandedDate.setTime(maxDate.getTime());
     }
 
     const expandedDateStr = expandedDate.toISOString().split("T")[0];
@@ -123,7 +130,7 @@ export function expandFiltersForNearMatches(
       return {
         expanded,
         expandedDimension: "date",
-        expansionDescription: `Move-in date expanded to ${formatDate(expandedDateStr)}`,
+        expansionDescription: `Showing rooms available through ${formatDate(expandedDateStr)}`,
       };
     }
   }

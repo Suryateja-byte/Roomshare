@@ -105,12 +105,15 @@ test.describe("LD: Page Load & Content (Visitor)", () => {
     const found = await goToListing(page, nav, "Reviewer Nob Hill");
     test.skip(!found, "Listing not found");
 
-    await expect(page.getByText(/Hosted by/).first()).toBeVisible();
-    await expect(page.getByText("E2E Reviewer")).toBeVisible();
+    // .first() avoids strict mode violation — "E2E Reviewer" appears in both
+    // the host section and the reviews section when the reviewer has reviews
+    await expect(
+      page.getByText(/Hosted by E2E Reviewer/).first()
+    ).toBeVisible();
     // Contact Host button is only rendered after session hydration (viewerReady).
     // On Mobile Chrome this can be slower — use a generous explicit timeout.
     await expect(
-      page.getByRole("button", { name: /Contact Host/i })
+      page.getByRole("button", { name: /Contact Host/i }).first()
     ).toBeVisible({ timeout: 45_000 });
     await expect(page.getByText("Identity verified")).toBeVisible();
   });
@@ -132,8 +135,10 @@ test.describe("LD: Page Load & Content (Visitor)", () => {
     test.skip(!found, "Listing not found");
 
     await expect(page.getByRole("heading", { name: /Reviews/ })).toBeVisible();
-    // Count in parentheses — could be (0) or higher
-    await expect(page.getByText(/\(\d+\)/)).toBeVisible();
+    // Count in parentheses — could be (0) or higher.
+    // Use .first() because the review count "(N)" may appear in multiple
+    // places on the page (e.g., heading + sidebar summary).
+    await expect(page.getByText(/\(\d+\)/).first()).toBeVisible();
   });
 });
 
@@ -404,8 +409,9 @@ test.describe("LD: Owner View", () => {
     const found = await goToListing(page, nav, "Sunny Mission Room");
     test.skip(!found, "Listing not found");
 
-    await expect(page.getByText("Boost visibility")).toBeVisible();
-    await expect(page.getByText("Promote now")).toBeVisible();
+    await expect(page.getByText("Boost Visibility")).toBeVisible();
+    // "Promote now" was replaced with a disabled "Coming Q3 2026" button
+    await expect(page.getByText("Coming Q3 2026")).toBeVisible();
   });
 });
 
@@ -486,7 +492,8 @@ test.describe("LD: Reviews", () => {
       .filter({ hasText: /review/i });
     const hasReviewsSection = await reviewsSection
       .first()
-      .isVisible({ timeout: 5000 })
+      .waitFor({ state: "visible", timeout: 5000 })
+      .then(() => true)
       .catch(() => false);
     if (!hasReviewsSection) {
       test.skip(
@@ -499,16 +506,20 @@ test.describe("LD: Reviews", () => {
     // Review count — soft assertion since seed data may vary
     const reviewCount = page.getByText(/\(\d+\)/).first();
     const hasCount = await reviewCount
-      .isVisible({ timeout: 5000 })
+      .waitFor({ state: "visible", timeout: 5000 })
+      .then(() => true)
       .catch(() => false);
     if (hasCount) {
       await expect(reviewCount).toBeVisible();
     }
 
     // Reviewer name — skip if not present (seed data may vary)
-    const reviewerName = page.getByText("E2E Reviewer");
+    // Use .first() because the seed user "E2E Reviewer" may appear in both
+    // the host section ("Hosted by E2E Reviewer") and the review list.
+    const reviewerName = page.getByText("E2E Reviewer").first();
     const hasReviewer = await reviewerName
-      .isVisible({ timeout: 5000 })
+      .waitFor({ state: "visible", timeout: 5000 })
+      .then(() => true)
       .catch(() => false);
     test.skip(
       !hasReviewer,

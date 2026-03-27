@@ -5,6 +5,7 @@ import { Heart } from "lucide-react";
 import { useRouter } from "next/navigation";
 import { cn } from "@/lib/utils";
 import { toast } from "sonner";
+import { triggerLightHaptic } from "@/lib/haptics";
 
 interface FavoriteButtonProps {
   listingId: string;
@@ -31,6 +32,7 @@ export default function FavoriteButton({
       if (isLoading) return;
 
       setIsLoading(true);
+      triggerLightHaptic();
       // Optimistic update with bounce animation on save
       const previousState = isSaved;
       const willSave = !isSaved;
@@ -80,8 +82,8 @@ export default function FavoriteButton({
       aria-label={isSaved ? "Remove from saved" : "Save listing"}
       aria-pressed={isSaved}
       className={cn(
-        "p-2 rounded-full bg-white/90 dark:bg-zinc-800/90 backdrop-blur-sm hover:bg-white dark:hover:bg-zinc-700 transition-colors shadow-sm group min-w-[44px] min-h-[44px] flex items-center justify-center focus-visible:ring-2 focus-visible:ring-zinc-900/20 dark:focus-visible:ring-zinc-400/40 focus-visible:ring-offset-2 dark:focus-visible:ring-offset-zinc-950",
-        isSaved ? "text-red-500" : "text-zinc-400 hover:text-red-500",
+        "p-2 rounded-full bg-surface-container-lowest/90 backdrop-blur-sm hover:bg-surface-container-lowest transition-colors shadow-ambient-sm group min-w-[44px] min-h-[44px] flex items-center justify-center focus-visible:ring-2 focus-visible:ring-primary/30 focus-visible:ring-offset-2",
+        isSaved ? "text-primary" : "text-on-surface-variant hover:text-primary",
         className
       )}
     >

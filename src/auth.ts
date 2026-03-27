@@ -91,6 +91,12 @@ export const { handlers, auth, signIn, signOut } = NextAuth({
   // The Prisma adapter will auto-link accounts when email matches
   callbacks: {
     async session({ session, token }) {
+      // H-1: Force logout if password was changed after session creation
+      if (token.passwordInvalidated) {
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any
+        return { ...session, user: undefined } as any;
+      }
+
       if (token.sub && session.user) {
         session.user.id = token.sub;
         session.user.emailVerified = token.emailVerified as Date | null;
@@ -147,6 +153,40 @@ export const { handlers, auth, signIn, signOut } = NextAuth({
           // Don't invalidate session on DB errors - keep existing token values
         }
       }
+
+      // H-1: Session invalidation — check passwordChangedAt every 5 minutes.
+      // Fallback for server actions that bypass proxy.ts middleware.
+      // Primary check is in checkSuspension() (auth-helpers.ts) for middleware routes.
+      if (token.authTime && token.sub && !token.passwordInvalidated) {
+        const now = Math.floor(Date.now() / 1000);
+        const lastCheck = (token.lastSecurityCheck as number) || 0;
+        const SECURITY_CHECK_INTERVAL = 5 * 60; // 5 minutes
+
+        if (now - lastCheck > SECURITY_CHECK_INTERVAL) {
+          try {
+            const secUser = await prisma.user.findUnique({
+              where: { id: token.sub as string },
+              select: { passwordChangedAt: true },
+            });
+            if (secUser?.passwordChangedAt) {
+              const changedAtEpoch = Math.floor(
+                secUser.passwordChangedAt.getTime() / 1000
+              );
+              if (changedAtEpoch > (token.authTime as number)) {
+                token.passwordInvalidated = true;
+                return token;
+              }
+            }
+            token.lastSecurityCheck = now;
+          } catch (error) {
+            // Fail-open: DB unavailability should not mass-logout users.
+            logger.sync.error("JWT passwordChangedAt check failed", {
+              error: sanitizeErrorMessage(error),
+            });
+          }
+        }
+      }
+
       return token;
     },
     async signIn({ user, account, profile }) {

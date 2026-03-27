@@ -119,11 +119,11 @@ test.describe("Search A11y: ARIA Live Regions & Screen Reader", () => {
             );
           } else {
             // No aria-busy set; wait for new listing cards to appear instead
-            await page.waitForTimeout(5_000);
+            await page.waitForLoadState("networkidle", { timeout: 10_000 }).catch(() => {});
           }
         } catch {
-          // Loading may still be in progress -- wait a bit more
-          await page.waitForTimeout(5_000);
+          // Loading may still be in progress -- wait for network to settle
+          await page.waitForLoadState("networkidle", { timeout: 10_000 }).catch(() => {});
         }
 
         // CURRENT BEHAVIOR: The aria-live text does NOT change after load-more

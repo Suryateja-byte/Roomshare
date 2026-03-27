@@ -28,7 +28,7 @@ const SEARCH_URL = `/search?${boundsQS}`;
 async function waitForSearchPage(page: import("@playwright/test").Page) {
   await page.goto(SEARCH_URL);
   await page.waitForLoadState("domcontentloaded");
-  await page.waitForSelector("button", { timeout: 30_000 });
+  await page.locator("button").first().waitFor({ state: "visible", timeout: 30_000 });
   await waitForMapReady(page);
 }
 
@@ -306,8 +306,8 @@ test.describe("Map controls (requires WebGL)", () => {
 
     await poiMasterBtn.click();
 
-    // After clicking master toggle, wait briefly for category buttons to appear
-    await page.waitForTimeout(1_000);
+    // After clicking master toggle, wait for category buttons to appear
+    await page.locator('[data-testid="poi-category"]').or(page.locator('button[aria-pressed]').filter({ hasText: /Transit|Parks|Grocery|Schools/i })).first().waitFor({ state: 'visible', timeout: 5000 }).catch(() => {});
 
     // Use broad locator for category controls — may be buttons or checkboxes
     const categories = page

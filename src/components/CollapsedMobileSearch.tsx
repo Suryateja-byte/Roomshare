@@ -106,22 +106,22 @@ export default function CollapsedMobileSearch({
       {/* Main search area - tap to expand */}
       <button
         onClick={onExpand}
-        className="flex-1 flex items-center gap-3 h-12 px-4 bg-white dark:bg-zinc-900 rounded-full shadow-sm border border-zinc-200 dark:border-zinc-700 hover:shadow-md transition-shadow"
+        className="flex-1 flex items-center gap-3 h-12 px-4 bg-surface-container-lowest rounded-full shadow-ambient-sm border border-outline-variant/20 hover:shadow-ambient transition-shadow"
         aria-label="Expand search"
       >
-        <Search className="w-5 h-5 text-zinc-500 flex-shrink-0" />
+        <Search className="w-5 h-5 text-on-surface-variant flex-shrink-0" />
         <div className="flex-1 min-w-0 text-left">
           <div
             className={`text-sm font-medium truncate ${
               location
-                ? "text-zinc-900 dark:text-white"
-                : "text-zinc-500 dark:text-zinc-500"
+                ? "text-on-surface"
+                : "text-on-surface-variant"
             }`}
           >
             {displayText}
           </div>
           {priceDisplay && (
-            <div className="text-xs text-zinc-500 dark:text-zinc-400 truncate">
+            <div className="text-xs text-on-surface-variant truncate">
               {priceDisplay}
             </div>
           )}
@@ -132,13 +132,13 @@ export default function CollapsedMobileSearch({
       {onOpenFilters && (
         <button
           onClick={onOpenFilters}
-          className="relative flex items-center justify-center w-12 h-12 bg-white dark:bg-zinc-900 rounded-full shadow-sm border border-zinc-200 dark:border-zinc-700 hover:shadow-md transition-shadow"
+          className="relative flex items-center justify-center w-12 h-12 bg-surface-container-lowest rounded-full shadow-ambient-sm border border-outline-variant/20 hover:shadow-ambient transition-shadow"
           aria-label={`Filters${activeFilterCount > 0 ? ` (${activeFilterCount} active)` : ""}`}
           data-testid="mobile-filter-button"
         >
-          <SlidersHorizontal className="w-5 h-5 text-zinc-600 dark:text-zinc-400" />
+          <SlidersHorizontal className="w-5 h-5 text-on-surface-variant" />
           {activeFilterCount > 0 && (
-            <span className="absolute -top-1 -right-1 flex items-center justify-center min-w-[18px] h-[18px] px-1 text-[10px] font-bold rounded-full bg-zinc-900 dark:bg-white text-white dark:text-zinc-900">
+            <span className="absolute -top-1 -right-1 flex items-center justify-center min-w-[18px] h-[18px] px-1 text-[10px] font-bold rounded-full bg-on-surface text-surface-container-lowest">
               {activeFilterCount}
             </span>
           )}

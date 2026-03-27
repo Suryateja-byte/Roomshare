@@ -69,7 +69,7 @@ async function waitForSearchPage(
   await page.goto(url);
   await page.waitForLoadState("domcontentloaded");
   // Wait for any button to appear (indicates page is interactive)
-  await page.waitForSelector("button", { timeout: 30_000 });
+  await page.locator("button").first().waitFor({ state: "visible", timeout: 30_000 });
   await waitForMapReady(page);
 }
 
@@ -375,7 +375,7 @@ test.describe("1.5: Map falls back to first listing location when no bounds", ()
     // Navigate to search WITHOUT bounds params
     await page.goto("/search");
     await page.waitForLoadState("domcontentloaded");
-    await page.waitForSelector("button", { timeout: 30_000 });
+    await page.locator("button").first().waitFor({ state: "visible", timeout: 30_000 });
     await waitForMapReady(page);
 
     // Map should still load

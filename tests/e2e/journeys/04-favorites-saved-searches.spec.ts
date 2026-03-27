@@ -61,7 +61,6 @@ test.describe("Favorites & Saved Searches Journeys", () => {
 
         // Click to toggle
         await targetButton.click();
-        await page.waitForTimeout(500);
 
         // State should change
         const newAriaPressed = await targetButton.getAttribute("aria-pressed");
@@ -106,7 +105,7 @@ test.describe("Favorites & Saved Searches Journeys", () => {
           .isVisible()
           .catch(() => false);
         if (hasListings || hasEmptyState) break;
-        await page.waitForTimeout(500);
+        await page.waitForLoadState("domcontentloaded").catch(() => {});
       }
 
       if (!hasListings && !hasEmptyState) {
@@ -156,7 +155,7 @@ test.describe("Favorites & Saved Searches Journeys", () => {
 
         if (await targetButton.isVisible()) {
           await targetButton.click();
-          await page.waitForTimeout(1000);
+          await page.waitForLoadState("networkidle").catch(() => {});
 
           // Count should decrease or listing should be removed
           const newCount = await listingCards.count();
@@ -310,7 +309,7 @@ test.describe("Favorites & Saved Searches Journeys", () => {
           }
 
           // Should be removed
-          await page.waitForTimeout(1000);
+          await page.waitForLoadState("networkidle").catch(() => {});
         }
       }
     });

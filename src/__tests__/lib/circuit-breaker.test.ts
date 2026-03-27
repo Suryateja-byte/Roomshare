@@ -214,8 +214,10 @@ describe("circuit-breaker", () => {
         // Advance time past reset timeout
         jest.advanceTimersByTime(5001);
 
-        // getState() should now return HALF_OPEN
-        expect(breaker.getState()).toBe("HALF_OPEN");
+        // MED-6 FIX: getState() is now a pure reader — it returns OPEN until
+        // execute() actually performs the transition to HALF_OPEN.
+        // The circuit IS ready for a trial request, but getState() reports OPEN.
+        expect(breaker.getState()).toBe("OPEN");
 
         jest.useRealTimers();
       });
@@ -315,7 +317,9 @@ describe("circuit-breaker", () => {
 
         jest.advanceTimersByTime(1001);
 
-        expect(breaker.getState()).toBe("HALF_OPEN");
+        // MED-6 FIX: getState() is now pure — returns OPEN until execute() transitions.
+        // The circuit will transition to HALF_OPEN on next execute() call.
+        expect(breaker.getState()).toBe("OPEN");
 
         jest.useRealTimers();
       });

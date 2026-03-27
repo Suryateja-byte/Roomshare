@@ -111,6 +111,22 @@ export default function ZeroResultsSuggestions({
             params.set("maxLng", expandedMaxLng.toString());
             params.delete("lat");
             params.delete("lng");
+
+            // Safety net: validate expansion produced sane bounds
+            const exMinLat = parseFloat(params.get("minLat") ?? "");
+            const exMaxLat = parseFloat(params.get("maxLat") ?? "");
+            if (
+              !Number.isFinite(exMinLat) ||
+              !Number.isFinite(exMaxLat) ||
+              exMinLat >= exMaxLat
+            ) {
+              // Expansion math produced invalid bounds — fall back to browse-all
+              params.delete("minLat");
+              params.delete("maxLat");
+              params.delete("minLng");
+              params.delete("maxLng");
+              params.delete("q");
+            }
             break;
           }
 
@@ -188,18 +204,18 @@ export default function ZeroResultsSuggestions({
     return (
       <div className="flex flex-col items-center justify-center py-12 px-4">
         {/* Empty state illustration */}
-        <div className="w-20 h-20 rounded-full bg-zinc-100 dark:bg-zinc-800 flex items-center justify-center mb-6">
+        <div className="w-20 h-20 rounded-full bg-surface-container-high flex items-center justify-center mb-6">
           <Search
-            className="w-10 h-10 text-zinc-400 dark:text-zinc-500"
+            className="w-10 h-10 text-on-surface-variant"
             strokeWidth={1.5}
           />
         </div>
 
-        <h3 className="text-lg font-semibold text-zinc-900 dark:text-white mb-2">
+        <h3 className="text-lg font-semibold text-on-surface mb-2">
           No listings found
         </h3>
 
-        <p className="text-zinc-500 dark:text-zinc-400 text-center max-w-sm mb-6">
+        <p className="text-on-surface-variant text-center max-w-sm mb-6">
           {query
             ? `We couldn't find any listings matching "${query}".`
             : "We couldn't find any listings matching your criteria."}
@@ -217,10 +233,10 @@ export default function ZeroResultsSuggestions({
         </div>
 
         {/* Nearby area suggestions */}
-        <div className="mt-8 pt-6 border-t border-zinc-200 dark:border-zinc-700 w-full max-w-sm">
+        <div className="mt-8 pt-6 border-t border-outline-variant/20 w-full max-w-sm">
           <div className="flex items-center gap-2 mb-3">
-            <Navigation className="w-4 h-4 text-zinc-400" />
-            <span className="text-sm font-medium text-zinc-500 dark:text-zinc-400">
+            <Navigation className="w-4 h-4 text-on-surface-variant" />
+            <span className="text-sm font-medium text-on-surface-variant">
               Try a different area
             </span>
           </div>
@@ -229,7 +245,7 @@ export default function ZeroResultsSuggestions({
               <Link
                 key={area}
                 href={`/search?q=${encodeURIComponent(area)}`}
-                className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-full bg-zinc-100 dark:bg-zinc-800 hover:bg-zinc-200 dark:hover:bg-zinc-700 text-sm text-zinc-600 dark:text-zinc-300 transition-colors"
+                className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-full bg-surface-container-high hover:bg-surface-container-high text-sm text-on-surface-variant transition-colors"
               >
                 <MapPin className="w-3 h-3" />
                 {area}
@@ -245,16 +261,16 @@ export default function ZeroResultsSuggestions({
     <div className="py-8 px-4">
       {/* Header with illustration */}
       <div className="flex flex-col items-center text-center mb-6">
-        <div className="w-16 h-16 rounded-full bg-amber-50 dark:bg-amber-900/30 flex items-center justify-center mb-4">
+        <div className="w-16 h-16 rounded-full bg-amber-50 flex items-center justify-center mb-4">
           <SlidersHorizontal
-            className="w-8 h-8 text-amber-500 dark:text-amber-400"
+            className="w-8 h-8 text-amber-500"
             strokeWidth={1.5}
           />
         </div>
-        <h3 className="text-lg font-semibold text-zinc-900 dark:text-white mb-1">
+        <h3 className="text-lg font-semibold text-on-surface mb-1">
           No exact matches
         </h3>
-        <p className="text-sm text-zinc-500 dark:text-zinc-400">
+        <p className="text-sm text-on-surface-variant">
           Try adjusting your filters to see more results
         </p>
       </div>
@@ -265,22 +281,22 @@ export default function ZeroResultsSuggestions({
           <button
             key={item.filter}
             onClick={() => handleRemoveFilter(item.filter)}
-            className="w-full flex items-center justify-between p-3 rounded-xl bg-white dark:bg-zinc-800/50 border border-zinc-200 dark:border-zinc-700 hover:border-zinc-300 dark:hover:border-zinc-600 hover:shadow-sm transition-all group"
+            className="w-full flex items-center justify-between p-3 rounded-xl bg-surface-container-lowest border border-outline-variant/20 hover:border-outline-variant/30 hover:shadow-sm transition-all group"
           >
             <div className="text-left">
-              <span className="text-sm text-zinc-700 dark:text-zinc-300 group-hover:text-zinc-900 dark:group-hover:text-white block">
+              <span className="text-sm text-on-surface-variant group-hover:text-on-surface block">
                 {item.suggestion}
               </span>
-              <span className="text-xs text-zinc-400 dark:text-zinc-500">
+              <span className="text-xs text-on-surface-variant">
                 Remove: {item.label}
               </span>
             </div>
-            <X className="w-4 h-4 text-zinc-400 dark:text-zinc-500 group-hover:text-zinc-600 dark:group-hover:text-zinc-300 flex-shrink-0" />
+            <X className="w-4 h-4 text-on-surface-variant group-hover:text-on-surface-variant flex-shrink-0" />
           </button>
         ))}
 
         {suggestions.length > 3 && (
-          <p className="text-xs text-zinc-400 dark:text-zinc-500 text-center pt-2">
+          <p className="text-xs text-on-surface-variant text-center pt-2">
             +{suggestions.length - 3} more suggestion
             {suggestions.length - 3 > 1 ? "s" : ""}
           </p>
@@ -289,10 +305,10 @@ export default function ZeroResultsSuggestions({
 
       {/* Nearby area suggestions */}
       {query && (
-        <div className="max-w-sm mx-auto mt-4 pt-4 border-t border-zinc-100 dark:border-zinc-800">
+        <div className="max-w-sm mx-auto mt-4 pt-4 border-t border-outline-variant/20">
           <div className="flex items-center gap-2 mb-2">
-            <Navigation className="w-3.5 h-3.5 text-zinc-400" />
-            <span className="text-xs font-medium text-zinc-400 dark:text-zinc-500">
+            <Navigation className="w-3.5 h-3.5 text-on-surface-variant" />
+            <span className="text-xs font-medium text-on-surface-variant">
               Try a different area
             </span>
           </div>
@@ -304,7 +320,7 @@ export default function ZeroResultsSuggestions({
                 <Link
                   key={area}
                   href={`/search?q=${encodeURIComponent(area)}`}
-                  className="inline-flex items-center gap-1 px-2.5 py-1 rounded-full bg-zinc-50 dark:bg-zinc-800/50 hover:bg-zinc-100 dark:hover:bg-zinc-700 text-xs text-zinc-500 dark:text-zinc-400 transition-colors"
+                  className="inline-flex items-center gap-1 px-2.5 py-1 rounded-full bg-surface-canvas hover:bg-surface-container-high text-xs text-on-surface-variant transition-colors"
                 >
                   <MapPin className="w-3 h-3" />
                   {area}
@@ -319,7 +335,7 @@ export default function ZeroResultsSuggestions({
         <Button
           variant="ghost"
           onClick={handleClearAll}
-          className="text-zinc-500 dark:text-zinc-400 hover:text-zinc-900 dark:hover:text-white"
+          className="text-on-surface-variant hover:text-on-surface"
         >
           Clear all filters
         </Button>

@@ -65,21 +65,21 @@ export default function UserAvatar({
     return (
       <div
         className={cn(
-          "rounded-full overflow-hidden bg-zinc-200 dark:bg-zinc-700 relative shrink-0",
+          "rounded-full overflow-hidden bg-surface-container-high relative shrink-0",
           sizeClass.split(" ").slice(0, 2).join(" "),
           className
         )}
       >
         {/* Show fallback while loading to prevent broken image flash */}
         {isLoading && (
-          <div className="absolute inset-0 flex items-center justify-center bg-zinc-200 dark:bg-zinc-700">
+          <div className="absolute inset-0 flex items-center justify-center bg-surface-container-high">
             {name ? (
-              <span className="text-zinc-500 dark:text-zinc-400 font-bold">
+              <span className="text-on-surface-variant font-bold">
                 {name.charAt(0).toUpperCase()}
               </span>
             ) : (
               <User
-                className="w-[60%] h-[60%] text-zinc-400 dark:text-zinc-500"
+                className="w-[60%] h-[60%] text-on-surface-variant"
                 strokeWidth={1.5}
               />
             )}
@@ -111,7 +111,7 @@ export default function UserAvatar({
     return (
       <div
         className={cn(
-          "rounded-full bg-indigo-100 dark:bg-indigo-900/50 flex items-center justify-center text-indigo-700 dark:text-indigo-300 font-bold shrink-0",
+          "rounded-full bg-primary flex items-center justify-center text-primary font-bold shrink-0",
           sizeClass,
           className
         )}
@@ -125,7 +125,7 @@ export default function UserAvatar({
   return (
     <div
       className={cn(
-        "rounded-full bg-zinc-100 dark:bg-zinc-800 flex items-center justify-center text-zinc-400 dark:text-zinc-500 shrink-0",
+        "rounded-full bg-surface-container-high flex items-center justify-center text-on-surface-variant shrink-0",
         sizeClass,
         className
       )}

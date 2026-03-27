@@ -47,17 +47,16 @@ test.describe("Recommended Filters", () => {
   }) => {
     await page.goto(SEARCH_URL);
     await page.waitForLoadState("domcontentloaded");
-    await page.waitForTimeout(3_000);
 
     const row = recommendedRow(page);
-    const rowVisible = await row.isVisible().catch(() => false);
+    const rowVisible = await row.isVisible({ timeout: 10_000 }).catch(() => false);
     test.skip(
       !rowVisible,
       "Recommended filters row not visible (may require results)"
     );
 
     // "Try:" label should be visible
-    await expect(row.locator("text=Try:")).toBeVisible({ timeout: 10_000 });
+    await expect(row.getByText("Try:")).toBeVisible({ timeout: 10_000 });
 
     // Count suggestion pill buttons inside the row
     const pills = row.locator("button");
@@ -92,10 +91,9 @@ test.describe("Recommended Filters", () => {
   }) => {
     await page.goto(SEARCH_URL);
     await page.waitForLoadState("domcontentloaded");
-    await page.waitForTimeout(3_000);
 
     const row = recommendedRow(page);
-    const rowVisible = await row.isVisible().catch(() => false);
+    const rowVisible = await row.isVisible({ timeout: 10_000 }).catch(() => false);
     test.skip(!rowVisible, "Recommended filters row not visible");
 
     // Find and click "Furnished" pill
@@ -142,7 +140,7 @@ test.describe("Recommended Filters", () => {
     const region = appliedFiltersRegion(page);
     const regionVisible = await region.isVisible().catch(() => false);
     if (regionVisible) {
-      await expect(region.locator("text=/Furnished/i").first()).toBeVisible({
+      await expect(region.getByText(/Furnished/i).first()).toBeVisible({
         timeout: 10_000,
       });
     }
@@ -154,10 +152,9 @@ test.describe("Recommended Filters", () => {
   }) => {
     await page.goto(SEARCH_URL);
     await page.waitForLoadState("domcontentloaded");
-    await page.waitForTimeout(3_000);
 
     const row = recommendedRow(page);
-    const rowVisible = await row.isVisible().catch(() => false);
+    const rowVisible = await row.isVisible({ timeout: 10_000 }).catch(() => false);
     test.skip(!rowVisible, "Recommended filters row not visible");
 
     // Record which pills are initially visible
@@ -190,7 +187,6 @@ test.describe("Recommended Filters", () => {
     expect(getUrlParam(page, "page")).toBeNull();
 
     // After applying, check updated recommendations
-    await page.waitForTimeout(1_000);
     const updatedRow = recommendedRow(page);
     const updatedRowVisible = await updatedRow.isVisible().catch(() => false);
 
@@ -228,7 +224,8 @@ test.describe("Recommended Filters", () => {
 
     await page.goto(allSuggestionsURL);
     await page.waitForLoadState("domcontentloaded");
-    await page.waitForTimeout(3_000);
+    // Wait for search results to render before checking recommendations
+    await expect(page.getByRole("heading", { level: 1 }).first()).toBeVisible({ timeout: 30_000 });
 
     // The "Try:" section should NOT be visible since all applicable suggestions are applied
     // (Private Room blocks Entire Place, and maxPrice=1000 matches Under $1000)

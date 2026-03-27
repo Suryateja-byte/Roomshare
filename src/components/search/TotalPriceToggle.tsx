@@ -27,7 +27,7 @@ export function TotalPriceToggle({
 
   return (
     <label className="inline-flex items-center gap-2 cursor-pointer select-none">
-      <span className="text-sm text-zinc-600 dark:text-zinc-400">
+      <span className="text-sm text-on-surface-variant">
         Show total price
       </span>
       <button
@@ -37,17 +37,17 @@ export function TotalPriceToggle({
         onClick={handleToggle}
         className={`
           relative inline-flex h-5 w-9 shrink-0 items-center rounded-full
-          transition-colors duration-200 focus-visible:ring-2 focus-visible:ring-zinc-900/30 dark:focus-visible:ring-zinc-400/40 focus-visible:ring-offset-2
+          transition-colors duration-200 focus-visible:ring-2 focus-visible:ring-primary/30 focus-visible:ring-offset-2
           ${
             showTotal
-              ? "bg-zinc-900 dark:bg-white"
-              : "bg-zinc-300 dark:bg-zinc-600"
+              ? "bg-on-surface"
+              : "bg-surface-container-high"
           }
         `}
       >
         <span
           className={`
-            inline-block h-3.5 w-3.5 rounded-full bg-white dark:bg-zinc-900 shadow-sm
+            inline-block h-3.5 w-3.5 rounded-full bg-surface-container-lowest shadow-sm
             transition-transform duration-200
             ${showTotal ? "translate-x-[18px]" : "translate-x-[3px]"}
           `}

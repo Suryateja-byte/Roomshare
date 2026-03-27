@@ -393,15 +393,20 @@ describe("bounds validation (P1 - DoS prevention)", () => {
     jest.clearAllMocks();
   });
 
-  it("returns 400 with boundsRequired when query present without bounds", async () => {
-    // No DB calls should happen - validation should reject early
+  it("returns 200 with empty facets and boundsRequired when query present without bounds", async () => {
+    // P1-5 FIX: Changed from 400 to 200 — "needs location" is a signal, not an error
+    // No DB calls should happen - validation should return empty facets early
     const request = createRequest({ q: "austin" }); // no bounds
     const response = await GET(request);
 
-    expect(response.status).toBe(400);
+    expect(response.status).toBe(200);
     const data = await response.json();
     expect(data.boundsRequired).toBe(true);
-    expect(data.error).toBeDefined();
+    expect(data.amenities).toEqual({});
+    expect(data.houseRules).toEqual({});
+    expect(data.roomTypes).toEqual({});
+    expect(data.priceRanges).toEqual({ min: null, max: null, median: null });
+    expect(data.priceHistogram).toBeNull();
   });
 
   it("allows query with valid bounds (200 status)", async () => {
@@ -451,7 +456,9 @@ describe("bounds validation (P1 - DoS prevention)", () => {
     expect(mockQueryRawUnsafe).toHaveBeenCalled();
   });
 
-  it("returns 400 for invalid coordinate values (NaN)", async () => {
+  it("returns 200 with boundsRequired for invalid coordinate values (NaN parsed as missing)", async () => {
+    // "invalid" is parsed as NaN by safeParseFloat → undefined → bounds incomplete
+    // → parseSearchParams creates no bounds → boundsRequired path (P1-5: now 200)
     const request = createRequest({
       q: "austin",
       minLng: "invalid",
@@ -461,9 +468,10 @@ describe("bounds validation (P1 - DoS prevention)", () => {
     });
     const response = await GET(request);
 
-    expect(response.status).toBe(400);
+    expect(response.status).toBe(200);
     const data = await response.json();
-    expect(data.error).toBeDefined();
+    expect(data.boundsRequired).toBe(true);
+    expect(data.amenities).toEqual({});
   });
 
   it("returns empty facets for unbounded browse (no query, no bounds) to prevent DoS", async () => {
@@ -573,19 +581,21 @@ describe("P2-NEW: lat/lng bounds derivation", () => {
     expect(mockQueryRawUnsafe).toHaveBeenCalled();
   });
 
-  it("still returns 400 for q with no location info at all", async () => {
+  it("returns 200 with empty facets for q with no location info at all (P1-5)", async () => {
     mockQueryRawUnsafe.mockReset(); // Should not be called
 
     const request = createRequest({
       q: "austin",
-      // No lat/lng, no bounds - should fail
+      // No lat/lng, no bounds - returns empty facets with boundsRequired signal
     });
     const response = await GET(request);
 
-    expect(response.status).toBe(400);
+    // P1-5 FIX: Changed from 400 to 200 — aligned with /api/search-count
+    expect(response.status).toBe(200);
     const data = await response.json();
     expect(data.boundsRequired).toBe(true);
-    // DB should NOT be queried - validation rejects early
+    expect(data.amenities).toEqual({});
+    // DB should NOT be queried - validation returns empty facets early
     expect(mockQueryRawUnsafe).not.toHaveBeenCalled();
   });
 

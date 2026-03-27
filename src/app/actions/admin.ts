@@ -381,7 +381,14 @@ export async function updateListingStatus(
     });
 
     // Fire-and-forget: mark listing dirty for search doc refresh
-    markListingDirty(listingId, "status_changed").catch(() => {});
+    markListingDirty(listingId, "status_changed").catch((err) => {
+      logger.sync.warn("markListingDirty failed", {
+        action: "adminUpdateListingStatus",
+        listingId,
+        reason: "status_changed",
+        error: err instanceof Error ? err.message : String(err),
+      });
+    });
 
     // Audit log
     await logAdminAction({
@@ -466,8 +473,10 @@ export async function deleteListing(listingId: string) {
       // Batch-create notifications for affected tenants
       if (pendingBookings.length > 0) {
         await tx.notification.createMany({
-          data: pendingBookings.map((booking) => ({
-            userId: booking.tenantId,
+          data: pendingBookings
+            .filter((booking) => booking.tenantId != null)
+            .map((booking) => ({
+            userId: booking.tenantId!,
             type: "BOOKING_CANCELLED",
             title: "Booking Request Cancelled",
             message: `Your pending booking request for "${listing.title}" has been cancelled because the listing was removed by an administrator.`,
@@ -738,11 +747,13 @@ export async function resolveReportAndRemoveListing(
         data: { status: "CANCELLED" },
       });
 
-      // Batch-create notifications for affected tenants
+      // Batch-create notifications for affected tenants (skip deleted accounts)
       if (affectedBookings.length > 0) {
         await tx.notification.createMany({
-          data: affectedBookings.map((booking) => ({
-            userId: booking.tenantId,
+          data: affectedBookings
+            .filter((booking) => booking.tenantId != null)
+            .map((booking) => ({
+            userId: booking.tenantId!,
             type: "BOOKING_CANCELLED",
             title: "Booking Cancelled - Listing Removed",
             message: `Your booking for "${listing.title}" has been cancelled because the listing was removed due to a policy violation.`,

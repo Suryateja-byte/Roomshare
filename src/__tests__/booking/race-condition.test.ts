@@ -193,6 +193,7 @@ describe("Booking Race Condition Prevention", () => {
               .fn()
               .mockResolvedValueOnce([mockListing])
               .mockResolvedValueOnce([{ total: BigInt(0) }]),
+            bookingAuditLog: { create: jest.fn().mockResolvedValue({}) },
           };
           return callback(tx);
         }
@@ -223,6 +224,7 @@ describe("Booking Race Condition Prevention", () => {
                 return Promise.resolve(null);
               }),
             },
+            bookingAuditLog: { create: jest.fn().mockResolvedValue({}) },
             $queryRaw: jest
               .fn()
               .mockImplementation((strings: TemplateStringsArray) => {
@@ -276,6 +278,7 @@ describe("Booking Race Condition Prevention", () => {
               .fn()
               .mockResolvedValueOnce([mockListing])
               .mockResolvedValueOnce([{ total: BigInt(0) }]),
+            bookingAuditLog: { create: jest.fn().mockResolvedValue({}) },
           };
           return callback(tx);
         }
@@ -334,6 +337,7 @@ describe("Booking Race Condition Prevention", () => {
               .fn()
               .mockResolvedValueOnce([noSlotsListing])
               .mockResolvedValueOnce([{ total: BigInt(1) }]), // 1 slot used = capacity full
+            bookingAuditLog: { create: jest.fn().mockResolvedValue({}) },
           };
           return callback(tx);
         }
@@ -367,6 +371,7 @@ describe("Booking Race Condition Prevention", () => {
               findFirst: jest.fn().mockResolvedValue(existingBooking),
             },
             $queryRaw: jest.fn().mockResolvedValue([mockListing]),
+            bookingAuditLog: { create: jest.fn().mockResolvedValue({}) },
           };
           return callback(tx);
         }
@@ -405,6 +410,7 @@ describe("Booking Race Condition Prevention", () => {
               findUnique: jest.fn().mockResolvedValue(mockOwner),
             },
             $queryRaw: jest.fn().mockResolvedValue([mockListing]),
+            bookingAuditLog: { create: jest.fn().mockResolvedValue({}) },
           };
           return callback(tx);
         }
@@ -444,6 +450,7 @@ describe("Booking Race Condition Prevention", () => {
               .fn()
               .mockResolvedValueOnce([mockListing])
               .mockResolvedValueOnce([{ total: BigInt(0) }]),
+            bookingAuditLog: { create: jest.fn().mockResolvedValue({}) },
           };
           return callback(tx);
         }
@@ -469,6 +476,7 @@ describe("Booking Race Condition Prevention", () => {
               findFirst: jest.fn().mockResolvedValue(null),
             },
             $queryRaw: jest.fn().mockResolvedValue([]), // No listing found
+            bookingAuditLog: { create: jest.fn().mockResolvedValue({}) },
           };
           return callback(tx);
         }
@@ -498,6 +506,7 @@ describe("Booking Race Condition Prevention", () => {
               findUnique: jest.fn().mockResolvedValue(mockOwner),
             },
             $queryRaw: jest.fn().mockResolvedValue([inactiveListing]),
+            bookingAuditLog: { create: jest.fn().mockResolvedValue({}) },
           };
           return callback(tx);
         }
@@ -594,6 +603,7 @@ describe("cross-operation concurrency (B2.2)", () => {
           booking: {
             updateMany: jest.fn().mockResolvedValue({ count: 1 }),
           },
+          bookingAuditLog: { create: jest.fn().mockResolvedValue({}) },
         };
         return callback(tx);
       }

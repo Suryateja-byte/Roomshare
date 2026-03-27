@@ -56,7 +56,7 @@ const SEARCH_URL = `/search?${boundsQS}`;
 async function waitForSearchPage(page: Page, url = SEARCH_URL) {
   await page.goto(url);
   await page.waitForLoadState("domcontentloaded");
-  await page.waitForSelector("button", { timeout: 30_000 });
+  await page.locator("button").first().waitFor({ state: "visible", timeout: 30_000 });
   await waitForMapReady(page);
 }
 
@@ -744,8 +744,8 @@ test.describe("Map Interactions Advanced (Stories 5-8)", () => {
         return;
       }
 
-      // Wait for debounced URL bounds update after pan (600ms debounce + CI overhead)
-      await page.waitForTimeout(1_000);
+      // Wait for debounced URL bounds update after pan
+      await page.waitForLoadState("networkidle").catch(() => {});
 
       // Poll for debounced URL bounds update after pan
       let boundsUpdated = false;
@@ -759,6 +759,7 @@ test.describe("Map Interactions Advanced (Stories 5-8)", () => {
           boundsUpdated = true;
           break;
         }
+        // INTENTIONAL: polling delay inside retry loop
         await page.waitForTimeout(500);
       }
       if (!boundsUpdated) {

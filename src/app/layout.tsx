@@ -1,6 +1,6 @@
 import type { Metadata, Viewport } from "next";
 import { headers } from "next/headers";
-import localFont from "next/font/local";
+import { Newsreader, Manrope } from "next/font/google";
 import "./globals.css";
 import Navbar from "@/components/Navbar";
 import NavbarWrapper from "@/components/NavbarWrapper";
@@ -13,21 +13,30 @@ import { ServiceWorkerRegistration } from "@/components/ServiceWorkerRegistratio
 import EmailVerificationWrapper from "@/components/EmailVerificationWrapper";
 import SuspensionBannerWrapper from "@/components/SuspensionBannerWrapper";
 import CustomScrollContainer from "@/components/ui/CustomScrollContainer";
+import BottomNavBar from "@/components/BottomNavBar";
 import { WebVitals } from "@/components/WebVitals";
 
-const inter = localFont({
-  src: "../fonts/InterVariable.woff2",
+const newsreader = Newsreader({
+  subsets: ["latin"],
+  weight: ["300", "400", "500", "600", "700"],
+  style: ["normal", "italic"],
   display: "swap",
-  variable: "--font-inter",
-  weight: "100 900",
+  variable: "--font-display",
+});
+
+const manrope = Manrope({
+  subsets: ["latin"],
+  weight: ["300", "400", "500", "600", "700"],
+  display: "swap",
+  variable: "--font-body",
 });
 
 export const metadata: Metadata = {
   metadataBase: new URL(
     process.env.NEXT_PUBLIC_APP_URL || "https://roomshare.app"
   ),
-  title: "RoomShare - Find Your Perfect Roommate",
-  description: "Connect with compatible roommates and find your ideal home.",
+  title: "RoomShare — Find Your People, Not Just a Place",
+  description: "Verified roommates. Real listings. People who actually show up to the tour.",
   manifest: "/manifest.json",
   appleWebApp: {
     capable: true,
@@ -37,10 +46,7 @@ export const metadata: Metadata = {
 };
 
 export const viewport: Viewport = {
-  themeColor: [
-    { media: "(prefers-color-scheme: light)", color: "#ffffff" },
-    { media: "(prefers-color-scheme: dark)", color: "#09090b" },
-  ],
+  themeColor: "#fbf9f4",
   width: "device-width",
   initialScale: 1,
   maximumScale: 5,
@@ -60,7 +66,7 @@ export default async function RootLayout({
   const nonce = requestHeaders.get("x-nonce") || undefined;
 
   return (
-    <html lang="en" suppressHydrationWarning>
+    <html lang="en">
       <head>
         {/* Preconnect to external origins for faster resource loading */}
         {/* OpenFreeMap - map tiles and glyphs */}
@@ -97,7 +103,7 @@ export default async function RootLayout({
           }}
         />
       </head>
-      <body className={inter.className}>
+      <body className={`${newsreader.variable} ${manrope.variable} font-body bg-surface-canvas text-on-surface`}>
         <Providers nonce={nonce}>
           <SkipLink />
           <CustomScrollContainer>
@@ -107,12 +113,15 @@ export default async function RootLayout({
               </NavbarWrapper>
               <EmailVerificationWrapper />
               <SuspensionBannerWrapper />
-              <MainLayout>{children}</MainLayout>
+              <MainLayout>
+                {children}
+              </MainLayout>
               <FooterWrapper>
                 <Footer />
               </FooterWrapper>
             </div>
           </CustomScrollContainer>
+          <BottomNavBar />
           <OfflineIndicator />
           <ServiceWorkerRegistration />
           <WebVitals />

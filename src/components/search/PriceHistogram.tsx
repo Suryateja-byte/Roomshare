@@ -45,8 +45,8 @@ export function PriceHistogram({
                 marginLeft: barGap / 2,
                 marginRight: barGap / 2,
                 backgroundColor: inRange
-                  ? "var(--color-zinc-900, #18181b)"
-                  : "var(--color-zinc-200, #e4e4e7)",
+                  ? "var(--color-on-surface, #1b1c19)"
+                  : "var(--color-surface-container-high, #eae8e3)",
               }}
             />
           );
@@ -56,7 +56,7 @@ export function PriceHistogram({
           {SKELETON_HEIGHTS.map((h, i) => (
             <div
               key={i}
-              className="flex-1 rounded-t-sm bg-zinc-100 dark:bg-zinc-800"
+              className="flex-1 rounded-t-sm bg-surface-container-high"
               style={{ height: `${h}%` }}
             />
           ))}

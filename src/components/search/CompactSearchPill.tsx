@@ -3,19 +3,11 @@
 import { Search, SlidersHorizontal } from "lucide-react";
 import { useSearchParams } from "next/navigation";
 import { useMemo } from "react";
+import { countActiveFilters } from "@/components/filters/filter-chip-utils";
 
 interface CompactSearchPillProps {
   onExpand: () => void;
   onOpenFilters?: () => void;
-}
-
-/** Count param values, splitting CSV entries (e.g. "Wifi,AC" → 2). */
-function countParamValues(searchParams: URLSearchParams, key: string): number {
-  return searchParams
-    .getAll(key)
-    .flatMap((v) => v.split(","))
-    .map((v) => v.trim())
-    .filter(Boolean).length;
 }
 
 /**
@@ -50,56 +42,32 @@ export function CompactSearchPill({
     return parts;
   }, [location, minPrice, maxPrice, roomType, leaseDuration]);
 
-  // Count active filters
-  const filterCount = useMemo(() => {
-    let count = 0;
-    const keys = [
-      "moveInDate",
-      "leaseDuration",
-      "roomType",
-      "genderPreference",
-      "householdGender",
-    ];
-    for (const key of keys) {
-      const val = searchParams.get(key);
-      if (val && val !== "any") count++;
-    }
-    count += countParamValues(searchParams, "amenities");
-    count += countParamValues(searchParams, "houseRules");
-    count += countParamValues(searchParams, "languages");
-    if (minPrice) count++;
-    if (maxPrice) count++;
-    // Count minSlots filter
-    const minSlots = searchParams.get("minSlots");
-    if (minSlots && parseInt(minSlots) >= 2) count++;
-    // Count nearMatches filter
-    if (
-      searchParams.get("nearMatches") === "1" ||
-      searchParams.get("nearMatches") === "true"
-    )
-      count++;
-    return count;
-  }, [searchParams, minPrice, maxPrice]);
+  // P1-3 FIX: Use shared countActiveFilters instead of ad-hoc counting.
+  // Validates against allowlists, counts price range as 1 chip, handles nearMatches consistently.
+  const filterCount = useMemo(
+    () => countActiveFilters(searchParams),
+    [searchParams]
+  );
 
   return (
     <div className="hidden md:flex items-center gap-2 w-full max-w-2xl mx-auto">
       <button
         onClick={onExpand}
-        className="flex-1 flex items-center gap-3 h-12 px-5 bg-white dark:bg-zinc-900 rounded-full shadow-sm border border-zinc-200 dark:border-zinc-700 hover:shadow-md transition-shadow focus:outline-none focus-visible:ring-2 focus-visible:ring-zinc-900/30 dark:focus-visible:ring-zinc-400/40 focus-visible:ring-offset-2"
+        className="flex-1 flex items-center gap-3 h-12 px-5 bg-surface-container-lowest rounded-full shadow-ambient-sm border border-outline-variant/20 hover:shadow-ambient transition-shadow focus:outline-none focus-visible:ring-2 focus-visible:ring-primary/30 focus-visible:ring-offset-2"
         aria-label="Expand search form"
       >
-        <Search className="w-4 h-4 text-zinc-500 flex-shrink-0" />
+        <Search className="w-4 h-4 text-on-surface-variant flex-shrink-0" />
         <div className="flex items-center gap-2 min-w-0 text-sm">
           {segments.map((seg, i) => (
             <span key={i} className="flex items-center gap-2">
               {i > 0 && (
-                <span className="w-px h-4 bg-zinc-200 dark:bg-zinc-700 flex-shrink-0" />
+                <span className="w-px h-4 bg-surface-container-high flex-shrink-0" />
               )}
               <span
                 className={`truncate ${
                   i === 0
-                    ? "font-medium text-zinc-900 dark:text-white"
-                    : "text-zinc-500 dark:text-zinc-400"
+                    ? "font-medium text-on-surface"
+                    : "text-on-surface-variant"
                 }`}
               >
                 {seg}
@@ -112,12 +80,12 @@ export function CompactSearchPill({
       {onOpenFilters && (
         <button
           onClick={onOpenFilters}
-          className="relative flex items-center justify-center w-12 h-12 bg-white dark:bg-zinc-900 rounded-full shadow-sm border border-zinc-200 dark:border-zinc-700 hover:shadow-md transition-shadow flex-shrink-0 focus:outline-none focus-visible:ring-2 focus-visible:ring-zinc-900/30 dark:focus-visible:ring-zinc-400/40 focus-visible:ring-offset-2"
+          className="relative flex items-center justify-center w-12 h-12 bg-surface-container-lowest rounded-full shadow-ambient-sm border border-outline-variant/20 hover:shadow-ambient transition-shadow flex-shrink-0 focus:outline-none focus-visible:ring-2 focus-visible:ring-primary/30 focus-visible:ring-offset-2"
           aria-label={`Filters${filterCount > 0 ? ` (${filterCount} active)` : ""}`}
         >
-          <SlidersHorizontal className="w-4 h-4 text-zinc-600 dark:text-zinc-400" />
+          <SlidersHorizontal className="w-4 h-4 text-on-surface-variant" />
           {filterCount > 0 && (
-            <span className="absolute -top-1 -right-1 flex items-center justify-center min-w-[18px] h-[18px] px-1 text-[10px] font-bold rounded-full bg-indigo-500 text-white">
+            <span className="absolute -top-1 -right-1 flex items-center justify-center min-w-[18px] h-[18px] px-1 text-[10px] font-bold rounded-full bg-primary text-on-primary">
               {filterCount}
             </span>
           )}

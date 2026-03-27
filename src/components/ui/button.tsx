@@ -9,31 +9,29 @@ function cn(...inputs: ClassValue[]) {
 
 const variantClasses = {
   primary:
-    "bg-zinc-900 text-white hover:bg-zinc-800 shadow-sm hover:shadow-md focus-visible:ring-zinc-900/30 dark:bg-white dark:text-zinc-900 dark:hover:bg-zinc-100 dark:focus-visible:ring-zinc-400/40",
+    "bg-gradient-to-br from-primary to-primary-container text-on-primary shadow-ambient hover:brightness-110 focus-visible:ring-primary/30",
   outline:
-    "border border-zinc-200 bg-transparent hover:bg-zinc-50 text-zinc-900 focus-visible:ring-zinc-900/30 dark:border-zinc-700 dark:text-white dark:hover:bg-zinc-800 dark:focus-visible:ring-zinc-400/40",
-  // P2-8: Improved contrast - zinc-600 (7:1) vs zinc-500's borderline 4.5:1, dark zinc-300 (7.6:1) vs zinc-400's failing 4.2:1
+    "bg-transparent border border-outline-variant/20 text-on-surface hover:bg-surface-container-high focus-visible:ring-primary/30",
   ghost:
-    "text-zinc-600 hover:text-zinc-900 hover:bg-zinc-100 focus-visible:ring-zinc-900/30 dark:text-zinc-300 dark:hover:text-white dark:hover:bg-zinc-800 dark:focus-visible:ring-zinc-400/40",
+    "text-on-surface-variant hover:text-on-surface hover:bg-surface-container-high focus-visible:ring-primary/30",
   white:
-    "bg-white text-zinc-900 hover:bg-zinc-50 shadow-sm border border-zinc-100 focus-visible:ring-zinc-900/30 dark:bg-zinc-800 dark:text-white dark:hover:bg-zinc-700 dark:border-zinc-700 dark:focus-visible:ring-zinc-400/40",
+    "bg-surface-container-lowest text-on-surface shadow-ambient-sm focus-visible:ring-primary/30",
   destructive:
-    "bg-red-600 text-white hover:bg-red-700 shadow-sm focus-visible:ring-red-600/30",
+    "bg-red-600 text-white hover:bg-red-700 shadow-ambient-sm focus-visible:ring-red-600/30",
   success:
-    "bg-green-600 text-white hover:bg-green-700 shadow-sm focus-visible:ring-green-600/30",
+    "bg-green-600 text-white hover:bg-green-700 shadow-ambient-sm focus-visible:ring-green-600/30",
   warning:
-    "bg-amber-500 text-white hover:bg-amber-600 shadow-sm focus-visible:ring-amber-500/30",
+    "bg-amber-500 text-white hover:bg-amber-600 shadow-ambient-sm focus-visible:ring-amber-500/30",
   accent:
-    "bg-indigo-600 text-white hover:bg-indigo-700 shadow-sm shadow-indigo-500/20 focus-visible:ring-indigo-600/30",
+    "bg-tertiary text-on-primary hover:bg-tertiary/90 focus-visible:ring-primary/30",
   "accent-ghost":
-    "text-indigo-600 dark:text-indigo-400 hover:bg-indigo-100 dark:hover:bg-indigo-950 focus-visible:ring-indigo-600/30",
+    "text-primary hover:bg-primary/10 focus-visible:ring-primary/30",
   secondary:
-    "bg-zinc-100 dark:bg-zinc-800 text-zinc-900 dark:text-white hover:bg-zinc-200 dark:hover:bg-zinc-700 focus-visible:ring-zinc-900/30 dark:focus-visible:ring-zinc-400/40",
-  // P2-8: Improved contrast - zinc-300 provides better visibility on dark backgrounds
+    "bg-surface-container-high text-on-surface hover:bg-surface-container-high/80 focus-visible:ring-primary/30",
   "ghost-inverse":
-    "text-zinc-300 hover:text-white hover:bg-white/10 focus-visible:ring-white/30",
+    "text-surface-container-high hover:text-white hover:bg-white/10 focus-visible:ring-white/30",
   filter:
-    "border border-zinc-200 bg-white text-zinc-600 hover:bg-zinc-50 data-[active=true]:bg-zinc-900 data-[active=true]:text-white data-[active=true]:border-zinc-900 focus-visible:ring-zinc-900/30 dark:border-zinc-700 dark:bg-zinc-800 dark:text-zinc-300 dark:hover:bg-zinc-700 dark:data-[active=true]:bg-white dark:data-[active=true]:text-zinc-900 dark:data-[active=true]:border-white dark:focus-visible:ring-zinc-400/40",
+    "border border-outline-variant/20 bg-surface-container-lowest text-on-surface-variant data-[active=true]:bg-gradient-to-br data-[active=true]:from-primary data-[active=true]:to-primary-container data-[active=true]:text-on-primary focus-visible:ring-primary/30",
 };
 
 const sizeClasses = {
@@ -45,7 +43,7 @@ const sizeClasses = {
 
 // P2-8: Improved disabled opacity for better contrast (60% vs 50%)
 const baseClasses =
-  "inline-flex items-center justify-center rounded-full font-medium transition-all duration-200 focus:outline-none focus-visible:ring-2 focus-visible:ring-offset-2 disabled:opacity-60 disabled:pointer-events-none active:scale-[0.98]";
+  "inline-flex items-center justify-center rounded-full font-medium transition-all duration-200 focus:outline-none focus-visible:ring-2 focus-visible:ring-offset-2 disabled:opacity-60 disabled:pointer-events-none active:scale-[0.97]";
 
 export interface ButtonProps extends React.ButtonHTMLAttributes<HTMLButtonElement> {
   asChild?: boolean;

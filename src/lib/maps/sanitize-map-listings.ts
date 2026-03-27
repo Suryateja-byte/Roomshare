@@ -11,6 +11,10 @@ type MapListingInput = {
     lng?: unknown;
   } | null;
   tier?: "primary" | "mini";
+  avgRating?: unknown;
+  reviewCount?: unknown;
+  recommendedScore?: unknown;
+  createdAt?: unknown;
 };
 
 function toFiniteNumber(value: unknown, fallback = 0): number {
@@ -28,6 +32,15 @@ function toFiniteNumber(value: unknown, fallback = 0): number {
 
 function toSafeSlotCount(value: unknown): number {
   return Math.max(0, Math.trunc(toFiniteNumber(value, 0)));
+}
+
+function toSafeDate(value: unknown): Date | null {
+  if (value instanceof Date) return isNaN(value.getTime()) ? null : value;
+  if (typeof value === "string" && value.length > 0) {
+    const d = new Date(value);
+    return isNaN(d.getTime()) ? null : d;
+  }
+  return null;
 }
 
 function hasValidCoordinateRange(lat: number, lng: number): boolean {
@@ -64,6 +77,14 @@ export function sanitizeMapListing(
       : [],
     location: { lat, lng },
     tier: listing.tier,
+    avgRating: toFiniteNumber(listing.avgRating, 0),
+    reviewCount: Math.max(0, Math.trunc(toFiniteNumber(listing.reviewCount, 0))),
+    recommendedScore: listing.recommendedScore != null
+      ? (Number.isFinite(toFiniteNumber(listing.recommendedScore, Number.NaN))
+          ? toFiniteNumber(listing.recommendedScore, 0)
+          : null)
+      : null,
+    createdAt: toSafeDate(listing.createdAt),
   };
 }
 

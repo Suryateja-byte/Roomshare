@@ -32,13 +32,13 @@ export default function CharacterCounter({
               ? "text-amber-500 font-medium"
               : isWarning
                 ? "text-amber-500/80"
-                : "text-zinc-400 dark:text-zinc-500"
+                : "text-on-surface-variant"
         )}
       >
         {current}
       </span>
-      <span className="text-zinc-300 dark:text-zinc-600">/</span>
-      <span className="text-zinc-400 dark:text-zinc-500">{max}</span>
+      <span className="text-on-surface-variant">/</span>
+      <span className="text-on-surface-variant">{max}</span>
       {isOver && (
         <span className="sr-only" aria-live="assertive">
           Character limit exceeded

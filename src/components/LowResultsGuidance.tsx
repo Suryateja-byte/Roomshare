@@ -102,19 +102,19 @@ export function LowResultsGuidance({
   const suggestions = generateFilterSuggestions(filterParams, resultCount);
 
   return (
-    <div className="mb-6 rounded-lg border border-amber-200 bg-amber-50 p-4 dark:border-amber-800 dark:bg-amber-950/30">
+    <div className="mb-6 rounded-lg border border-amber-200 bg-amber-50 p-4">
       <div className="flex items-start gap-3">
-        <div className="flex-shrink-0 rounded-full bg-amber-100 p-2 dark:bg-amber-900/50">
-          <Lightbulb className="h-5 w-5 text-amber-600 dark:text-amber-400" />
+        <div className="flex-shrink-0 rounded-full bg-amber-100 p-2">
+          <Lightbulb className="h-5 w-5 text-amber-600" />
         </div>
 
         <div className="flex-1 min-w-0">
-          <h3 className="text-sm font-medium text-amber-900 dark:text-amber-100">
+          <h3 className="text-sm font-medium text-amber-900">
             Only {resultCount} {resultCount === 1 ? "listing" : "listings"}{" "}
             found
           </h3>
 
-          <p className="mt-1 text-sm text-amber-700 dark:text-amber-300">
+          <p className="mt-1 text-sm text-amber-700">
             Try adjusting your filters to see more options:
           </p>
 
@@ -126,7 +126,7 @@ export function LowResultsGuidance({
                   key={suggestion.type}
                   onClick={() => handleSuggestionClick(suggestion)}
                   disabled={isPending}
-                  className="inline-flex items-center gap-1 rounded-full border border-amber-300 bg-white px-3 py-1.5 text-xs font-medium text-amber-800 transition-colors hover:bg-amber-100 disabled:opacity-60 dark:border-amber-700 dark:bg-amber-900/50 dark:text-amber-200 dark:hover:bg-amber-800/50"
+                  className="inline-flex items-center gap-1 rounded-full border border-amber-300 bg-surface-container-lowest px-3 py-1.5 text-xs font-medium text-amber-800 transition-colors hover:bg-amber-100 disabled:opacity-60"
                 >
                   {suggestion.label}
                   <ChevronRight className="h-3 w-3" />
@@ -136,23 +136,23 @@ export function LowResultsGuidance({
           )}
 
           {/* Near matches toggle */}
-          <div className="mt-4 border-t border-amber-200 pt-4 dark:border-amber-800">
+          <div className="mt-4 border-t border-amber-200 pt-4">
             <Button
               onClick={handleToggleNearMatches}
               disabled={isPending}
               variant="outline"
               size="sm"
-              className="group border-amber-400 bg-white text-amber-800 hover:bg-amber-100 hover:text-amber-900 dark:border-amber-600 dark:bg-amber-900/50 dark:text-amber-200 dark:hover:bg-amber-800/50"
+              className="group border-amber-400 bg-surface-container-lowest text-amber-800 hover:bg-amber-100 hover:text-amber-900"
             >
               <Sparkles className="mr-2 h-4 w-4 text-amber-500 group-hover:text-amber-600" />
               Include near matches
               {nearMatchCount !== undefined && nearMatchCount > 0 && (
-                <span className="ml-2 rounded-full bg-amber-200 px-2 py-0.5 text-xs font-semibold text-amber-800 dark:bg-amber-800 dark:text-amber-200">
+                <span className="ml-2 rounded-full bg-amber-200 px-2 py-0.5 text-xs font-semibold text-amber-800">
                   +{nearMatchCount}
                 </span>
               )}
             </Button>
-            <p className="mt-2 text-xs text-amber-600 dark:text-amber-400">
+            <p className="mt-2 text-xs text-amber-600">
               See listings that almost match your filters (slightly outside
               price or date range)
             </p>

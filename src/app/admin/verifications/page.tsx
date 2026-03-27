@@ -50,26 +50,26 @@ export default async function VerificationsPage() {
   const pendingCount = requests.filter((r) => r.status === "PENDING").length;
 
   return (
-    <div className="min-h-screen bg-zinc-50 dark:bg-zinc-950">
+    <div className="min-h-screen bg-surface-canvas">
       <div className="max-w-5xl mx-auto px-4 py-8">
         {/* Header */}
         <div className="mb-8">
           <Link
             href="/admin"
-            className="inline-flex items-center gap-2 text-zinc-500 dark:text-zinc-400 hover:text-zinc-700 dark:hover:text-zinc-200 mb-4"
+            className="inline-flex items-center gap-2 text-on-surface-variant hover:text-on-surface mb-4"
           >
             <ArrowLeft className="w-4 h-4" />
             Back to Dashboard
           </Link>
           <div className="flex items-center gap-4">
-            <div className="w-12 h-12 bg-zinc-900 dark:bg-white rounded-xl flex items-center justify-center">
-              <ShieldCheck className="w-6 h-6 text-white dark:text-zinc-900" />
+            <div className="w-12 h-12 bg-on-surface rounded-lg flex items-center justify-center">
+              <ShieldCheck className="w-6 h-6 text-white" />
             </div>
             <div>
-              <h1 className="text-2xl font-bold text-zinc-900 dark:text-white">
+              <h1 className="text-2xl font-display font-bold text-on-surface">
                 Verification Requests
               </h1>
-              <p className="text-zinc-500 dark:text-zinc-400">
+              <p className="text-on-surface-variant">
                 {pendingCount > 0
                   ? `${pendingCount} pending verification${pendingCount > 1 ? "s" : ""}`
                   : "No pending verifications"}

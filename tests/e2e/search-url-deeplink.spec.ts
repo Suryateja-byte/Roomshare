@@ -249,7 +249,7 @@ test.describe("Search URL Deep Links (P0)", () => {
       .catch(() => false);
 
     // Both outcomes are valid: browse results or suggestions/prompt
-    expect(cardCount >= 0 || hasSuggestions).toBe(true);
+    expect(cardCount > 0 || hasSuggestions).toBe(true);
   });
 
   // -------------------------------------------------------------------------

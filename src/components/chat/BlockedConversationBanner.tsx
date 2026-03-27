@@ -26,8 +26,8 @@ export default function BlockedConversationBanner({
   if (blockStatus === "blocked") {
     // Current user was blocked by the other user
     return (
-      <div className="px-6 py-4 bg-zinc-100 dark:bg-zinc-800 border-t border-zinc-200 dark:border-zinc-700">
-        <div className="flex items-center justify-center gap-3 text-zinc-500 dark:text-zinc-400">
+      <div className="px-6 py-4 bg-surface-container-high border-t border-outline-variant/20">
+        <div className="flex items-center justify-center gap-3 text-on-surface-variant">
           <Ban className="w-5 h-5 flex-shrink-0" />
           <p className="text-sm">
             You can no longer send messages to this user.
@@ -40,10 +40,10 @@ export default function BlockedConversationBanner({
   if (blockStatus === "blocker") {
     // Current user blocked the other user
     return (
-      <div className="px-6 py-4 bg-zinc-100 dark:bg-zinc-800 border-t border-zinc-200 dark:border-zinc-700">
+      <div className="px-6 py-4 bg-surface-container-high border-t border-outline-variant/20">
         <div className="flex items-center justify-center gap-3">
-          <ShieldOff className="w-5 h-5 text-zinc-500 dark:text-zinc-400 flex-shrink-0" />
-          <p className="text-sm text-zinc-500 dark:text-zinc-400">
+          <ShieldOff className="w-5 h-5 text-on-surface-variant flex-shrink-0" />
+          <p className="text-sm text-on-surface-variant">
             You have blocked {otherUserName}.
           </p>
           {onUnblock && (

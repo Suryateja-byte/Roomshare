@@ -2,6 +2,7 @@ import SearchLayoutView from "@/components/SearchLayoutView";
 import SearchHeaderWrapper from "@/components/SearchHeaderWrapper";
 import { SkipLink } from "@/components/ui/SkipLink";
 import { MapBoundsProvider } from "@/contexts/MapBoundsContext";
+import { ActivePanBoundsProvider } from "@/contexts/ActivePanBoundsContext";
 import { SearchTransitionProvider } from "@/contexts/SearchTransitionContext";
 import { FilterStateProvider } from "@/contexts/FilterStateContext";
 import { ListingFocusProvider } from "@/contexts/ListingFocusContext";
@@ -40,10 +41,10 @@ export default function SearchLayout({
     <SearchTransitionProvider>
       <FilterStateProvider>
         <MobileSearchProvider>
-          <div className="h-screen-safe flex flex-col bg-white dark:bg-zinc-950 overflow-hidden">
+          <div className="h-screen-safe flex flex-col bg-surface-canvas overflow-hidden">
             <SkipLink href="#search-results">Skip to search results</SkipLink>
             {/* Search Header - Persistent across navigations, fixed position */}
-            <header className="fixed top-0 left-0 right-0 w-full bg-white/95 dark:bg-zinc-900/95 backdrop-blur-md border-b border-zinc-100 dark:border-zinc-800 z-[1100] pointer-events-none">
+            <header className="fixed top-0 left-0 right-0 w-full bg-surface-container-lowest/95 backdrop-blur-xl shadow-[0_1px_8px_rgb(27_28_25/0.04)] z-[1100] pointer-events-none">
               <nav
                 aria-label="Search navigation"
                 className="pointer-events-auto"
@@ -61,11 +62,13 @@ export default function SearchLayout({
             >
               {/* Split view: List (from page) + Map (managed by SearchLayoutView) */}
               <MapBoundsProvider>
-                <ListingFocusProvider>
-                  <SearchV2DataProvider>
-                    <SearchLayoutView>{children}</SearchLayoutView>
-                  </SearchV2DataProvider>
-                </ListingFocusProvider>
+                <ActivePanBoundsProvider>
+                  <ListingFocusProvider>
+                    <SearchV2DataProvider>
+                      <SearchLayoutView>{children}</SearchLayoutView>
+                    </SearchV2DataProvider>
+                  </ListingFocusProvider>
+                </ActivePanBoundsProvider>
               </MapBoundsProvider>
             </div>
           </div>

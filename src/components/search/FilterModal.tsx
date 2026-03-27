@@ -169,7 +169,7 @@ export function FilterModal({
     >
       {/* Backdrop */}
       <div
-        className="absolute inset-0 z-0 bg-black/40 backdrop-blur-sm transition-opacity duration-300"
+        className="absolute inset-0 z-0 bg-on-surface/40 backdrop-blur-sm transition-opacity duration-300"
         onClick={onClose}
         aria-label="Close filters"
       />
@@ -178,17 +178,17 @@ export function FilterModal({
       <FocusTrap active={isOpen}>
         <div
           id="search-filters"
-          className="absolute right-0 top-0 z-10 h-full w-full max-w-md bg-white dark:bg-zinc-900 shadow-2xl transform transition-transform duration-300 ease-out animate-in slide-in-from-right overflow-hidden flex flex-col pt-[env(safe-area-inset-top,0px)]"
+          className="absolute right-0 top-0 z-10 h-full w-full max-w-md bg-surface-container-lowest shadow-2xl transform transition-transform duration-300 ease-out animate-in slide-in-from-right overflow-hidden flex flex-col pt-[env(safe-area-inset-top,0px)]"
         >
           {/* Header */}
-          <div className="flex items-center justify-between px-6 py-4 border-b border-zinc-100 dark:border-zinc-800 bg-white dark:bg-zinc-900">
+          <div className="flex items-center justify-between px-6 py-4 border-b border-outline-variant/20 bg-surface-container-lowest">
             <h2
               id="filter-drawer-title"
-              className="text-lg font-semibold text-zinc-900 dark:text-white"
+              className="text-lg font-semibold text-on-surface"
             >
               Filters
               {activeFilterCount > 0 && (
-                <span className="ml-2 inline-flex items-center justify-center min-w-[24px] h-6 px-2 text-sm font-semibold rounded-full bg-indigo-500 text-white">
+                <span className="ml-2 inline-flex items-center justify-center min-w-[24px] h-6 px-2 text-sm font-semibold rounded-full bg-primary text-white">
                   {activeFilterCount}
                 </span>
               )}
@@ -197,10 +197,10 @@ export function FilterModal({
               variant="ghost"
               size="icon"
               onClick={onClose}
-              className="rounded-full w-9 h-9 p-0 hover:bg-zinc-100 dark:hover:bg-zinc-800 transition-colors"
+              className="rounded-full w-9 h-9 p-0 hover:bg-surface-container-high transition-colors"
               aria-label="Close filters"
             >
-              <X className="w-5 h-5 text-zinc-500 dark:text-zinc-400" />
+              <X className="w-5 h-5 text-on-surface-variant" />
             </Button>
           </div>
 
@@ -222,7 +222,7 @@ export function FilterModal({
             <div className="space-y-2">
               <label
                 htmlFor="filter-move-in"
-                className="text-sm font-semibold text-zinc-900 dark:text-white"
+                className="text-sm font-semibold text-on-surface"
               >
                 Move-in Date
               </label>
@@ -239,7 +239,7 @@ export function FilterModal({
             <div className="space-y-2">
               <label
                 htmlFor="filter-lease"
-                className="text-sm font-semibold text-zinc-900 dark:text-white"
+                className="text-sm font-semibold text-on-surface"
               >
                 Lease Duration
               </label>
@@ -265,7 +265,7 @@ export function FilterModal({
             <div className="space-y-2">
               <label
                 htmlFor="filter-room-type"
-                className="text-sm font-semibold text-zinc-900 dark:text-white"
+                className="text-sm font-semibold text-on-surface"
               >
                 Room Type
               </label>
@@ -288,7 +288,7 @@ export function FilterModal({
                       >
                         {type}
                         {count !== undefined && (
-                          <span className="ml-1 text-xs text-zinc-500 dark:text-zinc-500">
+                          <span className="ml-1 text-xs text-on-surface-variant">
                             ({count})
                           </span>
                         )}
@@ -301,10 +301,10 @@ export function FilterModal({
 
             {/* Minimum Open Spots */}
             <div className="space-y-2">
-              <label className="text-sm font-semibold text-zinc-900 dark:text-white">
+              <label className="text-sm font-semibold text-on-surface">
                 Minimum Open Spots
               </label>
-              <p className="text-xs text-zinc-500 dark:text-zinc-400 -mt-1">
+              <p className="text-xs text-on-surface-variant -mt-1">
                 Show listings with at least this many available spots
               </p>
               <div className="flex items-center gap-3">
@@ -325,7 +325,7 @@ export function FilterModal({
                 >
                   <Minus className="h-4 w-4" />
                 </Button>
-                <span className="min-w-[3rem] text-center text-sm font-medium text-zinc-900 dark:text-white">
+                <span className="min-w-[3rem] text-center text-sm font-medium text-on-surface">
                   {minSlots === undefined ? "Any" : minSlots}
                 </span>
                 <Button
@@ -350,7 +350,7 @@ export function FilterModal({
 
             {/* Amenities */}
             <fieldset className="space-y-3">
-              <legend className="text-sm font-semibold text-zinc-900 dark:text-white">
+              <legend className="text-sm font-semibold text-on-surface">
                 Amenities
               </legend>
               <div
@@ -378,7 +378,7 @@ export function FilterModal({
                     >
                       {amenity}
                       {count !== undefined && !isActive && (
-                        <span className="ml-1 text-xs text-zinc-500 dark:text-zinc-500">
+                        <span className="ml-1 text-xs text-on-surface-variant">
                           ({count})
                         </span>
                       )}
@@ -391,7 +391,7 @@ export function FilterModal({
 
             {/* House Rules */}
             <fieldset className="space-y-3">
-              <legend className="text-sm font-semibold text-zinc-900 dark:text-white">
+              <legend className="text-sm font-semibold text-on-surface">
                 House Rules
               </legend>
               <div
@@ -419,7 +419,7 @@ export function FilterModal({
                     >
                       {rule}
                       {count !== undefined && !isActive && (
-                        <span className="ml-1 text-xs text-zinc-500 dark:text-zinc-500">
+                        <span className="ml-1 text-xs text-on-surface-variant">
                           ({count})
                         </span>
                       )}
@@ -432,17 +432,17 @@ export function FilterModal({
 
             {/* Languages */}
             <fieldset className="space-y-3">
-              <legend className="text-sm font-semibold text-zinc-900 dark:text-white">
+              <legend className="text-sm font-semibold text-on-surface">
                 Can Communicate In
               </legend>
-              <p className="text-xs text-zinc-500 dark:text-zinc-400 -mt-1">
+              <p className="text-xs text-on-surface-variant -mt-1">
                 Show listings where household speaks any of these
               </p>
 
               {/* Selected languages */}
               {languages.length > 0 && (
                 <div
-                  className="flex flex-wrap gap-2 pb-2 border-b border-zinc-200 dark:border-zinc-700"
+                  className="flex flex-wrap gap-2 pb-2 border-b border-outline-variant/20"
                   role="group"
                   aria-label="Selected languages"
                 >
@@ -495,7 +495,7 @@ export function FilterModal({
                   ))}
                 {filteredLanguages.filter((code) => !languages.includes(code))
                   .length === 0 && (
-                  <p className="text-sm text-zinc-500 dark:text-zinc-400">
+                  <p className="text-sm text-on-surface-variant">
                     {languageSearch
                       ? "No languages found"
                       : "All languages selected"}
@@ -508,7 +508,7 @@ export function FilterModal({
             <div className="space-y-2">
               <label
                 htmlFor="filter-gender-pref"
-                className="text-sm font-semibold text-zinc-900 dark:text-white"
+                className="text-sm font-semibold text-on-surface"
               >
                 Gender Preference
               </label>
@@ -541,7 +541,7 @@ export function FilterModal({
             <div className="space-y-2">
               <label
                 htmlFor="filter-household-gender"
-                className="text-sm font-semibold text-zinc-900 dark:text-white"
+                className="text-sm font-semibold text-on-surface"
               >
                 Household Gender
               </label>
@@ -566,7 +566,7 @@ export function FilterModal({
           </div>
 
           {/* Footer */}
-          <div className="px-6 py-4 pb-[max(1rem,env(safe-area-inset-bottom,0px))] border-t border-zinc-100 dark:border-zinc-800 bg-white dark:bg-zinc-900 space-y-3">
+          <div className="px-6 py-4 pb-[max(1rem,env(safe-area-inset-bottom,0px))] border-t border-outline-variant/20 bg-surface-container-lowest space-y-3">
             {count === 0 &&
               !isCountLoading &&
               drawerSuggestions &&
@@ -596,7 +596,7 @@ export function FilterModal({
                 className={`flex-1 rounded-xl h-12 text-white shadow-md disabled:opacity-60 disabled:cursor-not-allowed ${
                   count === 0 && !isCountLoading
                     ? "bg-amber-500 hover:bg-amber-600"
-                    : "bg-indigo-500 hover:bg-indigo-600"
+                    : "bg-primary hover:bg-primary"
                 }`}
                 data-testid="filter-modal-apply"
               >

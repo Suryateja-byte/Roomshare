@@ -14,10 +14,10 @@ const Checkbox = React.forwardRef<
     ref={ref}
     className={cn(
       // Touch target: 44px minimum via padding around 20px visual checkbox
-      "peer relative h-5 w-5 shrink-0 rounded-sm border border-primary",
-      "ring-offset-background focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2",
+      "peer relative h-5 w-5 shrink-0 rounded border border-outline-variant/40",
+      "focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/30 focus-visible:ring-offset-2",
       "disabled:cursor-not-allowed disabled:opacity-60",
-      "data-[state=checked]:bg-primary data-[state=checked]:text-primary-foreground",
+      "data-[state=checked]:bg-primary data-[state=checked]:text-on-primary data-[state=checked]:border-primary",
       // Touch target sizing - adds clickable padding to meet 44px minimum
       'touch-target before:absolute before:inset-[-12px] before:content-[""]',
       className

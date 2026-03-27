@@ -32,7 +32,7 @@ function getBoundaryFillLayer(isDarkMode: boolean): LayerProps {
     id: "boundary-fill",
     type: "fill",
     paint: {
-      "fill-color": isDarkMode ? "#a1a1aa" : "#3f3f46", // zinc-400 / zinc-700
+      "fill-color": "#4a4941", // on-surface-variant
       "fill-opacity": 0.08,
     },
   };
@@ -43,7 +43,7 @@ function getBoundaryLineLayer(isDarkMode: boolean): LayerProps {
     id: "boundary-line",
     type: "line",
     paint: {
-      "line-color": isDarkMode ? "#a1a1aa" : "#71717a", // zinc-400 / zinc-500
+      "line-color": "#4a4941", // on-surface-variant
       "line-width": 1.5,
       "line-opacity": 0.3,
       "line-dasharray": [4, 2],
@@ -55,10 +55,16 @@ export function BoundaryLayer({ query, isDarkMode }: BoundaryLayerProps) {
   const [geojson, setGeojson] = useState<BoundaryGeoJSON>(EMPTY_GEOJSON);
   const abortRef = useRef<AbortController | null>(null);
   const lastQueryRef = useRef<string | null>(null);
+  // MED-12 FIX: Debounce boundary fetch to prevent rapid Nominatim requests
+  const debounceRef = useRef<NodeJS.Timeout | null>(null);
 
   useEffect(() => {
-    // Cancel previous fetch
+    // Cancel previous fetch and debounce
     abortRef.current?.abort();
+    if (debounceRef.current) {
+      clearTimeout(debounceRef.current);
+      debounceRef.current = null;
+    }
 
     if (!query || query.trim().length < 2) {
       setGeojson(EMPTY_GEOJSON);
@@ -146,9 +152,16 @@ export function BoundaryLayer({ query, isDarkMode }: BoundaryLayerProps) {
       }
     };
 
-    fetchBoundary();
+    // MED-12 FIX: 300ms debounce prevents rapid Nominatim requests (rate limited to 1 req/sec)
+    debounceRef.current = setTimeout(fetchBoundary, 300);
 
-    return () => controller.abort();
+    return () => {
+      controller.abort();
+      if (debounceRef.current) {
+        clearTimeout(debounceRef.current);
+        debounceRef.current = null;
+      }
+    };
   }, [query]);
 
   const fillLayer = useMemo(

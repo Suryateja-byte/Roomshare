@@ -11,7 +11,7 @@
  * - A11y: aria-labels, live region for index
  */
 
-import { useState, useRef, useCallback, useEffect } from "react";
+import React, { useState, useRef, useCallback, useEffect } from "react";
 import Image from "next/image";
 import { ChevronLeft, ChevronRight } from "lucide-react";
 import { cn } from "@/lib/utils";
@@ -23,13 +23,17 @@ interface ListingCardCarouselProps {
   maxImages?: number;
   /** Called when image fails to load */
   onImageError?: () => void;
+  /** Whether this card is above the fold and first image should load with priority */
+  priority?: boolean;
 }
 
-export default function ListingCardCarousel({
+// L-6 FIX: React.memo prevents unnecessary re-renders from parent
+function ListingCardCarousel({
   images,
   alt,
   maxImages = 5,
   onImageError,
+  priority = false,
 }: ListingCardCarouselProps) {
   // Limit images to maxImages
   const displayImages = images.slice(0, maxImages);
@@ -190,10 +194,10 @@ export default function ListingCardCarousel({
                 sizes="(max-width: 768px) 100vw, (max-width: 1200px) 50vw, 33vw"
                 onError={index === 0 ? onImageError : undefined}
                 loading={index === 0 ? "eager" : "lazy"}
-                priority={index === 0}
+                priority={priority && index === 0}
               />
             ) : (
-              <div className="w-full h-full bg-zinc-200 dark:bg-zinc-700 animate-pulse" />
+              <div className="w-full h-full bg-surface-container-high animate-pulse" />
             )}
           </div>
         ))}
@@ -214,8 +218,8 @@ export default function ListingCardCarousel({
             className="absolute left-0 top-1/2 -translate-y-1/2 min-w-[44px] min-h-[44px] flex items-center justify-center pointer-events-auto focus:outline-none focus-visible:ring-2 focus-visible:ring-offset-2 focus-visible:ring-blue-500"
             aria-label="Previous image"
           >
-            <span className="w-8 h-8 rounded-full bg-white/90 dark:bg-zinc-800/90 shadow-md flex items-center justify-center hover:bg-white dark:hover:bg-zinc-700 transition-colors">
-              <ChevronLeft className="w-5 h-5 text-zinc-700 dark:text-zinc-200" />
+            <span className="w-8 h-8 rounded-full bg-surface-container-lowest/90 shadow-ambient flex items-center justify-center hover:bg-surface-container-lowest transition-colors">
+              <ChevronLeft className="w-5 h-5 text-on-surface-variant" />
             </span>
           </button>
         )}
@@ -228,8 +232,8 @@ export default function ListingCardCarousel({
             className="absolute right-0 top-1/2 -translate-y-1/2 min-w-[44px] min-h-[44px] flex items-center justify-center pointer-events-auto focus:outline-none focus-visible:ring-2 focus-visible:ring-offset-2 focus-visible:ring-blue-500"
             aria-label="Next image"
           >
-            <span className="w-8 h-8 rounded-full bg-white/90 dark:bg-zinc-800/90 shadow-md flex items-center justify-center hover:bg-white dark:hover:bg-zinc-700 transition-colors">
-              <ChevronRight className="w-5 h-5 text-zinc-700 dark:text-zinc-200" />
+            <span className="w-8 h-8 rounded-full bg-surface-container-lowest/90 shadow-ambient flex items-center justify-center hover:bg-surface-container-lowest transition-colors">
+              <ChevronRight className="w-5 h-5 text-on-surface-variant" />
             </span>
           </button>
         )}
@@ -259,7 +263,7 @@ export default function ListingCardCarousel({
               className={cn(
                 "block w-1.5 h-1.5 rounded-full transition-all duration-200",
                 index === currentIndex
-                  ? "bg-white w-3 shadow-sm"
+                  ? "bg-surface-container-lowest w-3 shadow-sm"
                   : "bg-white/60 group-hover/dot:bg-white/80"
               )}
             />
@@ -274,3 +278,5 @@ export default function ListingCardCarousel({
     </div>
   );
 }
+
+export default React.memo(ListingCardCarousel);

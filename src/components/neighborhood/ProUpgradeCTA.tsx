@@ -42,7 +42,7 @@ export function ProUpgradeCTA({
         {/* Blurred map preview background */}
         <div className="relative">
           <div
-            className="h-48 bg-gradient-to-br from-blue-100 via-blue-50 to-green-50 dark:from-blue-950 dark:via-slate-900 dark:to-green-950"
+            className="h-48 bg-gradient-to-br from-blue-100 via-blue-50 to-green-50"
             aria-hidden="true"
           >
             {/* Simulated map elements */}
@@ -72,9 +72,9 @@ export function ProUpgradeCTA({
 
               {/* Walkability rings */}
               <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2">
-                <div className="w-24 h-24 rounded-full border-2 border-dashed border-green-400/40 dark:border-green-500/30" />
-                <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-40 h-40 rounded-full border-2 border-dashed border-yellow-400/30 dark:border-yellow-500/20" />
-                <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-56 h-56 rounded-full border-2 border-dashed border-orange-400/20 dark:border-orange-500/15" />
+                <div className="w-24 h-24 rounded-full border-2 border-dashed border-green-400/40" />
+                <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-40 h-40 rounded-full border-2 border-dashed border-yellow-400/30" />
+                <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-56 h-56 rounded-full border-2 border-dashed border-orange-400/20" />
               </div>
 
               {/* Simulated POI markers */}
@@ -90,12 +90,12 @@ export function ProUpgradeCTA({
             </div>
 
             {/* Blur overlay */}
-            <div className="absolute inset-0 backdrop-blur-[3px] bg-background/30 dark:bg-background/40" />
+            <div className="absolute inset-0 backdrop-blur-[3px] bg-surface-canvas/30" />
           </div>
 
           {/* CTA Content */}
           <div className="absolute inset-0 flex flex-col items-center justify-center p-4 text-center">
-            <div className="bg-background/90 dark:bg-background/95 rounded-xl p-4 shadow-lg border max-w-xs">
+            <div className="bg-surface-canvas/90 rounded-xl p-4 shadow-lg border max-w-xs">
               <div className="flex items-center justify-center gap-2 mb-2">
                 <MapIcon className="h-5 w-5 text-primary" />
                 <span className="font-semibold text-lg">Pro Feature</span>

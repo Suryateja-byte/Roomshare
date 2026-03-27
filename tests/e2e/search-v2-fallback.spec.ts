@@ -270,7 +270,8 @@ test.describe("Search V2/V1 Fallback Behavior", () => {
       });
 
       await loadMoreButton.click();
-      await page.waitForTimeout(3000);
+      // Wait for the error response to be processed
+      await page.waitForLoadState("networkidle", { timeout: 10_000 }).catch(() => {});
 
       // After error, the button should not be in loading state
       // and an error message or retry option should appear

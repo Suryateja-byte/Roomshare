@@ -235,8 +235,10 @@ describe("listing-status actions", () => {
         // Verify prisma.$transaction is called
         expect(prisma.$transaction).toHaveBeenCalledTimes(1);
 
-        // The ownership check uses $queryRaw (FOR UPDATE) inside the transaction
+        // The ownership check uses $queryRaw with FOR UPDATE row lock
         expect(mockTx.$queryRaw).toHaveBeenCalled();
+        const sqlStrings = (mockTx.$queryRaw as jest.Mock).mock.calls[0][0].join("");
+        expect(sqlStrings).toContain("FOR UPDATE");
 
         // Booking count and listing update happen inside the transaction (via tx)
         expect(mockTx.booking.count).toHaveBeenCalled();

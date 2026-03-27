@@ -77,10 +77,12 @@ test.describe("Core Web Vitals — Anonymous Pages", () => {
   // CI-aware budgets (shared CI runners are slower)
   // ────────────────────────────────────────────────────────
   const isCI = !!process.env.CI;
-  const LCP_BUDGET = isCI ? 24000 : 8000;
-  const CLS_BUDGET = isCI ? 0.6 : 0.1;
-  const LOAD_BUDGET = isCI ? 30000 : 10000;
-  const DCL_BUDGET = isCI ? 24000 : 8000;
+  const LCP_BUDGET = isCI ? 16000 : 8000;
+  // CI CLS is consistently 0.39-0.50 due to font loading, uncached images, headless rendering
+  // 0.55 accommodates measured CI baseline (~0.50) with 10% margin while catching regressions
+  const CLS_BUDGET = isCI ? 0.55 : 0.1;
+  const LOAD_BUDGET = isCI ? 20000 : 10000;
+  const DCL_BUDGET = isCI ? 16000 : 8000;
 
   // ────────────────────────────────────────────────────────
   // Homepage (/)
@@ -103,7 +105,8 @@ test.describe("Core Web Vitals — Anonymous Pages", () => {
       await setupClsObserver(page);
       await page.goto("/");
       await page.waitForLoadState("load");
-      await page.waitForTimeout(3000); // Settle window
+      // INTENTIONAL: CLS measurement settle window — allow layout shifts to complete before reading metric
+      await page.waitForTimeout(3000);
 
       const cls = await readCls(page);
       expect(
@@ -150,6 +153,7 @@ test.describe("Core Web Vitals — Anonymous Pages", () => {
       await setupClsObserver(page);
       await page.goto(searchUrl);
       await page.waitForLoadState("load");
+      // INTENTIONAL: CLS measurement settle window — allow layout shifts to complete before reading metric
       await page.waitForTimeout(3000);
 
       const cls = await readCls(page);
@@ -192,6 +196,7 @@ test.describe("Core Web Vitals — Anonymous Pages", () => {
       await setupClsObserver(page);
       await page.goto("/login");
       await page.waitForLoadState("load");
+      // INTENTIONAL: CLS measurement settle window — allow layout shifts to complete before reading metric
       await page.waitForTimeout(3000);
 
       const cls = await readCls(page);
@@ -246,6 +251,7 @@ test.describe("Core Web Vitals — Anonymous Pages", () => {
 
       await page.goto(`/listings/${listingId}`);
       await page.waitForLoadState("load");
+      // INTENTIONAL: CLS measurement settle window — allow layout shifts to complete before reading metric
       await page.waitForTimeout(3000);
 
       const cls = await readCls(page);

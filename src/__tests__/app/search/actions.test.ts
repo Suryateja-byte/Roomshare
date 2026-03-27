@@ -58,6 +58,7 @@ describe("fetchMoreListings", () => {
 
   it("wraps executeSearchV2 with withTimeout using DATABASE timeout", async () => {
     const v2Data = {
+      response: { list: { nextCursor: "cursor-2" } },
       paginatedResult: {
         items: [{ id: "1" }],
         nextCursor: "cursor-2",
@@ -97,15 +98,17 @@ describe("fetchMoreListings", () => {
 
     const result = await fetchMoreListings("cursor-1", { q: "test" });
 
-    // Falls back to V1 empty result (cursor pagination not supported in V1)
+    // Falls back to V1 empty result with degraded signal (cursor pagination not supported in V1)
     expect(result).toEqual({
       items: [],
       nextCursor: null,
       hasNextPage: false,
+      degraded: true,
     });
 
-    // Warning was logged for V2 failure
+    // Warning was logged for V2 failure (via logger.sync.warn: "[timestamp] [WARN]", message, metadata)
     expect(warnSpy).toHaveBeenCalledWith(
+      expect.stringContaining("[WARN]"),
       expect.stringContaining("[fetchMoreListings] V2 failed"),
       expect.objectContaining({ error: expect.stringContaining("timed out") })
     );
@@ -115,6 +118,7 @@ describe("fetchMoreListings", () => {
 
   it("returns V2 result when it succeeds within timeout", async () => {
     const v2Data = {
+      response: { list: { nextCursor: "next" } },
       paginatedResult: {
         items: [{ id: "a" }, { id: "b" }],
         nextCursor: "next",

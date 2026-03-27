@@ -49,6 +49,9 @@ jest.mock("@/lib/schemas", () => ({
   createListingSchema: {
     safeParse: jest.fn(() => ({ success: true, data: {} })),
   },
+  createListingClientSchema: {
+    safeParse: jest.fn(() => ({ success: true, data: {} })),
+  },
 }));
 
 jest.mock("@/hooks/useNavigationGuard", () => ({

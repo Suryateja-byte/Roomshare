@@ -35,7 +35,7 @@ test.describe("Mobile Messages", () => {
     const backButton = page.locator('[data-testid="back-button"]').first();
     if (await backButton.isVisible({ timeout: 5000 }).catch(() => false)) {
       await backButton.click();
-      await page.waitForTimeout(300);
+      await page.locator('[data-testid="conversation-item"]').first().waitFor({ state: 'visible', timeout: 5000 }).catch(() => {});
     }
 
     // On mobile, the sidebar takes full width (w-full md:w-[400px])
@@ -146,7 +146,6 @@ test.describe("Mobile Messages", () => {
 
     if (await backButton.isVisible({ timeout: 10000 }).catch(() => false)) {
       await backButton.click();
-      await page.waitForTimeout(500);
 
       // After clicking back, the conversation list should be visible again
       // The sidebar becomes visible (no activeId)
@@ -239,7 +238,7 @@ test.describe("Mobile Messages", () => {
       .first();
     if (await backButton.isVisible({ timeout: 5000 }).catch(() => false)) {
       await backButton.click();
-      await page.waitForTimeout(500);
+      await page.locator('[data-testid="conversation-item"]').first().or(page.getByText(/no conversations/i)).first().waitFor({ state: 'visible', timeout: 5000 }).catch(() => {});
     }
 
     // The conversation list is wrapped in a flex-1 overflow-y-auto container
@@ -277,7 +276,7 @@ test.describe("Mobile Messages", () => {
       .first();
     if (await backButton.isVisible({ timeout: 5000 }).catch(() => false)) {
       await backButton.click();
-      await page.waitForTimeout(500);
+      await page.locator('[data-testid="conversation-item"]').first().or(page.getByText(/no conversations/i)).first().waitFor({ state: 'visible', timeout: 5000 }).catch(() => {});
     }
 
     // The unread badge is a red-500 rounded-full span inside conversation items

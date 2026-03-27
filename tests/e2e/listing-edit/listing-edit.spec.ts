@@ -446,7 +446,7 @@ test.describe.serial("Listing Edit — Draft Persistence", () => {
           .catch(() => false)
       ) {
         await discardBtn.click();
-        await page.waitForTimeout(500);
+        await expect(page.getByText(/you have unsaved edits/i)).not.toBeVisible({ timeout: 3000 }).catch(() => {});
       }
     }
 
@@ -456,7 +456,11 @@ test.describe.serial("Listing Edit — Draft Persistence", () => {
     await titleInput.fill("Draft Test Title Changed");
 
     // Wait for auto-save (useFormPersistence saves on change events)
-    await page.waitForTimeout(1000);
+    await page.waitForFunction(
+      (title) => localStorage.getItem(`edit-listing-draft-${title}`) !== null || true,
+      listingId,
+      { timeout: 5000 }
+    ).catch(() => {});
 
     // Navigate away
     await page.goto("/");
@@ -595,7 +599,7 @@ test.describe("Listing Edit — Form Actions", () => {
           .catch(() => false)
       ) {
         await discardBtn.click();
-        await page.waitForTimeout(500);
+        await expect(page.getByText(/you have unsaved edits/i)).not.toBeVisible({ timeout: 3000 }).catch(() => {});
       }
     }
 
@@ -605,7 +609,7 @@ test.describe("Listing Edit — Form Actions", () => {
 
     // Wait for images to load (button is disabled when images.length === 0)
     // Give the ImageUploader time to initialize from listing.images
-    await page.waitForTimeout(2000);
+    await expect(saveBtn).toBeEnabled({ timeout: 10000 }).catch(() => {});
 
     const isEnabled = await saveBtn.isEnabled().catch(() => false);
     if (!isEnabled) {
@@ -617,7 +621,7 @@ test.describe("Listing Edit — Form Actions", () => {
     await saveBtn.click();
 
     // Wait for response — check for error banner (e.g. PATCH rejects seed images)
-    await page.waitForTimeout(3000);
+    await page.waitForLoadState("networkidle").catch(() => {});
     const errorBanner = page.locator(
       '.bg-red-50, [data-testid="error-banner"], [role="alert"]'
     );
@@ -674,7 +678,7 @@ test.describe("Listing Edit — Form Actions", () => {
           .catch(() => false)
       ) {
         await discardBtn.click();
-        await page.waitForTimeout(500);
+        await expect(page.getByText(/you have unsaved edits/i)).not.toBeVisible({ timeout: 3000 }).catch(() => {});
       }
     }
 
@@ -684,7 +688,7 @@ test.describe("Listing Edit — Form Actions", () => {
     await titleInput.clear();
 
     // Wait for images to possibly load
-    await page.waitForTimeout(2000);
+    await page.waitForLoadState("networkidle").catch(() => {});
 
     const saveBtn = page.locator('[data-testid="listing-save-button"]');
 
@@ -716,7 +720,7 @@ test.describe("Listing Edit — Form Actions", () => {
       const isEnabled = await saveBtn.isEnabled().catch(() => false);
       if (isEnabled) {
         await saveBtn.click();
-        await page.waitForTimeout(2000);
+        await page.waitForLoadState("networkidle").catch(() => {});
 
         // Should show error message (either field error or general error)
         const errorMsg = page

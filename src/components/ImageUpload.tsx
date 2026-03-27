@@ -140,8 +140,8 @@ export default function ImageUpload({
         <div
           className={`relative border-2 border-dashed rounded-xl p-6 text-center transition-colors ${
             dragActive
-              ? "border-zinc-900 bg-zinc-50"
-              : "border-zinc-200 hover:border-zinc-300"
+              ? "border-outline-variant/20 bg-surface-canvas"
+              : "border-outline-variant/20 hover:border-outline-variant/30"
           }`}
           onDragEnter={handleDrag}
           onDragLeave={handleDrag}
@@ -161,20 +161,20 @@ export default function ImageUpload({
 
           {isUploading ? (
             <div className="flex flex-col items-center gap-2">
-              <Loader2 className="w-8 h-8 text-zinc-400 animate-spin" />
-              <p className="text-sm text-zinc-500">Uploading...</p>
+              <Loader2 className="w-8 h-8 text-on-surface-variant animate-spin" />
+              <p className="text-sm text-on-surface-variant">Uploading...</p>
             </div>
           ) : (
             <>
               <div className="flex flex-col items-center gap-2">
-                <div className="w-12 h-12 bg-zinc-100 rounded-full flex items-center justify-center">
-                  <Upload className="w-6 h-6 text-zinc-400" />
+                <div className="w-12 h-12 bg-surface-container-high rounded-full flex items-center justify-center">
+                  <Upload className="w-6 h-6 text-on-surface-variant" />
                 </div>
                 <div>
-                  <p className="text-sm font-medium text-zinc-700">
+                  <p className="text-sm font-medium text-on-surface-variant">
                     Drag & drop {multiple ? "images" : "an image"} here
                   </p>
-                  <p className="text-xs text-zinc-500 mt-1">
+                  <p className="text-xs text-on-surface-variant mt-1">
                     or click to browse
                   </p>
                 </div>
@@ -188,7 +188,7 @@ export default function ImageUpload({
                   Select {multiple ? "Images" : "Image"}
                 </Button>
               </div>
-              <p className="text-xs text-zinc-400 mt-3">
+              <p className="text-xs text-on-surface-variant mt-3">
                 JPEG, PNG, WebP, GIF up to 5MB
                 {multiple && ` (max ${maxFiles} images)`}
               </p>
@@ -202,7 +202,7 @@ export default function ImageUpload({
         <p
           id="image-upload-error"
           role="alert"
-          className="text-sm text-red-500 mt-2"
+          className="text-sm text-red-500 mt-2 animate-error-in"
         >
           {error}
         </p>
@@ -216,7 +216,7 @@ export default function ImageUpload({
           {images.map((url, index) => (
             <div
               key={url}
-              className="relative group aspect-square rounded-xl overflow-hidden border border-zinc-200"
+              className="relative group aspect-square rounded-xl overflow-hidden border border-outline-variant/20"
             >
               {/* eslint-disable-next-line @next/next/no-img-element -- blob/object URL preview not compatible with next/image */}
               <img
@@ -224,18 +224,18 @@ export default function ImageUpload({
                 alt={`Upload ${index + 1}`}
                 className="w-full h-full object-cover"
               />
-              <div className="absolute inset-0 bg-black/50 opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center">
+              <div className="absolute inset-0 bg-on-surface/50 opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center">
                 <button
                   type="button"
                   onClick={() => handleRemove(url)}
-                  className="p-2 min-w-[44px] min-h-[44px] flex items-center justify-center bg-white rounded-full shadow-lg hover:bg-red-50 transition-colors"
+                  className="p-2 min-w-[44px] min-h-[44px] flex items-center justify-center bg-surface-container-lowest rounded-full shadow-lg hover:bg-red-50 transition-colors"
                   aria-label="Remove image"
                 >
                   <X className="w-4 h-4 text-red-500" />
                 </button>
               </div>
               {multiple && index === 0 && (
-                <span className="absolute top-2 left-2 px-2 py-1 bg-zinc-900 text-white text-xs font-medium rounded-md">
+                <span className="absolute top-2 left-2 px-2 py-1 bg-on-surface text-white text-xs font-medium rounded-md">
                   Main
                 </span>
               )}
@@ -246,7 +246,7 @@ export default function ImageUpload({
 
       {/* Image Count */}
       {multiple && images.length > 0 && (
-        <p className="text-xs text-zinc-500 mt-2">
+        <p className="text-xs text-on-surface-variant mt-2">
           {images.length} of {maxFiles} images
         </p>
       )}

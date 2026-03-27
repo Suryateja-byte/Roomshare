@@ -64,6 +64,7 @@ test.describe("Listing Card Carousel", () => {
     // Hover over the carousel to reveal controls
     await carouselRegion.hover();
     // CSS transition may take longer in CI headless mode
+    // INTENTIONAL: CSS group-hover transition needs time to complete in headless mode
     await page.waitForTimeout(timeouts.animation + 300);
 
     // After hover the button should be visible (opacity-100, pointer-events-auto)
@@ -209,6 +210,7 @@ test.describe("Listing Card Carousel", () => {
 
     // Hover to show controls
     await carouselRegion.hover();
+    // INTENTIONAL: CSS group-hover transition needs time to complete in headless mode
     await page.waitForTimeout(timeouts.animation + 300);
 
     // After hover, both buttons should be visible (opacity-100)
@@ -225,6 +227,7 @@ test.describe("Listing Card Carousel", () => {
 
     // Keep hovering to ensure controls stay visible
     await carouselRegion.hover();
+    // INTENTIONAL: CSS group-hover transition needs time to complete in headless mode
     await page.waitForTimeout(timeouts.animation + 300);
 
     // Previous button should still be visible after navigation
