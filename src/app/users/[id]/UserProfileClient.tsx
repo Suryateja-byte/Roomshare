@@ -200,7 +200,7 @@ export default function UserProfileClient({
     setIsContactLoading(true);
     try {
       const result = await startConversation(user.listings[0].id);
-      if (result.conversationId) {
+      if ("conversationId" in result && result.conversationId) {
         router.push(`/messages/${result.conversationId}`);
       }
     } catch (error) {
