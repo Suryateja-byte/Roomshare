@@ -230,7 +230,7 @@ test.describe("Mobile Bottom Sheet - Drag Handle (7.2)", () => {
 
     const sheet = page.locator(selectors.bottomSheet);
     if (!(await sheet.isVisible({ timeout: 5000 }).catch(() => false))) {
-      test.skip();
+      test.skip(true, "Bottom sheet not visible");
       return;
     }
 
@@ -291,7 +291,7 @@ test.describe("Mobile Bottom Sheet - Expanded Drag Down (7.3)", () => {
 
     const sheet = page.locator(selectors.bottomSheet);
     if (!(await sheet.isVisible({ timeout: 5000 }).catch(() => false))) {
-      test.skip();
+      test.skip(true, "Bottom sheet not visible");
       return;
     }
 
@@ -328,7 +328,7 @@ test.describe("Mobile Bottom Sheet - Expanded Drag Down (7.3)", () => {
 
     const sheet = page.locator(selectors.bottomSheet);
     if (!(await sheet.isVisible({ timeout: 5000 }).catch(() => false))) {
-      test.skip();
+      test.skip(true, "Bottom sheet not visible");
       return;
     }
 
@@ -375,7 +375,7 @@ test.describe("Mobile Bottom Sheet - Map Touch Events (7.4)", () => {
 
     const sheet = page.locator(selectors.bottomSheet);
     if (!(await sheet.isVisible({ timeout: 5000 }).catch(() => false))) {
-      test.skip();
+      test.skip(true, "Bottom sheet not visible");
       return;
     }
 
@@ -422,7 +422,7 @@ test.describe("Mobile Bottom Sheet - Map Touch Events (7.4)", () => {
 
     const sheet = page.locator(selectors.bottomSheet);
     if (!(await sheet.isVisible({ timeout: 5000 }).catch(() => false))) {
-      test.skip();
+      test.skip(true, "Bottom sheet not visible");
       return;
     }
 
@@ -466,7 +466,7 @@ test.describe("Mobile Bottom Sheet - Escape Key (7.5)", () => {
 
     const sheet = page.locator(selectors.bottomSheet);
     if (!(await sheet.isVisible({ timeout: 5000 }).catch(() => false))) {
-      test.skip();
+      test.skip(true, "Bottom sheet not visible");
       return;
     }
 
@@ -505,7 +505,7 @@ test.describe("Mobile Bottom Sheet - Escape Key (7.5)", () => {
 
     const sheet = page.locator(selectors.bottomSheet);
     if (!(await sheet.isVisible({ timeout: 5000 }).catch(() => false))) {
-      test.skip();
+      test.skip(true, "Bottom sheet not visible");
       return;
     }
 
@@ -549,7 +549,7 @@ test.describe("Mobile Bottom Sheet - State Preservation (7.6)", () => {
     try {
       await expect(sheet).toBeVisible({ timeout: 5000 });
     } catch {
-      test.skip();
+      test.skip(true, "Bottom sheet not visible");
       return;
     }
 
@@ -617,7 +617,7 @@ test.describe("Mobile Bottom Sheet - Flick Velocity (7.7)", () => {
 
     const sheet = page.locator(selectors.bottomSheet);
     if (!(await sheet.isVisible({ timeout: 5000 }).catch(() => false))) {
-      test.skip();
+      test.skip(true, "Bottom sheet not visible");
       return;
     }
 
@@ -642,7 +642,7 @@ test.describe("Mobile Bottom Sheet - Flick Velocity (7.7)", () => {
 
     const sheet = page.locator(selectors.bottomSheet);
     if (!(await sheet.isVisible({ timeout: 5000 }).catch(() => false))) {
-      test.skip();
+      test.skip(true, "Bottom sheet not visible");
       return;
     }
 
@@ -667,7 +667,7 @@ test.describe("Mobile Bottom Sheet - Flick Velocity (7.7)", () => {
 
     const sheet = page.locator(selectors.bottomSheet);
     if (!(await sheet.isVisible({ timeout: 5000 }).catch(() => false))) {
-      test.skip();
+      test.skip(true, "Bottom sheet not visible");
       return;
     }
 
@@ -692,7 +692,7 @@ test.describe("Mobile Bottom Sheet - Pull to Refresh (7.8)", () => {
 
     const sheet = page.locator(selectors.bottomSheet);
     if (!(await sheet.isVisible({ timeout: 5000 }).catch(() => false))) {
-      test.skip();
+      test.skip(true, "Bottom sheet not visible");
       return;
     }
 
@@ -748,7 +748,7 @@ test.describe("Mobile Bottom Sheet - Keyboard Navigation (7.9)", () => {
 
     const handle = page.locator(selectors.bottomSheetHandle);
     if (!(await handle.isVisible({ timeout: 5000 }).catch(() => false))) {
-      test.skip();
+      test.skip(true, "Sheet handle not visible");
       return;
     }
 
@@ -779,7 +779,7 @@ test.describe("Mobile Bottom Sheet - Keyboard Navigation (7.9)", () => {
 
     const handle = page.locator(selectors.bottomSheetHandle);
     if (!(await handle.isVisible({ timeout: 5000 }).catch(() => false))) {
-      test.skip();
+      test.skip(true, "Sheet handle not visible");
       return;
     }
 
@@ -810,7 +810,7 @@ test.describe("Mobile Bottom Sheet - Keyboard Navigation (7.9)", () => {
 
     const handle = page.locator(selectors.bottomSheetHandle);
     if (!(await handle.isVisible({ timeout: 5000 }).catch(() => false))) {
-      test.skip();
+      test.skip(true, "Sheet handle not visible");
       return;
     }
 
@@ -841,7 +841,7 @@ test.describe("Mobile Bottom Sheet - Keyboard Navigation (7.9)", () => {
 
     const handle = page.locator(selectors.bottomSheetHandle);
     if (!(await handle.isVisible({ timeout: 5000 }).catch(() => false))) {
-      test.skip();
+      test.skip(true, "Sheet handle not visible");
       return;
     }
 
@@ -867,7 +867,7 @@ test.describe("Mobile Bottom Sheet - Keyboard Navigation (7.9)", () => {
 
     const handle = page.locator(selectors.bottomSheetHandle);
     if (!(await handle.isVisible({ timeout: 5000 }).catch(() => false))) {
-      test.skip();
+      test.skip(true, "Sheet handle not visible");
       return;
     }
 
@@ -902,7 +902,7 @@ test.describe("Mobile Bottom Sheet - Body Scroll Lock", () => {
 
     const sheet = page.locator(selectors.bottomSheet);
     if (!(await sheet.isVisible({ timeout: 5000 }).catch(() => false))) {
-      test.skip();
+      test.skip(true, "Bottom sheet not visible");
       return;
     }
 

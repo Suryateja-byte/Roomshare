@@ -121,10 +121,9 @@ test.describe("Messaging Journeys", () => {
       await nav.goToMessages();
 
       // Check we weren't redirected to login
-      if (!(await nav.isOnAuthenticatedPage())) {
-        test.skip(true, "Auth session expired - redirected to login");
-        return;
-      }
+      const isAuthenticated = await nav.isOnAuthenticatedPage();
+      test.skip(!isAuthenticated, "Auth session expired - redirected to login");
+      if (!isAuthenticated) return;
 
       // Should load messages page
       await assert.pageLoaded();
@@ -173,10 +172,9 @@ test.describe("Messaging Journeys", () => {
       await nav.goToMessages();
 
       // Check we weren't redirected to login
-      if (!(await nav.isOnAuthenticatedPage())) {
-        test.skip(true, "Auth session expired - redirected to login");
-        return;
-      }
+      const isAuthenticated = await nav.isOnAuthenticatedPage();
+      test.skip(!isAuthenticated, "Auth session expired - redirected to login");
+      if (!isAuthenticated) return;
 
       await page.waitForLoadState("domcontentloaded");
 
@@ -216,10 +214,9 @@ test.describe("Messaging Journeys", () => {
       await nav.goToMessages();
 
       // Check we weren't redirected to login
-      if (!(await nav.isOnAuthenticatedPage())) {
-        test.skip(true, "Auth session expired - redirected to login");
-        return;
-      }
+      const isAuthenticated = await nav.isOnAuthenticatedPage();
+      test.skip(!isAuthenticated, "Auth session expired - redirected to login");
+      if (!isAuthenticated) return;
 
       await page.waitForLoadState("domcontentloaded");
 
@@ -264,10 +261,9 @@ test.describe("Messaging Journeys", () => {
       await nav.goToMessages();
 
       // Check we weren't redirected to login
-      if (!(await nav.isOnAuthenticatedPage())) {
-        test.skip(true, "Auth session expired - redirected to login");
-        return;
-      }
+      const isAuthenticated = await nav.isOnAuthenticatedPage();
+      test.skip(!isAuthenticated, "Auth session expired - redirected to login");
+      if (!isAuthenticated) return;
 
       await page.waitForLoadState("domcontentloaded");
 
@@ -294,10 +290,9 @@ test.describe("Messaging Journeys", () => {
       await nav.goHome();
 
       // Check we weren't redirected to login
-      if (!(await nav.isOnAuthenticatedPage())) {
-        test.skip(true, "Auth session expired - redirected to login");
-        return;
-      }
+      const isAuthenticated = await nav.isOnAuthenticatedPage();
+      test.skip(!isAuthenticated, "Auth session expired - redirected to login");
+      if (!isAuthenticated) return;
 
       // Look for unread indicator on messages link/icon
       const messagesLink = page
@@ -317,10 +312,9 @@ test.describe("Messaging Journeys", () => {
       await nav.goToMessages();
 
       // Check we weren't redirected to login
-      if (!(await nav.isOnAuthenticatedPage())) {
-        test.skip(true, "Auth session expired - redirected to login");
-        return;
-      }
+      const isAuthenticated = await nav.isOnAuthenticatedPage();
+      test.skip(!isAuthenticated, "Auth session expired - redirected to login");
+      if (!isAuthenticated) return;
 
       await page.waitForLoadState("domcontentloaded");
 
@@ -358,10 +352,9 @@ test.describe("Messaging Journeys", () => {
       await nav.goToMessages();
 
       // Check we weren't redirected to login
-      if (!(await nav.isOnAuthenticatedPage())) {
-        test.skip(true, "Auth session expired - redirected to login");
-        return;
-      }
+      const isAuthenticated = await nav.isOnAuthenticatedPage();
+      test.skip(!isAuthenticated, "Auth session expired - redirected to login");
+      if (!isAuthenticated) return;
 
       await page.waitForLoadState("domcontentloaded");
 
@@ -412,10 +405,9 @@ test.describe("Messaging Journeys", () => {
       await nav.goToMessages();
 
       // Check we weren't redirected to login
-      if (!(await nav.isOnAuthenticatedPage())) {
-        test.skip(true, "Auth session expired - redirected to login");
-        return;
-      }
+      const isAuthenticated = await nav.isOnAuthenticatedPage();
+      test.skip(!isAuthenticated, "Auth session expired - redirected to login");
+      if (!isAuthenticated) return;
 
       await page.waitForLoadState("domcontentloaded");
 
@@ -456,10 +448,9 @@ test.describe("Messaging Journeys", () => {
       await nav.goToMessages();
 
       // Check we weren't redirected to login
-      if (!(await nav.isOnAuthenticatedPage())) {
-        test.skip(true, "Auth session expired - redirected to login");
-        return;
-      }
+      const isAuthenticated = await nav.isOnAuthenticatedPage();
+      test.skip(!isAuthenticated, "Auth session expired - redirected to login");
+      if (!isAuthenticated) return;
 
       await page.waitForLoadState("domcontentloaded");
 

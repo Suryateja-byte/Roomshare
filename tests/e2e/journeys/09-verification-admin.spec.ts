@@ -24,14 +24,9 @@ test.describe("Verification Journeys", () => {
 
       // Check we weren't redirected to login (auth session expired in CI)
       const currentUrl = page.url();
-      if (
-        currentUrl.includes("/login") ||
-        currentUrl.includes("/signup") ||
-        currentUrl.includes("/signin")
-      ) {
-        test.skip(true, "Auth redirect — session not available in CI");
-        return;
-      }
+      const onAuthPage = currentUrl.includes("/login") || currentUrl.includes("/signup") || currentUrl.includes("/signin");
+      test.skip(onAuthPage, "Auth redirect — session not available in CI");
+      if (onAuthPage) return;
 
       // Should show verification options
       await expect(
@@ -67,14 +62,9 @@ test.describe("Verification Journeys", () => {
 
       // Check we weren't redirected to login (auth session expired in CI)
       const currentUrl = page.url();
-      if (
-        currentUrl.includes("/login") ||
-        currentUrl.includes("/signup") ||
-        currentUrl.includes("/signin")
-      ) {
-        test.skip(true, "Auth redirect — session not available in CI");
-        return;
-      }
+      const onAuthPage = currentUrl.includes("/login") || currentUrl.includes("/signup") || currentUrl.includes("/signin");
+      test.skip(onAuthPage, "Auth redirect — session not available in CI");
+      if (onAuthPage) return;
 
       const startButton = page.getByRole("button", {
         name: /start|begin|get verified/i,
@@ -109,14 +99,9 @@ test.describe("Verification Journeys", () => {
 
       // Check we weren't redirected to login (auth session expired in CI)
       const currentUrl = page.url();
-      if (
-        currentUrl.includes("/login") ||
-        currentUrl.includes("/signup") ||
-        currentUrl.includes("/signin")
-      ) {
-        test.skip(true, "Auth redirect — session not available in CI");
-        return;
-      }
+      const onAuthPage = currentUrl.includes("/login") || currentUrl.includes("/signup") || currentUrl.includes("/signin");
+      test.skip(onAuthPage, "Auth redirect — session not available in CI");
+      if (onAuthPage) return;
 
       // Should show current status
       const statusIndicator = page
@@ -148,14 +133,9 @@ test.describe("Verification Journeys", () => {
 
       // Check we weren't redirected to login (auth session expired in CI)
       const verifyUrl = page.url();
-      if (
-        verifyUrl.includes("/login") ||
-        verifyUrl.includes("/signup") ||
-        verifyUrl.includes("/signin")
-      ) {
-        test.skip(true, "Auth redirect — session not available in CI");
-        return;
-      }
+      const onAuthPage = verifyUrl.includes("/login") || verifyUrl.includes("/signup") || verifyUrl.includes("/signin");
+      test.skip(onAuthPage, "Auth redirect — session not available in CI");
+      if (onAuthPage) return;
 
       const cancelButton = page.getByRole("button", {
         name: /cancel.*verification/i,

@@ -37,14 +37,9 @@ test.describe("J25: Send Message in Conversation", () => {
 
     // Check we weren't redirected to login or signup
     const messagesUrl = page.url();
-    if (
-      messagesUrl.includes("/login") ||
-      messagesUrl.includes("/signin") ||
-      messagesUrl.includes("/signup")
-    ) {
-      test.skip(true, "Auth redirect — session not available in CI");
-      return;
-    }
+    const onAuthPage = messagesUrl.includes("/login") || messagesUrl.includes("/signin") || messagesUrl.includes("/signup");
+    test.skip(onAuthPage, "Auth redirect — session not available in CI");
+    if (onAuthPage) return;
 
     await page.waitForLoadState("networkidle").catch(() => {});
 
@@ -192,10 +187,9 @@ test.describe("J27: Empty Messages Inbox", () => {
     await nav.goToMessages();
 
     // Check we weren't redirected to login
-    if (page.url().includes("/login") || page.url().includes("/signin")) {
-      test.skip(true, "Auth session expired - redirected to login");
-      return;
-    }
+    const onLoginPage = page.url().includes("/login") || page.url().includes("/signin");
+    test.skip(onLoginPage, "Auth session expired - redirected to login");
+    if (onLoginPage) return;
 
     await page.waitForLoadState("networkidle").catch(() => {});
 

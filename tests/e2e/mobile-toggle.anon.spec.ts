@@ -277,7 +277,7 @@ test.describe("Mobile Floating Toggle — View Switching (8.2)", () => {
       await expect(bottomSheet).toBeVisible({ timeout: 5000 });
     } catch {
       // Bottom sheet not implemented or not visible on this viewport
-      test.skip();
+      test.skip(true, "Bottom sheet not visible");
       return;
     }
 

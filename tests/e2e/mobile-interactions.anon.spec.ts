@@ -55,7 +55,7 @@ test.describe("Mobile Bottom Sheet - Snap Transitions", () => {
     await page.goto(`/search?${boundsQS}`);
     const sheetReady = await waitForMobileSheet(page);
     if (!sheetReady) {
-      test.skip();
+      test.skip(true, "Mobile bottom sheet not ready");
       return;
     }
 
@@ -87,7 +87,7 @@ test.describe("Mobile Bottom Sheet - Snap Transitions", () => {
     await page.goto(`/search?${boundsQS}`);
     const sheetReady = await waitForMobileSheet(page);
     if (!sheetReady) {
-      test.skip();
+      test.skip(true, "Mobile bottom sheet not ready");
       return;
     }
 
@@ -123,7 +123,7 @@ test.describe("Mobile Bottom Sheet - Content", () => {
     await page.goto(`/search?${boundsQS}`);
     const sheetReady = await waitForMobileSheet(page);
     if (!sheetReady) {
-      test.skip();
+      test.skip(true, "Mobile bottom sheet not ready");
       return;
     }
 
@@ -169,7 +169,7 @@ test.describe("Mobile Bottom Sheet - Content", () => {
     await page.goto(`/search?${boundsQS}`);
     const sheetReady = await waitForMobileSheet(page);
     if (!sheetReady) {
-      test.skip();
+      test.skip(true, "Mobile bottom sheet not ready");
       return;
     }
 
@@ -212,7 +212,7 @@ test.describe("Mobile Bottom Sheet - Content", () => {
     await page.goto(`/search?${boundsQS}`);
     const sheetReady = await waitForMobileSheet(page);
     if (!sheetReady) {
-      test.skip();
+      test.skip(true, "Mobile bottom sheet not ready");
       return;
     }
 
@@ -240,7 +240,7 @@ test.describe("Mobile Bottom Sheet - Content", () => {
     await page.goto(`/search?${boundsQS}`);
     const sheetReady = await waitForMobileSheet(page);
     if (!sheetReady) {
-      test.skip();
+      test.skip(true, "Mobile bottom sheet not ready");
       return;
     }
 
@@ -271,7 +271,7 @@ test.describe("Mobile Map and Sheet", () => {
     await page.goto(`/search?${boundsQS}`);
     const sheetReady = await waitForMobileSheet(page);
     if (!sheetReady) {
-      test.skip();
+      test.skip(true, "Mobile bottom sheet not ready");
       return;
     }
 
@@ -307,7 +307,7 @@ test.describe("Mobile Map and Sheet", () => {
     await page.goto(`/search?${boundsQS}`);
     const sheetReady = await waitForMobileSheet(page);
     if (!sheetReady) {
-      test.skip();
+      test.skip(true, "Mobile bottom sheet not ready");
       return;
     }
 
@@ -342,7 +342,7 @@ test.describe("Mobile Map and Sheet", () => {
     await page.goto(`/search?${boundsQS}`);
     const sheetReady = await waitForMobileSheet(page);
     if (!sheetReady) {
-      test.skip();
+      test.skip(true, "Mobile bottom sheet not ready");
       return;
     }
 
@@ -394,7 +394,7 @@ test.describe("Mobile Sort Interaction", () => {
     await page.goto(`/search?${boundsQS}`);
     const sheetReady = await waitForMobileSheet(page);
     if (!sheetReady) {
-      test.skip();
+      test.skip(true, "Mobile bottom sheet not ready");
       return;
     }
 
@@ -439,7 +439,7 @@ test.describe("Mobile Sort Interaction", () => {
     await page.goto(`/search?${boundsQS}`);
     const sheetReady = await waitForMobileSheet(page);
     if (!sheetReady) {
-      test.skip();
+      test.skip(true, "Mobile bottom sheet not ready");
       return;
     }
 
@@ -493,7 +493,7 @@ test.describe("Mobile Filter Interaction", () => {
     await page.goto(`/search?${boundsQS}`);
     const sheetReady = await waitForMobileSheet(page);
     if (!sheetReady) {
-      test.skip();
+      test.skip(true, "Mobile bottom sheet not ready");
       return;
     }
 
@@ -538,7 +538,7 @@ test.describe("Mobile Filter Interaction", () => {
     await page.goto(`/search?${boundsQS}`);
     const sheetReady = await waitForMobileSheet(page);
     if (!sheetReady) {
-      test.skip();
+      test.skip(true, "Mobile bottom sheet not ready");
       return;
     }
 
@@ -615,7 +615,7 @@ test.describe("Mobile Edge Cases", () => {
     await page.goto(`/search?${boundsQS}`);
     const sheetReady = await waitForMobileSheet(page);
     if (!sheetReady) {
-      test.skip();
+      test.skip(true, "Mobile bottom sheet not ready");
       return;
     }
 
@@ -654,7 +654,7 @@ test.describe("Mobile Edge Cases", () => {
     await page.goto(`/search?${boundsQS}`);
     const sheetReady = await waitForMobileSheet(page);
     if (!sheetReady) {
-      test.skip();
+      test.skip(true, "Mobile bottom sheet not ready");
       return;
     }
 
@@ -680,7 +680,7 @@ test.describe("Mobile Edge Cases", () => {
     await page.goto(`/search?${boundsQS}`);
     const sheetReady = await waitForMobileSheet(page);
     if (!sheetReady) {
-      test.skip();
+      test.skip(true, "Mobile bottom sheet not ready");
       return;
     }
 
@@ -716,7 +716,7 @@ test.describe("Mobile Edge Cases", () => {
     await page.goto(`/search?${boundsQS}`);
     const sheetReady = await waitForMobileSheet(page);
     if (!sheetReady) {
-      test.skip();
+      test.skip(true, "Mobile bottom sheet not ready");
       return;
     }
 
@@ -851,7 +851,7 @@ test.describe("Mobile Bottom Sheet - Overlay", () => {
     await page.goto(`/search?${boundsQS}`);
     const sheetReady = await waitForMobileSheet(page);
     if (!sheetReady) {
-      test.skip();
+      test.skip(true, "Mobile bottom sheet not ready");
       return;
     }
 
@@ -903,7 +903,7 @@ test.describe("Mobile Bottom Sheet - Content Overflow Control", () => {
     await page.goto(`/search?${boundsQS}`);
     const sheetReady = await waitForMobileSheet(page);
     if (!sheetReady) {
-      test.skip();
+      test.skip(true, "Mobile bottom sheet not ready");
       return;
     }
 
@@ -932,7 +932,7 @@ test.describe("Mobile Bottom Sheet - Content Overflow Control", () => {
     await page.goto(`/search?${boundsQS}`);
     const sheetReady = await waitForMobileSheet(page);
     if (!sheetReady) {
-      test.skip();
+      test.skip(true, "Mobile bottom sheet not ready");
       return;
     }
 

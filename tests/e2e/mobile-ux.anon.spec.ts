@@ -107,7 +107,7 @@ test.describe("Mobile UX — Bottom Sheet (4.1)", () => {
 
     const sheet = page.locator('[role="region"][aria-label="Search results"]');
     if (!(await sheet.isVisible({ timeout: 5000 }).catch(() => false))) {
-      test.skip();
+      test.skip(true, "Bottom sheet not visible");
       return;
     }
 
@@ -142,7 +142,7 @@ test.describe("Mobile UX — Bottom Sheet (4.1)", () => {
       }
     } else {
       // Expand button not available at current snap position, skip gracefully
-      test.skip();
+      test.skip(true, "Expand button not available");
       return;
     }
   });
@@ -155,7 +155,7 @@ test.describe("Mobile UX — Bottom Sheet (4.1)", () => {
 
     const sheet = page.locator('[role="region"][aria-label="Search results"]');
     if (!(await sheet.isVisible({ timeout: 5000 }).catch(() => false))) {
-      test.skip();
+      test.skip(true, "Bottom sheet not visible");
       return;
     }
 

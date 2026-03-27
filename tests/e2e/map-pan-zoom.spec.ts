@@ -95,10 +95,7 @@ test.describe("2.1: Pan map with mouse drag", () => {
     }
 
     const mapBox = await getMapBoundingBox(page);
-    if (!mapBox) {
-      test.skip(true, "Could not get map bounding box");
-      return;
-    }
+    test.skip(!mapBox, "Could not get map bounding box");
 
     // Record initial URL bounds
     const initialBounds = getUrlBounds(page.url());
@@ -155,10 +152,7 @@ test.describe("2.1: Pan map with mouse drag", () => {
       .filter({ hasText: /Search as I move/i });
     const toggleExists = (await searchToggle.count()) > 0;
 
-    if (!toggleExists) {
-      test.skip(true, "Search as I move toggle not found");
-      return;
-    }
+    test.skip(!toggleExists, "Search as I move toggle not found");
 
     // Check if toggle is ON (aria-checked="true")
     const isOn = (await searchToggle.getAttribute("aria-checked")) === "true";
@@ -172,10 +166,7 @@ test.describe("2.1: Pan map with mouse drag", () => {
     }
 
     const mapBox = await getMapBoundingBox(page);
-    if (!mapBox) {
-      test.skip(true, "Could not get map bounding box");
-      return;
-    }
+    test.skip(!mapBox, "Could not get map bounding box");
 
     // Perform mouse drag
     const centerX = mapBox.x + mapBox.width / 2;
@@ -221,10 +212,7 @@ test.describe("2.2: Zoom with scroll wheel", () => {
     }
 
     const mapBox = await getMapBoundingBox(page);
-    if (!mapBox) {
-      test.skip(true, "Could not get map bounding box");
-      return;
-    }
+    test.skip(!mapBox, "Could not get map bounding box");
 
     // Record initial URL bounds
     const initialBounds = getUrlBounds(page.url());
@@ -262,10 +250,7 @@ test.describe("2.2: Zoom with scroll wheel", () => {
     }
 
     const mapBox = await getMapBoundingBox(page);
-    if (!mapBox) {
-      test.skip(true, "Could not get map bounding box");
-      return;
-    }
+    test.skip(!mapBox, "Could not get map bounding box");
 
     // Move mouse to map center
     const centerX = mapBox.x + mapBox.width / 2;
@@ -296,10 +281,7 @@ test.describe("2.2: Zoom with scroll wheel", () => {
     }
 
     const mapBox = await getMapBoundingBox(page);
-    if (!mapBox) {
-      test.skip(true, "Could not get map bounding box");
-      return;
-    }
+    test.skip(!mapBox, "Could not get map bounding box");
 
     // Count initial markers
     const initialMarkerCount = await page.locator(selectors.mapMarker).count();
@@ -359,10 +341,7 @@ test.describe("2.3: Zoom with touch pinch on mobile", () => {
     }
 
     const mapBox = await getMapBoundingBox(page);
-    if (!mapBox) {
-      test.skip(true, "Could not get map bounding box");
-      return;
-    }
+    test.skip(!mapBox, "Could not get map bounding box");
 
     // Verify map is visible and touch-enabled
     const mapContainer = page.locator(selectors.map).first();
@@ -393,10 +372,7 @@ test.describe("2.3: Zoom with touch pinch on mobile", () => {
     }
 
     const mapBox = await getMapBoundingBox(page);
-    if (!mapBox) {
-      test.skip(true, "Could not get map bounding box");
-      return;
-    }
+    test.skip(!mapBox, "Could not get map bounding box");
 
     // Note: Playwright's touchscreen API has limited multi-touch support.
     // True pinch gestures require CDP-level touch events.
@@ -434,10 +410,7 @@ test.describe("2.4: Double-click to zoom in", () => {
     }
 
     const mapBox = await getMapBoundingBox(page);
-    if (!mapBox) {
-      test.skip(true, "Could not get map bounding box");
-      return;
-    }
+    test.skip(!mapBox, "Could not get map bounding box");
 
     // Record initial URL bounds
     const initialBounds = getUrlBounds(page.url());
@@ -482,10 +455,7 @@ test.describe("2.4: Double-click to zoom in", () => {
     }
 
     const mapBox = await getMapBoundingBox(page);
-    if (!mapBox) {
-      test.skip(true, "Could not get map bounding box");
-      return;
-    }
+    test.skip(!mapBox, "Could not get map bounding box");
 
     // Double-click multiple times
     const centerX = mapBox.x + mapBox.width / 2;
@@ -570,10 +540,7 @@ test.describe("2.5: Map bounds update debounced (600ms)", () => {
     }
 
     const mapBox = await getMapBoundingBox(page);
-    if (!mapBox) {
-      test.skip(true, "Could not get map bounding box");
-      return;
-    }
+    test.skip(!mapBox, "Could not get map bounding box");
 
     // Clear previous API calls
     apiCalls.length = 0;
@@ -639,10 +606,7 @@ test.describe("2.5: Map bounds update debounced (600ms)", () => {
     }
 
     const mapBox = await getMapBoundingBox(page);
-    if (!mapBox) {
-      test.skip(true, "Could not get map bounding box");
-      return;
-    }
+    test.skip(!mapBox, "Could not get map bounding box");
 
     // Perform single pan
     const centerX = mapBox.x + mapBox.width / 2;
@@ -681,10 +645,7 @@ test.describe("2.5: Map bounds update debounced (600ms)", () => {
     }
 
     const mapBox = await getMapBoundingBox(page);
-    if (!mapBox) {
-      test.skip(true, "Could not get map bounding box");
-      return;
-    }
+    test.skip(!mapBox, "Could not get map bounding box");
 
     // Track URL changes
     const urlChanges: { time: number; url: string }[] = [];
@@ -739,10 +700,7 @@ test.describe("General: Map interaction stability", () => {
     }
 
     const mapBox = await getMapBoundingBox(page);
-    if (!mapBox) {
-      test.skip(true, "Could not get map bounding box");
-      return;
-    }
+    test.skip(!mapBox, "Could not get map bounding box");
 
     const centerX = mapBox.x + mapBox.width / 2;
     const centerY = mapBox.y + mapBox.height / 2;
