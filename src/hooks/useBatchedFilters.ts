@@ -277,8 +277,17 @@ export function useBatchedFilters(
       const isPostCommitSyncActive = Date.now() < forceSyncUntilRef.current;
 
       // Guard: when the drawer is open and user has dirty edits,
-      // don't overwrite with force-sync — preserve the user's in-progress changes
-      if (isPostCommitSyncActive && isDrawerOpen && hasUnsavedEdits) {
+      // don't overwrite with force-sync — preserve the user's in-progress changes.
+      // STABILIZATION FIX: Added !committedFiltersChanged so that back/forward
+      // navigation (which changes committed filters) always syncs pending to URL,
+      // even within the forceSyncUntil window. Without this, pressing Back within
+      // 10s of committing filters while the drawer is open shows stale values.
+      if (
+        isPostCommitSyncActive &&
+        isDrawerOpen &&
+        hasUnsavedEdits &&
+        !committedFiltersChanged
+      ) {
         return prevPending;
       }
 

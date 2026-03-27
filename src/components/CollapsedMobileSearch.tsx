@@ -15,6 +15,7 @@
 import { Search, SlidersHorizontal } from "lucide-react";
 import { useSearchParams } from "next/navigation";
 import { useMemo } from "react";
+import { urlToFilterChips } from "@/components/filters/filter-chip-utils";
 
 interface CollapsedMobileSearchProps {
   /** Callback when tapped to expand */
@@ -23,14 +24,6 @@ interface CollapsedMobileSearchProps {
   onOpenFilters?: () => void;
 }
 
-/** Count param values, splitting CSV entries (e.g. "Wifi,AC" → 2). */
-function countParamValues(searchParams: URLSearchParams, key: string): number {
-  return searchParams
-    .getAll(key)
-    .flatMap((v) => v.split(","))
-    .map((v) => v.trim())
-    .filter(Boolean).length;
-}
 
 export default function CollapsedMobileSearch({
   onExpand,
@@ -44,44 +37,18 @@ export default function CollapsedMobileSearch({
   const minPrice = searchParams.get("minPrice");
   const maxPrice = searchParams.get("maxPrice");
 
-  // Count active filters (excluding location and price which are shown separately)
+  // Count active filters using shared chip logic with allowlist validation.
+  // Price chips are excluded because price is shown separately in the display text below.
+  // STABILIZATION FIX: Replaces ad-hoc counting that skipped allowlist validation and
+  // could inflate badge counts for garbage URL values (e.g. invalid amenity names).
   const activeFilterCount = useMemo(() => {
-    let count = 0;
-    if (searchParams.get("moveInDate")) count++;
-    if (
-      searchParams.get("leaseDuration") &&
-      searchParams.get("leaseDuration") !== "any"
-    )
-      count++;
-    if (searchParams.get("roomType") && searchParams.get("roomType") !== "any")
-      count++;
-    // Count gender preferences
-    if (
-      searchParams.get("genderPreference") &&
-      searchParams.get("genderPreference") !== "any"
-    )
-      count++;
-    if (
-      searchParams.get("householdGender") &&
-      searchParams.get("householdGender") !== "any"
-    )
-      count++;
-    // Count amenities (CSV-aware: useBatchedFilters serializes as "Wifi,AC")
-    count += countParamValues(searchParams, "amenities");
-    // Count house rules
-    count += countParamValues(searchParams, "houseRules");
-    // Count languages
-    count += countParamValues(searchParams, "languages");
-    // Count minSlots filter
-    const minSlots = searchParams.get("minSlots");
-    if (minSlots && parseInt(minSlots) >= 2) count++;
-    // Count nearMatches filter
-    if (
-      searchParams.get("nearMatches") === "1" ||
-      searchParams.get("nearMatches") === "true"
-    )
-      count++;
-    return count;
+    const chips = urlToFilterChips(searchParams);
+    return chips.filter(
+      (c) =>
+        c.paramKey !== "price-range" &&
+        c.paramKey !== "minPrice" &&
+        c.paramKey !== "maxPrice"
+    ).length;
   }, [searchParams]);
 
   // Format price range display

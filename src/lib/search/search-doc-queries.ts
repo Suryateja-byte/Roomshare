@@ -41,6 +41,7 @@ import {
   BOUNDS_EPSILON,
   DEFAULT_PAGE_SIZE,
   MAX_QUERY_LENGTH,
+  MAX_SAFE_PRICE,
 } from "@/lib/constants";
 import { features } from "@/lib/env";
 import { parseLocalDate } from "@/lib/utils";
@@ -1629,7 +1630,7 @@ export async function semanticSearchQuery(
         filterParams.bounds?.maxLat ?? null,
         filterParams.bounds?.maxLng ?? null,
         filterParams.minPrice ?? 0,
-        filterParams.maxPrice ?? 99999,
+        filterParams.maxPrice ?? MAX_SAFE_PRICE, // STABILIZATION FIX: was 99999, excluding listings >$99K from semantic search
         amenitiesLower,
         houseRulesLower,
         filterParams.roomType ?? null,
