@@ -140,8 +140,9 @@ test.describe("Profile Edit — Form Assertions", () => {
       timeout: timeouts.navigation,
     });
 
-    // Find the bio textarea (id="bio")
-    const bioTextarea = page.locator("#bio");
+    // Find the bio textarea scoped to the form (avoids SSR hydration duplicates)
+    const form = page.getByTestId("edit-profile-form").first();
+    const bioTextarea = form.locator("#bio");
     await expect(bioTextarea).toBeVisible({ timeout: timeouts.action });
 
     // Clear existing bio and type 501 characters
@@ -436,8 +437,9 @@ test.describe.serial("Profile Edit — Mutations", () => {
       timeout: timeouts.navigation,
     });
 
-    // Capture original bio before editing
-    const bioTextarea = page.locator("#bio");
+    // Capture original bio before editing (scoped to form to avoid SSR hydration duplicates)
+    const form = page.getByTestId("edit-profile-form").first();
+    const bioTextarea = form.locator("#bio");
     await expect(bioTextarea).toBeVisible({ timeout: timeouts.action });
     const originalBio = await bioTextarea.inputValue();
 
@@ -469,7 +471,8 @@ test.describe.serial("Profile Edit — Mutations", () => {
       timeout: timeouts.navigation,
     });
 
-    const bioTextareaRestore = page.locator("#bio");
+    const formRestore = page.getByTestId("edit-profile-form").first();
+    const bioTextareaRestore = formRestore.locator("#bio");
     await bioTextareaRestore.clear();
     await bioTextareaRestore.fill(originalBio);
 

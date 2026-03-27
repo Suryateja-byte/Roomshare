@@ -46,7 +46,7 @@ test.describe("VF: Page Structure", () => {
       page.getByRole("heading", { name: /ID Verification/i })
     ).toBeVisible({ timeout: timeouts.navigation });
     await expect(
-      page.getByText(/Build trust by verifying your identity/i)
+      page.getByText(/Build trust by verifying your identity/i).first()
     ).toBeVisible();
   });
 });
@@ -63,7 +63,7 @@ test.describe("VF: Verified State", () => {
     await expect(
       page.getByRole("heading", { name: /You're Verified/i })
     ).toBeVisible({ timeout: timeouts.navigation });
-    await expect(page.getByText(/View Your Profile/i)).toBeVisible();
+    await expect(page.getByText(/View Your Profile/i).first()).toBeVisible();
   });
 
   test("VF-04  profile link navigates to /profile", async ({ page }) => {
@@ -75,7 +75,7 @@ test.describe("VF: Verified State", () => {
       page.getByRole("heading", { name: /You're Verified/i })
     ).toBeVisible({ timeout: timeouts.navigation });
 
-    await page.getByText(/View Your Profile/i).click();
+    await page.getByText(/View Your Profile/i).first().click();
     await expect(page).toHaveURL(/\/profile/, { timeout: timeouts.navigation });
   });
 });

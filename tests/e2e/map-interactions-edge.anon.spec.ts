@@ -179,7 +179,10 @@ test.describe("Map Interactions Edge Cases (Stories 9-12)", () => {
     test(`${tags.anon} 9.2 - Loading placeholder shows while bundle loads (P2)`, async ({
       page,
       context,
+      browserName,
     }) => {
+      // CDP (Chrome DevTools Protocol) is Chromium-only — skip on Firefox/WebKit
+      test.skip(browserName !== "chromium", "CDP network throttling is Chromium-only");
       // This test is timing-sensitive and observes a transient loading state.
       // In fast CI environments the loading placeholder may never be visible.
       // Mark as slow to get 3x timeout.

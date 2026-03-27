@@ -62,7 +62,7 @@ test.describe("Mobile Profile", () => {
     await waitForHydration(page);
 
     // Wait for the edit form to appear
-    await expect(page.locator('[data-testid="edit-profile-form"]')).toBeVisible(
+    await expect(page.locator('[data-testid="edit-profile-form"]').first()).toBeVisible(
       { timeout: 15000 }
     );
 
@@ -78,7 +78,7 @@ test.describe("Mobile Profile", () => {
     await page.waitForLoadState("domcontentloaded");
     await waitForHydration(page);
 
-    await expect(page.locator('[data-testid="edit-profile-form"]')).toBeVisible(
+    await expect(page.locator('[data-testid="edit-profile-form"]').first()).toBeVisible(
       { timeout: 15000 }
     );
 
@@ -109,7 +109,7 @@ test.describe("Mobile Profile", () => {
     }
 
     const formVisible = await page
-      .locator('[data-testid="edit-profile-form"]')
+      .locator('[data-testid="edit-profile-form"]').first()
       .isVisible({ timeout: 15000 })
       .catch(() => false);
     test.skip(

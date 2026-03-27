@@ -85,7 +85,7 @@ test.describe("Settings — Read-only", () => {
       .catch(() => false);
     if (hasPasswordSection) {
       // Verify sub-elements of password section exist
-      await expect(page.locator("#currentPassword")).toBeVisible();
+      await expect(page.locator("#currentPassword").first()).toBeVisible();
     }
   });
 
