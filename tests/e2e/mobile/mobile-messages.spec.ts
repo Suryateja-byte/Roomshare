@@ -254,9 +254,9 @@ test.describe("Mobile Messages", () => {
 
   test("MM-08: Unread indicator visible on conversations", async ({ page }) => {
     // Skip if redirected to login (auth session unavailable in CI Mobile Chrome)
-    const onLoginPage_mm08 = page.url().includes("/login");
-    test.skip(onLoginPage_mm08, "Redirected to login — auth session unavailable");
-    if (onLoginPage_mm08) return;
+    const onLoginPage = page.url().includes("/login");
+    test.skip(onLoginPage, "Redirected to login — auth session unavailable");
+    if (onLoginPage) return;
     const messagesPage = page.locator('[data-testid="messages-page"]').first();
     const pageVisible = await messagesPage
       .waitFor({ state: "visible", timeout: 15000 })

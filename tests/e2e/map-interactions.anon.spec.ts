@@ -108,14 +108,12 @@ async function isMapFullyLoaded(page: Page): Promise<boolean> {
  * Returns true when the map IS ready (test should proceed).
  */
 async function guardMapReady(page: Page): Promise<boolean> {
-  if (!(await isMapAvailable(page))) {
-    test.skip(true, "Map canvas not visible (WebGL unavailable in headless)");
-    return false;
-  }
-  if (!(await isMapFullyLoaded(page))) {
-    test.skip(true, "Map not fully loaded (WebGL unavailable in headless)");
-    return false;
-  }
+  const mapAvailable = await isMapAvailable(page);
+  test.skip(!mapAvailable, "Map canvas not visible (WebGL unavailable in headless)");
+  if (!mapAvailable) return false;
+  const mapFullyLoaded = await isMapFullyLoaded(page);
+  test.skip(!mapFullyLoaded, "Map not fully loaded (WebGL unavailable in headless)");
+  if (!mapFullyLoaded) return false;
   return true;
 }
 
@@ -299,17 +297,11 @@ test.describe("1.x: Map + List Scroll Sync", () => {
 
     // Expand clusters so individual markers are visible
     const hasMarkers = await zoomToExpandClusters(page);
-    if (!hasMarkers) {
-      test.skip(true, "No individual markers after cluster expansion");
-      return;
-    }
+    test.skip(!hasMarkers, "No individual markers after cluster expansion");
 
     // Get the listing ID of the first visible marker
     const listingId = await getMarkerListingId(page, 0);
-    if (!listingId) {
-      test.skip(true, "Could not extract listing ID from first marker");
-      return;
-    }
+    test.skip(!listingId, "Could not extract listing ID from first marker");
 
     // Scroll the list panel to the very bottom so the target card is NOT in view
     await page.evaluate(() => {
@@ -336,10 +328,7 @@ test.describe("1.x: Map + List Scroll Sync", () => {
       return false;
     }, listingId);
 
-    if (!markerClicked) {
-      test.skip(true, "Marker element not found in DOM for click");
-      return;
-    }
+    test.skip(!markerClicked, "Marker element not found in DOM for click");
 
     // Poll for card to become active and scrolled into viewport.
     // In headless CI, the evaluate-based click may not always trigger the React handler.
@@ -389,16 +378,10 @@ test.describe("1.x: Map + List Scroll Sync", () => {
     if (!(await guardMapReady(page))) return;
 
     const hasMarkers = await zoomToExpandClusters(page);
-    if (!hasMarkers) {
-      test.skip(true, "No individual markers after cluster expansion");
-      return;
-    }
+    test.skip(!hasMarkers, "No individual markers after cluster expansion");
 
     const listingId = await getMarkerListingId(page, 0);
-    if (!listingId) {
-      test.skip(true, "Could not extract listing ID from first marker");
-      return;
-    }
+    test.skip(!listingId, "Could not extract listing ID from first marker");
 
     // Scroll list away from the target card
     await page.evaluate(() => {
@@ -452,16 +435,10 @@ test.describe("1.x: Map + List Scroll Sync", () => {
     if (!(await guardMapReady(page))) return;
 
     const hasMarkers = await zoomToExpandClusters(page);
-    if (!hasMarkers) {
-      test.skip(true, "No individual markers after cluster expansion");
-      return;
-    }
+    test.skip(!hasMarkers, "No individual markers after cluster expansion");
 
     const listingId = await getMarkerListingId(page, 0);
-    if (!listingId) {
-      test.skip(true, "Could not extract listing ID from first marker");
-      return;
-    }
+    test.skip(!listingId, "Could not extract listing ID from first marker");
 
     // Click marker to open popup and set activeId via evaluate
     await page.evaluate((id) => {
@@ -522,19 +499,13 @@ test.describe("2.x: Search as I Move -- Result Auto-Refresh", () => {
 
     // Pan the map significantly (30% of map width)
     const mapBox = await page.locator(sel.mapContainer).first().boundingBox();
-    if (!mapBox) {
-      test.skip(true, "Could not get map bounding box");
-      return;
-    }
+    test.skip(!mapBox, "Could not get map bounding box");
 
     const panDelta = Math.round(mapBox.width * 0.3);
     const panned =
       (await programmaticMapPan(page, panDelta, 0)) ||
       (await simulateMapPan(page, panDelta, 0));
-    if (!panned) {
-      test.skip(true, "Map pan did not succeed");
-      return;
-    }
+    test.skip(!panned, "Map pan did not succeed");
 
     // Poll for URL bounds to change after debounce fires
     // Allow extra time for Mobile Chrome and CI environments
@@ -668,10 +639,7 @@ test.describe("3.x: Search This Area -- Listing Verification", () => {
     const panned =
       (await programmaticMapPan(page, 150, 75)) ||
       (await simulateMapPan(page, 150, 75));
-    if (!panned) {
-      test.skip(true, "Map pan did not succeed");
-      return;
-    }
+    test.skip(!panned, "Map pan did not succeed");
 
     // Wait for banner to appear with count
     const searchAreaBtn = page.locator(sel.searchThisAreaBtn);
@@ -742,10 +710,7 @@ test.describe("3.x: Search This Area -- Listing Verification", () => {
     const panned =
       (await programmaticMapPan(page, 200, 100)) ||
       (await simulateMapPan(page, 200, 100));
-    if (!panned) {
-      test.skip(true, "Map pan did not succeed");
-      return;
-    }
+    test.skip(!panned, "Map pan did not succeed");
 
     // Wait for banner
     const resetBtn = page.locator(sel.resetMapBtn);

@@ -41,15 +41,8 @@ test.describe("Map Error Handling", () => {
   test.beforeEach(async ({}, testInfo) => {
     test.slow(); // Map tests need extra time for WebGL rendering in CI
     const projectName = testInfo.project.name;
-    if (projectName.includes("Mobile")) {
-      test.skip(
-        true,
-        "Map tests require desktop viewport - skipping on mobile"
-      );
-    }
-    if (projectName === "webkit") {
-      test.skip(true, "Map tests have timing issues on webkit - skipping");
-    }
+    test.skip(projectName.includes("Mobile"), "Map tests require desktop viewport - skipping on mobile");
+    test.skip(projectName === "webkit", "Map tests have timing issues on webkit - skipping");
   });
 
   // Helper to wait for map panel and a banner (error or info)

@@ -264,10 +264,7 @@ test.describe("1.3: Map persists across navigation", () => {
     await waitForSearchPage(page);
 
     const initialState = await getMapE2EState(page);
-    if (!initialState?.mapInitCount) {
-      test.skip(true, "E2E instrumentation not enabled");
-      return;
-    }
+    test.skip(!initialState?.mapInitCount, "E2E instrumentation not enabled");
 
     // Find and click a sort button if available
     const sortButton = page

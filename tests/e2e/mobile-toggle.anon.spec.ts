@@ -273,13 +273,9 @@ test.describe("Mobile Floating Toggle — View Switching (8.2)", () => {
     ).toBeAttached({ timeout: timeouts.navigation });
 
     const bottomSheet = page.locator(toggleSelectors.bottomSheet);
-    try {
-      await expect(bottomSheet).toBeVisible({ timeout: 5000 });
-    } catch {
-      // Bottom sheet not implemented or not visible on this viewport
-      test.skip(true, "Bottom sheet not visible");
-      return;
-    }
+    const sheetVisible = await bottomSheet.isVisible({ timeout: 5000 }).catch(() => false);
+    test.skip(!sheetVisible, "Bottom sheet not visible");
+    if (!sheetVisible) return;
 
     // Wait for header ResizeObserver + padding-top transition to settle
     // before taking baseline measurements

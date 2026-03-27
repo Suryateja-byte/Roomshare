@@ -19,9 +19,7 @@ test.use({
 });
 
 test.beforeEach(async ({}, testInfo) => {
-  if (testInfo.project.name.includes("webkit")) {
-    test.skip(true, "Radix UI hydration issues on webkit");
-  }
+  test.skip(testInfo.project.name.includes("webkit"), "Radix UI hydration issues on webkit");
   test.slow();
 });
 
@@ -106,10 +104,9 @@ test.describe("Mobile UX — Bottom Sheet (4.1)", () => {
     });
 
     const sheet = page.locator('[role="region"][aria-label="Search results"]');
-    if (!(await sheet.isVisible({ timeout: 5000 }).catch(() => false))) {
-      test.skip(true, "Bottom sheet not visible");
-      return;
-    }
+    const sheetVisible = await sheet.isVisible({ timeout: 5000 }).catch(() => false);
+    test.skip(!sheetVisible, "Bottom sheet not visible");
+    if (!sheetVisible) return;
 
     // Wait for sheet animation to fully settle before measuring
     await waitForSheetAnimation(page);
@@ -154,10 +151,9 @@ test.describe("Mobile UX — Bottom Sheet (4.1)", () => {
     });
 
     const sheet = page.locator('[role="region"][aria-label="Search results"]');
-    if (!(await sheet.isVisible({ timeout: 5000 }).catch(() => false))) {
-      test.skip(true, "Bottom sheet not visible");
-      return;
-    }
+    const sheetVisible = await sheet.isVisible({ timeout: 5000 }).catch(() => false);
+    test.skip(!sheetVisible, "Bottom sheet not visible");
+    if (!sheetVisible) return;
 
     const expandBtn = sheet.locator('button[aria-label="Expand results"]');
     if (await expandBtn.isVisible({ timeout: 3000 }).catch(() => false)) {

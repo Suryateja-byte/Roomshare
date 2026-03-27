@@ -218,10 +218,7 @@ test.describe("Filter URL-UI Desync", () => {
     // Check if category bar is visible
     const isVisible = await firstCategory.isVisible().catch(() => false);
 
-    if (!isVisible) {
-      test.skip(true, "Category bar not visible");
-      return;
-    }
+    test.skip(!isVisible, "Category bar not visible");
 
     // Rapid click the first category link 3 times
     await rapidClick(firstCategory, 3, 100);
