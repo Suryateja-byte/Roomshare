@@ -277,6 +277,7 @@ describe("SHARED mode: slotsRequested=3, totalSlots=5", () => {
               id: "listing-shared",
               ownerId: "owner-999",
               bookingMode: "SHARED",
+              status: "ACTIVE",
             },
           ])
           .mockResolvedValueOnce([{ total: BigInt(0) }]), // SUM ACCEPTED + active HELD
@@ -534,7 +535,7 @@ describe("HELD mode: slotsRequested=3, totalSlots=5", () => {
 
     (prisma.$transaction as jest.Mock).mockImplementation(async (callback) => {
       const tx = {
-        $queryRaw: jest.fn().mockResolvedValue([{ ownerId: "owner-999" }]), // FOR UPDATE
+        $queryRaw: jest.fn().mockResolvedValue([{ ownerId: "owner-999", status: "ACTIVE" }]), // FOR UPDATE
         $executeRaw: mockExecuteRaw,
         booking: {
           updateMany: jest.fn().mockResolvedValue({ count: 1 }),
@@ -614,7 +615,7 @@ describe("HELD mode: slotsRequested=3, totalSlots=5", () => {
 
     (prisma.$transaction as jest.Mock).mockImplementation(async (callback) => {
       const tx = {
-        $queryRaw: jest.fn().mockResolvedValue([{ ownerId: "owner-999" }]), // FOR UPDATE
+        $queryRaw: jest.fn().mockResolvedValue([{ ownerId: "owner-999", status: "ACTIVE" }]), // FOR UPDATE
         $executeRaw: mockExecuteRaw,
         booking: {
           updateMany: jest.fn().mockResolvedValue({ count: 1 }),
@@ -804,6 +805,7 @@ describe("WHOLE_UNIT mode: totalSlots=4", () => {
               id: "listing-wu",
               ownerId: "owner-999",
               bookingMode: "WHOLE_UNIT",
+              status: "ACTIVE",
             },
           ])
           .mockResolvedValueOnce([{ total: BigInt(0) }]),
@@ -1099,6 +1101,7 @@ describe("Mixed concurrent bookings: PENDING + HELD coexistence", () => {
               id: "listing-mix",
               ownerId: "owner-999",
               bookingMode: "SHARED",
+              status: "ACTIVE",
             },
           ])
           .mockResolvedValueOnce([{ total: BigInt(3) }]), // SUM: 3 slots from active HELD bookings
@@ -1151,6 +1154,7 @@ describe("Mixed concurrent bookings: PENDING + HELD coexistence", () => {
               id: "listing-mix",
               ownerId: "owner-999",
               bookingMode: "SHARED",
+              status: "ACTIVE",
             },
           ])
           .mockResolvedValueOnce([{ total: BigInt(0) }]), // expired HELD not included in SUM
@@ -1201,6 +1205,7 @@ describe("Mixed concurrent bookings: PENDING + HELD coexistence", () => {
               id: "listing-mix",
               ownerId: "owner-999",
               bookingMode: "SHARED",
+              status: "ACTIVE",
             },
           ])
           .mockResolvedValueOnce([{ total: BigInt(3) }]), // 3 slots from active HELD

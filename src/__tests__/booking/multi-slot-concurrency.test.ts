@@ -220,6 +220,7 @@ function makeAcceptTx(opts: {
       id: LISTING_ID,
       ownerId: OWNER_ID,
       bookingMode: "SHARED",
+      status: "ACTIVE",
     },
     usedSlots = BigInt(0),
     updateManyCount = 1,
@@ -522,6 +523,7 @@ describe("Hold + booking competing for last slots", () => {
           id: LISTING_ID,
           ownerId: OWNER_ID,
           bookingMode: "SHARED",
+          status: "ACTIVE",
         },
         // SUM(ACCEPTED + active HELD excl. current) = 3 (the hold)
         // 3 + 3 (this booking) = 6 > 5 → CAPACITY_EXCEEDED
@@ -559,6 +561,7 @@ describe("Hold + booking competing for last slots", () => {
           id: LISTING_ID,
           ownerId: OWNER_ID,
           bookingMode: "SHARED",
+          status: "ACTIVE",
         },
         // SUM(ACCEPTED + active HELD excl. current) = 3 (a hold for 3 slots)
         usedSlots: BigInt(3),
@@ -727,6 +730,7 @@ describe("Accept race for WHOLE_UNIT listing", () => {
           id: LISTING_ID,
           ownerId: OWNER_ID,
           bookingMode: "WHOLE_UNIT",
+          status: "ACTIVE",
         },
         usedSlots: BigInt(0), // no prior accepted bookings
       });
@@ -750,6 +754,7 @@ describe("Accept race for WHOLE_UNIT listing", () => {
           id: LISTING_ID,
           ownerId: OWNER_ID,
           bookingMode: "WHOLE_UNIT",
+          status: "ACTIVE",
         },
         usedSlots: BigInt(4), // booking A now accepted
       });
@@ -780,6 +785,7 @@ describe("Accept race for WHOLE_UNIT listing", () => {
           id: LISTING_ID,
           ownerId: OWNER_ID,
           bookingMode: "WHOLE_UNIT",
+          status: "ACTIVE",
         },
         // SUM shows 4 slots already committed (accepted booking A + active hold)
         usedSlots: BigInt(4),
@@ -810,6 +816,7 @@ describe("Accept race for WHOLE_UNIT listing", () => {
               id: LISTING_ID,
               ownerId: OWNER_ID,
               bookingMode: "WHOLE_UNIT",
+              status: "ACTIVE",
             },
           ])
           .mockResolvedValueOnce([{ total: BigInt(0) }]),
@@ -843,6 +850,7 @@ describe("Accept race for WHOLE_UNIT listing", () => {
               id: LISTING_ID,
               ownerId: OWNER_ID,
               bookingMode: "WHOLE_UNIT",
+              status: "ACTIVE",
             },
           ])
           .mockResolvedValueOnce([{ total: BigInt(0) }]),
@@ -982,7 +990,7 @@ describe("Expired hold does not block subsequent booking", () => {
 
     (prisma.$transaction as jest.Mock).mockImplementation(async (callback) => {
       const tx = {
-        $queryRaw: jest.fn().mockResolvedValueOnce([{ ownerId: OWNER_ID }]),
+        $queryRaw: jest.fn().mockResolvedValueOnce([{ ownerId: OWNER_ID, status: "ACTIVE" }]),
         $executeRaw: jest.fn(),
         booking: {
           // updateMany matches on status='HELD' AND version=1 — if sweeper already
@@ -1018,7 +1026,7 @@ describe("Expired hold does not block subsequent booking", () => {
 
     (prisma.$transaction as jest.Mock).mockImplementation(async (callback) => {
       const tx = {
-        $queryRaw: jest.fn().mockResolvedValueOnce([{ ownerId: OWNER_ID }]),
+        $queryRaw: jest.fn().mockResolvedValueOnce([{ ownerId: OWNER_ID, status: "ACTIVE" }]),
         $executeRaw: mockTxExecuteRaw,
         booking: {
           updateMany: jest.fn().mockResolvedValue({ count: 1 }),

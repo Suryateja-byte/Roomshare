@@ -278,6 +278,7 @@ describe("manage-booking actions", () => {
                     id: "listing-123",
                     ownerId: "owner-123",
                     bookingMode: "SHARED",
+                    status: "ACTIVE",
                   },
                 ])
                 .mockResolvedValueOnce([{ total: BigInt(0) }]),
@@ -309,6 +310,7 @@ describe("manage-booking actions", () => {
                     id: "listing-123",
                     ownerId: "owner-123",
                     bookingMode: "SHARED",
+                    status: "ACTIVE",
                   },
                 ])
                 .mockResolvedValueOnce([{ total: BigInt(0) }]),
@@ -368,6 +370,7 @@ describe("manage-booking actions", () => {
                 id: "listing-123",
                 ownerId: "owner-123",
                 bookingMode: "SHARED",
+                status: "ACTIVE",
               },
             ])
             .mockResolvedValueOnce([{ total: BigInt(0) }]),
@@ -397,6 +400,7 @@ describe("manage-booking actions", () => {
                   id: "listing-123",
                   ownerId: "owner-123",
                   bookingMode: "SHARED",
+                  status: "ACTIVE",
                 },
               ]),
             };
@@ -422,6 +426,7 @@ describe("manage-booking actions", () => {
                     id: "listing-123",
                     ownerId: "owner-123",
                     bookingMode: "SHARED",
+                    status: "ACTIVE",
                   },
                 ])
                 .mockResolvedValueOnce([{ total: BigInt(2) }]), // SUM=2 slots used = capacity exceeded
@@ -450,6 +455,7 @@ describe("manage-booking actions", () => {
                     id: "listing-123",
                     ownerId: "owner-123",
                     bookingMode: "SHARED",
+                    status: "ACTIVE",
                   },
                 ])
                 .mockResolvedValueOnce([{ total: BigInt(0) }]),
@@ -486,6 +492,7 @@ describe("manage-booking actions", () => {
                     id: "listing-123",
                     ownerId: "owner-123",
                     bookingMode: "SHARED",
+                    status: "ACTIVE",
                   },
                 ])
                 .mockResolvedValueOnce([{ total: BigInt(0) }]),
@@ -524,6 +531,7 @@ describe("manage-booking actions", () => {
                     id: "listing-123",
                     ownerId: "owner-123",
                     bookingMode: "SHARED",
+                    status: "ACTIVE",
                   },
                 ])
                 .mockResolvedValueOnce([{ total: BigInt(0) }]),
@@ -554,6 +562,7 @@ describe("manage-booking actions", () => {
                     id: "listing-123",
                     ownerId: "owner-123",
                     bookingMode: "SHARED",
+                    status: "ACTIVE",
                   },
                 ])
                 .mockResolvedValueOnce([{ total: BigInt(0) }]),
@@ -585,7 +594,7 @@ describe("manage-booking actions", () => {
             const tx = {
               $queryRaw: jest
                 .fn()
-                .mockResolvedValue([{ ownerId: "owner-123" }]),
+                .mockResolvedValue([{ ownerId: "owner-123", status: "ACTIVE" }]),
               booking: {
                 updateMany: mockTxUpdateMany,
               },
@@ -777,7 +786,7 @@ describe("manage-booking actions", () => {
             const tx = {
               $queryRaw: jest
                 .fn()
-                .mockResolvedValue([{ ownerId: "owner-123" }]),
+                .mockResolvedValue([{ ownerId: "owner-123", status: "ACTIVE" }]),
               booking: {
                 updateMany: jest.fn().mockResolvedValue({ count: 1 }),
               },
@@ -874,6 +883,7 @@ describe("manage-booking actions", () => {
                     id: "listing-123",
                     ownerId: "owner-123",
                     bookingMode: "SHARED",
+                    status: "ACTIVE",
                   },
                 ])
                 .mockResolvedValueOnce([{ total: BigInt(0) }]),
@@ -910,6 +920,7 @@ describe("manage-booking actions", () => {
                     id: "listing-123",
                     ownerId: "owner-123",
                     bookingMode: "SHARED",
+                    status: "ACTIVE",
                   },
                 ])
                 .mockResolvedValueOnce([{ total: BigInt(0) }]),
@@ -939,7 +950,7 @@ describe("manage-booking actions", () => {
             const tx = {
               $queryRaw: jest
                 .fn()
-                .mockResolvedValue([{ ownerId: "owner-123" }]),
+                .mockResolvedValue([{ ownerId: "owner-123", status: "ACTIVE" }]),
               booking: {
                 updateMany: jest.fn().mockResolvedValue({ count: 1 }),
               },
