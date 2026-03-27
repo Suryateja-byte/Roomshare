@@ -958,9 +958,6 @@ export default function MapComponent({
   const isMountedRef = useRef(true);
   // Track map-initiated activeId to avoid re-triggering popup from card "Show on Map"
   const lastMapActiveRef = useRef<string | null>(null);
-  // Skip the very first moveEnd (map settling at initialViewState) to prevent
-  // search-as-move from locking URL to SF defaults before auto-fly runs
-  const isInitialMoveRef = useRef(true);
   // Safety timeout: clear programmatic move flag if moveEnd doesn't fire
   const programmaticClearTimeoutRef = useRef<NodeJS.Timeout | null>(null);
   // Auto-zoom: fire once per search context when results are empty and no filters active
@@ -1561,6 +1558,17 @@ export default function MapComponent({
           }
         }
 
+        // Fallback: use point coordinates from URL (e.g. homepage → search navigation)
+        const lat = searchParams.get("lat");
+        const lng = searchParams.get("lng");
+        if (lat && lng) {
+          const parsedLat = parseFloat(lat);
+          const parsedLng = parseFloat(lng);
+          if (Number.isFinite(parsedLat) && Number.isFinite(parsedLng)) {
+            return { longitude: parsedLng, latitude: parsedLat, zoom: 13 };
+          }
+        }
+
         return listings.length > 0
           ? {
               longitude: listings[0].location.lng,
@@ -1692,8 +1700,6 @@ export default function MapComponent({
     win.__e2eSimulateUserPan = (dx: number, dy: number) => {
       const map = mapRef.current?.getMap();
       if (!map) return false;
-      // Clear initial move guard so this moveend is treated as user interaction
-      isInitialMoveRef.current = false;
       // Don't set isProgrammaticMoveRef — this simulates a user pan
       map.panBy([dx, dy], { duration: 0 });
       return true;
@@ -1702,8 +1708,6 @@ export default function MapComponent({
     win.__e2eSimulateUserZoom = (zoomLevel: number) => {
       const map = mapRef.current?.getMap();
       if (!map) return false;
-      // Clear initial move guard so this moveend is treated as user interaction
-      isInitialMoveRef.current = false;
       // Don't set isProgrammaticMoveRef — this simulates a user zoom
       map.zoomTo(zoomLevel, { duration: 0 });
       return true;
@@ -2210,15 +2214,6 @@ export default function MapComponent({
 
       // Clear active pan bounds since move has ended
       setActivePanBounds(null);
-
-      // Skip the very first moveEnd (map settling at initialViewState)
-      // This prevents search-as-move from locking URL to SF defaults
-      // before the auto-fly effect has a chance to run
-      if (isInitialMoveRef.current) {
-        isInitialMoveRef.current = false;
-        lastCenterRef.current = center;
-        return;
-      }
 
       // Skip resize-triggered moveEnd events where center barely changed.
       // Container resize (e.g., header height change from warning banner) triggers moveEnd
