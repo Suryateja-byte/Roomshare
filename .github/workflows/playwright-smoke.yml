@@ -68,6 +68,9 @@ jobs:
       - name: Generate Prisma client and run migrations
         run: pnpm exec prisma generate && pnpm exec prisma migrate deploy
 
+      - name: Seed E2E test data
+        run: pnpm run seed:e2e
+
       # Fix 2: Include Playwright version in cache key
       - name: Get Playwright version
         id: pw-version
