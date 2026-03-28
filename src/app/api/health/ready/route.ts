@@ -23,20 +23,29 @@ export async function GET() {
     );
   }
 
-  const publicChecks: Record<string, { status: "ok" | "error" }> = {};
+  const publicChecks: Record<string, { status: "ok" | "error" | "timeout" }> = {};
   const internalLatency: Record<string, number> = {};
   let healthy = true;
 
-  // Check database connectivity (CRITICAL)
+  // Check database connectivity (CRITICAL) — 3s timeout to prevent hang on pool exhaustion
+  const DB_TIMEOUT_MS = 3000;
   const dbStart = Date.now();
   try {
-    await prisma.$queryRaw`SELECT 1`;
+    await Promise.race([
+      prisma.$queryRaw`SELECT 1`,
+      new Promise((_, reject) =>
+        setTimeout(() => reject(new Error("DB health check timeout")), DB_TIMEOUT_MS)
+      ),
+    ]);
     const dbLatency = Date.now() - dbStart;
     publicChecks.database = { status: "ok" };
     internalLatency.database = dbLatency;
-  } catch {
-    publicChecks.database = { status: "error" };
-    internalLatency.database = Date.now() - dbStart;
+  } catch (_err) {
+    const dbLatency = Date.now() - dbStart;
+    publicChecks.database = {
+      status: dbLatency >= DB_TIMEOUT_MS ? "timeout" : "error",
+    };
+    internalLatency.database = dbLatency;
     healthy = false;
   }
 
