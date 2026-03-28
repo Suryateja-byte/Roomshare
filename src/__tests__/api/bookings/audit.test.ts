@@ -26,6 +26,10 @@ jest.mock("@/lib/env", () => ({
   },
 }));
 
+jest.mock("@/lib/with-rate-limit", () => ({
+  withRateLimit: jest.fn().mockResolvedValue(null),
+}));
+
 jest.mock("next/server", () => ({
   NextRequest: class MockNextRequest extends Request {
     declare headers: Headers;
