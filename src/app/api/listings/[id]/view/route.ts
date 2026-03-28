@@ -4,11 +4,11 @@ import { prisma } from "@/lib/prisma";
 import { checkRateLimit, getClientIP, RATE_LIMITS } from "@/lib/rate-limit";
 import { logger, sanitizeErrorMessage } from "@/lib/logger";
 import { markListingDirty } from "@/lib/search/search-doc-dirty";
+import { validateViewToken } from "@/app/api/metrics/hmac";
 
 // NOTE: No CSRF validation on this endpoint by design.
 // ListingViewTracker uses navigator.sendBeacon() which cannot set custom headers
-// or reliably send the Origin header. CSRF is not needed here — this endpoint
-// only increments a view counter and is rate-limited per IP/user.
+// or reliably send the Origin header. HMAC view tokens provide request authenticity.
 
 interface RouteContext {
   params: Promise<{ id: string }>;
@@ -16,6 +16,18 @@ interface RouteContext {
 
 export async function POST(request: Request, { params }: RouteContext) {
   const { id } = await params;
+
+  // API-003 FIX: Validate HMAC view token (defense-in-depth, not replacement for rate limiting)
+  try {
+    const body = await request.clone().json();
+    const vt = typeof body?.vt === "string" ? body.vt : undefined;
+    if (!validateViewToken(id, vt)) {
+      return new NextResponse(null, { status: 204 });
+    }
+  } catch {
+    // Malformed JSON — silently accept (graceful degradation for older clients)
+  }
+
   const session = await auth();
   const identifier = session?.user?.id ?? getClientIP(request);
   const rateLimit = await checkRateLimit(

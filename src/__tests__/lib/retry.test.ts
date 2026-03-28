@@ -89,17 +89,21 @@ describe("withRetry", () => {
     await jest.runAllTimersAsync();
     await resultPromise;
 
-    // Attempt 1 fails → delay = 500 * 2^0 = 500ms
-    // Attempt 2 fails → delay = 500 * 2^1 = 1000ms
+    // Attempt 1 fails → delay = 500 * 2^0 + jitter(0..500) = 500..1000ms
+    // Attempt 2 fails → delay = 500 * 2^1 + jitter(0..500) = 1000..1500ms
+    // INFRA-016: jitter makes delays non-deterministic, so check ranges
     const delays = setTimeoutSpy.mock.calls
       .filter(
         (call) =>
-          typeof call[1] === "number" && (call[1] === 500 || call[1] === 1000)
+          typeof call[1] === "number" && call[1] >= 500 && call[1] <= 1500
       )
-      .map((call) => call[1]);
+      .map((call) => call[1] as number);
 
-    expect(delays).toContain(500);
-    expect(delays).toContain(1000);
+    expect(delays.length).toBe(2);
+    expect(delays[0]).toBeGreaterThanOrEqual(500);
+    expect(delays[0]).toBeLessThan(1000);
+    expect(delays[1]).toBeGreaterThanOrEqual(1000);
+    expect(delays[1]).toBeLessThan(1500);
 
     setTimeoutSpy.mockRestore();
   });

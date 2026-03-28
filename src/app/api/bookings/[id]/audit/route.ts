@@ -2,13 +2,20 @@ import { NextRequest, NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
 import { auth } from "@/auth";
 import { features } from "@/lib/env";
+import { withRateLimit } from "@/lib/with-rate-limit";
 import { logger, sanitizeErrorMessage } from "@/lib/logger";
 import * as Sentry from "@sentry/nextjs";
 
 export async function GET(
-  _request: NextRequest,
+  request: NextRequest,
   { params }: { params: Promise<{ id: string }> }
 ) {
+  // API-008 FIX: Rate limit to prevent audit log enumeration
+  const rateLimitResponse = await withRateLimit(request, {
+    type: "bookingAudit",
+  });
+  if (rateLimitResponse) return rateLimitResponse;
+
   if (!features.bookingAudit) {
     return NextResponse.json({ error: "Not found" }, { status: 404 });
   }

@@ -1,13 +1,19 @@
 import { NextResponse } from "next/server";
 import { auth } from "@/auth";
 import { prisma } from "@/lib/prisma";
+import { withRateLimit } from "@/lib/with-rate-limit";
 import { logger, sanitizeErrorMessage } from "@/lib/logger";
 
 interface RouteContext {
   params: Promise<{ id: string }>;
 }
 
-export async function GET(_request: Request, { params }: RouteContext) {
+export async function GET(request: Request, { params }: RouteContext) {
+  // SEC-007 FIX: Rate limit to prevent enumeration/abuse
+  const rateLimitResponse = await withRateLimit(request, {
+    type: "viewerState",
+  });
+  if (rateLimitResponse) return rateLimitResponse;
   const { id } = await params;
   const session = await auth();
 

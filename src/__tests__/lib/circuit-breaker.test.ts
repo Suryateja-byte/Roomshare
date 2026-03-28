@@ -8,6 +8,7 @@ import {
   CircuitOpenError,
   isCircuitOpenError,
   circuitBreakers,
+  getAllCircuitBreakerStates,
 } from "@/lib/circuit-breaker";
 
 describe("circuit-breaker", () => {
@@ -488,6 +489,56 @@ describe("circuit-breaker", () => {
         expect(circuitBreakers.postgis).toBeDefined();
         expect(circuitBreakers.postgis.getState()).toBe("CLOSED");
       });
+    });
+  });
+
+  describe("getName", () => {
+    it("returns the configured name", () => {
+      const breaker = new CircuitBreaker({ name: "test-service" });
+      expect(breaker.getName()).toBe("test-service");
+    });
+
+    it("returns 'default' when no name is configured", () => {
+      const breaker = new CircuitBreaker();
+      expect(breaker.getName()).toBe("default");
+    });
+  });
+
+  describe("getAllCircuitBreakerStates", () => {
+    it("returns state for all pre-configured breakers", () => {
+      const states = getAllCircuitBreakerStates();
+
+      expect(states.length).toBe(Object.keys(circuitBreakers).length);
+
+      for (const entry of states) {
+        expect(entry).toHaveProperty("name");
+        expect(entry).toHaveProperty("state");
+        expect(entry).toHaveProperty("failureCount");
+        expect(entry).toHaveProperty("lastFailureTime");
+      }
+    });
+
+    it("includes expected breaker names", () => {
+      const states = getAllCircuitBreakerStates();
+      const names = states.map((s) => s.name);
+
+      expect(names).toContain("redis");
+      expect(names).toContain("radar");
+      expect(names).toContain("email");
+      expect(names).toContain("nominatim-geocode");
+      expect(names).toContain("postgis");
+      expect(names).toContain("supabase-storage");
+      expect(names).toContain("search-v2");
+    });
+
+    it("all breakers start CLOSED with zero failures", () => {
+      const states = getAllCircuitBreakerStates();
+
+      for (const entry of states) {
+        expect(entry.state).toBe("CLOSED");
+        expect(entry.failureCount).toBe(0);
+        expect(entry.lastFailureTime).toBeNull();
+      }
     });
   });
 });

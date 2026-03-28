@@ -7,6 +7,7 @@ import { auth } from "@/auth";
 import { logger, sanitizeErrorMessage } from "@/lib/logger";
 import { sanitizeUnicode } from "@/lib/schemas";
 import { features } from "@/lib/env";
+import { generateViewToken } from "@/app/api/metrics/hmac";
 import ListingPageClient from "./ListingPageClient";
 
 const getListingWithLocation = cache(async (id: string) => {
@@ -316,6 +317,7 @@ export default async function ListingPage({ params }: PageProps) {
         holdEnabled={features.softHoldsEnabled}
         coordinates={coordinates}
         similarListings={similarListings}
+        viewToken={generateViewToken(listing.id)}
       />
     </>
   );

@@ -500,10 +500,13 @@ export default function MobileBottomSheet({
             // P2-FIX (#134): Add safe area padding for notched devices when expanded
             isExpanded ? "pb-[env(safe-area-inset-bottom,0px)]" : ""
           }`}
-          onTouchStart={handleContentTouchStart}
-          onTouchMove={handleTouchMove}
-          onTouchEnd={handleTouchEnd}
-          onTouchCancel={handleTouchCancel}
+          // FE-001 FIX: Only attach touch handlers when NOT collapsed.
+          // Prevents intercepting map touch events on Android WebViews
+          // where pointer-events:none may not suppress React synthetic events.
+          onTouchStart={isCollapsed ? undefined : handleContentTouchStart}
+          onTouchMove={isCollapsed ? undefined : handleTouchMove}
+          onTouchEnd={isCollapsed ? undefined : handleTouchEnd}
+          onTouchCancel={isCollapsed ? undefined : handleTouchCancel}
           style={{
             // Prevent scroll when collapsed
             overflowY: isCollapsed ? "hidden" : "auto",

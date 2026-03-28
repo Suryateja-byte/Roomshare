@@ -114,5 +114,11 @@
     "ts-node": "^10.9.2",
     "typescript": "^5.9.3",
     "whatwg-fetch": "^3.6.20"
+  },
+  "pnpm": {
+    "overrides": {
+      "effect": ">=3.20.0",
+      "path-to-regexp@<0.1.13": ">=0.1.13"
+    }
   }
 }

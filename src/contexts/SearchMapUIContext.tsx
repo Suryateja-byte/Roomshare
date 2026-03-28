@@ -19,6 +19,7 @@ import {
   useContext,
   useState,
   useCallback,
+  useEffect,
   useMemo,
   useRef,
 } from "react";
@@ -68,6 +69,13 @@ export function SearchMapUIProvider({
   );
   const nonceRef = useRef(0);
   const dismissRef = useRef<(() => void) | null>(null);
+  // FE-011 FIX: Use ref to read shouldShowMap inside callback without
+  // adding it to useCallback deps (avoids context value identity churn
+  // on map toggle, which would re-render all consumers).
+  const shouldShowMapRef = useRef(shouldShowMap);
+  useEffect(() => {
+    shouldShowMapRef.current = shouldShowMap;
+  }, [shouldShowMap]);
 
   const focusListingOnMap = useCallback(
     (listingId: string) => {
@@ -77,11 +85,11 @@ export function SearchMapUIProvider({
       // New focus replaces any previous pending focus (nonce deduplication)
       setPendingFocus({ listingId, nonce });
 
-      if (!shouldShowMap) {
+      if (!shouldShowMapRef.current) {
         showMap();
       }
     },
-    [showMap, shouldShowMap]
+    [showMap]
   );
 
   const acknowledgeFocus = useCallback((nonce: number) => {

@@ -150,7 +150,9 @@ export function FilterModal({
   useEffect(() => {
     if (!isOpen) return;
     const handleKeyDown = (e: KeyboardEvent) => {
-      if (e.key === "Escape") onClose();
+      // FE-004 FIX: Respect defaultPrevented so child components (Radix Select
+      // dropdowns) can handle Escape without the modal also closing.
+      if (e.key === "Escape" && !e.defaultPrevented) onClose();
     };
     document.addEventListener("keydown", handleKeyDown);
     return () => document.removeEventListener("keydown", handleKeyDown);
