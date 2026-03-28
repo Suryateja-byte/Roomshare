@@ -20,10 +20,8 @@ jobs:
     steps:
       - uses: actions/checkout@v6
       - uses: pnpm/action-setup@v5
-      - uses: actions/checkout@v6
-      - uses: pnpm/action-setup@v5
         with:
-          version: 9
+          version: 10
       - uses: actions/setup-node@v4
         with:
           node-version: ${{ env.NODE_VERSION }}
@@ -37,10 +35,8 @@ jobs:
     steps:
       - uses: actions/checkout@v6
       - uses: pnpm/action-setup@v5
-      - uses: actions/checkout@v6
-      - uses: pnpm/action-setup@v5
         with:
-          version: 9
+          version: 10
       - uses: actions/setup-node@v4
         with:
           node-version: ${{ env.NODE_VERSION }}
@@ -73,7 +69,7 @@ jobs:
           docker exec "$CONTAINER_ID" bash -c "apt-get update && apt-get install -y postgresql-16-pgvector && rm -rf /var/lib/apt/lists/*"
       - uses: pnpm/action-setup@v5
         with:
-          version: 9
+          version: 10
       - uses: actions/setup-node@v4
         with:
           node-version: ${{ env.NODE_VERSION }}
@@ -95,10 +91,8 @@ jobs:
     steps:
       - uses: actions/checkout@v6
       - uses: pnpm/action-setup@v5
-      - uses: actions/checkout@v6
-      - uses: pnpm/action-setup@v5
         with:
-          version: 9
+          version: 10
       - uses: actions/setup-node@v4
         with:
           node-version: ${{ env.NODE_VERSION }}
@@ -121,10 +115,8 @@ jobs:
     steps:
       - uses: actions/checkout@v6
       - uses: pnpm/action-setup@v5
-      - uses: actions/checkout@v6
-      - uses: pnpm/action-setup@v5
         with:
-          version: 9
+          version: 10
       - uses: actions/setup-node@v4
         with:
           node-version: ${{ env.NODE_VERSION }}
@@ -141,10 +133,8 @@ jobs:
     steps:
       - uses: actions/checkout@v6
       - uses: pnpm/action-setup@v5
-      - uses: actions/checkout@v6
-      - uses: pnpm/action-setup@v5
         with:
-          version: 9
+          version: 10
       - uses: actions/setup-node@v4
         with:
           node-version: ${{ env.NODE_VERSION }}
@@ -166,10 +156,8 @@ jobs:
     steps:
       - uses: actions/checkout@v6
       - uses: pnpm/action-setup@v5
-      - uses: actions/checkout@v6
-      - uses: pnpm/action-setup@v5
         with:
-          version: 9
+          version: 10
       - uses: actions/setup-node@v4
         with:
           node-version: ${{ env.NODE_VERSION }}
@@ -193,10 +181,8 @@ jobs:
     steps:
       - uses: actions/checkout@v6
       - uses: pnpm/action-setup@v5
-      - uses: actions/checkout@v6
-      - uses: pnpm/action-setup@v5
         with:
-          version: 9
+          version: 10
       - uses: actions/setup-node@v4
         with:
           node-version: ${{ env.NODE_VERSION }}
@@ -216,10 +202,8 @@ jobs:
     steps:
       - uses: actions/checkout@v6
       - uses: pnpm/action-setup@v5
-      - uses: actions/checkout@v6
-      - uses: pnpm/action-setup@v5
         with:
-          version: 9
+          version: 10
       - uses: actions/setup-node@v4
         with:
           node-version: ${{ env.NODE_VERSION }}
@@ -238,10 +222,8 @@ jobs:
     steps:
       - uses: actions/checkout@v6
       - uses: pnpm/action-setup@v5
-      - uses: actions/checkout@v6
-      - uses: pnpm/action-setup@v5
         with:
-          version: 9
+          version: 10
       - uses: actions/setup-node@v4
         with:
           node-version: ${{ env.NODE_VERSION }}
