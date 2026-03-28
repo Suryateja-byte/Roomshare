@@ -55,9 +55,12 @@ export async function withRetry<T>(
         throw error;
       }
 
-      const delay = baseDelayMs * Math.pow(2, attempt - 1);
+      // INFRA-016 FIX: Add jitter to prevent thundering herd on concurrent retries
+      const exponentialDelay = baseDelayMs * Math.pow(2, attempt - 1);
+      const jitter = Math.random() * baseDelayMs;
+      const delay = exponentialDelay + jitter;
       logger.sync.warn(
-        `[Retry] ${context} attempt ${attempt}/${maxAttempts} failed, retrying in ${delay}ms`,
+        `[Retry] ${context} attempt ${attempt}/${maxAttempts} failed, retrying in ${Math.round(delay)}ms`,
         {
           error: error instanceof Error ? error.message : "Unknown error",
           attempt,
