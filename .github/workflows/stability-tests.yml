@@ -51,12 +51,14 @@ jobs:
       ENABLE_WHOLE_UNIT_MODE: 'true'
       ENABLE_SOFT_HOLDS: 'on'
       ENABLE_BOOKING_AUDIT: 'true'
-      CRON_SECRET: 'ci-stability-cron-secret'
+      CRON_SECRET: 'ci-stability-cron-secret-minimum-32-characters-long'
       NODE_OPTIONS: '--max-old-space-size=4096'
       CI: 'true'
       GOOGLE_CLIENT_ID: 'ci-placeholder-not-used-in-tests'
       GOOGLE_CLIENT_SECRET: 'ci-placeholder-not-used-in-tests'
       TURNSTILE_ENABLED: 'false'
+      # FLAKE-004: Skip globalSetup seed — CI already seeds in an explicit step above
+      SKIP_E2E_SEED: 'true'
 
     steps:
       - uses: actions/checkout@v6

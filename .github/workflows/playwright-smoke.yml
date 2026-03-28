@@ -45,6 +45,8 @@ jobs:
       GOOGLE_CLIENT_ID: 'ci-placeholder-not-used-in-tests'
       GOOGLE_CLIENT_SECRET: 'ci-placeholder-not-used-in-tests'
       TURNSTILE_ENABLED: 'false'
+      # FLAKE-004: Skip globalSetup seed — CI already seeds in an explicit step above
+      SKIP_E2E_SEED: 'true'
 
     steps:
       - uses: actions/checkout@v6

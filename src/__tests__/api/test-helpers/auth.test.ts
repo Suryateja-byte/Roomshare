@@ -165,9 +165,10 @@ describe("test-helpers auth", () => {
     expect(data.error).toBe("Not found");
   });
 
-  // SEC-001: Production guard on isEnabled
-  it("returns 404 in production even when E2E_TEST_HELPERS is true", async () => {
-    (process.env as any).NODE_ENV = "production";
+  // SEC-001: Production guard on isEnabled — blocks on VERCEL_ENV, not NODE_ENV,
+  // so CI production builds (next start) still allow test-helpers.
+  it("returns 404 in Vercel production even when E2E_TEST_HELPERS is true", async () => {
+    process.env.VERCEL_ENV = "production";
     process.env.E2E_TEST_HELPERS = "true";
 
     const request = makeRequest(
@@ -180,6 +181,33 @@ describe("test-helpers auth", () => {
     expect(response.status).toBe(404);
     const data = await response.json();
     expect(data.error).toBe("Not found");
+  });
+
+  // SEC-001b: CI production builds (NODE_ENV=production but no VERCEL_ENV) allow test-helpers
+  it("allows test-helpers in CI production builds (NODE_ENV=production, no VERCEL_ENV)", async () => {
+    (process.env as any).NODE_ENV = "production";
+    delete process.env.VERCEL_ENV;
+    process.env.E2E_TEST_HELPERS = "true";
+
+    (prisma.listing.findUnique as jest.Mock).mockResolvedValue({
+      id: "test-id",
+      totalSlots: 5,
+      availableSlots: 3,
+      bookingMode: "SHARED",
+      title: "Test Listing",
+      ownerId: "owner-1",
+    });
+
+    const request = makeRequest(
+      "getListingSlots",
+      { listingId: "test-id" },
+      `Bearer ${TEST_SECRET}`
+    );
+    const response = await POST(request);
+
+    expect(response.status).toBe(200);
+    const data = await response.json();
+    expect(data.id).toBe("test-id");
   });
 
   // API-005: cleanupTestBookings rejects empty params

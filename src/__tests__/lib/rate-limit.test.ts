@@ -214,23 +214,25 @@ describe("rate-limit", () => {
     });
 
     describe("E2E bypass production guard", () => {
-      const originalNodeEnv = process.env.NODE_ENV;
       const originalE2EDisable = process.env.E2E_DISABLE_RATE_LIMIT;
+      const originalVercelEnv = process.env.VERCEL_ENV;
 
       afterEach(() => {
         // Restore env vars
-        delete (process.env as { NODE_ENV?: string }).NODE_ENV;
-        (process.env as { NODE_ENV?: string }).NODE_ENV = originalNodeEnv;
         if (originalE2EDisable === undefined) {
           delete process.env.E2E_DISABLE_RATE_LIMIT;
         } else {
           process.env.E2E_DISABLE_RATE_LIMIT = originalE2EDisable;
         }
+        if (originalVercelEnv === undefined) {
+          delete process.env.VERCEL_ENV;
+        } else {
+          process.env.VERCEL_ENV = originalVercelEnv;
+        }
       });
 
-      it("does NOT bypass rate limiting when NODE_ENV is production", async () => {
-        delete (process.env as { NODE_ENV?: string }).NODE_ENV;
-        (process.env as { NODE_ENV?: string }).NODE_ENV = "production";
+      it("does NOT bypass rate limiting when VERCEL_ENV is production", async () => {
+        process.env.VERCEL_ENV = "production";
         process.env.E2E_DISABLE_RATE_LIMIT = "true";
 
         const now = new Date();

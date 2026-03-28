@@ -26,6 +26,7 @@ import {
   waitForMapReady,
   waitForDebounceAndResponse,
 } from "../helpers";
+import { isMapAvailable } from "../helpers/sync-helpers";
 
 test.describe("Map Error Handling", () => {
   // Map tests run as anonymous user with desktop viewport
@@ -88,6 +89,10 @@ test.describe("Map Error Handling", () => {
     test(`${tags.anon} - Shows info banner when viewport is clamped`, async ({
       page,
     }) => {
+      // Navigate first so isMapAvailable has a page to check
+      await page.goto("/search?minLng=-122.5&maxLng=-122.0&minLat=37.5&maxLat=38.0");
+      test.skip(!(await isMapAvailable(page)), "Map not available (WebGL unavailable in headless)");
+
       // Navigate to search with very wide bounds (beyond MAX spans)
       // lng span = 50 - (-100) = 150 degrees (exceeds MAX_LNG_SPAN of 130)
       // lat span = 60 - (-10) = 70 degrees (exceeds MAX_LAT_SPAN of 60)
@@ -108,6 +113,9 @@ test.describe("Map Error Handling", () => {
     test(`${tags.anon} - Clears info banner when viewport becomes valid`, async ({
       page,
     }) => {
+      await page.goto("/search?minLng=-122.5&maxLng=-122.0&minLat=37.5&maxLat=38.0");
+      test.skip(!(await isMapAvailable(page)), "Map not available (WebGL unavailable in headless)");
+
       // Start with too-large viewport (clamped by PersistentMapWrapper)
       await page.goto("/search?minLng=-100&maxLng=50&minLat=-10&maxLat=60");
 
@@ -234,6 +242,9 @@ test.describe("Map Error Handling", () => {
     test(`${tags.anon} - No console errors during normal map navigation`, async ({
       page,
     }) => {
+      await page.goto("/search?minLng=-122.5&maxLng=-122.0&minLat=37.5&maxLat=38.0");
+      test.skip(!(await isMapAvailable(page)), "Map not available (WebGL unavailable in headless)");
+
       const consoleErrors: string[] = [];
       page.on("console", (msg) => {
         if (msg.type() === "error") {

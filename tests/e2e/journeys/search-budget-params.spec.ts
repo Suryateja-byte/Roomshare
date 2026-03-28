@@ -456,12 +456,15 @@ test.describe("Budget URL Param Aliases", () => {
       await page.waitForLoadState("domcontentloaded");
 
       const minPriceInput = page.getByLabel(/minimum budget/i);
+      await expect(minPriceInput).toBeVisible({ timeout: 30000 });
       await expect(minPriceInput).toHaveValue("500", { timeout: 30000 });
 
       // Go back
       await page.goBack();
       await page.waitForLoadState("domcontentloaded");
 
+      // Wait for filter input to re-render after navigation
+      await expect(minPriceInput).toBeVisible({ timeout: 30000 });
       // Should be unfiltered
       await expect(minPriceInput).toHaveValue("", { timeout: 30000 });
 
@@ -469,6 +472,8 @@ test.describe("Budget URL Param Aliases", () => {
       await page.goForward();
       await page.waitForLoadState("domcontentloaded");
 
+      // Wait for filter input to re-render after navigation
+      await expect(minPriceInput).toBeVisible({ timeout: 30000 });
       // Should restore filter
       await expect(minPriceInput).toHaveValue("500", { timeout: 30000 });
     });

@@ -89,8 +89,9 @@ export async function checkRateLimit(
   config: RateLimitConfig
 ): Promise<RateLimitResult> {
   // E2E bypass — matches with-rate-limit.ts behavior to prevent cross-shard
-  // rate limit accumulation in CI (auth.ts calls this directly, not via middleware)
-  if (process.env.E2E_DISABLE_RATE_LIMIT === "true" && process.env.NODE_ENV !== "production") {
+  // rate limit accumulation in CI (auth.ts calls this directly, not via middleware).
+  // Uses VERCEL_ENV (not NODE_ENV) because CI runs `next start` which sets NODE_ENV=production.
+  if (process.env.E2E_DISABLE_RATE_LIMIT === "true" && process.env.VERCEL_ENV !== "production") {
     return {
       success: true,
       remaining: 999,
