@@ -11,7 +11,10 @@ import { NextRequest, NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
 
 function isEnabled(): boolean {
-  if (process.env.NODE_ENV === "production") return false;
+  // Block in actual Vercel production deployments, not CI production builds.
+  // CI runs `next start` which sets NODE_ENV=production, but VERCEL_ENV is
+  // only set by Vercel itself. E2E_TEST_HELPERS + secret auth remain primary gates.
+  if (process.env.VERCEL_ENV === "production") return false;
   return process.env.E2E_TEST_HELPERS === "true";
 }
 
