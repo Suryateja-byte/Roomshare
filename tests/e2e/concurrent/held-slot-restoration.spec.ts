@@ -33,6 +33,7 @@ test.describe("P0-3: HELD booking slot restoration", () => {
       // Create a HELD booking (consumes 1 slot at creation)
       const booking = await testApi<{ id: string }>(page, "createHeldBooking", {
         listingId,
+        tenantEmail: "e2e-other@roomshare.dev",
         slotsRequested: 1,
       });
       expect(booking.ok).toBe(true);
@@ -78,6 +79,7 @@ test.describe("P0-3: HELD booking slot restoration", () => {
       // Create a HELD booking
       const booking = await testApi<{ id: string }>(page, "createHeldBooking", {
         listingId,
+        tenantEmail: "e2e-other@roomshare.dev",
         slotsRequested: 1,
       });
       expect(booking.ok).toBe(true);
