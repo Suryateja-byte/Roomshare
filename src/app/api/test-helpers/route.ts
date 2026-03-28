@@ -334,6 +334,17 @@ export async function POST(request: NextRequest) {
         return NextResponse.json({ success: true, mode: params.mode });
       }
 
+      case "setListingStatus": {
+        await prisma.listing.update({
+          where: { id: params.listingId },
+          data: { status: params.status },
+        });
+        return NextResponse.json({
+          success: true,
+          status: params.status,
+        });
+      }
+
       case "createHeldBooking": {
         // Create a HELD booking with a FUTURE heldUntil (for HoldCountdown tests)
         const tenant = await prisma.user.findUnique({

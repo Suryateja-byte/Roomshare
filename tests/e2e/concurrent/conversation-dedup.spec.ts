@@ -73,8 +73,9 @@ test.describe("P0-1: Conversation Deduplication", () => {
     ]);
 
     // Wait for the Contact Host button to be visible on both pages.
-    const btn1 = page1.getByRole("button", { name: /contact host/i });
-    const btn2 = page2.getByRole("button", { name: /contact host/i });
+    // Use .first() — the page may have both mobile + desktop Contact Host buttons
+    const btn1 = page1.getByRole("button", { name: /contact host/i }).first();
+    const btn2 = page2.getByRole("button", { name: /contact host/i }).first();
     await Promise.all([
       expect(btn1).toBeVisible({ timeout: 15_000 }),
       expect(btn2).toBeVisible({ timeout: 15_000 }),
@@ -120,7 +121,7 @@ test.describe("P0-1: Conversation Deduplication", () => {
       timeout: 30_000,
     });
 
-    const contactBtn = page.getByRole("button", { name: /contact host/i });
+    const contactBtn = page.getByRole("button", { name: /contact host/i }).first();
     await expect(contactBtn).toBeVisible({ timeout: 15_000 });
 
     // Track server action requests to count how many fire.
@@ -198,7 +199,7 @@ test.describe("P0-1: Conversation Deduplication", () => {
       timeout: 30_000,
     });
 
-    const contactBtn = page.getByRole("button", { name: /contact host/i });
+    const contactBtn = page.getByRole("button", { name: /contact host/i }).first();
     await expect(contactBtn).toBeVisible({ timeout: 15_000 });
     await contactBtn.click();
 
@@ -215,7 +216,7 @@ test.describe("P0-1: Conversation Deduplication", () => {
     });
 
     // Second contact: click Contact Host again.
-    const contactBtn2 = page.getByRole("button", { name: /contact host/i });
+    const contactBtn2 = page.getByRole("button", { name: /contact host/i }).first();
     await expect(contactBtn2).toBeVisible({ timeout: 15_000 });
     await contactBtn2.click();
 
