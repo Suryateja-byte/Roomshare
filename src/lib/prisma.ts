@@ -117,8 +117,10 @@ function createPrismaClient(): PrismaClient {
     if (e.duration >= SLOW_QUERY_THRESHOLD_MS) {
       logger.sync.warn("Slow database query", {
         durationMs: e.duration,
+        query: e.query,
         target: e.target,
         timestamp: e.timestamp.toISOString(),
+        // e.params intentionally omitted — may contain user PII
       });
     }
   });
