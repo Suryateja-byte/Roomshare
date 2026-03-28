@@ -27,6 +27,15 @@ jest.mock("@/lib/logger", () => ({
   ),
 }));
 
+jest.mock("@sentry/nextjs", () => ({
+  captureException: jest.fn(),
+}));
+
+jest.mock("@/lib/origin-guard", () => ({
+  isOriginAllowed: jest.fn().mockReturnValue(false),
+  isHostAllowed: jest.fn().mockReturnValue(false),
+}));
+
 jest.mock("next/server", () => ({
   NextRequest: class MockNextRequest extends Request {
     constructor(url: string, init?: RequestInit) {
@@ -45,6 +54,7 @@ jest.mock("next/server", () => ({
 import { POST } from "@/app/api/agent/route";
 import { auth } from "@/auth";
 import { withRateLimit } from "@/lib/with-rate-limit";
+import { isOriginAllowed, isHostAllowed } from "@/lib/origin-guard";
 import { NextRequest } from "next/server";
 
 describe("POST /api/agent", () => {
@@ -60,10 +70,17 @@ describe("POST /api/agent", () => {
 
   const originalEnv = process.env;
 
+  const originalFetch = global.fetch;
+
   beforeEach(() => {
     jest.clearAllMocks();
     (auth as jest.Mock).mockResolvedValue(mockSession);
     (withRateLimit as jest.Mock).mockResolvedValue(null);
+    // Default: fetch returns a successful webhook response
+    global.fetch = jest.fn().mockResolvedValue({
+      ok: true,
+      json: async () => ({ answer: "Test answer" }),
+    }) as unknown as typeof fetch;
     process.env = {
       ...originalEnv,
       N8N_WEBHOOK_URL: "https://n8n.example.com/webhook/agent",
@@ -73,6 +90,7 @@ describe("POST /api/agent", () => {
 
   afterEach(() => {
     process.env = originalEnv;
+    global.fetch = originalFetch;
   });
 
   function createRequest(
@@ -124,6 +142,7 @@ describe("POST /api/agent", () => {
     });
 
     it("allows valid origin", async () => {
+      (isOriginAllowed as jest.Mock).mockReturnValue(true);
       const res = await POST(
         createRequest(validBody, {
           origin: "https://roomshare.app",
@@ -134,6 +153,7 @@ describe("POST /api/agent", () => {
     });
 
     it("allows valid host with port", async () => {
+      (isHostAllowed as jest.Mock).mockReturnValue(true);
       const res = await POST(
         createRequest(validBody, { host: "roomshare.app:443" }) as any
       );
@@ -504,6 +524,7 @@ describe("POST /api/agent", () => {
     });
 
     it("allows second origin in comma-separated list", async () => {
+      (isOriginAllowed as jest.Mock).mockReturnValue(true);
       const res = await POST(
         createRequest(validBody, {
           origin: "https://www.roomshare.app",
@@ -514,6 +535,7 @@ describe("POST /api/agent", () => {
     });
 
     it("allows valid host fallback when origin is absent", async () => {
+      (isHostAllowed as jest.Mock).mockReturnValue(true);
       const res = await POST(
         createRequest(validBody, { host: "www.roomshare.app" }) as any
       );
@@ -521,6 +543,8 @@ describe("POST /api/agent", () => {
     });
 
     it("rejects when both origin and host are missing in production", async () => {
+      (isOriginAllowed as jest.Mock).mockReturnValue(false);
+      (isHostAllowed as jest.Mock).mockReturnValue(false);
       const res = await POST(createRequest(validBody, {}) as any);
       expect(res.status).toBe(403);
     });
