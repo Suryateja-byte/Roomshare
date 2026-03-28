@@ -164,4 +164,37 @@ describe("test-helpers auth", () => {
     const data = await response.json();
     expect(data.error).toBe("Not found");
   });
+
+  // SEC-001: Production guard on isEnabled
+  it("returns 404 in production even when E2E_TEST_HELPERS is true", async () => {
+    (process.env as any).NODE_ENV = "production";
+    process.env.E2E_TEST_HELPERS = "true";
+
+    const request = makeRequest(
+      "getListingSlots",
+      { listingId: "test-id" },
+      `Bearer ${TEST_SECRET}`
+    );
+    const response = await POST(request);
+
+    expect(response.status).toBe(404);
+    const data = await response.json();
+    expect(data.error).toBe("Not found");
+  });
+
+  // API-005: cleanupTestBookings rejects empty params
+  it("returns 400 when cleanupTestBookings is called with no listingId or bookingIds", async () => {
+    const request = makeRequest(
+      "cleanupTestBookings",
+      {},
+      `Bearer ${TEST_SECRET}`
+    );
+    const response = await POST(request);
+
+    expect(response.status).toBe(400);
+    const data = await response.json();
+    expect(data.error).toBe(
+      "At least one of listingId or bookingIds is required"
+    );
+  });
 });
