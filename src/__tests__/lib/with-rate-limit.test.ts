@@ -34,6 +34,7 @@ const mockGetClientIPFromHeaders = getClientIPFromHeaders as jest.Mock;
 describe("Rate Limit Wrapper", () => {
   const originalE2EBypass = process.env.E2E_DISABLE_RATE_LIMIT;
   const originalNodeEnv = process.env.NODE_ENV;
+  const originalVercelEnv = process.env.VERCEL_ENV;
 
   const setNodeEnv = (value: string | undefined) => {
     Object.defineProperty(process.env, "NODE_ENV", {
@@ -46,6 +47,7 @@ describe("Rate Limit Wrapper", () => {
   beforeEach(() => {
     jest.clearAllMocks();
     delete process.env.E2E_DISABLE_RATE_LIMIT;
+    delete process.env.VERCEL_ENV;
     setNodeEnv(originalNodeEnv);
   });
 
@@ -54,6 +56,11 @@ describe("Rate Limit Wrapper", () => {
       process.env.E2E_DISABLE_RATE_LIMIT = originalE2EBypass;
     } else {
       delete process.env.E2E_DISABLE_RATE_LIMIT;
+    }
+    if (originalVercelEnv !== undefined) {
+      process.env.VERCEL_ENV = originalVercelEnv;
+    } else {
+      delete process.env.VERCEL_ENV;
     }
     setNodeEnv(originalNodeEnv);
   });
@@ -263,8 +270,10 @@ describe("Rate Limit Wrapper", () => {
       expect(mockCheckRateLimit).not.toHaveBeenCalled();
     });
 
-    it("does NOT bypass rate limit when NODE_ENV is production even with E2E flag", async () => {
+    it("does NOT bypass rate limit when VERCEL_ENV is production even with E2E flag", async () => {
+      // Must set NODE_ENV away from "test" since that's a separate bypass path
       setNodeEnv("production");
+      process.env.VERCEL_ENV = "production";
       process.env.E2E_DISABLE_RATE_LIMIT = "true";
 
       mockCheckRateLimit.mockResolvedValue({
