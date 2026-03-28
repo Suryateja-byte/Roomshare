@@ -227,7 +227,7 @@ test.describe("Map persistence: Map survives changes", () => {
     expect(afterZoom).not.toBeNull();
 
     // Zoom should be the same (within tolerance for floating point)
-    expect(Math.abs(afterZoom! - initialZoom)).toBeLessThan(0.5);
+    expect(Math.abs(afterZoom! - initialZoom!)).toBeLessThan(0.5);
   });
 
   test("4 - Map center preserved after filter change", async ({ page }) => {
@@ -249,10 +249,10 @@ test.describe("Map persistence: Map survives changes", () => {
 
     // Center should be approximately the same (tolerance ~0.05 degrees)
     const tolerance = 0.05;
-    expect(Math.abs(afterCenter!.lat - initialCenter.lat)).toBeLessThan(
+    expect(Math.abs(afterCenter!.lat - initialCenter!.lat)).toBeLessThan(
       tolerance
     );
-    expect(Math.abs(afterCenter!.lng - initialCenter.lng)).toBeLessThan(
+    expect(Math.abs(afterCenter!.lng - initialCenter!.lng)).toBeLessThan(
       tolerance
     );
   });
@@ -262,8 +262,9 @@ test.describe("Map persistence: Map survives changes", () => {
   }) => {
     await waitForSearchPage(page);
 
-    const initialState = await getMapE2EState(page);
-    test.skip(!initialState?.mapInstanceId, "E2E instrumentation not enabled");
+    const initialStateRaw = await getMapE2EState(page);
+    test.skip(!initialStateRaw?.mapInstanceId, "E2E instrumentation not enabled");
+    const initialState = initialStateRaw!;
 
     const hasMapRef = await waitForMapRef(page);
     test.skip(!hasMapRef, "Map ref not available");
@@ -300,8 +301,9 @@ test.describe("Map persistence: Map survives changes", () => {
   }) => {
     await waitForSearchPage(page);
 
-    const initialState = await getMapE2EState(page);
-    test.skip(!initialState?.mapInstanceId, "E2E instrumentation not enabled");
+    const initialStateRaw = await getMapE2EState(page);
+    test.skip(!initialStateRaw?.mapInstanceId, "E2E instrumentation not enabled");
+    const initialState = initialStateRaw!;
 
     // Change search query
     await page.goto(`${SEARCH_URL}&q=Mission+District`);
@@ -469,8 +471,9 @@ test.describe("Map persistence: Map state recovery", () => {
   }) => {
     await waitForSearchPage(page);
 
-    const initialState = await getMapE2EState(page);
-    test.skip(!initialState?.mapInstanceId, "E2E instrumentation not enabled");
+    const initialStateRaw = await getMapE2EState(page);
+    test.skip(!initialStateRaw?.mapInstanceId, "E2E instrumentation not enabled");
+    const initialState = initialStateRaw!;
 
     // Apply filter 1
     await navigateWithFilter(page, "roomType", "Private Room");

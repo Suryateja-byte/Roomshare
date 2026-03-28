@@ -650,16 +650,17 @@ test.describe("Map Interactions Advanced (Stories 5-8)", () => {
       // Read map center from E2E hook
       const center = await getMapCenter(page);
       test.skip(!center, "Could not read map center via E2E hook");
+      const c = center!;
 
       // Center should be approximately in the middle of the bounds
       const expectedLat = (specificBounds.minLat + specificBounds.maxLat) / 2; // 37.775
       const expectedLng = (specificBounds.minLng + specificBounds.maxLng) / 2; // -122.425
 
       const tolerance = 0.02;
-      expect(center.lat).toBeGreaterThanOrEqual(expectedLat - tolerance);
-      expect(center.lat).toBeLessThanOrEqual(expectedLat + tolerance);
-      expect(center.lng).toBeGreaterThanOrEqual(expectedLng - tolerance);
-      expect(center.lng).toBeLessThanOrEqual(expectedLng + tolerance);
+      expect(c.lat).toBeGreaterThanOrEqual(expectedLat - tolerance);
+      expect(c.lat).toBeLessThanOrEqual(expectedLat + tolerance);
+      expect(c.lng).toBeGreaterThanOrEqual(expectedLng - tolerance);
+      expect(c.lng).toBeLessThanOrEqual(expectedLng + tolerance);
     });
 
     test("8.2 (P1) - map pan updates URL bounds correctly", async ({
@@ -746,8 +747,9 @@ test.describe("Map Interactions Advanced (Stories 5-8)", () => {
       const hasRef1 = await waitForMapRef(page);
       test.skip(!hasRef1, "Map ref not available in first context");
 
-      const center1 = await getMapCenter(page);
-      test.skip(!center1, "Could not read map center in first context");
+      const center1Raw = await getMapCenter(page);
+      test.skip(!center1Raw, "Could not read map center in first context");
+      const center1 = center1Raw!;
 
       // Open second browser context (simulates a different user opening the shared URL)
       const context2 = await browser.newContext({
@@ -763,8 +765,9 @@ test.describe("Map Interactions Advanced (Stories 5-8)", () => {
         const hasRef2 = await waitForMapRef(page2);
         test.skip(!hasRef2, "Map ref not available in second context");
 
-        const center2 = await getMapCenter(page2);
-        test.skip(!center2, "Could not read map center in second context");
+        const center2Raw = await getMapCenter(page2);
+        test.skip(!center2Raw, "Could not read map center in second context");
+        const center2 = center2Raw!;
 
         // Both map centers should be within 0.01 degrees of each other
         const latDiff = Math.abs(center1.lat - center2.lat);

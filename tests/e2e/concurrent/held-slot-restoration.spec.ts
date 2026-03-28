@@ -18,7 +18,7 @@ test.describe("P0-3: HELD booking slot restoration", () => {
     "HELD→REJECTED restores availableSlots",
     async ({ page }) => {
       // Find a test listing and record initial slot count
-      const listing = await testApi(page, "findTestListing", {});
+      const listing = await testApi<{ id: string }>(page, "findTestListing", {});
       expect(listing.ok).toBe(true);
       const listingId = listing.data.id;
 
@@ -31,7 +31,7 @@ test.describe("P0-3: HELD booking slot restoration", () => {
       const initialSlots = before.data.availableSlots;
 
       // Create a HELD booking (consumes 1 slot at creation)
-      const booking = await testApi(page, "createHeldBooking", {
+      const booking = await testApi<{ id: string }>(page, "createHeldBooking", {
         listingId,
         slotsRequested: 1,
       });
@@ -63,7 +63,7 @@ test.describe("P0-3: HELD booking slot restoration", () => {
   test(
     "HELD→CANCELLED restores availableSlots",
     async ({ page }) => {
-      const listing = await testApi(page, "findTestListing", {});
+      const listing = await testApi<{ id: string }>(page, "findTestListing", {});
       expect(listing.ok).toBe(true);
       const listingId = listing.data.id;
 
@@ -76,7 +76,7 @@ test.describe("P0-3: HELD booking slot restoration", () => {
       const initialSlots = before.data.availableSlots;
 
       // Create a HELD booking
-      const booking = await testApi(page, "createHeldBooking", {
+      const booking = await testApi<{ id: string }>(page, "createHeldBooking", {
         listingId,
         slotsRequested: 1,
       });

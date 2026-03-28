@@ -208,17 +208,18 @@ test.describe("Bounds round-trip: Bounds in URL", () => {
     // Get bounds from actual map viewport
     const mapBounds = await getMapViewportBounds(page);
     test.skip(!mapBounds, "Could not read map viewport bounds");
+    const bounds = mapBounds!;
 
     // Map should have been fitted to URL bounds (with some tolerance for padding)
     const tolerance = 0.5; // Generous tolerance for fitBounds padding in headless CI
-    expect(mapBounds.minLat).toBeGreaterThanOrEqual(
+    expect(bounds.minLat).toBeGreaterThanOrEqual(
       urlBounds.minLat! - tolerance
     );
-    expect(mapBounds.maxLat).toBeLessThanOrEqual(urlBounds.maxLat! + tolerance);
-    expect(mapBounds.minLng).toBeGreaterThanOrEqual(
+    expect(bounds.maxLat).toBeLessThanOrEqual(urlBounds.maxLat! + tolerance);
+    expect(bounds.minLng).toBeGreaterThanOrEqual(
       urlBounds.minLng! - tolerance
     );
-    expect(mapBounds.maxLng).toBeLessThanOrEqual(urlBounds.maxLng! + tolerance);
+    expect(bounds.maxLng).toBeLessThanOrEqual(urlBounds.maxLng! + tolerance);
   });
 
   test("2 - After map move, URL bounds update to new viewport", async ({
@@ -377,16 +378,17 @@ test.describe("Bounds round-trip: Deep link with bounds", () => {
     });
 
     test.skip(!center, "Could not read map center");
+    const c = center!;
 
     // Center should be approximately in the middle of the provided bounds
     const expectedLat = (customBounds.minLat + customBounds.maxLat) / 2;
     const expectedLng = (customBounds.minLng + customBounds.maxLng) / 2;
     const tolerance = 0.1;
 
-    expect(center.lat).toBeGreaterThanOrEqual(expectedLat - tolerance);
-    expect(center.lat).toBeLessThanOrEqual(expectedLat + tolerance);
-    expect(center.lng).toBeGreaterThanOrEqual(expectedLng - tolerance);
-    expect(center.lng).toBeLessThanOrEqual(expectedLng + tolerance);
+    expect(c.lat).toBeGreaterThanOrEqual(expectedLat - tolerance);
+    expect(c.lat).toBeLessThanOrEqual(expectedLat + tolerance);
+    expect(c.lng).toBeGreaterThanOrEqual(expectedLng - tolerance);
+    expect(c.lng).toBeLessThanOrEqual(expectedLng + tolerance);
   });
 
   test("6 - Deep link with no bounds loads map at default/full extent", async ({

@@ -683,7 +683,7 @@ describe("Map Component", () => {
       expect(mockSetHasUserMoved).toHaveBeenCalledWith(true);
     });
 
-    it("should skip the very first moveEnd (initial map settling)", async () => {
+    it("should mark user moved on first non-programmatic moveEnd", async () => {
       render(<MapComponent listings={mockListings} />);
 
       await act(async () => {
@@ -700,7 +700,7 @@ describe("Map Component", () => {
         >
       ).__mapHandlers;
 
-      // First moveEnd (initial settling)
+      // First moveEnd — no previous center tracked, so it's treated as a real move
       await act(async () => {
         handlers?.onMoveEnd?.({
           viewState: { zoom: 12 },
@@ -715,10 +715,9 @@ describe("Map Component", () => {
         });
       });
 
-      // Should not trigger user moved on first moveEnd (skipped as initial settling)
-      // Note: The component's isInitialMoveRef skips the first move
-      // The component may call setHasUserMoved(false) during init, but should NOT call with true
-      expect(mockSetHasUserMoved).not.toHaveBeenCalledWith(true);
+      // Component uses center-dedup instead of initial-move skip;
+      // first moveEnd with no previous center triggers setHasUserMoved(true)
+      expect(mockSetHasUserMoved).toHaveBeenCalledWith(true);
     });
 
     it("should respect debounce timing (300ms)", async () => {
@@ -890,7 +889,7 @@ describe("Map Component", () => {
         >
       ).__mapHandlers;
 
-      // Skip initial moveEnd
+      // First moveEnd — establishes lastCenterRef baseline
       await act(async () => {
         handlers?.onMoveEnd?.({
           viewState: { zoom: 8 },
@@ -904,6 +903,14 @@ describe("Map Component", () => {
           },
         });
       });
+
+      // Flush any debounced search from the first moveEnd before clearing mocks
+      await act(async () => {
+        jest.advanceTimersByTime(1000);
+      });
+
+      // Clear mocks so we only observe the oversized viewport move
+      jest.clearAllMocks();
 
       // Oversized viewport (> MAP_FETCH_MAX_LAT_SPAN=60 / MAP_FETCH_MAX_LNG_SPAN=130)
       await act(async () => {

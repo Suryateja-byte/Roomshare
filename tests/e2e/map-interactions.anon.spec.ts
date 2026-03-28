@@ -300,8 +300,9 @@ test.describe("1.x: Map + List Scroll Sync", () => {
     test.skip(!hasMarkers, "No individual markers after cluster expansion");
 
     // Get the listing ID of the first visible marker
-    const listingId = await getMarkerListingId(page, 0);
-    test.skip(!listingId, "Could not extract listing ID from first marker");
+    const listingIdRaw = await getMarkerListingId(page, 0);
+    test.skip(!listingIdRaw, "Could not extract listing ID from first marker");
+    const listingId = listingIdRaw!;
 
     // Scroll the list panel to the very bottom so the target card is NOT in view
     await page.evaluate(() => {
@@ -380,8 +381,9 @@ test.describe("1.x: Map + List Scroll Sync", () => {
     const hasMarkers = await zoomToExpandClusters(page);
     test.skip(!hasMarkers, "No individual markers after cluster expansion");
 
-    const listingId = await getMarkerListingId(page, 0);
-    test.skip(!listingId, "Could not extract listing ID from first marker");
+    const listingIdRaw = await getMarkerListingId(page, 0);
+    test.skip(!listingIdRaw, "Could not extract listing ID from first marker");
+    const listingId = listingIdRaw!;
 
     // Scroll list away from the target card
     await page.evaluate(() => {
@@ -437,8 +439,9 @@ test.describe("1.x: Map + List Scroll Sync", () => {
     const hasMarkers = await zoomToExpandClusters(page);
     test.skip(!hasMarkers, "No individual markers after cluster expansion");
 
-    const listingId = await getMarkerListingId(page, 0);
-    test.skip(!listingId, "Could not extract listing ID from first marker");
+    const listingIdRaw = await getMarkerListingId(page, 0);
+    test.skip(!listingIdRaw, "Could not extract listing ID from first marker");
+    const listingId = listingIdRaw!;
 
     // Click marker to open popup and set activeId via evaluate
     await page.evaluate((id) => {
@@ -498,8 +501,9 @@ test.describe("2.x: Search as I Move -- Result Auto-Refresh", () => {
     const initialUrl = page.url();
 
     // Pan the map significantly (30% of map width)
-    const mapBox = await page.locator(sel.mapContainer).first().boundingBox();
-    test.skip(!mapBox, "Could not get map bounding box");
+    const mapBoxRaw = await page.locator(sel.mapContainer).first().boundingBox();
+    test.skip(!mapBoxRaw, "Could not get map bounding box");
+    const mapBox = mapBoxRaw!;
 
     const panDelta = Math.round(mapBox.width * 0.3);
     const panned =

@@ -111,9 +111,14 @@ jest.mock("@/app/actions/block", () => ({
   checkBlockBeforeAction: jest.fn().mockResolvedValue({ allowed: true }),
 }));
 
+jest.mock("next/headers", () => ({
+  headers: jest.fn().mockReturnValue(new Map()),
+}));
+
 jest.mock("@/lib/rate-limit", () => ({
   checkRateLimit: jest.fn().mockResolvedValue({ success: true, remaining: 29, resetAt: new Date() }),
-  RATE_LIMITS: { bookingStatus: { limit: 30, windowMs: 60 * 1000 } },
+  getClientIPFromHeaders: jest.fn().mockReturnValue("127.0.0.1"),
+  RATE_LIMITS: { bookingStatus: { limit: 30, windowMs: 60 * 1000 }, chatSendMessage: { limit: 30, windowMs: 60 * 1000 } },
 }));
 
 jest.mock("@/lib/booking-state-machine", () => ({
