@@ -124,6 +124,19 @@ export async function updateBookingStatus(
                             SET "availableSlots" = LEAST("availableSlots" + ${booking.slotsRequested}, "totalSlots")
                             WHERE "id" = ${booking.listing.id}
                         `;
+            await logBookingAudit(tx, {
+              bookingId: booking.id,
+              action: "EXPIRED",
+              previousStatus: "HELD",
+              newStatus: "EXPIRED",
+              actorId: null,
+              actorType: "SYSTEM",
+              details: {
+                mechanism: "inline_expiry",
+                slotsRequested: booking.slotsRequested,
+                heldUntil: booking.heldUntil,
+              },
+            });
           }
         });
       } catch (err) {
