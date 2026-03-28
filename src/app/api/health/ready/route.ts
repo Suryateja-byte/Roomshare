@@ -2,6 +2,7 @@ import { NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
 import { isInShutdownMode } from "@/lib/shutdown";
 import { logger } from "@/lib/logger";
+import { getAllCircuitBreakerStates } from "@/lib/circuit-breaker";
 
 /**
  * Readiness probe - confirms the application can serve traffic
@@ -88,20 +89,32 @@ export async function GET() {
     publicChecks.supabase = { status: "ok" }; // Just check config exists
   }
 
+  // INFRA-002 FIX: Expose circuit breaker states for ops visibility
+  const breakerStates = getAllCircuitBreakerStates();
+  const anyBreakerOpen = breakerStates.some((b) => b.state === "OPEN");
+
   // Log latency internally (not exposed in public response)
   logger.sync.debug("Health check latency", {
     route: "/api/health/ready",
     latency: internalLatency,
     healthy,
+    anyBreakerOpen,
   });
+
+  // Determine overall status:
+  // - "unhealthy" (503) if critical deps (DB) are down
+  // - "degraded" (200) if DB is healthy but a circuit breaker is open
+  // - "ready" (200) if everything is healthy
+  const status = !healthy ? "unhealthy" : anyBreakerOpen ? "degraded" : "ready";
 
   // P2-1: Health checks must never be cached - always return fresh data
   const response = NextResponse.json(
     {
-      status: healthy ? "ready" : "unhealthy",
+      status,
       timestamp: new Date().toISOString(),
       version: process.env.VERCEL_GIT_COMMIT_SHA?.slice(0, 7) || "dev",
       checks: publicChecks,
+      circuitBreakers: breakerStates,
     },
     { status: healthy ? 200 : 503 }
   );

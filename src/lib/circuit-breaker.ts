@@ -8,6 +8,8 @@
  * - HALF_OPEN: Testing if service has recovered
  */
 
+import { logger } from "@/lib/logger";
+
 export type CircuitState = "CLOSED" | "OPEN" | "HALF_OPEN";
 
 export interface CircuitBreakerOptions {
@@ -100,7 +102,7 @@ export class CircuitBreaker {
     // Check if circuit should move from OPEN to HALF_OPEN
     if (this.state === "OPEN") {
       if (this.shouldAttemptReset()) {
-        this.state = "HALF_OPEN";
+        this.transitionTo("HALF_OPEN");
         this.successes = 0;
       } else {
         throw new CircuitOpenError(this.name);
@@ -135,7 +137,7 @@ export class CircuitBreaker {
     if (this.state === "HALF_OPEN") {
       this.successes++;
       if (this.successes >= this.successThreshold) {
-        this.state = "CLOSED";
+        this.transitionTo("CLOSED");
         this.successes = 0;
       }
     }
@@ -151,14 +153,36 @@ export class CircuitBreaker {
 
     if (this.state === "HALF_OPEN") {
       // Any failure in half-open state reopens the circuit
-      this.state = "OPEN";
+      this.transitionTo("OPEN");
       this.successes = 0;
     } else if (
       this.state === "CLOSED" &&
       this.failures >= this.failureThreshold
     ) {
-      this.state = "OPEN";
+      this.transitionTo("OPEN");
     }
+  }
+
+  /**
+   * Log and apply a state transition
+   */
+  private transitionTo(newState: CircuitState): void {
+    const previousState = this.state;
+    this.state = newState;
+    logger.sync.info("Circuit breaker state transition", {
+      circuitBreaker: this.name,
+      from: previousState,
+      to: newState,
+      failureCount: this.failures,
+      totalFailures: this.totalFailures,
+    });
+  }
+
+  /**
+   * Get the circuit breaker name
+   */
+  getName(): string {
+    return this.name;
   }
 
   /**
@@ -262,3 +286,24 @@ export const circuitBreakers = {
     successThreshold: 1, // Close immediately on first success (V2 either works or doesn't)
   }),
 };
+
+/**
+ * INFRA-002 FIX: Expose all circuit breaker states for health endpoint monitoring.
+ * Returns an array of breaker summaries so ops can see degraded services.
+ */
+export function getAllCircuitBreakerStates(): Array<{
+  name: string;
+  state: CircuitState;
+  failureCount: number;
+  lastFailureTime: number | null;
+}> {
+  return Object.values(circuitBreakers).map((breaker) => {
+    const stats = breaker.getStats();
+    return {
+      name: breaker.getName(),
+      state: stats.state,
+      failureCount: stats.failures,
+      lastFailureTime: stats.lastFailure,
+    };
+  });
+}

@@ -19,6 +19,10 @@ jest.mock("@/lib/prisma", () => ({
   },
 }));
 
+jest.mock("@/lib/circuit-breaker", () => ({
+  getAllCircuitBreakerStates: jest.fn().mockReturnValue([]),
+}));
+
 // Mock NextResponse to capture Cache-Control headers
 jest.mock("next/server", () => {
   return {
@@ -40,6 +44,7 @@ jest.mock("next/server", () => {
 
 import { isInShutdownMode } from "@/lib/shutdown";
 import { prisma } from "@/lib/prisma";
+import { getAllCircuitBreakerStates } from "@/lib/circuit-breaker";
 
 describe("Health Endpoints", () => {
   const originalEnv = process.env;
@@ -265,6 +270,64 @@ describe("Health Endpoints", () => {
         const data = await response.json();
 
         expect(data.checks.redis.status).toBe("ok");
+      });
+    });
+
+    // INFRA-002: Circuit breaker visibility in health endpoint
+    describe("circuit breaker visibility", () => {
+      beforeEach(() => {
+        (prisma.$queryRaw as jest.Mock).mockResolvedValue([{ "?column?": 1 }]);
+      });
+
+      it("includes circuitBreakers array in response", async () => {
+        (getAllCircuitBreakerStates as jest.Mock).mockReturnValue([
+          { name: "redis", state: "CLOSED", failureCount: 0, lastFailureTime: null },
+        ]);
+
+        const response = await readyGET();
+        const data = await response.json();
+
+        expect(data.circuitBreakers).toBeDefined();
+        expect(Array.isArray(data.circuitBreakers)).toBe(true);
+      });
+
+      it('returns status "degraded" with 200 when a breaker is OPEN', async () => {
+        (getAllCircuitBreakerStates as jest.Mock).mockReturnValue([
+          { name: "redis", state: "OPEN", failureCount: 3, lastFailureTime: Date.now() },
+          { name: "email", state: "CLOSED", failureCount: 0, lastFailureTime: null },
+        ]);
+
+        const response = await readyGET();
+        const data = await response.json();
+
+        expect(response.status).toBe(200);
+        expect(data.status).toBe("degraded");
+      });
+
+      it('returns status "ready" when all breakers are CLOSED', async () => {
+        (getAllCircuitBreakerStates as jest.Mock).mockReturnValue([
+          { name: "redis", state: "CLOSED", failureCount: 0, lastFailureTime: null },
+          { name: "email", state: "CLOSED", failureCount: 0, lastFailureTime: null },
+        ]);
+
+        const response = await readyGET();
+        const data = await response.json();
+
+        expect(response.status).toBe(200);
+        expect(data.status).toBe("ready");
+      });
+
+      it('returns "unhealthy" 503 even if breakers are open when DB is down', async () => {
+        (prisma.$queryRaw as jest.Mock).mockRejectedValue(new Error("DB down"));
+        (getAllCircuitBreakerStates as jest.Mock).mockReturnValue([
+          { name: "redis", state: "OPEN", failureCount: 3, lastFailureTime: Date.now() },
+        ]);
+
+        const response = await readyGET();
+        const data = await response.json();
+
+        expect(response.status).toBe(503);
+        expect(data.status).toBe("unhealthy");
       });
     });
   });
