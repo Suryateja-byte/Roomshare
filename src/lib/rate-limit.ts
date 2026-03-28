@@ -275,6 +275,8 @@ export const RATE_LIMITS = {
   notifications: { limit: 60, windowMs: 60 * 1000 }, // 60 per minute
   savedSearchMutations: { limit: 30, windowMs: 60 * 60 * 1000 }, // 30 per hour
   canDeleteCheck: { limit: 30, windowMs: 60 * 60 * 1000 }, // 30 per hour
+  // SEC-007 FIX: Rate limit viewer-state endpoint (called on every listing page load)
+  viewerState: { limit: 60, windowMs: 60 * 1000 }, // 60 per minute
   bookingStatus: { limit: 30, windowMs: 60 * 1000 }, // 30 per minute
   // Phase 2: Rate limit booking creation (C4 fix — was unprotected)
   createBooking: { limit: 10, windowMs: 60 * 60 * 1000 }, // 10 per hour (per user)
