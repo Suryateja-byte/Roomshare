@@ -19,6 +19,7 @@ import {
   useContext,
   useState,
   useCallback,
+  useEffect,
   useMemo,
   useRef,
 } from "react";
@@ -72,7 +73,9 @@ export function SearchMapUIProvider({
   // adding it to useCallback deps (avoids context value identity churn
   // on map toggle, which would re-render all consumers).
   const shouldShowMapRef = useRef(shouldShowMap);
-  shouldShowMapRef.current = shouldShowMap;
+  useEffect(() => {
+    shouldShowMapRef.current = shouldShowMap;
+  }, [shouldShowMap]);
 
   const focusListingOnMap = useCallback(
     (listingId: string) => {
