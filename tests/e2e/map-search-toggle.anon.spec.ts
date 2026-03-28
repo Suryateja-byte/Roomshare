@@ -252,10 +252,8 @@ test.describe("4.x: Search as I move toggle", () => {
       }
 
       // Check if map is fully loaded (WebGL working)
-      if (!(await isMapFullyLoaded(page))) {
-        test.skip(true, "Map not fully loaded (WebGL unavailable in headless)");
-        return;
-      }
+      const mapFullyLoaded = await isMapFullyLoaded(page);
+      test.skip(!mapFullyLoaded, "Map not fully loaded (WebGL unavailable in headless)");
 
       // Turn toggle OFF
       await turnToggleOff(page);
@@ -308,10 +306,8 @@ test.describe("4.x: Search as I move toggle", () => {
         return;
       }
 
-      if (!(await isMapFullyLoaded(page))) {
-        test.skip(true, "Map not fully loaded (WebGL unavailable in headless)");
-        return;
-      }
+      const mapFullyLoaded = await isMapFullyLoaded(page);
+      test.skip(!mapFullyLoaded, "Map not fully loaded (WebGL unavailable in headless)");
 
       // Capture initial URL bounds
       const initialUrl = page.url();
@@ -362,10 +358,8 @@ test.describe("4.x: Search as I move toggle", () => {
         return;
       }
 
-      if (!(await isMapFullyLoaded(page))) {
-        test.skip(true, "Map not fully loaded (WebGL unavailable in headless)");
-        return;
-      }
+      const mapFullyLoaded = await isMapFullyLoaded(page);
+      test.skip(!mapFullyLoaded, "Map not fully loaded (WebGL unavailable in headless)");
 
       // Capture initial URL
       const initialUrl = page.url();
@@ -430,10 +424,8 @@ test.describe("4.x: Search as I move toggle", () => {
         return;
       }
 
-      if (!(await isMapFullyLoaded(page))) {
-        test.skip(true, "Map not fully loaded (WebGL unavailable in headless)");
-        return;
-      }
+      const mapFullyLoaded = await isMapFullyLoaded(page);
+      test.skip(!mapFullyLoaded, "Map not fully loaded (WebGL unavailable in headless)");
 
       // Turn toggle OFF
       await turnToggleOff(page);
@@ -493,10 +485,8 @@ test.describe("4.x: Search as I move toggle", () => {
         return;
       }
 
-      if (!(await isMapFullyLoaded(page))) {
-        test.skip(true, "Map not fully loaded (WebGL unavailable in headless)");
-        return;
-      }
+      const mapFullyLoaded = await isMapFullyLoaded(page);
+      test.skip(!mapFullyLoaded, "Map not fully loaded (WebGL unavailable in headless)");
 
       // Turn toggle OFF
       await turnToggleOff(page);
@@ -576,10 +566,8 @@ test.describe("4.x: Search as I move toggle", () => {
         return;
       }
 
-      if (!(await isMapFullyLoaded(page))) {
-        test.skip(true, "Map not fully loaded (WebGL unavailable in headless)");
-        return;
-      }
+      const mapFullyLoaded = await isMapFullyLoaded(page);
+      test.skip(!mapFullyLoaded, "Map not fully loaded (WebGL unavailable in headless)");
 
       // Turn toggle OFF
       await turnToggleOff(page);
@@ -684,10 +672,8 @@ test.describe("4.x: Search as I move toggle", () => {
         return;
       }
 
-      if (!(await isMapFullyLoaded(page))) {
-        test.skip(true, "Map not fully loaded (WebGL unavailable in headless)");
-        return;
-      }
+      const mapFullyLoaded = await isMapFullyLoaded(page);
+      test.skip(!mapFullyLoaded, "Map not fully loaded (WebGL unavailable in headless)");
 
       // Turn toggle OFF and pan
       await turnToggleOff(page);

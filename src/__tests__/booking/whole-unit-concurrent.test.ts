@@ -198,6 +198,7 @@ describe("WHOLE_UNIT concurrent race conditions (Phase 3)", () => {
                   id: "listing-wu",
                   ownerId: "owner-456",
                   bookingMode: "WHOLE_UNIT",
+                  status: "ACTIVE",
                 },
               ])
               .mockResolvedValueOnce([{ total: BigInt(0) }]), // No prior accepted bookings
@@ -232,6 +233,7 @@ describe("WHOLE_UNIT concurrent race conditions (Phase 3)", () => {
                   id: "listing-wu",
                   ownerId: "owner-456",
                   bookingMode: "WHOLE_UNIT",
+                  status: "ACTIVE",
                 },
               ])
               .mockResolvedValueOnce([{ total: BigInt(4) }]), // 4 slots used by booking A
@@ -280,6 +282,7 @@ describe("WHOLE_UNIT concurrent race conditions (Phase 3)", () => {
                   id: "listing-wu",
                   ownerId: "owner-456",
                   bookingMode: "WHOLE_UNIT",
+                  status: "ACTIVE",
                 },
               ])
               .mockResolvedValueOnce([{ total: BigInt(0) }]),
@@ -315,6 +318,7 @@ describe("WHOLE_UNIT concurrent race conditions (Phase 3)", () => {
                   id: "listing-wu",
                   ownerId: "owner-456",
                   bookingMode: "WHOLE_UNIT",
+                  status: "ACTIVE",
                 },
               ])
               .mockResolvedValueOnce([{ total: BigInt(0) }]), // No overlapping accepted in Oct-Dec

@@ -229,10 +229,9 @@ test.describe("Mobile Bottom Sheet - Drag Handle (7.2)", () => {
     });
 
     const sheet = page.locator(selectors.bottomSheet);
-    if (!(await sheet.isVisible({ timeout: 5000 }).catch(() => false))) {
-      test.skip();
-      return;
-    }
+    const sheetVisible = await sheet.isVisible({ timeout: 5000 }).catch(() => false);
+    test.skip(!sheetVisible, "Bottom sheet not visible");
+    if (!sheetVisible) return;
 
     // Start at half position
     const initialSnap = await getSnapIndex(page);
@@ -290,10 +289,9 @@ test.describe("Mobile Bottom Sheet - Expanded Drag Down (7.3)", () => {
     });
 
     const sheet = page.locator(selectors.bottomSheet);
-    if (!(await sheet.isVisible({ timeout: 5000 }).catch(() => false))) {
-      test.skip();
-      return;
-    }
+    const sheetVisible = await sheet.isVisible({ timeout: 5000 }).catch(() => false);
+    test.skip(!sheetVisible, "Bottom sheet not visible");
+    if (!sheetVisible) return;
 
     // Expand the sheet via keyboard on the slider handle
     const handle = page.locator(selectors.bottomSheetHandle);
@@ -327,10 +325,9 @@ test.describe("Mobile Bottom Sheet - Expanded Drag Down (7.3)", () => {
     });
 
     const sheet = page.locator(selectors.bottomSheet);
-    if (!(await sheet.isVisible({ timeout: 5000 }).catch(() => false))) {
-      test.skip();
-      return;
-    }
+    const sheetVisible = await sheet.isVisible({ timeout: 5000 }).catch(() => false);
+    test.skip(!sheetVisible, "Bottom sheet not visible");
+    if (!sheetVisible) return;
 
     // Expand the sheet via keyboard
     const handle = page.locator(selectors.bottomSheetHandle);
@@ -343,10 +340,7 @@ test.describe("Mobile Bottom Sheet - Expanded Drag Down (7.3)", () => {
     const isScrollable = await content.evaluate(
       (el) => el.scrollHeight > el.clientHeight
     );
-    if (!isScrollable) {
-      test.skip(true, "Content area is not scrollable (not enough listings)");
-      return;
-    }
+    test.skip(!isScrollable, "Content area is not scrollable (not enough listings)");
 
     // Scroll content down
     await content.evaluate((el) => {
@@ -374,10 +368,9 @@ test.describe("Mobile Bottom Sheet - Map Touch Events (7.4)", () => {
     });
 
     const sheet = page.locator(selectors.bottomSheet);
-    if (!(await sheet.isVisible({ timeout: 5000 }).catch(() => false))) {
-      test.skip();
-      return;
-    }
+    const sheetVisible = await sheet.isVisible({ timeout: 5000 }).catch(() => false);
+    test.skip(!sheetVisible, "Bottom sheet not visible");
+    if (!sheetVisible) return;
 
     // Collapse the sheet via minimize button or drag
     const minimizeBtn = page.locator(selectors.minimizeButton);
@@ -421,10 +414,9 @@ test.describe("Mobile Bottom Sheet - Map Touch Events (7.4)", () => {
     });
 
     const sheet = page.locator(selectors.bottomSheet);
-    if (!(await sheet.isVisible({ timeout: 5000 }).catch(() => false))) {
-      test.skip();
-      return;
-    }
+    const sheetVisible = await sheet.isVisible({ timeout: 5000 }).catch(() => false);
+    test.skip(!sheetVisible, "Bottom sheet not visible");
+    if (!sheetVisible) return;
 
     // Wait for header ResizeObserver + padding-top transition to settle
     await waitForLayoutStable(page);
@@ -465,10 +457,9 @@ test.describe("Mobile Bottom Sheet - Escape Key (7.5)", () => {
     });
 
     const sheet = page.locator(selectors.bottomSheet);
-    if (!(await sheet.isVisible({ timeout: 5000 }).catch(() => false))) {
-      test.skip();
-      return;
-    }
+    const sheetVisible = await sheet.isVisible({ timeout: 5000 }).catch(() => false);
+    test.skip(!sheetVisible, "Bottom sheet not visible");
+    if (!sheetVisible) return;
 
     // Expand — use auto-wait click (no force) for proper focus/keyboard context
     const expandBtn = page.locator(selectors.expandButton);
@@ -504,10 +495,9 @@ test.describe("Mobile Bottom Sheet - Escape Key (7.5)", () => {
     });
 
     const sheet = page.locator(selectors.bottomSheet);
-    if (!(await sheet.isVisible({ timeout: 5000 }).catch(() => false))) {
-      test.skip();
-      return;
-    }
+    const sheetVisible = await sheet.isVisible({ timeout: 5000 }).catch(() => false);
+    test.skip(!sheetVisible, "Bottom sheet not visible");
+    if (!sheetVisible) return;
 
     // Collapse — use auto-wait click (no force) for proper focus/keyboard context
     const minimizeBtn = page.locator(selectors.minimizeButton);
@@ -546,12 +536,9 @@ test.describe("Mobile Bottom Sheet - State Preservation (7.6)", () => {
     });
 
     const sheet = page.locator(selectors.bottomSheet);
-    try {
-      await expect(sheet).toBeVisible({ timeout: 5000 });
-    } catch {
-      test.skip();
-      return;
-    }
+    const sheetVisible = await sheet.isVisible({ timeout: 5000 }).catch(() => false);
+    test.skip(!sheetVisible, "Bottom sheet not visible");
+    if (!sheetVisible) return;
 
     // Wait for header ResizeObserver + padding-top transition to settle
     await waitForLayoutStable(page);
@@ -616,10 +603,9 @@ test.describe("Mobile Bottom Sheet - Flick Velocity (7.7)", () => {
     });
 
     const sheet = page.locator(selectors.bottomSheet);
-    if (!(await sheet.isVisible({ timeout: 5000 }).catch(() => false))) {
-      test.skip();
-      return;
-    }
+    const sheetVisible = await sheet.isVisible({ timeout: 5000 }).catch(() => false);
+    test.skip(!sheetVisible, "Bottom sheet not visible");
+    if (!sheetVisible) return;
 
     // Start at half
     expect(await getSnapIndex(page)).toBe(1);
@@ -641,10 +627,9 @@ test.describe("Mobile Bottom Sheet - Flick Velocity (7.7)", () => {
     });
 
     const sheet = page.locator(selectors.bottomSheet);
-    if (!(await sheet.isVisible({ timeout: 5000 }).catch(() => false))) {
-      test.skip();
-      return;
-    }
+    const sheetVisible = await sheet.isVisible({ timeout: 5000 }).catch(() => false);
+    test.skip(!sheetVisible, "Bottom sheet not visible");
+    if (!sheetVisible) return;
 
     // Start at half
     expect(await getSnapIndex(page)).toBe(1);
@@ -666,10 +651,9 @@ test.describe("Mobile Bottom Sheet - Flick Velocity (7.7)", () => {
     });
 
     const sheet = page.locator(selectors.bottomSheet);
-    if (!(await sheet.isVisible({ timeout: 5000 }).catch(() => false))) {
-      test.skip();
-      return;
-    }
+    const sheetVisible = await sheet.isVisible({ timeout: 5000 }).catch(() => false);
+    test.skip(!sheetVisible, "Bottom sheet not visible");
+    if (!sheetVisible) return;
 
     // Start at half
     expect(await getSnapIndex(page)).toBe(1);
@@ -691,10 +675,9 @@ test.describe("Mobile Bottom Sheet - Pull to Refresh (7.8)", () => {
     });
 
     const sheet = page.locator(selectors.bottomSheet);
-    if (!(await sheet.isVisible({ timeout: 5000 }).catch(() => false))) {
-      test.skip();
-      return;
-    }
+    const sheetVisible = await sheet.isVisible({ timeout: 5000 }).catch(() => false);
+    test.skip(!sheetVisible, "Bottom sheet not visible");
+    if (!sheetVisible) return;
 
     // Wait for header ResizeObserver + padding-top transition to settle
     await waitForLayoutStable(page);
@@ -748,7 +731,7 @@ test.describe("Mobile Bottom Sheet - Keyboard Navigation (7.9)", () => {
 
     const handle = page.locator(selectors.bottomSheetHandle);
     if (!(await handle.isVisible({ timeout: 5000 }).catch(() => false))) {
-      test.skip();
+      test.skip(true, "Sheet handle not visible");
       return;
     }
 
@@ -779,7 +762,7 @@ test.describe("Mobile Bottom Sheet - Keyboard Navigation (7.9)", () => {
 
     const handle = page.locator(selectors.bottomSheetHandle);
     if (!(await handle.isVisible({ timeout: 5000 }).catch(() => false))) {
-      test.skip();
+      test.skip(true, "Sheet handle not visible");
       return;
     }
 
@@ -810,7 +793,7 @@ test.describe("Mobile Bottom Sheet - Keyboard Navigation (7.9)", () => {
 
     const handle = page.locator(selectors.bottomSheetHandle);
     if (!(await handle.isVisible({ timeout: 5000 }).catch(() => false))) {
-      test.skip();
+      test.skip(true, "Sheet handle not visible");
       return;
     }
 
@@ -841,7 +824,7 @@ test.describe("Mobile Bottom Sheet - Keyboard Navigation (7.9)", () => {
 
     const handle = page.locator(selectors.bottomSheetHandle);
     if (!(await handle.isVisible({ timeout: 5000 }).catch(() => false))) {
-      test.skip();
+      test.skip(true, "Sheet handle not visible");
       return;
     }
 
@@ -867,7 +850,7 @@ test.describe("Mobile Bottom Sheet - Keyboard Navigation (7.9)", () => {
 
     const handle = page.locator(selectors.bottomSheetHandle);
     if (!(await handle.isVisible({ timeout: 5000 }).catch(() => false))) {
-      test.skip();
+      test.skip(true, "Sheet handle not visible");
       return;
     }
 
@@ -901,10 +884,9 @@ test.describe("Mobile Bottom Sheet - Body Scroll Lock", () => {
     });
 
     const sheet = page.locator(selectors.bottomSheet);
-    if (!(await sheet.isVisible({ timeout: 5000 }).catch(() => false))) {
-      test.skip();
-      return;
-    }
+    const sheetVisible = await sheet.isVisible({ timeout: 5000 }).catch(() => false);
+    test.skip(!sheetVisible, "Bottom sheet not visible");
+    if (!sheetVisible) return;
 
     // At half position, body should be scrollable
     expect(await getSnapIndex(page)).toBe(1);

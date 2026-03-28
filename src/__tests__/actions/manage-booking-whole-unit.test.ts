@@ -196,6 +196,7 @@ describe("manage-booking — WHOLE_UNIT mode (Phase 3)", () => {
                   id: "listing-123",
                   ownerId: "owner-123",
                   bookingMode: "WHOLE_UNIT",
+                  status: "ACTIVE",
                 },
               ])
               .mockResolvedValueOnce([{ total: BigInt(0) }]), // No overlapping accepted
@@ -236,6 +237,7 @@ describe("manage-booking — WHOLE_UNIT mode (Phase 3)", () => {
                   id: "listing-123",
                   ownerId: "owner-123",
                   bookingMode: "WHOLE_UNIT",
+                  status: "ACTIVE",
                 },
               ])
               .mockResolvedValueOnce([{ total: BigInt(4) }]), // 4 slots used by first booking
@@ -265,6 +267,7 @@ describe("manage-booking — WHOLE_UNIT mode (Phase 3)", () => {
                   id: "listing-123",
                   ownerId: "owner-123",
                   bookingMode: "WHOLE_UNIT",
+                  status: "ACTIVE",
                 },
               ])
               .mockResolvedValueOnce([{ total: BigInt(0) }]),
@@ -305,6 +308,7 @@ describe("manage-booking — WHOLE_UNIT mode (Phase 3)", () => {
                   id: "listing-123",
                   ownerId: "owner-123",
                   bookingMode: "WHOLE_UNIT",
+                  status: "ACTIVE",
                 },
               ])
               .mockResolvedValueOnce([{ total: BigInt(0) }]), // No overlap for Oct-Dec range
@@ -338,6 +342,7 @@ describe("manage-booking — WHOLE_UNIT mode (Phase 3)", () => {
                   id: "listing-123",
                   ownerId: "owner-123",
                   bookingMode: "WHOLE_UNIT",
+                  status: "ACTIVE",
                 },
               ])
               .mockResolvedValueOnce([{ total: BigInt(0) }]),
@@ -379,6 +384,7 @@ describe("manage-booking — WHOLE_UNIT mode (Phase 3)", () => {
                   id: "listing-123",
                   ownerId: "owner-123",
                   bookingMode: "WHOLE_UNIT",
+                  status: "ACTIVE",
                 },
               ])
               .mockResolvedValueOnce([{ total: BigInt(0) }]),
@@ -476,6 +482,7 @@ describe("manage-booking — WHOLE_UNIT mode (Phase 3)", () => {
                   id: "listing-shared",
                   ownerId: "owner-123",
                   bookingMode: "SHARED",
+                  status: "ACTIVE",
                 },
               ])
               .mockResolvedValueOnce([{ total: BigInt(0) }]),
@@ -513,6 +520,7 @@ describe("manage-booking — WHOLE_UNIT mode (Phase 3)", () => {
                   id: "listing-shared",
                   ownerId: "owner-123",
                   bookingMode: "SHARED",
+                  status: "ACTIVE",
                 },
               ])
               .mockResolvedValueOnce([{ total: BigInt(1) }]), // 1 slot already used
@@ -597,6 +605,7 @@ describe("manage-booking — WHOLE_UNIT mode (Phase 3)", () => {
                   id: "listing-123",
                   ownerId: "owner-123",
                   bookingMode: "WHOLE_UNIT",
+                  status: "ACTIVE",
                 },
               ])
               .mockResolvedValueOnce([{ total: BigInt(0) }]), // No overlap at boundary

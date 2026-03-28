@@ -211,17 +211,11 @@ test.describe("Map persistence: Map survives changes", () => {
     await waitForSearchPage(page);
 
     const hasMapRef = await waitForMapRef(page);
-    if (!hasMapRef) {
-      test.skip(true, "Map ref not available (WebGL unavailable in headless)");
-      return;
-    }
+    test.skip(!hasMapRef, "Map ref not available (WebGL unavailable in headless)");
 
     // Get current zoom
     const initialZoom = await getMapZoom(page);
-    if (initialZoom === null) {
-      test.skip(true, "Could not read zoom level");
-      return;
-    }
+    test.skip(initialZoom === null, "Could not read zoom level");
 
     // Apply a filter
     await navigateWithFilter(page, "maxPrice", "2000");
@@ -233,23 +227,17 @@ test.describe("Map persistence: Map survives changes", () => {
     expect(afterZoom).not.toBeNull();
 
     // Zoom should be the same (within tolerance for floating point)
-    expect(Math.abs(afterZoom! - initialZoom)).toBeLessThan(0.5);
+    expect(Math.abs(afterZoom! - initialZoom!)).toBeLessThan(0.5);
   });
 
   test("4 - Map center preserved after filter change", async ({ page }) => {
     await waitForSearchPage(page);
 
     const hasMapRef = await waitForMapRef(page);
-    if (!hasMapRef) {
-      test.skip(true, "Map ref not available (WebGL unavailable in headless)");
-      return;
-    }
+    test.skip(!hasMapRef, "Map ref not available (WebGL unavailable in headless)");
 
     const initialCenter = await getMapCenter(page);
-    if (!initialCenter) {
-      test.skip(true, "Could not read map center");
-      return;
-    }
+    test.skip(!initialCenter, "Could not read map center");
 
     // Apply a filter
     await navigateWithFilter(page, "maxPrice", "2000");
@@ -261,10 +249,10 @@ test.describe("Map persistence: Map survives changes", () => {
 
     // Center should be approximately the same (tolerance ~0.05 degrees)
     const tolerance = 0.05;
-    expect(Math.abs(afterCenter!.lat - initialCenter.lat)).toBeLessThan(
+    expect(Math.abs(afterCenter!.lat - initialCenter!.lat)).toBeLessThan(
       tolerance
     );
-    expect(Math.abs(afterCenter!.lng - initialCenter.lng)).toBeLessThan(
+    expect(Math.abs(afterCenter!.lng - initialCenter!.lng)).toBeLessThan(
       tolerance
     );
   });
@@ -274,17 +262,12 @@ test.describe("Map persistence: Map survives changes", () => {
   }) => {
     await waitForSearchPage(page);
 
-    const initialState = await getMapE2EState(page);
-    if (!initialState?.mapInstanceId) {
-      test.skip(true, "E2E instrumentation not enabled");
-      return;
-    }
+    const initialStateRaw = await getMapE2EState(page);
+    test.skip(!initialStateRaw?.mapInstanceId, "E2E instrumentation not enabled");
+    const initialState = initialStateRaw!;
 
     const hasMapRef = await waitForMapRef(page);
-    if (!hasMapRef) {
-      test.skip(true, "Map ref not available");
-      return;
-    }
+    test.skip(!hasMapRef, "Map ref not available");
 
     const initialZoom = await getMapZoom(page);
     const initialCenter = await getMapCenter(page);
@@ -318,11 +301,9 @@ test.describe("Map persistence: Map survives changes", () => {
   }) => {
     await waitForSearchPage(page);
 
-    const initialState = await getMapE2EState(page);
-    if (!initialState?.mapInstanceId) {
-      test.skip(true, "E2E instrumentation not enabled");
-      return;
-    }
+    const initialStateRaw = await getMapE2EState(page);
+    test.skip(!initialStateRaw?.mapInstanceId, "E2E instrumentation not enabled");
+    const initialState = initialStateRaw!;
 
     // Change search query
     await page.goto(`${SEARCH_URL}&q=Mission+District`);
@@ -341,10 +322,7 @@ test.describe("Map persistence: Map survives changes", () => {
   }) => {
     await waitForSearchPage(page);
 
-    if (!(await isMapCanvasVisible(page))) {
-      test.skip(true, "Map canvas not visible (WebGL unavailable)");
-      return;
-    }
+    test.skip(!(await isMapCanvasVisible(page)), "Map canvas not visible (WebGL unavailable)");
 
     // Verify canvas is visible before the filter change
     expect(await isMapCanvasVisible(page)).toBe(true);
@@ -382,10 +360,7 @@ test.describe("Map persistence: Map state recovery", () => {
   test("8 - Page refresh preserves map bounds from URL", async ({ page }) => {
     await waitForSearchPage(page);
 
-    if (!(await isMapContainerVisible(page))) {
-      test.skip(true, "Map not visible");
-      return;
-    }
+    test.skip(!(await isMapContainerVisible(page)), "Map not visible");
 
     // URL has bounds from SF_BOUNDS - verify they're there
     const url = new URL(page.url(), "http://localhost");
@@ -434,10 +409,7 @@ test.describe("Map persistence: Map state recovery", () => {
     test.slow();
     await waitForSearchPage(page);
 
-    if (!(await isMapContainerVisible(page))) {
-      test.skip(true, "Map not visible");
-      return;
-    }
+    test.skip(!(await isMapContainerVisible(page)), "Map not visible");
 
     // Find a listing card link and navigate to it
     // Listing URLs may start with /listings/c or just /listings/
@@ -456,10 +428,7 @@ test.describe("Map persistence: Map state recovery", () => {
     if ((await listingLink.count()) === 0) {
       // Wait longer for SSR hydration to produce listing cards
       await listingLink.waitFor({ state: 'attached', timeout: 15_000 }).catch(() => {});
-      if ((await listingLink.count()) === 0) {
-        test.skip(true, "No listing links found");
-        return;
-      }
+      test.skip((await listingLink.count()) === 0, "No listing links found");
     }
 
     const linkVisible = await listingLink
@@ -502,11 +471,9 @@ test.describe("Map persistence: Map state recovery", () => {
   }) => {
     await waitForSearchPage(page);
 
-    const initialState = await getMapE2EState(page);
-    if (!initialState?.mapInstanceId) {
-      test.skip(true, "E2E instrumentation not enabled");
-      return;
-    }
+    const initialStateRaw = await getMapE2EState(page);
+    test.skip(!initialStateRaw?.mapInstanceId, "E2E instrumentation not enabled");
+    const initialState = initialStateRaw!;
 
     // Apply filter 1
     await navigateWithFilter(page, "roomType", "Private Room");

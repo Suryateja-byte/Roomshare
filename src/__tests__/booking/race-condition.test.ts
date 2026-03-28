@@ -591,6 +591,7 @@ describe("cross-operation concurrency (B2.2)", () => {
           id: "listing-abc",
           ownerId: "owner-456",
           bookingMode: "SHARED",
+          status: "ACTIVE",
         },
       ])
       .mockResolvedValueOnce([{ total: BigInt(0) }]); // SUM(slotsRequested)

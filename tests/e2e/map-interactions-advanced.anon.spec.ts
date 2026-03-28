@@ -248,33 +248,21 @@ test.describe("Map Interactions Advanced (Stories 5-8)", () => {
     test("5.1 (P1) - zooming out creates cluster markers", async ({ page }) => {
       await waitForSearchPage(page);
 
-      if (!(await isMapAvailable(page))) {
-        test.skip(true, "Map not available (WebGL unavailable in headless)");
-        return;
-      }
+      test.skip(!(await isMapAvailable(page)), "Map not available (WebGL unavailable in headless)");
 
       const hasRef = await waitForMapRef(page);
-      if (!hasRef) {
-        test.skip(true, "Map ref not available");
-        return;
-      }
+      test.skip(!hasRef, "Map ref not available");
 
       // Step 1: Zoom in to level 14 to see individual markers
       const zoomedIn = await jumpToZoom(page, 14);
-      if (!zoomedIn) {
-        test.skip(true, "Could not zoom map programmatically");
-        return;
-      }
+      test.skip(!zoomedIn, "Could not zoom map programmatically");
       await triggerMarkerUpdate(page);
 
       const markersAtZoom14 = await page
         .locator(".maplibregl-marker:visible")
         .count();
 
-      if (markersAtZoom14 === 0) {
-        test.skip(true, "No markers at zoom 14 -- insufficient seed data");
-        return;
-      }
+      test.skip(markersAtZoom14 === 0, "No markers at zoom 14 -- insufficient seed data");
 
       // Step 2: Zoom out to level 10 to create clusters
       const zoomedOut = await jumpToZoom(page, 10);
@@ -317,16 +305,10 @@ test.describe("Map Interactions Advanced (Stories 5-8)", () => {
     }) => {
       await waitForSearchPage(page);
 
-      if (!(await isMapAvailable(page))) {
-        test.skip(true, "Map not available (WebGL unavailable in headless)");
-        return;
-      }
+      test.skip(!(await isMapAvailable(page)), "Map not available (WebGL unavailable in headless)");
 
       const hasRef = await waitForMapRef(page);
-      if (!hasRef) {
-        test.skip(true, "Map ref not available");
-        return;
-      }
+      test.skip(!hasRef, "Map ref not available");
 
       // Zoom out to level 10 to create cluster markers
       const zoomedOut = await jumpToZoom(page, 10);
@@ -340,10 +322,7 @@ test.describe("Map Interactions Advanced (Stories 5-8)", () => {
         .filter({ hasText: /^\d+$/ });
       const clusterCount = await clusterMarkers.count();
 
-      if (clusterCount === 0) {
-        test.skip(true, "No cluster markers visible at zoom 10");
-        return;
-      }
+      test.skip(clusterCount === 0, "No cluster markers visible at zoom 10");
 
       // Record state before clicking
       const zoomBefore = await getMapZoom(page);
@@ -383,31 +362,19 @@ test.describe("Map Interactions Advanced (Stories 5-8)", () => {
     }) => {
       await waitForSearchPage(page);
 
-      if (!(await isMapAvailable(page))) {
-        test.skip(true, "Map not available (WebGL unavailable in headless)");
-        return;
-      }
+      test.skip(!(await isMapAvailable(page)), "Map not available (WebGL unavailable in headless)");
 
       const hasRef = await waitForMapRef(page);
-      if (!hasRef) {
-        test.skip(true, "Map ref not available");
-        return;
-      }
+      test.skip(!hasRef, "Map ref not available");
 
       // Zoom in to expand clusters and reveal individual markers
       const expanded = await zoomToExpandClusters(page);
-      if (!expanded) {
-        test.skip(true, "Could not expand clusters");
-        return;
-      }
+      test.skip(!expanded, "Could not expand clusters");
 
       const markers = page.locator(".maplibregl-marker:visible");
       const markerCount = await markers.count();
 
-      if (markerCount < 2) {
-        test.skip(true, "Need at least 2 markers to test overlapping");
-        return;
-      }
+      test.skip(markerCount < 2, "Need at least 2 markers to test overlapping");
 
       // Find markers that are visually close (within 5px of each other)
       // by comparing their bounding boxes
@@ -491,22 +458,13 @@ test.describe("Map Interactions Advanced (Stories 5-8)", () => {
     }) => {
       await waitForSearchPage(page);
 
-      if (!(await isMapAvailable(page))) {
-        test.skip(true, "Map not available (WebGL unavailable in headless)");
-        return;
-      }
+      test.skip(!(await isMapAvailable(page)), "Map not available (WebGL unavailable in headless)");
 
       const hasRef = await waitForMapRef(page);
-      if (!hasRef) {
-        test.skip(true, "Map ref not available");
-        return;
-      }
+      test.skip(!hasRef, "Map ref not available");
 
       const expanded = await zoomToExpandClusters(page);
-      if (!expanded) {
-        test.skip(true, "Could not expand clusters");
-        return;
-      }
+      test.skip(!expanded, "Could not expand clusters");
 
       // Click each visible marker to look for a stacked popup
       const markers = page.locator(".maplibregl-marker:visible");
@@ -575,16 +533,10 @@ test.describe("Map Interactions Advanced (Stories 5-8)", () => {
     test("7.1 (P1) - changing sort preserves map markers", async ({ page }) => {
       await waitForSearchPage(page);
 
-      if (!(await isMapAvailable(page))) {
-        test.skip(true, "Map not available (WebGL unavailable in headless)");
-        return;
-      }
+      test.skip(!(await isMapAvailable(page)), "Map not available (WebGL unavailable in headless)");
 
       const hasRef = await waitForMapRef(page);
-      if (!hasRef) {
-        test.skip(true, "Map ref not available");
-        return;
-      }
+      test.skip(!hasRef, "Map ref not available");
 
       // Expand clusters to get consistent individual marker count
       await zoomToExpandClusters(page);
@@ -594,10 +546,7 @@ test.describe("Map Interactions Advanced (Stories 5-8)", () => {
         .locator(".maplibregl-marker:visible")
         .count();
 
-      if (initialMarkerCount === 0) {
-        test.skip(true, "No markers available to verify sort stability");
-        return;
-      }
+      test.skip(initialMarkerCount === 0, "No markers available to verify sort stability");
 
       // Change sort order via URL navigation (preserving bounds)
       await page.goto(`${SEARCH_URL}&sort=price_asc`);
@@ -643,12 +592,12 @@ test.describe("Map Interactions Advanced (Stories 5-8)", () => {
 
       await waitForSearchPage(page);
 
-      if (!(await isMapAvailable(page))) {
+      const mapIsAvailable = await isMapAvailable(page);
+      if (!mapIsAvailable) {
         // Clean up route before skipping
         await page.unroute("**/api/map-listings*");
-        test.skip(true, "Map not available (WebGL unavailable in headless)");
-        return;
       }
+      test.skip(!mapIsAvailable, "Map not available (WebGL unavailable in headless)");
 
       // Record call count after initial page load
       const callsAfterLoad = mapListingsCalls;
@@ -696,27 +645,22 @@ test.describe("Map Interactions Advanced (Stories 5-8)", () => {
       await waitForSearchPage(page, `/search?${specificBoundsQS}`);
 
       const hasRef = await waitForMapRef(page);
-      if (!hasRef) {
-        test.skip(true, "Map ref not available (WebGL unavailable)");
-        return;
-      }
+      test.skip(!hasRef, "Map ref not available (WebGL unavailable)");
 
       // Read map center from E2E hook
       const center = await getMapCenter(page);
-      if (!center) {
-        test.skip(true, "Could not read map center via E2E hook");
-        return;
-      }
+      test.skip(!center, "Could not read map center via E2E hook");
+      const c = center!;
 
       // Center should be approximately in the middle of the bounds
       const expectedLat = (specificBounds.minLat + specificBounds.maxLat) / 2; // 37.775
       const expectedLng = (specificBounds.minLng + specificBounds.maxLng) / 2; // -122.425
 
       const tolerance = 0.02;
-      expect(center.lat).toBeGreaterThanOrEqual(expectedLat - tolerance);
-      expect(center.lat).toBeLessThanOrEqual(expectedLat + tolerance);
-      expect(center.lng).toBeGreaterThanOrEqual(expectedLng - tolerance);
-      expect(center.lng).toBeLessThanOrEqual(expectedLng + tolerance);
+      expect(c.lat).toBeGreaterThanOrEqual(expectedLat - tolerance);
+      expect(c.lat).toBeLessThanOrEqual(expectedLat + tolerance);
+      expect(c.lng).toBeGreaterThanOrEqual(expectedLng - tolerance);
+      expect(c.lng).toBeLessThanOrEqual(expectedLng + tolerance);
     });
 
     test("8.2 (P1) - map pan updates URL bounds correctly", async ({
@@ -724,10 +668,7 @@ test.describe("Map Interactions Advanced (Stories 5-8)", () => {
     }) => {
       await waitForSearchPage(page);
 
-      if (!(await isMapAvailable(page))) {
-        test.skip(true, "Map not available (WebGL unavailable in headless)");
-        return;
-      }
+      test.skip(!(await isMapAvailable(page)), "Map not available (WebGL unavailable in headless)");
 
       await ensureSearchAsMoveOn(page);
 
@@ -739,10 +680,7 @@ test.describe("Map Interactions Advanced (Stories 5-8)", () => {
       const panned =
         (await programmaticMapPan(page, -300, 0)) ||
         (await simulateMapPan(page, -300, 0));
-      if (!panned) {
-        test.skip(true, "Map pan failed");
-        return;
-      }
+      test.skip(!panned, "Map pan failed");
 
       // Wait for debounced URL bounds update after pan
       await page.waitForLoadState("networkidle").catch(() => {});
@@ -773,10 +711,7 @@ test.describe("Map Interactions Advanced (Stories 5-8)", () => {
       // Parse new URL bounds
       const newBounds = getUrlBounds(page.url());
 
-      if (newBounds.minLng === null || initialBounds.minLng === null) {
-        test.skip(true, "URL bounds not updated after pan");
-        return;
-      }
+      test.skip(newBounds.minLng === null || initialBounds.minLng === null, "URL bounds not updated after pan");
 
       // Panning east means minLng and maxLng should both increase
       expect(newBounds.minLng).toBeGreaterThan(initialBounds.minLng!);
@@ -810,16 +745,11 @@ test.describe("Map Interactions Advanced (Stories 5-8)", () => {
       await waitForSearchPage(page, sharedUrl);
 
       const hasRef1 = await waitForMapRef(page);
-      if (!hasRef1) {
-        test.skip(true, "Map ref not available in first context");
-        return;
-      }
+      test.skip(!hasRef1, "Map ref not available in first context");
 
-      const center1 = await getMapCenter(page);
-      if (!center1) {
-        test.skip(true, "Could not read map center in first context");
-        return;
-      }
+      const center1Raw = await getMapCenter(page);
+      test.skip(!center1Raw, "Could not read map center in first context");
+      const center1 = center1Raw!;
 
       // Open second browser context (simulates a different user opening the shared URL)
       const context2 = await browser.newContext({
@@ -833,16 +763,11 @@ test.describe("Map Interactions Advanced (Stories 5-8)", () => {
         await waitForMapReady(page2);
 
         const hasRef2 = await waitForMapRef(page2);
-        if (!hasRef2) {
-          test.skip(true, "Map ref not available in second context");
-          return;
-        }
+        test.skip(!hasRef2, "Map ref not available in second context");
 
-        const center2 = await getMapCenter(page2);
-        if (!center2) {
-          test.skip(true, "Could not read map center in second context");
-          return;
-        }
+        const center2Raw = await getMapCenter(page2);
+        test.skip(!center2Raw, "Could not read map center in second context");
+        const center2 = center2Raw!;
 
         // Both map centers should be within 0.01 degrees of each other
         const latDiff = Math.abs(center1.lat - center2.lat);

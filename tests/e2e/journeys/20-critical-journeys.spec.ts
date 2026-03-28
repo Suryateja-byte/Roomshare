@@ -207,7 +207,7 @@ test.describe("J5: Listing Detail Page", () => {
     const count = await listings.count();
 
     if (count === 0) {
-      test.skip();
+      test.skip(true, "No listing cards found");
       return;
     }
 
@@ -247,7 +247,7 @@ test.describe("J6: Image Carousel on Listing", () => {
       selectors.listingCard
     );
     if ((await listings.count()) === 0) {
-      test.skip();
+      test.skip(true, "No listing cards found");
       return;
     }
 
@@ -332,7 +332,7 @@ test.describe("J10: Booking Request Flow", () => {
       selectors.listingCard
     );
     if ((await listings.count()) === 0) {
-      test.skip();
+      test.skip(true, "No listing cards found");
       return;
     }
 
@@ -356,10 +356,9 @@ test.describe("J11: Messaging — Conversation List", () => {
     await nav.goToMessages();
 
     // Check we weren't redirected to login
-    if (page.url().includes("/login") || page.url().includes("/signin")) {
-      test.skip(true, "Auth session expired - redirected to login");
-      return;
-    }
+    const onLoginPage = page.url().includes("/login") || page.url().includes("/signin");
+    test.skip(onLoginPage, "Auth session expired - redirected to login");
+    if (onLoginPage) return;
 
     // Should show messages interface or empty state (scope to main content)
     const main = page.locator("main");
@@ -391,10 +390,9 @@ test.describe("J12: Profile View & Edit", () => {
     await nav.goToProfile();
 
     // Check we weren't redirected to login
-    if (page.url().includes("/login") || page.url().includes("/signin")) {
-      test.skip(true, "Auth session expired - redirected to login");
-      return;
-    }
+    const onLoginPage = page.url().includes("/login") || page.url().includes("/signin");
+    test.skip(onLoginPage, "Auth session expired - redirected to login");
+    if (onLoginPage) return;
 
     // Should have heading
     const heading = page.locator("h1").first();
@@ -416,10 +414,9 @@ test.describe("J12: Profile View & Edit", () => {
     await page.waitForLoadState("domcontentloaded");
 
     // Check we weren't redirected to login
-    if (page.url().includes("/login") || page.url().includes("/signin")) {
-      test.skip(true, "Auth session expired - redirected to login");
-      return;
-    }
+    const onLoginPage = page.url().includes("/login") || page.url().includes("/signin");
+    test.skip(onLoginPage, "Auth session expired - redirected to login");
+    if (onLoginPage) return;
 
     // Should have a form
     const form = page.locator("form").first();
@@ -443,10 +440,9 @@ test.describe("J13: Settings Page", () => {
     await nav.goToSettings();
 
     // Check we weren't redirected to login
-    if (page.url().includes("/login") || page.url().includes("/signin")) {
-      test.skip(true, "Auth session expired - redirected to login");
-      return;
-    }
+    const onLoginPage = page.url().includes("/login") || page.url().includes("/signin");
+    test.skip(onLoginPage, "Auth session expired - redirected to login");
+    if (onLoginPage) return;
 
     const heading = page.locator("h1").first();
     await expect(heading).toBeVisible({ timeout: 10000 });
@@ -468,10 +464,9 @@ test.describe("J14: Favorites — Save & View", () => {
     await nav.goToSaved();
 
     // Check we weren't redirected to login
-    if (page.url().includes("/login") || page.url().includes("/signin")) {
-      test.skip(true, "Auth session expired - redirected to login");
-      return;
-    }
+    const onLoginPage = page.url().includes("/login") || page.url().includes("/signin");
+    test.skip(onLoginPage, "Auth session expired - redirected to login");
+    if (onLoginPage) return;
 
     // Should show saved listings or empty state (scope to main)
     const main = page.locator("main");
@@ -495,7 +490,7 @@ test.describe("J14: Favorites — Save & View", () => {
       selectors.listingCard
     );
     if ((await listings.count()) === 0) {
-      test.skip();
+      test.skip(true, "No listing cards found");
       return;
     }
 
@@ -514,10 +509,9 @@ test.describe("J15: Saved Searches", () => {
     await nav.goToSavedSearches();
 
     // Check we weren't redirected to login
-    if (page.url().includes("/login") || page.url().includes("/signin")) {
-      test.skip(true, "Auth session expired - redirected to login");
-      return;
-    }
+    const onLoginPage = page.url().includes("/login") || page.url().includes("/signin");
+    test.skip(onLoginPage, "Auth session expired - redirected to login");
+    if (onLoginPage) return;
 
     const main = page.locator("main");
     const content = main
@@ -540,10 +534,9 @@ test.describe("J16: Notifications Page", () => {
     await nav.goToNotifications();
 
     // Check we weren't redirected to login
-    if (page.url().includes("/login") || page.url().includes("/signin")) {
-      test.skip(true, "Auth session expired - redirected to login");
-      return;
-    }
+    const onLoginPage = page.url().includes("/login") || page.url().includes("/signin");
+    test.skip(onLoginPage, "Auth session expired - redirected to login");
+    if (onLoginPage) return;
 
     const main = page.locator("main");
     const content = main
@@ -566,7 +559,7 @@ test.describe("J17: Reviews on Listing", () => {
       selectors.listingCard
     );
     if ((await listings.count()) === 0) {
-      test.skip();
+      test.skip(true, "No listing cards found");
       return;
     }
 
@@ -590,10 +583,9 @@ test.describe("J18: Create Listing Flow", () => {
     await nav.goToCreateListing();
 
     // Check we weren't redirected to login
-    if (page.url().includes("/login") || page.url().includes("/signin")) {
-      test.skip(true, "Auth session expired - redirected to login");
-      return;
-    }
+    const onLoginPage = page.url().includes("/login") || page.url().includes("/signin");
+    test.skip(onLoginPage, "Auth session expired - redirected to login");
+    if (onLoginPage) return;
 
     // Should have a form
     const form = page.locator("form").first();

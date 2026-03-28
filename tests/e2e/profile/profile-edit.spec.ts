@@ -23,10 +23,9 @@ test.describe("Profile View — Read-only", () => {
 
   test("PE-01: view own profile page", async ({ page }) => {
     // Wait for auth redirect to settle (production mode may redirect to /login first)
-    if (page.url().includes("/login")) {
-      test.skip(true, "Auth session not established — redirected to login");
-      return;
-    }
+    const onLoginPage = page.url().includes("/login");
+    test.skip(onLoginPage, "Auth session not established — redirected to login");
+    if (onLoginPage) return;
 
     // Main profile container should be visible
     // Use .first() to handle RSC streaming which may temporarily create duplicate DOM nodes
@@ -86,9 +85,7 @@ test.describe("Profile Edit — Form Assertions", () => {
     await page.goto("/profile/edit");
     await page.waitForLoadState("networkidle");
     // Skip all edit tests if auth session not established
-    if (page.url().includes("/login")) {
-      test.skip(true, "Auth session not established — redirected to login");
-    }
+    test.skip(page.url().includes("/login"), "Auth session not established — redirected to login");
   });
 
   test("PE-03: edit form is pre-filled with current profile data", async ({
@@ -336,10 +333,9 @@ test.describe.serial("Profile Edit — Mutations", () => {
     // Check auth session before running mutations
     await page.goto("/profile");
     await page.waitForLoadState("networkidle");
-    if (page.url().includes("/login")) {
-      test.skip(true, "Auth session not established — redirected to login");
-      return;
-    }
+    const onLoginPage = page.url().includes("/login");
+    test.skip(onLoginPage, "Auth session not established — redirected to login");
+    if (onLoginPage) return;
 
     // Note original name from profile page
     await page.goto("/profile");

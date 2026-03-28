@@ -263,10 +263,8 @@ test.describe("Search as I move: Toggle behavior", () => {
   test("1 - Toggle is visible and defaults ON", async ({ page }) => {
     await waitForSearchPage(page);
 
-    if (!(await isMapInteractive(page))) {
-      test.skip(true, "Map controls not available (WebGL unavailable)");
-      return;
-    }
+    const mapInteractive = await isMapInteractive(page);
+    test.skip(!mapInteractive, "Map controls not available (WebGL unavailable)");
 
     const toggle = page.locator(toggleSelectors.searchAsMoveToggle);
     await expect(toggle).toBeVisible();
@@ -284,14 +282,10 @@ test.describe("Search as I move: Toggle behavior", () => {
   }) => {
     await waitForSearchPage(page);
 
-    if (!(await isMapInteractive(page))) {
-      test.skip(true, "Map controls not available");
-      return;
-    }
-    if (!(await isMapFullyLoaded(page))) {
-      test.skip(true, "Map not fully loaded (WebGL unavailable)");
-      return;
-    }
+    const mapInteractive = await isMapInteractive(page);
+    test.skip(!mapInteractive, "Map controls not available");
+    const mapFullyLoaded = await isMapFullyLoaded(page);
+    test.skip(!mapFullyLoaded, "Map not fully loaded (WebGL unavailable)");
 
     // Ensure toggle is ON
     await turnToggleOn(page);
@@ -301,10 +295,7 @@ test.describe("Search as I move: Toggle behavior", () => {
 
     // Pan the map
     const panned = await simulateMapPan(page, 150, 75);
-    if (!panned) {
-      test.skip(true, "Map pan failed");
-      return;
-    }
+    test.skip(!panned, "Map pan failed");
 
     // Wait for debounce (600ms) + server RSC fetch inside startTransition
     // On WSL2 with Turbopack, the full round-trip can take 10+ seconds
@@ -318,11 +309,7 @@ test.describe("Search as I move: Toggle behavior", () => {
       .then(() => true)
       .catch(() => false);
 
-    if (!urlChanged) {
-      // URL didn't change — likely slow server or animation frame issues in headless
-      test.skip(true, "URL did not update within timeout (slow WSL2 server)");
-      return;
-    }
+    test.skip(!urlChanged, "URL did not update within timeout (slow WSL2 server)");
 
     // URL bounds should have changed
     const newBounds = getUrlBounds(page.url());
@@ -340,14 +327,10 @@ test.describe("Search as I move: Toggle behavior", () => {
   }) => {
     await waitForSearchPage(page);
 
-    if (!(await isMapInteractive(page))) {
-      test.skip(true, "Map controls not available");
-      return;
-    }
-    if (!(await isMapFullyLoaded(page))) {
-      test.skip(true, "Map not fully loaded");
-      return;
-    }
+    const mapInteractive = await isMapInteractive(page);
+    test.skip(!mapInteractive, "Map controls not available");
+    const mapFullyLoaded = await isMapFullyLoaded(page);
+    test.skip(!mapFullyLoaded, "Map not fully loaded");
 
     await turnToggleOn(page);
 
@@ -355,10 +338,7 @@ test.describe("Search as I move: Toggle behavior", () => {
 
     // Zoom in via E2E hook (reliable in headless WebGL)
     const hasRef = await waitForMapRef(page);
-    if (!hasRef) {
-      test.skip(true, "Map ref not available");
-      return;
-    }
+    test.skip(!hasRef, "Map ref not available");
 
     // Try E2E hook first, fall back to scroll wheel
     const zoomed = await page.evaluate(() => {
@@ -376,10 +356,8 @@ test.describe("Search as I move: Toggle behavior", () => {
         .locator(toggleSelectors.mapContainer)
         .first()
         .boundingBox();
-      if (!mapBox) {
-        test.skip(true, "Could not get map bounding box");
-        return;
-      }
+      test.skip(!mapBox, "Could not get map bounding box");
+      if (!mapBox) return;
       await page.mouse.move(
         mapBox.x + mapBox.width / 2,
         mapBox.y + mapBox.height / 2
@@ -398,10 +376,7 @@ test.describe("Search as I move: Toggle behavior", () => {
       .then(() => true)
       .catch(() => false);
 
-    if (!urlChanged) {
-      test.skip(true, "URL did not update within timeout (slow WSL2 server)");
-      return;
-    }
+    test.skip(!urlChanged, "URL did not update within timeout (slow WSL2 server)");
 
     const newBounds = getUrlBounds(page.url());
     const boundsChanged =
@@ -416,14 +391,10 @@ test.describe("Search as I move: Toggle behavior", () => {
   test("4 - Toggle OFF, move map, URL does NOT change", async ({ page }) => {
     await waitForSearchPage(page);
 
-    if (!(await isMapInteractive(page))) {
-      test.skip(true, "Map controls not available");
-      return;
-    }
-    if (!(await isMapFullyLoaded(page))) {
-      test.skip(true, "Map not fully loaded");
-      return;
-    }
+    const mapInteractive = await isMapInteractive(page);
+    test.skip(!mapInteractive, "Map controls not available");
+    const mapFullyLoaded = await isMapFullyLoaded(page);
+    test.skip(!mapFullyLoaded, "Map not fully loaded");
 
     // Turn toggle OFF
     await turnToggleOff(page);
@@ -433,10 +404,7 @@ test.describe("Search as I move: Toggle behavior", () => {
 
     // Pan the map
     const panned = await simulateMapPan(page, 150, 75);
-    if (!panned) {
-      test.skip(true, "Map pan failed");
-      return;
-    }
+    test.skip(!panned, "Map pan failed");
 
     // Negative assertion: wait past debounce window to verify no search is triggered
     await page.waitForTimeout(MAP_SEARCH_DEBOUNCE_MS + 500); // INTENTIONAL: negative assertion — must wait past debounce to prove URL stays unchanged
@@ -451,23 +419,16 @@ test.describe("Search as I move: Toggle behavior", () => {
     await mockSearchCountApi(page, { count: 15 });
     await waitForSearchPage(page);
 
-    if (!(await isMapInteractive(page))) {
-      test.skip(true, "Map controls not available");
-      return;
-    }
-    if (!(await isMapFullyLoaded(page))) {
-      test.skip(true, "Map not fully loaded");
-      return;
-    }
+    const mapInteractive = await isMapInteractive(page);
+    test.skip(!mapInteractive, "Map controls not available");
+    const mapFullyLoaded = await isMapFullyLoaded(page);
+    test.skip(!mapFullyLoaded, "Map not fully loaded");
 
     await turnToggleOff(page);
 
     // Pan the map
     const panned = await simulateMapPan(page, 150, 75);
-    if (!panned) {
-      test.skip(true, "Map pan did not trigger state change");
-      return;
-    }
+    test.skip(!panned, "Map pan did not trigger state change");
 
     // Scope to map region to avoid picking the mobile-hidden (md:hidden) variant
     const mapRegion = page.locator(
@@ -483,23 +444,16 @@ test.describe("Search as I move: Toggle behavior", () => {
     await mockSearchCountApi(page, { count: 28 });
     await waitForSearchPage(page);
 
-    if (!(await isMapInteractive(page))) {
-      test.skip(true, "Map controls not available");
-      return;
-    }
-    if (!(await isMapFullyLoaded(page))) {
-      test.skip(true, "Map not fully loaded");
-      return;
-    }
+    const mapInteractive = await isMapInteractive(page);
+    test.skip(!mapInteractive, "Map controls not available");
+    const mapFullyLoaded = await isMapFullyLoaded(page);
+    test.skip(!mapFullyLoaded, "Map not fully loaded");
 
     const initialUrl = page.url();
 
     await turnToggleOff(page);
     const panned = await simulateMapPan(page, 150, 75);
-    if (!panned) {
-      test.skip(true, "Map pan did not trigger state change");
-      return;
-    }
+    test.skip(!panned, "Map pan did not trigger state change");
 
     // Scope to map region to avoid picking the mobile-hidden (md:hidden) variant
     const mapRegion = page.locator(
@@ -529,14 +483,10 @@ test.describe("Search as I move: Toggle behavior", () => {
   }) => {
     await waitForSearchPage(page);
 
-    if (!(await isMapInteractive(page))) {
-      test.skip(true, "Map controls not available");
-      return;
-    }
-    if (!(await isMapFullyLoaded(page))) {
-      test.skip(true, "Map not fully loaded");
-      return;
-    }
+    const mapInteractive = await isMapInteractive(page);
+    test.skip(!mapInteractive, "Map controls not available");
+    const mapFullyLoaded = await isMapFullyLoaded(page);
+    test.skip(!mapFullyLoaded, "Map not fully loaded");
 
     // Turn OFF
     await turnToggleOff(page);
@@ -554,10 +504,7 @@ test.describe("Search as I move: Toggle behavior", () => {
     // Now pan (URL SHOULD change)
     const urlBeforePan = page.url();
     const panned = await simulateMapPan(page, 100, 50);
-    if (!panned) {
-      test.skip(true, "Second map pan failed");
-      return;
-    }
+    test.skip(!panned, "Second map pan failed");
 
     await page
       .waitForFunction(
@@ -591,14 +538,10 @@ test.describe("Search as I move: Result synchronization", () => {
   }) => {
     await waitForSearchPage(page);
 
-    if (!(await isMapInteractive(page))) {
-      test.skip(true, "Map controls not available");
-      return;
-    }
-    if (!(await isMapFullyLoaded(page))) {
-      test.skip(true, "Map not fully loaded");
-      return;
-    }
+    const mapInteractive = await isMapInteractive(page);
+    test.skip(!mapInteractive, "Map controls not available");
+    const mapFullyLoaded = await isMapFullyLoaded(page);
+    test.skip(!mapFullyLoaded, "Map not fully loaded");
 
     await turnToggleOn(page);
 
@@ -609,10 +552,7 @@ test.describe("Search as I move: Result synchronization", () => {
 
     // Pan the map significantly
     const panned = await simulateMapPan(page, 200, 100);
-    if (!panned) {
-      test.skip(true, "Map pan failed");
-      return;
-    }
+    test.skip(!panned, "Map pan failed");
 
     // Wait for debounce to fire and network activity to settle
     await page.waitForResponse(resp => resp.url().includes("/search") && resp.status() === 200).catch(() => {});
@@ -633,20 +573,13 @@ test.describe("Search as I move: Result synchronization", () => {
   test("9 - Marker count is consistent after map move", async ({ page }) => {
     await waitForSearchPage(page);
 
-    if (!(await isMapInteractive(page))) {
-      test.skip(true, "Map controls not available");
-      return;
-    }
-    if (!(await isMapFullyLoaded(page))) {
-      test.skip(true, "Map not fully loaded");
-      return;
-    }
+    const mapInteractive = await isMapInteractive(page);
+    test.skip(!mapInteractive, "Map controls not available");
+    const mapFullyLoaded = await isMapFullyLoaded(page);
+    test.skip(!mapFullyLoaded, "Map not fully loaded");
 
     const hasRef = await waitForMapRef(page);
-    if (!hasRef) {
-      test.skip(true, "Map ref not available");
-      return;
-    }
+    test.skip(!hasRef, "Map ref not available");
 
     await turnToggleOn(page);
 
@@ -689,14 +622,10 @@ test.describe("Search as I move: Result synchronization", () => {
 
     await waitForSearchPage(page);
 
-    if (!(await isMapInteractive(page))) {
-      test.skip(true, "Map controls not available");
-      return;
-    }
-    if (!(await isMapFullyLoaded(page))) {
-      test.skip(true, "Map not fully loaded");
-      return;
-    }
+    const mapInteractive = await isMapInteractive(page);
+    test.skip(!mapInteractive, "Map controls not available");
+    const mapFullyLoaded = await isMapFullyLoaded(page);
+    test.skip(!mapFullyLoaded, "Map not fully loaded");
 
     await turnToggleOn(page);
 
@@ -729,14 +658,10 @@ test.describe("Search as I move: Result synchronization", () => {
 
     await waitForSearchPage(page);
 
-    if (!(await isMapInteractive(page))) {
-      test.skip(true, "Map controls not available");
-      return;
-    }
-    if (!(await isMapFullyLoaded(page))) {
-      test.skip(true, "Map not fully loaded");
-      return;
-    }
+    const mapInteractive = await isMapInteractive(page);
+    test.skip(!mapInteractive, "Map controls not available");
+    const mapFullyLoaded = await isMapFullyLoaded(page);
+    test.skip(!mapFullyLoaded, "Map not fully loaded");
 
     await turnToggleOn(page);
 
@@ -769,14 +694,10 @@ test.describe("Search as I move: Debounce and performance", () => {
   }) => {
     await waitForSearchPage(page);
 
-    if (!(await isMapInteractive(page))) {
-      test.skip(true, "Map controls not available");
-      return;
-    }
-    if (!(await isMapFullyLoaded(page))) {
-      test.skip(true, "Map not fully loaded");
-      return;
-    }
+    const mapInteractive = await isMapInteractive(page);
+    test.skip(!mapInteractive, "Map controls not available");
+    const mapFullyLoaded = await isMapFullyLoaded(page);
+    test.skip(!mapFullyLoaded, "Map not fully loaded");
 
     await turnToggleOn(page);
 
@@ -784,10 +705,7 @@ test.describe("Search as I move: Debounce and performance", () => {
 
     // Pan the map
     const panned = await simulateMapPan(page, 150, 75);
-    if (!panned) {
-      test.skip(true, "Map pan failed");
-      return;
-    }
+    test.skip(!panned, "Map pan failed");
 
     // Check immediately after pan - URL should NOT have changed yet
     // (within debounce window, though map animation takes ~800ms too)
@@ -806,10 +724,7 @@ test.describe("Search as I move: Debounce and performance", () => {
       .then(() => true)
       .catch(() => false);
 
-    if (!urlChanged) {
-      test.skip(true, "URL did not update within timeout (slow WSL2 server)");
-      return;
-    }
+    test.skip(!urlChanged, "URL did not update within timeout (slow WSL2 server)");
 
     // URL should have changed now
     const urlAfterDebounce = page.url();
@@ -835,14 +750,10 @@ test.describe("Search as I move: Debounce and performance", () => {
 
     await waitForSearchPage(page);
 
-    if (!(await isMapInteractive(page))) {
-      test.skip(true, "Map controls not available");
-      return;
-    }
-    if (!(await isMapFullyLoaded(page))) {
-      test.skip(true, "Map not fully loaded");
-      return;
-    }
+    const mapInteractive = await isMapInteractive(page);
+    test.skip(!mapInteractive, "Map controls not available");
+    const mapFullyLoaded = await isMapFullyLoaded(page);
+    test.skip(!mapFullyLoaded, "Map not fully loaded");
 
     await turnToggleOn(page);
 
@@ -898,24 +809,17 @@ test.describe("Search as I move: Debounce and performance", () => {
 
     await waitForSearchPage(page);
 
-    if (!(await isMapInteractive(page))) {
-      test.skip(true, "Map controls not available");
-      return;
-    }
-    if (!(await isMapFullyLoaded(page))) {
-      test.skip(true, "Map not fully loaded");
-      return;
-    }
+    const mapInteractive = await isMapInteractive(page);
+    test.skip(!mapInteractive, "Map controls not available");
+    const mapFullyLoaded = await isMapFullyLoaded(page);
+    test.skip(!mapFullyLoaded, "Map not fully loaded");
 
     // Turn toggle OFF so area count requests are triggered
     await turnToggleOff(page);
 
     // Pan multiple times rapidly
     const panned1 = await simulateMapPan(page, 50, 25);
-    if (!panned1) {
-      test.skip(true, "Map pan failed");
-      return;
-    }
+    test.skip(!panned1, "Map pan failed");
     // Wait for debounce to fire and search-count API to respond
     await page.waitForResponse(resp => resp.url().includes("search-count")).catch(() => {});
 

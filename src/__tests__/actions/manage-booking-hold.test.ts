@@ -195,7 +195,7 @@ describe("manage-booking-hold — Phase 4 hold management paths", () => {
     const mockTxUpdateMany = jest.fn().mockResolvedValue({ count: 1 });
     const mockTxQueryRaw = jest
       .fn()
-      .mockResolvedValue([{ ownerId: "owner-123" }]);
+      .mockResolvedValue([{ ownerId: "owner-123", status: "ACTIVE" }]);
     const mockTxExecuteRaw = jest.fn();
 
     (prisma.$transaction as jest.Mock).mockImplementation(async (callback) => {
@@ -234,7 +234,7 @@ describe("manage-booking-hold — Phase 4 hold management paths", () => {
     const mockTxUpdateMany = jest.fn().mockResolvedValue({ count: 1 });
     const mockTxQueryRaw = jest
       .fn()
-      .mockResolvedValue([{ ownerId: "owner-123" }]);
+      .mockResolvedValue([{ ownerId: "owner-123", status: "ACTIVE" }]);
 
     (prisma.$transaction as jest.Mock).mockImplementation(async (callback) => {
       const tx = {
@@ -381,7 +381,7 @@ describe("manage-booking-hold — Phase 4 hold management paths", () => {
 
     (prisma.$transaction as jest.Mock).mockImplementation(async (callback) => {
       const tx = {
-        $queryRaw: jest.fn().mockResolvedValue([{ ownerId: "owner-123" }]),
+        $queryRaw: jest.fn().mockResolvedValue([{ ownerId: "owner-123", status: "ACTIVE" }]),
         $executeRaw: mockTxExecuteRaw,
         booking: { updateMany: mockTxUpdateMany },
       };
@@ -574,6 +574,7 @@ describe("manage-booking-hold — Phase 4 hold management paths", () => {
               id: "listing-123",
               ownerId: "owner-123",
               bookingMode: "SHARED",
+              status: "ACTIVE",
             },
           ])
           // Second call: SUM of overlapping ACCEPTED + active HELD = 3
@@ -630,7 +631,7 @@ describe("manage-booking-hold — Phase 4 hold management paths", () => {
 
     (prisma.$transaction as jest.Mock).mockImplementation(async (callback) => {
       const tx = {
-        $queryRaw: jest.fn().mockResolvedValue([{ ownerId: "owner-123" }]),
+        $queryRaw: jest.fn().mockResolvedValue([{ ownerId: "owner-123", status: "ACTIVE" }]),
         $executeRaw: jest.fn(),
         booking: { updateMany: mockTxUpdateMany },
       };

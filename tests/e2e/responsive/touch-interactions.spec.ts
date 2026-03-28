@@ -140,10 +140,7 @@ test.describe("Tap target sizes", () => {
   }) => {
     await page.goto(`/search?${boundsQS}`);
     const sheetReady = await waitForMobileSheet(page);
-    if (!sheetReady) {
-      test.skip(true, "Bottom sheet not visible");
-      return;
-    }
+    test.skip(!sheetReady, "Bottom sheet not visible");
 
     const tooSmall = await page.evaluate(() => {
       const interactive = document.querySelectorAll(
@@ -214,10 +211,7 @@ test.describe("Tap target sizes", () => {
   test("bottom sheet drag handle meets 44px width", async ({ page }) => {
     await page.goto(`/search?${boundsQS}`);
     const sheetReady = await waitForMobileSheet(page);
-    if (!sheetReady) {
-      test.skip(true, "Bottom sheet not visible");
-      return;
-    }
+    test.skip(!sheetReady, "Bottom sheet not visible");
 
     const handle = page.locator(mobileSelectors.sheetHandle);
     await expect(handle).toBeVisible();
@@ -244,10 +238,7 @@ test.describe("No hover-only interactions", () => {
   }) => {
     await page.goto(`/search?${boundsQS}`);
     const sheetReady = await waitForMobileSheet(page);
-    if (!sheetReady) {
-      test.skip(true, "Bottom sheet not visible");
-      return;
-    }
+    test.skip(!sheetReady, "Bottom sheet not visible");
 
     // Expand to see listing cards with carousels
     await setSheetSnap(page, 2);
@@ -261,10 +252,7 @@ test.describe("No hover-only interactions", () => {
       .isVisible({ timeout: 5000 })
       .catch(() => false);
 
-    if (!carouselVisible) {
-      test.skip(true, "No image carousel found");
-      return;
-    }
+    test.skip(!carouselVisible, "No image carousel found");
 
     // Carousel should be keyboard-focusable (tabIndex=0)
     const tabIndex = await carousel.getAttribute("tabindex");
@@ -279,10 +267,7 @@ test.describe("No hover-only interactions", () => {
   test("listing cards are tappable without hover", async ({ page }) => {
     await page.goto(`/search?${boundsQS}`);
     const sheetReady = await waitForMobileSheet(page);
-    if (!sheetReady) {
-      test.skip(true, "Bottom sheet not visible");
-      return;
-    }
+    test.skip(!sheetReady, "Bottom sheet not visible");
 
     // At half position, listing cards should be visible
     const firstCard = page.locator(mobileSelectors.listingCard).first();
@@ -318,10 +303,7 @@ test.describe("No hover-only interactions", () => {
       .isVisible({ timeout: 10_000 })
       .catch(() => false);
 
-    if (!toggleVisible) {
-      test.skip(true, "Floating toggle not visible");
-      return;
-    }
+    test.skip(!toggleVisible, "Floating toggle not visible");
 
     // Tap the button (touch emulation)
     await toggleBtn.tap();
@@ -342,10 +324,7 @@ test.describe("Touch-action CSS properties", () => {
   test("bottom sheet handle has touch-action: none", async ({ page }) => {
     await page.goto(`/search?${boundsQS}`);
     const sheetReady = await waitForMobileSheet(page);
-    if (!sheetReady) {
-      test.skip(true, "Bottom sheet not visible");
-      return;
-    }
+    test.skip(!sheetReady, "Bottom sheet not visible");
 
     // The handle's parent div sets touch-action: none for full drag control
     const handleParent = page
@@ -363,10 +342,7 @@ test.describe("Touch-action CSS properties", () => {
   }) => {
     await page.goto(`/search?${boundsQS}`);
     const sheetReady = await waitForMobileSheet(page);
-    if (!sheetReady) {
-      test.skip(true, "Bottom sheet not visible");
-      return;
-    }
+    test.skip(!sheetReady, "Bottom sheet not visible");
 
     await setSheetSnap(page, 2);
     await waitForSheetAnimation(page);
@@ -380,10 +356,7 @@ test.describe("Touch-action CSS properties", () => {
       const carousel = page
         .locator('[aria-roledescription="carousel"]')
         .first();
-      if (!(await carousel.isVisible().catch(() => false))) {
-        test.skip(true, "No carousel found");
-        return;
-      }
+      test.skip(!(await carousel.isVisible().catch(() => false)), "No carousel found");
 
       // The first child div of the carousel should have touch-action: pan-y
       const viewportDiv = carousel.locator("> div").first();
@@ -407,10 +380,7 @@ test.describe("Touch-action CSS properties", () => {
   }) => {
     await page.goto(`/search?${boundsQS}`);
     const sheetReady = await waitForMobileSheet(page);
-    if (!sheetReady) {
-      test.skip(true, "Bottom sheet not visible");
-      return;
-    }
+    test.skip(!sheetReady, "Bottom sheet not visible");
 
     // At half position, content should be interactive
     expect(await getSheetSnapIndex(page)).toBe(1);
@@ -430,10 +400,7 @@ test.describe("Touch-action CSS properties", () => {
   }) => {
     await page.goto(`/search?${boundsQS}`);
     const sheetReady = await waitForMobileSheet(page);
-    if (!sheetReady) {
-      test.skip(true, "Bottom sheet not visible");
-      return;
-    }
+    test.skip(!sheetReady, "Bottom sheet not visible");
 
     await setSheetSnap(page, 0);
     expect(await getSheetSnapIndex(page)).toBe(0);
@@ -458,10 +425,7 @@ test.describe("Bottom sheet touch interactions", () => {
   test("sheet handle has cursor-grab styling", async ({ page }) => {
     await page.goto(`/search?${boundsQS}`);
     const sheetReady = await waitForMobileSheet(page);
-    if (!sheetReady) {
-      test.skip(true, "Bottom sheet not visible");
-      return;
-    }
+    test.skip(!sheetReady, "Bottom sheet not visible");
 
     const handleParent = page
       .locator(mobileSelectors.sheetHandle)
@@ -476,10 +440,7 @@ test.describe("Bottom sheet touch interactions", () => {
   test("sheet handle suppresses iOS tap highlight", async ({ page }) => {
     await page.goto(`/search?${boundsQS}`);
     const sheetReady = await waitForMobileSheet(page);
-    if (!sheetReady) {
-      test.skip(true, "Bottom sheet not visible");
-      return;
-    }
+    test.skip(!sheetReady, "Bottom sheet not visible");
 
     const handleParent = page
       .locator(mobileSelectors.sheetHandle)
@@ -496,10 +457,7 @@ test.describe("Bottom sheet touch interactions", () => {
   }) => {
     await page.goto(`/search?${boundsQS}`);
     const sheetReady = await waitForMobileSheet(page);
-    if (!sheetReady) {
-      test.skip(true, "Bottom sheet not visible");
-      return;
-    }
+    test.skip(!sheetReady, "Bottom sheet not visible");
 
     const handleParent = page
       .locator(mobileSelectors.sheetHandle)
@@ -516,19 +474,14 @@ test.describe("Bottom sheet touch interactions", () => {
   test("expand/collapse buttons are tappable on mobile", async ({ page }) => {
     await page.goto(`/search?${boundsQS}`);
     const sheetReady = await waitForMobileSheet(page);
-    if (!sheetReady) {
-      test.skip(true, "Bottom sheet not visible");
-      return;
-    }
+    test.skip(!sheetReady, "Bottom sheet not visible");
 
     // Start at half, try to expand via tap
     expect(await getSheetSnapIndex(page)).toBe(1);
 
     const expandBtn = page.locator(mobileSelectors.expandButton);
-    if (!(await expandBtn.isVisible({ timeout: 5000 }).catch(() => false))) {
-      test.skip(true, "Expand button not visible");
-      return;
-    }
+    const expandBtnVisible = await expandBtn.isVisible({ timeout: 5000 }).catch(() => false);
+    test.skip(!expandBtnVisible, "Expand button not visible");
 
     // Use tap() instead of click() to test touch behavior
     await expandBtn.tap();
@@ -556,10 +509,7 @@ test.describe("Map touch gestures", () => {
   }) => {
     await page.goto(`/search?${boundsQS}`);
     const sheetReady = await waitForMobileSheet(page);
-    if (!sheetReady) {
-      test.skip(true, "Bottom sheet not visible");
-      return;
-    }
+    test.skip(!sheetReady, "Bottom sheet not visible");
 
     // Collapse sheet to expose the map
     await setSheetSnap(page, 0);
@@ -570,10 +520,7 @@ test.describe("Map touch gestures", () => {
       .isVisible({ timeout: 10_000 })
       .catch(() => false);
 
-    if (!mapVisible) {
-      test.skip(true, "Map not visible (may be deferred on mobile)");
-      return;
-    }
+    test.skip(!mapVisible, "Map not visible (may be deferred on mobile)");
 
     const box = await map.boundingBox();
     expect(box).not.toBeNull();
@@ -669,10 +616,7 @@ test.describe("Hover fallbacks on touch devices", () => {
   test("map markers respond to tap (not just hover)", async ({ page }) => {
     await page.goto(`/search?${boundsQS}`);
     const sheetReady = await waitForMobileSheet(page);
-    if (!sheetReady) {
-      test.skip(true, "Bottom sheet not visible");
-      return;
-    }
+    test.skip(!sheetReady, "Bottom sheet not visible");
 
     // Collapse sheet to interact with map
     await setSheetSnap(page, 0);
@@ -686,10 +630,7 @@ test.describe("Hover fallbacks on touch devices", () => {
       .then(() => markers.count())
       .catch(() => 0);
 
-    if (markerCount === 0) {
-      test.skip(true, "No map markers rendered");
-      return;
-    }
+    test.skip(markerCount === 0, "No map markers rendered");
 
     // Tap a marker — it should have a click handler
     const firstMarker = markers.first();
@@ -714,10 +655,7 @@ test.describe("Safe area handling", () => {
   }) => {
     await page.goto(`/search?${boundsQS}`);
     const sheetReady = await waitForMobileSheet(page);
-    if (!sheetReady) {
-      test.skip(true, "Bottom sheet not visible");
-      return;
-    }
+    test.skip(!sheetReady, "Bottom sheet not visible");
 
     // Expand the sheet
     await setSheetSnap(page, 2);
@@ -766,10 +704,7 @@ test.describe("Body scroll lock", () => {
   }) => {
     await page.goto(`/search?${boundsQS}`);
     const sheetReady = await waitForMobileSheet(page);
-    if (!sheetReady) {
-      test.skip(true, "Bottom sheet not visible");
-      return;
-    }
+    test.skip(!sheetReady, "Bottom sheet not visible");
 
     // Expand the sheet fully
     await setSheetSnap(page, 2);
@@ -896,10 +831,7 @@ test.describe("Form submit button tap targets", () => {
   }) => {
     await page.goto(`/search?${boundsQS}`);
     const sheetReady = await waitForMobileSheet(page);
-    if (!sheetReady) {
-      test.skip(true, "Bottom sheet not visible");
-      return;
-    }
+    test.skip(!sheetReady, "Bottom sheet not visible");
 
     // Check sort button — width varies by text content and device rendering
     const sortBtn = page.locator(mobileSelectors.sortButton).first();

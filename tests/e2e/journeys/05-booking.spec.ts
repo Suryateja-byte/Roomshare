@@ -85,10 +85,9 @@ test.describe("Booking Journeys", () => {
       await nav.goToProfile();
 
       // Check we weren't redirected to login
-      if (!(await nav.isOnAuthenticatedPage())) {
-        test.skip(true, "Auth session expired - redirected to login");
-        return;
-      }
+      const isAuthenticated = await nav.isOnAuthenticatedPage();
+      test.skip(!isAuthenticated, "Auth session expired - redirected to login");
+      if (!isAuthenticated) return;
 
       await page.waitForLoadState("domcontentloaded");
 
@@ -123,10 +122,9 @@ test.describe("Booking Journeys", () => {
       await nav.goToBookings();
 
       // Check we weren't redirected to login
-      if (!(await nav.isOnAuthenticatedPage())) {
-        test.skip(true, "Auth session expired - redirected to login");
-        return;
-      }
+      const isAuthenticated = await nav.isOnAuthenticatedPage();
+      test.skip(!isAuthenticated, "Auth session expired - redirected to login");
+      if (!isAuthenticated) return;
 
       // Should load bookings page — use .first() to avoid strict mode violations
       await expect(page.getByRole("heading", { level: 1 }).first()).toBeVisible(
@@ -153,10 +151,9 @@ test.describe("Booking Journeys", () => {
       await nav.goToBookings();
 
       // Check we weren't redirected to login
-      if (!(await nav.isOnAuthenticatedPage())) {
-        test.skip(true, "Auth session expired - redirected to login");
-        return;
-      }
+      const isAuthenticated = await nav.isOnAuthenticatedPage();
+      test.skip(!isAuthenticated, "Auth session expired - redirected to login");
+      if (!isAuthenticated) return;
 
       await page.waitForLoadState("domcontentloaded");
 
@@ -190,10 +187,9 @@ test.describe("Booking Journeys", () => {
       await nav.goToBookings();
 
       // Check we weren't redirected to login
-      if (!(await nav.isOnAuthenticatedPage())) {
-        test.skip(true, "Auth session expired - redirected to login");
-        return;
-      }
+      const isAuthenticated = await nav.isOnAuthenticatedPage();
+      test.skip(!isAuthenticated, "Auth session expired - redirected to login");
+      if (!isAuthenticated) return;
 
       await page.waitForLoadState("domcontentloaded");
 
@@ -232,10 +228,9 @@ test.describe("Booking Journeys", () => {
       await nav.goToBookings();
 
       // Check we weren't redirected to login
-      if (!(await nav.isOnAuthenticatedPage())) {
-        test.skip(true, "Auth session expired - redirected to login");
-        return;
-      }
+      const isAuthenticated = await nav.isOnAuthenticatedPage();
+      test.skip(!isAuthenticated, "Auth session expired - redirected to login");
+      if (!isAuthenticated) return;
 
       await page.waitForLoadState("domcontentloaded");
 
@@ -349,10 +344,9 @@ test.describe("Booking Journeys", () => {
       await nav.goToNotifications();
 
       // Check we weren't redirected to login
-      if (!(await nav.isOnAuthenticatedPage())) {
-        test.skip(true, "Auth session expired - redirected to login");
-        return;
-      }
+      const isAuthenticated = await nav.isOnAuthenticatedPage();
+      test.skip(!isAuthenticated, "Auth session expired - redirected to login");
+      if (!isAuthenticated) return;
 
       // Should load notifications — use .first() to avoid strict mode violations
       await expect(
@@ -376,10 +370,9 @@ test.describe("Booking Journeys", () => {
       await nav.goToSettings();
 
       // Check we weren't redirected to login
-      if (!(await nav.isOnAuthenticatedPage())) {
-        test.skip(true, "Auth session expired - redirected to login");
-        return;
-      }
+      const isAuthenticated = await nav.isOnAuthenticatedPage();
+      test.skip(!isAuthenticated, "Auth session expired - redirected to login");
+      if (!isAuthenticated) return;
 
       await page.waitForLoadState("domcontentloaded");
 

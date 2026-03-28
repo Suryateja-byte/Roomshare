@@ -332,7 +332,7 @@ test.describe("Nearby Places — Functional Core @nearby", () => {
     // Only test on mobile viewport
     const viewport = page.viewportSize();
     if (!viewport || viewport.width >= 1024) {
-      test.skip();
+      test.skip(true, "Test requires mobile viewport");
       return;
     }
 

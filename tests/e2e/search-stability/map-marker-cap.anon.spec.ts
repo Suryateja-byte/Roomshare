@@ -79,17 +79,11 @@ test.describe("Map Marker Cap (MAX_MAP_MARKERS=200)", () => {
     await page.waitForLoadState("domcontentloaded");
 
     // Skip if map is not available (headless WebGL issue)
-    if (!(await isMapAvailable(page))) {
-      test.skip(true, "Map not available (WebGL unavailable in headless)");
-      return;
-    }
+    test.skip(!(await isMapAvailable(page)), "Map not available (WebGL unavailable in headless)");
 
     // Wait for map to load and data to render
     const hasMapRef = await waitForMapRef(page);
-    if (!hasMapRef) {
-      test.skip(true, "Map E2E ref not available");
-      return;
-    }
+    test.skip(!hasMapRef, "Map E2E ref not available");
 
     // Wait for markers to appear (or for the map to settle with no markers)
     await page.waitForLoadState("networkidle", { timeout: 10_000 }).catch(() => {});
@@ -114,10 +108,7 @@ test.describe("Map Marker Cap (MAX_MAP_MARKERS=200)", () => {
     await page.goto(SEARCH_URL);
     await page.waitForLoadState("domcontentloaded");
 
-    if (!(await isMapAvailable(page))) {
-      test.skip(true, "Map not available (WebGL unavailable in headless)");
-      return;
-    }
+    test.skip(!(await isMapAvailable(page)), "Map not available (WebGL unavailable in headless)");
 
     // Wait for map to fully render
     await waitForMapRef(page);
@@ -139,16 +130,10 @@ test.describe("Map Marker Cap (MAX_MAP_MARKERS=200)", () => {
     await page.goto(SEARCH_URL);
     await page.waitForLoadState("domcontentloaded");
 
-    if (!(await isMapAvailable(page))) {
-      test.skip(true, "Map not available (WebGL unavailable in headless)");
-      return;
-    }
+    test.skip(!(await isMapAvailable(page)), "Map not available (WebGL unavailable in headless)");
 
     const hasMapRef = await waitForMapRef(page);
-    if (!hasMapRef) {
-      test.skip(true, "Map E2E ref not available");
-      return;
-    }
+    test.skip(!hasMapRef, "Map E2E ref not available");
 
     // Wait for data to load
     await page.waitForLoadState("networkidle", { timeout: 10_000 }).catch(() => {});

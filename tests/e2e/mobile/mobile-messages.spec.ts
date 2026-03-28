@@ -14,10 +14,9 @@ test.describe("Mobile Messages", () => {
   }) => {
     // Wait for messages page to load — skip if redirected to login
     const currentUrl = page.url();
-    if (currentUrl.includes("/login") || currentUrl.includes("/signin")) {
-      test.skip(true, "Redirected to login — auth session unavailable in CI");
-      return;
-    }
+    const onLoginPage = currentUrl.includes("/login") || currentUrl.includes("/signin");
+    test.skip(onLoginPage, "Redirected to login — auth session unavailable in CI");
+    if (onLoginPage) return;
 
     const messagesPage = page.locator('[data-testid="messages-page"]').first();
     const pageVisible = await messagesPage
@@ -255,10 +254,9 @@ test.describe("Mobile Messages", () => {
 
   test("MM-08: Unread indicator visible on conversations", async ({ page }) => {
     // Skip if redirected to login (auth session unavailable in CI Mobile Chrome)
-    if (page.url().includes("/login")) {
-      test.skip(true, "Redirected to login — auth session unavailable");
-      return;
-    }
+    const onLoginPage = page.url().includes("/login");
+    test.skip(onLoginPage, "Redirected to login — auth session unavailable");
+    if (onLoginPage) return;
     const messagesPage = page.locator('[data-testid="messages-page"]').first();
     const pageVisible = await messagesPage
       .waitFor({ state: "visible", timeout: 15000 })

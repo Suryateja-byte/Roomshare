@@ -199,10 +199,7 @@ test.describe("Bounds round-trip: Bounds in URL", () => {
     await waitForSearchPage(page);
 
     const hasRef = await waitForMapRef(page);
-    if (!hasRef) {
-      test.skip(true, "Map ref not available (WebGL unavailable)");
-      return;
-    }
+    test.skip(!hasRef, "Map ref not available (WebGL unavailable)");
 
     // Get bounds from URL
     const urlBounds = getUrlBounds(page.url());
@@ -210,21 +207,19 @@ test.describe("Bounds round-trip: Bounds in URL", () => {
 
     // Get bounds from actual map viewport
     const mapBounds = await getMapViewportBounds(page);
-    if (!mapBounds) {
-      test.skip(true, "Could not read map viewport bounds");
-      return;
-    }
+    test.skip(!mapBounds, "Could not read map viewport bounds");
+    const bounds = mapBounds!;
 
     // Map should have been fitted to URL bounds (with some tolerance for padding)
     const tolerance = 0.5; // Generous tolerance for fitBounds padding in headless CI
-    expect(mapBounds.minLat).toBeGreaterThanOrEqual(
+    expect(bounds.minLat).toBeGreaterThanOrEqual(
       urlBounds.minLat! - tolerance
     );
-    expect(mapBounds.maxLat).toBeLessThanOrEqual(urlBounds.maxLat! + tolerance);
-    expect(mapBounds.minLng).toBeGreaterThanOrEqual(
+    expect(bounds.maxLat).toBeLessThanOrEqual(urlBounds.maxLat! + tolerance);
+    expect(bounds.minLng).toBeGreaterThanOrEqual(
       urlBounds.minLng! - tolerance
     );
-    expect(mapBounds.maxLng).toBeLessThanOrEqual(urlBounds.maxLng! + tolerance);
+    expect(bounds.maxLng).toBeLessThanOrEqual(urlBounds.maxLng! + tolerance);
   });
 
   test("2 - After map move, URL bounds update to new viewport", async ({
@@ -232,10 +227,8 @@ test.describe("Bounds round-trip: Bounds in URL", () => {
   }) => {
     await waitForSearchPage(page);
 
-    if (!(await isMapFullyLoaded(page))) {
-      test.skip(true, "Map not fully loaded");
-      return;
-    }
+    const mapFullyLoaded = await isMapFullyLoaded(page);
+    test.skip(!mapFullyLoaded, "Map not fully loaded");
 
     await ensureSearchAsMoveOn(page);
 
@@ -243,10 +236,7 @@ test.describe("Bounds round-trip: Bounds in URL", () => {
 
     // Pan the map
     const panned = await simulateMapPan(page, 150, 75);
-    if (!panned) {
-      test.skip(true, "Map pan failed");
-      return;
-    }
+    test.skip(!panned, "Map pan failed");
 
     // Wait for URL bounds to update after debounce
     await page
@@ -278,19 +268,14 @@ test.describe("Bounds round-trip: Bounds in URL", () => {
   }) => {
     await waitForSearchPage(page);
 
-    if (!(await isMapFullyLoaded(page))) {
-      test.skip(true, "Map not fully loaded");
-      return;
-    }
+    const mapFullyLoaded = await isMapFullyLoaded(page);
+    test.skip(!mapFullyLoaded, "Map not fully loaded");
 
     await ensureSearchAsMoveOn(page);
 
     // Pan to trigger a URL update with new bounds
     const panned = await simulateMapPan(page, 100, 50);
-    if (!panned) {
-      test.skip(true, "Map pan failed");
-      return;
-    }
+    test.skip(!panned, "Map pan failed");
 
     await page
       .waitForFunction((prev) => window.location.href !== prev, page.url(), {
@@ -332,10 +317,8 @@ test.describe("Bounds round-trip: Bounds in URL", () => {
   }) => {
     await waitForSearchPage(page);
 
-    if (!(await isMapFullyLoaded(page))) {
-      test.skip(true, "Map not fully loaded");
-      return;
-    }
+    const mapFullyLoaded = await isMapFullyLoaded(page);
+    test.skip(!mapFullyLoaded, "Map not fully loaded");
 
     await ensureSearchAsMoveOn(page);
 
@@ -346,10 +329,7 @@ test.describe("Bounds round-trip: Bounds in URL", () => {
 
     // Pan the map
     const panned = await simulateMapPan(page, 120, 60);
-    if (!panned) {
-      test.skip(true, "Map pan failed");
-      return;
-    }
+    test.skip(!panned, "Map pan failed");
 
     // Wait for URL to update after debounce
     await page
@@ -387,10 +367,7 @@ test.describe("Bounds round-trip: Deep link with bounds", () => {
     await waitForSearchPage(page, `/search?${customBoundsQS}`);
 
     const hasRef = await waitForMapRef(page);
-    if (!hasRef) {
-      test.skip(true, "Map ref not available");
-      return;
-    }
+    test.skip(!hasRef, "Map ref not available");
 
     // Get map center
     const center = await page.evaluate(() => {
@@ -400,20 +377,18 @@ test.describe("Bounds round-trip: Deep link with bounds", () => {
       return { lng: c.lng, lat: c.lat };
     });
 
-    if (!center) {
-      test.skip(true, "Could not read map center");
-      return;
-    }
+    test.skip(!center, "Could not read map center");
+    const c = center!;
 
     // Center should be approximately in the middle of the provided bounds
     const expectedLat = (customBounds.minLat + customBounds.maxLat) / 2;
     const expectedLng = (customBounds.minLng + customBounds.maxLng) / 2;
     const tolerance = 0.1;
 
-    expect(center.lat).toBeGreaterThanOrEqual(expectedLat - tolerance);
-    expect(center.lat).toBeLessThanOrEqual(expectedLat + tolerance);
-    expect(center.lng).toBeGreaterThanOrEqual(expectedLng - tolerance);
-    expect(center.lng).toBeLessThanOrEqual(expectedLng + tolerance);
+    expect(c.lat).toBeGreaterThanOrEqual(expectedLat - tolerance);
+    expect(c.lat).toBeLessThanOrEqual(expectedLat + tolerance);
+    expect(c.lng).toBeGreaterThanOrEqual(expectedLng - tolerance);
+    expect(c.lng).toBeLessThanOrEqual(expectedLng + tolerance);
   });
 
   test("6 - Deep link with no bounds loads map at default/full extent", async ({
@@ -506,19 +481,14 @@ test.describe("Bounds round-trip: Deep link with bounds", () => {
   }) => {
     await waitForSearchPage(page);
 
-    if (!(await isMapFullyLoaded(page))) {
-      test.skip(true, "Map not fully loaded");
-      return;
-    }
+    const mapFullyLoaded = await isMapFullyLoaded(page);
+    test.skip(!mapFullyLoaded, "Map not fully loaded");
 
     await ensureSearchAsMoveOn(page);
 
     // Pan the map to generate new bounds
     const panned = await simulateMapPan(page, 120, 60);
-    if (!panned) {
-      test.skip(true, "Map pan failed");
-      return;
-    }
+    test.skip(!panned, "Map pan failed");
 
     // Wait for URL to update after debounce
     await page
@@ -529,10 +499,7 @@ test.describe("Bounds round-trip: Deep link with bounds", () => {
 
     // Read new bounds from URL
     const boundsAfterPan = getUrlBounds(page.url());
-    if (boundsAfterPan.minLat === null) {
-      test.skip(true, "URL bounds not updated after pan");
-      return;
-    }
+    test.skip(boundsAfterPan.minLat === null, "URL bounds not updated after pan");
 
     // Refresh the page
     await page.reload();
@@ -634,10 +601,8 @@ test.describe("Bounds round-trip: Bounds + filters", () => {
   }) => {
     await waitForSearchPage(page);
 
-    if (!(await isMapFullyLoaded(page))) {
-      test.skip(true, "Map not fully loaded");
-      return;
-    }
+    const mapFullyLoaded = await isMapFullyLoaded(page);
+    test.skip(!mapFullyLoaded, "Map not fully loaded");
 
     await ensureSearchAsMoveOn(page);
 
@@ -652,10 +617,7 @@ test.describe("Bounds round-trip: Bounds + filters", () => {
 
     // Pan the map (should update bounds but NOT change filter)
     const panned = await simulateMapPan(page, 120, 60);
-    if (!panned) {
-      test.skip(true, "Map pan failed");
-      return;
-    }
+    test.skip(!panned, "Map pan failed");
 
     await page
       .waitForFunction((prev) => window.location.href !== prev, page.url(), {

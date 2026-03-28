@@ -19,7 +19,7 @@ export default function ContactHostButton({
     try {
       const result = await startConversation(listingId);
 
-      if (result.error) {
+      if ("error" in result && result.error) {
         if (result.error === "Unauthorized") {
           router.push("/login");
         } else {
@@ -28,7 +28,7 @@ export default function ContactHostButton({
         return;
       }
 
-      if (result.conversationId) {
+      if ("conversationId" in result && result.conversationId) {
         router.push(`/messages/${result.conversationId}`);
       }
     } catch (error: unknown) {

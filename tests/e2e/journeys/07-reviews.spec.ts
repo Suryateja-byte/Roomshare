@@ -111,10 +111,9 @@ test.describe("Reviews Journeys", () => {
       await nav.goToBookings();
 
       // Check we weren't redirected to login
-      if (!(await nav.isOnAuthenticatedPage())) {
-        test.skip(true, "Auth session expired - redirected to login");
-        return;
-      }
+      const isAuthenticated = await nav.isOnAuthenticatedPage();
+      test.skip(!isAuthenticated, "Auth session expired - redirected to login");
+      if (!isAuthenticated) return;
 
       await page.waitForLoadState("domcontentloaded");
 
@@ -171,10 +170,9 @@ test.describe("Reviews Journeys", () => {
       await nav.goToBookings();
 
       // Check we weren't redirected to login
-      if (!(await nav.isOnAuthenticatedPage())) {
-        test.skip(true, "Auth session expired - redirected to login");
-        return;
-      }
+      const isAuthenticated = await nav.isOnAuthenticatedPage();
+      test.skip(!isAuthenticated, "Auth session expired - redirected to login");
+      if (!isAuthenticated) return;
 
       await page.waitForLoadState("domcontentloaded");
 
@@ -209,10 +207,9 @@ test.describe("Reviews Journeys", () => {
       await nav.goToProfile();
 
       // Check we weren't redirected to login
-      if (!(await nav.isOnAuthenticatedPage())) {
-        test.skip(true, "Auth session expired - redirected to login");
-        return;
-      }
+      const isAuthenticated = await nav.isOnAuthenticatedPage();
+      test.skip(!isAuthenticated, "Auth session expired - redirected to login");
+      if (!isAuthenticated) return;
 
       await page.waitForLoadState("domcontentloaded");
 
@@ -259,10 +256,9 @@ test.describe("Reviews Journeys", () => {
       await nav.goToProfile();
 
       // Check we weren't redirected to login
-      if (!(await nav.isOnAuthenticatedPage())) {
-        test.skip(true, "Auth session expired - redirected to login");
-        return;
-      }
+      const isAuthenticated = await nav.isOnAuthenticatedPage();
+      test.skip(!isAuthenticated, "Auth session expired - redirected to login");
+      if (!isAuthenticated) return;
 
       await page.waitForLoadState("domcontentloaded");
 
@@ -303,10 +299,9 @@ test.describe("Reviews Journeys", () => {
       await nav.goToProfile();
 
       // Check we weren't redirected to login
-      if (!(await nav.isOnAuthenticatedPage())) {
-        test.skip(true, "Auth session expired - redirected to login");
-        return;
-      }
+      const isAuthenticated = await nav.isOnAuthenticatedPage();
+      test.skip(!isAuthenticated, "Auth session expired - redirected to login");
+      if (!isAuthenticated) return;
 
       await page.waitForLoadState("domcontentloaded");
 
@@ -433,10 +428,9 @@ test.describe("Reviews Journeys", () => {
       await nav.goToBookings();
 
       // Check we weren't redirected to login
-      if (!(await nav.isOnAuthenticatedPage())) {
-        test.skip(true, "Auth session expired - redirected to login");
-        return;
-      }
+      const isAuthenticated = await nav.isOnAuthenticatedPage();
+      test.skip(!isAuthenticated, "Auth session expired - redirected to login");
+      if (!isAuthenticated) return;
 
       await page.waitForLoadState("domcontentloaded");
 

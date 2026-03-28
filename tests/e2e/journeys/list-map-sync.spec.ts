@@ -211,10 +211,7 @@ test.describe("List <-> Map Sync", () => {
 
     // Check auth — if redirected to login, skip the entire test
     const isAuthenticated = await nav.isOnAuthenticatedPage();
-    if (!isAuthenticated) {
-      test.skip(true, "Auth session expired — redirected to login");
-      return;
-    }
+    test.skip(!isAuthenticated, "Auth session expired — redirected to login");
 
     // Wait for listings to load — scope to visible container
     await expect(
@@ -309,20 +306,14 @@ test.describe("List <-> Map Sync", () => {
       .waitFor({ state: "visible", timeout: 10_000 })
       .then(() => true)
       .catch(() => false);
-    if (!hasMapCanvas) {
-      test.skip(true, "Map canvas not visible in headless CI without WebGL");
-      return;
-    }
+    test.skip(!hasMapCanvas, "Map canvas not visible in headless CI without WebGL");
 
     // Wait for map to be fully ready
     await waitForMapReady(page);
 
     // Wait for markers to appear with proper timing (accounts for fetch + render)
     const markerCount = await safeWaitForMapMarkers(page);
-    if (markerCount === 0) {
-      test.skip();
-      return;
-    }
+    test.skip(markerCount === 0, "No map markers rendered");
 
     // Use :visible to avoid finding markers on hidden mobile/desktop map container
     const marker = page.locator(".maplibregl-marker:visible").first();
@@ -360,10 +351,7 @@ test.describe("List <-> Map Sync", () => {
 
     // Wait for markers with proper timing (accounts for fetch + render)
     const markerCount = await safeWaitForMapMarkers(page);
-    if (markerCount === 0) {
-      test.skip();
-      return;
-    }
+    test.skip(markerCount === 0, "No map markers rendered");
 
     // Use :visible to avoid finding markers on hidden mobile/desktop map container
     const marker = page.locator(".maplibregl-marker:visible").first();
@@ -457,19 +445,13 @@ test.describe("List <-> Map Sync", () => {
       .waitFor({ state: "visible", timeout: 10_000 })
       .then(() => true)
       .catch(() => false);
-    if (!hasMapCanvas) {
-      test.skip(true, "Map canvas not visible in headless CI without WebGL");
-      return;
-    }
+    test.skip(!hasMapCanvas, "Map canvas not visible in headless CI without WebGL");
 
     // Wait for map to be fully ready
     await waitForMapReady(page);
 
     const markerCount = await safeWaitForMapMarkers(page);
-    if (markerCount === 0) {
-      test.skip();
-      return;
-    }
+    test.skip(markerCount === 0, "No map markers rendered");
 
     // Use :visible to avoid finding markers on hidden mobile/desktop map container
     const marker = page.locator(".maplibregl-marker:visible").first();
@@ -528,19 +510,13 @@ test.describe("List <-> Map Sync", () => {
       .waitFor({ state: "visible", timeout: 10_000 })
       .then(() => true)
       .catch(() => false);
-    if (!hasMapCanvas) {
-      test.skip(true, "Map canvas not visible in headless CI without WebGL");
-      return;
-    }
+    test.skip(!hasMapCanvas, "Map canvas not visible in headless CI without WebGL");
 
     // Wait for map to be fully ready
     await waitForMapReady(page);
 
     const markerCount = await safeWaitForMapMarkers(page);
-    if (markerCount === 0) {
-      test.skip();
-      return;
-    }
+    test.skip(markerCount === 0, "No map markers rendered");
 
     // Use :visible to avoid finding markers on hidden mobile/desktop map container
     const marker = page.locator(".maplibregl-marker:visible").first();
@@ -598,19 +574,13 @@ test.describe("List <-> Map Sync", () => {
       .waitFor({ state: "visible", timeout: 10_000 })
       .then(() => true)
       .catch(() => false);
-    if (!hasMapCanvas) {
-      test.skip(true, "Map canvas not visible in headless CI without WebGL");
-      return;
-    }
+    test.skip(!hasMapCanvas, "Map canvas not visible in headless CI without WebGL");
 
     // Wait for map to be fully ready
     await waitForMapReady(page);
 
     const markerCount = await safeWaitForMapMarkers(page);
-    if (markerCount === 0) {
-      test.skip();
-      return;
-    }
+    test.skip(markerCount === 0, "No map markers rendered");
 
     // Use :visible to avoid finding markers on hidden mobile/desktop map container
     const marker = page.locator(".maplibregl-marker:visible").first();
@@ -731,9 +701,8 @@ test.describe("List <-> Map Sync", () => {
       .catch(() => false);
     if (!hasMarker) {
       await cleanup();
-      test.skip(true, "Map markers not visible in headless CI");
-      return;
     }
+    test.skip(!hasMarker, "Map markers not visible in headless CI");
     await clickMarkerViaEvaluate(marker);
 
     // Wait for popup container to appear (mapbox popup)
@@ -835,9 +804,8 @@ test.describe("List <-> Map Sync", () => {
       .catch(() => false);
     if (!hasMarker) {
       await cleanup();
-      test.skip(true, "Map markers not visible in headless CI");
-      return;
     }
+    test.skip(!hasMarker, "Map markers not visible in headless CI");
     await clickMarkerViaEvaluate(marker);
 
     // Wait for popup container to appear (mapbox popup)
@@ -948,9 +916,8 @@ test.describe("List <-> Map Sync", () => {
       .catch(() => false);
     if (!hasMarker) {
       await cleanup();
-      test.skip(true, "Map markers not visible in headless CI");
-      return;
     }
+    test.skip(!hasMarker, "Map markers not visible in headless CI");
     await clickMarkerViaEvaluate(marker);
 
     // Wait for popup container to appear (mapbox popup)
@@ -1164,19 +1131,13 @@ test.describe("List <-> Map Sync", () => {
       .waitFor({ state: "visible", timeout: 10_000 })
       .then(() => true)
       .catch(() => false);
-    if (!hasMapCanvas) {
-      test.skip(true, "Map canvas not visible in headless CI without WebGL");
-      return;
-    }
+    test.skip(!hasMapCanvas, "Map canvas not visible in headless CI without WebGL");
 
     // Wait for map to be fully ready
     await waitForMapReady(page);
 
     const markerCount = await safeWaitForMapMarkers(page);
-    if (markerCount === 0) {
-      test.skip();
-      return;
-    }
+    test.skip(markerCount === 0, "No map markers rendered");
 
     // Click marker to open popup and select listing using evaluate-based click
     const marker = page.locator(".maplibregl-marker:visible").first();
@@ -1227,19 +1188,13 @@ test.describe("List <-> Map Sync", () => {
       .waitFor({ state: "visible", timeout: 10_000 })
       .then(() => true)
       .catch(() => false);
-    if (!hasMapCanvas) {
-      test.skip(true, "Map canvas not visible in headless CI without WebGL");
-      return;
-    }
+    test.skip(!hasMapCanvas, "Map canvas not visible in headless CI without WebGL");
 
     // Wait for map to be fully ready
     await waitForMapReady(page);
 
     const markerCount = await safeWaitForMapMarkers(page);
-    if (markerCount === 0) {
-      test.skip();
-      return;
-    }
+    test.skip(markerCount === 0, "No map markers rendered");
 
     // Click marker to open popup using evaluate-based click
     const marker = page.locator(".maplibregl-marker:visible").first();
@@ -1312,9 +1267,8 @@ test.describe("List <-> Map Sync", () => {
       .catch(() => false);
     if (!hasMarker) {
       await cleanup();
-      test.skip(true, "Map markers not visible in headless CI");
-      return;
     }
+    test.skip(!hasMarker, "Map markers not visible in headless CI");
     await clickMarkerViaEvaluate(marker);
 
     // Wait for stacked popup
@@ -1379,19 +1333,13 @@ test.describe("List <-> Map Sync", () => {
       .waitFor({ state: "visible", timeout: 10_000 })
       .then(() => true)
       .catch(() => false);
-    if (!hasMapCanvas) {
-      test.skip(true, "Map canvas not visible in headless CI without WebGL");
-      return;
-    }
+    test.skip(!hasMapCanvas, "Map canvas not visible in headless CI without WebGL");
 
     // Wait for map to be fully ready
     await waitForMapReady(page);
 
     const markerCount = await safeWaitForMapMarkers(page);
-    if (markerCount === 0) {
-      test.skip();
-      return;
-    }
+    test.skip(markerCount === 0, "No map markers rendered");
 
     // Click marker to open popup and select a listing using evaluate-based click
     const marker = page.locator(".maplibregl-marker:visible").first();

@@ -35,13 +35,9 @@ test.describe("axe-core Gap Coverage — Admin Pages", () => {
 
       // Skip if redirected away (no admin auth available)
       const currentUrl = page.url();
-      if (
-        currentUrl.includes("/login") ||
-        (response && response.status() >= 400)
-      ) {
-        test.skip(true, `Admin auth not available — redirected from ${url}`);
-        return;
-      }
+      const adminRedirected = currentUrl.includes("/login") || (response !== null && response.status() >= 400);
+      test.skip(adminRedirected, `Admin auth not available — redirected from ${url}`);
+      if (adminRedirected) return;
 
       const results = await runAxeScan(page);
       const violations = filterViolations(results.violations);

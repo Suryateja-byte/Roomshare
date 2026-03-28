@@ -93,7 +93,7 @@ test.describe("Nearby Places — Visual Regression @nearby @visual", () => {
   test("V-005: Mobile list view", async ({ page }) => {
     const viewport = page.viewportSize();
     if (!viewport || viewport.width >= 1024) {
-      test.skip();
+      test.skip(true, "Test requires mobile viewport");
       return;
     }
 
@@ -113,7 +113,7 @@ test.describe("Nearby Places — Visual Regression @nearby @visual", () => {
   test("V-006: Mobile map view", async ({ page }) => {
     const viewport = page.viewportSize();
     if (!viewport || viewport.width >= 1024) {
-      test.skip();
+      test.skip(true, "Test requires mobile viewport");
       return;
     }
 

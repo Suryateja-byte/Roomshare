@@ -279,11 +279,11 @@ test.describe("9.3: Map style persistence across navigation", () => {
     await waitForMapReady(page1);
 
     // Check if controls are available in this context
-    if (!(await mapStyleControlsAvailable(page1))) {
+    const styleControlsAvailable = await mapStyleControlsAvailable(page1);
+    if (!styleControlsAvailable) {
       await context1.close();
-      test.skip(true, "Map style controls not rendered (WebGL unavailable)");
-      return;
     }
+    test.skip(!styleControlsAvailable, "Map style controls not rendered (WebGL unavailable)");
 
     // Set satellite style in first context
     const satelliteBtn = getStyleButton(page1, "Satellite");

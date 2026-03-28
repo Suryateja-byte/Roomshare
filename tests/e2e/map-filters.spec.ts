@@ -322,10 +322,7 @@ test.describe("Map + Filter Interactions", () => {
 
       // Check if map exists
       const initialMapId = await getMapInstanceId(page);
-      if (!initialMapId) {
-        test.skip(true, "Map not rendered (WebGL may be unavailable)");
-        return;
-      }
+      test.skip(!initialMapId, "Map not rendered (WebGL may be unavailable)");
 
       console.log(`[Test] Initial map instance ID: ${initialMapId}`);
 
@@ -415,11 +412,7 @@ test.describe("Map + Filter Interactions", () => {
       const filtersRegion = page.locator('[aria-label="Applied filters"]');
       const regionVisible = await filtersRegion.isVisible().catch(() => false);
 
-      if (!regionVisible) {
-        // Filter chips may not be rendered in this UI variant
-        test.skip(true, "Applied filters region not visible");
-        return;
-      }
+      test.skip(!regionVisible, "Applied filters region not visible");
 
       // Find and click the roomType filter chip's remove button
       const roomTypeChip = filtersRegion.locator(
@@ -450,10 +443,7 @@ test.describe("Map + Filter Interactions", () => {
 
       // Check if map exists
       const initialMapId = await getMapInstanceId(page);
-      if (!initialMapId) {
-        test.skip(true, "Map not rendered (WebGL may be unavailable)");
-        return;
-      }
+      test.skip(!initialMapId, "Map not rendered (WebGL may be unavailable)");
 
       // Wait for markers to render before measuring
       let initialMarkerCount: number;
@@ -577,10 +567,7 @@ test.describe("Map + Filter Interactions", () => {
       await waitForSearchPageReady(page);
 
       // Check if map exists
-      if (!(await getMapInstanceId(page))) {
-        test.skip(true, "Map not rendered");
-        return;
-      }
+      test.skip(!(await getMapInstanceId(page)), "Map not rendered");
 
       // Track network requests
       const tracker = await trackMapDataRequests(page);
@@ -653,10 +640,7 @@ test.describe("Map + Filter Interactions", () => {
       const map = page.locator(".maplibregl-canvas:visible").first();
       const mapVisible = await map.isVisible().catch(() => false);
 
-      if (!mapVisible) {
-        test.skip(true, "Map not visible");
-        return;
-      }
+      test.skip(!mapVisible, "Map not visible");
 
       // Apply a filter
       await navigateWithRoomTypeFilter(page, "Private Room");
@@ -664,10 +648,7 @@ test.describe("Map + Filter Interactions", () => {
       // Map should still be interactive after filter (can zoom)
       // Re-check visibility after filter navigation
       const mapStillVisible = await map.isVisible().catch(() => false);
-      if (!mapStillVisible) {
-        test.skip(true, "Map canvas not visible after filter change");
-        return;
-      }
+      test.skip(!mapStillVisible, "Map canvas not visible after filter change");
 
       await map.click({ timeout: 5_000 }).catch(() => {
         // Click may fail if canvas is obscured -- not a hard failure
