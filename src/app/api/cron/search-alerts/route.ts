@@ -14,38 +14,47 @@ export async function GET(request: NextRequest) {
   const authError = validateCronAuth(request);
   if (authError) return authError;
 
-  // Session-level advisory lock — prevents concurrent cron runs
-  const [lockResult] = await prisma.$queryRaw<[{ locked: boolean }]>`
-    SELECT pg_try_advisory_lock(hashtext(${SEARCH_ALERTS_LOCK_KEY})) as locked
-  `;
-
-  if (!lockResult.locked) {
-    logger.sync.info("[SearchAlerts] Skipped — another instance is running");
-    return NextResponse.json({
-      success: true,
-      skipped: true,
-      reason: "lock_held",
-    });
-  }
-
   try {
-    logger.sync.info("Starting search alerts processing...");
-    const startTime = Date.now();
+    // Transaction-level advisory lock — auto-releases on commit/rollback,
+    // preventing orphaned locks if Vercel kills the function on timeout.
+    const lockResult = await prisma.$transaction(async (tx) => {
+      const [lock] = await tx.$queryRaw<[{ locked: boolean }]>`
+        SELECT pg_try_advisory_xact_lock(hashtext(${SEARCH_ALERTS_LOCK_KEY})) as locked
+      `;
 
-    const result = await withRetry(() => processSearchAlerts(), {
-      context: "processSearchAlerts",
+      if (!lock.locked) {
+        return { skipped: true as const };
+      }
+
+      logger.sync.info("Starting search alerts processing...");
+      const startTime = Date.now();
+
+      const result = await withRetry(() => processSearchAlerts(), {
+        context: "processSearchAlerts",
+      });
+
+      const duration = Date.now() - startTime;
+      logger.sync.info(`Search alerts completed in ${duration}ms`, {
+        ...result,
+        duration,
+      });
+
+      return { skipped: false as const, duration, result };
     });
 
-    const duration = Date.now() - startTime;
-    logger.sync.info(`Search alerts completed in ${duration}ms`, {
-      ...result,
-      duration,
-    });
+    if (lockResult.skipped) {
+      logger.sync.info("[SearchAlerts] Skipped — another instance is running");
+      return NextResponse.json({
+        success: true,
+        skipped: true,
+        reason: "lock_held",
+      });
+    }
 
     return NextResponse.json({
       success: true,
-      duration: `${duration}ms`,
-      ...result,
+      duration: `${lockResult.duration}ms`,
+      ...lockResult.result,
     });
   } catch (error) {
     logger.sync.error("Search alerts cron error", {
@@ -56,10 +65,5 @@ export async function GET(request: NextRequest) {
       { success: false, error: "Search alerts processing failed" },
       { status: 500 }
     );
-  } finally {
-    // Always release the session-level lock, even on error
-    await prisma.$queryRaw`
-      SELECT pg_advisory_unlock(hashtext(${SEARCH_ALERTS_LOCK_KEY}))
-    `;
   }
 }
