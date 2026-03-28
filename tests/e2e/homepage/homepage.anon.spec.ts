@@ -91,8 +91,26 @@ test.describe("Homepage — Anonymous User", () => {
     const section = page.locator('[data-testid="featured-listings-section"]');
     await section.waitFor({ state: "attached", timeout: 20_000 });
     await section.scrollIntoViewIfNeeded();
-    // Wait for IntersectionObserver to fire after scroll
-    await page.evaluate(() => new Promise(r => requestAnimationFrame(() => requestAnimationFrame(r))));
+    // Wait for IntersectionObserver + Framer Motion whileInView to complete.
+    // Double-rAF is unreliable in headless CI (50-200ms IO callback delay).
+    // Instead, poll for the actual style change (opacity !== '0') which signals
+    // the animation variant has been applied.
+    await page.waitForFunction(
+      () => {
+        const el = document.querySelector(
+          '[data-testid="featured-listings-section"] [data-testid="listing-card"]'
+        );
+        if (!el) {
+          // No listing cards — may be empty state, which is also valid
+          const emptyText = document.querySelector(
+            '[data-testid="featured-listings-section"]'
+          )?.textContent ?? '';
+          return /latest curated spaces|be the first to share/i.test(emptyText);
+        }
+        return getComputedStyle(el).opacity !== '0';
+      },
+      { timeout: 20_000 }
+    );
 
     await expect(
       page
