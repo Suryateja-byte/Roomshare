@@ -156,6 +156,11 @@ function createMockMapInstance() {
     loaded: jest.fn(() => true),
     isSourceLoaded: jest.fn(() => true),
     getCanvas: jest.fn(() => mockCanvas),
+    getContainer: jest.fn(() => {
+      const container = document.createElement("div");
+      container.setAttribute("data-testid", "map-container-mock");
+      return container;
+    }),
   };
 }
 
