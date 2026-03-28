@@ -133,6 +133,7 @@ interface ListingPageClientProps {
   holdEnabled?: boolean;
   coordinates: { lat: number; lng: number } | null;
   similarListings?: Listing[];
+  viewToken?: string;
 }
 
 // Status badge with pulse animation
@@ -225,6 +226,7 @@ export default function ListingPageClient({
   holdEnabled,
   coordinates,
   similarListings,
+  viewToken,
 }: ListingPageClientProps) {
   const { data: session, status: sessionStatus } = useSession();
   const hasImages = listing.images && listing.images.length > 0;
@@ -337,7 +339,7 @@ export default function ListingPageClient({
 
   return (
     <div className="min-h-screen bg-surface-canvas pb-20">
-      <ListingViewTracker listingId={listing.id} ownerId={listing.ownerId} />
+      <ListingViewTracker listingId={listing.id} ownerId={listing.ownerId} viewToken={viewToken} />
 
       {/* Real-time freshness check for non-owners */}
       {canRenderGuestControls && (
