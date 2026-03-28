@@ -46,13 +46,16 @@ export async function GET(request: NextRequest) {
         }
 
         // Detect drift using SUM(slotsRequested), not COUNT
-        // Date-aware: only count bookings with future endDate (past bookings no longer consume slots)
+        // DATA-006 FIX: Only count bookings whose date range overlaps NOW
+        // - ACCEPTED: startDate <= NOW AND endDate >= NOW (currently active)
+        // - HELD: heldUntil > NOW (hold still valid)
+        // Previously used endDate >= NOW which counted future non-overlapping bookings
         const driftRows = await tx.$queryRaw<DriftRow[]>`
         SELECT
           l.id,
           l."availableSlots" AS actual,
           l."totalSlots" - COALESCE(SUM(b."slotsRequested") FILTER (
-            WHERE (b.status = 'ACCEPTED' AND b."endDate" >= NOW())
+            WHERE (b.status = 'ACCEPTED' AND b."startDate" <= NOW() AND b."endDate" >= NOW())
             OR (b.status = 'HELD' AND b."heldUntil" > NOW())
           ), 0) AS expected
         FROM "Listing" l
@@ -60,7 +63,7 @@ export async function GET(request: NextRequest) {
         WHERE l.status = 'ACTIVE'
         GROUP BY l.id
         HAVING l."availableSlots" != l."totalSlots" - COALESCE(SUM(b."slotsRequested") FILTER (
-          WHERE (b.status = 'ACCEPTED' AND b."endDate" >= NOW())
+          WHERE (b.status = 'ACCEPTED' AND b."startDate" <= NOW() AND b."endDate" >= NOW())
           OR (b.status = 'HELD' AND b."heldUntil" > NOW())
         ), 0)
       `;
