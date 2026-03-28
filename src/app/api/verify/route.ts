@@ -1,3 +1,4 @@
+import crypto from "crypto";
 import { NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
 import { headers } from "next/headers";
@@ -21,7 +22,11 @@ export async function GET() {
     );
   }
 
-  if (providedKey !== internalKey) {
+  if (
+    !providedKey ||
+    providedKey.length !== internalKey.length ||
+    !crypto.timingSafeEqual(Buffer.from(providedKey), Buffer.from(internalKey))
+  ) {
     return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
   }
 
