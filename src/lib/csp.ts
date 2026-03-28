@@ -14,16 +14,29 @@ const CONNECT_SRC_ORIGINS = [
   "https://challenges.cloudflare.com",
 ];
 
-export function buildCspHeader(nonce?: string): string {
+// SEC-002 FIX: Routes that render MapLibre maps and need 'unsafe-eval' for WebGL shaders
+const MAP_PAGE_PATTERNS = [/^\/search/, /^\/listings\/[^/]+$/];
+
+export function isMapPage(pathname: string): boolean {
+  return MAP_PAGE_PATTERNS.some((p) => p.test(pathname));
+}
+
+export function buildCspHeader(
+  nonce?: string,
+  options?: { pathname?: string }
+): string {
   const isDev = process.env.NODE_ENV !== "production";
+  const needsUnsafeEval = isDev || isMapPage(options?.pathname ?? "");
 
   const scriptSrcTokens: string[] = ["'self'"];
   if (isDev) {
     scriptSrcTokens.push("'unsafe-inline'", "'unsafe-eval'");
   } else if (nonce) {
     scriptSrcTokens.push(`'nonce-${nonce}'`, "'strict-dynamic'");
-    // Required by MapLibre GL for WebGL shader compilation (not application eval)
-    scriptSrcTokens.push("'unsafe-eval'");
+    // SEC-002 FIX: Only include 'unsafe-eval' on map pages (MapLibre WebGL shaders)
+    if (needsUnsafeEval) {
+      scriptSrcTokens.push("'unsafe-eval'");
+    }
   }
   scriptSrcTokens.push(
     "https://maps.googleapis.com",

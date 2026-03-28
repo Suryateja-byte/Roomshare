@@ -1,11 +1,15 @@
 import { buildCspHeader } from "@/lib/csp";
 
-export function applySecurityHeaders(request: { headers: Headers }) {
+export function applySecurityHeaders(request: {
+  headers: Headers;
+  nextUrl?: { pathname: string };
+}) {
   const isDev = process.env.NODE_ENV !== "production";
   const nonce = isDev
     ? undefined
     : crypto.randomUUID().replace(/-/g, "").slice(0, 24);
-  const cspHeader = buildCspHeader(nonce);
+  const pathname = request.nextUrl?.pathname ?? "";
+  const cspHeader = buildCspHeader(nonce, { pathname });
 
   const requestHeaders = new Headers(request.headers);
   requestHeaders.set("content-security-policy", cspHeader);

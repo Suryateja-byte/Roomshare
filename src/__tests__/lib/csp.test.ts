@@ -71,6 +71,81 @@ describe("buildCspHeader", () => {
     });
   });
 
+  // SEC-002: Route-scoped unsafe-eval
+  describe("route-scoped unsafe-eval (SEC-002)", () => {
+    beforeEach(() => {
+      Object.defineProperty(process.env, "NODE_ENV", {
+        value: "production",
+        writable: true,
+        configurable: true,
+      });
+    });
+
+    it("includes unsafe-eval on /search (map page)", () => {
+      jest.resetModules();
+      const { buildCspHeader } = require("@/lib/csp");
+      const csp = buildCspHeader("abc123", { pathname: "/search" });
+      const scriptSrc = csp
+        .split(";")
+        .find((d: string) => d.trim().startsWith("script-src"));
+      expect(scriptSrc).toContain("'unsafe-eval'");
+    });
+
+    it("includes unsafe-eval on /listings/[id] (map page)", () => {
+      jest.resetModules();
+      const { buildCspHeader } = require("@/lib/csp");
+      const csp = buildCspHeader("abc123", {
+        pathname: "/listings/clx123abc",
+      });
+      const scriptSrc = csp
+        .split(";")
+        .find((d: string) => d.trim().startsWith("script-src"));
+      expect(scriptSrc).toContain("'unsafe-eval'");
+    });
+
+    it("includes unsafe-eval on /search with query params", () => {
+      jest.resetModules();
+      const { buildCspHeader } = require("@/lib/csp");
+      const csp = buildCspHeader("abc123", {
+        pathname: "/search/boston",
+      });
+      const scriptSrc = csp
+        .split(";")
+        .find((d: string) => d.trim().startsWith("script-src"));
+      expect(scriptSrc).toContain("'unsafe-eval'");
+    });
+
+    it("excludes unsafe-eval on non-map pages", () => {
+      jest.resetModules();
+      const { buildCspHeader } = require("@/lib/csp");
+      const csp = buildCspHeader("abc123", { pathname: "/settings" });
+      const scriptSrc = csp
+        .split(";")
+        .find((d: string) => d.trim().startsWith("script-src"));
+      expect(scriptSrc).not.toContain("'unsafe-eval'");
+    });
+
+    it("excludes unsafe-eval on login page", () => {
+      jest.resetModules();
+      const { buildCspHeader } = require("@/lib/csp");
+      const csp = buildCspHeader("abc123", { pathname: "/auth/login" });
+      const scriptSrc = csp
+        .split(";")
+        .find((d: string) => d.trim().startsWith("script-src"));
+      expect(scriptSrc).not.toContain("'unsafe-eval'");
+    });
+
+    it("excludes unsafe-eval when no pathname provided", () => {
+      jest.resetModules();
+      const { buildCspHeader } = require("@/lib/csp");
+      const csp = buildCspHeader("abc123");
+      const scriptSrc = csp
+        .split(";")
+        .find((d: string) => d.trim().startsWith("script-src"));
+      expect(scriptSrc).not.toContain("'unsafe-eval'");
+    });
+  });
+
   describe("development (no nonce)", () => {
     beforeEach(() => {
       Object.defineProperty(process.env, "NODE_ENV", {
