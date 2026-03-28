@@ -265,35 +265,46 @@ export async function waitForHydration(
  * Replaces `waitForTimeout(2000)` after map initialization and interactions.
  *
  * In CI headless environments without GPU/WebGL, the map ref may never be
- * exposed. This function uses a two-phase approach:
- * 1. Try to wait for the E2E map ref to report loaded + idle
- * 2. If that fails, fall back to waiting for the map container to be present in DOM
+ * exposed. This function uses a three-phase approach:
+ * 1. Wait for data-map-ready="true" (set when __e2eMapRef is exposed)
+ * 2. If found, also wait for the ref to be idle (not moving/zooming)
+ * 3. If that fails, fall back to waiting for the map container in DOM
  */
 export async function waitForMapReady(
   page: Page,
   timeout = 15_000
 ): Promise<void> {
-  // Phase 1: Try the E2E map ref (fast path when WebGL works)
-  const mapRefReady = await page
-    .waitForFunction(
-      () => {
-        const map = (window as any).__e2eMapRef;
-        if (!map) return false;
-        return (
-          map.loaded() &&
-          !map.isMoving() &&
-          !map.isZooming() &&
-          !map.isRotating()
-        );
-      },
-      { timeout: Math.min(timeout, 10_000) }
-    )
+  // Phase 1: Wait for the data-map-ready attribute (signals ref is actually set)
+  const domReady = await page
+    .locator('[data-map-ready="true"]')
+    .first()
+    .waitFor({ state: "attached", timeout: Math.min(timeout, 10_000) })
     .then(() => true)
     .catch(() => false);
 
-  if (mapRefReady) return;
+  if (domReady) {
+    // Phase 2: Ref is available — wait for idle state (not moving/zooming)
+    await page
+      .waitForFunction(
+        () => {
+          const map = (window as any).__e2eMapRef;
+          if (!map) return true; // ref gone, proceed anyway
+          return (
+            map.loaded() &&
+            !map.isMoving() &&
+            !map.isZooming() &&
+            !map.isRotating()
+          );
+        },
+        { timeout: Math.min(timeout, 5_000) }
+      )
+      .catch(() => {
+        // Idle check timed out — proceed with best effort
+      });
+    return;
+  }
 
-  // Phase 2: Fall back to waiting for map container or canvas in DOM
+  // Phase 3: Fall back to waiting for map container or canvas in DOM
   await page
     .locator('.maplibregl-map, .maplibregl-canvas, [data-testid="map"]')
     .first()

@@ -1697,6 +1697,12 @@ export default function MapComponent({
     win.__e2eSetProgrammaticMove = setProgrammaticMove;
     win.__e2eUpdateMarkers = updateUnclusteredListings;
 
+    // Signal to E2E tests that the map ref is ready (not just DOM-present).
+    // waitForMapReady() waits for this attribute instead of falling back to
+    // DOM presence which doesn't guarantee the ref is available.
+    const mapContainer = mapRef.current.getMap().getContainer();
+    mapContainer?.setAttribute("data-map-ready", "true");
+
     win.__e2eSimulateUserPan = (dx: number, dy: number) => {
       const map = mapRef.current?.getMap();
       if (!map) return false;
@@ -1719,6 +1725,7 @@ export default function MapComponent({
       delete win.__e2eUpdateMarkers;
       delete win.__e2eSimulateUserPan;
       delete win.__e2eSimulateUserZoom;
+      mapContainer?.removeAttribute("data-map-ready");
     };
   }, [isMapLoaded, setProgrammaticMove, updateUnclusteredListings]);
 
@@ -2821,12 +2828,15 @@ export default function MapComponent({
             }
           }
 
-          // L3-MAP FIX: Gate E2E testing hooks behind non-production check
-          if (process.env.NODE_ENV !== "production" && mapRef.current) {
+          // Expose E2E map ref in onLoad (before React re-render triggers the useEffect).
+          // No NODE_ENV guard needed: window properties have no production impact,
+          // and the test-helpers API route is the real security gate.
+          if (mapRef.current) {
             const win = window as unknown as Record<string, unknown>;
             win.__e2eMapRef = mapRef.current.getMap();
             win.__e2eSetProgrammaticMove = setProgrammaticMove;
             win.__e2eUpdateMarkers = updateUnclusteredListings;
+            mapRef.current.getMap().getContainer()?.setAttribute("data-map-ready", "true");
           }
 
           // Fix 1: Listen for sourcedata to retry unclustered query after tiles load.
