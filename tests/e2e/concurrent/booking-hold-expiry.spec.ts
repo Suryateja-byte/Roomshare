@@ -36,8 +36,8 @@ test.describe("Booking Hold Expiry Races", () => {
       "createExpiredHold",
       {
         listingId,
+        tenantEmail: "e2e-other@roomshare.dev",
         slotsRequested: 1,
-        holdMinutes: 1,
         minutesAgo: 5,
       }
     );
@@ -72,14 +72,14 @@ test.describe("Booking Hold Expiry Races", () => {
     // Create 2 expired holds
     await testApi(page, "createExpiredHold", {
       listingId: listing.data.id,
+      tenantEmail: "e2e-other@roomshare.dev",
       slotsRequested: 1,
-      holdMinutes: 1,
       minutesAgo: 5,
     });
     await testApi(page, "createExpiredHold", {
       listingId: listing.data.id,
+      tenantEmail: "e2e-other@roomshare.dev",
       slotsRequested: 1,
-      holdMinutes: 1,
       minutesAgo: 5,
     });
 
