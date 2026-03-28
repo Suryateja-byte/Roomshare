@@ -41,10 +41,12 @@ export async function GET() {
     const dbLatency = Date.now() - dbStart;
     publicChecks.database = { status: "ok" };
     internalLatency.database = dbLatency;
-  } catch (_err) {
+  } catch (err) {
     const dbLatency = Date.now() - dbStart;
+    const isTimeout =
+      err instanceof Error && err.message === "DB health check timeout";
     publicChecks.database = {
-      status: dbLatency >= DB_TIMEOUT_MS ? "timeout" : "error",
+      status: isTimeout ? "timeout" : "error",
     };
     internalLatency.database = dbLatency;
     healthy = false;
