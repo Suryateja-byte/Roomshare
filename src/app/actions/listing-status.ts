@@ -67,13 +67,13 @@ export async function updateListingStatus(
         const activeBookings = await tx.booking.count({
           where: {
             listingId,
-            status: { in: ["ACCEPTED", "PENDING"] },
+            status: { in: ["ACCEPTED", "PENDING", "HELD"] },
           },
         });
         if (activeBookings > 0) {
           return {
             error:
-              "Cannot pause a listing with active or pending bookings. Please resolve them first.",
+              "Cannot pause a listing with active, pending, or held bookings. Please resolve them first.",
           } as const;
         }
       }

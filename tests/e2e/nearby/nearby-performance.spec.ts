@@ -98,7 +98,7 @@ test.describe("Nearby Places — Performance @nearby @perf", () => {
       test.info().project.name.includes("chromium") ||
       test.info().project.name.includes("Chrome");
     if (!isChromium) {
-      test.skip();
+      test.skip(true, "Performance API requires Chromium");
       return;
     }
 

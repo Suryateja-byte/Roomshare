@@ -93,9 +93,7 @@ test.describe("Map Interactions Edge Cases (Stories 9-12)", () => {
         "Map tests require desktop viewport - skipping on mobile"
       );
     }
-    if (projectName === "webkit") {
-      test.skip(true, "Map tests have timing issues on webkit - skipping");
-    }
+    test.skip(projectName === "webkit", "Map tests have timing issues on webkit - skipping");
   });
 
   // =========================================================================
@@ -537,10 +535,7 @@ test.describe("Map Interactions Edge Cases (Stories 9-12)", () => {
       }
 
       const hasMapRef = await waitForMapRef(page);
-      if (!hasMapRef) {
-        test.skip(true, "E2E map ref not exposed");
-        return;
-      }
+      test.skip(!hasMapRef, "E2E map ref not exposed");
 
       // Check that privacy-circles layer exists before proceeding
       const layerExists = await page.evaluate(() => {
@@ -776,10 +771,7 @@ test.describe("Map Interactions Edge Cases (Stories 9-12)", () => {
       }
 
       const hasMapRef = await waitForMapRef(page);
-      if (!hasMapRef) {
-        test.skip(true, "E2E map ref not exposed");
-        return;
-      }
+      test.skip(!hasMapRef, "E2E map ref not exposed");
 
       // Turn "Search as I move" toggle OFF so panning does not auto-update URL
       const toggle = page
@@ -787,10 +779,7 @@ test.describe("Map Interactions Edge Cases (Stories 9-12)", () => {
         .filter({ hasText: /search as i move/i });
       const toggleCount = await toggle.count();
 
-      if (toggleCount === 0) {
-        test.skip(true, "'Search as I move' toggle not found on page");
-        return;
-      }
+      test.skip(toggleCount === 0, "'Search as I move' toggle not found on page");
 
       // Check if toggle is currently ON (aria-checked="true")
       const isToggleOn = await toggle.first().getAttribute("aria-checked");

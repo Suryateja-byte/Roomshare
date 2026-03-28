@@ -60,19 +60,13 @@ const SEARCH_URL = `/search?${boundsQS}`;
  * Skips the test if map or markers are unavailable.
  */
 async function getFirstMarkerIdOrSkip(page: Page): Promise<string> {
-  if (!(await isMapAvailable(page))) {
-    test.skip(true, "Map not available (WebGL unavailable in headless)");
-  }
+  test.skip(!(await isMapAvailable(page)), "Map not available (WebGL unavailable in headless)");
 
   const markerCount = await waitForMarkersWithClusterExpansion(page);
-  if (markerCount === 0) {
-    test.skip(true, "No markers available after cluster expansion");
-  }
+  test.skip(markerCount === 0, "No markers available after cluster expansion");
 
   const id = await getMarkerListingId(page, 0);
-  if (!id) {
-    test.skip(true, "Could not read listing ID from first marker");
-  }
+  test.skip(!id, "Could not read listing ID from first marker");
   return id!;
 }
 
@@ -394,16 +388,12 @@ test.describe("Map-List Synchronization", () => {
     test("1.3 - Click different marker -> previous card loses highlight, new card highlighted", async ({
       page,
     }) => {
-      if (!(await isMapAvailable(page))) {
-        test.skip(true, "Map not available");
-      }
+      test.skip(!(await isMapAvailable(page)), "Map not available");
 
       const markerCount = await waitForMarkersWithClusterExpansion(page, {
         minCount: 2,
       });
-      if (markerCount < 2) {
-        test.skip(true, "Need at least 2 markers");
-      }
+      test.skip(markerCount < 2, "Need at least 2 markers");
 
       // Find markers that also have corresponding listing cards in the DOM.
       // Map markers may include listings beyond the first page of paginated
@@ -412,9 +402,7 @@ test.describe("Map-List Synchronization", () => {
       const markerIds = await getAllMarkerListingIds(page);
       const cardIds = new Set(await getAllCardListingIds(page));
       const matchedIds = markerIds.filter((id) => cardIds.has(id));
-      if (matchedIds.length < 2) {
-        test.skip(true, "Need at least 2 markers with matching listing cards");
-      }
+      test.skip(matchedIds.length < 2, "Need at least 2 markers with matching listing cards");
       const firstId = matchedIds[0];
       const secondId = matchedIds[1];
 
@@ -508,22 +496,18 @@ test.describe("Map-List Synchronization", () => {
     test("2.1 - Hover card -> corresponding marker gets elevated styling", async ({
       page,
     }) => {
-      if (!(await isMapAvailable(page))) {
-        test.skip(true, "Map not available");
-      }
+      test.skip(!(await isMapAvailable(page)), "Map not available");
 
       const markerCount = await waitForMarkersWithClusterExpansion(page);
-      if (markerCount === 0) test.skip(true, "No markers");
+      test.skip(markerCount === 0, "No markers");
 
       // Get the listing ID of the first card
       const cardId = await getFirstCardId(page);
-      if (!cardId) test.skip(true, "No card listing ID");
+      test.skip(!cardId, "No card listing ID");
 
       // Check if this card has a corresponding marker visible
       const markerIds = await getAllMarkerListingIds(page);
-      if (!markerIds.includes(cardId!)) {
-        test.skip(true, "Card listing has no visible marker on map");
-      }
+      test.skip(!markerIds.includes(cardId!), "Card listing has no visible marker on map");
 
       // Hover the card (uses evaluate on mobile to bypass bottom sheet overlay)
       const card = searchResultsContainer(page)
@@ -541,18 +525,16 @@ test.describe("Map-List Synchronization", () => {
     test("2.2 - Un-hover card -> marker returns to normal", async ({
       page,
     }) => {
-      if (!(await isMapAvailable(page))) test.skip(true, "Map not available");
+      test.skip(!(await isMapAvailable(page)), "Map not available");
 
       const markerCount = await waitForMarkersWithClusterExpansion(page);
-      if (markerCount === 0) test.skip(true, "No markers");
+      test.skip(markerCount === 0, "No markers");
 
       const cardId = await getFirstCardId(page);
-      if (!cardId) test.skip(true, "No card listing ID");
+      test.skip(!cardId, "No card listing ID");
 
       const markerIds = await getAllMarkerListingIds(page);
-      if (!markerIds.includes(cardId!)) {
-        test.skip(true, "No visible marker for this card");
-      }
+      test.skip(!markerIds.includes(cardId!), "No visible marker for this card");
 
       // Hover the card (uses evaluate on mobile to bypass bottom sheet overlay)
       const card = searchResultsContainer(page)
@@ -574,21 +556,19 @@ test.describe("Map-List Synchronization", () => {
     test("2.3 - Hover different card -> previous marker de-elevates, new marker elevates", async ({
       page,
     }) => {
-      if (!(await isMapAvailable(page))) test.skip(true, "Map not available");
+      test.skip(!(await isMapAvailable(page)), "Map not available");
 
       const markerCount = await waitForMarkersWithClusterExpansion(page, {
         minCount: 2,
       });
-      if (markerCount < 2) test.skip(true, "Need 2+ markers");
+      test.skip(markerCount < 2, "Need 2+ markers");
 
       const markerIds = await getAllMarkerListingIds(page);
       const cardIds = await getAllCardListingIds(page);
 
       // Find two card IDs that also have visible markers
       const overlapping = cardIds.filter((id) => markerIds.includes(id));
-      if (overlapping.length < 2) {
-        test.skip(true, "Need 2+ cards with visible markers");
-      }
+      test.skip(overlapping.length < 2, "Need 2+ cards with visible markers");
 
       const firstId = overlapping[0];
       const secondId = overlapping[1];
@@ -619,7 +599,7 @@ test.describe("Map-List Synchronization", () => {
       page,
     }) => {
       const cardId = await getFirstCardId(page);
-      if (!cardId) test.skip(true, "No card listing ID");
+      test.skip(!cardId, "No card listing ID");
 
       // Get the card's navigation link href — the Link component wraps the
       // card content including ImageCarousel which has drag handlers that can
@@ -663,19 +643,17 @@ test.describe("Map-List Synchronization", () => {
     test("3.1 - Click marker, then hover different card -> both active and hover states coexist", async ({
       page,
     }) => {
-      if (!(await isMapAvailable(page))) test.skip(true, "Map not available");
+      test.skip(!(await isMapAvailable(page)), "Map not available");
 
       const markerCount = await waitForMarkersWithClusterExpansion(page, {
         minCount: 2,
       });
-      if (markerCount < 2) test.skip(true, "Need 2+ markers");
+      test.skip(markerCount < 2, "Need 2+ markers");
 
       const markerIds = await getAllMarkerListingIds(page);
       const cardIds = await getAllCardListingIds(page);
       const overlapping = cardIds.filter((id) => markerIds.includes(id));
-      if (overlapping.length < 2) {
-        test.skip(true, "Need 2+ overlapping listings");
-      }
+      test.skip(overlapping.length < 2, "Need 2+ overlapping listings");
 
       const activeId = overlapping[0];
       const hoverId = overlapping[1];
@@ -711,9 +689,7 @@ test.describe("Map-List Synchronization", () => {
 
       const markerIds = await getAllMarkerListingIds(page);
       const cardIds = await getAllCardListingIds(page);
-      if (!cardIds.includes(listingId) || !markerIds.includes(listingId)) {
-        test.skip(true, "Listing not in both cards and markers");
-      }
+      test.skip(!cardIds.includes(listingId) || !markerIds.includes(listingId), "Listing not in both cards and markers");
 
       // Click marker to activate
       await clickMarkerByIndex(page, 0);
@@ -776,10 +752,10 @@ test.describe("Map-List Synchronization", () => {
     test("4.1 - Marker count matches listing card count (or subset if clustered)", async ({
       page,
     }) => {
-      if (!(await isMapAvailable(page))) test.skip(true, "Map not available");
+      test.skip(!(await isMapAvailable(page)), "Map not available");
 
       const markerCount = await waitForMarkersWithClusterExpansion(page);
-      if (markerCount === 0) test.skip(true, "No markers");
+      test.skip(markerCount === 0, "No markers");
 
       const cardIds = await getAllCardListingIds(page);
       const markerIds = await getAllMarkerListingIds(page);
@@ -804,7 +780,7 @@ test.describe("Map-List Synchronization", () => {
       page,
     }) => {
       test.slow(); // Filter navigation + map reload can exceed 60s on mobile
-      if (!(await isMapAvailable(page))) test.skip(true, "Map not available");
+      test.skip(!(await isMapAvailable(page)), "Map not available");
 
       await waitForMarkersWithClusterExpansion(page);
 
@@ -839,14 +815,13 @@ test.describe("Map-List Synchronization", () => {
     test("4.3 - After sort change -> card order changes but sync maintained", async ({
       page,
     }) => {
-      if (!(await isMapAvailable(page))) test.skip(true, "Map not available");
+      test.skip(!(await isMapAvailable(page)), "Map not available");
 
       await waitForMarkersWithClusterExpansion(page);
 
       // Get initial card order
       const initialCardIds = await getAllCardListingIds(page);
-      if (initialCardIds.length < 2)
-        test.skip(true, "Need 2+ cards for sort test");
+      test.skip(initialCardIds.length < 2, "Need 2+ cards for sort test");
 
       // Change sort via URL
       const url = new URL(page.url());
@@ -884,10 +859,10 @@ test.describe("Map-List Synchronization", () => {
       page,
     }) => {
       test.slow(); // Map pan + search reload can exceed 60s on mobile
-      if (!(await isMapAvailable(page))) test.skip(true, "Map not available");
+      test.skip(!(await isMapAvailable(page)), "Map not available");
 
       const hasMapRef = await waitForMapRef(page);
-      if (!hasMapRef) test.skip(true, "Map ref not available");
+      test.skip(!hasMapRef, "Map ref not available");
 
       // Get initial marker IDs
       await waitForMarkersWithClusterExpansion(page);
@@ -910,7 +885,7 @@ test.describe("Map-List Synchronization", () => {
         });
       });
 
-      if (!moved) test.skip(true, "Could not pan map");
+      test.skip(!moved, "Could not pan map");
 
       // Wait for map to settle after pan, then for markers or cards to appear
       await waitForMapReady(page);
@@ -946,9 +921,7 @@ test.describe("Map-List Synchronization", () => {
       const cardExists = await searchResultsContainer(page)
         .locator(`[data-testid="listing-card"][data-listing-id="${listingId}"]`)
         .count();
-      if (cardExists === 0) {
-        test.skip(true, "Card not found for this marker's listing");
-      }
+      test.skip(cardExists === 0, "Card not found for this marker's listing");
 
       // Scroll the results container to the bottom to ensure card is offscreen
       await page.evaluate(
@@ -979,17 +952,17 @@ test.describe("Map-List Synchronization", () => {
     test("5.2 - Rapid marker clicks -> only last clicked card is highlighted", async ({
       page,
     }) => {
-      if (!(await isMapAvailable(page))) test.skip(true, "Map not available");
+      test.skip(!(await isMapAvailable(page)), "Map not available");
 
       const markerCount = await waitForMarkersWithClusterExpansion(page, {
         minCount: 3,
       });
-      if (markerCount < 3) test.skip(true, "Need 3+ markers");
+      test.skip(markerCount < 3, "Need 3+ markers");
 
       const id0 = await getMarkerListingId(page, 0);
       const id1 = await getMarkerListingId(page, 1);
       const id2 = await getMarkerListingId(page, 2);
-      if (!id0 || !id1 || !id2) test.skip(true, "Could not read marker IDs");
+      test.skip(!id0 || !id1 || !id2, "Could not read marker IDs");
 
       // Rapidly click three markers: fire-and-forget for first two (no verification
       // delay), verify only the last click's effect. Using clickMarkerFast avoids the
@@ -1029,18 +1002,18 @@ test.describe("Map-List Synchronization", () => {
     test("5.3 - Map zoom in/out -> markers update, sync maintained", async ({
       page,
     }) => {
-      if (!(await isMapAvailable(page))) test.skip(true, "Map not available");
+      test.skip(!(await isMapAvailable(page)), "Map not available");
 
       const hasMapRef = await waitForMapRef(page);
-      if (!hasMapRef) test.skip(true, "Map ref not available");
+      test.skip(!hasMapRef, "Map ref not available");
 
       // Get initial marker count after expansion
       const initialCount = await waitForMarkersWithClusterExpansion(page);
-      if (initialCount === 0) test.skip(true, "No markers");
+      test.skip(initialCount === 0, "No markers");
 
       // Click a marker to set active state
       const listingId = await getMarkerListingId(page, 0);
-      if (!listingId) test.skip(true, "No marker ID");
+      test.skip(!listingId, "No marker ID");
       await clickMarkerByIndex(page, 0);
       await waitForCardHighlight(page, listingId!);
 
@@ -1088,22 +1061,20 @@ test.describe("Map-List Synchronization", () => {
       });
 
       // Check for map availability on mobile
-      if (!(await isMapAvailable(page))) {
-        test.skip(true, "Map not visible on mobile viewport");
-      }
+      test.skip(!(await isMapAvailable(page)), "Map not visible on mobile viewport");
 
       const mapReady = await waitForMapRef(page);
-      if (!mapReady) test.skip(true, "Map not ready");
+      test.skip(!mapReady, "Map not ready");
 
       await zoomToExpandClusters(page);
 
       const markerCount = await page
         .locator(".maplibregl-marker:visible")
         .count();
-      if (markerCount === 0) test.skip(true, "No markers on mobile");
+      test.skip(markerCount === 0, "No markers on mobile");
 
       const listingId = await getMarkerListingId(page, 0);
-      if (!listingId) test.skip(true, "No marker ID");
+      test.skip(!listingId, "No marker ID");
 
       // Click the marker
       await clickMarkerByIndex(page, 0);
@@ -1156,17 +1127,15 @@ test.describe("Map-List Synchronization", () => {
     test("6.2 - Hovered card has data-focus-state='hovered'", async ({
       page,
     }) => {
-      if (!(await isMapAvailable(page))) test.skip(true, "Map not available");
+      test.skip(!(await isMapAvailable(page)), "Map not available");
 
       await waitForMarkersWithClusterExpansion(page);
 
       const cardId = await getFirstCardId(page);
-      if (!cardId) test.skip(true, "No card");
+      test.skip(!cardId, "No card");
 
       const markerIds = await getAllMarkerListingIds(page);
-      if (!markerIds.includes(cardId!)) {
-        test.skip(true, "Card has no visible marker");
-      }
+      test.skip(!markerIds.includes(cardId!), "Card has no visible marker");
 
       // Hover the card (uses evaluate on mobile to bypass bottom sheet overlay)
       const card = searchResultsContainer(page)
@@ -1194,19 +1163,17 @@ test.describe("Map-List Synchronization", () => {
     });
 
     test("6.3 - Marker z-index changes on hover/active", async ({ page }) => {
-      if (!(await isMapAvailable(page))) test.skip(true, "Map not available");
+      test.skip(!(await isMapAvailable(page)), "Map not available");
 
       const markerCount = await waitForMarkersWithClusterExpansion(page, {
         minCount: 2,
       });
-      if (markerCount < 2) test.skip(true, "Need 2+ markers");
+      test.skip(markerCount < 2, "Need 2+ markers");
 
       const cardIds = await getAllCardListingIds(page);
       const markerIds = await getAllMarkerListingIds(page);
       const overlapping = cardIds.filter((id) => markerIds.includes(id));
-      if (overlapping.length === 0) {
-        test.skip(true, "No overlapping card/marker IDs");
-      }
+      test.skip(overlapping.length === 0, "No overlapping card/marker IDs");
 
       const targetId = overlapping[0];
 
@@ -1239,19 +1206,17 @@ test.describe("Map-List Synchronization", () => {
     test("6.4 - Multiple hover/active transitions don't cause flickering", async ({
       page,
     }) => {
-      if (!(await isMapAvailable(page))) test.skip(true, "Map not available");
+      test.skip(!(await isMapAvailable(page)), "Map not available");
 
       const markerCount = await waitForMarkersWithClusterExpansion(page, {
         minCount: 2,
       });
-      if (markerCount < 2) test.skip(true, "Need 2+ markers");
+      test.skip(markerCount < 2, "Need 2+ markers");
 
       const cardIds = await getAllCardListingIds(page);
       const markerIds = await getAllMarkerListingIds(page);
       const overlapping = cardIds.filter((id) => markerIds.includes(id));
-      if (overlapping.length < 2) {
-        test.skip(true, "Need 2+ overlapping IDs");
-      }
+      test.skip(overlapping.length < 2, "Need 2+ overlapping IDs");
 
       const id1 = overlapping[0];
       const id2 = overlapping[1];
@@ -1346,21 +1311,19 @@ test.describe("Map-List Synchronization", () => {
     test("Marker hover -> card gets ring-1 hover highlight", async ({
       page,
     }) => {
-      if (!(await isMapAvailable(page))) test.skip(true, "Map not available");
+      test.skip(!(await isMapAvailable(page)), "Map not available");
 
       const markerCount = await waitForMarkersWithClusterExpansion(page);
-      if (markerCount === 0) test.skip(true, "No markers");
+      test.skip(markerCount === 0, "No markers");
 
       const listingId = await getMarkerListingId(page, 0);
-      if (!listingId) test.skip(true, "No marker ID");
+      test.skip(!listingId, "No marker ID");
 
       // Check if a card exists for this listing
       const cardExists = await searchResultsContainer(page)
         .locator(`[data-testid="listing-card"][data-listing-id="${listingId}"]`)
         .count();
-      if (cardExists === 0) {
-        test.skip(true, "No card for this marker's listing");
-      }
+      test.skip(cardExists === 0, "No card for this marker's listing");
 
       // Hover the marker — may fail in headless CI where PointerEvent dispatch
       // doesn't reliably trigger React handlers
@@ -1457,18 +1420,18 @@ test.describe("Map-List Synchronization", () => {
     });
 
     test("Marker hover debounces scroll request (300ms)", async ({ page }) => {
-      if (!(await isMapAvailable(page))) test.skip(true, "Map not available");
+      test.skip(!(await isMapAvailable(page)), "Map not available");
 
       const markerCount = await waitForMarkersWithClusterExpansion(page, {
         minCount: 3,
       });
-      if (markerCount < 3) test.skip(true, "Need 3+ markers");
+      test.skip(markerCount < 3, "Need 3+ markers");
 
       // Get marker IDs for PointerEvent-based hover dispatch
       const hid0 = await getMarkerListingId(page, 0);
       const hid1 = await getMarkerListingId(page, 1);
       const hid2 = await getMarkerListingId(page, 2);
-      if (!hid0 || !hid1 || !hid2) test.skip(true, "Could not read marker IDs");
+      test.skip(!hid0 || !hid1 || !hid2, "Could not read marker IDs");
 
       // Instrument scroll count before hovering (viewport-aware container)
       await page.evaluate(() => {
@@ -1518,18 +1481,18 @@ test.describe("Map-List Synchronization", () => {
     test("FocusSource guard prevents card hover -> map -> card loop", async ({
       page,
     }) => {
-      if (!(await isMapAvailable(page))) test.skip(true, "Map not available");
+      test.skip(!(await isMapAvailable(page)), "Map not available");
 
       const markerCount = await waitForMarkersWithClusterExpansion(page);
-      if (markerCount === 0) test.skip(true, "No markers");
+      test.skip(markerCount === 0, "No markers");
 
       const listingId = await getMarkerListingId(page, 0);
-      if (!listingId) test.skip(true, "No marker ID");
+      test.skip(!listingId, "No marker ID");
 
       const cardExists = await searchResultsContainer(page)
         .locator(`[data-testid="listing-card"][data-listing-id="${listingId}"]`)
         .count();
-      if (cardExists === 0) test.skip(true, "No card for listing");
+      test.skip(cardExists === 0, "No card for listing");
 
       // Hover marker (sets focusSource to "map")
       try {
@@ -1566,16 +1529,14 @@ test.describe("Map-List Synchronization", () => {
       page,
     }) => {
       const cardId = await getFirstCardId(page);
-      if (!cardId) test.skip(true, "No card");
+      test.skip(!cardId, "No card");
 
       // Find the "Show on map" button on the first card
       const showOnMapBtn = searchResultsContainer(page).locator(
         `[data-testid="listing-card"][data-listing-id="${cardId}"] button[aria-label="Show on map"]`
       );
 
-      if ((await showOnMapBtn.count()) === 0) {
-        test.skip(true, "No 'Show on map' button found");
-      }
+      test.skip((await showOnMapBtn.count()) === 0, "No 'Show on map' button found");
 
       await showOnMapBtn.click();
 

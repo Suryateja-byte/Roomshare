@@ -54,10 +54,7 @@ test.describe("Mobile Bottom Sheet - Snap Transitions", () => {
   }) => {
     await page.goto(`/search?${boundsQS}`);
     const sheetReady = await waitForMobileSheet(page);
-    if (!sheetReady) {
-      test.skip();
-      return;
-    }
+    test.skip(!sheetReady, "Mobile bottom sheet not ready");
 
     // Collapse the sheet first via minimize button or keyboard
     await setSheetSnap(page, 0);
@@ -86,10 +83,7 @@ test.describe("Mobile Bottom Sheet - Snap Transitions", () => {
   test("Escape from half position stays at half", async ({ page }) => {
     await page.goto(`/search?${boundsQS}`);
     const sheetReady = await waitForMobileSheet(page);
-    if (!sheetReady) {
-      test.skip();
-      return;
-    }
+    test.skip(!sheetReady, "Mobile bottom sheet not ready");
 
     // Ensure we start at half (default)
     expect(await getSheetSnapIndex(page)).toBe(1);
@@ -122,10 +116,7 @@ test.describe("Mobile Bottom Sheet - Content", () => {
   test("listing cards are visible in half position", async ({ page }) => {
     await page.goto(`/search?${boundsQS}`);
     const sheetReady = await waitForMobileSheet(page);
-    if (!sheetReady) {
-      test.skip();
-      return;
-    }
+    test.skip(!sheetReady, "Mobile bottom sheet not ready");
 
     // Sheet starts at half
     expect(await getSheetSnapIndex(page)).toBe(1);
@@ -168,10 +159,7 @@ test.describe("Mobile Bottom Sheet - Content", () => {
   }) => {
     await page.goto(`/search?${boundsQS}`);
     const sheetReady = await waitForMobileSheet(page);
-    if (!sheetReady) {
-      test.skip();
-      return;
-    }
+    test.skip(!sheetReady, "Mobile bottom sheet not ready");
 
     // Expand the sheet
     await setSheetSnap(page, 2);
@@ -183,11 +171,7 @@ test.describe("Mobile Bottom Sheet - Content", () => {
       (el) => el.scrollHeight > el.clientHeight
     );
 
-    if (!isScrollable) {
-      // Not enough content to scroll -- skip
-      test.skip(true, "Content area not scrollable (insufficient listings)");
-      return;
-    }
+    test.skip(!isScrollable, "Content area not scrollable (insufficient listings)");
 
     // Verify overflow-y is auto (not hidden) when expanded
     const overflowY = await content.evaluate(
@@ -211,10 +195,7 @@ test.describe("Mobile Bottom Sheet - Content", () => {
   }) => {
     await page.goto(`/search?${boundsQS}`);
     const sheetReady = await waitForMobileSheet(page);
-    if (!sheetReady) {
-      test.skip();
-      return;
-    }
+    test.skip(!sheetReady, "Mobile bottom sheet not ready");
 
     // Collapse the sheet
     await setSheetSnap(page, 0);
@@ -239,10 +220,7 @@ test.describe("Mobile Bottom Sheet - Content", () => {
   test("sheet header shows result count text", async ({ page }) => {
     await page.goto(`/search?${boundsQS}`);
     const sheetReady = await waitForMobileSheet(page);
-    if (!sheetReady) {
-      test.skip();
-      return;
-    }
+    test.skip(!sheetReady, "Mobile bottom sheet not ready");
 
     // The sheet header should display either "Search results" or a count
     const sheet = page.locator(mobileSelectors.bottomSheet);
@@ -270,10 +248,7 @@ test.describe("Mobile Map and Sheet", () => {
   test("map is visible behind sheet in half position", async ({ page }) => {
     await page.goto(`/search?${boundsQS}`);
     const sheetReady = await waitForMobileSheet(page);
-    if (!sheetReady) {
-      test.skip();
-      return;
-    }
+    test.skip(!sheetReady, "Mobile bottom sheet not ready");
 
     // Sheet at half
     expect(await getSheetSnapIndex(page)).toBe(1);
@@ -284,11 +259,7 @@ test.describe("Mobile Map and Sheet", () => {
       .isVisible({ timeout: 10_000 })
       .catch(() => false);
 
-    if (!mapVisible) {
-      // Map may not be initialized yet on mobile (cost optimization)
-      test.skip(true, "Map not visible on mobile (may be deferred)");
-      return;
-    }
+    test.skip(!mapVisible, "Map not visible on mobile (may be deferred)");
 
     // The map should have a bounding box above or behind the sheet
     const mapBox = await map.boundingBox();
@@ -306,10 +277,7 @@ test.describe("Mobile Map and Sheet", () => {
   }) => {
     await page.goto(`/search?${boundsQS}`);
     const sheetReady = await waitForMobileSheet(page);
-    if (!sheetReady) {
-      test.skip();
-      return;
-    }
+    test.skip(!sheetReady, "Mobile bottom sheet not ready");
 
     // Collapse the sheet
     await setSheetSnap(page, 0);
@@ -321,10 +289,7 @@ test.describe("Mobile Map and Sheet", () => {
       .isVisible({ timeout: 10_000 })
       .catch(() => false);
 
-    if (!mapVisible) {
-      test.skip(true, "Map not visible on mobile (may be deferred)");
-      return;
-    }
+    test.skip(!mapVisible, "Map not visible on mobile (may be deferred)");
 
     // Map should take up most of the viewport when sheet is collapsed
     const mapBox = await map.boundingBox();
@@ -341,10 +306,7 @@ test.describe("Mobile Map and Sheet", () => {
   }) => {
     await page.goto(`/search?${boundsQS}`);
     const sheetReady = await waitForMobileSheet(page);
-    if (!sheetReady) {
-      test.skip();
-      return;
-    }
+    test.skip(!sheetReady, "Mobile bottom sheet not ready");
 
     // Sheet at half
     expect(await getSheetSnapIndex(page)).toBe(1);
@@ -357,10 +319,7 @@ test.describe("Mobile Map and Sheet", () => {
       .then(() => markers.count())
       .catch(() => 0);
 
-    if (markerCount === 0) {
-      test.skip(true, "No map markers rendered (map may not be initialized)");
-      return;
-    }
+    test.skip(markerCount === 0, "No map markers rendered (map may not be initialized)");
 
     // At least one marker should be visible
     expect(markerCount).toBeGreaterThanOrEqual(1);
@@ -393,10 +352,7 @@ test.describe("Mobile Sort Interaction", () => {
   test("sort button opens sort bottom sheet on mobile", async ({ page }) => {
     await page.goto(`/search?${boundsQS}`);
     const sheetReady = await waitForMobileSheet(page);
-    if (!sheetReady) {
-      test.skip();
-      return;
-    }
+    test.skip(!sheetReady, "Mobile bottom sheet not ready");
 
     // Expand the sheet to half or more so sort button is visible
     expect(await getSheetSnapIndex(page)).toBe(1);
@@ -415,10 +371,7 @@ test.describe("Mobile Sort Interaction", () => {
     }
 
     const sortBtnFinal = page.locator(mobileSelectors.sortButton).first();
-    if (!(await sortBtnFinal.isVisible().catch(() => false))) {
-      test.skip(true, "Sort button not visible in current viewport");
-      return;
-    }
+    test.skip(!(await sortBtnFinal.isVisible().catch(() => false)), "Sort button not visible in current viewport");
 
     // Click the sort button
     await sortBtnFinal.click();
@@ -438,18 +391,13 @@ test.describe("Mobile Sort Interaction", () => {
   test("selecting a sort option closes the sort sheet", async ({ page }) => {
     await page.goto(`/search?${boundsQS}`);
     const sheetReady = await waitForMobileSheet(page);
-    if (!sheetReady) {
-      test.skip();
-      return;
-    }
+    test.skip(!sheetReady, "Mobile bottom sheet not ready");
 
     // Try to find and click the sort button
     await setSheetSnap(page, 2);
     const sortBtn = page.locator(mobileSelectors.sortButton).first();
-    if (!(await sortBtn.isVisible({ timeout: 5000 }).catch(() => false))) {
-      test.skip(true, "Sort button not visible");
-      return;
-    }
+    const sortBtnVisible = await sortBtn.isVisible({ timeout: 5000 }).catch(() => false);
+    test.skip(!sortBtnVisible, "Sort button not visible");
 
     await sortBtn.click();
 
@@ -492,10 +440,7 @@ test.describe("Mobile Filter Interaction", () => {
   test("filters button opens filter modal on mobile", async ({ page }) => {
     await page.goto(`/search?${boundsQS}`);
     const sheetReady = await waitForMobileSheet(page);
-    if (!sheetReady) {
-      test.skip();
-      return;
-    }
+    test.skip(!sheetReady, "Mobile bottom sheet not ready");
 
     // The Filters button is in the search form header area
     // It uses aria-label containing "Filters"
@@ -506,10 +451,7 @@ test.describe("Mobile Filter Interaction", () => {
       .isVisible({ timeout: 5000 })
       .catch(() => false);
 
-    if (!filtersVisible) {
-      test.skip(true, "Filters button not visible on mobile");
-      return;
-    }
+    test.skip(!filtersVisible, "Filters button not visible on mobile");
 
     // Click the Filters button (use evaluate click for reliability on WSL2)
     await filtersBtn.evaluate((el) => (el as HTMLElement).click());
@@ -537,18 +479,13 @@ test.describe("Mobile Filter Interaction", () => {
   test("filter modal closes when applying filters", async ({ page }) => {
     await page.goto(`/search?${boundsQS}`);
     const sheetReady = await waitForMobileSheet(page);
-    if (!sheetReady) {
-      test.skip();
-      return;
-    }
+    test.skip(!sheetReady, "Mobile bottom sheet not ready");
 
     const filtersBtn = page
       .locator(`${mobileSelectors.filtersButton}:visible`)
       .first();
-    if (!(await filtersBtn.isVisible({ timeout: 5000 }).catch(() => false))) {
-      test.skip(true, "Filters button not visible on mobile");
-      return;
-    }
+    const filtersBtnVisible = await filtersBtn.isVisible({ timeout: 5000 }).catch(() => false);
+    test.skip(!filtersBtnVisible, "Filters button not visible on mobile");
 
     await filtersBtn.evaluate((el) => (el as HTMLElement).click());
 
@@ -570,10 +507,7 @@ test.describe("Mobile Filter Interaction", () => {
         .waitFor({ state: "visible", timeout: 10_000 })
         .then(() => true)
         .catch(() => false);
-      if (!retryOpened) {
-        test.skip(true, "Filter modal did not open");
-        return;
-      }
+      test.skip(!retryOpened, "Filter modal did not open");
     }
 
     // Use the data-testid for the Apply button (more reliable than text matching)
@@ -614,10 +548,7 @@ test.describe("Mobile Edge Cases", () => {
   }) => {
     await page.goto(`/search?${boundsQS}`);
     const sheetReady = await waitForMobileSheet(page);
-    if (!sheetReady) {
-      test.skip();
-      return;
-    }
+    test.skip(!sheetReady, "Mobile bottom sheet not ready");
 
     // Set to expanded
     await setSheetSnap(page, 2);
@@ -653,10 +584,7 @@ test.describe("Mobile Edge Cases", () => {
   }) => {
     await page.goto(`/search?${boundsQS}`);
     const sheetReady = await waitForMobileSheet(page);
-    if (!sheetReady) {
-      test.skip();
-      return;
-    }
+    test.skip(!sheetReady, "Mobile bottom sheet not ready");
 
     // Expand the sheet so content is scrollable
     await setSheetSnap(page, 2);
@@ -679,10 +607,7 @@ test.describe("Mobile Edge Cases", () => {
   }) => {
     await page.goto(`/search?${boundsQS}`);
     const sheetReady = await waitForMobileSheet(page);
-    if (!sheetReady) {
-      test.skip();
-      return;
-    }
+    test.skip(!sheetReady, "Mobile bottom sheet not ready");
 
     // Start at half
     expect(await getSheetSnapIndex(page)).toBe(1);
@@ -715,20 +640,15 @@ test.describe("Mobile Edge Cases", () => {
   }) => {
     await page.goto(`/search?${boundsQS}`);
     const sheetReady = await waitForMobileSheet(page);
-    if (!sheetReady) {
-      test.skip();
-      return;
-    }
+    test.skip(!sheetReady, "Mobile bottom sheet not ready");
 
     // Start at half
     expect(await getSheetSnapIndex(page)).toBe(1);
 
     // Click expand (use evaluate click for reliability on WSL2)
     const expandBtn = page.locator(mobileSelectors.expandButton);
-    if (!(await expandBtn.isVisible({ timeout: 5000 }).catch(() => false))) {
-      test.skip(true, "Expand button not visible");
-      return;
-    }
+    const expandBtnVisible = await expandBtn.isVisible({ timeout: 5000 }).catch(() => false);
+    test.skip(!expandBtnVisible, "Expand button not visible");
 
     await expandBtn.evaluate((el) => (el as HTMLElement).click());
     await waitForSheetAnimation(page);
@@ -850,10 +770,7 @@ test.describe("Mobile Bottom Sheet - Overlay", () => {
   test("dim overlay appears when sheet is expanded", async ({ page }) => {
     await page.goto(`/search?${boundsQS}`);
     const sheetReady = await waitForMobileSheet(page);
-    if (!sheetReady) {
-      test.skip();
-      return;
-    }
+    test.skip(!sheetReady, "Mobile bottom sheet not ready");
 
     // At half position, no overlay
     expect(await getSheetSnapIndex(page)).toBe(1);
@@ -902,10 +819,7 @@ test.describe("Mobile Bottom Sheet - Content Overflow Control", () => {
   }) => {
     await page.goto(`/search?${boundsQS}`);
     const sheetReady = await waitForMobileSheet(page);
-    if (!sheetReady) {
-      test.skip();
-      return;
-    }
+    test.skip(!sheetReady, "Mobile bottom sheet not ready");
 
     // Collapse the sheet
     await setSheetSnap(page, 0);
@@ -931,10 +845,7 @@ test.describe("Mobile Bottom Sheet - Content Overflow Control", () => {
   test("content scroll is enabled at half position", async ({ page }) => {
     await page.goto(`/search?${boundsQS}`);
     const sheetReady = await waitForMobileSheet(page);
-    if (!sheetReady) {
-      test.skip();
-      return;
-    }
+    test.skip(!sheetReady, "Mobile bottom sheet not ready");
 
     // Sheet starts at half
     expect(await getSheetSnapIndex(page)).toBe(1);

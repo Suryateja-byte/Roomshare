@@ -172,10 +172,9 @@ test.describe("UI Flow API Depth", () => {
       await page.waitForLoadState("domcontentloaded");
 
       // If redirected to login, skip
-      if (page.url().includes("/login")) {
-        test.skip(true, "Auth session expired");
-        return;
-      }
+      const onLoginPage = page.url().includes("/login");
+      test.skip(onLoginPage, "Auth session expired");
+      if (onLoginPage) return;
 
       // Page should render notification content or empty state
       await expect(

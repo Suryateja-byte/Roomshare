@@ -276,10 +276,9 @@ test.describe("Edge Case Journeys", () => {
       await nav.goToBookings();
 
       // Check we weren't redirected to login
-      if (!(await nav.isOnAuthenticatedPage())) {
-        test.skip(true, "Auth session expired - redirected to login");
-        return;
-      }
+      const isAuthenticated = await nav.isOnAuthenticatedPage();
+      test.skip(!isAuthenticated, "Auth session expired - redirected to login");
+      if (!isAuthenticated) return;
 
       await page.waitForLoadState("domcontentloaded");
 
@@ -303,14 +302,9 @@ test.describe("Edge Case Journeys", () => {
 
       // Check we weren't redirected to login (auth middleware may redirect all unknown routes)
       const currentUrl = page.url();
-      if (
-        currentUrl.includes("/login") ||
-        currentUrl.includes("/signup") ||
-        currentUrl.includes("/signin")
-      ) {
-        test.skip(true, "Auth redirect — session not available in CI");
-        return;
-      }
+      const onAuthPage = currentUrl.includes("/login") || currentUrl.includes("/signup") || currentUrl.includes("/signin");
+      test.skip(onAuthPage, "Auth redirect — session not available in CI");
+      if (onAuthPage) return;
 
       // Should show 404 page — check text content, heading, or HTTP status indicator
       await expect(
@@ -344,14 +338,9 @@ test.describe("Edge Case Journeys", () => {
 
       // Check we weren't redirected to login
       const currentUrl = page.url();
-      if (
-        currentUrl.includes("/login") ||
-        currentUrl.includes("/signup") ||
-        currentUrl.includes("/signin")
-      ) {
-        test.skip(true, "Auth redirect — session not available in CI");
-        return;
-      }
+      const onAuthPage = currentUrl.includes("/login") || currentUrl.includes("/signup") || currentUrl.includes("/signin");
+      test.skip(onAuthPage, "Auth redirect — session not available in CI");
+      if (onAuthPage) return;
 
       // Should show error or 404 — also check heading as fallback
       await expect(

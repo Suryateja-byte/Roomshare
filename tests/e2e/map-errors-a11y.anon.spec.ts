@@ -49,15 +49,8 @@ test.describe("Map Error States and Accessibility", () => {
   test.beforeEach(async ({}, testInfo) => {
     test.slow(); // Map tests need extra time for WebGL rendering in CI
     const projectName = testInfo.project.name;
-    if (projectName.includes("Mobile")) {
-      test.skip(
-        true,
-        "Map tests require desktop viewport - skipping on mobile"
-      );
-    }
-    if (projectName === "webkit") {
-      test.skip(true, "Map tests have timing issues on webkit - skipping");
-    }
+    test.skip(projectName.includes("Mobile"), "Map tests require desktop viewport - skipping on mobile");
+    test.skip(projectName === "webkit", "Map tests have timing issues on webkit - skipping");
   });
 
   // Helper: wait for map error banner
@@ -357,7 +350,7 @@ test.describe("Map Error States and Accessibility", () => {
         }
       } else {
         // Map may not render in headless mode without WebGL
-        test.skip(true, "Map not rendered (WebGL unavailable)");
+        test.skip(!mapContainerVisible, "Map not rendered (WebGL unavailable)");
       }
     });
 
@@ -402,10 +395,7 @@ test.describe("Map Error States and Accessibility", () => {
       const markers = page.locator(".maplibregl-marker");
       const markerCount = await markers.count();
 
-      if (markerCount === 0) {
-        test.skip(true, "No markers available for keyboard navigation test");
-        return;
-      }
+      test.skip(markerCount === 0, "No markers available for keyboard navigation test");
 
       // Try to focus on a marker
       const firstMarkerInner = markers
@@ -447,10 +437,7 @@ test.describe("Map Error States and Accessibility", () => {
       const markers = page.locator(".maplibregl-marker");
       const markerCount = await markers.count();
 
-      if (markerCount === 0) {
-        test.skip(true, "No markers available for focus management test");
-        return;
-      }
+      test.skip(markerCount === 0, "No markers available for focus management test");
 
       // Click a marker to open popup
       await markers.first().click();
@@ -552,17 +539,11 @@ test.describe("Map Error States and Accessibility", () => {
           .isVisible({ timeout: 5000 })
           .catch(() => false);
 
-        if (!sheetVisible) {
-          test.skip(true, "Bottom sheet not visible in this viewport");
-          return;
-        }
+        test.skip(!sheetVisible, "Bottom sheet not visible in this viewport");
 
         // Find the drag handle slider
         const dragHandle = bottomSheet.locator('[role="slider"]');
-        if ((await dragHandle.count()) === 0) {
-          test.skip(true, "Drag handle slider not found");
-          return;
-        }
+        test.skip((await dragHandle.count()) === 0, "Drag handle slider not found");
 
         // Focus on drag handle
         await dragHandle.first().focus();

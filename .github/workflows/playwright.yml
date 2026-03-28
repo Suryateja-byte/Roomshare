@@ -87,7 +87,7 @@ jobs:
 
       - uses: pnpm/action-setup@v5
         with:
-          version: 9
+          version: 10
 
       - uses: actions/setup-node@v4
         with:
@@ -99,6 +99,9 @@ jobs:
 
       - name: Generate Prisma client and run migrations
         run: pnpm exec prisma generate && pnpm exec prisma migrate deploy
+
+      - name: Seed E2E test data
+        run: pnpm run seed:e2e
 
       # Fix 2: Include Playwright version in cache key to prevent stale binaries
       - name: Get Playwright version
@@ -172,7 +175,7 @@ jobs:
 
       - uses: pnpm/action-setup@v5
         with:
-          version: 9
+          version: 10
 
       - uses: actions/setup-node@v4
         with:

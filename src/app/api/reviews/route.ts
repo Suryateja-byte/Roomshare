@@ -1,4 +1,5 @@
 import { NextResponse } from "next/server";
+import { Prisma } from "@prisma/client";
 import { prisma } from "@/lib/prisma";
 import { auth } from "@/auth";
 import { createInternalNotification } from "@/lib/notifications";
@@ -170,23 +171,37 @@ export async function POST(request: Request) {
       }
     }
 
-    const review = await prisma.review.create({
-      data: {
-        authorId: session.user.id,
-        listingId,
-        targetUserId,
-        rating,
-        comment,
-      },
-      include: {
-        author: {
-          select: {
-            name: true,
-            image: true,
+    let review;
+    try {
+      review = await prisma.review.create({
+        data: {
+          authorId: session.user.id,
+          listingId,
+          targetUserId,
+          rating,
+          comment,
+        },
+        include: {
+          author: {
+            select: {
+              name: true,
+              image: true,
+            },
           },
         },
-      },
-    });
+      });
+    } catch (err) {
+      if (
+        err instanceof Prisma.PrismaClientKnownRequestError &&
+        err.code === "P2002"
+      ) {
+        return NextResponse.json(
+          { error: "You have already reviewed this listing" },
+          { status: 409 }
+        );
+      }
+      throw err;
+    }
 
     // Fire-and-forget: mark listing dirty for search doc refresh
     if (listingId) {

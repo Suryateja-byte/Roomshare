@@ -1,4 +1,5 @@
 import { NextResponse } from "next/server";
+import { Prisma } from "@prisma/client";
 import { prisma } from "@/lib/prisma";
 import { auth } from "@/auth";
 import { withRateLimit } from "@/lib/with-rate-limit";
@@ -131,12 +132,25 @@ export async function POST(request: Request) {
       return response;
     } else {
       // Create
-      await prisma.savedListing.create({
-        data: {
-          userId,
-          listingId,
-        },
-      });
+      try {
+        await prisma.savedListing.create({
+          data: {
+            userId,
+            listingId,
+          },
+        });
+      } catch (err) {
+        if (
+          err instanceof Prisma.PrismaClientKnownRequestError &&
+          err.code === "P2002"
+        ) {
+          // Concurrent toggle already created the favorite — return idempotent success
+          const response = NextResponse.json({ saved: true });
+          response.headers.set("Cache-Control", "private, no-store");
+          return response;
+        }
+        throw err;
+      }
       // P2-1: User-specific toggle must not be cached
       const response = NextResponse.json({ saved: true });
       response.headers.set("Cache-Control", "private, no-store");

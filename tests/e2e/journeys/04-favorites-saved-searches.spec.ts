@@ -81,10 +81,9 @@ test.describe("Favorites & Saved Searches Journeys", () => {
       await nav.goToSaved();
 
       // Check we weren't redirected to login
-      if (!(await nav.isOnAuthenticatedPage())) {
-        test.skip(true, "Auth session expired - redirected to login");
-        return;
-      }
+      const isAuthenticated = await nav.isOnAuthenticatedPage();
+      test.skip(!isAuthenticated, "Auth session expired - redirected to login");
+      if (!isAuthenticated) return;
 
       // Page should load without error
       await assert.pageLoaded();
@@ -125,10 +124,9 @@ test.describe("Favorites & Saved Searches Journeys", () => {
       await page.waitForLoadState("domcontentloaded");
 
       // Check we weren't redirected to login
-      if (!(await nav.isOnAuthenticatedPage())) {
-        test.skip(true, "Auth session expired - redirected to login");
-        return;
-      }
+      const isAuthenticated = await nav.isOnAuthenticatedPage();
+      test.skip(!isAuthenticated, "Auth session expired - redirected to login");
+      if (!isAuthenticated) return;
 
       const listingCards = page.locator(selectors.listingCard);
       const initialCount = await listingCards.count();
@@ -249,10 +247,9 @@ test.describe("Favorites & Saved Searches Journeys", () => {
       await nav.goToSavedSearches();
 
       // Check we weren't redirected to login
-      if (!(await nav.isOnAuthenticatedPage())) {
-        test.skip(true, "Auth session expired - redirected to login");
-        return;
-      }
+      const isAuthenticated = await nav.isOnAuthenticatedPage();
+      test.skip(!isAuthenticated, "Auth session expired - redirected to login");
+      if (!isAuthenticated) return;
 
       // Should load without error
       // Target h1 page title specifically to avoid strict mode violation
@@ -280,10 +277,9 @@ test.describe("Favorites & Saved Searches Journeys", () => {
       await nav.goToSavedSearches();
 
       // Check we weren't redirected to login
-      if (!(await nav.isOnAuthenticatedPage())) {
-        test.skip(true, "Auth session expired - redirected to login");
-        return;
-      }
+      const isAuthenticated = await nav.isOnAuthenticatedPage();
+      test.skip(!isAuthenticated, "Auth session expired - redirected to login");
+      if (!isAuthenticated) return;
 
       await page.waitForLoadState("domcontentloaded");
 
@@ -318,10 +314,9 @@ test.describe("Favorites & Saved Searches Journeys", () => {
       await nav.goToSavedSearches();
 
       // Check we weren't redirected to login
-      if (!(await nav.isOnAuthenticatedPage())) {
-        test.skip(true, "Auth session expired - redirected to login");
-        return;
-      }
+      const isAuthenticated = await nav.isOnAuthenticatedPage();
+      test.skip(!isAuthenticated, "Auth session expired - redirected to login");
+      if (!isAuthenticated) return;
 
       await page.waitForLoadState("domcontentloaded");
 
@@ -344,10 +339,9 @@ test.describe("Favorites & Saved Searches Journeys", () => {
       await nav.goToSavedSearches();
 
       // Check we weren't redirected to login
-      if (!(await nav.isOnAuthenticatedPage())) {
-        test.skip(true, "Auth session expired - redirected to login");
-        return;
-      }
+      const isAuthenticated = await nav.isOnAuthenticatedPage();
+      test.skip(!isAuthenticated, "Auth session expired - redirected to login");
+      if (!isAuthenticated) return;
 
       await page.waitForLoadState("domcontentloaded");
 
@@ -387,10 +381,9 @@ test.describe("Favorites & Saved Searches Journeys", () => {
       await page.waitForLoadState("domcontentloaded");
 
       // Check we weren't redirected to login
-      if (!(await nav.isOnAuthenticatedPage())) {
-        test.skip(true, "Auth session expired - redirected to login");
-        return;
-      }
+      const isAuthenticated = await nav.isOnAuthenticatedPage();
+      test.skip(!isAuthenticated, "Auth session expired - redirected to login");
+      if (!isAuthenticated) return;
 
       // Should show recently viewed or empty state — wait for any page content
       await expect(

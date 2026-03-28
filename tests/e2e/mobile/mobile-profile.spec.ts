@@ -103,10 +103,9 @@ test.describe("Mobile Profile", () => {
     await waitForHydration(page);
 
     // Skip if redirected to login
-    if (page.url().includes("/login") || page.url().includes("/signin")) {
-      test.skip(true, "Redirected to login — auth session unavailable in CI");
-      return;
-    }
+    const onLoginPage = page.url().includes("/login") || page.url().includes("/signin");
+    test.skip(onLoginPage, "Redirected to login — auth session unavailable in CI");
+    if (onLoginPage) return;
 
     const formVisible = await page
       .locator('[data-testid="edit-profile-form"]').first()

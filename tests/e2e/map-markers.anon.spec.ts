@@ -266,17 +266,11 @@ test.describe("Map Marker Interactions", () => {
       page,
     }) => {
       // Skip if map not available (WebGL issue)
-      if (!(await isMapAvailable(page))) {
-        test.skip(true, "Map not available (WebGL unavailable in headless)");
-        return;
-      }
+      test.skip(!(await isMapAvailable(page)), "Map not available (WebGL unavailable in headless)");
 
       // Wait for markers
       const markerCount = await waitForMarkersWithClusterExpansion(page);
-      if (markerCount === 0) {
-        test.skip(true, "No markers available");
-        return;
-      }
+      test.skip(markerCount === 0, "No markers available");
 
       const marker = getFirstVisibleMarker(page);
       await expect(marker).toBeVisible({ timeout: timeouts.action });
@@ -302,16 +296,10 @@ test.describe("Map Marker Interactions", () => {
     });
 
     test("3.2a - close popup via close button", async ({ page }) => {
-      if (!(await isMapAvailable(page))) {
-        test.skip(true, "Map not available");
-        return;
-      }
+      test.skip(!(await isMapAvailable(page)), "Map not available");
 
       const markerCount = await waitForMarkersWithClusterExpansion(page);
-      if (markerCount === 0) {
-        test.skip(true, "No markers available");
-        return;
-      }
+      test.skip(markerCount === 0, "No markers available");
 
       const marker = getFirstVisibleMarker(page);
       await marker.evaluate((el) => (el as HTMLElement).click());
@@ -329,16 +317,10 @@ test.describe("Map Marker Interactions", () => {
     test("3.2b - close popup by clicking elsewhere on map", async ({
       page,
     }) => {
-      if (!(await isMapAvailable(page))) {
-        test.skip(true, "Map not available");
-        return;
-      }
+      test.skip(!(await isMapAvailable(page)), "Map not available");
 
       const markerCount = await waitForMarkersWithClusterExpansion(page);
-      if (markerCount === 0) {
-        test.skip(true, "No markers available");
-        return;
-      }
+      test.skip(markerCount === 0, "No markers available");
 
       const marker = getFirstVisibleMarker(page);
       await marker.evaluate((el) => (el as HTMLElement).click());
@@ -364,16 +346,10 @@ test.describe("Map Marker Interactions", () => {
     test("3.2c - popup close button has correct ARIA label", async ({
       page,
     }) => {
-      if (!(await isMapAvailable(page))) {
-        test.skip(true, "Map not available");
-        return;
-      }
+      test.skip(!(await isMapAvailable(page)), "Map not available");
 
       const markerCount = await waitForMarkersWithClusterExpansion(page);
-      if (markerCount === 0) {
-        test.skip(true, "No markers available");
-        return;
-      }
+      test.skip(markerCount === 0, "No markers available");
 
       const marker = getFirstVisibleMarker(page);
       await marker.evaluate((el) => (el as HTMLElement).click());
@@ -397,20 +373,14 @@ test.describe("Map Marker Interactions", () => {
     test("3.3 - clicking cluster marker zooms in to expand", async ({
       page,
     }) => {
-      if (!(await isMapAvailable(page))) {
-        test.skip(true, "Map not available");
-        return;
-      }
+      test.skip(!(await isMapAvailable(page)), "Map not available");
 
       // Get initial zoom level
       const initialZoom = await getMapZoom(page);
 
       // Wait for markers (may include clusters)
       const markerCount = await waitForMarkersWithClusterExpansion(page);
-      if (markerCount === 0) {
-        test.skip(true, "No markers available");
-        return;
-      }
+      test.skip(markerCount === 0, "No markers available");
 
       // Look for cluster marker (has count badge showing a number like "2", "3", etc.)
       const clusterMarker = page
@@ -431,10 +401,7 @@ test.describe("Map Marker Interactions", () => {
         await waitForMapReady(page);
 
         const newClusterCount = await clusterMarker.count();
-        if (newClusterCount === 0) {
-          test.skip(true, "No cluster markers available at any zoom level");
-          return;
-        }
+        test.skip(newClusterCount === 0, "No cluster markers available at any zoom level");
       }
 
       // Click the first cluster via evaluate to bypass actionability timeout
@@ -467,16 +434,10 @@ test.describe("Map Marker Interactions", () => {
     test('3.4 - "View Details" button navigates to listing page', async ({
       page,
     }) => {
-      if (!(await isMapAvailable(page))) {
-        test.skip(true, "Map not available");
-        return;
-      }
+      test.skip(!(await isMapAvailable(page)), "Map not available");
 
       const markerCount = await waitForMarkersWithClusterExpansion(page);
-      if (markerCount === 0) {
-        test.skip(true, "No markers available");
-        return;
-      }
+      test.skip(markerCount === 0, "No markers available");
 
       const marker = getFirstVisibleMarker(page);
       await marker.evaluate((el) => (el as HTMLElement).click());
@@ -530,23 +491,14 @@ test.describe("Map Marker Interactions", () => {
 
   test.describe("3.5-3.8: Keyboard Accessibility (P1-P2)", () => {
     test("3.5 - Enter key opens popup on focused marker", async ({ page }) => {
-      if (!(await isMapAvailable(page))) {
-        test.skip(true, "Map not available");
-        return;
-      }
+      test.skip(!(await isMapAvailable(page)), "Map not available");
 
       const markerCount = await waitForMarkersWithClusterExpansion(page);
-      if (markerCount === 0) {
-        test.skip(true, "No markers available");
-        return;
-      }
+      test.skip(markerCount === 0, "No markers available");
 
       // Tab to focus a marker
       const foundMarker = await tabToMarker(page);
-      if (!foundMarker) {
-        test.skip(true, "Could not tab to marker");
-        return;
-      }
+      test.skip(!foundMarker, "Could not tab to marker");
 
       // Press Enter to open popup
       await page.keyboard.press("Enter");
@@ -558,23 +510,14 @@ test.describe("Map Marker Interactions", () => {
     });
 
     test("3.5b - Space key opens popup on focused marker", async ({ page }) => {
-      if (!(await isMapAvailable(page))) {
-        test.skip(true, "Map not available");
-        return;
-      }
+      test.skip(!(await isMapAvailable(page)), "Map not available");
 
       const markerCount = await waitForMarkersWithClusterExpansion(page);
-      if (markerCount === 0) {
-        test.skip(true, "No markers available");
-        return;
-      }
+      test.skip(markerCount === 0, "No markers available");
 
       // Tab to focus a marker
       const foundMarker = await tabToMarker(page);
-      if (!foundMarker) {
-        test.skip(true, "Could not tab to marker");
-        return;
-      }
+      test.skip(!foundMarker, "Could not tab to marker");
 
       // Press Space to open popup
       await page.keyboard.press("Space");
@@ -588,16 +531,10 @@ test.describe("Map Marker Interactions", () => {
     test("3.5c - marker has correct ARIA attributes for accessibility", async ({
       page,
     }) => {
-      if (!(await isMapAvailable(page))) {
-        test.skip(true, "Map not available");
-        return;
-      }
+      test.skip(!(await isMapAvailable(page)), "Map not available");
 
       const markerCount = await waitForMarkersWithClusterExpansion(page);
-      if (markerCount === 0) {
-        test.skip(true, "No markers available");
-        return;
-      }
+      test.skip(markerCount === 0, "No markers available");
 
       const marker = getFirstVisibleMarker(page);
 
@@ -619,23 +556,14 @@ test.describe("Map Marker Interactions", () => {
     });
 
     test("3.6 - arrow keys navigate between markers", async ({ page }) => {
-      if (!(await isMapAvailable(page))) {
-        test.skip(true, "Map not available");
-        return;
-      }
+      test.skip(!(await isMapAvailable(page)), "Map not available");
 
       const markerCount = await waitForMarkersWithClusterExpansion(page);
-      if (markerCount < 2) {
-        test.skip(true, "Need at least 2 markers for navigation test");
-        return;
-      }
+      test.skip(markerCount < 2, "Need at least 2 markers for navigation test");
 
       // Tab to focus a marker
       const foundMarker = await tabToMarker(page);
-      if (!foundMarker) {
-        test.skip(true, "Could not tab to marker");
-        return;
-      }
+      test.skip(!foundMarker, "Could not tab to marker");
 
       // Get initial focused marker's aria-label (for debugging navigation)
       const initialLabel = await page.evaluate(
@@ -668,23 +596,14 @@ test.describe("Map Marker Interactions", () => {
     test("3.7 - Home key jumps to first marker, End to last", async ({
       page,
     }) => {
-      if (!(await isMapAvailable(page))) {
-        test.skip(true, "Map not available");
-        return;
-      }
+      test.skip(!(await isMapAvailable(page)), "Map not available");
 
       const markerCount = await waitForMarkersWithClusterExpansion(page);
-      if (markerCount < 2) {
-        test.skip(true, "Need at least 2 markers for Home/End test");
-        return;
-      }
+      test.skip(markerCount < 2, "Need at least 2 markers for Home/End test");
 
       // Tab to focus a marker
       const foundMarker = await tabToMarker(page);
-      if (!foundMarker) {
-        test.skip(true, "Could not tab to marker");
-        return;
-      }
+      test.skip(!foundMarker, "Could not tab to marker");
 
       // Press Home to go to first marker
       await page.keyboard.press("Home");
@@ -733,16 +652,10 @@ test.describe("Map Marker Interactions", () => {
     });
 
     test("3.8 - Escape key closes popup", async ({ page }) => {
-      if (!(await isMapAvailable(page))) {
-        test.skip(true, "Map not available");
-        return;
-      }
+      test.skip(!(await isMapAvailable(page)), "Map not available");
 
       const markerCount = await waitForMarkersWithClusterExpansion(page);
-      if (markerCount === 0) {
-        test.skip(true, "No markers available");
-        return;
-      }
+      test.skip(markerCount === 0, "No markers available");
 
       const marker = getFirstVisibleMarker(page);
       await marker.evaluate((el) => (el as HTMLElement).click());
@@ -760,16 +673,10 @@ test.describe("Map Marker Interactions", () => {
     test("3.8b - Escape closes popup but card highlight persists (activeId independent)", async ({
       page,
     }) => {
-      if (!(await isMapAvailable(page))) {
-        test.skip(true, "Map not available");
-        return;
-      }
+      test.skip(!(await isMapAvailable(page)), "Map not available");
 
       const markerCount = await waitForMarkersWithClusterExpansion(page);
-      if (markerCount === 0) {
-        test.skip(true, "No markers available");
-        return;
-      }
+      test.skip(markerCount === 0, "No markers available");
 
       const marker = getFirstVisibleMarker(page);
       await marker.evaluate((el) => (el as HTMLElement).click());
@@ -819,16 +726,10 @@ test.describe("Map Marker Interactions", () => {
     test("3.9 - markerPositions memo applies offsets for same-coord listings", async ({
       page,
     }) => {
-      if (!(await isMapAvailable(page))) {
-        test.skip(true, "Map not available");
-        return;
-      }
+      test.skip(!(await isMapAvailable(page)), "Map not available");
 
       const markerCount = await waitForMarkersWithClusterExpansion(page);
-      if (markerCount === 0) {
-        test.skip(true, "No markers available");
-        return;
-      }
+      test.skip(markerCount === 0, "No markers available");
 
       // Verify the offset logic exists by checking that the markerPositions memo
       // handles same-coordinate listings. We test this indirectly by verifying
@@ -836,10 +737,7 @@ test.describe("Map Marker Interactions", () => {
       const markers = page.locator(".maplibregl-marker:visible");
       const count = await markers.count();
 
-      if (count < 2) {
-        test.skip(true, "Need at least 2 markers to verify offset behavior");
-        return;
-      }
+      test.skip(count < 2, "Need at least 2 markers to verify offset behavior");
 
       // Get bounding boxes of first two markers
       const box1 = await markers.nth(0).boundingBox();
@@ -874,16 +772,10 @@ test.describe("Map Marker Interactions", () => {
 
   test.describe("Accessibility Checks", () => {
     test(`${tags.a11y} - markers are keyboard focusable`, async ({ page }) => {
-      if (!(await isMapAvailable(page))) {
-        test.skip(true, "Map not available");
-        return;
-      }
+      test.skip(!(await isMapAvailable(page)), "Map not available");
 
       const markerCount = await waitForMarkersWithClusterExpansion(page);
-      if (markerCount === 0) {
-        test.skip(true, "No markers available");
-        return;
-      }
+      test.skip(markerCount === 0, "No markers available");
 
       // All marker inner elements should have tabindex="0"
       const markerButtons = page.locator('.maplibregl-marker [role="button"]');
@@ -900,23 +792,14 @@ test.describe("Map Marker Interactions", () => {
     test(`${tags.a11y} - keyboard focus is visible on markers`, async ({
       page,
     }) => {
-      if (!(await isMapAvailable(page))) {
-        test.skip(true, "Map not available");
-        return;
-      }
+      test.skip(!(await isMapAvailable(page)), "Map not available");
 
       const markerCount = await waitForMarkersWithClusterExpansion(page);
-      if (markerCount === 0) {
-        test.skip(true, "No markers available");
-        return;
-      }
+      test.skip(markerCount === 0, "No markers available");
 
       // Tab to marker
       const foundMarker = await tabToMarker(page);
-      if (!foundMarker) {
-        test.skip(true, "Could not tab to marker");
-        return;
-      }
+      test.skip(!foundMarker, "Could not tab to marker");
 
       // Check for visible focus indicator (the component uses a focus ring)
       // The MapClient.tsx shows focus ring when keyboardFocusedId matches
@@ -932,16 +815,10 @@ test.describe("Map Marker Interactions", () => {
     test(`${tags.a11y} - popup is announced with appropriate content`, async ({
       page,
     }) => {
-      if (!(await isMapAvailable(page))) {
-        test.skip(true, "Map not available");
-        return;
-      }
+      test.skip(!(await isMapAvailable(page)), "Map not available");
 
       const markerCount = await waitForMarkersWithClusterExpansion(page);
-      if (markerCount === 0) {
-        test.skip(true, "No markers available");
-        return;
-      }
+      test.skip(markerCount === 0, "No markers available");
 
       const marker = getFirstVisibleMarker(page);
       await marker.evaluate((el) => (el as HTMLElement).click());

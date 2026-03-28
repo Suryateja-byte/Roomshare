@@ -45,7 +45,7 @@ test.describe("Listing Card Carousel", () => {
     // Skip if no carousels found (no listings with multiple images)
     const carouselCount = await carouselRegion.count();
     if (carouselCount === 0) {
-      test.skip();
+      test.skip(true, "No image carousels found");
       return;
     }
 
@@ -87,7 +87,7 @@ test.describe("Listing Card Carousel", () => {
 
     const carouselCount = await carouselRegion.count();
     if (carouselCount === 0) {
-      test.skip();
+      test.skip(true, "No image carousels found");
       return;
     }
 
@@ -142,7 +142,7 @@ test.describe("Listing Card Carousel", () => {
 
     const carouselCount = await carouselRegion.count();
     if (carouselCount === 0) {
-      test.skip();
+      test.skip(true, "No image carousels found");
       return;
     }
 
@@ -191,7 +191,7 @@ test.describe("Listing Card Carousel", () => {
 
     const carouselCount = await carouselRegion.count();
     if (carouselCount === 0) {
-      test.skip();
+      test.skip(true, "No image carousels found");
       return;
     }
 
@@ -248,7 +248,7 @@ test.describe("Listing Card Carousel", () => {
 
     const carouselCount = await carouselRegion.count();
     if (carouselCount === 0) {
-      test.skip();
+      test.skip(true, "No image carousels found");
       return;
     }
 

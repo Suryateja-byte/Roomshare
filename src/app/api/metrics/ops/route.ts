@@ -7,6 +7,7 @@
  * Exposes: process metrics, memory, error counters, request duration histograms.
  */
 
+import crypto from "crypto";
 import { getServerEnv } from "@/lib/env";
 
 export const runtime = "nodejs";
@@ -41,7 +42,13 @@ export async function GET(request: Request) {
   const { METRICS_SECRET: expectedToken } = getServerEnv();
 
   // Default-deny: require METRICS_SECRET configured AND bearer token to match
-  if (!expectedToken || authHeader !== `Bearer ${expectedToken}`) {
+  const expected = `Bearer ${expectedToken}`;
+  if (
+    !expectedToken ||
+    !authHeader ||
+    authHeader.length !== expected.length ||
+    !crypto.timingSafeEqual(Buffer.from(authHeader), Buffer.from(expected))
+  ) {
     return new Response("Unauthorized", { status: 401 });
   }
 

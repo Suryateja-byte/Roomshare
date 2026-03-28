@@ -73,36 +73,51 @@ export async function startConversation(listingId: string) {
       return { error: blockCheck.message };
     }
 
-    // Check existing conversation (exclude admin-deleted, but include per-user deleted for resurrection)
-    const existing = await prisma.conversation.findFirst({
-      where: {
-        listingId,
-        deletedAt: null, // Only exclude admin-deleted
-        AND: [
-          { participants: { some: { id: userId } } },
-          { participants: { some: { id: listing.ownerId } } },
-        ],
+    // P0-1 FIX: Wrap findFirst+create in SERIALIZABLE transaction with advisory lock
+    // to prevent duplicate conversations from concurrent requests (TOCTOU race).
+    const result = await prisma.$transaction(
+      async (tx) => {
+        // Advisory lock keyed on listingId + sorted participant pair.
+        // Same pair always acquires the same lock, serializing concurrent calls.
+        const sortedIds = [userId, listing.ownerId].sort().join(":");
+        const lockKey = `conv:${listingId}:${sortedIds}`;
+        await tx.$executeRaw`SELECT pg_advisory_xact_lock(hashtext(${lockKey}))`;
+
+        // Check existing conversation (exclude admin-deleted, include per-user deleted for resurrection)
+        const existing = await tx.conversation.findFirst({
+          where: {
+            listingId,
+            deletedAt: null,
+            AND: [
+              { participants: { some: { id: userId } } },
+              { participants: { some: { id: listing.ownerId } } },
+            ],
+          },
+        });
+
+        if (existing) {
+          // Resurrect: clear per-user deletion record if it exists
+          await tx.conversationDeletion.deleteMany({
+            where: { conversationId: existing.id, userId },
+          });
+          return { conversationId: existing.id };
+        }
+
+        const conversation = await tx.conversation.create({
+          data: {
+            listingId,
+            participants: {
+              connect: [{ id: userId }, { id: listing.ownerId }],
+            },
+          },
+        });
+
+        return { conversationId: conversation.id };
       },
-    });
+      { isolationLevel: "Serializable" }
+    );
 
-    if (existing) {
-      // Resurrect: clear per-user deletion record if it exists
-      await prisma.conversationDeletion.deleteMany({
-        where: { conversationId: existing.id, userId },
-      });
-      return { conversationId: existing.id };
-    }
-
-    const conversation = await prisma.conversation.create({
-      data: {
-        listingId,
-        participants: {
-          connect: [{ id: userId }, { id: listing.ownerId }],
-        },
-      },
-    });
-
-    return { conversationId: conversation.id };
+    return result;
   } catch (error: unknown) {
     logger.sync.error("Failed to start conversation", {
       action: "startConversation",

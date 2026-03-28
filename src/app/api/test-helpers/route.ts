@@ -11,6 +11,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
 
 function isEnabled(): boolean {
+  if (process.env.NODE_ENV === "production") return false;
   return process.env.E2E_TEST_HELPERS === "true";
 }
 
@@ -180,6 +181,13 @@ export async function POST(request: NextRequest) {
       }
 
       case "cleanupTestBookings": {
+        if (!params.listingId && !params.bookingIds) {
+          return NextResponse.json(
+            { error: "At least one of listingId or bookingIds is required" },
+            { status: 400 }
+          );
+        }
+
         const where: Record<string, unknown> = {};
         if (params.listingId) where.listingId = params.listingId;
         if (params.bookingIds) {
@@ -332,6 +340,17 @@ export async function POST(request: NextRequest) {
           data: { bookingMode: params.mode },
         });
         return NextResponse.json({ success: true, mode: params.mode });
+      }
+
+      case "setListingStatus": {
+        await prisma.listing.update({
+          where: { id: params.listingId },
+          data: { status: params.status },
+        });
+        return NextResponse.json({
+          success: true,
+          status: params.status,
+        });
       }
 
       case "createHeldBooking": {

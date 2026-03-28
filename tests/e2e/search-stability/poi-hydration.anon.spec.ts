@@ -81,16 +81,10 @@ test.describe("POI Layer Hydration Safety", () => {
     await page.goto(SEARCH_URL);
     await page.waitForLoadState("domcontentloaded");
 
-    if (!(await isMapAvailable(page))) {
-      test.skip(true, "Map not available (WebGL unavailable in headless)");
-      return;
-    }
+    test.skip(!(await isMapAvailable(page)), "Map not available (WebGL unavailable in headless)");
 
     const hasMapRef = await waitForMapRef(page);
-    if (!hasMapRef) {
-      test.skip(true, "Map E2E ref not available");
-      return;
-    }
+    test.skip(!hasMapRef, "Map E2E ref not available");
 
     // POI buttons should be rendered (Transit, POIs, Parks)
     const buttons = poiButtons(page);
@@ -113,16 +107,10 @@ test.describe("POI Layer Hydration Safety", () => {
     await page.goto(SEARCH_URL);
     await page.waitForLoadState("domcontentloaded");
 
-    if (!(await isMapAvailable(page))) {
-      test.skip(true, "Map not available (WebGL unavailable in headless)");
-      return;
-    }
+    test.skip(!(await isMapAvailable(page)), "Map not available (WebGL unavailable in headless)");
 
     const hasMapRef = await waitForMapRef(page);
-    if (!hasMapRef) {
-      test.skip(true, "Map E2E ref not available");
-      return;
-    }
+    test.skip(!hasMapRef, "Map E2E ref not available");
 
     // Wait for POI buttons
     const buttons = poiButtons(page);
@@ -155,10 +143,7 @@ test.describe("POI Layer Hydration Safety", () => {
     await page.goto(SEARCH_URL);
     await page.waitForLoadState("domcontentloaded");
 
-    if (!(await isMapAvailable(page))) {
-      test.skip(true, "Map not available (WebGL unavailable in headless)");
-      return;
-    }
+    test.skip(!(await isMapAvailable(page)), "Map not available (WebGL unavailable in headless)");
 
     // Wait for map and POI layer to fully render
     await waitForMapRef(page);
@@ -196,16 +181,10 @@ test.describe("POI Layer Hydration Safety", () => {
     await page.goto(SEARCH_URL);
     await page.waitForLoadState("domcontentloaded");
 
-    if (!(await isMapAvailable(page))) {
-      test.skip(true, "Map not available (WebGL unavailable in headless)");
-      return;
-    }
+    test.skip(!(await isMapAvailable(page)), "Map not available (WebGL unavailable in headless)");
 
     const hasMapRef = await waitForMapRef(page);
-    if (!hasMapRef) {
-      test.skip(true, "Map E2E ref not available");
-      return;
-    }
+    test.skip(!hasMapRef, "Map E2E ref not available");
 
     const buttons = poiButtons(page);
     await expect(buttons.first()).toBeVisible({ timeout: 15_000 });

@@ -418,7 +418,7 @@ test.describe("30 Critical User Journey Simulations", () => {
         .locator(selectors.listingCard)
         .count()) === 0
     ) {
-      test.skip();
+      test.skip(true, "No listing cards found");
       return;
     }
 
@@ -451,7 +451,7 @@ test.describe("30 Critical User Journey Simulations", () => {
       .locator(selectors.listingCard)
       .count();
     if (cardCount === 0) {
-      test.skip();
+      test.skip(true, "No listing cards found");
       return;
     }
 
@@ -462,7 +462,7 @@ test.describe("30 Critical User Journey Simulations", () => {
     const link = firstCard.locator('a[href^="/listings/"]').first();
     const href = await link.getAttribute("href").catch(() => null);
     if (!href) {
-      test.skip();
+      test.skip(true, "Listing link not found");
       return;
     }
     await page.goto(href);
@@ -498,7 +498,7 @@ test.describe("30 Critical User Journey Simulations", () => {
         .locator(selectors.listingCard)
         .count()) === 0
     ) {
-      test.skip();
+      test.skip(true, "No listing cards found");
       return;
     }
 
@@ -521,7 +521,7 @@ test.describe("30 Critical User Journey Simulations", () => {
         .locator(selectors.listingCard)
         .count()) === 0
     ) {
-      test.skip();
+      test.skip(true, "No listing cards found");
       return;
     }
 
@@ -562,7 +562,7 @@ test.describe("30 Critical User Journey Simulations", () => {
 
     const s20Container = searchResultsContainer(page);
     if ((await s20Container.locator(selectors.listingCard).count()) === 0) {
-      test.skip();
+      test.skip(true, "No listing cards found");
       return;
     }
 
@@ -636,7 +636,7 @@ test.describe("30 Critical User Journey Simulations", () => {
         .locator(selectors.listingCard)
         .count()) === 0
     ) {
-      test.skip();
+      test.skip(true, "No listing cards found");
       return;
     }
 

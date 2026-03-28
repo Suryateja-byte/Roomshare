@@ -152,10 +152,9 @@ test.describe("Profile & Settings Journeys", () => {
       await nav.goToSettings();
 
       // Check we weren't redirected to login
-      if (page.url().includes("/login")) {
-        test.skip(true, "Auth session expired - redirected to login");
-        return;
-      }
+      const onLoginPage = page.url().includes("/login");
+      test.skip(onLoginPage, "Auth session expired - redirected to login");
+      if (onLoginPage) return;
 
       // Wait for the settings page to fully hydrate
       await page
@@ -200,10 +199,9 @@ test.describe("Profile & Settings Journeys", () => {
       await nav.goToSettings();
 
       // Check we weren't redirected to login
-      if (page.url().includes("/login")) {
-        test.skip(true, "Auth session expired - redirected to login");
-        return;
-      }
+      const onLoginPage = page.url().includes("/login");
+      test.skip(onLoginPage, "Auth session expired - redirected to login");
+      if (onLoginPage) return;
 
       // Wait for the settings page to fully hydrate
       await page
@@ -235,10 +233,9 @@ test.describe("Profile & Settings Journeys", () => {
       await nav.goToSettings();
 
       // Check we weren't redirected to login
-      if (page.url().includes("/login")) {
-        test.skip(true, "Auth session expired - redirected to login");
-        return;
-      }
+      const onLoginPage = page.url().includes("/login");
+      test.skip(onLoginPage, "Auth session expired - redirected to login");
+      if (onLoginPage) return;
 
       // Find privacy section
       const privacySection = page
@@ -265,10 +262,9 @@ test.describe("Profile & Settings Journeys", () => {
       await nav.goToSettings();
 
       // Check we weren't redirected to login
-      if (page.url().includes("/login")) {
-        test.skip(true, "Auth session expired - redirected to login");
-        return;
-      }
+      const onLoginPage = page.url().includes("/login");
+      test.skip(onLoginPage, "Auth session expired - redirected to login");
+      if (onLoginPage) return;
 
       // Wait for the settings page to fully hydrate
       await page
@@ -326,10 +322,9 @@ test.describe("Profile & Settings Journeys", () => {
       await nav.goToSettings();
 
       // Check we weren't redirected to login
-      if (page.url().includes("/login")) {
-        test.skip(true, "Auth session expired - redirected to login");
-        return;
-      }
+      const onLoginPage = page.url().includes("/login");
+      test.skip(onLoginPage, "Auth session expired - redirected to login");
+      if (onLoginPage) return;
 
       // Wait for the settings page to fully hydrate
       await page
@@ -374,10 +369,9 @@ test.describe("Profile & Settings Journeys", () => {
       await nav.goToSettings();
 
       // Check we weren't redirected to login
-      if (page.url().includes("/login")) {
-        test.skip(true, "Auth session expired - redirected to login");
-        return;
-      }
+      const onLoginPage = page.url().includes("/login");
+      test.skip(onLoginPage, "Auth session expired - redirected to login");
+      if (onLoginPage) return;
 
       // Find connected accounts section
       const connectedSection = page.getByRole("heading", {
@@ -397,10 +391,9 @@ test.describe("Profile & Settings Journeys", () => {
       await nav.goToSettings();
 
       // Check we weren't redirected to login
-      if (page.url().includes("/login")) {
-        test.skip(true, "Auth session expired - redirected to login");
-        return;
-      }
+      const onLoginPage = page.url().includes("/login");
+      test.skip(onLoginPage, "Auth session expired - redirected to login");
+      if (onLoginPage) return;
 
       // Find account management or danger zone
       const dangerSection = page
@@ -447,14 +440,9 @@ test.describe("Profile & Settings Journeys", () => {
 
       // Check we weren't redirected to login or signup
       const currentUrl = page.url();
-      if (
-        currentUrl.includes("/login") ||
-        currentUrl.includes("/signup") ||
-        currentUrl.includes("/signin")
-      ) {
-        test.skip(true, "Auth redirect — session not available in CI");
-        return;
-      }
+      const onAuthPage = currentUrl.includes("/login") || currentUrl.includes("/signup") || currentUrl.includes("/signin");
+      test.skip(onAuthPage, "Auth redirect — session not available in CI");
+      if (onAuthPage) return;
 
       // Wait for the settings page to fully hydrate
       await page
@@ -516,10 +504,9 @@ test.describe("Profile & Settings Journeys", () => {
       await nav.goToSettings();
 
       // Check we weren't redirected to login
-      if (page.url().includes("/login")) {
-        test.skip(true, "Auth session expired - redirected to login");
-        return;
-      }
+      const onLoginPage = page.url().includes("/login");
+      test.skip(onLoginPage, "Auth session expired - redirected to login");
+      if (onLoginPage) return;
 
       // Find language selector
       const languageSelect = page

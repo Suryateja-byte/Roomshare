@@ -206,6 +206,23 @@ describe("Health Endpoints", () => {
       });
     });
 
+    // INFRA-006: DB health check timeout
+    describe("when database times out", () => {
+      it("returns 503 with timeout status when DB query hangs", async () => {
+        // Simulate a query that takes longer than the 3s timeout
+        (prisma.$queryRaw as jest.Mock).mockImplementation(
+          () => new Promise((resolve) => setTimeout(resolve, 5000))
+        );
+
+        const response = await readyGET();
+        const data = await response.json();
+
+        expect(response.status).toBe(503);
+        expect(data.status).toBe("unhealthy");
+        expect(data.checks.database.status).toBe("timeout");
+      }, 10000);
+    });
+
     describe("when shutting down", () => {
       it("returns 503 during graceful shutdown", async () => {
         (isInShutdownMode as jest.Mock).mockReturnValue(true);

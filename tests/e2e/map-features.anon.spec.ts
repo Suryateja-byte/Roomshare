@@ -131,10 +131,7 @@ test.describe("1.3: Synchronized highlighting", () => {
     // Scope to visible container to avoid hidden mobile/desktop duplicate.
     const hoverContainer = searchResultsContainer(page);
     const card = hoverContainer.locator(selectors.listingCard).first();
-    if ((await card.count()) === 0) {
-      test.skip(true, "No listing cards found");
-      return;
-    }
+    test.skip((await card.count()) === 0, "No listing cards found");
 
     try {
       await card.scrollIntoViewIfNeeded({ timeout: 5_000 });
@@ -288,10 +285,7 @@ test.describe("Map controls (requires WebGL)", () => {
 
   test("POIs master toggle activates all categories", async ({ page }) => {
     const poiMasterBtn = page.locator('button[aria-label*="Show all POIs"]');
-    if ((await poiMasterBtn.count()) === 0) {
-      test.skip(true, "POI master toggle button not found in DOM");
-      return;
-    }
+    test.skip((await poiMasterBtn.count()) === 0, "POI master toggle button not found in DOM");
 
     const poiVisible = await poiMasterBtn
       .isVisible({ timeout: 5_000 })
@@ -339,10 +333,7 @@ test.describe("Map controls (requires WebGL)", () => {
     const hasTransit = (await transitBtn.count()) > 0;
     const hasParks = (await parksBtn.count()) > 0;
 
-    if (!hasTransit && !hasParks) {
-      test.skip(true, "No category buttons found after master toggle click");
-      return;
-    }
+    test.skip(!hasTransit && !hasParks, "No category buttons found after master toggle click");
 
     if (hasTransit) {
       const transitPressed = await transitBtn

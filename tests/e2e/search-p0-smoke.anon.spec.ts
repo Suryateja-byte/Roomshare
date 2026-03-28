@@ -422,10 +422,7 @@ test.describe("Search P0 Smoke Suite", () => {
     // Click the first visible marker
     const markers = page.locator(".maplibregl-marker");
     const markerCount = await markers.count();
-    if (markerCount === 0) {
-      test.skip(true, "No markers found on map");
-      return;
-    }
+    test.skip(markerCount === 0, "No markers found on map");
 
     await markers.first().click();
 
@@ -462,10 +459,7 @@ test.describe("Search P0 Smoke Suite", () => {
       .isVisible({ timeout: 5_000 })
       .catch(() => false);
 
-    if (!toggleVisible) {
-      test.skip(true, "Search as I move toggle not visible");
-      return;
-    }
+    test.skip(!toggleVisible, "Search as I move toggle not visible");
 
     // Read initial state
     const initialChecked = await toggle.getAttribute("aria-checked");

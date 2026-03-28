@@ -124,6 +124,19 @@ export async function updateBookingStatus(
                             SET "availableSlots" = LEAST("availableSlots" + ${booking.slotsRequested}, "totalSlots")
                             WHERE "id" = ${booking.listing.id}
                         `;
+            await logBookingAudit(tx, {
+              bookingId: booking.id,
+              action: "EXPIRED",
+              previousStatus: "HELD",
+              newStatus: "EXPIRED",
+              actorId: null,
+              actorType: "SYSTEM",
+              details: {
+                mechanism: "inline_expiry",
+                slotsRequested: booking.slotsRequested,
+                heldUntil: booking.heldUntil,
+              },
+            });
           }
         });
       } catch (err) {
@@ -168,14 +181,20 @@ export async function updateBookingStatus(
         try {
           await prisma.$transaction(async (tx) => {
             // FOR UPDATE lock for TOCTOU protection
-            const [listing] = await tx.$queryRaw<Array<{ ownerId: string }>>`
-                            SELECT "ownerId" FROM "Listing"
+            const [listing] = await tx.$queryRaw<
+              Array<{ ownerId: string; status: string }>
+            >`
+                            SELECT "ownerId", "status" FROM "Listing"
                             WHERE "id" = ${booking.listing.id}
                             FOR UPDATE
                         `;
 
             if (listing.ownerId !== session.user.id) {
               throw new Error("UNAUTHORIZED_IN_TRANSACTION");
+            }
+
+            if (listing.status !== "ACTIVE") {
+              throw new Error("LISTING_NOT_ACTIVE");
             }
 
             // Verify booking is still HELD and not expired (atomic check)
@@ -219,6 +238,13 @@ export async function updateBookingStatus(
                 code: "UNAUTHORIZED",
               };
             }
+            if (error.message === "LISTING_NOT_ACTIVE") {
+              return {
+                error:
+                  "Cannot accept bookings on an inactive listing. The listing must be active.",
+                code: "LISTING_NOT_ACTIVE",
+              };
+            }
             if (error.message === "HOLD_EXPIRED_OR_MODIFIED") {
               return {
                 error:
@@ -250,9 +276,10 @@ export async function updateBookingStatus(
                 id: string;
                 ownerId: string;
                 bookingMode: string;
+                status: string;
               }>
             >`
-                            SELECT "availableSlots", "totalSlots", "id", "ownerId", "booking_mode" as "bookingMode" FROM "Listing"
+                            SELECT "availableSlots", "totalSlots", "id", "ownerId", "booking_mode" as "bookingMode", "status" FROM "Listing"
                             WHERE "id" = ${booking.listing.id}
                             FOR UPDATE
                         `;
@@ -260,6 +287,10 @@ export async function updateBookingStatus(
             // P0-3 FIX: Re-verify ownership under row lock (TOCTOU protection)
             if (listing.ownerId !== session.user.id) {
               throw new Error("UNAUTHORIZED_IN_TRANSACTION");
+            }
+
+            if (listing.status !== "ACTIVE") {
+              throw new Error("LISTING_NOT_ACTIVE");
             }
 
             // Phase 3: For WHOLE_UNIT, override slotsNeeded to current totalSlots from the locked row.
@@ -338,6 +369,13 @@ export async function updateBookingStatus(
               return {
                 error: "Only the listing owner can accept or reject bookings",
                 code: "UNAUTHORIZED",
+              };
+            }
+            if (error.message === "LISTING_NOT_ACTIVE") {
+              return {
+                error:
+                  "Cannot accept bookings on an inactive listing. The listing must be active.",
+                code: "LISTING_NOT_ACTIVE",
               };
             }
             if (error.message === "NO_SLOTS_AVAILABLE") {

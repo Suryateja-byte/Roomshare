@@ -42,6 +42,7 @@ jest.mock("@/lib/prisma", () => {
       findMany: jest.fn(),
     },
     $transaction: jest.fn(),
+    $executeRaw: jest.fn().mockResolvedValue(undefined),
   };
   // $transaction passes mockPrisma as tx so existing assertions still work
   mockPrisma.$transaction.mockImplementation((fn: any) => fn(mockPrisma));

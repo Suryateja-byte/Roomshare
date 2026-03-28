@@ -12,6 +12,9 @@ jest.mock("@/lib/search-alerts", () => ({
 jest.mock("@/lib/prisma", () => ({
   prisma: {
     $queryRaw: jest.fn(),
+    $transaction: jest.fn((fn: (tx: any) => Promise<any>) =>
+      fn({ $queryRaw: (jest.fn() as jest.Mock).mockResolvedValue([{ locked: true }]) })
+    ),
   },
 }));
 
@@ -63,11 +66,23 @@ describe("GET /api/cron/search-alerts", () => {
     "a-very-long-and-secure-cron-secret-that-is-at-least-32-characters";
   const originalEnv = process.env;
 
+  // Helper to configure $transaction mock with a specific lock result
+  function mockTransaction(locked: boolean) {
+    (prisma.$transaction as jest.Mock).mockImplementation(
+      (fn: (tx: any) => Promise<any>) => {
+        const tx = {
+          $queryRaw: jest.fn().mockResolvedValue([{ locked }]),
+        };
+        return fn(tx);
+      }
+    );
+  }
+
   beforeEach(() => {
     jest.clearAllMocks();
     process.env = { ...originalEnv, CRON_SECRET: VALID_CRON_SECRET };
     // Default: advisory lock acquired successfully
-    (prisma.$queryRaw as jest.Mock).mockResolvedValue([{ locked: true }]);
+    mockTransaction(true);
   });
 
   afterEach(() => {
@@ -235,7 +250,16 @@ describe("GET /api/cron/search-alerts", () => {
   });
 
   describe("advisory lock", () => {
-    it("acquires advisory lock before processing", async () => {
+    it("acquires transaction-level advisory lock before processing", async () => {
+      let capturedTx: any;
+      (prisma.$transaction as jest.Mock).mockImplementation(
+        (fn: (tx: any) => Promise<any>) => {
+          capturedTx = {
+            $queryRaw: jest.fn().mockResolvedValue([{ locked: true }]),
+          };
+          return fn(capturedTx);
+        }
+      );
       (processSearchAlerts as jest.Mock).mockResolvedValue({
         processed: 0,
         alertsSent: 0,
@@ -245,16 +269,15 @@ describe("GET /api/cron/search-alerts", () => {
 
       await GET(createRequest(`Bearer ${VALID_CRON_SECRET}`));
 
-      // First call should be the lock acquisition
-      const calls = (prisma.$queryRaw as jest.Mock).mock.calls;
-      expect(calls.length).toBeGreaterThanOrEqual(1);
-      // Tagged template: first arg is TemplateStringsArray (a string[])
+      // Lock acquired via tx.$queryRaw inside $transaction
+      const calls = capturedTx.$queryRaw.mock.calls;
+      expect(calls.length).toBe(1);
       const lockCallStrings = calls[0][0].join("");
-      expect(lockCallStrings).toContain("pg_try_advisory_lock");
+      expect(lockCallStrings).toContain("pg_try_advisory_xact_lock");
     });
 
     it("skips processing when lock is held by another instance", async () => {
-      (prisma.$queryRaw as jest.Mock).mockResolvedValue([{ locked: false }]);
+      mockTransaction(false);
 
       const response = await GET(createRequest(`Bearer ${VALID_CRON_SECRET}`));
 
@@ -265,11 +288,16 @@ describe("GET /api/cron/search-alerts", () => {
       expect(processSearchAlerts).not.toHaveBeenCalled();
     });
 
-    it("releases lock after successful processing", async () => {
-      // First call: lock acquisition (success), second call: lock release
-      (prisma.$queryRaw as jest.Mock)
-        .mockResolvedValueOnce([{ locked: true }])
-        .mockResolvedValueOnce([{ unlocked: true }]);
+    it("uses xact lock that auto-releases on transaction end (no manual unlock)", async () => {
+      let capturedTx: any;
+      (prisma.$transaction as jest.Mock).mockImplementation(
+        (fn: (tx: any) => Promise<any>) => {
+          capturedTx = {
+            $queryRaw: jest.fn().mockResolvedValue([{ locked: true }]),
+          };
+          return fn(capturedTx);
+        }
+      );
       (processSearchAlerts as jest.Mock).mockResolvedValue({
         processed: 1,
         alertsSent: 1,
@@ -279,26 +307,24 @@ describe("GET /api/cron/search-alerts", () => {
 
       await GET(createRequest(`Bearer ${VALID_CRON_SECRET}`));
 
-      const calls = (prisma.$queryRaw as jest.Mock).mock.calls;
-      expect(calls.length).toBe(2);
-      const unlockCallStrings = calls[1][0].join("");
-      expect(unlockCallStrings).toContain("pg_advisory_unlock");
+      // Only ONE tx.$queryRaw call (lock acquisition), no unlock call
+      const calls = capturedTx.$queryRaw.mock.calls;
+      expect(calls.length).toBe(1);
+      const callStr = calls[0][0].join("");
+      expect(callStr).not.toContain("pg_advisory_unlock");
     });
 
-    it("releases lock even on error", async () => {
-      (prisma.$queryRaw as jest.Mock)
-        .mockResolvedValueOnce([{ locked: true }])
-        .mockResolvedValueOnce([{ unlocked: true }]);
-      (processSearchAlerts as jest.Mock).mockRejectedValue(
+    it("auto-releases lock on error (transaction rollback)", async () => {
+      (prisma.$transaction as jest.Mock).mockRejectedValue(
         new Error("Processing failed")
       );
 
-      await GET(createRequest(`Bearer ${VALID_CRON_SECRET}`));
+      const response = await GET(createRequest(`Bearer ${VALID_CRON_SECRET}`));
 
-      const calls = (prisma.$queryRaw as jest.Mock).mock.calls;
-      expect(calls.length).toBe(2);
-      const unlockCallStrings = calls[1][0].join("");
-      expect(unlockCallStrings).toContain("pg_advisory_unlock");
+      // Error is caught and returns 500 — lock auto-released by rollback
+      expect(response.status).toBe(500);
+      const data = await response.json();
+      expect(data.success).toBe(false);
     });
   });
 });

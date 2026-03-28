@@ -82,7 +82,7 @@ test.describe("Nearby Places — Cross-Platform @nearby", () => {
   test("X-004: Mobile layout + view toggle", async ({ page }) => {
     const viewport = page.viewportSize();
     if (!viewport || viewport.width >= 1024) {
-      test.skip();
+      test.skip(true, "Test requires mobile viewport");
       return;
     }
 
@@ -115,7 +115,7 @@ test.describe("Nearby Places — Cross-Platform @nearby", () => {
   test("X-005: Tablet layout", async ({ page }) => {
     const viewport = page.viewportSize();
     if (!viewport || viewport.width < 768 || viewport.width >= 1024) {
-      test.skip();
+      test.skip(true, "Test requires mobile viewport");
       return;
     }
 
@@ -134,7 +134,7 @@ test.describe("Nearby Places — Cross-Platform @nearby", () => {
   test("X-006: Desktop split layout (panel + map)", async ({ page }) => {
     const viewport = page.viewportSize();
     if (!viewport || viewport.width < 1024) {
-      test.skip();
+      test.skip(true, "Test requires desktop viewport");
       return;
     }
 
@@ -167,7 +167,7 @@ test.describe("Nearby Places — Cross-Platform @nearby", () => {
   test("X-008: Wide viewport layout", async ({ page }) => {
     const viewport = page.viewportSize();
     if (!viewport || viewport.width < 1920) {
-      test.skip();
+      test.skip(true, "Test requires wide viewport (1920px+)");
       return;
     }
 

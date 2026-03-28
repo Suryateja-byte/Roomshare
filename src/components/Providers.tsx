@@ -5,6 +5,7 @@ import { Session } from "next-auth";
 import { Toaster } from "sonner";
 import { MotionConfig } from "framer-motion";
 import { ReactNode } from "react";
+import { ErrorBoundary } from "@/components/error/ErrorBoundary";
 
 interface ProvidersProps {
   children: ReactNode;
@@ -17,15 +18,17 @@ export default function Providers({
   session,
 }: ProvidersProps) {
   return (
-    <MotionConfig reducedMotion="user">
-      <SessionProvider
-        session={session}
-        refetchOnWindowFocus={true}
-        refetchInterval={600}
-      >
-        {children}
-        <Toaster position="top-center" richColors />
-      </SessionProvider>
-    </MotionConfig>
+    <ErrorBoundary>
+      <MotionConfig reducedMotion="user">
+        <SessionProvider
+          session={session}
+          refetchOnWindowFocus={true}
+          refetchInterval={600}
+        >
+          {children}
+          <Toaster position="top-center" richColors />
+        </SessionProvider>
+      </MotionConfig>
+    </ErrorBoundary>
   );
 }
