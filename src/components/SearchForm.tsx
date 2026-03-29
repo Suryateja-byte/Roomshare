@@ -951,7 +951,7 @@ export default function SearchForm({
             </div>
             {/* Divider between What and Where */}
             <div
-              className="hidden md:block w-px h-8 bg-surface-container-high mx-1"
+              className="w-full h-px md:w-px md:h-8 bg-surface-container-high mx-0 md:mx-1 my-1 md:my-0"
               aria-hidden="true"
             ></div>
           </>
@@ -1081,7 +1081,7 @@ export default function SearchForm({
 
         {/* Divider */}
         <div
-          className="hidden md:block w-px h-8 bg-surface-container-high mx-1"
+          className="w-full h-px md:w-px md:h-8 bg-surface-container-high mx-0 md:mx-1 my-1 md:my-0"
           aria-hidden="true"
         ></div>
 

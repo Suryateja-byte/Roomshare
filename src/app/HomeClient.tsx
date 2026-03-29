@@ -34,7 +34,7 @@ export default function HomeClient() {
         {/* ================================================================
             HERO SECTION — Editorial Living Room
             ================================================================ */}
-        <section aria-label="Search for rooms" className="relative pt-32 pb-16 md:pt-40 md:pb-24 min-h-screen flex flex-col justify-center overflow-x-hidden">
+        <section aria-label="Search for rooms" className="relative pt-32 pb-16 md:pt-40 md:pb-24 min-h-[100dvh] flex flex-col justify-center overflow-x-hidden">
           <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 w-full z-10">
             <div className="flex flex-col items-center text-center">
               <div className="w-full flex flex-col items-center justify-center mb-12 md:mb-16">
@@ -111,11 +111,10 @@ export default function HomeClient() {
               {/* Cinematic showcase image — desktop only */}
               <div className="w-full max-w-6xl mx-auto mt-4 md:mt-8 hidden md:block">
                 <m.div
-                  initial={{ opacity: 0, y: 40 }}
+                  initial={{ opacity: 0, y: 24 }}
                   animate={{ opacity: 1, y: 0 }}
                   transition={{
-                    duration: 0.8,
-                    delay: 0.2,
+                    duration: 0.6,
                     ease: [0.16, 1, 0.3, 1],
                   }}
                   className="relative aspect-[21/9] rounded-2xl overflow-hidden bg-surface-container-high shadow-ambient-lg"
@@ -140,6 +139,8 @@ export default function HomeClient() {
             Keep dark background per team decision #13
             ================================================================ */}
         <ScrollAnimation />
+
+        <div className="h-24 bg-gradient-to-b from-on-surface to-surface-container-high" />
 
         {/* ================================================================
             FEATURES — "Cozy Spaces, Real People"
@@ -213,7 +214,7 @@ export default function HomeClient() {
             transition={{ duration: 0.6, ease: [0.16, 1, 0.3, 1] }}
             className="max-w-3xl mx-auto px-4 sm:px-6"
           >
-            <h2 className="font-display text-4xl md:text-5xl lg:text-6xl font-normal tracking-tight mb-6 text-on-surface">
+            <h2 className="font-display text-3xl md:text-4xl lg:text-5xl font-normal tracking-tight mb-6 text-on-surface">
               Your next roommate is already here.
             </h2>
             <p className="text-lg text-on-surface-variant mb-10 max-w-xl mx-auto font-light">
@@ -268,7 +269,7 @@ function FeatureCard({
       variants={fadeInUp}
       className="flex flex-col items-center text-center group bg-surface-container-lowest rounded-xl p-8 shadow-ambient-sm"
     >
-      <div aria-hidden="true" className="mb-6 flex items-center justify-center w-12 h-12 rounded-full bg-primary/10 text-primary transition-all duration-300 group-hover:bg-primary group-hover:text-on-primary group-hover:scale-110">
+      <div aria-hidden="true" className="mb-6 flex items-center justify-center w-12 h-12 rounded-full bg-primary/10 text-primary transition-[transform,background-color,color] duration-200 group-hover:bg-primary group-hover:text-on-primary group-hover:scale-110">
         <Icon className="w-5 h-5" />
       </div>
       <h3 className="font-display text-lg font-medium mb-3 text-on-surface tracking-tight">
