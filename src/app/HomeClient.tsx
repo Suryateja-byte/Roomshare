@@ -1,6 +1,6 @@
 "use client";
 
-import { Suspense, useRef, lazy } from "react";
+import React, { Suspense, useRef, lazy } from "react";
 import { LazyMotion, domAnimation, m } from "framer-motion";
 import { useSession } from "next-auth/react";
 import Link from "next/link";
@@ -23,9 +23,57 @@ import { Button } from "@/components/ui/button";
 import { ShieldCheck, Zap, Coffee, ArrowRight } from "lucide-react";
 import { fadeInUp, staggerContainer } from "@/lib/motion-variants";
 
-export default function HomeClient() {
+class SearchFormErrorBoundary extends React.Component<
+  { children: React.ReactNode },
+  { hasError: boolean }
+> {
+  constructor(props: { children: React.ReactNode }) {
+    super(props);
+    this.state = { hasError: false };
+  }
+  static getDerivedStateFromError() {
+    return { hasError: true };
+  }
+  render() {
+    if (this.state.hasError) {
+      return (
+        <div className="w-full max-w-5xl mx-auto px-4 py-6 text-center">
+          <p className="text-on-surface-variant text-sm mb-3">Search is temporarily unavailable</p>
+          <a href="/search" className="text-primary text-sm font-medium hover:underline">
+            Go to search page &rarr;
+          </a>
+        </div>
+      );
+    }
+    return this.props.children;
+  }
+}
+
+function AuthCTA() {
   const { data: session, status } = useSession();
   const isLoggedIn = !!session?.user;
+
+  if (status === "loading" || isLoggedIn) return null;
+
+  return (
+    <m.div
+      variants={fadeInUp}
+      className="mt-8 flex items-center justify-center gap-3 text-sm"
+    >
+      <span className="text-on-surface-variant">
+        New here?
+      </span>
+      <Link
+        href="/signup"
+        className="font-medium text-primary hover:underline underline-offset-4 transition-colors"
+      >
+        Create an account
+      </Link>
+    </m.div>
+  );
+}
+
+export default function HomeClient() {
   const searchFormRef = useRef<HTMLDivElement>(null);
 
   return (
@@ -78,33 +126,20 @@ export default function HomeClient() {
                     className="w-full mx-auto max-w-4xl relative z-20"
                   >
                     <div className="bg-surface-container-lowest backdrop-blur-xl border border-outline-variant/20 rounded-2xl shadow-ambient p-1">
-                      <Suspense
-                        fallback={
-                          <div className="h-16 animate-shimmer bg-gradient-to-r from-surface-container-high via-surface-canvas to-surface-container-high bg-[length:200%_100%] rounded-xl" />
-                        }
-                      >
-                        <SearchForm />
-                      </Suspense>
+                      <SearchFormErrorBoundary>
+                        <Suspense
+                          fallback={
+                            <div className="h-16 animate-shimmer bg-gradient-to-r from-surface-container-high via-surface-canvas to-surface-container-high bg-[length:200%_100%] rounded-xl" />
+                          }
+                        >
+                          <SearchForm />
+                        </Suspense>
+                      </SearchFormErrorBoundary>
                     </div>
                   </m.div>
 
                   {/* CTA for logged-out users */}
-                  {status !== "loading" && !isLoggedIn && (
-                    <m.div
-                      variants={fadeInUp}
-                      className="mt-8 flex items-center justify-center gap-3 text-sm"
-                    >
-                      <span className="text-on-surface-variant">
-                        New here?
-                      </span>
-                      <Link
-                        href="/signup"
-                        className="font-medium text-primary hover:underline underline-offset-4 transition-colors"
-                      >
-                        Create an account
-                      </Link>
-                    </m.div>
-                  )}
+                  <AuthCTA />
                 </m.div>
               </div>
 
