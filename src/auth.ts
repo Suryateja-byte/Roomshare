@@ -41,6 +41,7 @@ async function getUser(email: string) {
 }
 
 export const { handlers, auth, signIn, signOut } = NextAuth({
+  basePath: "/api/auth",
   debug: process.env.NODE_ENV === "development",
   // eslint-disable-next-line @typescript-eslint/no-explicit-any -- PrismaAdapter return type doesn't match NextAuth Adapter exactly
   adapter: PrismaAdapter(prisma) as any,
