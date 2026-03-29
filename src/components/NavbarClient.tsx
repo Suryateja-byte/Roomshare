@@ -702,7 +702,7 @@ export default function NavbarClient({
       <div
         className={`lg:hidden fixed inset-0 z-modal bg-surface-canvas/80 backdrop-blur-[20px] transition-all duration-300 ${
           isMobileMenuOpen
-            ? "opacity-100 visible"
+            ? "opacity-100 visible pointer-events-auto"
             : "opacity-0 invisible pointer-events-none"
         }`}
         role="dialog"
@@ -713,7 +713,7 @@ export default function NavbarClient({
       >
         <div className="flex flex-col h-full">
           {/* Close button */}
-          <div className="flex justify-end p-6">
+          <div className="flex justify-end p-6 relative z-10">
             <button
               onClick={() => setIsMobileMenuOpen(false)}
               className="text-on-surface p-2 hover:bg-surface-container-high rounded-full transition-colors min-w-[44px] min-h-[44px] flex items-center justify-center"
