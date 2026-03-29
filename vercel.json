@@ -1,32 +1,12 @@
 {
   "crons": [
     {
-      "path": "/api/cron/search-alerts",
-      "schedule": "0 9 * * *"
-    },
-    {
-      "path": "/api/cron/cleanup-rate-limits",
-      "schedule": "0 3 * * *"
-    },
-    {
-      "path": "/api/cron/refresh-search-docs",
-      "schedule": "*/5 * * * *"
-    },
-    {
-      "path": "/api/cron/cleanup-typing-status",
-      "schedule": "*/5 * * * *"
-    },
-    {
-      "path": "/api/cron/cleanup-idempotency-keys",
-      "schedule": "0 4 * * *"
-    },
-    {
       "path": "/api/cron/sweep-expired-holds",
-      "schedule": "*/2 * * * *"
+      "schedule": "0 */6 * * *"
     },
     {
-      "path": "/api/cron/reconcile-slots",
-      "schedule": "0 5 * * 0"
+      "path": "/api/cron/daily-maintenance",
+      "schedule": "0 3 * * *"
     }
   ]
 }
