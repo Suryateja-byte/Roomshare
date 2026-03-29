@@ -39,7 +39,7 @@ export default function HomePage() {
                 <div className="max-w-2xl">
                   <div className="h-5 w-28 bg-surface-container-high rounded-full mb-6 animate-shimmer bg-gradient-to-r from-surface-container-high via-surface-canvas to-surface-container-high bg-[length:200%_100%]" />
                   <div className="h-10 w-72 bg-surface-container-high rounded-lg mb-4 animate-shimmer bg-gradient-to-r from-surface-container-high via-surface-canvas to-surface-container-high bg-[length:200%_100%]" />
-                  <div className="h-6 w-96 bg-surface-container-high rounded-lg animate-shimmer bg-gradient-to-r from-surface-container-high via-surface-canvas to-surface-container-high bg-[length:200%_100%]" />
+                  <div className="h-6 w-96 max-w-full bg-surface-container-high rounded-lg animate-shimmer bg-gradient-to-r from-surface-container-high via-surface-canvas to-surface-container-high bg-[length:200%_100%]" />
                 </div>
               </div>
               <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-8 sm:gap-10">

@@ -497,7 +497,7 @@ export default function ScrollAnimation() {
               Scroll to explore
             </span>
             <div className="w-5 h-8 rounded-full border border-white/20 relative">
-              <div className="absolute top-1.5 left-1/2 -translate-x-1/2 w-0.5 h-1.5 bg-primary rounded-full animate-bounce" />
+              <div className="absolute top-1.5 left-1/2 -translate-x-1/2 w-0.5 h-1.5 bg-primary rounded-full animate-gentle-bounce" />
             </div>
           </m.div>
         )}

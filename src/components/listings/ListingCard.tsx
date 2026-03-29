@@ -309,7 +309,7 @@ function ListingCardInner({
               images={displayImages}
               alt={displayTitle}
               priority={priority}
-              className="h-full w-full group-hover:scale-110 transition-transform duration-[2s] ease-out"
+              className="h-full w-full group-hover:scale-110 transition-transform duration-[2s] ease-[cubic-bezier(0.25,0.1,0.25,1.0)]"
               onImageError={handleImageError}
               onDragStateChange={setIsDragging}
             />

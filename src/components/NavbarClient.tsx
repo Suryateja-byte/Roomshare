@@ -603,7 +603,7 @@ export default function NavbarClient({
                     role="none"
                     className="p-6 bg-surface-container-high/40"
                   >
-                    <p className="font-semibold text-on-surface tracking-tight">
+                    <p className="font-semibold text-on-surface tracking-tight truncate">
                       {user.name}
                     </p>
                     <p className="text-xs text-on-surface-variant truncate mt-0.5">

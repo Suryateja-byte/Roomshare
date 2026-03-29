@@ -243,10 +243,10 @@ export default function HomeClient() {
             ================================================================ */}
         <section aria-label="Get started" className="py-16 md:py-20 bg-surface-canvas text-center">
           <m.div
-            initial={{ opacity: 0, y: 20 }}
-            whileInView={{ opacity: 1, y: 0 }}
+            initial="hidden"
+            whileInView="visible"
             viewport={{ once: true }}
-            transition={{ duration: 0.6, ease: [0.16, 1, 0.3, 1] }}
+            variants={fadeInUp}
             className="max-w-3xl mx-auto px-4 sm:px-6"
           >
             <h2 className="font-display text-3xl md:text-4xl lg:text-5xl font-normal tracking-tight mb-6 text-on-surface">

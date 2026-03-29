@@ -359,6 +359,15 @@ textarea:focus-visible {
   animation: shimmer 1.5s infinite linear;
 }
 
+@keyframes gentle-bounce {
+  0%, 100% { transform: translateY(0); }
+  50% { transform: translateY(6px); }
+}
+
+.animate-gentle-bounce {
+  animation: gentle-bounce 2s ease-in-out infinite;
+}
+
 /* Heart bounce animation for wishlist save */
 @keyframes heart-bounce {
   0% {
