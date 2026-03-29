@@ -249,6 +249,7 @@ export default function NavbarClient({
   // Handle scroll effect for glassmorphism
   // The actual scroll container is CustomScrollContainer (.custom-scroll-hide),
   // not window (html/body have overflow:hidden).
+  const isScrolledRef = useRef(false);
   useEffect(() => {
     const scrollContainer =
       document.querySelector(".custom-scroll-hide") ?? window;
@@ -257,7 +258,11 @@ export default function NavbarClient({
         scrollContainer instanceof HTMLElement
           ? scrollContainer.scrollTop
           : window.scrollY;
-      setIsScrolled(scrollTop > 20);
+      const scrolled = scrollTop > 20;
+      if (scrolled !== isScrolledRef.current) {
+        isScrolledRef.current = scrolled;
+        setIsScrolled(scrolled);
+      }
     };
     scrollContainer.addEventListener("scroll", handleScroll);
     handleScroll(); // Check initial scroll position
@@ -491,7 +496,7 @@ export default function NavbarClient({
 
   return (
     <header
-      className={`fixed top-0 left-0 right-0 z-dropdown transition-all duration-500 ease-[cubic-bezier(0.16,1,0.3,1)] data-[anim-hidden=true]:-translate-y-full data-[anim-hidden=true]:opacity-0 data-[anim-hidden=true]:pointer-events-none data-[anim-hidden=true]:border-transparent ${
+      className={`fixed top-0 left-0 right-0 z-dropdown transition-[transform,opacity,background-color,padding,border-color] duration-300 ease-[cubic-bezier(0.16,1,0.3,1)] data-[anim-hidden=true]:-translate-y-full data-[anim-hidden=true]:opacity-0 data-[anim-hidden=true]:pointer-events-none data-[anim-hidden=true]:border-transparent ${
         isScrolled
           ? "py-4 glass-nav"
           : "py-6 bg-transparent"
@@ -564,7 +569,7 @@ export default function NavbarClient({
                   id={menuButtonId}
                   onClick={() => setIsProfileOpen(!isProfileOpen)}
                   onKeyDown={handleTriggerKeyDown}
-                  className={`group flex items-center gap-2 p-1 pl-1.5 pr-1 min-h-[40px] rounded-full transition-all duration-300 ${
+                  className={`group flex items-center gap-2 p-1 pl-1.5 pr-1 min-h-[44px] rounded-full transition-all duration-300 ${
                     isProfileOpen
                       ? "bg-surface-container-high"
                       : "hover:bg-surface-canvas"
@@ -598,7 +603,7 @@ export default function NavbarClient({
                     role="none"
                     className="p-6 bg-surface-container-high/40"
                   >
-                    <p className="font-semibold text-on-surface tracking-tight">
+                    <p className="font-semibold text-on-surface tracking-tight truncate">
                       {user.name}
                     </p>
                     <p className="text-xs text-on-surface-variant truncate mt-0.5">
@@ -682,7 +687,7 @@ export default function NavbarClient({
             <div className="lg:hidden flex items-center">
               <button
                 onClick={() => setIsMobileMenuOpen(!isMobileMenuOpen)}
-                className="text-on-surface p-2 transition-colors hover:bg-surface-container-high rounded-full focus-visible:ring-2 focus-visible:ring-primary/30 focus-visible:ring-offset-2"
+                className="text-on-surface p-2 min-w-[44px] min-h-[44px] flex items-center justify-center transition-colors hover:bg-surface-container-high rounded-full focus-visible:ring-2 focus-visible:ring-primary/30 focus-visible:ring-offset-2"
                 aria-label={isMobileMenuOpen ? "Close menu" : "Open menu"}
                 aria-expanded={isMobileMenuOpen}
               >

@@ -1,10 +1,11 @@
 "use client";
 
-import { LazyMotion, domAnimation, m, Variants } from "framer-motion";
+import { LazyMotion, domAnimation, m } from "framer-motion";
 import Link from "next/link";
 import ListingCard from "@/components/listings/ListingCard";
 import { ArrowRight } from "lucide-react";
 import { Button } from "@/components/ui/button";
+import { fadeInUp, staggerContainer } from "@/lib/motion-variants";
 
 interface Listing {
   id: string;
@@ -38,23 +39,6 @@ interface Listing {
 interface FeaturedListingsClientProps {
   listings: Listing[];
 }
-
-const fadeInUp: Variants = {
-  hidden: { opacity: 0, y: 20 },
-  visible: {
-    opacity: 1,
-    y: 0,
-    transition: { duration: 0.6, ease: [0.25, 0.1, 0.25, 1.0] },
-  },
-};
-
-const staggerContainer: Variants = {
-  hidden: { opacity: 0 },
-  visible: {
-    opacity: 1,
-    transition: { staggerChildren: 0.1 },
-  },
-};
 
 export default function FeaturedListingsClient({
   listings,
@@ -118,7 +102,7 @@ export default function FeaturedListingsClient({
             whileInView="visible"
             viewport={{ once: true, margin: "-100px" }}
             variants={staggerContainer}
-            className="flex flex-col md:flex-row md:items-end justify-between gap-8 mb-16"
+            className="flex flex-col md:flex-row md:items-end justify-between gap-8 mb-16 md:mb-20"
           >
             <div className="max-w-2xl">
               <m.div
@@ -145,7 +129,7 @@ export default function FeaturedListingsClient({
             <m.div variants={fadeInUp} className="hidden md:block">
               <Button
                 asChild
-                variant="ghost"
+                variant="outline"
                 className="group rounded-full text-on-surface-variant hover:text-on-surface hover:bg-surface-container-high px-6 gap-2"
               >
                 <Link href="/search">

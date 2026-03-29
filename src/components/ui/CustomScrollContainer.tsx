@@ -145,7 +145,7 @@ const CustomScrollContainer = ({
 
   return (
     <ScrollContainerContext.Provider value={containerRef}>
-      <div className="relative w-full h-screen overflow-hidden bg-surface-canvas">
+      <div className="relative w-full h-screen-safe overflow-hidden bg-surface-canvas">
         {/* Hide Native Scrollbar */}
         <style>{`
                 .custom-scroll-hide::-webkit-scrollbar { display: none; }

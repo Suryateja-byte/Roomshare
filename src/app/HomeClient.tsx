@@ -1,7 +1,7 @@
 "use client";
 
-import { Suspense, useRef, lazy } from "react";
-import { LazyMotion, domAnimation, m, Variants } from "framer-motion";
+import React, { Suspense, useRef, lazy } from "react";
+import { LazyMotion, domAnimation, m } from "framer-motion";
 import { useSession } from "next-auth/react";
 import Link from "next/link";
 import Image from "next/image";
@@ -21,27 +21,59 @@ const ScrollAnimation = dynamic(
 );
 import { Button } from "@/components/ui/button";
 import { ShieldCheck, Zap, Coffee, ArrowRight } from "lucide-react";
+import { fadeInUp, staggerContainer } from "@/lib/motion-variants";
 
-const fadeInUp: Variants = {
-  hidden: { opacity: 0, y: 20 },
-  visible: {
-    opacity: 1,
-    y: 0,
-    transition: { duration: 0.6, ease: [0.25, 0.1, 0.25, 1.0] },
-  },
-};
+class SearchFormErrorBoundary extends React.Component<
+  { children: React.ReactNode },
+  { hasError: boolean }
+> {
+  constructor(props: { children: React.ReactNode }) {
+    super(props);
+    this.state = { hasError: false };
+  }
+  static getDerivedStateFromError() {
+    return { hasError: true };
+  }
+  render() {
+    if (this.state.hasError) {
+      return (
+        <div className="w-full max-w-5xl mx-auto px-4 py-6 text-center">
+          <p className="text-on-surface-variant text-sm mb-3">Search is temporarily unavailable</p>
+          <a href="/search" className="text-primary text-sm font-medium hover:underline">
+            Go to search page &rarr;
+          </a>
+        </div>
+      );
+    }
+    return this.props.children;
+  }
+}
 
-const staggerContainer: Variants = {
-  hidden: { opacity: 0 },
-  visible: {
-    opacity: 1,
-    transition: { staggerChildren: 0.1 },
-  },
-};
-
-export default function HomeClient() {
+function AuthCTA() {
   const { data: session, status } = useSession();
   const isLoggedIn = !!session?.user;
+
+  if (status === "loading" || isLoggedIn) return null;
+
+  return (
+    <m.div
+      variants={fadeInUp}
+      className="mt-8 flex items-center justify-center gap-3 text-sm bg-surface-container-high/50 rounded-full px-6 py-3"
+    >
+      <span className="text-on-surface-variant">
+        New here?
+      </span>
+      <Link
+        href="/signup"
+        className="font-medium text-primary hover:underline underline-offset-4 transition-colors"
+      >
+        Create an account
+      </Link>
+    </m.div>
+  );
+}
+
+export default function HomeClient() {
   const searchFormRef = useRef<HTMLDivElement>(null);
 
   return (
@@ -50,7 +82,7 @@ export default function HomeClient() {
         {/* ================================================================
             HERO SECTION — Editorial Living Room
             ================================================================ */}
-        <section className="relative pt-32 pb-16 md:pt-40 md:pb-24 min-h-screen flex flex-col justify-center overflow-x-hidden">
+        <section aria-label="Search for rooms" className="relative pt-32 pb-16 md:pt-40 md:pb-24 min-h-[100dvh] flex flex-col justify-center overflow-x-hidden">
           <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 w-full z-10">
             <div className="flex flex-col items-center text-center">
               <div className="w-full flex flex-col items-center justify-center mb-12 md:mb-16">
@@ -63,7 +95,7 @@ export default function HomeClient() {
                   {/* Editorial label */}
                   <m.div
                     variants={fadeInUp}
-                    className="font-body text-xs font-bold uppercase tracking-[0.15em] text-on-surface-variant mb-8"
+                    className="font-body text-xs font-bold uppercase tracking-[0.15em] text-on-surface-variant mb-6"
                   >
                     Find Your People
                   </m.div>
@@ -93,45 +125,31 @@ export default function HomeClient() {
                     ref={searchFormRef}
                     className="w-full mx-auto max-w-4xl relative z-20"
                   >
-                    <div className="bg-surface-container-lowest backdrop-blur-xl border border-outline-variant/20 rounded-2xl shadow-ambient p-1">
-                      <Suspense
-                        fallback={
-                          <div className="h-16 animate-shimmer bg-gradient-to-r from-surface-container-high via-surface-canvas to-surface-container-high bg-[length:200%_100%] rounded-xl" />
-                        }
-                      >
-                        <SearchForm />
-                      </Suspense>
+                    <div className="bg-surface-container-lowest backdrop-blur-xl border border-outline-variant/20 rounded-2xl shadow-ambient p-2">
+                      <SearchFormErrorBoundary>
+                        <Suspense
+                          fallback={
+                            <div className="h-16 animate-shimmer bg-gradient-to-r from-surface-container-high via-surface-canvas to-surface-container-high bg-[length:200%_100%] rounded-xl" />
+                          }
+                        >
+                          <SearchForm />
+                        </Suspense>
+                      </SearchFormErrorBoundary>
                     </div>
                   </m.div>
 
                   {/* CTA for logged-out users */}
-                  {status !== "loading" && !isLoggedIn && (
-                    <m.div
-                      variants={fadeInUp}
-                      className="mt-8 flex items-center justify-center gap-3 text-sm"
-                    >
-                      <span className="text-on-surface-variant">
-                        New here?
-                      </span>
-                      <Link
-                        href="/signup"
-                        className="font-medium text-primary hover:underline underline-offset-4 transition-colors"
-                      >
-                        Create an account
-                      </Link>
-                    </m.div>
-                  )}
+                  <AuthCTA />
                 </m.div>
               </div>
 
               {/* Cinematic showcase image — desktop only */}
               <div className="w-full max-w-6xl mx-auto mt-4 md:mt-8 hidden md:block">
                 <m.div
-                  initial={{ opacity: 0, y: 40 }}
+                  initial={{ opacity: 0, y: 24 }}
                   animate={{ opacity: 1, y: 0 }}
                   transition={{
-                    duration: 0.8,
-                    delay: 0.2,
+                    duration: 0.6,
                     ease: [0.16, 1, 0.3, 1],
                   }}
                   className="relative aspect-[21/9] rounded-2xl overflow-hidden bg-surface-container-high shadow-ambient-lg"
@@ -141,7 +159,7 @@ export default function HomeClient() {
                     alt="Warm, lived-in shared living space"
                     fill
                     priority
-                    sizes="100vw"
+                    sizes="(max-width: 1152px) 100vw, 1152px"
                     className="object-cover"
                   />
                   <div className="absolute inset-0 bg-gradient-to-t from-surface-canvas/20 to-transparent" />
@@ -157,11 +175,13 @@ export default function HomeClient() {
             ================================================================ */}
         <ScrollAnimation />
 
+        <div className="h-24 bg-gradient-to-b from-on-surface to-surface-container-high" />
+
         {/* ================================================================
             FEATURES — "Cozy Spaces, Real People"
             Surface container high background for tonal shift
             ================================================================ */}
-        <section className="py-16 md:py-20 bg-surface-container-high">
+        <section aria-label="Why RoomShare" className="py-16 md:py-20 bg-surface-container-high">
           <div className="max-w-7xl mx-auto px-4 sm:px-6">
             <m.div
               initial="hidden"
@@ -196,7 +216,7 @@ export default function HomeClient() {
               whileInView="visible"
               viewport={{ once: true, margin: "-100px" }}
               variants={staggerContainer}
-              className="grid sm:grid-cols-2 lg:grid-cols-3 gap-8 sm:gap-10 max-w-5xl mx-auto"
+              className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-6 sm:gap-8 lg:gap-10 max-w-5xl mx-auto"
             >
               <FeatureCard
                 icon={ShieldCheck}
@@ -221,15 +241,15 @@ export default function HomeClient() {
             CTA SECTION — "Your next roommate is already here"
             Surface canvas with generous whitespace
             ================================================================ */}
-        <section className="py-16 md:py-20 bg-surface-canvas text-center">
+        <section aria-label="Get started" className="py-16 md:py-20 bg-surface-canvas text-center">
           <m.div
-            initial={{ opacity: 0, y: 20 }}
-            whileInView={{ opacity: 1, y: 0 }}
+            initial="hidden"
+            whileInView="visible"
             viewport={{ once: true }}
-            transition={{ duration: 0.6, ease: [0.16, 1, 0.3, 1] }}
+            variants={fadeInUp}
             className="max-w-3xl mx-auto px-4 sm:px-6"
           >
-            <h2 className="font-display text-4xl md:text-5xl lg:text-6xl font-normal tracking-tight mb-6 text-on-surface">
+            <h2 className="font-display text-3xl md:text-4xl lg:text-5xl font-normal tracking-tight mb-6 text-on-surface">
               Your next roommate is already here.
             </h2>
             <p className="text-lg text-on-surface-variant mb-10 max-w-xl mx-auto font-light">
@@ -284,7 +304,7 @@ function FeatureCard({
       variants={fadeInUp}
       className="flex flex-col items-center text-center group bg-surface-container-lowest rounded-xl p-8 shadow-ambient-sm"
     >
-      <div className="mb-6 flex items-center justify-center w-12 h-12 rounded-full bg-primary/10 text-primary transition-all duration-300 group-hover:bg-primary group-hover:text-on-primary group-hover:scale-110">
+      <div aria-hidden="true" className="mb-6 flex items-center justify-center w-12 h-12 rounded-full bg-primary/10 text-primary transition-[transform,background-color,color] duration-200 group-hover:bg-primary group-hover:text-on-primary group-hover:scale-110">
         <Icon className="w-5 h-5" />
       </div>
       <h3 className="font-display text-lg font-medium mb-3 text-on-surface tracking-tight">

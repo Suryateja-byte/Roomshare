@@ -389,7 +389,7 @@ export default function ScrollAnimation() {
     <section
       ref={sectionRef}
       className="relative"
-      style={{ height: "400vh" }}
+      style={{ height: isMobile ? "300vh" : "400vh" }}
       aria-label="Scroll animation showing a person entering their new home"
       role="region"
     >
@@ -454,6 +454,7 @@ export default function ScrollAnimation() {
         {/* Canvas */}
         <canvas
           ref={canvasRef}
+          aria-hidden="true"
           className={`w-full h-full block transition-opacity duration-500 ${
             ready ? "opacity-100" : "opacity-0"
           }`}
@@ -488,6 +489,7 @@ export default function ScrollAnimation() {
         {/* Scroll hint — fades out after scrolling begins */}
         {ready && (
           <m.div
+            aria-hidden="true"
             style={{ opacity: scrollHintOpacity }}
             className="absolute bottom-8 left-1/2 -translate-x-1/2 z-10 flex flex-col items-center gap-2"
           >
@@ -495,7 +497,7 @@ export default function ScrollAnimation() {
               Scroll to explore
             </span>
             <div className="w-5 h-8 rounded-full border border-white/20 relative">
-              <div className="absolute top-1.5 left-1/2 -translate-x-1/2 w-0.5 h-1.5 bg-primary rounded-full animate-bounce" />
+              <div className="absolute top-1.5 left-1/2 -translate-x-1/2 w-0.5 h-1.5 bg-primary rounded-full animate-gentle-bounce" />
             </div>
           </m.div>
         )}
