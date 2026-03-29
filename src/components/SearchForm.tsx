@@ -1011,7 +1011,7 @@ export default function SearchForm({
                   isUserTypingLocationRef.current = false;
                 }, 500);
               }}
-              placeholder="Search destinations"
+              placeholder={focusedField && focusedField !== 'where' ? "City or area" : "Search destinations"}
               className={
                 isCompact
                   ? "text-base md:text-sm flex-1"
