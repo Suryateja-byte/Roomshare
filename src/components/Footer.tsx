@@ -128,13 +128,13 @@ export default function Footer() {
             © {new Date().getFullYear()} RoomShare Inc.
           </p>
           <div className="flex items-center gap-8 order-1 sm:order-2">
-            <ComingSoonButton className="text-[10px] font-bold text-on-surface-variant hover:text-on-surface uppercase tracking-[0.2em] transition-colors">
+            <ComingSoonButton aria-label="Instagram (coming soon)" className="text-[10px] font-bold text-on-surface-variant hover:text-on-surface uppercase tracking-[0.2em] transition-colors">
               Instagram
             </ComingSoonButton>
-            <ComingSoonButton className="text-[10px] font-bold text-on-surface-variant hover:text-on-surface uppercase tracking-[0.2em] transition-colors">
+            <ComingSoonButton aria-label="X, formerly Twitter (coming soon)" className="text-[10px] font-bold text-on-surface-variant hover:text-on-surface uppercase tracking-[0.2em] transition-colors">
               X
             </ComingSoonButton>
-            <ComingSoonButton className="text-[10px] font-bold text-on-surface-variant hover:text-on-surface uppercase tracking-[0.2em] transition-colors">
+            <ComingSoonButton aria-label="LinkedIn (coming soon)" className="text-[10px] font-bold text-on-surface-variant hover:text-on-surface uppercase tracking-[0.2em] transition-colors">
               LinkedIn
             </ComingSoonButton>
           </div>

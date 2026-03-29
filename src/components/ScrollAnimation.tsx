@@ -454,6 +454,7 @@ export default function ScrollAnimation() {
         {/* Canvas */}
         <canvas
           ref={canvasRef}
+          aria-hidden="true"
           className={`w-full h-full block transition-opacity duration-500 ${
             ready ? "opacity-100" : "opacity-0"
           }`}
@@ -488,6 +489,7 @@ export default function ScrollAnimation() {
         {/* Scroll hint — fades out after scrolling begins */}
         {ready && (
           <m.div
+            aria-hidden="true"
             style={{ opacity: scrollHintOpacity }}
             className="absolute bottom-8 left-1/2 -translate-x-1/2 z-10 flex flex-col items-center gap-2"
           >

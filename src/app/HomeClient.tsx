@@ -1,7 +1,7 @@
 "use client";
 
 import { Suspense, useRef, lazy } from "react";
-import { LazyMotion, domAnimation, m, Variants } from "framer-motion";
+import { LazyMotion, domAnimation, m } from "framer-motion";
 import { useSession } from "next-auth/react";
 import Link from "next/link";
 import Image from "next/image";
@@ -21,23 +21,7 @@ const ScrollAnimation = dynamic(
 );
 import { Button } from "@/components/ui/button";
 import { ShieldCheck, Zap, Coffee, ArrowRight } from "lucide-react";
-
-const fadeInUp: Variants = {
-  hidden: { opacity: 0, y: 20 },
-  visible: {
-    opacity: 1,
-    y: 0,
-    transition: { duration: 0.6, ease: [0.25, 0.1, 0.25, 1.0] },
-  },
-};
-
-const staggerContainer: Variants = {
-  hidden: { opacity: 0 },
-  visible: {
-    opacity: 1,
-    transition: { staggerChildren: 0.1 },
-  },
-};
+import { fadeInUp, staggerContainer } from "@/lib/motion-variants";
 
 export default function HomeClient() {
   const { data: session, status } = useSession();
@@ -50,7 +34,7 @@ export default function HomeClient() {
         {/* ================================================================
             HERO SECTION — Editorial Living Room
             ================================================================ */}
-        <section className="relative pt-32 pb-16 md:pt-40 md:pb-24 min-h-screen flex flex-col justify-center overflow-x-hidden">
+        <section aria-label="Search for rooms" className="relative pt-32 pb-16 md:pt-40 md:pb-24 min-h-screen flex flex-col justify-center overflow-x-hidden">
           <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 w-full z-10">
             <div className="flex flex-col items-center text-center">
               <div className="w-full flex flex-col items-center justify-center mb-12 md:mb-16">
@@ -161,7 +145,7 @@ export default function HomeClient() {
             FEATURES — "Cozy Spaces, Real People"
             Surface container high background for tonal shift
             ================================================================ */}
-        <section className="py-16 md:py-20 bg-surface-container-high">
+        <section aria-label="Why RoomShare" className="py-16 md:py-20 bg-surface-container-high">
           <div className="max-w-7xl mx-auto px-4 sm:px-6">
             <m.div
               initial="hidden"
@@ -221,7 +205,7 @@ export default function HomeClient() {
             CTA SECTION — "Your next roommate is already here"
             Surface canvas with generous whitespace
             ================================================================ */}
-        <section className="py-16 md:py-20 bg-surface-canvas text-center">
+        <section aria-label="Get started" className="py-16 md:py-20 bg-surface-canvas text-center">
           <m.div
             initial={{ opacity: 0, y: 20 }}
             whileInView={{ opacity: 1, y: 0 }}
@@ -284,7 +268,7 @@ function FeatureCard({
       variants={fadeInUp}
       className="flex flex-col items-center text-center group bg-surface-container-lowest rounded-xl p-8 shadow-ambient-sm"
     >
-      <div className="mb-6 flex items-center justify-center w-12 h-12 rounded-full bg-primary/10 text-primary transition-all duration-300 group-hover:bg-primary group-hover:text-on-primary group-hover:scale-110">
+      <div aria-hidden="true" className="mb-6 flex items-center justify-center w-12 h-12 rounded-full bg-primary/10 text-primary transition-all duration-300 group-hover:bg-primary group-hover:text-on-primary group-hover:scale-110">
         <Icon className="w-5 h-5" />
       </div>
       <h3 className="font-display text-lg font-medium mb-3 text-on-surface tracking-tight">
