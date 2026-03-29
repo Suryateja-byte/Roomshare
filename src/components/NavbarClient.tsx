@@ -569,7 +569,7 @@ export default function NavbarClient({
                   id={menuButtonId}
                   onClick={() => setIsProfileOpen(!isProfileOpen)}
                   onKeyDown={handleTriggerKeyDown}
-                  className={`group flex items-center gap-2 p-1 pl-1.5 pr-1 min-h-[40px] rounded-full transition-all duration-300 ${
+                  className={`group flex items-center gap-2 p-1 pl-1.5 pr-1 min-h-[44px] rounded-full transition-all duration-300 ${
                     isProfileOpen
                       ? "bg-surface-container-high"
                       : "hover:bg-surface-canvas"
@@ -687,7 +687,7 @@ export default function NavbarClient({
             <div className="lg:hidden flex items-center">
               <button
                 onClick={() => setIsMobileMenuOpen(!isMobileMenuOpen)}
-                className="text-on-surface p-2 transition-colors hover:bg-surface-container-high rounded-full focus-visible:ring-2 focus-visible:ring-primary/30 focus-visible:ring-offset-2"
+                className="text-on-surface p-2 min-w-[44px] min-h-[44px] flex items-center justify-center transition-colors hover:bg-surface-container-high rounded-full focus-visible:ring-2 focus-visible:ring-primary/30 focus-visible:ring-offset-2"
                 aria-label={isMobileMenuOpen ? "Close menu" : "Open menu"}
                 aria-expanded={isMobileMenuOpen}
               >

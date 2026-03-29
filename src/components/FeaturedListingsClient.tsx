@@ -102,7 +102,7 @@ export default function FeaturedListingsClient({
             whileInView="visible"
             viewport={{ once: true, margin: "-100px" }}
             variants={staggerContainer}
-            className="flex flex-col md:flex-row md:items-end justify-between gap-8 mb-16"
+            className="flex flex-col md:flex-row md:items-end justify-between gap-8 mb-16 md:mb-20"
           >
             <div className="max-w-2xl">
               <m.div
@@ -129,7 +129,7 @@ export default function FeaturedListingsClient({
             <m.div variants={fadeInUp} className="hidden md:block">
               <Button
                 asChild
-                variant="ghost"
+                variant="outline"
                 className="group rounded-full text-on-surface-variant hover:text-on-surface hover:bg-surface-container-high px-6 gap-2"
               >
                 <Link href="/search">

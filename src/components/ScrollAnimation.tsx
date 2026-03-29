@@ -389,7 +389,7 @@ export default function ScrollAnimation() {
     <section
       ref={sectionRef}
       className="relative"
-      style={{ height: "400vh" }}
+      style={{ height: isMobile ? "300vh" : "400vh" }}
       aria-label="Scroll animation showing a person entering their new home"
       role="region"
     >

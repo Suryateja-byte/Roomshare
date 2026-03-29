@@ -58,7 +58,7 @@ function AuthCTA() {
   return (
     <m.div
       variants={fadeInUp}
-      className="mt-8 flex items-center justify-center gap-3 text-sm"
+      className="mt-8 flex items-center justify-center gap-3 text-sm bg-surface-container-high/50 rounded-full px-6 py-3"
     >
       <span className="text-on-surface-variant">
         New here?
@@ -95,7 +95,7 @@ export default function HomeClient() {
                   {/* Editorial label */}
                   <m.div
                     variants={fadeInUp}
-                    className="font-body text-xs font-bold uppercase tracking-[0.15em] text-on-surface-variant mb-8"
+                    className="font-body text-xs font-bold uppercase tracking-[0.15em] text-on-surface-variant mb-6"
                   >
                     Find Your People
                   </m.div>
@@ -125,7 +125,7 @@ export default function HomeClient() {
                     ref={searchFormRef}
                     className="w-full mx-auto max-w-4xl relative z-20"
                   >
-                    <div className="bg-surface-container-lowest backdrop-blur-xl border border-outline-variant/20 rounded-2xl shadow-ambient p-1">
+                    <div className="bg-surface-container-lowest backdrop-blur-xl border border-outline-variant/20 rounded-2xl shadow-ambient p-2">
                       <SearchFormErrorBoundary>
                         <Suspense
                           fallback={
@@ -159,7 +159,7 @@ export default function HomeClient() {
                     alt="Warm, lived-in shared living space"
                     fill
                     priority
-                    sizes="100vw"
+                    sizes="(max-width: 1152px) 100vw, 1152px"
                     className="object-cover"
                   />
                   <div className="absolute inset-0 bg-gradient-to-t from-surface-canvas/20 to-transparent" />
@@ -216,7 +216,7 @@ export default function HomeClient() {
               whileInView="visible"
               viewport={{ once: true, margin: "-100px" }}
               variants={staggerContainer}
-              className="grid sm:grid-cols-2 lg:grid-cols-3 gap-8 sm:gap-10 max-w-5xl mx-auto"
+              className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-6 sm:gap-8 lg:gap-10 max-w-5xl mx-auto"
             >
               <FeatureCard
                 icon={ShieldCheck}
