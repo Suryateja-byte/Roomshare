@@ -398,9 +398,6 @@ export default async function SearchPage({ searchParams }: SearchPageProps) {
               {total === null ? "More than 100" : total}{" "}
               {total === 1 ? "place" : "places"} found
             </div>
-            <p className="text-sm md:text-base text-on-surface-variant font-light max-w-2xl">
-              Find the perfect sanctuary. Curated spaces and compatible people.
-            </p>
             {browseMode && (
               <p className="text-sm text-amber-600 mt-2">
                 Showing top listings. Select a location for more results.

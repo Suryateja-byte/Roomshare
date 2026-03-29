@@ -56,7 +56,7 @@ export function FilterChip({
     <span
       className={cn(
         "inline-flex items-center gap-1.5 px-3 py-1.5",
-        "bg-primary border border-primary/20",
+        "bg-primary/10 border border-primary/20",
         "text-sm text-primary",
         "rounded-full",
         "transition-colors duration-150",

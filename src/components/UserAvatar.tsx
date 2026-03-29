@@ -111,7 +111,7 @@ export default function UserAvatar({
     return (
       <div
         className={cn(
-          "rounded-full bg-primary flex items-center justify-center text-primary font-bold shrink-0",
+          "rounded-full bg-primary flex items-center justify-center text-on-primary font-bold shrink-0",
           sizeClass,
           className
         )}

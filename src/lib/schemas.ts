@@ -89,7 +89,7 @@ export const listingBookingModeSchema = z
 // ============================================
 // Structural regex: validates URL shape + path + extension. Tighten path to [\w./-]+ (M-S3)
 const SUPABASE_IMAGE_URL_PATTERN =
-  /^https:\/\/[a-z0-9-]+\.supabase\.co\/storage\/v1\/object\/public\/images\/listings\/[\w./-]+\.(jpg|jpeg|png|gif|webp)$/i;
+  /^https:\/\/[a-z0-9-]+\.supabase\.co\/storage\/v1\/object\/public\/images\/(listings|profiles)\/[\w./-]+\.(jpg|jpeg|png|gif|webp)$/i;
 
 // Pin Supabase project ref from env to prevent cross-project image injection (M-S3)
 function getExpectedSupabaseHost(): string | null {

@@ -158,7 +158,7 @@ export default function SortSelect({ currentSort }: SortSelectProps) {
                       onClick={() => handleSortChange(option.value)}
                       className={`flex items-center justify-between w-full px-4 py-3.5 min-h-[44px] rounded-xl text-sm font-medium transition-colors ${
                         isActive
-                          ? "bg-primary text-primary"
+                          ? "bg-primary/10 text-primary"
                           : "text-on-surface-variant hover:bg-surface-canvas"
                       }`}
                     >

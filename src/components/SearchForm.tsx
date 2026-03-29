@@ -921,7 +921,7 @@ export default function SearchForm({
               >
                 <Sparkles className="w-3 h-3" />
                 What
-                <span className="text-[8px] font-bold text-primary bg-primary px-1.5 py-0.5 rounded tracking-wider">
+                <span className="text-[8px] font-bold text-on-primary bg-primary px-1.5 py-0.5 rounded tracking-wider">
                   AI
                 </span>
               </label>
@@ -1011,7 +1011,7 @@ export default function SearchForm({
                   isUserTypingLocationRef.current = false;
                 }, 500);
               }}
-              placeholder="Search destinations"
+              placeholder={focusedField && focusedField !== 'where' ? "City or area" : "Search destinations"}
               className={
                 isCompact
                   ? "text-base md:text-sm flex-1"
@@ -1162,7 +1162,7 @@ export default function SearchForm({
                 aria-controls={showFilters ? "search-filters" : undefined}
                 className={`relative flex items-center gap-2 h-10 px-4 rounded-full text-xs font-bold uppercase tracking-wider transition-all duration-300 ${
                   activeFilterCount > 0
-                    ? "bg-primary text-primary"
+                    ? "bg-primary/10 text-primary"
                     : "text-on-surface-variant hover:text-on-surface hover:bg-surface-container-high"
                 }`}
               >

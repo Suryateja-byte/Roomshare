@@ -10,15 +10,9 @@ import { useSearchTransitionSafe } from "@/contexts/SearchTransitionContext";
  * Ordered by general popularity / usefulness.
  */
 const SUGGESTIONS = [
-  { label: "Furnished", param: "amenities", value: "Furnished" },
-  { label: "Pet Friendly", param: "houseRules", value: "Pets allowed" },
-  { label: "Wifi", param: "amenities", value: "Wifi" },
   { label: "Parking", param: "amenities", value: "Parking" },
   { label: "Washer", param: "amenities", value: "Washer" },
-  { label: "Private Room", param: "roomType", value: "Private Room" },
-  { label: "Entire Place", param: "roomType", value: "Entire Place" },
   { label: "Month-to-month", param: "leaseDuration", value: "Month-to-month" },
-  { label: "Under $1000", param: "maxPrice", value: "1000" },
   { label: "Couples OK", param: "houseRules", value: "Couples allowed" },
 ] as const;
 
@@ -50,12 +44,7 @@ export function RecommendedFilters() {
         const selected = parseArrayParam(searchParams, s.param);
         return !selected.includes(s.value);
       }
-      // For scalar params
-      if (s.param === "maxPrice") {
-        const existing = searchParams.get("maxPrice");
-        return !existing || Number(existing) > Number(s.value);
-      }
-      // For scalar single-select params (roomType, leaseDuration),
+      // For scalar single-select params (leaseDuration),
       // hide if any value is already set for that param
       const current = searchParams.get(s.param) ?? "";
       return !current;
