@@ -41,7 +41,17 @@ export async function POST(request: Request) {
     const result = registerSchema.safeParse(registrationData);
 
     if (!result.success) {
-      return NextResponse.json({ error: "Invalid input" }, { status: 400 });
+      const firstIssue = result.error.issues[0];
+      const field = firstIssue?.path[0];
+      const messages: Record<string, string> = {
+        name: "Name must be between 2 and 100 characters.",
+        email: "Please enter a valid email address.",
+        password: firstIssue?.message || "Password must be at least 12 characters.",
+      };
+      return NextResponse.json(
+        { error: messages[field as string] || "Invalid input. Please check your details and try again." },
+        { status: 400 }
+      );
     }
 
     const { name, password } = result.data;

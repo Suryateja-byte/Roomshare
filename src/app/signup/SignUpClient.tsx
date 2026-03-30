@@ -51,6 +51,13 @@ function SignUpForm() {
       return;
     }
 
+    // Validate password length (must match server-side schema: min 12)
+    if (password.length < 12) {
+      setError("Password must be at least 12 characters.");
+      setLoading(false);
+      return;
+    }
+
     // Validate password confirmation
     if (password !== confirmPassword) {
       setError("Those passwords don\u2019t match. Re-enter them and try again.");
