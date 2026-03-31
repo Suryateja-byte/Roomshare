@@ -235,7 +235,7 @@ function PlaceCard({
               {openNow && (
                 <Badge
                   variant="outline"
-                  className="text-[10px] px-1.5 py-0 h-4 text-green-600 border-green-300"
+                  className="text-xs px-1.5 py-0 h-4 text-green-600 border-green-300"
                 >
                   Open
                 </Badge>
