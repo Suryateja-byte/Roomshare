@@ -145,11 +145,9 @@ function LoginForm() {
             </div>
           )}
 
-          {(error || urlError) && (
-            <div id="form-error">
-              <AuthErrorAlert errorCode={urlError} customError={error} />
-            </div>
-          )}
+          <div id="form-error" role="alert" aria-atomic="true">
+            {(error || urlError) && <AuthErrorAlert errorCode={urlError} customError={error} />}
+          </div>
 
           {/* Google Sign In */}
           <button
@@ -315,7 +313,10 @@ function LoginForm() {
               className="w-full h-11 sm:h-12 rounded-full shadow-ambient-sm hover:shadow-ambient transition-all"
             >
               {loading ? (
-                <Loader2 className="w-5 h-5 animate-spin" />
+                <>
+                  <Loader2 className="w-5 h-5 animate-spin" aria-hidden="true" />
+                  <span className="sr-only">Signing in...</span>
+                </>
               ) : (
                 <>
                   Sign in <ArrowRight className="w-4 h-4 ml-2" />
