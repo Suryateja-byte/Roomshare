@@ -219,7 +219,7 @@ export default function UserProfileClient({
     : "Recently joined";
 
   return (
-    <div className="min-h-screen bg-surface-canvas font-body selection:bg-on-surface selection:text-white pb-20 pt-24">
+    <div className="min-h-screen bg-surface-canvas font-body selection:bg-on-surface selection:text-white pb-20 pt-4">
       <div className="container mx-auto max-w-5xl px-6 py-10">
         {/* Profile Header */}
         <div className="bg-surface-container-lowest rounded-[2.5rem] p-8 md:p-12 shadow-ambient-sm border border-outline-variant/20 mb-8 relative overflow-hidden">
