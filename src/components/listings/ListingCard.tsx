@@ -311,7 +311,7 @@ function ListingCardInner({
                   className="w-8 h-8 text-on-surface-variant mb-2"
                   strokeWidth={1}
                 />
-                <span className="text-[10px] text-on-surface-variant font-medium uppercase tracking-[0.2em]">
+                <span className="text-xs text-on-surface-variant font-medium uppercase tracking-[0.2em]">
                   No Photos
                 </span>
               </div>
@@ -335,7 +335,7 @@ function ListingCardInner({
               )}
               {hasRating && (
                 <div
-                  className="inline-flex items-center gap-1 px-2 py-1 rounded-lg text-[11px] font-bold bg-surface-container-lowest/90 text-on-surface shadow-ambient-sm backdrop-blur-md"
+                  className="inline-flex items-center gap-1 px-2 py-1 rounded-lg text-xs font-bold bg-surface-container-lowest/90 text-on-surface shadow-ambient-sm backdrop-blur-md"
                   aria-label={`Rating ${avgRating!.toFixed(1)} out of 5`}
                 >
                   <Star className="w-3 h-3 text-amber-400 fill-amber-400" />

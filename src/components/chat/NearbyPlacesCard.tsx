@@ -484,7 +484,7 @@ export function NearbyPlacesCard({
                 : `Nearby "${queryText}"`}
             </span>
             {currentRadius > INITIAL_RADIUS && (
-              <span className="text-[10px] text-on-surface-variant tracking-wide">
+              <span className="text-xs text-on-surface-variant tracking-wide">
                 Expanded search radius ({(currentRadius / 1000).toFixed(1)}km)
               </span>
             )}
@@ -493,7 +493,7 @@ export function NearbyPlacesCard({
         {/* P2-C3 FIX: Multi-brand warning */}
         {multiBrandDetected && (
           <div className="mt-2 px-3 py-1.5 bg-amber-50 border border-amber-100 rounded-lg">
-            <p className="text-[11px] text-amber-700 leading-snug">
+            <p className="text-xs text-amber-700 leading-snug">
               <strong>Note:</strong> Results may not include all brands
               mentioned. Try searching for each brand separately for best
               results.

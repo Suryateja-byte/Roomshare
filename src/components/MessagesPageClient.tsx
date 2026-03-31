@@ -813,7 +813,7 @@ export default function MessagesPageClient({
                       {other?.name || "Unknown User"}
                     </h3>
                     <span
-                      className={`text-2xs ${hasUnread ? "text-red-500 font-semibold" : "text-on-surface-variant"}`}
+                      className={`text-xs ${hasUnread ? "text-red-500 font-semibold" : "text-on-surface-variant"}`}
                     >
                       {lastMsg
                         ? new Date(lastMsg.createdAt).toLocaleTimeString([], {
@@ -1088,7 +1088,7 @@ export default function MessagesPageClient({
                         m.status !== "failed" &&
                         m.status !== "sending" && (
                           <div
-                            className={`flex items-center justify-end gap-1 mt-1 text-2xs ${m.read ? "text-blue-400" : "text-white/50"}`}
+                            className={`flex items-center justify-end gap-1 mt-1 text-xs ${m.read ? "text-blue-400" : "text-white/50"}`}
                           >
                             <CheckCheck className="w-3 h-3" />
                             <span>{m.read ? "Read" : "Delivered"}</span>
