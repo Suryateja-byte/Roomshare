@@ -7,6 +7,7 @@ import {
   resolveReportAndRemoveListing,
 } from "@/app/actions/admin";
 import UserAvatar from "@/components/UserAvatar";
+import { Button } from "@/components/ui/button";
 import {
   Clock,
   CheckCircle2,
@@ -362,12 +363,12 @@ export default function ReportList({
                           </div>
                         </div>
                       ) : (
-                        <button
+                        <Button
+                          size="sm"
                           onClick={() => setActionModalId(report.id)}
-                          className="px-4 py-2 bg-primary text-white rounded-lg text-sm font-medium hover:bg-primary/90"
                         >
                           Take Action
-                        </button>
+                        </Button>
                       )}
                     </>
                   )}

@@ -10,6 +10,7 @@ import { SearchResultsClient } from "@/components/search/SearchResultsClient";
 import { SearchResultsErrorBoundary } from "@/components/search/SearchResultsErrorBoundary";
 import Link from "next/link";
 import { Search } from "lucide-react";
+import { Button } from "@/components/ui/button";
 import {
   parseSearchParams,
   buildRawParamsFromSearchParams,
@@ -171,13 +172,12 @@ export default async function SearchPage({ searchParams }: SearchPageProps) {
               dropdown suggestions. This helps us find relevant listings in your
               area.
             </p>
-            <Link
-              href="/"
-              className="inline-flex items-center gap-2 px-4 py-2 bg-primary text-white rounded-lg hover:bg-primary/90 transition-colors"
-            >
-              <Search className="w-4 h-4" />
-              Try a new search
-            </Link>
+            <Button asChild>
+              <Link href="/">
+                <Search className="w-4 h-4" />
+                Try a new search
+              </Link>
+            </Button>
           </div>
         </div>
       </>

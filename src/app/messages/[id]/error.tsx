@@ -4,6 +4,7 @@ import { useEffect } from "react";
 import { RefreshCw, MessageSquare, ArrowLeft } from "lucide-react";
 import Link from "next/link";
 import * as Sentry from "@sentry/nextjs";
+import { Button } from "@/components/ui/button";
 
 export default function ChatError({
   error,
@@ -29,13 +30,10 @@ export default function ChatError({
         again.
       </p>
       <div className="flex gap-3">
-        <button
-          onClick={() => reset()}
-          className="inline-flex items-center gap-2 px-6 py-3 bg-primary text-white rounded-xl font-medium hover:bg-primary/90 transition-colors"
-        >
+        <Button onClick={() => reset()}>
           <RefreshCw className="w-4 h-4" />
           Try again
-        </button>
+        </Button>
         <Link
           href="/messages"
           className="inline-flex items-center gap-2 px-6 py-3 border border-outline-variant/20 text-on-surface rounded-xl font-medium hover:bg-surface-canvas transition-colors"
