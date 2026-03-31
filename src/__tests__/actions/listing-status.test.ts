@@ -441,6 +441,7 @@ describe("listing-status actions", () => {
           listing: {
             id: "listing-1",
             title: "Room 1",
+            price: 1200,
             status: "ACTIVE",
             location: { city: "NYC" },
             owner: {
@@ -469,6 +470,8 @@ describe("listing-status actions", () => {
           viewedAt: new Date(),
           listing: {
             id: "listing-1",
+            title: "Active Room",
+            price: 900,
             status: "ACTIVE",
             location: {},
             owner: {},
@@ -478,6 +481,8 @@ describe("listing-status actions", () => {
           viewedAt: new Date(),
           listing: {
             id: "listing-2",
+            title: "Paused Room",
+            price: 800,
             status: "PAUSED",
             location: {},
             owner: {},
@@ -487,6 +492,8 @@ describe("listing-status actions", () => {
           viewedAt: new Date(),
           listing: {
             id: "listing-3",
+            title: "Rented Room",
+            price: 1100,
             status: "RENTED",
             location: {},
             owner: {},
