@@ -330,7 +330,7 @@ export function NearbyPlacesCard({
   // C13 FIX: Enhanced skeleton UI during Google Maps script load
   if (status === "loading") {
     return (
-      <div className="bg-surface-container-lowest rounded-[24px] shadow-lg shadow-on-surface/50 border border-outline-variant/20 overflow-hidden">
+      <div className="bg-surface-container-lowest rounded-xl shadow-ambient-lg border border-outline-variant/20 overflow-hidden">
         {/* Header skeleton */}
         <div className="px-5 py-4 border-b border-outline-variant/20">
           <div className="flex items-center gap-2">
@@ -377,7 +377,7 @@ export function NearbyPlacesCard({
   // Render error state
   if (status === "error") {
     return (
-      <div className="bg-surface-container-lowest rounded-[24px] p-5 shadow-lg shadow-on-surface/50 border border-red-100">
+      <div className="bg-surface-container-lowest rounded-xl p-5 shadow-ambient-lg border border-red-100">
         <div className="flex items-start gap-3">
           <div className="w-6 h-6 rounded-full bg-red-50 flex items-center justify-center flex-shrink-0">
             <AlertCircle className="w-3.5 h-3.5 text-red-500" />
@@ -405,7 +405,7 @@ export function NearbyPlacesCard({
   // C2 FIX: Render rate limited state (when LLM tool invoked but rate limit exceeded)
   if (status === "rate-limited") {
     return (
-      <div className="bg-surface-container-lowest rounded-[24px] p-5 shadow-lg shadow-on-surface/50 border border-amber-100">
+      <div className="bg-surface-container-lowest rounded-xl p-5 shadow-ambient-lg border border-amber-100">
         <div className="flex items-start gap-3">
           <div className="w-6 h-6 rounded-full bg-amber-50 flex items-center justify-center flex-shrink-0">
             <AlertCircle className="w-3.5 h-3.5 text-amber-500" />
@@ -432,7 +432,7 @@ export function NearbyPlacesCard({
     const wasExpanded = hasExpandedOnce || currentRadius > INITIAL_RADIUS;
 
     return (
-      <div className="bg-surface-container-lowest rounded-[24px] p-5 shadow-lg shadow-on-surface/50 border border-outline-variant/20">
+      <div className="bg-surface-container-lowest rounded-xl p-5 shadow-ambient-lg border border-outline-variant/20">
         <div className="flex items-start gap-3">
           <div className="w-6 h-6 rounded-full bg-surface-container-high flex items-center justify-center flex-shrink-0">
             <MapPin className="w-3.5 h-3.5 text-on-surface-variant" />
@@ -457,7 +457,7 @@ export function NearbyPlacesCard({
   return (
     <div
       ref={containerRef}
-      className="bg-surface-container-lowest rounded-[24px] shadow-lg shadow-on-surface/50 border border-outline-variant/20 overflow-hidden"
+      className="bg-surface-container-lowest rounded-xl shadow-ambient-lg border border-outline-variant/20 overflow-hidden"
       // P3-B21 FIX: Accessibility - describe card purpose
       role="region"
       aria-label={`Nearby places search results for ${queryText}`}
