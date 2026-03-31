@@ -241,6 +241,9 @@ const nextConfig: NextConfig = {
 
   // Disable powered by header
   poweredByHeader: false,
+
+  // Remove the "N" dev indicator overlay
+  devIndicators: false,
 };
 
 let exportedConfig = nextConfig;
