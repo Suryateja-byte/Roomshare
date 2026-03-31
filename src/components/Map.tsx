@@ -3139,7 +3139,7 @@ export default function MapComponent({
                 {/* Availability badge */}
                 <div className="absolute bottom-2 left-2">
                   <span
-                    className={`inline-flex px-2 py-0.5 rounded-md text-2xs font-semibold uppercase ${
+                    className={`inline-flex px-2 py-0.5 rounded-md text-xs font-semibold uppercase ${
                       selectedListing.availableSlots > 0
                         ? "bg-emerald-500 text-white"
                         : "bg-on-surface text-white"

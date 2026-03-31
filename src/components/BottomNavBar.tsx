@@ -122,7 +122,7 @@ export default function BottomNavBar() {
                 size={22}
                 className={isActive ? "stroke-[2.5]" : "stroke-[1.5]"}
               />
-              <span className="text-[10px] uppercase tracking-widest font-body font-medium mt-0.5">
+              <span className="text-xs uppercase tracking-widest font-body font-medium mt-0.5">
                 {item.label}
               </span>
             </Link>

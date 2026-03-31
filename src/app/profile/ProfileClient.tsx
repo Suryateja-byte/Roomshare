@@ -127,7 +127,7 @@ const ListingCard = ({
               </span>
             </div>
           )}
-          <div className="absolute top-2 right-2 px-2 py-1 bg-surface-container-lowest/90 backdrop-blur-sm rounded-lg text-2xs font-bold uppercase tracking-wide text-green-600">
+          <div className="absolute top-2 right-2 px-2 py-1 bg-surface-container-lowest/90 backdrop-blur-sm rounded-lg text-xs font-bold uppercase tracking-wide text-green-600">
             {listing.availableSlots > 0 ? "Active" : "Full"}
           </div>
         </div>
