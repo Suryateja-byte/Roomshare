@@ -485,8 +485,8 @@ export default function SignUpClient() {
   return (
     <Suspense
       fallback={
-        <div className="min-h-screen flex items-center justify-center bg-surface-canvas">
-          <Loader2 className="w-8 h-8 animate-spin text-on-surface" />
+        <div role="status" aria-label="Loading sign up page" className="min-h-screen flex items-center justify-center bg-surface-canvas">
+          <Loader2 className="w-8 h-8 animate-spin text-on-surface" aria-hidden="true" />
         </div>
       }
     >

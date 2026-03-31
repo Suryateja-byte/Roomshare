@@ -15,6 +15,7 @@ import {
   LogOut,
   Settings,
   Heart,
+  ChevronDown,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import UserAvatar from "@/components/UserAvatar";
@@ -41,6 +42,7 @@ const IconButton = ({
       {count !== undefined && count > 0 && (
         <span
           data-testid="unread-badge"
+          aria-hidden="true"
           className="absolute top-1.5 right-1.5 flex h-2.5 w-2.5"
         >
           <span className="animate-[pulse-ring_2s_ease-in-out_infinite] absolute inline-flex h-full w-full rounded-full bg-primary opacity-50"></span>
@@ -51,7 +53,7 @@ const IconButton = ({
   );
 
   const className =
-    "p-2.5 min-w-[44px] min-h-[44px] flex items-center justify-center text-on-surface-variant hover:text-on-surface hover:bg-surface-container-high rounded-full transition-all relative focus-visible:ring-2 focus-visible:ring-primary/30 focus-visible:ring-offset-2";
+    "p-2.5 min-w-[44px] min-h-[44px] flex items-center justify-center text-on-surface-variant hover:text-on-surface hover:bg-surface-container-high rounded-full transition-colors relative focus-visible:ring-2 focus-visible:ring-primary/30 focus-visible:ring-offset-2";
 
   if (href) {
     return (
@@ -300,12 +302,30 @@ export default function NavbarClient({
         mainContent.setAttribute("inert", "");
       }
 
+      // Also prevent focus on bottom nav bar
+      const bottomNav = document.querySelector('[aria-label="Mobile navigation"]') as HTMLElement | null;
+      if (bottomNav) {
+        bottomNav.setAttribute("inert", "");
+      }
+
+      // Prevent focus on the header bar controls (not the parent nav, which contains the dialog)
+      const headerBar = document.querySelector('[data-header-bar]') as HTMLElement | null;
+      if (headerBar) {
+        headerBar.setAttribute("inert", "");
+      }
+
       return () => {
         if (scrollContainer) {
           scrollContainer.style.overflow = "";
         }
         if (mainContent) {
           mainContent.removeAttribute("inert");
+        }
+        if (bottomNav) {
+          bottomNav.removeAttribute("inert");
+        }
+        if (headerBar) {
+          headerBar.removeAttribute("inert");
         }
       };
     }
@@ -496,21 +516,21 @@ export default function NavbarClient({
 
   return (
     <header
-      className={`fixed top-0 left-0 right-0 z-dropdown transition-[transform,opacity,background-color,padding,border-color] duration-300 ease-[cubic-bezier(0.16,1,0.3,1)] data-[anim-hidden=true]:-translate-y-full data-[anim-hidden=true]:opacity-0 data-[anim-hidden=true]:pointer-events-none data-[anim-hidden=true]:border-transparent ${
+      className={`fixed top-0 left-0 right-0 z-dropdown transition-[transform,opacity,background-color,border-color] duration-300 ease-[cubic-bezier(0.16,1,0.3,1)] data-[anim-hidden=true]:-translate-y-full data-[anim-hidden=true]:opacity-0 data-[anim-hidden=true]:pointer-events-none data-[anim-hidden=true]:border-transparent ${
         isScrolled
           ? "py-4 glass-nav"
           : "py-6 bg-transparent"
       }`}
     >
     <nav aria-label="Main navigation">
-      <div className="max-w-7xl mx-auto px-6 sm:px-8">
+      <div data-header-bar className="max-w-7xl mx-auto px-6 sm:px-8">
         <div className="flex justify-between items-center h-10">
           {/* --- LEFT: Logo --- */}
           <Link
             href="/"
             className="flex items-center gap-2.5 cursor-pointer group flex-shrink-0"
           >
-            <div className="w-9 h-9 bg-on-surface rounded-lg flex items-center justify-center text-surface-container-lowest font-bold text-xl transition-all duration-500 group-hover:rotate-[10deg] group-hover:scale-110 shadow-ambient shadow-on-surface/10">
+            <div className="w-9 h-9 bg-on-surface rounded-lg flex items-center justify-center text-surface-container-lowest font-bold text-xl transition-transform duration-200 group-hover:rotate-[10deg] group-hover:scale-110 shadow-ambient shadow-on-surface/10">
               R
             </div>
             <span className="text-xl font-display font-semibold tracking-[-0.03em] text-on-surface hidden sm:block">
@@ -523,7 +543,7 @@ export default function NavbarClient({
           <div className="hidden lg:flex flex-1 items-center justify-center gap-1">
             <Link
               href="/search"
-              className={`text-sm font-medium px-5 py-2 rounded-full transition-all duration-300 focus-visible:ring-2 focus-visible:ring-primary/30 focus-visible:ring-offset-2 ${
+              className={`text-sm font-medium px-5 py-2 rounded-full transition-colors duration-300 focus-visible:ring-2 focus-visible:ring-primary/30 focus-visible:ring-offset-2 ${
                 pathname === "/search"
                   ? "text-on-surface bg-surface-container-high"
                   : "text-on-surface-variant hover:text-on-surface hover:bg-surface-container-high"
@@ -534,7 +554,7 @@ export default function NavbarClient({
             </Link>
             <Link
               href="/about"
-              className={`text-sm font-medium px-5 py-2 rounded-full transition-all duration-300 focus-visible:ring-2 focus-visible:ring-primary/30 focus-visible:ring-offset-2 ${
+              className={`text-sm font-medium px-5 py-2 rounded-full transition-colors duration-300 focus-visible:ring-2 focus-visible:ring-primary/30 focus-visible:ring-offset-2 ${
                 pathname === "/about"
                   ? "text-on-surface bg-surface-container-high"
                   : "text-on-surface-variant hover:text-on-surface hover:bg-surface-container-high"
@@ -563,13 +583,13 @@ export default function NavbarClient({
 
             {/* Profile Dropdown / Auth Buttons */}
             {user ? (
-              <div className="relative" ref={profileRef}>
+              <div className="relative hidden lg:block" ref={profileRef}>
                 <button
                   ref={triggerButtonRef}
                   id={menuButtonId}
                   onClick={() => setIsProfileOpen(!isProfileOpen)}
                   onKeyDown={handleTriggerKeyDown}
-                  className={`group flex items-center gap-2 p-1 pl-1.5 pr-1 min-h-[44px] rounded-full transition-all duration-300 ${
+                  className={`group flex items-center gap-2 p-1 pl-1.5 pr-1 min-h-[44px] rounded-full transition-[background-color,transform] duration-300 ${
                     isProfileOpen
                       ? "bg-surface-container-high"
                       : "hover:bg-surface-canvas"
@@ -581,9 +601,9 @@ export default function NavbarClient({
                   aria-label="User menu"
                 >
                   <UserAvatar image={user.image} name={user.name} size="sm" />
-                  <Menu
-                    size={16}
-                    className={`transition-colors duration-300 ${isProfileOpen ? "text-on-surface" : "text-on-surface-variant"}`}
+                  <ChevronDown
+                    size={14}
+                    className={`transition-colors duration-300 ${isProfileOpen ? "text-on-surface rotate-180" : "text-on-surface-variant"}`}
                   />
                 </button>
 
@@ -593,7 +613,7 @@ export default function NavbarClient({
                   role="menu"
                   aria-labelledby={menuButtonId}
                   onKeyDown={handleMenuKeyDown}
-                  className={`absolute right-0 mt-4 w-72 bg-surface-container-lowest/95 backdrop-blur-[20px] rounded-lg shadow-ambient shadow-on-surface/10 overflow-hidden origin-top-right z-sticky transition-all duration-300 ease-[cubic-bezier(0.16,1,0.3,1)] ${
+                  className={`absolute right-0 mt-4 w-72 bg-surface-container-lowest/95 backdrop-blur-[20px] rounded-lg shadow-ambient shadow-on-surface/10 overflow-hidden origin-top-right z-sticky transition-[opacity,transform,visibility] duration-300 ease-[cubic-bezier(0.16,1,0.3,1)] ${
                     isProfileOpen
                       ? "opacity-100 translate-y-0 visible scale-100"
                       : "opacity-0 -translate-y-4 invisible scale-95 pointer-events-none"
@@ -666,10 +686,10 @@ export default function NavbarClient({
                 </div>
               </div>
             ) : (
-              <div className="flex items-center gap-1.5">
+              <div className="flex items-center gap-2.5">
                 <Link
                   href="/login"
-                  className="text-sm font-medium text-on-surface-variant hover:text-on-surface px-4 py-2 transition-all duration-300 rounded-full hover:bg-surface-container-high"
+                  className="text-sm font-medium text-on-surface-variant hover:text-on-surface px-4 py-2 min-h-[44px] flex items-center transition-colors duration-300 rounded-full hover:bg-surface-container-high"
                 >
                   Log in
                 </Link>
@@ -700,7 +720,7 @@ export default function NavbarClient({
 
       {/* Mobile Menu - Full-screen glassmorphism overlay */}
       <div
-        className={`lg:hidden fixed inset-0 z-modal bg-surface-canvas/80 backdrop-blur-[20px] transition-all duration-300 ${
+        className={`lg:hidden fixed inset-0 z-modal bg-surface-canvas/95 backdrop-blur-[20px] transition-[opacity,visibility] duration-300 ${
           isMobileMenuOpen
             ? "opacity-100 visible pointer-events-auto"
             : "opacity-0 invisible pointer-events-none"
@@ -723,29 +743,19 @@ export default function NavbarClient({
             </button>
           </div>
           <div className={`flex-1 flex flex-col items-center justify-center px-6 -mt-16 space-y-8 ${isMobileMenuOpen ? "menu-stagger" : ""}`}>
-            <Link
-              href="/search"
-              className="font-display text-3xl font-medium text-on-surface hover:text-primary tracking-tight transition-colors duration-300"
-              onClick={() => setIsMobileMenuOpen(false)}
-              aria-current={pathname === "/search" ? "page" : undefined}
-            >
-              Find a Room
-            </Link>
+            {!user && (
+              <Link
+                href="/search"
+                className="font-display text-3xl font-medium text-on-surface hover:text-primary tracking-tight transition-colors duration-300"
+                onClick={() => setIsMobileMenuOpen(false)}
+                aria-current={pathname === "/search" ? "page" : undefined}
+              >
+                Find a Room
+              </Link>
+            )}
 
             {user && (
               <>
-                <Link
-                  href="/messages"
-                  className="font-display text-3xl font-medium text-on-surface hover:text-primary tracking-tight transition-colors duration-300 relative"
-                  onClick={() => setIsMobileMenuOpen(false)}
-                >
-                  Messages
-                  {currentUnreadCount > 0 && (
-                    <span className="absolute -top-1 -right-6 bg-primary text-on-primary text-xs font-bold w-5 h-5 flex items-center justify-center rounded-full font-body">
-                      {currentUnreadCount > 9 ? "9+" : currentUnreadCount}
-                    </span>
-                  )}
-                </Link>
                 <Link
                   href="/bookings"
                   className="font-display text-3xl font-medium text-on-surface hover:text-primary tracking-tight transition-colors duration-300"
@@ -754,18 +764,11 @@ export default function NavbarClient({
                   Bookings
                 </Link>
                 <Link
-                  href="/saved"
+                  href="/settings"
                   className="font-display text-3xl font-medium text-on-surface hover:text-primary tracking-tight transition-colors duration-300"
                   onClick={() => setIsMobileMenuOpen(false)}
                 >
-                  Saved
-                </Link>
-                <Link
-                  href="/profile"
-                  className="font-display text-3xl font-medium text-on-surface hover:text-primary tracking-tight transition-colors duration-300"
-                  onClick={() => setIsMobileMenuOpen(false)}
-                >
-                  Profile
+                  Settings
                 </Link>
               </>
             )}
