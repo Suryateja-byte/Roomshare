@@ -34,8 +34,10 @@ import {
 import { useScrollHeader } from "@/hooks/useScrollHeader";
 import { useKeyboardShortcuts } from "@/hooks/useKeyboardShortcuts";
 import { useMobileSearch } from "@/contexts/MobileSearchContext";
+import { useMediaQuery } from "@/hooks/useMediaQuery";
 import CollapsedMobileSearch from "@/components/CollapsedMobileSearch";
 import { CompactSearchPill } from "@/components/search/CompactSearchPill";
+import MobileSearchOverlay from "@/components/search/MobileSearchOverlay";
 import { useSession, signOut } from "next-auth/react";
 import { Button } from "@/components/ui/button";
 import UserAvatar from "@/components/UserAvatar";
@@ -112,9 +114,14 @@ const MenuItem = ({
 
 export default function SearchHeaderWrapper() {
   const { isCollapsed } = useScrollHeader({ threshold: 80 });
-  const { isExpanded, expand, openFilters } = useMobileSearch();
+  const { isExpanded, openFilters } = useMobileSearch();
   const { data: session } = useSession();
   const user = session?.user;
+
+  // Full-screen mobile search overlay (Option A — Airbnb pattern)
+  const [isMobileOverlayOpen, setIsMobileOverlayOpen] = useState(false);
+  const handleOpenMobileSearch = useCallback(() => setIsMobileOverlayOpen(true), []);
+  const handleCloseMobileSearch = useCallback(() => setIsMobileOverlayOpen(false), []);
 
   const menuButtonId = useId();
   const menuId = useId();
@@ -289,8 +296,10 @@ export default function SearchHeaderWrapper() {
     },
   ]);
 
-  // Show collapsed bar when scrolled and not manually expanded
-  const showCollapsed = isCollapsed && !isExpanded;
+  // Show collapsed bar when scrolled and not manually expanded.
+  // On mobile, default to collapsed to reclaim viewport space (P0 fix: SEARCH-MOB-01).
+  const isMobileViewport = useMediaQuery("(max-width: 767px)");
+  const showCollapsed = (isCollapsed && !isExpanded) || (isMobileViewport === true && !isExpanded);
 
   const handleExpandDesktop = useCallback(() => {
     // Scroll to top to reveal the full form
@@ -421,10 +430,10 @@ export default function SearchHeaderWrapper() {
       >
         <div className="w-full max-w-[1920px] mx-auto px-3 sm:px-4 md:px-6 py-3 sm:py-4">
           <div className="flex items-center gap-2 sm:gap-3">
-            {/* Logo - "R" mark only on search page to maximize search bar space */}
+            {/* Logo — always visible */}
             <Link
               href="/"
-              className="hidden md:flex items-center cursor-pointer group flex-shrink-0 mr-2 md:mr-4"
+              className="flex items-center cursor-pointer group flex-shrink-0 mr-1 sm:mr-2 md:mr-4"
               aria-label="RoomShare Home"
             >
               <div className="w-9 h-9 bg-on-surface rounded-lg flex items-center justify-center text-surface-container-lowest font-bold text-xl transition-all duration-500 group-hover:rotate-[10deg] group-hover:scale-110 shadow-ambient shadow-on-surface/10">
@@ -432,8 +441,8 @@ export default function SearchHeaderWrapper() {
               </div>
             </Link>
 
-            {/* Search Form */}
-            <div className="flex-1 min-w-0 relative">
+            {/* Search Form — desktop only (mobile uses full-screen overlay) */}
+            <div className="flex-1 min-w-0 relative hidden md:block">
               <Suspense fallback={<div className="h-12" />}>
                 <SearchForm />
               </Suspense>
@@ -598,8 +607,15 @@ export default function SearchHeaderWrapper() {
           showCollapsed ? "md:hidden block py-2" : "hidden"
         }`}
       >
-        <CollapsedMobileSearch onExpand={expand} onOpenFilters={openFilters} />
+        <CollapsedMobileSearch onExpand={handleOpenMobileSearch} onOpenFilters={openFilters} />
       </div>
+
+      {/* Full-screen mobile search overlay (Option A) */}
+      <MobileSearchOverlay
+        isOpen={isMobileOverlayOpen}
+        onClose={handleCloseMobileSearch}
+        onOpenFilters={openFilters}
+      />
 
       {/* Compact search pill - visible on desktop only when collapsed */}
       <div

@@ -86,25 +86,32 @@ export function RecommendedFilters() {
   };
 
   return (
-    <div className="flex items-center gap-2 overflow-x-auto scrollbar-hide py-2">
-      <Sparkles
-        className="w-3.5 h-3.5 text-on-surface-variant flex-shrink-0"
+    <div className="relative">
+      <div className="flex items-center gap-2 overflow-x-auto scrollbar-hide py-2 pr-6">
+        <Sparkles
+          className="w-3.5 h-3.5 text-on-surface-variant flex-shrink-0"
+          aria-hidden="true"
+        />
+        <span className="text-xs text-on-surface-variant flex-shrink-0">
+          Try:
+        </span>
+        {available.map((s) => (
+          <button
+            key={s.label}
+            type="button"
+            onClick={() => handleClick(s)}
+            disabled={isPending}
+            className="flex-shrink-0 px-3 py-1.5 text-xs font-medium rounded-full border border-outline-variant/20 text-on-surface-variant hover:bg-surface-container-high hover:border-outline-variant/30 transition-colors disabled:opacity-60 disabled:cursor-not-allowed"
+          >
+            {s.label}
+          </button>
+        ))}
+      </div>
+      {/* Fade indicator for overflow */}
+      <div
+        className="absolute right-0 top-0 bottom-0 w-8 bg-gradient-to-l from-surface-container-lowest to-transparent pointer-events-none"
         aria-hidden="true"
       />
-      <span className="text-xs text-on-surface-variant flex-shrink-0">
-        Try:
-      </span>
-      {available.map((s) => (
-        <button
-          key={s.label}
-          type="button"
-          onClick={() => handleClick(s)}
-          disabled={isPending}
-          className="flex-shrink-0 px-3 py-1.5 text-xs font-medium rounded-full border border-outline-variant/20 text-on-surface-variant hover:bg-surface-container-high hover:border-outline-variant/30 transition-colors disabled:opacity-60 disabled:cursor-not-allowed"
-        >
-          {s.label}
-        </button>
-      ))}
     </div>
   );
 }

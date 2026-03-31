@@ -256,6 +256,11 @@ function ImageCarouselInner({
         <ChevronRight className="w-5 h-5 text-on-surface-variant" />
       </button>
 
+      {/* Screen reader slide position announcement */}
+      <div role="status" aria-live="polite" className="sr-only">
+        Image {selectedIndex + 1} of {images.length}
+      </div>
+
       {/* Navigation Dots — max 5 visible, window shifts with selection */}
       <div
         className="absolute bottom-3 left-1/2 -translate-x-1/2 z-10 flex items-center gap-1.5"
@@ -270,16 +275,16 @@ function ImageCarouselInner({
               <button
                 key={index}
                 onClick={(e) => scrollTo(e, index)}
-                className="relative p-2.5 -m-2 flex items-center justify-center focus:outline-none focus:ring-2 focus:ring-white focus:ring-offset-1"
+                className="relative p-3 -m-2.5 flex items-center justify-center focus:outline-none focus:ring-2 focus:ring-white focus:ring-offset-1"
                 role="tab"
                 aria-selected={index === selectedIndex}
                 aria-label={`Go to image ${index + 1}`}
               >
                 <span
-                  className={`block rounded-full transition-all duration-200 ${
+                  className={`block rounded-full transition-[width,background-color] duration-200 h-2 ${
                     index === selectedIndex
-                      ? "bg-surface-container-lowest w-2.5 h-1.5"
-                      : "bg-white/60 w-1.5 h-1.5"
+                      ? "bg-surface-container-lowest w-6"
+                      : "bg-white/60 w-2"
                   }`}
                 />
               </button>
@@ -296,19 +301,19 @@ function ImageCarouselInner({
             <button
               key={index}
               onClick={(e) => scrollTo(e, index)}
-              className="relative p-2.5 -m-2 flex items-center justify-center focus:outline-none focus:ring-2 focus:ring-white focus:ring-offset-1"
+              className="relative p-3 -m-2.5 flex items-center justify-center focus:outline-none focus:ring-2 focus:ring-white focus:ring-offset-1"
               role="tab"
               aria-selected={index === selectedIndex}
               aria-label={`Go to image ${index + 1}`}
             >
               <span
-                className={`block rounded-full transition-all duration-200 ${
+                className={`block rounded-full transition-[width,background-color] duration-200 h-2 ${
                   index === selectedIndex
-                    ? "bg-surface-container-lowest w-2.5 h-1.5"
+                    ? "bg-surface-container-lowest w-6"
                     : index === visibleIndices[0] ||
                         index === visibleIndices[MAX_DOTS - 1]
-                      ? "bg-white/40 w-1 h-1"
-                      : "bg-white/60 w-1.5 h-1.5"
+                      ? "bg-white/40 w-1.5"
+                      : "bg-white/60 w-2"
                 }`}
               />
             </button>

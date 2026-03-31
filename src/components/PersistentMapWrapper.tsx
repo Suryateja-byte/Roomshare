@@ -297,9 +297,11 @@ function MapInfoBanner({ message }: { message: string }) {
 // Loading placeholder for lazy map component
 function MapLoadingPlaceholder() {
   return (
-    <div className="w-full h-full bg-surface-container-high animate-pulse flex items-center justify-center">
-      <div className="text-on-surface-variant text-sm">
-        Loading map...
+    <div className="w-full h-full bg-surface-container-high flex flex-col items-center justify-center gap-3">
+      <div className="w-10 h-10 rounded-full bg-outline-variant/20 animate-pulse" />
+      <div className="flex flex-col items-center gap-1.5">
+        <div className="w-24 h-2 rounded-full bg-outline-variant/20 animate-pulse" />
+        <div className="w-16 h-2 rounded-full bg-outline-variant/15 animate-pulse" />
       </div>
     </div>
   );

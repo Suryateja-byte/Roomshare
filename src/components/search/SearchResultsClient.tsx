@@ -449,13 +449,18 @@ export function SearchResultsClient({
                     </>
                   )}
                   <ListingCardErrorBoundary listingId={listing.id}>
-                    <ListingCard
-                      listing={listing}
-                      isSaved={savedIdsSet.has(listing.id)}
-                      priority={index === 0}
-                      showTotalPrice={effectiveShowTotalPrice}
-                      estimatedMonths={estimatedMonths}
-                    />
+                    <div
+                      aria-setsize={initialTotal ?? -1}
+                      aria-posinset={index + 1}
+                    >
+                      <ListingCard
+                        listing={listing}
+                        isSaved={savedIdsSet.has(listing.id)}
+                        priority={index === 0}
+                        showTotalPrice={effectiveShowTotalPrice}
+                        estimatedMonths={estimatedMonths}
+                      />
+                    </div>
                   </ListingCardErrorBoundary>
                 </Fragment>
               );

@@ -113,11 +113,13 @@ export default function SearchViewToggle({
           )}
         </MobileBottomSheet>
 
-        {/* Floating toggle pill */}
-        <FloatingMapButton
-          isListMode={mobileSnap > 0}
-          onToggle={handleFloatingToggle}
-        />
+        {/* Floating toggle pill — hidden when sheet is fully expanded */}
+        {mobileSnap !== 2 && (
+          <FloatingMapButton
+            isListMode={mobileSnap > 0}
+            onToggle={handleFloatingToggle}
+          />
+        )}
       </div>
 
       {/* Desktop Split View */}
@@ -125,8 +127,8 @@ export default function SearchViewToggle({
         {/* Left Panel: List View - Adjusts width based on map visibility */}
         <div
           data-testid="search-results-container"
-          className={`h-full overflow-y-auto scrollbar-hide transition-all duration-300 ${
-            shouldShowMap ? "w-[55%]" : "w-full"
+          className={`h-full overflow-y-auto transition-all duration-300 ${
+            shouldShowMap ? "w-[60%] lg:w-[55%]" : "w-full"
           }`}
         >
           {showChildrenInDesktop && children}
@@ -134,7 +136,7 @@ export default function SearchViewToggle({
 
         {/* Right Panel: Map View (45%) */}
         {renderMapInDesktop && (
-          <div className="w-[45%] h-full relative p-4 lg:p-6">
+          <div className="w-[40%] lg:w-[45%] h-full relative p-4 lg:p-6">
             <div className="w-full h-full relative rounded-2xl overflow-hidden border border-outline-variant/20/80 shadow-2xl bg-surface-container-high">
               {/* Desktop Hide Map Button */}
               <button

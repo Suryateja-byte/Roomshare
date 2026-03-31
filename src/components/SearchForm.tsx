@@ -881,7 +881,7 @@ export default function SearchForm({
   const getFieldFlex = (
     field: "what" | "where" | "budget"
   ): React.CSSProperties => {
-    const defaults = { what: "1.3 1 0%", where: "1.5 1 0%", budget: "1 1 0%" };
+    const defaults = { what: "1.3 1 0%", where: "1.5 1 0%", budget: "1.2 1 0%" };
     const transition = "flex 0.4s cubic-bezier(0.16, 1, 0.3, 1)";
     if (!focusedField) return { flex: defaults[field], transition };
     if (focusedField === field)
@@ -899,21 +899,23 @@ export default function SearchForm({
         onSubmit={handleSearch}
         className={`group relative flex flex-col md:flex-row md:items-center bg-surface-container-lowest backdrop-blur-2xl rounded-3xl md:rounded-full shadow-xl hover:shadow-2xl focus-within:shadow-2xl transition-all duration-300 w-full ${isCompact ? "p-1" : "p-2"}`}
         role="search"
+        aria-label="Search listings"
       >
         {/* Semantic "What" Input — AI-powered natural language search */}
+        {/* Hidden at md (tablet) to prevent truncation — shown at lg+ */}
         {semanticSearchEnabled && !isCompact && (
           <>
             <div
                 style={getFieldFlex('what')}
                 className={cn(
-                'w-full flex flex-col relative overflow-hidden whitespace-nowrap transition-opacity duration-300',
+                'w-full flex-col relative overflow-hidden whitespace-nowrap transition-opacity duration-300 hidden lg:flex',
                 isCompact ? 'px-4 py-2' : 'px-4 py-2 md:px-6 md:py-2.5',
                 focusedField === 'what' ? 'md:bg-surface-container-lowest/[0.03] md:rounded-2xl opacity-100' : (focusedField !== null ? 'opacity-50' : 'opacity-100'),
             )}>
               <label
                 htmlFor="search-what"
                 className={cn(
-                  "text-[10px] font-bold text-primary uppercase tracking-[0.15em] mb-1 flex items-center gap-1.5 transition-opacity duration-200",
+                  "text-[11px] font-bold text-primary uppercase tracking-[0.15em] mb-1 flex items-center gap-1.5 transition-opacity duration-200",
                   focusedField !== null &&
                     focusedField !== "what" &&
                     "md:opacity-0"
@@ -921,7 +923,7 @@ export default function SearchForm({
               >
                 <Sparkles className="w-3 h-3" />
                 What
-                <span className="text-[8px] font-bold text-on-primary bg-primary px-1.5 py-0.5 rounded tracking-wider">
+                <span className="text-[10px] font-bold text-on-primary bg-primary px-1.5 py-0.5 rounded tracking-wider">
                   AI
                 </span>
               </label>
@@ -949,9 +951,9 @@ export default function SearchForm({
                 )}
               </div>
             </div>
-            {/* Divider between What and Where */}
+            {/* Divider between What and Where — hidden at md with WHAT field */}
             <div
-              className="w-full h-px md:w-px md:h-8 bg-surface-container-high mx-0 md:mx-1 my-1 md:my-0"
+              className="w-full h-px lg:w-px lg:h-8 bg-surface-container-high mx-0 lg:mx-1 my-1 lg:my-0 hidden lg:block"
               aria-hidden="true"
             ></div>
           </>
@@ -970,7 +972,7 @@ export default function SearchForm({
             <label
               htmlFor="search-location"
               className={cn(
-                "text-[10px] font-bold text-on-surface-variant uppercase tracking-[0.15em] mb-1 transition-opacity duration-200",
+                "text-[11px] font-bold text-on-surface-variant uppercase tracking-[0.15em] mb-1 transition-opacity duration-200",
                 focusedField !== null &&
                   focusedField !== "where" &&
                   "md:opacity-0"
@@ -1097,7 +1099,7 @@ export default function SearchForm({
           {!isCompact && (
             <label
               className={cn(
-                "text-[10px] font-bold text-on-surface-variant uppercase tracking-[0.15em] mb-1 transition-opacity duration-200",
+                "text-[11px] font-bold text-on-surface-variant uppercase tracking-[0.15em] mb-1 transition-opacity duration-200",
                 focusedField !== null &&
                   focusedField !== "budget" &&
                   "md:opacity-0"

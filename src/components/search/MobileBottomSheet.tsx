@@ -453,7 +453,7 @@ export default function MobileBottomSheet({
                 setSnapIndex(2);
               }
             }}
-            className="w-12 h-1.5 rounded-full bg-surface-container-high mx-auto mb-2 cursor-pointer focus:outline-none focus-visible:ring-2 focus-visible:ring-primary/30 focus-visible:ring-offset-2"
+            className="w-12 h-1.5 rounded-full bg-surface-container-high mx-auto mb-2 cursor-pointer focus:outline-none focus-visible:ring-2 focus-visible:ring-primary/70 focus-visible:ring-offset-2"
           />
 
           {/* Header content */}

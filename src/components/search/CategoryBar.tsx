@@ -235,7 +235,7 @@ export function CategoryBar() {
       {/* Fade left edge */}
       {canScrollLeft && (
         <div
-          className="absolute left-0 top-0 bottom-0 w-16 bg-gradient-to-r from-white to-transparent pointer-events-none z-10"
+          className="absolute left-0 top-0 bottom-0 w-16 bg-gradient-to-r from-surface-container-lowest to-transparent pointer-events-none z-10"
           aria-hidden="true"
         />
       )}
@@ -243,8 +243,12 @@ export function CategoryBar() {
       {/* Scrollable container */}
       <div
         ref={scrollRef}
-        className="flex items-center gap-8 px-6 pt-6 pb-4 overflow-x-auto scrollbar-hide scroll-smooth"
+        className="flex items-center gap-4 sm:gap-6 md:gap-8 px-4 sm:px-6 pt-6 pb-4 overflow-x-auto scrollbar-hide scroll-smooth"
         style={{ cursor: "grab" }}
+        onKeyDown={(e) => {
+          if (e.key === "ArrowRight") scroll("right");
+          if (e.key === "ArrowLeft") scroll("left");
+        }}
       >
         {CATEGORIES.map((cat) => {
           const Icon = cat.icon;
@@ -261,7 +265,7 @@ export function CategoryBar() {
                 transition-all duration-200 flex-shrink-0 border-b-2
                 ${
                   isActive
-                    ? "border-outline-variant/20 text-on-surface"
+                    ? "border-on-surface text-on-surface"
                     : "border-transparent text-on-surface-variant hover:text-on-surface hover:border-outline-variant/30"
                 }
                 disabled:opacity-60 disabled:cursor-not-allowed
@@ -269,7 +273,7 @@ export function CategoryBar() {
               aria-pressed={isActive}
             >
               <Icon
-                className={`w-6 h-6 overflow-visible ${isActive ? "opacity-100" : "opacity-70 group-hover:opacity-100"}`}
+                className={`w-6 h-6 overflow-visible ${isActive ? "opacity-100" : "opacity-70"}`}
                 strokeWidth={isActive ? 2 : 1.5}
               />
               <span className="whitespace-nowrap">{cat.label}</span>
@@ -281,7 +285,7 @@ export function CategoryBar() {
       {/* Fade right edge */}
       {canScrollRight && (
         <div
-          className="absolute right-0 top-0 bottom-0 w-16 bg-gradient-to-l from-white to-transparent pointer-events-none z-10"
+          className="absolute right-0 top-0 bottom-0 w-10 bg-gradient-to-l from-surface-container-lowest to-transparent pointer-events-none z-10"
           aria-hidden="true"
         />
       )}

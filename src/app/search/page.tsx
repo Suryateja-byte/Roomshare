@@ -389,17 +389,17 @@ export default async function SearchPage({ searchParams }: SearchPageProps) {
             <h1
               id="search-results-heading"
               tabIndex={-1}
-              className="text-2xl md:text-3xl font-display font-semibold tracking-tight text-on-surface !outline-none mb-2"
+              className="text-xl md:text-2xl lg:text-3xl font-display font-semibold tracking-tight text-on-surface !outline-none mb-2"
             >
               {total === null ? "100+" : total}{" "}
-              {total === 1 ? "place" : "places"} {q ? `in "${q}"` : "available"}
+              {total === 1 ? "place" : "places"}{q ? ` in ${q}` : ""}
             </h1>
             <div aria-live="polite" className="sr-only">
               {total === null ? "More than 100" : total}{" "}
               {total === 1 ? "place" : "places"} found
             </div>
             {browseMode && (
-              <p className="text-sm text-amber-600 mt-2">
+              <p className="text-sm text-on-surface-variant mt-2">
                 Showing top listings. Select a location for more results.
               </p>
             )}

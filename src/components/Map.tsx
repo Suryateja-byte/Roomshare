@@ -3210,7 +3210,7 @@ export default function MapComponent({
           role="switch"
           aria-checked={searchAsMove}
           onClick={() => setSearchAsMove(!searchAsMove)}
-          className={`flex items-center gap-2 px-4 py-2.5 rounded-full shadow-lg border text-sm font-medium transition-all select-none focus:outline-none focus-visible:ring-2 focus-visible:ring-primary/30 focus-visible:ring-offset-2 backdrop-blur-md ${
+          className={`flex items-center gap-2 px-4 py-2.5 rounded-full shadow-lg border text-sm font-medium transition-all select-none whitespace-nowrap focus:outline-none focus-visible:ring-2 focus-visible:ring-primary/30 focus-visible:ring-offset-2 backdrop-blur-md ${
             searchAsMove
               ? "bg-white/95 text-on-surface border-white/20 ring-2 ring-green-500/50"
               : "bg-on-surface/90 text-white border-white/10 hover:bg-on-surface"
