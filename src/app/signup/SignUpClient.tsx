@@ -339,10 +339,10 @@ function SignUpForm() {
                   value={confirmPassword}
                   onChange={(e) => setConfirmPassword(e.target.value)}
                   className={`block w-full pl-10 pr-10 py-2.5 bg-surface-container-lowest border rounded-lg text-on-surface placeholder-on-surface-variant focus:outline-none focus-visible:ring-2 focus-visible:ring-primary/30 focus-visible:ring-offset-2 text-sm font-medium transition-shadow duration-200 ease-in-out shadow-ambient-sm ${
-                    confirmPassword && password !== confirmPassword
-                      ? "border-red-400"
-                      : confirmPassword && password === confirmPassword
-                        ? "border-green-400"
+                    confirmPassword && password === confirmPassword
+                      ? "border-green-400"
+                      : confirmPassword.length >= password.length && password !== confirmPassword
+                        ? "border-red-400"
                         : "border-outline-variant/20"
                   }`}
                   placeholder="••••••••"
