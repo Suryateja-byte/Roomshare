@@ -17,9 +17,9 @@ const PLACEHOLDER_IMAGES = [
 
 interface RecentListing {
   id: string;
-  title: string;
+  title: string | null;
   description: string;
-  price: number;
+  price: number | null;
   images: string[];
   viewedAt: Date;
   location?: {
@@ -164,7 +164,7 @@ export default function RecentlyViewedClient({
                 {/* Content */}
                 <div className="p-4">
                   <h3 className="font-semibold text-on-surface line-clamp-1 group-hover:underline">
-                    {listing.title}
+                    {listing.title ?? "Untitled listing"}
                   </h3>
                   {listing.location && (
                     <p className="text-sm text-on-surface-variant flex items-center gap-1 mt-1">
@@ -173,7 +173,7 @@ export default function RecentlyViewedClient({
                     </p>
                   )}
                   <p className="font-semibold text-on-surface mt-2">
-                    ${listing.price.toLocaleString()}
+                    ${(listing.price ?? 0).toLocaleString()}
                     <span className="text-on-surface-variant font-normal text-sm">
                       /mo
                     </span>

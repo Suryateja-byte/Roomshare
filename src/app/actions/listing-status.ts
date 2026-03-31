@@ -275,7 +275,12 @@ export async function getRecentlyViewed(limit: number = 10) {
     });
 
     return recentlyViewed
-      .filter((rv) => rv.listing.status === "ACTIVE")
+      .filter(
+        (rv) =>
+          rv.listing.status === "ACTIVE" &&
+          rv.listing.title != null &&
+          rv.listing.price != null
+      )
       .map((rv) => ({
         id: rv.listing.id,
         title: rv.listing.title,
