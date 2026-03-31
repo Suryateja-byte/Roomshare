@@ -19,7 +19,7 @@
 - Gate: pnpm lint PASS (0 errors, 3 pre-existing warnings), pnpm typecheck PASS, pnpm test PASS (8/8)
 - Sprint 6 (Phase 6 — Responsive): DONE
 - Sprint 7 (Phase 7 — Form UX): DONE
-- Sprint 8 (Phase 8 — Polish): NOT STARTED
+- Sprint 8 (Phase 8 — Polish): DONE
 
 ## Sprint 5 — Phase 5: Sub-12px Font Sweep
 - FIX-24: DONE — SearchForm.tsx (5 instances fixed, 2 exceptions preserved)
@@ -59,6 +59,18 @@
 - FIX-48b: DONE — HomeClient.tsx hero wrapper mb-12 md:mb-16 → mb-8 md:mb-12
 - FIX-49: DONE — HomeClient.tsx H1 text-4xl md:text-6xl → text-4xl sm:text-5xl md:text-6xl
 - Gate: pnpm typecheck PASS (exit 0), pnpm lint PASS (0 errors, 3 pre-existing warnings)
+
+## Sprint 8 — Phase 8: Polish & Minor
+- FIX-55: DONE — search/page.tsx metadata title "Roomshare" → "RoomShare" (3 occurrences)
+- FIX-56: DONE — CategoryBar.tsx category pill button gets `title={cat.label}` attribute
+- FIX-57: DONE — RecentlyViewedClient.tsx title/alt null guards + listing-status.ts server filter for null title/price + test mocks updated
+- FIX-58: DONE — NearbyPlacesCard.tsx 5x rounded-[24px] → rounded-xl
+- FIX-59: DONE — NearbyPlacesCard.tsx 5x shadow-lg shadow-on-surface/50 → shadow-ambient-lg
+- FIX-60: SKIP — semantic color tokens (text-success, bg-warning etc.) not defined as Tailwind utilities; only CSS color variables exist, not mapped token classes
+- FIX-61: DONE — NavbarClient.tsx profile dropdown button active state on /profile, /settings, /saved routes
+- Gate: pnpm typecheck PASS (exit 0), pnpm lint PASS (0 errors, 3 pre-existing warnings), pnpm test — FIX-57 tests pass; 5 pre-existing failing suites unaffected
+
+## HARNESS COMPLETE — All 8 sprints done. 61 fixes reviewed: 55 DONE, 6 SKIP.
 
 ## Sprint 7 — Phase 7: Form UX
 - FIX-50: DONE — LoginClient + SignUpClient: added Verifying... state to submit button when !turnstileToken && !loading
