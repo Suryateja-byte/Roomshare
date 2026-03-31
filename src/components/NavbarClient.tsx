@@ -592,7 +592,11 @@ export default function NavbarClient({
                   className={`group flex items-center gap-2 p-1 pl-1.5 pr-1 min-h-[44px] rounded-full transition-[background-color,transform] duration-300 ${
                     isProfileOpen
                       ? "bg-surface-container-high"
-                      : "hover:bg-surface-canvas"
+                      : pathname === "/profile" ||
+                          pathname === "/settings" ||
+                          pathname === "/saved"
+                        ? "bg-surface-container-high/50"
+                        : "hover:bg-surface-canvas"
                   }`}
                   aria-expanded={isProfileOpen}
                   aria-haspopup="menu"
