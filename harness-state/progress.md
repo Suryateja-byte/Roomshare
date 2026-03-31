@@ -18,7 +18,7 @@
 - FIX-23: DONE — 10 button bypasses replaced (6 error pages + search + verify + report)
 - Gate: pnpm lint PASS (0 errors, 3 pre-existing warnings), pnpm typecheck PASS, pnpm test PASS (8/8)
 - Sprint 6 (Phase 6 — Responsive): DONE
-- Sprint 7 (Phase 7 — Form UX): NOT STARTED
+- Sprint 7 (Phase 7 — Form UX): DONE
 - Sprint 8 (Phase 8 — Polish): NOT STARTED
 
 ## Sprint 5 — Phase 5: Sub-12px Font Sweep
@@ -59,6 +59,14 @@
 - FIX-48b: DONE — HomeClient.tsx hero wrapper mb-12 md:mb-16 → mb-8 md:mb-12
 - FIX-49: DONE — HomeClient.tsx H1 text-4xl md:text-6xl → text-4xl sm:text-5xl md:text-6xl
 - Gate: pnpm typecheck PASS (exit 0), pnpm lint PASS (0 errors, 3 pre-existing warnings)
+
+## Sprint 7 — Phase 7: Form UX
+- FIX-50: DONE — LoginClient + SignUpClient: added Verifying... state to submit button when !turnstileToken && !loading
+- FIX-51: DONE — SignUpClient: terms error "above" → "below", scrollIntoView to terms-checkbox, id changed from "terms" to "terms-checkbox"
+- FIX-52: DONE — SignUpClient: confirm password three-way border logic (green match / red only after full-length attempt / neutral)
+- FIX-53: DONE — PasswordStrengthMeter: returns min-h-[7.5rem] aria-hidden placeholder div instead of null when empty; test updated
+- FIX-54: DONE — ListingCard: motion-safe: prefix on group-hover:-translate-y-1, group-hover:scale-[1.05], transition-transform, duration-[600ms]
+- Gate: pnpm typecheck PASS (exit 0), pnpm lint PASS (0 errors, 3 pre-existing warnings), pnpm test (ListingCard|PasswordStrength) PASS (4/4)
 
 ## Log
 - 2026-03-31: Harness initialized. Spec and feature list created.
