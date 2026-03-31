@@ -46,8 +46,9 @@ function SignUpForm() {
     // Validate Terms of Service acceptance
     if (!acceptedTerms) {
       setError(
-        "To create your account, agree to the Terms of Service and Privacy Policy above."
+        "To create your account, agree to the Terms of Service and Privacy Policy below."
       );
+      setTimeout(() => document.getElementById("terms-checkbox")?.scrollIntoView({ behavior: "smooth", block: "center" }), 100);
       setLoading(false);
       return;
     }
@@ -376,14 +377,14 @@ function SignUpForm() {
             {/* Terms of Service Checkbox */}
             <div className="flex items-start gap-3 min-h-[44px]">
               <input
-                id="terms"
+                id="terms-checkbox"
                 type="checkbox"
                 checked={acceptedTerms}
                 onChange={(e) => setAcceptedTerms(e.target.checked)}
                 className="mt-1 h-5 w-5 rounded border-outline-variant/20 bg-surface-container-lowest text-primary focus:ring-2 focus:ring-primary cursor-pointer"
               />
               <label
-                htmlFor="terms"
+                htmlFor="terms-checkbox"
                 className="text-sm text-on-surface-variant cursor-pointer"
               >
                 I agree to the{" "}
