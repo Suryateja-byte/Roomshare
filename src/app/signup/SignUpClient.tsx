@@ -447,6 +447,12 @@ function SignUpForm() {
                   <Loader2 className="w-5 h-5 animate-spin" aria-hidden="true" />
                   <span className="sr-only">Creating account...</span>
                 </>
+              ) : !turnstileToken && !!process.env.NEXT_PUBLIC_TURNSTILE_SITE_KEY ? (
+                <>
+                  <Loader2 className="w-5 h-5 animate-spin" aria-hidden="true" />
+                  <span className="sr-only">Verifying...</span>
+                  Verifying...
+                </>
               ) : (
                 <>
                   Join RoomShare <ArrowRight className="w-4 h-4 ml-2" />

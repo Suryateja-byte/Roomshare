@@ -317,6 +317,12 @@ function LoginForm() {
                   <Loader2 className="w-5 h-5 animate-spin" aria-hidden="true" />
                   <span className="sr-only">Signing in...</span>
                 </>
+              ) : !turnstileToken && !!process.env.NEXT_PUBLIC_TURNSTILE_SITE_KEY ? (
+                <>
+                  <Loader2 className="w-5 h-5 animate-spin" aria-hidden="true" />
+                  <span className="sr-only">Verifying...</span>
+                  Verifying...
+                </>
               ) : (
                 <>
                   Sign in <ArrowRight className="w-4 h-4 ml-2" />
