@@ -110,13 +110,13 @@ export function MapEmptyState({ onZoomOut, searchParams }: MapEmptyStateProps) {
             <span
               key={chip.id}
               data-testid="filter-chip"
-              className="inline-flex items-center px-2 py-0.5 rounded-full text-[11px] font-medium bg-surface-container-high text-on-surface-variant"
+              className="inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium bg-surface-container-high text-on-surface-variant"
             >
               {chip.label}
             </span>
           ))}
           {overflowCount > 0 && (
-            <span className="inline-flex items-center px-2 py-0.5 rounded-full text-[11px] font-medium bg-surface-container-high text-on-surface-variant">
+            <span className="inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium bg-surface-container-high text-on-surface-variant">
               +{overflowCount} more
             </span>
           )}
@@ -133,7 +133,7 @@ export function MapEmptyState({ onZoomOut, searchParams }: MapEmptyStateProps) {
             <button
               key={`${suggestion.type}-${i}`}
               data-testid="suggestion-pill"
-              className="inline-flex items-center gap-1 px-2.5 py-1 rounded-full text-[11px] font-medium border border-primary/30 text-primary hover:bg-primary/10 transition-colors duration-150"
+              className="inline-flex items-center gap-1 px-2.5 py-1 rounded-full text-xs font-medium border border-primary/30 text-primary hover:bg-primary/10 transition-colors duration-150"
               onClick={() => handleRemoveSuggestion(suggestion)}
             >
               <X className="w-3 h-3" aria-hidden="true" />

@@ -201,7 +201,7 @@ export default function MobileSearchOverlay({
                     <div>
                       <label
                         htmlFor="mobile-search-where"
-                        className="block text-[11px] font-bold uppercase tracking-[0.15em] text-on-surface-variant mb-2"
+                        className="block text-xs font-bold uppercase tracking-[0.15em] text-on-surface-variant mb-2"
                       >
                         Where
                       </label>
@@ -220,7 +220,7 @@ export default function MobileSearchOverlay({
 
                     {/* BUDGET */}
                     <div>
-                      <label className="block text-[11px] font-bold uppercase tracking-[0.15em] text-on-surface-variant mb-2">
+                      <label className="block text-xs font-bold uppercase tracking-[0.15em] text-on-surface-variant mb-2">
                         Budget
                       </label>
                       <div className="flex items-center gap-2 border border-outline-variant/30 rounded-xl px-4 h-12">
@@ -284,7 +284,7 @@ export default function MobileSearchOverlay({
                   <div className="px-5 pt-5 pb-8">
                     {recentSearches.length > 0 ? (
                       <>
-                        <h3 className="text-[11px] font-bold text-on-surface-variant uppercase tracking-[0.15em] mb-3">
+                        <h3 className="text-xs font-bold text-on-surface-variant uppercase tracking-[0.15em] mb-3">
                           Recent searches
                         </h3>
                         <ul className="space-y-0.5">

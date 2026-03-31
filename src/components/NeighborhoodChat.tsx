@@ -846,7 +846,7 @@ export default function NeighborhoodChat({
               </div>
 
               {remainingSearches < RATE_LIMIT_CONFIG.maxSearchesPerListing && (
-                <span className="text-[10px] font-medium text-on-surface-variant bg-surface-container-high px-2 py-1 rounded-full tracking-wide uppercase">
+                <span className="text-xs font-medium text-on-surface-variant bg-surface-container-high px-2 py-1 rounded-full tracking-wide uppercase">
                   {remainingSearches} left
                 </span>
               )}
@@ -872,7 +872,7 @@ export default function NeighborhoodChat({
               <div className="min-h-full flex flex-col justify-end pt-12 pb-4">
                 {/* Date separator */}
                 <div className="w-full flex justify-center mb-8">
-                  <span className="text-[10px] font-medium text-on-surface-variant tracking-widest uppercase">
+                  <span className="text-xs font-medium text-on-surface-variant tracking-widest uppercase">
                     Today
                   </span>
                 </div>
@@ -1020,7 +1020,7 @@ export default function NeighborhoodChat({
                 </button>
               </form>
               <div className="text-center mt-3">
-                <p className="text-[10px] text-on-surface-variant font-medium tracking-widest uppercase">
+                <p className="text-xs text-on-surface-variant font-medium tracking-widest uppercase">
                   AI Concierge
                 </p>
               </div>

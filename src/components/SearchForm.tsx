@@ -915,7 +915,7 @@ export default function SearchForm({
               <label
                 htmlFor="search-what"
                 className={cn(
-                  "text-[11px] font-bold text-primary uppercase tracking-[0.15em] mb-1 flex items-center gap-1.5 transition-opacity duration-200",
+                  "text-xs font-bold text-primary uppercase tracking-[0.15em] mb-1 flex items-center gap-1.5 transition-opacity duration-200",
                   focusedField !== null &&
                     focusedField !== "what" &&
                     "md:opacity-0"
@@ -972,7 +972,7 @@ export default function SearchForm({
             <label
               htmlFor="search-location"
               className={cn(
-                "text-[11px] font-bold text-on-surface-variant uppercase tracking-[0.15em] mb-1 transition-opacity duration-200",
+                "text-xs font-bold text-on-surface-variant uppercase tracking-[0.15em] mb-1 transition-opacity duration-200",
                 focusedField !== null &&
                   focusedField !== "where" &&
                   "md:opacity-0"
@@ -1040,7 +1040,7 @@ export default function SearchForm({
           {showRecentSearches && recentSearches.length > 0 && (
             <div className="absolute top-full left-0 right-0 mt-3 bg-surface-container-lowest/95 backdrop-blur-[20px] rounded-lg shadow-ambient z-50 overflow-hidden animate-in fade-in slide-in-from-top-2 duration-300">
               <div className="flex items-center justify-between px-5 py-3 bg-surface-container-high/30">
-                <span className="text-[10px] font-bold text-on-surface-variant uppercase tracking-widest">
+                <span className="text-xs font-bold text-on-surface-variant uppercase tracking-widest">
                   Recent Searches
                 </span>
                 <Button
@@ -1052,7 +1052,7 @@ export default function SearchForm({
                     e.stopPropagation();
                     clearRecentSearches();
                   }}
-                  className="h-auto py-1 px-2 text-[10px] font-bold uppercase tracking-wider text-on-surface-variant hover:text-red-500"
+                  className="h-auto py-1 px-2 text-xs font-bold uppercase tracking-wider text-on-surface-variant hover:text-red-500"
                 >
                   Clear
                 </Button>
@@ -1099,7 +1099,7 @@ export default function SearchForm({
           {!isCompact && (
             <label
               className={cn(
-                "text-[11px] font-bold text-on-surface-variant uppercase tracking-[0.15em] mb-1 transition-opacity duration-200",
+                "text-xs font-bold text-on-surface-variant uppercase tracking-[0.15em] mb-1 transition-opacity duration-200",
                 focusedField !== null &&
                   focusedField !== "budget" &&
                   "md:opacity-0"
