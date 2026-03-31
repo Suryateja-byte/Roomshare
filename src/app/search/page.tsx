@@ -389,7 +389,7 @@ export default async function SearchPage({ searchParams }: SearchPageProps) {
             <h1
               id="search-results-heading"
               tabIndex={-1}
-              className="text-xl md:text-2xl lg:text-3xl font-display font-semibold tracking-tight text-on-surface !outline-none mb-2"
+              className="text-xl md:text-2xl lg:text-3xl font-display font-semibold tracking-tight text-on-surface focus:outline-none focus-visible:ring-2 focus-visible:ring-primary/30 focus-visible:rounded-lg mb-2"
             >
               {total === null ? "100+" : total}{" "}
               {total === 1 ? "place" : "places"}{q ? ` in ${q}` : ""}

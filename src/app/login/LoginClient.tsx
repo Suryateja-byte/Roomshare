@@ -10,6 +10,7 @@ import TurnstileWidget, {
   type TurnstileWidgetRef,
 } from "@/components/auth/TurnstileWidget";
 import { AuthErrorAlert } from "@/components/auth/AuthErrorAlert";
+import AuthPageLogo from "@/components/auth/AuthPageLogo";
 import { shouldHighlightEmailForm } from "@/lib/auth-errors";
 
 function LoginForm() {
@@ -101,14 +102,14 @@ function LoginForm() {
       <div className="hidden lg:flex w-1/2 bg-gradient-to-br from-primary to-primary-container relative flex-col justify-between p-8 xl:p-12 text-white">
         <div className="absolute inset-0 bg-[radial-gradient(circle_at_top_right,_var(--tw-gradient-stops))] from-primary/80 to-primary-container opacity-50"></div>
         <div className="relative z-10">
-          <span className="text-xl font-display font-semibold tracking-tighter">
+          <Link href="/" className="text-xl font-display font-semibold tracking-tighter hover:opacity-80 transition-opacity">
             RoomShare<span className="text-white/70">.</span>
-          </span>
+          </Link>
         </div>
         <div className="relative z-10 max-w-md">
           <h2 className="font-display text-2xl xl:text-3xl font-medium leading-tight">
-            &quot;Verified profiles sold me. I knew my roommate was legit
-            before we even met.&quot;
+            &ldquo;Verified profiles sold me. I knew my roommate was legit
+            before we even met.&rdquo;
           </h2>
           <div className="mt-8 flex items-center gap-4">
             <div className="w-10 h-10 rounded-full bg-white/10 flex items-center justify-center border border-white/20">
@@ -126,8 +127,9 @@ function LoginForm() {
       </div>
 
       {/* Right Form */}
-      <div className="w-full lg:w-1/2 flex items-center justify-center p-4 sm:p-6 pb-20">
+      <div className="w-full lg:w-1/2 flex items-center justify-center p-4 sm:p-6 pb-6">
         <div className="w-full max-w-sm space-y-6 sm:space-y-8">
+          <AuthPageLogo />
           <div className="text-center lg:text-left">
             <h1 className="font-display text-2xl sm:text-3xl font-semibold text-on-surface tracking-tight">
               Welcome back
@@ -144,7 +146,9 @@ function LoginForm() {
           )}
 
           {(error || urlError) && (
-            <AuthErrorAlert errorCode={urlError} customError={error} />
+            <div id="form-error">
+              <AuthErrorAlert errorCode={urlError} customError={error} />
+            </div>
           )}
 
           {/* Google Sign In */}
@@ -223,7 +227,8 @@ function LoginForm() {
                   name="email"
                   required
                   autoComplete="email"
-                  className="block w-full pl-10 pr-3 py-2.5 bg-surface-container-lowest border border-outline-variant/20 rounded-lg text-on-surface placeholder-on-surface-variant focus:outline-none text-sm font-medium transition-shadow duration-200 ease-in-out shadow-ambient-sm"
+                  aria-describedby={error || urlError ? "form-error" : undefined}
+                  className="block w-full pl-10 pr-3 py-2.5 bg-surface-container-lowest border border-outline-variant/20 rounded-lg text-on-surface placeholder-on-surface-variant focus:outline-none focus-visible:ring-2 focus-visible:ring-primary/30 focus-visible:ring-offset-2 text-sm font-medium transition-shadow duration-200 ease-in-out shadow-ambient-sm"
                   placeholder="you@example.com"
                 />
               </div>
@@ -238,7 +243,7 @@ function LoginForm() {
                 </label>
                 <Link
                   href="/forgot-password"
-                  className="text-xs text-on-surface-variant hover:text-on-surface transition-colors"
+                  className="text-xs text-on-surface-variant hover:text-on-surface transition-colors min-h-[44px] inline-flex items-center"
                 >
                   Forgot password?
                 </Link>
@@ -253,13 +258,13 @@ function LoginForm() {
                   name="password"
                   required
                   autoComplete="current-password"
-                  className="block w-full pl-10 pr-10 py-2.5 bg-surface-container-lowest border border-outline-variant/20 rounded-lg text-on-surface placeholder-on-surface-variant focus:outline-none text-sm font-medium transition-shadow duration-200 ease-in-out shadow-ambient-sm"
+                  className="block w-full pl-10 pr-10 py-2.5 bg-surface-container-lowest border border-outline-variant/20 rounded-lg text-on-surface placeholder-on-surface-variant focus:outline-none focus-visible:ring-2 focus-visible:ring-primary/30 focus-visible:ring-offset-2 text-sm font-medium transition-shadow duration-200 ease-in-out shadow-ambient-sm"
                   placeholder="••••••••"
                 />
                 <button
                   type="button"
                   onClick={() => setShowPassword(!showPassword)}
-                  className="absolute inset-y-0 right-0 pr-3 flex items-center text-on-surface-variant hover:text-on-surface transition-colors"
+                  className="absolute inset-y-0 right-0 pr-3 flex items-center text-on-surface-variant hover:text-on-surface transition-colors min-w-[44px] justify-center focus-visible:ring-2 focus-visible:ring-primary/30 focus-visible:ring-offset-2"
                   aria-label={showPassword ? "Hide password" : "Show password"}
                 >
                   {showPassword ? (
@@ -272,15 +277,17 @@ function LoginForm() {
             </div>
 
             {/* Turnstile Bot Protection */}
-            <TurnstileWidget
-              ref={turnstileRef}
-              onToken={(token) => {
-                setTurnstileToken(token);
-                setTurnstileError(false);
-              }}
-              onExpire={() => setTurnstileToken("")}
-              onError={() => setTurnstileError(true)}
-            />
+            <div className="flex justify-center">
+              <TurnstileWidget
+                ref={turnstileRef}
+                onToken={(token) => {
+                  setTurnstileToken(token);
+                  setTurnstileError(false);
+                }}
+                onExpire={() => setTurnstileToken("")}
+                onError={() => setTurnstileError(true)}
+              />
+            </div>
 
             {turnstileError && (
               <p className="text-sm text-red-600">
@@ -325,6 +332,17 @@ function LoginForm() {
             >
               Sign up
             </Link>
+          </p>
+
+          <div className="lg:hidden text-center pt-6 mt-4 border-t border-outline-variant/10">
+            <p className="font-display italic text-sm text-on-surface-variant leading-relaxed">
+              &ldquo;Verified profiles sold me.&rdquo;
+            </p>
+            <p className="text-xs text-on-surface-variant mt-2">Sarah J., San Francisco</p>
+          </div>
+
+          <p className="lg:hidden text-center text-xs text-on-surface-variant mt-6">
+            &copy; {new Date().getFullYear()} RoomShare Inc.
           </p>
         </div>
       </div>

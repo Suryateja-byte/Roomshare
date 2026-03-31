@@ -18,6 +18,7 @@ import TurnstileWidget, {
   type TurnstileWidgetRef,
 } from "@/components/auth/TurnstileWidget";
 import { AuthErrorAlert } from "@/components/auth/AuthErrorAlert";
+import AuthPageLogo from "@/components/auth/AuthPageLogo";
 import PasswordStrengthMeter from "@/components/PasswordStrengthMeter";
 
 function SignUpForm() {
@@ -125,9 +126,9 @@ function SignUpForm() {
 
         {/* Logo */}
         <div className="relative z-10">
-          <span className="text-xl font-display font-semibold tracking-tighter">
+          <Link href="/" className="text-xl font-display font-semibold tracking-tighter hover:opacity-80 transition-opacity">
             RoomShare<span className="text-white/70">.</span>
-          </span>
+          </Link>
         </div>
 
         {/* Testimonial / Value Prop */}
@@ -154,8 +155,9 @@ function SignUpForm() {
       </div>
 
       {/* Right Form */}
-      <div className="w-full lg:w-1/2 flex items-center justify-center p-4 sm:p-6 pb-20">
+      <div className="w-full lg:w-1/2 flex items-start pt-8 lg:items-center lg:pt-0 justify-center p-4 sm:p-6 pb-6">
         <div className="w-full max-w-sm space-y-6 sm:space-y-8">
+          <AuthPageLogo />
           {/* Header */}
           <div className="text-center lg:text-left">
             <h1 className="font-display text-2xl sm:text-3xl font-semibold text-on-surface tracking-tight">
@@ -167,7 +169,9 @@ function SignUpForm() {
           </div>
 
           {(error || urlError) && (
-            <AuthErrorAlert errorCode={urlError} customError={error} />
+            <div id="form-error">
+              <AuthErrorAlert errorCode={urlError} customError={error} />
+            </div>
           )}
 
           {/* Google Sign Up */}
@@ -245,7 +249,7 @@ function SignUpForm() {
                   name="name"
                   required
                   autoComplete="name"
-                  className="block w-full pl-10 pr-3 py-2.5 bg-surface-container-lowest border border-outline-variant/20 rounded-lg text-on-surface placeholder-on-surface-variant focus:outline-none text-sm font-medium transition-shadow duration-200 ease-in-out shadow-ambient-sm"
+                  className="block w-full pl-10 pr-3 py-2.5 bg-surface-container-lowest border border-outline-variant/20 rounded-lg text-on-surface placeholder-on-surface-variant focus:outline-none focus-visible:ring-2 focus-visible:ring-primary/30 focus-visible:ring-offset-2 text-sm font-medium transition-shadow duration-200 ease-in-out shadow-ambient-sm"
                   placeholder="John Doe"
                 />
               </div>
@@ -269,7 +273,8 @@ function SignUpForm() {
                   name="email"
                   required
                   autoComplete="email"
-                  className="block w-full pl-10 pr-3 py-2.5 bg-surface-container-lowest border border-outline-variant/20 rounded-lg text-on-surface placeholder-on-surface-variant focus:outline-none text-sm font-medium transition-shadow duration-200 ease-in-out shadow-ambient-sm"
+                  aria-describedby={error || urlError ? "form-error" : undefined}
+                  className="block w-full pl-10 pr-3 py-2.5 bg-surface-container-lowest border border-outline-variant/20 rounded-lg text-on-surface placeholder-on-surface-variant focus:outline-none focus-visible:ring-2 focus-visible:ring-primary/30 focus-visible:ring-offset-2 text-sm font-medium transition-shadow duration-200 ease-in-out shadow-ambient-sm"
                   placeholder="you@example.com"
                 />
               </div>
@@ -295,13 +300,13 @@ function SignUpForm() {
                   autoComplete="new-password"
                   value={password}
                   onChange={(e) => setPassword(e.target.value)}
-                  className="block w-full pl-10 pr-10 py-2.5 bg-surface-container-lowest border border-outline-variant/20 rounded-lg text-on-surface placeholder-on-surface-variant focus:outline-none text-sm font-medium transition-shadow duration-200 ease-in-out shadow-ambient-sm"
+                  className="block w-full pl-10 pr-10 py-2.5 bg-surface-container-lowest border border-outline-variant/20 rounded-lg text-on-surface placeholder-on-surface-variant focus:outline-none focus-visible:ring-2 focus-visible:ring-primary/30 focus-visible:ring-offset-2 text-sm font-medium transition-shadow duration-200 ease-in-out shadow-ambient-sm"
                   placeholder="••••••••"
                 />
                 <button
                   type="button"
                   onClick={() => setShowPassword(!showPassword)}
-                  className="absolute inset-y-0 right-0 pr-3 flex items-center text-on-surface-variant hover:text-on-surface transition-colors"
+                  className="absolute inset-y-0 right-0 pr-3 flex items-center text-on-surface-variant hover:text-on-surface transition-colors min-w-[44px] justify-center focus-visible:ring-2 focus-visible:ring-primary/30 focus-visible:ring-offset-2"
                   aria-label={showPassword ? "Hide password" : "Show password"}
                 >
                   {showPassword ? (
@@ -334,7 +339,7 @@ function SignUpForm() {
                   autoComplete="new-password"
                   value={confirmPassword}
                   onChange={(e) => setConfirmPassword(e.target.value)}
-                  className={`block w-full pl-10 pr-10 py-2.5 bg-surface-container-lowest border rounded-lg text-on-surface placeholder-on-surface-variant focus:outline-none text-sm font-medium transition-shadow duration-200 ease-in-out shadow-ambient-sm ${
+                  className={`block w-full pl-10 pr-10 py-2.5 bg-surface-container-lowest border rounded-lg text-on-surface placeholder-on-surface-variant focus:outline-none focus-visible:ring-2 focus-visible:ring-primary/30 focus-visible:ring-offset-2 text-sm font-medium transition-shadow duration-200 ease-in-out shadow-ambient-sm ${
                     confirmPassword && password !== confirmPassword
                       ? "border-red-400"
                       : confirmPassword && password === confirmPassword
@@ -346,7 +351,7 @@ function SignUpForm() {
                 <button
                   type="button"
                   onClick={() => setShowConfirmPassword(!showConfirmPassword)}
-                  className="absolute inset-y-0 right-0 pr-3 flex items-center text-on-surface-variant hover:text-on-surface transition-colors"
+                  className="absolute inset-y-0 right-0 pr-3 flex items-center text-on-surface-variant hover:text-on-surface transition-colors min-w-[44px] justify-center focus-visible:ring-2 focus-visible:ring-primary/30 focus-visible:ring-offset-2"
                   aria-label={
                     showConfirmPassword ? "Hide password" : "Show password"
                   }
@@ -371,13 +376,13 @@ function SignUpForm() {
             </div>
 
             {/* Terms of Service Checkbox */}
-            <div className="flex items-start gap-3">
+            <div className="flex items-start gap-3 min-h-[44px]">
               <input
                 id="terms"
                 type="checkbox"
                 checked={acceptedTerms}
                 onChange={(e) => setAcceptedTerms(e.target.checked)}
-                className="mt-1 h-4 w-4 rounded border-outline-variant/20 bg-surface-container-lowest text-primary focus:ring-2 focus:ring-primary cursor-pointer"
+                className="mt-1 h-5 w-5 rounded border-outline-variant/20 bg-surface-container-lowest text-primary focus:ring-2 focus:ring-primary cursor-pointer"
               />
               <label
                 htmlFor="terms"
@@ -401,15 +406,17 @@ function SignUpForm() {
             </div>
 
             {/* Turnstile Bot Protection */}
-            <TurnstileWidget
-              ref={turnstileRef}
-              onToken={(token) => {
-                setTurnstileToken(token);
-                setTurnstileError(false);
-              }}
-              onExpire={() => setTurnstileToken("")}
-              onError={() => setTurnstileError(true)}
-            />
+            <div className="flex justify-center">
+              <TurnstileWidget
+                ref={turnstileRef}
+                onToken={(token) => {
+                  setTurnstileToken(token);
+                  setTurnstileError(false);
+                }}
+                onExpire={() => setTurnstileToken("")}
+                onError={() => setTurnstileError(true)}
+              />
+            </div>
 
             {turnstileError && (
               <p className="text-sm text-red-600">
@@ -455,6 +462,17 @@ function SignUpForm() {
             >
               Sign in
             </Link>
+          </p>
+
+          <div className="lg:hidden text-center pt-6 mt-4 border-t border-outline-variant/10">
+            <p className="font-display italic text-sm text-on-surface-variant leading-relaxed">
+              &ldquo;Moved in two weeks after signing up.&rdquo;
+            </p>
+            <p className="text-xs text-on-surface-variant mt-2">Nina K., New York City</p>
+          </div>
+
+          <p className="lg:hidden text-center text-xs text-on-surface-variant mt-6">
+            &copy; {new Date().getFullYear()} RoomShare Inc.
           </p>
         </div>
       </div>
