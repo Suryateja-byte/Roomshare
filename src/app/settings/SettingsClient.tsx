@@ -24,6 +24,7 @@ import { unblockUser } from "@/app/actions/block";
 import PasswordStrengthMeter from "@/components/PasswordStrengthMeter";
 import UserAvatar from "@/components/UserAvatar";
 import { PasswordConfirmationModal } from "@/components/auth/PasswordConfirmationModal";
+import { Button } from "@/components/ui/button";
 
 interface BlockedUserInfo {
   id: string;
@@ -246,10 +247,9 @@ export default function SettingsClient({
           ))}
         </div>
         <div className="p-4 bg-surface-canvas pt-6">
-          <button
+          <Button
             onClick={handleSavePreferences}
             disabled={saving}
-            className="flex items-center gap-2 px-4 py-2 bg-primary text-white rounded-lg hover:bg-primary/90 disabled:opacity-60 transition-colors"
           >
             {saving ? (
               <Loader2 className="w-4 h-4 animate-spin" />
@@ -257,7 +257,7 @@ export default function SettingsClient({
               <Check className="w-4 h-4" />
             ) : null}
             {saveSuccess ? "Saved!" : "Save Preferences"}
-          </button>
+          </Button>
         </div>
       </section>
 
@@ -338,14 +338,14 @@ export default function SettingsClient({
                 Password changed successfully!
               </p>
             )}
-            <button
+            <Button
               type="submit"
+              variant="warning"
               disabled={changingPassword}
-              className="flex items-center gap-2 px-4 py-2 bg-amber-600 text-white rounded-lg hover:bg-amber-700 disabled:opacity-60 transition-colors"
             >
               {changingPassword && <Loader2 className="w-4 h-4 animate-spin" />}
               Change Password
-            </button>
+            </Button>
           </form>
         </section>
       )}
@@ -395,10 +395,11 @@ export default function SettingsClient({
                       </p>
                     </div>
                   </div>
-                  <button
+                  <Button
+                    variant="ghost"
+                    size="sm"
                     onClick={() => handleUnblock(blocked.user.id)}
                     disabled={unblockingId === blocked.user.id}
-                    className="flex items-center gap-2 px-3 py-1.5 text-sm font-medium text-on-surface-variant hover:text-on-surface hover:bg-surface-container-high rounded-lg transition-colors disabled:opacity-60"
                   >
                     {unblockingId === blocked.user.id ? (
                       <Loader2 className="w-4 h-4 animate-spin" />
@@ -406,7 +407,7 @@ export default function SettingsClient({
                       <ShieldOff className="w-4 h-4" />
                     )}
                     Unblock
-                  </button>
+                  </Button>
                 </li>
               ))}
             </ul>
@@ -439,12 +440,12 @@ export default function SettingsClient({
                 listings, messages, bookings, and reviews will be permanently
                 removed.
               </p>
-              <button
+              <Button
+                variant="destructive"
                 onClick={() => setShowDeleteConfirm(true)}
-                className="px-4 py-2 bg-red-600 text-white rounded-lg hover:bg-red-700 transition-colors"
               >
                 Delete My Account
-              </button>
+              </Button>
             </div>
           ) : (
             <div className="space-y-4">
@@ -477,23 +478,23 @@ export default function SettingsClient({
                 />
               </div>
               <div className="flex gap-3">
-                <button
+                <Button
+                  variant="outline"
                   onClick={() => {
                     setShowDeleteConfirm(false);
                     setDeleteConfirmText("");
                   }}
-                  className="px-4 py-2 border border-outline-variant/20 text-on-surface-variant rounded-lg hover:bg-surface-container-high transition-colors"
                 >
                   Cancel
-                </button>
-                <button
+                </Button>
+                <Button
+                  variant="destructive"
                   onClick={handleDeleteClick}
                   disabled={deleteConfirmText !== "DELETE" || deleting}
-                  className="flex items-center gap-2 px-4 py-2 bg-red-600 text-white rounded-lg hover:bg-red-700 disabled:opacity-60 disabled:cursor-not-allowed transition-colors"
                 >
                   {deleting && <Loader2 className="w-4 h-4 animate-spin" />}
                   Delete Forever
-                </button>
+                </Button>
               </div>
             </div>
           )}
