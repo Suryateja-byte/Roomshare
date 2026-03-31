@@ -288,7 +288,7 @@ function ListingCardInner({
           isDragging && "pointer-events-none"
         )}
       >
-        <div className="relative bg-surface-container-lowest flex flex-col rounded-none sm:rounded-lg overflow-hidden transition-lift shadow-ambient-sm group-hover:shadow-ambient-lg group-hover:shadow-on-surface/10 group-hover:-translate-y-1">
+        <div className="relative bg-surface-container-lowest flex flex-col rounded-none sm:rounded-lg overflow-hidden transition-lift shadow-ambient-sm group-hover:shadow-ambient-lg group-hover:shadow-on-surface/10 motion-safe:group-hover:-translate-y-1">
           {/* Image Area */}
           <div className="relative aspect-[16/10] sm:aspect-[4/3] overflow-hidden bg-surface-canvas">
             {/* Image Carousel or single image */}
@@ -296,7 +296,7 @@ function ListingCardInner({
               images={displayImages}
               alt={displayTitle}
               priority={priority}
-              className="h-full w-full group-hover:scale-[1.05] transition-transform duration-[600ms] ease-[cubic-bezier(0.25,0.1,0.25,1.0)]"
+              className="h-full w-full motion-safe:group-hover:scale-[1.05] motion-safe:transition-transform motion-safe:duration-[600ms] ease-[cubic-bezier(0.25,0.1,0.25,1.0)]"
               onImageError={handleImageError}
               onDragStateChange={setIsDragging}
             />
