@@ -540,7 +540,7 @@ export default function NavbarClient({
           </Link>
 
           {/* --- CENTER: Navigation Links --- */}
-          <div className="hidden lg:flex flex-1 items-center justify-center gap-1">
+          <div className="hidden md:flex flex-1 items-center justify-center gap-1">
             <Link
               href="/search"
               className={`text-sm font-medium px-5 py-2 rounded-full transition-colors duration-300 focus-visible:ring-2 focus-visible:ring-primary/30 focus-visible:ring-offset-2 ${
@@ -583,7 +583,7 @@ export default function NavbarClient({
 
             {/* Profile Dropdown / Auth Buttons */}
             {user ? (
-              <div className="relative hidden lg:block" ref={profileRef}>
+              <div className="relative hidden md:block" ref={profileRef}>
                 <button
                   ref={triggerButtonRef}
                   id={menuButtonId}
@@ -704,7 +704,7 @@ export default function NavbarClient({
             )}
 
             {/* Mobile Menu Toggle */}
-            <div className="lg:hidden flex items-center">
+            <div className="md:hidden flex items-center">
               <button
                 onClick={() => setIsMobileMenuOpen(!isMobileMenuOpen)}
                 className="text-on-surface p-2 min-w-[44px] min-h-[44px] flex items-center justify-center transition-colors hover:bg-surface-container-high rounded-full focus-visible:ring-2 focus-visible:ring-primary/30 focus-visible:ring-offset-2"
@@ -720,7 +720,7 @@ export default function NavbarClient({
 
       {/* Mobile Menu - Full-screen glassmorphism overlay */}
       <div
-        className={`lg:hidden fixed inset-0 z-modal bg-surface-canvas/95 backdrop-blur-[20px] transition-[opacity,visibility] duration-300 ${
+        className={`md:hidden fixed inset-0 z-modal bg-surface-canvas/95 backdrop-blur-[20px] transition-[opacity,visibility] duration-300 ${
           isMobileMenuOpen
             ? "opacity-100 visible pointer-events-auto"
             : "opacity-0 invisible pointer-events-none"
