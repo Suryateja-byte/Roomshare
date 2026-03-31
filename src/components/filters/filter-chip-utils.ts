@@ -7,6 +7,7 @@
 
 import { getLanguageName } from "@/lib/languages";
 import { getPriceParam } from "@/lib/search-params";
+import { formatPriceCompact } from "@/lib/format";
 import {
   LEASE_DURATION_ALIASES,
   ROOM_TYPE_ALIASES,
@@ -45,14 +46,6 @@ const PRESERVED_PARAMS = [
   "sort",
 ] as const;
 
-/**
- * Format a price value for display
- */
-function formatPrice(value: number | string): string {
-  const num = typeof value === "number" ? value : parseInt(value, 10);
-  if (isNaN(num)) return String(value);
-  return `$${num.toLocaleString()}`;
-}
 
 /**
  * Format a date string (YYYY-MM-DD) for display
@@ -95,19 +88,19 @@ export function urlToFilterChips(
   if (minPrice !== undefined && maxPrice !== undefined) {
     chips.push({
       id: "price-range",
-      label: `${formatPrice(minPrice)} - ${formatPrice(maxPrice)}`,
+      label: `${formatPriceCompact(minPrice)} - ${formatPriceCompact(maxPrice)}`,
       paramKey: "price-range", // Special key for combined price
     });
   } else if (minPrice !== undefined) {
     chips.push({
       id: "minPrice",
-      label: `Min ${formatPrice(minPrice)}`,
+      label: `Min ${formatPriceCompact(minPrice)}`,
       paramKey: "minPrice",
     });
   } else if (maxPrice !== undefined) {
     chips.push({
       id: "maxPrice",
-      label: `Max ${formatPrice(maxPrice)}`,
+      label: `Max ${formatPriceCompact(maxPrice)}`,
       paramKey: "maxPrice",
     });
   }

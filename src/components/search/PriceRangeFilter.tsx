@@ -4,6 +4,7 @@ import { useState, useCallback, useRef, useEffect } from "react";
 import * as Slider from "@radix-ui/react-slider";
 import type { PriceHistogramBucket } from "@/app/api/search/facets/route";
 import { PriceHistogram } from "./PriceHistogram";
+import { formatPriceCompact } from "@/lib/format";
 
 interface PriceRangeFilterProps {
   minPrice: number;
@@ -55,14 +56,8 @@ export function PriceRangeFilter({
     [onChange]
   );
 
-  // Format price for display
-  const formatPrice = (val: number) => {
-    if (val >= 10000) return `$${(val / 1000).toFixed(0)}k`;
-    return `$${val.toLocaleString()}`;
-  };
-
   const isAtMax = localMax >= absoluteMax;
-  const rangeLabel = `${formatPrice(localMin)} – ${isAtMax ? `${formatPrice(absoluteMax)}+` : formatPrice(localMax)}`;
+  const rangeLabel = `${formatPriceCompact(localMin)} – ${isAtMax ? `${formatPriceCompact(absoluteMax)}+` : formatPriceCompact(localMax)}`;
 
   return (
     <div className="space-y-2">
