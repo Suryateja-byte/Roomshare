@@ -260,6 +260,7 @@ export function CategoryBar() {
               type="button"
               onClick={() => handleSelect(cat.params)}
               disabled={isPending}
+              title={cat.label}
               className={`
                 flex flex-col items-center gap-2 pt-2 pb-3 min-w-[56px] text-xs font-medium
                 transition-all duration-200 flex-shrink-0 border-b-2
