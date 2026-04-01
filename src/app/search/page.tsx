@@ -84,8 +84,8 @@ export async function generateMetadata({
   const shouldNoIndex = hasPagination || isHighlyFiltered;
 
   const title = q
-    ? `Rooms for rent in ${q} | RoomShare`
-    : "Find Rooms & Roommates | RoomShare";
+    ? `Rooms for rent in ${q} | Roomshare`
+    : "Find Rooms & Roommates | Roomshare";
 
   const filterSummary: string[] = [];
   if (
@@ -106,7 +106,7 @@ export async function generateMetadata({
     filterSummary.push(`Room type: ${filterParams.roomType}`);
   }
 
-  const baseDescription = `Browse ${q ? `${q} ` : ""}room listings on RoomShare.`;
+  const baseDescription = `Browse ${q ? `${q} ` : ""}room listings on Roomshare.`;
   const description =
     `${baseDescription}${filterSummary.length > 0 ? ` ${filterSummary.join(" · ")}` : ""}`.substring(
       0,

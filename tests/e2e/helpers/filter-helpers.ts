@@ -221,7 +221,10 @@ export async function gotoSearchWithFilters(
  * Uses regex to match both "Filters" and "Filters (N active)" states.
  */
 export function filtersButton(page: Page): Locator {
-  return page.locator('button[data-hydrated][aria-label^="Filters"]');
+  // Match both desktop (data-hydrated) and mobile (data-testid) filter buttons
+  return page.locator(
+    'button[data-hydrated][aria-label^="Filters"], button[data-testid="mobile-filter-button"]'
+  ).first();
 }
 
 /** Locate the filter dialog */

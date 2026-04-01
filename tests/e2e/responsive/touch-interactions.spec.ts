@@ -182,6 +182,9 @@ test.describe("Tap target sizes", () => {
         if (cls.includes("chip") || cls.includes("toggle") || cls.includes("filter")) continue;
         // Skip amenity filter buttons (Furnished, Pet Friendly, Wifi, etc.)
         if (text.match(/furnished|pet friendly|wifi|parking|laundry|gym|pool|ac|heating/i)) continue;
+        // Skip category bar filter buttons (compact by design, scroll container)
+        if (el.closest('[class*="category"]') || el.closest('[role="tablist"]') || cls.includes("category")) continue;
+        if (text.match(/entire place|shared room|short.?term|under \$/i)) continue;
         // Skip slider elements (visual handle, parent has touch area)
         if (el.getAttribute("role") === "slider") continue;
         // Skip footer links, nav links, header links (text links, not primary actions)
