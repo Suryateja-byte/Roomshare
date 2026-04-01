@@ -9,9 +9,9 @@ function cn(...inputs: ClassValue[]) {
 
 const variantClasses = {
   primary:
-    "bg-gradient-to-br from-primary to-primary-container text-on-primary shadow-ambient hover:brightness-110 focus-visible:ring-primary/30",
+    "bg-primary text-on-primary shadow-ambient hover:bg-primary/90 focus-visible:ring-primary/30",
   outline:
-    "bg-transparent border border-outline-variant/20 text-on-surface hover:bg-surface-container-high focus-visible:ring-primary/30",
+    "bg-transparent border border-outline-variant/40 text-on-surface hover:bg-surface-container-high focus-visible:ring-primary/30",
   ghost:
     "text-on-surface-variant hover:text-on-surface hover:bg-surface-container-high focus-visible:ring-primary/30",
   white:
@@ -31,7 +31,7 @@ const variantClasses = {
   "ghost-inverse":
     "text-surface-container-high hover:text-white hover:bg-white/10 focus-visible:ring-white/30",
   filter:
-    "border border-outline-variant/20 bg-surface-container-lowest text-on-surface-variant data-[active=true]:bg-gradient-to-br data-[active=true]:from-primary data-[active=true]:to-primary-container data-[active=true]:text-on-primary focus-visible:ring-primary/30",
+    "border border-outline-variant/20 bg-surface-container-lowest text-on-surface-variant data-[active=true]:bg-primary data-[active=true]:text-on-primary focus-visible:ring-primary/30",
 };
 
 const sizeClasses = {

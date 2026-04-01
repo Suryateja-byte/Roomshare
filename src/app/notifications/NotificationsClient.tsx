@@ -171,7 +171,7 @@ export default function NotificationsClient({
   return (
     <div
       data-testid="notifications-page"
-      className="min-h-screen bg-surface-canvas pt-24 pb-20"
+      className="min-h-screen bg-surface-canvas pt-4 pb-20"
     >
       <div className="container mx-auto max-w-3xl px-6 py-10">
         {/* Header */}

@@ -5,6 +5,7 @@ import { getMyVerificationStatus } from "@/app/actions/verification";
 import VerificationForm from "./VerificationForm";
 import { ShieldCheck, Clock, XCircle, CheckCircle2 } from "lucide-react";
 import Link from "next/link";
+import { Button } from "@/components/ui/button";
 
 export const metadata: Metadata = {
   title: "Verify Your Identity | RoomShare",
@@ -54,12 +55,11 @@ export default async function VerifyPage() {
                   Your identity has been verified. You now have a verified badge
                   on your profile.
                 </p>
-                <Link
-                  href="/profile"
-                  className="inline-flex items-center gap-2 bg-primary text-white px-6 py-3 rounded-lg font-medium hover:bg-primary/90 transition-colors"
-                >
-                  View Your Profile
-                </Link>
+                <Button asChild>
+                  <Link href="/profile">
+                    View Your Profile
+                  </Link>
+                </Button>
               </div>
             )}
 

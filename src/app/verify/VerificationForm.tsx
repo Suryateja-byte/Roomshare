@@ -13,6 +13,7 @@ import {
   Loader2,
   Camera,
 } from "lucide-react";
+import { Button } from "@/components/ui/button";
 
 const documentTypes: {
   value: DocumentType;
@@ -257,10 +258,10 @@ export default function VerificationForm() {
       </div>
 
       {/* Submit Button */}
-      <button
+      <Button
         type="submit"
+        className="w-full"
         disabled={isSubmitting || !documentUrl}
-        className="w-full bg-primary text-white py-3 px-6 rounded-lg font-medium hover:bg-primary/90 disabled:opacity-60 disabled:cursor-not-allowed transition-all flex items-center justify-center gap-2"
       >
         {isSubmitting ? (
           <>
@@ -270,7 +271,7 @@ export default function VerificationForm() {
         ) : (
           "Submit for Verification"
         )}
-      </button>
+      </Button>
     </form>
   );
 }

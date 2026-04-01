@@ -17,9 +17,9 @@ const PLACEHOLDER_IMAGES = [
 
 interface RecentListing {
   id: string;
-  title: string;
+  title: string | null;
   description: string;
-  price: number;
+  price: number | null;
   images: string[];
   viewedAt: Date;
   location?: {
@@ -55,7 +55,7 @@ export default function RecentlyViewedClient({
   };
 
   return (
-    <div className="min-h-screen bg-surface-canvas pt-20 pb-20">
+    <div className="min-h-screen bg-surface-canvas pt-4 pb-20">
       <div className="container mx-auto max-w-6xl px-6 py-10">
         {/* Header */}
         <div className="flex items-center justify-between mb-8">
@@ -127,7 +127,7 @@ export default function RecentlyViewedClient({
                       <>
                         <Image
                           src={imageUrl}
-                          alt={listing.title}
+                          alt={listing.title ?? "Untitled listing"}
                           fill
                           className="object-cover group-hover:scale-105 transition-transform duration-300"
                           sizes="(max-width: 768px) 100vw, (max-width: 1200px) 50vw, 33vw"
@@ -164,7 +164,7 @@ export default function RecentlyViewedClient({
                 {/* Content */}
                 <div className="p-4">
                   <h3 className="font-semibold text-on-surface line-clamp-1 group-hover:underline">
-                    {listing.title}
+                    {listing.title ?? "Untitled listing"}
                   </h3>
                   {listing.location && (
                     <p className="text-sm text-on-surface-variant flex items-center gap-1 mt-1">
@@ -173,7 +173,7 @@ export default function RecentlyViewedClient({
                     </p>
                   )}
                   <p className="font-semibold text-on-surface mt-2">
-                    ${listing.price.toLocaleString()}
+                    ${(listing.price ?? 0).toLocaleString()}
                     <span className="text-on-surface-variant font-normal text-sm">
                       /mo
                     </span>

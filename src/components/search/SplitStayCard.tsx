@@ -3,6 +3,7 @@
 import Image from "next/image";
 import Link from "next/link";
 import { MapPin } from "lucide-react";
+import { formatPrice } from "@/lib/format";
 import {
   useListingFocusState,
   useListingFocusActions,
@@ -92,7 +93,7 @@ export function SplitStayCard({
           Combined total
         </span>
         <span className="font-bold text-lg text-on-surface">
-          ${combinedPrice.toLocaleString("en-US", { maximumFractionDigits: 0 })}
+          {formatPrice(combinedPrice)}
         </span>
       </div>
     </div>
@@ -179,10 +180,7 @@ function SplitStayHalf({
         <p className="text-xs text-on-surface-variant mt-0.5">
           {showTotalPrice && months > 1 ? (
             <>
-              $
-              {(listing.price * months).toLocaleString("en-US", {
-                maximumFractionDigits: 0,
-              })}
+              {formatPrice(listing.price * months)}
               <span className="text-on-surface-variant">
                 {" "}
                 total ({months} mo)
@@ -190,11 +188,7 @@ function SplitStayHalf({
             </>
           ) : (
             <>
-              $
-              {listing.price.toLocaleString("en-US", {
-                maximumFractionDigits: 0,
-              })}
-              /mo
+              {formatPrice(listing.price)}/mo
             </>
           )}
         </p>

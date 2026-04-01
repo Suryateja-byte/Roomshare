@@ -18,6 +18,7 @@ import Link from "next/link";
 import { cn } from "@/lib/utils";
 import { getAmenityIcon } from "@/lib/amenityIcons";
 import { getLanguageName } from "@/lib/languages";
+import { formatPrice } from "@/lib/format";
 import ListingCard from "@/components/listings/ListingCard";
 import type { Listing } from "@/components/listings/ListingCard";
 
@@ -668,7 +669,7 @@ export default function ListingPageClient({
                     {/* Price */}
                     <div className="mb-6 text-center">
                       <span className="text-2xl font-bold font-display text-on-surface">
-                        ${listing.price?.toLocaleString()}
+                        {formatPrice(listing.price ?? 0)}
                       </span>
                       <span className="text-sm text-on-surface-variant">
                         /mo

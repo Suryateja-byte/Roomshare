@@ -7,6 +7,7 @@ import FavoriteButton from "../FavoriteButton";
 import { ImageCarousel } from "./ImageCarousel";
 import { cn } from "@/lib/utils";
 import { getLanguageName } from "@/lib/languages";
+import { formatPrice } from "@/lib/format";
 import {
   useListingFocusActions,
   useIsListingFocused,
@@ -124,20 +125,6 @@ const PLACEHOLDER_IMAGES = [
   "https://images.unsplash.com/photo-1505691938895-1758d7feb511?auto=format&fit=crop&w=800&q=80",
 ];
 
-// HIGH-3 FIX: Module-level Intl.NumberFormat instance avoids reconstructing
-// the formatter on every render call (~10x faster than toLocaleString).
-const priceFormatter = new Intl.NumberFormat("en-US", {
-  maximumFractionDigits: 0,
-});
-
-// Format price with thousand separators for better readability
-function formatPrice(price: number): string {
-  // Handle edge cases
-  if (price === 0) return "Free";
-  if (price < 0) return "$0";
-  if (!Number.isFinite(price)) return "$0";
-  return `$${priceFormatter.format(price)}`;
-}
 
 interface ListingCardProps {
   listing: Listing;
@@ -301,7 +288,7 @@ function ListingCardInner({
           isDragging && "pointer-events-none"
         )}
       >
-        <div className="relative bg-surface-container-lowest flex flex-col rounded-none sm:rounded-lg overflow-hidden transition-lift shadow-ambient-sm group-hover:shadow-ambient-lg group-hover:shadow-on-surface/10 group-hover:-translate-y-1">
+        <div className="relative bg-surface-container-lowest flex flex-col rounded-none sm:rounded-lg overflow-hidden transition-lift shadow-ambient-sm group-hover:shadow-ambient-lg group-hover:shadow-on-surface/10 motion-safe:group-hover:-translate-y-1">
           {/* Image Area */}
           <div className="relative aspect-[16/10] sm:aspect-[4/3] overflow-hidden bg-surface-canvas">
             {/* Image Carousel or single image */}
@@ -309,7 +296,7 @@ function ListingCardInner({
               images={displayImages}
               alt={displayTitle}
               priority={priority}
-              className="h-full w-full group-hover:scale-110 transition-transform duration-[2s] ease-[cubic-bezier(0.25,0.1,0.25,1.0)]"
+              className="h-full w-full motion-safe:group-hover:scale-[1.05] motion-safe:transition-transform motion-safe:duration-[600ms] ease-[cubic-bezier(0.25,0.1,0.25,1.0)]"
               onImageError={handleImageError}
               onDragStateChange={setIsDragging}
             />
@@ -324,7 +311,7 @@ function ListingCardInner({
                   className="w-8 h-8 text-on-surface-variant mb-2"
                   strokeWidth={1}
                 />
-                <span className="text-[10px] text-on-surface-variant font-medium uppercase tracking-[0.2em]">
+                <span className="text-xs text-on-surface-variant font-medium uppercase tracking-[0.2em]">
                   No Photos
                 </span>
               </div>
@@ -348,12 +335,17 @@ function ListingCardInner({
               )}
               {hasRating && (
                 <div
-                  className="inline-flex items-center gap-1 px-2 py-1 rounded-lg text-[10px] font-bold bg-surface-container-lowest/90 text-on-surface shadow-ambient-sm backdrop-blur-md"
+                  className="inline-flex items-center gap-1 px-2 py-1 rounded-lg text-xs font-bold bg-surface-container-lowest/90 text-on-surface shadow-ambient-sm backdrop-blur-md"
                   aria-label={`Rating ${avgRating!.toFixed(1)} out of 5`}
                 >
                   <Star className="w-3 h-3 text-amber-400 fill-amber-400" />
                   <span>{avgRating!.toFixed(1)}</span>
                 </div>
+              )}
+              {!hasRating && (
+                <span className="inline-flex items-center font-medium px-2.5 py-1 text-xs bg-surface-container-lowest/90 backdrop-blur-sm shadow-ambient-sm rounded-lg text-primary">
+                  New
+                </span>
               )}
             </div>
           </div>
@@ -361,18 +353,13 @@ function ListingCardInner({
           {/* Content Area */}
           <div className="flex flex-col flex-1 p-5 sm:p-6">
             {/* Title and Rating Row */}
-            <div className="flex justify-between items-start gap-4 mb-1">
+            <div className="mb-1">
               <h3
-                className="font-semibold text-base text-on-surface line-clamp-1 leading-tight tracking-tight"
+                className="font-semibold text-base text-on-surface line-clamp-2 leading-tight tracking-tight"
                 title={displayTitle}
               >
                 {displayTitle}
               </h3>
-              {!hasRating && (
-                <span className="text-[10px] uppercase font-bold text-primary flex-shrink-0 tracking-[0.15em]">
-                  New
-                </span>
-              )}
             </div>
 
             {/* Location */}
@@ -413,11 +400,14 @@ function ListingCardInner({
 
             {/* Amenities & Languages - Simplified */}
             <div className="flex items-center justify-between gap-2 mt-auto">
-              <div className="flex items-center gap-1.5 overflow-hidden">
-                {listing.amenities.slice(0, 2).map((amenity) => (
+              <div className="flex items-center gap-1.5 overflow-hidden min-w-0 flex-1">
+                {listing.amenities.slice(0, 2).map((amenity, i) => (
                   <span
                     key={amenity}
-                    className="text-[10px] font-medium text-on-surface-variant truncate"
+                    className={cn(
+                      "text-xs font-medium text-on-surface-variant truncate",
+                      i > 0 && "hidden sm:inline"
+                    )}
                   >
                     • {amenity}
                   </span>
@@ -428,10 +418,10 @@ function ListingCardInner({
                 listing.householdLanguages.length > 0 && (
                   <div className="flex items-center gap-1 flex-shrink-0 ml-auto">
                     <Globe className="w-3 h-3 text-on-surface-variant" />
-                    <span className="text-[10px] font-medium text-on-surface-variant">
+                    <span className="text-xs font-medium text-on-surface-variant">
                       {getLanguageName(listing.householdLanguages[0])}
                       {listing.householdLanguages.length > 1 &&
-                        ` +${listing.householdLanguages.length - 1}`}
+                        ` +${Math.min(listing.householdLanguages.length - 1, 4)}`}
                     </span>
                   </div>
                 )}

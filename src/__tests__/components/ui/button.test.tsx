@@ -26,7 +26,7 @@ describe("Button", () => {
     it("renders primary variant by default", () => {
       render(<Button>Primary</Button>);
       const button = screen.getByRole("button");
-      expect(button).toHaveClass("bg-gradient-to-br");
+      expect(button).toHaveClass("bg-primary");
     });
 
     it("renders outline variant", () => {

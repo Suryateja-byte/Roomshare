@@ -569,7 +569,11 @@ export default function CreateListingForm({
         state.trim() !== "" &&
         zip.trim() !== "",
       photos: successfulImages.length > 0,
-      details: true,
+      details:
+        amenitiesValue.trim() !== "" ||
+        houseRulesValue.trim() !== "" ||
+        moveInDate !== "" ||
+        leaseDuration !== "",
     }),
     [
       title,
@@ -581,6 +585,10 @@ export default function CreateListingForm({
       state,
       zip,
       successfulImages.length,
+      amenitiesValue,
+      houseRulesValue,
+      moveInDate,
+      leaseDuration,
     ]
   );
 

@@ -85,7 +85,7 @@ export default function PasswordStrengthMeter({
   const config = strengthConfig[level];
 
   if (!password) {
-    return null;
+    return <div className="min-h-[7.5rem]" aria-hidden="true" />;
   }
 
   const percentage = (score / checks.length) * 100;
@@ -98,11 +98,18 @@ export default function PasswordStrengthMeter({
           <span className="text-on-surface-variant">
             Password strength
           </span>
-          <span className={cn("font-medium", config.color)}>
+          <span className={cn("font-medium", config.color)} aria-live="polite">
             {config.label}
           </span>
         </div>
-        <div className="h-1.5 bg-surface-container-high rounded-full overflow-hidden">
+        <div
+          className="h-1.5 bg-surface-container-high rounded-full overflow-hidden"
+          role="progressbar"
+          aria-valuenow={score}
+          aria-valuemin={0}
+          aria-valuemax={5}
+          aria-label="Password strength"
+        >
           <div
             className={cn(
               "h-full rounded-full transition-all duration-300",

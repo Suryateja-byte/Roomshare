@@ -173,7 +173,7 @@ export function FilterModal({
       <div
         className="absolute inset-0 z-0 bg-on-surface/40 backdrop-blur-sm transition-opacity duration-300"
         onClick={onClose}
-        aria-label="Close filters"
+        aria-hidden="true"
       />
 
       {/* Drawer Panel */}

@@ -5,20 +5,7 @@ import { LazyMotion, domAnimation, m } from "framer-motion";
 import { useSession } from "next-auth/react";
 import Link from "next/link";
 import Image from "next/image";
-import dynamic from "next/dynamic";
-
 const SearchForm = lazy(() => import("@/components/SearchForm"));
-const ScrollAnimation = dynamic(
-  () => import("@/components/ScrollAnimation"),
-  {
-    ssr: false,
-    loading: () => (
-      <div className="relative bg-on-surface" style={{ height: "200vh" }}>
-        <div className="sticky top-0 h-screen" />
-      </div>
-    ),
-  }
-);
 import { Button } from "@/components/ui/button";
 import { ShieldCheck, Zap, Coffee, ArrowRight } from "lucide-react";
 import { fadeInUp, staggerContainer } from "@/lib/motion-variants";
@@ -74,6 +61,8 @@ function AuthCTA() {
 }
 
 export default function HomeClient() {
+  const { data: session } = useSession();
+  const isLoggedIn = !!session?.user;
   const searchFormRef = useRef<HTMLDivElement>(null);
 
   return (
@@ -82,10 +71,10 @@ export default function HomeClient() {
         {/* ================================================================
             HERO SECTION — Editorial Living Room
             ================================================================ */}
-        <section aria-label="Search for rooms" className="relative pt-32 pb-16 md:pt-40 md:pb-24 min-h-[100dvh] flex flex-col justify-center overflow-x-hidden">
+        <section aria-label="Search for rooms" className="relative pt-24 pb-12 md:pt-32 md:pb-16 min-h-[60dvh] md:min-h-[80dvh] flex flex-col justify-center overflow-x-hidden">
           <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 w-full z-10">
             <div className="flex flex-col items-center text-center">
-              <div className="w-full flex flex-col items-center justify-center mb-12 md:mb-16">
+              <div className="w-full flex flex-col items-center justify-center mb-8 md:mb-12">
                 <m.div
                   initial="hidden"
                   animate="visible"
@@ -103,9 +92,9 @@ export default function HomeClient() {
                   {/* Newsreader display heading with italic emphasis */}
                   <m.h1
                     variants={fadeInUp}
-                    className="font-display text-4xl md:text-6xl lg:text-[5.5rem] font-normal tracking-tight text-on-surface mb-6 leading-[1.05]"
+                    className="font-display text-4xl sm:text-5xl md:text-6xl lg:text-[5.5rem] font-normal tracking-tight text-on-surface mb-6 leading-[1.05]"
                   >
-                    Finding <em className="italic">Your</em> People,
+                    Finding <em className="italic">Your</em> People,{" "}
                     <br className="hidden md:block" />
                     Not Just a Place
                   </m.h1>
@@ -125,7 +114,7 @@ export default function HomeClient() {
                     ref={searchFormRef}
                     className="w-full mx-auto max-w-4xl relative z-20"
                   >
-                    <div className="bg-surface-container-lowest backdrop-blur-xl border border-outline-variant/20 rounded-2xl shadow-ambient p-2">
+                    <div className="bg-surface-container-lowest backdrop-blur-xl border border-outline-variant/30 rounded-2xl shadow-ambient p-2 sm:p-3">
                       <SearchFormErrorBoundary>
                         <Suspense
                           fallback={
@@ -170,14 +159,6 @@ export default function HomeClient() {
         </section>
 
         {/* ================================================================
-            SCROLL ANIMATION — Cinematic "Walk through the door"
-            Keep dark background per team decision #13
-            ================================================================ */}
-        <ScrollAnimation />
-
-        <div className="h-24 bg-gradient-to-b from-on-surface to-surface-container-high" />
-
-        {/* ================================================================
             FEATURES — "Cozy Spaces, Real People"
             Surface container high background for tonal shift
             ================================================================ */}
@@ -186,7 +167,7 @@ export default function HomeClient() {
             <m.div
               initial="hidden"
               whileInView="visible"
-              viewport={{ once: true, margin: "-100px" }}
+              viewport={{ once: true, margin: "-80px" }}
               variants={staggerContainer}
               className="text-center mb-16 md:mb-20"
             >
@@ -214,9 +195,9 @@ export default function HomeClient() {
             <m.div
               initial="hidden"
               whileInView="visible"
-              viewport={{ once: true, margin: "-100px" }}
+              viewport={{ once: true, margin: "-80px" }}
               variants={staggerContainer}
-              className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-6 sm:gap-8 lg:gap-10 max-w-5xl mx-auto"
+              className="grid grid-cols-1 md:grid-cols-3 gap-6 sm:gap-8 lg:gap-10 max-w-5xl mx-auto"
             >
               <FeatureCard
                 icon={ShieldCheck}
@@ -245,16 +226,17 @@ export default function HomeClient() {
           <m.div
             initial="hidden"
             whileInView="visible"
-            viewport={{ once: true }}
+            viewport={{ once: true, margin: "-80px" }}
             variants={fadeInUp}
             className="max-w-3xl mx-auto px-4 sm:px-6"
           >
-            <h2 className="font-display text-3xl md:text-4xl lg:text-5xl font-normal tracking-tight mb-6 text-on-surface">
-              Your next roommate is already here.
+            <h2 className="font-display text-3xl md:text-4xl lg:text-5xl font-normal tracking-tight mb-6 text-on-surface text-balance">
+              {isLoggedIn ? "Find your perfect room." : "Your next roommate is already here."}
             </h2>
             <p className="text-lg text-on-surface-variant mb-10 max-w-xl mx-auto font-light">
-              Takes 2 minutes to set up a profile. Then start browsing
-              rooms tonight.
+              {isLoggedIn
+                ? "Browse verified listings and connect with roommates who match your lifestyle."
+                : "Takes 2 minutes to set up a profile. Then start browsing rooms tonight."}
             </p>
 
             <div className="flex flex-col sm:flex-row gap-4 justify-center items-center">
@@ -263,16 +245,18 @@ export default function HomeClient() {
                 size="lg"
                 className="w-full sm:w-auto rounded-full px-8 h-12 text-base font-medium"
               >
-                <Link href="/signup">Create Your Profile</Link>
+                <Link href={isLoggedIn ? "/search" : "/signup"}>
+                  {isLoggedIn ? "Browse Rooms" : "Create Your Profile"}
+                </Link>
               </Button>
               <Button
                 asChild
                 variant="outline"
                 size="lg"
-                className="group w-full sm:w-auto rounded-full px-8 h-12 text-base font-medium gap-2"
+                className="group w-full sm:w-auto rounded-full px-8 h-12 text-base font-medium gap-2 bg-surface-container-high sm:bg-transparent"
               >
-                <Link href="/search">
-                  See Rooms Near You{" "}
+                <Link href={isLoggedIn ? "/listings/create" : "/search"}>
+                  {isLoggedIn ? "List Your Room" : "See Rooms Near You"}{" "}
                   <ArrowRight
                     size={16}
                     className="group-hover:translate-x-1 transition-transform"

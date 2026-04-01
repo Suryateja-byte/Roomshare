@@ -568,7 +568,7 @@ export default function BookingsClient({
   ];
 
   return (
-    <div className="min-h-screen bg-surface-canvas pt-20 pb-20">
+    <div className="min-h-screen bg-surface-canvas pt-4 pb-20">
       <div className="container mx-auto max-w-4xl px-6 py-10">
         {/* Header */}
         <div className="flex flex-col sm:flex-row sm:items-start sm:justify-between gap-4 mb-8">

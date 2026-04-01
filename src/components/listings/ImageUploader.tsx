@@ -425,7 +425,7 @@ export default function ImageUploader({
                   className="absolute inset-0 flex flex-col items-center justify-center bg-red-500/90 text-white p-2"
                 >
                   <AlertCircle className="w-5 h-5 mb-1" aria-hidden="true" />
-                  <p className="text-2xs text-center mb-2 line-clamp-2">
+                  <p className="text-xs text-center mb-2 line-clamp-2">
                     {image.error}
                   </p>
                   {image.file && (

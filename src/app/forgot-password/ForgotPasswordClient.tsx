@@ -9,6 +9,7 @@ import { Label } from "@/components/ui/label";
 import TurnstileWidget, {
   type TurnstileWidgetRef,
 } from "@/components/auth/TurnstileWidget";
+import AuthPageLogo from "@/components/auth/AuthPageLogo";
 
 export default function ForgotPasswordClient() {
   const [email, setEmail] = useState("");
@@ -54,8 +55,8 @@ export default function ForgotPasswordClient() {
 
   if (success) {
     return (
-      <div className="min-h-screen bg-surface-canvas flex items-center justify-center px-4">
-        <div className="w-full max-w-md">
+      <div className="min-h-screen bg-surface-canvas flex items-center justify-center px-4 font-body">
+        <div className="w-full max-w-sm">
           <div className="bg-surface-container-lowest rounded-lg shadow-ambient p-8 text-center">
             <div className="w-16 h-16 bg-green-100 rounded-full flex items-center justify-center mx-auto mb-6">
               <CheckCircle2 className="w-8 h-8 text-green-600" />
@@ -90,9 +91,11 @@ export default function ForgotPasswordClient() {
   }
 
   return (
-    <div className="min-h-screen bg-surface-canvas flex items-center justify-center px-4">
-      <div className="w-full max-w-md">
+    <div className="min-h-screen bg-surface-canvas flex items-center justify-center px-4 font-body">
+      <div className="w-full max-w-sm">
         <div className="bg-surface-container-lowest rounded-lg shadow-ambient p-8">
+          <AuthPageLogo />
+
           <Link
             href="/login"
             className="inline-flex items-center gap-2 text-sm text-on-surface-variant hover:text-on-surface transition-colors mb-6"
@@ -129,7 +132,7 @@ export default function ForgotPasswordClient() {
             </div>
 
             {error && (
-              <div className="bg-red-50 border border-red-200 text-red-700 px-4 py-3 rounded-lg text-sm">
+              <div role="alert" className="bg-red-50 border border-red-200 text-red-700 px-4 py-3 rounded-lg text-sm">
                 {error}
               </div>
             )}

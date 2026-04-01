@@ -127,7 +127,7 @@ const ListingCard = ({
               </span>
             </div>
           )}
-          <div className="absolute top-2 right-2 px-2 py-1 bg-surface-container-lowest/90 backdrop-blur-sm rounded-lg text-2xs font-bold uppercase tracking-wide text-green-600">
+          <div className="absolute top-2 right-2 px-2 py-1 bg-surface-container-lowest/90 backdrop-blur-sm rounded-lg text-xs font-bold uppercase tracking-wide text-green-600">
             {listing.availableSlots > 0 ? "Active" : "Full"}
           </div>
         </div>
@@ -168,7 +168,7 @@ export default function ProfileClient({ user }: { user: UserWithListings }) {
   // Loading skeleton when user data is incomplete
   if (!user || !user.id) {
     return (
-      <div className="min-h-screen bg-surface-canvas font-body pb-20 pt-20">
+      <div className="min-h-screen bg-surface-canvas font-body pb-20 pt-4">
         <div className="container mx-auto max-w-5xl px-4 sm:px-6 py-10">
           <div className="bg-surface-container-lowest rounded-2xl sm:rounded-[2.5rem] p-6 sm:p-8 md:p-12 shadow-ambient-sm border border-outline-variant/20 mb-8">
             <div className="flex flex-col md:flex-row gap-6 md:gap-8 md:items-start animate-pulse">

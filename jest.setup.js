@@ -124,7 +124,7 @@ jest.mock("@marsidev/react-turnstile", () => {
   const React = require("react");
   return {
     __esModule: true,
-    Turnstile: React.forwardRef(function MockTurnstile({ onSuccess }) {
+    Turnstile: React.forwardRef(function MockTurnstile({ onSuccess }, _ref) {
       React.useEffect(() => {
         if (onSuccess) onSuccess("mock-turnstile-token");
       }, [onSuccess]);

@@ -140,7 +140,7 @@ export default function NotificationCenter() {
       >
         <Bell className="w-5 h-5" />
         {unreadCount > 0 && (
-          <span className="absolute top-0 right-0 w-4 h-4 bg-primary text-on-primary text-2xs font-bold flex items-center justify-center rounded-full">
+          <span className="absolute top-0 right-0 w-4 h-4 bg-primary text-on-primary text-xs font-bold flex items-center justify-center rounded-full">
             {unreadCount > 9 ? "9+" : unreadCount}
           </span>
         )}
@@ -209,7 +209,7 @@ export default function NotificationCenter() {
                         <p className="text-xs text-on-surface-variant line-clamp-2 mt-0.5">
                           {notification.message}
                         </p>
-                        <p className="text-2xs text-on-surface-variant mt-1">
+                        <p className="text-xs text-on-surface-variant mt-1">
                           {formatTimeAgo(notification.createdAt)}
                         </p>
                       </div>

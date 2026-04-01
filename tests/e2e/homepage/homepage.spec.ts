@@ -93,4 +93,31 @@ test.describe("Homepage — Authenticated User", () => {
     const href = await listLink.getAttribute("href");
     expect(href).toMatch(/\/listings\/create/);
   });
+
+  test("HP-13: Mobile menu remains full-screen after scrolling", async ({
+    page,
+  }) => {
+    const viewport = page.viewportSize();
+    test.skip(!viewport || viewport.width >= 768, "Mobile only");
+
+    await page.evaluate(() => {
+      const scroller = document.querySelector(".custom-scroll-hide");
+      if (scroller) {
+        scroller.scrollTop = 300;
+      }
+    });
+
+    await page.waitForTimeout(500);
+
+    const hamburger = page.getByLabel(/open menu/i);
+    await expect(hamburger).toBeVisible({ timeout: 10000 });
+    await hamburger.click();
+
+    const dialog = page.getByRole("dialog", { name: /navigation menu/i });
+    await expect(dialog).toBeVisible({ timeout: 10000 });
+
+    const box = await dialog.boundingBox();
+    expect(box).not.toBeNull();
+    expect(box!.height).toBeGreaterThan(viewport!.height * 0.9);
+  });
 });

@@ -619,14 +619,14 @@ export default function BookingForm({
                       year: "numeric",
                     })}
                   </span>
-                  <span className="text-red-500 text-2xs uppercase font-bold">
+                  <span className="text-red-500 text-xs uppercase font-bold">
                     Booked
                   </span>
                 </div>
               );
             })}
           </div>
-          <p className="text-2xs text-on-surface-variant mt-2 flex items-center gap-1">
+          <p className="text-xs text-on-surface-variant mt-2 flex items-center gap-1">
             <Info className="w-3 h-3" />
             Select dates that don&apos;t overlap with booked periods
           </p>

@@ -877,7 +877,7 @@ export default function ChatWindow({
                         className={`flex items-center gap-1 mt-1 ${isMe ? "justify-end" : ""}`}
                       >
                         <span
-                          className={`text-2xs ${isMe ? (msg.failed ? "text-red-300" : "text-on-surface-variant/60") : "text-on-surface-variant/60"}`}
+                          className={`text-xs ${isMe ? (msg.failed ? "text-red-300" : "text-on-surface-variant/60") : "text-on-surface-variant/60"}`}
                         >
                           {new Date(msg.createdAt).toLocaleTimeString([], {
                             hour: "2-digit",

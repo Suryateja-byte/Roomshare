@@ -33,6 +33,7 @@ jest.mock("next/link", () => {
 // Mock fetch — save original and restore in afterAll to prevent cross-file leaks
 const originalFetch = global.fetch;
 const mockFetch = jest.fn();
+const validPassword = "password12345";
 beforeAll(() => {
   global.fetch = mockFetch;
 });
@@ -81,10 +82,10 @@ describe("SignUpPage", () => {
 
     await userEvent.type(screen.getByLabelText(/full name/i), "Test User");
     await userEvent.type(screen.getByLabelText(/email/i), "test@example.com");
-    await userEvent.type(screen.getByLabelText("Password"), "password123");
+    await userEvent.type(screen.getByLabelText("Password"), validPassword);
     await userEvent.type(
       screen.getByLabelText("Confirm Password"),
-      "password123"
+      validPassword
     );
     await userEvent.click(screen.getByRole("checkbox"));
     await userEvent.click(
@@ -103,7 +104,7 @@ describe("SignUpPage", () => {
     await waitFor(() => {
       expect(mockSignIn).toHaveBeenCalledWith("credentials", {
         email: "test@example.com",
-        password: "password123",
+        password: validPassword,
         redirect: false,
       });
     });
@@ -122,10 +123,10 @@ describe("SignUpPage", () => {
       screen.getByLabelText(/email/i),
       "existing@example.com"
     );
-    await userEvent.type(screen.getByLabelText("Password"), "password123");
+    await userEvent.type(screen.getByLabelText("Password"), validPassword);
     await userEvent.type(
       screen.getByLabelText("Confirm Password"),
-      "password123"
+      validPassword
     );
     await userEvent.click(screen.getByRole("checkbox"));
     await userEvent.click(
@@ -152,10 +153,10 @@ describe("SignUpPage", () => {
 
     await userEvent.type(screen.getByLabelText(/full name/i), "Test User");
     await userEvent.type(screen.getByLabelText(/email/i), "test@example.com");
-    await userEvent.type(screen.getByLabelText("Password"), "password123");
+    await userEvent.type(screen.getByLabelText("Password"), validPassword);
     await userEvent.type(
       screen.getByLabelText("Confirm Password"),
-      "password123"
+      validPassword
     );
     await userEvent.click(screen.getByRole("checkbox"));
     await userEvent.click(
@@ -164,7 +165,9 @@ describe("SignUpPage", () => {
 
     // Button should be disabled during loading
     await waitFor(() => {
-      expect(screen.getByRole("button", { name: "" })).toBeDisabled();
+      expect(
+        screen.getByRole("button", { name: /creating account/i })
+      ).toBeDisabled();
     });
   });
 
@@ -184,10 +187,10 @@ describe("SignUpPage", () => {
 
     await userEvent.type(screen.getByLabelText(/full name/i), "Test User");
     await userEvent.type(screen.getByLabelText(/email/i), "test@example.com");
-    await userEvent.type(screen.getByLabelText("Password"), "password123");
+    await userEvent.type(screen.getByLabelText("Password"), validPassword);
     await userEvent.type(
       screen.getByLabelText("Confirm Password"),
-      "password123"
+      validPassword
     );
     await userEvent.click(screen.getByRole("checkbox"));
     await userEvent.click(
