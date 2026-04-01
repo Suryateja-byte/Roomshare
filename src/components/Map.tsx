@@ -34,6 +34,7 @@ import Image from "next/image";
 import { useRouter, useSearchParams } from "next/navigation";
 import { Home, Loader2, MapPin, Maximize2, X } from "lucide-react";
 import { triggerHaptic } from "@/lib/haptics";
+import { formatPrice } from "@/lib/format";
 import { Button } from "./ui/button";
 import { MAP_FLY_TO_EVENT, MapFlyToEventDetail } from "./SearchForm";
 import { useListingFocus } from "@/contexts/ListingFocusContext";
@@ -571,7 +572,7 @@ const MapMarkerItem = React.memo(function MapMarkerItem({
     [listingId, onClickById, onKeyboardNav]
   );
 
-  const ariaLabel = `$${price}/month${title ? `, ${title}` : ""}${availableSlots > 0 ? `, ${availableSlots} spots available` : ", currently filled"}. Use arrow keys to navigate between markers.`;
+  const ariaLabel = `${formatPrice(price)} per month${title ? `, ${title}` : ""}${availableSlots > 0 ? `, ${availableSlots} spots available` : ", currently filled"}. Use arrow keys to navigate between markers.`;
 
   return (
     <Marker
@@ -2670,7 +2671,7 @@ export default function MapComponent({
         aria-atomic="true"
       >
         {selectedListing
-          ? `Selected listing: ${selectedListing.title}, $${selectedListing.price} per month, ${selectedListing.availableSlots > 0 ? `${selectedListing.availableSlots} spots available` : "currently filled"}`
+          ? `Selected listing: ${selectedListing.title}, ${formatPrice(selectedListing.price)} per month, ${selectedListing.availableSlots > 0 ? `${selectedListing.availableSlots} spots available` : "currently filled"}`
           : ""}
       </div>
 
@@ -2699,7 +2700,7 @@ export default function MapComponent({
             const index = sortedMarkerPositions.findIndex(
               (p) => p.listing.id === keyboardFocusedId
             );
-            return `Marker ${index + 1} of ${sortedMarkerPositions.length}: ${focused.listing.title || "Listing"}, $${focused.listing.price} per month`;
+            return `Marker ${index + 1} of ${sortedMarkerPositions.length}: ${focused.listing.title || "Listing"}, ${formatPrice(focused.listing.price)} per month`;
           })()}
       </div>
 

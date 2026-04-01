@@ -1785,7 +1785,7 @@ describe("Map Component", () => {
       markerWrappers.forEach((wrapper) => {
         const ariaLabel = wrapper.getAttribute("aria-label");
         expect(ariaLabel).toBeTruthy();
-        expect(ariaLabel).toMatch(/\$\d+\/month/);
+        expect(ariaLabel).toMatch(/\$[\d,]+ per month/);
       });
     });
 

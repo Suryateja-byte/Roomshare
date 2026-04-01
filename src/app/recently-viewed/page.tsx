@@ -4,7 +4,7 @@ import { getRecentlyViewed } from "@/app/actions/listing-status";
 import RecentlyViewedClient from "./RecentlyViewedClient";
 
 export const metadata = {
-  title: "Recently Viewed | RoomShare",
+  title: "Recently Viewed | Roomshare",
   description: "Listings you have recently viewed",
 };
 

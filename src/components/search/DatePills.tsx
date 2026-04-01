@@ -2,6 +2,7 @@
 
 import { useCallback } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
+import { formatPrice } from "@/lib/format";
 
 export interface DateSuggestion {
   /** Display label, e.g. "Feb 15 – Mar 15" */
@@ -55,11 +56,7 @@ export function DatePills({ suggestions }: DatePillsProps) {
               {suggestion.label}
             </span>
             <span className="text-xs text-green-600 font-medium whitespace-nowrap">
-              ~$
-              {suggestion.avgPrice.toLocaleString("en-US", {
-                maximumFractionDigits: 0,
-              })}
-              /mo
+              ~{formatPrice(suggestion.avgPrice)}/mo
             </span>
           </button>
         ))}
