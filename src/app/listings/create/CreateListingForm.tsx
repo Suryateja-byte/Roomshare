@@ -617,6 +617,7 @@ export default function CreateListingForm({
                 key={section.id}
                 className="flex items-center flex-1"
                 aria-label={`Step ${index + 1} of ${FORM_SECTIONS.length}: ${section.label}, ${isComplete ? "complete" : "incomplete"}`}
+                data-step-complete={isComplete}
               >
                 {/* Step Circle */}
                 <div className="flex flex-col items-center">

@@ -1498,7 +1498,8 @@ describe("Map Component", () => {
       render(<MapComponent listings={[]} />);
 
       await act(async () => {
-        jest.advanceTimersByTime(100);
+        // Advance past the 1.5s map initialization gate + render cycle
+        jest.advanceTimersByTime(2000);
       });
 
       expect(screen.getByText(/no listings in this area/i)).toBeInTheDocument();
@@ -1511,7 +1512,7 @@ describe("Map Component", () => {
       render(<MapComponent listings={[]} />);
 
       await act(async () => {
-        jest.advanceTimersByTime(100);
+        jest.advanceTimersByTime(2000);
       });
 
       expect(
