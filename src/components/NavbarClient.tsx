@@ -518,7 +518,9 @@ export default function NavbarClient({
     <header
       className={`fixed top-0 left-0 right-0 z-dropdown transition-[transform,opacity,background-color,border-color] duration-300 ease-[cubic-bezier(0.16,1,0.3,1)] data-[anim-hidden=true]:-translate-y-full data-[anim-hidden=true]:opacity-0 data-[anim-hidden=true]:pointer-events-none data-[anim-hidden=true]:border-transparent ${
         isScrolled
-          ? "py-4 glass-nav"
+          ? isMobileMenuOpen
+            ? "py-4 bg-transparent"
+            : "py-4 glass-nav"
           : "py-6 bg-transparent"
       }`}
     >
