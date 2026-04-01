@@ -4,6 +4,7 @@ import { useState } from "react";
 import Link from "next/link";
 import Image from "next/image";
 import { Clock, Search, MapPin, Home } from "lucide-react";
+import { formatPrice } from "@/lib/format";
 
 // Placeholder images for when listing has no images
 const PLACEHOLDER_IMAGES = [
@@ -173,7 +174,7 @@ export default function RecentlyViewedClient({
                     </p>
                   )}
                   <p className="font-semibold text-on-surface mt-2">
-                    ${(listing.price ?? 0).toLocaleString()}
+                    {formatPrice(listing.price ?? 0)}
                     <span className="text-on-surface-variant font-normal text-sm">
                       /mo
                     </span>

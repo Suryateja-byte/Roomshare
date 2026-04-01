@@ -390,8 +390,8 @@ function ListingCardInner({
                     {formatPrice(listing.price)}
                   </span>
                   {listing.price > 0 && (
-                    <span className="text-on-surface-variant text-xs ml-1 uppercase tracking-wider font-medium">
-                      / mo
+                    <span className="text-on-surface-variant text-xs ml-1 tracking-wider font-medium">
+                      /mo
                     </span>
                   )}
                 </>

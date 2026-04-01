@@ -7,6 +7,11 @@ export function formatPrice(price: number): string {
   return `$${priceFormatter.format(price)}`;
 }
 
+/** Canonical monthly price: "$1,500/mo" */
+export function formatPricePerMonth(price: number): string {
+  return `${formatPrice(price)}/mo`;
+}
+
 export function formatPriceCompact(price: number): string {
   const num = typeof price === "number" ? price : parseInt(String(price), 10);
   if (isNaN(num)) return "$0";
