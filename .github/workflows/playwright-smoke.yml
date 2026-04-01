@@ -102,7 +102,7 @@ jobs:
         run: pnpm exec playwright test tests/e2e/search-smoke.spec.ts --project=chromium
 
       - name: Upload Playwright Report
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v7
         if: ${{ !cancelled() }}
         with:
           name: playwright-report

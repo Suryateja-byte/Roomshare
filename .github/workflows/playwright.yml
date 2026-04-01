@@ -150,7 +150,7 @@ jobs:
             --project=webkit-anon
 
       - name: Upload blob report
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v7
         if: ${{ !cancelled() }}
         with:
           name: blob-report-${{ matrix.shardIndex }}
@@ -158,7 +158,7 @@ jobs:
           retention-days: 7
 
       - name: Upload test artifacts on failure
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v7
         if: failure()
         with:
           name: test-results-shard-${{ matrix.shardIndex }}
@@ -203,7 +203,7 @@ jobs:
         run: pnpm exec playwright merge-reports --reporter=html ./all-blob-reports
 
       - name: Upload merged HTML report
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v7
         with:
           name: playwright-html-report
           path: playwright-report/
