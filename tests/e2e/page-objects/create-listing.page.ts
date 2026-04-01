@@ -368,12 +368,11 @@ export class CreateListingPage {
   // ── Progress Indicator ──
 
   async getCompletedStepCount(): Promise<number> {
-    // TODO: add data-step-complete attribute to step circles in CreateListingForm
-    // Completed step circles show a Check icon (green background with checkmark)
-    const greenSteps = this.page.locator(
-      '[data-testid="progress-steps"] .w-10.h-10.rounded-full.bg-green-50, [data-testid="progress-steps"] .w-10.h-10.rounded-full[class*="bg-green-900"]'
+    // Use data-step-complete attribute for reliable detection across themes
+    const completedSteps = this.page.locator(
+      '[data-testid="progress-steps"] [data-step-complete="true"]'
     );
-    return greenSteps.count();
+    return completedSteps.count();
   }
 
   async expectProgressText(text: string | RegExp) {

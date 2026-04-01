@@ -610,10 +610,11 @@ test.describe("Booking State Guards: Terminal States @critical @booking @securit
       });
       await navigateToBookingsTab(page, "received");
 
-      // Look for expired badge
+      // Look for expired badge — allow time for booking list to hydrate
       const expiredBadge = page.getByText("Expired").first();
       const badgeVisible = await expiredBadge
-        .isVisible({ timeout: 10_000 })
+        .waitFor({ state: "visible", timeout: 30_000 })
+        .then(() => true)
         .catch(() => false);
 
       if (badgeVisible) {

@@ -864,6 +864,8 @@ export default function MapComponent({
   // Scale map label text with OS/browser font-size (Dynamic Type support)
   const [textScale, setTextScale] = useState(1);
   const [isMapLoaded, setIsMapLoaded] = useState(false);
+  // Suppress MapEmptyState during initialization — map data fetch lags behind list SSR
+  const [isMapInitialized, setIsMapInitialized] = useState(false);
   const [isWebglContextLost, setIsWebglContextLost] = useState(false);
   const [mapRemountKey, setMapRemountKey] = useState(0);
   const [currentZoom, setCurrentZoom] = useState(12);
@@ -1003,6 +1005,17 @@ export default function MapComponent({
       roomshare.mapInitCount = ((roomshare.mapInitCount as number) || 0) + 1;
     }
   }, []); // Empty deps = only on mount
+
+  // Mark map as initialized after data has had time to arrive.
+  // Prevents "No listings" flash while map fetch catches up to list SSR.
+  useEffect(() => {
+    if (listings.length > 0) {
+      setIsMapInitialized(true);
+      return;
+    }
+    const timer = setTimeout(() => setIsMapInitialized(true), 1500);
+    return () => clearTimeout(timer);
+  }, [listings.length]);
 
   // Detect dark mode
   useEffect(() => {
@@ -3294,6 +3307,7 @@ export default function MapComponent({
 
       {/* Empty state overlay - when map is loaded but no listings in viewport */}
       {isMapLoaded &&
+        isMapInitialized &&
         !areTilesLoading &&
         !isSearching &&
         !suppressEmptyState &&

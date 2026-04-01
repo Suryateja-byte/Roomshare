@@ -243,12 +243,11 @@ test.describe("Authentication Journeys", () => {
         .click();
 
       // Should show error without revealing which field is wrong
+      // Scope to the form error container to avoid matching unrelated alerts
       await expect(
-        page
-          .getByText(/invalid|incorrect|wrong|failed/i)
-          .first()
-          .or(page.locator('[role="alert"]').first())
-      ).toBeVisible({ timeout: 30000 });
+        page.locator('#form-error[role="alert"]:not(:empty)')
+          .or(page.locator('form').getByText(/invalid|incorrect|wrong|failed|check your/i).first())
+      ).toBeVisible({ timeout: 30_000 });
 
       // Should stay on login page
       await expect(page).toHaveURL(/\/login/);
