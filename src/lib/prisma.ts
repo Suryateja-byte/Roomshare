@@ -19,7 +19,9 @@ const FALLBACK_DATABASE_URL =
 const getDatasourceUrl = () => {
   const baseUrl = process.env.DATABASE_URL;
   if (!baseUrl) {
-    if (process.env.NODE_ENV === "test") {
+    // Allow build-time static generation (no DB needed for prerendering)
+    // NEXT_PHASE is set by Next.js during `next build`
+    if (process.env.NODE_ENV === "test" || process.env.NEXT_PHASE) {
       return FALLBACK_DATABASE_URL;
     }
 
