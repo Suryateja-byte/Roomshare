@@ -159,6 +159,18 @@ let capturedMapProps: Record<string, any> = {};
 /* eslint-disable @typescript-eslint/no-require-imports, react/display-name */
 jest.mock("react-map-gl/maplibre", () => {
   const React = require("react");
+  const pickDomProps = (props: Record<string, unknown>) =>
+    Object.fromEntries(
+      Object.entries(props).filter(([key]) =>
+        key === "className" ||
+        key === "style" ||
+        key === "id" ||
+        key === "role" ||
+        key === "tabIndex" ||
+        key.startsWith("data-") ||
+        key.startsWith("aria-")
+      )
+    );
 
   const MockMap = React.forwardRef(
     (
@@ -242,7 +254,7 @@ jest.mock("react-map-gl/maplibre", () => {
           "data-scroll-zoom": String(scrollZoom),
           "data-double-click-zoom": String(doubleClickZoom),
           "data-keyboard": String(keyboard),
-          ...props,
+          ...pickDomProps(props),
         },
         children
       );
@@ -276,7 +288,7 @@ jest.mock("react-map-gl/maplibre", () => {
             });
           }
         },
-        ...props,
+        ...pickDomProps(props),
       },
       children
     );
@@ -294,7 +306,7 @@ jest.mock("react-map-gl/maplibre", () => {
       "div",
       {
         "data-testid": "map-popup",
-        ...props,
+        ...pickDomProps(props),
       },
       children
     );
@@ -310,14 +322,17 @@ jest.mock("react-map-gl/maplibre", () => {
     const React = require("react");
     return React.createElement(
       "div",
-      { "data-testid": "map-source", ...props },
+      { "data-testid": "map-source", ...pickDomProps(props) },
       children
     );
   };
 
   const MockLayer = (props: Record<string, unknown>) => {
     const React = require("react");
-    return React.createElement("div", { "data-testid": "map-layer", ...props });
+    return React.createElement("div", {
+      "data-testid": "map-layer",
+      ...pickDomProps(props),
+    });
   };
 
   return {

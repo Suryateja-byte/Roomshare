@@ -339,7 +339,9 @@ describe("PersistentMapWrapper - Networking & Race Conditions (P1-7)", () => {
       );
 
       // Should show loading placeholder
-      expect(container.textContent).toContain("Loading map");
+      expect(
+        container.querySelector('[role="status"][aria-label="Loading map"]')
+      ).toBeInTheDocument();
 
       // Should NOT have made API call (waiting for v2 data)
       expect(mockFetch).not.toHaveBeenCalled();

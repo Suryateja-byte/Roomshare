@@ -248,8 +248,8 @@ describe("CreateListingForm", () => {
     it("shows progress indicator", () => {
       render(<CreateListingForm />);
 
-      // Details section is always complete by default, so 1/4 is shown
-      expect(screen.getByText(/1\/4 complete/)).toBeInTheDocument();
+      // A fresh form starts with no sections complete.
+      expect(screen.getByText(/0\/4 complete/)).toBeInTheDocument();
     });
 
     it("displays form fields", () => {

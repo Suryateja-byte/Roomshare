@@ -50,7 +50,7 @@ describe("filter-chip-utils", () => {
         const params = new URLSearchParams("minPrice=10000&maxPrice=50000");
         const chips = urlToFilterChips(params);
 
-        expect(chips[0].label).toBe("$10,000 - $50,000");
+        expect(chips[0].label).toBe("$10k - $50k");
       });
 
       it("supports zero as a valid min price", () => {

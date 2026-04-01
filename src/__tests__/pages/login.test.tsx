@@ -146,7 +146,7 @@ describe("LoginPage", () => {
     await userEvent.click(screen.getByRole("button", { name: /sign in/i }));
 
     // Submit button should be disabled during loading
-    const submitButton = screen.getByRole("button", { name: "" });
+    const submitButton = screen.getByRole("button", { name: /signing in/i });
     expect(submitButton).toBeDisabled();
   });
 });
