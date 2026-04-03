@@ -68,7 +68,6 @@ function setCachedCount(cacheKey: string, count: number | null): void {
 export function useFilterImpactCount({
   searchParams,
   chip,
-  isHovering,
   currentCount,
 }: UseFilterImpactCountOptions): UseFilterImpactCountReturn {
   const [countWithoutFilter, setCountWithoutFilter] = useState<number | null>(
@@ -164,18 +163,9 @@ export function useFilterImpactCount({
     }
   }, [cacheKey, searchParams, chip]);
 
-  // Effect to trigger debounced fetch on hover
+  // Fetch impact count on mount (eagerly) so badges show instantly
   useEffect(() => {
-    // Clear any pending timeout
-    if (debounceTimeoutRef.current) {
-      clearTimeout(debounceTimeoutRef.current);
-      debounceTimeoutRef.current = null;
-    }
-
-    // Only fetch when hovering and haven't fetched yet for this chip
-    if (!isHovering || hasFetched) {
-      return;
-    }
+    if (hasFetched) return;
 
     // Check cache immediately
     const cached = getCachedCount(cacheKey);
@@ -185,12 +175,11 @@ export function useFilterImpactCount({
       return;
     }
 
-    // Debounce the fetch
+    // Small delay to batch multiple chips appearing at once
     debounceTimeoutRef.current = setTimeout(() => {
       fetchCount();
     }, DEBOUNCE_MS);
 
-    // Cleanup on unmount or dependency change
     return () => {
       if (debounceTimeoutRef.current) {
         clearTimeout(debounceTimeoutRef.current);
@@ -199,7 +188,7 @@ export function useFilterImpactCount({
         abortControllerRef.current.abort();
       }
     };
-  }, [isHovering, hasFetched, cacheKey, fetchCount]);
+  }, [hasFetched, cacheKey, fetchCount]);
 
   // Reset hasFetched when chip changes
   useEffect(() => {

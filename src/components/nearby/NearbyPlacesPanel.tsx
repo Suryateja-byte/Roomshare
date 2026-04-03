@@ -10,11 +10,10 @@
  *
  * COMPLIANCE CRITICAL:
  * - NO API call on mount (only on explicit user interaction)
- * - Requires authentication to search
+ * - Available to guests and signed-in users
  */
 
 import React, { useState, useCallback, useRef, useEffect } from "react";
-import { useSession } from "next-auth/react";
 import {
   MapPin,
   Search,
@@ -27,7 +26,6 @@ import {
   Dumbbell,
   Pill,
 } from "lucide-react";
-import { Button } from "@/components/ui/button";
 import {
   CATEGORY_CHIPS,
   RADIUS_OPTIONS,
@@ -60,7 +58,6 @@ export default function NearbyPlacesPanel({
   onPlacesChange,
   onPlaceHover,
 }: NearbyPlacesPanelProps) {
-  const { data: session, status } = useSession();
   const [searchQuery, setSearchQuery] = useState("");
   const [selectedChip, setSelectedChip] = useState<CategoryChip | null>(null);
   const [selectedRadius, setSelectedRadius] = useState<number>(
@@ -211,61 +208,6 @@ export default function NearbyPlacesPanel({
     abortControllerRef.current?.abort();
   }, [listingLat, listingLng]);
 
-  // Auth gate - show loading skeleton
-  if (status === "loading") {
-    return (
-      <div className="p-4 sm:p-6 animate-pulse space-y-4">
-        <div className="h-12 bg-surface-container-high rounded-2xl" />
-        <div className="flex gap-2 overflow-x-auto hide-scrollbar">
-          {[1, 2, 3, 4].map((i) => (
-            <div
-              key={i}
-              className="h-10 w-28 flex-shrink-0 bg-surface-container-high rounded-full"
-            />
-          ))}
-        </div>
-      </div>
-    );
-  }
-
-  // Auth gate - show login prompt
-  if (status === "unauthenticated" || !session) {
-    return (
-      <div
-        className="
-          flex flex-col items-center justify-center
-          h-full py-16 px-6 text-center
-          bg-gradient-to-br from-surface-canvas to-surface-container-high
-         
-        "
-      >
-        <div
-          className="
-            w-14 h-14 mb-4
-            flex items-center justify-center
-            bg-gradient-to-br from-primary to-primary-container
-            rounded-lg shadow-ambient-lg shadow-primary/30
-          "
-        >
-          <MapPin className="w-6 h-6 text-white" />
-        </div>
-        <h3 className="text-lg font-semibold text-on-surface">
-          Explore nearby places
-        </h3>
-        <p className="text-sm text-on-surface-variant mt-1 mb-4 max-w-xs">
-          Sign in to discover restaurants, stores, and services near this
-          listing
-        </p>
-        <Button variant="primary" size="sm" asChild>
-          <a href="/login" className="gap-2">
-            <span>Sign in to explore</span>
-            <ArrowRight className="w-4 h-4" />
-          </a>
-        </Button>
-      </div>
-    );
-  }
-
   return (
     <div className="flex flex-col h-full">
       {/* Search & Filters (Sticky Header) */}
@@ -408,7 +350,7 @@ export default function NearbyPlacesPanel({
 
       {/* Results Area - Scrollable */}
       <div
-        className="flex-1 overflow-y-auto hide-scrollbar p-4 sm:px-6 space-y-3 bg-surface-canvas/50 pb-24 lg:pb-4"
+        className="flex-1 overflow-y-auto hide-scrollbar-mobile p-4 sm:px-6 space-y-3 bg-surface-canvas/50 pb-24 lg:pb-4"
         tabIndex={0}
         role="region"
         aria-busy={isLoading}
@@ -448,9 +390,7 @@ export default function NearbyPlacesPanel({
             <div>
               <p className="text-sm font-medium">{error}</p>
               {errorDetails && (
-                <p className="text-xs text-red-500 mt-1">
-                  {errorDetails}
-                </p>
+                <p className="text-xs text-red-500 mt-1">{errorDetails}</p>
               )}
             </div>
           </div>

@@ -172,7 +172,7 @@ function ListingCardCarousel({
       {/* Scroll container */}
       <div
         ref={scrollContainerRef}
-        className="flex w-full h-full snap-x snap-mandatory overflow-x-auto scrollbar-hide"
+        className="flex w-full h-full snap-x snap-mandatory overflow-x-auto hide-scrollbar"
         onScroll={handleScroll}
         style={{ scrollSnapType: "x mandatory" }}
       >

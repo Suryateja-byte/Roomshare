@@ -1,0 +1,93 @@
+- generic [active] [ref=e1]:
+  - link "Skip to main content" [ref=e2] [cursor=pointer]:
+    - /url: "#main-content"
+  - generic [ref=e5]:
+    - banner [ref=e6]:
+      - navigation "Main navigation" [ref=e7]:
+        - generic [ref=e9]:
+          - link "R RoomShare." [ref=e10] [cursor=pointer]:
+            - /url: /
+            - generic [ref=e11]: R
+            - generic [ref=e12]: RoomShare.
+          - generic [ref=e13]:
+            - link "Find a Room" [ref=e14] [cursor=pointer]:
+              - /url: /search
+            - link "How it works" [ref=e15] [cursor=pointer]:
+              - /url: /about
+          - generic [ref=e16]:
+            - generic [ref=e17]:
+              - button "Notifications" [ref=e19]:
+                - img [ref=e20]
+              - link "Messages" [ref=e23] [cursor=pointer]:
+                - /url: /messages
+                - img [ref=e24]
+            - generic [ref=e26]:
+              - link "Log in" [ref=e27] [cursor=pointer]:
+                - /url: /login
+              - link "Join" [ref=e28] [cursor=pointer]:
+                - /url: /signup
+    - main [ref=e29]:
+      - generic [ref=e31]:
+        - img [ref=e33]
+        - heading "This page packed up and moved out" [level=1] [ref=e36]
+        - paragraph [ref=e37]: The page you're looking for was removed or never existed. Let's get you somewhere better.
+        - generic [ref=e38]:
+          - link "Browse Listings" [ref=e39] [cursor=pointer]:
+            - /url: /search
+            - img [ref=e40]
+            - text: Browse Listings
+          - link "Back to Home" [ref=e43] [cursor=pointer]:
+            - /url: /
+            - img [ref=e44]
+            - text: Back to Home
+    - contentinfo [ref=e47]:
+      - generic [ref=e48]:
+        - generic [ref=e49]:
+          - generic [ref=e50]:
+            - link "R RoomShare." [ref=e51] [cursor=pointer]:
+              - /url: /
+              - generic [ref=e52]: R
+              - generic [ref=e53]: RoomShare.
+            - paragraph [ref=e54]: Find your people, not just a place.
+          - navigation "Platform" [ref=e55]:
+            - heading "Platform" [level=2] [ref=e56]
+            - list [ref=e57]:
+              - listitem [ref=e58]:
+                - link "Browse" [ref=e59] [cursor=pointer]:
+                  - /url: /search
+              - listitem [ref=e60]:
+                - link "List a Room" [ref=e61] [cursor=pointer]:
+                  - /url: /listings/create
+              - listitem [ref=e62]:
+                - button "Safety" [ref=e63]
+          - navigation "Company" [ref=e64]:
+            - heading "Company" [level=2] [ref=e65]
+            - list [ref=e66]:
+              - listitem [ref=e67]:
+                - link "About" [ref=e68] [cursor=pointer]:
+                  - /url: /about
+              - listitem [ref=e69]:
+                - button "Careers" [ref=e70]
+              - listitem [ref=e71]:
+                - button "Blog" [ref=e72]
+          - navigation "Support" [ref=e73]:
+            - heading "Support" [level=2] [ref=e74]
+            - list [ref=e75]:
+              - listitem [ref=e76]:
+                - button "Help Center" [ref=e77]
+              - listitem [ref=e78]:
+                - button "Contact" [ref=e79]
+          - navigation "Legal" [ref=e80]:
+            - heading "Legal" [level=2] [ref=e81]
+            - list [ref=e82]:
+              - listitem [ref=e83]:
+                - button "Privacy" [ref=e84]
+              - listitem [ref=e85]:
+                - button "Terms" [ref=e86]
+        - generic [ref=e87]:
+          - paragraph [ref=e88]: © 2026 RoomShare Inc.
+          - generic [ref=e89]:
+            - button "Instagram (coming soon)" [ref=e90]: Instagram
+            - button "X, formerly Twitter (coming soon)" [ref=e91]: X
+            - button "LinkedIn (coming soon)" [ref=e92]: LinkedIn
+  - region "Notifications alt+T"

@@ -32,6 +32,7 @@ import Link from "next/link";
 import UserAvatar from "@/components/UserAvatar";
 import { useBlockStatus } from "@/hooks/useBlockStatus";
 import BlockedConversationBanner from "@/components/chat/BlockedConversationBanner";
+import { useMediaQuery } from "@/hooks/useMediaQuery";
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -104,6 +105,7 @@ export default function MessagesPageClient({
   currentUserId,
   initialConversations,
 }: MessagesPageClientProps) {
+  const isMobileViewport = useMediaQuery("(max-width: 767px)");
   const [conversations, setConversations] =
     useState<Conversation[]>(initialConversations);
   const [activeId, setActiveId] = useState<string | null>(null);
@@ -311,11 +313,15 @@ export default function MessagesPageClient({
 
   // Set active conversation if there are conversations
   useEffect(() => {
-    if (initialConversations.length > 0 && !activeId) {
+    if (
+      isMobileViewport === false &&
+      initialConversations.length > 0 &&
+      !activeId
+    ) {
       setActiveId(initialConversations[0].id);
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps -- intentional dependency omission to prevent infinite loops
-  }, [initialConversations]);
+  }, [initialConversations, isMobileViewport]);
 
   // Scroll to bottom when messages change
   useEffect(() => {
@@ -724,7 +730,7 @@ export default function MessagesPageClient({
   return (
     <div
       data-testid="messages-page"
-      className="fixed inset-0 z-40 bg-surface-container-lowest flex overflow-hidden font-body selection:bg-on-surface selection:text-white pt-[80px]"
+      className="fixed inset-0 z-40 bg-surface-container-lowest flex overflow-hidden font-body selection:bg-on-surface selection:text-white pt-[80px] pb-[calc(4rem+env(safe-area-inset-bottom,0px))] md:pb-0"
     >
       {/* Sidebar */}
       <div
@@ -790,7 +796,17 @@ export default function MessagesPageClient({
               <div
                 key={c.id}
                 data-testid="conversation-item"
-                onClick={() => setActiveId(c.id)}
+                onClick={() => {
+                  const shouldOpenThreadRoute =
+                    typeof window !== "undefined" &&
+                    window.matchMedia("(max-width: 767px)").matches;
+
+                  if (shouldOpenThreadRoute || isMobileViewport) {
+                    router.push(`/messages/${c.id}`);
+                    return;
+                  }
+                  setActiveId(c.id);
+                }}
                 className={`px-6 py-4 flex gap-4 cursor-pointer transition-colors border-l-4 ${activeId === c.id ? "bg-surface-canvas border-outline-variant/20" : "bg-surface-container-lowest border-transparent hover:bg-surface-canvas"}`}
               >
                 <div className="relative">

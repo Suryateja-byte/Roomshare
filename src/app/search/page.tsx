@@ -380,16 +380,16 @@ export default async function SearchPage({ searchParams }: SearchPageProps) {
   const listContent = (
     <div className="max-w-[840px] mx-auto pb-24 md:pb-6">
       <CategoryBar />
-      <div className="px-4 sm:px-6 pt-4 sm:pt-6">
+      <div className="px-4 sm:px-5 pt-0">
         <RecommendedFilters />
         <AppliedFilterChips currentCount={total} />
 
-        <div className="flex flex-col md:flex-row md:items-start justify-between gap-6 mb-8 md:mb-10">
-          <div className="flex-1">
+        <div className="flex flex-row items-center justify-between gap-4 py-2 mb-4">
+          <div className="flex-1 min-w-0">
             <h1
               id="search-results-heading"
               tabIndex={-1}
-              className="text-xl md:text-2xl lg:text-3xl font-display font-semibold tracking-tight text-on-surface focus:outline-none focus-visible:ring-2 focus-visible:ring-primary/30 focus-visible:rounded-lg mb-2"
+              className="text-lg md:text-xl font-display font-medium tracking-tight text-on-surface focus:outline-none focus-visible:ring-2 focus-visible:ring-primary/30 focus-visible:rounded-lg truncate"
             >
               {total === null ? "100+" : total}{" "}
               {total === 1 ? "place" : "places"}{q ? ` in ${q}` : ""}
@@ -399,13 +399,13 @@ export default async function SearchPage({ searchParams }: SearchPageProps) {
               {total === 1 ? "place" : "places"} found
             </div>
             {browseMode && (
-              <p className="text-sm text-on-surface-variant mt-2">
+              <p className="text-xs text-on-surface-variant mt-0.5">
                 Showing top listings. Select a location for more results.
               </p>
             )}
           </div>
 
-          <div className="flex items-center gap-3 shrink-0 self-start">
+          <div className="flex items-center gap-2 shrink-0">
             <SaveSearchButton />
             <SortSelect currentSort={sortOption} />
           </div>

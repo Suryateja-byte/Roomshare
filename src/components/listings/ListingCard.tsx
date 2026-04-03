@@ -125,7 +125,6 @@ const PLACEHOLDER_IMAGES = [
   "https://images.unsplash.com/photo-1505691938895-1758d7feb511?auto=format&fit=crop&w=800&q=80",
 ];
 
-
 interface ListingCardProps {
   listing: Listing;
   isSaved?: boolean;
@@ -207,6 +206,11 @@ function ListingCardInner({
 
   // Fallback for empty/null titles
   const displayTitle = listing.title?.trim() || "Untitled Listing";
+  const formattedLocation = formatLocation(
+    listing.location.city,
+    listing.location.state
+  );
+  const imageAlt = `${displayTitle} in ${formattedLocation}`;
 
   // Build screen reader label: Price → Rating → Room Type → Location → Badges
   const srParts: string[] = [];
@@ -231,7 +235,7 @@ function ListingCardInner({
         : "currently filled"
     );
   }
-  srParts.push(formatLocation(listing.location.city, listing.location.state));
+  srParts.push(formattedLocation);
   if (listing.amenities.length > 0) {
     srParts.push(listing.amenities.slice(0, 3).join(", "));
   }
@@ -256,9 +260,7 @@ function ListingCardInner({
       className={cn(
         "relative rounded-lg transition-shadow",
         isActive && "ring-2 ring-primary ring-offset-2",
-        isHovered &&
-          !isActive &&
-          "shadow-ambient ring-1 ring-primary/20",
+        isHovered && !isActive && "shadow-ambient ring-1 ring-primary/20",
         className
       )}
     >
@@ -284,17 +286,17 @@ function ListingCardInner({
         href={`/listings/${listing.id}`}
         onClick={isDragging ? (e) => e.preventDefault() : undefined}
         className={cn(
-          "block group focus:outline-none focus-visible:ring-2 focus-visible:ring-primary/30 focus-visible:ring-offset-2 rounded-none sm:rounded-lg",
+          "block group rounded-lg focus:outline-none focus-visible:ring-2 focus-visible:ring-primary/30 focus-visible:ring-offset-2",
           isDragging && "pointer-events-none"
         )}
       >
-        <div className="relative bg-surface-container-lowest flex flex-col rounded-none sm:rounded-lg overflow-hidden transition-lift shadow-ambient-sm group-hover:shadow-ambient-lg group-hover:shadow-on-surface/10 motion-safe:group-hover:-translate-y-1">
+        <div className="relative flex flex-col overflow-hidden rounded-lg bg-surface-container-lowest transition-lift shadow-ambient-sm group-hover:shadow-ambient-lg group-hover:shadow-on-surface/10 motion-safe:group-hover:-translate-y-1">
           {/* Image Area */}
-          <div className="relative aspect-[16/10] sm:aspect-[4/3] overflow-hidden bg-surface-canvas">
+          <div className="relative aspect-[16/9] sm:aspect-[4/3] overflow-hidden bg-surface-canvas">
             {/* Image Carousel or single image */}
             <ImageCarousel
               images={displayImages}
-              alt={displayTitle}
+              alt={imageAlt}
               priority={priority}
               className="h-full w-full motion-safe:group-hover:scale-[1.05] motion-safe:transition-transform motion-safe:duration-[600ms] ease-[cubic-bezier(0.25,0.1,0.25,1.0)]"
               onImageError={handleImageError}

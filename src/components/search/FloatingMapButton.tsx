@@ -42,19 +42,11 @@ export default function FloatingMapButton({
           animate={{ scale: 1, opacity: 1 }}
           exit={{ scale: 0.9, opacity: 0 }}
           transition={{ type: "spring", stiffness: 500, damping: 30 }}
-          className={`fixed left-1/2 -translate-x-1/2 z-50 flex items-center gap-2 px-5 py-3 min-h-[44px] bg-on-surface text-white rounded-full shadow-xl shadow-on-surface/30 active:scale-95 transition-all focus:outline-none focus-visible:ring-2 focus-visible:ring-offset-2 focus-visible:ring-primary/30 md:hidden ${
-            // P1-FIX (#80): Adjust bottom position based on sheet state to avoid overlap.
-            // When sheet is collapsed (isListMode=false), position higher to clear the sheet header.
-            // P2-FIX (#134): Add safe-area-inset-bottom for notched devices.
-            // P2-18 FIX: Bottom position derived from shared SNAP_COLLAPSED constant (was hardcoded 15dvh).
-            isListMode
-              ? "pb-[calc(0.75rem+env(safe-area-inset-bottom,0px))]"
-              : "pb-[env(safe-area-inset-bottom,0px)]"
-          }`}
+          className="fixed inset-x-0 z-50 mx-auto flex w-max items-center justify-center gap-2 rounded-full bg-on-surface px-5 py-3 text-white shadow-xl shadow-on-surface/30 transition-all focus:outline-none focus-visible:ring-2 focus-visible:ring-primary/30 focus-visible:ring-offset-2 active:scale-95 md:hidden"
           style={{
             bottom: isListMode
-              ? "1.5rem"
-              : `calc(${SNAP_COLLAPSED * 100}dvh + 1rem)`,
+              ? "calc(1.5rem + env(safe-area-inset-bottom, 0px))"
+              : `calc(${SNAP_COLLAPSED * 100}dvh + 1rem + env(safe-area-inset-bottom, 0px))`,
           }}
           aria-label={isListMode ? "Show map" : "Show list"}
         >

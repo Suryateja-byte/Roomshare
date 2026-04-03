@@ -18,8 +18,9 @@ export default function NavbarWrapper({
   // Search routes have their own header with search functionality
   const isSearchPage =
     pathname === "/search" || pathname.startsWith("/search/");
+  const isMessageThread = pathname.startsWith("/messages/");
 
-  if (isAuthPage || isSearchPage) {
+  if (isAuthPage || isSearchPage || isMessageThread) {
     return null;
   }
 

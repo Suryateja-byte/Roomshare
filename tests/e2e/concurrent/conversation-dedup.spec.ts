@@ -12,10 +12,29 @@
  */
 import { test, expect } from "../helpers/test-utils";
 import { testApi } from "../helpers/stability-helpers";
+import type { Locator, Page } from "@playwright/test";
 
 // User1 (host) owns the listing; user2 (tenant) contacts the host.
 const USER1_EMAIL = process.env.E2E_TEST_EMAIL || "e2e-test@roomshare.dev";
 const USER2_STATE = "playwright/.auth/user2.json";
+
+async function getVisibleContactHostButton(page: Page): Promise<Locator> {
+  const hostSectionButton = page
+    .getByTestId("contact-host-host-section")
+    .getByRole("button", { name: /contact host/i });
+  const sidebarButton = page
+    .getByTestId("contact-host-sidebar")
+    .getByRole("button", { name: /contact host/i });
+
+  await expect(
+    page.locator(
+      '[data-testid="contact-host-host-section"]:visible, [data-testid="contact-host-sidebar"]:visible'
+    )
+  ).toHaveCount(1, { timeout: 15_000 });
+
+  if (await hostSectionButton.isVisible()) return hostSectionButton;
+  return sidebarButton;
+}
 
 test.describe("P0-1: Conversation Deduplication", () => {
   test.describe.configure({ mode: "serial", retries: 0 });
@@ -72,10 +91,9 @@ test.describe("P0-1: Conversation Deduplication", () => {
       }),
     ]);
 
-    // Wait for the Contact Host button to be visible on both pages.
-    // Use .first() — the page may have both mobile + desktop Contact Host buttons
-    const btn1 = page1.getByRole("button", { name: /contact host/i }).first();
-    const btn2 = page2.getByRole("button", { name: /contact host/i }).first();
+    // Wait for the single visible Contact Host button on both pages.
+    const btn1 = await getVisibleContactHostButton(page1);
+    const btn2 = await getVisibleContactHostButton(page2);
     await Promise.all([
       expect(btn1).toBeVisible({ timeout: 15_000 }),
       expect(btn2).toBeVisible({ timeout: 15_000 }),
@@ -121,7 +139,7 @@ test.describe("P0-1: Conversation Deduplication", () => {
       timeout: 30_000,
     });
 
-    const contactBtn = page.getByRole("button", { name: /contact host/i }).first();
+    const contactBtn = await getVisibleContactHostButton(page);
     await expect(contactBtn).toBeVisible({ timeout: 15_000 });
 
     // Track server action requests to count how many fire.
@@ -141,9 +159,7 @@ test.describe("P0-1: Conversation Deduplication", () => {
     await page.waitForURL(/\/messages\/[a-zA-Z0-9_-]+/, { timeout: 30_000 });
 
     const conversationUrl = page.url();
-    const convId = conversationUrl.match(
-      /\/messages\/([a-zA-Z0-9_-]+)/
-    )?.[1];
+    const convId = conversationUrl.match(/\/messages\/([a-zA-Z0-9_-]+)/)?.[1];
     expect(convId).toBeTruthy();
 
     // The UI guard should have prevented the second request entirely.
@@ -159,9 +175,7 @@ test.describe("P0-1: Conversation Deduplication", () => {
 
     // Count conversation items that reference this listing (by conversation link).
     // Each conversation item links to /messages/<conversationId>.
-    const conversationItems = page.locator(
-      '[data-testid="conversation-item"]'
-    );
+    const conversationItems = page.locator('[data-testid="conversation-item"]');
     const itemCount = await conversationItems.count();
 
     // Collect all conversation IDs visible in the list.
@@ -177,7 +191,9 @@ test.describe("P0-1: Conversation Deduplication", () => {
 
     // The conversation we just created should appear exactly once.
     // (There may be pre-existing seeded conversations, but our convId should not be duplicated.)
-    const matchingIds = Array.from(visibleConvIds).filter((id) => id === convId);
+    const matchingIds = Array.from(visibleConvIds).filter(
+      (id) => id === convId
+    );
     expect(matchingIds.length).toBeLessThanOrEqual(1);
 
     await ctx.close();
@@ -199,14 +215,12 @@ test.describe("P0-1: Conversation Deduplication", () => {
       timeout: 30_000,
     });
 
-    const contactBtn = page.getByRole("button", { name: /contact host/i }).first();
+    const contactBtn = await getVisibleContactHostButton(page);
     await expect(contactBtn).toBeVisible({ timeout: 15_000 });
     await contactBtn.click();
 
     await page.waitForURL(/\/messages\/[a-zA-Z0-9_-]+/, { timeout: 30_000 });
-    const firstConvId = page.url().match(
-      /\/messages\/([a-zA-Z0-9_-]+)/
-    )?.[1];
+    const firstConvId = page.url().match(/\/messages\/([a-zA-Z0-9_-]+)/)?.[1];
     expect(firstConvId).toBeTruthy();
 
     // Navigate away — go back to listing.
@@ -216,14 +230,12 @@ test.describe("P0-1: Conversation Deduplication", () => {
     });
 
     // Second contact: click Contact Host again.
-    const contactBtn2 = page.getByRole("button", { name: /contact host/i }).first();
+    const contactBtn2 = await getVisibleContactHostButton(page);
     await expect(contactBtn2).toBeVisible({ timeout: 15_000 });
     await contactBtn2.click();
 
     await page.waitForURL(/\/messages\/[a-zA-Z0-9_-]+/, { timeout: 30_000 });
-    const secondConvId = page.url().match(
-      /\/messages\/([a-zA-Z0-9_-]+)/
-    )?.[1];
+    const secondConvId = page.url().match(/\/messages\/([a-zA-Z0-9_-]+)/)?.[1];
     expect(secondConvId).toBeTruthy();
 
     // Both visits must return the same conversation — no duplicate created.

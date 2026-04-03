@@ -1,6 +1,13 @@
 import type { ReactNode } from "react";
 import "@testing-library/jest-dom";
-import { render, screen, waitFor, act, cleanup } from "@testing-library/react";
+import {
+  render,
+  screen,
+  waitFor,
+  act,
+  cleanup,
+  fireEvent,
+} from "@testing-library/react";
 
 const mockPush = jest.fn();
 const mockSendMessage = jest.fn();
@@ -10,9 +17,14 @@ const mockDeleteConversation = jest.fn();
 const mockRouter = {
   push: mockPush,
 };
+const mockUseMediaQuery = jest.fn<boolean | undefined, [string]>();
 
 jest.mock("next/navigation", () => ({
   useRouter: () => mockRouter,
+}));
+
+jest.mock("@/hooks/useMediaQuery", () => ({
+  useMediaQuery: (query: string) => mockUseMediaQuery(query),
 }));
 
 jest.mock("next/link", () => ({
@@ -216,6 +228,7 @@ describe("MessagesPageClient", () => {
     jest.useFakeTimers();
     fetchMock.mockReset();
     global.fetch = fetchMock as unknown as typeof fetch;
+    mockUseMediaQuery.mockReturnValue(false);
     mockMarkAllMessagesAsRead.mockResolvedValue({ success: true, count: 0 });
     mockDeleteConversation.mockResolvedValue({ success: true });
   });
@@ -365,5 +378,26 @@ describe("MessagesPageClient", () => {
 
     expect(loggedPollingError).toBe(false);
     errorSpy.mockRestore();
+  });
+
+  it("keeps the inbox list visible first on mobile and routes taps to the thread page", async () => {
+    mockUseMediaQuery.mockReturnValue(true);
+
+    render(
+      <MessagesPageClient
+        currentUserId="user-123"
+        initialConversations={initialConversations}
+      />
+    );
+
+    expect(screen.queryByTestId("message-input")).not.toBeInTheDocument();
+    expect(fetchMock).not.toHaveBeenCalledWith(
+      expect.stringContaining("/api/messages?conversationId=conv-1&poll=1"),
+      expect.anything()
+    );
+
+    fireEvent.click(screen.getByTestId("conversation-item"));
+
+    expect(mockPush).toHaveBeenCalledWith("/messages/conv-1");
   });
 });

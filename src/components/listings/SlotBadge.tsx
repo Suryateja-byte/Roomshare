@@ -52,20 +52,102 @@ export function SlotBadge({
     return (
       <span
         className={cn(
-          "inline-flex items-center font-medium px-2.5 py-1 text-xs",
+          "inline-flex items-center gap-1 font-medium px-2.5 py-1 text-xs",
           overlayBase,
           overlayText[variant],
           className
         )}
         data-testid="slot-badge"
       >
+        {variant === "success" && (
+          <svg
+            className="w-3 h-3 flex-shrink-0"
+            viewBox="0 0 24 24"
+            fill="none"
+            stroke="currentColor"
+            strokeWidth="2.5"
+            strokeLinecap="round"
+            strokeLinejoin="round"
+            aria-hidden="true"
+          >
+            <polyline points="20 6 9 17 4 12" />
+          </svg>
+        )}
+        {variant === "destructive" && (
+          <svg
+            className="w-3 h-3 flex-shrink-0"
+            viewBox="0 0 24 24"
+            fill="none"
+            stroke="currentColor"
+            strokeWidth="2.5"
+            strokeLinecap="round"
+            strokeLinejoin="round"
+            aria-hidden="true"
+          >
+            <line x1="18" y1="6" x2="6" y2="18" />
+            <line x1="6" y1="6" x2="18" y2="18" />
+          </svg>
+        )}
+        {variant === "info" && (
+          <svg
+            className="w-3 h-3 flex-shrink-0"
+            viewBox="0 0 24 24"
+            fill="currentColor"
+            aria-hidden="true"
+          >
+            <circle cx="12" cy="12" r="4" />
+          </svg>
+        )}
         {label}
       </span>
     );
   }
 
   return (
-    <Badge variant={variant} className={className} data-testid="slot-badge">
+    <Badge
+      variant={variant}
+      className={cn("gap-1", className)}
+      data-testid="slot-badge"
+    >
+      {variant === "success" && (
+        <svg
+          className="w-3 h-3 flex-shrink-0"
+          viewBox="0 0 24 24"
+          fill="none"
+          stroke="currentColor"
+          strokeWidth="2.5"
+          strokeLinecap="round"
+          strokeLinejoin="round"
+          aria-hidden="true"
+        >
+          <polyline points="20 6 9 17 4 12" />
+        </svg>
+      )}
+      {variant === "destructive" && (
+        <svg
+          className="w-3 h-3 flex-shrink-0"
+          viewBox="0 0 24 24"
+          fill="none"
+          stroke="currentColor"
+          strokeWidth="2.5"
+          strokeLinecap="round"
+          strokeLinejoin="round"
+          aria-hidden="true"
+        >
+          <line x1="18" y1="6" x2="6" y2="18" />
+          <line x1="6" y1="6" x2="18" y2="18" />
+        </svg>
+      )}
+      {variant === "info" && (
+        <svg
+          className="w-3 h-3 flex-shrink-0"
+          viewBox="0 0 24 24"
+          fill="currentColor"
+          aria-hidden="true"
+        >
+          <circle cx="12" cy="12" r="4" />
+        </svg>
+      )}
       {label}
     </Badge>
   );

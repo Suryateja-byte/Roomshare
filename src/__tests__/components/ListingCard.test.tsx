@@ -31,6 +31,21 @@ jest.mock("next/image", () => ({
   ),
 }));
 
+jest.mock("@/components/listings/ImageCarousel", () => ({
+  ImageCarousel: function MockImageCarousel({
+    images,
+    alt,
+  }: {
+    images: string[];
+    alt: string;
+  }) {
+    return (
+      // eslint-disable-next-line @next/next/no-img-element
+      <img src={images[0] ?? ""} alt={alt} data-testid="listing-image" />
+    );
+  },
+}));
+
 const mockListing = {
   id: "listing-123",
   title: "Cozy Room in Downtown",
@@ -110,6 +125,22 @@ describe("ListingCard", () => {
       render(<ListingCard listing={mockListing} />);
       const link = screen.getByRole("link");
       expect(link).toHaveAttribute("href", "/listings/listing-123");
+    });
+
+    it("keeps the clickable shell rounded on mobile", () => {
+      render(<ListingCard listing={mockListing} />);
+      const link = screen.getByRole("link");
+      expect(link).toHaveClass("rounded-lg");
+      expect(link).not.toHaveClass("rounded-none");
+    });
+
+    it("keeps the card surface rounded on mobile", () => {
+      render(<ListingCard listing={mockListing} />);
+      const link = screen.getByRole("link");
+      const cardSurface = link.firstElementChild;
+      expect(cardSurface).not.toBeNull();
+      expect(cardSurface).toHaveClass("rounded-lg");
+      expect(cardSurface).not.toHaveClass("rounded-none");
     });
   });
 
@@ -215,7 +246,10 @@ describe("ListingCard", () => {
     it("has alt text on image", () => {
       render(<ListingCard listing={mockListing} />);
       const img = screen.getByRole("img");
-      expect(img).toHaveAttribute("alt", "Cozy Room in Downtown");
+      expect(img).toHaveAttribute(
+        "alt",
+        "Cozy Room in Downtown in San Francisco, CA"
+      );
     });
 
     it("has rating aria-label", () => {

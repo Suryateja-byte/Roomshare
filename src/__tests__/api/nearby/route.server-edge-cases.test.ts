@@ -101,47 +101,43 @@ describe("POST /api/nearby - Server Edge Cases", () => {
     } as unknown as Request;
   };
 
-  describe("Authentication Edge Cases", () => {
-    it("returns 401 when session is null", async () => {
+  describe("Guest Access Edge Cases", () => {
+    it("allows nearby search when session is null", async () => {
       mockAuth.mockResolvedValue(null);
 
       const response = await POST(createRequest(validRequestBody));
-      const data = await response.json();
 
-      expect(response.status).toBe(401);
-      expect(data.error).toBe("Unauthorized");
+      expect(response.status).toBe(200);
+      expect(mockAuth).not.toHaveBeenCalled();
     });
 
-    it("returns 401 when session user is undefined", async () => {
+    it("allows nearby search when session user is undefined", async () => {
       mockAuth.mockResolvedValue({ user: undefined });
 
       const response = await POST(createRequest(validRequestBody));
-      const data = await response.json();
 
-      expect(response.status).toBe(401);
-      expect(data.error).toBe("Unauthorized");
+      expect(response.status).toBe(200);
+      expect(mockAuth).not.toHaveBeenCalled();
     });
 
-    it("returns 401 when user id is missing", async () => {
+    it("allows nearby search when user id is missing", async () => {
       mockAuth.mockResolvedValue({
         user: { name: "Test", email: "test@test.com" },
       });
 
       const response = await POST(createRequest(validRequestBody));
-      const data = await response.json();
 
-      expect(response.status).toBe(401);
-      expect(data.error).toBe("Unauthorized");
+      expect(response.status).toBe(200);
+      expect(mockAuth).not.toHaveBeenCalled();
     });
 
-    it("returns 401 when user id is empty string", async () => {
+    it("allows nearby search when user id is empty string", async () => {
       mockAuth.mockResolvedValue({ user: { id: "", name: "Test" } });
 
       const response = await POST(createRequest(validRequestBody));
-      const data = await response.json();
 
-      expect(response.status).toBe(401);
-      expect(data.error).toBe("Unauthorized");
+      expect(response.status).toBe(200);
+      expect(mockAuth).not.toHaveBeenCalled();
     });
   });
 

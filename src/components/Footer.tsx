@@ -4,7 +4,7 @@ import ComingSoonButton from "./ComingSoonButton";
 
 export default function Footer() {
   return (
-    <footer className="bg-surface-container-high pt-12 md:pt-24 pb-24 sm:pb-16 md:pb-12 overflow-hidden">
+    <footer className="bg-surface-container-high pt-12 md:pt-24 pb-[calc(6rem+env(safe-area-inset-bottom,0px))] sm:pb-16 md:pb-12 overflow-hidden">
       <div className="max-w-7xl mx-auto px-6 sm:px-8">
         <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-6 gap-8 md:gap-16 mb-12 md:mb-20">
           {/* Brand Section */}
@@ -31,7 +31,7 @@ export default function Footer() {
             <h2 className="font-body uppercase tracking-[0.1em] text-sm text-on-surface-variant mb-6">
               Platform
             </h2>
-            <ul className="flex flex-col gap-4 text-sm text-on-surface-variant font-light">
+            <ul className="flex flex-col gap-3 text-sm text-on-surface-variant font-light">
               <li>
                 <FooterNavLink
                   href="/search"
@@ -61,7 +61,7 @@ export default function Footer() {
             <h2 className="font-body uppercase tracking-[0.1em] text-sm text-on-surface-variant mb-6">
               Company
             </h2>
-            <ul className="flex flex-col gap-4 text-sm text-on-surface-variant font-light">
+            <ul className="flex flex-col gap-3 text-sm text-on-surface-variant font-light">
               <li>
                 <FooterNavLink
                   href="/about"
@@ -88,7 +88,7 @@ export default function Footer() {
             <h2 className="font-body uppercase tracking-[0.1em] text-sm text-on-surface-variant mb-6">
               Support
             </h2>
-            <ul className="flex flex-col gap-4 text-sm text-on-surface-variant font-light">
+            <ul className="flex flex-col gap-3 text-sm text-on-surface-variant font-light">
               <li>
                 <ComingSoonButton className="hover:text-on-surface transition-colors text-left min-h-[44px] inline-flex items-center">
                   Help Center
@@ -107,7 +107,7 @@ export default function Footer() {
             <h2 className="font-body uppercase tracking-[0.1em] text-sm text-on-surface-variant mb-6">
               Legal
             </h2>
-            <ul className="flex flex-col gap-4 text-sm text-on-surface-variant font-light">
+            <ul className="flex flex-col gap-3 text-sm text-on-surface-variant font-light">
               <li>
                 <ComingSoonButton className="hover:text-on-surface transition-colors text-left min-h-[44px] inline-flex items-center">
                   Privacy
@@ -127,14 +127,23 @@ export default function Footer() {
           <p className="text-xs font-bold text-on-surface-variant uppercase tracking-[0.2em] order-2 sm:order-1">
             © {new Date().getFullYear()} RoomShare Inc.
           </p>
-          <div className="flex items-center gap-8 order-1 sm:order-2">
-            <ComingSoonButton aria-label="Instagram (coming soon)" className="text-xs font-bold text-on-surface-variant hover:text-on-surface uppercase tracking-[0.2em] transition-colors min-h-[44px] inline-flex items-center">
+          <div className="flex items-center gap-6 sm:gap-8 order-1 sm:order-2">
+            <ComingSoonButton
+              aria-label="Instagram (coming soon)"
+              className="text-xs font-bold text-on-surface-variant hover:text-on-surface uppercase tracking-[0.2em] transition-colors min-h-[44px] inline-flex items-center"
+            >
               Instagram
             </ComingSoonButton>
-            <ComingSoonButton aria-label="X, formerly Twitter (coming soon)" className="text-xs font-bold text-on-surface-variant hover:text-on-surface uppercase tracking-[0.2em] transition-colors min-h-[44px] inline-flex items-center">
+            <ComingSoonButton
+              aria-label="X, formerly Twitter (coming soon)"
+              className="text-xs font-bold text-on-surface-variant hover:text-on-surface uppercase tracking-[0.2em] transition-colors min-h-[44px] inline-flex items-center"
+            >
               X
             </ComingSoonButton>
-            <ComingSoonButton aria-label="LinkedIn (coming soon)" className="text-xs font-bold text-on-surface-variant hover:text-on-surface uppercase tracking-[0.2em] transition-colors min-h-[44px] inline-flex items-center">
+            <ComingSoonButton
+              aria-label="LinkedIn (coming soon)"
+              className="text-xs font-bold text-on-surface-variant hover:text-on-surface uppercase tracking-[0.2em] transition-colors min-h-[44px] inline-flex items-center"
+            >
               LinkedIn
             </ComingSoonButton>
           </div>

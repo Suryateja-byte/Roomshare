@@ -320,17 +320,16 @@ describe("POST /api/nearby - Env/Deployment Edge Cases", () => {
       });
     });
 
-    it("requires auth in all environments", async () => {
+    it("allows guest nearby search in all environments", async () => {
       process.env.RADAR_SECRET_KEY = "test-key";
 
       // No session
       (auth as jest.Mock).mockResolvedValue(null);
 
       const response = await POST(createRequest(validRequestBody));
-      const data = await response.json();
 
-      expect(response.status).toBe(401);
-      expect(data.error).toBe("Unauthorized");
+      expect(response.status).toBe(200);
+      expect(auth).not.toHaveBeenCalled();
     });
   });
 

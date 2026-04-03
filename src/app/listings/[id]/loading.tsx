@@ -30,12 +30,12 @@ export default function ListingLoading() {
           <div className="flex-1">
             {/* Header */}
             <div className="mb-8">
-              <div className="flex justify-between items-start">
+              <div className="flex flex-col gap-4 md:flex-row md:items-start md:justify-between">
                 <div className="space-y-4 w-full">
                   <SimpleSkeleton className="h-10 w-3/4" />
                   <SimpleSkeleton className="h-5 w-1/3" />
                 </div>
-                <div className="flex gap-2">
+                <div className="flex w-full justify-end gap-2 md:w-auto">
                   <SimpleSkeleton className="h-10 w-10 rounded-full" />
                   <SimpleSkeleton className="h-10 w-10 rounded-full" />
                 </div>

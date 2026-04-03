@@ -1,8 +1,8 @@
 /**
- * Auth/Session Edge Cases Tests
+ * Guest Access Edge Cases Tests
  *
- * Tests for authentication and session edge cases in the Nearby Places API.
- * Validates handling of session states, token expiry, and auth failures.
+ * Tests that nearby search remains available even when auth state is absent
+ * or unstable because the web listing experience now allows guest access.
  *
  * @see Plan Category B - Auth/Session Edge Cases (10 tests)
  */
@@ -25,7 +25,7 @@ jest.mock("next/server", () => ({
   },
 }));
 
-// Mock auth
+// Mock auth to verify the route no longer depends on it
 jest.mock("@/auth", () => ({
   auth: jest.fn(),
 }));
@@ -42,16 +42,9 @@ global.fetch = mockFetch;
 import { POST } from "@/app/api/nearby/route";
 import { auth } from "@/auth";
 import { withRateLimit } from "@/lib/with-rate-limit";
-import {
-  mockSession,
-  mockSessionNoId,
-  createExpiringSessionMock,
-  createFailingSessionMock,
-  createAccountSwitchMock,
-} from "@/__tests__/utils/mocks/session.mock";
 import { mockRadarPlace } from "@/__tests__/utils/mocks/radar-api.mock";
 
-describe("POST /api/nearby - Auth/Session Edge Cases", () => {
+describe("POST /api/nearby - Guest Access Edge Cases", () => {
   const validRequestBody = {
     listingLat: 37.7749,
     listingLng: -122.4194,
@@ -81,136 +74,52 @@ describe("POST /api/nearby - Auth/Session Edge Cases", () => {
     } as unknown as Request;
   };
 
-  // B1: Session with blocked cookies returns auth prompt
-  describe("B1: Blocked Cookies", () => {
-    it("returns 401 when session is null (cookies blocked)", async () => {
+  describe("B1: Missing Session State", () => {
+    it("allows nearby search when session is null", async () => {
       (auth as jest.Mock).mockResolvedValue(null);
 
       const response = await POST(createRequest(validRequestBody));
-      const data = await response.json();
 
-      expect(response.status).toBe(401);
-      expect(data.error).toBe("Unauthorized");
+      expect(response.status).toBe(200);
+      expect(auth).not.toHaveBeenCalled();
     });
   });
 
-  // B2: Third-party cookie restrictions handled
-  describe("B2: Third-Party Cookie Restrictions", () => {
-    it("returns 401 when session user is undefined", async () => {
+  describe("B2: Malformed Session Shapes", () => {
+    it("allows nearby search when session user is undefined", async () => {
       (auth as jest.Mock).mockResolvedValue({ expires: "2025-01-01" });
 
       const response = await POST(createRequest(validRequestBody));
-      const data = await response.json();
-
-      expect(response.status).toBe(401);
-      expect(data.error).toBe("Unauthorized");
-    });
-  });
-
-  // B3: Slow session fetch shows loading then auth
-  describe("B3: Slow Session Fetch", () => {
-    it("waits for slow session resolution", async () => {
-      // Simulate slow session fetch
-      (auth as jest.Mock).mockImplementation(
-        () =>
-          new Promise((resolve) => setTimeout(() => resolve(mockSession), 100))
-      );
-
-      const response = await POST(createRequest(validRequestBody));
-      const data = await response.json();
 
       expect(response.status).toBe(200);
-      expect(data.places).toBeDefined();
+      expect(auth).not.toHaveBeenCalled();
     });
-  });
 
-  // B4: Session refresh mid-request returns 401 gracefully
-  describe("B4: Token Expiry Mid-Request", () => {
-    it("handles session that expires during request", async () => {
-      const expiringSession = createExpiringSessionMock();
-      (auth as jest.Mock).mockImplementation(expiringSession.auth);
-
-      // First call succeeds
-      const response1 = await POST(createRequest(validRequestBody));
-      expect(response1.status).toBe(200);
-
-      // Expire the session
-      expiringSession.expire();
-
-      // Second call should fail
-      const response2 = await POST(createRequest(validRequestBody));
-      const data = await response2.json();
-
-      expect(response2.status).toBe(401);
-      expect(data.error).toBe("Unauthorized");
-    });
-  });
-
-  // B5: Account switch without reload uses new session
-  describe("B5: Account Switch", () => {
-    it("uses updated session after account switch", async () => {
-      const accountSwitch = createAccountSwitchMock();
-      (auth as jest.Mock).mockImplementation(accountSwitch.auth);
-
-      // First request with user-123
-      const response1 = await POST(createRequest(validRequestBody));
-      expect(response1.status).toBe(200);
-
-      // Switch to user-456
-      accountSwitch.switchTo("user-456");
-
-      // Second request should use new user
-      const response2 = await POST(createRequest(validRequestBody));
-      expect(response2.status).toBe(200);
-
-      // Verify auth was called with different user context
-      expect(accountSwitch.getCurrentUser()).toBe("user-456");
-    });
-  });
-
-  // B6: Account downgrade mid-session shows upgrade
-  describe("B6: Entitlement Change", () => {
-    it("handles session without nearby entitlement", async () => {
-      // Session exists but user might lack entitlement
-      (auth as jest.Mock).mockResolvedValue(mockSession);
+    it("allows nearby search when session user id is missing", async () => {
+      (auth as jest.Mock).mockResolvedValue({
+        user: { name: "Test User", email: "test@example.com" },
+      });
 
       const response = await POST(createRequest(validRequestBody));
 
-      // Current implementation doesn't check entitlements, just auth
       expect(response.status).toBe(200);
+      expect(auth).not.toHaveBeenCalled();
     });
   });
 
-  // B7: Session exists but lacks nearby entitlement
-  describe("B7: Permission Check", () => {
-    it("requires user ID in session", async () => {
-      (auth as jest.Mock).mockResolvedValue(mockSessionNoId);
+  describe("B3: Repeated Guest Requests", () => {
+    it("stays stable across repeated nearby requests without auth context", async () => {
+      for (let i = 0; i < 10; i++) {
+        const response = await POST(createRequest(validRequestBody));
+        expect(response.status).toBe(200);
+      }
 
-      const response = await POST(createRequest(validRequestBody));
-      const data = await response.json();
-
-      expect(response.status).toBe(401);
-      expect(data.error).toBe("Unauthorized");
+      expect(auth).not.toHaveBeenCalled();
     });
   });
 
-  // B8: Private window session absent shows login
-  describe("B8: Incognito Mode", () => {
-    it("returns 401 in incognito (no session)", async () => {
-      (auth as jest.Mock).mockResolvedValue(null);
-
-      const response = await POST(createRequest(validRequestBody));
-      const data = await response.json();
-
-      expect(response.status).toBe(401);
-      expect(data.error).toBe("Unauthorized");
-    });
-  });
-
-  // B9: CSRF mismatch returns 403
-  describe("B9: CSRF Validation", () => {
-    it("handles rate limiting response (simulates CSRF protection)", async () => {
-      (auth as jest.Mock).mockResolvedValue(mockSession);
+  describe("B4: Rate Limiting Still Applies", () => {
+    it("handles a rate limiting response for guest traffic", async () => {
       (withRateLimit as jest.Mock).mockResolvedValueOnce({
         status: 403,
         json: async () => ({ error: "Forbidden" }),
@@ -222,33 +131,16 @@ describe("POST /api/nearby - Auth/Session Edge Cases", () => {
     });
   });
 
-  // B10: Frequent logout/login doesn't memory leak
-  describe("B10: Session Cleanup", () => {
-    it("handles rapid session changes without issues", async () => {
-      const accountSwitch = createAccountSwitchMock();
-      (auth as jest.Mock).mockImplementation(accountSwitch.auth);
-
-      // Simulate rapid login/logout cycles
-      for (let i = 0; i < 10; i++) {
-        accountSwitch.switchTo(`user-${i}`);
-        const response = await POST(createRequest(validRequestBody));
-        expect(response.status).toBe(200);
-      }
-
-      // All requests should complete without memory issues
-      expect(accountSwitch.auth).toHaveBeenCalledTimes(10);
-    });
-
-    it("handles auth system failure gracefully", async () => {
-      const failingAuth = createFailingSessionMock("Auth system unavailable");
-      (auth as jest.Mock).mockImplementation(failingAuth.auth);
+  describe("B5: Auth System Independence", () => {
+    it("ignores auth system failures because guest access is allowed", async () => {
+      (auth as jest.Mock).mockRejectedValue(
+        new Error("Auth system unavailable")
+      );
 
       const response = await POST(createRequest(validRequestBody));
-      const data = await response.json();
 
-      // Should return 500, not crash
-      expect(response.status).toBe(500);
-      expect(data.error).toBe("Internal server error");
+      expect(response.status).toBe(200);
+      expect(auth).not.toHaveBeenCalled();
     });
   });
 });

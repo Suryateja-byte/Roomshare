@@ -403,4 +403,31 @@ describe("Route ChatWindow", () => {
     expect(loggedPollingError).toBe(false);
     errorSpy.mockRestore();
   });
+
+  it("renders a thread-level back button that returns to the inbox", async () => {
+    fetchMock.mockImplementation((input) => {
+      const url = String(input);
+      if (url.includes("/api/messages?")) {
+        return createJsonResponse({ messages: [], hasNewMessages: false });
+      }
+      return createJsonResponse({ success: true, count: 0 });
+    });
+
+    render(
+      <ChatWindow
+        initialMessages={[]}
+        conversationId="conv-123"
+        currentUserId="user-123"
+        currentUserName="Current User"
+        otherUserId="other-user"
+        otherUserName="Other User"
+        otherUserImage={null}
+      />
+    );
+
+    const backButton = await screen.findByTestId("back-button");
+    backButton.click();
+
+    expect(mockPush).toHaveBeenCalledWith("/messages");
+  });
 });

@@ -4,7 +4,7 @@
  * Search for nearby places using Radar API.
  *
  * COMPLIANCE NOTES:
- * - Requires authentication (login required)
+ * - Available to guests and signed-in users
  * - No caching (default to safe)
  * - No POI database storage
  * - Only called on explicit user interaction (never prefetch)
@@ -12,7 +12,6 @@
 
 import { NextResponse } from "next/server";
 import { z } from "zod";
-import { auth } from "@/auth";
 import { captureApiError } from "@/lib/api-error-handler";
 import { logger } from "@/lib/logger";
 import { withRateLimit } from "@/lib/with-rate-limit";
@@ -104,12 +103,6 @@ export async function POST(request: Request) {
       type: "nearbySearch",
     });
     if (rateLimitResponse) return rateLimitResponse;
-
-    // Authentication check
-    const session = await auth();
-    if (!session?.user?.id || session.user.id.trim() === "") {
-      return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
-    }
 
     // Check if Radar API is configured
     const radarSecretKey = process.env.RADAR_SECRET_KEY;

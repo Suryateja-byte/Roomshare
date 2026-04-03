@@ -101,7 +101,7 @@ test.describe("Homepage — Authenticated User", () => {
     test.skip(!viewport || viewport.width >= 768, "Mobile only");
 
     await page.evaluate(() => {
-      const scroller = document.querySelector(".custom-scroll-hide");
+      const scroller = document.querySelector("[data-app-scroll-container]");
       if (scroller) {
         scroller.scrollTop = 300;
       }

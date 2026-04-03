@@ -85,7 +85,9 @@ export default function PasswordStrengthMeter({
   const config = strengthConfig[level];
 
   if (!password) {
-    return <div className="min-h-[7.5rem]" aria-hidden="true" />;
+    return (
+      <div className={cn("min-h-[7.5rem]", className)} aria-hidden="true" />
+    );
   }
 
   const percentage = (score / checks.length) * 100;
@@ -95,9 +97,7 @@ export default function PasswordStrengthMeter({
       {/* Strength Bar */}
       <div className="space-y-1">
         <div className="flex items-center justify-between text-xs">
-          <span className="text-on-surface-variant">
-            Password strength
-          </span>
+          <span className="text-on-surface-variant">Password strength</span>
           <span className={cn("font-medium", config.color)} aria-live="polite">
             {config.label}
           </span>
@@ -127,9 +127,7 @@ export default function PasswordStrengthMeter({
             key={i}
             className={cn(
               "flex items-center gap-1.5 text-xs transition-colors",
-              check.passed
-                ? "text-green-600"
-                : "text-on-surface-variant"
+              check.passed ? "text-green-600" : "text-on-surface-variant"
             )}
           >
             {check.passed ? (

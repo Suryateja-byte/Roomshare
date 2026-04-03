@@ -25,8 +25,13 @@ class SearchFormErrorBoundary extends React.Component<
     if (this.state.hasError) {
       return (
         <div className="w-full max-w-5xl mx-auto px-4 py-6 text-center">
-          <p className="text-on-surface-variant text-sm mb-3">Search is temporarily unavailable</p>
-          <a href="/search" className="text-primary text-sm font-medium hover:underline">
+          <p className="text-on-surface-variant text-sm mb-3">
+            Search is temporarily unavailable
+          </p>
+          <a
+            href="/search"
+            className="text-primary text-sm font-medium hover:underline"
+          >
             Go to search page &rarr;
           </a>
         </div>
@@ -47,9 +52,7 @@ function AuthCTA() {
       variants={fadeInUp}
       className="mt-8 flex items-center justify-center gap-3 text-sm bg-surface-container-high/50 rounded-full px-6 py-3"
     >
-      <span className="text-on-surface-variant">
-        New here?
-      </span>
+      <span className="text-on-surface-variant">New here?</span>
       <Link
         href="/signup"
         className="font-medium text-primary hover:underline underline-offset-4 transition-colors"
@@ -71,7 +74,10 @@ export default function HomeClient() {
         {/* ================================================================
             HERO SECTION — Editorial Living Room
             ================================================================ */}
-        <section aria-label="Search for rooms" className="relative pt-24 pb-12 md:pt-32 md:pb-16 min-h-[60dvh] md:min-h-[80dvh] flex flex-col justify-center overflow-x-hidden">
+        <section
+          aria-label="Search for rooms"
+          className="relative pt-24 pb-12 md:pt-32 md:pb-16 min-h-[60dvh] md:min-h-[70dvh] flex flex-col justify-center overflow-x-hidden"
+        >
           <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 w-full z-10">
             <div className="flex flex-col items-center text-center">
               <div className="w-full flex flex-col items-center justify-center mb-8 md:mb-12">
@@ -92,20 +98,20 @@ export default function HomeClient() {
                   {/* Newsreader display heading with italic emphasis */}
                   <m.h1
                     variants={fadeInUp}
-                    className="font-display text-4xl sm:text-5xl md:text-6xl lg:text-[5.5rem] font-normal tracking-tight text-on-surface mb-6 leading-[1.05]"
+                    className="font-display text-4xl sm:text-5xl md:text-6xl lg:text-[5.5rem] font-normal tracking-tight text-on-surface mb-6 leading-[1.05] text-balance"
                   >
                     Finding <em className="italic">Your</em> People,{" "}
-                    <br className="hidden md:block" />
+                    <br className="hidden lg:block" />
                     Not Just a Place
                   </m.h1>
 
                   {/* Manrope subheading */}
                   <m.p
                     variants={fadeInUp}
-                    className="text-lg md:text-xl text-on-surface-variant mb-10 max-w-2xl mx-auto font-light leading-relaxed"
+                    className="text-lg md:text-xl text-on-surface-variant mb-10 max-w-2xl mx-auto leading-relaxed"
                   >
-                    Verified roommates. Real listings. People who actually
-                    show up to the tour.
+                    Verified roommates. Real listings. People who actually show
+                    up to the tour.
                   </m.p>
 
                   {/* Glassmorphism search bar */}
@@ -114,14 +120,14 @@ export default function HomeClient() {
                     ref={searchFormRef}
                     className="w-full mx-auto max-w-4xl relative z-20"
                   >
-                    <div className="bg-surface-container-lowest backdrop-blur-xl border border-outline-variant/30 rounded-2xl shadow-ambient p-2 sm:p-3">
+                    <div className="bg-transparent border-0 shadow-none p-0 md:bg-surface-container-lowest md:backdrop-blur-xl md:border md:border-outline-variant/30 md:rounded-2xl md:shadow-ambient md:p-2 lg:p-3">
                       <SearchFormErrorBoundary>
                         <Suspense
                           fallback={
                             <div className="h-16 animate-shimmer bg-gradient-to-r from-surface-container-high via-surface-canvas to-surface-container-high bg-[length:200%_100%] rounded-xl" />
                           }
                         >
-                          <SearchForm />
+                          <SearchForm variant="home" />
                         </Suspense>
                       </SearchFormErrorBoundary>
                     </div>
@@ -150,6 +156,8 @@ export default function HomeClient() {
                     priority
                     sizes="(max-width: 1152px) 100vw, 1152px"
                     className="object-cover"
+                    placeholder="blur"
+                    blurDataURL="data:image/svg+xml;base64,PHN2ZyB3aWR0aD0iMjM0MCIgaGVpZ2h0PSI5MzYiIHhtbG5zPSJodHRwOi8vd3d3LnczLm9yZy8yMDAwL3N2ZyI+PHJlY3Qgd2lkdGg9IjEwMCUiIGhlaWdodD0iMTAwJSIgZmlsbD0iI2VhZThlMyIvPjwvc3ZnPg=="
                   />
                   <div className="absolute inset-0 bg-gradient-to-t from-surface-canvas/20 to-transparent" />
                 </m.div>
@@ -162,7 +170,10 @@ export default function HomeClient() {
             FEATURES — "Cozy Spaces, Real People"
             Surface container high background for tonal shift
             ================================================================ */}
-        <section aria-label="Why RoomShare" className="py-16 md:py-20 bg-surface-container-high">
+        <section
+          aria-label="Why RoomShare"
+          className="py-16 md:py-20 bg-surface-container-high"
+        >
           <div className="max-w-7xl mx-auto px-4 sm:px-6">
             <m.div
               initial="hidden"
@@ -197,7 +208,7 @@ export default function HomeClient() {
               whileInView="visible"
               viewport={{ once: true, margin: "-80px" }}
               variants={staggerContainer}
-              className="grid grid-cols-1 md:grid-cols-3 gap-6 sm:gap-8 lg:gap-10 max-w-5xl mx-auto"
+              className="grid grid-cols-1 md:grid-cols-3 gap-4 sm:gap-8 lg:gap-10 max-w-5xl mx-auto"
             >
               <FeatureCard
                 icon={ShieldCheck}
@@ -222,7 +233,10 @@ export default function HomeClient() {
             CTA SECTION — "Your next roommate is already here"
             Surface canvas with generous whitespace
             ================================================================ */}
-        <section aria-label="Get started" className="py-16 md:py-20 bg-surface-canvas text-center">
+        <section
+          aria-label="Get started"
+          className="py-16 pb-24 md:py-20 md:pb-20 bg-surface-canvas text-center"
+        >
           <m.div
             initial="hidden"
             whileInView="visible"
@@ -231,7 +245,9 @@ export default function HomeClient() {
             className="max-w-3xl mx-auto px-4 sm:px-6"
           >
             <h2 className="font-display text-3xl md:text-4xl lg:text-5xl font-normal tracking-tight mb-6 text-on-surface text-balance">
-              {isLoggedIn ? "Find your perfect room." : "Your next roommate is already here."}
+              {isLoggedIn
+                ? "Find your perfect room."
+                : "Your next roommate is already here."}
             </h2>
             <p className="text-lg text-on-surface-variant mb-10 max-w-xl mx-auto font-light">
               {isLoggedIn
@@ -286,17 +302,18 @@ function FeatureCard({
   return (
     <m.div
       variants={fadeInUp}
-      className="flex flex-col items-center text-center group bg-surface-container-lowest rounded-xl p-8 shadow-ambient-sm"
+      className="flex flex-col items-center text-center group bg-surface-container-lowest rounded-xl p-6 sm:p-8 shadow-ambient-sm h-full"
     >
-      <div aria-hidden="true" className="mb-6 flex items-center justify-center w-12 h-12 rounded-full bg-primary/10 text-primary transition-[transform,background-color,color] duration-200 group-hover:bg-primary group-hover:text-on-primary group-hover:scale-110">
+      <div
+        aria-hidden="true"
+        className="mb-6 flex items-center justify-center w-12 h-12 rounded-full bg-primary/10 text-primary transition-[transform,background-color,color] duration-200 group-hover:bg-primary group-hover:text-on-primary group-hover:scale-110"
+      >
         <Icon className="w-5 h-5" />
       </div>
       <h3 className="font-display text-lg font-medium mb-3 text-on-surface tracking-tight">
         {title}
       </h3>
-      <p className="text-on-surface-variant font-light leading-relaxed">
-        {description}
-      </p>
+      <p className="text-on-surface-variant leading-relaxed">{description}</p>
     </m.div>
   );
 }

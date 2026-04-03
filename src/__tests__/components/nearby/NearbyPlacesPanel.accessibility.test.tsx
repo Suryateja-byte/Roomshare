@@ -448,8 +448,8 @@ describe("NearbyPlacesPanel - Accessibility", () => {
     });
   });
 
-  describe("Login Prompt Accessibility", () => {
-    it("unauthenticated state shows accessible login link", () => {
+  describe("Guest Access Accessibility", () => {
+    it("keeps the nearby search input accessible for guests", () => {
       const { useSession } = require("next-auth/react");
       useSession.mockReturnValue({
         data: null,
@@ -458,8 +458,12 @@ describe("NearbyPlacesPanel - Accessibility", () => {
 
       renderPanel();
 
-      const loginLink = screen.getByRole("link", { name: /sign in/i });
-      expect(loginLink).toHaveAttribute("href", "/login");
+      expect(
+        screen.getByRole("textbox", { name: /search nearby places/i })
+      ).toBeInTheDocument();
+      expect(
+        screen.queryByRole("link", { name: /sign in/i })
+      ).not.toBeInTheDocument();
     });
   });
 

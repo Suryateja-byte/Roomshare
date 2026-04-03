@@ -17,6 +17,7 @@ import {
   Loader2,
   Check,
   CheckCheck,
+  ArrowLeft,
   MoreVertical,
   Ban,
   ShieldOff,
@@ -727,6 +728,15 @@ export default function ChatWindow({
         data-testid="chat-header"
         className="px-6 py-4 bg-surface-container-lowest flex items-center gap-3"
       >
+        <button
+          type="button"
+          data-testid="back-button"
+          aria-label="Back to messages"
+          onClick={() => router.push("/messages")}
+          className="p-2 -ml-2 min-w-[44px] min-h-[44px] flex items-center justify-center text-on-surface-variant hover:bg-surface-container-high rounded-full transition-colors"
+        >
+          <ArrowLeft className="w-5 h-5" />
+        </button>
         <div className={`relative ${isBlocked ? "opacity-50 grayscale" : ""}`}>
           <UserAvatar
             image={otherUserImage}
@@ -825,7 +835,7 @@ export default function ChatWindow({
       {/* Messages */}
       <div
         data-testid="messages-container"
-        className="flex-1 overflow-y-auto px-6 py-4"
+        className="flex-1 overflow-y-auto px-6 pt-4 pb-6"
       >
         {Object.entries(groupedMessages).map(([date, msgs]) => (
           <div key={date}>
@@ -975,7 +985,7 @@ export default function ChatWindow({
           isUnblocking={isUnblocking}
         />
       ) : (
-        <div className="px-6 py-4 bg-surface-container-lowest space-y-2">
+        <div className="px-6 pt-4 pb-[calc(1rem+env(safe-area-inset-bottom,0px))] bg-surface-container-lowest space-y-2">
           {/* Offline banner */}
           {isOffline && (
             <div className="flex items-center gap-2 p-2 rounded-lg bg-surface-container-high text-sm text-on-surface-variant">

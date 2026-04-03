@@ -123,23 +123,23 @@ describe("POST /api/nearby", () => {
     } as unknown as Request;
   };
 
-  describe("authentication", () => {
-    it("returns 401 when not authenticated", async () => {
+  describe("guest access", () => {
+    it("allows nearby search when no session exists", async () => {
       (auth as jest.Mock).mockResolvedValue(null);
 
       const response = await POST(createRequest(validRequestBody));
-      const data = await response.json();
 
-      expect(response.status).toBe(401);
-      expect(data.error).toBe("Unauthorized");
+      expect(response.status).toBe(200);
+      expect(auth).not.toHaveBeenCalled();
     });
 
-    it("returns 401 when user id is missing", async () => {
+    it("allows nearby search when session user id is missing", async () => {
       (auth as jest.Mock).mockResolvedValue({ user: { name: "Test" } });
 
       const response = await POST(createRequest(validRequestBody));
 
-      expect(response.status).toBe(401);
+      expect(response.status).toBe(200);
+      expect(auth).not.toHaveBeenCalled();
     });
   });
 

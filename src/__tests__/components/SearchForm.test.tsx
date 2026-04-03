@@ -251,6 +251,82 @@ describe("SearchForm", () => {
     });
   });
 
+  describe("rendering - home variant", () => {
+    const originalSemanticEnv = process.env.NEXT_PUBLIC_ENABLE_SEMANTIC_SEARCH;
+
+    beforeEach(() => {
+      process.env.NEXT_PUBLIC_ENABLE_SEMANTIC_SEARCH = "true";
+    });
+
+    afterAll(() => {
+      process.env.NEXT_PUBLIC_ENABLE_SEMANTIC_SEARCH = originalSemanticEnv;
+    });
+
+    it('renders "What", "Where", and "Budget" controls', () => {
+      render(<SearchForm variant="home" />);
+
+      expect(screen.getByText("What")).toBeInTheDocument();
+      expect(screen.getByText("Where")).toBeInTheDocument();
+      expect(screen.getByText("Budget")).toBeInTheDocument();
+      expect(
+        screen.getByPlaceholderText(/describe your ideal room/i)
+      ).toBeInTheDocument();
+    });
+
+    it("renders filters and search buttons", () => {
+      render(<SearchForm variant="home" />);
+
+      expect(
+        screen.getByRole("button", { name: /filters/i })
+      ).toBeInTheDocument();
+      expect(
+        screen.getByRole("button", { name: /search/i })
+      ).toBeInTheDocument();
+    });
+
+    it("opens the filter modal from the home variant", async () => {
+      render(<SearchForm variant="home" />);
+
+      await user.click(screen.getByRole("button", { name: /filters/i }));
+      jest.runAllTimers();
+
+      expect(screen.getByText("Move-in Date")).toBeInTheDocument();
+    });
+
+    it("preserves semantic, location, and budget submission behavior", async () => {
+      render(<SearchForm variant="home" />);
+
+      await user.type(
+        screen.getByPlaceholderText(/describe your ideal room/i),
+        "sunny room"
+      );
+      await user.type(screen.getByLabelText(/minimum budget/i), "900");
+      await user.type(screen.getByLabelText(/maximum budget/i), "1500");
+      await user.click(screen.getByTestId("select-location"));
+
+      jest.advanceTimersByTime(500);
+
+      const pushCall = mockPush.mock.calls[0]?.[0] ?? "";
+      expect(pushCall).toContain("what=sunny+room");
+      expect(pushCall).toContain("q=sunny+room");
+      expect(pushCall).toContain("minPrice=900");
+      expect(pushCall).toContain("maxPrice=1500");
+      expect(pushCall).toContain("lat=37.7749");
+      expect(pushCall).toContain("lng=-122.4194");
+    });
+
+    it("shows the location warning when text is entered without a selection", async () => {
+      render(<SearchForm variant="home" />);
+
+      await user.type(screen.getByTestId("location-input"), "San Francisco");
+      fireEvent.submit(screen.getByRole("search"));
+
+      expect(
+        screen.getByText(/select a location from the dropdown/i)
+      ).toBeInTheDocument();
+    });
+  });
+
   // ============================================
   // URL Parameter Initialization Tests
   // ============================================

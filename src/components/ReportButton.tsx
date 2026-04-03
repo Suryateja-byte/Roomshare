@@ -82,32 +82,41 @@ export default function ReportButton({ listingId }: ReportButtonProps) {
     }
   };
 
+  const triggerClassName =
+    "w-11 gap-0 rounded-full border border-outline-variant/40 px-0 text-on-surface-variant hover:bg-surface-container-high hover:text-red-600 md:w-auto md:gap-2 md:border-0 md:px-3";
+
+  const triggerContent = (
+    <>
+      <Flag className="w-4 h-4 shrink-0" />
+      <span
+        data-testid="report-listing-label"
+        className="hidden text-xs md:inline"
+      >
+        Report this listing
+      </span>
+    </>
+  );
+
+  const renderTriggerButton = () => (
+    <Button
+      aria-label="Report this listing"
+      data-testid="report-listing"
+      variant="ghost"
+      size="sm"
+      className={triggerClassName}
+    >
+      {triggerContent}
+    </Button>
+  );
+
   // Render placeholder button during SSR to prevent hydration mismatch
   if (!mounted) {
-    return (
-      <Button
-        variant="ghost"
-        size="sm"
-        className="text-on-surface-variant hover:text-red-600 gap-2"
-      >
-        <Flag className="w-4 h-4" />
-        <span className="text-xs">Report this listing</span>
-      </Button>
-    );
+    return renderTriggerButton();
   }
 
   return (
     <Dialog open={isOpen} onOpenChange={setIsOpen}>
-      <DialogTrigger asChild>
-        <Button
-          variant="ghost"
-          size="sm"
-          className="text-on-surface-variant hover:text-red-600 gap-2"
-        >
-          <Flag className="w-4 h-4" />
-          <span className="text-xs">Report this listing</span>
-        </Button>
-      </DialogTrigger>
+      <DialogTrigger asChild>{renderTriggerButton()}</DialogTrigger>
       <DialogContent className="sm:max-w-[425px]">
         <DialogHeader>
           <DialogTitle>Report Listing</DialogTitle>

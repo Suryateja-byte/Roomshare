@@ -41,16 +41,6 @@ import { Badge } from "@/components/ui/badge";
 import { useSession } from "next-auth/react";
 import ListingViewTracker from "./ListingViewTracker";
 
-// Lazy-load NeighborhoodChat to avoid loading framer-motion + AI SDK on initial page load
-// This defers ~200KB+ of JS until after the page is interactive
-const NeighborhoodChat = dynamic(
-  () => import("@/components/NeighborhoodChat"),
-  {
-    ssr: false,
-    loading: () => null, // Chat widget appears after load, no placeholder needed
-  }
-);
-
 // Lazy-load NearbyPlacesSection (MapLibre GL + Radar) to avoid loading ~150KB+ on initial page load
 const NearbyPlacesSection = dynamic(
   () => import("@/components/nearby/NearbyPlacesSection"),
@@ -206,9 +196,7 @@ function InfoStat({
 function StatCard({ label, value }: { label: string; value: number | string }) {
   return (
     <div className="bg-surface-canvas p-3 rounded-xl border border-outline-variant/20 text-center">
-      <span className="block text-2xl font-bold text-on-surface">
-        {value}
-      </span>
+      <span className="block text-2xl font-bold text-on-surface">{value}</span>
       <span className="text-xs text-on-surface-variant font-medium">
         {label}
       </span>
@@ -340,7 +328,11 @@ export default function ListingPageClient({
 
   return (
     <div className="min-h-screen bg-surface-canvas pb-20">
-      <ListingViewTracker listingId={listing.id} ownerId={listing.ownerId} viewToken={viewToken} />
+      <ListingViewTracker
+        listingId={listing.id}
+        ownerId={listing.ownerId}
+        viewToken={viewToken}
+      />
 
       {/* Real-time freshness check for non-owners */}
       {canRenderGuestControls && (
@@ -350,25 +342,57 @@ export default function ListingPageClient({
       <div className="pt-6">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
           {/* Breadcrumbs & Title Header */}
-          <div className="flex justify-between items-end mb-6">
-            <div className="flex flex-col gap-1">
+          <div
+            data-testid="listing-detail-header"
+            className="mb-6 flex flex-col gap-4 md:flex-row md:items-start md:justify-between lg:items-end"
+          >
+            <div
+              data-testid="listing-detail-title-group"
+              className="min-w-0 flex-1 flex flex-col gap-1"
+            >
               {/* Breadcrumb */}
               <nav aria-label="Breadcrumb" className="mb-1">
                 <ol className="flex items-center gap-1.5 text-sm text-on-surface-variant font-medium">
-                  <li><Link href="/" className="hover:text-on-surface transition-colors">Home</Link></li>
-                  <li aria-hidden="true"><ChevronRight className="w-3 h-3" /></li>
-                  <li><Link href="/search" className="hover:text-on-surface transition-colors">Search</Link></li>
-                  <li aria-hidden="true"><ChevronRight className="w-3 h-3" /></li>
-                  <li aria-current="page" className="text-on-surface font-semibold truncate max-w-[200px]">{listing.title}</li>
+                  <li>
+                    <Link
+                      href="/"
+                      className="hover:text-on-surface transition-colors"
+                    >
+                      Home
+                    </Link>
+                  </li>
+                  <li aria-hidden="true">
+                    <ChevronRight className="w-3 h-3" />
+                  </li>
+                  <li>
+                    <Link
+                      href="/search"
+                      className="hover:text-on-surface transition-colors"
+                    >
+                      Search
+                    </Link>
+                  </li>
+                  <li aria-hidden="true">
+                    <ChevronRight className="w-3 h-3" />
+                  </li>
+                  <li
+                    aria-current="page"
+                    className="text-on-surface font-semibold truncate max-w-[200px]"
+                  >
+                    {listing.title}
+                  </li>
                 </ol>
               </nav>
               {/* Title */}
-              <h1 className="text-3xl md:text-4xl font-bold font-display tracking-tight text-on-surface">
+              <h1 className="break-words text-3xl font-bold font-display leading-tight tracking-tight text-on-surface md:text-4xl">
                 {listing.title}
               </h1>
             </div>
             {/* Action buttons */}
-            <div className="flex gap-2">
+            <div
+              data-testid="listing-detail-actions"
+              className="flex w-full flex-wrap items-center justify-end gap-2 self-end md:w-auto md:flex-none md:flex-nowrap md:self-auto [&>*]:shrink-0"
+            >
               <ShareListingButton
                 listingId={listing.id}
                 title={listing.title}
@@ -577,9 +601,7 @@ export default function ListingPageClient({
                       )}
                       {listing.owner.isVerified && reviews.length >= 5 && (
                         <>
-                          <span className="text-outline-variant/20">
-                            •
-                          </span>
+                          <span className="text-outline-variant/20">•</span>
                           <div className="flex items-center gap-1 text-xs font-medium text-on-surface-variant">
                             <Star className="w-3.5 h-3.5 text-primary" />
                             Superhost
@@ -588,7 +610,10 @@ export default function ListingPageClient({
                       )}
                     </div>
                     {canRenderGuestControls && (
-                      <div className="mt-4">
+                      <div
+                        data-testid="contact-host-host-section"
+                        className="mt-4 lg:hidden"
+                      >
                         <ContactHostButton listingId={listing.id} />
                       </div>
                     )}
@@ -732,7 +757,10 @@ export default function ListingPageClient({
                           Coming Q3 2026
                         </button>
                         <p className="text-xs text-on-surface-variant mt-1">
-                          <Link href="/notifications" className="underline underline-offset-2 hover:text-on-surface">
+                          <Link
+                            href="/notifications"
+                            className="underline underline-offset-2 hover:text-on-surface"
+                          >
                             Get notified
                           </Link>
                         </p>
@@ -758,7 +786,10 @@ export default function ListingPageClient({
                       bookingMode={listing.bookingMode}
                       holdTtlMinutes={listing.holdTtlMinutes}
                     />
-                    <div className="[&>button]:bg-transparent [&>button]:border [&>button]:border-outline-variant/30 [&>button]:text-on-surface [&>button]:hover:bg-surface-container-high [&>button]:shadow-none">
+                    <div
+                      data-testid="contact-host-sidebar"
+                      className="hidden lg:block [&>button]:bg-transparent [&>button]:border [&>button]:border-outline-variant/30 [&>button]:text-on-surface [&>button]:hover:bg-surface-container-high [&>button]:shadow-none"
+                    >
                       <ContactHostButton listingId={listing.id} />
                     </div>
                   </>
@@ -768,15 +799,6 @@ export default function ListingPageClient({
           </div>
         </div>
       </div>
-
-      {/* Neighborhood AI Chat Widget */}
-      {coordinates && (
-        <NeighborhoodChat
-          listingId={listing.id}
-          latitude={coordinates.lat}
-          longitude={coordinates.lng}
-        />
-      )}
     </div>
   );
 }

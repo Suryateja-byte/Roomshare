@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useEffect } from "react";
 
 interface ServiceWorkerRegistrationProps {
   onUpdate?: () => void;
@@ -11,10 +11,6 @@ export function ServiceWorkerRegistration({
   onUpdate,
   onSuccess,
 }: ServiceWorkerRegistrationProps) {
-  const [updateAvailable, setUpdateAvailable] = useState(false);
-  const [registration, setRegistration] =
-    useState<ServiceWorkerRegistration | null>(null);
-
   useEffect(() => {
     if (typeof window === "undefined" || !("serviceWorker" in navigator)) {
       return;
@@ -46,8 +42,6 @@ export function ServiceWorkerRegistration({
           scope: "/",
         });
 
-        setRegistration(reg);
-
         // Check if there's an update available
         reg.addEventListener("updatefound", () => {
           const newWorker = reg.installing;
@@ -58,8 +52,7 @@ export function ServiceWorkerRegistration({
                 newWorker.state === "installed" &&
                 navigator.serviceWorker.controller
               ) {
-                // New content available
-                setUpdateAvailable(true);
+                // Notify callers, but keep updates silent on the web UI.
                 onUpdate?.();
               } else if (newWorker.state === "activated") {
                 // Content cached for offline use
@@ -98,64 +91,5 @@ export function ServiceWorkerRegistration({
     };
   }, [onUpdate, onSuccess]);
 
-  const handleUpdate = () => {
-    if (registration?.waiting) {
-      // Send skip waiting message to SW
-      registration.waiting.postMessage({ type: "SKIP_WAITING" });
-      // Reload to activate new version
-      window.location.reload();
-    }
-  };
-
-  if (!updateAvailable) {
-    return null;
-  }
-
-  return (
-    <div
-      role="alert"
-      className="fixed bottom-4 left-4 right-4 z-50 mx-auto max-w-md rounded-lg border border-outline-variant/20 bg-surface-container-lowest p-4 shadow-lg "
-    >
-      <div className="flex items-start gap-3">
-        <div className="flex-shrink-0">
-          <svg
-            className="h-5 w-5 text-on-surface-variant "
-            fill="none"
-            viewBox="0 0 24 24"
-            stroke="currentColor"
-            strokeWidth={2}
-            aria-hidden="true"
-          >
-            <path
-              strokeLinecap="round"
-              strokeLinejoin="round"
-              d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15"
-            />
-          </svg>
-        </div>
-        <div className="flex-1">
-          <h3 className="text-sm font-medium text-on-surface ">
-            Update available
-          </h3>
-          <p className="mt-1 text-sm text-on-surface-variant ">
-            A new version of the app is available.
-          </p>
-          <div className="mt-3 flex gap-2">
-            <button
-              onClick={handleUpdate}
-              className="rounded-md bg-on-surface px-3 py-1.5 text-xs font-medium text-white transition-colors hover:bg-on-surface focus:outline-none focus-visible:ring-2 focus-visible:ring-primary/30 focus-visible:ring-offset-2 "
-            >
-              Update now
-            </button>
-            <button
-              onClick={() => setUpdateAvailable(false)}
-              className="rounded-md px-3 py-1.5 text-xs font-medium text-on-surface-variant transition-colors hover:bg-surface-container-high focus:outline-none focus-visible:ring-2 focus-visible:ring-primary/30 focus-visible:ring-offset-2 "
-            >
-              Later
-            </button>
-          </div>
-        </div>
-      </div>
-    </div>
-  );
+  return null;
 }

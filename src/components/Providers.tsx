@@ -22,8 +22,8 @@ export default function Providers({
       <MotionConfig reducedMotion="user">
         <SessionProvider
           session={session}
-          refetchOnWindowFocus={true}
-          refetchInterval={600}
+          refetchOnWindowFocus={false}
+          refetchInterval={600000}
         >
           {children}
           <Toaster position="top-center" richColors />

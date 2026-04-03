@@ -133,7 +133,7 @@ export interface MapFlyToEventDetail {
 export default function SearchForm({
   variant = "default",
 }: {
-  variant?: "default" | "compact";
+  variant?: "default" | "compact" | "home";
 }) {
   const searchParams = useSearchParams();
   const formRef = useRef<HTMLFormElement | null>(null);
@@ -253,7 +253,9 @@ export default function SearchForm({
   // Track the isSearching reset timeout so it can be cleaned up on unmount
   const resetSearchingTimeoutRef = useRef<NodeJS.Timeout | null>(null);
   // H4 FIX: Sync ref with state so handleSearch reads current value without dep
-  useEffect(() => { isSearchingRef.current = isSearching; }, [isSearching]);
+  useEffect(() => {
+    isSearchingRef.current = isSearching;
+  }, [isSearching]);
 
   // Recent searches from canonical hook (handles localStorage, migration, enhanced format)
   const { recentSearches, saveRecentSearch, clearRecentSearches } =
@@ -547,8 +549,10 @@ export default function SearchForm({
         : null;
 
       // EU-D: Guard against NaN from invalid input (e.g., "abc" → NaN)
-      if (finalMinPrice !== null && !Number.isFinite(finalMinPrice)) finalMinPrice = null;
-      if (finalMaxPrice !== null && !Number.isFinite(finalMaxPrice)) finalMaxPrice = null;
+      if (finalMinPrice !== null && !Number.isFinite(finalMinPrice))
+        finalMinPrice = null;
+      if (finalMaxPrice !== null && !Number.isFinite(finalMaxPrice))
+        finalMaxPrice = null;
 
       // Enforce non-negative values
       if (finalMinPrice !== null && finalMinPrice < 0) finalMinPrice = 0;
@@ -872,6 +876,7 @@ export default function SearchForm({
   // No duplicate lock needed here.
 
   const isCompact = variant === "compact";
+  const isHome = variant === "home";
   // 'en-CA' locale returns YYYY-MM-DD format in local timezone, safe across DST transitions
   const minMoveInDate = new Date().toLocaleDateString("en-CA");
 
@@ -881,7 +886,11 @@ export default function SearchForm({
   const getFieldFlex = (
     field: "what" | "where" | "budget"
   ): React.CSSProperties => {
-    const defaults = { what: "1.3 1 0%", where: "1.5 1 0%", budget: "1.2 1 0%" };
+    const defaults = {
+      what: "1.3 1 0%",
+      where: "1.5 1 0%",
+      budget: "1.2 1 0%",
+    };
     const transition = "flex 0.4s cubic-bezier(0.16, 1, 0.3, 1)";
     if (!focusedField) return { flex: defaults[field], transition };
     if (focusedField === field)
@@ -889,15 +898,51 @@ export default function SearchForm({
     return { flex: "0.3 1 0%", transition };
   };
 
+  const fieldPaddingClasses = isCompact
+    ? "px-4 py-2"
+    : isHome
+      ? "px-0 py-0 md:px-6 md:py-2.5"
+      : "px-4 py-2 md:px-6 md:py-2.5";
+
+  const getFieldStateClasses = (field: "what" | "where" | "budget") => {
+    if (isHome) {
+      return cn(
+        focusedField === field &&
+          "md:bg-surface-container-lowest/[0.03] md:rounded-2xl",
+        focusedField !== null && focusedField !== field && "md:opacity-50"
+      );
+    }
+
+    return focusedField === field
+      ? "md:bg-surface-container-lowest/[0.03] md:rounded-2xl opacity-100"
+      : focusedField !== null
+        ? "opacity-50"
+        : "opacity-100";
+  };
+
   // CLS fix: min-h matches Suspense fallback in SearchHeaderWrapper.tsx
   return (
     <div
-      className={`relative w-full mx-auto min-h-[56px] sm:min-h-[64px] ${isCompact ? "max-w-2xl" : "max-w-5xl"}`}
+      className={cn(
+        "relative w-full mx-auto",
+        isCompact
+          ? "min-h-[56px] sm:min-h-[64px] max-w-2xl"
+          : isHome
+            ? "max-w-[360px] md:max-w-5xl"
+            : "min-h-[56px] sm:min-h-[64px] max-w-5xl"
+      )}
     >
       <form
         ref={formRef}
         onSubmit={handleSearch}
-        className={`group relative flex flex-col md:flex-row md:items-center bg-surface-container-lowest backdrop-blur-2xl rounded-3xl md:rounded-full shadow-xl hover:shadow-2xl focus-within:shadow-2xl transition-all duration-300 w-full ${isCompact ? "p-1" : "p-2"}`}
+        className={cn(
+          "group relative flex w-full flex-col",
+          isHome
+            ? "rounded-[2rem] bg-white p-7 shadow-[0_20px_40px_-15px_rgba(0,0,0,0.07)] md:flex-row md:items-center md:rounded-full md:bg-surface-container-lowest md:p-2 md:shadow-xl md:backdrop-blur-2xl md:transition-all md:duration-300 md:hover:shadow-2xl md:focus-within:shadow-2xl"
+            : "bg-surface-container-lowest backdrop-blur-2xl rounded-3xl md:rounded-full shadow-xl hover:shadow-2xl focus-within:shadow-2xl transition-all duration-300 md:flex-row md:items-center",
+          isCompact && "p-1",
+          !isCompact && !isHome && "p-2"
+        )}
         role="search"
         aria-label="Search listings"
       >
@@ -906,28 +951,48 @@ export default function SearchForm({
         {semanticSearchEnabled && !isCompact && (
           <>
             <div
-                style={getFieldFlex('what')}
-                className={cn(
-                'w-full flex-col relative overflow-hidden whitespace-nowrap transition-opacity duration-300 hidden lg:flex',
-                isCompact ? 'px-4 py-2' : 'px-4 py-2 md:px-6 md:py-2.5',
-                focusedField === 'what' ? 'md:bg-surface-container-lowest/[0.03] md:rounded-2xl opacity-100' : (focusedField !== null ? 'opacity-50' : 'opacity-100'),
-            )}>
+              style={getFieldFlex("what")}
+              className={cn(
+                "w-full flex-col relative overflow-hidden whitespace-nowrap transition-opacity duration-300",
+                isHome ? "flex md:hidden lg:flex" : "hidden lg:flex",
+                fieldPaddingClasses,
+                getFieldStateClasses("what")
+              )}
+            >
               <label
                 htmlFor="search-what"
                 className={cn(
-                  "text-xs font-bold text-primary uppercase tracking-[0.15em] mb-1 flex items-center gap-1.5 transition-opacity duration-200",
+                  "transition-opacity duration-200",
+                  isHome
+                    ? "mb-2.5 flex items-center text-[11px] font-bold uppercase tracking-[0.2em] leading-none text-[#A85338] md:mb-1 md:gap-1.5 md:text-xs md:tracking-[0.15em] md:text-primary"
+                    : "mb-1 flex items-center gap-1.5 text-xs font-bold uppercase tracking-[0.15em] text-primary",
                   focusedField !== null &&
                     focusedField !== "what" &&
                     "md:opacity-0"
                 )}
               >
-                <Sparkles className="w-3 h-3" />
+                <Sparkles
+                  className={cn(
+                    isHome
+                      ? "mr-1.5 h-[14px] w-[14px] shrink-0 text-[#A85338] md:mr-0 md:h-3 md:w-3 md:text-primary"
+                      : "h-3 w-3"
+                  )}
+                  strokeWidth={isHome ? 2.5 : 2}
+                />
                 What
-                <span className="text-[10px] font-bold text-on-primary bg-primary px-1.5 py-0.5 rounded tracking-wider">
+                <span
+                  className={cn(
+                    isHome
+                      ? "ml-2 rounded-[4px] bg-[#A85338] px-1.5 py-0.5 text-[9px] font-bold tracking-wide text-white md:ml-0 md:rounded md:bg-primary md:text-[10px] md:tracking-wider md:text-on-primary"
+                      : "rounded bg-primary px-1.5 py-0.5 text-[10px] font-bold tracking-wider text-on-primary"
+                  )}
+                >
                   AI
                 </span>
               </label>
-              <div className="flex items-center gap-1">
+              <div
+                className={cn("flex items-center", isHome ? "gap-0" : "gap-1")}
+              >
                 <input
                   id="search-what"
                   type="text"
@@ -935,15 +1000,25 @@ export default function SearchForm({
                   onChange={(e) => setWhatQuery(e.target.value)}
                   onFocus={() => handleFieldFocus("what")}
                   onBlur={handleFieldBlur}
-                  placeholder="Describe your ideal room..."
-                  className="w-full bg-transparent border-none p-0 text-base md:text-sm font-medium text-on-surface placeholder:text-on-surface-variant focus:ring-0 focus:outline-none"
+                  placeholder="Describe your ideal room"
+                  className={cn(
+                    "w-full bg-transparent border-none focus:ring-0 focus:outline-none",
+                    isHome
+                      ? "rounded-md px-1 py-1 -ml-1 text-[16px] text-[#2F2F2B] placeholder:text-[#7A7A7A] transition-colors focus:bg-[#F8F7F3] md:-ml-0 md:rounded-none md:px-0 md:py-0 md:text-base md:font-medium md:text-on-surface md:placeholder:text-on-surface-variant md:focus:bg-transparent"
+                      : "p-0 text-base md:text-sm font-medium text-on-surface placeholder:text-on-surface-variant"
+                  )}
                   autoComplete="off"
                 />
                 {whatQuery && (
                   <button
                     type="button"
                     onClick={() => setWhatQuery("")}
-                    className="flex-shrink-0 p-1 rounded-full text-on-surface-variant hover:text-on-surface-variant transition-colors"
+                    className={cn(
+                      "flex-shrink-0 rounded-full transition-colors",
+                      isHome
+                        ? "p-1.5 text-[#7A7A7A] hover:bg-[#F8F7F3] hover:text-[#2F2F2B] md:p-1 md:text-on-surface-variant md:hover:bg-transparent md:hover:text-on-surface-variant"
+                        : "p-1 text-on-surface-variant hover:text-on-surface-variant"
+                    )}
                     aria-label="Clear search description"
                   >
                     <X className="w-3.5 h-3.5" />
@@ -953,7 +1028,11 @@ export default function SearchForm({
             </div>
             {/* Divider between What and Where — hidden at md with WHAT field */}
             <div
-              className="w-full h-px lg:w-px lg:h-8 bg-surface-container-high mx-0 lg:mx-1 my-1 lg:my-0 hidden lg:block"
+              className={cn(
+                isHome
+                  ? "my-5 block h-px w-full bg-[#EFEEE9] md:hidden lg:my-0 lg:block lg:h-8 lg:w-px lg:bg-outline-variant/20"
+                  : "w-full h-px lg:w-px lg:h-8 bg-outline-variant/20 mx-0 lg:mx-1 my-1 lg:my-0 hidden lg:block"
+              )}
               aria-hidden="true"
             ></div>
           </>
@@ -964,15 +1043,19 @@ export default function SearchForm({
           style={getFieldFlex("where")}
           className={cn(
             "w-full flex flex-col relative group/input overflow-hidden whitespace-nowrap transition-opacity duration-300",
-            isCompact ? "px-4 py-2" : "px-4 py-2 md:px-6 md:py-2.5",
-            focusedField === "where" ? "md:bg-surface-container-lowest/[0.03] md:rounded-2xl opacity-100" : (focusedField !== null ? "opacity-50" : "opacity-100")
+            isHome && "overflow-visible md:overflow-hidden",
+            fieldPaddingClasses,
+            getFieldStateClasses("where")
           )}
         >
           {!isCompact && (
             <label
               htmlFor="search-location"
               className={cn(
-                "text-xs font-bold text-on-surface-variant uppercase tracking-[0.15em] mb-1 transition-opacity duration-200",
+                "transition-opacity duration-200",
+                isHome
+                  ? "mb-2.5 ml-1 text-[11px] font-bold uppercase tracking-[0.2em] leading-none text-[#6B6B6B] md:mb-1 md:ml-0 md:text-xs md:tracking-[0.15em] md:text-on-surface-variant"
+                  : "mb-1 text-xs font-bold uppercase tracking-[0.15em] text-on-surface-variant",
                 focusedField !== null &&
                   focusedField !== "where" &&
                   "md:opacity-0"
@@ -981,7 +1064,12 @@ export default function SearchForm({
               Where
             </label>
           )}
-          <div className="flex items-center gap-1">
+          <div
+            className={cn(
+              "flex items-center",
+              isHome ? "justify-between gap-2" : "gap-1"
+            )}
+          >
             <LocationSearchInput
               id="search-location"
               value={location}
@@ -1013,25 +1101,47 @@ export default function SearchForm({
                   isUserTypingLocationRef.current = false;
                 }, 500);
               }}
-              placeholder={focusedField && focusedField !== 'where' ? "City or area" : "Search destinations"}
-              className={
-                isCompact
-                  ? "text-base md:text-sm flex-1"
-                  : "text-base md:text-sm font-medium flex-1 bg-transparent border-none p-0 focus:ring-0"
+              placeholder={
+                focusedField && focusedField !== "where"
+                  ? "City or area"
+                  : "Search destinations"
+              }
+              className="flex-1"
+              inputClassName={
+                isHome
+                  ? "rounded-md px-1 py-1 -ml-1 text-[16px] text-[#2F2F2B] placeholder:text-[#7A7A7A] transition-colors focus:bg-[#F8F7F3] md:-ml-0 md:rounded-none md:px-0 md:py-0 md:text-base md:font-medium md:text-on-surface md:placeholder:text-on-surface-variant md:focus:bg-transparent"
+                  : undefined
               }
             />
             <button
               type="button"
               onClick={handleUseMyLocation}
               disabled={geoLoading}
-              className="flex-shrink-0 p-1.5 rounded-full text-on-surface-variant hover:text-on-surface transition-colors disabled:opacity-50"
+              className={cn(
+                "flex-shrink-0 rounded-full transition-colors disabled:opacity-50",
+                isHome
+                  ? "p-2 -mr-2 text-[#9CA3AF] hover:bg-[#F8F7F3] hover:text-[#1F2937] active:bg-[#EFEBE5] md:mr-0 md:p-1.5 md:text-on-surface-variant md:hover:bg-transparent md:hover:text-on-surface"
+                  : "p-1.5 text-on-surface-variant hover:text-on-surface"
+              )}
               aria-label="Use my current location"
               title="Use my current location"
             >
               {geoLoading ? (
-                <Loader2 className="w-3.5 h-3.5 animate-spin" />
+                <Loader2
+                  className={cn(
+                    isHome
+                      ? "h-[18px] w-[18px] animate-spin md:h-3.5 md:w-3.5"
+                      : "w-3.5 h-3.5 animate-spin"
+                  )}
+                />
               ) : (
-                <LocateFixed className="w-3.5 h-3.5" />
+                <LocateFixed
+                  className={cn(
+                    isHome
+                      ? "h-[18px] w-[18px] md:h-3.5 md:w-3.5"
+                      : "w-3.5 h-3.5"
+                  )}
+                />
               )}
             </button>
           </div>
@@ -1083,7 +1193,11 @@ export default function SearchForm({
 
         {/* Divider */}
         <div
-          className="w-full h-px md:w-px md:h-8 bg-surface-container-high mx-0 md:mx-1 my-1 md:my-0"
+          className={cn(
+            isHome
+              ? "my-5 h-px w-full bg-[#EFEEE9] md:mx-1 md:my-0 md:h-8 md:w-px md:bg-outline-variant/20"
+              : "w-full h-px md:w-px md:h-8 bg-outline-variant/20 mx-0 md:mx-1 my-1 md:my-0"
+          )}
           aria-hidden="true"
         ></div>
 
@@ -1092,14 +1206,17 @@ export default function SearchForm({
           style={getFieldFlex("budget")}
           className={cn(
             "w-full flex flex-col overflow-hidden whitespace-nowrap transition-opacity duration-300",
-            isCompact ? "px-4 py-2" : "px-4 py-2 md:px-6 md:py-2.5",
-            focusedField === "budget" ? "md:bg-surface-container-lowest/[0.03] md:rounded-2xl opacity-100" : (focusedField !== null ? "opacity-50" : "opacity-100")
+            fieldPaddingClasses,
+            getFieldStateClasses("budget")
           )}
         >
           {!isCompact && (
             <label
               className={cn(
-                "text-xs font-bold text-on-surface-variant uppercase tracking-[0.15em] mb-1 transition-opacity duration-200",
+                "transition-opacity duration-200",
+                isHome
+                  ? "mb-2.5 ml-1 text-[11px] font-bold uppercase tracking-[0.2em] leading-none text-[#6B6B6B] md:mb-1 md:ml-0 md:text-xs md:tracking-[0.15em] md:text-on-surface-variant"
+                  : "mb-1 text-xs font-bold uppercase tracking-[0.15em] text-on-surface-variant",
                 focusedField !== null &&
                   focusedField !== "budget" &&
                   "md:opacity-0"
@@ -1108,9 +1225,17 @@ export default function SearchForm({
               Budget
             </label>
           )}
-          <div className="flex items-center gap-2">
+          <div className={cn("flex items-center", isHome ? "gap-3" : "gap-2")}>
             <div className="flex items-center gap-1 flex-1">
-              <span className="text-on-surface-variant text-xs">$</span>
+              <span
+                className={cn(
+                  "text-on-surface-variant text-xs",
+                  isHome &&
+                    "text-base font-normal text-[#7A7A7A] md:text-xs md:text-on-surface-variant"
+                )}
+              >
+                $
+              </span>
               <input
                 id="search-budget-min"
                 aria-label="Minimum budget"
@@ -1121,14 +1246,35 @@ export default function SearchForm({
                 onFocus={() => handleFieldFocus("budget")}
                 onBlur={handleFieldBlur}
                 placeholder="Min"
-                className={`w-full bg-transparent border-none p-0 text-base md:text-sm font-medium text-on-surface placeholder:text-on-surface-variant focus:ring-0 focus:outline-none appearance-none [-moz-appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none`}
+                className={cn(
+                  "w-full bg-transparent border-none appearance-none focus:ring-0 focus:outline-none [-moz-appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none",
+                  isHome
+                    ? "rounded-md px-1 py-1 -ml-1 text-[16px] text-[#2F2F2B] placeholder:text-[#7A7A7A] transition-colors focus:bg-[#F8F7F3] md:-ml-0 md:rounded-none md:px-0 md:py-0 md:text-base md:font-medium md:text-on-surface md:placeholder:text-on-surface-variant md:focus:bg-transparent"
+                    : "p-0 text-base md:text-sm font-medium text-on-surface placeholder:text-on-surface-variant"
+                )}
                 min="0"
                 step="50"
               />
             </div>
-            <span className="text-on-surface-variant text-xs">—</span>
+            <span
+              className={cn(
+                isHome
+                  ? "text-lg font-light text-[#C0C0C0] md:text-xs md:font-normal md:text-on-surface-variant"
+                  : "text-on-surface-variant text-xs"
+              )}
+            >
+              —
+            </span>
             <div className="flex items-center gap-1 flex-1">
-              <span className="text-on-surface-variant text-xs">$</span>
+              <span
+                className={cn(
+                  "text-on-surface-variant text-xs",
+                  isHome &&
+                    "text-base font-normal text-[#7A7A7A] md:text-xs md:text-on-surface-variant"
+                )}
+              >
+                $
+              </span>
               <input
                 id="search-budget-max"
                 aria-label="Maximum budget"
@@ -1139,7 +1285,12 @@ export default function SearchForm({
                 onFocus={() => handleFieldFocus("budget")}
                 onBlur={handleFieldBlur}
                 placeholder="Max"
-                className={`w-full bg-transparent border-none p-0 text-base md:text-sm font-medium text-on-surface placeholder:text-on-surface-variant focus:ring-0 focus:outline-none appearance-none [-moz-appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none`}
+                className={cn(
+                  "w-full bg-transparent border-none appearance-none focus:ring-0 focus:outline-none [-moz-appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none",
+                  isHome
+                    ? "rounded-md px-1 py-1 -ml-1 text-[16px] text-[#2F2F2B] placeholder:text-[#7A7A7A] transition-colors focus:bg-[#F8F7F3] md:-ml-0 md:rounded-none md:px-0 md:py-0 md:text-base md:font-medium md:text-on-surface md:placeholder:text-on-surface-variant md:focus:bg-transparent"
+                    : "p-0 text-base md:text-sm font-medium text-on-surface placeholder:text-on-surface-variant"
+                )}
                 min="0"
                 step="50"
               />
@@ -1147,61 +1298,105 @@ export default function SearchForm({
           </div>
         </div>
 
-        {/* Filters Button */}
-        {!isCompact && (
-          <>
-            <div
-              className="hidden md:block w-px h-8 bg-surface-container-high mx-1"
-              aria-hidden="true"
-            ></div>
-            <div className="flex items-center px-3">
-              <button
-                type="button"
-                data-hydrated={hasMounted || undefined}
-                onClick={() => setShowFilters(true)}
-                aria-label={`Filters${activeFilterCount > 0 ? ` (${activeFilterCount} active)` : ""}`}
-                aria-expanded={showFilters}
-                aria-controls={showFilters ? "search-filters" : undefined}
-                className={`relative flex items-center gap-2 h-10 px-4 rounded-full text-xs font-bold uppercase tracking-wider transition-all duration-300 ${
-                  activeFilterCount > 0
-                    ? "bg-primary/10 text-primary"
-                    : "text-on-surface-variant hover:text-on-surface hover:bg-surface-container-high"
-                }`}
-              >
-                <SlidersHorizontal className="w-3.5 h-3.5" />
-                <span className="hidden sm:inline">Filters</span>
-                {activeFilterCount > 0 && (
-                  <span className="absolute -top-1 -right-1 w-4 h-4 rounded-full bg-primary text-on-primary flex items-center justify-center text-[9px] font-bold shadow-ambient-sm">
-                    {activeFilterCount}
-                  </span>
-                )}
-              </button>
-            </div>
-          </>
-        )}
-
-        {/* Search Button */}
         <div
-          className={`flex items-center justify-center ${isCompact ? "p-0.5" : "p-1"}`}
+          className={cn(
+            isHome
+              ? "mt-6 flex items-center justify-between pt-1 md:mt-0 md:pt-0 md:contents"
+              : "contents"
+          )}
         >
-          <Button
-            type="submit"
-            disabled={isSearching}
-            aria-label={isSearching ? "Searching" : "Search"}
-            aria-busy={isSearching}
-            className={`rounded-full transition-all duration-500 hover:scale-105 active:scale-95 shadow-ambient-lg shadow-primary/20 ${isCompact ? "h-10 w-10 p-0" : "h-12 w-full md:w-12 bg-gradient-to-br from-primary to-primary-container hover:from-primary hover:to-primary"}`}
+          {/* Filters Button */}
+          {!isCompact && (
+            <>
+              <div
+                className="hidden md:block w-px h-8 bg-outline-variant/20 mx-1"
+                aria-hidden="true"
+              ></div>
+              <div
+                className={cn("flex items-center", isHome ? "px-0" : "px-3")}
+              >
+                <button
+                  type="button"
+                  data-hydrated={hasMounted || undefined}
+                  onClick={() => setShowFilters(true)}
+                  aria-label={`Filters${activeFilterCount > 0 ? ` (${activeFilterCount} active)` : ""}`}
+                  aria-expanded={showFilters}
+                  aria-controls={showFilters ? "search-filters" : undefined}
+                  className={cn(
+                    "relative flex items-center gap-2 transition-all duration-300",
+                    isHome
+                      ? activeFilterCount > 0
+                        ? "-ml-3 rounded-xl bg-[#F4E7E0] px-3 py-2 text-[12px] font-bold uppercase tracking-[0.1em] text-[#A85338] md:ml-0 md:h-10 md:rounded-full md:bg-primary/10 md:px-4 md:text-xs md:tracking-wider md:text-primary"
+                        : "-ml-3 rounded-xl px-3 py-2 text-[12px] font-bold uppercase tracking-[0.1em] text-[#6B6B6B] hover:bg-[#F8F7F3] hover:text-[#1F2937] active:bg-[#EFEBE5] md:ml-0 md:h-10 md:rounded-full md:px-4 md:text-xs md:tracking-wider md:text-on-surface-variant md:hover:bg-surface-container-high md:hover:text-on-surface"
+                      : activeFilterCount > 0
+                        ? "h-10 rounded-full bg-primary/10 px-4 text-xs font-bold uppercase tracking-wider text-primary"
+                        : "h-10 rounded-full px-4 text-xs font-bold uppercase tracking-wider text-on-surface-variant hover:bg-surface-container-high hover:text-on-surface"
+                  )}
+                >
+                  <SlidersHorizontal
+                    className={cn(
+                      isHome
+                        ? "h-[18px] w-[18px] md:h-3.5 md:w-3.5"
+                        : "w-3.5 h-3.5"
+                    )}
+                  />
+                  <span className={cn(!isHome && "hidden sm:inline")}>
+                    Filters
+                  </span>
+                  {activeFilterCount > 0 && (
+                    <span className="absolute -right-1 -top-1 flex h-4 w-4 items-center justify-center rounded-full bg-primary text-[9px] font-bold text-on-primary shadow-ambient-sm">
+                      {activeFilterCount}
+                    </span>
+                  )}
+                </button>
+              </div>
+            </>
+          )}
+
+          {/* Search Button */}
+          <div
+            className={cn(
+              "flex items-center justify-center",
+              isHome ? "p-0 md:p-1" : isCompact ? "p-0.5" : "p-1"
+            )}
           >
-            {isSearching ? (
-              <Loader2 className="animate-spin w-5 h-5" />
-            ) : (
-              <Search className="w-5 h-5" strokeWidth={2.5} />
-            )}
-            {!isCompact && (
-              <span className="md:hidden ml-2 font-bold text-sm uppercase tracking-widest">
-                Search
-              </span>
-            )}
-          </Button>
+            <Button
+              type="submit"
+              size={isHome ? "icon" : undefined}
+              disabled={isSearching}
+              aria-label={isSearching ? "Searching" : "Search"}
+              aria-busy={isSearching}
+              className={cn(
+                "rounded-full transition-all duration-500 hover:scale-105 active:scale-95",
+                isHome
+                  ? "h-[54px] w-[54px] min-h-[54px] min-w-[54px] bg-[#A85338] text-white shadow-[0_8px_20px_-6px_rgba(168,83,56,0.5)] hover:bg-[#944830] md:h-12 md:w-12 md:min-h-[44px] md:min-w-[44px] md:bg-gradient-to-br md:from-primary md:to-primary-container md:hover:from-primary md:hover:to-primary md:shadow-ambient-lg md:shadow-primary/20"
+                  : isCompact
+                    ? "h-10 w-10 p-0 shadow-ambient-lg shadow-primary/20"
+                    : "h-12 w-full md:w-12 bg-gradient-to-br from-primary to-primary-container hover:from-primary hover:to-primary shadow-ambient-lg shadow-primary/20"
+              )}
+            >
+              {isSearching ? (
+                <Loader2
+                  className={cn(
+                    "animate-spin",
+                    isHome ? "h-[22px] w-[22px] md:h-5 md:w-5" : "w-5 h-5"
+                  )}
+                />
+              ) : (
+                <Search
+                  className={cn(
+                    isHome ? "h-[22px] w-[22px] md:h-5 md:w-5" : "w-5 h-5"
+                  )}
+                  strokeWidth={2.5}
+                />
+              )}
+              {!isCompact && !isHome && (
+                <span className="md:hidden ml-2 font-bold text-sm uppercase tracking-widest">
+                  Search
+                </span>
+              )}
+            </Button>
+          </div>
         </div>
       </form>
 
@@ -1211,7 +1406,12 @@ export default function SearchForm({
       {showLocationWarning && !isCompact && !locationInputFocused && (
         <div
           id="location-warning"
-          className="absolute left-0 right-0 top-full mt-2 mx-auto max-w-5xl px-4 py-2 bg-amber-50 border border-amber-200 rounded-xl text-sm text-amber-800 flex items-center gap-2 pointer-events-none z-40 shadow-lg"
+          className={cn(
+            "border border-amber-200 bg-amber-50 text-sm text-amber-800 flex gap-2",
+            isHome
+              ? "mt-3 items-start rounded-2xl px-4 py-3 shadow-sm md:pointer-events-none md:absolute md:left-0 md:right-0 md:top-full md:mx-auto md:mt-2 md:max-w-5xl md:items-center md:rounded-xl md:px-4 md:py-2 md:z-40 md:shadow-lg"
+              : "absolute left-0 right-0 top-full mt-2 mx-auto max-w-5xl items-center rounded-xl px-4 py-2 pointer-events-none z-40 shadow-lg"
+          )}
         >
           <svg
             className="w-4 h-4 flex-shrink-0"

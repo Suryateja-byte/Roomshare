@@ -53,6 +53,37 @@ test.describe("Mobile UX — Page Load", () => {
     );
     expect(realErrors).toHaveLength(0);
   });
+
+  test("listing cards keep rounded corners inside the mobile results sheet", async ({
+    page,
+  }) => {
+    await page.goto(`/search?${boundsQS}`);
+
+    const mobileContainer = page.locator(
+      '[data-testid="mobile-search-results-container"]'
+    );
+    const firstCard = mobileContainer.locator('[data-testid="listing-card"]').first();
+    await expect(firstCard).toBeVisible({ timeout: 30_000 });
+
+    const radii = await firstCard.evaluate((article) => {
+      const link = article.querySelector("a");
+      const cardSurface = link?.firstElementChild;
+
+      return {
+        article: getComputedStyle(article as HTMLElement).borderTopLeftRadius,
+        link: link
+          ? getComputedStyle(link as HTMLElement).borderTopLeftRadius
+          : null,
+        cardSurface: cardSurface
+          ? getComputedStyle(cardSurface as HTMLElement).borderTopLeftRadius
+          : null,
+      };
+    });
+
+    expect(parseFloat(radii.article)).toBeGreaterThan(0);
+    expect(parseFloat(radii.link ?? "0")).toBeGreaterThan(0);
+    expect(parseFloat(radii.cardSurface ?? "0")).toBeGreaterThan(0);
+  });
 });
 
 test.describe("Mobile UX — Bottom Sheet (4.1)", () => {

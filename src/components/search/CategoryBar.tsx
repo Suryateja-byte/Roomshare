@@ -18,8 +18,6 @@ import {
   DollarSign,
   Users,
   Sparkles,
-  ChevronLeft,
-  ChevronRight,
 } from "lucide-react";
 
 /**
@@ -217,34 +215,21 @@ export function CategoryBar() {
 
   return (
     <nav
-      className="relative border-b border-outline-variant/20 bg-surface-container-lowest"
+      className="relative border-b border-outline-variant/30 bg-surface-canvas"
       aria-label="Category filters"
     >
-      {/* Left arrow */}
-      {canScrollLeft && (
-        <button
-          type="button"
-          onClick={() => scroll("left")}
-          className="absolute left-0 top-1/2 -translate-y-1/2 z-20 hidden md:flex items-center justify-center w-8 h-8 bg-surface-container-lowest border border-outline-variant/20 rounded-full shadow-sm hover:shadow-md transition-shadow ml-2"
-          aria-label="Scroll categories left"
-        >
-          <ChevronLeft className="w-4 h-4 text-on-surface" />
-        </button>
-      )}
-
       {/* Fade left edge */}
       {canScrollLeft && (
         <div
-          className="absolute left-0 top-0 bottom-0 w-16 bg-gradient-to-r from-surface-container-lowest to-transparent pointer-events-none z-10"
+          className="absolute left-0 top-0 bottom-0 w-12 bg-gradient-to-r from-surface-canvas to-transparent pointer-events-none z-10"
           aria-hidden="true"
         />
       )}
 
-      {/* Scrollable container */}
+      {/* Scrollable container — inline pill layout */}
       <div
         ref={scrollRef}
-        className="flex items-center gap-4 sm:gap-6 md:gap-8 px-4 sm:px-6 pt-6 pb-4 overflow-x-auto scrollbar-hide scroll-smooth"
-        style={{ cursor: "grab" }}
+        className="flex items-center gap-2 px-4 sm:px-5 py-2.5 overflow-x-auto hide-scrollbar scroll-smooth"
         onKeyDown={(e) => {
           if (e.key === "ArrowRight") scroll("right");
           if (e.key === "ArrowLeft") scroll("left");
@@ -262,22 +247,23 @@ export function CategoryBar() {
               disabled={isPending}
               title={cat.label}
               className={`
-                flex flex-col items-center gap-2 pt-2 pb-3 min-w-[56px] text-xs font-medium
-                transition-all duration-200 flex-shrink-0 border-b-2
+                inline-flex items-center gap-1.5 px-4 py-2 min-h-[36px]
+                rounded-full text-[13px] font-medium whitespace-nowrap flex-shrink-0
+                transition-all duration-200
                 ${
                   isActive
-                    ? "border-on-surface text-on-surface"
-                    : "border-transparent text-on-surface-variant hover:text-on-surface hover:border-outline-variant/30"
+                    ? "bg-primary text-on-primary border border-primary shadow-sm shadow-primary/20"
+                    : "bg-surface-container-lowest text-on-surface-variant border border-outline-variant/40 hover:border-primary-container hover:text-on-surface hover:shadow-sm"
                 }
                 disabled:opacity-60 disabled:cursor-not-allowed
               `}
               aria-pressed={isActive}
             >
               <Icon
-                className={`w-6 h-6 overflow-visible ${isActive ? "opacity-100" : "opacity-70"}`}
-                strokeWidth={isActive ? 2 : 1.5}
+                className="w-[15px] h-[15px] overflow-visible"
+                strokeWidth={isActive ? 2.5 : 1.75}
               />
-              <span className="whitespace-nowrap">{cat.label}</span>
+              <span>{cat.label}</span>
             </button>
           );
         })}
@@ -286,21 +272,9 @@ export function CategoryBar() {
       {/* Fade right edge */}
       {canScrollRight && (
         <div
-          className="absolute right-0 top-0 bottom-0 w-10 bg-gradient-to-l from-surface-container-lowest to-transparent pointer-events-none z-10"
+          className="absolute right-0 top-0 bottom-0 w-10 bg-gradient-to-l from-surface-canvas to-transparent pointer-events-none z-10"
           aria-hidden="true"
         />
-      )}
-
-      {/* Right arrow */}
-      {canScrollRight && (
-        <button
-          type="button"
-          onClick={() => scroll("right")}
-          className="absolute right-0 top-1/2 -translate-y-1/2 z-20 hidden md:flex items-center justify-center w-8 h-8 bg-surface-container-lowest border border-outline-variant/20 rounded-full shadow-sm hover:shadow-md transition-shadow mr-2"
-          aria-label="Scroll categories right"
-        >
-          <ChevronRight className="w-4 h-4 text-on-surface" />
-        </button>
       )}
     </nav>
   );

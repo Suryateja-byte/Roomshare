@@ -18,15 +18,15 @@ import { WebVitals } from "@/components/WebVitals";
 
 const newsreader = Newsreader({
   subsets: ["latin"],
-  weight: ["300", "400", "500", "600", "700"],
-  style: ["normal", "italic"],
+  weight: ["400", "600"],
+  style: ["normal"],
   display: "swap",
   variable: "--font-display",
 });
 
 const manrope = Manrope({
   subsets: ["latin"],
-  weight: ["300", "400", "500", "600", "700"],
+  weight: ["400", "500", "600"],
   display: "swap",
   variable: "--font-body",
 });

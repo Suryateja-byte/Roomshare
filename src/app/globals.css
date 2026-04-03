@@ -464,16 +464,6 @@ input:autofill {
   background-color: #fbf9f4 !important;
 }
 
-/* Global Scrollbar Hiding */
-*::-webkit-scrollbar {
-  display: none !important;
-}
-
-* {
-  -ms-overflow-style: none !important;
-  scrollbar-width: none !important;
-}
-
 /* DEPRECATED: Below WCAG 12px minimum. Use text-xs instead. */
 .text-2xs {
   font-size: 0.625rem;
@@ -572,27 +562,31 @@ input:autofill {
   }
 }
 
-/* MapLibre Attribution — editorial glassmorphism */
+/* MapLibre Attribution — minimal, unobtrusive, legally compliant */
 .maplibregl-ctrl-attrib {
-  background: rgb(251 249 244 / 0.95) !important;
-  backdrop-filter: blur(12px);
-  -webkit-backdrop-filter: blur(12px);
-  border-radius: 8px !important;
-  border: 1px solid rgb(27 28 25 / 0.05) !important;
-  padding: 4px 10px !important;
-  font-size: 10px !important;
-  font-weight: 500 !important;
-  color: #4a4941 !important;
-  box-shadow: 0 4px 12px rgb(27 28 25 / 0.05) !important;
-  margin: 0 12px 12px 0 !important;
+  background: rgb(255 255 255 / 0.7) !important;
+  backdrop-filter: blur(8px);
+  -webkit-backdrop-filter: blur(8px);
+  border-radius: 6px !important;
+  border: none !important;
+  padding: 3px 8px !important;
+  font-size: 9px !important;
+  font-weight: 400 !important;
+  letter-spacing: 0.01em !important;
+  color: rgb(74 73 65 / 0.6) !important;
+  box-shadow: none !important;
+  margin: 0 8px 8px 0 !important;
+  line-height: 1.4 !important;
+  max-width: none !important;
 }
 
 .maplibregl-ctrl-attrib a {
-  color: inherit !important;
+  color: rgb(74 73 65 / 0.7) !important;
   text-decoration: none !important;
 }
 
 .maplibregl-ctrl-attrib a:hover {
+  color: rgb(74 73 65 / 1) !important;
   text-decoration: underline !important;
 }
 
@@ -601,12 +595,11 @@ input:autofill {
 }
 
 .maplibregl-ctrl-attrib-inner {
-  display: flex;
-  align-items: center;
-  gap: 4px;
+  display: inline !important;
+  white-space: nowrap;
 }
 
-/* Hide scrollbar utility */
+/* Scrollbar utilities */
 .hide-scrollbar::-webkit-scrollbar {
   display: none;
 }
@@ -614,6 +607,17 @@ input:autofill {
 .hide-scrollbar {
   -ms-overflow-style: none;
   scrollbar-width: none;
+}
+
+@media (max-width: 767px) {
+  .hide-scrollbar-mobile::-webkit-scrollbar {
+    display: none;
+  }
+
+  .hide-scrollbar-mobile {
+    -ms-overflow-style: none;
+    scrollbar-width: none;
+  }
 }
 
 /* Map pin pulse ring animation */

@@ -8,6 +8,7 @@ function pathShouldRemovePadding(pathname: string): boolean {
   const isHomePage = pathname === "/";
   const isSearchPage =
     pathname === "/search" || pathname.startsWith("/search/");
+  const isMessageThread = pathname.startsWith("/messages/");
   const isAuthPage =
     pathname === "/login" ||
     pathname === "/signup" ||
@@ -15,7 +16,7 @@ function pathShouldRemovePadding(pathname: string): boolean {
     pathname === "/reset-password" ||
     pathname === "/verify";
 
-  return isHomePage || isSearchPage || isAuthPage;
+  return isHomePage || isSearchPage || isMessageThread || isAuthPage;
 }
 
 export default function MainLayout({

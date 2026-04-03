@@ -64,7 +64,7 @@ export function AppliedFilterChips({
       aria-label="Applied filters"
     >
       {/* Horizontal scrolling container */}
-      <div className="flex items-center gap-2 overflow-x-auto scrollbar-hide">
+      <div className="flex items-center gap-2 overflow-x-auto hide-scrollbar">
         {/* Filter chips */}
         <div className="flex items-center gap-2 flex-nowrap">
           {chips.map((chip) => (

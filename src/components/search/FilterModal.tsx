@@ -207,7 +207,7 @@ export function FilterModal({
           </div>
 
           {/* Scrollable Content */}
-          <div className="flex-1 overflow-y-auto p-6 space-y-6 scrollbar-hide">
+          <div className="flex-1 overflow-y-auto p-6 space-y-6 hide-scrollbar-mobile">
             {/* Price Range */}
             {onPriceChange && (
               <PriceRangeFilter

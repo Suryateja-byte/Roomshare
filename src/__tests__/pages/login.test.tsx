@@ -4,8 +4,12 @@ import LoginPage from "@/app/login/page";
 
 // Mock next-auth/react
 const mockSignIn = jest.fn();
+const mockSignOut = jest.fn();
+let mockSearchParams = new URLSearchParams();
+
 jest.mock("next-auth/react", () => ({
   signIn: (...args: unknown[]) => mockSignIn(...args),
+  signOut: (...args: unknown[]) => mockSignOut(...args),
   useSession: () => ({ data: null, status: "unauthenticated" }),
 }));
 
@@ -17,7 +21,7 @@ jest.mock("next/navigation", () => ({
     push: mockPush,
     refresh: mockRefresh,
   }),
-  useSearchParams: () => new URLSearchParams(),
+  useSearchParams: () => mockSearchParams,
 }));
 
 // Mock next/link
@@ -36,6 +40,7 @@ jest.mock("next/link", () => {
 describe("LoginPage", () => {
   beforeEach(() => {
     jest.clearAllMocks();
+    mockSearchParams = new URLSearchParams();
   });
 
   it("renders login form", () => {
@@ -64,6 +69,33 @@ describe("LoginPage", () => {
 
     const forgotLink = screen.getByText("Forgot password?");
     expect(forgotLink.closest("a")).toHaveAttribute("href", "/forgot-password");
+  });
+
+  it("toggles password visibility", async () => {
+    render(<LoginPage />);
+
+    const passwordInput = screen.getByLabelText("Password");
+    expect(passwordInput).toHaveAttribute("type", "password");
+
+    await userEvent.click(
+      screen.getByRole("button", { name: /show password/i })
+    );
+    expect(passwordInput).toHaveAttribute("type", "text");
+
+    await userEvent.click(
+      screen.getByRole("button", { name: /hide password/i })
+    );
+    expect(passwordInput).toHaveAttribute("type", "password");
+  });
+
+  it("renders the registered banner when redirected from signup", () => {
+    mockSearchParams = new URLSearchParams("registered=true");
+
+    render(<LoginPage />);
+
+    expect(
+      screen.getByText("You're all set! Sign in to get started.")
+    ).toBeInTheDocument();
   });
 
   it("calls signIn on form submit", async () => {
@@ -110,7 +142,9 @@ describe("LoginPage", () => {
 
     // Verify no error message is shown after successful login
     expect(
-      screen.queryByText("Incorrect email or password. Check your details and try again.")
+      screen.queryByText(
+        "Incorrect email or password. Check your details and try again."
+      )
     ).not.toBeInTheDocument();
   });
 
@@ -124,7 +158,11 @@ describe("LoginPage", () => {
     await userEvent.click(screen.getByRole("button", { name: /sign in/i }));
 
     await waitFor(() => {
-      expect(screen.getByText("Incorrect email or password. Check your details and try again.")).toBeInTheDocument();
+      expect(
+        screen.getByText(
+          "Incorrect email or password. Check your details and try again."
+        )
+      ).toBeInTheDocument();
     });
   });
 

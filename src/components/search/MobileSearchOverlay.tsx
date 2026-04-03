@@ -195,7 +195,7 @@ export default function MobileSearchOverlay({
                 </div>
 
                 {/* Form fields */}
-                <div className="flex-1 overflow-y-auto">
+                <div className="flex-1 overflow-y-auto hide-scrollbar-mobile">
                   <div className="px-5 pt-6 pb-4 space-y-5">
                     {/* WHERE */}
                     <div>
@@ -212,9 +212,10 @@ export default function MobileSearchOverlay({
                           onChange={setLocation}
                           onLocationSelect={handleLocationSelect}
                           placeholder="Enter city or area"
-                          className="w-full h-12 px-4 pr-10 bg-surface-container-lowest border border-outline-variant/30 rounded-xl text-sm text-on-surface placeholder:text-on-surface-variant focus:outline-none focus:ring-2 focus:ring-primary/30 focus:border-primary/30"
+                          className="w-full h-12 rounded-xl border border-outline-variant/30 bg-surface-container-lowest px-4 pr-11 focus-within:border-primary/30 focus-within:ring-2 focus-within:ring-primary/30"
+                          inputClassName="text-base text-on-surface placeholder:text-on-surface-variant"
                         />
-                        <LocateFixed className="absolute right-3 top-1/2 -translate-y-1/2 w-4.5 h-4.5 text-on-surface-variant pointer-events-none" />
+                        <LocateFixed className="absolute right-4 top-1/2 h-4.5 w-4.5 -translate-y-1/2 text-on-surface-variant pointer-events-none" />
                       </div>
                     </div>
 

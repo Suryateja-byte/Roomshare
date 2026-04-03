@@ -22,6 +22,10 @@ test.beforeEach(async () => {
   test.slow(); // 3× timeout (180 s) for server-rendered detail pages
 });
 
+function visibleContactHostButtons(page: import("@playwright/test").Page) {
+  return page.locator("button:visible").filter({ hasText: "Contact Host" });
+}
+
 // ---------------------------------------------------------------------------
 // Shared navigation helper
 // ---------------------------------------------------------------------------
@@ -64,6 +68,9 @@ test.describe("LD: Page Load & Content (Visitor)", () => {
     );
     // City name visible (in breadcrumb or stats bar)
     await expect(page.getByText("San Francisco").first()).toBeVisible();
+    await expect(
+      page.getByRole("button", { name: /open ai assistant/i })
+    ).toHaveCount(0);
   });
 
   test("LD-02  quick stats bar shows status, location, slots", async ({
@@ -98,10 +105,10 @@ test.describe("LD: Page Load & Content (Visitor)", () => {
     await expect(page.getByText("WiFi")).toBeVisible();
   });
 
-  test("LD-05  host section with Contact Host button", async ({
+  test("LD-05  Contact Host button appears in the correct viewport section", async ({
     page,
     nav,
-  }) => {
+  }, testInfo) => {
     const found = await goToListing(page, nav, "Reviewer Nob Hill");
     test.skip(!found, "Listing not found");
 
@@ -110,11 +117,22 @@ test.describe("LD: Page Load & Content (Visitor)", () => {
     await expect(
       page.getByText(/Hosted by E2E Reviewer/).first()
     ).toBeVisible();
-    // Contact Host button is only rendered after session hydration (viewerReady).
-    // On Mobile Chrome this can be slower — use a generous explicit timeout.
-    await expect(
-      page.getByRole("button", { name: /Contact Host/i }).first()
-    ).toBeVisible({ timeout: 45_000 });
+    // The page should expose one visible CTA, placed by breakpoint.
+    await expect(visibleContactHostButtons(page)).toHaveCount(1, {
+      timeout: 45_000,
+    });
+
+    const hostSectionContact = page.getByTestId("contact-host-host-section");
+    const sidebarContact = page.getByTestId("contact-host-sidebar");
+
+    if (testInfo.project.name.includes("Mobile")) {
+      await expect(hostSectionContact).toBeVisible();
+      await expect(sidebarContact).toBeHidden();
+    } else {
+      await expect(hostSectionContact).toBeHidden();
+      await expect(sidebarContact).toBeVisible();
+    }
+
     await expect(page.getByText("Identity verified")).toBeVisible();
   });
 
@@ -163,6 +181,38 @@ test.describe("LD: Visitor Action Buttons", () => {
     await expect(page.getByText("Email")).toBeVisible();
   });
 
+  test("LD-08a  mobile header keeps action buttons below the title without overflow", async ({
+    page,
+    nav,
+  }, testInfo) => {
+    test.skip(!testInfo.project.name.includes("Mobile"), "Mobile only");
+
+    const found = await goToListing(page, nav, "Reviewer Nob Hill");
+    test.skip(!found, "Listing not found");
+
+    const titleGroup = page.getByTestId("listing-detail-title-group");
+    const actions = page.getByTestId("listing-detail-actions");
+
+    await expect(titleGroup).toBeVisible();
+    await expect(actions).toBeVisible();
+    await expect(page.getByRole("button", { name: /Share listing/i })).toBeVisible();
+    await expect(page.getByTestId("report-listing")).toBeVisible();
+
+    const hasHorizontalOverflow = await page.evaluate(
+      () => document.documentElement.scrollWidth > window.innerWidth
+    );
+    expect(hasHorizontalOverflow).toBe(false);
+
+    const titleBox = await titleGroup.boundingBox();
+    const actionsBox = await actions.boundingBox();
+
+    expect(titleBox).not.toBeNull();
+    expect(actionsBox).not.toBeNull();
+    expect(actionsBox!.y).toBeGreaterThanOrEqual(
+      titleBox!.y + titleBox!.height - 1
+    );
+  });
+
   test("LD-09  save button toggles heart icon", async ({ page, nav }) => {
     const found = await goToListing(page, nav, "Reviewer Nob Hill");
     test.skip(!found, "Listing not found");
@@ -202,11 +252,9 @@ test.describe("LD: Visitor Action Buttons", () => {
     const found = await goToListing(page, nav, "Reviewer Nob Hill");
     test.skip(!found, "Listing not found");
 
-    // ReportButton has a hydration guard (mounted state) — wait for Radix
-    // DialogTrigger to hydrate by checking for data-state attribute
-    const reportBtn = page.locator(
-      'button:has-text("Report this listing")[data-state]'
-    );
+    // ReportButton has a hydration guard (mounted state) — wait for the
+    // hydrated trigger rather than the SSR placeholder shell.
+    const reportBtn = page.locator('[data-testid="report-listing"][data-state]');
     const hydrated = await reportBtn
       .waitFor({ state: "attached", timeout: 10_000 })
       .then(() => true)

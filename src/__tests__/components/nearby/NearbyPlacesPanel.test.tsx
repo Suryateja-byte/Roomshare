@@ -18,24 +18,6 @@ import { CATEGORY_CHIPS, RADIUS_OPTIONS } from "@/types/nearby";
 const mockFetch = jest.fn();
 global.fetch = mockFetch;
 
-// Mock useSession
-const mockSession = {
-  data: {
-    user: {
-      id: "user-123",
-      name: "Test User",
-      email: "test@example.com",
-    },
-  },
-  status: "authenticated",
-};
-
-jest.mock("next-auth/react", () => ({
-  useSession: jest.fn(() => mockSession),
-}));
-
-import { useSession } from "next-auth/react";
-
 describe("NearbyPlacesPanel", () => {
   const defaultProps = {
     listingLat: 37.7749,
@@ -60,7 +42,6 @@ describe("NearbyPlacesPanel", () => {
   beforeEach(() => {
     jest.clearAllMocks();
     jest.useFakeTimers();
-    (useSession as jest.Mock).mockReturnValue(mockSession);
     mockFetch.mockResolvedValue({
       ok: true,
       json: async () => mockPlacesResponse,
@@ -71,37 +52,14 @@ describe("NearbyPlacesPanel", () => {
     jest.useRealTimers();
   });
 
-  describe("authentication gate", () => {
-    it("shows login prompt when not authenticated", () => {
-      (useSession as jest.Mock).mockReturnValue({
-        data: null,
-        status: "unauthenticated",
-      });
-
-      render(<NearbyPlacesPanel {...defaultProps} />);
-
-      // Check for the link to login
-      expect(
-        screen.getByRole("link", { name: /sign in/i })
-      ).toBeInTheDocument();
-    });
-
-    it("shows loading state when session is loading", () => {
-      (useSession as jest.Mock).mockReturnValue({
-        data: null,
-        status: "loading",
-      });
-
-      render(<NearbyPlacesPanel {...defaultProps} />);
-
-      // Should show skeleton or loading indicator
-      expect(screen.queryByRole("textbox")).not.toBeInTheDocument();
-    });
-
-    it("shows search interface when authenticated", () => {
+  describe("guest access", () => {
+    it("shows the search interface without a sign-in gate", () => {
       render(<NearbyPlacesPanel {...defaultProps} />);
 
       expect(screen.getByPlaceholderText(/search/i)).toBeInTheDocument();
+      expect(
+        screen.queryByRole("link", { name: /sign in/i })
+      ).not.toBeInTheDocument();
     });
   });
 

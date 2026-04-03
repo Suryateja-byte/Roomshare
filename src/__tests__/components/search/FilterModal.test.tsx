@@ -271,6 +271,18 @@ describe("FilterModal", () => {
       const dialog = screen.getByRole("dialog");
       expect(dialog).toHaveAttribute("aria-labelledby", "filter-drawer-title");
     });
+
+    it("keeps the drawer content on a mobile-only hidden-scrollbar policy", () => {
+      const { container } = render(<FilterModal {...makeProps()} />);
+      const scrollableContent = container.querySelector(
+        ".overflow-y-auto"
+      ) as HTMLElement | null;
+
+      expect(scrollableContent).toBeInTheDocument();
+      expect(scrollableContent).toHaveClass("hide-scrollbar-mobile");
+      expect(scrollableContent).not.toHaveClass("scrollbar-hide");
+      expect(scrollableContent).not.toHaveClass("scrollbar-none");
+    });
   });
 
   describe("close button", () => {

@@ -83,7 +83,8 @@ export default function BottomNavBar() {
 
   // Don't render on search page — it has its own bottom sheet and floating buttons
   const isSearchPage = pathname.startsWith("/search");
-  if (!session?.user || isSearchPage) return null;
+  const isMessageThread = pathname.startsWith("/messages/");
+  if (!session?.user || isSearchPage || isMessageThread) return null;
 
   return (
     <nav
@@ -100,9 +101,7 @@ export default function BottomNavBar() {
     >
       <div className="flex items-center justify-around h-16">
         {NAV_ITEMS.map((item) => {
-          const isActive = item.matchPaths.some((p) =>
-            pathname.startsWith(p)
-          );
+          const isActive = item.matchPaths.some((p) => pathname.startsWith(p));
           const Icon = item.icon;
 
           return (

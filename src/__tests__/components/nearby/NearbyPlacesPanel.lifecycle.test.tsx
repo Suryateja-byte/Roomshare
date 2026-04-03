@@ -550,7 +550,7 @@ describe("NearbyPlacesPanel - UI State & React Lifecycle", () => {
 
   // Additional lifecycle tests
   describe("Session State Changes", () => {
-    it("shows loading skeleton when session is loading", () => {
+    it("does not block the search UI while session state is loading", () => {
       mockUseSession.mockReturnValue({
         data: null,
         status: "loading",
@@ -558,12 +558,13 @@ describe("NearbyPlacesPanel - UI State & React Lifecycle", () => {
 
       const { container } = renderPanel();
 
-      // Should show loading skeleton (has animate-pulse class)
-      const skeleton = container.querySelector(".animate-pulse");
-      expect(skeleton).toBeInTheDocument();
+      expect(
+        screen.getByRole("textbox", { name: /search nearby places/i })
+      ).toBeInTheDocument();
+      expect(container.querySelector(".animate-pulse")).not.toBeInTheDocument();
     });
 
-    it("shows login prompt when unauthenticated", () => {
+    it("keeps guest search available when unauthenticated", () => {
       mockUseSession.mockReturnValue({
         data: null,
         status: "unauthenticated",
@@ -571,8 +572,10 @@ describe("NearbyPlacesPanel - UI State & React Lifecycle", () => {
 
       renderPanel();
 
-      // Should show login prompt
-      expect(screen.getByText(/sign in to explore/i)).toBeInTheDocument();
+      expect(
+        screen.getByRole("textbox", { name: /search nearby places/i })
+      ).toBeInTheDocument();
+      expect(screen.queryByText(/sign in to explore/i)).not.toBeInTheDocument();
     });
   });
 

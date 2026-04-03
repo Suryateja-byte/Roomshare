@@ -1,0 +1,217 @@
+import React from "react";
+import { render, screen } from "@testing-library/react";
+import ListingPageClient from "@/app/listings/[id]/ListingPageClient";
+
+const mockUseSession = jest.fn();
+
+jest.mock("next/dynamic", () => ({
+  __esModule: true,
+  default: () => {
+    const MockDynamicComponent = () => <div data-testid="dynamic-component" />;
+    MockDynamicComponent.displayName = "MockDynamicComponent";
+    return MockDynamicComponent;
+  },
+}));
+
+jest.mock("next/link", () => ({
+  __esModule: true,
+  default: ({
+    children,
+    href,
+    ...props
+  }: React.AnchorHTMLAttributes<HTMLAnchorElement> & { href: string }) => (
+    <a href={href} {...props}>
+      {children}
+    </a>
+  ),
+}));
+
+jest.mock("next-auth/react", () => ({
+  useSession: () => mockUseSession(),
+}));
+
+jest.mock("@/components/listings/ListingCard", () => ({
+  __esModule: true,
+  default: () => <div data-testid="listing-card" />,
+}));
+
+jest.mock("@/components/ImageGallery", () => ({
+  __esModule: true,
+  default: () => <div data-testid="image-gallery" />,
+}));
+
+jest.mock("@/components/BookingForm", () => ({
+  __esModule: true,
+  default: () => <div data-testid="booking-form" />,
+}));
+
+jest.mock("@/components/ReviewForm", () => ({
+  __esModule: true,
+  default: () => <div data-testid="review-form" />,
+}));
+
+jest.mock("@/components/ReviewList", () => ({
+  __esModule: true,
+  default: () => <div data-testid="review-list" />,
+}));
+
+jest.mock("@/components/ContactHostButton", () => ({
+  __esModule: true,
+  default: () => <button data-testid="contact-host">Contact Host</button>,
+}));
+
+jest.mock("@/components/DeleteListingButton", () => ({
+  __esModule: true,
+  default: () => <button data-testid="delete-listing">Delete</button>,
+}));
+
+jest.mock("@/components/ReportButton", () => ({
+  __esModule: true,
+  default: () => <button data-testid="report-listing">Report</button>,
+}));
+
+jest.mock("@/components/ShareListingButton", () => ({
+  __esModule: true,
+  default: () => <button data-testid="share-listing">Share</button>,
+}));
+
+jest.mock("@/components/SaveListingButton", () => ({
+  __esModule: true,
+  default: () => <button data-testid="save-listing">Save</button>,
+}));
+
+jest.mock("@/components/ListingStatusToggle", () => ({
+  __esModule: true,
+  default: () => <div data-testid="listing-status-toggle" />,
+}));
+
+jest.mock("@/components/ListingFreshnessCheck", () => ({
+  __esModule: true,
+  default: () => <div data-testid="listing-freshness-check" />,
+}));
+
+jest.mock("@/components/UserAvatar", () => ({
+  __esModule: true,
+  default: () => <div data-testid="user-avatar" />,
+}));
+
+jest.mock("@/components/listings/RoomPlaceholder", () => ({
+  __esModule: true,
+  default: () => <div data-testid="room-placeholder" />,
+}));
+
+jest.mock("@/components/listings/SlotBadge", () => ({
+  SlotBadge: () => <div data-testid="slot-badge" />,
+}));
+
+jest.mock("@/components/ui/badge", () => ({
+  Badge: ({
+    children,
+  }: {
+    children: React.ReactNode;
+    variant?: string;
+    className?: string;
+  }) => <span>{children}</span>,
+}));
+
+function makeProps(
+  overrides?: Partial<React.ComponentProps<typeof ListingPageClient>>
+): React.ComponentProps<typeof ListingPageClient> {
+  return {
+    listing: {
+      id: "listing-1",
+      title:
+        "Japantown Shared Room with Extra Long Title for Mobile Header Coverage",
+      description: "Shared room near Japan Center.",
+      price: 850,
+      images: ["https://example.com/room.jpg"],
+      amenities: ["Wifi", "Kitchen"],
+      householdLanguages: ["en"],
+      totalSlots: 2,
+      availableSlots: 1,
+      bookingMode: "REQUEST",
+      holdTtlMinutes: 15,
+      status: "ACTIVE",
+      viewCount: 12,
+      genderPreference: null,
+      householdGender: null,
+      location: {
+        city: "San Francisco",
+        state: "CA",
+      },
+      owner: {
+        id: "owner-1",
+        name: "Host",
+        image: null,
+        bio: "Host bio",
+        isVerified: true,
+        createdAt: new Date("2025-01-01T00:00:00.000Z"),
+      },
+      ownerId: "owner-1",
+    },
+    reviews: [],
+    isOwner: false,
+    isLoggedIn: true,
+    userHasBooking: false,
+    userExistingReview: null,
+    bookedDates: [],
+    holdEnabled: false,
+    coordinates: null,
+    similarListings: [],
+    viewToken: "view-token-1",
+    ...overrides,
+  };
+}
+
+describe("ListingPageClient", () => {
+  beforeEach(() => {
+    jest.clearAllMocks();
+    mockUseSession.mockReturnValue({
+      data: {
+        user: {
+          id: "viewer-1",
+        },
+      },
+      status: "authenticated",
+    });
+
+    global.fetch = jest.fn().mockResolvedValue({
+      ok: true,
+      status: 200,
+      headers: {
+        get: () => "application/json",
+      },
+      json: async () => ({
+        hasBookingHistory: false,
+        existingReview: null,
+      }),
+    }) as typeof fetch;
+  });
+
+  it("renders a mobile-safe header structure for long visitor titles", async () => {
+    render(<ListingPageClient {...makeProps()} />);
+
+    const header = await screen.findByTestId("listing-detail-header");
+    const titleGroup = screen.getByTestId("listing-detail-title-group");
+    const actions = screen.getByTestId("listing-detail-actions");
+
+    expect(header).toHaveClass("flex-col");
+    expect(header).toHaveClass("md:flex-row");
+    expect(titleGroup).toHaveClass("min-w-0");
+    expect(titleGroup).toHaveClass("flex-1");
+    expect(actions).toHaveClass("w-full");
+    expect(actions).toHaveClass("justify-end");
+    expect(actions).toHaveClass("md:w-auto");
+    expect(actions).toHaveClass("md:flex-nowrap");
+
+    expect(
+      screen.getByRole("heading", {
+        name:
+          "Japantown Shared Room with Extra Long Title for Mobile Header Coverage",
+      })
+    ).toBeInTheDocument();
+    expect(screen.getByTestId("share-listing")).toBeInTheDocument();
+    expect(screen.getByTestId("save-listing")).toBeInTheDocument();
+    expect(screen.getByTestId("report-listing")).toBeInTheDocument();
+  });
+});

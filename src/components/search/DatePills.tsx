@@ -44,7 +44,7 @@ export function DatePills({ suggestions }: DatePillsProps) {
       <p className="text-xs text-on-surface-variant mb-2">
         Flexible dates? Try these for lower prices:
       </p>
-      <div className="flex gap-2 overflow-x-auto pb-1 -mx-1 px-1 scrollbar-none">
+      <div className="flex gap-2 overflow-x-auto pb-1 -mx-1 px-1 hide-scrollbar">
         {suggestions.map((suggestion) => (
           <button
             key={suggestion.params}

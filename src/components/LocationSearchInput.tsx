@@ -4,6 +4,7 @@ import { useState, useRef, useEffect, useCallback, useId } from "react";
 import { createPortal } from "react-dom";
 import { MapPin, Loader2, X, AlertCircle, SearchX } from "lucide-react";
 import { useDebounce } from "use-debounce";
+import { cn } from "@/lib/utils";
 import {
   getCachedResults,
   setCachedResults,
@@ -48,6 +49,7 @@ interface LocationSearchInputProps {
   onBlur?: () => void;
   placeholder?: string;
   className?: string;
+  inputClassName?: string;
   /** HTML id for the input element - required for proper label association */
   id?: string;
 }
@@ -60,6 +62,7 @@ export default function LocationSearchInput({
   onBlur,
   placeholder = "City, neighborhood...",
   className = "",
+  inputClassName = "",
   id,
 }: LocationSearchInputProps) {
   const [suggestions, setSuggestions] = useState<LocationSuggestion[]>([]);
@@ -82,10 +85,16 @@ export default function LocationSearchInput({
 
   // Portal positioning: track the input's bounding rect so the dropdown
   // can be rendered at document.body with correct coordinates.
-  const [dropdownPos, setDropdownPos] = useState<{ top: number; left: number; width: number } | null>(null);
+  const [dropdownPos, setDropdownPos] = useState<{
+    top: number;
+    left: number;
+    width: number;
+  } | null>(null);
   const [isMounted, setIsMounted] = useState(false);
 
-  useEffect(() => { setIsMounted(true); }, []);
+  useEffect(() => {
+    setIsMounted(true);
+  }, []);
 
   const updateDropdownPosition = useCallback(() => {
     const container = containerRef.current;
@@ -320,7 +329,6 @@ export default function LocationSearchInput({
           setSelectedIndex(-1);
           break;
       }
-       
     },
     // eslint-disable-next-line react-hooks/exhaustive-deps -- handleSelectSuggestion defined after this hook; stable via useCallback
     [showSuggestions, suggestions, selectedIndex]
@@ -436,8 +444,8 @@ export default function LocationSearchInput({
   }, [isPopupOpen, updateDropdownPosition]);
 
   return (
-    <div ref={containerRef} className={`relative ${className}`}>
-      <div className="relative">
+    <div ref={containerRef} className={cn("relative", className)}>
+      <div className="relative h-full">
         <input
           ref={inputRef}
           id={id}
@@ -451,7 +459,10 @@ export default function LocationSearchInput({
           onCompositionStart={handleCompositionStart}
           onCompositionEnd={handleCompositionEnd}
           placeholder={placeholder}
-          className="w-full bg-transparent border-none p-0 text-on-surface placeholder:text-on-surface-variant focus:ring-0 focus:outline-none text-base md:text-sm truncate pr-8"
+          className={cn(
+            "h-full w-full min-w-0 bg-transparent border-none p-0 text-on-surface placeholder:text-on-surface-variant focus:ring-0 focus:outline-none text-base md:text-sm truncate pr-8",
+            inputClassName
+          )}
           autoComplete="off"
           // ARIA combobox attributes for screen reader accessibility
           role="combobox"
@@ -468,7 +479,7 @@ export default function LocationSearchInput({
         />
 
         {/* Loading/Clear indicator */}
-        <div className="absolute right-0 top-1/2 -translate-y-1/2">
+        <div className="absolute inset-y-0 right-0 flex items-center">
           {isLoading ? (
             <Loader2
               className="w-4 h-4 text-on-surface-variant animate-spin"
@@ -488,130 +499,151 @@ export default function LocationSearchInput({
       </div>
 
       {/* All dropdown variants rendered via portal to escape header stacking context */}
-      {isMounted && dropdownPos && isPopupOpen && createPortal(
-        <>
-          {/* Type more hint */}
-          {showSuggestions && showTypeMoreHint && !isLoading && (
-            <div
-              ref={suggestionsRef}
-              role="status"
-              aria-live="polite"
-              className="fixed bg-surface-container-lowest backdrop-blur-xl rounded-2xl shadow-2xl overflow-hidden z-[9999] animate-in fade-in-0 slide-in-from-top-2"
-              style={{ top: dropdownPos.top, left: dropdownPos.left, width: dropdownPos.width }}
-            >
-              <div className="px-4 py-3 text-sm text-on-surface-variant">
-                Type at least {MIN_QUERY_LENGTH} characters to search
-              </div>
-            </div>
-          )}
-
-          {/* Suggestions dropdown */}
-          {showSuggestions && suggestions.length > 0 && !showTypeMoreHint && (
-            <div
-              ref={suggestionsRef}
-              className="fixed bg-surface-container-lowest backdrop-blur-xl rounded-2xl shadow-2xl overflow-hidden z-[9999] animate-in fade-in-0 slide-in-from-top-2"
-              style={{ top: dropdownPos.top, left: dropdownPos.left, width: dropdownPos.width }}
-            >
-              <ul
-                className="p-2"
-                role="listbox"
-                id={`${listboxId}-listbox`}
-                aria-label="Location suggestions"
-              >
-                {suggestions.map((suggestion, index) => (
-                  <li
-                    key={suggestion.id}
-                    role="option"
-                    id={`${listboxId}-option-${index}`}
-                    aria-selected={index === selectedIndex}
-                  >
-                    <button
-                      type="button"
-                      onClick={() => handleSelectSuggestion(suggestion)}
-                      className={`w-full px-3 py-2.5 flex items-start gap-3 rounded-xl transition-colors duration-150 text-left ${
-                        index === selectedIndex
-                          ? "bg-surface-container-high"
-                          : "hover:bg-surface-container-high/80"
-                      }`}
-                      tabIndex={-1}
-                    >
-                      <MapPin
-                        className={`w-5 h-5 mt-0.5 flex-shrink-0 ${getPlaceTypeIcon(suggestion.place_type)}`}
-                      />
-                      <div className="flex-1 min-w-0">
-                        <p className="text-sm font-medium text-on-surface truncate">
-                          {suggestion.place_name.split(",")[0]}
-                        </p>
-                        <p className="text-xs text-on-surface-variant truncate">
-                          {suggestion.place_name
-                            .split(",")
-                            .slice(1)
-                            .join(",")
-                            .trim()}
-                        </p>
-                      </div>
-                    </button>
-                  </li>
-                ))}
-              </ul>
-            </div>
-          )}
-
-          {/* Error state dropdown */}
-          {showSuggestions && error && !isLoading && !showTypeMoreHint && (
-            <div
-              ref={suggestionsRef}
-              role="alert"
-              aria-live="assertive"
-              className="fixed bg-surface-container-lowest backdrop-blur-xl rounded-2xl shadow-2xl overflow-hidden z-[9999] animate-in fade-in-0 slide-in-from-top-2"
-              style={{ top: dropdownPos.top, left: dropdownPos.left, width: dropdownPos.width }}
-            >
-              <div className="p-4 flex items-center gap-3">
-                <div className="p-2 rounded-full bg-red-100">
-                  <AlertCircle className="w-5 h-5 text-red-500" />
-                </div>
-                <div>
-                  <p className="text-sm font-medium text-red-700">
-                    Search unavailable
-                  </p>
-                  <p className="text-xs text-red-500 animate-error-in">{error}</p>
-                </div>
-              </div>
-            </div>
-          )}
-
-          {/* No results dropdown */}
-          {showSuggestions &&
-            noResults &&
-            !error &&
-            !isLoading &&
-            suggestions.length === 0 &&
-            !showTypeMoreHint && (
+      {isMounted &&
+        dropdownPos &&
+        isPopupOpen &&
+        createPortal(
+          <>
+            {/* Type more hint */}
+            {showSuggestions && showTypeMoreHint && !isLoading && (
               <div
                 ref={suggestionsRef}
                 role="status"
                 aria-live="polite"
                 className="fixed bg-surface-container-lowest backdrop-blur-xl rounded-2xl shadow-2xl overflow-hidden z-[9999] animate-in fade-in-0 slide-in-from-top-2"
-                style={{ top: dropdownPos.top, left: dropdownPos.left, width: dropdownPos.width }}
+                style={{
+                  top: dropdownPos.top,
+                  left: dropdownPos.left,
+                  width: dropdownPos.width,
+                }}
+              >
+                <div className="px-4 py-3 text-sm text-on-surface-variant">
+                  Type at least {MIN_QUERY_LENGTH} characters to search
+                </div>
+              </div>
+            )}
+
+            {/* Suggestions dropdown */}
+            {showSuggestions && suggestions.length > 0 && !showTypeMoreHint && (
+              <div
+                ref={suggestionsRef}
+                className="fixed bg-surface-container-lowest backdrop-blur-xl rounded-2xl shadow-2xl overflow-hidden z-[9999] animate-in fade-in-0 slide-in-from-top-2"
+                style={{
+                  top: dropdownPos.top,
+                  left: dropdownPos.left,
+                  width: dropdownPos.width,
+                }}
+              >
+                <ul
+                  className="p-2"
+                  role="listbox"
+                  id={`${listboxId}-listbox`}
+                  aria-label="Location suggestions"
+                >
+                  {suggestions.map((suggestion, index) => (
+                    <li
+                      key={suggestion.id}
+                      role="option"
+                      id={`${listboxId}-option-${index}`}
+                      aria-selected={index === selectedIndex}
+                    >
+                      <button
+                        type="button"
+                        onClick={() => handleSelectSuggestion(suggestion)}
+                        className={`w-full px-3 py-2.5 flex items-start gap-3 rounded-xl transition-colors duration-150 text-left ${
+                          index === selectedIndex
+                            ? "bg-surface-container-high"
+                            : "hover:bg-surface-container-high/80"
+                        }`}
+                        tabIndex={-1}
+                      >
+                        <MapPin
+                          className={`w-5 h-5 mt-0.5 flex-shrink-0 ${getPlaceTypeIcon(suggestion.place_type)}`}
+                        />
+                        <div className="flex-1 min-w-0">
+                          <p className="text-sm font-medium text-on-surface truncate">
+                            {suggestion.place_name.split(",")[0]}
+                          </p>
+                          <p className="text-xs text-on-surface-variant truncate">
+                            {suggestion.place_name
+                              .split(",")
+                              .slice(1)
+                              .join(",")
+                              .trim()}
+                          </p>
+                        </div>
+                      </button>
+                    </li>
+                  ))}
+                </ul>
+              </div>
+            )}
+
+            {/* Error state dropdown */}
+            {showSuggestions && error && !isLoading && !showTypeMoreHint && (
+              <div
+                ref={suggestionsRef}
+                role="alert"
+                aria-live="assertive"
+                className="fixed bg-surface-container-lowest backdrop-blur-xl rounded-2xl shadow-2xl overflow-hidden z-[9999] animate-in fade-in-0 slide-in-from-top-2"
+                style={{
+                  top: dropdownPos.top,
+                  left: dropdownPos.left,
+                  width: dropdownPos.width,
+                }}
               >
                 <div className="p-4 flex items-center gap-3">
-                  <div className="p-2 rounded-full bg-surface-container-high">
-                    <SearchX className="w-5 h-5 text-on-surface-variant" />
+                  <div className="p-2 rounded-full bg-red-100">
+                    <AlertCircle className="w-5 h-5 text-red-500" />
                   </div>
                   <div>
-                    <p className="text-sm font-medium text-on-surface-variant">
-                      No locations found
+                    <p className="text-sm font-medium text-red-700">
+                      Search unavailable
                     </p>
-                    <p className="text-xs text-on-surface-variant">
-                      Try a different city or neighborhood name
+                    <p className="text-xs text-red-500 animate-error-in">
+                      {error}
                     </p>
                   </div>
                 </div>
               </div>
             )}
-        </>,
-        document.body
-      )}
+
+            {/* No results dropdown */}
+            {showSuggestions &&
+              noResults &&
+              !error &&
+              !isLoading &&
+              suggestions.length === 0 &&
+              !showTypeMoreHint && (
+                <div
+                  ref={suggestionsRef}
+                  role="status"
+                  aria-live="polite"
+                  className="fixed bg-surface-container-lowest backdrop-blur-xl rounded-2xl shadow-2xl overflow-hidden z-[9999] animate-in fade-in-0 slide-in-from-top-2"
+                  style={{
+                    top: dropdownPos.top,
+                    left: dropdownPos.left,
+                    width: dropdownPos.width,
+                  }}
+                >
+                  <div className="p-4 flex items-center gap-3">
+                    <div className="p-2 rounded-full bg-surface-container-high">
+                      <SearchX className="w-5 h-5 text-on-surface-variant" />
+                    </div>
+                    <div>
+                      <p className="text-sm font-medium text-on-surface-variant">
+                        No locations found
+                      </p>
+                      <p className="text-xs text-on-surface-variant">
+                        Try a different city or neighborhood name
+                      </p>
+                    </div>
+                  </div>
+                </div>
+              )}
+          </>,
+          document.body
+        )}
     </div>
   );
 }

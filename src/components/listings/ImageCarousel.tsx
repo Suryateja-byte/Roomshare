@@ -281,10 +281,10 @@ function ImageCarouselInner({
                 aria-label={`Go to image ${index + 1}`}
               >
                 <span
-                  className={`block rounded-full transition-[width,background-color] duration-200 h-2 ${
+                  className={`block rounded-full transition-[width,background-color] duration-200 h-2 shadow-[0_0_3px_rgb(0_0_0/0.4)] ${
                     index === selectedIndex
                       ? "bg-surface-container-lowest w-6"
-                      : "bg-white/60 w-2"
+                      : "bg-white/80 w-2"
                   }`}
                 />
               </button>
@@ -307,13 +307,13 @@ function ImageCarouselInner({
               aria-label={`Go to image ${index + 1}`}
             >
               <span
-                className={`block rounded-full transition-[width,background-color] duration-200 h-2 ${
+                className={`block rounded-full transition-[width,background-color] duration-200 h-2 shadow-[0_0_3px_rgb(0_0_0/0.4)] ${
                   index === selectedIndex
                     ? "bg-surface-container-lowest w-6"
                     : index === visibleIndices[0] ||
                         index === visibleIndices[MAX_DOTS - 1]
                       ? "bg-white/40 w-1.5"
-                      : "bg-white/60 w-2"
+                      : "bg-white/80 w-2"
                 }`}
               />
             </button>

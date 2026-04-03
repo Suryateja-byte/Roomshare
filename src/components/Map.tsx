@@ -431,7 +431,7 @@ const MarkerPinContent = React.memo(function MarkerPinContent({
         <div
           className={cn(
             "w-3 h-3 rounded-full shadow-md transition-transform duration-200",
-            "bg-surface-container-high ring-2 ring-white",
+            "bg-on-surface ring-2 ring-white shadow-lg",
             "group-hover/marker:scale-125"
           )}
         />

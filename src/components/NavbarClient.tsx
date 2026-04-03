@@ -248,13 +248,13 @@ export default function NavbarClient({
     }
   }, [user, scheduleNextPoll]);
 
-  // Handle scroll effect for glassmorphism
-  // The actual scroll container is CustomScrollContainer (.custom-scroll-hide),
-  // not window (html/body have overflow:hidden).
+  // Handle scroll effect for glassmorphism.
+  // The actual scroll container is the app-level scroll container exposed by
+  // CustomScrollContainer, not window (html/body have overflow:hidden).
   const isScrolledRef = useRef(false);
   useEffect(() => {
     const scrollContainer =
-      document.querySelector(".custom-scroll-hide") ?? window;
+      document.querySelector("[data-app-scroll-container]") ?? window;
     const handleScroll = () => {
       const scrollTop =
         scrollContainer instanceof HTMLElement
@@ -285,12 +285,12 @@ export default function NavbarClient({
     return () => document.removeEventListener("mousedown", handleClickOutside);
   }, []);
 
-  // Handle scroll locking and focus trapping for mobile menu
+  // Handle scroll locking and focus trapping for mobile menu.
   // Body already has overflow:hidden (globals.css). Target the actual scroll container.
   useEffect(() => {
     if (isMobileMenuOpen) {
       const scrollContainer = document.querySelector(
-        ".custom-scroll-hide"
+        "[data-app-scroll-container]"
       ) as HTMLElement | null;
       if (scrollContainer) {
         scrollContainer.style.overflow = "hidden";

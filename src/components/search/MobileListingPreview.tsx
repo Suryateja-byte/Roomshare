@@ -85,7 +85,7 @@ export default function MobileListingPreview({
   return (
     <div
       ref={scrollRef}
-      className="flex overflow-x-auto snap-x snap-mandatory scrollbar-hide"
+      className="flex overflow-x-auto snap-x snap-mandatory hide-scrollbar"
       onScrollCapture={handleScroll}
       style={{ scrollSnapType: "x mandatory" }}
     >

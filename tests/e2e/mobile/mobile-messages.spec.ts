@@ -14,8 +14,12 @@ test.describe("Mobile Messages", () => {
   }) => {
     // Wait for messages page to load — skip if redirected to login
     const currentUrl = page.url();
-    const onLoginPage = currentUrl.includes("/login") || currentUrl.includes("/signin");
-    test.skip(onLoginPage, "Redirected to login — auth session unavailable in CI");
+    const onLoginPage =
+      currentUrl.includes("/login") || currentUrl.includes("/signin");
+    test.skip(
+      onLoginPage,
+      "Redirected to login — auth session unavailable in CI"
+    );
     if (onLoginPage) return;
 
     const messagesPage = page.locator('[data-testid="messages-page"]').first();
@@ -27,15 +31,6 @@ test.describe("Mobile Messages", () => {
       !pageVisible,
       "Messages page not visible — auth or routing issue in CI"
     );
-
-    // On mobile, the component auto-selects the first conversation on mount,
-    // hiding the sidebar (hidden md:flex). Navigate back to the list first
-    // so we can inspect the conversation item dimensions.
-    const backButton = page.locator('[data-testid="back-button"]').first();
-    if (await backButton.isVisible({ timeout: 5000 }).catch(() => false)) {
-      await backButton.click();
-      await page.locator('[data-testid="conversation-item"]').first().waitFor({ state: 'visible', timeout: 5000 }).catch(() => {});
-    }
 
     // On mobile, the sidebar takes full width (w-full md:w-[400px])
     // Check conversation items exist and are full-width
@@ -77,15 +72,14 @@ test.describe("Mobile Messages", () => {
     if (
       await conversationItem.isVisible({ timeout: 10000 }).catch(() => false)
     ) {
-      // On mobile, the first conversation auto-activates and shows chat area
-      // The sidebar is hidden (hidden md:flex) when activeId is set.
-      // Since useEffect auto-selects the first conversation, we should already see messages.
+      await conversationItem.click();
+      await page.waitForURL(/\/messages\/[^/]+$/, { timeout: 10000 });
 
       // Check for message bubbles or the message input (chat is active)
       const messageArea = page
-        .locator('[data-testid="message-bubble"]')
-        .first()
-        .or(page.locator('[data-testid="message-input"]'))
+        .locator(
+          '[data-testid="message-bubble"], [data-testid="message-input"]'
+        )
         .first();
 
       await expect(messageArea).toBeVisible({ timeout: 10000 });
@@ -107,8 +101,17 @@ test.describe("Mobile Messages", () => {
       page.locator('[data-testid="messages-page"]').first()
     ).toBeVisible({ timeout: 15000 });
 
-    // On mobile, the first conversation auto-opens
-    const messageInput = page.locator('[data-testid="message-input"]');
+    const conversationItem = page
+      .locator('[data-testid="conversation-item"]')
+      .first();
+    if (
+      await conversationItem.isVisible({ timeout: 5000 }).catch(() => false)
+    ) {
+      await conversationItem.click();
+      await page.waitForURL(/\/messages\/[^/]+$/, { timeout: 10000 });
+    }
+
+    const messageInput = page.getByPlaceholder(/type a message/i);
     if (await messageInput.isVisible({ timeout: 10000 }).catch(() => false)) {
       // Verify input is visible
       await expect(messageInput).toBeVisible();
@@ -126,6 +129,9 @@ test.describe("Mobile Messages", () => {
       if (box) {
         expect(box.height).toBeGreaterThanOrEqual(30);
       }
+
+      const bottomNav = page.locator('nav[aria-label="Mobile navigation"]');
+      await expect(bottomNav).toBeHidden();
     } else {
       test.skip(true, "No active conversation with message input");
     }
@@ -136,12 +142,17 @@ test.describe("Mobile Messages", () => {
       page.locator('[data-testid="messages-page"]').first()
     ).toBeVisible({ timeout: 15000 });
 
-    // On mobile, when a conversation is active, a back button (ArrowLeft) appears
-    // The back button is: md:hidden, sets activeId to null
-    const backButton = page
-      .locator("button")
-      .filter({ has: page.locator("svg.lucide-arrow-left") })
+    const conversationItem = page
+      .locator('[data-testid="conversation-item"]')
       .first();
+    if (
+      await conversationItem.isVisible({ timeout: 5000 }).catch(() => false)
+    ) {
+      await conversationItem.click();
+      await page.waitForURL(/\/messages\/[^/]+$/, { timeout: 10000 });
+    }
+
+    const backButton = page.locator('[data-testid="back-button"]').first();
 
     if (await backButton.isVisible({ timeout: 10000 }).catch(() => false)) {
       await backButton.click();
@@ -200,7 +211,17 @@ test.describe("Mobile Messages", () => {
       page.locator('[data-testid="messages-page"]').first()
     ).toBeVisible({ timeout: 15000 });
 
-    // Wait for message bubbles to appear (auto-loaded for first conversation)
+    const conversationItem = page
+      .locator('[data-testid="conversation-item"]')
+      .first();
+    if (
+      await conversationItem.isVisible({ timeout: 5000 }).catch(() => false)
+    ) {
+      await conversationItem.click();
+      await page.waitForURL(/\/messages\/[^/]+$/, { timeout: 10000 });
+    }
+
+    // Wait for message bubbles to appear after opening a conversation
     const messageBubble = page
       .locator('[data-testid="message-bubble"]')
       .first();
@@ -230,16 +251,6 @@ test.describe("Mobile Messages", () => {
       page.locator('[data-testid="messages-page"]').first()
     ).toBeVisible({ timeout: 15000 });
 
-    // First go back to conversation list (if auto-opened a conversation)
-    const backButton = page
-      .locator("button")
-      .filter({ has: page.locator("svg.lucide-arrow-left") })
-      .first();
-    if (await backButton.isVisible({ timeout: 5000 }).catch(() => false)) {
-      await backButton.click();
-      await page.locator('[data-testid="conversation-item"]').first().or(page.getByText(/no conversations/i)).first().waitFor({ state: 'visible', timeout: 5000 }).catch(() => {});
-    }
-
     // The conversation list is wrapped in a flex-1 overflow-y-auto container
     const listContainer = page
       .locator('[data-testid="messages-page"] .overflow-y-auto')
@@ -263,18 +274,11 @@ test.describe("Mobile Messages", () => {
       .then(() => true)
       .catch(() => false);
     if (!pageVisible) {
-      test.skip(true, "Messages page not visible — auth or routing issue in CI");
+      test.skip(
+        true,
+        "Messages page not visible — auth or routing issue in CI"
+      );
       return;
-    }
-
-    // Navigate back to conversation list if needed
-    const backButton = page
-      .locator("button")
-      .filter({ has: page.locator("svg.lucide-arrow-left") })
-      .first();
-    if (await backButton.isVisible({ timeout: 5000 }).catch(() => false)) {
-      await backButton.click();
-      await page.locator('[data-testid="conversation-item"]').first().or(page.getByText(/no conversations/i)).first().waitFor({ state: 'visible', timeout: 5000 }).catch(() => {});
     }
 
     // The unread badge is a red-500 rounded-full span inside conversation items

@@ -49,7 +49,9 @@ describe("SignUpPage", () => {
   it("renders signup form", () => {
     render(<SignUpPage />);
 
-    expect(screen.getByRole("heading", { name: "Join RoomShare" })).toBeInTheDocument();
+    expect(
+      screen.getByRole("heading", { name: "Join RoomShare" })
+    ).toBeInTheDocument();
     expect(screen.getByLabelText(/full name/i)).toBeInTheDocument();
     expect(screen.getByLabelText(/email/i)).toBeInTheDocument();
     expect(screen.getByLabelText("Password")).toBeInTheDocument();
@@ -68,6 +70,83 @@ describe("SignUpPage", () => {
 
     const signInLink = screen.getByText("Sign in");
     expect(signInLink.closest("a")).toHaveAttribute("href", "/login");
+  });
+
+  it("renders terms and privacy links", () => {
+    render(<SignUpPage />);
+
+    expect(screen.getByText("Terms of Service").closest("a")).toHaveAttribute(
+      "href",
+      "/terms"
+    );
+    expect(screen.getByText("Privacy Policy").closest("a")).toHaveAttribute(
+      "href",
+      "/privacy"
+    );
+  });
+
+  it("toggles password visibility for both password fields", async () => {
+    render(<SignUpPage />);
+
+    const passwordInput = screen.getByLabelText("Password");
+    const confirmPasswordInput = screen.getByLabelText("Confirm Password");
+    expect(passwordInput).toHaveAttribute("type", "password");
+    expect(confirmPasswordInput).toHaveAttribute("type", "password");
+
+    const toggleButtons = screen.getAllByRole("button", {
+      name: /show password/i,
+    });
+
+    await userEvent.click(toggleButtons[0]);
+    expect(passwordInput).toHaveAttribute("type", "text");
+
+    await userEvent.click(toggleButtons[1]);
+    expect(confirmPasswordInput).toHaveAttribute("type", "text");
+  });
+
+  it("requires terms acceptance before submitting", async () => {
+    render(<SignUpPage />);
+
+    await userEvent.type(screen.getByLabelText(/full name/i), "Test User");
+    await userEvent.type(screen.getByLabelText(/email/i), "test@example.com");
+    await userEvent.type(screen.getByLabelText("Password"), validPassword);
+    await userEvent.type(
+      screen.getByLabelText("Confirm Password"),
+      validPassword
+    );
+    await userEvent.click(
+      screen.getByRole("button", { name: /join roomshare/i })
+    );
+
+    expect(
+      screen.getByText(
+        "To create your account, agree to the Terms of Service and Privacy Policy below."
+      )
+    ).toBeInTheDocument();
+    expect(mockFetch).not.toHaveBeenCalled();
+  });
+
+  it("shows a validation error for mismatched passwords", async () => {
+    render(<SignUpPage />);
+
+    await userEvent.type(screen.getByLabelText(/full name/i), "Test User");
+    await userEvent.type(screen.getByLabelText(/email/i), "test@example.com");
+    await userEvent.type(screen.getByLabelText("Password"), validPassword);
+    await userEvent.type(
+      screen.getByLabelText("Confirm Password"),
+      "differentpassword123"
+    );
+    await userEvent.click(screen.getByRole("checkbox"));
+    await userEvent.click(
+      screen.getByRole("button", { name: /join roomshare/i })
+    );
+
+    expect(
+      screen.getByText(
+        "Those passwords don’t match. Re-enter them and try again."
+      )
+    ).toBeInTheDocument();
+    expect(mockFetch).not.toHaveBeenCalled();
   });
 
   it("submits form successfully", async () => {

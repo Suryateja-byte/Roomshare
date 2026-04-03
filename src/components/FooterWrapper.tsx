@@ -17,7 +17,8 @@ export default function FooterWrapper({
     pathname === "/reset-password" ||
     pathname === "/verify" ||
     pathname === "/search" ||
-    pathname.startsWith("/search/");
+    pathname.startsWith("/search/") ||
+    pathname.startsWith("/messages/");
 
   if (shouldHideFooter) {
     return null;

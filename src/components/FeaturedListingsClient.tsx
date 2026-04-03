@@ -102,7 +102,7 @@ export default function FeaturedListingsClient({
             whileInView="visible"
             viewport={{ once: true, margin: "-100px" }}
             variants={staggerContainer}
-            className="flex flex-col md:flex-row md:items-end justify-between gap-8 mb-16 md:mb-20"
+            className="flex flex-col md:flex-row md:items-center justify-between gap-8 mb-16 md:mb-20"
           >
             <div className="max-w-2xl">
               <m.div
@@ -124,6 +124,23 @@ export default function FeaturedListingsClient({
               >
                 Fresh rooms from verified hosts — updated daily.
               </m.p>
+
+              <m.div variants={fadeInUp} className="md:hidden mt-4">
+                <Button
+                  asChild
+                  variant="outline"
+                  size="sm"
+                  className="group rounded-full border-outline-variant/20 text-on-surface-variant hover:text-on-surface gap-2"
+                >
+                  <Link href="/search">
+                    See All
+                    <ArrowRight
+                      size={14}
+                      className="group-hover:translate-x-1 transition-transform"
+                    />
+                  </Link>
+                </Button>
+              </m.div>
             </div>
 
             <m.div variants={fadeInUp} className="hidden md:block">
@@ -148,10 +165,10 @@ export default function FeaturedListingsClient({
             whileInView="visible"
             viewport={{ once: true, margin: "-100px" }}
             variants={staggerContainer}
-            className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-8 sm:gap-10"
+            className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-6 sm:gap-10"
           >
             {listings.map((listing, index) => (
-              <m.div key={listing.id} variants={fadeInUp}>
+              <m.div key={listing.id} variants={fadeInUp} className="h-full">
                 <ListingCard
                   listing={listing}
                   priority={index < 3}

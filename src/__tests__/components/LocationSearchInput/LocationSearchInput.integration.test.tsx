@@ -35,6 +35,8 @@ interface WrapperProps {
   onLocationSelectSpy?: jest.Mock;
   placeholder?: string;
   id?: string;
+  className?: string;
+  inputClassName?: string;
 }
 
 function ControlledWrapper({
@@ -43,6 +45,8 @@ function ControlledWrapper({
   onLocationSelectSpy,
   placeholder,
   id,
+  className,
+  inputClassName,
 }: WrapperProps) {
   const [value, setValue] = useState(initialValue);
 
@@ -58,6 +62,8 @@ function ControlledWrapper({
         onLocationSelectSpy?.(location);
       }}
       placeholder={placeholder}
+      className={className}
+      inputClassName={inputClassName}
     />
   );
 }
@@ -133,9 +139,30 @@ describe("LocationSearchInput - Integration Tests", () => {
         onLocationSelectSpy={props.onLocationSelectSpy ?? mockOnLocationSelect}
         placeholder={props.placeholder}
         id={props.id}
+        className={props.className}
+        inputClassName={props.inputClassName}
       />
     );
   };
+
+  describe("Layout alignment", () => {
+    it("stretches the input and trailing control to fill fixed-height shells", () => {
+      renderInput({ initialValue: "Austin", className: "h-12" });
+
+      const input = screen.getByRole("combobox");
+      const clearButton = screen.getByRole("button", { name: "Clear search" });
+
+      expect(input.parentElement).toHaveClass("relative");
+      expect(input.parentElement).toHaveClass("h-full");
+      expect(input).toHaveClass("h-full");
+      expect(input).toHaveClass("min-w-0");
+      expect(clearButton.parentElement).toHaveClass("absolute");
+      expect(clearButton.parentElement).toHaveClass("inset-y-0");
+      expect(clearButton.parentElement).toHaveClass("right-0");
+      expect(clearButton.parentElement).toHaveClass("flex");
+      expect(clearButton.parentElement).toHaveClass("items-center");
+    });
+  });
 
   describe("Complete User Flow", () => {
     it("complete flow: type → select → submit", async () => {
