@@ -44,6 +44,13 @@ jest.mock("@/components/SearchForm", () => ({
   default: (props: { variant?: string }) => mockSearchForm(props),
 }));
 
+jest.mock("@/components/home/EditorialLivingRoomHero", () => ({
+  __esModule: true,
+  default: ({ children }: { children: React.ReactNode }) => (
+    <section data-testid="immersive-hero">{children}</section>
+  ),
+}));
+
 jest.mock("framer-motion", () => {
   const React = require("react");
 

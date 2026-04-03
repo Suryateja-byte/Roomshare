@@ -56,7 +56,7 @@ export default function BottomNavBar() {
 
   // Hide on scroll down, show on scroll up
   useEffect(() => {
-    const scrollContainer = document.querySelector("[data-scroll-container]");
+    const scrollContainer = document.querySelector("[data-app-scroll-container]");
     if (!scrollContainer) return;
 
     const handleScroll = () => {
@@ -89,12 +89,16 @@ export default function BottomNavBar() {
   return (
     <nav
       aria-label="Mobile navigation"
+      data-testid="bottom-nav"
       className={`
         fixed bottom-0 left-0 right-0 z-sticky md:hidden
         bg-surface-container-lowest
         shadow-[0_-2px_16px_rgb(27_28_25/0.06)]
         border-t border-outline-variant/30
-        transition-transform duration-300
+        transition-all duration-300
+        data-[anim-hidden=true]:translate-y-full
+        data-[anim-hidden=true]:opacity-0
+        data-[anim-hidden=true]:pointer-events-none
         ${visible ? "translate-y-0" : "translate-y-full"}
       `}
       style={{ paddingBottom: "env(safe-area-inset-bottom, 0px)" }}

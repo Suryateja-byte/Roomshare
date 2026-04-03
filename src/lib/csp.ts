@@ -15,7 +15,7 @@ const CONNECT_SRC_ORIGINS = [
 ];
 
 // SEC-002 FIX: Routes that render MapLibre maps and need 'unsafe-eval' for WebGL shaders
-const MAP_PAGE_PATTERNS = [/^\/search/, /^\/listings\/[^/]+$/];
+const MAP_PAGE_PATTERNS = [/^\/$/, /^\/search/, /^\/listings\/[^/]+$/];
 
 export function isMapPage(pathname: string): boolean {
   return MAP_PAGE_PATTERNS.some((p) => p.test(pathname));

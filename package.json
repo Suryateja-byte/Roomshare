@@ -84,6 +84,7 @@
     "sharp": "^0.34.5",
     "sonner": "^2.0.7",
     "tailwind-merge": "^3.5.0",
+    "three": "^0.183.2",
     "use-debounce": "^10.1.1",
     "zod": "^4.3.6"
   },
@@ -102,6 +103,7 @@
     "@types/node": "^20.19.37",
     "@types/react": "^19.2.14",
     "@types/react-dom": "^19.2.3",
+    "@types/three": "^0.183.1",
     "eslint": "^9.39.4",
     "eslint-config-next": "^16.2.1",
     "eslint-config-prettier": "^10.1.8",
