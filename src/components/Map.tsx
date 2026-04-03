@@ -3367,7 +3367,11 @@ export default function MapComponent({
                 key={selectedListing.id}
                 initial={reducedMotion ? { opacity: 0 } : { opacity: 0, y: 16 }}
                 animate={reducedMotion ? { opacity: 1 } : { opacity: 1, y: 0 }}
-                exit={reducedMotion ? { opacity: 0 } : { opacity: 0, y: 8 }}
+                exit={
+                  reducedMotion
+                    ? { opacity: 0, transition: { duration: 0.15 } }
+                    : { opacity: 0, y: 8, transition: { type: "tween", duration: 0.15 } }
+                }
                 transition={
                   reducedMotion
                     ? { duration: 0.15 }
