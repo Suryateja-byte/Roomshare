@@ -129,6 +129,8 @@ interface ListingCardProps {
   listing: Listing;
   isSaved?: boolean;
   className?: string;
+  /** Search feed-specific mobile hierarchy. Desktop remains unchanged. */
+  mobileVariant?: "default" | "feed";
   /** Priority loading for LCP optimization - use for above-fold images */
   priority?: boolean;
   /** When true, show total price (price × estimatedMonths) instead of per-month */
@@ -158,6 +160,7 @@ function arePropsEqual(
     pl.location.state === nl.location.state &&
     prev.isSaved === next.isSaved &&
     prev.className === next.className &&
+    prev.mobileVariant === next.mobileVariant &&
     prev.priority === next.priority &&
     prev.showTotalPrice === next.showTotalPrice &&
     prev.estimatedMonths === next.estimatedMonths
@@ -168,6 +171,7 @@ function ListingCardInner({
   listing,
   isSaved,
   className,
+  mobileVariant = "default",
   priority = false,
   showTotalPrice = false,
   estimatedMonths = 1,
@@ -177,6 +181,7 @@ function ListingCardInner({
   const { setHovered, setActive, hasProvider, focusSourceRef } =
     useListingFocusActions();
   const { isHovered, isActive } = useIsListingFocused(listing.id);
+  const isFeedCard = mobileVariant === "feed";
 
   // Track image errors by index
   const handleImageError = useCallback((index: number) => {
@@ -203,6 +208,10 @@ function ListingCardInner({
     ? listing.avgRating
     : null;
   const hasRating = (listing.reviewCount ?? 0) > 0 && avgRating !== null;
+  const isGuestFavorite =
+    (listing.reviewCount ?? 0) >= 5 && (avgRating ?? 0) >= 4.9;
+  const isTopRated =
+    !isGuestFavorite && (avgRating ?? 0) >= 4.5 && (listing.reviewCount ?? 0) >= 3;
 
   // Fallback for empty/null titles
   const displayTitle = listing.title?.trim() || "Untitled Listing";
@@ -217,6 +226,9 @@ function ListingCardInner({
   srParts.push(
     listing.price === 0 ? "Free" : `${formatPrice(listing.price)} per month`
   );
+  if (isTopRated) {
+    srParts.push("top rated");
+  }
   if (hasRating) {
     srParts.push(`rated ${avgRating!.toFixed(1)} out of 5`);
   } else {
@@ -245,7 +257,9 @@ function ListingCardInner({
     <article
       aria-label={ariaLabel}
       data-testid="listing-card"
+      data-listing-card-id={listing.id}
       data-listing-id={listing.id}
+      data-mobile-variant={mobileVariant}
       data-focus-state={isActive ? "active" : isHovered ? "hovered" : "none"}
       onMouseEnter={() => {
         if (focusSourceRef.current === "map") return;
@@ -258,13 +272,22 @@ function ListingCardInner({
       }}
       onBlur={() => setHovered(null)}
       className={cn(
-        "relative rounded-lg transition-shadow",
-        isActive && "ring-2 ring-primary ring-offset-2",
+        "relative transition-all duration-300 scroll-mt-4 lg:scroll-mt-6",
+        isFeedCard ? "rounded-[1.25rem] lg:rounded-lg" : "rounded-lg",
+        isActive &&
+          (isFeedCard
+            ? "ring-2 ring-primary ring-offset-2 shadow-ambient-lg shadow-primary/10 -translate-y-0.5"
+            : "ring-2 ring-primary ring-offset-2"),
         isHovered && !isActive && "shadow-ambient ring-1 ring-primary/20",
         className
       )}
     >
-      <div className="absolute top-3 right-3 z-20 flex items-center gap-1.5">
+      <div
+        className={cn(
+          "absolute z-20 flex items-center gap-1.5",
+          isFeedCard ? "top-2.5 right-2.5 lg:top-3 lg:right-3" : "top-3 right-3"
+        )}
+      >
         {hasProvider && (
           <button
             type="button"
@@ -286,13 +309,26 @@ function ListingCardInner({
         href={`/listings/${listing.id}`}
         onClick={isDragging ? (e) => e.preventDefault() : undefined}
         className={cn(
-          "block group rounded-lg focus:outline-none focus-visible:ring-2 focus-visible:ring-primary/30 focus-visible:ring-offset-2",
+          "block group focus:outline-none focus-visible:ring-2 focus-visible:ring-primary/30 focus-visible:ring-offset-2",
+          isFeedCard ? "rounded-[1.25rem] lg:rounded-lg" : "rounded-lg",
           isDragging && "pointer-events-none"
         )}
       >
-        <div className="relative flex flex-col overflow-hidden rounded-lg bg-surface-container-lowest transition-lift shadow-ambient-sm group-hover:shadow-ambient-lg group-hover:shadow-on-surface/10 motion-safe:group-hover:-translate-y-1">
+        <div
+          className={cn(
+            "relative flex flex-col overflow-hidden bg-surface-container-lowest transition-lift shadow-ambient-sm group-hover:shadow-ambient-lg group-hover:shadow-on-surface/10 motion-safe:group-hover:-translate-y-1",
+            isFeedCard ? "rounded-[1.25rem] lg:rounded-lg" : "rounded-lg"
+          )}
+        >
           {/* Image Area */}
-          <div className="relative aspect-[16/9] sm:aspect-[4/3] overflow-hidden bg-surface-canvas">
+          <div
+            className={cn(
+              "relative overflow-hidden bg-surface-canvas",
+              isFeedCard
+                ? "aspect-[16/10] sm:aspect-[4/3]"
+                : "aspect-[16/9] sm:aspect-[4/3]"
+            )}
+          >
             {/* Image Carousel or single image */}
             <ImageCarousel
               images={displayImages}
@@ -320,114 +356,264 @@ function ListingCardInner({
             )}
 
             {/* Badges — top-left stack */}
-            <div className="absolute top-4 left-4 z-20 flex flex-col gap-2">
-              <TrustBadge
-                avgRating={listing.avgRating}
-                reviewCount={listing.reviewCount}
-              />
-              <SlotBadge
-                availableSlots={listing.availableSlots}
-                totalSlots={listing.totalSlots}
-                overlay
-              />
-              {listing.totalSlots > 1 && (
-                <span className="inline-flex items-center font-medium px-2.5 py-1 text-xs bg-surface-container-lowest/90 backdrop-blur-sm shadow-ambient-sm rounded-lg text-primary">
-                  Multi-Room
-                </span>
+            <div
+              className={cn(
+                "absolute top-4 left-4 z-20 flex flex-col",
+                isFeedCard ? "gap-1.5" : "gap-2"
               )}
-              {hasRating && (
-                <div
-                  className="inline-flex items-center gap-1 px-2 py-1 rounded-lg text-xs font-bold bg-surface-container-lowest/90 text-on-surface shadow-ambient-sm backdrop-blur-md"
-                  aria-label={`Rating ${avgRating!.toFixed(1)} out of 5`}
-                >
-                  <Star className="w-3 h-3 text-amber-400 fill-amber-400" />
-                  <span>{avgRating!.toFixed(1)}</span>
-                </div>
-              )}
-              {!hasRating && (
-                <span className="inline-flex items-center font-medium px-2.5 py-1 text-xs bg-surface-container-lowest/90 backdrop-blur-sm shadow-ambient-sm rounded-lg text-primary">
-                  New
-                </span>
-              )}
-            </div>
-          </div>
-
-          {/* Content Area */}
-          <div className="flex flex-col flex-1 p-5 sm:p-6">
-            {/* Title and Rating Row */}
-            <div className="mb-1">
-              <h3
-                className="font-semibold text-base text-on-surface line-clamp-2 leading-tight tracking-tight"
-                title={displayTitle}
-              >
-                {displayTitle}
-              </h3>
-            </div>
-
-            {/* Location */}
-            <p className="text-sm text-on-surface-variant mb-4 font-light">
-              {formatLocation(listing.location.city, listing.location.state)}
-            </p>
-
-            {/* Price — Large and prominent */}
-            <div className="flex items-baseline mb-5">
-              {showTotalPrice && estimatedMonths > 1 ? (
+            >
+              {isFeedCard ? (
                 <>
-                  <span
-                    data-testid="listing-price"
-                    className="font-display font-semibold text-xl text-on-surface tracking-tight"
-                  >
-                    {formatPrice(listing.price * estimatedMonths)}
-                  </span>
-                  <span className="text-on-surface-variant text-xs ml-1 uppercase tracking-wider font-medium">
-                    total
-                  </span>
+                  {isGuestFavorite && (
+                    <TrustBadge
+                      avgRating={listing.avgRating}
+                      reviewCount={listing.reviewCount}
+                    />
+                  )}
+                  <SlotBadge
+                    availableSlots={listing.availableSlots}
+                    totalSlots={listing.totalSlots}
+                    overlay
+                  />
+                  {!isGuestFavorite &&
+                    (isTopRated ? (
+                      <span className="inline-flex items-center px-2 py-1 rounded-lg text-xs font-semibold bg-amber-50 text-amber-800 shadow-ambient-sm backdrop-blur-sm">
+                        Top Rated
+                      </span>
+                    ) : hasRating ? (
+                      <div
+                        className="inline-flex items-center gap-1 px-2 py-1 rounded-lg text-xs font-bold bg-surface-container-lowest/90 text-on-surface shadow-ambient-sm backdrop-blur-md"
+                        aria-label={`Rating ${avgRating!.toFixed(1)} out of 5`}
+                      >
+                        <Star className="w-3 h-3 text-amber-400 fill-amber-400" />
+                        <span>{avgRating!.toFixed(1)}</span>
+                      </div>
+                    ) : (
+                      <span className="inline-flex items-center font-medium px-2.5 py-1 text-xs bg-surface-container-lowest/90 backdrop-blur-sm shadow-ambient-sm rounded-lg text-primary">
+                        New
+                      </span>
+                    ))}
                 </>
               ) : (
                 <>
-                  <span
-                    data-testid="listing-price"
-                    className="font-display font-semibold text-xl text-on-surface tracking-tight"
-                  >
-                    {formatPrice(listing.price)}
-                  </span>
-                  {listing.price > 0 && (
-                    <span className="text-on-surface-variant text-xs ml-1 tracking-wider font-medium">
-                      /mo
+                  <TrustBadge
+                    avgRating={listing.avgRating}
+                    reviewCount={listing.reviewCount}
+                  />
+                  <SlotBadge
+                    availableSlots={listing.availableSlots}
+                    totalSlots={listing.totalSlots}
+                    overlay
+                  />
+                  {listing.totalSlots > 1 && (
+                    <span className="inline-flex items-center font-medium px-2.5 py-1 text-xs bg-surface-container-lowest/90 backdrop-blur-sm shadow-ambient-sm rounded-lg text-primary">
+                      Multi-Room
+                    </span>
+                  )}
+                  {isTopRated ? (
+                    <span className="inline-flex items-center px-2 py-1 rounded-lg text-xs font-semibold bg-amber-50 text-amber-800 shadow-ambient-sm backdrop-blur-sm">
+                      Top Rated
+                    </span>
+                  ) : hasRating ? (
+                    <div
+                      className="inline-flex items-center gap-1 px-2 py-1 rounded-lg text-xs font-bold bg-surface-container-lowest/90 text-on-surface shadow-ambient-sm backdrop-blur-md"
+                      aria-label={`Rating ${avgRating!.toFixed(1)} out of 5`}
+                    >
+                      <Star className="w-3 h-3 text-amber-400 fill-amber-400" />
+                      <span>{avgRating!.toFixed(1)}</span>
+                    </div>
+                  ) : (
+                    <span className="inline-flex items-center font-medium px-2.5 py-1 text-xs bg-surface-container-lowest/90 backdrop-blur-sm shadow-ambient-sm rounded-lg text-primary">
+                      New
                     </span>
                   )}
                 </>
               )}
             </div>
+          </div>
 
-            {/* Amenities & Languages - Simplified */}
-            <div className="flex items-center justify-between gap-2 mt-auto">
-              <div className="flex items-center gap-1.5 overflow-hidden min-w-0 flex-1">
-                {listing.amenities.slice(0, 2).map((amenity, i) => (
-                  <span
-                    key={amenity}
-                    className={cn(
-                      "text-xs font-medium text-on-surface-variant truncate",
-                      i > 0 && "hidden sm:inline"
+          {/* Content Area */}
+          <div
+            className={cn(
+              "flex flex-col flex-1",
+              isFeedCard ? "p-4 sm:p-5 lg:p-6" : "p-5 sm:p-6"
+            )}
+          >
+            {isFeedCard ? (
+              <>
+                <div className="flex items-start justify-between gap-3 mb-3">
+                  <div className="min-w-0">
+                    {isActive && (
+                      <span className="inline-flex items-center rounded-full bg-primary/10 px-2.5 py-1 text-[11px] font-semibold uppercase tracking-[0.08em] text-primary mb-2">
+                        Selected on map
+                      </span>
                     )}
-                  >
-                    • {amenity}
-                  </span>
-                ))}
-              </div>
-
-              {listing.householdLanguages &&
-                listing.householdLanguages.length > 0 && (
-                  <div className="flex items-center gap-1 flex-shrink-0 ml-auto">
-                    <Globe className="w-3 h-3 text-on-surface-variant" />
-                    <span className="text-xs font-medium text-on-surface-variant">
-                      {getLanguageName(listing.householdLanguages[0])}
-                      {listing.householdLanguages.length > 1 &&
-                        ` +${Math.min(listing.householdLanguages.length - 1, 4)}`}
-                    </span>
+                    <p className="text-[15px] font-semibold text-on-surface truncate">
+                      {formattedLocation}
+                    </p>
+                    <h3
+                      className="mt-1 text-sm text-on-surface-variant line-clamp-1 lg:text-base lg:text-on-surface lg:line-clamp-2 lg:leading-tight lg:tracking-tight lg:font-semibold"
+                      title={displayTitle}
+                    >
+                      {displayTitle}
+                    </h3>
                   </div>
-                )}
-            </div>
+
+                  {hasRating ? (
+                    <div
+                      className="hidden lg:inline-flex items-center gap-1 text-sm font-medium text-on-surface flex-shrink-0"
+                      aria-label={`Rating ${avgRating!.toFixed(1)} out of 5`}
+                    >
+                      <Star className="w-4 h-4 text-amber-400 fill-amber-400" />
+                      <span>{avgRating!.toFixed(1)}</span>
+                    </div>
+                  ) : null}
+                </div>
+
+                <div className="flex items-baseline justify-between gap-3 mb-3">
+                  <div className="flex items-baseline min-w-0">
+                    {showTotalPrice && estimatedMonths > 1 ? (
+                      <>
+                        <span
+                          data-testid="listing-price"
+                          className="font-display font-semibold text-xl text-on-surface tracking-tight"
+                        >
+                          {formatPrice(listing.price * estimatedMonths)}
+                        </span>
+                        <span className="text-on-surface-variant text-[11px] ml-1 uppercase tracking-wider font-medium">
+                          total
+                        </span>
+                      </>
+                    ) : (
+                      <>
+                        <span
+                          data-testid="listing-price"
+                          className="font-display font-semibold text-xl text-on-surface tracking-tight"
+                        >
+                          {formatPrice(listing.price)}
+                        </span>
+                        {listing.price > 0 && (
+                          <span className="text-on-surface-variant text-[11px] ml-1 tracking-wider font-medium">
+                            /mo
+                          </span>
+                        )}
+                      </>
+                    )}
+                  </div>
+
+                  {!hasRating && (
+                    <span className="hidden lg:inline-flex items-center rounded-full bg-surface-container-high px-2 py-1 text-[11px] font-medium text-on-surface-variant">
+                      New listing
+                    </span>
+                  )}
+                </div>
+
+                <div className="flex items-center justify-between gap-2 mt-auto">
+                  <div className="flex items-center gap-1.5 overflow-hidden min-w-0 flex-1">
+                    {listing.amenities.slice(0, 2).map((amenity, i) => (
+                      <span
+                        key={amenity}
+                        className={cn(
+                          "text-xs font-medium text-on-surface-variant truncate",
+                          i > 0 && "hidden sm:inline"
+                        )}
+                      >
+                        • {amenity}
+                      </span>
+                    ))}
+                  </div>
+
+                  {listing.householdLanguages &&
+                    listing.householdLanguages.length > 0 && (
+                      <div className="flex items-center gap-1 flex-shrink-0 ml-auto">
+                        <Globe className="w-3 h-3 text-on-surface-variant" />
+                        <span className="text-xs font-medium text-on-surface-variant">
+                          {getLanguageName(listing.householdLanguages[0])}
+                          {listing.householdLanguages.length > 1 &&
+                            ` +${Math.min(listing.householdLanguages.length - 1, 4)}`}
+                        </span>
+                      </div>
+                    )}
+                </div>
+              </>
+            ) : (
+              <>
+                {/* Title and Rating Row */}
+                <div className="mb-1">
+                  <h3
+                    className="font-semibold text-base text-on-surface line-clamp-2 leading-tight tracking-tight"
+                    title={displayTitle}
+                  >
+                    {displayTitle}
+                  </h3>
+                </div>
+
+                {/* Location */}
+                <p className="text-sm text-on-surface-variant mb-4 font-light">
+                  {formatLocation(listing.location.city, listing.location.state)}
+                </p>
+
+                {/* Price — Large and prominent */}
+                <div className="flex items-baseline mb-5">
+                  {showTotalPrice && estimatedMonths > 1 ? (
+                    <>
+                      <span
+                        data-testid="listing-price"
+                        className="font-display font-semibold text-xl text-on-surface tracking-tight"
+                      >
+                        {formatPrice(listing.price * estimatedMonths)}
+                      </span>
+                      <span className="text-on-surface-variant text-xs ml-1 uppercase tracking-wider font-medium">
+                        total
+                      </span>
+                    </>
+                  ) : (
+                    <>
+                      <span
+                        data-testid="listing-price"
+                        className="font-display font-semibold text-xl text-on-surface tracking-tight"
+                      >
+                        {formatPrice(listing.price)}
+                      </span>
+                      {listing.price > 0 && (
+                        <span className="text-on-surface-variant text-xs ml-1 tracking-wider font-medium">
+                          /mo
+                        </span>
+                      )}
+                    </>
+                  )}
+                </div>
+
+                {/* Amenities & Languages - Simplified */}
+                <div className="flex items-center justify-between gap-2 mt-auto">
+                  <div className="flex items-center gap-1.5 overflow-hidden min-w-0 flex-1">
+                    {listing.amenities.slice(0, 2).map((amenity, i) => (
+                      <span
+                        key={amenity}
+                        className={cn(
+                          "text-xs font-medium text-on-surface-variant truncate",
+                          i > 0 && "hidden sm:inline"
+                        )}
+                      >
+                        • {amenity}
+                      </span>
+                    ))}
+                  </div>
+
+                  {listing.householdLanguages &&
+                    listing.householdLanguages.length > 0 && (
+                      <div className="flex items-center gap-1 flex-shrink-0 ml-auto">
+                        <Globe className="w-3 h-3 text-on-surface-variant" />
+                        <span className="text-xs font-medium text-on-surface-variant">
+                          {getLanguageName(listing.householdLanguages[0])}
+                          {listing.householdLanguages.length > 1 &&
+                            ` +${Math.min(listing.householdLanguages.length - 1, 4)}`}
+                        </span>
+                      </div>
+                    )}
+                </div>
+              </>
+            )}
           </div>
         </div>
       </Link>

@@ -142,6 +142,14 @@ describe("ListingCard", () => {
       expect(cardSurface).toHaveClass("rounded-lg");
       expect(cardSurface).not.toHaveClass("rounded-none");
     });
+
+    it("marks search-feed cards with the mobile feed variant", () => {
+      render(<ListingCard listing={mockListing} mobileVariant="feed" />);
+      expect(screen.getByTestId("listing-card")).toHaveAttribute(
+        "data-mobile-variant",
+        "feed"
+      );
+    });
   });
 
   describe("price formatting", () => {
@@ -269,6 +277,55 @@ describe("ListingCard", () => {
       const { container } = render(<ListingCard listing={mockListing} />);
       const starSvg = container.querySelector("svg.text-amber-400");
       expect(starSvg).toBeInTheDocument();
+    });
+  });
+
+  describe("Top Rated badge", () => {
+    const topRatedListing = {
+      ...mockListing,
+      avgRating: 4.6,
+      reviewCount: 4,
+    };
+
+    it("shows Top Rated badge in default variant (avgRating=4.6, reviewCount=4)", () => {
+      render(<ListingCard listing={topRatedListing} />);
+      expect(screen.getByText("Top Rated")).toBeInTheDocument();
+    });
+
+    it("shows Top Rated badge in feed variant (avgRating=4.6, reviewCount=4)", () => {
+      render(<ListingCard listing={topRatedListing} mobileVariant="feed" />);
+      expect(screen.getByText("Top Rated")).toBeInTheDocument();
+    });
+
+    it("hides Top Rated badge when avgRating below threshold (4.3)", () => {
+      const listing = { ...mockListing, avgRating: 4.3, reviewCount: 4 };
+      render(<ListingCard listing={listing} />);
+      expect(screen.queryByText("Top Rated")).not.toBeInTheDocument();
+    });
+
+    it("hides Top Rated badge when Guest Favorite takes priority (avgRating=4.95, reviewCount=6)", () => {
+      const listing = { ...mockListing, avgRating: 4.95, reviewCount: 6 };
+      render(<ListingCard listing={listing} />);
+      expect(screen.queryByText("Top Rated")).not.toBeInTheDocument();
+    });
+
+    it("hides Top Rated badge when reviewCount too low (2)", () => {
+      const listing = { ...mockListing, avgRating: 4.6, reviewCount: 2 };
+      render(<ListingCard listing={listing} />);
+      expect(screen.queryByText("Top Rated")).not.toBeInTheDocument();
+    });
+
+    it("includes 'top rated' in ariaLabel when badge is present", () => {
+      render(<ListingCard listing={topRatedListing} />);
+      const article = screen.getByTestId("listing-card");
+      expect(article).toHaveAttribute("aria-label", expect.stringContaining("top rated"));
+    });
+
+    it("does not include 'top rated' in ariaLabel when badge is absent (avgRating=4.3)", () => {
+      const listing = { ...mockListing, avgRating: 4.3, reviewCount: 4 };
+      render(<ListingCard listing={listing} />);
+      const article = screen.getByTestId("listing-card");
+      expect(article).not.toHaveAttribute("aria-label", expect.stringContaining("top rated"));
     });
   });
 });
