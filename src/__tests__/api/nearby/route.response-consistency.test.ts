@@ -279,8 +279,15 @@ describe("POST /api/nearby - Response Consistency", () => {
   });
 
   describe("Error Response Structure", () => {
-    it("401 error has consistent structure", async () => {
+    it("unauthenticated requests are allowed (guest access)", async () => {
+      // Route is available to guests per compliance notes — no auth check
       (auth as jest.Mock).mockResolvedValue(null);
+
+      mockFetch.mockResolvedValue({
+        ok: true,
+        status: 200,
+        json: async () => ({ places: [] }),
+      });
 
       const response = await POST(
         createRequest({
@@ -288,11 +295,11 @@ describe("POST /api/nearby - Response Consistency", () => {
           categories: ["test"],
         })
       );
-      const data = await response.json();
 
-      expect(response.status).toBe(401);
-      expect(data).toHaveProperty("error");
-      expect(typeof data.error).toBe("string");
+      expect(response.status).toBe(200);
+      const data = await response.json();
+      expect(data).toHaveProperty("places");
+      expect(data).toHaveProperty("meta");
     });
 
     it("400 error has consistent structure with details", async () => {
