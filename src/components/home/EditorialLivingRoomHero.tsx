@@ -352,7 +352,7 @@ export default function EditorialLivingRoomHero({ children }: EditorialLivingRoo
     renderer.setPixelRatio(Math.min(window.devicePixelRatio, MAX_PIXEL_RATIO));
     renderer.setSize(canvasContainer.clientWidth, canvasContainer.clientHeight);
     renderer.shadowMap.enabled = true;
-    renderer.shadowMap.type = THREE.PCFSoftShadowMap;
+    renderer.shadowMap.type = THREE.PCFShadowMap;
     renderer.toneMapping = THREE.ACESFilmicToneMapping;
     renderer.toneMappingExposure = 1.15;
 
@@ -540,8 +540,12 @@ export default function EditorialLivingRoomHero({ children }: EditorialLivingRoo
       });
 
       renderer.dispose();
-      renderer.forceContextLoss();
-      // Remove the canvas element Three.js created
+      // Do NOT call forceContextLoss() — in React Strict Mode (dev), the effect
+      // double-invokes and the second mount needs a fresh WebGL context. Browsers
+      // have a limited context pool (~8-16) and forceContextLoss doesn't release
+      // the slot synchronously, causing "Cannot read properties of null ('precision')"
+      // on the second mount. The browser will reclaim the context when the canvas
+      // is removed from the DOM and garbage collected.
       if (canvas.parentElement) canvas.parentElement.removeChild(canvas);
     };
   }, [scrollContainerRef]);
