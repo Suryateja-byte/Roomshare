@@ -311,7 +311,7 @@ function setChromeHidden(hidden: boolean): void {
 
 export default function EditorialLivingRoomHero({ children }: EditorialLivingRoomHeroProps) {
   const sectionRef = useRef<HTMLElement>(null);
-  const canvasRef = useRef<HTMLCanvasElement>(null);
+  const canvasRef = useRef<HTMLDivElement>(null);
   const overlayRef = useRef<HTMLDivElement>(null);
   const posterRef = useRef<HTMLDivElement>(null);
   const loaderRef = useRef<HTMLDivElement>(null);
@@ -325,26 +325,32 @@ export default function EditorialLivingRoomHero({ children }: EditorialLivingRoo
 
   // Initialize Three.js scene
   const initScene = useCallback(() => {
-    const canvas = canvasRef.current;
+    const canvasContainer = canvasRef.current;
     const section = sectionRef.current;
     const container = scrollContainerRef.current;
-    if (!canvas || !section || !container) return;
+    if (!canvasContainer || !section || !container) return;
 
     // Scene setup
     const scene = new THREE.Scene();
     scene.fog = new THREE.FogExp2("#fbf9f4", 0.04);
 
-    const camera = new THREE.PerspectiveCamera(35, canvas.clientWidth / canvas.clientHeight, 0.1, 100);
+    const camera = new THREE.PerspectiveCamera(35, canvasContainer.clientWidth / canvasContainer.clientHeight, 0.1, 100);
     camera.up.set(0, 0, 1);
 
+    // Let Three.js create its own canvas element — avoids React Strict Mode
+    // double-invoke issues where getContext() returns a stale/disposed context.
     const renderer = new THREE.WebGLRenderer({
-      canvas,
       antialias: true,
       alpha: true,
       powerPreference: "high-performance",
     });
+    const canvas = renderer.domElement;
+    canvas.className = "absolute inset-0 w-full h-full";
+    canvas.style.background = "radial-gradient(circle at center, #ffffff 0%, #fbf9f4 70%)";
+    canvasContainer.appendChild(canvas);
+
     renderer.setPixelRatio(Math.min(window.devicePixelRatio, MAX_PIXEL_RATIO));
-    renderer.setSize(canvas.clientWidth, canvas.clientHeight);
+    renderer.setSize(canvasContainer.clientWidth, canvasContainer.clientHeight);
     renderer.shadowMap.enabled = true;
     renderer.shadowMap.type = THREE.PCFSoftShadowMap;
     renderer.toneMapping = THREE.ACESFilmicToneMapping;
@@ -412,7 +418,7 @@ export default function EditorialLivingRoomHero({ children }: EditorialLivingRoo
     let startTime = performance.now();
 
     // Resize handler
-    const stickyContainer = canvas.parentElement;
+    const stickyContainer = canvasContainer.parentElement;
     const resizeObserver = new ResizeObserver(() => {
       if (!stickyContainer) return;
       const w = stickyContainer.clientWidth;
@@ -535,6 +541,8 @@ export default function EditorialLivingRoomHero({ children }: EditorialLivingRoo
 
       renderer.dispose();
       renderer.forceContextLoss();
+      // Remove the canvas element Three.js created
+      if (canvas.parentElement) canvas.parentElement.removeChild(canvas);
     };
   }, [scrollContainerRef]);
 
@@ -587,11 +595,10 @@ export default function EditorialLivingRoomHero({ children }: EditorialLivingRoo
       style={{ height: `${SECTION_HEIGHT_VH}vh` }}
     >
       <div className="sticky top-0 h-screen-safe overflow-hidden">
-        {/* Layer 1: WebGL canvas */}
-        <canvas
+        {/* Layer 1: WebGL canvas container (Three.js appends its own canvas) */}
+        <div
           ref={canvasRef}
           className="absolute inset-0 z-0 w-full h-full"
-          style={{ background: "radial-gradient(circle at center, #ffffff 0%, #fbf9f4 70%)" }}
         />
 
         {/* Layer 2: Poster (pre-render LCP, fades after first Three.js frame) */}
