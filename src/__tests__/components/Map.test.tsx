@@ -35,6 +35,7 @@ const mockReplace = jest.fn();
 const mockReplaceWithTransition = jest.fn();
 let mockSearchParams = new URLSearchParams();
 let mockCanvas: ReturnType<typeof createMockCanvas>;
+let phoneViewportMatches = false;
 
 function createMockCanvas() {
   const listeners: Record<string, EventListener[]> = {};
@@ -449,6 +450,23 @@ jest.mock("@/components/map/POILayer", () => ({
   POILayer: () => null,
 }));
 
+jest.mock("framer-motion", () => ({
+  LazyMotion: ({ children }: { children: React.ReactNode }) => <>{children}</>,
+  AnimatePresence: ({ children }: { children: React.ReactNode }) => (
+    <>{children}</>
+  ),
+  domAnimation: {},
+  m: {
+    div: ({
+      children,
+      ...props
+    }: Record<string, unknown> & { children?: React.ReactNode }) => (
+      <div {...props}>{children}</div>
+    ),
+  },
+  useReducedMotion: () => false,
+}));
+
 // Import component after mocks
 import MapComponent from "@/components/Map";
 import { triggerHaptic } from "@/lib/haptics";
@@ -511,6 +529,17 @@ describe("Map Component", () => {
 
     // Reset refs
     mockIsProgrammaticMoveRef.current = false;
+    phoneViewportMatches = false;
+    Object.defineProperty(window, "matchMedia", {
+      writable: true,
+      value: jest.fn().mockImplementation((query: string) => ({
+        matches: query.includes("max-width: 767px") ? phoneViewportMatches : false,
+        media: query,
+        addEventListener: jest.fn(),
+        removeEventListener: jest.fn(),
+        dispatchEvent: jest.fn(),
+      })),
+    });
 
     // Set up mock features for querySourceFeatures
     // This simulates what Mapbox returns for unclustered points
@@ -1074,6 +1103,170 @@ describe("Map Component", () => {
 
       // Popup should be visible
       expect(screen.getByTestId("map-popup")).toBeInTheDocument();
+    });
+
+    it("suppresses the popup in sheet selection mode while syncing the active listing", async () => {
+      render(
+        <MapComponent
+          listings={mockListings}
+          selectionPresentation="sheet"
+        />
+      );
+
+      await act(async () => {
+        jest.advanceTimersByTime(100);
+      });
+
+      const handlers = (
+        window as unknown as Record<string, { onIdle?: () => void }>
+      ).__mapHandlers;
+      await act(async () => {
+        handlers?.onIdle?.();
+      });
+
+      const markers = screen.getAllByTestId("map-marker");
+      await act(async () => {
+        fireEvent.click(markers[0]);
+      });
+
+      expect(screen.queryByTestId("map-popup")).not.toBeInTheDocument();
+      expect(mockSetActive).toHaveBeenCalledWith(mockListings[0].id);
+      expect(mockRequestScrollTo).toHaveBeenCalledWith(mockListings[0].id);
+    });
+
+    it("renders a phone preview card in preview selection mode without opening the popup", async () => {
+      phoneViewportMatches = true;
+      render(
+        <MapComponent
+          listings={mockListings}
+          selectionPresentation="preview"
+        />
+      );
+
+      await act(async () => {
+        jest.advanceTimersByTime(100);
+      });
+
+      const handlers = (
+        window as unknown as Record<string, { onIdle?: () => void }>
+      ).__mapHandlers;
+      await act(async () => {
+        handlers?.onIdle?.();
+      });
+
+      const markers = screen.getAllByTestId("map-marker");
+      await act(async () => {
+        fireEvent.click(markers[0]);
+      });
+
+      expect(screen.queryByTestId("map-popup")).not.toBeInTheDocument();
+      expect(screen.getByTestId("map-preview-card")).toBeInTheDocument();
+      expect(mockSetActive).toHaveBeenCalledWith(mockListings[0].id);
+      expect(mockRequestScrollTo).toHaveBeenCalledWith(mockListings[0].id);
+    });
+
+    it("keeps the phone preview during programmatic recenter and dismisses it on user move", async () => {
+      phoneViewportMatches = true;
+      render(
+        <MapComponent
+          listings={mockListings}
+          selectionPresentation="preview"
+        />
+      );
+
+      await act(async () => {
+        jest.advanceTimersByTime(100);
+      });
+
+      let handlers = (
+        window as unknown as Record<string, { onIdle?: () => void; onMoveStart?: () => void }>
+      ).__mapHandlers;
+      await act(async () => {
+        handlers?.onIdle?.();
+      });
+
+      const markers = screen.getAllByTestId("map-marker");
+      await act(async () => {
+        fireEvent.click(markers[0]);
+      });
+
+      expect(screen.getByTestId("map-preview-card")).toBeInTheDocument();
+
+      handlers = (
+        window as unknown as Record<string, { onIdle?: () => void; onMoveStart?: () => void }>
+      ).__mapHandlers;
+
+      mockIsProgrammaticMoveRef.current = true;
+      await act(async () => {
+        handlers?.onMoveStart?.();
+      });
+      expect(screen.getByTestId("map-preview-card")).toBeInTheDocument();
+
+      mockIsProgrammaticMoveRef.current = false;
+      await act(async () => {
+        handlers?.onMoveStart?.();
+      });
+
+      await waitFor(() => {
+        expect(screen.queryByTestId("map-preview-card")).not.toBeInTheDocument();
+      });
+      expect(mockSetActive).toHaveBeenLastCalledWith(null);
+    });
+
+    it("keeps the phone preview through the first blank-map click after marker selection, then dismisses it on the next blank-map click", async () => {
+      phoneViewportMatches = true;
+      render(
+        <MapComponent
+          listings={mockListings}
+          selectionPresentation="preview"
+        />
+      );
+
+      await act(async () => {
+        jest.advanceTimersByTime(100);
+      });
+
+      let handlers = (
+        window as unknown as Record<
+          string,
+          { onIdle?: () => void; onClick?: (e: unknown) => void }
+        >
+      ).__mapHandlers;
+      await act(async () => {
+        handlers?.onIdle?.();
+      });
+
+      const markers = screen.getAllByTestId("map-marker");
+      await act(async () => {
+        fireEvent.click(markers[0]);
+      });
+
+      expect(screen.getByTestId("map-preview-card")).toBeInTheDocument();
+
+      handlers = (
+        window as unknown as Record<
+          string,
+          { onIdle?: () => void; onClick?: (e: unknown) => void }
+        >
+      ).__mapHandlers;
+
+      const blankMapClick = {
+        originalEvent: { target: document.createElement("div") },
+      };
+
+      await act(async () => {
+        handlers?.onClick?.(blankMapClick);
+      });
+      expect(screen.getByTestId("map-preview-card")).toBeInTheDocument();
+
+      await act(async () => {
+        handlers?.onClick?.(blankMapClick);
+      });
+
+      await waitFor(() => {
+        expect(screen.queryByTestId("map-preview-card")).not.toBeInTheDocument();
+      });
+      expect(mockSetActive).toHaveBeenLastCalledWith(null);
     });
 
     it("passes displayed marker positions to PrivacyCircle for overlapping listings", async () => {

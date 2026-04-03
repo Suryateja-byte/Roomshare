@@ -32,7 +32,16 @@ import React, {
 import Link from "next/link";
 import Image from "next/image";
 import { useRouter, useSearchParams } from "next/navigation";
-import { Home, Loader2, MapPin, Maximize2, X } from "lucide-react";
+import {
+  Home,
+  Loader2,
+  MapPin,
+  Maximize2,
+  Minus,
+  Plus,
+  Star,
+  X,
+} from "lucide-react";
 import { triggerHaptic } from "@/lib/haptics";
 import { formatPrice } from "@/lib/format";
 import { Button } from "./ui/button";
@@ -60,7 +69,17 @@ import {
   MAP_FETCH_MAX_LAT_SPAN,
   MAP_FETCH_MAX_LNG_SPAN,
 } from "@/lib/constants";
+import { SNAP_COLLAPSED } from "@/lib/mobile-layout";
+import { SEARCH_PHONE_MAX_QUERY } from "@/lib/search-layout";
 import { cn } from "@/lib/utils";
+import { useMediaQuery } from "@/hooks/useMediaQuery";
+import {
+  LazyMotion,
+  domAnimation,
+  AnimatePresence,
+  m,
+  useReducedMotion,
+} from "framer-motion";
 
 /** Parse a string to float and validate it's a finite number within an optional range. */
 function safeParseFloat(
@@ -85,6 +104,8 @@ interface Listing {
   price: number;
   availableSlots: number;
   images?: string[];
+  avgRating?: number;
+  reviewCount?: number;
   location: {
     lat: number;
     lng: number;
@@ -240,6 +261,13 @@ export interface MapComponentProps {
    * Called when user clicks a marker or closes popup.
    */
   onSelectedListingChange?: (listingId: string | null) => void;
+
+  /**
+   * How marker selection is presented.
+   * Search uses "preview" on phones, "sheet" on tablets, and "popup" on desktop.
+   * @default "popup"
+   */
+  selectionPresentation?: "popup" | "sheet" | "preview";
 
   // --- Behavior Props ---
 
@@ -412,6 +440,7 @@ interface MarkerPinContentProps {
   tier: "primary" | "mini" | undefined;
   currentZoom: number;
   isHovered: boolean;
+  isActive: boolean;
 }
 
 const MarkerPinContent = React.memo(function MarkerPinContent({
@@ -419,13 +448,14 @@ const MarkerPinContent = React.memo(function MarkerPinContent({
   tier,
   currentZoom,
   isHovered,
+  isActive,
 }: MarkerPinContentProps) {
   const isMini = tier === "mini";
   const showAsDot =
     currentZoom < ZOOM_DOTS_ONLY ||
     (currentZoom < ZOOM_TOP_N_PINS && isMini);
 
-  if (showAsDot && !isHovered) {
+  if (showAsDot && !isHovered && !isActive) {
     return (
       <>
         <div
@@ -449,7 +479,7 @@ const MarkerPinContent = React.memo(function MarkerPinContent({
           isMini && currentZoom >= ZOOM_TOP_N_PINS
             ? "px-2 py-1 rounded-lg text-xs"
             : "px-3 py-1.5 rounded-xl text-sm",
-          isHovered
+          isHovered || isActive
             ? "bg-surface-container-lowest text-on-surface ring-2 ring-primary/30 scale-105"
             : "bg-on-surface text-white group-hover/marker:bg-on-surface"
         )}
@@ -462,7 +492,7 @@ const MarkerPinContent = React.memo(function MarkerPinContent({
           isMini && currentZoom >= ZOOM_TOP_N_PINS
             ? "-bottom-[4px] border-l-[5px] border-r-[5px] border-t-[5px]"
             : "-bottom-[6px] border-l-[7px] border-r-[7px] border-t-[7px]",
-          isHovered
+          isHovered || isActive
             ? "border-t-white"
             : "border-t-on-surface group-hover/marker:border-t-on-surface"
         )}
@@ -618,6 +648,7 @@ const MapMarkerItem = React.memo(function MapMarkerItem({
           tier={tier}
           currentZoom={currentZoom}
           isHovered={isHovered}
+          isActive={isActive}
         />
         {/* Pulsing ring on hover/active for visibility on dense maps */}
         {(isHovered || isActive) && (
@@ -820,6 +851,7 @@ export default function MapComponent({
   onMoveEnd: onMoveEndProp,
   selectedListingId: controlledSelectedId,
   onSelectedListingChange,
+  selectionPresentation = "popup",
   disableAutoFit = false,
   suppressEmptyState = false,
 }: MapComponentProps) {
@@ -830,6 +862,9 @@ export default function MapComponent({
   // --- Controlled vs Uncontrolled Selection ---
   // When selectedListingId prop is provided, selection is controlled by parent
   const isControlledSelection = controlledSelectedId !== undefined;
+  const usesPopupSelection = selectionPresentation === "popup";
+  const usesPreviewSelection = selectionPresentation === "preview";
+  const usesOverlaySelection = usesPopupSelection || usesPreviewSelection;
   const [internalSelectedListing, setInternalSelectedListing] =
     useState<Listing | null>(null);
 
@@ -876,6 +911,8 @@ export default function MapComponent({
   const [viewportInfoMessage, setViewportInfoMessage] = useState<string | null>(
     null
   );
+  const isPhoneViewport = useMediaQuery(SEARCH_PHONE_MAX_QUERY);
+  const reducedMotion = useReducedMotion();
   const { hoveredId, activeId, setHovered, setActive, requestScrollTo } =
     useListingFocus();
   // Keyboard navigation state for arrow key navigation between markers
@@ -961,6 +998,48 @@ export default function MapComponent({
   const isMountedRef = useRef(true);
   // Track map-initiated activeId to avoid re-triggering popup from card "Show on Map"
   const lastMapActiveRef = useRef<string | null>(null);
+  // Guard the synthetic blank-map click that can follow a marker tap on phone
+  // preview mode. Without this, the preview can dismiss immediately.
+  const ignoreNextPreviewBackgroundClickRef = useRef(false);
+  const previewBackgroundClickGuardTimeoutRef = useRef<NodeJS.Timeout | null>(
+    null
+  );
+  const clearPreviewBackgroundClickGuard = useCallback(() => {
+    ignoreNextPreviewBackgroundClickRef.current = false;
+    if (previewBackgroundClickGuardTimeoutRef.current) {
+      clearTimeout(previewBackgroundClickGuardTimeoutRef.current);
+      previewBackgroundClickGuardTimeoutRef.current = null;
+    }
+  }, []);
+  const armPreviewBackgroundClickGuard = useCallback(() => {
+    if (!usesPreviewSelection) return;
+
+    clearPreviewBackgroundClickGuard();
+    ignoreNextPreviewBackgroundClickRef.current = true;
+    previewBackgroundClickGuardTimeoutRef.current = setTimeout(() => {
+      ignoreNextPreviewBackgroundClickRef.current = false;
+      previewBackgroundClickGuardTimeoutRef.current = null;
+    }, 250);
+  }, [clearPreviewBackgroundClickGuard, usesPreviewSelection]);
+  const dismissPreviewSelection = useCallback(() => {
+    if (!usesPreviewSelection) return;
+    clearPreviewBackgroundClickGuard();
+    lastMapActiveRef.current = null;
+    setSelectedListing(null);
+    setActive(null);
+  }, [
+    clearPreviewBackgroundClickGuard,
+    usesPreviewSelection,
+    setSelectedListing,
+    setActive,
+  ]);
+  const handleSelectedListingClose = useCallback(() => {
+    if (usesPreviewSelection) {
+      dismissPreviewSelection();
+      return;
+    }
+    setSelectedListing(null);
+  }, [usesPreviewSelection, dismissPreviewSelection, setSelectedListing]);
   // Safety timeout: clear programmatic move flag if moveEnd doesn't fire
   const programmaticClearTimeoutRef = useRef<NodeJS.Timeout | null>(null);
   // Auto-zoom: fire once per search context when results are empty and no filters active
@@ -979,6 +1058,12 @@ export default function MapComponent({
   const sourcedataDebounceRef = useRef<NodeJS.Timeout | null>(null);
   // Debounce timer for marker hover scroll (300ms delay to prevent jank)
   const hoverScrollTimeoutRef = useRef<NodeJS.Timeout | null>(null);
+
+  useEffect(() => {
+    return () => {
+      clearPreviewBackgroundClickGuard();
+    };
+  }, [clearPreviewBackgroundClickGuard]);
 
   // Map-move auto-search tuning:
   // - Reduced from 400ms to 50ms to instantly update list after drag
@@ -1682,6 +1767,21 @@ export default function MapComponent({
     mapRef.current.flyTo({ zoom: Math.max(currentZoom - 2, 1), duration: 800 });
   }, [setProgrammaticMove, isProgrammaticMoveRef]);
 
+  const handleZoomIn = useCallback(() => {
+    if (!mapRef.current) return;
+    const map = mapRef.current.getMap();
+    if (!map) return;
+    const currentZoom = map.getZoom();
+    pendingSearchAfterZoomRef.current = true;
+    setProgrammaticMove(true);
+    if (programmaticClearTimeoutRef.current)
+      clearTimeout(programmaticClearTimeoutRef.current);
+    programmaticClearTimeoutRef.current = setTimeout(() => {
+      if (isProgrammaticMoveRef.current) setProgrammaticMove(false);
+    }, PROGRAMMATIC_MOVE_TIMEOUT_MS);
+    mapRef.current.flyTo({ zoom: Math.min(currentZoom + 1.5, 18), duration: 500 });
+  }, [setProgrammaticMove, isProgrammaticMoveRef]);
+
   // Fire auto-zoom when empty results, no filters, and user hasn't manually panned
   useEffect(() => {
     if (!isMapLoaded || areTilesLoading || isSearching) return;
@@ -1820,6 +1920,17 @@ export default function MapComponent({
     }
   }, [listings, activeId, setActive, selectedListing, setSelectedListing]);
 
+  useEffect(() => {
+    if (!usesOverlaySelection && !isControlledSelection && selectedListing) {
+      setSelectedListing(null);
+    }
+  }, [
+    usesOverlaySelection,
+    isControlledSelection,
+    selectedListing,
+    setSelectedListing,
+  ]);
+
   // P0 FIX: Clear isSearching when transition completes, even if listings didn't change
   // This fixes the "loading forever" bug when panning to an area with identical results
   useEffect(() => {
@@ -1905,17 +2016,17 @@ export default function MapComponent({
     };
   }, []);
 
-  // Keyboard: Escape closes popup
+  // Keyboard: Escape closes popup/preview
   useEffect(() => {
     const handleKeyDown = (e: KeyboardEvent) => {
       if (e.key === "Escape" && selectedListing) {
         e.stopImmediatePropagation(); // Prevent other Escape handlers (e.g., bottom sheet)
-        setSelectedListing(null);
+        handleSelectedListingClose();
       }
     };
     window.addEventListener("keydown", handleKeyDown);
     return () => window.removeEventListener("keydown", handleKeyDown);
-  }, [selectedListing, setSelectedListing]);
+  }, [selectedListing, handleSelectedListingClose]);
 
   // Sync URL bounds to context and track for reset functionality
   useEffect(() => {
@@ -2119,7 +2230,8 @@ export default function MapComponent({
     isProgrammaticMoveRef,
   ]);
 
-  // When a card's "Show on Map" button sets activeId, open popup and center map.
+  // When a card's "Show on Map" button sets activeId, reveal the active selection
+  // presentation and center the map on the listing.
   // Zoom in past clusterMaxZoom (14) to ensure the individual pin is visible
   // and not absorbed into a cluster circle.
   useEffect(() => {
@@ -2136,7 +2248,9 @@ export default function MapComponent({
       }, 3000);
       return;
     }
-    setSelectedListing(listing);
+    if (usesOverlaySelection) {
+      setSelectedListing(listing);
+    }
     setProgrammaticMove(true);
     // Safety: clear programmatic flag if moveEnd doesn't fire
     if (programmaticClearTimeoutRef.current)
@@ -2158,6 +2272,7 @@ export default function MapComponent({
   }, [
     activeId,
     listings,
+    usesOverlaySelection,
     setProgrammaticMove,
     isProgrammaticMoveRef,
     setSelectedListing,
@@ -2520,7 +2635,12 @@ export default function MapComponent({
   const handleMarkerClick = useCallback(
     (listing: Listing, coords: { lng: number; lat: number }) => {
       triggerHaptic();
-      setSelectedListing(listing);
+      if (usesOverlaySelection) {
+        if (usesPreviewSelection) {
+          armPreviewBackgroundClickGuard();
+        }
+        setSelectedListing(listing);
+      }
       // Set active listing for card highlight and scroll-to
       lastMapActiveRef.current = listing.id;
       setActive(listing.id);
@@ -2543,6 +2663,9 @@ export default function MapComponent({
       });
     },
     [
+      armPreviewBackgroundClickGuard,
+      usesOverlaySelection,
+      usesPreviewSelection,
       setSelectedListing,
       setActive,
       requestScrollTo,
@@ -2932,6 +3055,13 @@ export default function MapComponent({
           }
         }}
         onMoveStart={() => {
+          if (
+            usesPreviewSelection &&
+            selectedListing &&
+            !isProgrammaticMoveRef.current
+          ) {
+            dismissPreviewSelection();
+          }
           // M3-MAP FIX: Defer tile-loading indicator by 200ms so brief pans
           // don't flash the loading overlay
           if (tileLoadingTimerRef.current)
@@ -2970,6 +3100,16 @@ export default function MapComponent({
           const target = e.originalEvent?.target as HTMLElement | undefined;
           if (target?.closest("[data-listing-id]")) {
             return;
+          }
+          if (
+            usesPreviewSelection &&
+            ignoreNextPreviewBackgroundClickRef.current
+          ) {
+            clearPreviewBackgroundClickGuard();
+            return;
+          }
+          if (usesPreviewSelection && selectedListing) {
+            dismissPreviewSelection();
           }
           // Otherwise handle cluster click
           if (useClustering) onClusterClick(e);
@@ -3097,12 +3237,12 @@ export default function MapComponent({
           listings={listings}
         />
 
-        {selectedListing && (
+        {usesPopupSelection && selectedListing && (
           <Popup
             longitude={selectedListing.location.lng}
             latitude={selectedListing.location.lat}
             anchor="top"
-            onClose={() => setSelectedListing(null)}
+            onClose={handleSelectedListingClose}
             closeOnClick={false}
             maxWidth="320px"
             className={`z-[60] [&_.maplibregl-popup-content]:rounded-xl [&_.maplibregl-popup-content]:p-0 [&_.maplibregl-popup-content]:!bg-transparent [&_.maplibregl-popup-content]:!shadow-none [&_.maplibregl-popup-close-button]:hidden ${
@@ -3143,7 +3283,7 @@ export default function MapComponent({
                   <Button
                     variant="ghost"
                     size="icon"
-                    onClick={() => setSelectedListing(null)}
+                    onClick={handleSelectedListingClose}
                     className="rounded-full bg-on-surface/50 hover:bg-on-surface/70 text-white hover:text-white border-none"
                     aria-label="Close listing preview"
                   >
@@ -3217,6 +3357,121 @@ export default function MapComponent({
           isDarkMode={isDarkMode}
         />
       </Map>
+
+      <LazyMotion features={domAnimation}>
+        <AnimatePresence>
+          {usesPreviewSelection &&
+            isPhoneViewport === true &&
+            selectedListing && (
+              <m.div
+                key={selectedListing.id}
+                initial={reducedMotion ? { opacity: 0 } : { opacity: 0, y: 16 }}
+                animate={reducedMotion ? { opacity: 1 } : { opacity: 1, y: 0 }}
+                exit={reducedMotion ? { opacity: 0 } : { opacity: 0, y: 8 }}
+                transition={
+                  reducedMotion
+                    ? { duration: 0.15 }
+                    : { type: "spring", stiffness: 400, damping: 30 }
+                }
+                className="pointer-events-none absolute inset-x-0 z-[45] px-4"
+                style={{
+                  bottom: `calc(${SNAP_COLLAPSED * 100}dvh + 4.75rem + env(safe-area-inset-bottom, 0px))`,
+                }}
+              >
+                <div
+                  data-testid="map-preview-card"
+                  className="pointer-events-auto relative overflow-hidden rounded-[1.75rem] border border-outline-variant/20 bg-surface-container-lowest shadow-[0_18px_45px_-20px_rgba(0,0,0,0.35)]"
+                >
+              <button
+                type="button"
+                onClick={handleSelectedListingClose}
+                className="absolute top-3 right-3 z-10 flex h-8 w-8 items-center justify-center rounded-full bg-on-surface/55 text-white backdrop-blur-sm transition-colors hover:bg-on-surface/70 focus:outline-none focus-visible:ring-2 focus-visible:ring-primary/30"
+                aria-label="Close listing preview"
+              >
+                <X className="w-4 h-4" />
+              </button>
+
+              <Link
+                href={`/listings/${selectedListing.id}`}
+                className="flex items-stretch gap-3 p-3 pr-12"
+              >
+                <div className="relative h-24 w-24 shrink-0 overflow-hidden rounded-2xl bg-surface-container-high">
+                  {selectedListing.images && selectedListing.images[0] ? (
+                    <Image
+                      src={selectedListing.images[0]}
+                      alt={selectedListing.title}
+                      fill
+                      sizes="96px"
+                      className="object-cover"
+                    />
+                  ) : (
+                    <div className="flex h-full w-full items-center justify-center">
+                      <Home className="w-8 h-8 text-on-surface-variant" />
+                    </div>
+                  )}
+                </div>
+
+                <div className="min-w-0 flex-1 py-0.5">
+                  {Number.isFinite(selectedListing.avgRating) &&
+                  (selectedListing.reviewCount ?? 0) > 0 ? (
+                    <div className="mb-1 flex items-center gap-1 text-xs font-semibold text-on-surface">
+                      <Star className="h-3.5 w-3.5 fill-on-surface text-on-surface" />
+                      <span>{selectedListing.avgRating!.toFixed(2)}</span>
+                    </div>
+                  ) : null}
+
+                  <h3 className="line-clamp-2 text-sm font-semibold leading-tight text-on-surface">
+                    {selectedListing.title}
+                  </h3>
+
+                  <div className="mt-2 inline-flex items-center rounded-full bg-surface-container-high px-2.5 py-1 text-[11px] font-medium text-on-surface-variant">
+                    {selectedListing.availableSlots > 0
+                      ? `${selectedListing.availableSlots} available`
+                      : "Filled"}
+                  </div>
+
+                  <p className="mt-2 flex items-baseline gap-1">
+                    <span className="text-lg font-bold text-on-surface">
+                      {formatPrice(selectedListing.price)}
+                    </span>
+                    <span className="text-sm text-on-surface-variant">
+                      /month
+                    </span>
+                  </p>
+                </div>
+              </Link>
+                </div>
+              </m.div>
+            )}
+        </AnimatePresence>
+      </LazyMotion>
+
+      {isPhoneViewport === true && (
+        <div className="absolute top-20 right-4 z-[50] flex flex-col overflow-hidden rounded-2xl border border-outline-variant/20 bg-surface-container-lowest/95 shadow-ambient backdrop-blur-md">
+          <button
+            type="button"
+            onClick={() => {
+              triggerHaptic();
+              handleZoomIn();
+            }}
+            className="flex h-11 w-11 items-center justify-center border-b border-outline-variant/20 text-on-surface-variant transition-colors hover:bg-surface-container-high focus:outline-none focus-visible:ring-2 focus-visible:ring-primary/30 focus-visible:ring-inset"
+            aria-label="Zoom in on map"
+          >
+            <Plus className="w-4 h-4" />
+          </button>
+          <button
+            type="button"
+            onClick={() => {
+              triggerHaptic();
+              handleZoomOut();
+            }}
+            className="flex h-11 w-11 items-center justify-center text-on-surface-variant transition-colors hover:bg-surface-container-high focus:outline-none focus-visible:ring-2 focus-visible:ring-primary/30 focus-visible:ring-inset"
+            aria-label="Zoom out on map"
+          >
+            <Minus className="w-4 h-4" />
+          </button>
+        </div>
+      )}
 
       {/* Search as I move toggle - prominent pill button */}
       <div className="absolute top-4 left-1/2 -translate-x-1/2 z-[50]">
