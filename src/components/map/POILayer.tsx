@@ -130,7 +130,7 @@ export function POILayer({ mapRef, isMapLoaded }: POILayerProps) {
   ];
 
   return (
-    <div className="absolute top-20 right-4 z-[30] md:z-[50] flex flex-col gap-2">
+    <div className="absolute top-[260px] right-4 z-[30] md:z-[50] flex flex-col gap-2">
       {/* Individual category toggles */}
       {categories.map((cat) => (
         <button
