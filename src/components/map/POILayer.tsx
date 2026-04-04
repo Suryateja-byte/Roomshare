@@ -130,23 +130,25 @@ export function POILayer({ mapRef, isMapLoaded }: POILayerProps) {
   ];
 
   return (
-    <div className="absolute top-[260px] right-4 z-[30] md:z-[50] flex flex-col gap-2">
-      {/* Individual category toggles */}
-      {categories.map((cat) => (
+    <div className="absolute top-20 left-4 z-[30] md:z-[50] flex flex-row overflow-hidden rounded-full border border-outline-variant/20 bg-surface-container-lowest/95 shadow-ambient backdrop-blur-md">
+      {/* Grouped category toggles */}
+      {categories.map((cat, index) => (
         <button
           key={cat.id}
           onClick={() => toggleCategory(cat.id)}
           className={cn(
-            "flex items-center justify-center gap-2 px-3 py-2 rounded-full shadow-md border text-sm font-medium transition-all min-h-[44px] focus:outline-none focus-visible:ring-2 focus-visible:ring-primary/30 focus-visible:ring-offset-2 backdrop-blur-md",
+            "flex items-center justify-center h-11 px-3.5 transition-colors focus:outline-none focus-visible:ring-2 focus-visible:ring-primary/30 focus-visible:ring-inset",
+            index !== categories.length - 1 && "border-r border-outline-variant/20",
             activeCategories.has(cat.id)
-              ? "bg-on-surface/90 text-white border-outline-variant/20"
-              : "bg-white/90 text-on-surface-variant border-outline-variant/20/50 hover:bg-surface-canvas"
+              ? "bg-on-surface/10 text-on-surface"
+              : "text-on-surface-variant hover:bg-surface-container-high"
           )}
+          title={cat.label}
           aria-label={`${activeCategories.has(cat.id) ? "Hide" : "Show"} ${cat.label}`}
           aria-pressed={activeCategories.has(cat.id)}
         >
           {cat.icon}
-          {cat.label}
+          <span className="ml-2 hidden md:inline text-sm font-medium">{cat.label}</span>
         </button>
       ))}
     </div>
