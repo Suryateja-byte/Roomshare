@@ -44,7 +44,15 @@ export default function SearchViewToggle({
   // Same pattern as SearchResultsLoadingWrapper.tsx:33-48.
   const filterParamsKey = useMemo(() => {
     const filterOnly = new URLSearchParams(searchParams.toString());
-    for (const k of ["minLat", "maxLat", "minLng", "maxLng", "lat", "lng", "zoom"]) {
+    for (const k of [
+      "minLat",
+      "maxLat",
+      "minLng",
+      "maxLng",
+      "lat",
+      "lng",
+      "zoom",
+    ]) {
       filterOnly.delete(k);
     }
     filterOnly.sort();
@@ -63,12 +71,14 @@ export default function SearchViewToggle({
     setMobileSnap(1);
   }, [filterParamsKey]);
 
-  // When a map pin is tapped (activeId changes) on mobile, snap sheet to half
+  // When a map pin is tapped (activeId changes) on mobile, collapse the sheet
+  // so the preview card is visible. When map background is tapped (activeId cleared),
+  // keep the sheet collapsed.
   useEffect(() => {
-    if (activeId && isDesktop === false) {
-      setMobileSnap(1);
+    if (isDesktop === false && hasMounted) {
+      setMobileSnap(0);
     }
-  }, [activeId, isDesktop]);
+  }, [activeId, isDesktop, hasMounted]);
 
   const handleFloatingToggle = useCallback(() => {
     // If sheet is showing list (half or expanded), collapse to show map

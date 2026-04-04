@@ -76,9 +76,7 @@ const MenuItem = ({
 
   const content = (
     <>
-      <span
-        className={danger ? "text-red-500" : "text-on-surface-variant"}
-      >
+      <span className={danger ? "text-red-500" : "text-on-surface-variant"}>
         {icon}
       </span>
       {text}
@@ -120,8 +118,14 @@ export default function SearchHeaderWrapper() {
 
   // Full-screen mobile search overlay (Option A — Airbnb pattern)
   const [isMobileOverlayOpen, setIsMobileOverlayOpen] = useState(false);
-  const handleOpenMobileSearch = useCallback(() => setIsMobileOverlayOpen(true), []);
-  const handleCloseMobileSearch = useCallback(() => setIsMobileOverlayOpen(false), []);
+  const handleOpenMobileSearch = useCallback(
+    () => setIsMobileOverlayOpen(true),
+    []
+  );
+  const handleCloseMobileSearch = useCallback(
+    () => setIsMobileOverlayOpen(false),
+    []
+  );
 
   const menuButtonId = useId();
   const menuId = useId();
@@ -275,9 +279,8 @@ export default function SearchHeaderWrapper() {
       requestAnimationFrame(() => {
         const menuEl = document.getElementById(menuId);
         if (menuEl) {
-          const items = menuEl.querySelectorAll<HTMLElement>(
-            '[role="menuitem"]'
-          );
+          const items =
+            menuEl.querySelectorAll<HTMLElement>('[role="menuitem"]');
           menuItemsRef.current = Array.from(items);
         }
       });
@@ -299,7 +302,8 @@ export default function SearchHeaderWrapper() {
   // Show collapsed bar when scrolled and not manually expanded.
   // On mobile, default to collapsed to reclaim viewport space (P0 fix: SEARCH-MOB-01).
   const isMobileViewport = useMediaQuery("(max-width: 767px)");
-  const showCollapsed = (isCollapsed && !isExpanded) || (isMobileViewport === true && !isExpanded);
+  const showCollapsed =
+    (isCollapsed && !isExpanded) || (isMobileViewport === true && !isExpanded);
 
   const handleExpandDesktop = useCallback(() => {
     // Scroll to top to reveal the full form
@@ -422,10 +426,10 @@ export default function SearchHeaderWrapper() {
 
   return (
     <>
-      {/* Full search form - hidden when collapsed */}
+      {/* Full search form - hidden on mobile always, hidden on desktop when collapsed */}
       <div
-        className={`transition-all duration-300 ease-out ${
-          showCollapsed ? "hidden" : "block"
+        className={`transition-all duration-300 ease-out hidden ${
+          showCollapsed ? "" : "md:block"
         }`}
       >
         <div className="w-full max-w-[1920px] mx-auto px-3 sm:px-4 md:px-6 py-3 sm:py-4">
@@ -601,13 +605,12 @@ export default function SearchHeaderWrapper() {
         </div>
       </div>
 
-      {/* Collapsed search bar - visible on mobile only when collapsed */}
-      <div
-        className={`transition-all duration-300 ease-out ${
-          showCollapsed ? "md:hidden block py-2" : "hidden"
-        }`}
-      >
-        <CollapsedMobileSearch onExpand={handleOpenMobileSearch} onOpenFilters={openFilters} />
+      {/* Collapsed search bar - always visible on mobile, hidden on desktop */}
+      <div className="transition-all duration-300 ease-out md:hidden block py-2">
+        <CollapsedMobileSearch
+          onExpand={handleOpenMobileSearch}
+          onOpenFilters={openFilters}
+        />
       </div>
 
       {/* Full-screen mobile search overlay (Option A) */}
@@ -619,8 +622,8 @@ export default function SearchHeaderWrapper() {
 
       {/* Compact search pill - visible on desktop only when collapsed */}
       <div
-        className={`transition-all duration-300 ease-out ${
-          showCollapsed ? "hidden md:block py-2 px-6" : "hidden"
+        className={`transition-all duration-300 ease-out hidden ${
+          showCollapsed ? "md:block py-2 px-6" : ""
         }`}
       >
         <CompactSearchPill

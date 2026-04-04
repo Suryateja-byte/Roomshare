@@ -1005,7 +1005,7 @@ export default function SearchForm({
                     "w-full bg-transparent border-none focus:ring-0 focus:outline-none",
                     isHome
                       ? "rounded-md px-1 py-1 -ml-1 text-[16px] text-[#2F2F2B] placeholder:text-[#7A7A7A] transition-colors focus:bg-[#F8F7F3] md:-ml-0 md:rounded-none md:px-0 md:py-0 md:text-base md:font-medium md:text-on-surface md:placeholder:text-on-surface-variant md:focus:bg-transparent"
-                      : "p-0 text-base md:text-sm font-medium text-on-surface placeholder:text-on-surface-variant"
+                      : "p-0 text-[16px] md:text-sm font-medium text-on-surface placeholder:text-on-surface-variant"
                   )}
                   autoComplete="off"
                 />
@@ -1017,7 +1017,7 @@ export default function SearchForm({
                       "flex-shrink-0 rounded-full transition-colors",
                       isHome
                         ? "p-1.5 text-[#7A7A7A] hover:bg-[#F8F7F3] hover:text-[#2F2F2B] md:p-1 md:text-on-surface-variant md:hover:bg-transparent md:hover:text-on-surface-variant"
-                        : "p-1 text-on-surface-variant hover:text-on-surface-variant"
+                        : "p-3 text-on-surface-variant hover:text-on-surface-variant"
                     )}
                     aria-label="Clear search description"
                   >
@@ -1110,7 +1110,7 @@ export default function SearchForm({
               inputClassName={
                 isHome
                   ? "rounded-md px-1 py-1 -ml-1 text-[16px] text-[#2F2F2B] placeholder:text-[#7A7A7A] transition-colors focus:bg-[#F8F7F3] md:-ml-0 md:rounded-none md:px-0 md:py-0 md:text-base md:font-medium md:text-on-surface md:placeholder:text-on-surface-variant md:focus:bg-transparent"
-                  : undefined
+                  : "text-[16px] md:text-sm"
               }
             />
             <button
@@ -1121,7 +1121,7 @@ export default function SearchForm({
                 "flex-shrink-0 rounded-full transition-colors disabled:opacity-50",
                 isHome
                   ? "p-2 -mr-2 text-[#9CA3AF] hover:bg-[#F8F7F3] hover:text-[#1F2937] active:bg-[#EFEBE5] md:mr-0 md:p-1.5 md:text-on-surface-variant md:hover:bg-transparent md:hover:text-on-surface"
-                  : "p-1.5 text-on-surface-variant hover:text-on-surface"
+                  : "p-3 text-on-surface-variant hover:text-on-surface"
               )}
               aria-label="Use my current location"
               title="Use my current location"
@@ -1250,7 +1250,7 @@ export default function SearchForm({
                   "w-full bg-transparent border-none appearance-none focus:ring-0 focus:outline-none [-moz-appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none",
                   isHome
                     ? "rounded-md px-1 py-1 -ml-1 text-[16px] text-[#2F2F2B] placeholder:text-[#7A7A7A] transition-colors focus:bg-[#F8F7F3] md:-ml-0 md:rounded-none md:px-0 md:py-0 md:text-base md:font-medium md:text-on-surface md:placeholder:text-on-surface-variant md:focus:bg-transparent"
-                    : "p-0 text-base md:text-sm font-medium text-on-surface placeholder:text-on-surface-variant"
+                    : "p-0 text-[16px] md:text-sm font-medium text-on-surface placeholder:text-on-surface-variant"
                 )}
                 min="0"
                 step="50"
@@ -1289,7 +1289,7 @@ export default function SearchForm({
                   "w-full bg-transparent border-none appearance-none focus:ring-0 focus:outline-none [-moz-appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none",
                   isHome
                     ? "rounded-md px-1 py-1 -ml-1 text-[16px] text-[#2F2F2B] placeholder:text-[#7A7A7A] transition-colors focus:bg-[#F8F7F3] md:-ml-0 md:rounded-none md:px-0 md:py-0 md:text-base md:font-medium md:text-on-surface md:placeholder:text-on-surface-variant md:focus:bg-transparent"
-                    : "p-0 text-base md:text-sm font-medium text-on-surface placeholder:text-on-surface-variant"
+                    : "p-0 text-[16px] md:text-sm font-medium text-on-surface placeholder:text-on-surface-variant"
                 )}
                 min="0"
                 step="50"

@@ -401,7 +401,7 @@ export default function MobileBottomSheet({
       >
         {/* Drag handle area */}
         <div
-          className="flex-shrink-0 pt-2 pb-3 px-4 cursor-grab active:cursor-grabbing select-none"
+          className="flex-shrink-0 py-5 px-4 cursor-grab active:cursor-grabbing select-none"
           onTouchStart={handleTouchStart}
           onTouchMove={handleTouchMove}
           onTouchEnd={handleTouchEnd}

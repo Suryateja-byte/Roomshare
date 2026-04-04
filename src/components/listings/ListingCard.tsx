@@ -211,7 +211,9 @@ function ListingCardInner({
   const isGuestFavorite =
     (listing.reviewCount ?? 0) >= 5 && (avgRating ?? 0) >= 4.9;
   const isTopRated =
-    !isGuestFavorite && (avgRating ?? 0) >= 4.5 && (listing.reviewCount ?? 0) >= 3;
+    !isGuestFavorite &&
+    (avgRating ?? 0) >= 4.5 &&
+    (listing.reviewCount ?? 0) >= 3;
 
   // Fallback for empty/null titles
   const displayTitle = listing.title?.trim() || "Untitled Listing";
@@ -325,7 +327,7 @@ function ListingCardInner({
             className={cn(
               "relative overflow-hidden bg-surface-canvas",
               isFeedCard
-                ? "aspect-[16/10] sm:aspect-[4/3]"
+                ? "aspect-[1/1] sm:aspect-[4/3]"
                 : "aspect-[16/9] sm:aspect-[4/3]"
             )}
           >
@@ -364,35 +366,11 @@ function ListingCardInner({
             >
               {isFeedCard ? (
                 <>
-                  {isGuestFavorite && (
-                    <TrustBadge
-                      avgRating={listing.avgRating}
-                      reviewCount={listing.reviewCount}
-                    />
-                  )}
                   <SlotBadge
                     availableSlots={listing.availableSlots}
                     totalSlots={listing.totalSlots}
                     overlay
                   />
-                  {!isGuestFavorite &&
-                    (isTopRated ? (
-                      <span className="inline-flex items-center px-2 py-1 rounded-lg text-xs font-semibold bg-amber-50 text-amber-800 shadow-ambient-sm backdrop-blur-sm">
-                        Top Rated
-                      </span>
-                    ) : hasRating ? (
-                      <div
-                        className="inline-flex items-center gap-1 px-2 py-1 rounded-lg text-xs font-bold bg-surface-container-lowest/90 text-on-surface shadow-ambient-sm backdrop-blur-md"
-                        aria-label={`Rating ${avgRating!.toFixed(1)} out of 5`}
-                      >
-                        <Star className="w-3 h-3 text-amber-400 fill-amber-400" />
-                        <span>{avgRating!.toFixed(1)}</span>
-                      </div>
-                    ) : (
-                      <span className="inline-flex items-center font-medium px-2.5 py-1 text-xs bg-surface-container-lowest/90 backdrop-blur-sm shadow-ambient-sm rounded-lg text-primary">
-                        New
-                      </span>
-                    ))}
                 </>
               ) : (
                 <>
@@ -459,9 +437,20 @@ function ListingCardInner({
                     </h3>
                   </div>
 
-                  {hasRating ? (
+                  {isGuestFavorite ? (
+                    <div className="flex-shrink-0">
+                      <TrustBadge
+                        avgRating={listing.avgRating}
+                        reviewCount={listing.reviewCount}
+                      />
+                    </div>
+                  ) : isTopRated ? (
+                    <span className="inline-flex items-center px-2 py-1 rounded-lg text-xs font-semibold bg-amber-50 text-amber-800 flex-shrink-0">
+                      Top Rated
+                    </span>
+                  ) : hasRating ? (
                     <div
-                      className="hidden lg:inline-flex items-center gap-1 text-sm font-medium text-on-surface flex-shrink-0"
+                      className="inline-flex items-center gap-1 text-sm font-medium text-on-surface flex-shrink-0"
                       aria-label={`Rating ${avgRating!.toFixed(1)} out of 5`}
                     >
                       <Star className="w-4 h-4 text-amber-400 fill-amber-400" />
@@ -502,7 +491,7 @@ function ListingCardInner({
                   </div>
 
                   {!hasRating && (
-                    <span className="hidden lg:inline-flex items-center rounded-full bg-surface-container-high px-2 py-1 text-[11px] font-medium text-on-surface-variant">
+                    <span className="inline-flex items-center rounded-full bg-surface-container-high px-2 py-1 text-[11px] font-medium text-on-surface-variant">
                       New listing
                     </span>
                   )}
@@ -550,7 +539,10 @@ function ListingCardInner({
 
                 {/* Location */}
                 <p className="text-sm text-on-surface-variant mb-4 font-light">
-                  {formatLocation(listing.location.city, listing.location.state)}
+                  {formatLocation(
+                    listing.location.city,
+                    listing.location.state
+                  )}
                 </p>
 
                 {/* Price — Large and prominent */}
