@@ -48,10 +48,7 @@ import { Button } from "./ui/button";
 import { MAP_FLY_TO_EVENT, MapFlyToEventDetail } from "./SearchForm";
 import { useListingFocus } from "@/contexts/ListingFocusContext";
 import { useSearchTransitionSafe } from "@/contexts/SearchTransitionContext";
-import {
-  useMapBounds,
-  useMapMovedBanner,
-} from "@/contexts/MapBoundsContext";
+import { useMapBounds, useMapMovedBanner } from "@/contexts/MapBoundsContext";
 import { useActivePanBoundsSetter } from "@/contexts/ActivePanBoundsContext";
 import { MapMovedBanner } from "./map/MapMovedBanner";
 import { MapGestureHint } from "./map/MapGestureHint";
@@ -452,8 +449,7 @@ const MarkerPinContent = React.memo(function MarkerPinContent({
 }: MarkerPinContentProps) {
   const isMini = tier === "mini";
   const showAsDot =
-    currentZoom < ZOOM_DOTS_ONLY ||
-    (currentZoom < ZOOM_TOP_N_PINS && isMini);
+    currentZoom < ZOOM_DOTS_ONLY || (currentZoom < ZOOM_TOP_N_PINS && isMini);
 
   if (showAsDot && !isHovered && !isActive) {
     return (
@@ -594,7 +590,14 @@ const MapMarkerItem = React.memo(function MapMarkerItem({
         e.stopPropagation();
         onClickById(listingId);
       } else if (
-        ["ArrowUp", "ArrowDown", "ArrowLeft", "ArrowRight", "Home", "End"].includes(e.key)
+        [
+          "ArrowUp",
+          "ArrowDown",
+          "ArrowLeft",
+          "ArrowRight",
+          "Home",
+          "End",
+        ].includes(e.key)
       ) {
         onKeyboardNav(e, listingId);
       }
@@ -1779,7 +1782,10 @@ export default function MapComponent({
     programmaticClearTimeoutRef.current = setTimeout(() => {
       if (isProgrammaticMoveRef.current) setProgrammaticMove(false);
     }, PROGRAMMATIC_MOVE_TIMEOUT_MS);
-    mapRef.current.flyTo({ zoom: Math.min(currentZoom + 1.5, 18), duration: 500 });
+    mapRef.current.flyTo({
+      zoom: Math.min(currentZoom + 1.5, 18),
+      duration: 500,
+    });
   }, [setProgrammaticMove, isProgrammaticMoveRef]);
 
   // Fire auto-zoom when empty results, no filters, and user hasn't manually panned
@@ -2973,7 +2979,10 @@ export default function MapComponent({
             win.__e2eMapRef = mapRef.current.getMap();
             win.__e2eSetProgrammaticMove = setProgrammaticMove;
             win.__e2eUpdateMarkers = updateUnclusteredListings;
-            mapRef.current.getMap().getContainer()?.setAttribute("data-map-ready", "true");
+            mapRef.current
+              .getMap()
+              .getContainer()
+              ?.setAttribute("data-map-ready", "true");
           }
 
           // Fix 1: Listen for sourcedata to retry unclustered query after tiles load.
@@ -3370,7 +3379,11 @@ export default function MapComponent({
                 exit={
                   reducedMotion
                     ? { opacity: 0, transition: { duration: 0.15 } }
-                    : { opacity: 0, y: 8, transition: { type: "tween", duration: 0.15 } }
+                    : {
+                        opacity: 0,
+                        y: 8,
+                        transition: { type: "tween", duration: 0.15 },
+                      }
                 }
                 transition={
                   reducedMotion
@@ -3386,96 +3399,136 @@ export default function MapComponent({
                   data-testid="map-preview-card"
                   className="pointer-events-auto relative overflow-hidden rounded-[1.75rem] border border-outline-variant/20 bg-surface-container-lowest shadow-[0_18px_45px_-20px_rgba(0,0,0,0.35)]"
                 >
-              <button
-                type="button"
-                onClick={handleSelectedListingClose}
-                className="absolute top-3 right-3 z-10 flex h-8 w-8 items-center justify-center rounded-full bg-on-surface/55 text-white backdrop-blur-sm transition-colors hover:bg-on-surface/70 focus:outline-none focus-visible:ring-2 focus-visible:ring-primary/30"
-                aria-label="Close listing preview"
-              >
-                <X className="w-4 h-4" />
-              </button>
+                  <button
+                    type="button"
+                    onClick={handleSelectedListingClose}
+                    className="absolute top-3 right-3 z-10 flex h-8 w-8 items-center justify-center rounded-full bg-on-surface/55 text-white backdrop-blur-sm transition-colors hover:bg-on-surface/70 focus:outline-none focus-visible:ring-2 focus-visible:ring-primary/30"
+                    aria-label="Close listing preview"
+                  >
+                    <X className="w-4 h-4" />
+                  </button>
 
-              <Link
-                href={`/listings/${selectedListing.id}`}
-                className="flex items-stretch gap-3 p-3 pr-12"
-              >
-                <div className="relative h-24 w-24 shrink-0 overflow-hidden rounded-2xl bg-surface-container-high">
-                  {selectedListing.images && selectedListing.images[0] ? (
-                    <Image
-                      src={selectedListing.images[0]}
-                      alt={selectedListing.title}
-                      fill
-                      sizes="96px"
-                      className="object-cover"
-                    />
-                  ) : (
-                    <div className="flex h-full w-full items-center justify-center">
-                      <Home className="w-8 h-8 text-on-surface-variant" />
+                  <Link
+                    href={`/listings/${selectedListing.id}`}
+                    className="flex items-stretch gap-3 p-3 pr-12"
+                  >
+                    <div className="relative h-24 w-24 shrink-0 overflow-hidden rounded-2xl bg-surface-container-high">
+                      {selectedListing.images && selectedListing.images[0] ? (
+                        <Image
+                          src={selectedListing.images[0]}
+                          alt={selectedListing.title}
+                          fill
+                          sizes="96px"
+                          className="object-cover"
+                        />
+                      ) : (
+                        <div className="flex h-full w-full items-center justify-center">
+                          <Home className="w-8 h-8 text-on-surface-variant" />
+                        </div>
+                      )}
                     </div>
-                  )}
-                </div>
 
-                <div className="min-w-0 flex-1 py-0.5">
-                  {Number.isFinite(selectedListing.avgRating) &&
-                  (selectedListing.reviewCount ?? 0) > 0 ? (
-                    <div className="mb-1 flex items-center gap-1 text-xs font-semibold text-on-surface">
-                      <Star className="h-3.5 w-3.5 fill-on-surface text-on-surface" />
-                      <span>{selectedListing.avgRating!.toFixed(2)}</span>
+                    <div className="min-w-0 flex-1 py-0.5">
+                      {Number.isFinite(selectedListing.avgRating) &&
+                      (selectedListing.reviewCount ?? 0) > 0 ? (
+                        <div className="mb-1 flex items-center gap-1 text-xs font-semibold text-on-surface">
+                          <Star className="h-3.5 w-3.5 fill-on-surface text-on-surface" />
+                          <span>{selectedListing.avgRating!.toFixed(2)}</span>
+                        </div>
+                      ) : null}
+
+                      <h3 className="line-clamp-2 text-sm font-semibold leading-tight text-on-surface">
+                        {selectedListing.title}
+                      </h3>
+
+                      <div className="mt-2 inline-flex items-center rounded-full bg-surface-container-high px-2.5 py-1 text-[11px] font-medium text-on-surface-variant">
+                        {selectedListing.availableSlots > 0
+                          ? `${selectedListing.availableSlots} available`
+                          : "Filled"}
+                      </div>
+
+                      <p className="mt-2 flex items-baseline gap-1">
+                        <span className="text-lg font-bold text-on-surface">
+                          {formatPrice(selectedListing.price)}
+                        </span>
+                        <span className="text-sm text-on-surface-variant">
+                          /month
+                        </span>
+                      </p>
                     </div>
-                  ) : null}
-
-                  <h3 className="line-clamp-2 text-sm font-semibold leading-tight text-on-surface">
-                    {selectedListing.title}
-                  </h3>
-
-                  <div className="mt-2 inline-flex items-center rounded-full bg-surface-container-high px-2.5 py-1 text-[11px] font-medium text-on-surface-variant">
-                    {selectedListing.availableSlots > 0
-                      ? `${selectedListing.availableSlots} available`
-                      : "Filled"}
-                  </div>
-
-                  <p className="mt-2 flex items-baseline gap-1">
-                    <span className="text-lg font-bold text-on-surface">
-                      {formatPrice(selectedListing.price)}
-                    </span>
-                    <span className="text-sm text-on-surface-variant">
-                      /month
-                    </span>
-                  </p>
-                </div>
-              </Link>
+                  </Link>
                 </div>
               </m.div>
             )}
         </AnimatePresence>
       </LazyMotion>
 
-      {isPhoneViewport === true && (
-        <div className="absolute top-20 right-4 z-[50] flex flex-col overflow-hidden rounded-2xl border border-outline-variant/20 bg-surface-container-lowest/95 shadow-ambient backdrop-blur-md">
+      {/* Map Controls Group (Right Side) */}
+      <div className="absolute top-20 right-4 z-[50] flex flex-col gap-2">
+        {/* Zoom Controls (Mobile Only) */}
+        {isPhoneViewport === true && (
+          <div className="flex flex-col overflow-hidden rounded-2xl border border-outline-variant/20 bg-surface-container-lowest/95 shadow-ambient backdrop-blur-md">
+            <button
+              type="button"
+              onClick={() => {
+                triggerHaptic();
+                handleZoomIn();
+              }}
+              className="flex h-11 w-11 items-center justify-center border-b border-outline-variant/20 text-on-surface-variant transition-colors hover:bg-surface-container-high focus:outline-none focus-visible:ring-2 focus-visible:ring-primary/30 focus-visible:ring-inset"
+              aria-label="Zoom in on map"
+            >
+              <Plus className="w-4 h-4" />
+            </button>
+            <button
+              type="button"
+              onClick={() => {
+                triggerHaptic();
+                handleZoomOut();
+              }}
+              className="flex h-11 w-11 items-center justify-center text-on-surface-variant transition-colors hover:bg-surface-container-high focus:outline-none focus-visible:ring-2 focus-visible:ring-primary/30 focus-visible:ring-inset"
+              aria-label="Zoom out on map"
+            >
+              <Minus className="w-4 h-4" />
+            </button>
+          </div>
+        )}
+
+        {/* Fit all results button - zoom to show all markers */}
+        {listings.length >= 1 && isMapLoaded && (
           <button
-            type="button"
             onClick={() => {
-              triggerHaptic();
-              handleZoomIn();
+              if (!mapRef.current || listings.length === 0) return;
+              const points = listings.map((l) => ({
+                lng: l.location.lng,
+                lat: l.location.lat,
+              }));
+              const minLng = Math.min(...points.map((p) => p.lng));
+              const maxLng = Math.max(...points.map((p) => p.lng));
+              const minLat = Math.min(...points.map((p) => p.lat));
+              const maxLat = Math.max(...points.map((p) => p.lat));
+              setProgrammaticMove(true);
+              // P2-FIX (#166): Add safety timeout to clear programmatic flag if moveEnd doesn't fire
+              if (programmaticClearTimeoutRef.current)
+                clearTimeout(programmaticClearTimeoutRef.current);
+              programmaticClearTimeoutRef.current = setTimeout(() => {
+                if (isProgrammaticMoveRef.current) setProgrammaticMove(false);
+              }, PROGRAMMATIC_MOVE_TIMEOUT_MS);
+              mapRef.current.fitBounds(
+                [
+                  [minLng, minLat],
+                  [maxLng, maxLat],
+                ],
+                { padding: 50, duration: 1000 }
+              );
             }}
-            className="flex h-11 w-11 items-center justify-center border-b border-outline-variant/20 text-on-surface-variant transition-colors hover:bg-surface-container-high focus:outline-none focus-visible:ring-2 focus-visible:ring-primary/30 focus-visible:ring-inset"
-            aria-label="Zoom in on map"
+            className="flex h-11 w-11 items-center justify-center rounded-full border border-outline-variant/20 bg-surface-container-lowest/95 text-on-surface-variant shadow-ambient backdrop-blur-md transition-colors hover:bg-surface-container-high focus:outline-none focus-visible:ring-2 focus-visible:ring-primary/30 focus-visible:ring-offset-2"
+            aria-label="Fit all results in view"
+            title="Fit all results"
           >
-            <Plus className="w-4 h-4" />
+            <Maximize2 className="w-4 h-4" />
           </button>
-          <button
-            type="button"
-            onClick={() => {
-              triggerHaptic();
-              handleZoomOut();
-            }}
-            className="flex h-11 w-11 items-center justify-center text-on-surface-variant transition-colors hover:bg-surface-container-high focus:outline-none focus-visible:ring-2 focus-visible:ring-primary/30 focus-visible:ring-inset"
-            aria-label="Zoom out on map"
-          >
-            <Minus className="w-4 h-4" />
-          </button>
-        </div>
-      )}
+        )}
+      </div>
 
       {/* Search as I move toggle - prominent pill button */}
       <div className="absolute top-4 left-1/2 -translate-x-1/2 z-[50]">
@@ -3500,41 +3553,7 @@ export default function MapComponent({
       {/* POI & Neighborhood label toggles */}
       <POILayer mapRef={mapRef} isMapLoaded={isMapLoaded} />
 
-      {/* Fit all results button - zoom to show all markers */}
-      {listings.length >= 1 && isMapLoaded && (
-        <button
-          onClick={() => {
-            if (!mapRef.current || listings.length === 0) return;
-            const points = listings.map((l) => ({
-              lng: l.location.lng,
-              lat: l.location.lat,
-            }));
-            const minLng = Math.min(...points.map((p) => p.lng));
-            const maxLng = Math.max(...points.map((p) => p.lng));
-            const minLat = Math.min(...points.map((p) => p.lat));
-            const maxLat = Math.max(...points.map((p) => p.lat));
-            setProgrammaticMove(true);
-            // P2-FIX (#166): Add safety timeout to clear programmatic flag if moveEnd doesn't fire
-            if (programmaticClearTimeoutRef.current)
-              clearTimeout(programmaticClearTimeoutRef.current);
-            programmaticClearTimeoutRef.current = setTimeout(() => {
-              if (isProgrammaticMoveRef.current) setProgrammaticMove(false);
-            }, PROGRAMMATIC_MOVE_TIMEOUT_MS);
-            mapRef.current.fitBounds(
-              [
-                [minLng, minLat],
-                [maxLng, maxLat],
-              ],
-              { padding: 50, duration: 1000 }
-            );
-          }}
-          className="absolute bottom-4 right-4 z-[50] w-11 h-11 flex items-center justify-center bg-surface-container-lowest/90 backdrop-blur-md rounded-full shadow-ambient border border-outline-variant/20/50 hover:bg-surface-canvas transition-colors focus:outline-none focus-visible:ring-2 focus-visible:ring-primary/30 focus-visible:ring-offset-2"
-          aria-label="Fit all results in view"
-          title="Fit all results"
-        >
-          <Maximize2 className="w-4 h-4 text-on-surface-variant" />
-        </button>
-      )}
+      {/* Fit all results button moved to top-right control pillar */}
 
       {/* MapMovedBanner - Shows when user panned with search-as-move OFF */}
       {(showBanner || showLocationConflict) && (
