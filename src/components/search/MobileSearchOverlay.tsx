@@ -17,6 +17,10 @@ import { FocusTrap } from "@/components/ui/FocusTrap";
 import { useBodyScrollLock } from "@/hooks/useBodyScrollLock";
 import LocationSearchInput from "@/components/LocationSearchInput";
 import { urlToFilterChips } from "@/components/filters/filter-chip-utils";
+import {
+  MAP_FLY_TO_EVENT,
+  type MapFlyToEventDetail,
+} from "@/components/SearchForm";
 
 interface MobileSearchOverlayProps {
   /** Whether the overlay is open */
@@ -150,6 +154,21 @@ export default function MobileSearchOverlay({
     params.delete("cursor");
     params.delete("page");
 
+    // Dispatch fly-to event so the persistent map flies to the new location.
+    // On mobile the map never remounts (it lives in layout), so without this
+    // event the map stays at its old position after a location search.
+    if (locationCoords) {
+      const event = new CustomEvent<MapFlyToEventDetail>(MAP_FLY_TO_EVENT, {
+        detail: {
+          lat: locationCoords.lat,
+          lng: locationCoords.lng,
+          bbox: locationCoords.bounds,
+          zoom: 13,
+        },
+      });
+      window.dispatchEvent(event);
+    }
+
     router.push(`/search?${params.toString()}`);
     onClose();
   }, [
@@ -187,7 +206,7 @@ export default function MobileSearchOverlay({
             animate={{ y: 0 }}
             exit={{ y: "100%" }}
             transition={{ type: "spring", damping: 25, stiffness: 300, mass: 0.8 }}
-            className="fixed inset-0 z-[1200] bg-surface-container-lowest flex flex-col md:hidden"
+            className="fixed inset-0 z-[1200] bg-surface-container-lowest flex flex-col"
             role="dialog"
             aria-modal="true"
             aria-label="Search"
