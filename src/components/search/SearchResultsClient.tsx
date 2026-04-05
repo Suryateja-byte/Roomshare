@@ -1,6 +1,13 @@
 "use client";
 
-import { useState, useCallback, useRef, useMemo, useEffect, Fragment } from "react";
+import {
+  useState,
+  useCallback,
+  useRef,
+  useMemo,
+  useEffect,
+  Fragment,
+} from "react";
 import { safeMark, safeMeasure } from "@/lib/perf";
 import { Search, Loader2 } from "lucide-react";
 import Link from "next/link";
@@ -10,6 +17,7 @@ import { ListingCardErrorBoundary } from "@/components/search/ListingCardErrorBo
 import NearMatchSeparator from "@/components/listings/NearMatchSeparator";
 import ZeroResultsSuggestions from "@/components/ZeroResultsSuggestions";
 import SuggestedSearches from "@/components/search/SuggestedSearches";
+import SaveSearchButton from "@/components/SaveSearchButton";
 import { fetchMoreListings } from "@/app/search/actions";
 import { TotalPriceToggle } from "@/components/search/TotalPriceToggle";
 import { clearAllFilters } from "@/components/filters/filter-chip-utils";
@@ -199,7 +207,9 @@ export function SearchResultsClient({
 
       // M14 FIX: Handle rate limit via discriminated field (not string matching)
       if (result.rateLimited) {
-        setLoadError("Too many requests — please wait 30 seconds and try again.");
+        setLoadError(
+          "Too many requests — please wait 30 seconds and try again."
+        );
         return;
       }
 
@@ -245,7 +255,9 @@ export function SearchResultsClient({
       const friendly =
         raw.includes("Rate limit") || raw.includes("Too many requests")
           ? "Too many requests — please wait 30 seconds and try again."
-          : raw.includes("fetch") || raw.includes("network") || raw.includes("Failed to fetch")
+          : raw.includes("fetch") ||
+              raw.includes("network") ||
+              raw.includes("Failed to fetch")
             ? "Connection lost. Check your internet and try again."
             : "Failed to load more results. Please try again.";
       setLoadError(friendly);
@@ -253,7 +265,7 @@ export function SearchResultsClient({
       isLoadingRef.current = false;
       setIsLoadingMore(false);
     }
-  // F2 FIX: Removed allListings dep — count read from totalCountRef instead
+    // F2 FIX: Removed allListings dep — count read from totalCountRef instead
   }, [nextCursor, rawParams, initialTotal, initialListings.length]);
 
   const total = initialTotal;
@@ -312,9 +324,9 @@ export function SearchResultsClient({
     })();
 
     return () => controller.abort();
-  // F8 FIX: Use stable ID key instead of allListings array reference
-  // Prevents unnecessary effect cycles when allListings recreates with same IDs
-  // eslint-disable-next-line react-hooks/exhaustive-deps
+    // F8 FIX: Use stable ID key instead of allListings array reference
+    // Prevents unnecessary effect cycles when allListings recreates with same IDs
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [allListingIdsKey]);
 
   useEffect(() => {
@@ -368,7 +380,7 @@ export function SearchResultsClient({
       {hasConfirmedZeroResults ? (
         <div
           data-testid="empty-state"
-          className="flex flex-col items-center justify-center py-12 sm:py-20 border-2 border-dashed border-outline-variant/20 rounded-2xl sm:rounded-3xl bg-surface-canvas/50"
+          className="flex flex-col items-center justify-center py-16 sm:py-24 border-2 border-dashed border-outline-variant/20 rounded-2xl sm:rounded-3xl bg-surface-canvas/50"
         >
           <div className="w-14 h-14 sm:w-16 sm:h-16 rounded-full bg-surface-container-lowest flex items-center justify-center shadow-sm mb-4">
             <Search className="w-5 h-5 sm:w-6 sm:h-6 text-on-surface-variant" />
@@ -377,8 +389,8 @@ export function SearchResultsClient({
             No matches found
           </h2>
           <p className="text-on-surface-variant text-sm max-w-xs text-center px-4">
-            Try adjusting your filters, expanding your price range, or
-            searching a nearby area.
+            Try adjusting your filters, expanding your price range, or searching
+            a nearby area.
             {query ? ` No results for "${query}".` : ""}
           </p>
 
@@ -428,7 +440,8 @@ export function SearchResultsClient({
             role="feed"
             aria-label="Search results"
             aria-busy={isLoadingMore}
-            className="grid grid-cols-1 sm:grid-cols-2 gap-4 sm:gap-x-6 sm:gap-y-8"
+            data-hydrated={isHydrated || undefined}
+            className="grid grid-cols-1 sm:grid-cols-2 gap-5 sm:gap-x-6 sm:gap-y-9"
           >
             {allListings.map((listing, index) => {
               // Insert separator before the first near-match item
@@ -452,6 +465,8 @@ export function SearchResultsClient({
                     <div
                       aria-setsize={initialTotal ?? -1}
                       aria-posinset={index + 1}
+                      className="animate-card-entrance"
+                      style={{ animationDelay: `${index * 50}ms` }}
                     >
                       <ListingCard
                         listing={listing}
@@ -526,9 +541,8 @@ export function SearchResultsClient({
           {/* Cap reached — nudge user to refine */}
           {reachedCap && nextCursor && (
             <p className="text-center text-sm text-on-surface-variant mt-6">
-              Showing {allListings.length} results.{" "}
-              Try adjusting your filters or zooming into a specific area to find
-              more relevant listings.
+              Showing {allListings.length} results. Try adjusting your filters
+              or zooming into a specific area to find more relevant listings.
             </p>
           )}
 
@@ -562,6 +576,22 @@ export function SearchResultsClient({
               {total === null ? "100+" : total} places
               {query ? ` in ${query}` : ""}
             </p>
+          )}
+          {allListings.length > 0 && !hasConfirmedZeroResults && isHydrated && !isLoadingMore && (
+            <section
+              aria-label="Save search"
+              className="mt-12 mb-4 relative overflow-hidden bg-surface-container-high/40 rounded-2xl p-8 flex flex-col sm:flex-row items-center justify-between gap-6 border border-outline-variant/20"
+            >
+              <div>
+                <h3 className="text-lg font-display font-semibold text-on-surface mb-1">
+                  Don&apos;t miss out
+                </h3>
+                <p className="text-sm text-on-surface-variant">
+                  We add new spaces daily. Save this search to get notified first.
+                </p>
+              </div>
+              <SaveSearchButton />
+            </section>
           )}
         </>
       )}

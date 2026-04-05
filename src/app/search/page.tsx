@@ -380,7 +380,7 @@ export default async function SearchPage({ searchParams }: SearchPageProps) {
   const listContent = (
     <div className="max-w-[840px] mx-auto pb-24 md:pb-6">
       <CategoryBar />
-      <div className="px-4 sm:px-5 pt-0">
+      <div className="px-4 sm:px-5 lg:px-8 pt-0">
         <RecommendedFilters />
         <AppliedFilterChips currentCount={total} />
 
@@ -392,7 +392,8 @@ export default async function SearchPage({ searchParams }: SearchPageProps) {
               className="text-lg md:text-xl font-display font-medium tracking-tight text-on-surface focus:outline-none focus-visible:ring-2 focus-visible:ring-primary/30 focus-visible:rounded-lg truncate"
             >
               {total === null ? "100+" : total}{" "}
-              {total === 1 ? "place" : "places"}{q ? ` in ${q}` : ""}
+              {total === 1 ? "place" : "places"}
+              {q ? ` in ${q}` : ""}
             </h1>
             <div aria-live="polite" className="sr-only">
               {total === null ? "More than 100" : total}{" "}

@@ -37,13 +37,18 @@
   --color-info: #1e6fa0;
 
   /* Social brand colors (unchanged) */
-  --color-social-twitter: #1DA1F2;
-  --color-social-facebook: #1877F2;
+  --color-social-twitter: #1da1f2;
+  --color-social-facebook: #1877f2;
 
   /* === TYPOGRAPHY === */
-  --font-display: "Newsreader", "Newsreader-fallback", Georgia, "Times New Roman", serif;
-  --font-body: "Manrope", "Manrope-fallback", ui-sans-serif, system-ui, -apple-system, sans-serif;
-  --font-sans: "Manrope", "Manrope-fallback", ui-sans-serif, system-ui, -apple-system, sans-serif;
+  --font-display:
+    "Newsreader", "Newsreader-fallback", Georgia, "Times New Roman", serif;
+  --font-body:
+    "Manrope", "Manrope-fallback", ui-sans-serif, system-ui, -apple-system,
+    sans-serif;
+  --font-sans:
+    "Manrope", "Manrope-fallback", ui-sans-serif, system-ui, -apple-system,
+    sans-serif;
 
   /* === BORDER RADIUS === */
   --radius-sm: 6px;
@@ -53,10 +58,15 @@
   --radius-full: 9999px;
 
   /* === SHADOWS (tinted charcoal, dual-layer) === */
-  --shadow-ambient-sm: 0 2px 20px rgb(27 28 25 / 0.03), 0 1px 6px rgb(27 28 25 / 0.02);
-  --shadow-ambient: 0 8px 40px rgb(27 28 25 / 0.04), 0 2px 12px rgb(27 28 25 / 0.02);
-  --shadow-ambient-lg: 0 12px 60px rgb(27 28 25 / 0.06), 0 4px 20px rgb(27 28 25 / 0.03);
-  --shadow-ambient-deep: 0 16px 80px rgb(27 28 25 / 0.08), 0 6px 24px rgb(27 28 25 / 0.04);
+  --shadow-ambient-sm:
+    0 2px 20px rgb(27 28 25 / 0.03), 0 1px 6px rgb(27 28 25 / 0.02);
+  --shadow-ambient:
+    0 8px 40px rgb(27 28 25 / 0.04), 0 2px 12px rgb(27 28 25 / 0.02);
+  --shadow-ambient-lg:
+    0 12px 60px rgb(27 28 25 / 0.06), 0 4px 20px rgb(27 28 25 / 0.03);
+  --shadow-ambient-deep:
+    0 16px 80px rgb(27 28 25 / 0.08), 0 6px 24px rgb(27 28 25 / 0.04);
+  --shadow-ghost: 0 12px 40px -12px rgb(27 28 25 / 0.12);
 
   /* === STAGGER TIMING === */
   --stagger-tight: 50ms;
@@ -67,7 +77,7 @@
 @layer base {
   :root {
     /* === ANIMATION TOKENS === */
-    --ease-warm: cubic-bezier(0.25, 0.1, 0.25, 1.0);
+    --ease-warm: cubic-bezier(0.25, 0.1, 0.25, 1);
     --ease-warm-in: cubic-bezier(0.55, 0, 1, 0.45);
     --ease-warm-out: cubic-bezier(0, 0.55, 0.45, 1);
     --ease-editorial: cubic-bezier(0.16, 1, 0.3, 1);
@@ -148,6 +158,24 @@
   }
 }
 
+/* Card entrance animation — hydration-gated staggered fade-in-up */
+@keyframes card-entrance {
+  from {
+    opacity: 0;
+    transform: translateY(20px);
+  }
+}
+
+[data-hydrated="true"] .animate-card-entrance {
+  animation: card-entrance 0.6s var(--ease-editorial) backwards;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  [data-hydrated="true"] .animate-card-entrance {
+    animation: none;
+  }
+}
+
 /* Keyframe Animations */
 @keyframes fadeUp {
   from {
@@ -159,6 +187,23 @@
     opacity: 1;
     transform: translateY(0);
   }
+}
+
+/* Hero fade-in: CSS-only animation immune to React re-renders.
+   Uses animation-fill-mode: both so elements start hidden and end visible. */
+@keyframes heroFadeIn {
+  from {
+    opacity: 0;
+    transform: translateY(16px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+.animate-hero-fade-in {
+  animation: heroFadeIn 0.4s cubic-bezier(0.25, 0.1, 0.25, 1.0) both;
 }
 
 @keyframes slideDown {
@@ -175,16 +220,30 @@
 
 /* Booking success celebration */
 @keyframes booking-glow {
-  0% { box-shadow: 0 0 0 0 rgb(154 64 39 / 0.3); }
-  50% { box-shadow: 0 0 0 24px rgb(154 64 39 / 0); }
-  100% { box-shadow: 0 0 0 32px rgb(154 64 39 / 0); }
+  0% {
+    box-shadow: 0 0 0 0 rgb(154 64 39 / 0.3);
+  }
+  50% {
+    box-shadow: 0 0 0 24px rgb(154 64 39 / 0);
+  }
+  100% {
+    box-shadow: 0 0 0 32px rgb(154 64 39 / 0);
+  }
 }
 
 @keyframes booking-icon-spring {
-  0% { transform: scale(0); }
-  60% { transform: scale(1.2); }
-  80% { transform: scale(0.95); }
-  100% { transform: scale(1); }
+  0% {
+    transform: scale(0);
+  }
+  60% {
+    transform: scale(1.2);
+  }
+  80% {
+    transform: scale(0.95);
+  }
+  100% {
+    transform: scale(1);
+  }
 }
 
 /* Form error message entrance */
@@ -219,14 +278,30 @@
   opacity: 0;
   animation: menuItemIn 300ms var(--ease-warm-out) both;
 }
-.menu-stagger > *:nth-child(1) { animation-delay: 50ms; }
-.menu-stagger > *:nth-child(2) { animation-delay: 100ms; }
-.menu-stagger > *:nth-child(3) { animation-delay: 150ms; }
-.menu-stagger > *:nth-child(4) { animation-delay: 200ms; }
-.menu-stagger > *:nth-child(5) { animation-delay: 250ms; }
-.menu-stagger > *:nth-child(6) { animation-delay: 300ms; }
-.menu-stagger > *:nth-child(7) { animation-delay: 350ms; }
-.menu-stagger > *:nth-child(8) { animation-delay: 400ms; }
+.menu-stagger > *:nth-child(1) {
+  animation-delay: 50ms;
+}
+.menu-stagger > *:nth-child(2) {
+  animation-delay: 100ms;
+}
+.menu-stagger > *:nth-child(3) {
+  animation-delay: 150ms;
+}
+.menu-stagger > *:nth-child(4) {
+  animation-delay: 200ms;
+}
+.menu-stagger > *:nth-child(5) {
+  animation-delay: 250ms;
+}
+.menu-stagger > *:nth-child(6) {
+  animation-delay: 300ms;
+}
+.menu-stagger > *:nth-child(7) {
+  animation-delay: 350ms;
+}
+.menu-stagger > *:nth-child(8) {
+  animation-delay: 400ms;
+}
 
 /* Animation Utility Classes */
 .animate-fade-up {
@@ -360,8 +435,13 @@ textarea:focus-visible {
 }
 
 @keyframes gentle-bounce {
-  0%, 100% { transform: translateY(0); }
-  50% { transform: translateY(6px); }
+  0%,
+  100% {
+    transform: translateY(0);
+  }
+  50% {
+    transform: translateY(6px);
+  }
 }
 
 .animate-gentle-bounce {
@@ -475,6 +555,13 @@ input:autofill {
   line-height: 1.5;
 }
 
+.text-micro-label {
+  font-size: 0.7rem;
+  text-transform: uppercase;
+  letter-spacing: 0.15em;
+  font-weight: 600;
+}
+
 /* Z-Index Utilities */
 .z-dropdown {
   z-index: var(--z-dropdown);
@@ -518,30 +605,31 @@ input:autofill {
   .transition-editorial {
     transition-property: all;
     transition-duration: 300ms;
-    transition-timing-function: cubic-bezier(0.25, 0.1, 0.25, 1.0);
+    transition-timing-function: cubic-bezier(0.25, 0.1, 0.25, 1);
   }
 
   .transition-lift {
     transition-property: transform, box-shadow;
     transition-duration: 300ms;
-    transition-timing-function: cubic-bezier(0.25, 0.1, 0.25, 1.0);
+    transition-timing-function: cubic-bezier(0.25, 0.1, 0.25, 1);
   }
 
   .transition-fade {
     transition-property: opacity;
     transition-duration: 200ms;
-    transition-timing-function: cubic-bezier(0.25, 0.1, 0.25, 1.0);
+    transition-timing-function: cubic-bezier(0.25, 0.1, 0.25, 1);
   }
 
   /* Warm notification pulse (replaces aggressive animate-ping) */
   .animate-warm-pulse {
-    animation: warm-pulse 2s cubic-bezier(0.25, 0.1, 0.25, 1.0) infinite;
+    animation: warm-pulse 2s cubic-bezier(0.25, 0.1, 0.25, 1) infinite;
   }
 }
 
 /* Warm notification pulse keyframe */
 @keyframes warm-pulse {
-  0%, 100% {
+  0%,
+  100% {
     transform: scale(1);
     opacity: 0.5;
   }
