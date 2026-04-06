@@ -8,7 +8,11 @@ import { ListingStatus, ReportStatus } from "@prisma/client";
 import { logAdminAction } from "@/lib/audit";
 import { logger } from "@/lib/logger";
 import { markListingDirty } from "@/lib/search/search-doc-dirty";
-import { checkRateLimit, RATE_LIMITS, getClientIPFromHeaders } from "@/lib/rate-limit";
+import {
+  checkRateLimit,
+  RATE_LIMITS,
+  getClientIPFromHeaders,
+} from "@/lib/rate-limit";
 import { headers } from "next/headers";
 
 // Helper to check admin status — exported for use in other admin action files (verification.ts etc.)
@@ -393,7 +397,12 @@ export async function updateListingStatus(
     // Audit log
     await logAdminAction({
       adminId: adminCheck.userId!,
-      action: status === "PAUSED" ? "LISTING_HIDDEN" : status === "RENTED" ? "LISTING_RENTED" : "LISTING_RESTORED",
+      action:
+        status === "PAUSED"
+          ? "LISTING_HIDDEN"
+          : status === "RENTED"
+            ? "LISTING_RENTED"
+            : "LISTING_RESTORED",
       targetType: "Listing",
       targetId: listingId,
       details: {
@@ -476,12 +485,12 @@ export async function deleteListing(listingId: string) {
           data: pendingBookings
             .filter((booking) => booking.tenantId != null)
             .map((booking) => ({
-            userId: booking.tenantId!,
-            type: "BOOKING_CANCELLED",
-            title: "Booking Request Cancelled",
-            message: `Your pending booking request for "${listing.title}" has been cancelled because the listing was removed by an administrator.`,
-            link: "/bookings",
-          })),
+              userId: booking.tenantId!,
+              type: "BOOKING_CANCELLED",
+              title: "Booking Request Cancelled",
+              message: `Your pending booking request for "${listing.title}" has been cancelled because the listing was removed by an administrator.`,
+              link: "/bookings",
+            })),
         });
       }
 
@@ -753,12 +762,12 @@ export async function resolveReportAndRemoveListing(
           data: affectedBookings
             .filter((booking) => booking.tenantId != null)
             .map((booking) => ({
-            userId: booking.tenantId!,
-            type: "BOOKING_CANCELLED",
-            title: "Booking Cancelled - Listing Removed",
-            message: `Your booking for "${listing.title}" has been cancelled because the listing was removed due to a policy violation.`,
-            link: "/bookings",
-          })),
+              userId: booking.tenantId!,
+              type: "BOOKING_CANCELLED",
+              title: "Booking Cancelled - Listing Removed",
+              message: `Your booking for "${listing.title}" has been cancelled because the listing was removed due to a policy violation.`,
+              link: "/bookings",
+            })),
         });
       }
 

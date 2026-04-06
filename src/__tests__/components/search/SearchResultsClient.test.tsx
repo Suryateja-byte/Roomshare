@@ -98,6 +98,13 @@ jest.mock("@/lib/search/split-stay", () => ({
   findSplitStays: jest.fn(() => []),
 }));
 
+// Mock SaveSearchButton (imports next-auth which uses ESM exports)
+jest.mock("@/components/SaveSearchButton", () => {
+  return function MockSaveSearchButton() {
+    return <button data-testid="save-search-button">Save Search</button>;
+  };
+});
+
 // Mock sessionStorage
 const mockSessionStorage: Record<string, string> = {};
 beforeAll(() => {

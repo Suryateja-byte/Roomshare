@@ -10,7 +10,9 @@ jest.mock("lucide-react", () => ({
 }));
 
 jest.mock("@/components/ui/dialog", () => ({
-  Dialog: ({ children }: { children: React.ReactNode }) => <div>{children}</div>,
+  Dialog: ({ children }: { children: React.ReactNode }) => (
+    <div>{children}</div>
+  ),
   DialogTrigger: ({ children }: { children: React.ReactNode }) => children,
   DialogContent: ({ children }: { children: React.ReactNode }) => (
     <div>{children}</div>
@@ -45,7 +47,9 @@ jest.mock("@/components/ui/textarea", () => ({
 }));
 
 jest.mock("@/components/ui/select", () => ({
-  Select: ({ children }: { children: React.ReactNode }) => <div>{children}</div>,
+  Select: ({ children }: { children: React.ReactNode }) => (
+    <div>{children}</div>
+  ),
   SelectTrigger: ({ children }: { children: React.ReactNode }) => (
     <button type="button">{children}</button>
   ),

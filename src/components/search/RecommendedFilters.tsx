@@ -88,10 +88,10 @@ export function RecommendedFilters() {
   return (
     <div className="flex items-center gap-1.5 overflow-x-auto hide-scrollbar py-1.5 px-4 sm:px-5">
       <Sparkles
-        className="w-3 h-3 text-primary/50 flex-shrink-0"
+        className="w-3 h-3 text-primary/80 flex-shrink-0"
         aria-hidden="true"
       />
-      <span className="text-[10px] font-semibold uppercase tracking-wider text-primary/50 flex-shrink-0 mr-0.5">
+      <span className="text-xs font-semibold uppercase tracking-wider text-primary/80 flex-shrink-0 mr-0.5">
         Try
       </span>
       {available.map((s) => (
@@ -100,7 +100,7 @@ export function RecommendedFilters() {
           type="button"
           onClick={() => handleClick(s)}
           disabled={isPending}
-          className="flex-shrink-0 px-3 py-1 text-xs font-medium rounded-full border border-dashed border-primary/25 text-primary/65 hover:border-solid hover:border-primary/40 hover:bg-primary/5 hover:text-primary transition-colors disabled:opacity-60 disabled:cursor-not-allowed"
+          className="flex-shrink-0 px-3 py-1 text-xs font-medium rounded-full border border-dashed border-primary/25 text-primary/80 hover:border-solid hover:border-primary/40 hover:bg-primary/5 hover:text-primary transition-colors disabled:opacity-60 disabled:cursor-not-allowed focus-visible:ring-2 focus-visible:ring-primary/30 focus-visible:ring-offset-1"
         >
           {s.label}
         </button>

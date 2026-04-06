@@ -119,9 +119,7 @@ const ListingCard = ({
           </p>
           <p className="text-sm font-bold text-on-surface mt-2">
             ${listing.price}
-            <span className="text-on-surface-variant font-normal">
-              /mo
-            </span>
+            <span className="text-on-surface-variant font-normal">/mo</span>
           </p>
         </div>
       </div>

@@ -170,10 +170,7 @@ export default async function AuditLogPage({ searchParams }: PageProps) {
         <div className="flex items-center justify-between mb-8">
           <div>
             <div className="flex items-center gap-2 text-sm text-on-surface-variant mb-2">
-              <Link
-                href="/admin"
-                className="hover:text-on-surface"
-              >
+              <Link href="/admin" className="hover:text-on-surface">
                 Admin
               </Link>
               <span>/</span>
@@ -261,7 +258,8 @@ export default async function AuditLogPage({ searchParams }: PageProps) {
                     const config = actionConfig[log.action] || {
                       icon: Shield,
                       label: log.action,
-                      color: "text-on-surface-variant bg-surface-container-high",
+                      color:
+                        "text-on-surface-variant bg-surface-container-high",
                     };
                     const ActionIcon = config.icon;
 
@@ -298,7 +296,8 @@ export default async function AuditLogPage({ searchParams }: PageProps) {
                               </div>
                             )}
                             <span className="text-sm text-on-surface">
-                              {log.admin.name || `Admin ${log.admin.id.substring(0, 8)}`}
+                              {log.admin.name ||
+                                `Admin ${log.admin.id.substring(0, 8)}`}
                             </span>
                           </div>
                         </td>

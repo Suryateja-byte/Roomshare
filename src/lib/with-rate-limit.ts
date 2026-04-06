@@ -122,7 +122,8 @@ export async function checkServerComponentRateLimit(
   // Uses VERCEL_ENV (not NODE_ENV) because CI runs `next start` which sets NODE_ENV=production.
   if (
     process.env.NODE_ENV === "test" ||
-    (process.env.E2E_DISABLE_RATE_LIMIT === "true" && process.env.VERCEL_ENV !== "production")
+    (process.env.E2E_DISABLE_RATE_LIMIT === "true" &&
+      process.env.VERCEL_ENV !== "production")
   ) {
     return { allowed: true, remaining: 999, retryAfter: undefined };
   }

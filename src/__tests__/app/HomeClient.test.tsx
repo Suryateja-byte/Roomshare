@@ -2,6 +2,8 @@ import React from "react";
 import { render, screen } from "@testing-library/react";
 import HomeClient from "@/app/HomeClient";
 
+const mockUseSession = jest.fn();
+
 const mockSearchForm = jest.fn(({ variant }: { variant?: string }) => (
   <div data-testid="search-form" data-variant={variant}>
     Search Form
@@ -9,10 +11,7 @@ const mockSearchForm = jest.fn(({ variant }: { variant?: string }) => (
 ));
 
 jest.mock("next-auth/react", () => ({
-  useSession: () => ({
-    data: null,
-    status: "unauthenticated",
-  }),
+  useSession: () => mockUseSession(),
 }));
 
 jest.mock("next/link", () => ({
@@ -31,24 +30,9 @@ jest.mock("next/link", () => ({
   ),
 }));
 
-jest.mock("next/image", () => ({
-  __esModule: true,
-  default: ({ alt, ...props }: any) => (
-    // eslint-disable-next-line @next/next/no-img-element
-    <img alt={alt} {...props} />
-  ),
-}));
-
 jest.mock("@/components/SearchForm", () => ({
   __esModule: true,
   default: (props: { variant?: string }) => mockSearchForm(props),
-}));
-
-jest.mock("@/components/home/EditorialLivingRoomHero", () => ({
-  __esModule: true,
-  default: ({ children }: { children: React.ReactNode }) => (
-    <section data-testid="immersive-hero">{children}</section>
-  ),
 }));
 
 jest.mock("framer-motion", () => {
@@ -60,9 +44,27 @@ jest.mock("framer-motion", () => {
       get: (_target, tag: string) =>
         React.forwardRef(
           (
-            { children, ...props }: { children?: React.ReactNode },
+            {
+              children,
+              ...props
+            }: {
+              children?: React.ReactNode;
+              [key: string]: unknown;
+            },
             ref: React.ForwardedRef<HTMLElement>
-          ) => React.createElement(tag, { ref, ...props }, children)
+          ) => {
+            const {
+              animate: _animate,
+              initial: _initial,
+              transition: _transition,
+              variants: _variants,
+              viewport: _viewport,
+              whileInView: _whileInView,
+              ...domProps
+            } = props;
+
+            return React.createElement(tag, { ref, ...domProps }, children);
+          }
         ),
     }
   );
@@ -79,6 +81,10 @@ jest.mock("framer-motion", () => {
 describe("HomeClient", () => {
   beforeEach(() => {
     mockSearchForm.mockClear();
+    mockUseSession.mockReturnValue({
+      data: null,
+      status: "unauthenticated",
+    });
   });
 
   it('passes the "home" variant to SearchForm', async () => {
@@ -86,5 +92,11 @@ describe("HomeClient", () => {
 
     const searchForm = await screen.findByTestId("search-form");
     expect(searchForm).toHaveAttribute("data-variant", "home");
+  });
+
+  it("renders the heading and hero section", () => {
+    render(<HomeClient />);
+
+    expect(screen.getByRole("heading", { level: 1 })).toBeInTheDocument();
   });
 });

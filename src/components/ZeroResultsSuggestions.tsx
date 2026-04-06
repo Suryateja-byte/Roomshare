@@ -126,6 +126,7 @@ export default function ZeroResultsSuggestions({
               params.delete("minLng");
               params.delete("maxLng");
               params.delete("q");
+              params.delete("where");
             }
             break;
           }
@@ -162,6 +163,7 @@ export default function ZeroResultsSuggestions({
 
           // Last-resort fallback: avoid invalid q-without-bounds state.
           params.delete("q");
+          params.delete("where");
           params.delete("lat");
           params.delete("lng");
           params.delete("minLat");
@@ -185,6 +187,7 @@ export default function ZeroResultsSuggestions({
     const params = new URLSearchParams();
     for (const key of [
       "q",
+      "where",
       "lat",
       "lng",
       "minLat",

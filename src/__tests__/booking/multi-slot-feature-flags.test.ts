@@ -356,7 +356,9 @@ describe("multiSlotBooking=OFF", () => {
 
     (prisma.$transaction as jest.Mock).mockImplementation(async (callback) => {
       const tx = {
-        $queryRaw: jest.fn().mockResolvedValue([{ ownerId: "owner-1", status: "ACTIVE" }]),
+        $queryRaw: jest
+          .fn()
+          .mockResolvedValue([{ ownerId: "owner-1", status: "ACTIVE" }]),
         booking: { updateMany: jest.fn().mockResolvedValue({ count: 1 }) },
       };
       return callback(tx);
@@ -418,7 +420,9 @@ describe("softHoldsEnabled=OFF", () => {
 
     (prisma.$transaction as jest.Mock).mockImplementation(async (callback) => {
       const tx = {
-        $queryRaw: jest.fn().mockResolvedValue([{ ownerId: "owner-1", status: "ACTIVE" }]),
+        $queryRaw: jest
+          .fn()
+          .mockResolvedValue([{ ownerId: "owner-1", status: "ACTIVE" }]),
         booking: { updateMany: jest.fn().mockResolvedValue({ count: 1 }) },
       };
       return callback(tx);
@@ -508,7 +512,9 @@ describe("softHoldsEnabled=DRAIN", () => {
 
     (prisma.$transaction as jest.Mock).mockImplementation(async (callback) => {
       const tx = {
-        $queryRaw: jest.fn().mockResolvedValue([{ ownerId: "owner-1", status: "ACTIVE" }]),
+        $queryRaw: jest
+          .fn()
+          .mockResolvedValue([{ ownerId: "owner-1", status: "ACTIVE" }]),
         booking: { updateMany: jest.fn().mockResolvedValue({ count: 1 }) },
       };
       return callback(tx);

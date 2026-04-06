@@ -8,14 +8,11 @@ function cn(...inputs: ClassValue[]) {
 
 const variantClasses = {
   default: "bg-surface-container-high text-on-surface-variant",
-  success:
-    "bg-green-100 text-green-700",
-  warning:
-    "bg-amber-100 text-amber-700",
+  success: "bg-green-100 text-green-700",
+  warning: "bg-amber-100 text-amber-700",
   destructive: "bg-red-100 text-red-700",
   info: "bg-blue-100 text-blue-700",
-  purple:
-    "bg-tertiary/10 text-tertiary",
+  purple: "bg-tertiary/10 text-tertiary",
   outline:
     "border border-outline-variant/20 text-on-surface-variant bg-transparent",
 };

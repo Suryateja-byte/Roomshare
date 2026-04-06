@@ -40,7 +40,12 @@ export async function fetchMoreListings(
       "/search"
     );
     if (!rateLimitResult.allowed) {
-      return { items: [], nextCursor: null, hasNextPage: false, rateLimited: true };
+      return {
+        items: [],
+        nextCursor: null,
+        hasNextPage: false,
+        rateLimited: true,
+      };
     }
 
     // Embed cursor in rawParams for v2
@@ -92,9 +97,12 @@ export async function fetchMoreListings(
           Sentry.captureException(error, {
             tags: { component: "search-action", path: "fetchMoreListings-v2" },
           });
-          logger.sync.warn("[fetchMoreListings] V2 failed, falling back to v1", {
-            error: sanitizeErrorMessage(error),
-          });
+          logger.sync.warn(
+            "[fetchMoreListings] V2 failed, falling back to v1",
+            {
+              error: sanitizeErrorMessage(error),
+            }
+          );
         }
       }
     }

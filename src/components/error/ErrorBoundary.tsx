@@ -84,19 +84,12 @@ export function ErrorFallback({
       className="flex min-h-[400px] flex-col items-center justify-center p-8 text-center"
     >
       <div className="mb-4 rounded-full bg-red-100 p-3">
-        <AlertTriangle
-          className="h-8 w-8 text-red-600"
-          aria-hidden="true"
-        />
+        <AlertTriangle className="h-8 w-8 text-red-600" aria-hidden="true" />
       </div>
 
-      <h2 className="mb-2 text-xl font-semibold text-on-surface">
-        {title}
-      </h2>
+      <h2 className="mb-2 text-xl font-semibold text-on-surface">{title}</h2>
 
-      <p className="mb-6 max-w-md text-on-surface-variant">
-        {description}
-      </p>
+      <p className="mb-6 max-w-md text-on-surface-variant">{description}</p>
 
       {process.env.NODE_ENV === "development" && error && (
         <details className="mb-6 max-w-lg rounded-lg bg-surface-container-high p-4 text-left">

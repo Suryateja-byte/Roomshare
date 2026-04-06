@@ -9,7 +9,8 @@ import { Button } from "@/components/ui/button";
 
 export const metadata: Metadata = {
   title: "Verify Your Identity | RoomShare",
-  description: "Complete identity verification to build trust with potential roommates.",
+  description:
+    "Complete identity verification to build trust with potential roommates.",
   robots: { index: false, follow: false },
 };
 
@@ -33,7 +34,9 @@ export default async function VerifyPage() {
                 <ShieldCheck className="w-8 h-8" />
               </div>
               <div>
-                <h1 className="font-display text-2xl font-bold">ID Verification</h1>
+                <h1 className="font-display text-2xl font-bold">
+                  ID Verification
+                </h1>
                 <p className="text-white/70 mt-1">
                   Build trust by verifying your identity
                 </p>
@@ -56,9 +59,7 @@ export default async function VerifyPage() {
                   on your profile.
                 </p>
                 <Button asChild>
-                  <Link href="/profile">
-                    View Your Profile
-                  </Link>
+                  <Link href="/profile">View Your Profile</Link>
                 </Button>
               </div>
             )}
@@ -79,9 +80,7 @@ export default async function VerifyPage() {
                 <div className="bg-surface-container-high rounded-lg p-4 inline-block">
                   <p className="text-sm text-on-surface-variant">
                     Request ID:{" "}
-                    <code className="text-on-surface">
-                      {status.requestId}
-                    </code>
+                    <code className="text-on-surface">{status.requestId}</code>
                   </p>
                 </div>
               </div>
@@ -197,9 +196,7 @@ export default async function VerifyPage() {
                         <CheckCircle2 className="w-4 h-4 text-green-600" />
                       </div>
                       <div>
-                        <p className="font-medium text-on-surface">
-                          Stand Out
-                        </p>
+                        <p className="font-medium text-on-surface">Stand Out</p>
                         <p className="text-sm text-on-surface-variant">
                           Get a verification badge on your profile
                         </p>

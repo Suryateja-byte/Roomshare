@@ -55,7 +55,7 @@ describe("XSS Security Tests", () => {
       const escaped = escapeHtml(input);
 
       // L-5 FIX: Regex-based escaping now escapes double quotes too (more secure).
-      expect(escaped).toBe('He said &quot;hello&quot;');
+      expect(escaped).toBe("He said &quot;hello&quot;");
     });
 
     it("handles single quotes in text content", () => {

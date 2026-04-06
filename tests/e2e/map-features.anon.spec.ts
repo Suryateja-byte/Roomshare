@@ -46,8 +46,17 @@ async function mapControlsAvailable(page: import("@playwright/test").Page) {
   } catch {
     return false;
   }
-  const dropPin = page.locator("button").filter({ hasText: /Drop pin/i });
-  return (await dropPin.count()) > 0;
+  const mapTools = page.locator('button[aria-label^="Map tools"]').first();
+  return await mapTools.isVisible().catch(() => false);
+}
+
+async function openMapTools(page: import("@playwright/test").Page) {
+  const trigger = page.locator('button[aria-label^="Map tools"]').first();
+  await trigger.click();
+  await page
+    .locator('[data-testid="poi-category"]')
+    .first()
+    .waitFor({ state: "visible", timeout: 5_000 });
 }
 
 // Map tests need extra time for WebGL rendering and tile loading in CI
@@ -214,41 +223,29 @@ test.describe("Map controls (requires WebGL)", () => {
 
   // 1.6: Drop-a-Pin
   test("drop pin button toggles to cancel state", async ({ page }) => {
-    const dropPinBtn = page
-      .locator("button")
-      .filter({ hasText: /Drop pin/i })
-      .first();
+    await openMapTools(page);
+
+    const dropPinBtn = page.getByTestId("map-tools-drop-pin");
     await dropPinBtn.click();
-    await page
-      .locator("button")
-      .filter({ hasText: /Cancel/i })
-      .first()
-      .waitFor({ timeout: 5_000 });
+    await expect(page.locator('button[aria-label^="Map tools"]')).toBeVisible();
 
-    const cancelBtn = page.locator("button").filter({ hasText: /Cancel/i });
-    expect(await cancelBtn.count()).toBeGreaterThanOrEqual(1);
+    await openMapTools(page);
+    const cancelBtn = page.getByTestId("map-tools-drop-pin");
+    await expect(cancelBtn).toContainText(/Cancel drop pin/i);
 
-    await cancelBtn.first().click();
-    await page
-      .locator("button")
-      .filter({ hasText: /Drop pin/i })
-      .first()
-      .waitFor({ timeout: 5_000 });
-    expect(
-      await page
-        .locator("button")
-        .filter({ hasText: /Drop pin/i })
-        .count()
-    ).toBeGreaterThanOrEqual(1);
+    await cancelBtn.click();
+    await openMapTools(page);
+    await expect(page.getByTestId("map-tools-drop-pin")).toContainText(
+      /Drop pin/i
+    );
   });
 
   // 1.7: POI toggles
   test("POI toggle buttons are present and functional", async ({ page }) => {
-    const poiBtn = page.locator("button").filter({ hasText: /^POIs$/i });
-    expect(await poiBtn.count()).toBeGreaterThanOrEqual(1);
+    await openMapTools(page);
 
     const transitBtn = page
-      .locator("button[aria-pressed]")
+      .locator('[data-testid="poi-category"]')
       .filter({ hasText: /Transit/i })
       .first();
     if ((await transitBtn.count()) === 0) return;
@@ -265,22 +262,18 @@ test.describe("Map controls (requires WebGL)", () => {
     }
 
     // Read current state rather than assuming it starts at "false"
-    const initialState = await transitBtn.getAttribute("aria-pressed");
+    const initialState = await transitBtn.getAttribute("aria-checked");
     await transitBtn.click();
     // After click, state should have toggled
     const expectedAfterClick = initialState === "true" ? "false" : "true";
-    await expect(transitBtn).toHaveAttribute(
-      "aria-pressed",
-      expectedAfterClick,
-      { timeout: 10_000 }
-    );
+    await expect(transitBtn).toHaveAttribute("aria-checked", expectedAfterClick, {
+      timeout: 10_000,
+    });
     await transitBtn.click();
     // After second click, state should be back to initial
-    await expect(transitBtn).toHaveAttribute(
-      "aria-pressed",
-      initialState ?? "false",
-      { timeout: 10_000 }
-    );
+    await expect(transitBtn).toHaveAttribute("aria-checked", initialState ?? "false", {
+      timeout: 10_000,
+    });
   });
 
   test("POIs master toggle activates all categories", async ({ page }) => {
@@ -365,35 +358,31 @@ test.describe("Map controls (requires WebGL)", () => {
 
   // Keyboard accessibility
   test("map controls are keyboard accessible", async ({ page }) => {
-    const dropPinBtn = page
-      .locator("button")
-      .filter({ hasText: /Drop pin/i })
-      .first();
+    const toolsTrigger = page.locator('button[aria-label^="Map tools"]').first();
+    await toolsTrigger.focus();
+    await page.keyboard.press("Enter");
+    await page.getByTestId("map-tools-drop-pin").waitFor({ timeout: 5_000 });
+
+    const dropPinBtn = page.getByTestId("map-tools-drop-pin");
     await dropPinBtn.focus();
     await page.keyboard.press("Enter");
-    await page
-      .locator("button")
-      .filter({ hasText: /Cancel/i })
-      .first()
-      .waitFor({ timeout: 5_000 });
 
-    const cancelBtn = page.locator("button").filter({ hasText: /Cancel/i });
-    expect(await cancelBtn.count()).toBeGreaterThanOrEqual(1);
-    await cancelBtn.first().click();
+    await toolsTrigger.focus();
+    await page.keyboard.press("Enter");
 
     const transitBtn = page
-      .locator("button[aria-pressed]")
+      .locator('[data-testid="poi-category"]')
       .filter({ hasText: /Transit/i })
       .first();
     if (
       (await transitBtn.count()) > 0 &&
       (await transitBtn.isVisible().catch(() => false))
     ) {
-      const prevState = await transitBtn.getAttribute("aria-pressed");
+      const prevState = await transitBtn.getAttribute("aria-checked");
       await transitBtn.focus();
       await page.keyboard.press("Enter");
       const expectedState = prevState === "true" ? "false" : "true";
-      await expect(transitBtn).toHaveAttribute("aria-pressed", expectedState, {
+      await expect(transitBtn).toHaveAttribute("aria-checked", expectedState, {
         timeout: 10_000,
       });
     }

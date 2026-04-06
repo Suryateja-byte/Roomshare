@@ -219,9 +219,7 @@ export default function SettingsClient({
               className="p-4 flex items-center justify-between hover:bg-surface-container-high"
             >
               <div>
-                <p className="font-medium text-on-surface">
-                  {option.label}
-                </p>
+                <p className="font-medium text-on-surface">{option.label}</p>
                 <p className="text-sm text-on-surface-variant">
                   {option.description}
                 </p>
@@ -247,10 +245,7 @@ export default function SettingsClient({
           ))}
         </div>
         <div className="p-4 bg-surface-canvas pt-6">
-          <Button
-            onClick={handleSavePreferences}
-            disabled={saving}
-          >
+          <Button onClick={handleSavePreferences} disabled={saving}>
             {saving ? (
               <Loader2 className="w-4 h-4 animate-spin" />
             ) : saveSuccess ? (
@@ -338,11 +333,7 @@ export default function SettingsClient({
                 Password changed successfully!
               </p>
             )}
-            <Button
-              type="submit"
-              variant="warning"
-              disabled={changingPassword}
-            >
+            <Button type="submit" variant="warning" disabled={changingPassword}>
               {changingPassword && <Loader2 className="w-4 h-4 animate-spin" />}
               Change Password
             </Button>

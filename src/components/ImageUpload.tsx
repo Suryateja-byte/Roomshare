@@ -26,82 +26,86 @@ export default function ImageUpload({
   const [dragActive, setDragActive] = useState(false);
   const inputRef = useRef<HTMLInputElement>(null);
 
-  const images = useMemo(() =>
-    multiple
-      ? Array.isArray(value)
-        ? value
-        : value
+  const images = useMemo(
+    () =>
+      multiple
+        ? Array.isArray(value)
+          ? value
+          : value
+            ? [value]
+            : []
+        : typeof value === "string" && value
           ? [value]
-          : []
-      : typeof value === "string" && value
-        ? [value]
-        : [],
+          : [],
     [multiple, value]
   );
 
-  const handleUpload = useCallback(async (files: FileList | null) => {
-    if (!files || files.length === 0) return;
+  const handleUpload = useCallback(
+    async (files: FileList | null) => {
+      if (!files || files.length === 0) return;
 
-    setError(null);
-    setIsUploading(true);
+      setError(null);
+      setIsUploading(true);
 
-    const filesToUpload = Array.from(files);
+      const filesToUpload = Array.from(files);
 
-    // Check max files limit for multiple uploads
-    if (multiple && images.length + filesToUpload.length > maxFiles) {
-      setError(`Maximum ${maxFiles} images allowed`);
-      setIsUploading(false);
-      return;
-    }
-
-    try {
-      const uploadedUrls: string[] = [];
-
-      for (const file of filesToUpload) {
-        const formData = new FormData();
-        formData.append("file", file);
-        formData.append("type", type);
-
-        const controller = new AbortController();
-        const timeoutId = setTimeout(() => controller.abort(), 60_000);
-
-        let response: Response;
-        try {
-          response = await fetch("/api/upload", {
-            method: "POST",
-            body: formData,
-            signal: controller.signal,
-          });
-        } finally {
-          clearTimeout(timeoutId);
-        }
-
-        const data = await response.json();
-
-        if (!response.ok) {
-          throw new Error(data.error || "Upload failed");
-        }
-
-        uploadedUrls.push(data.url);
+      // Check max files limit for multiple uploads
+      if (multiple && images.length + filesToUpload.length > maxFiles) {
+        setError(`Maximum ${maxFiles} images allowed`);
+        setIsUploading(false);
+        return;
       }
 
-      if (multiple) {
-        onChange([...images, ...uploadedUrls]);
-      } else {
-        onChange(uploadedUrls[0]);
+      try {
+        const uploadedUrls: string[] = [];
+
+        for (const file of filesToUpload) {
+          const formData = new FormData();
+          formData.append("file", file);
+          formData.append("type", type);
+
+          const controller = new AbortController();
+          const timeoutId = setTimeout(() => controller.abort(), 60_000);
+
+          let response: Response;
+          try {
+            response = await fetch("/api/upload", {
+              method: "POST",
+              body: formData,
+              signal: controller.signal,
+            });
+          } finally {
+            clearTimeout(timeoutId);
+          }
+
+          const data = await response.json();
+
+          if (!response.ok) {
+            throw new Error(data.error || "Upload failed");
+          }
+
+          uploadedUrls.push(data.url);
+        }
+
+        if (multiple) {
+          onChange([...images, ...uploadedUrls]);
+        } else {
+          onChange(uploadedUrls[0]);
+        }
+      } catch (err) {
+        const message =
+          err instanceof Error && err.name === "AbortError"
+            ? "Upload timed out. Please try a smaller file or check your connection."
+            : err instanceof Error
+              ? err.message
+              : "Upload failed";
+        setError(message);
+      } finally {
+        setIsUploading(false);
       }
-    } catch (err) {
-      const message =
-        err instanceof Error && err.name === "AbortError"
-          ? "Upload timed out. Please try a smaller file or check your connection."
-          : err instanceof Error
-            ? err.message
-            : "Upload failed";
-      setError(message);
-    } finally {
-      setIsUploading(false);
-    }
-  }, [images, multiple, maxFiles, onChange, type]);
+    },
+    [images, multiple, maxFiles, onChange, type]
+  );
 
   const handleRemove = async (urlToRemove: string) => {
     if (multiple) {

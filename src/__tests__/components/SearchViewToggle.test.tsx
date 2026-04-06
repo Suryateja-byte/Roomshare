@@ -1,4 +1,4 @@
-import { render, screen } from "@testing-library/react";
+import { fireEvent, render, screen } from "@testing-library/react";
 import SearchViewToggle from "@/components/SearchViewToggle";
 
 let matchMediaMatches = true;
@@ -75,5 +75,71 @@ describe("SearchViewToggle", () => {
       </SearchViewToggle>
     );
     expect(screen.getAllByTestId("card")).toHaveLength(3);
+  });
+
+  it("uses an inner desktop scroll region instead of scrolling the split-view shell", () => {
+    matchMediaMatches = true;
+    render(
+      <SearchViewToggle {...props}>
+        <TestChild />
+      </SearchViewToggle>
+    );
+
+    const shell = screen.getByTestId("search-results-container");
+    const scrollRegion = screen.getByTestId(
+      "desktop-search-results-scroll-area"
+    );
+
+    expect(shell).toHaveClass("overflow-hidden");
+    expect(shell).not.toHaveClass("overflow-y-auto");
+    expect(scrollRegion).toHaveClass("desktop-search-results-scroll");
+    expect(scrollRegion).toHaveAttribute(
+      "data-search-results-scroll-region",
+      "desktop"
+    );
+  });
+
+  it("shows desktop overflow fades when the results pane can scroll", () => {
+    matchMediaMatches = true;
+    render(
+      <SearchViewToggle {...props}>
+        <TestChild />
+      </SearchViewToggle>
+    );
+
+    const scrollRegion = screen.getByTestId(
+      "desktop-search-results-scroll-area"
+    );
+
+    Object.defineProperty(scrollRegion, "clientHeight", {
+      configurable: true,
+      value: 320,
+    });
+    Object.defineProperty(scrollRegion, "scrollHeight", {
+      configurable: true,
+      value: 960,
+    });
+    Object.defineProperty(scrollRegion, "scrollTop", {
+      configurable: true,
+      writable: true,
+      value: 0,
+    });
+
+    fireEvent.scroll(scrollRegion);
+
+    expect(
+      screen.queryByTestId("desktop-results-top-fade")
+    ).not.toBeInTheDocument();
+    expect(screen.getByTestId("desktop-results-bottom-fade")).toBeInTheDocument();
+
+    Object.defineProperty(scrollRegion, "scrollTop", {
+      configurable: true,
+      writable: true,
+      value: 120,
+    });
+
+    fireEvent.scroll(scrollRegion);
+
+    expect(screen.getByTestId("desktop-results-top-fade")).toBeInTheDocument();
   });
 });

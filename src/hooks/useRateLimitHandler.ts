@@ -45,8 +45,7 @@ export function useRateLimitHandler(): UseRateLimitHandlerReturn {
     // Falls back to retryAfter presence for backward compat with endpoints
     // that haven't adopted the code field yet.
     const isRateLimitError =
-      result.code === "RATE_LIMITED" ||
-      result.retryAfter !== undefined;
+      result.code === "RATE_LIMITED" || result.retryAfter !== undefined;
 
     if (isRateLimitError) {
       setIsRateLimited(true);

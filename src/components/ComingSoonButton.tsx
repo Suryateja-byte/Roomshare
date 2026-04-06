@@ -2,8 +2,7 @@
 
 import { toast } from "sonner";
 
-interface ComingSoonButtonProps
-  extends React.ButtonHTMLAttributes<HTMLButtonElement> {
+interface ComingSoonButtonProps extends React.ButtonHTMLAttributes<HTMLButtonElement> {
   children: React.ReactNode;
 }
 

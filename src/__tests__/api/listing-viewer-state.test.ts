@@ -4,7 +4,10 @@
 
 jest.mock("next/server", () => ({
   NextResponse: {
-    json: (data: any, init?: { status?: number; headers?: Record<string, string> }) => {
+    json: (
+      data: any,
+      init?: { status?: number; headers?: Record<string, string> }
+    ) => {
       const headers = new Map<string, string>();
       if (init?.headers) {
         for (const [k, v] of Object.entries(init.headers)) {
@@ -72,7 +75,9 @@ describe("GET /api/listings/[id]/viewer-state", () => {
   });
 
   it("returns hasBookingHistory: true when ACCEPTED booking exists", async () => {
-    (prisma.booking.findFirst as jest.Mock).mockResolvedValue({ id: "booking-1" });
+    (prisma.booking.findFirst as jest.Mock).mockResolvedValue({
+      id: "booking-1",
+    });
 
     const response = await GET(createRequest(), routeContext);
     const data = await response.json();

@@ -14,7 +14,10 @@ import { verifyTurnstileToken } from "@/lib/turnstile";
 const registerSchema = z.object({
   name: z.string().min(2).max(100),
   email: z.string().email().max(254),
-  password: z.string().min(12, "Password must be at least 12 characters").max(128),
+  password: z
+    .string()
+    .min(12, "Password must be at least 12 characters")
+    .max(128),
 });
 
 export async function POST(request: Request) {
@@ -46,10 +49,15 @@ export async function POST(request: Request) {
       const messages: Record<string, string> = {
         name: "Name must be between 2 and 100 characters.",
         email: "Please enter a valid email address.",
-        password: firstIssue?.message || "Password must be at least 12 characters.",
+        password:
+          firstIssue?.message || "Password must be at least 12 characters.",
       };
       return NextResponse.json(
-        { error: messages[field as string] || "Invalid input. Please check your details and try again." },
+        {
+          error:
+            messages[field as string] ||
+            "Invalid input. Please check your details and try again.",
+        },
         { status: 400 }
       );
     }

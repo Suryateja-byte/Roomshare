@@ -41,10 +41,7 @@ export default function ReviewList({
   return (
     <div className="space-y-6">
       {reviews.map((review) => (
-        <div
-          key={review.id}
-          className="pb-6"
-        >
+        <div key={review.id} className="pb-6">
           <div className="flex items-center justify-between mb-2">
             <div className="flex items-center gap-3">
               <UserAvatar

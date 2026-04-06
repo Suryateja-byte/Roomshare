@@ -156,6 +156,10 @@ function createMockMapInstance() {
     resize: jest.fn(),
     loaded: jest.fn(() => true),
     isSourceLoaded: jest.fn(() => true),
+    unproject: jest.fn(([x, y]: [number, number]) => ({
+      lng: -122.4194 + (x - 400) / 1000,
+      lat: 37.7749 - (y - 300) / 1000,
+    })),
     getCanvas: jest.fn(() => mockCanvas),
     getContainer: jest.fn(() => {
       const container = document.createElement("div");
@@ -448,6 +452,10 @@ jest.mock("@/components/map/UserMarker", () => ({
 
 jest.mock("@/components/map/POILayer", () => ({
   POILayer: () => null,
+  usePOILayerState: () => ({
+    activeCategories: new Set(),
+    toggleCategory: jest.fn(),
+  }),
 }));
 
 jest.mock("framer-motion", () => ({
@@ -507,6 +515,30 @@ const mockListings = [
   },
 ];
 
+function createMockRect({
+  left,
+  top,
+  width,
+  height,
+}: {
+  left: number;
+  top: number;
+  width: number;
+  height: number;
+}): DOMRect {
+  return {
+    left,
+    top,
+    width,
+    height,
+    right: left + width,
+    bottom: top + height,
+    x: left,
+    y: top,
+    toJSON: () => ({}),
+  } as DOMRect;
+}
+
 // --------------------------------------------------------------------------
 // Test Suite
 // --------------------------------------------------------------------------
@@ -533,7 +565,9 @@ describe("Map Component", () => {
     Object.defineProperty(window, "matchMedia", {
       writable: true,
       value: jest.fn().mockImplementation((query: string) => ({
-        matches: query.includes("max-width: 767px") ? phoneViewportMatches : false,
+        matches: query.includes("max-width: 767px")
+          ? phoneViewportMatches
+          : false,
         media: query,
         addEventListener: jest.fn(),
         removeEventListener: jest.fn(),
@@ -1105,12 +1139,124 @@ describe("Map Component", () => {
       expect(screen.getByTestId("map-popup")).toBeInTheDocument();
     });
 
+    it("does not auto-pan again when the popup already fits inside the map pane", async () => {
+      render(<MapComponent listings={mockListings} />);
+
+      await act(async () => {
+        jest.advanceTimersByTime(100);
+      });
+
+      const handlers = (
+        window as unknown as Record<string, { onIdle?: () => void }>
+      ).__mapHandlers;
+      await act(async () => {
+        handlers?.onIdle?.();
+      });
+
+      const mapRegion = screen.getByRole("region", {
+        name: /interactive map showing listing locations/i,
+      });
+      Object.defineProperty(mapRegion, "clientWidth", {
+        configurable: true,
+        value: 800,
+      });
+      Object.defineProperty(mapRegion, "clientHeight", {
+        configurable: true,
+        value: 600,
+      });
+      mapRegion.getBoundingClientRect = jest
+        .fn()
+        .mockReturnValue(
+          createMockRect({ left: 0, top: 0, width: 800, height: 600 })
+        );
+
+      const markers = screen.getAllByTestId("map-marker");
+      await act(async () => {
+        fireEvent.click(markers[0]);
+      });
+
+      const popupCard = screen.getByTestId("map-popup-card");
+      popupCard.getBoundingClientRect = jest
+        .fn()
+        .mockReturnValue(
+          createMockRect({ left: 140, top: 140, width: 280, height: 220 })
+        );
+
+      mockMapInstance.easeTo.mockClear();
+      mockMapInstance.unproject.mockClear();
+
+      await act(async () => {
+        jest.runOnlyPendingTimers();
+      });
+
+      expect(mockMapInstance.unproject).not.toHaveBeenCalled();
+      expect(mockMapInstance.easeTo).not.toHaveBeenCalled();
+    });
+
+    it("auto-pans when the popup would overflow the map safe area", async () => {
+      render(<MapComponent listings={mockListings} />);
+
+      await act(async () => {
+        jest.advanceTimersByTime(100);
+      });
+
+      const handlers = (
+        window as unknown as Record<string, { onIdle?: () => void }>
+      ).__mapHandlers;
+      await act(async () => {
+        handlers?.onIdle?.();
+      });
+
+      const mapRegion = screen.getByRole("region", {
+        name: /interactive map showing listing locations/i,
+      });
+      Object.defineProperty(mapRegion, "clientWidth", {
+        configurable: true,
+        value: 800,
+      });
+      Object.defineProperty(mapRegion, "clientHeight", {
+        configurable: true,
+        value: 600,
+      });
+      mapRegion.getBoundingClientRect = jest
+        .fn()
+        .mockReturnValue(
+          createMockRect({ left: 0, top: 0, width: 800, height: 600 })
+        );
+
+      const markers = screen.getAllByTestId("map-marker");
+      await act(async () => {
+        fireEvent.click(markers[0]);
+      });
+
+      const popupCard = screen.getByTestId("map-popup-card");
+      popupCard.getBoundingClientRect = jest
+        .fn()
+        .mockReturnValue(
+          createMockRect({ left: -40, top: 24, width: 280, height: 220 })
+        );
+
+      mockMapInstance.unproject.mockReturnValue({
+        lng: -122.33,
+        lat: 37.88,
+      });
+      mockMapInstance.easeTo.mockClear();
+      mockMapInstance.unproject.mockClear();
+
+      await act(async () => {
+        jest.runOnlyPendingTimers();
+      });
+
+      expect(mockMapInstance.unproject).toHaveBeenCalledWith([336, 228]);
+      expect(mockMapInstance.easeTo).toHaveBeenCalledWith({
+        center: [-122.33, 37.88],
+        duration: 250,
+      });
+    });
+
     it("suppresses the popup in sheet selection mode while syncing the active listing", async () => {
       render(
-        <MapComponent
-          listings={mockListings}
-          selectionPresentation="sheet"
-        />
+        <MapComponent listings={mockListings} selectionPresentation="sheet" />
       );
 
       await act(async () => {
@@ -1137,10 +1283,7 @@ describe("Map Component", () => {
     it("renders a phone preview card in preview selection mode without opening the popup", async () => {
       phoneViewportMatches = true;
       render(
-        <MapComponent
-          listings={mockListings}
-          selectionPresentation="preview"
-        />
+        <MapComponent listings={mockListings} selectionPresentation="preview" />
       );
 
       await act(async () => {
@@ -1168,10 +1311,7 @@ describe("Map Component", () => {
     it("keeps the phone preview during programmatic recenter and dismisses it on user move", async () => {
       phoneViewportMatches = true;
       render(
-        <MapComponent
-          listings={mockListings}
-          selectionPresentation="preview"
-        />
+        <MapComponent listings={mockListings} selectionPresentation="preview" />
       );
 
       await act(async () => {
@@ -1179,7 +1319,10 @@ describe("Map Component", () => {
       });
 
       let handlers = (
-        window as unknown as Record<string, { onIdle?: () => void; onMoveStart?: () => void }>
+        window as unknown as Record<
+          string,
+          { onIdle?: () => void; onMoveStart?: () => void }
+        >
       ).__mapHandlers;
       await act(async () => {
         handlers?.onIdle?.();
@@ -1193,7 +1336,10 @@ describe("Map Component", () => {
       expect(screen.getByTestId("map-preview-card")).toBeInTheDocument();
 
       handlers = (
-        window as unknown as Record<string, { onIdle?: () => void; onMoveStart?: () => void }>
+        window as unknown as Record<
+          string,
+          { onIdle?: () => void; onMoveStart?: () => void }
+        >
       ).__mapHandlers;
 
       mockIsProgrammaticMoveRef.current = true;
@@ -1208,7 +1354,9 @@ describe("Map Component", () => {
       });
 
       await waitFor(() => {
-        expect(screen.queryByTestId("map-preview-card")).not.toBeInTheDocument();
+        expect(
+          screen.queryByTestId("map-preview-card")
+        ).not.toBeInTheDocument();
       });
       expect(mockSetActive).toHaveBeenLastCalledWith(null);
     });
@@ -1216,10 +1364,7 @@ describe("Map Component", () => {
     it("keeps the phone preview through the first blank-map click after marker selection, then dismisses it on the next blank-map click", async () => {
       phoneViewportMatches = true;
       render(
-        <MapComponent
-          listings={mockListings}
-          selectionPresentation="preview"
-        />
+        <MapComponent listings={mockListings} selectionPresentation="preview" />
       );
 
       await act(async () => {
@@ -1264,7 +1409,9 @@ describe("Map Component", () => {
       });
 
       await waitFor(() => {
-        expect(screen.queryByTestId("map-preview-card")).not.toBeInTheDocument();
+        expect(
+          screen.queryByTestId("map-preview-card")
+        ).not.toBeInTheDocument();
       });
       expect(mockSetActive).toHaveBeenLastCalledWith(null);
     });
@@ -1651,8 +1798,8 @@ describe("Map Component", () => {
     });
   });
 
-  describe("fit all results button", () => {
-    it("renders fit all button when listings exist", async () => {
+  describe("desktop map controls", () => {
+    it("renders the hide map button on desktop", async () => {
       render(<MapComponent listings={mockListings} />);
 
       await act(async () => {
@@ -1660,23 +1807,53 @@ describe("Map Component", () => {
       });
 
       expect(
-        screen.getByRole("button", { name: /fit all results/i })
+        screen.getByRole("button", { name: /hide map/i })
       ).toBeInTheDocument();
     });
 
-    it("calls fitBounds when clicked", async () => {
+    it("shows a contextual reset pill after the user drifts away from the results", async () => {
       render(<MapComponent listings={mockListings} />);
 
       await act(async () => {
         jest.advanceTimersByTime(100);
       });
 
-      const fitButton = screen.getByRole("button", {
-        name: /fit all results/i,
-      });
+      const handlers = (
+        window as unknown as Record<
+          string,
+          {
+            onMoveEnd?: (e: unknown) => void;
+          }
+        >
+      ).__mapHandlers;
 
       await act(async () => {
-        fireEvent.click(fitButton);
+        handlers?.onMoveEnd?.({
+          viewState: {
+            longitude: -140,
+            latitude: 45,
+            zoom: 8,
+            bearing: 0,
+            pitch: 0,
+          },
+          target: {
+            getBounds: () => ({
+              getWest: () => -150,
+              getEast: () => -140,
+              getSouth: () => 40,
+              getNorth: () => 48,
+            }),
+          },
+        });
+      });
+
+      const resetButton = screen.getByRole("button", {
+        name: /show all results on map/i,
+      });
+      expect(resetButton).toBeInTheDocument();
+
+      await act(async () => {
+        fireEvent.click(resetButton);
       });
 
       expect(mockSetProgrammaticMove).toHaveBeenCalledWith(true);

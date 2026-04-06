@@ -1,39 +1,50 @@
 "use client";
 
-import { useState, useRef, useEffect, useCallback, useId } from "react";
+import {
+  useState,
+  useRef,
+  useEffect,
+  useCallback,
+  useId,
+  useMemo,
+} from "react";
 import { createPortal } from "react-dom";
-import { MapPin, Loader2, X, AlertCircle, SearchX } from "lucide-react";
+import {
+  MapPin,
+  Loader2,
+  X,
+  SearchX,
+  History,
+  RotateCw,
+  WifiOff,
+} from "lucide-react";
 import { useDebounce } from "use-debounce";
 import { cn } from "@/lib/utils";
+import { FetchTimeoutError, fetchWithTimeout } from "@/lib/fetch-with-timeout";
 import {
-  getCachedResults,
-  setCachedResults,
-  type GeocodingResult,
-} from "@/lib/geocoding-cache";
-import { searchPhoton, PHOTON_QUERY_MAX_LENGTH } from "@/lib/geocoding/photon";
-import { FetchTimeoutError } from "@/lib/fetch-with-timeout";
+  LOCATION_AUTOCOMPLETE_DEFAULT_LIMIT,
+  LOCATION_AUTOCOMPLETE_MIN_QUERY_LENGTH,
+  sanitizeAutocompleteQuery,
+  type LocationAutocompleteErrorCode,
+  type LocationAutocompleteErrorResponse,
+  type LocationAutocompleteSuccessResponse,
+} from "@/lib/geocoding/autocomplete";
 
-const MIN_QUERY_LENGTH = 2;
-
-/**
- * Sanitizes user input for safe API requests
- * - Trims whitespace
- * - Removes control characters
- * - Enforces max length
- */
-function sanitizeQuery(input: string): string {
-  return input
-    .trim()
-    .replace(/[\x00-\x1F\x7F]/g, "") // Remove control characters
-    .slice(0, PHOTON_QUERY_MAX_LENGTH);
-}
+const AUTOCOMPLETE_TIMEOUT_MS = 9000;
 
 interface LocationSuggestion {
   id: string;
   place_name: string;
-  center: [number, number]; // [lng, lat]
+  center: [number, number];
   place_type: string[];
   bbox?: [number, number, number, number];
+}
+
+export interface LocationSearchFallbackItem {
+  id: string;
+  primaryText: string;
+  secondaryText?: string;
+  onSelect: () => void;
 }
 
 interface LocationSearchInputProps {
@@ -43,15 +54,160 @@ interface LocationSearchInputProps {
     name: string;
     lat: number;
     lng: number;
-    bbox?: [number, number, number, number]; // [minLng, minLat, maxLng, maxLat]
+    bbox?: [number, number, number, number];
   }) => void;
   onFocus?: () => void;
   onBlur?: () => void;
   placeholder?: string;
   className?: string;
   inputClassName?: string;
-  /** HTML id for the input element - required for proper label association */
   id?: string;
+  fallbackItems?: LocationSearchFallbackItem[];
+  fallbackTitle?: string;
+}
+
+class AutocompleteUnavailableError extends Error {
+  constructor(public readonly code: LocationAutocompleteErrorCode) {
+    super(code);
+    this.name = "AutocompleteUnavailableError";
+  }
+}
+
+interface PhotonFeatureProperties {
+  osm_id?: number;
+  osm_type?: string;
+  name?: string;
+  city?: string;
+  state?: string;
+  country?: string;
+  district?: string;
+  extent?: [number, number, number, number];
+  type?: string;
+}
+
+type PhotonLikeResponse = {
+  features?: Array<{
+    geometry?: { coordinates?: [number, number] };
+    properties?: PhotonFeatureProperties;
+  }>;
+};
+
+function buildPlaceName(props?: PhotonFeatureProperties) {
+  if (!props) return "Unknown location";
+
+  const parts: string[] = [];
+  if (props.name) parts.push(props.name);
+  if (props.city && props.city !== props.name) {
+    parts.push(props.city);
+  } else if (props.district && props.district !== props.name) {
+    parts.push(props.district);
+  }
+  if (props.state) parts.push(props.state);
+  if (props.country) parts.push(props.country);
+
+  return parts.join(", ") || "Unknown location";
+}
+
+function inferPlaceType(type?: string): string[] {
+  if (!type) return ["place"];
+
+  switch (type) {
+    case "city":
+    case "town":
+    case "village":
+      return ["place"];
+    case "district":
+    case "suburb":
+    case "neighbourhood":
+      return ["neighborhood"];
+    case "street":
+    case "house":
+      return ["address"];
+    case "state":
+    case "county":
+      return ["region"];
+    case "country":
+      return ["country"];
+    case "locality":
+      return ["locality"];
+    default:
+      return ["place"];
+  }
+}
+
+function normalizeLegacyPhotonResponse(
+  data: PhotonLikeResponse
+): LocationSuggestion[] {
+  return (data.features || []).map((feature) => {
+    const props = feature.properties ?? {};
+
+    return {
+      id: `${props.osm_type || "N"}:${props.osm_id || 0}`,
+      place_name: buildPlaceName(props),
+      center: feature.geometry?.coordinates ?? [0, 0],
+      place_type: inferPlaceType(props.type),
+      bbox: props.extent,
+    };
+  });
+}
+
+function normalizeAutocompleteResults(
+  payload: LocationAutocompleteSuccessResponse | PhotonLikeResponse
+): LocationSuggestion[] {
+  if (Array.isArray((payload as LocationAutocompleteSuccessResponse).results)) {
+    return (payload as LocationAutocompleteSuccessResponse)
+      .results as LocationSuggestion[];
+  }
+
+  return normalizeLegacyPhotonResponse(payload as PhotonLikeResponse);
+}
+
+async function fetchAutocompleteSuggestions(
+  query: string,
+  signal: AbortSignal
+): Promise<LocationSuggestion[]> {
+  const params = new URLSearchParams({
+    q: query,
+    limit: String(LOCATION_AUTOCOMPLETE_DEFAULT_LIMIT),
+  });
+  const url = `/api/geocoding/autocomplete?${params.toString()}`;
+
+  let response: Response;
+  try {
+    response = await fetchWithTimeout(url, {
+      signal,
+      timeout: AUTOCOMPLETE_TIMEOUT_MS,
+    });
+  } catch (error) {
+    if (error instanceof FetchTimeoutError) {
+      throw new AutocompleteUnavailableError("TIMEOUT");
+    }
+    throw error;
+  }
+
+  if (!response.ok) {
+    const payload =
+      (await response
+        .json()
+        .catch(() => null)) as LocationAutocompleteErrorResponse | null;
+
+    if (payload?.code === "INVALID_QUERY") {
+      return [];
+    }
+
+    if (payload?.code === "TIMEOUT" || payload?.code === "UNAVAILABLE") {
+      throw new AutocompleteUnavailableError(payload.code);
+    }
+
+    throw new AutocompleteUnavailableError("UNAVAILABLE");
+  }
+
+  const data =
+    (await response.json()) as
+      | LocationAutocompleteSuccessResponse
+      | PhotonLikeResponse;
+
+  return normalizeAutocompleteResults(data);
 }
 
 export default function LocationSearchInput({
@@ -64,13 +220,15 @@ export default function LocationSearchInput({
   className = "",
   inputClassName = "",
   id,
+  fallbackItems = [],
+  fallbackTitle = "Recent locations",
 }: LocationSearchInputProps) {
   const [suggestions, setSuggestions] = useState<LocationSuggestion[]>([]);
   const [isLoading, setIsLoading] = useState(false);
   const [showSuggestions, setShowSuggestions] = useState(false);
   const [selectedIndex, setSelectedIndex] = useState(-1);
-  const [error, setError] = useState<string | null>(null);
   const [noResults, setNoResults] = useState(false);
+  const [serviceUnavailable, setServiceUnavailable] = useState(false);
 
   const inputRef = useRef<HTMLInputElement>(null);
   const suggestionsRef = useRef<HTMLDivElement>(null);
@@ -82,173 +240,167 @@ export default function LocationSearchInput({
   const justSelectedRef = useRef(false);
 
   const listboxId = useId();
-
-  // Portal positioning: track the input's bounding rect so the dropdown
-  // can be rendered at document.body with correct coordinates.
   const [dropdownPos, setDropdownPos] = useState<{
     top: number;
     left: number;
     width: number;
   } | null>(null);
   const [isMounted, setIsMounted] = useState(false);
+  const [debouncedValue] = useDebounce(value, 300);
 
   useEffect(() => {
     setIsMounted(true);
   }, []);
 
-  const updateDropdownPosition = useCallback(() => {
-    const container = containerRef.current;
-    if (!container) return;
-    const rect = container.getBoundingClientRect();
-    setDropdownPos({
-      top: rect.bottom + 8, // 8px gap (mt-2)
-      left: rect.left,
-      width: Math.max(rect.width, 300), // min 300px
-    });
-  }, []);
-
-  const [debouncedValue] = useDebounce(value, 300);
-
-  // Cleanup on unmount
   useEffect(() => {
     return () => {
-      if (abortRef.current) {
-        abortRef.current.abort();
-      }
+      abortRef.current?.abort();
     };
   }, []);
 
-  // Fetch suggestions from Photon geocoding API
-  const fetchSuggestions = useCallback(async (query: string) => {
-    // Sanitize input
-    const sanitized = sanitizeQuery(query);
+  const updateDropdownPosition = useCallback(() => {
+    const container = containerRef.current;
+    if (!container) return;
 
-    // Reset states
-    setError(null);
-    setNoResults(false);
-
-    // Validate minimum length
-    if (!sanitized || sanitized.length < MIN_QUERY_LENGTH) {
-      setSuggestions([]);
-      setShowSuggestions(false);
-      return;
-    }
-
-    // Request deduplication - skip if same query already pending
-    if (pendingQueryRef.current === sanitized) {
-      return;
-    }
-
-    // Check cache first
-    const cached = await getCachedResults(sanitized);
-    if (cached) {
-      setSuggestions(cached as LocationSuggestion[]);
-      setSelectedIndex(-1);
-      setShowSuggestions(true);
-      if (cached.length === 0 && sanitized.length >= 3) {
-        setNoResults(true);
-      }
-      return;
-    }
-
-    // Track this request
-    const requestId = ++requestIdRef.current;
-    pendingQueryRef.current = sanitized;
-
-    // Cancel previous request
-    if (abortRef.current) {
-      abortRef.current.abort();
-    }
-    const controller = new AbortController();
-    abortRef.current = controller;
-
-    setIsLoading(true);
-
-    try {
-      const results = await searchPhoton(sanitized, {
-        signal: controller.signal,
-      });
-
-      // Stale response check
-      if (requestId !== requestIdRef.current) return;
-
-      const features = results as LocationSuggestion[];
-
-      // Cache the results (fire-and-forget; don't block rendering)
-      void setCachedResults(sanitized, features as GeocodingResult[]);
-
-      setSuggestions(features);
-      setSelectedIndex(-1);
-      setShowSuggestions(true);
-
-      // Set noResults if query was long enough but no results found
-      if (sanitized.length >= 3 && features.length === 0) {
-        setNoResults(true);
-      }
-    } catch (err) {
-      // Handle AbortError silently (intentional cancellation)
-      if (err instanceof DOMException && err.name === "AbortError") {
-        return;
-      }
-
-      // Handle network errors
-      if (err instanceof TypeError && err.message.includes("fetch")) {
-        console.error("Network error fetching location suggestions:", err);
-        if (requestId === requestIdRef.current) {
-          setSuggestions([]);
-          setError("Network error. Check your connection.");
-          setShowSuggestions(true); // Show error in dropdown
-        }
-        return;
-      }
-
-      // Handle timeout errors with user-friendly message
-      if (err instanceof FetchTimeoutError) {
-        console.warn("Location search timed out:", err.url);
-        if (requestId === requestIdRef.current) {
-          setSuggestions([]);
-          setError("Location search timed out. Please try again.");
-          setShowSuggestions(true);
-        }
-        return;
-      }
-
-      console.error("Error fetching location suggestions:", err);
-      if (requestId === requestIdRef.current) {
-        setSuggestions([]);
-        setError(
-          err instanceof Error ? err.message : "Unable to search locations"
-        );
-        setShowSuggestions(true); // Show error in dropdown
-      }
-    } finally {
-      if (pendingQueryRef.current === sanitized) {
-        pendingQueryRef.current = null;
-      }
-      if (requestId === requestIdRef.current) {
-        setIsLoading(false);
-      }
-    }
+    const rect = container.getBoundingClientRect();
+    setDropdownPos({
+      top: rect.bottom + 8,
+      left: rect.left,
+      width: Math.max(rect.width, 300),
+    });
   }, []);
 
-  // Fetch suggestions when debounced value changes (but not during IME composition)
+  const sanitizedValue = sanitizeAutocompleteQuery(value);
+  const showTypeMoreHint =
+    sanitizedValue.length > 0 &&
+    sanitizedValue.length < LOCATION_AUTOCOMPLETE_MIN_QUERY_LENGTH &&
+    !isComposingRef.current;
+
+  const visibleFallbackItems = useMemo(() => {
+    if (fallbackItems.length === 0) {
+      return [];
+    }
+
+    const normalizedQuery = sanitizedValue.toLowerCase();
+    if (!normalizedQuery) {
+      return fallbackItems;
+    }
+
+    const matches = fallbackItems.filter((item) => {
+      const haystack = `${item.primaryText} ${item.secondaryText || ""}`.toLowerCase();
+      return haystack.includes(normalizedQuery);
+    });
+
+    return matches.length > 0 ? matches : fallbackItems;
+  }, [fallbackItems, sanitizedValue]);
+
+  const showFallbackOptions = serviceUnavailable && visibleFallbackItems.length > 0;
+  const availableOptionCount = showFallbackOptions
+    ? visibleFallbackItems.length
+    : suggestions.length;
+
+  const clearTransientState = useCallback(() => {
+    setNoResults(false);
+    setServiceUnavailable(false);
+  }, []);
+
+  const fetchSuggestions = useCallback(
+    async (query: string) => {
+      const sanitized = sanitizeAutocompleteQuery(query);
+
+      clearTransientState();
+
+      if (
+        !sanitized ||
+        sanitized.length < LOCATION_AUTOCOMPLETE_MIN_QUERY_LENGTH
+      ) {
+        setSuggestions([]);
+        setShowSuggestions(false);
+        return;
+      }
+
+      if (pendingQueryRef.current === sanitized) {
+        return;
+      }
+
+      const requestId = ++requestIdRef.current;
+      pendingQueryRef.current = sanitized;
+
+      abortRef.current?.abort();
+      const controller = new AbortController();
+      abortRef.current = controller;
+
+      setIsLoading(true);
+
+      try {
+        const results = await fetchAutocompleteSuggestions(
+          sanitized,
+          controller.signal
+        );
+
+        if (requestId !== requestIdRef.current) return;
+
+        setSuggestions(results);
+        setSelectedIndex(-1);
+        setShowSuggestions(true);
+
+        if (sanitized.length >= 3 && results.length === 0) {
+          setNoResults(true);
+        }
+      } catch (error) {
+        if (
+          (error instanceof DOMException && error.name === "AbortError") ||
+          (error instanceof Error && error.name === "AbortError")
+        ) {
+          return;
+        }
+
+        if (requestId !== requestIdRef.current) {
+          return;
+        }
+
+        if (
+          error instanceof AutocompleteUnavailableError ||
+          error instanceof TypeError ||
+          error instanceof FetchTimeoutError
+        ) {
+          setSuggestions([]);
+          setServiceUnavailable(true);
+          setShowSuggestions(true);
+          setSelectedIndex(-1);
+          return;
+        }
+
+        setSuggestions([]);
+        setServiceUnavailable(true);
+        setShowSuggestions(true);
+        setSelectedIndex(-1);
+      } finally {
+        if (pendingQueryRef.current === sanitized) {
+          pendingQueryRef.current = null;
+        }
+        if (requestId === requestIdRef.current) {
+          setIsLoading(false);
+        }
+      }
+    },
+    [clearTransientState]
+  );
+
   useEffect(() => {
     if (!isComposingRef.current) {
-      fetchSuggestions(debouncedValue);
+      void fetchSuggestions(debouncedValue);
     }
   }, [debouncedValue, fetchSuggestions]);
 
-  // Handle clicking outside to close suggestions
   useEffect(() => {
     const handleClickOutside = (event: MouseEvent) => {
       const target = event.target as Node;
 
-      // Ignore clicks inside the dropdown (including scrollbar)
       if (suggestionsRef.current?.contains(target)) {
         return;
       }
 
-      // Ignore clicks on the input
       if (inputRef.current?.contains(target)) {
         return;
       }
@@ -260,78 +412,16 @@ export default function LocationSearchInput({
     return () => document.removeEventListener("mousedown", handleClickOutside);
   }, []);
 
-  // IME composition handlers for CJK input support
   const handleCompositionStart = useCallback(() => {
     isComposingRef.current = true;
   }, []);
 
   const handleCompositionEnd = useCallback(
-    (e: React.CompositionEvent<HTMLInputElement>) => {
+    (event: React.CompositionEvent<HTMLInputElement>) => {
       isComposingRef.current = false;
-      // Trigger search with final composed value
-      const finalValue = e.currentTarget.value;
-      fetchSuggestions(finalValue);
+      void fetchSuggestions(event.currentTarget.value);
     },
     [fetchSuggestions]
-  );
-
-  // Handle keyboard navigation (WAI-ARIA combobox pattern)
-  const handleKeyDown = useCallback(
-    (e: React.KeyboardEvent) => {
-      switch (e.key) {
-        case "ArrowDown":
-          e.preventDefault();
-          if (!showSuggestions && suggestions.length > 0) {
-            // Open dropdown on ArrowDown when closed but has suggestions
-            setShowSuggestions(true);
-            setSelectedIndex(0);
-          } else if (showSuggestions && suggestions.length > 0) {
-            setSelectedIndex((prev) =>
-              prev < suggestions.length - 1 ? prev + 1 : prev
-            );
-          }
-          break;
-
-        case "ArrowUp":
-          e.preventDefault();
-          if (showSuggestions && suggestions.length > 0) {
-            setSelectedIndex((prev) => (prev > 0 ? prev - 1 : -1));
-          }
-          break;
-
-        case "Enter":
-          if (
-            showSuggestions &&
-            selectedIndex >= 0 &&
-            selectedIndex < suggestions.length
-          ) {
-            e.preventDefault();
-            handleSelectSuggestion(suggestions[selectedIndex]);
-          }
-          break;
-
-        case "Tab":
-          // Select highlighted option and close (don't prevent default - allow focus to move)
-          if (
-            showSuggestions &&
-            selectedIndex >= 0 &&
-            selectedIndex < suggestions.length
-          ) {
-            handleSelectSuggestion(suggestions[selectedIndex]);
-          }
-          setShowSuggestions(false);
-          setSelectedIndex(-1);
-          break;
-
-        case "Escape":
-          e.preventDefault();
-          setShowSuggestions(false);
-          setSelectedIndex(-1);
-          break;
-      }
-    },
-    // eslint-disable-next-line react-hooks/exhaustive-deps -- handleSelectSuggestion defined after this hook; stable via useCallback
-    [showSuggestions, suggestions, selectedIndex]
   );
 
   const handleSelectSuggestion = useCallback(
@@ -342,64 +432,160 @@ export default function LocationSearchInput({
       setShowSuggestions(false);
       setSuggestions([]);
       setSelectedIndex(-1);
-      // Reset flag after React's event cycle completes
+      clearTransientState();
+
       requestAnimationFrame(() => {
         justSelectedRef.current = false;
       });
 
-      if (onLocationSelect) {
-        onLocationSelect({
-          name: suggestion.place_name,
-          lat,
-          lng,
-          bbox: suggestion.bbox,
-        });
+      onLocationSelect?.({
+        name: suggestion.place_name,
+        lat,
+        lng,
+        bbox: suggestion.bbox,
+      });
+    },
+    [clearTransientState, onChange, onLocationSelect]
+  );
+
+  const handleSelectFallback = useCallback(
+    (item: LocationSearchFallbackItem) => {
+      item.onSelect();
+      setShowSuggestions(false);
+      setSelectedIndex(-1);
+      clearTransientState();
+    },
+    [clearTransientState]
+  );
+
+  const handleRetry = useCallback(() => {
+    if (!sanitizedValue) {
+      return;
+    }
+
+    setShowSuggestions(true);
+    setSelectedIndex(-1);
+    void fetchSuggestions(sanitizedValue);
+  }, [fetchSuggestions, sanitizedValue]);
+
+  const handleKeyDown = useCallback(
+    (event: React.KeyboardEvent) => {
+      switch (event.key) {
+        case "ArrowDown":
+          event.preventDefault();
+          if (!showSuggestions && availableOptionCount > 0) {
+            setShowSuggestions(true);
+            setSelectedIndex(0);
+          } else if (showSuggestions && availableOptionCount > 0) {
+            setSelectedIndex((prev) =>
+              prev < availableOptionCount - 1 ? prev + 1 : prev
+            );
+          }
+          break;
+
+        case "ArrowUp":
+          event.preventDefault();
+          if (showSuggestions && availableOptionCount > 0) {
+            setSelectedIndex((prev) => (prev > 0 ? prev - 1 : -1));
+          }
+          break;
+
+        case "Enter":
+          if (
+            showSuggestions &&
+            selectedIndex >= 0 &&
+            selectedIndex < availableOptionCount
+          ) {
+            event.preventDefault();
+            if (showFallbackOptions) {
+              handleSelectFallback(visibleFallbackItems[selectedIndex]);
+            } else {
+              handleSelectSuggestion(suggestions[selectedIndex]);
+            }
+          }
+          break;
+
+        case "Tab":
+          if (
+            showSuggestions &&
+            selectedIndex >= 0 &&
+            selectedIndex < availableOptionCount
+          ) {
+            if (showFallbackOptions) {
+              handleSelectFallback(visibleFallbackItems[selectedIndex]);
+            } else {
+              handleSelectSuggestion(suggestions[selectedIndex]);
+            }
+          }
+          setShowSuggestions(false);
+          setSelectedIndex(-1);
+          break;
+
+        case "Escape":
+          event.preventDefault();
+          setShowSuggestions(false);
+          setSelectedIndex(-1);
+          break;
       }
     },
-    [onChange, onLocationSelect]
+    [
+      availableOptionCount,
+      handleSelectFallback,
+      handleSelectSuggestion,
+      showFallbackOptions,
+      showSuggestions,
+      selectedIndex,
+      suggestions,
+      visibleFallbackItems,
+    ]
   );
 
   const handleInputChange = useCallback(
-    (e: React.ChangeEvent<HTMLInputElement>) => {
-      const newValue = e.target.value;
+    (event: React.ChangeEvent<HTMLInputElement>) => {
+      const newValue = event.target.value;
+      clearTransientState();
       onChange(newValue);
       if (!justSelectedRef.current) {
         setShowSuggestions(true);
       }
-      // Note: actual fetch is triggered by debouncedValue effect
-      // unless IME composition is in progress
     },
-    [onChange]
+    [clearTransientState, onChange]
   );
 
-  const handleClear = () => {
+  const handleClear = useCallback(() => {
     onChange("");
     setSuggestions([]);
     setShowSuggestions(false);
-    setError(null);
-    setNoResults(false);
+    setSelectedIndex(-1);
+    clearTransientState();
     inputRef.current?.focus();
-  };
+  }, [clearTransientState, onChange]);
 
   const handleInputFocus = useCallback(() => {
-    if (suggestions.length > 0 || value.length >= MIN_QUERY_LENGTH) {
+    if (
+      suggestions.length > 0 ||
+      serviceUnavailable ||
+      value.length >= LOCATION_AUTOCOMPLETE_MIN_QUERY_LENGTH
+    ) {
       setShowSuggestions(true);
     }
     onFocus?.();
-  }, [suggestions.length, value.length, onFocus]);
+  }, [onFocus, serviceUnavailable, suggestions.length, value.length]);
 
-  // Handle click on input to reopen suggestions when already focused
   const handleInputClick = useCallback(() => {
-    if (suggestions.length > 0 && !showSuggestions) {
+    if (
+      (suggestions.length > 0 ||
+        serviceUnavailable ||
+        value.length >= LOCATION_AUTOCOMPLETE_MIN_QUERY_LENGTH) &&
+      !showSuggestions
+    ) {
       setShowSuggestions(true);
     }
-  }, [suggestions.length, showSuggestions]);
+  }, [serviceUnavailable, showSuggestions, suggestions.length, value.length]);
 
   const handleInputBlur = useCallback(() => {
-    // Small delay to allow click events on suggestions to fire first
     setTimeout(() => {
       if (!containerRef.current?.contains(document.activeElement)) {
-        // Focus moved outside the component
         setShowSuggestions(false);
       }
     }, 150);
@@ -407,7 +593,6 @@ export default function LocationSearchInput({
   }, [onBlur]);
 
   const getPlaceTypeIcon = (placeTypes: string[]) => {
-    // Return appropriate styling based on place type
     if (placeTypes.includes("neighborhood")) return "text-orange-500";
     if (placeTypes.includes("locality")) return "text-blue-500";
     if (placeTypes.includes("place")) return "text-green-500";
@@ -415,28 +600,22 @@ export default function LocationSearchInput({
     return "text-on-surface-variant";
   };
 
-  // Show "type more" hint when user has typed but not enough characters
-  const sanitizedValue = sanitizeQuery(value);
-  const showTypeMoreHint =
-    sanitizedValue.length > 0 &&
-    sanitizedValue.length < MIN_QUERY_LENGTH &&
-    !isComposingRef.current;
-
-  // Compute whether any popup is visible for aria-expanded
   const isPopupOpen =
     showSuggestions &&
     (suggestions.length > 0 ||
-      (error && !isLoading) ||
-      (noResults && !error && !isLoading) ||
+      serviceUnavailable ||
+      (noResults && !isLoading) ||
       showTypeMoreHint);
 
-  // Recalculate portal position when popup opens or on scroll/resize
   useEffect(() => {
     if (!isPopupOpen) return;
+
     updateDropdownPosition();
     const handleUpdate = () => updateDropdownPosition();
+
     window.addEventListener("scroll", handleUpdate, true);
     window.addEventListener("resize", handleUpdate);
+
     return () => {
       window.removeEventListener("scroll", handleUpdate, true);
       window.removeEventListener("resize", handleUpdate);
@@ -460,11 +639,10 @@ export default function LocationSearchInput({
           onCompositionEnd={handleCompositionEnd}
           placeholder={placeholder}
           className={cn(
-            "h-full w-full min-w-0 bg-transparent border-none p-0 text-on-surface placeholder:text-on-surface-variant focus:ring-0 focus:outline-none text-base md:text-sm truncate pr-8",
+            "h-full w-full min-w-0 bg-transparent border-none p-0 pr-8 text-base text-on-surface placeholder:text-on-surface-variant focus:outline-none focus:ring-0 md:text-sm truncate",
             inputClassName
           )}
           autoComplete="off"
-          // ARIA combobox attributes for screen reader accessibility
           role="combobox"
           aria-expanded={isPopupOpen}
           aria-controls={isPopupOpen ? `${listboxId}-listbox` : undefined}
@@ -478,39 +656,37 @@ export default function LocationSearchInput({
           aria-busy={isLoading}
         />
 
-        {/* Loading/Clear indicator */}
         <div className="absolute inset-y-0 right-0 flex items-center">
           {isLoading ? (
             <Loader2
-              className="w-4 h-4 text-on-surface-variant animate-spin"
+              className="h-4 w-4 animate-spin text-on-surface-variant"
               aria-hidden="true"
             />
           ) : value ? (
             <button
               type="button"
               onClick={handleClear}
-              className="p-1 min-w-[44px] min-h-[44px] flex items-center justify-center hover:bg-surface-container-high rounded-full transition-colors"
+              className="flex min-h-[44px] min-w-[44px] items-center justify-center rounded-full p-1 transition-colors hover:bg-surface-container-high"
               aria-label="Clear search"
             >
-              <X className="w-3 h-3 text-on-surface-variant" />
+              <X className="h-3 w-3 text-on-surface-variant" />
             </button>
           ) : null}
         </div>
       </div>
 
-      {/* All dropdown variants rendered via portal to escape header stacking context */}
       {isMounted &&
         dropdownPos &&
         isPopupOpen &&
         createPortal(
           <>
-            {/* Type more hint */}
             {showSuggestions && showTypeMoreHint && !isLoading && (
               <div
                 ref={suggestionsRef}
                 role="status"
                 aria-live="polite"
-                className="fixed bg-surface-container-lowest backdrop-blur-xl rounded-2xl shadow-2xl overflow-hidden z-[9999] animate-in fade-in-0 slide-in-from-top-2"
+                data-location-search-popup="true"
+                className="fixed z-[9999] overflow-hidden rounded-2xl bg-surface-container-lowest shadow-2xl backdrop-blur-xl animate-in fade-in-0 slide-in-from-top-2"
                 style={{
                   top: dropdownPos.top,
                   left: dropdownPos.left,
@@ -518,16 +694,16 @@ export default function LocationSearchInput({
                 }}
               >
                 <div className="px-4 py-3 text-sm text-on-surface-variant">
-                  Type at least {MIN_QUERY_LENGTH} characters to search
+                  Type at least {LOCATION_AUTOCOMPLETE_MIN_QUERY_LENGTH} characters to search
                 </div>
               </div>
             )}
 
-            {/* Suggestions dropdown */}
             {showSuggestions && suggestions.length > 0 && !showTypeMoreHint && (
               <div
                 ref={suggestionsRef}
-                className="fixed bg-surface-container-lowest backdrop-blur-xl rounded-2xl shadow-2xl overflow-hidden z-[9999] animate-in fade-in-0 slide-in-from-top-2"
+                data-location-search-popup="true"
+                className="fixed z-[9999] overflow-hidden rounded-2xl bg-surface-container-lowest shadow-2xl backdrop-blur-xl animate-in fade-in-0 slide-in-from-top-2"
                 style={{
                   top: dropdownPos.top,
                   left: dropdownPos.left,
@@ -550,21 +726,25 @@ export default function LocationSearchInput({
                       <button
                         type="button"
                         onClick={() => handleSelectSuggestion(suggestion)}
-                        className={`w-full px-3 py-2.5 flex items-start gap-3 rounded-xl transition-colors duration-150 text-left ${
+                        className={cn(
+                          "flex w-full items-start gap-3 rounded-xl px-3 py-2.5 text-left transition-colors duration-150",
                           index === selectedIndex
                             ? "bg-surface-container-high"
                             : "hover:bg-surface-container-high/80"
-                        }`}
+                        )}
                         tabIndex={-1}
                       >
                         <MapPin
-                          className={`w-5 h-5 mt-0.5 flex-shrink-0 ${getPlaceTypeIcon(suggestion.place_type)}`}
+                          className={cn(
+                            "mt-0.5 h-5 w-5 flex-shrink-0",
+                            getPlaceTypeIcon(suggestion.place_type)
+                          )}
                         />
-                        <div className="flex-1 min-w-0">
-                          <p className="text-sm font-medium text-on-surface truncate">
+                        <div className="min-w-0 flex-1">
+                          <p className="truncate text-sm font-medium text-on-surface">
                             {suggestion.place_name.split(",")[0]}
                           </p>
-                          <p className="text-xs text-on-surface-variant truncate">
+                          <p className="truncate text-xs text-on-surface-variant">
                             {suggestion.place_name
                               .split(",")
                               .slice(1)
@@ -579,39 +759,102 @@ export default function LocationSearchInput({
               </div>
             )}
 
-            {/* Error state dropdown */}
-            {showSuggestions && error && !isLoading && !showTypeMoreHint && (
-              <div
-                ref={suggestionsRef}
-                role="alert"
-                aria-live="assertive"
-                className="fixed bg-surface-container-lowest backdrop-blur-xl rounded-2xl shadow-2xl overflow-hidden z-[9999] animate-in fade-in-0 slide-in-from-top-2"
-                style={{
-                  top: dropdownPos.top,
-                  left: dropdownPos.left,
-                  width: dropdownPos.width,
-                }}
-              >
-                <div className="p-4 flex items-center gap-3">
-                  <div className="p-2 rounded-full bg-red-100">
-                    <AlertCircle className="w-5 h-5 text-red-500" />
+            {showSuggestions &&
+              serviceUnavailable &&
+              !isLoading &&
+              !showTypeMoreHint && (
+                <div
+                  ref={suggestionsRef}
+                  role="status"
+                  aria-live="polite"
+                  data-location-search-popup="true"
+                  data-location-search-unavailable="true"
+                  className="fixed z-[9999] overflow-hidden rounded-2xl bg-surface-container-lowest shadow-2xl backdrop-blur-xl animate-in fade-in-0 slide-in-from-top-2"
+                  style={{
+                    top: dropdownPos.top,
+                    left: dropdownPos.left,
+                    width: dropdownPos.width,
+                  }}
+                >
+                  <div className="flex items-start gap-3 border-b border-outline-variant/10 px-4 py-3">
+                    <div className="flex h-10 w-10 items-center justify-center rounded-full bg-surface-container-high text-on-surface-variant">
+                      <WifiOff className="h-4 w-4" />
+                    </div>
+                    <div className="min-w-0 flex-1">
+                      <p className="text-sm font-medium text-on-surface">
+                        Live suggestions unavailable
+                      </p>
+                      <p className="text-xs text-on-surface-variant">
+                        {showFallbackOptions
+                          ? "Pick a recent location below or retry."
+                          : "Try again in a moment."}
+                      </p>
+                    </div>
+                    <button
+                      type="button"
+                      onClick={handleRetry}
+                      className="inline-flex min-h-[36px] items-center gap-1 rounded-full border border-outline-variant/20 px-3 text-xs font-medium text-on-surface transition-colors hover:bg-surface-container-high"
+                      data-location-search-retry="true"
+                    >
+                      <RotateCw className="h-3.5 w-3.5" />
+                      Retry
+                    </button>
                   </div>
-                  <div>
-                    <p className="text-sm font-medium text-red-700">
-                      Search unavailable
-                    </p>
-                    <p className="text-xs text-red-500 animate-error-in">
-                      {error}
-                    </p>
-                  </div>
-                </div>
-              </div>
-            )}
 
-            {/* No results dropdown */}
+                  {showFallbackOptions && (
+                    <>
+                      <div className="px-4 pt-3 text-[11px] font-semibold uppercase tracking-[0.16em] text-on-surface-variant">
+                        {fallbackTitle}
+                      </div>
+                      <ul
+                        className="p-2"
+                        role="listbox"
+                        id={`${listboxId}-listbox`}
+                        aria-label={fallbackTitle}
+                      >
+                        {visibleFallbackItems.map((item, index) => (
+                          <li
+                            key={item.id}
+                            role="option"
+                            id={`${listboxId}-option-${index}`}
+                            aria-selected={index === selectedIndex}
+                          >
+                            <button
+                              type="button"
+                              onClick={() => handleSelectFallback(item)}
+                              className={cn(
+                                "flex w-full items-start gap-3 rounded-xl px-3 py-2.5 text-left transition-colors duration-150",
+                                index === selectedIndex
+                                  ? "bg-surface-container-high"
+                                  : "hover:bg-surface-container-high/80"
+                              )}
+                              tabIndex={-1}
+                            >
+                              <div className="mt-0.5 flex h-8 w-8 flex-shrink-0 items-center justify-center rounded-full bg-surface-container-high text-on-surface-variant">
+                                <History className="h-4 w-4" />
+                              </div>
+                              <div className="min-w-0 flex-1">
+                                <p className="truncate text-sm font-medium text-on-surface">
+                                  {item.primaryText}
+                                </p>
+                                {item.secondaryText ? (
+                                  <p className="truncate text-xs text-on-surface-variant">
+                                    {item.secondaryText}
+                                  </p>
+                                ) : null}
+                              </div>
+                            </button>
+                          </li>
+                        ))}
+                      </ul>
+                    </>
+                  )}
+                </div>
+              )}
+
             {showSuggestions &&
               noResults &&
-              !error &&
+              !serviceUnavailable &&
               !isLoading &&
               suggestions.length === 0 &&
               !showTypeMoreHint && (
@@ -619,16 +862,17 @@ export default function LocationSearchInput({
                   ref={suggestionsRef}
                   role="status"
                   aria-live="polite"
-                  className="fixed bg-surface-container-lowest backdrop-blur-xl rounded-2xl shadow-2xl overflow-hidden z-[9999] animate-in fade-in-0 slide-in-from-top-2"
+                  data-location-search-popup="true"
+                  className="fixed z-[9999] overflow-hidden rounded-2xl bg-surface-container-lowest shadow-2xl backdrop-blur-xl animate-in fade-in-0 slide-in-from-top-2"
                   style={{
                     top: dropdownPos.top,
                     left: dropdownPos.left,
                     width: dropdownPos.width,
                   }}
                 >
-                  <div className="p-4 flex items-center gap-3">
-                    <div className="p-2 rounded-full bg-surface-container-high">
-                      <SearchX className="w-5 h-5 text-on-surface-variant" />
+                  <div className="flex items-center gap-3 p-4">
+                    <div className="rounded-full bg-surface-container-high p-2">
+                      <SearchX className="h-5 w-5 text-on-surface-variant" />
                     </div>
                     <div>
                       <p className="text-sm font-medium text-on-surface-variant">

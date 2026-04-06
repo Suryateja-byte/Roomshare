@@ -34,8 +34,14 @@ interface SearchLayoutViewProps {
  * - Preferences persist via localStorage
  */
 export default function SearchLayoutView({ children }: SearchLayoutViewProps) {
-  const { shouldShowMap, shouldRenderMap, toggleMap, showMap, isLoading } =
-    useMapPreference();
+  const {
+    shouldShowMap,
+    shouldRenderMap,
+    toggleMap,
+    showMap,
+    hideMap,
+    isLoading,
+  } = useMapPreference();
 
   useKeyboardShortcuts([
     {
@@ -62,7 +68,11 @@ export default function SearchLayoutView({ children }: SearchLayoutViewProps) {
   };
 
   return (
-    <SearchMapUIProvider showMap={showMap} shouldShowMap={shouldShowMap}>
+    <SearchMapUIProvider
+      showMap={showMap}
+      hideMap={hideMap}
+      shouldShowMap={shouldShowMap}
+    >
       {/* Bridge: Scrolls listing card into view when map marker is clicked */}
       <ListScrollBridge />
 

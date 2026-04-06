@@ -105,7 +105,7 @@ test.describe("Mobile Filter Experience", () => {
     // Verify snap position is reasonable (not broken)
     const snap = await getSheetSnapIndex(page);
     expect(snap).toBeGreaterThanOrEqual(0);
-    expect(snap).toBeLessThanOrEqual(2); // Valid snap indices: 0, 1, 2
+    expect(snap).toBeLessThanOrEqual(1); // Valid snap indices: 0 (collapsed), 1 (expanded)
   });
 
   test(`${tags.filter}${tags.mobile} all filter sections scrollable on small viewport (P1)`, async ({

@@ -36,6 +36,7 @@ export {
  */
 export interface HashableFilterParams {
   query?: string;
+  vibeQuery?: string;
   minPrice?: number;
   maxPrice?: number;
   amenities?: string[];
@@ -74,6 +75,7 @@ export function generateQueryHash(params: HashableFilterParams): string {
   // Normalize params for stable hashing
   const normalized = {
     q: (params.query ?? "").toLowerCase().trim(),
+    what: (params.vibeQuery ?? "").toLowerCase().trim(),
     minPrice: params.minPrice ?? null,
     maxPrice: params.maxPrice ?? null,
     amenities: [...(params.amenities ?? [])].sort(),

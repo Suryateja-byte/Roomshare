@@ -150,17 +150,15 @@ describe("LocationSearchInput - Integration Tests", () => {
       renderInput({ initialValue: "Austin", className: "h-12" });
 
       const input = screen.getByRole("combobox");
-      const clearButton = screen.getByRole("button", { name: "Clear search" });
+      const trailingControl = input.parentElement?.querySelector(
+        ".absolute.inset-y-0.right-0.flex.items-center"
+      );
 
       expect(input.parentElement).toHaveClass("relative");
       expect(input.parentElement).toHaveClass("h-full");
       expect(input).toHaveClass("h-full");
       expect(input).toHaveClass("min-w-0");
-      expect(clearButton.parentElement).toHaveClass("absolute");
-      expect(clearButton.parentElement).toHaveClass("inset-y-0");
-      expect(clearButton.parentElement).toHaveClass("right-0");
-      expect(clearButton.parentElement).toHaveClass("flex");
-      expect(clearButton.parentElement).toHaveClass("items-center");
+      expect(trailingControl).not.toBeNull();
     });
   });
 

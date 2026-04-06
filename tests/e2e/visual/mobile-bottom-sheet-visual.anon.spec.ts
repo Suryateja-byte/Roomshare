@@ -1,8 +1,8 @@
 /**
  * Visual Regression — Mobile Bottom Sheet
  *
- * Captures baseline screenshots for the mobile bottom sheet in all snap
- * positions, empty state, header component, dark mode variants, and
+ * Captures baseline screenshots for the mobile bottom sheet in both snap
+ * positions (collapsed / expanded), empty state, header component, and
  * transition states with CLS verification.
  */
 
@@ -41,24 +41,7 @@ test.describe("Mobile Bottom Sheet — Visual Regression", () => {
   });
 
   // -----------------------------------------------------------------------
-  // 1. Half position (default)
-  // -----------------------------------------------------------------------
-  test("half position — default snap", async ({ page }) => {
-    const sheetReady = await navigateToMobileSearch(page);
-    test.skip(!sheetReady, "Mobile sheet not visible");
-
-    await setSheetSnap(page, 1);
-    await waitForSheetAnimation(page);
-    await disableAnimations(page);
-
-    await expect(page).toHaveScreenshot("bottom-sheet-half.png", {
-      ...SCREENSHOT_DEFAULTS.fullPage,
-      mask: [...defaultMasks(page), ...imageMasks(page)],
-    });
-  });
-
-  // -----------------------------------------------------------------------
-  // 2. Collapsed — map nearly fullscreen
+  // 1. Collapsed — map nearly fullscreen
   // -----------------------------------------------------------------------
   test("collapsed — map nearly fullscreen", async ({ page }) => {
     const sheetReady = await navigateToMobileSearch(page);
@@ -75,13 +58,13 @@ test.describe("Mobile Bottom Sheet — Visual Regression", () => {
   });
 
   // -----------------------------------------------------------------------
-  // 3. Expanded — listings scrollable
+  // 2. Expanded — listings scrollable
   // -----------------------------------------------------------------------
   test("expanded — listings scrollable", async ({ page }) => {
     const sheetReady = await navigateToMobileSearch(page);
     test.skip(!sheetReady, "Mobile sheet not visible");
 
-    await setSheetSnap(page, 2);
+    await setSheetSnap(page, 1);
     await waitForSheetAnimation(page);
     await disableAnimations(page);
 
@@ -108,7 +91,7 @@ test.describe("Mobile Bottom Sheet — Visual Regression", () => {
   });
 
   // -----------------------------------------------------------------------
-  // 5. Handle/header design (component screenshot)
+  // 3. Handle/header design (component screenshot)
   // -----------------------------------------------------------------------
   test("handle and header design", async ({ page }) => {
     const sheetReady = await navigateToMobileSearch(page);
@@ -124,41 +107,23 @@ test.describe("Mobile Bottom Sheet — Visual Regression", () => {
     });
   });
 
-
   // -----------------------------------------------------------------------
-  // 9. Pre-transition baseline (half)
-  // -----------------------------------------------------------------------
-  test("pre-transition baseline at half", async ({ page }) => {
-    const sheetReady = await navigateToMobileSearch(page);
-    test.skip(!sheetReady, "Mobile sheet not visible");
-
-    await setSheetSnap(page, 1);
-    await waitForSheetAnimation(page);
-    await disableAnimations(page);
-
-    await expect(page).toHaveScreenshot("bottom-sheet-pre-transition.png", {
-      ...SCREENSHOT_DEFAULTS.fullPage,
-      mask: [...defaultMasks(page), ...imageMasks(page)],
-    });
-  });
-
-  // -----------------------------------------------------------------------
-  // 10. Post-transition (expanded) + CLS check
+  // 4. Post-transition (expanded) + CLS check
   // -----------------------------------------------------------------------
   test("post-transition expanded with CLS check", async ({ page }) => {
     const sheetReady = await navigateToMobileSearch(page);
     test.skip(!sheetReady, "Mobile sheet not visible");
 
-    // Start at half, then expand
-    await setSheetSnap(page, 1);
+    // Start collapsed, then expand
+    await setSheetSnap(page, 0);
     await waitForSheetAnimation(page);
 
-    await setSheetSnap(page, 2);
+    await setSheetSnap(page, 1);
     await waitForSheetAnimation(page);
     await disableAnimations(page);
 
     // CLS verification: assert sheet height is within 3px of 85% viewport
-    const expectedHeight = VIEWPORTS.mobileLarge.height * 0.85; // 844 * 0.85 = 717.4
+    const expectedHeight = VIEWPORTS.mobileLarge.height * 0.85;
     const sheet = page.locator(mobileSelectors.bottomSheet).first();
     const actualHeight = await sheet.evaluate((el) =>
       parseFloat(window.getComputedStyle(el).height)

@@ -236,10 +236,11 @@ describe("useFilterImpactCount", () => {
     expect(result.current.formattedDelta).toBe("+25");
   });
 
-  // ── Test 6: No fetch when isHovering=false ────────────────────────────────
+  // ── Test 6: Eagerly fetches on mount regardless of isHovering ─────────────
 
-  it("never fetches when isHovering stays false", () => {
+  it("eagerly fetches on mount even when isHovering is false", () => {
     const chip = makeChip("wifi");
+    mockRateLimitedFetch.mockResolvedValueOnce(mockResponse({ count: 70 }));
 
     renderHook(() =>
       useFilterImpactCount({
@@ -251,10 +252,10 @@ describe("useFilterImpactCount", () => {
     );
 
     act(() => {
-      jest.advanceTimersByTime(DEBOUNCE_MS * 10);
+      jest.advanceTimersByTime(DEBOUNCE_MS);
     });
 
-    expect(mockRateLimitedFetch).not.toHaveBeenCalled();
+    expect(mockRateLimitedFetch).toHaveBeenCalledTimes(1);
   });
 
   // ── Test 7: Chip ID change resets state ───────────────────────────────────

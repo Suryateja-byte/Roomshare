@@ -38,7 +38,11 @@ export interface RecentSearch {
   /** Display location (e.g., "Austin, TX") */
   location: string;
   /** Optional geocoded coordinates */
-  coords?: { lat: number; lng: number };
+  coords?: {
+    lat: number;
+    lng: number;
+    bounds?: [number, number, number, number];
+  };
   /** When the search was saved */
   timestamp: number;
   /** Applied filters at time of search */
@@ -52,7 +56,11 @@ export interface RecentSearch {
  */
 interface LegacyRecentSearch {
   location: string;
-  coords?: { lat: number; lng: number };
+  coords?: {
+    lat: number;
+    lng: number;
+    bounds?: [number, number, number, number];
+  };
   timestamp: number;
 }
 
@@ -197,7 +205,11 @@ export function useRecentSearches() {
   const saveRecentSearch = useCallback(
     (
       location: string,
-      coords?: { lat: number; lng: number },
+      coords?: {
+        lat: number;
+        lng: number;
+        bounds?: [number, number, number, number];
+      },
       filters: RecentSearchFilters = {},
       resultCount?: number
     ) => {

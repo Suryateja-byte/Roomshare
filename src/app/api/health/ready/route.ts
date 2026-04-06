@@ -24,7 +24,8 @@ export async function GET() {
     );
   }
 
-  const publicChecks: Record<string, { status: "ok" | "error" | "timeout" }> = {};
+  const publicChecks: Record<string, { status: "ok" | "error" | "timeout" }> =
+    {};
   const internalLatency: Record<string, number> = {};
   let healthy = true;
 
@@ -35,7 +36,10 @@ export async function GET() {
     await Promise.race([
       prisma.$queryRaw`SELECT 1`,
       new Promise((_, reject) =>
-        setTimeout(() => reject(new Error("DB health check timeout")), DB_TIMEOUT_MS)
+        setTimeout(
+          () => reject(new Error("DB health check timeout")),
+          DB_TIMEOUT_MS
+        )
       ),
     ]);
     const dbLatency = Date.now() - dbStart;

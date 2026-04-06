@@ -594,7 +594,9 @@ describe("manage-booking actions", () => {
             const tx = {
               $queryRaw: jest
                 .fn()
-                .mockResolvedValue([{ ownerId: "owner-123", status: "ACTIVE" }]),
+                .mockResolvedValue([
+                  { ownerId: "owner-123", status: "ACTIVE" },
+                ]),
               booking: {
                 updateMany: mockTxUpdateMany,
               },
@@ -786,7 +788,9 @@ describe("manage-booking actions", () => {
             const tx = {
               $queryRaw: jest
                 .fn()
-                .mockResolvedValue([{ ownerId: "owner-123", status: "ACTIVE" }]),
+                .mockResolvedValue([
+                  { ownerId: "owner-123", status: "ACTIVE" },
+                ]),
               booking: {
                 updateMany: jest.fn().mockResolvedValue({ count: 1 }),
               },
@@ -950,7 +954,9 @@ describe("manage-booking actions", () => {
             const tx = {
               $queryRaw: jest
                 .fn()
-                .mockResolvedValue([{ ownerId: "owner-123", status: "ACTIVE" }]),
+                .mockResolvedValue([
+                  { ownerId: "owner-123", status: "ACTIVE" },
+                ]),
               booking: {
                 updateMany: jest.fn().mockResolvedValue({ count: 1 }),
               },

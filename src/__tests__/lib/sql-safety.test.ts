@@ -70,9 +70,9 @@ describe("assertParameterizedWhereClause", () => {
 
     it("throws when clause contains an empty string literal", () => {
       // Empty string '' is not in the allow-list
-      expect(() =>
-        assertParameterizedWhereClause("d.title = ''")
-      ).toThrow("SECURITY");
+      expect(() => assertParameterizedWhereClause("d.title = ''")).toThrow(
+        "SECURITY"
+      );
     });
 
     it("throws on a basic SQL injection attempt with OR clause", () => {
@@ -89,9 +89,9 @@ describe("assertParameterizedWhereClause", () => {
     });
 
     it("throws when clause contains an arbitrary word literal", () => {
-      expect(() =>
-        assertParameterizedWhereClause("d.city = 'London'")
-      ).toThrow("SECURITY");
+      expect(() => assertParameterizedWhereClause("d.city = 'London'")).toThrow(
+        "SECURITY"
+      );
     });
   });
 
@@ -119,7 +119,9 @@ describe("joinWhereClauseWithSecurityInvariant", () => {
       "d.price > $1",
       "d.status = 'ACTIVE'",
     ]);
-    expect(result).toBe("d.lat IS NOT NULL AND d.price > $1 AND d.status = 'ACTIVE'");
+    expect(result).toBe(
+      "d.lat IS NOT NULL AND d.price > $1 AND d.status = 'ACTIVE'"
+    );
   });
 
   it("returns a single condition unchanged when array has one element", () => {
@@ -145,9 +147,7 @@ describe("joinWhereClauseWithSecurityInvariant", () => {
     // Each individual fragment is benign; the joined string would still be checked.
     // Here we verify that a disallowed literal anywhere in the joined output is caught.
     expect(() =>
-      joinWhereClauseWithSecurityInvariant([
-        "d.status = 'PAUSED'",
-      ])
+      joinWhereClauseWithSecurityInvariant(["d.status = 'PAUSED'"])
     ).toThrow("SECURITY");
   });
 });
@@ -172,34 +172,30 @@ describe("assertValidSortColumn", () => {
   });
 
   it("throws when column is not in the allowed list", () => {
-    expect(() =>
-      assertValidSortColumn("d.injected", allowedColumns)
-    ).toThrow("SECURITY");
+    expect(() => assertValidSortColumn("d.injected", allowedColumns)).toThrow(
+      "SECURITY"
+    );
   });
 
   it("error message includes the invalid column name", () => {
-    expect(() =>
-      assertValidSortColumn("d.bad_column", allowedColumns)
-    ).toThrow("d.bad_column");
+    expect(() => assertValidSortColumn("d.bad_column", allowedColumns)).toThrow(
+      "d.bad_column"
+    );
   });
 
   it("is case-sensitive — does not allow a differently-cased column name", () => {
     // SQL column names are case-sensitive in Prisma raw queries
-    expect(() =>
-      assertValidSortColumn("D.PRICE", allowedColumns)
-    ).toThrow("SECURITY");
+    expect(() => assertValidSortColumn("D.PRICE", allowedColumns)).toThrow(
+      "SECURITY"
+    );
   });
 
   it("throws for an empty string column name", () => {
-    expect(() =>
-      assertValidSortColumn("", allowedColumns)
-    ).toThrow("SECURITY");
+    expect(() => assertValidSortColumn("", allowedColumns)).toThrow("SECURITY");
   });
 
   it("throws when the allowed list itself is empty", () => {
-    expect(() =>
-      assertValidSortColumn("d.price", [])
-    ).toThrow("SECURITY");
+    expect(() => assertValidSortColumn("d.price", [])).toThrow("SECURITY");
   });
 });
 
@@ -246,9 +242,7 @@ describe("assertValidEnum", () => {
   const allowedValues = ["ACTIVE", "DRAFT", "ARCHIVED"];
 
   it("does not throw when value is in the allowed list", () => {
-    expect(() =>
-      assertValidEnum("ACTIVE", allowedValues)
-    ).not.toThrow();
+    expect(() => assertValidEnum("ACTIVE", allowedValues)).not.toThrow();
   });
 
   it("does not throw for every value in the allowed list", () => {
@@ -258,38 +252,26 @@ describe("assertValidEnum", () => {
   });
 
   it("throws when value is not in the allowed list", () => {
-    expect(() =>
-      assertValidEnum("PAUSED", allowedValues)
-    ).toThrow("SECURITY");
+    expect(() => assertValidEnum("PAUSED", allowedValues)).toThrow("SECURITY");
   });
 
   it("error message includes the invalid value", () => {
-    expect(() =>
-      assertValidEnum("BANNED", allowedValues)
-    ).toThrow("BANNED");
+    expect(() => assertValidEnum("BANNED", allowedValues)).toThrow("BANNED");
   });
 
   it("error message includes the list of allowed values", () => {
-    expect(() =>
-      assertValidEnum("BANNED", allowedValues)
-    ).toThrow("ACTIVE");
+    expect(() => assertValidEnum("BANNED", allowedValues)).toThrow("ACTIVE");
   });
 
   it("is case-sensitive — does not accept a differently-cased value", () => {
-    expect(() =>
-      assertValidEnum("active", allowedValues)
-    ).toThrow("SECURITY");
+    expect(() => assertValidEnum("active", allowedValues)).toThrow("SECURITY");
   });
 
   it("throws for an empty string value", () => {
-    expect(() =>
-      assertValidEnum("", allowedValues)
-    ).toThrow("SECURITY");
+    expect(() => assertValidEnum("", allowedValues)).toThrow("SECURITY");
   });
 
   it("throws when the allowed list is empty", () => {
-    expect(() =>
-      assertValidEnum("ACTIVE", [])
-    ).toThrow("SECURITY");
+    expect(() => assertValidEnum("ACTIVE", [])).toThrow("SECURITY");
   });
 });

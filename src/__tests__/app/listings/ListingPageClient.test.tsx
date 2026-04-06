@@ -206,8 +206,7 @@ describe("ListingPageClient", () => {
 
     expect(
       screen.getByRole("heading", {
-        name:
-          "Japantown Shared Room with Extra Long Title for Mobile Header Coverage",
+        name: "Japantown Shared Room with Extra Long Title for Mobile Header Coverage",
       })
     ).toBeInTheDocument();
     expect(screen.getByTestId("share-listing")).toBeInTheDocument();

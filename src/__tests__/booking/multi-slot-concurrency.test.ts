@@ -990,7 +990,9 @@ describe("Expired hold does not block subsequent booking", () => {
 
     (prisma.$transaction as jest.Mock).mockImplementation(async (callback) => {
       const tx = {
-        $queryRaw: jest.fn().mockResolvedValueOnce([{ ownerId: OWNER_ID, status: "ACTIVE" }]),
+        $queryRaw: jest
+          .fn()
+          .mockResolvedValueOnce([{ ownerId: OWNER_ID, status: "ACTIVE" }]),
         $executeRaw: jest.fn(),
         booking: {
           // updateMany matches on status='HELD' AND version=1 — if sweeper already
@@ -1026,7 +1028,9 @@ describe("Expired hold does not block subsequent booking", () => {
 
     (prisma.$transaction as jest.Mock).mockImplementation(async (callback) => {
       const tx = {
-        $queryRaw: jest.fn().mockResolvedValueOnce([{ ownerId: OWNER_ID, status: "ACTIVE" }]),
+        $queryRaw: jest
+          .fn()
+          .mockResolvedValueOnce([{ ownerId: OWNER_ID, status: "ACTIVE" }]),
         $executeRaw: mockTxExecuteRaw,
         booking: {
           updateMany: jest.fn().mockResolvedValue({ count: 1 }),

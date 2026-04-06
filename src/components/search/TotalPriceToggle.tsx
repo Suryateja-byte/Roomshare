@@ -27,9 +27,7 @@ export function TotalPriceToggle({
 
   return (
     <label className="inline-flex items-center gap-2 cursor-pointer select-none">
-      <span className="text-sm text-on-surface-variant">
-        Show total price
-      </span>
+      <span className="text-sm text-on-surface-variant">Show total price</span>
       <button
         type="button"
         role="switch"
@@ -38,11 +36,7 @@ export function TotalPriceToggle({
         className={`
           relative inline-flex h-5 w-9 shrink-0 items-center rounded-full
           transition-colors duration-200 focus-visible:ring-2 focus-visible:ring-primary/30 focus-visible:ring-offset-2
-          ${
-            showTotal
-              ? "bg-on-surface"
-              : "bg-surface-container-high"
-          }
+          ${showTotal ? "bg-on-surface" : "bg-surface-container-high"}
         `}
       >
         <span

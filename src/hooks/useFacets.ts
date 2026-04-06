@@ -219,7 +219,11 @@ export function useFacets({
       // P1-5: Read boundsRequired from 200 response (server no longer returns 400 for this)
       const isBoundsRequired = data.boundsRequired === true;
 
-      facetsCache.set(cacheKey, validData, isBoundsRequired ? ERROR_FALLBACK_TTL_MS : CACHE_TTL_MS);
+      facetsCache.set(
+        cacheKey,
+        validData,
+        isBoundsRequired ? ERROR_FALLBACK_TTL_MS : CACHE_TTL_MS
+      );
 
       if (!abortController.signal.aborted) {
         setFacets(validData);

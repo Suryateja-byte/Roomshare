@@ -4,21 +4,24 @@ import { useEffect, useMemo, useRef, useState } from "react";
 import { Loader2 } from "lucide-react";
 import { useSearchTransitionSafe } from "@/contexts/SearchTransitionContext";
 import { useSearchParams } from "next/navigation";
+import { cn } from "@/lib/utils";
 
 interface SearchResultsLoadingWrapperProps {
   children: React.ReactNode;
 }
 
 /**
- * SearchResultsLoadingWrapper - Shows loading state during filter transitions
+ * SearchResultsLoadingWrapper - Shows a non-jarring pending state during
+ * filter, sort, and bounds transitions.
  *
- * This component wraps the search results and displays a subtle loading indicator
- * when the user changes filters, sorts, or navigates between pages.
+ * The current results remain mounted so the list height and scroll position stay
+ * stable while the next payload loads. Only the results body is dimmed and made
+ * temporarily non-interactive.
  *
  * UX considerations:
  * - Keeps current results visible (no jarring content flash)
- * - Shows spinner + opacity reduction to indicate loading
- * - Accessible with aria-busy attribute
+ * - Uses a compact status pill instead of painting a second card grid
+ * - Restricts aria-busy to the results body region
  * - Smooth transitions for professional feel
  */
 export function SearchResultsLoadingWrapper({
@@ -27,6 +30,9 @@ export function SearchResultsLoadingWrapper({
   const transitionContext = useSearchTransitionSafe();
   const isPending = transitionContext?.isPending ?? false;
   const isSlowTransition = transitionContext?.isSlowTransition ?? false;
+  const pendingLabel = isSlowTransition
+    ? "Still loading..."
+    : "Updating results...";
 
   // Focus #search-results-heading when FILTER params change (skip initial mount & bounds-only changes)
   const searchParams = useSearchParams();
@@ -72,36 +78,47 @@ export function SearchResultsLoadingWrapper({
   }, [isPending]);
 
   return (
-    <div className="relative" aria-busy={isPending}>
+    <div
+      className="relative"
+      aria-busy={isPending}
+      data-testid="search-results-pending-region"
+    >
       {/* Explicit SR announcement for result count changes */}
       <span className="sr-only" aria-live="polite" role="status">
         {srAnnouncement}
       </span>
-      {/* Loading overlay - shows during transitions */}
+
       {isPending && (
-        <div
-          className="absolute inset-0 z-10 flex items-start justify-center pt-24 pointer-events-none"
-          aria-hidden="true"
-        >
-          <div className="flex items-center gap-2 px-4 py-2 bg-surface-container-lowest/90 rounded-full shadow-ambient border border-outline-variant/20/50 backdrop-blur-sm animate-in fade-in duration-200">
-            <Loader2 className="w-4 h-4 animate-spin text-on-surface-variant" />
-            <span className="text-sm font-medium text-on-surface-variant">
-              {isSlowTransition ? "Still loading..." : "Updating results..."}
-            </span>
+        <>
+          <div
+            className="pointer-events-none absolute inset-0 z-10 bg-surface-canvas/58 backdrop-blur-[1px] transition-opacity duration-200"
+            data-testid="search-results-pending-overlay"
+            aria-hidden="true"
+          />
+          <div className="pointer-events-none absolute inset-x-0 top-3 z-20 flex justify-center px-3">
+            <div
+              role="status"
+              aria-live="polite"
+              aria-atomic="true"
+              data-testid="search-results-pending-status"
+              className="inline-flex min-h-[44px] items-center gap-2 rounded-full border border-outline-variant/20 bg-surface-container-lowest/95 px-4 py-2 text-sm font-medium text-on-surface shadow-ambient backdrop-blur-md"
+            >
+              <Loader2
+                className="h-4 w-4 animate-spin text-on-surface-variant"
+                aria-hidden="true"
+              />
+              <span>{pendingLabel}</span>
+            </div>
           </div>
-        </div>
+        </>
       )}
 
-      {/* Content - always fully visible for accessibility/automation */}
-      <div>{children}</div>
-
-      {/* Translucent overlay dims content during loading without hiding children */}
-      {isPending && (
-        <div
-          className="absolute inset-0 bg-white/40 z-[5] pointer-events-none transition-opacity duration-200"
-          aria-hidden="true"
-        />
-      )}
+      <div
+        data-testid="search-results-content"
+        className={cn(isPending && "pointer-events-none select-none")}
+      >
+        {children}
+      </div>
     </div>
   );
 }

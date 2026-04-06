@@ -78,12 +78,16 @@ export function sanitizeMapListing(
     location: { lat, lng },
     tier: listing.tier,
     avgRating: toFiniteNumber(listing.avgRating, 0),
-    reviewCount: Math.max(0, Math.trunc(toFiniteNumber(listing.reviewCount, 0))),
-    recommendedScore: listing.recommendedScore != null
-      ? (Number.isFinite(toFiniteNumber(listing.recommendedScore, Number.NaN))
+    reviewCount: Math.max(
+      0,
+      Math.trunc(toFiniteNumber(listing.reviewCount, 0))
+    ),
+    recommendedScore:
+      listing.recommendedScore != null
+        ? Number.isFinite(toFiniteNumber(listing.recommendedScore, Number.NaN))
           ? toFiniteNumber(listing.recommendedScore, 0)
-          : null)
-      : null,
+          : null
+        : null,
     createdAt: toSafeDate(listing.createdAt),
   };
 }

@@ -175,11 +175,13 @@ function buildTxMock(opts: {
       // Second call: SUM of overlapping accepted slots
       .mockResolvedValueOnce([{ total: BigInt(usedSlots) }]),
     user: {
-      findUnique: jest.fn().mockImplementation(({ where }: { where: { id: string } }) => {
-        if (where.id === "owner-456") return Promise.resolve(owner);
-        if (where.id === "user-123") return Promise.resolve(tenant);
-        return Promise.resolve(null);
-      }),
+      findUnique: jest
+        .fn()
+        .mockImplementation(({ where }: { where: { id: string } }) => {
+          if (where.id === "owner-456") return Promise.resolve(owner);
+          if (where.id === "user-123") return Promise.resolve(tenant);
+          return Promise.resolve(null);
+        }),
     },
     booking: {
       findFirst: jest
@@ -188,10 +190,12 @@ function buildTxMock(opts: {
         .mockResolvedValueOnce(duplicateBooking)
         // Second call: overlapping date range check
         .mockResolvedValueOnce(overlapBooking),
-      create: jest.fn().mockImplementation((args: { data: Record<string, unknown> }) => {
-        if (onBookingCreate) return Promise.resolve(onBookingCreate(args));
-        return Promise.resolve(createdBooking);
-      }),
+      create: jest
+        .fn()
+        .mockImplementation((args: { data: Record<string, unknown> }) => {
+          if (onBookingCreate) return Promise.resolve(onBookingCreate(args));
+          return Promise.resolve(createdBooking);
+        }),
     },
   };
 }
@@ -314,10 +318,17 @@ describe("Booking transaction integrity", () => {
           .mockResolvedValueOnce([ownedListing])
           .mockResolvedValueOnce([{ total: BigInt(0) }]),
         user: {
-          findUnique: jest.fn().mockImplementation(({ where }: { where: { id: string } }) => {
-            if (where.id === "user-123") return Promise.resolve({ id: "user-123", name: "Owner", email: "owner@example.com" });
-            return Promise.resolve(null);
-          }),
+          findUnique: jest
+            .fn()
+            .mockImplementation(({ where }: { where: { id: string } }) => {
+              if (where.id === "user-123")
+                return Promise.resolve({
+                  id: "user-123",
+                  name: "Owner",
+                  email: "owner@example.com",
+                });
+              return Promise.resolve(null);
+            }),
         },
         booking: {
           findFirst: jest.fn().mockResolvedValue(null),
@@ -624,18 +635,25 @@ describe("Booking transaction integrity", () => {
           .mockResolvedValueOnce([wholeUnitListing])
           .mockResolvedValueOnce([{ total: BigInt(0) }]),
         user: {
-          findUnique: jest.fn().mockImplementation(({ where }: { where: { id: string } }) => {
-            if (where.id === "owner-456") return Promise.resolve(BASE_OWNER);
-            if (where.id === "user-123") return Promise.resolve(BASE_TENANT);
-            return Promise.resolve(null);
-          }),
+          findUnique: jest
+            .fn()
+            .mockImplementation(({ where }: { where: { id: string } }) => {
+              if (where.id === "owner-456") return Promise.resolve(BASE_OWNER);
+              if (where.id === "user-123") return Promise.resolve(BASE_TENANT);
+              return Promise.resolve(null);
+            }),
         },
         booking: {
           findFirst: jest.fn().mockResolvedValue(null),
-          create: jest.fn().mockImplementation((args: { data: Record<string, unknown> }) => {
-            capturedSlotsRequested = args.data.slotsRequested as number;
-            return Promise.resolve({ ...BASE_BOOKING, slotsRequested: args.data.slotsRequested });
-          }),
+          create: jest
+            .fn()
+            .mockImplementation((args: { data: Record<string, unknown> }) => {
+              capturedSlotsRequested = args.data.slotsRequested as number;
+              return Promise.resolve({
+                ...BASE_BOOKING,
+                slotsRequested: args.data.slotsRequested,
+              });
+            }),
         },
       };
       setupTransaction(tx);

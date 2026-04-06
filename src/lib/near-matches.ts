@@ -102,7 +102,11 @@ export function expandFiltersForNearMatches(
     // Defense-in-depth: skip expansion if date string is invalid
     // (producer at search-doc-queries.ts already guards, but malformed data could arrive via other paths)
     if (isNaN(originalDate.getTime())) {
-      return { expanded: params, expandedDimension: null, expansionDescription: null };
+      return {
+        expanded: params,
+        expandedDimension: null,
+        expansionDescription: null,
+      };
     }
 
     // Expand by moving the date forward by expandDays

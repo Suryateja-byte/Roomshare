@@ -2,6 +2,8 @@
 
 export interface SearchFilters {
   query?: string;
+  locationLabel?: string;
+  vibeQuery?: string;
   minPrice?: number;
   maxPrice?: number;
   amenities?: string[];
@@ -27,6 +29,8 @@ export function buildSearchUrl(filters: SearchFilters): string {
   const params = new URLSearchParams();
 
   if (filters.query) params.set("q", filters.query);
+  if (filters.locationLabel) params.set("where", filters.locationLabel);
+  if (filters.vibeQuery) params.set("what", filters.vibeQuery);
   if (filters.minPrice !== undefined)
     params.set("minPrice", filters.minPrice.toString());
   if (filters.maxPrice !== undefined)

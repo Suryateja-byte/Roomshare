@@ -1,7 +1,6 @@
 "use client";
 
-import React, { Suspense, useRef, lazy } from "react";
-import dynamic from "next/dynamic";
+import React, { Suspense, lazy } from "react";
 import { LazyMotion, domAnimation, m } from "framer-motion";
 import { useSession } from "next-auth/react";
 import Link from "next/link";
@@ -9,25 +8,6 @@ const SearchForm = lazy(() => import("@/components/SearchForm"));
 import { Button } from "@/components/ui/button";
 import { ShieldCheck, Zap, Coffee, ArrowRight } from "lucide-react";
 import { fadeInUp, staggerContainer } from "@/lib/motion-variants";
-
-const EditorialLivingRoomHero = dynamic(
-  () => import("@/components/home/EditorialLivingRoomHero"),
-  {
-    ssr: false,
-    loading: () => (
-      <section
-        aria-label="Search for rooms"
-        className="relative min-h-[60dvh] md:min-h-[70dvh] flex flex-col justify-center bg-surface-canvas"
-      >
-        <div className="flex items-center justify-center h-full">
-          <span className="font-display text-on-surface-variant text-lg animate-pulse">
-            Loading...
-          </span>
-        </div>
-      </section>
-    ),
-  },
-);
 
 class SearchFormErrorBoundary extends React.Component<
   { children: React.ReactNode },
@@ -85,75 +65,75 @@ function AuthCTA() {
 export default function HomeClient() {
   const { data: session } = useSession();
   const isLoggedIn = !!session?.user;
-  const searchFormRef = useRef<HTMLDivElement>(null);
 
   return (
     <LazyMotion features={domAnimation}>
       <div className="flex flex-col bg-surface-canvas text-on-surface font-body">
         {/* ================================================================
-            HERO SECTION — Immersive 3D Editorial Living Room
+            HERO SECTION — Editorial Hero
             ================================================================ */}
-        <EditorialLivingRoomHero>
+        <section
+          aria-label="Search for rooms"
+          className="relative pt-24 pb-16 md:pt-32 md:pb-20 min-h-[60dvh] md:min-h-[70dvh] flex flex-col justify-center overflow-x-hidden"
+        >
           <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 w-full">
             <div className="flex flex-col items-center text-center">
-              <m.div
-                initial="hidden"
-                animate="visible"
-                variants={staggerContainer}
-                className="w-full flex flex-col items-center"
-              >
-                {/* Editorial label */}
-                <m.div
-                  variants={fadeInUp}
-                  className="font-body text-xs font-bold uppercase tracking-[0.15em] text-on-surface-variant mb-6"
-                >
-                  Find Your People
-                </m.div>
-
-                {/* Newsreader display heading with italic emphasis */}
-                <m.h1
-                  variants={fadeInUp}
-                  className="font-display text-4xl sm:text-5xl md:text-6xl lg:text-[5.5rem] font-normal tracking-tight text-on-surface mb-6 leading-[1.05] text-balance"
-                >
-                  Finding <em className="italic">Your</em> People,{" "}
-                  <br className="hidden lg:block" />
-                  Not Just a Place
-                </m.h1>
-
-                {/* Manrope subheading */}
-                <m.p
-                  variants={fadeInUp}
-                  className="text-lg md:text-xl text-on-surface-variant mb-10 max-w-2xl mx-auto leading-relaxed"
-                >
-                  Verified roommates. Real listings. People who actually show
-                  up to the tour.
-                </m.p>
-
-                {/* Glassmorphism search bar */}
-                <m.div
-                  variants={fadeInUp}
-                  ref={searchFormRef}
-                  className="w-full mx-auto max-w-4xl relative z-20"
-                >
-                  <div className="bg-transparent border-0 shadow-none p-0 md:bg-surface-container-lowest md:backdrop-blur-xl md:border md:border-outline-variant/30 md:rounded-2xl md:shadow-ambient md:p-2 lg:p-3">
-                    <SearchFormErrorBoundary>
-                      <Suspense
-                        fallback={
-                          <div className="h-16 animate-shimmer bg-gradient-to-r from-surface-container-high via-surface-canvas to-surface-container-high bg-[length:200%_100%] rounded-xl" />
-                        }
-                      >
-                        <SearchForm variant="home" />
-                      </Suspense>
-                    </SearchFormErrorBoundary>
+              <div className="w-full flex flex-col items-center justify-center mb-8 md:mb-12">
+                {/* CSS-only hero animation — immune to React re-renders
+                    that interrupt Framer Motion's LazyMotion init */}
+                <div className="w-full flex flex-col items-center">
+                  {/* Editorial label */}
+                  <div
+                    className="font-body text-xs font-bold uppercase tracking-[0.15em] text-on-surface-variant mb-6 animate-hero-fade-in"
+                    style={{ animationDelay: "0ms" }}
+                  >
+                    Find Your People
                   </div>
-                </m.div>
 
-                {/* CTA for logged-out users */}
-                <AuthCTA />
-              </m.div>
+                  {/* Newsreader display heading with italic emphasis */}
+                  <h1
+                    className="font-display text-4xl sm:text-5xl md:text-6xl lg:text-[5.5rem] font-normal tracking-tight text-on-surface mb-6 leading-[1.05] text-balance animate-hero-fade-in"
+                    style={{ animationDelay: "80ms" }}
+                  >
+                    Finding <em className="italic">Your</em> People,{" "}
+                    <br className="hidden lg:block" />
+                    Not Just a Place
+                  </h1>
+
+                  {/* Manrope subheading */}
+                  <p
+                    className="text-lg md:text-xl text-on-surface-variant mb-10 max-w-2xl mx-auto leading-relaxed animate-hero-fade-in"
+                    style={{ animationDelay: "160ms" }}
+                  >
+                    Verified roommates. Real listings. People who actually show
+                    up to the tour.
+                  </p>
+
+                  {/* Glassmorphism search bar */}
+                  <div
+                    className="w-full mx-auto max-w-4xl relative z-20 animate-hero-fade-in"
+                    style={{ animationDelay: "240ms" }}
+                  >
+                    <div className="bg-transparent border-0 shadow-none p-0 md:bg-surface-container-lowest md:backdrop-blur-xl md:border md:border-outline-variant/30 md:rounded-2xl md:shadow-ambient md:p-2 lg:p-3">
+                      <SearchFormErrorBoundary>
+                        <Suspense
+                          fallback={
+                            <div className="h-16 animate-shimmer bg-gradient-to-r from-surface-container-high via-surface-canvas to-surface-container-high bg-[length:200%_100%] rounded-xl" />
+                          }
+                        >
+                          <SearchForm variant="home" />
+                        </Suspense>
+                      </SearchFormErrorBoundary>
+                    </div>
+                  </div>
+
+                  {/* CTA for logged-out users */}
+                  <AuthCTA />
+                </div>
+              </div>
             </div>
           </div>
-        </EditorialLivingRoomHero>
+        </section>
 
         {/* ================================================================
             FEATURES — "Cozy Spaces, Real People"

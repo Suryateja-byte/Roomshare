@@ -59,7 +59,9 @@ export default function ReportButton({ listingId }: ReportButtonProps) {
       });
 
       if (response.status === 429) {
-        setError("Too many reports submitted. Please wait a minute and try again.");
+        setError(
+          "Too many reports submitted. Please wait a minute and try again."
+        );
         return;
       }
 

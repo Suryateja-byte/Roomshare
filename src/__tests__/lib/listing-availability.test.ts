@@ -69,9 +69,9 @@ describe("getListingAvailability", () => {
       new Error("Connection refused")
     );
 
-    await expect(
-      getListingAvailability("listing-123")
-    ).rejects.toThrow("Connection refused");
+    await expect(getListingAvailability("listing-123")).rejects.toThrow(
+      "Connection refused"
+    );
   });
 
   it("handles undefined result from destructuring", async () => {

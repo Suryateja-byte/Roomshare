@@ -107,8 +107,8 @@ describe("queryWithTimeout", () => {
       new Error("canceling statement due to statement timeout")
     );
 
-    await expect(
-      queryWithTimeout("SELECT pg_sleep(30)", [])
-    ).rejects.toThrow("canceling statement due to statement timeout");
+    await expect(queryWithTimeout("SELECT pg_sleep(30)", [])).rejects.toThrow(
+      "canceling statement due to statement timeout"
+    );
   });
 });

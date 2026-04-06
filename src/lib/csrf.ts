@@ -60,13 +60,9 @@ export function validateCsrf(request: Request): NextResponse | null {
   // In development, allow localhost variants
   const isDev = process.env.NODE_ENV === "development";
   if (isDev) {
-    const localhostPatterns = [
-      "localhost",
-      "127.0.0.1",
-      "0.0.0.0",
-    ];
-    const isLocalhostOrigin = localhostPatterns.some(
-      (p) => originHost.startsWith(p)
+    const localhostPatterns = ["localhost", "127.0.0.1", "0.0.0.0"];
+    const isLocalhostOrigin = localhostPatterns.some((p) =>
+      originHost.startsWith(p)
     );
     const isLocalhostHost = host
       ? localhostPatterns.some((p) => host.startsWith(p))

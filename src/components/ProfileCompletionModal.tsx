@@ -60,7 +60,10 @@ export default function ProfileCompletionModal({
               <AlertCircle className="w-6 h-6 text-amber-600" />
             </div>
             <div>
-              <h2 id="profile-completion-title" className="text-lg font-semibold text-on-surface">
+              <h2
+                id="profile-completion-title"
+                className="text-lg font-semibold text-on-surface"
+              >
                 Complete Your Profile
               </h2>
               <p className="text-sm text-on-surface-variant">
@@ -72,12 +75,8 @@ export default function ProfileCompletionModal({
           {/* Progress */}
           <div className="mb-6">
             <div className="flex justify-between text-sm mb-2">
-              <span className="text-on-surface-variant">
-                Current progress
-              </span>
-              <span className="font-medium text-on-surface">
-                {percentage}%
-              </span>
+              <span className="text-on-surface-variant">Current progress</span>
+              <span className="font-medium text-on-surface">{percentage}%</span>
             </div>
             <div className="w-full bg-surface-container-high rounded-full h-2">
               <div

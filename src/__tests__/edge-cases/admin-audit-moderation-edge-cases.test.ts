@@ -524,7 +524,9 @@ describe("Category I: Admin + Audit Logs + Moderation Edge Cases", () => {
             findMany: jest.fn().mockResolvedValue([]),
             updateMany: jest.fn().mockResolvedValue({ count: 0 }),
           },
-          notification: { createMany: jest.fn().mockResolvedValue({ count: 0 }) },
+          notification: {
+            createMany: jest.fn().mockResolvedValue({ count: 0 }),
+          },
           listing: {
             delete: jest.fn().mockResolvedValue({ id: "listing-123" }),
           },

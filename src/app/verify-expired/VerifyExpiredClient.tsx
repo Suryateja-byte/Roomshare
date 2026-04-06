@@ -58,7 +58,9 @@ export default function VerifyExpiredClient() {
             <div className="w-16 h-16 bg-white/20 rounded-full flex items-center justify-center mx-auto mb-4">
               <Clock className="w-8 h-8" />
             </div>
-            <h1 className="font-display text-2xl font-bold">Verification Link Expired</h1>
+            <h1 className="font-display text-2xl font-bold">
+              Verification Link Expired
+            </h1>
             <p className="text-amber-100 mt-2">
               Your email verification link is no longer valid
             </p>

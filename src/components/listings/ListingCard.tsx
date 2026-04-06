@@ -29,6 +29,9 @@ export interface Listing {
   images?: string[];
   avgRating?: number;
   reviewCount?: number;
+  roomType?: string;
+  moveInDate?: Date | string;
+  leaseDuration?: string;
 }
 
 // State abbreviation map
@@ -106,6 +109,53 @@ function formatLocation(city: string, state: string): string {
   return `${cleanCity}, ${stateAbbr}`;
 }
 
+// Format move-in date for card display
+function formatMoveInDate(date?: Date | string): string | null {
+  if (!date) return null;
+  try {
+    const d = typeof date === "string" ? new Date(date) : date;
+    if (isNaN(d.getTime())) return null;
+    // Use UTC to avoid timezone offset issues with date-only strings
+    return `Available ${d.toLocaleDateString("en-US", { month: "short", day: "numeric", timeZone: "UTC" })}`;
+  } catch {
+    return null;
+  }
+}
+
+// Map lease duration values to display labels
+const LEASE_DURATION_LABELS: Record<string, string> = {
+  month_to_month: "Month-to-month",
+  "1_month": "1 mo",
+  "3_months": "3 mo lease",
+  "6_months": "6 mo lease",
+  "9_months": "9 mo lease",
+  "12_months": "12 mo lease",
+  "1_year": "12 mo lease",
+};
+
+function formatLeaseDuration(duration?: string): string | null {
+  if (!duration) return null;
+  return LEASE_DURATION_LABELS[duration] || duration;
+}
+
+// Format room type for display
+function formatRoomType(roomType?: string): string | null {
+  if (!roomType) return null;
+  // Handle common DB values
+  const labels: Record<string, string> = {
+    private: "Private Room",
+    private_room: "Private Room",
+    "Private Room": "Private Room",
+    shared: "Shared Room",
+    shared_room: "Shared Room",
+    "Shared Room": "Shared Room",
+    entire: "Entire Place",
+    entire_place: "Entire Place",
+    "Entire Place": "Entire Place",
+  };
+  return labels[roomType] || roomType;
+}
+
 const PLACEHOLDER_IMAGES = [
   "https://images.unsplash.com/photo-1522708323590-d24dbb6b0267?auto=format&fit=crop&w=800&q=80",
   "https://images.unsplash.com/photo-1502672260266-1c1ef2d93688?auto=format&fit=crop&w=800&q=80",
@@ -140,8 +190,9 @@ function arePropsEqual(
     pl.avgRating === nl.avgRating &&
     pl.reviewCount === nl.reviewCount &&
     pl.images === nl.images &&
-    pl.amenities === nl.amenities &&
-    pl.householdLanguages === nl.householdLanguages &&
+    pl.roomType === nl.roomType &&
+    pl.leaseDuration === nl.leaseDuration &&
+    String(pl.moveInDate) === String(nl.moveInDate) &&
     pl.location.city === nl.location.city &&
     pl.location.state === nl.location.state &&
     prev.isSaved === next.isSaved &&
@@ -204,14 +255,19 @@ function ListingCardInner({
   );
   const imageAlt = `${displayTitle} in ${formattedLocation}`;
 
+  const displayRoomType = formatRoomType(listing.roomType);
+  const displayMoveIn = formatMoveInDate(listing.moveInDate);
+  const displayLease = formatLeaseDuration(listing.leaseDuration);
+
   const srParts: string[] = [];
   srParts.push(
     listing.price === 0 ? "Free" : `${formatPrice(listing.price)} per month`
   );
+  if (displayRoomType) srParts.push(displayRoomType);
   if (isTopRated) srParts.push("top rated");
   if (hasRating) srParts.push(`rated ${avgRating!.toFixed(1)} out of 5`);
   else srParts.push("new listing");
-  
+
   if (listing.totalSlots > 1) {
     srParts.push(
       isAvailable
@@ -226,9 +282,8 @@ function ListingCardInner({
     );
   }
   srParts.push(formattedLocation);
-  if (listing.amenities.length > 0) {
-    srParts.push(listing.amenities.slice(0, 3).join(", "));
-  }
+  if (displayMoveIn) srParts.push(displayMoveIn);
+  if (displayLease) srParts.push(displayLease);
   const ariaLabel = `${displayTitle}: ${srParts.join(", ")}`;
 
   return (
@@ -250,7 +305,7 @@ function ListingCardInner({
       }}
       onBlur={() => setHovered(null)}
       className={cn(
-        "group relative flex flex-col rounded-2xl bg-surface-container-lowest mb-4 shadow-sm transition-all duration-500 overflow-hidden",
+        "group relative flex flex-col rounded-2xl bg-surface-container-lowest mb-4 shadow-sm transition-all duration-500 overflow-hidden cursor-pointer",
         !isActive && "hover:shadow-xl hover:-translate-y-1",
         isActive && "ring-2 ring-primary ring-offset-2 -translate-y-0.5 shadow-xl",
         isHovered && !isActive && "ring-1 ring-primary/20",
@@ -312,11 +367,11 @@ function ListingCardInner({
               overlay
             />
             {isTopRated ? (
-              <span className="inline-flex items-center px-2 py-1 rounded-lg text-xs font-semibold bg-surface-container-lowest/80 text-on-surface shadow-sm backdrop-blur-md">
+              <span className="inline-flex items-center px-2.5 py-1 rounded-md text-[11px] uppercase tracking-wider font-bold bg-surface-container-lowest/90 text-on-surface shadow-sm backdrop-blur-md">
                 Top Rated
               </span>
             ) : !hasRating ? (
-              <span className="inline-flex items-center px-2 py-1 rounded-lg text-xs font-semibold bg-surface-container-lowest/80 text-on-surface shadow-sm backdrop-blur-md">
+              <span className="inline-flex items-center px-2.5 py-1 rounded-md text-[11px] uppercase tracking-wider font-bold bg-amber-300 text-amber-950 shadow-sm backdrop-blur-md">
                 New
               </span>
             ) : null}
@@ -324,41 +379,51 @@ function ListingCardInner({
         </div>
 
         <div className="p-4 flex flex-col flex-1">
-          <div className="flex items-start justify-between gap-3 mb-1">
-            <h3
-              className="font-medium text-[1.05rem] leading-tight text-on-surface line-clamp-1 flex-1"
-              title={displayTitle}
-            >
-              {displayTitle}
-            </h3>
+          {/* Row 1: Price + Rating */}
+          <div className="flex items-baseline justify-between gap-3 mb-1">
+            <div className="flex items-baseline gap-1">
+              <span
+                data-testid="listing-price"
+                className="font-display italic text-xl font-medium text-on-surface"
+              >
+                {showTotalPrice && estimatedMonths > 1
+                  ? formatPrice(listing.price * estimatedMonths)
+                  : formatPrice(listing.price)}
+              </span>
+              <span className="text-xs uppercase tracking-wider font-semibold text-on-surface-variant">
+                {showTotalPrice && estimatedMonths > 1 ? "total" : "/mo"}
+              </span>
+            </div>
             {hasRating && (
               <div
-                className="flex items-center gap-1 text-sm font-medium text-on-surface flex-shrink-0"
+                className="flex items-center gap-1 text-sm text-on-surface-variant flex-shrink-0"
                 aria-label={`Rating ${avgRating!.toFixed(1)} out of 5`}
               >
-                <Star className="w-4 h-4 text-amber-400 fill-amber-400" />
+                <Star className="w-3.5 h-3.5 text-amber-400 fill-amber-400" />
                 <span>{avgRating!.toFixed(1)}</span>
+                {(listing.reviewCount ?? 0) > 0 && (
+                  <span className="text-xs">({listing.reviewCount})</span>
+                )}
               </div>
             )}
           </div>
 
-          <p className="text-on-surface-variant text-sm mb-1 truncate">
-            {formattedLocation} • {listing.amenities.slice(0, 2).join(" • ")}
-          </p>
+          {/* Row 2: Room Type / Title + Location */}
+          <h3
+            className="font-medium text-[0.95rem] leading-tight text-on-surface line-clamp-1 mb-0.5"
+            title={displayTitle}
+          >
+            {displayRoomType
+              ? `${displayRoomType} · ${formattedLocation}`
+              : displayTitle}
+          </h3>
 
-          <div className="mt-auto pt-2 flex items-baseline gap-1">
-            <span
-              data-testid="listing-price"
-              className="font-display italic text-2xl font-medium text-on-surface"
-            >
-              {showTotalPrice && estimatedMonths > 1 
-                ? formatPrice(listing.price * estimatedMonths) 
-                : formatPrice(listing.price)}
-            </span>
-            <span className="text-xs uppercase tracking-wider font-semibold text-on-surface-variant">
-              {showTotalPrice && estimatedMonths > 1 ? "total" : "/mo"}
-            </span>
-          </div>
+          {/* Row 3: Location (when no roomType) or Availability */}
+          <p className="text-on-surface-variant text-sm truncate font-medium">
+            {displayRoomType
+              ? [displayMoveIn, displayLease].filter(Boolean).join(" · ") || formattedLocation
+              : [formattedLocation, displayMoveIn, displayLease].filter(Boolean).join(" · ")}
+          </p>
         </div>
       </Link>
     </article>

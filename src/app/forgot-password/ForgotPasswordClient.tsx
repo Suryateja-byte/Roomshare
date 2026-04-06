@@ -35,8 +35,12 @@ export default function ForgotPasswordClient() {
       const data = await response.json();
 
       if (response.status === 429) {
-        const retryAfter = data.retryAfter || parseInt(response.headers.get("Retry-After") || "60", 10);
-        throw new Error(`Too many attempts. Please wait ${retryAfter} seconds and try again.`);
+        const retryAfter =
+          data.retryAfter ||
+          parseInt(response.headers.get("Retry-After") || "60", 10);
+        throw new Error(
+          `Too many attempts. Please wait ${retryAfter} seconds and try again.`
+        );
       }
 
       if (!response.ok) {
@@ -132,7 +136,10 @@ export default function ForgotPasswordClient() {
             </div>
 
             {error && (
-              <div role="alert" className="bg-red-50 border border-red-200 text-red-700 px-4 py-3 rounded-lg text-sm">
+              <div
+                role="alert"
+                className="bg-red-50 border border-red-200 text-red-700 px-4 py-3 rounded-lg text-sm"
+              >
                 {error}
               </div>
             )}

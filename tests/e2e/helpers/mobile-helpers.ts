@@ -6,13 +6,13 @@
  * MobileBottomSheet component's behavior for consistent test usage.
  *
  * Key concepts:
- * - Snap indices: 0=collapsed (~15vh), 1=half (~50vh), 2=expanded (~85vh)
+ * - Snap indices: 0=collapsed (~15vh), 1=expanded (~85vh)
  * - The sheet uses framer-motion spring animations (~400-600ms)
  * - The slider handle supports keyboard navigation (ArrowUp/Down/Home/End)
  * - data-snap-current attribute on the content area reflects current snap
  */
 
-import { Page, Locator } from "@playwright/test";
+import { Page } from "@playwright/test";
 
 // ---------------------------------------------------------------------------
 // Selectors (matching MobileBottomSheet.tsx DOM structure)
@@ -25,10 +25,6 @@ export const mobileSelectors = {
   sheetHandle: '[role="slider"][aria-label="Results panel size"]',
   /** Content area that exposes data-snap-current attribute */
   snapContent: "[data-snap-current]",
-  /** Expand button shown when sheet is at half position */
-  expandButton: 'button[aria-label="Expand results"]',
-  /** Collapse button shown when sheet is expanded */
-  collapseButton: 'button[aria-label="Collapse results"]',
   /** Minimize (X) button to dismiss sheet */
   minimizeButton: 'button[aria-label="Minimize results panel"]',
   /** Listing card elements */
@@ -61,9 +57,8 @@ export const mobileSelectors = {
 // ---------------------------------------------------------------------------
 
 export const SNAP_COLLAPSED = 0.15;
-export const SNAP_HALF = 0.5;
 export const SNAP_EXPANDED = 0.85;
-export const SNAP_POINTS = [SNAP_COLLAPSED, SNAP_HALF, SNAP_EXPANDED] as const;
+export const SNAP_POINTS = [SNAP_COLLAPSED, SNAP_EXPANDED] as const;
 
 // ---------------------------------------------------------------------------
 // Core helpers
@@ -115,7 +110,7 @@ export async function getSheetHeightFraction(page: Page): Promise<number> {
  */
 export async function setSheetSnap(
   page: Page,
-  targetSnap: 0 | 1 | 2
+  targetSnap: 0 | 1
 ): Promise<void> {
   const currentSnap = await getSheetSnapIndex(page);
   if (currentSnap === targetSnap) return;

@@ -16,7 +16,6 @@ import {
   fireEvent,
 } from "@testing-library/react";
 
-
 // Mock MapLibre GL JS
 const mockMarkerRemove = jest.fn();
 const mockMarkerSetLngLat = jest.fn().mockReturnThis();
@@ -98,6 +97,20 @@ jest.mock("@/lib/maps/stadia", () => ({
   getStadiaStyle: jest.fn(() => "https://stadia.style.json"),
 }));
 
+// Mock fetch for style loading (NearbyPlacesMap fetches style JSON before creating map)
+global.fetch = jest.fn(() =>
+  Promise.resolve({
+    ok: true,
+    json: () =>
+      Promise.resolve({
+        version: 8,
+        sources: {},
+        layers: [],
+        projection: { type: "mercator" },
+      }),
+  })
+) as jest.Mock;
+
 import NearbyPlacesMap from "@/components/nearby/NearbyPlacesMap";
 import type { NearbyPlace } from "@/types/nearby";
 
@@ -122,6 +135,14 @@ describe("NearbyPlacesMap - Marker/Popup DOM & Events", () => {
     jest.clearAllMocks();
     createdMarkers.length = 0;
   });
+
+  // Wait for async map init (fetch style JSON) then trigger 'load' event
+  const waitForMapInit = async () => {
+    await act(async () => {
+      // Flush fetch promise chain
+      await new Promise((r) => setTimeout(r, 50));
+    });
+  };
 
   // Trigger map 'load' event to initialize markers
   const triggerMapLoad = () => {
@@ -148,6 +169,7 @@ describe("NearbyPlacesMap - Marker/Popup DOM & Events", () => {
         />
       );
 
+      await waitForMapInit();
       triggerMapLoad();
 
       // Initial marker count (includes listing marker)
@@ -172,7 +194,7 @@ describe("NearbyPlacesMap - Marker/Popup DOM & Events", () => {
       expect(createdMarkers.length).toBe(initialMarkerCount);
     });
 
-    it("removes old markers and adds new ones on category change", () => {
+    it("removes old markers and adds new ones on category change", async () => {
       const groceryPlaces = [
         createMockPlace("grocery-1", { category: "food-grocery" }),
       ];
@@ -185,6 +207,7 @@ describe("NearbyPlacesMap - Marker/Popup DOM & Events", () => {
         />
       );
 
+      await waitForMapInit();
       triggerMapLoad();
 
       // Switch to different category with different places
@@ -207,7 +230,7 @@ describe("NearbyPlacesMap - Marker/Popup DOM & Events", () => {
 
   // H2: Popup updates while open don't flicker
   describe("H2: Open Popup Updates", () => {
-    it("maintains popup stability during marker updates", () => {
+    it("maintains popup stability during marker updates", async () => {
       const places = [createMockPlace("place-1")];
 
       const { rerender } = render(
@@ -218,6 +241,7 @@ describe("NearbyPlacesMap - Marker/Popup DOM & Events", () => {
         />
       );
 
+      await waitForMapInit();
       triggerMapLoad();
 
       // Simulate popup being open
@@ -251,6 +275,7 @@ describe("NearbyPlacesMap - Marker/Popup DOM & Events", () => {
         />
       );
 
+      await waitForMapInit();
       triggerMapLoad();
 
       // Rapid clicks should not throw
@@ -269,7 +294,7 @@ describe("NearbyPlacesMap - Marker/Popup DOM & Events", () => {
 
   // H4: Ghost markers removed on category change
   describe("H4: Marker Cleanup", () => {
-    it("removes all markers when places array is cleared", () => {
+    it("removes all markers when places array is cleared", async () => {
       const places = [
         createMockPlace("place-1"),
         createMockPlace("place-2"),
@@ -284,6 +309,7 @@ describe("NearbyPlacesMap - Marker/Popup DOM & Events", () => {
         />
       );
 
+      await waitForMapInit();
       triggerMapLoad();
 
       // Clear all places
@@ -299,7 +325,7 @@ describe("NearbyPlacesMap - Marker/Popup DOM & Events", () => {
       expect(mockMarkerRemove).toHaveBeenCalled();
     });
 
-    it("removes only stale markers on partial update", () => {
+    it("removes only stale markers on partial update", async () => {
       const places = [
         createMockPlace("place-1"),
         createMockPlace("place-2"),
@@ -314,6 +340,7 @@ describe("NearbyPlacesMap - Marker/Popup DOM & Events", () => {
         />
       );
 
+      await waitForMapInit();
       triggerMapLoad();
 
       mockMarkerRemove.mockClear();
@@ -334,7 +361,7 @@ describe("NearbyPlacesMap - Marker/Popup DOM & Events", () => {
 
   // H5: Only one popup open at a time
   describe("H5: Single Popup", () => {
-    it("configures popups with no close button per design", () => {
+    it("configures popups with no close button per design", async () => {
       const places = [createMockPlace("place-1")];
 
       render(
@@ -345,6 +372,7 @@ describe("NearbyPlacesMap - Marker/Popup DOM & Events", () => {
         />
       );
 
+      await waitForMapInit();
       triggerMapLoad();
 
       // MapLibre's Popup is configured with closeButton: false
@@ -359,7 +387,7 @@ describe("NearbyPlacesMap - Marker/Popup DOM & Events", () => {
 
   // H6: Hover scale doesn't shift marker position
   describe("H6: Transform Origin", () => {
-    it("creates markers with centered transform origin via CSS classes", () => {
+    it("creates markers with centered transform origin via CSS classes", async () => {
       const places = [createMockPlace("place-1")];
 
       render(
@@ -370,6 +398,7 @@ describe("NearbyPlacesMap - Marker/Popup DOM & Events", () => {
         />
       );
 
+      await waitForMapInit();
       triggerMapLoad();
 
       // Markers should have class with centering for stable hover
@@ -389,7 +418,7 @@ describe("NearbyPlacesMap - Marker/Popup DOM & Events", () => {
 
   // H7: Dense markers (50+) don't lag on mousemove
   describe("H7: Performance", () => {
-    it("handles 50+ markers without excessive rendering", () => {
+    it("handles 50+ markers without excessive rendering", async () => {
       const manyPlaces = Array.from({ length: 60 }, (_, i) =>
         createMockPlace(`place-${i}`, {
           location: { lat: 37.7749 + i * 0.001, lng: -122.4194 + i * 0.001 },
@@ -406,6 +435,7 @@ describe("NearbyPlacesMap - Marker/Popup DOM & Events", () => {
         />
       );
 
+      await waitForMapInit();
       triggerMapLoad();
 
       const renderTime = performance.now() - startTime;
@@ -420,7 +450,7 @@ describe("NearbyPlacesMap - Marker/Popup DOM & Events", () => {
 
   // H8: Detached marker removes event listener
   describe("H8: Listener Cleanup", () => {
-    it("cleans up map on unmount", () => {
+    it("cleans up map on unmount", async () => {
       const places = [createMockPlace("place-1")];
 
       const { unmount } = render(
@@ -431,6 +461,7 @@ describe("NearbyPlacesMap - Marker/Popup DOM & Events", () => {
         />
       );
 
+      await waitForMapInit();
       triggerMapLoad();
 
       unmount();
@@ -442,7 +473,7 @@ describe("NearbyPlacesMap - Marker/Popup DOM & Events", () => {
 
   // H9: POI markers render above listing marker
   describe("H9: Z-Order", () => {
-    it("adds listing marker first, then POI markers", () => {
+    it("adds listing marker first, then POI markers", async () => {
       const places = [createMockPlace("place-1")];
 
       render(
@@ -453,6 +484,7 @@ describe("NearbyPlacesMap - Marker/Popup DOM & Events", () => {
         />
       );
 
+      await waitForMapInit();
       triggerMapLoad();
 
       // Markers added via addTo - listing marker added in map.on('load')
@@ -467,7 +499,7 @@ describe("NearbyPlacesMap - Marker/Popup DOM & Events", () => {
 
   // H10: innerHTML XSS prevention (regression)
   describe("H10: XSS Prevention", () => {
-    it("escapes HTML in place names to prevent XSS", () => {
+    it("escapes HTML in place names to prevent XSS", async () => {
       const maliciousPlace = createMockPlace("xss-test", {
         name: '<script>alert("XSS")</script>Malicious',
         address: '<img onerror="alert(1)" src="x">',
@@ -481,6 +513,7 @@ describe("NearbyPlacesMap - Marker/Popup DOM & Events", () => {
         />
       );
 
+      await waitForMapInit();
       triggerMapLoad();
 
       // Popup content should be escaped
@@ -504,7 +537,7 @@ describe("NearbyPlacesMap - Marker/Popup DOM & Events", () => {
       }
     });
 
-    it("uses escapeHtml utility for popup content", () => {
+    it("uses escapeHtml utility for popup content", async () => {
       // The component uses escapeHtml() function
       // Verify by checking popup HTML doesn't contain raw script tags
       const dangerousName = "<script>steal(cookies)</script>";
@@ -518,6 +551,7 @@ describe("NearbyPlacesMap - Marker/Popup DOM & Events", () => {
         />
       );
 
+      await waitForMapInit();
       triggerMapLoad();
 
       // Check that setHTML was called with escaped content
@@ -535,7 +569,7 @@ describe("NearbyPlacesMap - Marker/Popup DOM & Events", () => {
 
   // Additional edge case tests
   describe("Highlight State Management", () => {
-    it("applies highlighted class when highlightedPlaceId matches", () => {
+    it("applies highlighted class when highlightedPlaceId matches", async () => {
       const places = [createMockPlace("place-1"), createMockPlace("place-2")];
 
       const { rerender } = render(
@@ -547,6 +581,7 @@ describe("NearbyPlacesMap - Marker/Popup DOM & Events", () => {
         />
       );
 
+      await waitForMapInit();
       triggerMapLoad();
 
       // Set highlighted place
@@ -564,7 +599,7 @@ describe("NearbyPlacesMap - Marker/Popup DOM & Events", () => {
       expect(mockMapOn).toHaveBeenCalledWith("load", expect.any(Function));
     });
 
-    it("clears highlight when highlightedPlaceId changes to null", () => {
+    it("clears highlight when highlightedPlaceId changes to null", async () => {
       const places = [createMockPlace("place-1")];
 
       const { rerender } = render(
@@ -576,6 +611,7 @@ describe("NearbyPlacesMap - Marker/Popup DOM & Events", () => {
         />
       );
 
+      await waitForMapInit();
       triggerMapLoad();
 
       // Clear highlight
@@ -594,7 +630,7 @@ describe("NearbyPlacesMap - Marker/Popup DOM & Events", () => {
   });
 
   describe("Map Controls", () => {
-    it("fit all markers button appears when places exist", () => {
+    it("fit all markers button appears when places exist", async () => {
       const places = [createMockPlace("place-1")];
 
       render(
@@ -611,7 +647,7 @@ describe("NearbyPlacesMap - Marker/Popup DOM & Events", () => {
       ).toBeInTheDocument();
     });
 
-    it("fit all markers button hidden when no places", () => {
+    it("fit all markers button hidden when no places", async () => {
       render(
         <NearbyPlacesMap
           listingLat={listingLat}
@@ -626,7 +662,7 @@ describe("NearbyPlacesMap - Marker/Popup DOM & Events", () => {
       ).not.toBeInTheDocument();
     });
 
-    it("reset view navigates to listing location", () => {
+    it("reset view navigates to listing location", async () => {
       render(
         <NearbyPlacesMap
           listingLat={listingLat}
@@ -645,5 +681,4 @@ describe("NearbyPlacesMap - Marker/Popup DOM & Events", () => {
       );
     });
   });
-
 });

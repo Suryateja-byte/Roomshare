@@ -66,7 +66,7 @@ test.describe("Search Loading States", () => {
 
     // Try to detect loading indicators
     const loadingIndicators = page.locator(
-      '[aria-busy="true"], [class*="skeleton"], [class*="animate-pulse"], [class*="loading"]'
+      '[data-testid="listing-card-skeleton-grid"], [aria-busy="true"], [class*="skeleton"], [class*="animate-pulse"], [class*="loading"]'
     );
 
     // Wait briefly for either loading state or results
@@ -121,27 +121,19 @@ test.describe("Search Loading States", () => {
 
       await recommendedPill.click();
 
-      // Check for the pending overlay (bg-white/40)
-      // SearchResultsLoadingWrapper adds aria-busy="true" during pending
-      const wrapper = page.locator('[aria-busy="true"]');
-      const isBusy = await wrapper.isVisible().catch(() => false);
+      const pendingRegion = page.locator(
+        '[data-testid="search-results-pending-region"][aria-busy="true"]'
+      );
+      const isBusy = await pendingRegion.isVisible().catch(() => false);
 
       if (isBusy) {
         expect(isBusy).toBe(true);
-        // Also check for the loading spinner overlay
-        const spinner = page.locator(".animate-spin");
-        const spinnerVisible = await spinner.isVisible().catch(() => false);
-
-        if (spinnerVisible) {
-          // The "Updating results..." text should be visible
-          const updatingText = page.getByText(
-            /updating results|still loading/i
-          );
-          const textVisible = await updatingText.isVisible().catch(() => false);
-          if (textVisible) {
-            await expect(updatingText).toBeVisible();
-          }
-        }
+        await expect(
+          page.getByTestId("search-results-pending-status")
+        ).toContainText(/updating results|still loading/i);
+        await expect(
+          page.locator('[data-testid="listing-card-skeleton-grid"]')
+        ).toHaveCount(0);
       } else {
         console.log(
           "Info: Transition completed too fast to observe pending state"
@@ -163,7 +155,7 @@ test.describe("Search Loading States", () => {
     await waitForResults(page);
 
     // After load, the SearchResultsLoadingWrapper should have aria-busy="false"
-    const wrapper = page.locator(".relative[aria-busy]");
+    const wrapper = page.locator('[data-testid="search-results-pending-region"]');
 
     if ((await wrapper.count()) > 0) {
       // After initial load, should not be busy

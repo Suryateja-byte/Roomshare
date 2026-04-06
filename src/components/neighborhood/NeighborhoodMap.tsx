@@ -475,7 +475,9 @@ export function NeighborhoodMap({
           >
             <div
               className={`p-3 rounded-lg ${
-                isDarkMode ? "bg-on-surface text-white" : "bg-surface-container-lowest text-on-surface"
+                isDarkMode
+                  ? "bg-on-surface text-white"
+                  : "bg-surface-container-lowest text-on-surface"
               }`}
             >
               <h4 className="font-medium text-sm">{popupPoi.name}</h4>

@@ -307,9 +307,7 @@ describe("POST /api/upload", () => {
       };
     });
 
-    const { POST: POST_SHARP_FAIL } = await import(
-      "@/app/api/upload/route"
-    );
+    const { POST: POST_SHARP_FAIL } = await import("@/app/api/upload/route");
 
     const file = createFakeFile(JPEG_MAGIC, "photo.jpg", "image/jpeg");
     const request = makeUploadRequest(file);

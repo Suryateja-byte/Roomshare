@@ -3,7 +3,9 @@ import Link from "next/link";
 export default function ListingNotFound() {
   return (
     <section className="flex flex-col items-center justify-center min-h-[60vh] px-4 text-center bg-surface-canvas">
-      <h1 className="text-2xl font-bold font-display text-on-surface mb-2">Listing not found</h1>
+      <h1 className="text-2xl font-bold font-display text-on-surface mb-2">
+        Listing not found
+      </h1>
       <p className="text-on-surface-variant mb-6">
         This listing may have been removed or the link is incorrect.
       </p>

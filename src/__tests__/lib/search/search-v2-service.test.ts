@@ -26,8 +26,8 @@ jest.mock("@/lib/logger", () => ({
       warn: jest.fn(),
     },
   },
-  sanitizeErrorMessage: jest.fn(
-    (error: unknown) => error instanceof Error ? error.message : "Unknown error"
+  sanitizeErrorMessage: jest.fn((error: unknown) =>
+    error instanceof Error ? error.message : "Unknown error"
   ),
 }));
 
@@ -54,6 +54,8 @@ jest.mock("@/lib/search/search-doc-queries", () => ({
   getSearchDocMapListings: jest.fn(),
   getSearchDocListingsWithKeyset: jest.fn(),
   getSearchDocListingsFirstPage: jest.fn(),
+  semanticSearchQuery: jest.fn(),
+  mapSemanticRowsToListingData: jest.fn(),
   MAX_UNBOUNDED_RESULTS: 48,
 }));
 
@@ -100,6 +102,7 @@ jest.mock("@/lib/env", () => ({
     searchRanking: false,
     searchDebugRanking: false,
     searchDoc: false,
+    semanticSearch: false,
   },
   CURSOR_SECRET: "",
 }));
@@ -128,6 +131,8 @@ import {
   getSearchDocMapListings,
   getSearchDocListingsWithKeyset,
   getSearchDocListingsFirstPage,
+  semanticSearchQuery,
+  mapSemanticRowsToListingData,
 } from "@/lib/search/search-doc-queries";
 import {
   isRankingEnabled,
@@ -183,6 +188,13 @@ const mockGetSearchDocListingsWithKeyset =
 const mockGetSearchDocListingsFirstPage =
   getSearchDocListingsFirstPage as jest.MockedFunction<
     typeof getSearchDocListingsFirstPage
+  >;
+const mockSemanticSearchQuery = semanticSearchQuery as jest.MockedFunction<
+  typeof semanticSearchQuery
+>;
+const mockMapSemanticRowsToListingData =
+  mapSemanticRowsToListingData as jest.MockedFunction<
+    typeof mapSemanticRowsToListingData
   >;
 const mockIsRankingEnabled = isRankingEnabled as jest.MockedFunction<
   typeof isRankingEnabled
@@ -287,6 +299,7 @@ function defaultParsedSearchParams(
 ) {
   return {
     q: undefined,
+    what: undefined,
     requestedPage: overrides.requestedPage ?? 1,
     sortOption: "recommended" as const,
     filterParams: {
@@ -352,8 +365,10 @@ function setupDefaultMocks({
   mockDetermineMode.mockReturnValue(mode);
   mockShouldIncludePins.mockReturnValue(mode === "pins");
   mockGenerateQueryHash.mockReturnValue("abcdef1234567890");
-  mockTransformToListItems.mockReturnValue(
-    listItems.map((l) => ({
+  mockSemanticSearchQuery.mockResolvedValue(null);
+  mockMapSemanticRowsToListingData.mockImplementation((rows) => rows as never);
+  mockTransformToListItems.mockImplementation((items) =>
+    items.map((l) => ({
       id: l.id,
       title: l.title,
       price: l.price,
@@ -385,6 +400,7 @@ describe("search-v2-service", () => {
     (features as Record<string, unknown>).searchKeyset = false;
     (features as Record<string, unknown>).searchRanking = false;
     (features as Record<string, unknown>).searchDebugRanking = false;
+    (features as Record<string, unknown>).semanticSearch = false;
   });
 
   describe("executeSearchV2", () => {
@@ -418,6 +434,101 @@ describe("search-v2-service", () => {
       // paginatedResult has the raw listing data
       expect(result.paginatedResult!.items).toHaveLength(1);
       expect(result.paginatedResult!.items[0].id).toBe("l-1");
+    });
+
+    it("uses vibeQuery for semantic ranking while preserving the location query", async () => {
+      setupDefaultMocks();
+      (features as Record<string, unknown>).semanticSearch = true;
+      mockParseSearchParams.mockReturnValue(
+        defaultParsedSearchParams({
+          filterParams: {
+            query: "Irving",
+            vibeQuery: "quiet roommates",
+            bounds: BOUNDS,
+          },
+        })
+      );
+      const semanticListing = makeListingData({ id: "semantic-1" });
+      mockSemanticSearchQuery.mockResolvedValue([{ id: "semantic-row-1" }] as never);
+      mockMapSemanticRowsToListingData.mockReturnValue([semanticListing]);
+
+      const result = await executeSearchV2({
+        rawParams: {
+          q: "Irving",
+          what: "quiet roommates",
+          minLat: "32.8",
+          maxLat: "32.9",
+          minLng: "-96.99",
+          maxLng: "-96.9",
+        },
+      });
+
+      expect(mockSemanticSearchQuery).toHaveBeenCalledWith(
+        expect.objectContaining({
+          query: "Irving",
+          vibeQuery: "quiet roommates",
+        }),
+        expect.any(Number),
+        0
+      );
+      expect(mockGetListingsPaginated).not.toHaveBeenCalled();
+      expect(mockGetMapListings).toHaveBeenCalledWith(
+        expect.objectContaining({
+          query: undefined,
+          vibeQuery: "quiet roommates",
+        })
+      );
+      expect(result.paginatedResult?.items[0]?.id).toBe("semantic-1");
+    });
+
+    it("falls back to broadened area results when semantic ranking returns no rows", async () => {
+      const listItems = [
+        makeListingData({
+          id: "generic",
+          title: "Sunny home",
+          description: "Bright room near transit",
+        }),
+        makeListingData({
+          id: "quiet",
+          title: "Quiet roommates welcome",
+          description: "Calm home with respectful housemates",
+        }),
+      ];
+      setupDefaultMocks({ listItems });
+      (features as Record<string, unknown>).semanticSearch = true;
+      mockParseSearchParams.mockReturnValue(
+        defaultParsedSearchParams({
+          filterParams: {
+            query: "Irving",
+            vibeQuery: "quiet roommates",
+            bounds: BOUNDS,
+          },
+        })
+      );
+      mockSemanticSearchQuery.mockResolvedValue(null);
+
+      const result = await executeSearchV2({
+        rawParams: {
+          q: "Irving",
+          what: "quiet roommates",
+          minLat: "32.8",
+          maxLat: "32.9",
+          minLng: "-96.99",
+          maxLng: "-96.9",
+        },
+      });
+
+      expect(result.response?.meta.warnings).toContain("VIBE_SOFT_FALLBACK");
+      expect(mockGenerateQueryHash).toHaveBeenCalledWith(
+        expect.objectContaining({
+          query: "Irving",
+          vibeQuery: "quiet roommates",
+        })
+      );
+      expect(result.paginatedResult?.items.map((item) => item.id)).toEqual([
+        "quiet",
+        "generic",
+      ]);
     });
 
     it("handles map query timeout gracefully (returns list only)", async () => {

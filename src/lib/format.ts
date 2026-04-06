@@ -1,4 +1,6 @@
-const priceFormatter = new Intl.NumberFormat("en-US", { maximumFractionDigits: 0 });
+const priceFormatter = new Intl.NumberFormat("en-US", {
+  maximumFractionDigits: 0,
+});
 
 export function formatPrice(price: number): string {
   if (price === 0) return "Free";

@@ -54,7 +54,12 @@ export class SearchResultsErrorBoundary extends Component<Props, State> {
             We had trouble loading search results. Please try again.
           </p>
           <button
-            onClick={() => this.setState((prev) => ({ hasError: false, retryKey: prev.retryKey + 1 }))}
+            onClick={() =>
+              this.setState((prev) => ({
+                hasError: false,
+                retryKey: prev.retryKey + 1,
+              }))
+            }
             className="inline-flex items-center gap-2 px-4 py-2 bg-on-surface text-white rounded-lg hover:bg-on-surface transition-colors text-sm font-medium"
           >
             <RefreshCw className="w-4 h-4" />

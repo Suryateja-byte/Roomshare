@@ -1,7 +1,7 @@
 "use client";
 
 import { useState, useRef, useCallback, type ReactNode } from "react";
-import { LazyMotion, domAnimation, m } from "framer-motion";
+import { LazyMotion, domAnimation, m, useReducedMotion } from "framer-motion";
 import { ArrowDown, Loader2 } from "lucide-react";
 
 const PULL_THRESHOLD = 60;
@@ -31,6 +31,7 @@ export default function PullToRefresh({
   enabled = true,
   scrollContainerRef,
 }: PullToRefreshProps) {
+  const reducedMotion = useReducedMotion();
   const [pullDistance, setPullDistance] = useState(0);
   const [isRefreshing, setIsRefreshing] = useState(false);
   const [isPulling, setIsPulling] = useState(false);
@@ -119,7 +120,7 @@ export default function PullToRefresh({
             ) : (
               <m.div
                 animate={{ rotate: progress >= 1 ? 180 : 0 }}
-                transition={{ duration: 0.2 }}
+                transition={{ duration: reducedMotion ? 0 : 0.2 }}
               >
                 <ArrowDown className="w-5 h-5 text-on-surface-variant" />
               </m.div>

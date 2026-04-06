@@ -14,7 +14,6 @@
  */
 
 import {
-  Suspense,
   useCallback,
   useState,
   useRef,
@@ -36,13 +35,14 @@ import { useKeyboardShortcuts } from "@/hooks/useKeyboardShortcuts";
 import { useMobileSearch } from "@/contexts/MobileSearchContext";
 import { useMediaQuery } from "@/hooks/useMediaQuery";
 import CollapsedMobileSearch from "@/components/CollapsedMobileSearch";
-import { CompactSearchPill } from "@/components/search/CompactSearchPill";
 import MobileSearchOverlay from "@/components/search/MobileSearchOverlay";
+import DesktopHeaderSearch, {
+  type DesktopHeaderSearchHandle,
+} from "@/components/search/DesktopHeaderSearch";
 import { useSession, signOut } from "next-auth/react";
 import { Button } from "@/components/ui/button";
 import UserAvatar from "@/components/UserAvatar";
 import NotificationCenter from "@/components/NotificationCenter";
-import SearchForm from "@/components/SearchForm";
 
 // Exponential backoff constants for unread message polling
 const BASE_POLL_INTERVAL = 30000; // 30 seconds
@@ -112,9 +112,11 @@ const MenuItem = ({
 
 export default function SearchHeaderWrapper() {
   const { isCollapsed } = useScrollHeader({ threshold: 80 });
-  const { isExpanded, openFilters } = useMobileSearch();
+  const { openFilters } = useMobileSearch();
+  const isMobileViewport = useMediaQuery("(max-width: 767px)");
   const { data: session } = useSession();
   const user = session?.user;
+  const desktopSearchRef = useRef<DesktopHeaderSearchHandle>(null);
 
   // Full-screen mobile search overlay (Option A — Airbnb pattern)
   const [isMobileOverlayOpen, setIsMobileOverlayOpen] = useState(false);
@@ -294,21 +296,16 @@ export default function SearchHeaderWrapper() {
     {
       key: "k",
       meta: true,
-      action: () => document.getElementById("search-location")?.focus(),
-      description: "Focus search input",
+      action: () => {
+        if (isMobileViewport === true) {
+          handleOpenMobileSearch();
+          return;
+        }
+        desktopSearchRef.current?.openAndFocus("where");
+      },
+      description: "Open search",
     },
   ]);
-
-  // Show collapsed bar when scrolled and not manually expanded.
-  // On mobile, default to collapsed to reclaim viewport space (P0 fix: SEARCH-MOB-01).
-  const isMobileViewport = useMediaQuery("(max-width: 767px)");
-  const showCollapsed =
-    (isCollapsed && !isExpanded) || (isMobileViewport === true && !isExpanded);
-
-  const handleExpandDesktop = useCallback(() => {
-    // Scroll to top to reveal the full form
-    window.scrollTo({ top: 0, behavior: "smooth" });
-  }, []);
 
   // Keyboard handler for the menu container (roving tabindex)
   const handleMenuKeyDown = useCallback(
@@ -428,9 +425,7 @@ export default function SearchHeaderWrapper() {
     <>
       {/* Full search form - hidden on mobile always, hidden on desktop when collapsed */}
       <div
-        className={`transition-all duration-300 ease-out hidden ${
-          showCollapsed ? "" : "md:block"
-        }`}
+        className={`transition-all duration-300 ease-out hidden md:block`}
       >
         <div className="w-full max-w-[1920px] mx-auto px-3 sm:px-4 md:px-6 py-3 sm:py-4">
           <div className="flex items-center gap-2 sm:gap-3">
@@ -445,11 +440,12 @@ export default function SearchHeaderWrapper() {
               </div>
             </Link>
 
-            {/* Search Form — desktop only (mobile uses full-screen overlay) */}
-            <div className="flex-1 min-w-0 relative hidden md:block">
-              <Suspense fallback={<div className="h-12" />}>
-                <SearchForm />
-              </Suspense>
+            {/* Desktop header search — mobile keeps the full-screen overlay flow */}
+            <div className="flex-1 min-w-0 relative hidden md:flex justify-center">
+              <DesktopHeaderSearch
+                ref={desktopSearchRef}
+                collapsed={isCollapsed}
+              />
             </div>
 
             {/* Right Actions - User Profile / Auth */}
@@ -620,17 +616,7 @@ export default function SearchHeaderWrapper() {
         onOpenFilters={openFilters}
       />
 
-      {/* Compact search pill - visible on desktop only when collapsed */}
-      <div
-        className={`transition-all duration-300 ease-out hidden ${
-          showCollapsed ? "md:block py-2 px-6" : ""
-        }`}
-      >
-        <CompactSearchPill
-          onExpand={handleExpandDesktop}
-          onOpenFilters={openFilters}
-        />
-      </div>
+
     </>
   );
 }

@@ -103,7 +103,6 @@ jest.mock("maplibre-gl", () => ({
   LngLatBounds: jest.fn(() => mockLngLatBoundsInstance),
 }));
 
-
 // Mock CSS imports
 jest.mock("maplibre-gl/dist/maplibre-gl.css", () => ({}));
 jest.mock("@/styles/nearby-map.css", () => ({}));
@@ -111,6 +110,14 @@ jest.mock("@/styles/nearby-map.css", () => ({}));
 import NearbyPlacesMap from "@/components/nearby/NearbyPlacesMap";
 import maplibregl from "maplibre-gl";
 
+// Mock fetch for style loading (NearbyPlacesMap fetches style JSON before creating map)
+const mockStyleJson = { version: 8, sources: {}, layers: [], projection: { type: "mercator" } };
+global.fetch = jest.fn(() =>
+  Promise.resolve({
+    ok: true,
+    json: () => Promise.resolve(mockStyleJson),
+  })
+) as jest.Mock;
 
 describe("NearbyPlacesMap - Smoke Tests", () => {
   const defaultProps = {
@@ -160,7 +167,7 @@ describe("NearbyPlacesMap - Smoke Tests", () => {
       render(<NearbyPlacesMap {...defaultProps} />);
 
       await act(async () => {
-        await new Promise((resolve) => setTimeout(resolve, 10));
+        await new Promise((resolve) => setTimeout(resolve, 50));
       });
 
       expect(maplibregl.Map).toHaveBeenCalledWith(
@@ -175,7 +182,7 @@ describe("NearbyPlacesMap - Smoke Tests", () => {
       render(<NearbyPlacesMap {...defaultProps} />);
 
       await act(async () => {
-        await new Promise((resolve) => setTimeout(resolve, 10));
+        await new Promise((resolve) => setTimeout(resolve, 50));
       });
 
       // At least one marker should be created (the listing marker)
@@ -186,7 +193,7 @@ describe("NearbyPlacesMap - Smoke Tests", () => {
       render(<NearbyPlacesMap {...defaultProps} />);
 
       await act(async () => {
-        await new Promise((resolve) => setTimeout(resolve, 10));
+        await new Promise((resolve) => setTimeout(resolve, 50));
       });
 
       expect(mockMapInstance.on).toHaveBeenCalledWith(
@@ -201,7 +208,7 @@ describe("NearbyPlacesMap - Smoke Tests", () => {
       render(<NearbyPlacesMap {...defaultProps} places={mockPlaces} />);
 
       await act(async () => {
-        await new Promise((resolve) => setTimeout(resolve, 10));
+        await new Promise((resolve) => setTimeout(resolve, 50));
       });
 
       // Should have listing marker + 2 place markers
@@ -216,7 +223,7 @@ describe("NearbyPlacesMap - Smoke Tests", () => {
       );
 
       await act(async () => {
-        await new Promise((resolve) => setTimeout(resolve, 10));
+        await new Promise((resolve) => setTimeout(resolve, 50));
       });
 
       const initialMarkerCount = createdMarkers.length;
@@ -225,7 +232,7 @@ describe("NearbyPlacesMap - Smoke Tests", () => {
       rerender(<NearbyPlacesMap {...defaultProps} places={[]} />);
 
       await act(async () => {
-        await new Promise((resolve) => setTimeout(resolve, 10));
+        await new Promise((resolve) => setTimeout(resolve, 50));
       });
 
       // Place markers should be removed
@@ -239,7 +246,7 @@ describe("NearbyPlacesMap - Smoke Tests", () => {
       );
 
       await act(async () => {
-        await new Promise((resolve) => setTimeout(resolve, 10));
+        await new Promise((resolve) => setTimeout(resolve, 50));
       });
 
       const initialCallCount = (maplibregl.Marker as jest.Mock).mock.calls
@@ -249,7 +256,7 @@ describe("NearbyPlacesMap - Smoke Tests", () => {
       rerender(<NearbyPlacesMap {...defaultProps} places={mockPlaces} />);
 
       await act(async () => {
-        await new Promise((resolve) => setTimeout(resolve, 10));
+        await new Promise((resolve) => setTimeout(resolve, 50));
       });
 
       // New markers should be created for the additional place(s)
@@ -264,7 +271,7 @@ describe("NearbyPlacesMap - Smoke Tests", () => {
       render(<NearbyPlacesMap {...defaultProps} places={mockPlaces} />);
 
       await act(async () => {
-        await new Promise((resolve) => setTimeout(resolve, 10));
+        await new Promise((resolve) => setTimeout(resolve, 50));
       });
 
       expect(mockMapInstance.fitBounds).toHaveBeenCalledTimes(1);
@@ -283,7 +290,7 @@ describe("NearbyPlacesMap - Smoke Tests", () => {
       );
 
       await act(async () => {
-        await new Promise((resolve) => setTimeout(resolve, 10));
+        await new Promise((resolve) => setTimeout(resolve, 50));
       });
 
       expect(mockMapInstance.fitBounds).toHaveBeenCalledTimes(1);
@@ -304,7 +311,7 @@ describe("NearbyPlacesMap - Smoke Tests", () => {
       rerender(<NearbyPlacesMap {...defaultProps} places={newPlaces} />);
 
       await act(async () => {
-        await new Promise((resolve) => setTimeout(resolve, 10));
+        await new Promise((resolve) => setTimeout(resolve, 50));
       });
 
       // fitBounds should NOT be called again
@@ -315,7 +322,7 @@ describe("NearbyPlacesMap - Smoke Tests", () => {
       render(<NearbyPlacesMap {...defaultProps} places={[]} />);
 
       await act(async () => {
-        await new Promise((resolve) => setTimeout(resolve, 10));
+        await new Promise((resolve) => setTimeout(resolve, 50));
       });
 
       expect(mockMapInstance.fitBounds).not.toHaveBeenCalled();
@@ -333,7 +340,7 @@ describe("NearbyPlacesMap - Smoke Tests", () => {
       );
 
       await act(async () => {
-        await new Promise((resolve) => setTimeout(resolve, 10));
+        await new Promise((resolve) => setTimeout(resolve, 50));
       });
 
       // Find markers with matching placeId and check for highlighted class
@@ -358,7 +365,7 @@ describe("NearbyPlacesMap - Smoke Tests", () => {
       );
 
       await act(async () => {
-        await new Promise((resolve) => setTimeout(resolve, 10));
+        await new Promise((resolve) => setTimeout(resolve, 50));
       });
 
       // Change highlighted place
@@ -371,7 +378,7 @@ describe("NearbyPlacesMap - Smoke Tests", () => {
       );
 
       await act(async () => {
-        await new Promise((resolve) => setTimeout(resolve, 10));
+        await new Promise((resolve) => setTimeout(resolve, 50));
       });
 
       // First marker should no longer be highlighted
@@ -447,7 +454,7 @@ describe("NearbyPlacesMap - Smoke Tests", () => {
       render(<NearbyPlacesMap {...defaultProps} />);
 
       await act(async () => {
-        await new Promise((resolve) => setTimeout(resolve, 10));
+        await new Promise((resolve) => setTimeout(resolve, 50));
       });
 
       fireEvent.click(screen.getByRole("button", { name: /zoom in/i }));
@@ -459,7 +466,7 @@ describe("NearbyPlacesMap - Smoke Tests", () => {
       render(<NearbyPlacesMap {...defaultProps} />);
 
       await act(async () => {
-        await new Promise((resolve) => setTimeout(resolve, 10));
+        await new Promise((resolve) => setTimeout(resolve, 50));
       });
 
       fireEvent.click(screen.getByRole("button", { name: /zoom out/i }));
@@ -471,7 +478,7 @@ describe("NearbyPlacesMap - Smoke Tests", () => {
       render(<NearbyPlacesMap {...defaultProps} />);
 
       await act(async () => {
-        await new Promise((resolve) => setTimeout(resolve, 10));
+        await new Promise((resolve) => setTimeout(resolve, 50));
       });
 
       fireEvent.click(
@@ -490,7 +497,7 @@ describe("NearbyPlacesMap - Smoke Tests", () => {
       render(<NearbyPlacesMap {...defaultProps} places={mockPlaces} />);
 
       await act(async () => {
-        await new Promise((resolve) => setTimeout(resolve, 10));
+        await new Promise((resolve) => setTimeout(resolve, 50));
       });
 
       // Clear previous fitBounds calls
@@ -507,7 +514,7 @@ describe("NearbyPlacesMap - Smoke Tests", () => {
       const { unmount } = render(<NearbyPlacesMap {...defaultProps} />);
 
       await act(async () => {
-        await new Promise((resolve) => setTimeout(resolve, 10));
+        await new Promise((resolve) => setTimeout(resolve, 50));
       });
 
       unmount();
@@ -521,7 +528,7 @@ describe("NearbyPlacesMap - Smoke Tests", () => {
       );
 
       await act(async () => {
-        await new Promise((resolve) => setTimeout(resolve, 10));
+        await new Promise((resolve) => setTimeout(resolve, 50));
       });
 
       unmount();
@@ -530,7 +537,6 @@ describe("NearbyPlacesMap - Smoke Tests", () => {
       expect(mockMapInstance.remove).toHaveBeenCalled();
     });
   });
-
 
   describe("Popup XSS Prevention", () => {
     it("escapes HTML in popup content", async () => {
@@ -548,7 +554,7 @@ describe("NearbyPlacesMap - Smoke Tests", () => {
       render(<NearbyPlacesMap {...defaultProps} places={xssPlaces} />);
 
       await act(async () => {
-        await new Promise((resolve) => setTimeout(resolve, 10));
+        await new Promise((resolve) => setTimeout(resolve, 50));
       });
 
       // Popup.setHTML should have been called with escaped content

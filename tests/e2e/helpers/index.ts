@@ -66,7 +66,6 @@ export {
   waitForMobileSheet,
   navigateToMobileSearch,
   SNAP_COLLAPSED,
-  SNAP_HALF,
   SNAP_EXPANDED,
   SNAP_POINTS,
 } from "./mobile-helpers";

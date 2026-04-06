@@ -13,7 +13,11 @@ jest.mock("@/lib/prisma", () => ({
   prisma: {
     $queryRaw: jest.fn(),
     $transaction: jest.fn((fn: (tx: any) => Promise<any>) =>
-      fn({ $queryRaw: (jest.fn() as jest.Mock).mockResolvedValue([{ locked: true }]) })
+      fn({
+        $queryRaw: (jest.fn() as jest.Mock).mockResolvedValue([
+          { locked: true },
+        ]),
+      })
     ),
   },
 }));

@@ -25,10 +25,10 @@ import {
   parseSearchParams,
 } from "@/lib/search-params";
 import {
-  LAT_OFFSET_DEGREES,
   MAP_FETCH_MAX_LAT_SPAN,
   MAP_FETCH_MAX_LNG_SPAN,
 } from "@/lib/constants";
+import { boundsTupleToObject, deriveSearchBoundsFromPoint } from "@/lib/search/location-bounds";
 import { logger, sanitizeErrorMessage } from "@/lib/logger";
 import * as Sentry from "@sentry/nextjs";
 import { getSearchRateLimitIdentifier } from "@/lib/search-rate-limit-identifier";
@@ -80,16 +80,7 @@ export async function GET(request: NextRequest) {
           lng >= -180 &&
           lng <= 180
         ) {
-          // ~10km radius - use canonical LAT_OFFSET_DEGREES
-          const cosLat = Math.cos((lat * Math.PI) / 180);
-          const lngOffset = cosLat < 0.01 ? 180 : LAT_OFFSET_DEGREES / cosLat;
-
-          bounds = {
-            minLat: Math.max(-90, lat - LAT_OFFSET_DEGREES),
-            maxLat: Math.min(90, lat + LAT_OFFSET_DEGREES),
-            minLng: Math.max(-180, lng - lngOffset),
-            maxLng: Math.min(180, lng + lngOffset),
-          };
+          bounds = boundsTupleToObject(deriveSearchBoundsFromPoint(lat, lng));
         }
       }
 
@@ -116,6 +107,7 @@ export async function GET(request: NextRequest) {
 
       // Capture sort before overriding — needed for semantic search check
       const sortOption = parsed.filterParams.sort || "recommended";
+      const vibeQuery = parsed.filterParams.vibeQuery?.trim();
 
       // Build filter params from canonical parsed values with validated bounds
       const filterParams = {
@@ -130,10 +122,11 @@ export async function GET(request: NextRequest) {
       // When semantic search is active, strip the query for the map so it
       // shows ALL listings in bounds (the list handles semantic ranking).
       // This prevents the map from showing 0 results while the list has results.
+      const hasSemanticVibeQuery =
+        typeof vibeQuery === "string" && vibeQuery.length >= 3;
       const semanticActive =
         features.semanticSearch &&
-        filterParams.query &&
-        filterParams.query.length >= 3 &&
+        hasSemanticVibeQuery &&
         sortOption === "recommended";
       const mapFilterParams = semanticActive
         ? { ...filterParams, query: undefined }

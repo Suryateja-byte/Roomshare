@@ -3,15 +3,15 @@
  *
  * Tests the non-blocking pending state during search transitions:
  * - Old results stay visible with translucent overlay
- * - No blocking overlay or skeleton
+ * - No duplicate skeleton grid rendered during transitions
  * - aria-busy attribute during transition
- * - SlowTransitionBadge for slow transitions
+ * - Compact pending status for slow transitions
  *
  * Implementation note:
  * - SearchViewToggle renders `data-testid="search-results-container"` (width/scroll wrapper)
- * - SearchResultsLoadingWrapper renders `div.relative[aria-busy]` INSIDE the container
- * - Pending state uses a translucent overlay (bg-white/40) + spinner, NOT opacity-60 on container
- * - pointer-events-none is on the overlay child, not the container itself
+ * - SearchResultsLoadingWrapper renders `data-testid="search-results-pending-region"` INSIDE the container
+ * - Pending state uses a compact status pill + subtle scrim
+ * - pointer-events-none is applied to the stale results body, not the outer container
  */
 
 import {
@@ -53,7 +53,9 @@ test.describe("Breathing Pending State (PR1)", () => {
       await expect(resultsContainer).toBeVisible({ timeout: 30000 });
 
       // The aria-busy wrapper is inside the results container (SearchResultsLoadingWrapper)
-      const ariaBusyWrapper = resultsContainer.locator("[aria-busy]").first();
+      const ariaBusyWrapper = resultsContainer
+        .locator('[data-testid="search-results-pending-region"]')
+        .first();
 
       // If the wrapper exists, verify it is NOT busy initially
       if ((await ariaBusyWrapper.count()) > 0) {
@@ -110,13 +112,20 @@ test.describe("Breathing Pending State (PR1)", () => {
       await expect(filterDialog(page)).not.toBeVisible({ timeout: 30_000 });
 
       // Check for pending state indicators (may be too fast to catch)
-      // SearchResultsLoadingWrapper adds aria-busy="true" and a translucent overlay
-      const busyElement = page.locator('[aria-busy="true"]');
+      const busyElement = page.locator(
+        '[data-testid="search-results-pending-region"][aria-busy="true"]'
+      );
       const wasBusy = await busyElement.isVisible().catch(() => false);
 
       if (wasBusy) {
         // Pending state was observed -- good
         expect(wasBusy).toBe(true);
+        await expect(
+          page.getByTestId("search-results-pending-status")
+        ).toContainText(/updating results|still loading/i);
+        await expect(
+          page.locator('[data-testid="listing-card-skeleton-grid"]')
+        ).toHaveCount(0);
       } else {
         // Transition was too fast to observe -- acceptable
         console.log(
@@ -181,16 +190,16 @@ test.describe("Breathing Pending State (PR1)", () => {
       await expect(resultsContainer).toBeVisible({ timeout: 10000 });
 
       // The SearchResultsLoadingWrapper is inside the container.
-      // When NOT pending, there should be no pointer-events-none overlay.
-      // The overlay with pointer-events-none only appears during pending state.
-      // We verify the container itself accepts pointer events.
+      // When NOT pending, the outer results container should still accept pointer events.
       const containerPointerEvents = await resultsContainer.evaluate((el) => {
         return window.getComputedStyle(el).pointerEvents;
       });
       expect(containerPointerEvents).not.toBe("none");
 
       // Also verify that aria-busy wrapper (if present) is not busy
-      const ariaBusyWrapper = resultsContainer.locator("[aria-busy]").first();
+      const ariaBusyWrapper = resultsContainer
+        .locator('[data-testid="search-results-pending-region"]')
+        .first();
       if ((await ariaBusyWrapper.count()) > 0) {
         await expect(ariaBusyWrapper).toHaveAttribute("aria-busy", "false");
       }
@@ -209,9 +218,11 @@ test.describe("Breathing Pending State (PR1)", () => {
       const resultsContainer = searchResultsContainer(page);
       await expect(resultsContainer).toBeVisible({ timeout: 10000 });
 
-      // The aria-busy attribute is on the SearchResultsLoadingWrapper (div.relative[aria-busy])
+      // The aria-busy attribute is on the SearchResultsLoadingWrapper
       // which is a child of the search-results-container
-      const ariaBusyWrapper = resultsContainer.locator("[aria-busy]").first();
+      const ariaBusyWrapper = resultsContainer
+        .locator('[data-testid="search-results-pending-region"]')
+        .first();
 
       if ((await ariaBusyWrapper.count()) > 0) {
         // aria-busy should be "false" when not transitioning
@@ -275,10 +286,6 @@ test.describe("Breathing Pending State (PR1)", () => {
       const resultsContainer = searchResultsContainer(page);
       await expect(resultsContainer).toBeVisible({ timeout: 10000 });
 
-      // The SearchResultsLoadingWrapper uses a translucent overlay for pending state.
-      // The overlay div has classes: "transition-opacity duration-200"
-      // These classes are on the overlay child, not the outer container.
-      //
       // Verify the container has a CSS transition property (from `transition-all duration-300`
       // on the search-results-container in SearchViewToggle).
       const transitionValue = await resultsContainer.evaluate((el) => {
@@ -294,9 +301,10 @@ test.describe("Breathing Pending State (PR1)", () => {
       if (hasTransition) {
         expect(hasTransition).toBe(true);
       } else {
-        // Fallback: verify the loading wrapper inside has transition support
-        // SearchResultsLoadingWrapper's overlay has transition-opacity duration-200
-        const wrapper = resultsContainer.locator(".relative").first();
+        // Fallback: verify the loading wrapper inside has rendered
+        const wrapper = resultsContainer
+          .locator('[data-testid="search-results-pending-region"]')
+          .first();
         if ((await wrapper.count()) > 0) {
           await expect(wrapper).toBeAttached();
         }

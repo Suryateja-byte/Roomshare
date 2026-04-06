@@ -94,7 +94,9 @@ export default async function AdminReportsPage() {
               <h1 className="text-2xl font-display font-bold text-on-surface">
                 Reports Management
               </h1>
-              <p className="text-on-surface-variant">Review and resolve user reports</p>
+              <p className="text-on-surface-variant">
+                Review and resolve user reports
+              </p>
             </div>
           </div>
         </div>

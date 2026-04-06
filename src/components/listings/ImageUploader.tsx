@@ -370,10 +370,8 @@ export default function ImageUploader({
             </div>
             <div className="space-y-1">
               <p className="text-sm font-semibold text-on-surface-variant">
-                <span className="text-on-surface">
-                  Click to upload
-                </span>{" "}
-                or drag and drop
+                <span className="text-on-surface">Click to upload</span> or drag
+                and drop
               </p>
               <p className="text-xs text-on-surface-variant">
                 JPEG, PNG, WebP or GIF (max 5MB each)

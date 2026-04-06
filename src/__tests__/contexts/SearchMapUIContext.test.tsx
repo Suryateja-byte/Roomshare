@@ -19,10 +19,18 @@ import {
   usePendingMapFocus,
 } from "@/contexts/SearchMapUIContext";
 
-// Wrapper factory that accepts showMap and shouldShowMap props
-const createWrapper = (showMap: () => void, shouldShowMap: boolean) => {
+// Wrapper factory that accepts showMap/hideMap and shouldShowMap props
+const createWrapper = (
+  showMap: () => void,
+  shouldShowMap: boolean,
+  hideMap: () => void = jest.fn()
+) => {
   return ({ children }: { children: React.ReactNode }) => (
-    <SearchMapUIProvider showMap={showMap} shouldShowMap={shouldShowMap}>
+    <SearchMapUIProvider
+      showMap={showMap}
+      hideMap={hideMap}
+      shouldShowMap={shouldShowMap}
+    >
       {children}
     </SearchMapUIProvider>
   );

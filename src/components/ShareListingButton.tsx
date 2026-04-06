@@ -135,7 +135,9 @@ export default function ShareListingButton({
                   className="w-full flex items-center gap-3 px-4 py-2 text-left hover:bg-surface-canvas transition-colors"
                 >
                   <Icon className={`w-4 h-4 ${option.color}`} />
-                  <span className="text-sm text-on-surface-variant">{option.name}</span>
+                  <span className="text-sm text-on-surface-variant">
+                    {option.name}
+                  </span>
                 </button>
               );
             })}

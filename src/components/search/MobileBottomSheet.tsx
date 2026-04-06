@@ -7,16 +7,16 @@ import {
   useEffect,
   type ReactNode,
 } from "react";
-import { LazyMotion, domAnimation, m, AnimatePresence } from "framer-motion";
+import { LazyMotion, domAnimation, m, AnimatePresence, useReducedMotion } from "framer-motion";
 import { X } from "lucide-react";
 import PullToRefresh from "./PullToRefresh";
 import { useBodyScrollLock } from "@/hooks/useBodyScrollLock";
 import { useMediaQuery } from "@/hooks/useMediaQuery";
 // P2-18 FIX: Import snap points from shared constants so FloatingMapButton
 // and MobileBottomSheet stay in sync. Previously hardcoded locally.
-import { SNAP_COLLAPSED, SNAP_HALF, SNAP_EXPANDED } from "@/lib/mobile-layout";
+import { SNAP_COLLAPSED, SNAP_EXPANDED } from "@/lib/mobile-layout";
 
-const SNAP_POINTS = [SNAP_COLLAPSED, SNAP_HALF, SNAP_EXPANDED] as const;
+const SNAP_POINTS = [SNAP_COLLAPSED, SNAP_EXPANDED] as const;
 
 /** Minimum drag distance (px) to trigger a snap change */
 const DRAG_THRESHOLD = 40;
@@ -68,6 +68,7 @@ export default function MobileBottomSheet({
   onSnapChange,
   onRefresh,
 }: MobileBottomSheetProps) {
+  const reducedMotion = useReducedMotion();
   const [internalSnap, setInternalSnap] = useState(1); // Start at half
   const snapIndex = controlledSnap ?? internalSnap;
   const setSnapIndex = useCallback(
@@ -91,6 +92,14 @@ export default function MobileBottomSheet({
 
   const sheetRef = useRef<HTMLDivElement>(null);
   const contentRef = useRef<HTMLDivElement>(null);
+
+  // Reset scroll position to top on mount and when children change
+  // (SearchResultsClient is keyed by searchParamsString, so new search = remount)
+  useEffect(() => {
+    if (contentRef.current) {
+      contentRef.current.scrollTop = 0;
+    }
+  }, [children]);
   const dragStartY = useRef(0);
   const dragStartSnap = useRef(0);
   const dragStartTime = useRef(0);
@@ -327,9 +336,9 @@ export default function MobileBottomSheet({
   // useMediaQuery returns undefined during SSR — strict equality with false ensures
   // no lock fires during SSR/hydration (safe because sheet starts at snapIndex 1).
   const isDesktop = useMediaQuery("(min-width: 768px)");
-  useBodyScrollLock((snapIndex === 2 || isDragging) && isDesktop === false);
+  useBodyScrollLock((snapIndex === 1 || isDragging) && isDesktop === false);
 
-  const isExpanded = snapIndex === 2;
+  const isExpanded = snapIndex === 1;
   const isCollapsed = snapIndex === 0;
 
   // Bug #3 fix: When expanded, raise sheet above the fixed header (z-[1100])
@@ -352,7 +361,7 @@ export default function MobileBottomSheet({
             initial={{ opacity: 0 }}
             animate={{ opacity: 0.3 }}
             exit={{ opacity: 0 }}
-            transition={{ duration: 0.2 }}
+            transition={{ duration: reducedMotion ? 0 : 0.2 }}
             className="fixed inset-0 z-30 bg-on-surface pointer-events-none md:hidden"
             data-testid="sheet-overlay"
             aria-hidden="true"
@@ -364,14 +373,14 @@ export default function MobileBottomSheet({
         ref={sheetRef}
         role="region"
         aria-label="Search results"
-        className="fixed bottom-0 left-0 right-0 flex flex-col bg-surface-container-lowest rounded-t-2xl shadow-[0_-4px_24px_rgba(0,0,0,0.12)][0_-4px_24px_rgba(0,0,0,0.4)]"
+        className="fixed bottom-[64px] pb-[env(safe-area-inset-bottom,0px)] md:bottom-0 md:pb-0 left-0 right-0 flex flex-col bg-surface-container-lowest rounded-t-2xl shadow-[0_-4px_24px_rgba(0,0,0,0.12)]"
         animate={
           isDragging
             ? { height: displayHeightPx }
             : { height: `${displayHeightVh}dvh` }
         }
         transition={
-          isDragging ? { duration: 0 } : { type: "spring", ...SPRING_CONFIG }
+          isDragging || reducedMotion ? { duration: 0 } : { type: "spring", ...SPRING_CONFIG }
         }
         style={
           {
@@ -392,7 +401,6 @@ export default function MobileBottomSheet({
             // Exposed as CSS variables so child components or global styles can use them.
             // Example usage: .listing-card { scroll-snap-align: start; }
             "--snap-collapsed": `${SNAP_COLLAPSED * 100}dvh`,
-            "--snap-half": `${SNAP_HALF * 100}dvh`,
             "--snap-expanded": `${SNAP_EXPANDED * 100}dvh`,
             "--snap-current-index": snapIndex,
             "--snap-current-height": `${SNAP_POINTS[snapIndex] * 100}dvh`,
@@ -401,7 +409,7 @@ export default function MobileBottomSheet({
       >
         {/* Drag handle area */}
         <div
-          className="flex-shrink-0 py-5 px-4 cursor-grab active:cursor-grabbing select-none"
+          className="group flex-shrink-0 py-5 px-4 cursor-grab active:cursor-grabbing select-none"
           onTouchStart={handleTouchStart}
           onTouchMove={handleTouchMove}
           onTouchEnd={handleTouchEnd}
@@ -426,22 +434,20 @@ export default function MobileBottomSheet({
             tabIndex={0}
             aria-label="Results panel size"
             aria-valuemin={0}
-            aria-valuemax={2}
+            aria-valuemax={1}
             aria-valuenow={snapIndex}
             aria-valuetext={
               snapIndex === 0
                 ? "collapsed"
-                : snapIndex === 1
-                  ? "half screen"
-                  : "expanded"
+                : "expanded"
             }
             onKeyDown={(e) => {
               if (e.key === "Enter" || e.key === " ") {
                 e.preventDefault();
-                setSnapIndex(snapIndex === 2 ? 1 : 2);
+                setSnapIndex(snapIndex === 1 ? 0 : 1);
               } else if (e.key === "ArrowUp" || e.key === "ArrowRight") {
                 e.preventDefault();
-                if (snapIndex < 2) setSnapIndex(snapIndex + 1);
+                if (snapIndex < 1) setSnapIndex(snapIndex + 1);
               } else if (e.key === "ArrowDown" || e.key === "ArrowLeft") {
                 e.preventDefault();
                 if (snapIndex > 0) setSnapIndex(snapIndex - 1);
@@ -450,10 +456,10 @@ export default function MobileBottomSheet({
                 setSnapIndex(0);
               } else if (e.key === "End") {
                 e.preventDefault();
-                setSnapIndex(2);
+                setSnapIndex(1);
               }
             }}
-            className="w-12 h-1.5 rounded-full bg-surface-container-high mx-auto mb-2 cursor-pointer focus:outline-none focus-visible:ring-2 focus-visible:ring-primary/70 focus-visible:ring-offset-2"
+            className="w-16 h-2 rounded-full bg-on-surface-variant/40 group-active:scale-x-110 group-active:bg-on-surface-variant/80 transition-all duration-300 mx-auto mb-2 cursor-pointer focus:outline-none focus-visible:ring-2 focus-visible:ring-primary/70 focus-visible:ring-offset-2"
           />
 
           {/* Header content */}
@@ -471,15 +477,6 @@ export default function MobileBottomSheet({
             )}
             {!isCollapsed && (
               <div className="flex items-center gap-1">
-                <button
-                  onClick={() => setSnapIndex((prev) => (prev === 2 ? 1 : 2))}
-                  className="text-xs text-on-surface-variant hover:text-on-surface-variant px-2 py-1 rounded transition-colors focus:outline-none focus-visible:ring-2 focus-visible:ring-primary/30"
-                  aria-label={
-                    isExpanded ? "Collapse results" : "Expand results"
-                  }
-                >
-                  {isExpanded ? "Collapse" : "Expand"}
-                </button>
                 {/* P2-FIX (#123): Visible close button to dismiss sheet */}
                 <button
                   onClick={() => setSnapIndex(0)}
@@ -527,7 +524,6 @@ export default function MobileBottomSheet({
           }}
           // P2-FIX (#128): Data attributes for snap points (used by tests/debugging)
           data-snap-collapsed={SNAP_COLLAPSED}
-          data-snap-half={SNAP_HALF}
           data-snap-expanded={SNAP_EXPANDED}
           data-snap-current={snapIndex}
         >

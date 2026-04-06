@@ -454,7 +454,9 @@ export async function createBooking(
   // P0-04 FIX: Use withIdempotency wrapper for atomic idempotency handling
   // This ensures idempotency key is claimed BEFORE transaction runs, not after
   if (idempotencyKey) {
-    let idempotencyResult: Awaited<ReturnType<typeof withIdempotency<InternalBookingResult>>>;
+    let idempotencyResult: Awaited<
+      ReturnType<typeof withIdempotency<InternalBookingResult>>
+    >;
     try {
       idempotencyResult = await withIdempotency<InternalBookingResult>(
         idempotencyKey,
@@ -500,7 +502,8 @@ export async function createBooking(
       }
       return {
         success: false,
-        error: "Something went wrong while processing your booking. Please try again.",
+        error:
+          "Something went wrong while processing your booking. Please try again.",
         code: "SERVER_ERROR",
       };
     }
@@ -1058,7 +1061,9 @@ export async function createHold(
 
   // Idempotency path
   if (idempotencyKey) {
-    let idempotencyResult: Awaited<ReturnType<typeof withIdempotency<InternalHoldResult>>>;
+    let idempotencyResult: Awaited<
+      ReturnType<typeof withIdempotency<InternalHoldResult>>
+    >;
     try {
       idempotencyResult = await withIdempotency<InternalHoldResult>(
         idempotencyKey,
@@ -1104,7 +1109,8 @@ export async function createHold(
       }
       return {
         success: false,
-        error: "Something went wrong while placing your hold. Please try again.",
+        error:
+          "Something went wrong while placing your hold. Please try again.",
         code: "SERVER_ERROR",
       };
     }

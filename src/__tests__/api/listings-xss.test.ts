@@ -471,7 +471,7 @@ describe("POST /api/listings — XSS / injection / boundary tests", () => {
   // =========================================================================
 
   describe("XSS in address field", () => {
-    it('rejects <script> tag in address', async () => {
+    it("rejects <script> tag in address", async () => {
       const response = await POST(
         makeRequest({
           ...validBody,
@@ -485,7 +485,7 @@ describe("POST /api/listings — XSS / injection / boundary tests", () => {
       const response = await POST(
         makeRequest({
           ...validBody,
-          address: '<img src=x onerror=alert(1)>',
+          address: "<img src=x onerror=alert(1)>",
         })
       );
       expect(response.status).toBe(400);
@@ -515,7 +515,7 @@ describe("POST /api/listings — XSS / injection / boundary tests", () => {
   });
 
   describe("XSS in city field", () => {
-    it('rejects <script> tag in city', async () => {
+    it("rejects <script> tag in city", async () => {
       const response = await POST(
         makeRequest({
           ...validBody,
@@ -529,7 +529,7 @@ describe("POST /api/listings — XSS / injection / boundary tests", () => {
       const response = await POST(
         makeRequest({
           ...validBody,
-          city: '<img src=x onerror=alert(1)>',
+          city: "<img src=x onerror=alert(1)>",
         })
       );
       expect(response.status).toBe(400);
@@ -548,11 +548,11 @@ describe("POST /api/listings — XSS / injection / boundary tests", () => {
   });
 
   describe("XSS in state field", () => {
-    it('rejects <script> tag in state', async () => {
+    it("rejects <script> tag in state", async () => {
       const response = await POST(
         makeRequest({
           ...validBody,
-          state: '<script>alert(1)</script>',
+          state: "<script>alert(1)</script>",
         })
       );
       expect(response.status).toBe(400);
@@ -562,7 +562,7 @@ describe("POST /api/listings — XSS / injection / boundary tests", () => {
       const response = await POST(
         makeRequest({
           ...validBody,
-          state: '<svg onload=alert(1)>',
+          state: "<svg onload=alert(1)>",
         })
       );
       expect(response.status).toBe(400);

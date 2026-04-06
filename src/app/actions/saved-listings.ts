@@ -13,7 +13,10 @@ import {
 } from "@/lib/rate-limit";
 // Basic listingId format check — rejects empty/absurdly long strings
 const isReasonableId = (id: string) =>
-  typeof id === "string" && id.length >= 1 && id.length <= 100 && /^[\w-]+$/.test(id);
+  typeof id === "string" &&
+  id.length >= 1 &&
+  id.length <= 100 &&
+  /^[\w-]+$/.test(id);
 
 export async function toggleSaveListing(listingId: string) {
   if (!isReasonableId(listingId)) {

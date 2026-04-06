@@ -1,9 +1,10 @@
 "use client";
 
-import { useEffect, useRef, useState, useCallback } from "react";
+import { useEffect, useRef, useState, useCallback, useMemo } from "react";
 import { createPortal } from "react-dom";
 import { useRouter, useSearchParams } from "next/navigation";
-import { LazyMotion, domAnimation, m, AnimatePresence } from "framer-motion";
+import { LazyMotion, domAnimation, m, AnimatePresence, useReducedMotion } from "framer-motion";
+import { toast } from "sonner";
 import {
   ArrowLeft,
   Search,
@@ -21,6 +22,11 @@ import {
   MAP_FLY_TO_EVENT,
   type MapFlyToEventDetail,
 } from "@/components/SearchForm";
+import {
+  buildSearchIntentParams,
+  readSearchIntentState,
+  type SearchLocationSelection,
+} from "@/lib/search/search-intent";
 
 interface MobileSearchOverlayProps {
   /** Whether the overlay is open */
@@ -52,17 +58,16 @@ export default function MobileSearchOverlay({
 }: MobileSearchOverlayProps) {
   const router = useRouter();
   const searchParams = useSearchParams();
+  const searchParamsString = searchParams.toString();
+  const reducedMotion = useReducedMotion();
   const locationInputRef = useRef<HTMLInputElement>(null);
   const { recentSearches, removeRecentSearch, formatSearch } =
     useRecentSearches();
 
   // Form state — initialized from current URL params
   const [location, setLocation] = useState("");
-  const [locationCoords, setLocationCoords] = useState<{
-    lat: number;
-    lng: number;
-    bounds?: [number, number, number, number];
-  } | null>(null);
+  const [locationCoords, setLocationCoords] =
+    useState<SearchLocationSelection | null>(null);
   const [minPrice, setMinPrice] = useState("");
   const [maxPrice, setMaxPrice] = useState("");
   // FilterModal is handled by the parent via onOpenFilters callback
@@ -79,16 +84,19 @@ export default function MobileSearchOverlay({
   // Sync form state from URL when overlay opens
   useEffect(() => {
     if (isOpen) {
-      setLocation(searchParams.get("q") || "");
+      const intentState = readSearchIntentState(
+        new URLSearchParams(searchParamsString)
+      );
+      setLocation(intentState.locationInput);
+      setLocationCoords(intentState.selectedLocation);
       setMinPrice(searchParams.get("minPrice") || "");
       setMaxPrice(searchParams.get("maxPrice") || "");
-      setLocationCoords(null);
 
       // Auto-focus location input after animation
       const timer = setTimeout(() => locationInputRef.current?.focus(), 200);
       return () => clearTimeout(timer);
     }
-  }, [isOpen, searchParams]);
+  }, [isOpen, searchParams, searchParamsString]);
 
   // Escape closes
   useEffect(() => {
@@ -116,27 +124,41 @@ export default function MobileSearchOverlay({
     []
   );
 
+  const locationFallbackItems = useMemo(
+    () =>
+      recentSearches
+        .filter((search) => search.coords)
+        .map((search) => ({
+          id: search.id,
+          primaryText: search.location,
+          secondaryText: "Recent search",
+          onSelect: () => {
+            setLocation(search.location);
+            setLocationCoords({
+              lat: search.coords!.lat,
+              lng: search.coords!.lng,
+              bounds: search.coords!.bounds,
+            });
+          },
+        })),
+    [recentSearches]
+  );
+
   const handleSearch = useCallback(() => {
-    const params = new URLSearchParams(searchParams.toString());
-
-    // Update location
-    if (location) {
-      params.set("q", location);
-    } else {
-      params.delete("q");
+    if (location.trim().length > 2 && !locationCoords) {
+      toast.error("Select a location from the dropdown suggestions.");
+      locationInputRef.current?.focus();
+      return;
     }
 
-    // Update coordinates from location selection
-    if (locationCoords) {
-      params.set("lat", String(locationCoords.lat));
-      params.set("lng", String(locationCoords.lng));
-      if (locationCoords.bounds) {
-        params.set("minLng", String(locationCoords.bounds[0]));
-        params.set("minLat", String(locationCoords.bounds[1]));
-        params.set("maxLng", String(locationCoords.bounds[2]));
-        params.set("maxLat", String(locationCoords.bounds[3]));
-      }
-    }
+    const currentIntent = readSearchIntentState(
+      new URLSearchParams(searchParamsString)
+    );
+    const params = buildSearchIntentParams(searchParams, {
+      location,
+      vibe: currentIntent.vibeInput,
+      selectedLocation: locationCoords,
+    });
 
     // Update price
     if (minPrice) {
@@ -149,10 +171,6 @@ export default function MobileSearchOverlay({
     } else {
       params.delete("maxPrice");
     }
-
-    // Reset pagination
-    params.delete("cursor");
-    params.delete("page");
 
     // Dispatch fly-to event so the persistent map flies to the new location.
     // On mobile the map never remounts (it lives in layout), so without this
@@ -173,6 +191,7 @@ export default function MobileSearchOverlay({
     onClose();
   }, [
     searchParams,
+    searchParamsString,
     location,
     locationCoords,
     minPrice,
@@ -182,14 +201,23 @@ export default function MobileSearchOverlay({
   ]);
 
   const handleRecentClick = useCallback(
-    (recentLocation: string) => {
-      // Navigate directly with the recent search location
-      const params = new URLSearchParams();
-      params.set("q", recentLocation);
+    (search: (typeof recentSearches)[number]) => {
+      const params = buildSearchIntentParams(searchParams, {
+        location: search.location,
+        vibe: readSearchIntentState(new URLSearchParams(searchParamsString))
+          .vibeInput,
+        selectedLocation: search.coords
+          ? {
+              lat: search.coords.lat,
+              lng: search.coords.lng,
+              bounds: search.coords.bounds,
+            }
+          : null,
+      });
       router.push(`/search?${params.toString()}`);
       onClose();
     },
-    [router, onClose]
+    [onClose, recentSearches, router, searchParams, searchParamsString]
   );
 
   // Portal to document.body to escape the <header>'s stacking context (z-[1100]).
@@ -205,7 +233,7 @@ export default function MobileSearchOverlay({
             initial={{ y: "100%" }}
             animate={{ y: 0 }}
             exit={{ y: "100%" }}
-            transition={{ type: "spring", damping: 25, stiffness: 300, mass: 0.8 }}
+            transition={reducedMotion ? { duration: 0 } : { type: "spring", damping: 25, stiffness: 300, mass: 0.8 }}
             className="fixed inset-0 z-[1200] bg-surface-container-lowest flex flex-col"
             role="dialog"
             aria-modal="true"
@@ -224,7 +252,7 @@ export default function MobileSearchOverlay({
                 <m.span 
                   initial={{ opacity: 0, x: -10 }}
                   animate={{ opacity: 1, x: 0 }}
-                  transition={{ delay: 0.1, duration: 0.3 }}
+                  transition={reducedMotion ? { duration: 0 } : { delay: 0.1, duration: 0.3 }}
                   className="text-base font-semibold text-on-surface"
                 >
                   Search
@@ -235,7 +263,7 @@ export default function MobileSearchOverlay({
               <m.div 
                 initial={{ opacity: 0, y: 20 }}
                 animate={{ opacity: 1, y: 0 }}
-                transition={{ delay: 0.15, duration: 0.4, ease: "easeOut" }}
+                transition={reducedMotion ? { duration: 0 } : { delay: 0.15, duration: 0.4, ease: "easeOut" }}
                 className="flex-1 overflow-y-auto hide-scrollbar-mobile"
               >
                 <div className="px-5 pt-6 pb-4 space-y-5">
@@ -251,8 +279,12 @@ export default function MobileSearchOverlay({
                       <LocationSearchInput
                         id="mobile-search-where"
                         value={location}
-                        onChange={setLocation}
+                        onChange={(nextLocation) => {
+                          setLocation(nextLocation);
+                          setLocationCoords(null);
+                        }}
                         onLocationSelect={handleLocationSelect}
+                        fallbackItems={locationFallbackItems}
                         placeholder="Enter city or area"
                         className="w-full h-12 rounded-xl border border-outline-variant/30 bg-surface-container-lowest px-4 pr-11 focus-within:border-primary/30 focus-within:ring-2 focus-within:ring-primary/30"
                         inputClassName="text-base text-on-surface placeholder:text-on-surface-variant"
@@ -275,7 +307,7 @@ export default function MobileSearchOverlay({
                         onChange={(e) => setMinPrice(e.target.value)}
                         placeholder="Min"
                         aria-label="Minimum budget"
-                        className="flex-1 h-full bg-transparent text-sm text-on-surface placeholder:text-on-surface-variant focus:outline-none min-w-0 [appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none"
+                        className="flex-1 h-full bg-transparent text-sm text-on-surface placeholder:text-on-surface-variant focus:outline-none focus-visible:ring-2 focus-visible:ring-primary/30 min-w-0 [appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none"
                       />
                       <span className="text-on-surface-variant text-xs">—</span>
                       <span className="text-on-surface-variant text-sm">$</span>
@@ -286,7 +318,7 @@ export default function MobileSearchOverlay({
                         onChange={(e) => setMaxPrice(e.target.value)}
                         placeholder="Max"
                         aria-label="Maximum budget"
-                        className="flex-1 h-full bg-transparent text-sm text-on-surface placeholder:text-on-surface-variant focus:outline-none min-w-0 [appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none"
+                        className="flex-1 h-full bg-transparent text-sm text-on-surface placeholder:text-on-surface-variant focus:outline-none focus-visible:ring-2 focus-visible:ring-primary/30 min-w-0 [appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none"
                       />
                     </div>
                   </div>
@@ -295,7 +327,6 @@ export default function MobileSearchOverlay({
                   <button
                     type="button"
                     onClick={() => {
-                      onClose();
                       onOpenFilters?.();
                     }}
                     className="relative flex items-center gap-2.5 w-full h-12 px-4 border border-outline-variant/30 rounded-xl text-sm font-medium text-on-surface-variant hover:bg-surface-container-high transition-colors"
@@ -338,9 +369,7 @@ export default function MobileSearchOverlay({
                           return (
                             <li key={search.id} className="flex items-center">
                               <button
-                                onClick={() =>
-                                  handleRecentClick(search.location)
-                                }
+                                onClick={() => handleRecentClick(search)}
                                 className="flex-1 flex items-center gap-3 px-3 py-3 rounded-xl hover:bg-surface-canvas transition-colors text-left"
                               >
                                 <Clock className="w-4 h-4 text-on-surface-variant flex-shrink-0" />

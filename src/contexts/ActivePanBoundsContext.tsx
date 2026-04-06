@@ -57,17 +57,11 @@ export function ActivePanBoundsProvider({
   const [activePanBounds, setActivePanBoundsState] =
     useState<MapBoundsCoords | null>(null);
 
-  const setActivePanBounds = useCallback(
-    (bounds: MapBoundsCoords | null) => {
-      setActivePanBoundsState(bounds);
-    },
-    []
-  );
+  const setActivePanBounds = useCallback((bounds: MapBoundsCoords | null) => {
+    setActivePanBoundsState(bounds);
+  }, []);
 
-  const stateValue = useMemo(
-    () => ({ activePanBounds }),
-    [activePanBounds]
-  );
+  const stateValue = useMemo(() => ({ activePanBounds }), [activePanBounds]);
 
   const setterValue = useMemo(
     () => ({ setActivePanBounds }),

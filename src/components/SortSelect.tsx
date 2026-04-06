@@ -127,6 +127,7 @@ export default function SortSelect({ currentSort }: SortSelectProps) {
           role="dialog"
           aria-modal="true"
           aria-labelledby="sort-sheet-title"
+          tabIndex={-1}
         >
           {/* Backdrop */}
           <div
@@ -188,10 +189,8 @@ export default function SortSelect({ currentSort }: SortSelectProps) {
         >
           <SelectTrigger
             aria-label="Sort by"
-            className={`h-9 w-auto min-w-[140px] border-none bg-transparent hover:bg-surface-container-high px-3 py-1.5 font-semibold text-xs focus:ring-0 ${
-              isNonDefault
-                ? "text-on-surface"
-                : "text-on-surface-variant"
+            className={`h-9 w-auto min-w-[140px] border-none bg-transparent hover:bg-surface-container-high px-3 py-1.5 font-semibold text-xs focus-visible:ring-2 focus-visible:ring-primary/30 ${
+              isNonDefault ? "text-on-surface" : "text-on-surface-variant"
             }`}
           >
             <SelectValue placeholder="Recommended">{currentLabel}</SelectValue>

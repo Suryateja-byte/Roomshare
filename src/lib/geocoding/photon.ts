@@ -9,12 +9,13 @@
 
 import type { GeocodingResult } from "../geocoding-cache";
 import { fetchWithTimeout } from "../fetch-with-timeout";
+import { LOCATION_AUTOCOMPLETE_QUERY_MAX_LENGTH } from "./autocomplete";
 
 const PHOTON_BASE_URL = "https://photon.komoot.io/api";
 const GEOCODING_TIMEOUT_MS = 8000;
 
 /** Max query length (reasonable limit; Photon has no documented cap) */
-export const PHOTON_QUERY_MAX_LENGTH = 500;
+export const PHOTON_QUERY_MAX_LENGTH = LOCATION_AUTOCOMPLETE_QUERY_MAX_LENGTH;
 
 interface PhotonProperties {
   osm_id: number;

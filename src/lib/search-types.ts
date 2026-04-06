@@ -53,6 +53,9 @@ export type SortOption =
 
 export interface FilterParams {
   query?: string;
+  /** Display-only selected location label. Does not act as a hard listing filter. */
+  locationLabel?: string;
+  vibeQuery?: string;
   minPrice?: number;
   maxPrice?: number;
   amenities?: string[];

@@ -16,6 +16,7 @@ import { Search, SlidersHorizontal } from "lucide-react";
 import { useSearchParams } from "next/navigation";
 import { useMemo } from "react";
 import { urlToFilterChips } from "@/components/filters/filter-chip-utils";
+import { readSearchIntentState } from "@/lib/search/search-intent";
 
 interface CollapsedMobileSearchProps {
   /** Callback when tapped to expand */
@@ -24,7 +25,6 @@ interface CollapsedMobileSearchProps {
   onOpenFilters?: () => void;
 }
 
-
 export default function CollapsedMobileSearch({
   onExpand,
   onOpenFilters,
@@ -32,8 +32,11 @@ export default function CollapsedMobileSearch({
   const searchParams = useSearchParams();
 
   // Get current search state from URL
-  const hasSemanticQuery = searchParams.has("what");
-  const location = hasSemanticQuery ? "" : searchParams.get("q") || "";
+  const intentState = useMemo(
+    () => readSearchIntentState(new URLSearchParams(searchParams.toString())),
+    [searchParams]
+  );
+  const location = intentState.locationSummary;
   const minPrice = searchParams.get("minPrice");
   const maxPrice = searchParams.get("maxPrice");
 
@@ -66,7 +69,8 @@ export default function CollapsedMobileSearch({
   }, [minPrice, maxPrice]);
 
   // Build display text
-  const displayText = location || "Where to?";
+  const displayText =
+    location && location !== "Anywhere" ? location : "Where to?";
 
   return (
     <div className="md:hidden flex items-center gap-2 w-full max-w-md mx-auto px-3">
@@ -80,9 +84,7 @@ export default function CollapsedMobileSearch({
         <div className="flex-1 min-w-0 text-left">
           <div
             className={`text-sm font-medium truncate ${
-              location
-                ? "text-on-surface"
-                : "text-on-surface-variant"
+              location ? "text-on-surface" : "text-on-surface-variant"
             }`}
           >
             {displayText}

@@ -10,8 +10,7 @@ import Providers from "@/components/Providers";
 import { SkipLink } from "@/components/ui/SkipLink";
 import { OfflineIndicator } from "@/components/OfflineIndicator";
 import { ServiceWorkerRegistration } from "@/components/ServiceWorkerRegistration";
-import EmailVerificationWrapper from "@/components/EmailVerificationWrapper";
-import SuspensionBannerWrapper from "@/components/SuspensionBannerWrapper";
+import AccountNoticeHost from "@/components/AccountNoticeHost";
 import CustomScrollContainer from "@/components/ui/CustomScrollContainer";
 import BottomNavBar from "@/components/BottomNavBar";
 import { WebVitals } from "@/components/WebVitals";
@@ -36,7 +35,8 @@ export const metadata: Metadata = {
     process.env.NEXT_PUBLIC_APP_URL || "https://roomshare.app"
   ),
   title: "RoomShare — Find Your People, Not Just a Place",
-  description: "Verified roommates. Real listings. People who actually show up to the tour.",
+  description:
+    "Verified roommates. Real listings. People who actually show up to the tour.",
   manifest: "/manifest.json",
   appleWebApp: {
     capable: true,
@@ -87,8 +87,7 @@ export default async function RootLayout({
               "@context": "https://schema.org",
               "@type": "WebSite",
               name: "RoomShare",
-              url:
-                process.env.NEXT_PUBLIC_APP_URL || "https://roomshare.app",
+              url: process.env.NEXT_PUBLIC_APP_URL || "https://roomshare.app",
               description:
                 "Find compatible roommates and shared housing. Verified profiles, instant messaging, and flexible leases.",
               potentialAction: {
@@ -103,7 +102,9 @@ export default async function RootLayout({
           }}
         />
       </head>
-      <body className={`${newsreader.variable} ${manrope.variable} font-body bg-surface-canvas text-on-surface`}>
+      <body
+        className={`${newsreader.variable} ${manrope.variable} font-body bg-surface-canvas text-on-surface`}
+      >
         <Providers nonce={nonce}>
           <SkipLink />
           <CustomScrollContainer>
@@ -111,11 +112,8 @@ export default async function RootLayout({
               <NavbarWrapper>
                 <Navbar />
               </NavbarWrapper>
-              <EmailVerificationWrapper />
-              <SuspensionBannerWrapper />
-              <MainLayout>
-                {children}
-              </MainLayout>
+              <AccountNoticeHost placement="global" />
+              <MainLayout>{children}</MainLayout>
               <FooterWrapper>
                 <Footer />
               </FooterWrapper>

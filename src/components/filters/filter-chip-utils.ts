@@ -37,6 +37,7 @@ export interface FilterChipData {
  */
 const PRESERVED_PARAMS = [
   "q",
+  "where",
   "lat",
   "lng",
   "minLat",
@@ -45,7 +46,6 @@ const PRESERVED_PARAMS = [
   "maxLng",
   "sort",
 ] as const;
-
 
 /**
  * Format a date string (YYYY-MM-DD) for display

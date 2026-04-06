@@ -78,10 +78,12 @@ describe("MapMovedBanner", () => {
         />
       );
 
-      const wrapper = container.firstChild as HTMLElement;
-      expect(wrapper).toHaveClass("absolute");
-      expect(wrapper).toHaveClass("top-16");
-      expect(wrapper).toHaveClass("-translate-x-1/2");
+      // AnimatePresence > m.div wraps the inner styled div
+      const innerDiv = container.querySelector(".absolute") as HTMLElement;
+      expect(innerDiv).not.toBeNull();
+      expect(innerDiv).toHaveClass("absolute");
+      expect(innerDiv).toHaveClass("top-16");
+      expect(innerDiv).toHaveClass("-translate-x-1/2");
     });
   });
 
@@ -167,8 +169,10 @@ describe("MapMovedBanner", () => {
         />
       );
 
-      const wrapper = container.firstChild as HTMLElement;
-      expect(wrapper.className).toContain("bg-amber");
+      // AnimatePresence > m.div wraps the inner styled div
+      const amberDiv = container.querySelector("[class*='bg-amber']") as HTMLElement;
+      expect(amberDiv).not.toBeNull();
+      expect(amberDiv.className).toContain("bg-amber");
     });
 
     it("renders MapPin icon", () => {

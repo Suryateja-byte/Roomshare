@@ -30,6 +30,7 @@ export function FilterPill({
       className={`
         group flex items-center gap-1.5 px-3 py-1.5 rounded-full text-sm font-medium
         transition-all duration-200 whitespace-nowrap
+        focus-visible:ring-2 focus-visible:ring-primary/30 focus-visible:ring-offset-1
         ${
           variant === "active"
             ? "bg-on-surface text-white hover:bg-on-surface"

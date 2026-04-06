@@ -2,7 +2,13 @@
  * Tests for EditListingForm bookingMode selector, auto-set behavior,
  * and PATCH submission flow
  */
-import { render, screen, fireEvent, act, waitFor } from "@testing-library/react";
+import {
+  render,
+  screen,
+  fireEvent,
+  act,
+  waitFor,
+} from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import EditListingForm from "@/app/listings/[id]/edit/EditListingForm";
 
@@ -357,9 +363,7 @@ describe("EditListingForm — PATCH submission", () => {
   });
 
   it("does not call PATCH when no images are present", async () => {
-    render(
-      <EditListingForm listing={{ ...defaultListing, images: [] }} />
-    );
+    render(<EditListingForm listing={{ ...defaultListing, images: [] }} />);
 
     // Don't add image — try to submit without images
     const submitButton = screen.getByText("Save Changes");

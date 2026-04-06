@@ -629,6 +629,8 @@ test.describe("Map Interactions Edge Cases (Stories 9-12)", () => {
         if (hasZoomInterpolation) {
           // Expression-based radius confirmed -- Mapbox will scale at runtime
           expect(hasZoomInterpolation).toBe(true);
+          expect(expressionStr).toContain("48");
+          expect(expressionStr).not.toContain("192");
         } else {
           test.info().annotations.push({
             type: "info",
@@ -637,6 +639,23 @@ test.describe("Map Interactions Edge Cases (Stories 9-12)", () => {
               `Zoom 12: ${radiusAtZoom12}, Zoom 16: ${radiusAtZoom16}`,
           });
         }
+      }
+
+      const opacityExpression = await page.evaluate(() => {
+        const map = (window as any).__e2eMapRef;
+        if (!map) return null;
+        try {
+          return JSON.stringify(
+            map.getPaintProperty("privacy-circles", "circle-opacity")
+          );
+        } catch {
+          return null;
+        }
+      });
+
+      if (opacityExpression) {
+        expect(opacityExpression).toContain("zoom");
+        expect(opacityExpression).toContain("0.05");
       }
     });
 

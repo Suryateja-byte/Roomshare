@@ -59,11 +59,21 @@ export function useScrollHeader({
     // Previously created a new object on every scroll tick, causing re-renders
     // even when isCollapsed and isScrollingUp hadn't changed.
     setState((prev) => {
-      const newCollapsed = shouldExpand ? false : isCollapsed || prev.isCollapsed;
-      if (prev.isCollapsed === newCollapsed && prev.isScrollingUp === isScrollingUp && prev.scrollY === currentScrollY) {
+      const newCollapsed = shouldExpand
+        ? false
+        : isCollapsed || prev.isCollapsed;
+      if (
+        prev.isCollapsed === newCollapsed &&
+        prev.isScrollingUp === isScrollingUp &&
+        prev.scrollY === currentScrollY
+      ) {
         return prev; // Bail out — no re-render
       }
-      return { isCollapsed: newCollapsed, scrollY: currentScrollY, isScrollingUp };
+      return {
+        isCollapsed: newCollapsed,
+        scrollY: currentScrollY,
+        isScrollingUp,
+      };
     });
 
     lastScrollY.current = currentScrollY;

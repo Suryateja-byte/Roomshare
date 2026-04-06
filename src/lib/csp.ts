@@ -2,6 +2,8 @@ const CONNECT_SRC_ORIGINS = [
   "'self'",
   "https://photon.komoot.io",
   "https://nominatim.openstreetmap.org",
+  "https://tile.openstreetmap.org",
+  "https://*.tile.openstreetmap.org",
   "https://tiles.openfreemap.org",
   "https://maps.googleapis.com",
   "https://places.googleapis.com",
@@ -14,8 +16,9 @@ const CONNECT_SRC_ORIGINS = [
   "https://challenges.cloudflare.com",
 ];
 
+
 // SEC-002 FIX: Routes that render MapLibre maps and need 'unsafe-eval' for WebGL shaders
-const MAP_PAGE_PATTERNS = [/^\/$/, /^\/search/, /^\/listings\/[^/]+$/];
+const MAP_PAGE_PATTERNS = [/^\/search/, /^\/listings\/[^/]+$/];
 
 export function isMapPage(pathname: string): boolean {
   return MAP_PAGE_PATTERNS.some((p) => p.test(pathname));
