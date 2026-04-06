@@ -19,9 +19,7 @@ import {
 import { executeSearchV2 } from "@/lib/search/search-v2-service";
 import { V1PathResetSetter } from "@/components/search/V1PathResetSetter";
 import { SearchResultsLoadingWrapper } from "@/components/search/SearchResultsLoadingWrapper";
-import { AppliedFilterChips } from "@/components/filters/AppliedFilterChips";
-import { CategoryBar } from "@/components/search/CategoryBar";
-import { RecommendedFilters } from "@/components/search/RecommendedFilters";
+import { InlineFilterStrip } from "@/components/search/InlineFilterStrip";
 import { features } from "@/lib/env";
 import { withTimeout, DEFAULT_TIMEOUTS } from "@/lib/timeout-wrapper";
 import { DEFAULT_PAGE_SIZE } from "@/lib/constants";
@@ -34,6 +32,8 @@ import type { Metadata } from "next";
 
 type SearchPageSearchParams = {
   q?: string;
+  where?: string;
+  what?: string;
   minPrice?: string;
   maxPrice?: string;
   amenities?: string | string[];
@@ -65,7 +65,7 @@ export async function generateMetadata({
   searchParams,
 }: SearchPageProps): Promise<Metadata> {
   const rawParams = await searchParams;
-  const { q, filterParams } = parseSearchParams(rawParams);
+  const { q, what, locationLabel, filterParams } = parseSearchParams(rawParams);
   const hasPagination = Boolean(rawParams.page || rawParams.cursor);
   const activeFilterCount = [
     filterParams.minPrice !== undefined,
@@ -83,8 +83,9 @@ export async function generateMetadata({
   const isHighlyFiltered = activeFilterCount >= 3;
   const shouldNoIndex = hasPagination || isHighlyFiltered;
 
-  const title = q
-    ? `Rooms for rent in ${q} | Roomshare`
+  const locationHeading = locationLabel || q;
+  const title = locationHeading
+    ? `Rooms for rent in ${locationHeading} | Roomshare`
     : "Find Rooms & Roommates | Roomshare";
 
   const filterSummary: string[] = [];
@@ -106,7 +107,7 @@ export async function generateMetadata({
     filterSummary.push(`Room type: ${filterParams.roomType}`);
   }
 
-  const baseDescription = `Browse ${q ? `${q} ` : ""}room listings on Roomshare.`;
+  const baseDescription = `Browse ${locationHeading ? `${locationHeading} ` : ""}room listings on Roomshare${what ? " that match your vibe" : ""}.`;
   const description =
     `${baseDescription}${filterSummary.length > 0 ? ` ${filterSummary.join(" · ")}` : ""}`.substring(
       0,
@@ -133,7 +134,11 @@ export async function generateMetadata({
         }
       : undefined,
     alternates: {
-      canonical: `/search${q ? `?q=${encodeURIComponent(q)}` : ""}`,
+      canonical: locationLabel
+        ? `/search?where=${encodeURIComponent(locationLabel)}`
+        : q
+          ? `/search?q=${encodeURIComponent(q)}`
+          : "/search",
     },
   };
 }
@@ -143,6 +148,8 @@ export default async function SearchPage({ searchParams }: SearchPageProps) {
 
   const {
     q,
+    locationLabel,
+    what,
     filterParams,
     requestedPage,
     sortOption,
@@ -153,6 +160,7 @@ export default async function SearchPage({ searchParams }: SearchPageProps) {
   // Early return for unbounded searches - check BEFORE any search attempt
   // This ensures friendly UX regardless of V2/V1 path or failures
   if (boundsRequired) {
+    const searchLabel = locationLabel || q || what || "your search";
     return (
       <>
         {/* P2b Fix: Reset v2 context state on bounds-required path.
@@ -168,9 +176,9 @@ export default async function SearchPage({ searchParams }: SearchPageProps) {
               Please select a location
             </h1>
             <p className="text-on-surface-variant max-w-md mx-auto mb-6">
-              To search for &ldquo;{q}&rdquo;, please select a location from the
-              dropdown suggestions. This helps us find relevant listings in your
-              area.
+              To search for &ldquo;{searchLabel}&rdquo;, please select a
+              location from the dropdown suggestions. This helps us find
+              relevant listings in your area.
             </p>
             <Button asChild>
               <Link href="/">
@@ -222,6 +230,7 @@ export default async function SearchPage({ searchParams }: SearchPageProps) {
     | PaginatedResultHybrid<ListingData>
     | undefined;
   let v2NextCursor: string | null = null;
+  let vibeAdvisory: string | undefined;
 
   // Check if v2 is enabled via feature flag OR query param override (?v2=1)
   // P0-7 FIX: Only allow v2 override in non-production (prevents feature flag bypass)
@@ -277,6 +286,9 @@ export default async function SearchPage({ searchParams }: SearchPageProps) {
         usedV2 = true;
         paginatedResult = v2Result.paginatedResult;
         v2NextCursor = v2Result.response.list.nextCursor ?? null;
+        if (v2Result.response.meta.warnings?.includes("VIBE_SOFT_FALLBACK")) {
+          vibeAdvisory = "Showing best matches for your vibe in this area";
+        }
       }
     } catch (err) {
       // V2 failed - will fall back to v1 below
@@ -377,27 +389,30 @@ export default async function SearchPage({ searchParams }: SearchPageProps) {
       ? (paginatedResult.nextCursor ?? null)
       : null);
 
+  const displayLocation = locationLabel || q || "";
+
   const listContent = (
     <div className="max-w-[840px] mx-auto pb-24 md:pb-6">
-      <CategoryBar />
       <div className="px-4 sm:px-5 lg:px-8 pt-0">
-        <RecommendedFilters />
-        <AppliedFilterChips currentCount={total} />
+        <InlineFilterStrip />
 
         <div className="flex flex-row items-center justify-between gap-4 py-2 mb-4">
           <div className="flex-1 min-w-0">
-            <h1
-              id="search-results-heading"
-              tabIndex={-1}
-              className="text-lg md:text-xl font-display font-medium tracking-tight text-on-surface focus:outline-none focus-visible:ring-2 focus-visible:ring-primary/30 focus-visible:rounded-lg truncate"
-            >
-              {total === null ? "100+" : total}{" "}
-              {total === 1 ? "place" : "places"}
-              {q ? ` in ${q}` : ""}
-            </h1>
-            <div aria-live="polite" className="sr-only">
-              {total === null ? "More than 100" : total}{" "}
-              {total === 1 ? "place" : "places"} found
+            <div className="flex items-baseline gap-3">
+              <h1
+                id="search-results-heading"
+                tabIndex={-1}
+                className="text-lg md:text-xl font-display font-medium tracking-tight text-on-surface focus:outline-none focus-visible:ring-2 focus-visible:ring-primary/30 focus-visible:rounded-lg truncate"
+              >
+                {total === null ? "100+" : total}{" "}
+                {total === 1 ? "place" : "places"}
+                {displayLocation ? ` in ${displayLocation}` : ""}
+              </h1>
+              {listings.length > 0 && (
+                <span className="text-xs bg-surface-container-high text-on-surface-variant px-2.5 py-1 rounded-full whitespace-nowrap shrink-0">
+                  Showing 1–{listings.length}
+                </span>
+              )}
             </div>
             {browseMode && (
               <p className="text-xs text-on-surface-variant mt-0.5">
@@ -412,22 +427,27 @@ export default async function SearchPage({ searchParams }: SearchPageProps) {
           </div>
         </div>
 
-        <SearchResultsErrorBoundary>
-          <SearchResultsClient
-            key={normalizedKeyString}
-            initialListings={listings}
-            initialNextCursor={initialNextCursor}
-            initialTotal={total}
-            savedListingIds={[]}
-            searchParamsString={searchParamsString}
-            filterParams={filterParams}
-            query={q ?? ""}
-            browseMode={browseMode}
-            hasConfirmedZeroResults={hasConfirmedZeroResults}
-            filterSuggestions={[]}
-            nearMatchExpansion={nearMatchExpansion}
-          />
-        </SearchResultsErrorBoundary>
+        <SearchResultsLoadingWrapper>
+          <SearchResultsErrorBoundary>
+            <SearchResultsClient
+              key={normalizedKeyString}
+              initialListings={listings}
+              initialNextCursor={initialNextCursor}
+              initialTotal={total}
+              savedListingIds={[]}
+              searchParamsString={searchParamsString}
+              filterParams={filterParams}
+              query={displayLocation}
+              vibeQuery={what}
+              browseMode={browseMode}
+              hasConfirmedZeroResults={hasConfirmedZeroResults}
+              filterSuggestions={[]}
+              nearMatchExpansion={nearMatchExpansion}
+              vibeAdvisory={vibeAdvisory}
+              clientSideSearchEnabled={features.clientSideSearch}
+            />
+          </SearchResultsErrorBoundary>
+        </SearchResultsLoadingWrapper>
       </div>
     </div>
   );
@@ -439,8 +459,7 @@ export default async function SearchPage({ searchParams }: SearchPageProps) {
           Currently V2MapDataSetter exists but has no render site — V2 map data path is dead code.
           V1PathResetSetter runs on every render, keeping isV2Enabled=false. */}
       <V1PathResetSetter />
-      {/* Wrap results with loading indicator for filter transitions */}
-      <SearchResultsLoadingWrapper>{listContent}</SearchResultsLoadingWrapper>
+      {listContent}
     </>
   );
 }

@@ -434,6 +434,16 @@ textarea:focus-visible {
   animation: shimmer 1.5s infinite linear;
 }
 
+/* Indeterminate loading bar for client-side search fetch */
+@keyframes indeterminate {
+  0% {
+    transform: translateX(-100%);
+  }
+  100% {
+    transform: translateX(350%);
+  }
+}
+
 @keyframes gentle-bounce {
   0%,
   100% {
@@ -705,6 +715,35 @@ input:autofill {
   .hide-scrollbar-mobile {
     -ms-overflow-style: none;
     scrollbar-width: none;
+  }
+}
+
+@media (min-width: 768px) {
+  .desktop-search-results-scroll {
+    scrollbar-gutter: stable;
+    scrollbar-width: thin;
+    scrollbar-color: rgb(74 73 65 / 0.34) transparent;
+  }
+
+  .desktop-search-results-scroll::-webkit-scrollbar {
+    width: 10px;
+  }
+
+  .desktop-search-results-scroll::-webkit-scrollbar-track {
+    background: transparent;
+  }
+
+  .desktop-search-results-scroll::-webkit-scrollbar-thumb {
+    background: rgb(74 73 65 / 0.28);
+    border: 2px solid transparent;
+    border-radius: 9999px;
+    background-clip: padding-box;
+  }
+
+  .desktop-search-results-scroll:hover::-webkit-scrollbar-thumb,
+  .desktop-search-results-scroll:focus-visible::-webkit-scrollbar-thumb {
+    background: rgb(74 73 65 / 0.45);
+    background-clip: padding-box;
   }
 }
 

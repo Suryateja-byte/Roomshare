@@ -8,6 +8,7 @@ import {
   useEffect,
   Fragment,
 } from "react";
+import { useSearchParams } from "next/navigation";
 import { safeMark, safeMeasure } from "@/lib/perf";
 import { Search, Loader2 } from "lucide-react";
 import Link from "next/link";
@@ -22,6 +23,7 @@ import { fetchMoreListings } from "@/app/search/actions";
 import { TotalPriceToggle } from "@/components/search/TotalPriceToggle";
 import { clearAllFilters } from "@/components/filters/filter-chip-utils";
 import { SplitStayCard } from "@/components/search/SplitStayCard";
+import { ExpandSearchSuggestions } from "@/components/search/ExpandSearchSuggestions";
 import { findSplitStays } from "@/lib/search/split-stay";
 import { getFilterSuggestions } from "@/app/actions/filter-suggestions";
 import type { ListingData, FilterSuggestion } from "@/lib/data";
@@ -42,11 +44,16 @@ interface SearchResultsClientProps {
   searchParamsString: string;
   filterParams: FilterParams;
   query: string;
+  vibeQuery?: string;
   browseMode: boolean;
   hasConfirmedZeroResults: boolean;
   filterSuggestions: FilterSuggestion[];
   /** Description of near-match expansion (e.g., "Showing rooms within $200 of your budget") */
   nearMatchExpansion?: string;
+  /** Subtle advisory when vibe search falls back to broader area matches */
+  vibeAdvisory?: string;
+  /** When true, URL changes trigger client-side fetch instead of SSR */
+  clientSideSearchEnabled?: boolean;
 }
 
 export function SearchResultsClient({
@@ -57,10 +64,13 @@ export function SearchResultsClient({
   searchParamsString,
   filterParams,
   query,
+  vibeQuery,
   browseMode,
   hasConfirmedZeroResults,
   filterSuggestions,
   nearMatchExpansion,
+  vibeAdvisory,
+  clientSideSearchEnabled = false,
 }: SearchResultsClientProps) {
   const [isHydrated, setIsHydrated] = useState(false);
   const [extraListings, setExtraListings] = useState<ListingData[]>([]);
@@ -102,6 +112,121 @@ export function SearchResultsClient({
   // Prevents refetching favorites for all IDs on every "Load More"
   const fetchedFavIdsRef = useRef<Set<string>>(new Set());
 
+  // --- Client-side search fetch (when feature flag enabled) ---
+  const [clientFetchedListings, setClientFetchedListings] = useState<
+    ListingData[] | null
+  >(null);
+  const [clientFetchedTotal, setClientFetchedTotal] = useState<number | null>(
+    null
+  );
+  const [clientFetchedNearMatch, setClientFetchedNearMatch] = useState<
+    string | undefined
+  >(undefined);
+  const [clientFetchedVibeAdvisory, setClientFetchedVibeAdvisory] = useState<
+    string | undefined
+  >(undefined);
+  const [isClientFetching, setIsClientFetching] = useState(false);
+  const clientFetchAbortRef = useRef<AbortController | null>(null);
+  const previousSearchParamsRef = useRef<string | null>(null);
+
+  // Listen for URL search param changes (triggered by replaceState in Map.tsx)
+  const currentSearchParams = useSearchParams();
+  const currentSearchParamsString = useMemo(
+    () => currentSearchParams.toString(),
+    [currentSearchParams]
+  );
+
+  useEffect(() => {
+    if (!clientSideSearchEnabled) return;
+
+    // Skip the initial render — SSR data covers the first load
+    if (previousSearchParamsRef.current === null) {
+      previousSearchParamsRef.current = currentSearchParamsString;
+      return;
+    }
+
+    // No change
+    if (previousSearchParamsRef.current === currentSearchParamsString) return;
+    previousSearchParamsRef.current = currentSearchParamsString;
+
+    // Cancel any in-flight request
+    clientFetchAbortRef.current?.abort();
+    const controller = new AbortController();
+    clientFetchAbortRef.current = controller;
+
+    setIsClientFetching(true);
+
+    // Strip cursor/page from params (fresh search, not pagination)
+    const fetchParams = new URLSearchParams(currentSearchParamsString);
+    fetchParams.delete("cursor");
+    fetchParams.delete("cursorStack");
+    fetchParams.delete("pageNumber");
+    fetchParams.delete("page");
+
+    void (async () => {
+      try {
+        const response = await fetch(
+          `/api/search/listings?${fetchParams.toString()}`,
+          { signal: controller.signal }
+        );
+
+        if (!response.ok) {
+          // Non-OK response: silently degrade, SSR data remains visible
+          setIsClientFetching(false);
+          return;
+        }
+
+        const data = (await response.json()) as {
+          items: ListingData[];
+          nextCursor: string | null;
+          total: number | null;
+          nearMatchExpansion?: string;
+          vibeAdvisory?: string;
+          unboundedSearch?: boolean;
+        };
+
+        // Unbounded search: clear results
+        if (data.unboundedSearch) {
+          setClientFetchedListings([]);
+          setClientFetchedTotal(0);
+          setNextCursor(null);
+          setClientFetchedNearMatch(undefined);
+          setClientFetchedVibeAdvisory(undefined);
+          setIsClientFetching(false);
+          return;
+        }
+
+        // Replace listings in-place (no remount)
+        setClientFetchedListings(data.items);
+        setClientFetchedTotal(data.total);
+        setClientFetchedNearMatch(data.nearMatchExpansion);
+        setClientFetchedVibeAdvisory(data.vibeAdvisory);
+
+        // Reset pagination state for new results
+        setExtraListings([]);
+        setNextCursor(data.nextCursor);
+        seenIdsRef.current = new Set(data.items.map((l) => l.id));
+        fetchedFavIdsRef.current = new Set();
+        totalCountRef.current = data.items.length;
+      } catch (err) {
+        if ((err as Error).name === "AbortError") return;
+        // Fetch failed: keep old listings visible, no crash
+      } finally {
+        if (!controller.signal.aborted) {
+          setIsClientFetching(false);
+        }
+      }
+    })();
+
+    return () => controller.abort();
+  }, [clientSideSearchEnabled, currentSearchParamsString]);
+
+  // Use client-fetched data when available, otherwise fall back to SSR props
+  const effectiveListings = clientFetchedListings ?? initialListings;
+  const effectiveTotal = clientFetchedListings !== null ? clientFetchedTotal : initialTotal;
+  const effectiveNearMatch = clientFetchedListings !== null ? clientFetchedNearMatch : nearMatchExpansion;
+  const effectiveVibeAdvisory = clientFetchedListings !== null ? clientFetchedVibeAdvisory : vibeAdvisory;
+
   // Derive a stable fingerprint of the initial data to detect server-side changes
   const initialDataFingerprint = useMemo(
     () => initialListings.map((l) => l.id).join(","),
@@ -124,8 +249,8 @@ export function SearchResultsClient({
   }, [initialDataFingerprint, initialNextCursor, initialListings]);
 
   const allListings = useMemo(
-    () => [...initialListings, ...extraListings],
-    [initialListings, extraListings]
+    () => [...effectiveListings, ...extraListings],
+    [effectiveListings, extraListings]
   );
   // F8 FIX: Stable string key for effects that depend on listing IDs, not array reference
   const allListingIdsKey = useMemo(
@@ -237,7 +362,7 @@ export function SearchResultsClient({
       setExtraListings((prev) => {
         const next = [...prev, ...dedupedItems];
         // F2 FIX: Update ref inside setState for deterministic count
-        totalCountRef.current = initialListings.length + next.length;
+        totalCountRef.current = effectiveListings.length + next.length;
         return next;
       });
       setNextCursor(result.nextCursor);
@@ -245,7 +370,7 @@ export function SearchResultsClient({
       // Announce to screen readers (after state update)
       // F2 FIX: Use ref for count instead of stale allListings closure
       const newCount = totalCountRef.current;
-      const totalLabel = initialTotal !== null ? ` of ~${initialTotal}` : "";
+      const totalLabel = effectiveTotal !== null ? ` of ~${effectiveTotal}` : "";
       setLoadMoreAnnouncement(
         `Loaded ${dedupedItems.length} more listing${dedupedItems.length === 1 ? "" : "s"}, showing ${newCount}${totalLabel}`
       );
@@ -266,9 +391,14 @@ export function SearchResultsClient({
       setIsLoadingMore(false);
     }
     // F2 FIX: Removed allListings dep — count read from totalCountRef instead
-  }, [nextCursor, rawParams, initialTotal, initialListings.length]);
+  }, [nextCursor, rawParams, effectiveTotal, effectiveListings.length]);
 
-  const total = initialTotal;
+  const total = effectiveTotal;
+  // When client-fetched data is active, derive zero-results from effective total
+  const effectiveZeroResults =
+    clientFetchedListings !== null
+      ? effectiveTotal !== null && effectiveTotal === 0
+      : hasConfirmedZeroResults;
 
   useEffect(() => {
     const allIds = allListings.map((listing) => listing.id);
@@ -365,7 +495,7 @@ export function SearchResultsClient({
         aria-atomic="true"
         className="sr-only"
       >
-        {hasConfirmedZeroResults
+        {effectiveZeroResults
           ? `No listings found${query ? ` for "${query}"` : ""}`
           : total === null
             ? `Found more than 100 listings${query ? ` for "${query}"` : ""}`
@@ -377,7 +507,14 @@ export function SearchResultsClient({
         {loadMoreAnnouncement}
       </div>
 
-      {hasConfirmedZeroResults ? (
+      {/* Client-side fetch announcement */}
+      {isClientFetching && (
+        <div role="status" aria-live="polite" className="sr-only">
+          Updating search results
+        </div>
+      )}
+
+      {effectiveZeroResults ? (
         <div
           data-testid="empty-state"
           className="flex flex-col items-center justify-center py-16 sm:py-24 border-2 border-dashed border-outline-variant/20 rounded-2xl sm:rounded-3xl bg-surface-canvas/50"
@@ -420,12 +557,26 @@ export function SearchResultsClient({
 
           {/* Price toggle */}
           {allListings.length > 0 && (
-            <div className="flex items-center justify-between mb-4">
-              <p className="text-sm text-on-surface-variant">
-                {total !== null
-                  ? `${total} ${total === 1 ? "place" : "places"}${query ? ` in ${query}` : ""}`
-                  : `100+ places${query ? ` in ${query}` : ""}`}
-              </p>
+            <div className="mb-4 flex flex-col gap-2 sm:flex-row sm:items-start sm:justify-between">
+              <div className="min-w-0">
+                <p className="text-sm text-on-surface-variant">
+                  {isClientFetching
+                    ? "Updating..."
+                    : total !== null
+                      ? `${total} ${total === 1 ? "place" : "places"}${query ? ` in ${query}` : ""}`
+                      : `100+ places${query ? ` in ${query}` : ""}`}
+                </p>
+                {vibeQuery ? (
+                  <p className="mt-1 text-xs text-on-surface-variant/90">
+                    Matching vibe: {vibeQuery}
+                  </p>
+                ) : null}
+                {effectiveVibeAdvisory ? (
+                  <p className="mt-2 inline-flex rounded-full bg-surface-container-high px-3 py-1 text-xs font-medium text-on-surface-variant">
+                    {effectiveVibeAdvisory}
+                  </p>
+                ) : null}
+              </div>
               {estimatedMonths > 1 && (
                 <TotalPriceToggle
                   showTotal={effectiveShowTotalPrice}
@@ -435,13 +586,42 @@ export function SearchResultsClient({
             </div>
           )}
 
+          {/* Progress bar — shows proportion of results loaded */}
+          {total !== null && total > 0 && (
+            <div className="h-[3px] bg-surface-container-high rounded-full overflow-hidden mb-4">
+              <div
+                className="h-full bg-primary rounded-full transition-[width] duration-500"
+                style={{
+                  width: `${Math.min((allListings.length / Math.max(total, 1)) * 100, 100)}%`,
+                }}
+                role="progressbar"
+                aria-valuenow={allListings.length}
+                aria-valuemax={total}
+                aria-label={`Showing ${allListings.length} of ${total} results`}
+              />
+            </div>
+          )}
+
+          {/* Client-side fetch loading bar */}
+          {isClientFetching && (
+            <div className="h-[3px] bg-surface-container-high rounded-full overflow-hidden mb-4">
+              <div
+                className="h-full bg-primary rounded-full animate-[indeterminate_1.5s_ease-in-out_infinite] motion-reduce:animate-none"
+                style={{ width: "40%" }}
+                role="progressbar"
+                aria-label="Loading new search results"
+              />
+            </div>
+          )}
+
           <h2 className="sr-only">Available listings</h2>
           <div
             role="feed"
             aria-label="Search results"
-            aria-busy={isLoadingMore}
+            aria-busy={isLoadingMore || isClientFetching}
             data-hydrated={isHydrated || undefined}
-            className="grid grid-cols-1 sm:grid-cols-2 gap-5 sm:gap-x-6 sm:gap-y-9"
+            className="grid grid-cols-1 sm:grid-cols-2 gap-5 sm:gap-x-6 sm:gap-y-9 transition-opacity duration-200 ease-out motion-reduce:transition-none"
+            style={isClientFetching ? { opacity: 0.6 } : undefined}
           >
             {allListings.map((listing, index) => {
               // Insert separator before the first near-match item
@@ -454,16 +634,16 @@ export function SearchResultsClient({
                   {isFirstNearMatch && nearMatchCount > 0 && (
                     <>
                       <NearMatchSeparator nearMatchCount={nearMatchCount} />
-                      {nearMatchExpansion && (
+                      {effectiveNearMatch && (
                         <p className="col-span-full text-sm text-amber-600 -mt-2 mb-2">
-                          {nearMatchExpansion}
+                          {effectiveNearMatch}
                         </p>
                       )}
                     </>
                   )}
                   <ListingCardErrorBoundary listingId={listing.id}>
                     <div
-                      aria-setsize={initialTotal ?? -1}
+                      aria-setsize={total ?? -1}
                       aria-posinset={index + 1}
                       className="animate-card-entrance"
                       style={{ animationDelay: `${index * 50}ms` }}
@@ -521,7 +701,7 @@ export function SearchResultsClient({
                     ? "Loading more results"
                     : `Show more places. Currently showing ${allListings.length}${total !== null ? ` of ${total}` : ""} listings`
                 }
-                className="inline-flex items-center gap-2 px-6 py-3 rounded-full bg-gradient-to-br from-primary to-primary-container hover:from-primary hover:to-primary text-on-primary text-sm font-medium transition-colors disabled:opacity-50 touch-target shadow-ambient-sm"
+                className="inline-flex items-center gap-2 px-6 py-3 rounded-full bg-primary hover:bg-primary/90 text-on-primary text-sm font-medium transition-colors disabled:opacity-50 touch-target"
               >
                 {isLoadingMore ? (
                   <>
@@ -570,6 +750,14 @@ export function SearchResultsClient({
               </p>
             )}
 
+          {/* Expansion suggestions for sparse results (1-5 listings) */}
+          {total !== null && total > 0 && total <= 5 && (
+            <ExpandSearchSuggestions
+              currentCount={total}
+              searchParamsString={searchParamsString}
+            />
+          )}
+
           {/* Contextual footer */}
           {allListings.length > 0 && (
             <p className="text-center text-xs text-on-surface-variant mt-6 pb-4">
@@ -577,7 +765,7 @@ export function SearchResultsClient({
               {query ? ` in ${query}` : ""}
             </p>
           )}
-          {allListings.length > 0 && !hasConfirmedZeroResults && isHydrated && !isLoadingMore && (
+          {allListings.length > 0 && !effectiveZeroResults && isHydrated && !isLoadingMore && (
             <section
               aria-label="Save search"
               className="mt-12 mb-4 relative overflow-hidden bg-surface-container-high/40 rounded-2xl p-8 flex flex-col sm:flex-row items-center justify-between gap-6 border border-outline-variant/20"

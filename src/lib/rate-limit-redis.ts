@@ -305,6 +305,25 @@ export const searchV2SustainedLimiter = new Ratelimit({
   analytics: true,
 });
 
+// ============ SEARCH LIST LIMITERS ============
+// Separate bucket for /api/search/listings (client-side search)
+// Same limits as search-v2 but isolated so rapid map pans don't
+// consume the SSR search rate budget.
+
+export const searchListBurstLimiter = new Ratelimit({
+  redis,
+  limiter: Ratelimit.slidingWindow(60, "1 m"),
+  prefix: "search-list-burst",
+  analytics: true,
+});
+
+export const searchListSustainedLimiter = new Ratelimit({
+  redis,
+  limiter: Ratelimit.slidingWindow(300, "1 h"),
+  prefix: "search-list-sustained",
+  analytics: true,
+});
+
 // ============ LISTINGS READ LIMITERS ============
 
 /**
@@ -608,6 +627,61 @@ export async function checkSearchV2RateLimit(
       searchV2SustainedLimiter,
       ip,
       "search-v2-sustained-limit"
+    );
+    if (!sustainedResult.success) {
+      return {
+        success: false,
+        retryAfter: Math.ceil((sustainedResult.reset - Date.now()) / 1000),
+      };
+    }
+
+    return { success: true };
+  } catch (error) {
+    if (isTimeoutError(error)) {
+      console.error("[RateLimit] Redis timeout:", error);
+    } else if (isCircuitOpenError(error)) {
+      console.error("[RateLimit] Circuit breaker open:", error);
+    } else {
+      console.error("[RateLimit] Redis error:", error);
+    }
+    return checkDbFallbackRateLimit("searchV2", ip);
+  }
+}
+
+/**
+ * Check search list rate limits (both burst and sustained).
+ * Separate bucket for /api/search/listings (client-side search).
+ *
+ * @param ip - Client IP address
+ * @returns Rate limit result with optional retry-after seconds
+ */
+export async function checkSearchListRateLimit(
+  ip: string
+): Promise<RateLimitResult> {
+  if (
+    !process.env.UPSTASH_REDIS_REST_URL ||
+    !process.env.UPSTASH_REDIS_REST_TOKEN
+  ) {
+    return checkDbFallbackRateLimit("searchV2", ip);
+  }
+
+  try {
+    const burstResult = await protectedRateLimitCheck(
+      searchListBurstLimiter,
+      ip,
+      "search-list-burst-limit"
+    );
+    if (!burstResult.success) {
+      return {
+        success: false,
+        retryAfter: Math.ceil((burstResult.reset - Date.now()) / 1000),
+      };
+    }
+
+    const sustainedResult = await protectedRateLimitCheck(
+      searchListSustainedLimiter,
+      ip,
+      "search-list-sustained-limit"
     );
     if (!sustainedResult.success) {
       return {
