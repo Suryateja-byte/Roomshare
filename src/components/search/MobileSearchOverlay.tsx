@@ -118,10 +118,36 @@ export default function MobileSearchOverlay({
       lng: number;
       bounds?: [number, number, number, number];
     }) => {
-      setLocation(loc.name);
-      setLocationCoords({ lat: loc.lat, lng: loc.lng, bounds: loc.bounds });
+      // Build search URL directly with fresh callback data to avoid stale closure.
+      const selectedLocation: SearchLocationSelection = {
+        lat: loc.lat,
+        lng: loc.lng,
+        bounds: loc.bounds,
+      };
+      const currentIntent = readSearchIntentState(
+        new URLSearchParams(searchParamsString)
+      );
+      const params = buildSearchIntentParams(searchParams, {
+        location: loc.name,
+        vibe: currentIntent.vibeInput,
+        selectedLocation,
+      });
+
+      if (minPrice) params.set("minPrice", minPrice);
+      else params.delete("minPrice");
+      if (maxPrice) params.set("maxPrice", maxPrice);
+      else params.delete("maxPrice");
+
+      window.dispatchEvent(
+        new CustomEvent<MapFlyToEventDetail>(MAP_FLY_TO_EVENT, {
+          detail: { lat: loc.lat, lng: loc.lng, bbox: loc.bounds, zoom: 13 },
+        })
+      );
+
+      router.push(`/search?${params.toString()}`);
+      onClose();
     },
-    []
+    [searchParams, searchParamsString, minPrice, maxPrice, router, onClose]
   );
 
   const locationFallbackItems = useMemo(

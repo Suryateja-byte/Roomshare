@@ -238,6 +238,7 @@ export default function LocationSearchInput({
   const pendingQueryRef = useRef<string | null>(null);
   const isComposingRef = useRef(false);
   const justSelectedRef = useRef(false);
+  const lastSelectedValueRef = useRef<string | null>(null);
 
   const listboxId = useId();
   const [dropdownPos, setDropdownPos] = useState<{
@@ -388,7 +389,10 @@ export default function LocationSearchInput({
   );
 
   useEffect(() => {
-    if (!isComposingRef.current) {
+    if (
+      !isComposingRef.current &&
+      lastSelectedValueRef.current !== debouncedValue
+    ) {
       void fetchSuggestions(debouncedValue);
     }
   }, [debouncedValue, fetchSuggestions]);
@@ -427,6 +431,7 @@ export default function LocationSearchInput({
   const handleSelectSuggestion = useCallback(
     (suggestion: LocationSuggestion) => {
       justSelectedRef.current = true;
+      lastSelectedValueRef.current = suggestion.place_name;
       const [lng, lat] = suggestion.center;
       onChange(suggestion.place_name);
       setShowSuggestions(false);
@@ -545,6 +550,7 @@ export default function LocationSearchInput({
       const newValue = event.target.value;
       clearTransientState();
       onChange(newValue);
+      lastSelectedValueRef.current = null;
       if (!justSelectedRef.current) {
         setShowSuggestions(true);
       }
@@ -558,6 +564,7 @@ export default function LocationSearchInput({
     setShowSuggestions(false);
     setSelectedIndex(-1);
     clearTransientState();
+    lastSelectedValueRef.current = null;
     inputRef.current?.focus();
   }, [clearTransientState, onChange]);
 

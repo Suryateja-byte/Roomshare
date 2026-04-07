@@ -25,7 +25,7 @@ interface PhotonProperties {
   state?: string;
   country?: string;
   type?: string;
-  extent?: [number, number, number, number]; // [minLng, minLat, maxLng, maxLat]
+  extent?: [number, number, number, number]; // Photon format: [minLng, maxLat, maxLng, minLat]
   street?: string;
   housenumber?: string;
   postcode?: string;
@@ -108,12 +108,17 @@ function inferPlaceType(type?: string): string[] {
 /** Transform a single Photon feature to GeocodingResult */
 function toGeocodingResult(feature: PhotonFeature): GeocodingResult {
   const props = feature.properties;
+  // Photon extent is [minLng, maxLat, maxLng, minLat].
+  // App expects [minLng, minLat, maxLng, maxLat] — swap indices 1 and 3.
+  const bbox: [number, number, number, number] | undefined = props.extent
+    ? [props.extent[0], props.extent[3], props.extent[2], props.extent[1]]
+    : undefined;
   return {
     id: `${props.osm_type || "N"}:${props.osm_id || 0}`,
     place_name: buildPlaceName(props),
     center: feature.geometry.coordinates as [number, number],
     place_type: inferPlaceType(props.type),
-    bbox: props.extent, // Already [minLng, minLat, maxLng, maxLat]
+    bbox,
   };
 }
 
@@ -127,7 +132,10 @@ export async function searchPhoton(
 ): Promise<GeocodingResult[]> {
   const limit = options?.limit ?? 5;
   const encoded = encodeURIComponent(query);
-  const url = `${PHOTON_BASE_URL}?q=${encoded}&limit=${limit}&lang=en`;
+  // Over-request to compensate for post-filtering non-US results.
+  // Bias toward US geographic center so US results rank higher.
+  const requestLimit = limit * 3;
+  const url = `${PHOTON_BASE_URL}?q=${encoded}&limit=${requestLimit}&lang=en&lat=39.8283&lon=-98.5795`;
 
   const response = await fetchWithTimeout(url, {
     signal: options?.signal,
@@ -142,5 +150,9 @@ export async function searchPhoton(
   }
 
   const data: PhotonResponse = await response.json();
-  return (data.features || []).map(toGeocodingResult);
+  const features = data.features || [];
+  return features
+    .filter((f) => f.properties.country === "United States")
+    .slice(0, limit)
+    .map(toGeocodingResult);
 }
