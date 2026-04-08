@@ -321,9 +321,11 @@ test.describe("Budget URL Param Aliases", () => {
       await page.waitForLoadState("domcontentloaded");
 
       // Click the remove button for price chip
-      await priceChipButton(page, /^\$500 - \$1,500$/).evaluate((el) =>
-        el.click()
-      );
+      await priceChipButton(page, /^\$500 - \$1,500$/).evaluate((el) => {
+        if (el instanceof HTMLElement) {
+          el.click();
+        }
+      });
 
       // Wait for URL to update - should have no price params
       await expect
