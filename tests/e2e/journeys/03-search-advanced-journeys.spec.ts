@@ -554,7 +554,18 @@ test.describe("30 Advanced Search Page Journeys", () => {
     // Wait for search results to fully load (budget inputs hydrate with URL params after mount)
     await page.waitForLoadState("networkidle").catch(() => {});
 
-    // Negative price should be clamped to 0 or ignored (empty) in the input
+    // On mobile, price inputs are hidden behind the MobileSearchOverlay.
+    // Verify via URL params instead.
+    const viewport = page.viewportSize();
+    if (!viewport || viewport.width < 768) {
+      // URL should have minPrice clamped or stripped
+      const url = new URL(page.url());
+      const minPrice = url.searchParams.get("minPrice");
+      expect(minPrice === null || minPrice === "0" || minPrice === "").toBe(true);
+      return;
+    }
+
+    // Desktop: verify the input directly
     const minInput = page.getByLabel(/minimum budget/i);
     await expect
       .poll(
