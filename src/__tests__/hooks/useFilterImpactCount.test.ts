@@ -236,12 +236,14 @@ describe("useFilterImpactCount", () => {
     expect(result.current.formattedDelta).toBe("+25");
   });
 
-  // ── Test 6: No fetch when isHovering=false ────────────────────────────────
+  // ── Test 6: Fetches eagerly on mount (isHovering no longer gates fetch) ────
 
-  it("never fetches when isHovering stays false", () => {
-    const chip = makeChip("wifi");
+  it("fetches eagerly on mount after debounce delay", async () => {
+    const chip = makeChip("eager-mount");
 
-    renderHook(() =>
+    mockRateLimitedFetch.mockResolvedValueOnce(mockResponse({ count: 60 }));
+
+    const { result } = renderHook(() =>
       useFilterImpactCount({
         searchParams,
         chip,
@@ -250,11 +252,21 @@ describe("useFilterImpactCount", () => {
       })
     );
 
+    // Before debounce fires, no fetch yet
+    expect(mockRateLimitedFetch).not.toHaveBeenCalled();
+
+    // Advance past debounce
     act(() => {
-      jest.advanceTimersByTime(DEBOUNCE_MS * 10);
+      jest.advanceTimersByTime(DEBOUNCE_MS);
     });
 
-    expect(mockRateLimitedFetch).not.toHaveBeenCalled();
+    // Fetch fires after debounce
+    expect(mockRateLimitedFetch).toHaveBeenCalledTimes(1);
+
+    // Wait for state update
+    await waitFor(() => {
+      expect(result.current.formattedDelta).toBe("+15");
+    });
   });
 
   // ── Test 7: Chip ID change resets state ───────────────────────────────────

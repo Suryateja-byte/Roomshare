@@ -43,15 +43,18 @@ class SearchFormErrorBoundary extends React.Component<
   render() {
     if (this.state.hasError) {
       return (
-        <div className="w-full max-w-5xl mx-auto px-4 py-6 text-center">
-          <p className="text-on-surface-variant text-sm mb-3">
-            Search is temporarily unavailable
+        <div className="w-full max-w-5xl mx-auto px-4 py-16 text-center">
+          <h1 className="font-display text-4xl md:text-5xl font-normal tracking-tight text-on-surface mb-4">
+            Find Your People, Not Just a Place
+          </h1>
+          <p className="text-on-surface-variant text-lg mb-6">
+            Verified roommates. Real listings. People who actually show up to the tour.
           </p>
           <a
             href="/search"
-            className="text-primary text-sm font-medium hover:underline"
+            className="inline-flex items-center gap-2 bg-primary text-on-primary px-6 py-3 rounded-full font-medium hover:opacity-90 transition-opacity"
           >
-            Go to search page &rarr;
+            Start searching &rarr;
           </a>
         </div>
       );
