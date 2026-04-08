@@ -16,7 +16,13 @@ test.describe("P0-1: Mobile Filters Accessibility", () => {
   // Test at iPhone-sized viewport
   test.use({ viewport: { width: 375, height: 812 } });
 
-  test.beforeEach(async () => {
+  test.beforeEach(async ({}, testInfo) => {
+    // This test requires true mobile device emulation (isMobile: true).
+    // Desktop Chrome with viewport override alone doesn't fully trigger
+    // mobile layout (useMediaQuery hydration timing + touch events).
+    if (!testInfo.project.name.includes("Mobile")) {
+      test.skip(true, "Mobile filter tests require Mobile Chrome/Safari project");
+    }
     test.slow();
   });
 
