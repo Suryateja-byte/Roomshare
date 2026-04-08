@@ -191,7 +191,9 @@ export default function NearbyPlacesMap({
   const updateMarkersRef = useRef<((p: NearbyPlace[]) => void) | null>(null);
   // Ref to latest places so async initMap can read them after await
   const placesRef = useRef<NearbyPlace[]>(places);
-  placesRef.current = places;
+  useEffect(() => {
+    placesRef.current = places;
+  }, [places]);
 
   // Single warm theme — always use light map style
 
@@ -282,7 +284,9 @@ export default function NearbyPlacesMap({
   );
 
   // Keep ref in sync so initMap can call it after async map creation
-  updateMarkersRef.current = updateMarkers;
+  useEffect(() => {
+    updateMarkersRef.current = updateMarkers;
+  }, [updateMarkers]);
 
   // Initialize map with OpenFreeMap Liberty tiles (matching search map)
   // Fetch style as JSON and ensure projection is set to avoid MapLibre TypeError
