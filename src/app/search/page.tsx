@@ -398,7 +398,7 @@ export default async function SearchPage({ searchParams }: SearchPageProps) {
 
         <div className="flex flex-row items-center justify-between gap-4 py-2 mb-4">
           <div className="flex-1 min-w-0">
-            <div className="flex items-baseline gap-3">
+            <div className="flex items-baseline gap-3 min-w-0">
               <h1
                 id="search-results-heading"
                 tabIndex={-1}
