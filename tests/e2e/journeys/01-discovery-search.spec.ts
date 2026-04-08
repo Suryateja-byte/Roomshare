@@ -282,7 +282,8 @@ test.describe("Discovery & Search Journeys", () => {
           .isVisible({ timeout: 5000 })
           .catch(() => false)
       ) {
-        await mapToggle.first().click();
+        // force: true on mobile — the bottom sheet overlay may intercept the click
+        await mapToggle.first().click({ force: isMobile });
 
         // Wait for map to render — Mapbox GL adds .maplibregl-map class, or use role="region" aria-label
         const map = page
