@@ -6,11 +6,12 @@
  * - Alias params filter server-side correctly (no out-of-range listings)
  * - Canonical params take precedence when both present
  * - Mixed param variants work (minBudget + maxPrice, etc.)
- * - Budget inputs prefill from URL on initial load
+ * - Visible applied price state reflects URL params on initial load
  *
  * DB stores price as Float (dollars, not cents) - no conversion needed.
  */
 
+import type { Page } from "@playwright/test";
 import {
   test,
   expect,
@@ -26,6 +27,14 @@ test.describe("Budget URL Param Aliases", () => {
   test.beforeEach(async () => {
     test.slow();
   });
+
+  function priceChipButton(page: Page, label: RegExp) {
+    return page.getByRole("button", { name: label }).first();
+  }
+
+  async function expectPriceChip(page: Page, label: RegExp) {
+    await expect(priceChipButton(page, label)).toBeVisible({ timeout: 30000 });
+  }
 
   test.describe("Server-Side Price Filtering", () => {
     test(`${tags.anon} ${tags.smoke} - Budget aliases filter listings server-side`, async ({
@@ -112,77 +121,23 @@ test.describe("Budget URL Param Aliases", () => {
     });
   });
 
-  test.describe("Input Prefilling from URL", () => {
-    test(`${tags.anon} - Budget inputs prefill from budget alias params`, async ({
+  test.describe("Visible Price State from URL", () => {
+    test(`${tags.anon} - Budget alias params render the applied price chip`, async ({
       page,
     }) => {
       await page.goto(`/search?${boundsQS}&minBudget=500&maxBudget=1500`);
       await page.waitForLoadState("domcontentloaded");
 
-      // Try aria-label based selector first, fall back to id-based
-      const minPriceInput = page
-        .getByLabel(/minimum budget/i)
-        .or(page.locator("#search-budget-min"));
-      const maxPriceInput = page
-        .getByLabel(/maximum budget/i)
-        .or(page.locator("#search-budget-max"));
-
-      // Check if inputs are present at all before asserting values
-      const minVisible = await minPriceInput
-        .first()
-        .isVisible({ timeout: 5000 })
-        .catch(() => false);
-      const maxVisible = await maxPriceInput
-        .first()
-        .isVisible({ timeout: 5000 })
-        .catch(() => false);
-      test.skip(
-        !minVisible || !maxVisible,
-        "Budget inputs not visible — SearchForm may be collapsed"
-      );
-
-      await expect(minPriceInput.first()).toHaveValue("500", {
-        timeout: 30000,
-      });
-      await expect(maxPriceInput.first()).toHaveValue("1500", {
-        timeout: 30000,
-      });
+      await expectPriceChip(page, /^\$500 - \$1,500$/);
     });
 
-    test(`${tags.anon} - Budget inputs prefill from canonical params`, async ({
+    test(`${tags.anon} - Canonical price params render the applied price chip`, async ({
       page,
     }) => {
       await page.goto(`/search?${boundsQS}&minPrice=800&maxPrice=2000`);
       await page.waitForLoadState("domcontentloaded");
 
-      // Try aria-label based selector first, fall back to id-based
-      const minPriceInput = page
-        .getByLabel(/minimum budget/i)
-        .or(page.locator("#search-budget-min"));
-      const maxPriceInput = page
-        .getByLabel(/maximum budget/i)
-        .or(page.locator("#search-budget-max"));
-
-      // Check if inputs are present at all before asserting values
-      const minVisible = await minPriceInput
-        .first()
-        .isVisible({ timeout: 5000 })
-        .catch(() => false);
-      const maxVisible = await maxPriceInput
-        .first()
-        .isVisible({ timeout: 5000 })
-        .catch(() => false);
-      test.skip(
-        !minVisible || !maxVisible,
-        "Budget inputs not visible — SearchForm may be collapsed"
-      );
-
-      await expect(minPriceInput.first()).toHaveValue("800", {
-        timeout: 30000,
-      });
-      await expect(maxPriceInput.first()).toHaveValue("2000", {
-        timeout: 30000,
-      });
+      await expectPriceChip(page, /^\$800 - \$2,000$/);
     });
   });
 
@@ -196,9 +151,7 @@ test.describe("Budget URL Param Aliases", () => {
       );
       await page.waitForLoadState("domcontentloaded");
 
-      // Input should show canonical value (700), not alias (500)
-      const minPriceInput = page.getByLabel(/minimum budget/i);
-      await expect(minPriceInput).toHaveValue("700", { timeout: 30000 });
+      await expectPriceChip(page, /^\$700 - \$1,500$/);
 
       // Wait for listing cards (or zero results)
       const listingCards = searchResultsContainer(page).locator(
@@ -238,9 +191,7 @@ test.describe("Budget URL Param Aliases", () => {
       );
       await page.waitForLoadState("domcontentloaded");
 
-      // Input should show canonical value (1200), not alias (2000)
-      const maxPriceInput = page.getByLabel(/maximum budget/i);
-      await expect(maxPriceInput).toHaveValue("1200", { timeout: 30000 });
+      await expectPriceChip(page, /^\$500 - \$1,200$/);
 
       // Wait for listing cards (or zero results)
       const listingCards = searchResultsContainer(page).locator(
@@ -279,11 +230,7 @@ test.describe("Budget URL Param Aliases", () => {
       await page.goto(`/search?${boundsQS}&minBudget=500&maxPrice=1500`);
       await page.waitForLoadState("domcontentloaded");
 
-      const minPriceInput = page.getByLabel(/minimum budget/i);
-      const maxPriceInput = page.getByLabel(/maximum budget/i);
-
-      await expect(minPriceInput).toHaveValue("500", { timeout: 30000 });
-      await expect(maxPriceInput).toHaveValue("1500", { timeout: 30000 });
+      await expectPriceChip(page, /^\$500 - \$1,500$/);
 
       // Wait for listing cards (or zero results)
       const listingCards = searchResultsContainer(page).locator(
@@ -319,11 +266,7 @@ test.describe("Budget URL Param Aliases", () => {
       await page.goto(`/search?${boundsQS}&minPrice=600&maxBudget=1800`);
       await page.waitForLoadState("domcontentloaded");
 
-      const minPriceInput = page.getByLabel(/minimum budget/i);
-      const maxPriceInput = page.getByLabel(/maximum budget/i);
-
-      await expect(minPriceInput).toHaveValue("600", { timeout: 30000 });
-      await expect(maxPriceInput).toHaveValue("1800", { timeout: 30000 });
+      await expectPriceChip(page, /^\$600 - \$1,800$/);
 
       // Wait for listing cards (or zero results)
       const listingCards = searchResultsContainer(page).locator(
@@ -367,16 +310,7 @@ test.describe("Budget URL Param Aliases", () => {
       await page.goto(`/search?${boundsQS}&minBudget=500&maxBudget=1500`);
       await page.waitForLoadState("domcontentloaded");
 
-      // Verify chips container is visible — scope to visible search container
-      // to avoid matching the CSS-hidden mobile/desktop duplicate
-      const chipsRegion = searchResultsContainer(page)
-        .locator('[role="region"][aria-label="Applied filters"]')
-        .first();
-      await expect(chipsRegion).toBeVisible({ timeout: 30000 });
-
-      // Verify price chip is present (format: "$500 - $1,500")
-      const priceChip = chipsRegion.getByText(/\$500.*\$1,?500/);
-      await expect(priceChip).toBeVisible();
+      await expectPriceChip(page, /^\$500 - \$1,500$/);
     });
 
     test(`${tags.anon} - Removing price chip clears both canonical and alias params`, async ({
@@ -386,17 +320,10 @@ test.describe("Budget URL Param Aliases", () => {
       await page.goto(`/search?${boundsQS}&minBudget=500&maxBudget=1500`);
       await page.waitForLoadState("domcontentloaded");
 
-      // Scope to visible search container to avoid matching CSS-hidden duplicate
-      const chipsRegion = searchResultsContainer(page)
-        .locator('[role="region"][aria-label="Applied filters"]')
-        .first();
-      await expect(chipsRegion).toBeVisible({ timeout: 30000 });
-
       // Click the remove button for price chip
-      const removeButton = chipsRegion
-        .getByRole("button", { name: /remove filter/i })
-        .first();
-      await removeButton.click();
+      await priceChipButton(page, /^\$500 - \$1,500$/).evaluate((el) =>
+        el.click()
+      );
 
       // Wait for URL to update - should have no price params
       await expect
@@ -417,8 +344,7 @@ test.describe("Budget URL Param Aliases", () => {
         )
         .toBe(true);
 
-      // Chips region should be hidden (no more filters)
-      await expect(chipsRegion).not.toBeVisible();
+      await expect(page.getByRole("button", { name: /^\$500 - \$1,500$/ })).toHaveCount(0);
     });
   });
 
@@ -429,19 +355,13 @@ test.describe("Budget URL Param Aliases", () => {
       await page.goto(`/search?${boundsQS}&minBudget=500&maxBudget=1500`);
       await page.waitForLoadState("domcontentloaded");
 
-      const minPriceInput = page.getByLabel(/minimum budget/i);
-      const maxPriceInput = page.getByLabel(/maximum budget/i);
-
-      await expect(minPriceInput).toHaveValue("500", { timeout: 30000 });
-      await expect(maxPriceInput).toHaveValue("1500", { timeout: 30000 });
+      await expectPriceChip(page, /^\$500 - \$1,500$/);
 
       // Refresh page
       await page.reload();
       await page.waitForLoadState("domcontentloaded");
 
-      // Values should persist
-      await expect(minPriceInput).toHaveValue("500", { timeout: 30000 });
-      await expect(maxPriceInput).toHaveValue("1500", { timeout: 30000 });
+      await expectPriceChip(page, /^\$500 - \$1,500$/);
     });
 
     test(`${tags.anon} - Back/forward navigation maintains filter state`, async ({
@@ -455,27 +375,19 @@ test.describe("Budget URL Param Aliases", () => {
       await page.goto(`/search?${boundsQS}&minBudget=500&maxBudget=1500`);
       await page.waitForLoadState("domcontentloaded");
 
-      const minPriceInput = page.getByLabel(/minimum budget/i);
-      await expect(minPriceInput).toBeVisible({ timeout: 30000 });
-      await expect(minPriceInput).toHaveValue("500", { timeout: 30000 });
+      await expectPriceChip(page, /^\$500 - \$1,500$/);
 
       // Go back
       await page.goBack();
       await page.waitForLoadState("domcontentloaded");
 
-      // Wait for filter input to re-render after navigation
-      await expect(minPriceInput).toBeVisible({ timeout: 30000 });
-      // Should be unfiltered
-      await expect(minPriceInput).toHaveValue("", { timeout: 30000 });
+      await expect(page.getByRole("button", { name: /^\$500 - \$1,500$/ })).toHaveCount(0);
 
       // Go forward
       await page.goForward();
       await page.waitForLoadState("domcontentloaded");
 
-      // Wait for filter input to re-render after navigation
-      await expect(minPriceInput).toBeVisible({ timeout: 30000 });
-      // Should restore filter
-      await expect(minPriceInput).toHaveValue("500", { timeout: 30000 });
+      await expectPriceChip(page, /^\$500 - \$1,500$/);
     });
   });
 });

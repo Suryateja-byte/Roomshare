@@ -329,7 +329,7 @@ export default function SearchForm({
 
   // Register mobile "open filters" callback for the collapsed search bar.
   useEffect(() => {
-    registerOpenFilters(() => setShowFilters(true));
+    return registerOpenFilters(() => setShowFilters(true));
   }, [registerOpenFilters]);
 
   const handleLocationSelect = (locationData: {

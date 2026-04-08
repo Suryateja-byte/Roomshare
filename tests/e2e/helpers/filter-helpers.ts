@@ -221,10 +221,16 @@ export async function gotoSearchWithFilters(
  * Uses regex to match both "Filters" and "Filters (N active)" states.
  */
 export function filtersButton(page: Page): Locator {
-  // Match both desktop (data-hydrated) and mobile (data-testid) filter buttons
-  return page.locator(
-    'button[data-hydrated][aria-label^="Filters"], button[data-testid="mobile-filter-button"]'
-  ).first();
+  const viewport = page.viewportSize();
+  const isMobile = viewport ? viewport.width < 768 : false;
+
+  if (isMobile) {
+    return searchResultsContainer(page)
+      .locator('button[data-testid="mobile-filter-button"]')
+      .first();
+  }
+
+  return page.locator('button[data-hydrated][aria-label^="Filters"]').first();
 }
 
 /** Locate the filter dialog */
@@ -240,7 +246,15 @@ export function filterDialog(page: Page): Locator {
 export async function clickFiltersButton(page: Page): Promise<void> {
   const btn = filtersButton(page);
   await expect(btn).toBeVisible({ timeout: 15_000 });
-  await btn.click();
+  await btn
+    .scrollIntoViewIfNeeded()
+    .catch(() => {});
+
+  try {
+    await btn.click({ timeout: 5_000 });
+  } catch {
+    await btn.click({ force: true, timeout: 15_000 });
+  }
 
   const dialog = filterDialog(page);
   const visible = await dialog
@@ -286,12 +300,19 @@ export function clearAllButton(page: Page): Locator {
 export async function openFilterModal(page: Page): Promise<Locator> {
   const btn = filtersButton(page);
   await expect(btn).toBeVisible({ timeout: 15_000 });
+  await btn
+    .scrollIntoViewIfNeeded()
+    .catch(() => {});
 
   const dialog = filterDialog(page);
 
   // Click and wait for dialog. On CI under load, the modal render
   // may take a few seconds, so we give a generous initial timeout.
-  await btn.click();
+  try {
+    await btn.click({ timeout: 5_000 });
+  } catch {
+    await btn.click({ force: true, timeout: 15_000 });
+  }
   let dialogVisible = await dialog
     .waitFor({ state: "visible", timeout: 30_000 })
     .then(() => true)

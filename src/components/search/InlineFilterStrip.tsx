@@ -184,7 +184,8 @@ export function InlineFilterStrip() {
   }, []);
 
   useEffect(() => {
-    registerOpenFilters(() => setShowFilterDrawer(true));
+    // Results-page drawer should win over the header form while it is mounted.
+    return registerOpenFilters(() => setShowFilterDrawer(true), 10);
   }, [registerOpenFilters]);
 
   useEffect(() => {
@@ -460,6 +461,9 @@ export function InlineFilterStrip() {
               disabled={isPending}
               data-hydrated={hasMounted || undefined}
               aria-label={`Filters${activeCount > 0 ? `, ${activeCount} active` : ""}`}
+              aria-expanded={showFilterDrawer ? "true" : "false"}
+              aria-controls="search-filters"
+              aria-haspopup="dialog"
               data-testid="mobile-filter-button"
               className={cn(
                 "flex items-center gap-1.5 px-4 py-2.5 min-h-[44px] rounded-full text-sm font-medium whitespace-nowrap transition-colors shrink-0 border",

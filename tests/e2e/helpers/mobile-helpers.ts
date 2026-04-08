@@ -42,8 +42,9 @@ export const mobileSelectors = {
   sortSheetHeading: 'h3:has-text("Sort by")',
   /** Mobile filter button in collapsed search bar */
   mobileFilterButton: '[data-testid="mobile-filter-button"]',
-  /** Filters button in the search form */
-  filtersButton: 'button[data-hydrated][aria-label^="Filters"]',
+  /** Filters button inside the mobile results panel */
+  filtersButton:
+    '[data-testid="mobile-search-results-container"] button[data-testid="mobile-filter-button"]',
   /** Filter modal dialog */
   filterModal: '[role="dialog"]',
   /** Desktop sidebar results container */
