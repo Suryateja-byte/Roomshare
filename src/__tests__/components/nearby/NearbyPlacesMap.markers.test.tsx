@@ -671,6 +671,9 @@ describe("NearbyPlacesMap - Marker/Popup DOM & Events", () => {
         />
       );
 
+      // Must wait for async map init (fetch style) so mapRef.current is set
+      await waitForMapInit();
+
       fireEvent.click(screen.getByLabelText("Reset to listing location"));
 
       expect(mockMapFlyTo).toHaveBeenCalledWith(

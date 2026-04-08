@@ -449,6 +449,10 @@ jest.mock("@/components/map/UserMarker", () => ({
 
 jest.mock("@/components/map/POILayer", () => ({
   POILayer: () => null,
+  usePOILayerState: () => ({
+    activeCategories: new Set(),
+    toggleCategory: jest.fn(),
+  }),
 }));
 
 // Import component after mocks
