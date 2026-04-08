@@ -13,6 +13,7 @@ import {
   checkMetricsRateLimit,
   checkSearchV2RateLimit,
   checkSearchCountRateLimit,
+  checkSearchListRateLimit,
 } from "./rate-limit-redis";
 import { getClientIP } from "./rate-limit";
 import { getRequestId } from "./request-context";
@@ -23,6 +24,7 @@ export type RedisRateLimitType =
   | "metrics"
   | "search-count"
   | "search-v2"
+  | "search-list"
   | "listings-read";
 
 interface RateLimitRedisOptions {
@@ -42,6 +44,7 @@ const RATE_LIMIT_CONFIGS: Record<
   metrics: { burstLimit: 100, sustainedLimit: 500 },
   "search-count": { burstLimit: 30, sustainedLimit: 200 },
   "search-v2": { burstLimit: 60, sustainedLimit: 300 },
+  "search-list": { burstLimit: 60, sustainedLimit: 300 },
   "listings-read": { burstLimit: 30, sustainedLimit: 100 },
 };
 
@@ -74,7 +77,7 @@ export async function withRateLimitRedis(
   }
 
   // Check rate limit based on type
-  let result;
+  let result: { success: boolean; retryAfter?: number };
   switch (type) {
     case "chat":
       result = await checkChatRateLimit(identifier);
@@ -90,6 +93,9 @@ export async function withRateLimitRedis(
       break;
     case "search-v2":
       result = await checkSearchV2RateLimit(identifier);
+      break;
+    case "search-list":
+      result = await checkSearchListRateLimit(identifier);
       break;
     case "listings-read":
       result = await checkListingsReadRateLimit(identifier);

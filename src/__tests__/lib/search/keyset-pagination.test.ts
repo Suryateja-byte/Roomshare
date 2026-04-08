@@ -404,15 +404,20 @@ describe("Rating keyset cursor correctness (#29)", () => {
   // Dataset with review_count always non-null (matches real schema: NOT NULL DEFAULT 0)
   // Sorted by: avg_rating DESC NULLS LAST, review_count DESC, listing_created_at DESC, id ASC
   const dataset = [
-    { id: "r1", avg_rating: 5.0 as number | null, review_count: 100, created_at: "2026-01-10" },
-    { id: "r2", avg_rating: 5.0, review_count: 50,  created_at: "2026-01-09" },
-    { id: "r3", avg_rating: 5.0, review_count: 0,   created_at: "2026-01-08" },
-    { id: "r4", avg_rating: 4.5, review_count: 30,  created_at: "2026-01-07" },
-    { id: "r5", avg_rating: 4.5, review_count: 30,  created_at: "2026-01-06" },
-    { id: "r6", avg_rating: 4.5, review_count: 10,  created_at: "2026-01-05" },
-    { id: "r7", avg_rating: 4.5, review_count: 0,   created_at: "2026-01-04" },
-    { id: "r8", avg_rating: 4.0, review_count: 20,  created_at: "2026-01-03" },
-    { id: "r9", avg_rating: null, review_count: 0,   created_at: "2026-01-02" },
+    {
+      id: "r1",
+      avg_rating: 5.0 as number | null,
+      review_count: 100,
+      created_at: "2026-01-10",
+    },
+    { id: "r2", avg_rating: 5.0, review_count: 50, created_at: "2026-01-09" },
+    { id: "r3", avg_rating: 5.0, review_count: 0, created_at: "2026-01-08" },
+    { id: "r4", avg_rating: 4.5, review_count: 30, created_at: "2026-01-07" },
+    { id: "r5", avg_rating: 4.5, review_count: 30, created_at: "2026-01-06" },
+    { id: "r6", avg_rating: 4.5, review_count: 10, created_at: "2026-01-05" },
+    { id: "r7", avg_rating: 4.5, review_count: 0, created_at: "2026-01-04" },
+    { id: "r8", avg_rating: 4.0, review_count: 20, created_at: "2026-01-03" },
+    { id: "r9", avg_rating: null, review_count: 0, created_at: "2026-01-02" },
   ];
 
   /**
@@ -421,7 +426,12 @@ describe("Rating keyset cursor correctness (#29)", () => {
    */
   function isAfterCursor(
     row: (typeof dataset)[0],
-    cursor: { avg_rating: number | null; review_count: number; created_at: string; id: string }
+    cursor: {
+      avg_rating: number | null;
+      review_count: number;
+      created_at: string;
+      id: string;
+    }
   ): boolean {
     const cr = cursor.avg_rating;
     const cc = cursor.review_count;
@@ -441,22 +451,44 @@ describe("Rating keyset cursor correctness (#29)", () => {
       (row.avg_rating !== null && row.avg_rating < cr) ||
       row.avg_rating === null ||
       (row.avg_rating === cr && row.review_count < cc) ||
-      (row.avg_rating === cr && row.review_count === cc && row.created_at < cd) ||
-      (row.avg_rating === cr && row.review_count === cc && row.created_at === cd && row.id > ci)
+      (row.avg_rating === cr &&
+        row.review_count === cc &&
+        row.created_at < cd) ||
+      (row.avg_rating === cr &&
+        row.review_count === cc &&
+        row.created_at === cd &&
+        row.id > ci)
     );
   }
 
   it("cursor at boundary between rating groups includes all lower groups", () => {
     // Cursor at r3 (last row of rating=5.0 group)
-    const cursor = { avg_rating: 5.0, review_count: 0, created_at: "2026-01-08", id: "r3" };
+    const cursor = {
+      avg_rating: 5.0,
+      review_count: 0,
+      created_at: "2026-01-08",
+      id: "r3",
+    };
     const nextPage = dataset.filter((row) => isAfterCursor(row, cursor));
 
-    expect(nextPage.map((r) => r.id)).toEqual(["r4", "r5", "r6", "r7", "r8", "r9"]);
+    expect(nextPage.map((r) => r.id)).toEqual([
+      "r4",
+      "r5",
+      "r6",
+      "r7",
+      "r8",
+      "r9",
+    ]);
   });
 
   it("cursor within same rating/count group uses date tiebreaker", () => {
     // Cursor at r4 (rating=4.5, count=30, date=2026-01-07)
-    const cursor = { avg_rating: 4.5, review_count: 30, created_at: "2026-01-07", id: "r4" };
+    const cursor = {
+      avg_rating: 4.5,
+      review_count: 30,
+      created_at: "2026-01-07",
+      id: "r4",
+    };
     const nextPage = dataset.filter((row) => isAfterCursor(row, cursor));
 
     // r5 has same rating+count but earlier date → included
@@ -464,7 +496,12 @@ describe("Rating keyset cursor correctness (#29)", () => {
   });
 
   it("null rating cursor returns only later null-rating rows", () => {
-    const cursor = { avg_rating: null, review_count: 0, created_at: "2026-01-02", id: "r9" };
+    const cursor = {
+      avg_rating: null,
+      review_count: 0,
+      created_at: "2026-01-02",
+      id: "r9",
+    };
     const nextPage = dataset.filter((row) => isAfterCursor(row, cursor));
 
     expect(nextPage).toEqual([]);
@@ -522,7 +559,9 @@ describe("Rating keyset cursor correctness (#29)", () => {
     // theoretically have null from a crafted/legacy cursor. The SQL must handle it.
     const { buildKeysetWhereClause } = jest.requireActual(
       "@/lib/search/search-doc-queries"
-    ) as { buildKeysetWhereClause: typeof import("@/lib/search/search-doc-queries").buildKeysetWhereClause };
+    ) as {
+      buildKeysetWhereClause: typeof import("@/lib/search/search-doc-queries").buildKeysetWhereClause;
+    };
 
     const cursor: KeysetCursor = {
       v: 1,
@@ -533,14 +572,21 @@ describe("Rating keyset cursor correctness (#29)", () => {
 
     const result = buildKeysetWhereClause(cursor, "rating", 10);
     expect(result.clause).toContain("d.review_count IS NOT NULL");
-    expect(result.params).toEqual([4.5, null, "2026-01-07T00:00:00.000Z", "test-id"]);
+    expect(result.params).toEqual([
+      4.5,
+      null,
+      "2026-01-07T00:00:00.000Z",
+      "test-id",
+    ]);
     expect(result.nextParamIndex).toBe(14);
   });
 
   it("SQL clause for non-null-count cursor has correct structure", () => {
     const { buildKeysetWhereClause } = jest.requireActual(
       "@/lib/search/search-doc-queries"
-    ) as { buildKeysetWhereClause: typeof import("@/lib/search/search-doc-queries").buildKeysetWhereClause };
+    ) as {
+      buildKeysetWhereClause: typeof import("@/lib/search/search-doc-queries").buildKeysetWhereClause;
+    };
 
     const cursor: KeysetCursor = {
       v: 1,
@@ -557,6 +603,11 @@ describe("Rating keyset cursor correctness (#29)", () => {
     expect(result.clause).toContain("d.review_count IS NULL");
     expect(result.clause).toContain("d.listing_created_at <");
     expect(result.clause).toContain("d.id >");
-    expect(result.params).toEqual([4.5, 30, "2026-01-07T00:00:00.000Z", "test-id"]);
+    expect(result.params).toEqual([
+      4.5,
+      30,
+      "2026-01-07T00:00:00.000Z",
+      "test-id",
+    ]);
   });
 });

@@ -189,11 +189,7 @@ export function DatePicker({
         )}
       >
         <span
-          className={cn(
-            value
-              ? "text-on-surface"
-              : "text-on-surface-variant"
-          )}
+          className={cn(value ? "text-on-surface" : "text-on-surface-variant")}
         >
           {value ? formatDisplayDate(value) : placeholder}
         </span>
@@ -228,11 +224,7 @@ export function DatePicker({
         )}
       >
         <span
-          className={cn(
-            value
-              ? "text-on-surface"
-              : "text-on-surface-variant"
-          )}
+          className={cn(value ? "text-on-surface" : "text-on-surface-variant")}
         >
           {value ? formatDisplayDate(value) : placeholder}
         </span>
@@ -279,7 +271,10 @@ export function DatePicker({
           <div className="flex items-center justify-between mb-4">
             <button
               type="button"
-              onClick={handlePrevMonth}
+              onClick={(e) => {
+                e.stopPropagation();
+                handlePrevMonth();
+              }}
               className="p-2 hover:bg-surface-container-high rounded-lg transition-colors"
               aria-label="Previous month"
             >
@@ -290,7 +285,10 @@ export function DatePicker({
             </span>
             <button
               type="button"
-              onClick={handleNextMonth}
+              onClick={(e) => {
+                e.stopPropagation();
+                handleNextMonth();
+              }}
               className="p-2 hover:bg-surface-container-high rounded-lg transition-colors"
               aria-label="Next month"
             >
@@ -331,11 +329,8 @@ export function DatePicker({
                       "text-on-surface hover:bg-surface-container-high",
                     day.isDisabled &&
                       "text-on-surface-variant cursor-not-allowed",
-                    todayDate &&
-                      !selected &&
-                      "ring-2 ring-on-surface/20",
-                    selected &&
-                      "bg-primary text-on-primary font-medium"
+                    todayDate && !selected && "ring-2 ring-on-surface/20",
+                    selected && "bg-primary text-on-primary font-medium"
                   )}
                 >
                   {day.date.getDate()}

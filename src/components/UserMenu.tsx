@@ -33,9 +33,8 @@ export default function UserMenu({ user }: UserMenuProps) {
   // Focus first menu item when opened
   useEffect(() => {
     if (!isOpen || !menuRef.current) return;
-    const firstItem = menuRef.current.querySelector<HTMLElement>(
-      '[role="menuitem"]'
-    );
+    const firstItem =
+      menuRef.current.querySelector<HTMLElement>('[role="menuitem"]');
     firstItem?.focus();
   }, [isOpen]);
 
@@ -79,10 +78,7 @@ export default function UserMenu({ user }: UserMenuProps) {
 
       {isOpen && (
         <>
-          <div
-            className="fixed inset-0 z-40"
-            onClick={close}
-          />
+          <div className="fixed inset-0 z-40" onClick={close} />
           <div
             ref={menuRef}
             role="menu"

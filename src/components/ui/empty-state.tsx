@@ -41,10 +41,7 @@ const EmptyState = React.forwardRef<HTMLDivElement, EmptyStateProps>(
         {Icon && (
           <div className="w-16 h-16 bg-surface-container-high rounded-full flex items-center justify-center mb-4">
             <Icon
-              className={cn(
-                "w-8 h-8 text-on-surface-variant",
-                iconClassName
-              )}
+              className={cn("w-8 h-8 text-on-surface-variant", iconClassName)}
             />
           </div>
         )}
@@ -52,9 +49,7 @@ const EmptyState = React.forwardRef<HTMLDivElement, EmptyStateProps>(
           {title}
         </h3>
         {description && (
-          <p className="text-on-surface-variant max-w-sm mb-4">
-            {description}
-          </p>
+          <p className="text-on-surface-variant max-w-sm mb-4">{description}</p>
         )}
         {action && <div className="mt-2">{action}</div>}
         {children}

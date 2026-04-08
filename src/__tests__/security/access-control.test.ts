@@ -412,7 +412,11 @@ describe("Access Control Security Tests", () => {
       const mockTx = {
         $queryRaw: jest.fn().mockResolvedValue([{ ownerId: "user-regular" }]),
         booking: { count: jest.fn().mockResolvedValue(0) },
-        listing: { update: jest.fn().mockResolvedValue({ id: "listing-1", status: "PAUSED" }) },
+        listing: {
+          update: jest
+            .fn()
+            .mockResolvedValue({ id: "listing-1", status: "PAUSED" }),
+        },
       };
       mockPrisma.$transaction.mockImplementation(async (fn: any) => fn(mockTx));
 

@@ -658,6 +658,33 @@ describe("useBatchedFilters hook", () => {
       expect(calledUrl).not.toContain("pageNumber=");
       expect(calledUrl).toContain("minPrice=600");
     });
+
+    it("accepts commit overrides for immediate filter actions", () => {
+      (useSearchParams as jest.Mock).mockReturnValue(
+        createMockSearchParams({
+          sort: "recommended",
+        })
+      );
+
+      const { result } = renderHook(() => useBatchedFilters());
+
+      act(() => {
+        result.current.commit({
+          roomType: "Private Room",
+          moveInDate: "2026-05-01",
+        });
+      });
+
+      expect(result.current.pending.roomType).toBe("Private Room");
+      expect(result.current.pending.moveInDate).toBe("2026-05-01");
+
+      const calledUrl = mockRouter.push.mock.calls[0][0] as string;
+      const searchUrl = new URL(calledUrl, "http://localhost");
+
+      expect(searchUrl.searchParams.get("sort")).toBe("recommended");
+      expect(searchUrl.searchParams.get("roomType")).toBe("Private Room");
+      expect(searchUrl.searchParams.get("moveInDate")).toBe("2026-05-01");
+    });
   });
 
   describe("reset after multiple setPending calls", () => {

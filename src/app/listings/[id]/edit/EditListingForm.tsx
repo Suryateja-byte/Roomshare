@@ -533,9 +533,7 @@ export default function EditListingForm({
                 <p className="text-sm font-medium text-red-900">
                   Failed to save changes
                 </p>
-                <p className="text-sm text-red-600 mt-1">
-                  {error}
-                </p>
+                <p className="text-sm text-red-600 mt-1">{error}</p>
                 <p className="text-xs text-red-500 mt-2">
                   Your changes have been saved locally and won&apos;t be lost.
                 </p>

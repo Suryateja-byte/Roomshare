@@ -4,6 +4,7 @@ import { Search, SlidersHorizontal } from "lucide-react";
 import { useSearchParams } from "next/navigation";
 import { useMemo } from "react";
 import { countActiveFilters } from "@/components/filters/filter-chip-utils";
+import { readSearchIntentState } from "@/lib/search/search-intent";
 
 interface CompactSearchPillProps {
   onExpand: () => void;
@@ -20,8 +21,12 @@ export function CompactSearchPill({
 }: CompactSearchPillProps) {
   const searchParams = useSearchParams();
 
-  const hasSemanticQuery = searchParams.has("what");
-  const location = hasSemanticQuery ? "" : searchParams.get("q") || "";
+  const intentState = useMemo(
+    () => readSearchIntentState(new URLSearchParams(searchParams.toString())),
+    [searchParams]
+  );
+  const location = intentState.locationSummary;
+  const vibe = intentState.vibeInput;
   const minPrice = searchParams.get("minPrice");
   const maxPrice = searchParams.get("maxPrice");
   const roomType = searchParams.get("roomType");
@@ -39,8 +44,9 @@ export function CompactSearchPill({
     }
     if (roomType && roomType !== "any") parts.push(roomType);
     if (leaseDuration && leaseDuration !== "any") parts.push(leaseDuration);
+    if (vibe) parts.push(vibe);
     return parts;
-  }, [location, minPrice, maxPrice, roomType, leaseDuration]);
+  }, [leaseDuration, location, maxPrice, minPrice, roomType, vibe]);
 
   // P1-3 FIX: Use shared countActiveFilters instead of ad-hoc counting.
   // Validates against allowlists, counts price range as 1 chip, handles nearMatches consistently.
@@ -61,7 +67,7 @@ export function CompactSearchPill({
           {segments.map((seg, i) => (
             <span key={i} className="flex items-center gap-2">
               {i > 0 && (
-                <span className="w-px h-4 bg-surface-container-high flex-shrink-0" />
+                <span className="w-px h-4 bg-outline-variant/40 flex-shrink-0" />
               )}
               <span
                 className={`truncate ${

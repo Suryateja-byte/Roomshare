@@ -10,6 +10,7 @@ jest.mock("framer-motion", () => ({
     <>{children}</>
   ),
   domAnimation: {},
+  useReducedMotion: () => false,
   m: {
     button: ({
       children,
@@ -40,7 +41,11 @@ describe("FloatingMapButton", () => {
 
   it("centers the mobile pill without translate-based positioning", () => {
     render(
-      <FloatingMapButton isListMode={false} resultCount={12} onToggle={jest.fn()} />
+      <FloatingMapButton
+        isListMode={false}
+        resultCount={12}
+        onToggle={jest.fn()}
+      />
     );
 
     const button = screen.getByRole("button", { name: "Show list" });

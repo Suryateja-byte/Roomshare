@@ -9,7 +9,8 @@ import type { SearchFilters } from "@/lib/search-utils";
 
 export const metadata: Metadata = {
   title: "Saved Searches | RoomShare",
-  description: "Manage your saved room searches and get notified of new matches.",
+  description:
+    "Manage your saved room searches and get notified of new matches.",
   robots: { index: false, follow: false },
 };
 

@@ -195,8 +195,8 @@ export interface UseBatchedFiltersReturn {
   ) => void;
   /** Discard pending changes, restore to URL state */
   reset: () => void;
-  /** Write pending state to URL and navigate */
-  commit: () => void;
+  /** Write pending state to URL and navigate, with optional immediate overrides */
+  commit: (overrides?: Partial<BatchedFilterValues>) => void;
   /** The committed (URL) filter values */
   committed: BatchedFilterValues;
 }
@@ -349,12 +349,17 @@ export function useBatchedFilters(
     setPendingState(committed);
   }, [committed]);
 
-  const commit = useCallback(() => {
+  const commit = useCallback((overrides?: Partial<BatchedFilterValues>) => {
     // After an explicit apply action, prioritize URL state for a short window.
     // This avoids preserving stale dirty state during immediate back/forward transitions.
     // 10s covers typical back/forward navigation latency with margin.
     const FORCE_SYNC_WINDOW_MS = 10_000;
     forceSyncUntilRef.current = Date.now() + FORCE_SYNC_WINDOW_MS;
+    const nextPending = overrides ? { ...pending, ...overrides } : pending;
+
+    if (overrides) {
+      setPendingState(nextPending);
+    }
 
     // Start from current URL to preserve non-filter params (bounds, sort, q, lat, lng, nearMatches)
     const params = new URLSearchParams(searchParams.toString());
@@ -387,29 +392,29 @@ export function useBatchedFilters(
     }
 
     // Set pending filter values
-    if (pending.minPrice) params.set("minPrice", pending.minPrice);
-    if (pending.maxPrice) params.set("maxPrice", pending.maxPrice);
-    if (pending.roomType) params.set("roomType", pending.roomType);
-    if (pending.leaseDuration)
-      params.set("leaseDuration", pending.leaseDuration);
-    if (pending.moveInDate) params.set("moveInDate", pending.moveInDate);
-    if (pending.amenities.length > 0) {
-      params.set("amenities", pending.amenities.join(","));
+    if (nextPending.minPrice) params.set("minPrice", nextPending.minPrice);
+    if (nextPending.maxPrice) params.set("maxPrice", nextPending.maxPrice);
+    if (nextPending.roomType) params.set("roomType", nextPending.roomType);
+    if (nextPending.leaseDuration)
+      params.set("leaseDuration", nextPending.leaseDuration);
+    if (nextPending.moveInDate) params.set("moveInDate", nextPending.moveInDate);
+    if (nextPending.amenities.length > 0) {
+      params.set("amenities", nextPending.amenities.join(","));
     }
-    if (pending.houseRules.length > 0) {
-      params.set("houseRules", pending.houseRules.join(","));
+    if (nextPending.houseRules.length > 0) {
+      params.set("houseRules", nextPending.houseRules.join(","));
     }
-    if (pending.languages.length > 0) {
-      params.set("languages", pending.languages.join(","));
+    if (nextPending.languages.length > 0) {
+      params.set("languages", nextPending.languages.join(","));
     }
-    if (pending.genderPreference) {
-      params.set("genderPreference", pending.genderPreference);
+    if (nextPending.genderPreference) {
+      params.set("genderPreference", nextPending.genderPreference);
     }
-    if (pending.householdGender) {
-      params.set("householdGender", pending.householdGender);
+    if (nextPending.householdGender) {
+      params.set("householdGender", nextPending.householdGender);
     }
-    if (pending.minSlots && parseInt(pending.minSlots) >= 2) {
-      params.set("minSlots", pending.minSlots);
+    if (nextPending.minSlots && parseInt(nextPending.minSlots, 10) >= 2) {
+      params.set("minSlots", nextPending.minSlots);
     }
 
     const searchUrl = `/search?${params.toString()}`;

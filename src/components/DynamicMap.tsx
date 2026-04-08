@@ -18,7 +18,9 @@ function hasWebGLSupport(): boolean {
   if (cachedWebGLSupport !== null) return cachedWebGLSupport;
   try {
     const canvas = document.createElement("canvas");
-    cachedWebGLSupport = !!(canvas.getContext("webgl") || canvas.getContext("webgl2"));
+    cachedWebGLSupport = !!(
+      canvas.getContext("webgl") || canvas.getContext("webgl2")
+    );
   } catch {
     cachedWebGLSupport = false;
   }
@@ -81,9 +83,7 @@ export default function DynamicMap(props: DynamicMapProps) {
   if (webglSupported === null) {
     return (
       <div className="w-full h-full bg-surface-container-high animate-pulse flex items-center justify-center">
-        <div className="text-on-surface-variant text-sm">
-          Loading map...
-        </div>
+        <div className="text-on-surface-variant text-sm">Loading map...</div>
       </div>
     );
   }

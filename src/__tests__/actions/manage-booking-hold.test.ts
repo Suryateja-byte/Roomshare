@@ -381,7 +381,9 @@ describe("manage-booking-hold — Phase 4 hold management paths", () => {
 
     (prisma.$transaction as jest.Mock).mockImplementation(async (callback) => {
       const tx = {
-        $queryRaw: jest.fn().mockResolvedValue([{ ownerId: "owner-123", status: "ACTIVE" }]),
+        $queryRaw: jest
+          .fn()
+          .mockResolvedValue([{ ownerId: "owner-123", status: "ACTIVE" }]),
         $executeRaw: mockTxExecuteRaw,
         booking: { updateMany: mockTxUpdateMany },
       };
@@ -631,7 +633,9 @@ describe("manage-booking-hold — Phase 4 hold management paths", () => {
 
     (prisma.$transaction as jest.Mock).mockImplementation(async (callback) => {
       const tx = {
-        $queryRaw: jest.fn().mockResolvedValue([{ ownerId: "owner-123", status: "ACTIVE" }]),
+        $queryRaw: jest
+          .fn()
+          .mockResolvedValue([{ ownerId: "owner-123", status: "ACTIVE" }]),
         $executeRaw: jest.fn(),
         booking: { updateMany: mockTxUpdateMany },
       };

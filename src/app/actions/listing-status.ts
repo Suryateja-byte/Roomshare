@@ -15,7 +15,10 @@ import {
 // Basic listingId format check — rejects empty/absurdly long strings
 // without being as strict as CUID/UUID validation (allows test IDs)
 const isReasonableId = (id: string) =>
-  typeof id === "string" && id.length >= 1 && id.length <= 100 && /^[\w-]+$/.test(id);
+  typeof id === "string" &&
+  id.length >= 1 &&
+  id.length <= 100 &&
+  /^[\w-]+$/.test(id);
 
 export type ListingStatus = "ACTIVE" | "PAUSED" | "RENTED";
 
@@ -47,44 +50,47 @@ export async function updateListingStatus(
   }
 
   try {
-    const result = await prisma.$transaction(async (tx) => {
-      // Lock listing row to prevent concurrent modifications
-      const rows = await tx.$queryRaw<{ ownerId: string }[]>`
+    const result = await prisma.$transaction(
+      async (tx) => {
+        // Lock listing row to prevent concurrent modifications
+        const rows = await tx.$queryRaw<{ ownerId: string }[]>`
         SELECT "ownerId" FROM "Listing"
         WHERE id = ${listingId}
         FOR UPDATE
       `;
 
-      if (rows.length === 0) {
-        return { error: "Listing not found" } as const;
-      }
-
-      if (rows[0].ownerId !== session.user.id) {
-        return { error: "You can only update your own listings" } as const;
-      }
-
-      if (status === "PAUSED") {
-        const activeBookings = await tx.booking.count({
-          where: {
-            listingId,
-            status: { in: ["ACCEPTED", "PENDING", "HELD"] },
-          },
-        });
-        if (activeBookings > 0) {
-          return {
-            error:
-              "Cannot pause a listing with active, pending, or held bookings. Please resolve them first.",
-          } as const;
+        if (rows.length === 0) {
+          return { error: "Listing not found" } as const;
         }
-      }
 
-      await tx.listing.update({
-        where: { id: listingId },
-        data: { status },
-      });
+        if (rows[0].ownerId !== session.user.id) {
+          return { error: "You can only update your own listings" } as const;
+        }
 
-      return { success: true } as const;
-    }, { timeout: 10000 });
+        if (status === "PAUSED") {
+          const activeBookings = await tx.booking.count({
+            where: {
+              listingId,
+              status: { in: ["ACCEPTED", "PENDING", "HELD"] },
+            },
+          });
+          if (activeBookings > 0) {
+            return {
+              error:
+                "Cannot pause a listing with active, pending, or held bookings. Please resolve them first.",
+            } as const;
+          }
+        }
+
+        await tx.listing.update({
+          where: { id: listingId },
+          data: { status },
+        });
+
+        return { success: true } as const;
+      },
+      { timeout: 10000 }
+    );
 
     if ("error" in result) {
       return result;

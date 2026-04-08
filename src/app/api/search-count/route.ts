@@ -56,11 +56,12 @@ export async function GET(request: NextRequest) {
       const rawParams = buildRawParamsFromSearchParams(searchParams);
 
       // Parse and validate using same logic as main search
-      const { filterParams } = parseSearchParams(rawParams);
+      const parsed = parseSearchParams(rawParams);
+      const { filterParams } = parsed;
 
       // Block unbounded text searches - require bounds when query present
       // This prevents full-table scans that are expensive and not useful
-      if (filterParams.query && !filterParams.bounds) {
+      if (parsed.boundsRequired) {
         return NextResponse.json(
           { count: null, boundsRequired: true },
           {
@@ -75,6 +76,7 @@ export async function GET(request: NextRequest) {
       // Return null count with browseMode flag to indicate capped results
       if (
         !filterParams.query &&
+        !filterParams.vibeQuery &&
         !filterParams.bounds &&
         !hasActiveFilters(filterParams)
       ) {
@@ -91,7 +93,14 @@ export async function GET(request: NextRequest) {
       // Clamp oversized bounds for consistency with /api/search/facets and /api/map-listings.
       // LIMIT 101 subquery already caps row scan, but clamping prevents unnecessarily broad ST_MakeEnvelope.
       const effectiveFilterParams = filterParams.bounds
-        ? { ...filterParams, bounds: clampBoundsToMaxSpan(filterParams.bounds, MAP_FETCH_MAX_LAT_SPAN, MAP_FETCH_MAX_LNG_SPAN) }
+        ? {
+            ...filterParams,
+            bounds: clampBoundsToMaxSpan(
+              filterParams.bounds,
+              MAP_FETCH_MAX_LAT_SPAN,
+              MAP_FETCH_MAX_LNG_SPAN
+            ),
+          }
         : filterParams;
 
       // Get count using existing getLimitedCount function

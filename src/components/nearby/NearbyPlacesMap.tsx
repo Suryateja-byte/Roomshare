@@ -68,7 +68,6 @@ function getCategoryIconPath(category: string): string {
 // OpenFreeMap tile style URLs (matching search map)
 const OPENFREEMAP_STYLE_LIGHT = "https://tiles.openfreemap.org/styles/liberty";
 
-
 /**
  * Create a custom home marker element using safe DOM methods
  *
@@ -129,9 +128,7 @@ function createHomeMarkerElement(): HTMLDivElement {
  *
  * @see https://css-tricks.com/avoid-css-jitter/
  */
-function createPOIMarkerElement(
-  category: string,
-): HTMLDivElement {
+function createPOIMarkerElement(category: string): HTMLDivElement {
   const colors = getCategoryColors(category);
   const iconPath = getCategoryIconPath(category);
 
@@ -154,10 +151,7 @@ function createPOIMarkerElement(
   svg.setAttribute("height", "14");
   svg.setAttribute("viewBox", "0 0 14 14");
   svg.setAttribute("fill", "none");
-  svg.setAttribute(
-    "stroke",
-    colors.markerBorder
-  );
+  svg.setAttribute("stroke", colors.markerBorder);
   svg.setAttribute("stroke-width", "1.5");
   svg.setAttribute("stroke-linecap", "round");
   svg.setAttribute("stroke-linejoin", "round");
@@ -192,54 +186,16 @@ export default function NearbyPlacesMap({
   const markersRef = useRef<maplibregl.Marker[]>([]);
   const listingMarkerRef = useRef<maplibregl.Marker | null>(null);
   const hasFitBoundsRef = useRef<boolean>(false);
+  // Ref to hold the latest updateMarkers callback so async initMap can
+  // trigger initial marker creation after the map is ready.
+  const updateMarkersRef = useRef<((p: NearbyPlace[]) => void) | null>(null);
+  // Ref to latest places so async initMap can read them after await
+  const placesRef = useRef<NearbyPlace[]>(places);
+  useEffect(() => {
+    placesRef.current = places;
+  }, [places]);
 
   // Single warm theme — always use light map style
-
-  // Initialize map with OpenFreeMap Liberty tiles (matching search map)
-  useEffect(() => {
-    if (!mapContainerRef.current) return;
-
-    const styleUrl = OPENFREEMAP_STYLE_LIGHT;
-
-    const map = new maplibregl.Map({
-      container: mapContainerRef.current,
-      style: styleUrl,
-      center: [listingLng, listingLat],
-      zoom: 14,
-    });
-
-    mapRef.current = map;
-
-    // No default navigation controls - we add custom ones
-
-    // Wait for map to load before adding markers
-    map.on("load", () => {
-      // Add listing marker (center) with custom element
-      const homeEl = createHomeMarkerElement();
-      const listingMarker = new maplibregl.Marker({ element: homeEl })
-        .setLngLat([listingLng, listingLat])
-        .setPopup(
-          new maplibregl.Popup({ offset: 25, closeButton: false }).setHTML(
-            '<div class="px-3 py-2 font-semibold text-sm">Listing Location</div>'
-          )
-        )
-        .addTo(map);
-
-      listingMarkerRef.current = listingMarker;
-    });
-
-    // Handle any map errors
-    map.on("error", (e) => {
-      console.error("Map error:", e.error?.message || e);
-    });
-
-    return () => {
-      map.remove();
-      mapRef.current = null;
-      listingMarkerRef.current = null;
-      hasFitBoundsRef.current = false; // Reset for new map instance
-    };
-  }, [listingLat, listingLng]); // Re-create map when theme changes
 
   // Update POI markers when places change
   const updateMarkers = useCallback(
@@ -326,6 +282,83 @@ export default function NearbyPlacesMap({
     },
     [listingLat, listingLng]
   );
+
+  // Keep ref in sync so initMap can call it after async map creation
+  useEffect(() => {
+    updateMarkersRef.current = updateMarkers;
+  }, [updateMarkers]);
+
+  // Initialize map with OpenFreeMap Liberty tiles (matching search map)
+  // Fetch style as JSON and ensure projection is set to avoid MapLibre TypeError
+  useEffect(() => {
+    if (!mapContainerRef.current) return;
+    let cancelled = false;
+
+    const initMap = async () => {
+      let style: string | maplibregl.StyleSpecification =
+        OPENFREEMAP_STYLE_LIGHT;
+      try {
+        const res = await fetch(OPENFREEMAP_STYLE_LIGHT);
+        if (res.ok) {
+          const json = await res.json();
+          if (!json.projection) {
+            json.projection = { type: "mercator" };
+          }
+          style = json as maplibregl.StyleSpecification;
+        }
+      } catch {
+        // Fall back to URL string if fetch fails
+      }
+      if (cancelled || !mapContainerRef.current) return;
+
+      const map = new maplibregl.Map({
+        container: mapContainerRef.current,
+        style,
+        center: [listingLng, listingLat],
+        zoom: 14,
+      });
+
+      mapRef.current = map;
+
+      // Now that the map is ready, create markers for any places that
+      // were passed on initial render (the places useEffect already
+      // ran and returned early because mapRef was null at that point).
+      updateMarkersRef.current?.(placesRef.current);
+
+      // Wait for map to load before adding markers
+      map.on("load", () => {
+        // Add listing marker (center) with custom element
+        const homeEl = createHomeMarkerElement();
+        const listingMarker = new maplibregl.Marker({ element: homeEl })
+          .setLngLat([listingLng, listingLat])
+          .setPopup(
+            new maplibregl.Popup({ offset: 25, closeButton: false }).setHTML(
+              '<div class="px-3 py-2 font-semibold text-sm">Listing Location</div>'
+            )
+          )
+          .addTo(map);
+
+        listingMarkerRef.current = listingMarker;
+      });
+
+      // Handle any map errors
+      map.on("error", (e) => {
+        console.error("Map error:", e.error?.message || e);
+      });
+    };
+
+    initMap();
+
+    return () => {
+      cancelled = true;
+      if (mapRef.current) {
+        mapRef.current.remove();
+        mapRef.current = null;
+      }
+      listingMarkerRef.current = null;
+      hasFitBoundsRef.current = false; // Reset for new map instance
+    };
+  }, [listingLat, listingLng]); // Re-create map when coordinates change
 
   // Update markers when places change
   useEffect(() => {

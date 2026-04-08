@@ -8,7 +8,10 @@ jest.mock("next/server", () => {
     headers: Map<string, string>;
     private _body: unknown;
 
-    constructor(body: unknown, init?: { status?: number; headers?: Record<string, string> }) {
+    constructor(
+      body: unknown,
+      init?: { status?: number; headers?: Record<string, string> }
+    ) {
       this._body = body;
       this.status = init?.status || 200;
       this.headers = new Map(Object.entries(init?.headers ?? {}));

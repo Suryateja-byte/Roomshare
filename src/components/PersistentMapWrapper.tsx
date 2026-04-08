@@ -38,6 +38,7 @@ import {
 import { useActivePanBoundsState } from "@/contexts/ActivePanBoundsContext";
 import { MapErrorBoundary } from "@/components/map/MapErrorBoundary";
 import { useSearchTransitionSafe } from "@/contexts/SearchTransitionContext";
+import { useMediaQuery } from "@/hooks/useMediaQuery";
 import { sanitizeMapListings } from "@/lib/maps/sanitize-map-listings";
 import {
   MAP_FETCH_MAX_LAT_SPAN,
@@ -265,9 +266,7 @@ function MapErrorBanner({
       aria-live="polite"
       className="absolute top-4 left-4 right-4 z-50 bg-amber-50 border border-amber-200 rounded-lg p-3 flex items-center justify-between gap-2"
     >
-      <span className="text-sm text-amber-700 block">
-        {message}
-      </span>
+      <span className="text-sm text-amber-700 block">{message}</span>
       <button
         onClick={onRetry}
         className="text-sm font-medium text-amber-800 hover:underline flex-shrink-0"
@@ -287,9 +286,7 @@ function MapInfoBanner({ message }: { message: string }) {
       aria-live="polite"
       className="absolute top-4 left-4 right-4 z-50 bg-blue-50 border border-blue-200 rounded-lg p-3"
     >
-      <span className="text-sm text-blue-700 block">
-        {message}
-      </span>
+      <span className="text-sm text-blue-700 block">{message}</span>
     </div>
   );
 }
@@ -423,6 +420,7 @@ interface PersistentMapWrapperProps {
 export default function PersistentMapWrapper({
   shouldRenderMap,
 }: PersistentMapWrapperProps) {
+  const isDesktop = useMediaQuery("(min-width: 768px)");
   const searchParams = useSearchParams();
   const [listings, setListings] = useState<MapListingData[]>([]);
   // mapSource tracks whether the most recent data came from a client fetch ('v1') or SSR payload ('v2')
@@ -1059,6 +1057,7 @@ export default function PersistentMapWrapper({
           <LazyDynamicMap
             listings={stableEffectiveListings}
             suppressEmptyState={Boolean(infoMessage)}
+            selectionPresentation={isDesktop === false ? "preview" : "popup"}
           />
         </Suspense>
       </MapErrorBoundary>

@@ -32,6 +32,8 @@ interface UserMarkerProps {
   hoveredListingCoords: { lat: number; lng: number } | null;
   /** Dark mode */
   isDarkMode: boolean;
+  /** Whether to render the floating map control button */
+  showControl?: boolean;
 }
 
 /** Calculate straight-line distance in km between two points (Haversine) */
@@ -64,6 +66,7 @@ export function UserMarker({
   onSetPin,
   hoveredListingCoords,
   isDarkMode,
+  showControl = true,
 }: UserMarkerProps) {
   const abortRef = useRef<AbortController | null>(null);
 
@@ -100,21 +103,22 @@ export function UserMarker({
 
   return (
     <>
-      {/* Drop-a-pin control button */}
-      <button
-        onClick={onToggleDropMode}
-        className={cn(
-          "absolute bottom-4 left-4 z-[50] flex items-center justify-center gap-2 px-4 py-2.5 rounded-full shadow-lg border text-sm font-medium transition-all min-h-[44px] backdrop-blur-md focus:outline-none focus-visible:ring-2 focus-visible:ring-primary/30 focus-visible:ring-offset-2",
-          isDropMode
-            ? "bg-rose-500/90 text-white border-rose-500/90 ring-2 ring-rose-300/50"
-            : "bg-white/90 text-on-surface-variant border-outline-variant/20/50 hover:bg-surface-canvas"
-        )}
-        aria-label={isDropMode ? "Cancel drop pin" : "Drop a pin on the map"}
-        title={isDropMode ? "Cancel" : "Drop a pin"}
-      >
-        <MapPin className="w-4 h-4" />
-        {isDropMode ? "Cancel" : "Drop pin"}
-      </button>
+      {showControl && (
+        <button
+          onClick={onToggleDropMode}
+          className={cn(
+            "absolute bottom-4 left-4 z-[50] flex items-center justify-center gap-2 px-4 py-2.5 rounded-full shadow-lg border text-sm font-medium transition-all min-h-[44px] backdrop-blur-md focus:outline-none focus-visible:ring-2 focus-visible:ring-primary/30 focus-visible:ring-offset-2",
+            isDropMode
+              ? "bg-rose-500/90 text-white border-rose-500/90 ring-2 ring-rose-300/50"
+              : "bg-white/90 text-on-surface-variant border-outline-variant/20/50 hover:bg-surface-canvas"
+          )}
+          aria-label={isDropMode ? "Cancel drop pin" : "Drop a pin on the map"}
+          title={isDropMode ? "Cancel" : "Drop a pin"}
+        >
+          <MapPin className="w-4 h-4" />
+          {isDropMode ? "Cancel" : "Drop pin"}
+        </button>
+      )}
 
       {/* Rendered user pin marker */}
       {pin && (

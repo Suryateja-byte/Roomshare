@@ -11,7 +11,8 @@ import { features } from "@/lib/env";
 
 export const metadata: Metadata = {
   title: "Create Listing | RoomShare",
-  description: "List your room or shared space on RoomShare and find the perfect roommate.",
+  description:
+    "List your room or shared space on RoomShare and find the perfect roommate.",
   robots: { index: false, follow: false },
 };
 

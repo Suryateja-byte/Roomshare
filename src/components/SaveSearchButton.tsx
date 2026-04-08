@@ -51,6 +51,8 @@ export default function SaveSearchButton({
     // Build RawSearchParams from URL
     const raw: RawSearchParams = {
       q: searchParams.get("q") ?? undefined,
+      where: searchParams.get("where") ?? undefined,
+      what: searchParams.get("what") ?? undefined,
       minPrice: searchParams.get("minPrice") ?? undefined,
       maxPrice: searchParams.get("maxPrice") ?? undefined,
       amenities: searchParams.getAll("amenities"),
@@ -77,6 +79,8 @@ export default function SaveSearchButton({
     // Convert FilterParams to SearchFilters format
     const filters: SearchFilters = {};
     if (fp.query) filters.query = fp.query;
+    if (parsed.locationLabel) filters.locationLabel = parsed.locationLabel;
+    if (fp.vibeQuery) filters.vibeQuery = fp.vibeQuery;
     if (fp.minPrice !== undefined) filters.minPrice = fp.minPrice;
     if (fp.maxPrice !== undefined) filters.maxPrice = fp.maxPrice;
     if (fp.amenities) filters.amenities = fp.amenities;
@@ -104,7 +108,12 @@ export default function SaveSearchButton({
     const filters = getCurrentFilters();
     const parts: string[] = [];
 
-    if (filters.query) parts.push(filters.query);
+    if (filters.locationLabel) {
+      parts.push(filters.locationLabel);
+    } else if (filters.query) {
+      parts.push(filters.query);
+    }
+    if (filters.vibeQuery) parts.push(filters.vibeQuery);
     if (filters.roomType) parts.push(filters.roomType.replace("_", " "));
     if (filters.minPrice !== undefined || filters.maxPrice !== undefined) {
       const priceRange = [
@@ -205,7 +214,10 @@ export default function SaveSearchButton({
               <div className="space-y-4">
                 {/* Search Name */}
                 <div>
-                  <label htmlFor="save-search-name" className="block text-sm font-medium text-on-surface-variant mb-1">
+                  <label
+                    htmlFor="save-search-name"
+                    className="block text-sm font-medium text-on-surface-variant mb-1"
+                  >
                     Search Name
                   </label>
                   <input
@@ -214,7 +226,7 @@ export default function SaveSearchButton({
                     value={name}
                     onChange={(e) => setName(e.target.value)}
                     placeholder="e.g., Downtown apartments under $1500"
-                    className="w-full px-4 py-2.5 border border-outline-variant/20 rounded-lg focus:outline-none focus-visible:ring-2 focus-visible:ring-primary/30"
+                    className="w-full px-4 py-2.5 border border-outline-variant/20 rounded-xl focus:outline-none focus-visible:ring-2 focus-visible:ring-primary/30"
                     aria-describedby={error ? "save-search-error" : undefined}
                     aria-invalid={!!error}
                   />
@@ -274,7 +286,7 @@ export default function SaveSearchButton({
                               onClick={() => setAlertFrequency(freq)}
                               className={`flex-1 px-3 py-2 rounded-lg text-sm font-medium transition-colors ${
                                 alertFrequency === freq
-                                  ? "bg-on-surface text-white"
+                                  ? "bg-primary text-on-primary"
                                   : "bg-surface-container-lowest border border-outline-variant/20 text-on-surface-variant hover:bg-surface-container-high"
                               }`}
                             >
@@ -319,7 +331,7 @@ export default function SaveSearchButton({
                   <button
                     onClick={handleSave}
                     disabled={isLoading}
-                    className="flex-1 px-4 py-2.5 bg-on-surface text-white rounded-lg font-medium hover:bg-on-surface disabled:opacity-60 transition-colors flex items-center justify-center gap-2"
+                    className="flex-1 px-4 py-2.5 bg-primary text-on-primary rounded-lg font-medium hover:bg-primary/90 disabled:opacity-60 transition-colors flex items-center justify-center gap-2"
                   >
                     {isLoading ? (
                       <>

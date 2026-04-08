@@ -54,10 +54,12 @@ function hashBody(body: Record<string, unknown>): string {
 }
 
 /** Factory: a minimal mock transaction client. */
-function createMockTx(overrides: Partial<{
-  $executeRaw: jest.Mock;
-  $queryRaw: jest.Mock;
-}> = {}) {
+function createMockTx(
+  overrides: Partial<{
+    $executeRaw: jest.Mock;
+    $queryRaw: jest.Mock;
+  }> = {}
+) {
   return {
     $executeRaw: jest.fn().mockResolvedValue(undefined),
     $queryRaw: jest.fn(),
@@ -86,13 +88,28 @@ describe("withIdempotency", () => {
       const operation = jest.fn().mockResolvedValue(opResult);
 
       const tx = createMockTx({
-        $queryRaw: jest.fn().mockResolvedValue([
-          { id: "idem-1", status: "processing", requestHash: BODY_HASH, resultData: null },
-        ]),
+        $queryRaw: jest
+          .fn()
+          .mockResolvedValue([
+            {
+              id: "idem-1",
+              status: "processing",
+              requestHash: BODY_HASH,
+              resultData: null,
+            },
+          ]),
       });
-      (prisma.$transaction as jest.Mock).mockImplementation(async (fn) => fn(tx));
+      (prisma.$transaction as jest.Mock).mockImplementation(async (fn) =>
+        fn(tx)
+      );
 
-      const result = await withIdempotency(KEY, USER, ENDPOINT, BODY, operation);
+      const result = await withIdempotency(
+        KEY,
+        USER,
+        ENDPOINT,
+        BODY,
+        operation
+      );
 
       expect(result.success).toBe(true);
       if (result.success) {
@@ -107,11 +124,20 @@ describe("withIdempotency", () => {
     it("passes the transaction client into the operation callback", async () => {
       const operation = jest.fn().mockResolvedValue({ ok: true });
       const tx = createMockTx({
-        $queryRaw: jest.fn().mockResolvedValue([
-          { id: "idem-2", status: "processing", requestHash: BODY_HASH, resultData: null },
-        ]),
+        $queryRaw: jest
+          .fn()
+          .mockResolvedValue([
+            {
+              id: "idem-2",
+              status: "processing",
+              requestHash: BODY_HASH,
+              resultData: null,
+            },
+          ]),
       });
-      (prisma.$transaction as jest.Mock).mockImplementation(async (fn) => fn(tx));
+      (prisma.$transaction as jest.Mock).mockImplementation(async (fn) =>
+        fn(tx)
+      );
 
       await withIdempotency(KEY, USER, ENDPOINT, BODY, operation);
 
@@ -125,13 +151,28 @@ describe("withIdempotency", () => {
       const operation = jest.fn();
 
       const tx = createMockTx({
-        $queryRaw: jest.fn().mockResolvedValue([
-          { id: "idem-1", status: "completed", requestHash: BODY_HASH, resultData: cached },
-        ]),
+        $queryRaw: jest
+          .fn()
+          .mockResolvedValue([
+            {
+              id: "idem-1",
+              status: "completed",
+              requestHash: BODY_HASH,
+              resultData: cached,
+            },
+          ]),
       });
-      (prisma.$transaction as jest.Mock).mockImplementation(async (fn) => fn(tx));
+      (prisma.$transaction as jest.Mock).mockImplementation(async (fn) =>
+        fn(tx)
+      );
 
-      const result = await withIdempotency(KEY, USER, ENDPOINT, BODY, operation);
+      const result = await withIdempotency(
+        KEY,
+        USER,
+        ENDPOINT,
+        BODY,
+        operation
+      );
 
       expect(result.success).toBe(true);
       if (result.success) {
@@ -145,16 +186,32 @@ describe("withIdempotency", () => {
   describe("key reused with different request body", () => {
     it("returns success=false with status 400 and an error mentioning 'reused'", async () => {
       const operation = jest.fn();
-      const differentHash = "0000000000000000000000000000000000000000000000000000000000000000";
+      const differentHash =
+        "0000000000000000000000000000000000000000000000000000000000000000";
 
       const tx = createMockTx({
-        $queryRaw: jest.fn().mockResolvedValue([
-          { id: "idem-1", status: "completed", requestHash: differentHash, resultData: {} },
-        ]),
+        $queryRaw: jest
+          .fn()
+          .mockResolvedValue([
+            {
+              id: "idem-1",
+              status: "completed",
+              requestHash: differentHash,
+              resultData: {},
+            },
+          ]),
       });
-      (prisma.$transaction as jest.Mock).mockImplementation(async (fn) => fn(tx));
+      (prisma.$transaction as jest.Mock).mockImplementation(async (fn) =>
+        fn(tx)
+      );
 
-      const result = await withIdempotency(KEY, USER, ENDPOINT, BODY, operation);
+      const result = await withIdempotency(
+        KEY,
+        USER,
+        ENDPOINT,
+        BODY,
+        operation
+      );
 
       expect(result.success).toBe(false);
       if (!result.success) {
@@ -172,9 +229,17 @@ describe("withIdempotency", () => {
       const tx = createMockTx({
         $queryRaw: jest.fn().mockResolvedValue([]), // no row
       });
-      (prisma.$transaction as jest.Mock).mockImplementation(async (fn) => fn(tx));
+      (prisma.$transaction as jest.Mock).mockImplementation(async (fn) =>
+        fn(tx)
+      );
 
-      const result = await withIdempotency(KEY, USER, ENDPOINT, BODY, operation);
+      const result = await withIdempotency(
+        KEY,
+        USER,
+        ENDPOINT,
+        BODY,
+        operation
+      );
 
       expect(result.success).toBe(false);
       if (!result.success) {
@@ -189,13 +254,28 @@ describe("withIdempotency", () => {
       const operation = jest.fn();
 
       const tx = createMockTx({
-        $queryRaw: jest.fn().mockResolvedValue([
-          { id: "idem-1", status: "completed", requestHash: BODY_HASH, resultData: null },
-        ]),
+        $queryRaw: jest
+          .fn()
+          .mockResolvedValue([
+            {
+              id: "idem-1",
+              status: "completed",
+              requestHash: BODY_HASH,
+              resultData: null,
+            },
+          ]),
       });
-      (prisma.$transaction as jest.Mock).mockImplementation(async (fn) => fn(tx));
+      (prisma.$transaction as jest.Mock).mockImplementation(async (fn) =>
+        fn(tx)
+      );
 
-      const result = await withIdempotency(KEY, USER, ENDPOINT, BODY, operation);
+      const result = await withIdempotency(
+        KEY,
+        USER,
+        ENDPOINT,
+        BODY,
+        operation
+      );
 
       expect(result.success).toBe(false);
       if (!result.success) {
@@ -212,11 +292,20 @@ describe("withIdempotency", () => {
       const operation = jest.fn().mockRejectedValue(operationError);
 
       const tx = createMockTx({
-        $queryRaw: jest.fn().mockResolvedValue([
-          { id: "idem-1", status: "processing", requestHash: BODY_HASH, resultData: null },
-        ]),
+        $queryRaw: jest
+          .fn()
+          .mockResolvedValue([
+            {
+              id: "idem-1",
+              status: "processing",
+              requestHash: BODY_HASH,
+              resultData: null,
+            },
+          ]),
       });
-      (prisma.$transaction as jest.Mock).mockImplementation(async (fn) => fn(tx));
+      (prisma.$transaction as jest.Mock).mockImplementation(async (fn) =>
+        fn(tx)
+      );
 
       await expect(
         withIdempotency(KEY, USER, ENDPOINT, BODY, operation)
@@ -251,9 +340,16 @@ describe("withIdempotency", () => {
           throw serializationError;
         }
         const tx = createMockTx({
-          $queryRaw: jest.fn().mockResolvedValue([
-            { id: "idem-1", status: "processing", requestHash: BODY_HASH, resultData: null },
-          ]),
+          $queryRaw: jest
+            .fn()
+            .mockResolvedValue([
+              {
+                id: "idem-1",
+                status: "processing",
+                requestHash: BODY_HASH,
+                resultData: null,
+              },
+            ]),
         });
         return fn(tx);
       });
@@ -271,16 +367,25 @@ describe("withIdempotency", () => {
       const opResult = { ok: true };
       const operation = jest.fn().mockResolvedValue(opResult);
 
-      const sqlstateError = new Error("ERROR 40001: could not serialize access");
+      const sqlstateError = new Error(
+        "ERROR 40001: could not serialize access"
+      );
 
       let callCount = 0;
       (prisma.$transaction as jest.Mock).mockImplementation(async (fn) => {
         callCount++;
         if (callCount === 1) throw sqlstateError;
         const tx = createMockTx({
-          $queryRaw: jest.fn().mockResolvedValue([
-            { id: "idem-1", status: "processing", requestHash: BODY_HASH, resultData: null },
-          ]),
+          $queryRaw: jest
+            .fn()
+            .mockResolvedValue([
+              {
+                id: "idem-1",
+                status: "processing",
+                requestHash: BODY_HASH,
+                resultData: null,
+              },
+            ]),
         });
         return fn(tx);
       });
@@ -390,12 +495,15 @@ describe("idempotencyResponse", () => {
       [400, "Idempotency key reused with different request body"],
       [409, "Request already in progress"],
       [500, "Internal idempotency error"],
-    ])("preserves status %d and includes error string in body", (status, error) => {
-      const response = idempotencyResponse({ success: false, status, error });
+    ])(
+      "preserves status %d and includes error string in body",
+      (status, error) => {
+        const response = idempotencyResponse({ success: false, status, error });
 
-      expect(response.status).toBe(status);
-      expect(response.body).toEqual({ error });
-    });
+        expect(response.status).toBe(status);
+        expect(response.body).toEqual({ error });
+      }
+    );
 
     it("does not include a headers field on error responses", () => {
       const response = idempotencyResponse({

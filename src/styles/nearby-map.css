@@ -69,7 +69,6 @@
   text-decoration: underline;
 }
 
-
 /* Marker highlight effect */
 .poi-marker.highlighted > div {
   transform: scale(1.25);

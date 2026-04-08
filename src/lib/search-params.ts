@@ -4,9 +4,12 @@ import {
   MAX_SAFE_PAGE,
   MAX_ARRAY_ITEMS,
   MAX_QUERY_LENGTH,
-  LAT_OFFSET_DEGREES,
 } from "./constants";
 import type { SortOption, FilterParams, FilterCriteria } from "./search-types";
+import {
+  boundsTupleToObject,
+  deriveSearchBoundsFromPoint,
+} from "./search/location-bounds";
 import {
   VALID_BOOKING_MODES,
   VALID_AMENITIES,
@@ -63,6 +66,8 @@ export function hasActiveFilters(params: FilterParams): boolean {
 
 export interface RawSearchParams {
   q?: string | string[];
+  where?: string | string[];
+  what?: string | string[];
   minPrice?: string | string[];
   maxPrice?: string | string[];
   // Budget aliases — canonical (minPrice/maxPrice) take precedence
@@ -91,6 +96,8 @@ export interface RawSearchParams {
 
 export interface ParsedSearchParams {
   q?: string;
+  locationLabel?: string;
+  what?: string;
   requestedPage: number;
   sortOption: SortOption;
   filterParams: FilterCriteria;
@@ -114,6 +121,7 @@ export interface ParsedSearchParams {
  */
 export const FILTER_QUERY_KEYS = [
   "q",
+  "what",
   "minPrice",
   "maxPrice",
   "amenities",
@@ -174,6 +182,9 @@ export function buildCanonicalFilterParamsFromSearchParams(
 
     if (filterParams.query) {
       canonical.set("q", filterParams.query);
+    }
+    if (filterParams.vibeQuery) {
+      canonical.set("what", filterParams.vibeQuery);
     }
     if (filterParams.minPrice !== undefined) {
       canonical.set("minPrice", String(filterParams.minPrice));
@@ -348,11 +359,25 @@ const safeParseDate = (value: string | undefined): string | undefined => {
 export function parseSearchParams(raw: RawSearchParams): ParsedSearchParams {
   const rawQuery = getFirstValue(raw.q);
   const trimmed = rawQuery ? rawQuery.trim() : "";
-  const query =
+  const queryText =
     trimmed.length > MAX_QUERY_LENGTH
       ? trimmed.slice(0, MAX_QUERY_LENGTH)
       : trimmed;
-  const q = query || undefined;
+  const q = queryText || undefined;
+  const rawWhere = getFirstValue(raw.where);
+  const trimmedWhere = rawWhere ? rawWhere.trim() : "";
+  const whereText =
+    trimmedWhere.length > MAX_QUERY_LENGTH
+      ? trimmedWhere.slice(0, MAX_QUERY_LENGTH)
+      : trimmedWhere;
+  const explicitLocationLabel = whereText || undefined;
+  const rawWhat = getFirstValue(raw.what);
+  const trimmedWhat = rawWhat ? rawWhat.trim() : "";
+  const vibeQueryText =
+    trimmedWhat.length > MAX_QUERY_LENGTH
+      ? trimmedWhat.slice(0, MAX_QUERY_LENGTH)
+      : trimmedWhat;
+  const what = vibeQueryText || undefined;
 
   const requestedPage = safeParseInt(
     getFirstValue(raw.page),
@@ -390,6 +415,14 @@ export function parseSearchParams(raw: RawSearchParams): ParsedSearchParams {
   const validMaxLat = safeParseFloat(getFirstValue(raw.maxLat), -90, 90);
   const validMinLng = safeParseFloat(getFirstValue(raw.minLng), -180, 180);
   const validMaxLng = safeParseFloat(getFirstValue(raw.maxLng), -180, 180);
+
+  const isLegacyPointLocationQuery =
+    !explicitLocationLabel &&
+    q !== undefined &&
+    validLat !== undefined &&
+    validLng !== undefined;
+  const locationLabel = explicitLocationLabel ?? (isLegacyPointLocationQuery ? q : undefined);
+  const effectiveQuery = isLegacyPointLocationQuery ? undefined : q;
 
   let effectiveMinLat = validMinLat;
   let effectiveMaxLat = validMaxLat;
@@ -433,15 +466,9 @@ export function parseSearchParams(raw: RawSearchParams): ParsedSearchParams {
       maxLng: validMaxLng,
     };
   } else if (validLat !== undefined && validLng !== undefined) {
-    // Use canonical LAT_OFFSET_DEGREES (~10km radius)
-    const cosLat = Math.cos((validLat * Math.PI) / 180);
-    const lngOffset = cosLat < 0.01 ? 180 : LAT_OFFSET_DEGREES / cosLat;
-    bounds = {
-      minLat: Math.max(-90, validLat - LAT_OFFSET_DEGREES),
-      maxLat: Math.min(90, validLat + LAT_OFFSET_DEGREES),
-      minLng: Math.max(-180, validLng - lngOffset),
-      maxLng: Math.min(180, validLng + lngOffset),
-    };
+    bounds = boundsTupleToObject(
+      deriveSearchBoundsFromPoint(validLat, validLng)
+    );
   }
 
   const sortOption: SortOption = validSortOptions.includes(
@@ -499,7 +526,9 @@ export function parseSearchParams(raw: RawSearchParams): ParsedSearchParams {
         : undefined;
 
   const filterParams: FilterParams = {
-    query: q,
+    query: effectiveQuery,
+    locationLabel,
+    vibeQuery: what,
     minPrice: effectiveMinPrice,
     maxPrice: effectiveMaxPrice,
     amenities: amenitiesList,
@@ -517,14 +546,20 @@ export function parseSearchParams(raw: RawSearchParams): ParsedSearchParams {
     nearMatches,
   };
 
-  const boundsRequired = isBoundsRequired({ query: q, bounds });
+  const boundsRequired = isBoundsRequired({
+    query: effectiveQuery,
+    vibeQuery: what,
+    bounds,
+  });
 
   // Flag browse-all mode: no query and no bounds
   // Results will be capped but UI should inform user that more are available
-  const browseMode = !q && !bounds;
+  const browseMode = !effectiveQuery && !what && !bounds;
 
   return {
-    q,
+    q: effectiveQuery,
+    locationLabel,
+    what,
     requestedPage,
     sortOption,
     filterParams,
@@ -580,6 +615,18 @@ export function validateSearchFilters(filters: unknown): FilterParams {
     const trimmed = input.query.trim();
     if (trimmed.length > 0 && trimmed.length <= 200) {
       validated.query = trimmed;
+    }
+  }
+  if (typeof input.locationLabel === "string") {
+    const trimmed = input.locationLabel.trim();
+    if (trimmed.length > 0 && trimmed.length <= 200) {
+      validated.locationLabel = trimmed;
+    }
+  }
+  if (typeof input.vibeQuery === "string") {
+    const trimmed = input.vibeQuery.trim();
+    if (trimmed.length > 0 && trimmed.length <= 200) {
+      validated.vibeQuery = trimmed;
     }
   }
 
@@ -727,7 +774,8 @@ export function validateSearchFilters(filters: unknown): FilterParams {
  */
 export function isBoundsRequired(params: {
   query?: string | null;
+  vibeQuery?: string | null;
   bounds?: unknown;
 }): boolean {
-  return !!params.query && !params.bounds;
+  return !!(params.query || params.vibeQuery) && !params.bounds;
 }

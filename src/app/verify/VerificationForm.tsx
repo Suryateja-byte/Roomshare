@@ -214,9 +214,7 @@ export default function VerificationForm() {
           >
             <div
               className={`w-12 h-12 rounded-full flex items-center justify-center ${
-                selfieUrl
-                  ? "bg-green-100"
-                  : "bg-surface-container-high"
+                selfieUrl ? "bg-green-100" : "bg-surface-container-high"
               }`}
             >
               <Camera

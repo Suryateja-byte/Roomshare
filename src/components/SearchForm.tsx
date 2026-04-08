@@ -56,6 +56,14 @@ import {
   generateFilterSuggestions,
   type FilterSuggestion,
 } from "@/lib/near-matches";
+import {
+  readSearchIntentState,
+  type SearchLocationSelection,
+} from "@/lib/search/search-intent";
+import {
+  deriveSearchBoundsFromPoint,
+  boundsTupleToObject,
+} from "@/lib/search/location-bounds";
 
 // Debounce delay in milliseconds
 const SEARCH_DEBOUNCE_MS = 300;
@@ -137,27 +145,17 @@ export default function SearchForm({
 }) {
   const searchParams = useSearchParams();
   const formRef = useRef<HTMLFormElement | null>(null);
-  const parseCoords = () => {
-    const lat = searchParams.get("lat");
-    const lng = searchParams.get("lng");
-    if (!lat || !lng) return null;
-    const parsedLat = parseFloat(lat);
-    const parsedLng = parseFloat(lng);
-    if (!Number.isFinite(parsedLat) || !Number.isFinite(parsedLng)) {
-      return null;
-    }
-    return { lat: parsedLat, lng: parsedLng };
-  };
-  const [location, setLocation] = useState(
-    searchParams.get("what") ? "" : searchParams.get("q") || ""
+  const initialIntentState = readSearchIntentState(
+    new URLSearchParams(searchParams.toString())
   );
+  const [location, setLocation] = useState(initialIntentState.locationInput);
   // Show "What" field when semantic search env var is set.
   // Uses NEXT_PUBLIC_ prefix so it's available in client components.
   // Falls back to checking if the "what" param exists in URL (field was previously shown).
   const semanticSearchEnabled =
     process.env.NEXT_PUBLIC_ENABLE_SEMANTIC_SEARCH === "true" ||
     !!searchParams.get("what");
-  const [whatQuery, setWhatQuery] = useState(searchParams.get("what") || "");
+  const [whatQuery, setWhatQuery] = useState(initialIntentState.vibeInput);
   // Focus-triggered flex expansion: tracks which field is focused to animate flex ratios.
   // Focused field expands (flex-[3.5]) while others shrink (flex-[0.5-0.8]).
   const [focusedField, setFocusedField] = useState<
@@ -202,11 +200,8 @@ export default function SearchForm({
     minSlots,
   } = pending;
 
-  const [selectedCoords, setSelectedCoords] = useState<{
-    lat: number;
-    lng: number;
-    bbox?: [number, number, number, number];
-  } | null>(parseCoords);
+  const [selectedCoords, setSelectedCoords] =
+    useState<SearchLocationSelection | null>(initialIntentState.selectedLocation);
   const [geoLoading, setGeoLoading] = useState(false);
 
   const [hasMounted, setHasMounted] = useState(false);
@@ -262,6 +257,23 @@ export default function SearchForm({
     useRecentSearches();
   const [showRecentSearches, setShowRecentSearches] = useState(false);
 
+  const recentLocationFallbackItems = useMemo(
+    () =>
+      recentSearches
+        .filter((search) => search.coords)
+        .map((search) => ({
+          id: search.id,
+          primaryText: search.location,
+          secondaryText: "Recent search",
+          onSelect: () => {
+            setLocation(search.location);
+            setSelectedCoords(search.coords!);
+            setShowRecentSearches(false);
+          },
+        })),
+    [recentSearches]
+  );
+
   // Select a recent search
   const selectRecentSearch = useCallback((search: RecentSearch) => {
     setLocation(search.location);
@@ -299,21 +311,16 @@ export default function SearchForm({
   // Sync non-filter state (location, coords) with URL when it changes
   // Filter state sync is handled by useBatchedFilters internally
   useEffect(() => {
-    const coords = parseCoords();
-    if (coords) {
-      setSelectedCoords(coords);
-    }
+    const nextIntentState = readSearchIntentState(
+      new URLSearchParams(searchParams.toString())
+    );
+    setSelectedCoords(nextIntentState.selectedLocation);
     // Don't overwrite user's in-progress typing with URL state.
     // Resize-triggered map moveEnd can delete `q` from URL while user is still typing.
     if (!isUserTypingLocationRef.current) {
-      // When `what` param is present, `q` contains semantic text — don't copy it into location
-      if (!searchParams.get("what")) {
-        setLocation(searchParams.get("q") || "");
-      }
+      setLocation(nextIntentState.locationInput);
     }
-    // Keep whatQuery in sync with URL
-    setWhatQuery(searchParams.get("what") || "");
-    // eslint-disable-next-line react-hooks/exhaustive-deps -- parseCoords is stable; including it would cause infinite re-renders
+    setWhatQuery(nextIntentState.vibeInput);
   }, [searchParams]);
 
   const router = useRouter();
@@ -322,7 +329,7 @@ export default function SearchForm({
 
   // Register mobile "open filters" callback for the collapsed search bar.
   useEffect(() => {
-    registerOpenFilters(() => setShowFilters(true));
+    return registerOpenFilters(() => setShowFilters(true));
   }, [registerOpenFilters]);
 
   const handleLocationSelect = (locationData: {
@@ -336,7 +343,7 @@ export default function SearchForm({
       setSelectedCoords({
         lat: locationData.lat,
         lng: locationData.lng,
-        bbox: locationData.bbox,
+        bounds: locationData.bbox,
       });
     });
 
@@ -497,6 +504,7 @@ export default function SearchForm({
       // This prevents stale values from persisting when filters are cleared
       const filterParamsToDelete = [
         "q",
+        "where",
         "what",
         "minPrice",
         "maxPrice",
@@ -523,18 +531,18 @@ export default function SearchForm({
         params.delete("maxLng");
       }
 
-      // Semantic "What" query — when filled, use it as `q` for semantic search
-      // and set `what` signal so URL sync knows `q` is semantic, not location.
-      // When empty, remove `what` and use location as `q` (existing behavior).
+      // Keep location and vibe separate in the URL.
+      // `where` is the selected location label, while `what` is the vibe intent.
       const trimmedWhat = whatQuery.trim();
+      if (selectedCoords && trimmedLocation.length >= 2) {
+        params.set("where", trimmedLocation);
+      } else {
+        params.delete("where");
+      }
       if (trimmedWhat && trimmedWhat.length >= 2) {
-        params.set("q", trimmedWhat);
         params.set("what", trimmedWhat);
       } else {
         params.delete("what");
-        if (trimmedLocation && trimmedLocation.length >= 2) {
-          params.set("q", trimmedLocation);
-        }
       }
 
       // Price validation with auto-swap if inverted
@@ -572,11 +580,28 @@ export default function SearchForm({
       if (finalMaxPrice !== null)
         params.set("maxPrice", finalMaxPrice.toString());
 
-      // Include coordinates if a location was selected from suggestions
-      // Only include if location text is not empty (prevents stale coords)
+      // Include coordinates and a usable initial viewport when a location was selected.
       if (selectedCoords) {
         params.set("lat", selectedCoords.lat.toString());
         params.set("lng", selectedCoords.lng.toString());
+        const bounds =
+          selectedCoords.bounds ??
+          deriveSearchBoundsFromPoint(selectedCoords.lat, selectedCoords.lng);
+        params.set("minLng", bounds[0].toString());
+        params.set("minLat", bounds[1].toString());
+        params.set("maxLng", bounds[2].toString());
+        params.set("maxLat", bounds[3].toString());
+      } else if (trimmedWhat.length >= 2 && !params.has("minLat")) {
+        // Vibe-only search with no location and no existing map bounds.
+        // Supply default bounds (SF area) to satisfy isBoundsRequired()
+        // and prevent the "Please select a location" error page.
+        const fallback = boundsTupleToObject(
+          deriveSearchBoundsFromPoint(37.7749, -122.4194)
+        );
+        params.set("minLat", fallback.minLat.toString());
+        params.set("maxLat", fallback.maxLat.toString());
+        params.set("minLng", fallback.minLng.toString());
+        params.set("maxLng", fallback.maxLng.toString());
       }
 
       const validatedMoveInDate = validateMoveInDate(committed.moveInDate);
@@ -1005,7 +1030,7 @@ export default function SearchForm({
                     "w-full bg-transparent border-none focus:ring-0 focus:outline-none",
                     isHome
                       ? "rounded-md px-1 py-1 -ml-1 text-[16px] text-[#2F2F2B] placeholder:text-[#7A7A7A] transition-colors focus:bg-[#F8F7F3] md:-ml-0 md:rounded-none md:px-0 md:py-0 md:text-base md:font-medium md:text-on-surface md:placeholder:text-on-surface-variant md:focus:bg-transparent"
-                      : "p-0 text-base md:text-sm font-medium text-on-surface placeholder:text-on-surface-variant"
+                      : "p-0 text-[16px] md:text-sm font-medium text-on-surface placeholder:text-on-surface-variant"
                   )}
                   autoComplete="off"
                 />
@@ -1017,7 +1042,7 @@ export default function SearchForm({
                       "flex-shrink-0 rounded-full transition-colors",
                       isHome
                         ? "p-1.5 text-[#7A7A7A] hover:bg-[#F8F7F3] hover:text-[#2F2F2B] md:p-1 md:text-on-surface-variant md:hover:bg-transparent md:hover:text-on-surface-variant"
-                        : "p-1 text-on-surface-variant hover:text-on-surface-variant"
+                        : "p-3 text-on-surface-variant hover:text-on-surface-variant"
                     )}
                     aria-label="Clear search description"
                   >
@@ -1084,6 +1109,7 @@ export default function SearchForm({
                 handleLocationSelect(data);
                 setShowRecentSearches(false);
               }}
+              fallbackItems={recentLocationFallbackItems}
               onFocus={() => {
                 setLocationInputFocused(true);
                 handleFieldFocus("where");
@@ -1110,7 +1136,7 @@ export default function SearchForm({
               inputClassName={
                 isHome
                   ? "rounded-md px-1 py-1 -ml-1 text-[16px] text-[#2F2F2B] placeholder:text-[#7A7A7A] transition-colors focus:bg-[#F8F7F3] md:-ml-0 md:rounded-none md:px-0 md:py-0 md:text-base md:font-medium md:text-on-surface md:placeholder:text-on-surface-variant md:focus:bg-transparent"
-                  : undefined
+                  : "text-[16px] md:text-sm"
               }
             />
             <button
@@ -1121,7 +1147,7 @@ export default function SearchForm({
                 "flex-shrink-0 rounded-full transition-colors disabled:opacity-50",
                 isHome
                   ? "p-2 -mr-2 text-[#9CA3AF] hover:bg-[#F8F7F3] hover:text-[#1F2937] active:bg-[#EFEBE5] md:mr-0 md:p-1.5 md:text-on-surface-variant md:hover:bg-transparent md:hover:text-on-surface"
-                  : "p-1.5 text-on-surface-variant hover:text-on-surface"
+                  : "p-3 text-on-surface-variant hover:text-on-surface"
               )}
               aria-label="Use my current location"
               title="Use my current location"
@@ -1250,7 +1276,7 @@ export default function SearchForm({
                   "w-full bg-transparent border-none appearance-none focus:ring-0 focus:outline-none [-moz-appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none",
                   isHome
                     ? "rounded-md px-1 py-1 -ml-1 text-[16px] text-[#2F2F2B] placeholder:text-[#7A7A7A] transition-colors focus:bg-[#F8F7F3] md:-ml-0 md:rounded-none md:px-0 md:py-0 md:text-base md:font-medium md:text-on-surface md:placeholder:text-on-surface-variant md:focus:bg-transparent"
-                    : "p-0 text-base md:text-sm font-medium text-on-surface placeholder:text-on-surface-variant"
+                    : "p-0 text-[16px] md:text-sm font-medium text-on-surface placeholder:text-on-surface-variant"
                 )}
                 min="0"
                 step="50"
@@ -1289,7 +1315,7 @@ export default function SearchForm({
                   "w-full bg-transparent border-none appearance-none focus:ring-0 focus:outline-none [-moz-appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none",
                   isHome
                     ? "rounded-md px-1 py-1 -ml-1 text-[16px] text-[#2F2F2B] placeholder:text-[#7A7A7A] transition-colors focus:bg-[#F8F7F3] md:-ml-0 md:rounded-none md:px-0 md:py-0 md:text-base md:font-medium md:text-on-surface md:placeholder:text-on-surface-variant md:focus:bg-transparent"
-                    : "p-0 text-base md:text-sm font-medium text-on-surface placeholder:text-on-surface-variant"
+                    : "p-0 text-[16px] md:text-sm font-medium text-on-surface placeholder:text-on-surface-variant"
                 )}
                 min="0"
                 step="50"

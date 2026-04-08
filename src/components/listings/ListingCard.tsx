@@ -2,17 +2,15 @@
 
 import { memo, useState, useCallback } from "react";
 import Link from "next/link";
-import { Star, Home, Globe, MapPin } from "lucide-react";
+import { Star, Home, MapPin } from "lucide-react";
 import FavoriteButton from "../FavoriteButton";
 import { ImageCarousel } from "./ImageCarousel";
 import { cn } from "@/lib/utils";
-import { getLanguageName } from "@/lib/languages";
 import { formatPrice } from "@/lib/format";
 import {
   useListingFocusActions,
   useIsListingFocused,
 } from "@/contexts/ListingFocusContext";
-import { TrustBadge } from "@/components/ui/TrustBadge";
 import { SlotBadge } from "./SlotBadge";
 
 export interface Listing {
@@ -31,6 +29,9 @@ export interface Listing {
   images?: string[];
   avgRating?: number;
   reviewCount?: number;
+  roomType?: string;
+  moveInDate?: Date | string;
+  leaseDuration?: string;
 }
 
 // State abbreviation map
@@ -87,22 +88,16 @@ const STATE_ABBREVIATIONS: Record<string, string> = {
   Wyoming: "WY",
 };
 
-// Format location to avoid redundancy (e.g., "Irving, TX" not "Irving, TX, TX")
+// Format location to avoid redundancy
 function formatLocation(city: string, state: string): string {
-  // Convert state to abbreviation if it's a full name
   const stateAbbr =
     state.length === 2
       ? state.toUpperCase()
       : STATE_ABBREVIATIONS[state] || state;
-
-  // Clean city - remove any trailing state abbreviation if it matches
   let cleanCity = city.trim();
-
-  // Check if city already ends with the state abbreviation (e.g., "Irving, TX")
   const cityParts = cleanCity.split(",").map((p) => p.trim());
   if (cityParts.length > 1) {
     const lastPart = cityParts[cityParts.length - 1].toUpperCase();
-    // If the last part is the same as state or its abbreviation, remove it
     if (
       lastPart === stateAbbr ||
       lastPart === state.toUpperCase() ||
@@ -111,11 +106,56 @@ function formatLocation(city: string, state: string): string {
       cleanCity = cityParts.slice(0, -1).join(", ");
     }
   }
-
   return `${cleanCity}, ${stateAbbr}`;
 }
 
-// Placeholder images for when listing has no images
+// Format move-in date for card display
+function formatMoveInDate(date?: Date | string): string | null {
+  if (!date) return null;
+  try {
+    const d = typeof date === "string" ? new Date(date) : date;
+    if (isNaN(d.getTime())) return null;
+    // Use UTC to avoid timezone offset issues with date-only strings
+    return `Available ${d.toLocaleDateString("en-US", { month: "short", day: "numeric", timeZone: "UTC" })}`;
+  } catch {
+    return null;
+  }
+}
+
+// Map lease duration values to display labels
+const LEASE_DURATION_LABELS: Record<string, string> = {
+  month_to_month: "Month-to-month",
+  "1_month": "1 mo",
+  "3_months": "3 mo lease",
+  "6_months": "6 mo lease",
+  "9_months": "9 mo lease",
+  "12_months": "12 mo lease",
+  "1_year": "12 mo lease",
+};
+
+function formatLeaseDuration(duration?: string): string | null {
+  if (!duration) return null;
+  return LEASE_DURATION_LABELS[duration] || duration;
+}
+
+// Format room type for display
+function formatRoomType(roomType?: string): string | null {
+  if (!roomType) return null;
+  // Handle common DB values
+  const labels: Record<string, string> = {
+    private: "Private Room",
+    private_room: "Private Room",
+    "Private Room": "Private Room",
+    shared: "Shared Room",
+    shared_room: "Shared Room",
+    "Shared Room": "Shared Room",
+    entire: "Entire Place",
+    entire_place: "Entire Place",
+    "Entire Place": "Entire Place",
+  };
+  return labels[roomType] || roomType;
+}
+
 const PLACEHOLDER_IMAGES = [
   "https://images.unsplash.com/photo-1522708323590-d24dbb6b0267?auto=format&fit=crop&w=800&q=80",
   "https://images.unsplash.com/photo-1502672260266-1c1ef2d93688?auto=format&fit=crop&w=800&q=80",
@@ -129,13 +169,9 @@ interface ListingCardProps {
   listing: Listing;
   isSaved?: boolean;
   className?: string;
-  /** Search feed-specific mobile hierarchy. Desktop remains unchanged. */
   mobileVariant?: "default" | "feed";
-  /** Priority loading for LCP optimization - use for above-fold images */
   priority?: boolean;
-  /** When true, show total price (price × estimatedMonths) instead of per-month */
   showTotalPrice?: boolean;
-  /** Number of months for total price calculation */
   estimatedMonths?: number;
 }
 
@@ -154,8 +190,9 @@ function arePropsEqual(
     pl.avgRating === nl.avgRating &&
     pl.reviewCount === nl.reviewCount &&
     pl.images === nl.images &&
-    pl.amenities === nl.amenities &&
-    pl.householdLanguages === nl.householdLanguages &&
+    pl.roomType === nl.roomType &&
+    pl.leaseDuration === nl.leaseDuration &&
+    String(pl.moveInDate) === String(nl.moveInDate) &&
     pl.location.city === nl.location.city &&
     pl.location.state === nl.location.state &&
     prev.isSaved === next.isSaved &&
@@ -181,20 +218,16 @@ function ListingCardInner({
   const { setHovered, setActive, hasProvider, focusSourceRef } =
     useListingFocusActions();
   const { isHovered, isActive } = useIsListingFocused(listing.id);
-  const isFeedCard = mobileVariant === "feed";
 
-  // Track image errors by index
   const handleImageError = useCallback((index: number) => {
     setImageErrors((prev) => new Set(prev).add(index));
   }, []);
 
-  // Get valid images (filter out errored ones)
   const validImages = (listing.images || []).filter(
     (_, i) => !imageErrors.has(i)
   );
   const hasValidImages = validImages.length > 0;
 
-  // Fallback to placeholder if no valid images
   const placeholderIndex =
     listing.id.split("").reduce((acc, char) => acc + char.charCodeAt(0), 0) %
     PLACEHOLDER_IMAGES.length;
@@ -211,9 +244,10 @@ function ListingCardInner({
   const isGuestFavorite =
     (listing.reviewCount ?? 0) >= 5 && (avgRating ?? 0) >= 4.9;
   const isTopRated =
-    !isGuestFavorite && (avgRating ?? 0) >= 4.5 && (listing.reviewCount ?? 0) >= 3;
+    !isGuestFavorite &&
+    (avgRating ?? 0) >= 4.5 &&
+    (listing.reviewCount ?? 0) >= 3;
 
-  // Fallback for empty/null titles
   const displayTitle = listing.title?.trim() || "Untitled Listing";
   const formattedLocation = formatLocation(
     listing.location.city,
@@ -221,19 +255,19 @@ function ListingCardInner({
   );
   const imageAlt = `${displayTitle} in ${formattedLocation}`;
 
-  // Build screen reader label: Price → Rating → Room Type → Location → Badges
+  const displayRoomType = formatRoomType(listing.roomType);
+  const displayMoveIn = formatMoveInDate(listing.moveInDate);
+  const displayLease = formatLeaseDuration(listing.leaseDuration);
+
   const srParts: string[] = [];
   srParts.push(
     listing.price === 0 ? "Free" : `${formatPrice(listing.price)} per month`
   );
-  if (isTopRated) {
-    srParts.push("top rated");
-  }
-  if (hasRating) {
-    srParts.push(`rated ${avgRating!.toFixed(1)} out of 5`);
-  } else {
-    srParts.push("new listing");
-  }
+  if (displayRoomType) srParts.push(displayRoomType);
+  if (isTopRated) srParts.push("top rated");
+  if (hasRating) srParts.push(`rated ${avgRating!.toFixed(1)} out of 5`);
+  else srParts.push("new listing");
+
   if (listing.totalSlots > 1) {
     srParts.push(
       isAvailable
@@ -248,9 +282,8 @@ function ListingCardInner({
     );
   }
   srParts.push(formattedLocation);
-  if (listing.amenities.length > 0) {
-    srParts.push(listing.amenities.slice(0, 3).join(", "));
-  }
+  if (displayMoveIn) srParts.push(displayMoveIn);
+  if (displayLease) srParts.push(displayLease);
   const ariaLabel = `${displayTitle}: ${srParts.join(", ")}`;
 
   return (
@@ -272,22 +305,14 @@ function ListingCardInner({
       }}
       onBlur={() => setHovered(null)}
       className={cn(
-        "relative transition-all duration-300 scroll-mt-4 lg:scroll-mt-6",
-        isFeedCard ? "rounded-[1.25rem] lg:rounded-lg" : "rounded-lg",
-        isActive &&
-          (isFeedCard
-            ? "ring-2 ring-primary ring-offset-2 shadow-ambient-lg shadow-primary/10 -translate-y-0.5"
-            : "ring-2 ring-primary ring-offset-2"),
-        isHovered && !isActive && "shadow-ambient ring-1 ring-primary/20",
+        "group relative flex flex-col rounded-2xl bg-surface-container-lowest mb-4 shadow-sm transition-all duration-500 overflow-hidden cursor-pointer",
+        !isActive && "hover:shadow-xl hover:-translate-y-1",
+        isActive && "ring-2 ring-primary ring-offset-2 -translate-y-0.5 shadow-xl",
+        isHovered && !isActive && "ring-1 ring-primary/20",
         className
       )}
     >
-      <div
-        className={cn(
-          "absolute z-20 flex items-center gap-1.5",
-          isFeedCard ? "top-2.5 right-2.5 lg:top-3 lg:right-3" : "top-3 right-3"
-        )}
-      >
+      <div className="absolute z-20 top-3 right-3 flex items-center gap-1.5">
         {hasProvider && (
           <button
             type="button"
@@ -296,7 +321,7 @@ function ListingCardInner({
               e.stopPropagation();
               setActive(listing.id);
             }}
-            className="relative p-1.5 rounded-full bg-surface-container-lowest/80 backdrop-blur-sm shadow-ambient-sm hover:bg-surface-container-lowest transition-colors before:absolute before:inset-0 before:-m-[10px] before:content-['']"
+            className="relative p-1.5 rounded-full bg-surface-container-lowest/80 backdrop-blur-sm shadow-sm hover:bg-surface-container-lowest transition-colors before:absolute before:inset-0 before:-m-[10px] before:content-['']"
             aria-label="Show on map"
             title="Show on map"
           >
@@ -305,316 +330,100 @@ function ListingCardInner({
         )}
         <FavoriteButton listingId={listing.id} initialIsSaved={isSaved} />
       </div>
+
       <Link
         href={`/listings/${listing.id}`}
         onClick={isDragging ? (e) => e.preventDefault() : undefined}
         className={cn(
-          "block group focus:outline-none focus-visible:ring-2 focus-visible:ring-primary/30 focus-visible:ring-offset-2",
-          isFeedCard ? "rounded-[1.25rem] lg:rounded-lg" : "rounded-lg",
+          "block focus:outline-none focus-visible:ring-2 focus-visible:ring-primary/30 focus-visible:ring-offset-2 flex-1 flex flex-col",
           isDragging && "pointer-events-none"
         )}
       >
-        <div
-          className={cn(
-            "relative flex flex-col overflow-hidden bg-surface-container-lowest transition-lift shadow-ambient-sm group-hover:shadow-ambient-lg group-hover:shadow-on-surface/10 motion-safe:group-hover:-translate-y-1",
-            isFeedCard ? "rounded-[1.25rem] lg:rounded-lg" : "rounded-lg"
+        <div className="relative overflow-hidden aspect-[4/3] bg-surface-canvas">
+          <ImageCarousel
+            images={displayImages}
+            alt={imageAlt}
+            priority={priority}
+            className="w-full h-full object-cover transition-transform duration-1000 ease-out group-hover:scale-105"
+            onImageError={handleImageError}
+            onDragStateChange={setIsDragging}
+          />
+
+          <div className="absolute inset-0 bg-gradient-to-t from-black/30 via-transparent to-transparent opacity-0 group-hover:opacity-100 transition-opacity duration-500 pointer-events-none"></div>
+
+          {showImagePlaceholder && (
+            <div className="absolute inset-0 bg-surface-canvas flex flex-col items-center justify-center pointer-events-none">
+              <Home className="w-8 h-8 text-on-surface-variant mb-2" strokeWidth={1} />
+              <span className="text-xs text-on-surface-variant font-medium uppercase tracking-[0.2em]">
+                No Photos
+              </span>
+            </div>
           )}
-        >
-          {/* Image Area */}
-          <div
-            className={cn(
-              "relative overflow-hidden bg-surface-canvas",
-              isFeedCard
-                ? "aspect-[16/10] sm:aspect-[4/3]"
-                : "aspect-[16/9] sm:aspect-[4/3]"
-            )}
-          >
-            {/* Image Carousel or single image */}
-            <ImageCarousel
-              images={displayImages}
-              alt={imageAlt}
-              priority={priority}
-              className="h-full w-full motion-safe:group-hover:scale-[1.05] motion-safe:transition-transform motion-safe:duration-[600ms] ease-[cubic-bezier(0.25,0.1,0.25,1.0)]"
-              onImageError={handleImageError}
-              onDragStateChange={setIsDragging}
+
+          <div className="absolute top-4 left-4 z-20 flex flex-col gap-2">
+            <SlotBadge
+              availableSlots={listing.availableSlots}
+              totalSlots={listing.totalSlots}
+              overlay
             />
+            {isTopRated ? (
+              <span className="inline-flex items-center px-2.5 py-1 rounded-md text-[11px] uppercase tracking-wider font-bold bg-surface-container-lowest/90 text-on-surface shadow-sm backdrop-blur-md">
+                Top Rated
+              </span>
+            ) : !hasRating ? (
+              <span className="inline-flex items-center px-2.5 py-1 rounded-md text-[11px] uppercase tracking-wider font-bold bg-amber-300 text-amber-950 shadow-sm backdrop-blur-md">
+                New
+              </span>
+            ) : null}
+          </div>
+        </div>
 
-            {/* Gradient Overlay for better text readability and depth */}
-            <div className="absolute inset-0 bg-gradient-to-t from-black/40 via-transparent to-transparent opacity-0 group-hover:opacity-100 transition-opacity duration-500 pointer-events-none"></div>
-
-            {/* Empty state overlay - Intentional waiting state */}
-            {showImagePlaceholder && (
-              <div className="absolute inset-0 bg-surface-canvas flex flex-col items-center justify-center pointer-events-none">
-                <Home
-                  className="w-8 h-8 text-on-surface-variant mb-2"
-                  strokeWidth={1}
-                />
-                <span className="text-xs text-on-surface-variant font-medium uppercase tracking-[0.2em]">
-                  No Photos
-                </span>
+        <div className="p-4 flex flex-col flex-1">
+          {/* Row 1: Price + Rating */}
+          <div className="flex items-baseline justify-between gap-3 mb-1">
+            <div className="flex items-baseline gap-1">
+              <span
+                data-testid="listing-price"
+                className="font-display italic text-xl font-medium text-on-surface"
+              >
+                {showTotalPrice && estimatedMonths > 1
+                  ? formatPrice(listing.price * estimatedMonths)
+                  : formatPrice(listing.price)}
+              </span>
+              <span className="text-xs uppercase tracking-wider font-semibold text-on-surface-variant">
+                {showTotalPrice && estimatedMonths > 1 ? "total" : "/mo"}
+              </span>
+            </div>
+            {hasRating && (
+              <div
+                className="flex items-center gap-1 text-sm text-on-surface-variant flex-shrink-0"
+                aria-label={`Rating ${avgRating!.toFixed(1)} out of 5`}
+              >
+                <Star className="w-3.5 h-3.5 text-amber-400 fill-amber-400" />
+                <span>{avgRating!.toFixed(1)}</span>
+                {(listing.reviewCount ?? 0) > 0 && (
+                  <span className="text-xs">({listing.reviewCount})</span>
+                )}
               </div>
             )}
-
-            {/* Badges — top-left stack */}
-            <div
-              className={cn(
-                "absolute top-4 left-4 z-20 flex flex-col",
-                isFeedCard ? "gap-1.5" : "gap-2"
-              )}
-            >
-              {isFeedCard ? (
-                <>
-                  {isGuestFavorite && (
-                    <TrustBadge
-                      avgRating={listing.avgRating}
-                      reviewCount={listing.reviewCount}
-                    />
-                  )}
-                  <SlotBadge
-                    availableSlots={listing.availableSlots}
-                    totalSlots={listing.totalSlots}
-                    overlay
-                  />
-                  {!isGuestFavorite &&
-                    (isTopRated ? (
-                      <span className="inline-flex items-center px-2 py-1 rounded-lg text-xs font-semibold bg-amber-50 text-amber-800 shadow-ambient-sm backdrop-blur-sm">
-                        Top Rated
-                      </span>
-                    ) : hasRating ? (
-                      <div
-                        className="inline-flex items-center gap-1 px-2 py-1 rounded-lg text-xs font-bold bg-surface-container-lowest/90 text-on-surface shadow-ambient-sm backdrop-blur-md"
-                        aria-label={`Rating ${avgRating!.toFixed(1)} out of 5`}
-                      >
-                        <Star className="w-3 h-3 text-amber-400 fill-amber-400" />
-                        <span>{avgRating!.toFixed(1)}</span>
-                      </div>
-                    ) : (
-                      <span className="inline-flex items-center font-medium px-2.5 py-1 text-xs bg-surface-container-lowest/90 backdrop-blur-sm shadow-ambient-sm rounded-lg text-primary">
-                        New
-                      </span>
-                    ))}
-                </>
-              ) : (
-                <>
-                  <TrustBadge
-                    avgRating={listing.avgRating}
-                    reviewCount={listing.reviewCount}
-                  />
-                  <SlotBadge
-                    availableSlots={listing.availableSlots}
-                    totalSlots={listing.totalSlots}
-                    overlay
-                  />
-                  {listing.totalSlots > 1 && (
-                    <span className="inline-flex items-center font-medium px-2.5 py-1 text-xs bg-surface-container-lowest/90 backdrop-blur-sm shadow-ambient-sm rounded-lg text-primary">
-                      Multi-Room
-                    </span>
-                  )}
-                  {isTopRated ? (
-                    <span className="inline-flex items-center px-2 py-1 rounded-lg text-xs font-semibold bg-amber-50 text-amber-800 shadow-ambient-sm backdrop-blur-sm">
-                      Top Rated
-                    </span>
-                  ) : hasRating ? (
-                    <div
-                      className="inline-flex items-center gap-1 px-2 py-1 rounded-lg text-xs font-bold bg-surface-container-lowest/90 text-on-surface shadow-ambient-sm backdrop-blur-md"
-                      aria-label={`Rating ${avgRating!.toFixed(1)} out of 5`}
-                    >
-                      <Star className="w-3 h-3 text-amber-400 fill-amber-400" />
-                      <span>{avgRating!.toFixed(1)}</span>
-                    </div>
-                  ) : (
-                    <span className="inline-flex items-center font-medium px-2.5 py-1 text-xs bg-surface-container-lowest/90 backdrop-blur-sm shadow-ambient-sm rounded-lg text-primary">
-                      New
-                    </span>
-                  )}
-                </>
-              )}
-            </div>
           </div>
 
-          {/* Content Area */}
-          <div
-            className={cn(
-              "flex flex-col flex-1",
-              isFeedCard ? "p-4 sm:p-5 lg:p-6" : "p-5 sm:p-6"
-            )}
+          {/* Row 2: Room Type / Title + Location */}
+          <h3
+            className="font-medium text-[0.95rem] leading-tight text-on-surface line-clamp-1 mb-0.5"
+            title={displayTitle}
           >
-            {isFeedCard ? (
-              <>
-                <div className="flex items-start justify-between gap-3 mb-3">
-                  <div className="min-w-0">
-                    {isActive && (
-                      <span className="inline-flex items-center rounded-full bg-primary/10 px-2.5 py-1 text-[11px] font-semibold uppercase tracking-[0.08em] text-primary mb-2">
-                        Selected on map
-                      </span>
-                    )}
-                    <p className="text-[15px] font-semibold text-on-surface truncate">
-                      {formattedLocation}
-                    </p>
-                    <h3
-                      className="mt-1 text-sm text-on-surface-variant line-clamp-1 lg:text-base lg:text-on-surface lg:line-clamp-2 lg:leading-tight lg:tracking-tight lg:font-semibold"
-                      title={displayTitle}
-                    >
-                      {displayTitle}
-                    </h3>
-                  </div>
+            {displayRoomType
+              ? `${displayRoomType} · ${formattedLocation}`
+              : displayTitle}
+          </h3>
 
-                  {hasRating ? (
-                    <div
-                      className="hidden lg:inline-flex items-center gap-1 text-sm font-medium text-on-surface flex-shrink-0"
-                      aria-label={`Rating ${avgRating!.toFixed(1)} out of 5`}
-                    >
-                      <Star className="w-4 h-4 text-amber-400 fill-amber-400" />
-                      <span>{avgRating!.toFixed(1)}</span>
-                    </div>
-                  ) : null}
-                </div>
-
-                <div className="flex items-baseline justify-between gap-3 mb-3">
-                  <div className="flex items-baseline min-w-0">
-                    {showTotalPrice && estimatedMonths > 1 ? (
-                      <>
-                        <span
-                          data-testid="listing-price"
-                          className="font-display font-semibold text-xl text-on-surface tracking-tight"
-                        >
-                          {formatPrice(listing.price * estimatedMonths)}
-                        </span>
-                        <span className="text-on-surface-variant text-[11px] ml-1 uppercase tracking-wider font-medium">
-                          total
-                        </span>
-                      </>
-                    ) : (
-                      <>
-                        <span
-                          data-testid="listing-price"
-                          className="font-display font-semibold text-xl text-on-surface tracking-tight"
-                        >
-                          {formatPrice(listing.price)}
-                        </span>
-                        {listing.price > 0 && (
-                          <span className="text-on-surface-variant text-[11px] ml-1 tracking-wider font-medium">
-                            /mo
-                          </span>
-                        )}
-                      </>
-                    )}
-                  </div>
-
-                  {!hasRating && (
-                    <span className="hidden lg:inline-flex items-center rounded-full bg-surface-container-high px-2 py-1 text-[11px] font-medium text-on-surface-variant">
-                      New listing
-                    </span>
-                  )}
-                </div>
-
-                <div className="flex items-center justify-between gap-2 mt-auto">
-                  <div className="flex items-center gap-1.5 overflow-hidden min-w-0 flex-1">
-                    {listing.amenities.slice(0, 2).map((amenity, i) => (
-                      <span
-                        key={amenity}
-                        className={cn(
-                          "text-xs font-medium text-on-surface-variant truncate",
-                          i > 0 && "hidden sm:inline"
-                        )}
-                      >
-                        • {amenity}
-                      </span>
-                    ))}
-                  </div>
-
-                  {listing.householdLanguages &&
-                    listing.householdLanguages.length > 0 && (
-                      <div className="flex items-center gap-1 flex-shrink-0 ml-auto">
-                        <Globe className="w-3 h-3 text-on-surface-variant" />
-                        <span className="text-xs font-medium text-on-surface-variant">
-                          {getLanguageName(listing.householdLanguages[0])}
-                          {listing.householdLanguages.length > 1 &&
-                            ` +${Math.min(listing.householdLanguages.length - 1, 4)}`}
-                        </span>
-                      </div>
-                    )}
-                </div>
-              </>
-            ) : (
-              <>
-                {/* Title and Rating Row */}
-                <div className="mb-1">
-                  <h3
-                    className="font-semibold text-base text-on-surface line-clamp-2 leading-tight tracking-tight"
-                    title={displayTitle}
-                  >
-                    {displayTitle}
-                  </h3>
-                </div>
-
-                {/* Location */}
-                <p className="text-sm text-on-surface-variant mb-4 font-light">
-                  {formatLocation(listing.location.city, listing.location.state)}
-                </p>
-
-                {/* Price — Large and prominent */}
-                <div className="flex items-baseline mb-5">
-                  {showTotalPrice && estimatedMonths > 1 ? (
-                    <>
-                      <span
-                        data-testid="listing-price"
-                        className="font-display font-semibold text-xl text-on-surface tracking-tight"
-                      >
-                        {formatPrice(listing.price * estimatedMonths)}
-                      </span>
-                      <span className="text-on-surface-variant text-xs ml-1 uppercase tracking-wider font-medium">
-                        total
-                      </span>
-                    </>
-                  ) : (
-                    <>
-                      <span
-                        data-testid="listing-price"
-                        className="font-display font-semibold text-xl text-on-surface tracking-tight"
-                      >
-                        {formatPrice(listing.price)}
-                      </span>
-                      {listing.price > 0 && (
-                        <span className="text-on-surface-variant text-xs ml-1 tracking-wider font-medium">
-                          /mo
-                        </span>
-                      )}
-                    </>
-                  )}
-                </div>
-
-                {/* Amenities & Languages - Simplified */}
-                <div className="flex items-center justify-between gap-2 mt-auto">
-                  <div className="flex items-center gap-1.5 overflow-hidden min-w-0 flex-1">
-                    {listing.amenities.slice(0, 2).map((amenity, i) => (
-                      <span
-                        key={amenity}
-                        className={cn(
-                          "text-xs font-medium text-on-surface-variant truncate",
-                          i > 0 && "hidden sm:inline"
-                        )}
-                      >
-                        • {amenity}
-                      </span>
-                    ))}
-                  </div>
-
-                  {listing.householdLanguages &&
-                    listing.householdLanguages.length > 0 && (
-                      <div className="flex items-center gap-1 flex-shrink-0 ml-auto">
-                        <Globe className="w-3 h-3 text-on-surface-variant" />
-                        <span className="text-xs font-medium text-on-surface-variant">
-                          {getLanguageName(listing.householdLanguages[0])}
-                          {listing.householdLanguages.length > 1 &&
-                            ` +${Math.min(listing.householdLanguages.length - 1, 4)}`}
-                        </span>
-                      </div>
-                    )}
-                </div>
-              </>
-            )}
-          </div>
+          {/* Row 3: Location (when no roomType) or Availability */}
+          <p className="text-on-surface-variant text-sm truncate font-medium">
+            {displayRoomType
+              ? [displayMoveIn, displayLease].filter(Boolean).join(" · ") || formattedLocation
+              : [formattedLocation, displayMoveIn, displayLease].filter(Boolean).join(" · ")}
+          </p>
         </div>
       </Link>
     </article>

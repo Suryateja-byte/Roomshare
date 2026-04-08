@@ -84,7 +84,9 @@ export default async function AdminListingsPage() {
               <h1 className="text-2xl font-display font-bold text-on-surface">
                 Listing Moderation
               </h1>
-              <p className="text-on-surface-variant">Review and manage all listings</p>
+              <p className="text-on-surface-variant">
+                Review and manage all listings
+              </p>
             </div>
           </div>
         </div>

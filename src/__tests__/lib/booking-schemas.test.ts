@@ -287,7 +287,9 @@ describe("createBookingSchema", () => {
       const result = createBookingSchema.safeParse(input);
       expect(result.success).toBe(false);
       if (!result.success) {
-        expect(result.error.issues[0].message).toBe("Slots must be a whole number");
+        expect(result.error.issues[0].message).toBe(
+          "Slots must be a whole number"
+        );
       }
     });
   });

@@ -114,10 +114,9 @@ function makeViewRequest(): Request {
 }
 
 function makeCanDeleteRequest(): Request {
-  return new Request(
-    `http://localhost/api/listings/${LISTING_ID}/can-delete`,
-    { method: "GET" }
-  );
+  return new Request(`http://localhost/api/listings/${LISTING_ID}/can-delete`, {
+    method: "GET",
+  });
 }
 
 const routeContext = {
@@ -170,7 +169,9 @@ describe("recentlyViewed — upsert + LRU eviction DB query patterns", () => {
       const { create, update } = call[0];
 
       expect(create.viewedAt).toBeInstanceOf(Date);
-      expect(create.viewedAt.getTime()).toBeGreaterThanOrEqual(before.getTime());
+      expect(create.viewedAt.getTime()).toBeGreaterThanOrEqual(
+        before.getTime()
+      );
       expect(create.viewedAt.getTime()).toBeLessThanOrEqual(after.getTime());
 
       expect(update.viewedAt).toBeInstanceOf(Date);

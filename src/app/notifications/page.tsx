@@ -17,10 +17,13 @@ export default async function NotificationsPage() {
 
   const { notifications, hasMore } = await getNotifications(20);
 
-   
   return (
     <NotificationsClient
-      initialNotifications={notifications as unknown as Parameters<typeof NotificationsClient>[0]["initialNotifications"]}
+      initialNotifications={
+        notifications as unknown as Parameters<
+          typeof NotificationsClient
+        >[0]["initialNotifications"]
+      }
       initialHasMore={hasMore}
     />
   );

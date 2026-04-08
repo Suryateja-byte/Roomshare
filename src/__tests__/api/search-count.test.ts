@@ -149,6 +149,7 @@ describe("GET /api/search-count", () => {
   it("returns boundsRequired: true when query is present but bounds are absent", async () => {
     mockParseSearchParams.mockReturnValue({
       filterParams: { query: "beachside" },
+      boundsRequired: true,
     });
 
     const request = createRequest({ q: "beachside" });
@@ -300,6 +301,7 @@ describe("GET /api/search-count", () => {
   it("sets private no-store Cache-Control on boundsRequired response", async () => {
     mockParseSearchParams.mockReturnValue({
       filterParams: { query: "studio apartment" },
+      boundsRequired: true,
     });
 
     const request = createRequest({ q: "studio apartment" });

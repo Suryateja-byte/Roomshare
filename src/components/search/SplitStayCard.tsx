@@ -89,9 +89,7 @@ export function SplitStayCard({
 
       {/* Combined price footer */}
       <div className="px-4 py-3 border-t border-outline-variant/20 flex items-baseline justify-between">
-        <span className="text-sm text-on-surface-variant">
-          Combined total
-        </span>
+        <span className="text-sm text-on-surface-variant">Combined total</span>
         <span className="font-bold text-lg text-on-surface">
           {formatPrice(combinedPrice)}
         </span>
@@ -126,9 +124,7 @@ function SplitStayHalf({
       className={cn(
         "relative transition-shadow",
         isActive && "ring-2 ring-primary ring-inset",
-        isHovered &&
-          !isActive &&
-          "ring-1 ring-primary/20 ring-inset"
+        isHovered && !isActive && "ring-1 ring-primary/20 ring-inset"
       )}
       onMouseEnter={() => {
         if (focusSourceRef.current === "map") return;
@@ -187,9 +183,7 @@ function SplitStayHalf({
               </span>
             </>
           ) : (
-            <>
-              {formatPrice(listing.price)}/mo
-            </>
+            <>{formatPrice(listing.price)}/mo</>
           )}
         </p>
       </Link>

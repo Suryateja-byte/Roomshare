@@ -192,7 +192,8 @@ describe("Turnstile production warning", () => {
   });
 
   it("does NOT log error when disabled in development", async () => {
-    (process.env as Record<string, string | undefined>).NODE_ENV = "development";
+    (process.env as Record<string, string | undefined>).NODE_ENV =
+      "development";
     process.env.TURNSTILE_ENABLED = "false";
     delete process.env.TURNSTILE_SECRET_KEY;
 

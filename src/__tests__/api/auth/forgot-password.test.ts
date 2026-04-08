@@ -15,9 +15,7 @@ jest.mock("@/lib/prisma", () => ({
 }));
 
 jest.mock("@/lib/email", () => ({
-  sendNotificationEmail: jest.fn(() =>
-    Promise.resolve({ success: true })
-  ),
+  sendNotificationEmail: jest.fn(() => Promise.resolve({ success: true })),
 }));
 
 jest.mock("@/lib/with-rate-limit", () => ({
@@ -87,7 +85,10 @@ describe("Forgot Password API", () => {
   const createRequest = (body: object) =>
     new Request("http://localhost:3000/api/auth/forgot-password", {
       method: "POST",
-      headers: { "content-type": "application/json", origin: "http://localhost:3000" },
+      headers: {
+        "content-type": "application/json",
+        origin: "http://localhost:3000",
+      },
       body: JSON.stringify({ turnstileToken: "test-token", ...body }),
     }) as unknown as NextRequest;
 

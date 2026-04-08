@@ -29,6 +29,8 @@ const savedSearchNameSchema = z.string().trim().min(1).max(100);
 const savedSearchFiltersSchema = z
   .object({
     query: z.string().optional(),
+    locationLabel: z.string().optional(),
+    vibeQuery: z.string().optional(),
     minPrice: z.number().optional(),
     maxPrice: z.number().optional(),
     roomType: z.string().optional(),
@@ -57,6 +59,8 @@ const savedSearchFiltersSchema = z
 const savedSearchFiltersWriteSchema = z
   .object({
     query: z.string().optional(),
+    locationLabel: z.string().optional(),
+    vibeQuery: z.string().optional(),
     minPrice: z.number().optional(),
     maxPrice: z.number().optional(),
     roomType: z.string().optional(),
@@ -140,7 +144,8 @@ export async function saveSearch(input: SaveSearchInput) {
     // Two-layer validation: validateSearchFilters checks values against allowlists,
     // savedSearchFiltersWriteSchema.strip() removes unknown fields from JSON
     const validatedFilters = validateSearchFilters(input.filters);
-    const strippedFilters = savedSearchFiltersWriteSchema.parse(validatedFilters);
+    const strippedFilters =
+      savedSearchFiltersWriteSchema.parse(validatedFilters);
 
     const savedSearch = await prisma.savedSearch.create({
       data: {

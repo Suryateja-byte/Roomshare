@@ -281,7 +281,12 @@ describe("Health Endpoints", () => {
 
       it("includes circuitBreakers array in response", async () => {
         (getAllCircuitBreakerStates as jest.Mock).mockReturnValue([
-          { name: "redis", state: "CLOSED", failureCount: 0, lastFailureTime: null },
+          {
+            name: "redis",
+            state: "CLOSED",
+            failureCount: 0,
+            lastFailureTime: null,
+          },
         ]);
 
         const response = await readyGET();
@@ -293,8 +298,18 @@ describe("Health Endpoints", () => {
 
       it('returns status "degraded" with 200 when a breaker is OPEN', async () => {
         (getAllCircuitBreakerStates as jest.Mock).mockReturnValue([
-          { name: "redis", state: "OPEN", failureCount: 3, lastFailureTime: Date.now() },
-          { name: "email", state: "CLOSED", failureCount: 0, lastFailureTime: null },
+          {
+            name: "redis",
+            state: "OPEN",
+            failureCount: 3,
+            lastFailureTime: Date.now(),
+          },
+          {
+            name: "email",
+            state: "CLOSED",
+            failureCount: 0,
+            lastFailureTime: null,
+          },
         ]);
 
         const response = await readyGET();
@@ -306,8 +321,18 @@ describe("Health Endpoints", () => {
 
       it('returns status "ready" when all breakers are CLOSED', async () => {
         (getAllCircuitBreakerStates as jest.Mock).mockReturnValue([
-          { name: "redis", state: "CLOSED", failureCount: 0, lastFailureTime: null },
-          { name: "email", state: "CLOSED", failureCount: 0, lastFailureTime: null },
+          {
+            name: "redis",
+            state: "CLOSED",
+            failureCount: 0,
+            lastFailureTime: null,
+          },
+          {
+            name: "email",
+            state: "CLOSED",
+            failureCount: 0,
+            lastFailureTime: null,
+          },
         ]);
 
         const response = await readyGET();
@@ -320,7 +345,12 @@ describe("Health Endpoints", () => {
       it('returns "unhealthy" 503 even if breakers are open when DB is down', async () => {
         (prisma.$queryRaw as jest.Mock).mockRejectedValue(new Error("DB down"));
         (getAllCircuitBreakerStates as jest.Mock).mockReturnValue([
-          { name: "redis", state: "OPEN", failureCount: 3, lastFailureTime: Date.now() },
+          {
+            name: "redis",
+            state: "OPEN",
+            failureCount: 3,
+            lastFailureTime: Date.now(),
+          },
         ]);
 
         const response = await readyGET();

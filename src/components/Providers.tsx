@@ -13,10 +13,7 @@ interface ProvidersProps {
   nonce?: string;
 }
 
-export default function Providers({
-  children,
-  session,
-}: ProvidersProps) {
+export default function Providers({ children, session }: ProvidersProps) {
   return (
     <ErrorBoundary>
       <MotionConfig reducedMotion="user">

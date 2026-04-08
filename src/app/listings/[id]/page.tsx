@@ -221,50 +221,55 @@ export default async function ListingPage({ params }: PageProps) {
 
   // JSON-LD structured data for search engines.
   // Content uses sanitizeUnicode() for title/description — safe from injection.
-  const jsonLd = listing.status === "ACTIVE" ? {
-    "@context": "https://schema.org",
-    "@type": "LodgingBusiness",
-    name: sanitizeUnicode(listing.title),
-    description: sanitizeUnicode(listing.description).substring(0, 300),
-    image: listing.images?.[0] || undefined,
-    address: listing.location
+  const jsonLd =
+    listing.status === "ACTIVE"
       ? {
-          "@type": "PostalAddress",
-          addressLocality: listing.location.city,
-          addressRegion: listing.location.state,
-        }
-      : undefined,
-    ...(coordinates
-      ? {
-          geo: {
-            "@type": "GeoCoordinates",
-            latitude: coordinates.lat,
-            longitude: coordinates.lng,
+          "@context": "https://schema.org",
+          "@type": "LodgingBusiness",
+          name: sanitizeUnicode(listing.title),
+          description: sanitizeUnicode(listing.description).substring(0, 300),
+          image: listing.images?.[0] || undefined,
+          address: listing.location
+            ? {
+                "@type": "PostalAddress",
+                addressLocality: listing.location.city,
+                addressRegion: listing.location.state,
+              }
+            : undefined,
+          ...(coordinates
+            ? {
+                geo: {
+                  "@type": "GeoCoordinates",
+                  latitude: coordinates.lat,
+                  longitude: coordinates.lng,
+                },
+              }
+            : {}),
+          offers: {
+            "@type": "Offer",
+            price: Number(listing.price),
+            priceCurrency: "USD",
+            availability:
+              listing.availableSlots > 0
+                ? "https://schema.org/InStock"
+                : "https://schema.org/SoldOut",
           },
+          ...(reviews.length > 0
+            ? {
+                aggregateRating: {
+                  "@type": "AggregateRating",
+                  ratingValue: (
+                    reviews.reduce((sum, r) => sum + r.rating, 0) /
+                    reviews.length
+                  ).toFixed(1),
+                  reviewCount: reviews.length,
+                  bestRating: 5,
+                  worstRating: 1,
+                },
+              }
+            : {}),
         }
-      : {}),
-    offers: {
-      "@type": "Offer",
-      price: Number(listing.price),
-      priceCurrency: "USD",
-      availability: listing.availableSlots > 0
-        ? "https://schema.org/InStock"
-        : "https://schema.org/SoldOut",
-    },
-    ...(reviews.length > 0
-      ? {
-          aggregateRating: {
-            "@type": "AggregateRating",
-            ratingValue: (
-              reviews.reduce((sum, r) => sum + r.rating, 0) / reviews.length
-            ).toFixed(1),
-            reviewCount: reviews.length,
-            bestRating: 5,
-            worstRating: 1,
-          },
-        }
-      : {}),
-  } : null;
+      : null;
 
   return (
     <>

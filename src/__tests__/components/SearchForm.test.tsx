@@ -158,6 +158,7 @@ describe("SearchForm", () => {
     jest.useFakeTimers();
     // Reset search params
     mockSearchParams.delete("q");
+    mockSearchParams.delete("where");
     mockSearchParams.delete("minPrice");
     mockSearchParams.delete("maxPrice");
     mockSearchParams.delete("moveInDate");
@@ -300,6 +301,7 @@ describe("SearchForm", () => {
         screen.getByPlaceholderText(/describe your ideal room/i),
         "sunny room"
       );
+      await user.type(screen.getByTestId("location-input"), "San Francisco");
       await user.type(screen.getByLabelText(/minimum budget/i), "900");
       await user.type(screen.getByLabelText(/maximum budget/i), "1500");
       await user.click(screen.getByTestId("select-location"));
@@ -308,11 +310,13 @@ describe("SearchForm", () => {
 
       const pushCall = mockPush.mock.calls[0]?.[0] ?? "";
       expect(pushCall).toContain("what=sunny+room");
-      expect(pushCall).toContain("q=sunny+room");
+      expect(pushCall).toContain("where=San+Francisco");
       expect(pushCall).toContain("minPrice=900");
       expect(pushCall).toContain("maxPrice=1500");
       expect(pushCall).toContain("lat=37.7749");
       expect(pushCall).toContain("lng=-122.4194");
+      expect(pushCall).toContain("minLat=");
+      expect(pushCall).toContain("maxLng=");
     });
 
     it("shows the location warning when text is entered without a selection", async () => {
@@ -718,10 +722,10 @@ describe("SearchForm", () => {
       jest.advanceTimersByTime(500);
 
       const pushCall = mockPush.mock.calls[0][0];
-      expect(pushCall).toContain("q=downtown");
+      expect(pushCall).toContain("where=downtown");
     });
 
-    it("only includes q param if 2+ chars", async () => {
+    it("only includes a canonical location label when a selection exists", async () => {
       render(<SearchForm />);
 
       const locationInput = screen.getByTestId("location-input");
@@ -734,6 +738,7 @@ describe("SearchForm", () => {
 
       const pushCall = mockPush.mock.calls[0][0];
       expect(pushCall).not.toContain("q=");
+      expect(pushCall).not.toContain("where=");
     });
 
     it("shows loading state during search", async () => {
@@ -900,8 +905,8 @@ describe("SearchForm", () => {
     });
 
     describe("location change clears old location params", () => {
-      it("removes old q/lat/lng when location is cleared", async () => {
-        mockSearchParams.set("q", "San Francisco");
+      it("removes old where/lat/lng when location is cleared", async () => {
+        mockSearchParams.set("where", "San Francisco");
         mockSearchParams.set("lat", "37.7749");
         mockSearchParams.set("lng", "-122.4194");
         render(<SearchForm />);
@@ -914,7 +919,7 @@ describe("SearchForm", () => {
         jest.advanceTimersByTime(500);
 
         const pushCall = mockPush.mock.calls[0]?.[0] ?? "";
-        expect(pushCall).not.toContain("q=San");
+        expect(pushCall).not.toContain("where=San");
         expect(pushCall).not.toContain("lat=");
         expect(pushCall).not.toContain("lng=");
       });
@@ -989,6 +994,8 @@ describe("SearchForm", () => {
         expect(pushCall).toContain("lat=40.7128");
         expect(pushCall).toContain("lng=-74.006");
         expect(pushCall).not.toContain("q=");
+        expect(pushCall).not.toContain("where=");
+        expect(pushCall).toContain("minLat=");
       });
 
       it("shows toast on permission denied", () => {

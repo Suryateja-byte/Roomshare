@@ -235,7 +235,10 @@ describe("useFacets", () => {
     (useSearchParams as jest.Mock).mockReturnValue(
       makeSearchParams({ lat: "37.3", lng: "-122.3" })
     );
-    const updatedFacets = { ...SAMPLE_FACETS, roomTypes: { "Private Room": 5 } };
+    const updatedFacets = {
+      ...SAMPLE_FACETS,
+      roomTypes: { "Private Room": 5 },
+    };
     mockFetch
       .mockResolvedValueOnce(mockOkResponse(SAMPLE_FACETS))
       .mockResolvedValueOnce(mockOkResponse(updatedFacets));

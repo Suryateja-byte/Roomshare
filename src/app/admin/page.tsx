@@ -175,9 +175,7 @@ export default async function AdminDashboard() {
               <p className="text-2xl font-bold text-on-surface">
                 {stat.value.toLocaleString()}
               </p>
-              <p className="text-sm text-on-surface-variant">
-                {stat.label}
-              </p>
+              <p className="text-sm text-on-surface-variant">{stat.label}</p>
               {stat.alert && (
                 <span className="absolute top-3 right-3 w-2 h-2 bg-amber-400 rounded-full animate-pulse" />
               )}

@@ -161,14 +161,15 @@ jest.mock("react-map-gl/maplibre", () => {
   const React = require("react");
   const pickDomProps = (props: Record<string, unknown>) =>
     Object.fromEntries(
-      Object.entries(props).filter(([key]) =>
-        key === "className" ||
-        key === "style" ||
-        key === "id" ||
-        key === "role" ||
-        key === "tabIndex" ||
-        key.startsWith("data-") ||
-        key.startsWith("aria-")
+      Object.entries(props).filter(
+        ([key]) =>
+          key === "className" ||
+          key === "style" ||
+          key === "id" ||
+          key === "role" ||
+          key === "tabIndex" ||
+          key.startsWith("data-") ||
+          key.startsWith("aria-")
       )
     );
 
@@ -448,6 +449,10 @@ jest.mock("@/components/map/UserMarker", () => ({
 
 jest.mock("@/components/map/POILayer", () => ({
   POILayer: () => null,
+  usePOILayerState: () => ({
+    activeCategories: new Set(),
+    toggleCategory: jest.fn(),
+  }),
 }));
 
 // Import component after mocks

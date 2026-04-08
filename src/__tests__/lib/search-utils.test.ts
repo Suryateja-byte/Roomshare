@@ -7,6 +7,18 @@ describe("buildSearchUrl", () => {
     expect(url).toBe("/search?q=downtown");
   });
 
+  it("should build URL with a canonical location label", () => {
+    const filters: SearchFilters = {
+      locationLabel: "San Francisco",
+      vibeQuery: "quiet roommates",
+      lat: 37.7749,
+      lng: -122.4194,
+    };
+    const url = buildSearchUrl(filters);
+    expect(url).toContain("where=San+Francisco");
+    expect(url).toContain("what=quiet+roommates");
+  });
+
   it("should build URL with price filters", () => {
     const filters: SearchFilters = { minPrice: 500, maxPrice: 1000 };
     const url = buildSearchUrl(filters);

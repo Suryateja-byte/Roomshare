@@ -76,17 +76,41 @@ describe("ListingCard", () => {
       expect(screen.getByText(/\/\s*mo/i)).toBeInTheDocument();
     });
 
-    it("renders location", () => {
+    it("renders location in the card body", () => {
       render(<ListingCard listing={mockListing} />);
-      expect(screen.getByText("San Francisco, CA")).toBeInTheDocument();
+      expect(screen.getByText(/San Francisco, CA/)).toBeInTheDocument();
     });
 
-    it("renders amenities (max 2)", () => {
-      render(<ListingCard listing={mockListing} />);
-      expect(screen.getByText(/wifi/i)).toBeInTheDocument();
-      expect(screen.getByText(/parking/i)).toBeInTheDocument();
-      expect(screen.queryByText(/laundry/i)).not.toBeInTheDocument();
-      expect(screen.queryByText(/pool/i)).not.toBeInTheDocument();
+    it("renders room type with location when roomType is provided", () => {
+      const listing = { ...mockListing, roomType: "Private Room" };
+      render(<ListingCard listing={listing} />);
+      expect(
+        screen.getByText(/Private Room · San Francisco, CA/)
+      ).toBeInTheDocument();
+    });
+
+    it("renders availability metadata when moveInDate and leaseDuration provided", () => {
+      const listing = {
+        ...mockListing,
+        roomType: "Private Room",
+        moveInDate: "2026-08-01",
+        leaseDuration: "6_months",
+      };
+      render(<ListingCard listing={listing} />);
+      expect(screen.getByText(/Available Aug 1/)).toBeInTheDocument();
+      expect(screen.getByText(/6 mo lease/)).toBeInTheDocument();
+    });
+
+    it("shows location and availability on one line when no roomType", () => {
+      const listing = {
+        ...mockListing,
+        moveInDate: "2026-08-01",
+        leaseDuration: "6_months",
+      };
+      render(<ListingCard listing={listing} />);
+      const el = screen.getByText(/San Francisco, CA/);
+      expect(el.textContent).toContain("Available Aug 1");
+      expect(el.textContent).toContain("6 mo lease");
     });
 
     it("renders availability badge with slot counts", () => {
@@ -127,20 +151,11 @@ describe("ListingCard", () => {
       expect(link).toHaveAttribute("href", "/listings/listing-123");
     });
 
-    it("keeps the clickable shell rounded on mobile", () => {
+    it("keeps the card article rounded on mobile", () => {
       render(<ListingCard listing={mockListing} />);
-      const link = screen.getByRole("link");
-      expect(link).toHaveClass("rounded-lg");
-      expect(link).not.toHaveClass("rounded-none");
-    });
-
-    it("keeps the card surface rounded on mobile", () => {
-      render(<ListingCard listing={mockListing} />);
-      const link = screen.getByRole("link");
-      const cardSurface = link.firstElementChild;
-      expect(cardSurface).not.toBeNull();
-      expect(cardSurface).toHaveClass("rounded-lg");
-      expect(cardSurface).not.toHaveClass("rounded-none");
+      const article = screen.getByTestId("listing-card");
+      expect(article).toHaveClass("rounded-2xl");
+      expect(article).not.toHaveClass("rounded-none");
     });
 
     it("marks search-feed cards with the mobile feed variant", () => {
@@ -179,7 +194,7 @@ describe("ListingCard", () => {
         location: { city: "Austin", state: "Texas" },
       };
       render(<ListingCard listing={listing} />);
-      expect(screen.getByText("Austin, TX")).toBeInTheDocument();
+      expect(screen.getByText(/Austin, TX/)).toBeInTheDocument();
     });
 
     it("keeps state abbreviation as is", () => {
@@ -188,7 +203,7 @@ describe("ListingCard", () => {
         location: { city: "Denver", state: "CO" },
       };
       render(<ListingCard listing={listing} />);
-      expect(screen.getByText("Denver, CO")).toBeInTheDocument();
+      expect(screen.getByText(/Denver, CO/)).toBeInTheDocument();
     });
 
     it("removes duplicate state from city", () => {
@@ -197,9 +212,9 @@ describe("ListingCard", () => {
         location: { city: "Irving, TX", state: "TX" },
       };
       render(<ListingCard listing={listing} />);
-      expect(screen.getByText("Irving, TX")).toBeInTheDocument();
+      expect(screen.getByText(/Irving, TX/)).toBeInTheDocument();
       // Should not show "Irving, TX, TX"
-      expect(screen.queryByText("Irving, TX, TX")).not.toBeInTheDocument();
+      expect(screen.queryByText(/Irving, TX, TX/)).not.toBeInTheDocument();
     });
   });
 
@@ -318,14 +333,20 @@ describe("ListingCard", () => {
     it("includes 'top rated' in ariaLabel when badge is present", () => {
       render(<ListingCard listing={topRatedListing} />);
       const article = screen.getByTestId("listing-card");
-      expect(article).toHaveAttribute("aria-label", expect.stringContaining("top rated"));
+      expect(article).toHaveAttribute(
+        "aria-label",
+        expect.stringContaining("top rated")
+      );
     });
 
     it("does not include 'top rated' in ariaLabel when badge is absent (avgRating=4.3)", () => {
       const listing = { ...mockListing, avgRating: 4.3, reviewCount: 4 };
       render(<ListingCard listing={listing} />);
       const article = screen.getByTestId("listing-card");
-      expect(article).not.toHaveAttribute("aria-label", expect.stringContaining("top rated"));
+      expect(article).not.toHaveAttribute(
+        "aria-label",
+        expect.stringContaining("top rated")
+      );
     });
   });
 });

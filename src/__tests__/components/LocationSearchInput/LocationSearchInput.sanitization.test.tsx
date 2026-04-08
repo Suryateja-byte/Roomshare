@@ -106,9 +106,8 @@ describe("LocationSearchInput - Input Sanitization", () => {
       });
 
       const url = mockFetch.mock.calls[0][0] as string;
-      // URL should contain trimmed query
-      expect(url).toContain("San%20Francisco");
-      expect(url).not.toContain("%20%20"); // No double spaces at edges
+      const parsedUrl = new URL(url, "http://localhost");
+      expect(parsedUrl.searchParams.get("q")).toBe("San Francisco");
     });
 
     it("does not trigger API for whitespace-only input", async () => {
@@ -158,7 +157,7 @@ describe("LocationSearchInput - Input Sanitization", () => {
       });
 
       const url = mockFetch.mock.calls[0][0] as string;
-      const parsedUrl = new URL(url);
+      const parsedUrl = new URL(url, "http://localhost");
       const decodedQuery = parsedUrl.searchParams.get("q") || "";
 
       expect(decodedQuery.length).toBeLessThanOrEqual(500);
@@ -269,7 +268,7 @@ describe("LocationSearchInput - Input Sanitization", () => {
 
           // Should not throw, should properly encode
           const url = mockFetch.mock.calls[0][0] as string;
-          expect(url).toContain("photon.komoot.io");
+          expect(url).toContain("/api/geocoding/autocomplete");
         }
       }
     );

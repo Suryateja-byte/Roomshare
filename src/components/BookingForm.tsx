@@ -176,7 +176,10 @@ export default function BookingForm({
         setShowConfirmModal(false);
         if (isLoading) {
           // In-flight request continues; inform user
-          toast("Your booking may still be processing. Check your bookings page for status.", { duration: 5000 });
+          toast(
+            "Your booking may still be processing. Check your bookings page for status.",
+            { duration: 5000 }
+          );
         }
       }
     };
@@ -479,14 +482,19 @@ export default function BookingForm({
   const renderErrorBanner = () => {
     if (!message || message.includes("success")) return null;
 
-    const isRetryable = errorType === "server" || errorType === "network" || errorType === "rate_limit";
+    const isRetryable =
+      errorType === "server" ||
+      errorType === "network" ||
+      errorType === "rate_limit";
     const isAuthError = errorType === "auth";
 
     return (
       <div
         role="alert"
         className={`rounded-xl p-4 animate-error-in ${
-          errorType === "server" || errorType === "network" || errorType === "rate_limit"
+          errorType === "server" ||
+          errorType === "network" ||
+          errorType === "rate_limit"
             ? "bg-amber-50 border border-amber-200"
             : "bg-red-50 border border-red-200"
         }`}
@@ -494,12 +502,16 @@ export default function BookingForm({
         <div className="flex items-start gap-3">
           <div
             className={`flex-shrink-0 w-8 h-8 rounded-full flex items-center justify-center ${
-              errorType === "server" || errorType === "network" || errorType === "rate_limit"
+              errorType === "server" ||
+              errorType === "network" ||
+              errorType === "rate_limit"
                 ? "bg-amber-100"
                 : "bg-red-100"
             }`}
           >
-            {errorType === "server" || errorType === "network" || errorType === "rate_limit" ? (
+            {errorType === "server" ||
+            errorType === "network" ||
+            errorType === "rate_limit" ? (
               <AlertTriangle className="w-4 h-4 text-amber-600" />
             ) : (
               <XCircle className="w-4 h-4 text-red-600" />
@@ -508,7 +520,9 @@ export default function BookingForm({
           <div className="flex-1 min-w-0">
             <p
               className={`text-sm font-medium ${
-                errorType === "server" || errorType === "network" || errorType === "rate_limit"
+                errorType === "server" ||
+                errorType === "network" ||
+                errorType === "rate_limit"
                   ? "text-amber-800"
                   : "text-red-800"
               }`}
@@ -558,9 +572,7 @@ export default function BookingForm({
             </div>
           </div>
           <div className="flex-1 animate-[fadeUp_500ms_cubic-bezier(0.16,1,0.3,1)_200ms_both] motion-reduce:animate-none">
-            <p className="text-sm font-medium text-green-800">
-              {message}
-            </p>
+            <p className="text-sm font-medium text-green-800">{message}</p>
             <p className="text-xs text-green-600 mt-0.5">
               Redirecting to your bookings...
             </p>
@@ -574,9 +586,7 @@ export default function BookingForm({
     <div className="bg-surface-container-lowest rounded-3xl shadow-xl p-6 sticky top-24">
       <div className="flex justify-between items-end mb-6">
         <div>
-          <span className="text-3xl font-bold text-on-surface">
-            ${price}
-          </span>
+          <span className="text-3xl font-bold text-on-surface">${price}</span>
           <span className="text-on-surface-variant"> / month</span>
         </div>
         <div
@@ -961,7 +971,10 @@ export default function BookingForm({
                 onClick={() => {
                   setShowConfirmModal(false);
                   if (isLoading) {
-                    toast("Your booking may still be processing. Check your bookings page for status.", { duration: 5000 });
+                    toast(
+                      "Your booking may still be processing. Check your bookings page for status.",
+                      { duration: 5000 }
+                    );
                   }
                 }}
               />
@@ -1037,15 +1050,11 @@ export default function BookingForm({
                       <span className="text-on-surface-variant">
                         Service fee
                       </span>
-                      <span className="text-green-600">
-                        Free
-                      </span>
+                      <span className="text-green-600">Free</span>
                     </div>
                     <div className="h-px bg-primary/20" />
                     <div className="flex justify-between items-center">
-                      <span className="font-bold text-on-surface">
-                        Total
-                      </span>
+                      <span className="font-bold text-on-surface">Total</span>
                       <span className="text-xl font-bold text-primary">
                         ${bookingInfo.totalPrice.toFixed(2)}
                       </span>
@@ -1068,7 +1077,10 @@ export default function BookingForm({
                     onClick={() => {
                       setShowConfirmModal(false);
                       if (isLoading) {
-                        toast("Your booking may still be processing. Check your bookings page for status.", { duration: 5000 });
+                        toast(
+                          "Your booking may still be processing. Check your bookings page for status.",
+                          { duration: 5000 }
+                        );
                       }
                     }}
                   >

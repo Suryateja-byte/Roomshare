@@ -141,9 +141,7 @@ const ListingCard = ({
           </p>
           <p className="text-sm font-bold text-on-surface mt-2">
             ${listing.price}
-            <span className="text-on-surface-variant font-normal">
-              /mo
-            </span>
+            <span className="text-on-surface-variant font-normal">/mo</span>
           </p>
         </div>
       </div>
@@ -289,41 +287,25 @@ export default function ProfileClient({ user }: { user: UserWithListings }) {
               </h3>
               <ul className="space-y-4">
                 <li className="flex items-center justify-between text-sm">
-                  <span className="text-on-surface-variant">
-                    Identity
-                  </span>
+                  <span className="text-on-surface-variant">Identity</span>
                   {user.isVerified ? (
                     <CheckCircle2 className="w-5 h-5 text-green-500 flex-shrink-0" />
                   ) : (
-                    <span className="text-on-surface-variant/50">
-                      Pending
-                    </span>
+                    <span className="text-on-surface-variant/50">Pending</span>
                   )}
                 </li>
                 <li className="flex items-center justify-between text-sm">
-                  <span className="text-on-surface-variant">
-                    Email address
-                  </span>
+                  <span className="text-on-surface-variant">Email address</span>
                   {user.emailVerified ? (
                     <CheckCircle2 className="w-5 h-5 text-green-500 flex-shrink-0" />
                   ) : (
-                    <span className="text-on-surface-variant/50">
-                      Pending
-                    </span>
+                    <span className="text-on-surface-variant/50">Pending</span>
                   )}
                 </li>
-                <li
-                  role="separator"
-                  aria-hidden="true"
-                  className="py-2"
-                />
+                <li role="separator" aria-hidden="true" className="py-2" />
                 <li className="flex items-center justify-between text-sm">
-                  <span className="text-on-surface font-medium">
-                    Joined
-                  </span>
-                  <span className="text-on-surface-variant">
-                    {joinedDate}
-                  </span>
+                  <span className="text-on-surface font-medium">Joined</span>
+                  <span className="text-on-surface-variant">{joinedDate}</span>
                 </li>
               </ul>
             </div>

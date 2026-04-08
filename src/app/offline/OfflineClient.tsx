@@ -5,9 +5,7 @@ import { Button } from "@/components/ui/button";
 
 export default function OfflineClient() {
   return (
-    <main
-      className="flex min-h-screen flex-col items-center justify-center bg-surface-canvas p-8"
-    >
+    <main className="flex min-h-screen flex-col items-center justify-center bg-surface-canvas p-8">
       {/* Offline icon */}
       <div className="mb-6 rounded-full bg-surface-container-high p-4">
         <WifiOff className="h-12 w-12 text-on-surface-variant" />

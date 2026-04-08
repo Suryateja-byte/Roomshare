@@ -26,7 +26,12 @@ export default function NotFound() {
               Browse Listings
             </Link>
           </Button>
-          <Button asChild variant="outline" size="lg" className="rounded-full px-8">
+          <Button
+            asChild
+            variant="outline"
+            size="lg"
+            className="rounded-full px-8"
+          >
             <Link href="/">
               <Home className="mr-2 h-4 w-4" />
               Back to Home

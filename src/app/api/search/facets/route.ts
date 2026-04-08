@@ -613,13 +613,14 @@ export async function GET(request: NextRequest) {
         }
       });
 
-      const { filterParams } = parseSearchParams(rawParams);
+      const parsed = parseSearchParams(rawParams);
+      const { filterParams } = parsed;
       // Immutable working copy — may be replaced with clamped bounds below
       let effectiveFilterParams = filterParams;
 
       // Security: Return empty facets for unbounded requests to prevent
       // full-table GROUP BY aggregation DoS (5 parallel scans with no WHERE bounds).
-      if (!filterParams.bounds && !filterParams.query) {
+      if (!filterParams.bounds && !filterParams.query && !filterParams.vibeQuery) {
         logger.debug(
           "[search/facets] Unbounded browse — returning empty facets",
           {
@@ -649,17 +650,20 @@ export async function GET(request: NextRequest) {
       // P2-NEW Fix: Use filterParams.bounds (which derives bounds from lat/lng)
       // instead of raw URL params. parseSearchParams() creates ~10km radius
       // bounds from lat/lng, enabling normal SearchForm flow (q+lat+lng).
-      if (filterParams.query) {
+      if (parsed.boundsRequired) {
         // Check if bounds are missing (neither explicit bounds nor derived from lat/lng)
         if (!filterParams.bounds) {
           // P1-5 FIX: Return HTTP 200 with empty FacetsResponse + boundsRequired flag.
           // Previously returned HTTP 400, which was semantically wrong ("needs location"
           // is not a client error) and required useFacets to special-case the 400 status.
           // Now aligned with /api/search-count which also returns 200 for boundsRequired.
-          logger.debug("[search/facets] Query without bounds — returning empty facets", {
-            hasQuery: true,
-            hasBounds: false,
-          });
+          logger.debug(
+            "[search/facets] Query without bounds — returning empty facets",
+            {
+              hasQuery: Boolean(filterParams.query || filterParams.vibeQuery),
+              hasBounds: false,
+            }
+          );
           return NextResponse.json(
             {
               amenities: {},

@@ -190,10 +190,7 @@ describe("SQL Injection Prevention", () => {
   it("rejects SQL injection in sort column parameter", () => {
     const allowedColumns = ["d.price", "d.created_at", "d.title"];
     expect(() =>
-      assertValidSortColumn(
-        "d.price; DROP TABLE listings; --",
-        allowedColumns
-      )
+      assertValidSortColumn("d.price; DROP TABLE listings; --", allowedColumns)
     ).toThrow("SECURITY");
   });
 
@@ -261,9 +258,7 @@ describe("XSS Prevention", () => {
   });
 
   it("allows special characters that are not HTML tags", () => {
-    const result = noHtmlTags(
-      'Room & Board - "Best Deal" in Town ($800/mo)'
-    );
+    const result = noHtmlTags('Room & Board - "Best Deal" in Town ($800/mo)');
     expect(result).toBe(true);
   });
 });

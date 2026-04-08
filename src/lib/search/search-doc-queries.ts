@@ -738,8 +738,10 @@ function mapRawListingsToPublic(listings: ListingRaw[]): ListingData[] {
       primaryHomeLanguage: l.primaryHomeLanguage,
       leaseDuration: l.leaseDuration,
       roomType: l.roomType,
-      moveInDate: l.moveInDate && !isNaN(new Date(l.moveInDate).getTime())
-        ? new Date(l.moveInDate) : undefined,
+      moveInDate:
+        l.moveInDate && !isNaN(new Date(l.moveInDate).getTime())
+          ? new Date(l.moveInDate)
+          : undefined,
       createdAt: l.createdAt ? new Date(l.createdAt) : new Date(),
       viewCount: Number(l.viewCount) || 0,
       avgRating: Number(l.avgRating) || 0,
@@ -848,7 +850,8 @@ async function getSearchDocMapListingsInternal(
         reviewCount: Number(l.reviewCount) || 0,
         // L-9 FIX: Use explicit null check instead of falsy coalescing.
         // `Number(0) || null` falsely converts a valid score of 0 to null.
-        recommendedScore: l.recommendedScore != null ? Number(l.recommendedScore) : null,
+        recommendedScore:
+          l.recommendedScore != null ? Number(l.recommendedScore) : null,
         createdAt: l.createdAt ? new Date(l.createdAt) : null,
       }))
     );
@@ -1289,8 +1292,7 @@ export async function getSearchDocListingsWithKeyset(
       logger.sync.warn(
         "[getSearchDocListingsWithKeyset] Count query failed, using null",
         {
-          error:
-            countError instanceof Error ? countError.message : "Unknown",
+          error: countError instanceof Error ? countError.message : "Unknown",
         }
       );
     }
@@ -1587,7 +1589,7 @@ export async function semanticSearchQuery(
 ): Promise<SemanticSearchRow[] | null> {
   if (!features.semanticSearch) return null;
 
-  const rawQuery = filterParams.query?.trim() ?? "";
+  const rawQuery = filterParams.vibeQuery?.trim() ?? filterParams.query?.trim() ?? "";
   const queryText = sanitizeSearchQuery(rawQuery);
   if (!isValidQuery(queryText) || queryText.length < 3) return null;
 
@@ -1671,35 +1673,35 @@ export function mapSemanticRowsToListingData(
   return rows
     .filter((row) => hasValidCoordinates(row.lat, row.lng))
     .map((row) => ({
-    id: row.id,
-    title: row.title,
-    description: row.description,
-    price: Number(row.price),
-    images: row.images,
-    roomType: row.room_type ?? undefined,
-    leaseDuration: row.lease_duration ?? undefined,
-    availableSlots: row.available_slots,
-    totalSlots: row.total_slots,
-    amenities: row.amenities,
-    houseRules: row.house_rules,
-    householdLanguages: row.household_languages,
-    primaryHomeLanguage: row.primary_home_language ?? undefined,
-    genderPreference: row.gender_preference ?? undefined,
-    householdGender: row.household_gender ?? undefined,
-    moveInDate: row.move_in_date ?? undefined,
-    // ownerId intentionally omitted — @deprecated, S3 security fix (types/listing.ts:28)
-    // Match mapRawListingsToPublic: include rating/review/view/createdAt fields
-    // for ListingCard rendering (star ratings, review counts, recency)
-    avgRating: Number(row.avg_rating) || 0,
-    reviewCount: Number(row.review_count) || 0,
-    viewCount: Number(row.view_count) || 0,
-    createdAt: row.listing_created_at ?? new Date(),
-    location: {
-      // address and zip intentionally omitted — "only included in listing detail, not search" (search-types.ts:37)
-      city: row.city,
-      state: row.state,
-      lat: row.lat!,
-      lng: row.lng!,
-    },
-  }));
+      id: row.id,
+      title: row.title,
+      description: row.description,
+      price: Number(row.price),
+      images: row.images,
+      roomType: row.room_type ?? undefined,
+      leaseDuration: row.lease_duration ?? undefined,
+      availableSlots: row.available_slots,
+      totalSlots: row.total_slots,
+      amenities: row.amenities,
+      houseRules: row.house_rules,
+      householdLanguages: row.household_languages,
+      primaryHomeLanguage: row.primary_home_language ?? undefined,
+      genderPreference: row.gender_preference ?? undefined,
+      householdGender: row.household_gender ?? undefined,
+      moveInDate: row.move_in_date ?? undefined,
+      // ownerId intentionally omitted — @deprecated, S3 security fix (types/listing.ts:28)
+      // Match mapRawListingsToPublic: include rating/review/view/createdAt fields
+      // for ListingCard rendering (star ratings, review counts, recency)
+      avgRating: Number(row.avg_rating) || 0,
+      reviewCount: Number(row.review_count) || 0,
+      viewCount: Number(row.view_count) || 0,
+      createdAt: row.listing_created_at ?? new Date(),
+      location: {
+        // address and zip intentionally omitted — "only included in listing detail, not search" (search-types.ts:37)
+        city: row.city,
+        state: row.state,
+        lat: row.lat!,
+        lng: row.lng!,
+      },
+    }));
 }

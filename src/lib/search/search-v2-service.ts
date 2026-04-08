@@ -5,7 +5,11 @@
  * Avoids HTTP self-call overhead when page.tsx needs unified search data.
  */
 
-import { getListingsPaginated, getMapListings } from "@/lib/data";
+import {
+  getListingsPaginated,
+  getMapListings,
+  sanitizeSearchQuery,
+} from "@/lib/data";
 import { parseSearchParams } from "@/lib/search-params";
 import { features } from "@/lib/env";
 import {
@@ -56,6 +60,81 @@ import {
 } from "@/lib/constants";
 import { logger, sanitizeErrorMessage } from "@/lib/logger";
 import { withTimeout, DEFAULT_TIMEOUTS } from "@/lib/timeout-wrapper";
+
+const VIBE_SOFT_FALLBACK_WARNING = "VIBE_SOFT_FALLBACK";
+
+function normalizeForVibeMatch(value: string | undefined | null): string {
+  return sanitizeSearchQuery(value ?? "").toLowerCase();
+}
+
+function tokenizeVibeQuery(vibeQuery: string): string[] {
+  return Array.from(
+    new Set(
+      normalizeForVibeMatch(vibeQuery)
+        .split(/\s+/)
+        .map((token) => token.trim())
+        .filter((token) => token.length >= 2)
+    )
+  );
+}
+
+function computeVibeSoftMatchScore(
+  listing: ListingData,
+  vibeQuery: string,
+  tokens: string[]
+): number {
+  const normalizedPhrase = normalizeForVibeMatch(vibeQuery);
+  const title = normalizeForVibeMatch(listing.title);
+  const description = normalizeForVibeMatch(listing.description);
+  const amenities = normalizeForVibeMatch(listing.amenities.join(" "));
+  const houseRules = normalizeForVibeMatch(listing.houseRules.join(" "));
+  const languages = normalizeForVibeMatch(listing.householdLanguages.join(" "));
+  const roomType = normalizeForVibeMatch(listing.roomType);
+  const leaseDuration = normalizeForVibeMatch(listing.leaseDuration);
+
+  let score = 0;
+
+  if (normalizedPhrase) {
+    if (title.includes(normalizedPhrase)) score += 8;
+    if (description.includes(normalizedPhrase)) score += 4;
+  }
+
+  for (const token of tokens) {
+    if (title.includes(token)) score += 3;
+    if (description.includes(token)) score += 1.5;
+    if (amenities.includes(token)) score += 1.25;
+    if (houseRules.includes(token)) score += 1;
+    if (languages.includes(token)) score += 0.75;
+    if (roomType.includes(token)) score += 1;
+    if (leaseDuration.includes(token)) score += 0.5;
+  }
+
+  return score;
+}
+
+function rerankListingsByVibe(
+  items: ListingData[],
+  vibeQuery: string
+): ListingData[] {
+  const tokens = tokenizeVibeQuery(vibeQuery);
+  if (tokens.length === 0) {
+    return items;
+  }
+
+  return items
+    .map((listing, index) => ({
+      listing,
+      index,
+      score: computeVibeSoftMatchScore(listing, vibeQuery, tokens),
+    }))
+    .sort((left, right) => {
+      if (right.score !== left.score) {
+        return right.score - left.score;
+      }
+      return left.index - right.index;
+    })
+    .map((entry) => entry.listing);
+}
 
 /**
  * Extract first value from a param that may be string, string[], or undefined.
@@ -133,6 +212,9 @@ export async function executeSearchV2(
     // Get sort option from parsed params (default to recommended)
     const sortOption: SortOption =
       (parsed.filterParams.sort as SortOption) || "recommended";
+    const vibeQuery = parsed.filterParams.vibeQuery?.trim();
+    const shouldUseRecommendedVibeRanking =
+      Boolean(vibeQuery) && sortOption === "recommended";
 
     // Handle cursor-based pagination
     const cursorStr = getFirstValue(params.rawParams.cursor);
@@ -170,13 +252,36 @@ export async function executeSearchV2(
     const listPromise = (async (): Promise<{
       listResult: PaginatedResultHybrid<ListingData>;
       nextCursor: string | null;
+      usedSoftVibeFallback: boolean;
     }> => {
+      const finalizeListResult = (
+        listResult: PaginatedResultHybrid<ListingData>,
+        nextCursor: string | null
+      ) => {
+        const usedSoftVibeFallback =
+          Boolean(vibeQuery) &&
+          shouldUseRecommendedVibeRanking &&
+          listResult.items.length > 0;
+
+        return {
+          listResult:
+            usedSoftVibeFallback && vibeQuery
+              ? {
+                  ...listResult,
+                  items: rerankListingsByVibe(listResult.items, vibeQuery),
+                }
+              : listResult,
+          nextCursor,
+          usedSoftVibeFallback,
+        };
+      };
+
       // Semantic search branch — text queries with "recommended" sort
       if (
         features.semanticSearch &&
-        filterParams.query &&
-        filterParams.query.length >= 3 &&
-        sortOption === "recommended"
+        vibeQuery &&
+        vibeQuery.length >= 3 &&
+        shouldUseRecommendedVibeRanking
       ) {
         const pageSize = filterParams.limit || DEFAULT_PAGE_SIZE;
         const offset = (page - 1) * pageSize;
@@ -203,9 +308,11 @@ export async function executeSearchV2(
           return {
             listResult: semanticResult,
             nextCursor: semanticResult.nextCursor ?? null,
+            usedSoftVibeFallback: false,
           };
         }
-        // Fall through to existing FTS/keyword search if semantic returns null
+        // Fall through to bounded structural search if semantic matching is
+        // unavailable or returns no rows. Vibe becomes a soft ranking signal.
       }
 
       if (useKeyset) {
@@ -216,49 +323,46 @@ export async function executeSearchV2(
             filterParams,
             keysetCursor
           );
-          return {
-            listResult: keysetResult,
-            nextCursor: keysetResult.nextCursor,
-          };
+          return finalizeListResult(keysetResult, keysetResult.nextCursor);
         } else if (page > 1) {
           // Legacy cursor with page offset (e.g., semantic→FTS fallback with {p:N} cursor).
           // Route to offset-based pagination so the page number is respected,
           // preventing duplicate results when the ranking engine changes mid-session.
           const result = await getSearchDocListingsPaginated(filterParams);
-          return {
-            listResult: result,
-            nextCursor: result.hasNextPage ? encodeCursor(page + 1) : null,
-          };
+          return finalizeListResult(
+            result,
+            result.hasNextPage ? encodeCursor(page + 1) : null
+          );
         } else {
           // First page - get first page with keyset cursor
           const firstPageResult =
             await getSearchDocListingsFirstPage(filterParams);
-          return {
-            listResult: firstPageResult,
-            nextCursor: firstPageResult.nextCursor,
-          };
+          return finalizeListResult(
+            firstPageResult,
+            firstPageResult.nextCursor
+          );
         }
       } else {
         // Offset pagination path (legacy or SearchDoc disabled)
         if (useSearchDoc) {
           const result = await getSearchDocListingsPaginated(filterParams);
-          return {
-            listResult: result,
-            nextCursor: result.hasNextPage ? encodeCursor(page + 1) : null,
-          };
+          return finalizeListResult(
+            result,
+            result.hasNextPage ? encodeCursor(page + 1) : null
+          );
         } else {
           // Legacy path: PaginatedResult doesn't have hasNextPage, compute from totalPages
           const result = await getListingsPaginated(filterParams);
           const hasNext = result.page < result.totalPages;
-          return {
-            listResult: {
+          return finalizeListResult(
+            {
               ...result,
               totalPages: result.totalPages,
               hasNextPage: hasNext,
               hasPrevPage: result.page > 1,
             },
-            nextCursor: hasNext ? encodeCursor(page + 1) : null,
-          };
+            hasNext ? encodeCursor(page + 1) : null
+          );
         }
       }
     })();
@@ -275,11 +379,12 @@ export async function executeSearchV2(
     // The list uses vector similarity (matches natural language), but the map uses FTS
     // (keyword matching) which fails for descriptive queries like "bright sunny studio".
     // Stripping `query` lets the map show all listings in bounds matching structural filters.
+    const hasSemanticVibeQuery =
+      typeof vibeQuery === "string" && vibeQuery.length >= 3;
     const isSemanticActive =
       features.semanticSearch &&
-      filterParams.query &&
-      filterParams.query.length >= 3 &&
-      sortOption === "recommended";
+      hasSemanticVibeQuery &&
+      shouldUseRecommendedVibeRanking;
     const mapFilterParams = {
       ...filterParams,
       ...(mapBounds ? { bounds: mapBounds } : {}),
@@ -312,13 +417,14 @@ export async function executeSearchV2(
     // Handle partial failures gracefully
     let listResult: PaginatedResultHybrid<ListingData>;
     let nextCursor: string | null;
+    let usedSoftVibeFallback = false;
     let mapListings: MapListingData[];
     let mapTruncated: boolean | undefined;
     let mapTotalCandidates: number | undefined;
     const warnings: string[] = [];
 
     if (listSettled.status === "fulfilled") {
-      ({ listResult, nextCursor } = listSettled.value);
+      ({ listResult, nextCursor, usedSoftVibeFallback } = listSettled.value);
     } else {
       logger.sync.error("[SearchV2] List query failed", {
         error:
@@ -358,12 +464,17 @@ export async function executeSearchV2(
       mapListings = [];
     }
 
+    if (usedSoftVibeFallback) {
+      warnings.push(VIBE_SOFT_FALLBACK_WARNING);
+    }
+
     // Determine mode based on mapListings count (not list total)
     const mode = determineMode(mapListings.length);
 
     // Generate query hash for caching (excludes pagination)
     const queryHash = generateQueryHash({
       query: parsed.filterParams.query,
+      vibeQuery: parsed.filterParams.vibeQuery,
       minPrice: parsed.filterParams.minPrice,
       maxPrice: parsed.filterParams.maxPrice,
       amenities: parsed.filterParams.amenities,

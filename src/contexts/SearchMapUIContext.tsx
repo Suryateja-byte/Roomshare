@@ -34,6 +34,7 @@ interface SearchMapUIContextValue {
   focusListingOnMap: (listingId: string) => void;
   acknowledgeFocus: (nonce: number) => void;
   clearPendingFocus: () => void;
+  hideMap: () => void;
   /** Register a dismiss function (called by Map.tsx on mount) */
   registerDismiss: (fn: () => void) => void;
   /** Dismiss popups and clear selection (called by ListingCard before navigation) */
@@ -49,6 +50,7 @@ const NOOP_CONTEXT_VALUE: SearchMapUIContextValue = {
   focusListingOnMap: () => {},
   acknowledgeFocus: () => {},
   clearPendingFocus: () => {},
+  hideMap: () => {},
   registerDismiss: () => {},
   dismiss: () => {},
 };
@@ -56,12 +58,14 @@ const NOOP_CONTEXT_VALUE: SearchMapUIContextValue = {
 interface SearchMapUIProviderProps {
   children: React.ReactNode;
   showMap: () => void;
+  hideMap: () => void;
   shouldShowMap: boolean;
 }
 
 export function SearchMapUIProvider({
   children,
   showMap,
+  hideMap,
   shouldShowMap,
 }: SearchMapUIProviderProps) {
   const [pendingFocus, setPendingFocus] = useState<PendingMapFocus | null>(
@@ -114,6 +118,7 @@ export function SearchMapUIProvider({
       focusListingOnMap,
       acknowledgeFocus,
       clearPendingFocus,
+      hideMap,
       registerDismiss,
       dismiss,
     }),
@@ -122,6 +127,7 @@ export function SearchMapUIProvider({
       focusListingOnMap,
       acknowledgeFocus,
       clearPendingFocus,
+      hideMap,
       registerDismiss,
       dismiss,
     ]

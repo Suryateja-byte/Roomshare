@@ -266,9 +266,9 @@ describe("authorized callback — route protection", () => {
     });
 
     it("allows admin user on public route /listings/456", () => {
-      expect(
-        authorized(buildArgs("/listings/456", { isAdmin: true }))
-      ).toBe(true);
+      expect(authorized(buildArgs("/listings/456", { isAdmin: true }))).toBe(
+        true
+      );
     });
   });
 

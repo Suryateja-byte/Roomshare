@@ -23,10 +23,13 @@ interface MobileSearchContextValue {
   expand: () => void;
   /** Collapse the search bar (let scroll behavior take over) */
   collapse: () => void;
-  /** Callback to open filter drawer (registered by SearchForm) */
+  /** Callback to open the highest-priority registered filter drawer */
   openFilters: () => void;
-  /** Register the filter drawer opener (called by SearchForm) */
-  registerOpenFilters: (handler: () => void) => void;
+  /** Register a filter drawer opener and return a cleanup callback */
+  registerOpenFilters: (
+    handler: () => void,
+    priority?: number
+  ) => () => void;
 }
 
 const MobileSearchContext = createContext<MobileSearchContextValue | null>(
@@ -41,7 +44,7 @@ const FALLBACK_CONTEXT: MobileSearchContextValue = {
   expand: () => {},
   collapse: () => {},
   openFilters: () => {},
-  registerOpenFilters: () => {},
+  registerOpenFilters: () => () => {},
 };
 
 export function MobileSearchProvider({
@@ -51,9 +54,11 @@ export function MobileSearchProvider({
 }) {
   const [isExpanded, setIsExpanded] = useState(false);
 
-  // Use ref instead of state - updates don't cause re-renders!
-  // This prevents the infinite loop caused by handler registration
-  const openFiltersHandlerRef = useRef<(() => void) | null>(null);
+  // Store registrations in refs so handlers can be added/removed without re-rendering.
+  const openFiltersRegistrationsRef = useRef<
+    Array<{ id: number; priority: number; handler: () => void }>
+  >([]);
+  const nextRegistrationIdRef = useRef(0);
 
   const expand = useCallback(() => {
     setIsExpanded(true);
@@ -65,15 +70,42 @@ export function MobileSearchProvider({
     setIsExpanded(false);
   }, []);
 
-  // No dependency needed - ref is always current
   const openFilters = useCallback(() => {
-    openFiltersHandlerRef.current?.();
+    const registrations = openFiltersRegistrationsRef.current;
+    if (registrations.length === 0) return;
+
+    let selected = registrations[0];
+    for (const registration of registrations) {
+      const isHigherPriority = registration.priority > selected.priority;
+      const isNewerSamePriority =
+        registration.priority === selected.priority &&
+        registration.id > selected.id;
+
+      if (isHigherPriority || isNewerSamePriority) {
+        selected = registration;
+      }
+    }
+
+    selected.handler();
   }, []);
 
-  // No state update - just stores in ref (no re-render!)
-  const registerOpenFilters = useCallback((handler: () => void) => {
-    openFiltersHandlerRef.current = handler;
-  }, []);
+  const registerOpenFilters = useCallback(
+    (handler: () => void, priority = 0) => {
+      const id = nextRegistrationIdRef.current++;
+      openFiltersRegistrationsRef.current = [
+        ...openFiltersRegistrationsRef.current,
+        { id, priority, handler },
+      ];
+
+      return () => {
+        openFiltersRegistrationsRef.current =
+          openFiltersRegistrationsRef.current.filter(
+            (registration) => registration.id !== id
+          );
+      };
+    },
+    []
+  );
 
   const value = useMemo(
     () => ({

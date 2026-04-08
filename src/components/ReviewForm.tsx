@@ -358,9 +358,7 @@ export default function ReviewForm({
             <CheckCircle2 className="w-5 h-5 text-green-600" />
           </div>
           <div className="flex-1 min-w-0">
-            <h3 className="font-semibold text-on-surface mb-1">
-              Your Review
-            </h3>
+            <h3 className="font-semibold text-on-surface mb-1">Your Review</h3>
             <div className="flex items-center gap-1 mb-2">
               {[1, 2, 3, 4, 5].map((star) => (
                 <Star
@@ -484,9 +482,7 @@ export default function ReviewForm({
       onSubmit={handleSubmit}
       className="space-y-4 bg-surface-canvas p-6 rounded-xl border border-outline-variant/20"
     >
-      <h3 className="font-semibold text-lg text-on-surface">
-        Write a Review
-      </h3>
+      <h3 className="font-semibold text-lg text-on-surface">Write a Review</h3>
 
       {/* Success state */}
       {isSubmitted && (

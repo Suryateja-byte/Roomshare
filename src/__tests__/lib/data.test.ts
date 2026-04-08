@@ -1415,7 +1415,9 @@ describe("slotThreshold parameterization", () => {
     it("parameterizes slotThreshold via $1 placeholder instead of interpolating", async () => {
       mockQueryWithTimeout.mockResolvedValue([]);
 
-      await getMapListings({ bounds: { minLat: 30, maxLat: 40, minLng: -120, maxLng: -110 } });
+      await getMapListings({
+        bounds: { minLat: 30, maxLat: 40, minLng: -120, maxLng: -110 },
+      });
 
       expect(mockQueryWithTimeout).toHaveBeenCalled();
       const sql = mockQueryWithTimeout.mock.calls[0][0] as string;
@@ -1446,7 +1448,9 @@ describe("slotThreshold parameterization", () => {
     it("parameterizes slotThreshold via $1 placeholder instead of interpolating", async () => {
       mockQueryWithTimeout.mockResolvedValue([{ total: BigInt(0) }]);
 
-      await getListingsPaginated({ bounds: { minLat: 30, maxLat: 40, minLng: -120, maxLng: -110 } });
+      await getListingsPaginated({
+        bounds: { minLat: 30, maxLat: 40, minLng: -120, maxLng: -110 },
+      });
 
       expect(mockQueryWithTimeout).toHaveBeenCalled();
       // getListingsPaginated issues two queries (count + data) — check both

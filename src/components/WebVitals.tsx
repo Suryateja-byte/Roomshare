@@ -39,7 +39,8 @@ function logMetricToConsole(
 ) {
   const color = RATING_COLORS[rating];
   const unit = name === "CLS" ? "" : "ms";
-  const displayValue = name === "CLS" ? value.toFixed(4) : `${Math.round(value)}${unit}`;
+  const displayValue =
+    name === "CLS" ? value.toFixed(4) : `${Math.round(value)}${unit}`;
 
   console.log(
     `%c[Web Vitals] %c${name} %c${displayValue} %c(${rating})`,

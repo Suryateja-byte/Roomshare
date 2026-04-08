@@ -23,8 +23,8 @@ interface PrivacyCircleProps {
 }
 
 // Build circle layer paint props based on dark mode.
-// ~200m radius circle: circle-radius interpolated by zoom to approximate
-// 200m in screen pixels. At zoom 12: ~3px, 14: ~12px, 16: ~48px.
+// Keep the approximate-location cue visible, but cap the close-zoom footprint
+// so the circles read as intentional privacy halos instead of visual artifacts.
 function getCircleLayer(isDarkMode: boolean): LayerProps {
   return {
     id: "privacy-circles",
@@ -39,20 +39,49 @@ function getCircleLayer(isDarkMode: boolean): LayerProps {
         12,
         3,
         14,
-        12,
-        16,
-        48,
+        10,
+        15,
         18,
-        192,
+        16,
+        28,
+        17,
+        38,
+        18,
+        48,
       ],
-      "circle-color": isDarkMode
-        ? "rgba(161, 161, 170, 0.15)"
-        : "rgba(113, 113, 122, 0.12)",
+      "circle-color": isDarkMode ? "#a1a1aa" : "#71717a",
+      "circle-opacity": [
+        "interpolate",
+        ["linear"],
+        ["zoom"],
+        10,
+        0.1,
+        12,
+        0.12,
+        14,
+        0.1,
+        16,
+        0.08,
+        18,
+        0.05,
+      ],
       "circle-stroke-width": 1,
-      "circle-stroke-color": isDarkMode
-        ? "rgba(161, 161, 170, 0.25)"
-        : "rgba(113, 113, 122, 0.2)",
-      "circle-stroke-opacity": 0.6,
+      "circle-stroke-color": isDarkMode ? "#a1a1aa" : "#71717a",
+      "circle-stroke-opacity": [
+        "interpolate",
+        ["linear"],
+        ["zoom"],
+        10,
+        0.2,
+        12,
+        0.2,
+        14,
+        0.18,
+        16,
+        0.14,
+        18,
+        0.1,
+      ],
     },
   };
 }

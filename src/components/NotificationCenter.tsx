@@ -150,9 +150,7 @@ export default function NotificationCenter() {
         <div className="absolute right-0 mt-2 w-80 sm:w-96 bg-surface-container-lowest/95 backdrop-blur-[20px] rounded-lg shadow-ambient overflow-hidden z-sticky animate-in fade-in zoom-in-95 duration-200">
           {/* Header */}
           <div className="px-4 py-3 bg-surface-container-high/30 flex items-center justify-between">
-            <h3 className="font-semibold text-on-surface">
-              Notifications
-            </h3>
+            <h3 className="font-semibold text-on-surface">Notifications</h3>
             {unreadCount > 0 && (
               <button
                 onClick={handleMarkAllAsRead}

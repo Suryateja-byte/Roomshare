@@ -63,9 +63,7 @@ jest.mock("@/lib/rate-limit", () => ({
 }));
 
 jest.mock("@/lib/with-rate-limit", () => ({
-  checkServerComponentRateLimit: jest
-    .fn()
-    .mockResolvedValue({ allowed: true }),
+  checkServerComponentRateLimit: jest.fn().mockResolvedValue({ allowed: true }),
 }));
 
 jest.mock("next/headers", () => ({
@@ -79,7 +77,10 @@ jest.mock("@/app/actions/suspension", () => ({
 import { prisma } from "@/lib/prisma";
 import { auth } from "@/auth";
 
-const mockPrisma = prisma as unknown as Record<string, Record<string, jest.Mock>>;
+const mockPrisma = prisma as unknown as Record<
+  string,
+  Record<string, jest.Mock>
+>;
 
 const ALICE = { user: { id: "alice-id", name: "Alice" } };
 
@@ -94,7 +95,9 @@ describe("IDOR & Data Exposure Prevention — Phase 2", () => {
       (auth as jest.Mock).mockResolvedValue(ALICE);
       // Prisma throws P2025 when compound WHERE (id + userId) finds nothing
       mockPrisma.savedSearch.delete.mockRejectedValue(
-        Object.assign(new Error("Record to delete does not exist."), { code: "P2025" })
+        Object.assign(new Error("Record to delete does not exist."), {
+          code: "P2025",
+        })
       );
 
       const { deleteSavedSearch } = await import("@/app/actions/saved-search");
@@ -129,8 +132,12 @@ describe("IDOR & Data Exposure Prevention — Phase 2", () => {
         Object.assign(new Error("Record not found"), { code: "P2025" })
       );
 
-      const { updateSavedSearchName } = await import("@/app/actions/saved-search");
-      const result = await updateSavedSearchName("bob-search-id", "Hacked Name");
+      const { updateSavedSearchName } =
+        await import("@/app/actions/saved-search");
+      const result = await updateSavedSearchName(
+        "bob-search-id",
+        "Hacked Name"
+      );
       expect(result).toEqual({ error: expect.stringContaining("search name") });
 
       expect(mockPrisma.savedSearch.update).toHaveBeenCalledWith({
@@ -151,7 +158,8 @@ describe("IDOR & Data Exposure Prevention — Phase 2", () => {
         Object.assign(new Error("Record not found"), { code: "P2025" })
       );
 
-      const { markNotificationAsRead } = await import("@/app/actions/notifications");
+      const { markNotificationAsRead } =
+        await import("@/app/actions/notifications");
       const result = await markNotificationAsRead("bob-notification-id");
       expect(result).toEqual({ error: expect.any(String) });
 
@@ -170,7 +178,8 @@ describe("IDOR & Data Exposure Prevention — Phase 2", () => {
         Object.assign(new Error("Record not found"), { code: "P2025" })
       );
 
-      const { deleteNotification } = await import("@/app/actions/notifications");
+      const { deleteNotification } =
+        await import("@/app/actions/notifications");
       const result = await deleteNotification("bob-notification-id");
       expect(result).toEqual({ error: expect.any(String) });
 
@@ -194,7 +203,8 @@ describe("IDOR & Data Exposure Prevention — Phase 2", () => {
         listing: { ownerId: "bob-id" }, // Bob owns the listing, Alice is trying
       });
 
-      const { createReviewResponse } = await import("@/app/actions/review-response");
+      const { createReviewResponse } =
+        await import("@/app/actions/review-response");
       const result = await createReviewResponse("review-1", "Nice try");
       expect(result).toEqual({ error: expect.stringContaining("owner") });
     });
@@ -207,7 +217,8 @@ describe("IDOR & Data Exposure Prevention — Phase 2", () => {
         review: { listing: { ownerId: "bob-id" } },
       });
 
-      const { updateReviewResponse } = await import("@/app/actions/review-response");
+      const { updateReviewResponse } =
+        await import("@/app/actions/review-response");
       const result = await updateReviewResponse("response-1", "Edited");
       expect(result).toEqual({ error: expect.stringContaining("owner") });
     });
@@ -220,7 +231,8 @@ describe("IDOR & Data Exposure Prevention — Phase 2", () => {
         review: { listing: { ownerId: "bob-id" } },
       });
 
-      const { deleteReviewResponse } = await import("@/app/actions/review-response");
+      const { deleteReviewResponse } =
+        await import("@/app/actions/review-response");
       const result = await deleteReviewResponse("response-1");
       expect(result).toEqual({ error: expect.stringContaining("owner") });
     });

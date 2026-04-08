@@ -4,52 +4,55 @@ import { Skeleton } from "./Skeleton";
  * Skeleton for ListingCard - dimensions must match ListingCard.tsx exactly to prevent CLS.
  *
  * CLS-critical dimensions (sync with ListingCard.tsx):
- * - Image: aspect-[16/10] sm:aspect-[4/3]
- * - Content padding: p-3 sm:p-4
+ * - Card shell: rounded-2xl with shadow-sm and no visible border
+ * - Image: aspect-[4/3]
  * - Title row: mb-0.5
- * - Location: mb-3
- * - Amenities: mb-2
- * - Languages row: ~24px height, mb-4 (always reserve space)
- * - Price: mt-auto pushed to bottom
+ * - Content padding: p-4
+ * - Overlay actions: top-right controls + top-left badges reserve the same footprint
  */
 export function ListingCardSkeleton() {
   return (
-    <div className="bg-surface-container-lowest rounded-xl border border-outline-variant/20/60 overflow-hidden">
-      {/* Image placeholder - matches ListingCard aspect-[16/10] sm:aspect-[4/3] */}
-      <Skeleton
-        variant="rectangular"
-        className="aspect-[16/10] sm:aspect-[4/3] w-full"
-      />
+    <div
+      data-testid="listing-card-skeleton"
+      className="group relative flex flex-col rounded-2xl bg-surface-container-lowest mb-4 shadow-sm overflow-hidden"
+      aria-hidden="true"
+      role="presentation"
+    >
+      <div className="relative overflow-hidden aspect-[4/3] bg-surface-canvas">
+        <Skeleton variant="rectangular" className="h-full w-full" />
 
-      {/* Content - CLS fix: p-3 sm:p-4 matches ListingCard */}
-      <div className="p-3 sm:p-4 flex flex-col min-h-[156px]">
-        {/* Title and rating - mb-0.5 matches ListingCard */}
-        <div className="flex justify-between items-start gap-3 mb-0.5">
-          <Skeleton variant="text" width="70%" height={18} />
-          <Skeleton variant="text" width={40} height={16} />
+        <div className="absolute z-20 top-3 right-3 flex items-center gap-1.5">
+          <Skeleton variant="circular" width={32} height={32} />
+          <Skeleton variant="circular" width={40} height={40} />
         </div>
 
-        {/* Location - mb-3 matches ListingCard */}
-        <Skeleton variant="text" width="45%" height={14} className="mb-3" />
+        <div className="absolute top-4 left-4 z-20 flex flex-col gap-2">
+          <Skeleton
+            variant="rounded"
+            width={116}
+            height={28}
+            className="rounded-md"
+          />
+          <Skeleton
+            variant="rounded"
+            width={72}
+            height={24}
+            className="rounded-md"
+          />
+        </div>
+      </div>
 
-        {/* Amenities - mb-2 matches ListingCard */}
-        <div className="flex gap-1.5 mb-2">
-          <Skeleton variant="rounded" width={60} height={20} />
-          <Skeleton variant="rounded" width={50} height={20} />
-          <Skeleton variant="rounded" width={45} height={20} />
+      <div className="p-4 flex flex-col flex-1">
+        <div className="flex items-baseline justify-between gap-3 mb-1">
+          <div className="flex items-baseline gap-2">
+            <Skeleton variant="text" width={96} height={28} />
+            <Skeleton variant="text" width={26} height={14} />
+          </div>
+          <Skeleton variant="text" width={52} height={18} />
         </div>
 
-        {/* Languages row placeholder - reserves space for conditional section */}
-        <div className="flex gap-1.5 mb-4">
-          <Skeleton variant="circular" width={14} height={14} />
-          <Skeleton variant="rounded" width={55} height={18} />
-          <Skeleton variant="rounded" width={45} height={18} />
-        </div>
-
-        {/* Price - mt-auto pushes to bottom like ListingCard */}
-        <div className="mt-auto">
-          <Skeleton variant="text" width={80} height={24} />
-        </div>
+        <Skeleton variant="text" width="72%" height={18} className="mb-0.5" />
+        <Skeleton variant="text" width="58%" height={16} />
       </div>
     </div>
   );
@@ -57,7 +60,10 @@ export function ListingCardSkeleton() {
 
 export function ListingGridSkeleton({ count = 6 }: { count?: number }) {
   return (
-    <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 sm:gap-x-6 sm:gap-y-8">
+    <div
+      data-testid="listing-card-skeleton-grid"
+      className="grid grid-cols-1 sm:grid-cols-2 gap-5 sm:gap-x-6 sm:gap-y-9"
+    >
       {Array.from({ length: count }).map((_, i) => (
         <ListingCardSkeleton key={i} />
       ))}

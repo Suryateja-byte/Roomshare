@@ -248,7 +248,7 @@ test.describe("No hover-only interactions", () => {
     test.skip(!sheetReady, "Bottom sheet not visible");
 
     // Expand to see listing cards with carousels
-    await setSheetSnap(page, 2);
+    await setSheetSnap(page, 1);
     await waitForSheetAnimation(page);
 
     // Find the first image carousel
@@ -351,7 +351,7 @@ test.describe("Touch-action CSS properties", () => {
     const sheetReady = await waitForMobileSheet(page);
     test.skip(!sheetReady, "Bottom sheet not visible");
 
-    await setSheetSnap(page, 2);
+    await setSheetSnap(page, 1);
     await waitForSheetAnimation(page);
 
     // Find the Embla viewport (the element with touch-action:pan-y class)
@@ -382,14 +382,15 @@ test.describe("Touch-action CSS properties", () => {
     }
   });
 
-  test("sheet content area allows touch events at half position", async ({
+  test("sheet content area allows touch events when expanded", async ({
     page,
   }) => {
     await page.goto(`/search?${boundsQS}`);
     const sheetReady = await waitForMobileSheet(page);
     test.skip(!sheetReady, "Bottom sheet not visible");
 
-    // At half position, content should be interactive
+    // When expanded, content should be interactive
+    await setSheetSnap(page, 1);
     expect(await getSheetSnapIndex(page)).toBe(1);
 
     const content = page.locator(mobileSelectors.snapContent).first();
@@ -478,31 +479,23 @@ test.describe("Bottom sheet touch interactions", () => {
     expect(userSelect).toBe("none");
   });
 
-  test("expand/collapse buttons are tappable on mobile", async ({ page }) => {
+  test("minimize button is tappable on mobile", async ({ page }) => {
     await page.goto(`/search?${boundsQS}`);
     const sheetReady = await waitForMobileSheet(page);
     test.skip(!sheetReady, "Bottom sheet not visible");
 
-    // Start at half, try to expand via tap
+    // Sheet starts expanded (index 1), minimize should collapse it
     expect(await getSheetSnapIndex(page)).toBe(1);
 
-    const expandBtn = page.locator(mobileSelectors.expandButton);
-    const expandBtnVisible = await expandBtn.isVisible({ timeout: 5000 }).catch(() => false);
-    test.skip(!expandBtnVisible, "Expand button not visible");
+    const minimizeBtn = page.locator(mobileSelectors.minimizeButton);
+    const minimizeBtnVisible = await minimizeBtn.isVisible({ timeout: 5000 }).catch(() => false);
+    test.skip(!minimizeBtnVisible, "Minimize button not visible");
 
     // Use tap() instead of click() to test touch behavior
-    await expandBtn.tap();
+    await minimizeBtn.tap();
     await waitForSheetAnimation(page);
 
-    expect(await getSheetSnapIndex(page)).toBe(2);
-
-    // Now collapse via tap
-    const collapseBtn = page.locator(mobileSelectors.collapseButton);
-    if (await collapseBtn.isVisible({ timeout: 3000 }).catch(() => false)) {
-      await collapseBtn.tap();
-      await waitForSheetAnimation(page);
-      expect(await getSheetSnapIndex(page)).toBe(1);
-    }
+    expect(await getSheetSnapIndex(page)).toBe(0);
   });
 });
 
@@ -665,7 +658,7 @@ test.describe("Safe area handling", () => {
     test.skip(!sheetReady, "Bottom sheet not visible");
 
     // Expand the sheet
-    await setSheetSnap(page, 2);
+    await setSheetSnap(page, 1);
     await waitForSheetAnimation(page);
 
     // Check that the sheet or its content has safe-area padding
@@ -714,7 +707,7 @@ test.describe("Body scroll lock", () => {
     test.skip(!sheetReady, "Bottom sheet not visible");
 
     // Expand the sheet fully
-    await setSheetSnap(page, 2);
+    await setSheetSnap(page, 1);
     await waitForSheetAnimation(page);
 
     // Check overscroll-behavior on the content area

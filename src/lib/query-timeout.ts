@@ -26,9 +26,7 @@ export async function queryWithTimeout<T>(
     );
   }
   return prisma.$transaction(async (tx) => {
-    await tx.$executeRawUnsafe(
-      `SET LOCAL statement_timeout = ${timeoutMs}`
-    );
+    await tx.$executeRawUnsafe(`SET LOCAL statement_timeout = ${timeoutMs}`);
     return tx.$queryRawUnsafe<T[]>(query, ...params);
   });
 }

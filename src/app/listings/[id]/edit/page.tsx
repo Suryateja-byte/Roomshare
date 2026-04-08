@@ -7,7 +7,8 @@ import { features } from "@/lib/env";
 
 export const metadata: Metadata = {
   title: "Edit Listing | RoomShare",
-  description: "Update your listing details, photos, and availability on RoomShare.",
+  description:
+    "Update your listing details, photos, and availability on RoomShare.",
   robots: { index: false, follow: false },
 };
 

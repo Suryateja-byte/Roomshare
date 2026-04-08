@@ -113,6 +113,7 @@ const serverEnvSchema = z
     GEMINI_API_KEY: z.string().min(1).optional(),
     ENABLE_SEMANTIC_SEARCH: z.enum(["true", "false"]).optional(),
     ENABLE_IMAGE_EMBEDDINGS: z.enum(["true", "false"]).optional(),
+    ENABLE_CLIENT_SIDE_SEARCH: z.enum(["true", "false"]).optional(),
     SEMANTIC_WEIGHT: z.coerce.number().min(0).max(1).optional(),
 
     // Node environment
@@ -205,6 +206,7 @@ const clientEnvSchema = z
 
     // Feature flags
     NEXT_PUBLIC_NEARBY_ENABLED: z.enum(["true", "false"]).optional(),
+    NEXT_PUBLIC_ENABLE_CLIENT_SIDE_SEARCH: z.enum(["true", "false"]).optional(),
 
     // Cloudflare Turnstile (bot protection - required in production)
     NEXT_PUBLIC_TURNSTILE_SITE_KEY: z.string().optional(),
@@ -289,6 +291,8 @@ function validateClientEnv(): ClientEnv {
       process.env.NEXT_PUBLIC_RADAR_PUBLISHABLE_KEY,
     NEXT_PUBLIC_STADIA_API_KEY: process.env.NEXT_PUBLIC_STADIA_API_KEY,
     NEXT_PUBLIC_NEARBY_ENABLED: process.env.NEXT_PUBLIC_NEARBY_ENABLED,
+    NEXT_PUBLIC_ENABLE_CLIENT_SIDE_SEARCH:
+      process.env.NEXT_PUBLIC_ENABLE_CLIENT_SIDE_SEARCH,
     NEXT_PUBLIC_TURNSTILE_SITE_KEY: process.env.NEXT_PUBLIC_TURNSTILE_SITE_KEY,
     NEXT_PUBLIC_APP_URL: process.env.NEXT_PUBLIC_APP_URL,
   };
@@ -497,6 +501,9 @@ export const features = {
     if (process.env.NODE_ENV !== "production") return true;
     // In production, require explicit env flag (for staging/preview debugging)
     return process.env.SEARCH_DEBUG_RANKING === "true";
+  },
+  get clientSideSearch() {
+    return process.env.ENABLE_CLIENT_SIDE_SEARCH === "true";
   },
   get semanticSearch() {
     return process.env.ENABLE_SEMANTIC_SEARCH === "true";

@@ -158,9 +158,9 @@ describe("buildSearchDocWhereConditions", () => {
         amenities: ["Pool"],
       });
 
-      expect(
-        result.conditions.some((c) => c.includes("amenities_lower"))
-      ).toBe(true);
+      expect(result.conditions.some((c) => c.includes("amenities_lower"))).toBe(
+        true
+      );
       expect(result.params).toContainEqual(["pool"]);
     });
 
@@ -201,9 +201,9 @@ describe("buildSearchDocWhereConditions", () => {
         },
       });
 
-      expect(
-        result.conditions.some((c) => c.includes("ST_MakeEnvelope"))
-      ).toBe(true);
+      expect(result.conditions.some((c) => c.includes("ST_MakeEnvelope"))).toBe(
+        true
+      );
       expect(result.params).toContain(-122.5);
       expect(result.params).toContain(37.7);
       expect(result.params).toContain(-122.3);
@@ -217,9 +217,9 @@ describe("buildSearchDocWhereConditions", () => {
         bookingMode: "instant",
       });
 
-      expect(
-        result.conditions.some((c) => c.includes("booking_mode"))
-      ).toBe(true);
+      expect(result.conditions.some((c) => c.includes("booking_mode"))).toBe(
+        true
+      );
       expect(result.params).toContain("instant");
     });
 

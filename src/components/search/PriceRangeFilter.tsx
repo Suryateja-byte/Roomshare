@@ -65,9 +65,7 @@ export function PriceRangeFilter({
         <label className="text-sm font-semibold text-on-surface">
           Price Range
         </label>
-        <span className="text-sm text-on-surface-variant">
-          {rangeLabel}
-        </span>
+        <span className="text-sm text-on-surface-variant">{rangeLabel}</span>
       </div>
 
       {/* Histogram + Slider container */}

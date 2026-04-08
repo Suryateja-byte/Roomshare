@@ -157,9 +157,7 @@ export default function ProfileCompletionIndicator({
           </h3>
           <span
             className={`text-sm font-bold ${
-              percentage === 100
-                ? "text-green-600"
-                : "text-on-surface"
+              percentage === 100 ? "text-green-600" : "text-on-surface"
             }`}
           >
             {percentage}%
@@ -190,9 +188,7 @@ export default function ProfileCompletionIndicator({
             key={step.id}
             href={step.href}
             className={`flex items-center gap-4 px-6 py-4 transition-colors ${
-              step.completed
-                ? "bg-surface-canvas"
-                : "hover:bg-surface-canvas"
+              step.completed ? "bg-surface-canvas" : "hover:bg-surface-canvas"
             }`}
           >
             {/* Status Icon */}

@@ -41,7 +41,8 @@ export async function GET(request: Request) {
   try {
     const { searchParams } = new URL(request.url);
     const rawParams = buildRawParamsFromSearchParams(searchParams);
-    const { filterParams, requestedPage, boundsRequired } = parseSearchParams(rawParams);
+    const { filterParams, requestedPage, boundsRequired } =
+      parseSearchParams(rawParams);
 
     // Block unbounded text searches before hitting DB (defense-in-depth).
     // getListingsPaginated also rejects these, but checking here avoids the DB round-trip.

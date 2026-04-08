@@ -351,8 +351,9 @@ export async function getMapListings(
   // Build WHERE conditions dynamically
   // minAvailableSlots defaults to 1 (at least one slot available)
   const slotThreshold = Math.max(minAvailableSlots ?? 1, 1);
-  const queryParams: (string | number | boolean | null | Date | string[])[] =
-    [slotThreshold];
+  const queryParams: (string | number | boolean | null | Date | string[])[] = [
+    slotThreshold,
+  ];
   let paramIndex = 2;
   const conditions: string[] = [
     'l."availableSlots" >= $1',

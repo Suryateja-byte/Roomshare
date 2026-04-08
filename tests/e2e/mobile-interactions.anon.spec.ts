@@ -29,7 +29,6 @@ import {
   isMobileViewport,
   waitForMobileSheet,
   SNAP_COLLAPSED,
-  SNAP_HALF,
   SNAP_EXPANDED,
 } from "./helpers/mobile-helpers";
 
@@ -49,7 +48,7 @@ test.describe("Mobile Bottom Sheet - Snap Transitions", () => {
     viewport: { width: 390, height: 844 },
   });
 
-  test("double ArrowUp from collapsed traverses half then expanded", async ({
+  test("ArrowUp from collapsed moves to expanded", async ({
     page,
   }) => {
     await page.goto(`/search?${boundsQS}`);
@@ -60,7 +59,7 @@ test.describe("Mobile Bottom Sheet - Snap Transitions", () => {
     await setSheetSnap(page, 0);
     expect(await getSheetSnapIndex(page)).toBe(0);
 
-    // Focus the handle and press ArrowUp once -> should go to half (1)
+    // Focus the handle and press ArrowUp once -> should go to expanded (1)
     const handle = page.locator(mobileSelectors.sheetHandle);
     await handle.focus();
     await page.keyboard.press("ArrowUp");
@@ -68,38 +67,30 @@ test.describe("Mobile Bottom Sheet - Snap Transitions", () => {
 
     expect(await getSheetSnapIndex(page)).toBe(1);
 
-    // Press ArrowUp again -> should go to expanded (2)
-    await page.keyboard.press("ArrowUp");
-    await waitForSheetAnimation(page);
-
-    expect(await getSheetSnapIndex(page)).toBe(2);
-
     // Verify the height matches expanded (~85vh)
     const fraction = await getSheetHeightFraction(page);
     expect(fraction).toBeGreaterThan(0.75);
     expect(fraction).toBeLessThan(0.95);
   });
 
-  test("Escape from half position stays at half", async ({ page }) => {
+  test("Escape from expanded collapses sheet", async ({ page }) => {
     await page.goto(`/search?${boundsQS}`);
     const sheetReady = await waitForMobileSheet(page);
     test.skip(!sheetReady, "Mobile bottom sheet not ready");
 
-    // Ensure we start at half (default)
+    // Ensure we start at expanded (default, index 1)
     expect(await getSheetSnapIndex(page)).toBe(1);
 
-    // Press Escape -- should NOT collapse further, stays at half
+    // Press Escape -- should collapse to 0
     await page.keyboard.press("Escape");
     await waitForSheetAnimation(page);
 
-    // The component code: if (e.key === "Escape" && snapIndex !== 0) setSnapIndex(1)
-    // At half (1), this sets to 1, so no change
-    expect(await getSheetSnapIndex(page)).toBe(1);
+    expect(await getSheetSnapIndex(page)).toBe(0);
 
-    // Verify height still approximately 50vh
+    // Verify collapsed height (~15vh)
     const fraction = await getSheetHeightFraction(page);
-    expect(fraction).toBeGreaterThan(0.4);
-    expect(fraction).toBeLessThan(0.6);
+    expect(fraction).toBeGreaterThan(0.1);
+    expect(fraction).toBeLessThan(0.25);
   });
 });
 
@@ -113,12 +104,12 @@ test.describe("Mobile Bottom Sheet - Content", () => {
     viewport: { width: 390, height: 844 },
   });
 
-  test("listing cards are visible in half position", async ({ page }) => {
+  test("listing cards are visible in expanded position", async ({ page }) => {
     await page.goto(`/search?${boundsQS}`);
     const sheetReady = await waitForMobileSheet(page);
     test.skip(!sheetReady, "Mobile bottom sheet not ready");
 
-    // Sheet starts at half
+    // Sheet starts at expanded (index 1)
     expect(await getSheetSnapIndex(page)).toBe(1);
 
     // Listing cards should be visible within the sheet
@@ -162,8 +153,8 @@ test.describe("Mobile Bottom Sheet - Content", () => {
     test.skip(!sheetReady, "Mobile bottom sheet not ready");
 
     // Expand the sheet
-    await setSheetSnap(page, 2);
-    expect(await getSheetSnapIndex(page)).toBe(2);
+    await setSheetSnap(page, 1);
+    expect(await getSheetSnapIndex(page)).toBe(1);
 
     // The content area should be scrollable when expanded
     const content = page.locator(mobileSelectors.snapContent).first();
@@ -210,11 +201,6 @@ test.describe("Mobile Bottom Sheet - Content", () => {
     const pullUpVisible = await pullUpText.isVisible().catch(() => false);
     // This text is conditionally rendered only when isCollapsed
     expect(pullUpVisible).toBeTruthy();
-
-    // The expand/collapse buttons should NOT be visible when collapsed
-    const expandBtn = page.locator(mobileSelectors.expandButton);
-    const expandVisible = await expandBtn.isVisible().catch(() => false);
-    expect(expandVisible).toBeFalsy();
   });
 
   test("sheet header shows result count text", async ({ page }) => {
@@ -245,12 +231,12 @@ test.describe("Mobile Map and Sheet", () => {
     viewport: { width: 390, height: 844 },
   });
 
-  test("map is visible behind sheet in half position", async ({ page }) => {
+  test("map is visible behind sheet in expanded position", async ({ page }) => {
     await page.goto(`/search?${boundsQS}`);
     const sheetReady = await waitForMobileSheet(page);
     test.skip(!sheetReady, "Mobile bottom sheet not ready");
 
-    // Sheet at half
+    // Sheet at expanded (index 1)
     expect(await getSheetSnapIndex(page)).toBe(1);
 
     // Map container should be present and visible
@@ -301,14 +287,14 @@ test.describe("Mobile Map and Sheet", () => {
     }
   });
 
-  test("map markers visible when sheet is at half position", async ({
+  test("map markers visible when sheet is at expanded position", async ({
     page,
   }) => {
     await page.goto(`/search?${boundsQS}`);
     const sheetReady = await waitForMobileSheet(page);
     test.skip(!sheetReady, "Mobile bottom sheet not ready");
 
-    // Sheet at half
+    // Sheet at expanded (index 1)
     expect(await getSheetSnapIndex(page)).toBe(1);
 
     // Wait for map markers to appear (they load asynchronously after map init)
@@ -354,7 +340,7 @@ test.describe("Mobile Sort Interaction", () => {
     const sheetReady = await waitForMobileSheet(page);
     test.skip(!sheetReady, "Mobile bottom sheet not ready");
 
-    // Expand the sheet to half or more so sort button is visible
+    // Sheet starts at expanded so sort button should be visible
     expect(await getSheetSnapIndex(page)).toBe(1);
 
     // Look for the mobile sort button (aria-label starts with "Sort:")
@@ -365,8 +351,8 @@ test.describe("Mobile Sort Interaction", () => {
       .catch(() => false);
 
     if (!sortVisible) {
-      // Sort button may not be in viewport at half position -- try expanding
-      await setSheetSnap(page, 2);
+      // Sort button may not be in viewport -- try expanding
+      await setSheetSnap(page, 1);
       await waitForSheetAnimation(page);
     }
 
@@ -394,7 +380,7 @@ test.describe("Mobile Sort Interaction", () => {
     test.skip(!sheetReady, "Mobile bottom sheet not ready");
 
     // Try to find and click the sort button
-    await setSheetSnap(page, 2);
+    await setSheetSnap(page, 1);
     const sortBtn = page.locator(mobileSelectors.sortButton).first();
     const sortBtnVisible = await sortBtn.isVisible({ timeout: 5000 }).catch(() => false);
     test.skip(!sortBtnVisible, "Sort button not visible");
@@ -551,8 +537,8 @@ test.describe("Mobile Edge Cases", () => {
     test.skip(!sheetReady, "Mobile bottom sheet not ready");
 
     // Set to expanded
-    await setSheetSnap(page, 2);
-    expect(await getSheetSnapIndex(page)).toBe(2);
+    await setSheetSnap(page, 1);
+    expect(await getSheetSnapIndex(page)).toBe(1);
 
     // Simulate orientation change by resizing viewport to landscape
     await page.setViewportSize({ width: 844, height: 390 });
@@ -568,7 +554,7 @@ test.describe("Mobile Edge Cases", () => {
       // If still mobile layout, snap should be preserved
       const snap = await getSheetSnapIndex(page);
       expect(snap).toBeGreaterThanOrEqual(0);
-      expect(snap).toBeLessThanOrEqual(2);
+      expect(snap).toBeLessThanOrEqual(1);
     }
 
     // Rotate back to portrait
@@ -587,8 +573,8 @@ test.describe("Mobile Edge Cases", () => {
     test.skip(!sheetReady, "Mobile bottom sheet not ready");
 
     // Expand the sheet so content is scrollable
-    await setSheetSnap(page, 2);
-    expect(await getSheetSnapIndex(page)).toBe(2);
+    await setSheetSnap(page, 1);
+    expect(await getSheetSnapIndex(page)).toBe(1);
 
     // Verify overscroll-behavior: contain on the content area
     const content = page.locator(mobileSelectors.snapContent).first();
@@ -609,10 +595,10 @@ test.describe("Mobile Edge Cases", () => {
     const sheetReady = await waitForMobileSheet(page);
     test.skip(!sheetReady, "Mobile bottom sheet not ready");
 
-    // Start at half
+    // Start at expanded (default, index 1)
     expect(await getSheetSnapIndex(page)).toBe(1);
 
-    // The minimize (X) button should be visible at half position
+    // The minimize (X) button should be visible at expanded position
     const minimizeBtn = page.locator(mobileSelectors.minimizeButton);
     try {
       await expect(minimizeBtn).toBeVisible({ timeout: 5000 });
@@ -635,34 +621,6 @@ test.describe("Mobile Edge Cases", () => {
     expect(fraction).toBeLessThan(0.25);
   });
 
-  test("expand button toggles sheet between half and expanded", async ({
-    page,
-  }) => {
-    await page.goto(`/search?${boundsQS}`);
-    const sheetReady = await waitForMobileSheet(page);
-    test.skip(!sheetReady, "Mobile bottom sheet not ready");
-
-    // Start at half
-    expect(await getSheetSnapIndex(page)).toBe(1);
-
-    // Click expand (use evaluate click for reliability on WSL2)
-    const expandBtn = page.locator(mobileSelectors.expandButton);
-    const expandBtnVisible = await expandBtn.isVisible({ timeout: 5000 }).catch(() => false);
-    test.skip(!expandBtnVisible, "Expand button not visible");
-
-    await expandBtn.evaluate((el) => (el as HTMLElement).click());
-    await waitForSheetAnimation(page);
-    expect(await getSheetSnapIndex(page)).toBe(2);
-
-    // Now "Collapse results" button should appear
-    const collapseBtn = page.locator(mobileSelectors.collapseButton);
-    await expect(collapseBtn).toBeVisible({ timeout: 5000 });
-
-    // Click collapse (use evaluate click for reliability on WSL2)
-    await collapseBtn.evaluate((el) => (el as HTMLElement).click());
-    await waitForSheetAnimation(page);
-    expect(await getSheetSnapIndex(page)).toBe(1);
-  });
 });
 
 // ---------------------------------------------------------------------------
@@ -772,15 +730,16 @@ test.describe("Mobile Bottom Sheet - Overlay", () => {
     const sheetReady = await waitForMobileSheet(page);
     test.skip(!sheetReady, "Mobile bottom sheet not ready");
 
-    // At half position, no overlay
-    expect(await getSheetSnapIndex(page)).toBe(1);
+    // Collapse first so we can test transition to expanded
+    await setSheetSnap(page, 0);
+    expect(await getSheetSnapIndex(page)).toBe(0);
     const overlay = page.locator('[data-testid="sheet-overlay"]');
     let overlayVisible = await overlay.isVisible().catch(() => false);
     expect(overlayVisible).toBeFalsy();
 
     // Expand the sheet
-    await setSheetSnap(page, 2);
-    expect(await getSheetSnapIndex(page)).toBe(2);
+    await setSheetSnap(page, 1);
+    expect(await getSheetSnapIndex(page)).toBe(1);
 
     // Wait for AnimatePresence to render the overlay
     await waitForSheetAnimation(page);
@@ -795,8 +754,8 @@ test.describe("Mobile Bottom Sheet - Overlay", () => {
     // Overlay should be present when expanded
     expect(overlayVisible).toBeTruthy();
 
-    // Collapse back to half
-    await setSheetSnap(page, 1);
+    // Collapse back
+    await setSheetSnap(page, 0);
     await waitForSheetAnimation(page);
 
     // Overlay should be gone (wait for AnimatePresence exit animation)
@@ -842,12 +801,12 @@ test.describe("Mobile Bottom Sheet - Content Overflow Control", () => {
     expect(pointerEvents).toBe("none");
   });
 
-  test("content scroll is enabled at half position", async ({ page }) => {
+  test("content scroll is enabled at expanded position", async ({ page }) => {
     await page.goto(`/search?${boundsQS}`);
     const sheetReady = await waitForMobileSheet(page);
     test.skip(!sheetReady, "Mobile bottom sheet not ready");
 
-    // Sheet starts at half
+    // Sheet starts at expanded (index 1)
     expect(await getSheetSnapIndex(page)).toBe(1);
 
     // The content area should have overflow-y: auto (scrollable)
@@ -858,7 +817,7 @@ test.describe("Mobile Bottom Sheet - Content Overflow Control", () => {
     );
     expect(overflowY).toBe("auto");
 
-    // Content should have pointer-events: auto at half
+    // Content should have pointer-events: auto at expanded
     const pointerEvents = await content.evaluate(
       (el) =>
         (el as HTMLElement).style.pointerEvents ||

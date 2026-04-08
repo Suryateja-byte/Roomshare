@@ -389,13 +389,15 @@ describe("GET /api/map-listings (C2.2)", () => {
       mockFeatures.semanticSearch = true;
 
       (parseSearchParams as jest.Mock).mockReturnValue({
-        q: "bright sunny studio",
+        q: "San Francisco",
+        what: "bright sunny studio",
         requestedPage: 1,
         sortOption: "recommended",
         boundsRequired: false,
         browseMode: false,
         filterParams: {
-          query: "bright sunny studio",
+          query: "San Francisco",
+          vibeQuery: "bright sunny studio",
           sort: undefined, // undefined sort defaults to "recommended"
           minPrice: undefined,
           maxPrice: undefined,
@@ -407,7 +409,8 @@ describe("GET /api/map-listings (C2.2)", () => {
         maxLng: "-122.0",
         minLat: "37.5",
         maxLat: "38.0",
-        q: "bright sunny studio",
+        q: "San Francisco",
+        what: "bright sunny studio",
       });
 
       await GET(req);
@@ -425,13 +428,15 @@ describe("GET /api/map-listings (C2.2)", () => {
       mockFeatures.semanticSearch = true;
 
       (parseSearchParams as jest.Mock).mockReturnValue({
-        q: "bright sunny studio",
+        q: "San Francisco",
+        what: "bright sunny studio",
         requestedPage: 1,
         sortOption: "newest",
         boundsRequired: false,
         browseMode: false,
         filterParams: {
-          query: "bright sunny studio",
+          query: "San Francisco",
+          vibeQuery: "bright sunny studio",
           sort: "newest",
           minPrice: undefined,
           maxPrice: undefined,
@@ -443,7 +448,8 @@ describe("GET /api/map-listings (C2.2)", () => {
         maxLng: "-122.0",
         minLat: "37.5",
         maxLat: "38.0",
-        q: "bright sunny studio",
+        q: "San Francisco",
+        what: "bright sunny studio",
         sort: "newest",
       });
 
@@ -452,7 +458,7 @@ describe("GET /api/map-listings (C2.2)", () => {
       // When sort is not "recommended", query should be preserved
       expect(getMapListings).toHaveBeenCalledWith(
         expect.objectContaining({
-          query: "bright sunny studio",
+          query: "San Francisco",
           bounds: VALID_BOUNDS,
         })
       );
@@ -462,13 +468,15 @@ describe("GET /api/map-listings (C2.2)", () => {
       mockFeatures.semanticSearch = false;
 
       (parseSearchParams as jest.Mock).mockReturnValue({
-        q: "bright sunny studio",
+        q: "San Francisco",
+        what: "bright sunny studio",
         requestedPage: 1,
         sortOption: "recommended",
         boundsRequired: false,
         browseMode: false,
         filterParams: {
-          query: "bright sunny studio",
+          query: "San Francisco",
+          vibeQuery: "bright sunny studio",
           sort: undefined,
           minPrice: undefined,
           maxPrice: undefined,
@@ -480,7 +488,8 @@ describe("GET /api/map-listings (C2.2)", () => {
         maxLng: "-122.0",
         minLat: "37.5",
         maxLat: "38.0",
-        q: "bright sunny studio",
+        q: "San Francisco",
+        what: "bright sunny studio",
       });
 
       await GET(req);
@@ -488,7 +497,7 @@ describe("GET /api/map-listings (C2.2)", () => {
       // Semantic search off: query should be preserved
       expect(getMapListings).toHaveBeenCalledWith(
         expect.objectContaining({
-          query: "bright sunny studio",
+          query: "San Francisco",
           bounds: VALID_BOUNDS,
         })
       );

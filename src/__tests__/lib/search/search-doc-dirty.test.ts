@@ -22,8 +22,8 @@ jest.mock("@/lib/logger", () => ({
       error: jest.fn(),
     },
   },
-  sanitizeErrorMessage: jest.fn(
-    (error: unknown) => error instanceof Error ? error.message : "Unknown error"
+  sanitizeErrorMessage: jest.fn((error: unknown) =>
+    error instanceof Error ? error.message : "Unknown error"
   ),
 }));
 

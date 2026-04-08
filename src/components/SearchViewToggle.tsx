@@ -2,11 +2,12 @@
 
 import { useRef, useState, useEffect, useCallback, useMemo } from "react";
 import { useSearchParams } from "next/navigation";
-import { Map, MapPinOff } from "lucide-react";
+import { Map } from "lucide-react";
 import MobileBottomSheet from "./search/MobileBottomSheet";
 import FloatingMapButton from "./search/FloatingMapButton";
 import { useListingFocus } from "@/contexts/ListingFocusContext";
 import { useMediaQuery } from "@/hooks/useMediaQuery";
+import { cn } from "@/lib/utils";
 
 interface SearchViewToggleProps {
   children: React.ReactNode;
@@ -30,9 +31,13 @@ export default function SearchViewToggle({
   resultHeaderText,
 }: SearchViewToggleProps) {
   const mobileListRef = useRef<HTMLDivElement>(null);
+  const desktopListScrollRef = useRef<HTMLDivElement>(null);
+  const desktopListContentRef = useRef<HTMLDivElement>(null);
   const isDesktop = useMediaQuery("(min-width: 768px)");
   const [hasMounted, setHasMounted] = useState(false);
-  const [mobileSnap, setMobileSnap] = useState(1); // 0=collapsed, 1=half, 2=expanded
+  const [mobileSnap, setMobileSnap] = useState(1); // 0=collapsed, 1=expanded
+  const [showDesktopTopFade, setShowDesktopTopFade] = useState(false);
+  const [showDesktopBottomFade, setShowDesktopBottomFade] = useState(false);
   const { activeId } = useListingFocus();
   const searchParams = useSearchParams();
 
@@ -44,14 +49,22 @@ export default function SearchViewToggle({
   // Same pattern as SearchResultsLoadingWrapper.tsx:33-48.
   const filterParamsKey = useMemo(() => {
     const filterOnly = new URLSearchParams(searchParams.toString());
-    for (const k of ["minLat", "maxLat", "minLng", "maxLng", "lat", "lng", "zoom"]) {
+    for (const k of [
+      "minLat",
+      "maxLat",
+      "minLng",
+      "maxLng",
+      "lat",
+      "lng",
+      "zoom",
+    ]) {
       filterOnly.delete(k);
     }
     filterOnly.sort();
     return filterOnly.toString();
   }, [searchParams]);
 
-  // Reset bottom sheet to half-open when search results change (filter/sort/query).
+  // Reset bottom sheet to expanded when search results change (filter/sort/query).
   // Prevents the sheet staying collapsed after the user navigates to a new search.
   // Skips initial mount (mobileSnap is already 1) and bounds-only changes (map pans).
   const isInitialFilterKey = useRef(true);
@@ -63,16 +76,24 @@ export default function SearchViewToggle({
     setMobileSnap(1);
   }, [filterParamsKey]);
 
-  // When a map pin is tapped (activeId changes) on mobile, snap sheet to half
+  // When a map pin is tapped (activeId changes to a non-null value) on mobile,
+  // collapse the sheet so the map and preview card are visible.
+  // Uses a ref to skip the initial mount and only react to actual marker selection.
+  const prevActiveIdRef = useRef(activeId);
   useEffect(() => {
-    if (activeId && isDesktop === false) {
-      setMobileSnap(1);
+    if (
+      isDesktop === false &&
+      activeId != null &&
+      activeId !== prevActiveIdRef.current
+    ) {
+      setMobileSnap(0);
     }
+    prevActiveIdRef.current = activeId;
   }, [activeId, isDesktop]);
 
   const handleFloatingToggle = useCallback(() => {
-    // If sheet is showing list (half or expanded), collapse to show map
-    // If collapsed, expand to half to show list
+    // If sheet is showing list (expanded), collapse to show map
+    // If collapsed, expand to show list
     setMobileSnap((prev) => (prev > 0 ? 0 : 1));
   }, []);
 
@@ -87,6 +108,74 @@ export default function SearchViewToggle({
   // hides the inactive one). After mount, render in exactly one container.
   const showChildrenInMobile = !hasMounted || isDesktop === false;
   const showChildrenInDesktop = !hasMounted || isDesktop !== false;
+  const desktopScrollInsetClass = shouldShowMap
+    ? "right-3 lg:right-4"
+    : "right-2 lg:right-3";
+
+  const updateDesktopOverflowState = useCallback(() => {
+    const scrollContainer = desktopListScrollRef.current;
+    if (!scrollContainer || isDesktop !== true) {
+      setShowDesktopTopFade(false);
+      setShowDesktopBottomFade(false);
+      return;
+    }
+
+    const { scrollTop, clientHeight, scrollHeight } = scrollContainer;
+    const hasOverflow = scrollHeight - clientHeight > 12;
+
+    setShowDesktopTopFade(hasOverflow && scrollTop > 8);
+    setShowDesktopBottomFade(
+      hasOverflow && scrollTop + clientHeight < scrollHeight - 8
+    );
+  }, [isDesktop]);
+
+  useEffect(() => {
+    if (isDesktop !== true) {
+      setShowDesktopTopFade(false);
+      setShowDesktopBottomFade(false);
+      return;
+    }
+
+    const scrollContainer = desktopListScrollRef.current;
+    const contentContainer = desktopListContentRef.current;
+    if (!scrollContainer) return;
+
+    const handleScroll = () => {
+      updateDesktopOverflowState();
+    };
+
+    handleScroll();
+    scrollContainer.addEventListener("scroll", handleScroll, { passive: true });
+
+    if (typeof window !== "undefined") {
+      window.requestAnimationFrame(handleScroll);
+      window.addEventListener("resize", handleScroll);
+    }
+
+    const resizeObserver =
+      typeof ResizeObserver === "undefined"
+        ? null
+        : new ResizeObserver(handleScroll);
+
+    resizeObserver?.observe(scrollContainer);
+    if (contentContainer) {
+      resizeObserver?.observe(contentContainer);
+    }
+
+    return () => {
+      scrollContainer.removeEventListener("scroll", handleScroll);
+      if (typeof window !== "undefined") {
+        window.removeEventListener("resize", handleScroll);
+      }
+      resizeObserver?.disconnect();
+    };
+  }, [
+    filterParamsKey,
+    isDesktop,
+    shouldShowMap,
+    showChildrenInDesktop,
+    updateDesktopOverflowState,
+  ]);
 
   return (
     <>
@@ -113,13 +202,11 @@ export default function SearchViewToggle({
           )}
         </MobileBottomSheet>
 
-        {/* Floating toggle pill — hidden when sheet is fully expanded */}
-        {mobileSnap !== 2 && (
-          <FloatingMapButton
-            isListMode={mobileSnap > 0}
-            onToggle={handleFloatingToggle}
-          />
-        )}
+        {/* Floating toggle pill */}
+        <FloatingMapButton
+          isListMode={mobileSnap > 0}
+          onToggle={handleFloatingToggle}
+        />
       </div>
 
       {/* Desktop Split View */}
@@ -127,29 +214,55 @@ export default function SearchViewToggle({
         {/* Left Panel: List View - Adjusts width based on map visibility */}
         <div
           data-testid="search-results-container"
-          className={`h-full overflow-y-auto transition-all duration-300 ${
+          className={`relative h-full min-h-0 overflow-hidden bg-surface-canvas transition-all duration-300 ${
             shouldShowMap ? "w-[60%] lg:w-[55%]" : "w-full"
           }`}
         >
-          {showChildrenInDesktop && children}
+          <div
+            className={cn(
+              "relative h-full min-h-0",
+              shouldShowMap ? "pr-3 lg:pr-4" : "pr-2 lg:pr-3"
+            )}
+          >
+            <div
+              ref={desktopListScrollRef}
+              data-testid="desktop-search-results-scroll-area"
+              data-search-results-scroll-region="desktop"
+              className="desktop-search-results-scroll h-full min-h-0 overflow-y-auto overscroll-contain scroll-smooth"
+            >
+              <div ref={desktopListContentRef} className="min-h-full">
+                {showChildrenInDesktop && children}
+              </div>
+            </div>
+
+            {showDesktopTopFade && (
+              <div
+                data-testid="desktop-results-top-fade"
+                aria-hidden="true"
+                className={cn(
+                  "pointer-events-none absolute left-0 top-0 h-10 bg-gradient-to-b from-surface-canvas via-surface-canvas/95 to-transparent",
+                  desktopScrollInsetClass
+                )}
+              />
+            )}
+
+            {showDesktopBottomFade && (
+              <div
+                data-testid="desktop-results-bottom-fade"
+                aria-hidden="true"
+                className={cn(
+                  "pointer-events-none absolute bottom-0 left-0 h-12 bg-gradient-to-t from-surface-canvas via-surface-canvas/95 to-transparent",
+                  desktopScrollInsetClass
+                )}
+              />
+            )}
+          </div>
         </div>
 
         {/* Right Panel: Map View (45%) */}
         {renderMapInDesktop && (
-          <div className="w-[40%] lg:w-[45%] h-full relative p-4 lg:p-6">
-            <div className="w-full h-full relative rounded-2xl overflow-hidden border border-outline-variant/20/80 shadow-2xl bg-surface-container-high">
-              {/* Desktop Hide Map Button */}
-              <button
-                onClick={onToggle}
-                disabled={isLoading}
-                className="absolute top-4 right-4 z-[50] h-11 inline-flex items-center gap-1.5 px-4 bg-on-surface/90 backdrop-blur-md text-white rounded-full shadow-lg border border-white/10 hover:bg-on-surface text-sm font-medium transition-colors disabled:opacity-60"
-                aria-label="Hide map"
-              >
-                <MapPinOff className="w-4 h-4" />
-                <span>Hide map</span>
-              </button>
-              {mapComponent}
-            </div>
+          <div className="relative w-[40%] lg:w-[45%] h-full min-h-0 flex-shrink-0 overflow-hidden border-l border-outline-variant/20 bg-surface-container-highest">
+            {mapComponent}
           </div>
         )}
 
@@ -158,7 +271,7 @@ export default function SearchViewToggle({
           <button
             onClick={onToggle}
             disabled={isLoading}
-            className="fixed bottom-6 right-6 z-[50] flex items-center gap-2 px-5 py-3 bg-on-surface/90 backdrop-blur-md text-white rounded-full shadow-xl shadow-on-surface/30 hover:bg-on-surface active:scale-[0.98] transition-all duration-200 disabled:opacity-60 border border-white/10"
+            className="fixed top-[100px] right-6 z-[50] h-10 inline-flex items-center gap-2 px-4 bg-surface-container-lowest/90 backdrop-blur-md text-on-surface rounded-lg shadow-[0_2px_12px_rgba(0,0,0,0.12)] border border-outline-variant/30 hover:bg-surface-container-lowest hover:scale-[1.02] active:scale-[0.98] transition-all duration-200 disabled:opacity-60"
             aria-label="Show map"
           >
             <Map className="w-4 h-4" />

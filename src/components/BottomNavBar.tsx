@@ -56,7 +56,9 @@ export default function BottomNavBar() {
 
   // Hide on scroll down, show on scroll up
   useEffect(() => {
-    const scrollContainer = document.querySelector("[data-app-scroll-container]");
+    const scrollContainer = document.querySelector(
+      "[data-app-scroll-container]"
+    ) as HTMLElement | null;
     if (!scrollContainer) return;
 
     const handleScroll = () => {
@@ -81,10 +83,9 @@ export default function BottomNavBar() {
     return () => scrollContainer.removeEventListener("scroll", handleScroll);
   }, []);
 
-  // Don't render on search page — it has its own bottom sheet and floating buttons
-  const isSearchPage = pathname.startsWith("/search");
+  // Don't render on message thread - it has its own input bar
   const isMessageThread = pathname.startsWith("/messages/");
-  if (!session?.user || isSearchPage || isMessageThread) return null;
+  if (isMessageThread) return null;
 
   return (
     <nav
@@ -95,7 +96,7 @@ export default function BottomNavBar() {
         bg-surface-container-lowest
         shadow-[0_-2px_16px_rgb(27_28_25/0.06)]
         border-t border-outline-variant/30
-        transition-all duration-300
+        transition-[transform,opacity] duration-300
         data-[anim-hidden=true]:translate-y-full
         data-[anim-hidden=true]:opacity-0
         data-[anim-hidden=true]:pointer-events-none

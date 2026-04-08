@@ -23,7 +23,13 @@ export function ContentReveal({ children }: { children: ReactNode }) {
     <LazyMotion features={domAnimation}>
       <AnimatePresence mode="popLayout">
         <m.div
-          key={typeof children === "object" && children !== null && "key" in children ? (children as { key: string }).key : "content"}
+          key={
+            typeof children === "object" &&
+            children !== null &&
+            "key" in children
+              ? (children as { key: string }).key
+              : "content"
+          }
           initial={{ opacity: 0, y: 4 }}
           animate={{ opacity: 1, y: 0 }}
           exit={{ opacity: 0 }}

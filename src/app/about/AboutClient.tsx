@@ -107,17 +107,12 @@ export default function AboutClient() {
               </p>
               <p>
                 We believed there had to be a better way. A way to prioritize{" "}
-                <strong className="text-on-surface font-medium">
-                  safety
-                </strong>
-                ,{" "}
+                <strong className="text-on-surface font-medium">safety</strong>,{" "}
                 <strong className="text-on-surface font-medium">
                   compatibility
                 </strong>
                 , and{" "}
-                <strong className="text-on-surface font-medium">
-                  trust
-                </strong>{" "}
+                <strong className="text-on-surface font-medium">trust</strong>{" "}
                 before you ever sign a lease.
               </p>
               <p>
@@ -186,8 +181,8 @@ export default function AboutClient() {
               Stop scrolling. Start living.
             </h2>
             <p className="text-xl text-white/60 mb-12 max-w-2xl mx-auto font-light">
-              Set up your profile in 2 minutes. Browse verified rooms
-              tonight. Move in when you&apos;re ready.
+              Set up your profile in 2 minutes. Browse verified rooms tonight.
+              Move in when you&apos;re ready.
             </p>
             <div className="flex flex-col sm:flex-row gap-4 justify-center">
               <Link

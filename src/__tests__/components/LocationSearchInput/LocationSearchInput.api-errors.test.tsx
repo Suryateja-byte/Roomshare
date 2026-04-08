@@ -68,6 +68,18 @@ describe("LocationSearchInput - API Error Handling", () => {
   const user = userEvent.setup({ delay: null });
   const mockOnLocationSelect = jest.fn();
 
+  const expectUnavailableState = async () => {
+    await waitFor(() => {
+      expect(
+        screen.getByText("Live suggestions unavailable")
+      ).toBeInTheDocument();
+    });
+    expect(
+      screen.getByRole("button", { name: /retry/i })
+    ).toBeInTheDocument();
+    expect(screen.queryByText("Search unavailable")).not.toBeInTheDocument();
+  };
+
   beforeEach(() => {
     jest.clearAllMocks();
     jest.useFakeTimers({ advanceTimers: true });
@@ -89,7 +101,7 @@ describe("LocationSearchInput - API Error Handling", () => {
   };
 
   describe("429 Rate Limit Handling", () => {
-    it("shows error message on 429", async () => {
+    it("shows the soft unavailable state on 429", async () => {
       mockFetch.mockResolvedValueOnce({
         ok: false,
         status: 429,
@@ -102,17 +114,12 @@ describe("LocationSearchInput - API Error Handling", () => {
       await user.type(input, "San Francisco");
       jest.advanceTimersByTime(350);
 
-      await waitFor(() => {
-        // searchPhoton throws 'Failed to fetch suggestions' for non-500 errors
-        expect(
-          screen.getByText("Failed to fetch suggestions")
-        ).toBeInTheDocument();
-      });
+      await expectUnavailableState();
     });
   });
 
   describe("422 Validation Error", () => {
-    it("shows appropriate message for 422", async () => {
+    it("falls back to the soft unavailable state when the response is malformed", async () => {
       mockFetch.mockResolvedValueOnce({
         ok: false,
         status: 422,
@@ -125,12 +132,7 @@ describe("LocationSearchInput - API Error Handling", () => {
       await user.type(input, "San Francisco");
       jest.advanceTimersByTime(350);
 
-      await waitFor(() => {
-        // searchPhoton throws 'Failed to fetch suggestions' for non-500 errors
-        expect(
-          screen.getByText("Failed to fetch suggestions")
-        ).toBeInTheDocument();
-      });
+      await expectUnavailableState();
     });
   });
 
@@ -148,12 +150,7 @@ describe("LocationSearchInput - API Error Handling", () => {
       await user.type(input, "San Francisco");
       jest.advanceTimersByTime(350);
 
-      await waitFor(() => {
-        // searchPhoton throws 'Failed to fetch suggestions' for non-500 errors
-        expect(
-          screen.getByText("Failed to fetch suggestions")
-        ).toBeInTheDocument();
-      });
+      await expectUnavailableState();
     });
 
     it("shows access error for 403", async () => {
@@ -169,17 +166,12 @@ describe("LocationSearchInput - API Error Handling", () => {
       await user.type(input, "San Francisco");
       jest.advanceTimersByTime(350);
 
-      await waitFor(() => {
-        // searchPhoton throws 'Failed to fetch suggestions' for non-500 errors
-        expect(
-          screen.getByText("Failed to fetch suggestions")
-        ).toBeInTheDocument();
-      });
+      await expectUnavailableState();
     });
   });
 
   describe("500+ Server Errors", () => {
-    it("shows service unavailable message for 500", async () => {
+    it("shows the soft unavailable state for 500", async () => {
       mockFetch.mockResolvedValueOnce({
         ok: false,
         status: 500,
@@ -192,15 +184,10 @@ describe("LocationSearchInput - API Error Handling", () => {
       await user.type(input, "San Francisco");
       jest.advanceTimersByTime(350);
 
-      await waitFor(() => {
-        // Component throws 'Location service is temporarily unavailable' for 500+
-        expect(
-          screen.getByText("Location service is temporarily unavailable")
-        ).toBeInTheDocument();
-      });
+      await expectUnavailableState();
     });
 
-    it("shows service unavailable for 503", async () => {
+    it("shows the soft unavailable state for 503", async () => {
       mockFetch.mockResolvedValueOnce({
         ok: false,
         status: 503,
@@ -213,12 +200,7 @@ describe("LocationSearchInput - API Error Handling", () => {
       await user.type(input, "San Francisco");
       jest.advanceTimersByTime(350);
 
-      await waitFor(() => {
-        // Component throws 'Location service is temporarily unavailable' for 500+
-        expect(
-          screen.getByText("Location service is temporarily unavailable")
-        ).toBeInTheDocument();
-      });
+      await expectUnavailableState();
     });
   });
 
@@ -232,9 +214,7 @@ describe("LocationSearchInput - API Error Handling", () => {
       await user.type(input, "San Francisco");
       jest.advanceTimersByTime(350);
 
-      await waitFor(() => {
-        expect(screen.getByText(/network|connection/i)).toBeInTheDocument();
-      });
+      await expectUnavailableState();
     });
 
     it("handles AbortError silently (no error shown)", async () => {
@@ -445,7 +425,7 @@ describe("LocationSearchInput - API Error Handling", () => {
   });
 
   describe("Error Recovery", () => {
-    it("clears error when new successful request is made", async () => {
+    it("clears the unavailable state when a new successful request is made", async () => {
       // First request fails
       mockFetch.mockResolvedValueOnce({
         ok: false,
@@ -466,12 +446,7 @@ describe("LocationSearchInput - API Error Handling", () => {
       await user.type(input, "bad");
       jest.advanceTimersByTime(350);
 
-      await waitFor(() => {
-        // Component throws 'Location service is temporarily unavailable' for 500+
-        expect(
-          screen.getByText("Location service is temporarily unavailable")
-        ).toBeInTheDocument();
-      });
+      await expectUnavailableState();
 
       await user.clear(input);
       await user.type(input, "San Francisco");
@@ -481,9 +456,36 @@ describe("LocationSearchInput - API Error Handling", () => {
         // Place name split across elements
         expect(screen.getByText("San Francisco")).toBeInTheDocument();
         expect(
-          screen.queryByText("Location service is temporarily unavailable")
+          screen.queryByText("Live suggestions unavailable")
         ).not.toBeInTheDocument();
       });
+    });
+
+    it("shows fallback items when provided and the service is unavailable", async () => {
+      mockFetch.mockResolvedValueOnce({
+        ok: false,
+        status: 503,
+        json: async () => ({ code: "UNAVAILABLE" }),
+      });
+
+      renderInput({
+        fallbackItems: [
+          {
+            id: "fallback-1",
+            primaryText: "Irving, TX",
+            secondaryText: "Recent search",
+            onSelect: jest.fn(),
+          },
+        ],
+      });
+      const input = screen.getByRole("combobox");
+
+      await user.type(input, "Irving");
+      jest.advanceTimersByTime(350);
+
+      await expectUnavailableState();
+      expect(screen.getByText("Recent locations")).toBeInTheDocument();
+      expect(screen.getByText("Irving, TX")).toBeInTheDocument();
     });
   });
 });

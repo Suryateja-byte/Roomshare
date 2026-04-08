@@ -2,7 +2,13 @@
  * Tests for BookingForm component
  */
 
-import { render, screen, fireEvent, waitFor, act } from "@testing-library/react";
+import {
+  render,
+  screen,
+  fireEvent,
+  waitFor,
+  act,
+} from "@testing-library/react";
 import React from "react";
 import BookingForm from "@/components/BookingForm";
 
@@ -379,7 +385,9 @@ describe("BookingForm", () => {
 
       // Success message should appear
       await waitFor(() => {
-        expect(screen.getByText(/request sent successfully/i)).toBeInTheDocument();
+        expect(
+          screen.getByText(/request sent successfully/i)
+        ).toBeInTheDocument();
       });
     });
 
@@ -449,9 +457,7 @@ describe("BookingForm", () => {
       });
 
       await waitFor(() => {
-        expect(
-          screen.getByText(/session has expired/i)
-        ).toBeInTheDocument();
+        expect(screen.getByText(/session has expired/i)).toBeInTheDocument();
       });
     });
 
@@ -545,7 +551,10 @@ describe("BookingForm", () => {
     });
 
     it("debounce: double-click confirm does not double-submit", async () => {
-      let resolveBooking: (value: { success: boolean; bookingId: string }) => void;
+      let resolveBooking: (value: {
+        success: boolean;
+        bookingId: string;
+      }) => void;
       (createBooking as jest.Mock).mockImplementation(
         () =>
           new Promise((resolve) => {

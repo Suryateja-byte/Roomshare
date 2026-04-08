@@ -624,9 +624,9 @@ describe("filter-chip-utils", () => {
     });
 
     it("counts each amenity separately", () => {
-      expect(
-        countActiveFilters(new URLSearchParams("amenities=Wifi,AC"))
-      ).toBe(2);
+      expect(countActiveFilters(new URLSearchParams("amenities=Wifi,AC"))).toBe(
+        2
+      );
     });
 
     it("counts each house rule separately", () => {
@@ -644,9 +644,9 @@ describe("filter-chip-utils", () => {
     });
 
     it("does NOT count invalid filter values", () => {
-      expect(
-        countActiveFilters(new URLSearchParams("roomType=INVALID"))
-      ).toBe(0);
+      expect(countActiveFilters(new URLSearchParams("roomType=INVALID"))).toBe(
+        0
+      );
     });
 
     it("does NOT count invalid amenities", () => {
@@ -656,15 +656,11 @@ describe("filter-chip-utils", () => {
     });
 
     it("counts nearMatches when active", () => {
-      expect(
-        countActiveFilters(new URLSearchParams("nearMatches=1"))
-      ).toBe(1);
+      expect(countActiveFilters(new URLSearchParams("nearMatches=1"))).toBe(1);
     });
 
     it("does NOT count nearMatches=0", () => {
-      expect(
-        countActiveFilters(new URLSearchParams("nearMatches=0"))
-      ).toBe(0);
+      expect(countActiveFilters(new URLSearchParams("nearMatches=0"))).toBe(0);
     });
 
     it("does NOT count preserved params (q, sort, bounds)", () => {
@@ -694,9 +690,7 @@ describe("filter-chip-utils", () => {
     });
 
     it("deduplicates repeated amenity params", () => {
-      const params = new URLSearchParams(
-        "amenities=Wifi&amenities=AC,Wifi"
-      );
+      const params = new URLSearchParams("amenities=Wifi&amenities=AC,Wifi");
       // Wifi appears twice but should be deduplicated to 1 chip
       expect(countActiveFilters(params)).toBe(2); // Wifi + AC
     });

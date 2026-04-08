@@ -237,7 +237,9 @@ describe("listing-status actions", () => {
 
         // The ownership check uses $queryRaw with FOR UPDATE row lock
         expect(mockTx.$queryRaw).toHaveBeenCalled();
-        const sqlStrings = (mockTx.$queryRaw as jest.Mock).mock.calls[0][0].join("");
+        const sqlStrings = (
+          mockTx.$queryRaw as jest.Mock
+        ).mock.calls[0][0].join("");
         expect(sqlStrings).toContain("FOR UPDATE");
 
         // Booking count and listing update happen inside the transaction (via tx)
@@ -258,11 +260,10 @@ describe("listing-status actions", () => {
 
         // But NOT inside the transaction callback — verify by confirming
         // revalidatePath is called AFTER $transaction resolves
-        const txCallOrder =
-          (prisma.$transaction as jest.Mock).mock.invocationCallOrder[0];
-        const revalidateCallOrder = (
-          revalidatePath as jest.Mock
-        ).mock.invocationCallOrder[0];
+        const txCallOrder = (prisma.$transaction as jest.Mock).mock
+          .invocationCallOrder[0];
+        const revalidateCallOrder = (revalidatePath as jest.Mock).mock
+          .invocationCallOrder[0];
         expect(revalidateCallOrder).toBeGreaterThan(txCallOrder);
       });
 

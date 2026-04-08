@@ -83,6 +83,64 @@ describe("parseSearchParams - query cases", () => {
   });
 });
 
+describe("parseSearchParams - vibe cases", () => {
+  it("parses what separately from q", () => {
+    const result = parseSearchParams({
+      q: "Irving",
+      what: "quiet roommates",
+    });
+
+    expect(result.q).toBe("Irving");
+    expect(result.what).toBe("quiet roommates");
+    expect(result.filterParams.query).toBe("Irving");
+    expect(result.filterParams.vibeQuery).toBe("quiet roommates");
+  });
+
+  it("parses canonical where separately from the hard query", () => {
+    const result = parseSearchParams({
+      where: "Irving",
+      what: "dark room",
+      lat: "32.814",
+      lng: "-96.9489",
+    });
+
+    expect(result.locationLabel).toBe("Irving");
+    expect(result.filterParams.locationLabel).toBe("Irving");
+    expect(result.q).toBeUndefined();
+    expect(result.filterParams.query).toBeUndefined();
+    expect(result.filterParams.vibeQuery).toBe("dark room");
+    expect(result.boundsRequired).toBe(false);
+  });
+
+  it("treats legacy q-plus-point URLs as selected-location searches, not FTS", () => {
+    const result = parseSearchParams({
+      q: "Irving",
+      what: "dark room",
+      lat: "32.814",
+      lng: "-96.9489",
+    });
+
+    expect(result.locationLabel).toBe("Irving");
+    expect(result.q).toBeUndefined();
+    expect(result.filterParams.query).toBeUndefined();
+    expect(result.filterParams.locationLabel).toBe("Irving");
+    expect(result.filterParams.bounds).toEqual(
+      expect.objectContaining({
+        minLat: expect.any(Number),
+        maxLat: expect.any(Number),
+      })
+    );
+    expect(result.boundsRequired).toBe(false);
+  });
+
+  it("requires bounds for vibe-only searches", () => {
+    const result = parseSearchParams({ what: "sunny room" });
+
+    expect(result.boundsRequired).toBe(true);
+    expect(result.browseMode).toBe(false);
+  });
+});
+
 describe("parseSearchParams - price cases", () => {
   const cases: Array<
     [

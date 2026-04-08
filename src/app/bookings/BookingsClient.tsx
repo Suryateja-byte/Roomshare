@@ -81,20 +81,17 @@ interface BookingsClientProps {
 
 const statusConfig = {
   PENDING: {
-    color:
-      "bg-yellow-100 text-yellow-700 border-yellow-200",
+    color: "bg-yellow-100 text-yellow-700 border-yellow-200",
     icon: Clock,
     label: "Pending",
   },
   ACCEPTED: {
-    color:
-      "bg-green-100 text-green-700 border-green-200",
+    color: "bg-green-100 text-green-700 border-green-200",
     icon: CheckCircle2,
     label: "Accepted",
   },
   REJECTED: {
-    color:
-      "bg-red-100 text-red-700 border-red-200",
+    color: "bg-red-100 text-red-700 border-red-200",
     icon: XCircle,
     label: "Rejected",
   },
@@ -105,14 +102,12 @@ const statusConfig = {
     label: "Cancelled",
   },
   HELD: {
-    color:
-      "bg-blue-100 text-blue-700 border-blue-200",
+    color: "bg-blue-100 text-blue-700 border-blue-200",
     icon: PauseCircle,
     label: "Held",
   },
   EXPIRED: {
-    color:
-      "bg-orange-100 text-orange-700 border-orange-200",
+    color: "bg-orange-100 text-orange-700 border-orange-200",
     icon: AlertCircle,
     label: "Expired",
   },

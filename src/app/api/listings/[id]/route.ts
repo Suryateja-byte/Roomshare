@@ -70,9 +70,27 @@ const updateListingSchema = z.object({
     .optional()
     .default([]),
   totalSlots: z.coerce.number().int().min(1).max(20),
-  address: z.string().trim().min(1).max(200).transform(sanitizeUnicode).refine(noHtmlTags, NO_HTML_MSG),
-  city: z.string().trim().min(1).max(100).transform(sanitizeUnicode).refine(noHtmlTags, NO_HTML_MSG),
-  state: z.string().trim().min(1).max(100).transform(sanitizeUnicode).refine(noHtmlTags, NO_HTML_MSG),
+  address: z
+    .string()
+    .trim()
+    .min(1)
+    .max(200)
+    .transform(sanitizeUnicode)
+    .refine(noHtmlTags, NO_HTML_MSG),
+  city: z
+    .string()
+    .trim()
+    .min(1)
+    .max(100)
+    .transform(sanitizeUnicode)
+    .refine(noHtmlTags, NO_HTML_MSG),
+  state: z
+    .string()
+    .trim()
+    .min(1)
+    .max(100)
+    .transform(sanitizeUnicode)
+    .refine(noHtmlTags, NO_HTML_MSG),
   zip: z.string().trim().min(1).max(20),
   moveInDate: z
     .union([
@@ -185,12 +203,12 @@ export async function DELETE(
             data: pendingBookings
               .filter((booking) => booking.tenantId != null)
               .map((booking) => ({
-              userId: booking.tenantId!,
-              type: "BOOKING_CANCELLED",
-              title: "Booking Request Cancelled",
-              message: `Your pending booking request for "${listing.title}" has been cancelled because the host removed the listing.`,
-              link: "/bookings",
-            })),
+                userId: booking.tenantId!,
+                type: "BOOKING_CANCELLED",
+                title: "Booking Request Cancelled",
+                message: `Your pending booking request for "${listing.title}" has been cancelled because the host removed the listing.`,
+                link: "/bookings",
+              })),
           });
         }
 
@@ -208,12 +226,12 @@ export async function DELETE(
             data: heldBookings
               .filter((booking) => booking.tenantId != null)
               .map((booking) => ({
-              userId: booking.tenantId!,
-              type: "BOOKING_HOLD_EXPIRED",
-              title: "Hold Cancelled",
-              message: `Your hold on "${listing.title}" has been cancelled because the host removed the listing.`,
-              link: "/bookings",
-            })),
+                userId: booking.tenantId!,
+                type: "BOOKING_HOLD_EXPIRED",
+                title: "Hold Cancelled",
+                message: `Your hold on "${listing.title}" has been cancelled because the host removed the listing.`,
+                link: "/bookings",
+              })),
           });
         }
 

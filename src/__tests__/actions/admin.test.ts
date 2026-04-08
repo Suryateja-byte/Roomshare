@@ -552,7 +552,9 @@ describe("admin actions", () => {
               findMany: jest.fn().mockResolvedValue([]),
               updateMany: jest.fn().mockResolvedValue({ count: 0 }),
             },
-            notification: { createMany: jest.fn().mockResolvedValue({ count: 0 }) },
+            notification: {
+              createMany: jest.fn().mockResolvedValue({ count: 0 }),
+            },
             listing: { delete: jest.fn().mockResolvedValue({}) },
             report: {
               findUnique: jest.fn().mockResolvedValue(null),
@@ -773,7 +775,9 @@ describe("admin actions", () => {
               findMany: jest.fn().mockResolvedValue([]),
               updateMany: jest.fn().mockResolvedValue({ count: 0 }),
             },
-            notification: { createMany: jest.fn().mockResolvedValue({ count: 0 }) },
+            notification: {
+              createMany: jest.fn().mockResolvedValue({ count: 0 }),
+            },
             listing: { delete: jest.fn().mockResolvedValue({}) },
             ...overrides,
           };
@@ -1045,18 +1049,22 @@ describe("admin actions", () => {
       (prisma.$transaction as jest.Mock).mockImplementation(
         async (fn: (tx: unknown) => Promise<unknown>) => {
           const tx = {
-            $queryRaw: jest.fn().mockResolvedValue([{
-              id: "listing-123",
-              title: "Test",
-              ownerId: "owner-123",
-              status: "ACTIVE",
-            }]),
+            $queryRaw: jest.fn().mockResolvedValue([
+              {
+                id: "listing-123",
+                title: "Test",
+                ownerId: "owner-123",
+                status: "ACTIVE",
+              },
+            ]),
             booking: {
               count: jest.fn().mockResolvedValue(0),
               findMany: jest.fn().mockResolvedValue([]),
               updateMany: jest.fn().mockResolvedValue({ count: 0 }),
             },
-            notification: { createMany: jest.fn().mockResolvedValue({ count: 0 }) },
+            notification: {
+              createMany: jest.fn().mockResolvedValue({ count: 0 }),
+            },
             listing: { delete: jest.fn().mockResolvedValue({}) },
           };
           return fn(tx);
@@ -1084,11 +1092,13 @@ describe("admin actions", () => {
       (prisma.$transaction as jest.Mock).mockImplementation(
         async (fn: (tx: unknown) => Promise<unknown>) => {
           const tx = {
-            $queryRaw: jest.fn().mockResolvedValue([{
-              id: "listing-123",
-              title: "Test",
-              ownerId: "owner-123",
-            }]),
+            $queryRaw: jest.fn().mockResolvedValue([
+              {
+                id: "listing-123",
+                title: "Test",
+                ownerId: "owner-123",
+              },
+            ]),
             report: {
               findUnique: jest.fn().mockResolvedValue({
                 listingId: "listing-123",
@@ -1103,7 +1113,9 @@ describe("admin actions", () => {
               findMany: jest.fn().mockResolvedValue([]),
               updateMany: jest.fn().mockResolvedValue({ count: 0 }),
             },
-            notification: { createMany: jest.fn().mockResolvedValue({ count: 0 }) },
+            notification: {
+              createMany: jest.fn().mockResolvedValue({ count: 0 }),
+            },
             listing: { delete: jest.fn().mockResolvedValue({}) },
           };
           return fn(tx);
@@ -1128,7 +1140,11 @@ describe("admin actions", () => {
       });
       (prisma.user.findUnique as jest.Mock)
         .mockResolvedValueOnce({ isAdmin: true }) // requireAdmin
-        .mockResolvedValueOnce({ isAdmin: false, name: "User", email: "u@e.com" }); // user lookup
+        .mockResolvedValueOnce({
+          isAdmin: false,
+          name: "User",
+          email: "u@e.com",
+        }); // user lookup
       (prisma.user.update as jest.Mock).mockResolvedValue({});
       (logAdminAction as jest.Mock).mockResolvedValue({});
 

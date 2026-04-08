@@ -535,7 +535,9 @@ describe("HELD mode: slotsRequested=3, totalSlots=5", () => {
 
     (prisma.$transaction as jest.Mock).mockImplementation(async (callback) => {
       const tx = {
-        $queryRaw: jest.fn().mockResolvedValue([{ ownerId: "owner-999", status: "ACTIVE" }]), // FOR UPDATE
+        $queryRaw: jest
+          .fn()
+          .mockResolvedValue([{ ownerId: "owner-999", status: "ACTIVE" }]), // FOR UPDATE
         $executeRaw: mockExecuteRaw,
         booking: {
           updateMany: jest.fn().mockResolvedValue({ count: 1 }),
@@ -615,7 +617,9 @@ describe("HELD mode: slotsRequested=3, totalSlots=5", () => {
 
     (prisma.$transaction as jest.Mock).mockImplementation(async (callback) => {
       const tx = {
-        $queryRaw: jest.fn().mockResolvedValue([{ ownerId: "owner-999", status: "ACTIVE" }]), // FOR UPDATE
+        $queryRaw: jest
+          .fn()
+          .mockResolvedValue([{ ownerId: "owner-999", status: "ACTIVE" }]), // FOR UPDATE
         $executeRaw: mockExecuteRaw,
         booking: {
           updateMany: jest.fn().mockResolvedValue({ count: 1 }),

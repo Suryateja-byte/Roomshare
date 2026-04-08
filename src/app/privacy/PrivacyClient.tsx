@@ -54,10 +54,7 @@ export default function PrivacyClient() {
       <div className="pt-32 pb-16 px-6 bg-surface-canvas">
         <div className="container mx-auto max-w-4xl text-center">
           <div className="inline-flex items-center justify-center p-3 bg-surface-container-lowest rounded-2xl shadow-ambient-sm mb-6">
-            <Shield
-              className="w-8 h-8 text-on-surface"
-              strokeWidth={1.5}
-            />
+            <Shield className="w-8 h-8 text-on-surface" strokeWidth={1.5} />
           </div>
           <h1 className="font-display text-4xl md:text-5xl font-bold tracking-tight mb-6">
             Privacy Policy
@@ -261,8 +258,8 @@ export default function PrivacyClient() {
 
           <section id="security" className="mb-16 scroll-mt-32">
             <h2 className="font-display text-2xl font-bold text-on-surface mb-4 flex items-center gap-2">
-              <Lock className="w-6 h-6 text-on-surface-variant" /> 6.
-              Data Security
+              <Lock className="w-6 h-6 text-on-surface-variant" /> 6. Data
+              Security
             </h2>
             <p className="text-on-surface-variant leading-relaxed">
               We have put in place appropriate security measures to prevent your
@@ -293,7 +290,9 @@ export default function PrivacyClient() {
             </h2>
             <div className="bg-primary text-white rounded-lg p-8 md:p-10 relative overflow-hidden">
               <div className="relative z-10">
-                <h3 className="font-display text-xl font-bold mb-2">Have questions?</h3>
+                <h3 className="font-display text-xl font-bold mb-2">
+                  Have questions?
+                </h3>
                 <p className="text-white/60 mb-6">
                   Our Data Protection Officer is available to help.
                 </p>

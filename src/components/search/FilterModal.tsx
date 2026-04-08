@@ -2,6 +2,8 @@
 
 import { useEffect } from "react";
 import { createPortal } from "react-dom";
+import { LazyMotion, domAnimation, m, AnimatePresence } from "framer-motion";
+import { useMediaQuery } from "@/hooks/useMediaQuery";
 import { X, Minus, Plus } from "lucide-react";
 import { useBodyScrollLock } from "@/hooks/useBodyScrollLock";
 import { Button } from "@/components/ui/button";
@@ -145,6 +147,8 @@ export function FilterModal({
   onRemoveFilterSuggestion,
 }: FilterModalProps) {
   useBodyScrollLock(isOpen);
+  const isDesktop = useMediaQuery("(min-width: 768px)");
+  const isMobile = isDesktop === false;
 
   // Close on Escape key
   useEffect(() => {
@@ -158,30 +162,49 @@ export function FilterModal({
     return () => document.removeEventListener("keydown", handleKeyDown);
   }, [isOpen, onClose]);
 
-  if (!isOpen || typeof document === "undefined") {
+  if (typeof document === "undefined") {
     return null;
   }
 
   return createPortal(
-    <div
-      className="fixed inset-0 z-modal overflow-hidden"
-      aria-labelledby="filter-drawer-title"
-      role="dialog"
-      aria-modal="true"
-    >
-      {/* Backdrop */}
-      <div
-        className="absolute inset-0 z-0 bg-on-surface/40 backdrop-blur-sm transition-opacity duration-300"
-        onClick={onClose}
-        aria-hidden="true"
-      />
+    <LazyMotion features={domAnimation}>
+      <AnimatePresence>
+        {isOpen && (
+          <div
+            className="fixed inset-0 z-modal overflow-hidden"
+            aria-labelledby="filter-drawer-title"
+            role="dialog"
+            aria-modal="true"
+          >
+            {/* Backdrop */}
+            <m.div
+              initial={{ opacity: 0 }}
+              animate={{ opacity: 1 }}
+              exit={{ opacity: 0 }}
+              transition={{ duration: 0.3 }}
+              className="absolute inset-0 z-0 bg-on-surface/40 backdrop-blur-sm"
+              onClick={onClose}
+              aria-hidden="true"
+            />
 
-      {/* Drawer Panel */}
-      <FocusTrap active={isOpen}>
-        <div
-          id="search-filters"
-          className="absolute right-0 top-0 z-10 h-full w-full max-w-md bg-surface-container-lowest shadow-2xl transform transition-transform duration-300 ease-out animate-in slide-in-from-right overflow-hidden flex flex-col pt-[env(safe-area-inset-top,0px)]"
-        >
+            {/* Drawer Panel */}
+            <FocusTrap active={isOpen}>
+              <m.div
+                id="search-filters"
+                initial={isMobile ? { y: "100%" } : { x: "100%" }}
+                animate={isMobile ? { y: 0 } : { x: 0 }}
+                exit={isMobile ? { y: "100%" } : { x: "100%" }}
+                transition={
+                  isMobile
+                    ? { type: "spring", damping: 25, stiffness: 300, mass: 0.8 }
+                    : { type: "tween", duration: 0.3, ease: "easeOut" }
+                }
+                className={
+                  isMobile
+                    ? "fixed inset-0 z-[1200] bg-surface-container-lowest flex flex-col md:hidden pt-[env(safe-area-inset-top,0px)]"
+                    : "absolute right-0 top-0 z-10 h-full w-full max-w-md bg-surface-container-lowest shadow-2xl overflow-hidden flex flex-col pt-[env(safe-area-inset-top,0px)]"
+                }
+              >
           {/* Header */}
           <div className="flex items-center justify-between px-6 py-4 border-b border-outline-variant/20 bg-surface-container-lowest">
             <h2
@@ -613,9 +636,12 @@ export function FilterModal({
               </Button>
             </div>
           </div>
-        </div>
+        </m.div>
       </FocusTrap>
-    </div>,
+          </div>
+        )}
+      </AnimatePresence>
+    </LazyMotion>,
     document.body
   );
 }

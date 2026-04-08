@@ -242,7 +242,8 @@ export default function ListingList({
                             </span>
                           )}
                           <span className="flex items-center gap-1">
-                            <DollarSign className="w-3 h-3" />{formatPrice(Number(listing.price))}/mo
+                            <DollarSign className="w-3 h-3" />
+                            {formatPrice(Number(listing.price))}/mo
                           </span>
                           <span className="flex items-center gap-1">
                             <Eye className="w-3 h-3" />

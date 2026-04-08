@@ -74,11 +74,7 @@ function FieldError({
 }) {
   if (!fieldErrors[field]) return null;
   return (
-    <p
-      id={`${field}-error`}
-      role="alert"
-      className="text-red-500 text-xs mt-1"
-    >
+    <p id={`${field}-error`} role="alert" className="text-red-500 text-xs mt-1">
       {fieldErrors[field]}
     </p>
   );
@@ -636,18 +632,14 @@ export default function CreateListingForm({
                   </div>
                   <span
                     className={`text-xs font-medium mt-2 text-center hidden sm:block transition-colors duration-300 ${
-                      isComplete
-                        ? "text-green-600"
-                        : "text-on-surface-variant"
+                      isComplete ? "text-green-600" : "text-on-surface-variant"
                     }`}
                   >
                     {section.label}
                   </span>
                   <span
                     className={`text-xs font-medium mt-2 text-center sm:hidden transition-colors duration-300 ${
-                      isComplete
-                        ? "text-green-600"
-                        : "text-on-surface-variant"
+                      isComplete ? "text-green-600" : "text-on-surface-variant"
                     }`}
                   >
                     {index + 1}
@@ -657,9 +649,7 @@ export default function CreateListingForm({
                 {index < FORM_SECTIONS.length - 1 && (
                   <div
                     className={`flex-1 h-0.5 mx-2 sm:mx-4 transition-colors duration-300 ${
-                      isComplete
-                        ? "bg-green-500"
-                        : "bg-surface-container-high"
+                      isComplete ? "bg-green-500" : "bg-surface-container-high"
                     }`}
                   />
                 )}
@@ -777,9 +767,7 @@ export default function CreateListingForm({
               disabled={loading}
               aria-invalid={!!fieldErrors.title}
               aria-describedby={fieldErrors.title ? "title-error" : undefined}
-              className={
-                fieldErrors.title ? "border-red-500" : ""
-              }
+              className={fieldErrors.title ? "border-red-500" : ""}
             />
             <FieldError field="title" fieldErrors={fieldErrors} />
           </div>
@@ -827,9 +815,7 @@ export default function CreateListingForm({
                 disabled={loading}
                 aria-invalid={!!fieldErrors.price}
                 aria-describedby={fieldErrors.price ? "price-error" : undefined}
-                className={
-                  fieldErrors.price ? "border-red-500" : ""
-                }
+                className={fieldErrors.price ? "border-red-500" : ""}
               />
               <FieldError field="price" fieldErrors={fieldErrors} />
             </div>
@@ -851,11 +837,7 @@ export default function CreateListingForm({
                 aria-describedby={
                   fieldErrors.totalSlots ? "totalSlots-error" : undefined
                 }
-                className={
-                  fieldErrors.totalSlots
-                    ? "border-red-500"
-                    : ""
-                }
+                className={fieldErrors.totalSlots ? "border-red-500" : ""}
               />
               <FieldError field="totalSlots" fieldErrors={fieldErrors} />
             </div>
@@ -948,9 +930,7 @@ export default function CreateListingForm({
               aria-describedby={
                 fieldErrors.address ? "address-error" : undefined
               }
-              className={
-                fieldErrors.address ? "border-red-500" : ""
-              }
+              className={fieldErrors.address ? "border-red-500" : ""}
             />
             <FieldError field="address" fieldErrors={fieldErrors} />
           </div>
@@ -968,9 +948,7 @@ export default function CreateListingForm({
                 disabled={loading}
                 aria-invalid={!!fieldErrors.city}
                 aria-describedby={fieldErrors.city ? "city-error" : undefined}
-                className={
-                  fieldErrors.city ? "border-red-500" : ""
-                }
+                className={fieldErrors.city ? "border-red-500" : ""}
               />
               <FieldError field="city" fieldErrors={fieldErrors} />
             </div>
@@ -987,9 +965,7 @@ export default function CreateListingForm({
                 disabled={loading}
                 aria-invalid={!!fieldErrors.state}
                 aria-describedby={fieldErrors.state ? "state-error" : undefined}
-                className={
-                  fieldErrors.state ? "border-red-500" : ""
-                }
+                className={fieldErrors.state ? "border-red-500" : ""}
               />
               <FieldError field="state" fieldErrors={fieldErrors} />
             </div>
@@ -1006,9 +982,7 @@ export default function CreateListingForm({
                 disabled={loading}
                 aria-invalid={!!fieldErrors.zip}
                 aria-describedby={fieldErrors.zip ? "zip-error" : undefined}
-                className={
-                  fieldErrors.zip ? "border-red-500" : ""
-                }
+                className={fieldErrors.zip ? "border-red-500" : ""}
               />
               <FieldError field="zip" fieldErrors={fieldErrors} />
             </div>
@@ -1067,11 +1041,7 @@ export default function CreateListingForm({
               aria-describedby={
                 fieldErrors.amenities ? "amenities-error" : undefined
               }
-              className={
-                fieldErrors.amenities
-                  ? "border-red-500"
-                  : ""
-              }
+              className={fieldErrors.amenities ? "border-red-500" : ""}
             />
             <FieldError field="amenities" fieldErrors={fieldErrors} />
             <p className="text-xs text-on-surface-variant mt-2">
@@ -1268,11 +1238,7 @@ export default function CreateListingForm({
               aria-describedby={
                 fieldErrors.houseRules ? "houseRules-error" : undefined
               }
-              className={
-                fieldErrors.houseRules
-                  ? "border-red-500"
-                  : ""
-              }
+              className={fieldErrors.houseRules ? "border-red-500" : ""}
             />
             <FieldError field="houseRules" fieldErrors={fieldErrors} />
             <p className="text-xs text-on-surface-variant mt-2">

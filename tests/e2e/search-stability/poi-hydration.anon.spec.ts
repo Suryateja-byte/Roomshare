@@ -57,13 +57,18 @@ async function waitForMapRef(page: Page, timeout = 30_000): Promise<boolean> {
 
 /**
  * Locate POI toggle buttons.
- * POILayer renders buttons with aria-label like "Show Transit", "Hide Transit", etc.
- * and aria-pressed="true"/"false".
+ * Desktop POI controls live inside the Map tools menu and expose
+ * menuitemcheckbox semantics with aria-label like "Show Transit".
  */
 function poiButtons(page: Page) {
-  return page.locator("button[aria-pressed]").filter({
-    has: page.locator("text=/Transit|POIs|Parks/"),
-  });
+  return page.locator('[data-testid="poi-category"]');
+}
+
+async function openMapTools(page: Page) {
+  const trigger = page.locator('button[aria-label^="Map tools"]').first();
+  await trigger.waitFor({ state: "visible", timeout: 15_000 });
+  await trigger.click();
+  await poiButtons(page).first().waitFor({ state: "visible", timeout: 15_000 });
 }
 
 // ---------------------------------------------------------------------------
@@ -86,6 +91,8 @@ test.describe("POI Layer Hydration Safety", () => {
     const hasMapRef = await waitForMapRef(page);
     test.skip(!hasMapRef, "Map E2E ref not available");
 
+    await openMapTools(page);
+
     // POI buttons should be rendered (Transit, POIs, Parks)
     const buttons = poiButtons(page);
     await expect(buttons.first()).toBeVisible({ timeout: 15_000 });
@@ -96,7 +103,7 @@ test.describe("POI Layer Hydration Safety", () => {
 
     // All should start unpressed (default state, no sessionStorage)
     for (let i = 0; i < count; i++) {
-      const pressed = await buttons.nth(i).getAttribute("aria-pressed");
+      const pressed = await buttons.nth(i).getAttribute("aria-checked");
       expect(pressed).toBe("false");
     }
   });
@@ -113,21 +120,21 @@ test.describe("POI Layer Hydration Safety", () => {
     test.skip(!hasMapRef, "Map E2E ref not available");
 
     // Wait for POI buttons
+    await openMapTools(page);
     const buttons = poiButtons(page);
-    await expect(buttons.first()).toBeVisible({ timeout: 15_000 });
 
     // Click the first POI button (Transit)
     const transitButton = buttons.first();
     await transitButton.click();
 
     // Should now be pressed
-    await expect(transitButton).toHaveAttribute("aria-pressed", "true");
+    await expect(transitButton).toHaveAttribute("aria-checked", "true");
 
     // Click again to toggle off
     await transitButton.click();
 
     // Should be unpressed again
-    await expect(transitButton).toHaveAttribute("aria-pressed", "false");
+    await expect(transitButton).toHaveAttribute("aria-checked", "false");
   });
 
   test("no hydration mismatch warnings in console", async ({ page }) => {
@@ -186,8 +193,9 @@ test.describe("POI Layer Hydration Safety", () => {
     const hasMapRef = await waitForMapRef(page);
     test.skip(!hasMapRef, "Map E2E ref not available");
 
+    await openMapTools(page);
+
     const buttons = poiButtons(page);
-    await expect(buttons.first()).toBeVisible({ timeout: 15_000 });
 
     const count = await buttons.count();
     for (let i = 0; i < count; i++) {

@@ -6,7 +6,7 @@
  * 2. collapse() sets isExpanded to false
  * 3. isExpanded reflects current state
  * 4. openFilters() calls registered handler
- * 5. registerOpenFilters() stores handler via ref (no re-render)
+ * 5. registerOpenFilters() supports cleanup and priority without re-rendering
  * 6. Stable fallback when used outside provider
  */
 
@@ -158,6 +158,48 @@ describe("MobileSearchContext", () => {
 
       expect(handler1).not.toHaveBeenCalled();
       expect(handler2).toHaveBeenCalledTimes(1);
+    });
+
+    it("restores the previous handler when the latest registration is cleaned up", () => {
+      const { result } = renderHook(() => useMobileSearch(), { wrapper });
+      const handler1 = jest.fn();
+      const handler2 = jest.fn();
+      let unregisterLatest = () => {};
+
+      act(() => {
+        result.current.registerOpenFilters(handler1);
+        unregisterLatest = result.current.registerOpenFilters(handler2);
+      });
+
+      act(() => {
+        unregisterLatest();
+      });
+
+      act(() => {
+        result.current.openFilters();
+      });
+
+      expect(handler1).toHaveBeenCalledTimes(1);
+      expect(handler2).not.toHaveBeenCalled();
+    });
+
+    it("prefers a higher-priority handler over later default registrations", () => {
+      const { result } = renderHook(() => useMobileSearch(), { wrapper });
+      const defaultHandler = jest.fn();
+      const highPriorityHandler = jest.fn();
+
+      act(() => {
+        result.current.registerOpenFilters(defaultHandler);
+        result.current.registerOpenFilters(highPriorityHandler, 10);
+        result.current.registerOpenFilters(jest.fn());
+      });
+
+      act(() => {
+        result.current.openFilters();
+      });
+
+      expect(defaultHandler).not.toHaveBeenCalled();
+      expect(highPriorityHandler).toHaveBeenCalledTimes(1);
     });
   });
 

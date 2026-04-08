@@ -73,6 +73,40 @@ function getFirstVisibleMarker(page: Page) {
   return page.locator(".maplibregl-marker:visible").first();
 }
 
+async function getMarkerClosestToMapEdge(page: Page) {
+  const index = await page.locator(".maplibregl-marker:visible").evaluateAll(
+    (elements) => {
+      const map = document.querySelector(
+        '[aria-label="Interactive map showing listing locations"]'
+      );
+      const mapRect = map?.getBoundingClientRect();
+      if (!mapRect || elements.length === 0) return 0;
+
+      let bestIndex = 0;
+      let bestDistance = Number.POSITIVE_INFINITY;
+
+      elements.forEach((element, idx) => {
+        const rect = element.getBoundingClientRect();
+        const distanceToEdge = Math.min(
+          rect.top - mapRect.top,
+          rect.left - mapRect.left,
+          mapRect.right - rect.right,
+          mapRect.bottom - rect.bottom
+        );
+
+        if (distanceToEdge < bestDistance) {
+          bestDistance = distanceToEdge;
+          bestIndex = idx;
+        }
+      });
+
+      return bestIndex;
+    }
+  );
+
+  return page.locator(".maplibregl-marker:visible").nth(index);
+}
+
 /**
  * Tab through page elements until a marker is focused
  * Returns true if a marker was focused, false otherwise
@@ -211,6 +245,39 @@ async function zoomToExpandClusters(page: Page): Promise<boolean> {
   return finalCount > 0;
 }
 
+async function jumpMapToZoom(page: Page, zoom: number): Promise<boolean> {
+  const hasMapRef = await waitForMapRef(page);
+  if (!hasMapRef) return false;
+
+  const zoomed = await page.evaluate((targetZoom) => {
+    return new Promise<boolean>((resolve) => {
+      const map = (window as any).__e2eMapRef;
+      const setProgrammatic = (window as any).__e2eSetProgrammaticMove;
+      if (!map || !setProgrammatic) {
+        resolve(false);
+        return;
+      }
+
+      setProgrammatic(true);
+      map.once("idle", () => resolve(true));
+      map.jumpTo({ zoom: targetZoom });
+      setTimeout(() => resolve(true), 10000);
+    });
+  }, zoom);
+
+  if (!zoomed) return false;
+
+  await page.evaluate(() => {
+    const updateMarkers = (window as any).__e2eUpdateMarkers;
+    if (typeof updateMarkers === "function") {
+      updateMarkers();
+    }
+  });
+
+  await waitForMapReady(page);
+  return true;
+}
+
 /**
  * Wait for markers with automatic cluster expansion.
  * First checks for existing markers, then zooms in to expand clusters if needed.
@@ -293,6 +360,43 @@ test.describe("Map Marker Interactions", () => {
         .count();
 
       expect(hasViewDetails + hasStackedHeader).toBeGreaterThan(0);
+    });
+
+    test("3.1b - popup stays inside the desktop map safe area at high zoom", async ({
+      page,
+    }) => {
+      test.skip(
+        !(await isMapAvailable(page)),
+        "Map not available (WebGL unavailable in headless)"
+      );
+
+      const markerCount = await waitForMarkersWithClusterExpansion(page);
+      test.skip(markerCount === 0, "No markers available");
+
+      const zoomed = await jumpMapToZoom(page, 18);
+      test.skip(!zoomed, "Could not zoom map for edge popup containment test");
+
+      const edgeMarker = await getMarkerClosestToMapEdge(page);
+      await expect(edgeMarker).toBeVisible({ timeout: timeouts.action });
+      await edgeMarker.evaluate((el) => (el as HTMLElement).click());
+
+      await waitForPopup(page);
+
+      const mapBox = await page
+        .locator('[aria-label="Interactive map showing listing locations"]')
+        .boundingBox();
+      const popupBox = await page.locator(".maplibregl-popup").boundingBox();
+
+      test.skip(!mapBox || !popupBox, "Map or popup bounding box unavailable");
+
+      expect(popupBox!.y).toBeGreaterThanOrEqual(mapBox!.y + 92);
+      expect(popupBox!.x).toBeGreaterThanOrEqual(mapBox!.x + 20);
+      expect(popupBox!.x + popupBox!.width).toBeLessThanOrEqual(
+        mapBox!.x + mapBox!.width - 20
+      );
+      expect(popupBox!.y + popupBox!.height).toBeLessThanOrEqual(
+        mapBox!.y + mapBox!.height - 20
+      );
     });
 
     test("3.2a - close popup via close button", async ({ page }) => {

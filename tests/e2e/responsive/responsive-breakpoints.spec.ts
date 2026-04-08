@@ -67,7 +67,7 @@ for (const bp of breakpoints) {
             while (parent && parent !== document.body) {
               const parentStyle = window.getComputedStyle(parent);
               const overflow = parentStyle.overflow + parentStyle.overflowX;
-              if (overflow.includes("hidden") || overflow.includes("clip")) {
+              if (overflow.includes("hidden") || overflow.includes("clip") || overflow.includes("auto") || overflow.includes("scroll")) {
                 const parentRect = parent.getBoundingClientRect();
                 // Parent clips content and its right edge is within viewport
                 if (parentRect.right <= viewportWidth + 2) {

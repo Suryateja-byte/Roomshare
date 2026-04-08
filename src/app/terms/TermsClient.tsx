@@ -44,10 +44,7 @@ export default function TermsClient() {
       <div className="pt-32 pb-16 px-6 bg-surface-canvas">
         <div className="container mx-auto max-w-4xl text-center">
           <div className="inline-flex items-center justify-center p-3 bg-surface-container-lowest rounded-2xl shadow-ambient-sm mb-6">
-            <Scale
-              className="w-8 h-8 text-on-surface"
-              strokeWidth={1.5}
-            />
+            <Scale className="w-8 h-8 text-on-surface" strokeWidth={1.5} />
           </div>
           <h1 className="font-display text-4xl md:text-5xl font-bold tracking-tight mb-6">
             Terms of Service
@@ -92,10 +89,10 @@ export default function TermsClient() {
           <div className="bg-surface-canvas p-6 rounded-lg mb-12 flex items-start gap-4 not-prose">
             <AlertCircle className="w-6 h-6 text-on-surface shrink-0 mt-1" />
             <p className="text-sm text-on-surface-variant leading-relaxed m-0">
-              <strong className="text-on-surface">Note:</strong>{" "}
-              These Terms include a class action waiver and a waiver of jury
-              trials, and require binding arbitration on an individual basis to
-              resolve disputes.
+              <strong className="text-on-surface">Note:</strong> These Terms
+              include a class action waiver and a waiver of jury trials, and
+              require binding arbitration on an individual basis to resolve
+              disputes.
             </p>
           </div>
 
@@ -134,9 +131,7 @@ export default function TermsClient() {
                 </p>
               </div>
               <div className="p-5 border border-outline-variant/20 rounded-lg bg-surface-container-lowest hover:border-outline-variant/40 transition-colors">
-                <h3 className="font-bold text-on-surface mb-2">
-                  Verification
-                </h3>
+                <h3 className="font-bold text-on-surface mb-2">Verification</h3>
                 <p className="text-sm text-on-surface-variant">
                   We reserve the right to verify your identity through various
                   means, including government ID.
