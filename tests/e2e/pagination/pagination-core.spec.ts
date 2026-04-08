@@ -50,6 +50,9 @@ const sel = {
 // ---------------------------------------------------------------------------
 test.describe("Pagination Core", () => {
   test.describe.configure({ mode: "serial" });
+  // Pagination mock + searchResultsContainer assumes desktop layout.
+  // On mobile, the bottom sheet interactions interfere with load-more.
+  test.use({ viewport: { width: 1280, height: 720 } });
 
   test.beforeEach(async () => {
     test.slow();

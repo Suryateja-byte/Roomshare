@@ -57,6 +57,9 @@ const sel = {
 // ---------------------------------------------------------------------------
 
 test.describe("Pagination Accessibility (Scenario 11)", () => {
+  // Force desktop viewport — pagination mock relies on desktop layout
+  test.use({ viewport: { width: 1280, height: 720 } });
+
   test.beforeEach(async () => {
     test.slow();
   });

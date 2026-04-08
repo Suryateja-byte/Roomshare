@@ -38,6 +38,8 @@ const sel = {
 } as const;
 
 test.describe("Pagination URL State", () => {
+  test.use({ viewport: { width: 1280, height: 720 } });
+
   test.beforeEach(async () => {
     test.slow();
   });
