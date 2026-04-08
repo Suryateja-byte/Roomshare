@@ -72,7 +72,8 @@ test.describe("Booking Authorization Boundaries @critical @booking @security", (
 
       // The sign-in link/button should be present
       const signInButton = page.getByRole("link", { name: /sign in to continue/i })
-        .or(page.getByRole("button", { name: /sign in to continue/i }));
+        .or(page.getByRole("button", { name: /sign in to continue/i }))
+        .first();
       await expect(signInButton).toBeVisible({ timeout: 5_000 });
     });
   });
