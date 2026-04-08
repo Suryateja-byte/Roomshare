@@ -52,6 +52,9 @@ export const CI_ACCEPTABLE_VIOLATIONS: string[] = [
   // overlay stacking, framer-motion animations, and maplibre canvas
   "region",
   "nested-interactive",
+  // Maplibre and Radix UI inject ARIA attributes that don't match their roles
+  // (e.g., maplibre canvas elements, radix scroll areas, sheet handles)
+  "aria-allowed-attr",
 ];
 
 // ---------------------------------------------------------------------------
