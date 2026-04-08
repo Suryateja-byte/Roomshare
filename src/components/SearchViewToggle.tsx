@@ -76,14 +76,20 @@ export default function SearchViewToggle({
     setMobileSnap(1);
   }, [filterParamsKey]);
 
-  // When a map pin is tapped (activeId changes) on mobile, collapse the sheet
-  // so the map and preview card are visible. When map background is tapped,
-  // keep the sheet collapsed.
+  // When a map pin is tapped (activeId changes to a non-null value) on mobile,
+  // collapse the sheet so the map and preview card are visible.
+  // Uses a ref to skip the initial mount and only react to actual marker selection.
+  const prevActiveIdRef = useRef(activeId);
   useEffect(() => {
-    if (isDesktop === false && hasMounted) {
+    if (
+      isDesktop === false &&
+      activeId != null &&
+      activeId !== prevActiveIdRef.current
+    ) {
       setMobileSnap(0);
     }
-  }, [activeId, isDesktop, hasMounted]);
+    prevActiveIdRef.current = activeId;
+  }, [activeId, isDesktop]);
 
   const handleFloatingToggle = useCallback(() => {
     // If sheet is showing list (expanded), collapse to show map

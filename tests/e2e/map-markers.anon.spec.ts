@@ -389,12 +389,12 @@ test.describe("Map Marker Interactions", () => {
 
       test.skip(!mapBox || !popupBox, "Map or popup bounding box unavailable");
 
-      expect(popupBox!.top).toBeGreaterThanOrEqual(mapBox!.y + 92);
-      expect(popupBox!.left).toBeGreaterThanOrEqual(mapBox!.x + 20);
-      expect(popupBox!.right).toBeLessThanOrEqual(
+      expect(popupBox!.y).toBeGreaterThanOrEqual(mapBox!.y + 92);
+      expect(popupBox!.x).toBeGreaterThanOrEqual(mapBox!.x + 20);
+      expect(popupBox!.x + popupBox!.width).toBeLessThanOrEqual(
         mapBox!.x + mapBox!.width - 20
       );
-      expect(popupBox!.bottom).toBeLessThanOrEqual(
+      expect(popupBox!.y + popupBox!.height).toBeLessThanOrEqual(
         mapBox!.y + mapBox!.height - 20
       );
     });
