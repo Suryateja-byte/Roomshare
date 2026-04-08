@@ -88,12 +88,9 @@ setup.fixme("authenticate as admin", async ({ page }) => {
 
   await loginAndSaveState(page, adminEmail, adminPassword, adminAuthFile);
 
-  // Verify admin access by navigating to admin page (if it exists)
-  const response = await page.goto("/admin").catch(() => null);
-  // If the admin route doesn't exist or redirects away, skip the URL assertion
-  if (response && response.ok()) {
-    await expect(page).toHaveURL(/\/admin/);
-  }
+  // Verify admin access by navigating to admin page
+  await page.goto("/admin");
+  await expect(page).toHaveURL(/\/admin/);
 });
 
 /**
