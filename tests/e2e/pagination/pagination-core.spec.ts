@@ -64,7 +64,7 @@ test.describe("Pagination Core", () => {
     test.slow();
 
     // 12 mock items for one load-more page
-    const mock = await setupPaginationMock(page, { totalLoadMoreItems: 12 });
+    const mock = await setupPaginationMock(page, { totalLoadMoreItems: 24 });
 
     await page.goto(`/search?${boundsQS}`);
     const container = searchResultsContainer(page);
@@ -148,7 +148,7 @@ test.describe("Pagination Core", () => {
     // there are still 12 remaining → nextCursor stays non-null at the cap.
     // Combined with 12 real initial items = 60 (the cap).
     // The component shows cap message only when reachedCap && nextCursor.
-    await setupPaginationMock(page, { totalLoadMoreItems: 60 });
+    await setupPaginationMock(page, { totalLoadMoreItems: 72 });
     await page.goto(`/search?${boundsQS}`);
     const container = searchResultsContainer(page);
 
@@ -224,7 +224,7 @@ test.describe("Pagination Core", () => {
 
     // Add a 2-second delay to make the loading state observable
     await setupPaginationMock(page, {
-      totalLoadMoreItems: 12,
+      totalLoadMoreItems: 24,
       delayMs: 2000,
     });
     await page.goto(`/search?${boundsQS}`);
@@ -264,7 +264,7 @@ test.describe("Pagination Core", () => {
 
     // First load-more will fail (abort the request)
     await setupPaginationMock(page, {
-      totalLoadMoreItems: 12,
+      totalLoadMoreItems: 24,
       failOnLoadMore: 1,
     });
     await page.goto(`/search?${boundsQS}`);
@@ -302,7 +302,7 @@ test.describe("Pagination Core", () => {
 
     // First load-more fails, retry succeeds
     const mock = await setupPaginationMock(page, {
-      totalLoadMoreItems: 12,
+      totalLoadMoreItems: 24,
       failOnLoadMore: 1,
     });
     await page.goto(`/search?${boundsQS}`);
@@ -346,7 +346,7 @@ test.describe("Pagination Core", () => {
 
     // Use delay so the loading state is observable during double-click
     const mock = await setupPaginationMock(page, {
-      totalLoadMoreItems: 12,
+      totalLoadMoreItems: 24,
       delayMs: 1000,
     });
     await page.goto(`/search?${boundsQS}`);
@@ -475,7 +475,7 @@ test.describe("Pagination Core", () => {
 
     // 60 mock items so that after 4 loads of 12 (48 consumed), cursor stays
     // non-null. The component shows cap message only when reachedCap && nextCursor.
-    await setupPaginationMock(page, { totalLoadMoreItems: 60 });
+    await setupPaginationMock(page, { totalLoadMoreItems: 72 });
     await page.goto(`/search?${boundsQS}`);
     const container = searchResultsContainer(page);
 
@@ -537,7 +537,7 @@ test.describe("Pagination Core", () => {
     // 60 mock items available -- more than enough to exceed the cap.
     // Client will stop at 48 mock + 12 real = 60 (the cap).
     // The extra 12 mock items beyond the cap are never requested.
-    await setupPaginationMock(page, { totalLoadMoreItems: 60 });
+    await setupPaginationMock(page, { totalLoadMoreItems: 72 });
     await page.goto(`/search?${boundsQS}`);
     const container = searchResultsContainer(page);
 
@@ -697,7 +697,7 @@ test.describe("Pagination Core", () => {
 
     // 5-second delay on load-more to simulate high-latency network
     await setupPaginationMock(page, {
-      totalLoadMoreItems: 12,
+      totalLoadMoreItems: 24,
       delayMs: 5000,
     });
     await page.goto(`/search?${boundsQS}`);

@@ -139,7 +139,7 @@ test.describe("Pagination Accessibility (Scenario 11)", () => {
 
       // Use a 2-second delay so the loading state is observable
       await setupPaginationMock(page, {
-        totalLoadMoreItems: 12,
+        totalLoadMoreItems: 24,
         delayMs: 2000,
       });
       await page.goto(`/search?${boundsQS}`);
@@ -262,7 +262,7 @@ test.describe("Pagination Accessibility (Scenario 11)", () => {
     async ({ page }) => {
       test.slow();
 
-      await setupPaginationMock(page, { totalLoadMoreItems: 12 });
+      await setupPaginationMock(page, { totalLoadMoreItems: 24 });
       await page.goto(`/search?${boundsQS}`);
       const container = searchResultsContainer(page);
 
@@ -325,7 +325,7 @@ test.describe("Pagination Accessibility (Scenario 11)", () => {
 
       // Use a 3-second delay so the loading state is observable
       const mock = await setupPaginationMock(page, {
-        totalLoadMoreItems: 12,
+        totalLoadMoreItems: 24,
         delayMs: 3000,
       });
       await page.goto(`/search?${boundsQS}`);

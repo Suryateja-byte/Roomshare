@@ -274,7 +274,7 @@ test.describe("5. Cursor Reset on Filter/Sort Change", () => {
     test.slow();
 
     // 12 mock items available for load-more after the remount
-    await setupPaginationMock(page, { totalLoadMoreItems: 12 });
+    await setupPaginationMock(page, { totalLoadMoreItems: 24 });
     await page.goto(SEARCH_URL);
     const container = searchResultsContainer(page);
 
@@ -347,7 +347,7 @@ test.describe("6. Sort + Pagination Order Preservation", () => {
     // Set up mock with custom ascending prices well above all seed data.
     // Seed data max is ~$2,200; mock starts at $10,000 to guarantee the
     // cross-page boundary (last real price <= first mock price) holds.
-    const mock = await setupPaginationMock(page, { totalLoadMoreItems: 12 });
+    const mock = await setupPaginationMock(page, { totalLoadMoreItems: 24 });
     for (let i = 0; i < mock.allMockListings.length; i++) {
       mock.allMockListings[i] = createMockListing(i, {
         price: 10_000 + i * 100, // 10000, 10100, ..., 11100
@@ -401,7 +401,7 @@ test.describe("6. Sort + Pagination Order Preservation", () => {
 
     // Mock prices descending, all below seed min (~$800).
     // This ensures cross-page boundary (last real price >= first mock price).
-    const mock = await setupPaginationMock(page, { totalLoadMoreItems: 12 });
+    const mock = await setupPaginationMock(page, { totalLoadMoreItems: 24 });
     for (let i = 0; i < mock.allMockListings.length; i++) {
       mock.allMockListings[i] = createMockListing(i, {
         price: 200 - i * 10, // 200, 190, 180, ..., 90
@@ -451,7 +451,7 @@ test.describe("6. Sort + Pagination Order Preservation", () => {
   test("6.3 load more with newest maintains result order", async ({ page }) => {
     test.slow();
 
-    await setupPaginationMock(page, { totalLoadMoreItems: 12 });
+    await setupPaginationMock(page, { totalLoadMoreItems: 24 });
     await page.goto(`/search?sort=newest&${boundsQS}`);
     const container = searchResultsContainer(page);
 
@@ -494,7 +494,7 @@ test.describe("6. Sort + Pagination Order Preservation", () => {
   test("6.4 load more with rating maintains result order", async ({ page }) => {
     test.slow();
 
-    await setupPaginationMock(page, { totalLoadMoreItems: 12 });
+    await setupPaginationMock(page, { totalLoadMoreItems: 24 });
     await page.goto(`/search?sort=rating&${boundsQS}`);
     const container = searchResultsContainer(page);
 

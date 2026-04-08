@@ -168,7 +168,7 @@ test.describe("Split-Stay Feature (Scenario 9)", () => {
     // Mock listings have prices $800, $850, $900, ... (from createMockListing).
     // Adding these to the pool changes the sorted price order, which may
     // change which pairs are selected (cheapest + most expensive).
-    await setupPaginationMock(page, { totalLoadMoreItems: 12 });
+    await setupPaginationMock(page, { totalLoadMoreItems: 24 });
 
     // Navigate with 6-month lease duration to trigger split-stay
     await page.goto(`/search?${boundsQS}&leaseDuration=6%20months`);

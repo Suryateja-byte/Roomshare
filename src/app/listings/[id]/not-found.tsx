@@ -2,7 +2,7 @@ import Link from "next/link";
 
 export default function ListingNotFound() {
   return (
-    <div className="flex flex-col items-center justify-center min-h-[50vh] px-4 bg-surface-canvas">
+    <div className="flex flex-col items-center justify-center min-h-[50vh] px-4 bg-surface-canvas" data-testid="not-found">
       <h1 className="text-2xl font-bold font-display text-on-surface">
         Listing not found
       </h1>

@@ -126,7 +126,7 @@ test.describe("Pagination URL State", () => {
     test.slow();
 
     // Mock not strictly needed for this test, but set up for consistency
-    await setupPaginationMock(page, { totalLoadMoreItems: 12 });
+    await setupPaginationMock(page, { totalLoadMoreItems: 24 });
     await page.goto(`/search?${boundsQS}`);
     const container = searchResultsContainer(page);
 
@@ -182,7 +182,7 @@ test.describe("Pagination URL State", () => {
     test.slow();
 
     // 12 mock items for one load-more page
-    await setupPaginationMock(page, { totalLoadMoreItems: 12 });
+    await setupPaginationMock(page, { totalLoadMoreItems: 24 });
 
     // Navigate with multiple filter params
     const filterParams = `${boundsQS}&minPrice=500&maxPrice=2000&roomType=private&sort=price_asc`;
@@ -294,7 +294,7 @@ test.describe("Pagination URL State", () => {
 
     // Setup mock for consistency with other tests in this file
     // (not strictly needed since this test only checks the initial page)
-    await setupPaginationMock(page, { totalLoadMoreItems: 12 });
+    await setupPaginationMock(page, { totalLoadMoreItems: 24 });
     await page.goto(`/search?${boundsQS}`);
     const container = searchResultsContainer(page);
 
