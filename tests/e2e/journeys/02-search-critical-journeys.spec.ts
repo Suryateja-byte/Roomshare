@@ -64,14 +64,22 @@ test.describe("20 Critical Search Page Journeys", () => {
     expect(url.searchParams.get("minPrice")).toBe("500");
     expect(url.searchParams.get("maxPrice")).toBe("1500");
 
-    // Verify price inputs reflect values (wait for hydration to populate inputs)
-    const minInput = page.getByLabel(/minimum budget/i);
-    const maxInput = page.getByLabel(/maximum budget/i);
-    await expect
-      .poll(() => minInput.inputValue(), { timeout: 10_000 })
-      .not.toBe("");
-    await expect(minInput).toHaveValue("500");
-    await expect(maxInput).toHaveValue("1500");
+    // On mobile, price inputs live inside MobileSearchOverlay (closed by default).
+    // The SearchForm with budget inputs has class "hidden md:block" — not rendered
+    // on mobile. URL param assertions above already verify the filter is applied.
+    const viewport = page.viewportSize();
+    if (!viewport || viewport.width < 768) {
+      // Skip input-value verification on mobile; URL params are the source of truth.
+    } else {
+      // Verify price inputs reflect values (wait for hydration to populate inputs)
+      const minInput = page.getByLabel(/minimum budget/i);
+      const maxInput = page.getByLabel(/maximum budget/i);
+      await expect
+        .poll(() => minInput.inputValue(), { timeout: 10_000 })
+        .not.toBe("");
+      await expect(minInput).toHaveValue("500");
+      await expect(maxInput).toHaveValue("1500");
+    }
 
     // Results heading should be visible
     await expect(page.getByRole("heading", { level: 1 }).first()).toBeVisible({
@@ -576,12 +584,18 @@ test.describe("20 Critical Search Page Journeys", () => {
     expect(url.searchParams.get("minPrice")).toBe("700");
     expect(url.searchParams.get("sort")).toBe("price_asc");
 
-    // Verify price input still shows correct value (wait for hydration)
-    const minInput = page.getByLabel(/minimum budget/i);
-    await expect
-      .poll(() => minInput.inputValue(), { timeout: 10_000 })
-      .not.toBe("");
-    await expect(minInput).toHaveValue("700");
+    // On mobile, price inputs live inside MobileSearchOverlay (closed by default).
+    // The SearchForm with budget inputs has class "hidden md:block" — not rendered
+    // on mobile. URL param assertions above already verify the filter is preserved.
+    const viewport = page.viewportSize();
+    if (viewport && viewport.width >= 768) {
+      // Verify price input still shows correct value (wait for hydration)
+      const minInput = page.getByLabel(/minimum budget/i);
+      await expect
+        .poll(() => minInput.inputValue(), { timeout: 10_000 })
+        .not.toBe("");
+      await expect(minInput).toHaveValue("700");
+    }
   });
 
   // ─────────────────────────────────────────────────
@@ -589,6 +603,17 @@ test.describe("20 Critical Search Page Journeys", () => {
   // ─────────────────────────────────────────────────
   test("J17: Map toggle shows and hides map view", async ({ page, nav }) => {
     test.slow();
+
+    // On mobile, the map is always visible behind the bottom sheet (no dedicated
+    // map toggle button on desktop pattern). The FloatingMapButton collapses the
+    // bottom sheet to reveal the map — different UX from the desktop toggle.
+    // Skip the desktop-style toggle assertions on mobile viewports.
+    const viewport = page.viewportSize();
+    if (viewport && viewport.width < 768) {
+      test.skip(true, "Map toggle works differently on mobile (FloatingMapButton collapses sheet, not a desktop-style show/hide toggle)");
+      return;
+    }
+
     await nav.goToSearch({ bounds: SF_BOUNDS });
     await page.waitForLoadState("domcontentloaded").catch(() => {});
     await expect(page.getByRole("heading", { level: 1 }).first()).toBeVisible({
@@ -620,8 +645,8 @@ test.describe("20 Critical Search Page Journeys", () => {
         const hideMapBtn = page
           .getByRole("button", { name: /hide map|list/i })
           .or(mapToggle.first());
-        if (await hideMapBtn.isVisible()) {
-          await hideMapBtn.click();
+        if (await hideMapBtn.first().isVisible()) {
+          await hideMapBtn.first().click();
         }
       }
     }

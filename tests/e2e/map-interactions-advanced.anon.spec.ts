@@ -676,10 +676,11 @@ test.describe("Map Interactions Advanced (Stories 5-8)", () => {
       const initialBounds = getUrlBounds(page.url());
       expect(initialBounds.minLng).not.toBeNull();
 
-      // Pan map east with a large delta to ensure bounds change is detectable
+      // Pan map east with a large delta to ensure bounds change is detectable.
+      // panBy([+dx, 0]) moves the viewport right, revealing content to the east (minLng increases).
       const panned =
-        (await programmaticMapPan(page, -300, 0)) ||
-        (await simulateMapPan(page, -300, 0));
+        (await programmaticMapPan(page, 300, 0)) ||
+        (await simulateMapPan(page, 300, 0));
       test.skip(!panned, "Map pan failed");
 
       // Wait for debounced URL bounds update after pan

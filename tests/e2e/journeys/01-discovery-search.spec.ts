@@ -269,6 +269,8 @@ test.describe("Discovery & Search Journeys", () => {
         { timeout: 30000 }
       );
 
+      const isMobile = (page.viewportSize()?.width ?? 1024) < 768;
+
       // Find and click map view toggle — button text is "Map" (mobile) or "Show map" (desktop)
       const mapToggle = page
         .getByRole("button", { name: /show map|^map$/i })
@@ -290,11 +292,11 @@ test.describe("Discovery & Search Journeys", () => {
 
         // Check for markers
         const markers = page.locator(selectors.mapMarker);
-        // May or may not have markers depending on listings
-        await page.waitForLoadState("networkidle").catch(() => {});
 
-        // Try clicking a marker if visible
-        if ((await markers.count()) > 0) {
+        // Try clicking a marker if visible.
+        // On mobile the map is partially covered by the bottom sheet and markers
+        // may not produce a popup in the same way as desktop — skip popup assertion.
+        if (!isMobile && (await markers.count()) > 0) {
           await markers.first().click();
 
           // Should show popup or listing info

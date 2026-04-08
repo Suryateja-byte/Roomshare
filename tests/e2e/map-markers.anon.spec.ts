@@ -115,12 +115,12 @@ async function tabToMarker(page: Page, maxAttempts = 30): Promise<boolean> {
   for (let i = 0; i < maxAttempts; i++) {
     await page.keyboard.press("Tab");
 
-    // Check if active element is a marker (has aria-label with price format "$X/month")
+    // Check if active element is a marker (has aria-label with price format "$X per month" or "$X/month")
     const isMarkerFocused = await page.evaluate(() => {
       const active = document.activeElement;
       if (!active) return false;
       const ariaLabel = active.getAttribute("aria-label") || "";
-      return ariaLabel.includes("$") && ariaLabel.includes("/month");
+      return ariaLabel.includes("$") && (ariaLabel.includes("per month") || ariaLabel.includes("/month"));
     });
 
     if (isMarkerFocused) return true;
@@ -651,11 +651,11 @@ test.describe("Map Marker Interactions", () => {
       expect(tabIndex).toBe("0");
 
       // Check aria-label contains price and navigation hint
-      // Format: "$1200/month, Title, N spots available. Use arrow keys to navigate between markers."
+      // Format: "$1200 per month, Title, N spots available. Use arrow keys to navigate between markers."
       const ariaLabel = await markerInner.getAttribute("aria-label");
       expect(ariaLabel).toBeTruthy();
       expect(ariaLabel).toMatch(/\$/); // Contains price
-      expect(ariaLabel).toMatch(/\/month/); // Contains "/month"
+      expect(ariaLabel).toMatch(/(?:\/month|per month)/i); // Contains month price indicator
       expect(ariaLabel).toMatch(/arrow keys/i); // Contains navigation hint
     });
 

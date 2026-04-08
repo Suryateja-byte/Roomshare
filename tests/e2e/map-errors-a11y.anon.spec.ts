@@ -548,38 +548,42 @@ test.describe("Map Error States and Accessibility", () => {
         // Focus on drag handle
         await dragHandle.first().focus();
 
-        // Test arrow key navigation
-        const initialValue = await dragHandle
-          .first()
-          .getAttribute("aria-valuenow");
-        const initialNum = parseInt(initialValue || "1", 10);
+        // Ensure sheet is collapsed first (Home key sets snap to 0) so ArrowUp has room to expand.
+        // The 2-snap model has valuenow in {0, 1}; ArrowUp at max (1) is a no-op.
+        await page.keyboard.press("Home");
+        await expect
+          .poll(
+            async () => {
+              const val = await dragHandle.first().getAttribute("aria-valuenow");
+              return parseInt(val || "1", 10);
+            },
+            { timeout: 2000 }
+          )
+          .toBe(0);
+
+        const initialNum = 0;
 
         // Press ArrowUp to expand
         await page.keyboard.press("ArrowUp");
 
         // Wait for the value to update after ArrowUp
-        if (initialNum < 2) {
-          await expect
-            .poll(
-              async () => {
-                const val = await dragHandle
-                  .first()
-                  .getAttribute("aria-valuenow");
-                return parseInt(val || "1", 10);
-              },
-              { timeout: 2000 }
-            )
-            .toBeGreaterThan(initialNum);
-        }
+        await expect
+          .poll(
+            async () => {
+              const val = await dragHandle
+                .first()
+                .getAttribute("aria-valuenow");
+              return parseInt(val || "0", 10);
+            },
+            { timeout: 2000 }
+          )
+          .toBeGreaterThan(initialNum);
 
         const afterUpValue = await dragHandle
           .first()
           .getAttribute("aria-valuenow");
         const afterUpNum = parseInt(afterUpValue || "1", 10);
-
-        if (initialNum < 2) {
-          expect(afterUpNum).toBeGreaterThanOrEqual(initialNum);
-        }
+        expect(afterUpNum).toBeGreaterThan(initialNum);
 
         // Test Escape key to collapse
         await page.keyboard.press("Escape");
@@ -595,7 +599,7 @@ test.describe("Map Error States and Accessibility", () => {
             },
             { timeout: 2000 }
           )
-          .toBeLessThanOrEqual(afterUpNum);
+          .toBeLessThan(afterUpNum);
       });
     });
   });
