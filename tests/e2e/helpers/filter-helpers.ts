@@ -232,24 +232,28 @@ export function filtersButton(page: Page): Locator {
 }
 
 /**
- * Ensure filter button is visible on mobile by triggering collapsed search bar.
+ * Ensure filter button is visible on mobile.
  * On mobile viewports, the Filters button lives in CollapsedMobileSearch which
- * only appears after scrolling down. This helper scrolls to trigger it.
+ * appears after useMediaQuery hydrates (may take 1-2s after page load).
+ * Falls back to scrolling if the button doesn't appear after waiting.
  */
 async function ensureMobileFilterButton(page: Page): Promise<void> {
   const viewport = page.viewportSize();
   if (!viewport || viewport.width >= 768) return; // Desktop: button already visible
 
   const btn = filtersButton(page);
-  const alreadyVisible = await btn.isVisible().catch(() => false);
-  if (alreadyVisible) return;
 
-  // Scroll down to trigger the collapsed header (which contains the mobile filter button)
+  // Wait for useMediaQuery hydration to show the collapsed bar
+  const visible = await btn.waitFor({ state: "visible", timeout: 10_000 })
+    .then(() => true)
+    .catch(() => false);
+  if (visible) return;
+
+  // Fallback: scroll to force collapsed state detection
   await page.evaluate(() => window.scrollBy(0, 200));
   await page.waitForTimeout(500);
-  // Scroll back up slightly — the collapsed bar should persist
   await page.evaluate(() => window.scrollBy(0, -100));
-  await page.waitForTimeout(300);
+  await page.waitForTimeout(500);
 }
 
 /** Locate the filter dialog */
