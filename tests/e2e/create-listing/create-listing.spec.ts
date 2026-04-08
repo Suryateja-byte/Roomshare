@@ -324,9 +324,9 @@ test.describe("Create Listing — Functional Tests", () => {
 
       await clp.goto();
 
-      // "Finer Details" is always marked complete (all optional fields)
+      // On a fresh form, no sections are complete (all fields are empty)
       const initialSteps = await clp.getCompletedStepCount();
-      expect(initialSteps).toBeGreaterThanOrEqual(1); // At least "Finer Details"
+      expect(initialSteps).toBe(0);
 
       // Fill basics: title + description(>=10 chars) + price + totalSlots
       await clp.fillBasics(data);

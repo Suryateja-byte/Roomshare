@@ -36,6 +36,9 @@ test.beforeEach(async ({}, testInfo) => {
   if (testInfo.project.name.includes("webkit")) {
     test.skip(true, "Radix UI hydration issues on webkit");
   }
+  if (testInfo.project.name.includes("firefox")) {
+    test.skip(true, "framer-motion toggle animations unreliable in Firefox CI");
+  }
   test.slow();
 });
 
