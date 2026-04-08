@@ -1039,6 +1039,10 @@ export default function MapComponent({
   const throttleTimeoutRef = useRef<NodeJS.Timeout | null>(null);
   const searchSafetyTimeoutRef = useRef<NodeJS.Timeout | null>(null);
   const onMoveThrottleRef = useRef<NodeJS.Timeout | null>(null);
+  // Ref to hold the latest searchAsMove value for use inside debounce/throttle callbacks.
+  // These callbacks capture refs (not state), so they always see the current value
+  // even if searchAsMove state changed after the callback was scheduled.
+  const searchAsMoveRef = useRef<boolean>(true);
   const [isFullscreen, setIsFullscreen] = useState(false);
   const [canFullscreen, setCanFullscreen] = useState(false);
   // P2-FIX (#79): Ref to hold latest executeMapSearch to prevent stale closure in nested timeouts
@@ -2206,6 +2210,20 @@ export default function MapComponent({
     win.__e2eMapRef = mapRef.current.getMap();
     win.__e2eSetProgrammaticMove = setProgrammaticMove;
     win.__e2eUpdateMarkers = updateUnclusteredListings;
+    // Allow E2E tests to disable "Search as I move" to prevent the map from
+    // calling router.replace() during pagination tests with load-more delays.
+    // The wrapper also updates searchAsMoveRef synchronously so that any
+    // already-scheduled debounce/throttle callbacks see the new value immediately
+    // without waiting for a React re-render cycle.
+    win.__e2eSetSearchAsMove = (value: boolean) => {
+      searchAsMoveRef.current = value;
+      // Also set the frozen flag that executeMapSearch checks directly.
+      // This provides a belt-and-suspenders guard: the ref prevents debounce
+      // callbacks from calling executeMapSearch, and the frozen flag prevents
+      // any remaining path from actually executing the search.
+      win["__e2eMapSearchFrozen"] = !value;
+      setSearchAsMove(value);
+    };
 
     // Signal to E2E tests that the map ref is ready (not just DOM-present).
     // waitForMapReady() waits for this attribute instead of falling back to
@@ -2233,6 +2251,7 @@ export default function MapComponent({
       delete win.__e2eMapRef;
       delete win.__e2eSetProgrammaticMove;
       delete win.__e2eUpdateMarkers;
+      delete win.__e2eSetSearchAsMove;
       delete win.__e2eSimulateUserPan;
       delete win.__e2eSimulateUserZoom;
       mapContainer?.removeAttribute("data-map-ready");
@@ -2511,6 +2530,14 @@ export default function MapComponent({
       minLat: number;
       maxLat: number;
     }) => {
+      // E2E: If search-as-move is explicitly disabled via the E2E hook, skip.
+      // This is a secondary guard — the primary guard is in the debounce/throttle
+      // callbacks via searchAsMoveRef. This guard handles the case where
+      // executeMapSearch is called directly (e.g., setSearchHandler).
+      if (typeof window !== "undefined") {
+        const win = window as unknown as Record<string, unknown>;
+        if (win["__e2eMapSearchFrozen"] === true) return;
+      }
       // P2-FIX (#154): Use numeric comparison with tolerance instead of string comparison
       // This avoids floating-point precision issues with toFixed() rounding
       // Tolerance of 0.0001 = ~11 meters, same precision as before but more robust
@@ -2587,6 +2614,13 @@ export default function MapComponent({
   useEffect(() => {
     executeMapSearchRef.current = executeMapSearch;
   }, [executeMapSearch]);
+
+  // Keep searchAsMoveRef in sync with searchAsMove state.
+  // Debounce/throttle callbacks use the ref so they always see the current value
+  // even if searchAsMove changed after the callback was scheduled.
+  useEffect(() => {
+    searchAsMoveRef.current = searchAsMove;
+  }, [searchAsMove]);
 
   // Register search and reset handlers with context (after executeMapSearch is defined)
   useEffect(() => {
@@ -2813,6 +2847,10 @@ export default function MapComponent({
         }
 
         debounceTimer.current = setTimeout(() => {
+          // Re-check searchAsMove via ref — it may have been toggled off
+          // after the debounce was scheduled (e.g., by E2E test hook or user toggle).
+          if (!searchAsMoveRef.current) return;
+
           const now = Date.now();
           const timeSinceLastSearch = now - lastSearchTimeRef.current;
 
@@ -2829,7 +2867,12 @@ export default function MapComponent({
             const delay = MIN_SEARCH_INTERVAL_MS - timeSinceLastSearch;
             throttleTimeoutRef.current = setTimeout(() => {
               // P2-FIX (#79): Use ref to get latest executeMapSearch, preventing stale closure
-              if (pendingBoundsRef.current && executeMapSearchRef.current) {
+              // Re-check searchAsMove via ref in case it was toggled while throttle was pending.
+              if (
+                pendingBoundsRef.current &&
+                executeMapSearchRef.current &&
+                searchAsMoveRef.current
+              ) {
                 executeMapSearchRef.current(pendingBoundsRef.current);
               }
             }, delay);

@@ -59,6 +59,19 @@ export interface PaginationMockOptions {
   delayMs?: number;
   /** Which load-more call index should fail, 1-based (0 = never fail) */
   failOnLoadMore?: number;
+  /**
+   * When true, disable the map's "Search as I move" feature immediately after
+   * the map becomes ready (via window.__e2eSetSearchAsMove exposed by Map.tsx).
+   * This prevents the map from calling router.replace() with new bounds during
+   * pagination tests, which would cause SearchResultsClient to remount and reset
+   * the accumulated card count.
+   *
+   * Use this in tests with delayMs > 0 or multiple sequential load-more clicks
+   * where the map has time to fire a bounds-change navigation.
+   *
+   * Default: true when delayMs > 0, false otherwise.
+   */
+  freezeMapNavigations?: boolean;
 }
 
 export interface PaginationMockHandle {
@@ -267,10 +280,40 @@ export async function setupPaginationMock(
     itemsPerPage = 12,
     delayMs = 0,
     failOnLoadMore = 0,
+    freezeMapNavigations = delayMs > 0,
   } = options;
 
   // Generate all mock listings for load-more responses
   const allMockListings = createListingBatch(0, totalLoadMoreItems);
+
+  // -----------------------------------------------------------------------
+  // Freeze map navigations: disable "Search as I move" via E2E hook
+  // -----------------------------------------------------------------------
+  // When freezeMapNavigations=true we inject a script that polls until the
+  // window.__e2eSetSearchAsMove hook (exposed by Map.tsx) is available, then
+  // immediately calls it with `false`. This stops the map from calling
+  // router.replace() with new bounds while a delayed load-more is in flight,
+  // which would otherwise reset SearchResultsClient's accumulated listings.
+  if (freezeMapNavigations) {
+    await page.addInitScript(() => {
+      const win = window as unknown as Record<string, unknown>;
+      // Set the frozen flag immediately so executeMapSearch sees it as soon as
+      // the Map component first tries to fire (before the hook is even available).
+      win["__e2eMapSearchFrozen"] = true;
+      // Then poll until the React hook is ready and call it so the UI toggle
+      // also reflects the disabled state.
+      let elapsed = 0;
+      const iv = setInterval(() => {
+        elapsed += 10;
+        if (typeof win["__e2eSetSearchAsMove"] === "function") {
+          (win["__e2eSetSearchAsMove"] as (v: boolean) => void)(false);
+          clearInterval(iv);
+        } else if (elapsed >= 10_000) {
+          clearInterval(iv);
+        }
+      }, 10);
+    });
+  }
 
   // State tracking
   let _loadMoreCallCount = 0;

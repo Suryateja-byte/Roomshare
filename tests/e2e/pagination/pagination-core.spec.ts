@@ -54,8 +54,12 @@ test.describe("Pagination Core", () => {
   // On mobile, the bottom sheet interactions interfere with load-more.
   test.use({ viewport: { width: 1280, height: 720 } });
 
-  test.beforeEach(async () => {
+  test.beforeEach(async ({ page }) => {
     test.slow();
+    // Clear any route handlers registered by previous serial tests.
+    // In serial mode, the same page object is reused, so handlers accumulate.
+    // Unrouting prevents stale handlers from intercepting requests in later tests.
+    await page.unrouteAll({ behavior: "ignoreErrors" });
   });
 
   // -------------------------------------------------------------------------
@@ -151,7 +155,13 @@ test.describe("Pagination Core", () => {
     // there are still 12 remaining → nextCursor stays non-null at the cap.
     // Combined with 12 real initial items = 60 (the cap).
     // The component shows cap message only when reachedCap && nextCursor.
-    await setupPaginationMock(page, { totalLoadMoreItems: 72 });
+    // freezeMapNavigations: prevent the map's "Search as I move" from calling
+    // router.replace() during the multiple sequential load-more clicks, which
+    // would remount SearchResultsClient and reset the accumulated card count.
+    await setupPaginationMock(page, {
+      totalLoadMoreItems: 72,
+      freezeMapNavigations: true,
+    });
     await page.goto(`/search?${boundsQS}`);
     const container = searchResultsContainer(page);
 
@@ -238,6 +248,10 @@ test.describe("Pagination Core", () => {
 
     const loadMoreBtn = container.locator(sel.loadMoreBtn);
     await expect(loadMoreBtn).toBeVisible({ timeout: 30_000 });
+
+    // NOTE: "Search as I move" is already disabled by the freezeMapNavigations
+    // option in setupPaginationMock (auto-enabled when delayMs > 0). The init
+    // script calls window.__e2eSetSearchAsMove(false) as soon as the map loads.
 
     // Click load more
     await loadMoreBtn.click();
@@ -438,7 +452,12 @@ test.describe("Pagination Core", () => {
     test.slow();
 
     // 36 mock items for three load-more pages (12 * 3)
-    await setupPaginationMock(page, { totalLoadMoreItems: 36 });
+    // freezeMapNavigations: prevent map's "Search as I move" from triggering
+    // router.replace() during sequential load-more clicks.
+    await setupPaginationMock(page, {
+      totalLoadMoreItems: 36,
+      freezeMapNavigations: true,
+    });
     await page.goto(`/search?${boundsQS}`);
     const container = searchResultsContainer(page);
 
@@ -479,7 +498,12 @@ test.describe("Pagination Core", () => {
 
     // 60 mock items so that after 4 loads of 12 (48 consumed), cursor stays
     // non-null. The component shows cap message only when reachedCap && nextCursor.
-    await setupPaginationMock(page, { totalLoadMoreItems: 72 });
+    // freezeMapNavigations: prevent map's "Search as I move" from triggering
+    // router.replace() during the sequential load-more clicks.
+    await setupPaginationMock(page, {
+      totalLoadMoreItems: 72,
+      freezeMapNavigations: true,
+    });
     await page.goto(`/search?${boundsQS}`);
     const container = searchResultsContainer(page);
 
@@ -541,7 +565,12 @@ test.describe("Pagination Core", () => {
     // 60 mock items available -- more than enough to exceed the cap.
     // Client will stop at 48 mock + 12 real = 60 (the cap).
     // The extra 12 mock items beyond the cap are never requested.
-    await setupPaginationMock(page, { totalLoadMoreItems: 72 });
+    // freezeMapNavigations: prevent map's "Search as I move" from triggering
+    // router.replace() during the sequential load-more clicks.
+    await setupPaginationMock(page, {
+      totalLoadMoreItems: 72,
+      freezeMapNavigations: true,
+    });
     await page.goto(`/search?${boundsQS}`);
     const container = searchResultsContainer(page);
 
