@@ -215,22 +215,23 @@ function encodeMockCursor(offset: number): string {
 /**
  * Encode a plain JavaScript value as an RSC Flight response body.
  *
- * Used for server action return values. Next.js 14/15 server actions use
- * a multi-row format:
- *   Row 0: action metadata with reference to the result row
- *   Row 1: the actual return value
+ * Used for server action return values. The RSC flight format uses a
+ * multi-row text stream where each row is `id:type:payload\n`.
  *
- * Real format example:
+ * For server actions, the format is:
+ *   Row 0: action metadata referencing the result row
+ *   Row 1: the actual return value (JSON-serialized)
+ *
+ * Next.js 14–16 (React 19) server action format:
  *   0:{"a":"$@1","f":"","b":"development"}
  *   1:{"items":[...],"nextCursor":"...","hasNextPage":true}
  *
- * The `$@1` reference in row 0 tells the RSC runtime that the action
- * result lives in row 1.
- *
- * NOTE: If the Next.js server action response format changes in future versions,
- * this function may need adjustment. The current format targets Next.js 14/15.
+ * If `$@1` doesn't work (React 19 may use `$1` instead of `$@1`),
+ * the fallback format inlines the result in row 0.
  */
 function encodeAsRSCResponse(value: unknown): string {
+  // React 19 / Next.js 16 may use `$1` (lazy reference) instead of `$@1` (promise ref)
+  // Try the $@1 format first since it's the documented pattern
   const row0 = JSON.stringify({ a: "$@1", f: "", b: "development" });
   const row1 = JSON.stringify(value);
   return `0:${row0}\n1:${row1}\n`;

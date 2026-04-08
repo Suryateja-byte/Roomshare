@@ -65,9 +65,9 @@ export default function SuggestedSearches() {
     <div className="py-6">
       <div className="flex items-center gap-2 mb-3">
         <TrendingUp className="w-4 h-4 text-on-surface-variant" />
-        <h3 className="text-sm font-medium text-on-surface-variant">
+        <h2 className="text-sm font-medium text-on-surface-variant">
           Popular areas
-        </h3>
+        </h2>
       </div>
       <div className="flex flex-wrap gap-2">
         {POPULAR_AREAS.map((area) => (

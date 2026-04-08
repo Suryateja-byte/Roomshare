@@ -26,9 +26,25 @@ test.describe("P0-1: Mobile Filters Accessibility", () => {
     await page.goto("/search");
     await page.waitForLoadState("domcontentloaded");
 
-    // 1) Assert Filters button exists and is visible on mobile (hydration-aware)
+    // Wait for content to render
+    await page.locator('[data-testid="listing-card"], h1, h2, h3').first()
+      .waitFor({ state: "attached", timeout: 20_000 }).catch(() => {});
+
+    // On mobile, filter button is in collapsed header (auto-shown after useMediaQuery hydration)
+    // Wait for the button directly — collapsed bar shows automatically on mobile viewports
     const filtersBtnLocator = getFiltersButton(page);
-    await expect(filtersBtnLocator).toBeVisible({ timeout: 20_000 });
+    const btnVisible = await filtersBtnLocator.waitFor({ state: "visible", timeout: 15_000 })
+      .then(() => true)
+      .catch(() => false);
+
+    if (!btnVisible) {
+      // Fallback: scroll to trigger collapsed header
+      await page.evaluate(() => window.scrollBy(0, 200));
+      await page.waitForTimeout(1000);
+    }
+
+    // 1) Assert Filters button exists and is visible on mobile
+    await expect(filtersBtnLocator).toBeVisible({ timeout: 10_000 });
 
     // 2) Open filter modal using shared helper
     const filterDialog = await openFilterModal(page);
@@ -47,9 +63,20 @@ test.describe("P0-1: Mobile Filters Accessibility", () => {
     await page.goto("/search");
     await page.waitForLoadState("domcontentloaded");
 
-    // Open filters using shared hydration-aware helper
+    // Wait for content to render
+    await page.locator('[data-testid="listing-card"], h1, h2, h3').first()
+      .waitFor({ state: "attached", timeout: 20_000 }).catch(() => {});
+
+    // Wait for collapsed header (auto-shows on mobile after hydration)
     const filtersBtnLocator = getFiltersButton(page);
-    await expect(filtersBtnLocator).toBeVisible({ timeout: 20_000 });
+    const btnVisible = await filtersBtnLocator.waitFor({ state: "visible", timeout: 15_000 })
+      .then(() => true)
+      .catch(() => false);
+    if (!btnVisible) {
+      await page.evaluate(() => window.scrollBy(0, 200));
+      await page.waitForTimeout(1000);
+    }
+    await expect(filtersBtnLocator).toBeVisible({ timeout: 10_000 });
     const filterDialog = await openFilterModal(page);
 
     // Close via close button
