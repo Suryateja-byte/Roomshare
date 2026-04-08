@@ -237,6 +237,7 @@ test.describe("Signup Form", () => {
         .or(page.getByText(/bot verification failed/i))
         .or(page.getByText(/failed to register/i))
         .or(page.getByRole("alert"))
+        .first()
     ).toBeVisible({ timeout: 15_000 });
   });
 

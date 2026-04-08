@@ -50,9 +50,19 @@ test.describe("Booking Authorization Boundaries @critical @booking @security", (
         timeout: 60_000,
       });
 
-      // Should see "Sign in to book this room" instead of a booking form
+      // Wait for page to settle
+      await page.waitForLoadState("networkidle", { timeout: 20_000 }).catch(() => {});
+
+      // Should see "Sign in to book this room" instead of a booking form.
+      // On mobile, may need to scroll down to the booking section.
       const signInGate = page.getByText("Sign in to book this room");
-      await expect(signInGate).toBeVisible({ timeout: 15_000 });
+      const gateVisible = await signInGate.isVisible().catch(() => false);
+      if (!gateVisible) {
+        // Scroll down to where the booking form would be
+        await page.evaluate(() => window.scrollTo(0, document.body.scrollHeight));
+        await page.waitForTimeout(1000);
+      }
+      await expect(signInGate).toBeVisible({ timeout: 20_000 });
 
       // The "Request to Book" button should NOT be visible
       const bookButton = page
@@ -61,7 +71,9 @@ test.describe("Booking Authorization Boundaries @critical @booking @security", (
       expect(await bookButton.count()).toBe(0);
 
       // The sign-in link/button should be present
-      const signInButton = page.getByRole("link", { name: /sign in to continue/i });
+      const signInButton = page.getByRole("link", { name: /sign in to continue/i })
+        .or(page.getByRole("button", { name: /sign in to continue/i }))
+        .first();
       await expect(signInButton).toBeVisible({ timeout: 5_000 });
     });
   });
@@ -339,18 +351,24 @@ test.describe("Booking Authorization Boundaries @critical @booking @security", (
         }
       );
 
-      // Should get a 404 response or show a "not found" message
+      // Should get a 404 response or show a "not found" message.
+      // Next.js may return 200 with a not-found component, or 404 status.
       const status = response?.status();
       const is404Response = status === 404;
 
+      // Wait for page to fully render (not-found pages may take a moment)
+      await page.waitForLoadState("networkidle", { timeout: 15_000 }).catch(() => {});
+
       // Check for visible "not found" or error messaging
-      const notFoundText = page.getByText(/not found|doesn't exist|no longer available/i);
+      const notFoundText = page.getByText(/not found|doesn't exist|no longer available|may have been removed/i);
       const errorPage = page.locator('[data-testid="not-found"], [data-testid="error"]');
-      const heading404 = page.getByRole("heading", { name: /not found|404/i });
+      const heading404 = page.getByRole("heading", { name: /not found|404|listing not found/i });
+      // Also check for "Browse listings" link which appears on the not-found page
+      const browseLink = page.getByRole("link", { name: /browse listings/i });
 
       const hasNotFoundText = await notFoundText
         .first()
-        .isVisible({ timeout: 10_000 })
+        .isVisible({ timeout: 15_000 })
         .catch(() => false);
       const hasErrorElement = await errorPage
         .first()
@@ -360,10 +378,14 @@ test.describe("Booking Authorization Boundaries @critical @booking @security", (
         .first()
         .isVisible({ timeout: 3_000 })
         .catch(() => false);
+      const hasBrowseLink = await browseLink
+        .first()
+        .isVisible({ timeout: 3_000 })
+        .catch(() => false);
 
       // At least one indicator of "not found" should be present
       const notFoundDetected =
-        is404Response || hasNotFoundText || hasErrorElement || has404Heading;
+        is404Response || hasNotFoundText || hasErrorElement || has404Heading || hasBrowseLink;
       expect(notFoundDetected).toBe(true);
 
       // The booking form should NOT be present

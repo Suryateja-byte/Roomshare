@@ -5,6 +5,13 @@ import {
   useListingFocus,
 } from "@/contexts/ListingFocusContext";
 
+// Polyfill scrollIntoView for jsdom (not implemented natively)
+const mockScrollIntoView = jest.fn();
+beforeEach(() => {
+  mockScrollIntoView.mockClear();
+  HTMLElement.prototype.scrollIntoView = mockScrollIntoView;
+});
+
 function ScrollTrigger() {
   const { requestScrollTo } = useListingFocus();
 
@@ -15,13 +22,6 @@ function ScrollTrigger() {
   );
 }
 
-// Mock scrollIntoView globally (JSDOM doesn't implement it)
-const scrollIntoViewMock = jest.fn();
-beforeEach(() => {
-  scrollIntoViewMock.mockClear();
-  Element.prototype.scrollIntoView = scrollIntoViewMock;
-});
-
 function renderBridge() {
   render(
     <ListingFocusProvider>
@@ -30,6 +30,7 @@ function renderBridge() {
       <div
         data-testid="scroll-container"
         data-search-scroll-container="true"
+        style={{ scrollPaddingTop: "16px", scrollPaddingBottom: "24px" }}
       >
         <article
           data-testid="listing-card"
@@ -41,32 +42,27 @@ function renderBridge() {
     </ListingFocusProvider>
   );
 
-  const card = screen.getByTestId("listing-card") as HTMLElement;
-
-  return { card };
+  return {};
 }
 
-
 describe("ListScrollBridge", () => {
-  it("scrolls to the target card via scrollIntoView", async () => {
+  it("scrolls the target card into view when scroll is requested", async () => {
     renderBridge();
 
     await act(async () => {
-      fireEvent.click(
-        screen.getByRole("button", { name: "Scroll to listing" })
-      );
+      fireEvent.click(screen.getByRole("button", { name: "Scroll to listing" }));
     });
 
-    expect(scrollIntoViewMock).toHaveBeenCalledWith({
+    expect(mockScrollIntoView).toHaveBeenCalledWith({
       behavior: "smooth",
       block: "nearest",
     });
   });
 
-  it("renders nothing visible (pure side-effect bridge)", () => {
+  it("does not scroll when no scroll request is pending", () => {
     renderBridge();
-    // ListScrollBridge returns null — it renders no DOM of its own
-    const bridge = document.querySelector("[data-testid='list-scroll-bridge']");
-    expect(bridge).toBeNull();
+
+    // No click = no scroll request
+    expect(mockScrollIntoView).not.toHaveBeenCalled();
   });
 });
