@@ -189,7 +189,9 @@ export async function waitForSearchReady(
     .locator(`${selectors.listingCard}, ${selectors.emptyState}, h1, h2, h3`)
     .first()
     .waitFor({ state: "attached", timeout: 30_000 });
-  // Wait for Filters button to be visible — confirms SearchForm hydrated
+  // Wait for Filters button to be visible — confirms SearchForm hydrated.
+  // On mobile, the button may be in the collapsed header (scroll-triggered).
+  await ensureMobileFilterButton(page);
   await filtersButton(page).waitFor({ state: "visible", timeout: 20_000 });
 }
 
@@ -208,7 +210,9 @@ export async function gotoSearchWithFilters(
     .locator(`${selectors.listingCard}, ${selectors.emptyState}, h1, h2, h3`)
     .first()
     .waitFor({ state: "attached", timeout: 30_000 });
-  // Wait for Filters button to be visible — confirms SearchForm hydrated
+  // Wait for Filters button to be visible — confirms SearchForm hydrated.
+  // On mobile, the button may be in the collapsed header (scroll-triggered).
+  await ensureMobileFilterButton(page);
   await filtersButton(page).waitFor({ state: "visible", timeout: 20_000 });
 }
 
@@ -223,8 +227,29 @@ export async function gotoSearchWithFilters(
 export function filtersButton(page: Page): Locator {
   // Match both desktop (data-hydrated) and mobile (data-testid) filter buttons
   return page.locator(
-    'button[data-hydrated][aria-label^="Filters"], button[data-testid="mobile-filter-button"]'
+    'button[data-hydrated][aria-label^="Filters"], button[data-testid="mobile-filter-button"], button[aria-label^="Filters"]'
   ).first();
+}
+
+/**
+ * Ensure filter button is visible on mobile by triggering collapsed search bar.
+ * On mobile viewports, the Filters button lives in CollapsedMobileSearch which
+ * only appears after scrolling down. This helper scrolls to trigger it.
+ */
+async function ensureMobileFilterButton(page: Page): Promise<void> {
+  const viewport = page.viewportSize();
+  if (!viewport || viewport.width >= 768) return; // Desktop: button already visible
+
+  const btn = filtersButton(page);
+  const alreadyVisible = await btn.isVisible().catch(() => false);
+  if (alreadyVisible) return;
+
+  // Scroll down to trigger the collapsed header (which contains the mobile filter button)
+  await page.evaluate(() => window.scrollBy(0, 200));
+  await page.waitForTimeout(500);
+  // Scroll back up slightly — the collapsed bar should persist
+  await page.evaluate(() => window.scrollBy(0, -100));
+  await page.waitForTimeout(300);
 }
 
 /** Locate the filter dialog */
@@ -238,6 +263,7 @@ export function filterDialog(page: Page): Locator {
  * where the button is SSR-rendered but onClick isn't attached yet.
  */
 export async function clickFiltersButton(page: Page): Promise<void> {
+  await ensureMobileFilterButton(page);
   const btn = filtersButton(page);
   await expect(btn).toBeVisible({ timeout: 15_000 });
   await btn.click();
@@ -284,6 +310,9 @@ export function clearAllButton(page: Page): Locator {
  * 2. Dynamic import: FilterModal chunk may not be loaded on first click
  */
 export async function openFilterModal(page: Page): Promise<Locator> {
+  // On mobile, filter button may be in collapsed header — trigger it
+  await ensureMobileFilterButton(page);
+
   const btn = filtersButton(page);
   await expect(btn).toBeVisible({ timeout: 15_000 });
 

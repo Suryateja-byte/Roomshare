@@ -26,7 +26,15 @@ test.describe("P0-1: Mobile Filters Accessibility", () => {
     await page.goto("/search");
     await page.waitForLoadState("domcontentloaded");
 
-    // 1) Assert Filters button exists and is visible on mobile (hydration-aware)
+    // Wait for content to render
+    await page.locator('[data-testid="listing-card"], h1, h2, h3').first()
+      .waitFor({ state: "attached", timeout: 20_000 }).catch(() => {});
+
+    // On mobile, filter button is in collapsed search bar (triggered by scroll)
+    await page.evaluate(() => window.scrollBy(0, 200));
+    await page.waitForTimeout(500);
+
+    // 1) Assert Filters button exists and is visible on mobile
     const filtersBtnLocator = getFiltersButton(page);
     await expect(filtersBtnLocator).toBeVisible({ timeout: 20_000 });
 
@@ -46,6 +54,12 @@ test.describe("P0-1: Mobile Filters Accessibility", () => {
   test(`${tags.a11y} - Filter drawer can be closed`, async ({ page }) => {
     await page.goto("/search");
     await page.waitForLoadState("domcontentloaded");
+
+    // Wait for content, then scroll to trigger collapsed header on mobile
+    await page.locator('[data-testid="listing-card"], h1, h2, h3').first()
+      .waitFor({ state: "attached", timeout: 20_000 }).catch(() => {});
+    await page.evaluate(() => window.scrollBy(0, 200));
+    await page.waitForTimeout(500);
 
     // Open filters using shared hydration-aware helper
     const filtersBtnLocator = getFiltersButton(page);
