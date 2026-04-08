@@ -45,7 +45,9 @@ function categoryButton(page: Page, label: string) {
 // Tests
 // ---------------------------------------------------------------------------
 
-test.describe("Category Bar", () => {
+// CategoryBar was removed in Phase 1 search redesign and replaced by InlineFilterStrip.
+// These tests need to be rewritten to target the new component.
+test.describe.skip("Category Bar", () => {
   test.use({ storageState: { cookies: [], origins: [] } });
 
   test.beforeEach(async () => {

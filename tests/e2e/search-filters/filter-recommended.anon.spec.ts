@@ -34,7 +34,9 @@ function recommendedRow(page: Page) {
 // Tests
 // ---------------------------------------------------------------------------
 
-test.describe("Recommended Filters", () => {
+// RecommendedFilters was removed in Phase 1 search redesign and replaced by InlineFilterStrip.
+// These tests need to be rewritten to target the new component.
+test.describe.skip("Recommended Filters", () => {
   test.use({ storageState: { cookies: [], origins: [] } });
 
   test.beforeEach(async () => {
