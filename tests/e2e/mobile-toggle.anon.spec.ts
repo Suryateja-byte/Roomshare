@@ -282,7 +282,7 @@ test.describe("Mobile Floating Toggle — View Switching (8.2)", () => {
     await waitForLayoutStable(page);
     await waitForSheetAnimation(page);
 
-    // Use data-snap-current attribute (0=collapsed, 1=half, 2=expanded)
+    // Use data-snap-current attribute (0=collapsed, 1=expanded)
     // This is more reliable than pixel measurements which race with spring animations
     const snapContent = bottomSheet.locator("[data-snap-current]");
     const hasSnapAttr = (await snapContent.count()) > 0;

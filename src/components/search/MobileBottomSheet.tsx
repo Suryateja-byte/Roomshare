@@ -311,7 +311,7 @@ export default function MobileBottomSheet({
     [snapIndex, handleTouchStart]
   );
 
-  // Escape key collapses to half (only when sheet is visible and no higher-priority handlers)
+  // Escape key collapses the sheet (only when expanded and no higher-priority handlers)
   useEffect(() => {
     const handleKeyDown = (e: KeyboardEvent) => {
       if (e.key === "Escape" && snapIndex !== 0) {
@@ -321,8 +321,8 @@ export default function MobileBottomSheet({
           document.querySelector("[data-focus-trap]")
         )
           return;
-        // Only handle if sheet is not collapsed (map popup has priority via stopImmediatePropagation)
-        setSnapIndex(1);
+        // Collapse sheet when Escape is pressed (2-snap model: 0=collapsed, 1=expanded)
+        setSnapIndex(0);
       }
     };
     window.addEventListener("keydown", handleKeyDown);

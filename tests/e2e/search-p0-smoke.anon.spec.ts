@@ -499,7 +499,7 @@ test.describe("Search P0 Smoke Suite", () => {
 
     // Verify the slider has expected aria attributes
     await expect(sheetHandle).toHaveAttribute("aria-valuemin", "0");
-    await expect(sheetHandle).toHaveAttribute("aria-valuemax", "2");
+    await expect(sheetHandle).toHaveAttribute("aria-valuemax", "1");
   });
 
   // S12: URL shareability
