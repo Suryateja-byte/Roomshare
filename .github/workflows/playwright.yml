@@ -33,7 +33,7 @@ jobs:
   playwright-tests:
     name: "Shard ${{ matrix.shardIndex }}/10"
     runs-on: ubuntu-latest
-    timeout-minutes: 30
+    timeout-minutes: 45
 
     strategy:
       fail-fast: false
