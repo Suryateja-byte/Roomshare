@@ -7,7 +7,7 @@
 # slice of tests, then uploads a blob report for merging.
 #
 # Projects (6):
-#   chromium, chromium-admin, chromium-anon, Mobile Chrome, firefox-anon, webkit-anon
+#   chromium, chromium-anon, Mobile Chrome, firefox-anon, webkit-anon
 # =============================================================================
 
 name: Playwright E2E Tests
@@ -143,7 +143,6 @@ jobs:
             --reporter=blob \
             --workers=1 \
             --project=chromium \
-            --project=chromium-admin \
             --project=chromium-anon \
             --project="Mobile Chrome" \
             --project=firefox-anon \
