@@ -76,22 +76,6 @@ export default defineConfig({
     {
       name: "setup",
       testMatch: /.*\.setup\.ts/,
-      use: {
-        ...devices["Desktop Chrome"],
-        executablePath: process.env.PLAYWRIGHT_CHROMIUM_EXECUTABLE_PATH ||
-          (() => {
-            const fs = require("fs");
-            const candidates = [
-              "/home/surya/.cache/ms-playwright/chromium_headless_shell-1217/chrome-headless-shell-linux64/chrome-headless-shell",
-              "/home/surya/.cache/ms-playwright/chromium_headless_shell-1208/chrome-headless-shell-linux64/chrome-headless-shell",
-              "/home/surya/.cache/ms-playwright/chromium_headless_shell-1200/chrome-headless-shell-linux64/chrome-headless-shell",
-            ];
-            for (const p of candidates) {
-              if (fs.existsSync(p)) return p;
-            }
-            return undefined;
-          })(),
-      },
     },
 
     {
@@ -100,19 +84,6 @@ export default defineConfig({
       use: {
         ...devices["Desktop Chrome"],
         storageState: "playwright/.auth/user.json",
-        executablePath: process.env.PLAYWRIGHT_CHROMIUM_EXECUTABLE_PATH ||
-          (() => {
-            const fs = require("fs");
-            const candidates = [
-              "/home/surya/.cache/ms-playwright/chromium_headless_shell-1217/chrome-headless-shell-linux64/chrome-headless-shell",
-              "/home/surya/.cache/ms-playwright/chromium_headless_shell-1208/chrome-headless-shell-linux64/chrome-headless-shell",
-              "/home/surya/.cache/ms-playwright/chromium_headless_shell-1200/chrome-headless-shell-linux64/chrome-headless-shell",
-            ];
-            for (const p of candidates) {
-              if (fs.existsSync(p)) return p;
-            }
-            return undefined;
-          })(),
       },
       dependencies: ["setup"],
     },
