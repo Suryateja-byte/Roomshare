@@ -1177,7 +1177,13 @@ test.describe("30 Advanced Search Page Journeys", () => {
   // ─────────────────────────────────────────────────
   test(`${tags.mobile} J47: Tablet viewport (769px) shows appropriate layout`, async ({
     browser,
-  }) => {
+  }, testInfo) => {
+    // Mobile Chrome project uses mobile device emulation (user agent, DPR)
+    // which conflicts with tablet viewport testing — skip on mobile projects.
+    test.skip(
+      testInfo.project.name.includes("Mobile"),
+      "Tablet layout test not applicable on mobile device emulation"
+    );
     test.slow();
     // Create a fresh browser context with tablet viewport so useMediaQuery
     // initializes at the correct breakpoint during page load — avoids the
