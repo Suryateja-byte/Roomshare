@@ -503,7 +503,7 @@ export default function ListingPageClient({
                             )}
                           </div>
                           <span className="text-on-surface-variant font-medium">
-                            {amenity}
+                            {hasHydrated ? amenity : null}
                           </span>
                         </div>
                       );
