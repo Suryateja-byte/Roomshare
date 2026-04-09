@@ -29,7 +29,9 @@ test.describe("Budget URL Param Aliases", () => {
   });
 
   function priceChipButton(page: Page, label: RegExp) {
-    return page.getByRole("button", { name: label }).first();
+    // Chip buttons have aria-label="Remove filter: $500 - $1,500" so match
+    // by visible text content rather than accessible name.
+    return page.locator('[aria-label="Applied filters"] button').filter({ hasText: label }).first();
   }
 
   async function expectPriceChip(page: Page, label: RegExp) {
