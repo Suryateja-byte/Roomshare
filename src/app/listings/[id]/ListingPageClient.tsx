@@ -224,6 +224,7 @@ export default function ListingPageClient({
   viewToken,
 }: ListingPageClientProps) {
   const { data: session, status: sessionStatus } = useSession();
+  const [hasHydrated, setHasHydrated] = useState(false);
   const hasImages = listing.images && listing.images.length > 0;
   const resolvedUserId = session?.user?.id ?? null;
   const resolvedIsOwner = isOwner || resolvedUserId === listing.ownerId;
@@ -265,6 +266,10 @@ export default function ListingPageClient({
         return gender;
     }
   };
+
+  useEffect(() => {
+    setHasHydrated(true);
+  }, []);
 
   useEffect(() => {
     if (resolvedIsOwner) {
@@ -469,7 +474,7 @@ export default function ListingPageClient({
                   About this place
                 </h2>
                 <p className="text-on-surface-variant leading-relaxed text-lg font-light whitespace-pre-line">
-                  {listing.description}
+                  {hasHydrated ? listing.description : null}
                 </p>
               </div>
 
