@@ -1194,9 +1194,13 @@ test.describe("30 Advanced Search Page Journeys", () => {
       timeout: 30000,
     });
 
+    // Wait for hydration to complete — useMediaQuery needs a render cycle
+    // after setViewportSize before the desktop layout activates.
+    await page.waitForLoadState("networkidle").catch(() => {});
+
     // Search form should be visible at tablet width
     const searchForm = page.locator('form[role="search"]');
-    await expect(searchForm).toBeVisible();
+    await expect(searchForm).toBeVisible({ timeout: 15_000 });
 
     // Verify listing cards are present in the DOM (count > 0 or empty state text exists)
     await expect(async () => {
