@@ -1196,7 +1196,12 @@ test.describe("30 Advanced Search Page Journeys", () => {
 
     // Wait for hydration to complete — useMediaQuery needs a render cycle
     // after setViewportSize before the desktop layout activates.
-    await page.waitForLoadState("networkidle").catch(() => {});
+    // The data-hydrated attribute on filter buttons confirms React hydration.
+    await page
+      .locator('button[data-hydrated][aria-label^="Filters"]')
+      .first()
+      .waitFor({ state: "visible", timeout: 30_000 })
+      .catch(() => {});
 
     // Search form should be visible at tablet width
     const searchForm = page.locator('form[role="search"]');
