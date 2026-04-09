@@ -129,6 +129,12 @@ interface ListingPageClientProps {
 
 // Status badge with pulse animation
 function StatusBadge({ status }: { status: string }) {
+  const [hasMounted, setHasMounted] = useState(false);
+
+  useEffect(() => {
+    setHasMounted(true);
+  }, []);
+
   const config = {
     ACTIVE: {
       bg: "bg-green-50",
@@ -171,7 +177,7 @@ function StatusBadge({ status }: { status: string }) {
       <span
         className={cn("w-1.5 h-1.5 rounded-full animate-pulse", config.dot)}
       />
-      {config.label}
+      {hasMounted ? config.label : null}
     </div>
   );
 }
@@ -218,6 +224,7 @@ export default function ListingPageClient({
   viewToken,
 }: ListingPageClientProps) {
   const { data: session, status: sessionStatus } = useSession();
+  const [hasHydrated, setHasHydrated] = useState(false);
   const hasImages = listing.images && listing.images.length > 0;
   const resolvedUserId = session?.user?.id ?? null;
   const resolvedIsOwner = isOwner || resolvedUserId === listing.ownerId;
@@ -259,6 +266,10 @@ export default function ListingPageClient({
         return gender;
     }
   };
+
+  useEffect(() => {
+    setHasHydrated(true);
+  }, []);
 
   useEffect(() => {
     if (resolvedIsOwner) {
@@ -463,7 +474,7 @@ export default function ListingPageClient({
                   About this place
                 </h2>
                 <p className="text-on-surface-variant leading-relaxed text-lg font-light whitespace-pre-line">
-                  {listing.description}
+                  {hasHydrated ? listing.description : null}
                 </p>
               </div>
 
@@ -492,7 +503,7 @@ export default function ListingPageClient({
                             )}
                           </div>
                           <span className="text-on-surface-variant font-medium">
-                            {amenity}
+                            {hasHydrated ? amenity : null}
                           </span>
                         </div>
                       );
@@ -772,6 +783,12 @@ export default function ListingPageClient({
                 {/* Guest Booking Card */}
                 {canRenderGuestControls && (
                   <>
+                    <div
+                      data-testid="contact-host-sidebar"
+                      className="hidden lg:block [&>button]:bg-transparent [&>button]:border [&>button]:border-outline-variant/30 [&>button]:text-on-surface [&>button]:hover:bg-surface-container-high [&>button]:shadow-none"
+                    >
+                      <ContactHostButton listingId={listing.id} />
+                    </div>
                     <BookingForm
                       listingId={listing.id}
                       price={listing.price}
@@ -786,12 +803,6 @@ export default function ListingPageClient({
                       bookingMode={listing.bookingMode}
                       holdTtlMinutes={listing.holdTtlMinutes}
                     />
-                    <div
-                      data-testid="contact-host-sidebar"
-                      className="hidden lg:block [&>button]:bg-transparent [&>button]:border [&>button]:border-outline-variant/30 [&>button]:text-on-surface [&>button]:hover:bg-surface-container-high [&>button]:shadow-none"
-                    >
-                      <ContactHostButton listingId={listing.id} />
-                    </div>
                   </>
                 )}
               </div>

@@ -382,9 +382,11 @@ export function searchResultsContainer(page: Page): Locator {
   const isMobile = viewport ? viewport.width < 768 : false;
 
   if (isMobile) {
-    return page.locator('[data-testid="mobile-search-results-container"]');
+    return page.locator('[data-testid="mobile-search-results-container"]').first();
   }
-  return page.locator('[data-testid="search-results-container"]');
+  // Use .first() to avoid strict mode violations during the brief SSR/hydration
+  // window where React may render two instances before reconciliation completes.
+  return page.locator('[data-testid="search-results-container"]').first();
 }
 
 /**

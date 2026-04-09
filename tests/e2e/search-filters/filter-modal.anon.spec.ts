@@ -138,8 +138,17 @@ test.describe("Filter Modal: Open / Close / Apply", () => {
     await closeButton(page).click();
     await expect(dialog).not.toBeVisible({ timeout: 10_000 });
 
-    // URL should not have changed
-    expect(page.url()).toBe(urlBefore);
+    // Filter params should not have changed (bounds may shift due to map loading).
+    // Compare only the non-geographic params.
+    const stripBounds = (url: string) => {
+      const u = new URL(url);
+      for (const k of ["minLat", "maxLat", "minLng", "maxLng", "lat", "lng", "zoom"]) {
+        u.searchParams.delete(k);
+      }
+      u.searchParams.sort();
+      return u.searchParams.toString();
+    };
+    expect(stripBounds(page.url())).toBe(stripBounds(urlBefore));
   });
 
   // 8. Modal traps focus (first/last element tab cycling)

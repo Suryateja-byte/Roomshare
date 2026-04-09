@@ -4,7 +4,7 @@ import Link from "next/link";
 import { Button } from "@/components/ui/button";
 import { Loader2, Mail, Lock, ArrowRight, Eye, EyeOff } from "lucide-react";
 import { signIn, signOut, useSession } from "next-auth/react";
-import { useState, Suspense, useEffect, useRef } from "react";
+import { useState, useEffect, useRef } from "react";
 import { useSearchParams } from "next/navigation";
 import TurnstileWidget, {
   type TurnstileWidgetRef,
@@ -34,10 +34,15 @@ function LoginForm() {
   const [loading, setLoading] = useState(false);
   const [googleLoading, setGoogleLoading] = useState(false);
   const [error, setError] = useState("");
+  const [hasHydrated, setHasHydrated] = useState(false);
   const [showPassword, setShowPassword] = useState(false);
   const [turnstileToken, setTurnstileToken] = useState<string>("");
   const [turnstileError, setTurnstileError] = useState(false);
   const turnstileRef = useRef<TurnstileWidgetRef>(null);
+
+  useEffect(() => {
+    setHasHydrated(true);
+  }, []);
 
   // Focus email input when OAuth error suggests using email form
   useEffect(() => {
@@ -185,7 +190,7 @@ function LoginForm() {
           icon={Lock}
           id="password"
           type={showPassword ? "text" : "password"}
-          name="password"
+          name={hasHydrated ? "password" : undefined}
           required
           autoComplete="current-password"
           placeholder="••••••••"
@@ -279,22 +284,5 @@ function LoginForm() {
 }
 
 export default function LoginClient() {
-  return (
-    <Suspense
-      fallback={
-        <div
-          role="status"
-          aria-label="Loading sign in page"
-          className="min-h-screen flex items-center justify-center bg-surface-canvas"
-        >
-          <Loader2
-            className="w-8 h-8 animate-spin text-on-surface"
-            aria-hidden="true"
-          />
-        </div>
-      }
-    >
-      <LoginForm />
-    </Suspense>
-  );
+  return <LoginForm />;
 }

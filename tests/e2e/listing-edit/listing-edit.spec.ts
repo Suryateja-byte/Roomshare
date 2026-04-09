@@ -203,7 +203,7 @@ test.describe("Listing Edit — Auth & Access Guards", () => {
     ).toBeVisible({ timeout: 10000 });
 
     // Verify title is pre-filled (not empty)
-    const titleInput = page.locator('[data-testid="listing-title-input"]');
+    const titleInput = page.locator('[data-testid="listing-title-input"]').first();
     await expect(titleInput).toBeVisible({ timeout: 10000 });
     const titleValue = await titleInput.inputValue();
     expect(titleValue.length).toBeGreaterThan(0);

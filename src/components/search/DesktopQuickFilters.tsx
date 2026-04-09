@@ -23,6 +23,7 @@ interface DesktopQuickFiltersProps {
   disabled: boolean;
   hasMounted: boolean;
   activeCount: number;
+  isAdvancedFiltersOpen: boolean;
   openQuickFilter: QuickFilterKey | null;
   onQuickFilterOpenChange: (key: QuickFilterKey, open: boolean) => void;
   onOpenAdvancedFilters: () => void;
@@ -136,6 +137,7 @@ export function DesktopQuickFilters({
   disabled,
   hasMounted,
   activeCount,
+  isAdvancedFiltersOpen,
   openQuickFilter,
   onQuickFilterOpenChange,
   onOpenAdvancedFilters,
@@ -387,6 +389,9 @@ export function DesktopQuickFilters({
         onClick={onOpenAdvancedFilters}
         disabled={disabled}
         aria-label={`Filters${activeCount > 0 ? `, ${activeCount} active` : ""}`}
+        aria-expanded={isAdvancedFiltersOpen ? "true" : "false"}
+        aria-controls="search-filters"
+        aria-haspopup="dialog"
         data-hydrated={hasMounted || undefined}
         data-testid="quick-filter-more-filters"
         className={cn(

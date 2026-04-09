@@ -373,7 +373,7 @@ export default function MobileBottomSheet({
         ref={sheetRef}
         role="region"
         aria-label="Search results"
-        className="fixed bottom-[64px] pb-[env(safe-area-inset-bottom,0px)] md:bottom-0 md:pb-0 left-0 right-0 flex flex-col bg-surface-container-lowest rounded-t-2xl shadow-[0_-4px_24px_rgba(0,0,0,0.12)]"
+        className="fixed bottom-0 left-0 right-0 flex flex-col bg-surface-container-lowest rounded-t-2xl shadow-[0_-4px_24px_rgba(0,0,0,0.12)]"
         animate={
           isDragging
             ? { height: displayHeightPx }
@@ -493,6 +493,8 @@ export default function MobileBottomSheet({
         {/* Scrollable content with CSS scroll-snap enhancement */}
         <div
           ref={contentRef}
+          tabIndex={0}
+          aria-label="Search results"
           className={`flex-1 overflow-y-auto hide-scrollbar-mobile ${
             // P2-FIX (#134): Add safe area padding for notched devices when expanded
             isExpanded ? "pb-[env(safe-area-inset-bottom,0px)]" : ""

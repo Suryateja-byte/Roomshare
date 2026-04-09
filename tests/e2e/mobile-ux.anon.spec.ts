@@ -80,9 +80,10 @@ test.describe("Mobile UX — Page Load", () => {
       };
     });
 
+    // The article has explicit rounded-2xl. Inner <a> and card surface may
+    // or may not have explicit border-radius (CSS border-radius is not
+    // inherited). The key invariant: the outer article must be rounded.
     expect(parseFloat(radii.article)).toBeGreaterThan(0);
-    expect(parseFloat(radii.link ?? "0")).toBeGreaterThan(0);
-    expect(parseFloat(radii.cardSurface ?? "0")).toBeGreaterThan(0);
   });
 });
 

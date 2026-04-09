@@ -16,7 +16,10 @@ import {
 import { useSearchTransitionSafe } from "@/contexts/SearchTransitionContext";
 import { useMobileSearch } from "@/contexts/MobileSearchContext";
 import { useMediaQuery } from "@/hooks/useMediaQuery";
-import { useBatchedFilters } from "@/hooks/useBatchedFilters";
+import {
+  emptyFilterValues,
+  useBatchedFilters,
+} from "@/hooks/useBatchedFilters";
 import { useDebouncedFilterCount } from "@/hooks/useDebouncedFilterCount";
 import { useFacets } from "@/hooks/useFacets";
 import { VALID_AMENITIES, VALID_HOUSE_RULES } from "@/lib/search-params";
@@ -83,6 +86,24 @@ function formatMoveInQuickLabel(moveInDate: string) {
     month: "short",
     day: "numeric",
   });
+}
+
+function countPendingActiveFilters(values: typeof emptyFilterValues): number {
+  let count = 0;
+
+  if (values.minPrice || values.maxPrice) count += 1;
+  if (values.moveInDate) count += 1;
+  if (values.roomType) count += 1;
+  if (values.leaseDuration) count += 1;
+  if (values.genderPreference) count += 1;
+  if (values.householdGender) count += 1;
+  if (values.minSlots) count += 1;
+
+  count += values.amenities.length;
+  count += values.houseRules.length;
+  count += values.languages.length;
+
+  return count;
 }
 
 function PrimaryFilterButton({
@@ -198,8 +219,17 @@ export function InlineFilterStrip() {
     () => countActiveFilters(searchParams),
     [searchParams]
   );
+  // Use the media query result directly. SSR hydration mismatch is handled
+  // by SearchViewToggle rendering children in both containers with inert on
+  // the inactive one — no need to force desktop layout pre-mount here.
+  const showDesktopQuickFilters = isDesktopQuickFilters;
   const chips = useMemo(() => urlToFilterChips(searchParams), [searchParams]);
   const hasActiveFilters = activeCount > 0;
+  const pendingActiveCount = useMemo(
+    () => countPendingActiveFilters(pending),
+    [pending]
+  );
+  const drawerHasActiveFilters = pendingActiveCount > 0;
 
   const filteredLanguages = useMemo(() => {
     const search = languageSearch.toLowerCase().trim();
@@ -272,16 +302,22 @@ export function InlineFilterStrip() {
       const newQuery = removeFilterFromUrl(searchParams, chip);
       navigateToSearch(newQuery);
     },
-    [chips, navigateToSearch, searchParams]
+    [navigateToSearch, searchParams]
   );
 
   const handleClearAll = useCallback(() => {
     const newQuery = clearAllFilters(searchParams);
+    setPending({ ...emptyFilterValues });
     setOpenQuickFilter(null);
-    setShowFilterDrawer(false);
-    reset();
+    setLanguageSearch("");
+
+    if (!showFilterDrawer) {
+      setShowFilterDrawer(false);
+      reset();
+    }
+
     navigateToSearch(newQuery);
-  }, [navigateToSearch, reset, searchParams]);
+  }, [navigateToSearch, reset, searchParams, setPending, showFilterDrawer]);
 
   const toggleAmenity = useCallback(
     (amenity: string) => {
@@ -378,11 +414,12 @@ export function InlineFilterStrip() {
   return (
     <>
       <div className="hide-scrollbar -mx-1 flex items-center gap-2 overflow-x-auto px-1 py-2">
-        {isDesktopQuickFilters ? (
+        {showDesktopQuickFilters ? (
           <DesktopQuickFilters
             disabled={isPending}
             hasMounted={hasMounted}
             activeCount={activeCount}
+            isAdvancedFiltersOpen={showFilterDrawer}
             openQuickFilter={openQuickFilter}
             onQuickFilterOpenChange={handleQuickFilterOpenChange}
             onOpenAdvancedFilters={handleOpenFilters}
@@ -484,7 +521,11 @@ export function InlineFilterStrip() {
         )}
 
         {chips.length > 0 ? (
-          <>
+          <div
+            role="region"
+            aria-label="Applied filters"
+            className="flex items-center gap-2"
+          >
             <div className="h-6 w-px shrink-0 bg-outline-variant/40" />
             {chips.map((chip) => (
               <button
@@ -492,6 +533,7 @@ export function InlineFilterStrip() {
                 type="button"
                 onClick={() => handleRemoveChip(chip)}
                 disabled={isPending}
+                aria-label={`Remove filter: ${chip.label}`}
                 className="flex min-h-[36px] shrink-0 items-center gap-1 whitespace-nowrap rounded-full border border-primary/20 bg-primary/10 px-3 py-2 text-sm text-on-surface transition-colors hover:bg-primary/15"
               >
                 <span className="max-w-[150px] truncate">{chip.label}</span>
@@ -503,12 +545,13 @@ export function InlineFilterStrip() {
                 type="button"
                 onClick={handleClearAll}
                 disabled={isPending}
+                aria-label="Clear all filters"
                 className="flex min-h-[44px] shrink-0 items-center whitespace-nowrap px-3 py-1.5 text-xs text-on-surface-variant transition-colors hover:text-on-surface"
               >
                 Clear all
               </button>
             ) : null}
-          </>
+          </div>
         ) : null}
       </div>
 
@@ -520,8 +563,8 @@ export function InlineFilterStrip() {
           setShowFilterDrawer(false);
         }}
         onClearAll={handleClearAll}
-        hasActiveFilters={hasActiveFilters}
-        activeFilterCount={activeCount}
+        hasActiveFilters={showFilterDrawer ? drawerHasActiveFilters : hasActiveFilters}
+        activeFilterCount={showFilterDrawer ? pendingActiveCount : activeCount}
         moveInDate={moveInDate}
         leaseDuration={leaseDuration}
         roomType={roomType}

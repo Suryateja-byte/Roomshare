@@ -106,8 +106,17 @@ export default function SearchViewToggle({
   // Render children in BOTH containers before mount so SSR HTML matches
   // client hydration regardless of viewport (CSS md:hidden / hidden md:flex
   // hides the inactive one). After mount, render in exactly one container.
-  const showChildrenInMobile = !hasMounted || isDesktop === false;
-  const showChildrenInDesktop = !hasMounted || isDesktop !== false;
+  // The inactive container gets aria-hidden + inert to prevent duplicate
+  // selectors in E2E tests and assistive tech from seeing both copies.
+  //
+  // IMPORTANT: isDesktop is undefined until useMediaQuery resolves. We must
+  // wait for it to be a definitive boolean before applying inert, otherwise
+  // there's a race window where hasMounted=true but isDesktop=undefined
+  // causes inert to be applied to the mobile container on mobile viewports.
+  const isResolved = isDesktop !== undefined;
+  const isMobileActive = isDesktop === false;
+  const showChildrenInMobile = !hasMounted || isMobileActive;
+  const showChildrenInDesktop = !hasMounted || !isMobileActive;
   const desktopScrollInsetClass = shouldShowMap
     ? "right-3 lg:right-4"
     : "right-2 lg:right-3";
@@ -180,7 +189,11 @@ export default function SearchViewToggle({
   return (
     <>
       {/* Mobile: Map always visible with bottom sheet overlay */}
-      <div className="md:hidden flex-1 flex flex-col overflow-hidden relative">
+      <div
+        aria-hidden={isResolved && !isMobileActive ? true : undefined}
+        {...(isResolved && !isMobileActive ? { inert: true } : {})}
+        className="md:hidden flex-1 flex flex-col overflow-hidden relative"
+      >
         {/* Map fills the background */}
         {renderMapInMobile && (
           <div className="absolute inset-0">{mapComponent}</div>
@@ -210,7 +223,11 @@ export default function SearchViewToggle({
       </div>
 
       {/* Desktop Split View */}
-      <div className="hidden md:flex flex-1 overflow-hidden">
+      <div
+        aria-hidden={isResolved && isMobileActive ? true : undefined}
+        {...(isResolved && isMobileActive ? { inert: true } : {})}
+        className="hidden md:flex flex-1 overflow-hidden"
+      >
         {/* Left Panel: List View - Adjusts width based on map visibility */}
         <div
           data-testid="search-results-container"

@@ -379,6 +379,12 @@ function ListingCardInner({
         </div>
 
         <div className="p-4 flex flex-col flex-1">
+          {displayRoomType ? (
+            <span className="sr-only" data-testid="listing-title-text">
+              {displayTitle}
+            </span>
+          ) : null}
+
           {/* Row 1: Price + Rating */}
           <div className="flex items-baseline justify-between gap-3 mb-1">
             <div className="flex items-baseline gap-1">

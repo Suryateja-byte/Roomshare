@@ -16,6 +16,7 @@ import LocationSearchInput from "@/components/LocationSearchInput";
 import { Button } from "@/components/ui/button";
 import { useSearchTransitionSafe } from "@/contexts/SearchTransitionContext";
 import { useRecentSearches } from "@/hooks/useRecentSearches";
+import { getPriceParam } from "@/lib/search-params";
 import { cn } from "@/lib/utils";
 import {
   buildSearchIntentParams,
@@ -37,6 +38,41 @@ interface DesktopHeaderSearchProps {
 
 const LOCATION_INPUT_ID = "desktop-header-search-location";
 const VIBE_INPUT_ID = "desktop-header-search-vibe";
+const MIN_BUDGET_INPUT_ID = "search-budget-min";
+const MAX_BUDGET_INPUT_ID = "search-budget-max";
+
+function validateMoveInDate(value: string | null): string {
+  if (!value) return "";
+  const trimmed = value.trim();
+  if (!/^\d{4}-\d{2}-\d{2}$/.test(trimmed)) return "";
+
+  const [yearStr, monthStr, dayStr] = trimmed.split("-");
+  const year = parseInt(yearStr, 10);
+  const month = parseInt(monthStr, 10);
+  const day = parseInt(dayStr, 10);
+
+  if (month < 1 || month > 12) return "";
+  if (day < 1 || day > 31) return "";
+
+  const date = new Date(year, month - 1, day);
+  if (
+    date.getFullYear() !== year ||
+    date.getMonth() !== month - 1 ||
+    date.getDate() !== day
+  ) {
+    return "";
+  }
+
+  const today = new Date();
+  today.setHours(0, 0, 0, 0);
+  if (date < today) return "";
+
+  const maxDate = new Date();
+  maxDate.setFullYear(maxDate.getFullYear() + 2);
+  if (date > maxDate) return "";
+
+  return trimmed;
+}
 
 function focusInput(field: "where" | "vibe") {
   const element = document.getElementById(
@@ -67,6 +103,20 @@ export const DesktopHeaderSearch = forwardRef<
   const [vibe, setVibe] = useState(intentState.vibeInput);
   const [selectedLocation, setSelectedLocation] =
     useState<SearchLocationSelection | null>(intentState.selectedLocation);
+  const [minPrice, setMinPrice] = useState(() => {
+    const parsed = getPriceParam(
+      new URLSearchParams(searchParamsString),
+      "min"
+    );
+    return parsed !== undefined ? String(parsed) : "";
+  });
+  const [maxPrice, setMaxPrice] = useState(() => {
+    const parsed = getPriceParam(
+      new URLSearchParams(searchParamsString),
+      "max"
+    );
+    return parsed !== undefined ? String(parsed) : "";
+  });
 
   const locationFallbackItems = useMemo(
     () =>
@@ -97,11 +147,38 @@ export const DesktopHeaderSearch = forwardRef<
     setLocation(nextState.locationInput);
     setVibe(nextState.vibeInput);
     setSelectedLocation(nextState.selectedLocation);
+    setMinPrice(
+      getPriceParam(new URLSearchParams(searchParamsString), "min") !==
+        undefined
+        ? String(getPriceParam(new URLSearchParams(searchParamsString), "min"))
+        : ""
+    );
+    setMaxPrice(
+      getPriceParam(new URLSearchParams(searchParamsString), "max") !==
+        undefined
+        ? String(getPriceParam(new URLSearchParams(searchParamsString), "max"))
+        : ""
+    );
   }, [searchParamsString]);
 
   useEffect(() => {
     syncFromSearchParams();
   }, [syncFromSearchParams]);
+
+  useEffect(() => {
+    const rawMoveInDate = searchParams.get("moveInDate");
+    const validated = validateMoveInDate(rawMoveInDate);
+
+    if (rawMoveInDate && !validated) {
+      const params = new URLSearchParams(searchParamsString);
+      params.delete("moveInDate");
+      const qs = params.toString();
+      router.replace(`${window.location.pathname}${qs ? `?${qs}` : ""}`, {
+        scroll: false,
+      });
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
 
   useEffect(() => {
     if (!collapsed) {
@@ -218,6 +295,41 @@ export const DesktopHeaderSearch = forwardRef<
         }
       );
 
+      let finalMinPrice = minPrice ? parseFloat(minPrice) : null;
+      let finalMaxPrice = maxPrice ? parseFloat(maxPrice) : null;
+
+      if (finalMinPrice !== null && !Number.isFinite(finalMinPrice)) {
+        finalMinPrice = null;
+      }
+      if (finalMaxPrice !== null && !Number.isFinite(finalMaxPrice)) {
+        finalMaxPrice = null;
+      }
+      if (finalMinPrice !== null && finalMinPrice < 0) {
+        finalMinPrice = 0;
+      }
+      if (finalMaxPrice !== null && finalMaxPrice < 0) {
+        finalMaxPrice = 0;
+      }
+      if (
+        finalMinPrice !== null &&
+        finalMaxPrice !== null &&
+        finalMinPrice > finalMaxPrice
+      ) {
+        [finalMinPrice, finalMaxPrice] = [finalMaxPrice, finalMinPrice];
+      }
+
+      searchUrlParams.delete("minBudget");
+      searchUrlParams.delete("maxBudget");
+      searchUrlParams.delete("minPrice");
+      searchUrlParams.delete("maxPrice");
+
+      if (finalMinPrice !== null) {
+        searchUrlParams.set("minPrice", String(finalMinPrice));
+      }
+      if (finalMaxPrice !== null) {
+        searchUrlParams.set("maxPrice", String(finalMaxPrice));
+      }
+
       if (selectedLocation) {
         window.dispatchEvent(
           new CustomEvent<MapFlyToEventDetail>(MAP_FLY_TO_EVENT, {
@@ -240,6 +352,8 @@ export const DesktopHeaderSearch = forwardRef<
     [
       collapsed,
       location,
+      maxPrice,
+      minPrice,
       navigateToSearch,
       searchParamsString,
       selectedLocation,
@@ -333,6 +447,48 @@ export const DesktopHeaderSearch = forwardRef<
               className="w-full bg-transparent border-none p-0 text-sm text-on-surface placeholder:text-on-surface-variant focus:outline-none focus:ring-0"
               autoComplete="off"
             />
+          </div>
+
+          <div className="min-w-0 w-[220px] pl-4 pr-4">
+            <label
+              htmlFor={MIN_BUDGET_INPUT_ID}
+              className="mb-0.5 block text-xs font-bold uppercase tracking-wider text-on-surface"
+            >
+              Budget
+            </label>
+            <div className="flex items-center gap-2 text-sm">
+              <div className="flex min-w-0 flex-1 items-center gap-1 rounded-full bg-surface-container-high px-3 py-2">
+                <span className="text-on-surface-variant">$</span>
+                <input
+                  id={MIN_BUDGET_INPUT_ID}
+                  aria-label="Minimum budget"
+                  type="number"
+                  inputMode="numeric"
+                  min="0"
+                  step="50"
+                  value={minPrice}
+                  onChange={(event) => setMinPrice(event.target.value)}
+                  placeholder="Min"
+                  className="w-full bg-transparent border-none p-0 text-sm text-on-surface placeholder:text-on-surface-variant focus:outline-none focus:ring-0 [-moz-appearance:textfield] [&::-webkit-inner-spin-button]:appearance-none [&::-webkit-outer-spin-button]:appearance-none"
+                />
+              </div>
+              <span className="text-on-surface-variant">-</span>
+              <div className="flex min-w-0 flex-1 items-center gap-1 rounded-full bg-surface-container-high px-3 py-2">
+                <span className="text-on-surface-variant">$</span>
+                <input
+                  id={MAX_BUDGET_INPUT_ID}
+                  aria-label="Maximum budget"
+                  type="number"
+                  inputMode="numeric"
+                  min="0"
+                  step="50"
+                  value={maxPrice}
+                  onChange={(event) => setMaxPrice(event.target.value)}
+                  placeholder="Max"
+                  className="w-full bg-transparent border-none p-0 text-sm text-on-surface placeholder:text-on-surface-variant focus:outline-none focus:ring-0 [-moz-appearance:textfield] [&::-webkit-inner-spin-button]:appearance-none [&::-webkit-outer-spin-button]:appearance-none"
+                />
+              </div>
+            </div>
           </div>
         </div>
 
