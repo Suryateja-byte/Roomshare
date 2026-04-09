@@ -106,6 +106,9 @@ test.describe("30 Advanced Search Page Journeys", () => {
     await maxInput.fill("");
     await maxInput.pressSequentially("2000", { delay: 50 });
     await expect(maxInput).toHaveValue("2000", { timeout: 30000 });
+    // Press Enter to submit the search form — inline budget inputs only
+    // update the URL when the form is submitted (not on blur).
+    await maxInput.press("Enter");
     await expect
       .poll(
         () =>

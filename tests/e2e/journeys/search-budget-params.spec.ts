@@ -323,11 +323,9 @@ test.describe("Budget URL Param Aliases", () => {
       await page.waitForLoadState("domcontentloaded");
 
       // Click the remove button for price chip
-      await priceChipButton(page, /^\$500 - \$1,500$/).evaluate((el) => {
-        if (el instanceof HTMLElement) {
-          el.click();
-        }
-      });
+      const chip = priceChipButton(page, /^\$500 - \$1,500$/);
+      await expect(chip).toBeVisible({ timeout: 30_000 });
+      await chip.click();
 
       // Wait for URL to update - should have no price params
       await expect
@@ -348,7 +346,10 @@ test.describe("Budget URL Param Aliases", () => {
         )
         .toBe(true);
 
-      await expect(page.getByRole("button", { name: /^\$500 - \$1,500$/ })).toHaveCount(0);
+      // After removal, no chip button should contain this price text
+      await expect(
+        page.locator('[aria-label="Applied filters"] button').filter({ hasText: /\$500 - \$1,500/ })
+      ).toHaveCount(0);
     });
   });
 
@@ -385,7 +386,10 @@ test.describe("Budget URL Param Aliases", () => {
       await page.goBack();
       await page.waitForLoadState("domcontentloaded");
 
-      await expect(page.getByRole("button", { name: /^\$500 - \$1,500$/ })).toHaveCount(0);
+      // After removal, no chip button should contain this price text
+      await expect(
+        page.locator('[aria-label="Applied filters"] button').filter({ hasText: /\$500 - \$1,500/ })
+      ).toHaveCount(0);
 
       // Go forward
       await page.goForward();
