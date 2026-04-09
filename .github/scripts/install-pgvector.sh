@@ -8,7 +8,7 @@ if [[ -z "${container_id}" ]]; then
   exit 1
 fi
 
-docker exec "${container_id}" bash <<'EOF'
+docker exec -i "${container_id}" bash <<'EOF'
 set -euo pipefail
 
 export DEBIAN_FRONTEND=noninteractive
