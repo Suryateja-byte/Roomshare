@@ -23,7 +23,12 @@ async function loginAndSaveState(
   await page.getByLabel(/email/i).fill(email);
   await page.getByLabel(/password/i).first().fill(password);
 
+  // waitForTurnstileIfPresent waits up to 30s for Turnstile to auto-solve.
+  // It catches timeout errors and proceeds — the server-side uses test keys
+  // that always pass regardless of the response field value.
   await waitForTurnstileIfPresent(page);
+
+  const submitBtn = page.getByRole("button", { name: /sign in|log in|login/i });
 
   const loginResponsePromise = page.waitForResponse(
     (response) =>
@@ -31,7 +36,20 @@ async function loginAndSaveState(
     { timeout: 30000 }
   );
 
-  await page.getByRole("button", { name: /sign in|log in|login/i }).click();
+  // Try a normal click first (works when Turnstile has already resolved).
+  // If the button is still disabled (Turnstile "Verifying..."), dispatch a
+  // programmatic submit event on the form to bypass the disabled state.
+  // The server uses always-pass test keys so no valid token is required.
+  const clicked = await submitBtn.isEnabled().catch(() => false);
+  if (clicked) {
+    await submitBtn.click();
+  } else {
+    // Button disabled — submit the form programmatically via JS
+    await page.evaluate(() => {
+      const form = document.querySelector("form");
+      if (form) form.requestSubmit();
+    });
+  }
 
   await loginResponsePromise;
 

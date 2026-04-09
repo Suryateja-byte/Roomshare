@@ -64,21 +64,21 @@ test.describe("20 Critical Search Page Journeys", () => {
     expect(url.searchParams.get("minPrice")).toBe("500");
     expect(url.searchParams.get("maxPrice")).toBe("1500");
 
-    // On mobile, price inputs live inside MobileSearchOverlay (closed by default).
-    // The SearchForm with budget inputs has class "hidden md:block" — not rendered
-    // on mobile. URL param assertions above already verify the filter is applied.
+    // Phase 1 UI redesign replaced the SearchForm budget text inputs with a
+    // slider-based PriceRangeFilter inside the InlineFilterStrip. There are no
+    // longer "Minimum budget" / "Maximum budget" labelled inputs on the search page.
+    // URL param assertions above are the source of truth for the applied filter.
+    // On desktop, the active price range is also reflected in the filter bar pill
+    // label (e.g. "$500-$1.5k"). Verify that the filter bar shows a price pill.
     const viewport = page.viewportSize();
-    if (!viewport || viewport.width < 768) {
-      // Skip input-value verification on mobile; URL params are the source of truth.
-    } else {
-      // Verify price inputs reflect values (wait for hydration to populate inputs)
-      const minInput = page.getByLabel(/minimum budget/i);
-      const maxInput = page.getByLabel(/maximum budget/i);
+    if (viewport && viewport.width >= 768) {
+      // On desktop, the price quick-filter button label shows the active range.
+      // Wait for hydration — the label updates after useBatchedFilters syncs.
+      const priceBtn = page.locator('[data-testid="quick-filter-price"]');
+      await expect(priceBtn).toBeVisible({ timeout: 15_000 });
       await expect
-        .poll(() => minInput.inputValue(), { timeout: 10_000 })
-        .not.toBe("");
-      await expect(minInput).toHaveValue("500");
-      await expect(maxInput).toHaveValue("1500");
+        .poll(() => priceBtn.textContent(), { timeout: 15_000 })
+        .toMatch(/\$500|\$1[,.]?5/i);
     }
 
     // Results heading should be visible
@@ -584,17 +584,16 @@ test.describe("20 Critical Search Page Journeys", () => {
     expect(url.searchParams.get("minPrice")).toBe("700");
     expect(url.searchParams.get("sort")).toBe("price_asc");
 
-    // On mobile, price inputs live inside MobileSearchOverlay (closed by default).
-    // The SearchForm with budget inputs has class "hidden md:block" — not rendered
-    // on mobile. URL param assertions above already verify the filter is preserved.
+    // Phase 1 UI redesign replaced budget text inputs with a slider-based filter.
+    // URL param assertions above confirm the filter is preserved after reload.
+    // On desktop, also verify the filter bar price button reflects the active value.
     const viewport = page.viewportSize();
     if (viewport && viewport.width >= 768) {
-      // Verify price input still shows correct value (wait for hydration)
-      const minInput = page.getByLabel(/minimum budget/i);
+      const priceBtn = page.locator('[data-testid="quick-filter-price"]');
+      await expect(priceBtn).toBeVisible({ timeout: 15_000 });
       await expect
-        .poll(() => minInput.inputValue(), { timeout: 10_000 })
-        .not.toBe("");
-      await expect(minInput).toHaveValue("700");
+        .poll(() => priceBtn.textContent(), { timeout: 15_000 })
+        .toMatch(/\$700|\$700\+/i);
     }
   });
 

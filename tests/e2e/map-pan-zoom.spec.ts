@@ -33,7 +33,15 @@ const AREA_COUNT_DEBOUNCE_MS = 600;
 async function waitForSearchPage(page: import("@playwright/test").Page) {
   await page.goto(SEARCH_URL);
   await page.waitForLoadState("domcontentloaded");
-  await page.locator("button").first().waitFor({ state: "visible", timeout: 30_000 });
+  // On mobile the first button in DOM is a hidden submit button inside the
+  // collapsed search bar; wait for any visible interactive element instead.
+  // Using the map container or a broadly-visible landmark avoids the hidden-button trap.
+  await page
+    .locator(
+      '[data-testid="map"], .maplibregl-map, [data-testid="listing-card"], h1, h2, main'
+    )
+    .first()
+    .waitFor({ state: "attached", timeout: 30_000 });
   await waitForMapReady(page);
 }
 
