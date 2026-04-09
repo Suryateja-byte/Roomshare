@@ -190,8 +190,8 @@ test.describe("LD: Visitor Action Buttons", () => {
     const found = await goToListing(page, nav, "Reviewer Nob Hill");
     test.skip(!found, "Listing not found");
 
-    const titleGroup = page.getByTestId("listing-detail-title-group");
-    const actions = page.getByTestId("listing-detail-actions");
+    const titleGroup = page.getByTestId("listing-detail-title-group").first();
+    const actions = page.getByTestId("listing-detail-actions").first();
 
     await expect(titleGroup).toBeVisible();
     await expect(actions).toBeVisible();
