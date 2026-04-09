@@ -27,6 +27,7 @@ import {
   waitForNoUrlParam,
   pollForUrlParam,
   waitForUrlStable,
+  waitForFilterCommit,
   openFilterModal,
 } from "../helpers";
 import type { Page } from "@playwright/test";
@@ -155,8 +156,8 @@ test.describe("Price Range Filter", () => {
     await setInlineMaxPrice(page, "");
     await submitSearch(page);
 
-    // Params should be gone
-    await waitForNoUrlParam(page, "minPrice");
+    // Wait for filter state to fully commit (URL + React hydration)
+    await waitForFilterCommit(page, "minPrice", null);
     expect(getUrlParam(page, "minPrice")).toBeNull();
     expect(getUrlParam(page, "maxPrice")).toBeNull();
   });
@@ -247,15 +248,15 @@ test.describe("Price Range Filter", () => {
     // Refresh the page
     await page.reload();
     await page.waitForLoadState("domcontentloaded");
-    await waitForUrlParam(page, "minPrice", "800");
 
-    // Params should still be present
+    // Wait for full filter hydration after reload (URL + React state)
+    await waitForFilterCommit(page, "minPrice", "800");
     expect(getUrlParam(page, "minPrice")).toBe("800");
     expect(getUrlParam(page, "maxPrice")).toBe("2500");
 
     // Verify the inline inputs reflect the URL state
-    const minInput = page.locator("#search-budget-min");
-    const maxInput = page.locator("#search-budget-max");
+    const minInput = page.locator("#search-budget-min").first();
+    const maxInput = page.locator("#search-budget-max").first();
     if (await minInput.isVisible()) {
       await expect(minInput).toHaveValue("800");
     }

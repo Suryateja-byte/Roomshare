@@ -145,6 +145,39 @@ export async function waitForNoUrlParam(
 }
 
 /**
+ * Wait for a filter to be fully committed to both URL and React state.
+ *
+ * Bridges the gap between URL update (router.push) and React hydration
+ * (useBatchedFilters 10-second force-sync window). Waits for:
+ * 1. URL parameter to match expected value (or be absent)
+ * 2. SearchForm to be hydrated (data-hydrated attribute on filter buttons)
+ */
+export async function waitForFilterCommit(
+  page: Page,
+  paramKey: string,
+  expectedValue?: string | null,
+  timeout = 30_000
+): Promise<void> {
+  // Step 1: Wait for URL param
+  if (expectedValue === null) {
+    await waitForNoUrlParam(page, paramKey, Math.floor(timeout * 0.6));
+  } else if (expectedValue !== undefined) {
+    await waitForUrlParam(page, paramKey, expectedValue, Math.floor(timeout * 0.6));
+  } else {
+    await waitForUrlParam(page, paramKey, undefined, Math.floor(timeout * 0.6));
+  }
+
+  // Step 2: Wait for SearchForm hydration (data-hydrated on filter buttons)
+  await page
+    .locator(
+      'button[data-hydrated][aria-label^="Filters"], button[data-hydrated][data-testid="quick-filter-more-filters"], button[data-hydrated][data-testid="mobile-filter-button"]'
+    )
+    .first()
+    .waitFor({ state: "visible", timeout: Math.floor(timeout * 0.4) })
+    .catch(() => {});
+}
+
+/**
  * Assert a URL param equals a specific value (auto-retries via waitForURL).
  */
 export async function expectUrlParam(
