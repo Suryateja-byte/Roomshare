@@ -373,7 +373,7 @@ export default function MobileBottomSheet({
         ref={sheetRef}
         role="region"
         aria-label="Search results"
-        className="fixed bottom-[64px] pb-[env(safe-area-inset-bottom,0px)] md:bottom-0 md:pb-0 left-0 right-0 flex flex-col bg-surface-container-lowest rounded-t-2xl shadow-[0_-4px_24px_rgba(0,0,0,0.12)]"
+        className="fixed bottom-0 left-0 right-0 flex flex-col bg-surface-container-lowest rounded-t-2xl shadow-[0_-4px_24px_rgba(0,0,0,0.12)]"
         animate={
           isDragging
             ? { height: displayHeightPx }

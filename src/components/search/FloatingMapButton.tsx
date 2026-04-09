@@ -43,11 +43,11 @@ export default function FloatingMapButton({
           animate={{ scale: 1, opacity: 1 }}
           exit={{ scale: 0.9, opacity: 0 }}
           transition={reducedMotion ? { duration: 0 } : { type: "spring", stiffness: 500, damping: 30 }}
-          className="fixed inset-x-0 z-50 mx-auto flex w-max items-center justify-center gap-2 rounded-full bg-on-surface px-5 py-3 text-white shadow-2xl shadow-on-surface/30 transition-all focus:outline-none focus-visible:ring-2 focus-visible:ring-primary/30 focus-visible:ring-offset-2 active:scale-95 md:hidden"
+          className="fixed inset-x-0 z-50 z-[1201] mx-auto flex w-max items-center justify-center gap-2 rounded-full bg-on-surface px-5 py-3 text-white shadow-2xl shadow-on-surface/30 transition-all focus:outline-none focus-visible:ring-2 focus-visible:ring-primary/30 focus-visible:ring-offset-2 active:scale-95 md:hidden"
           style={{
             bottom: isListMode
-              ? "calc(1.5rem + env(safe-area-inset-bottom, 0px))"
-              : `calc(${SNAP_COLLAPSED * 100}dvh + 1rem + env(safe-area-inset-bottom, 0px))`,
+              ? "calc(var(--mobile-bottom-nav-offset, 4.5rem) + 1.5rem + env(safe-area-inset-bottom, 0px))"
+              : `calc(max(${SNAP_COLLAPSED * 100}dvh, var(--mobile-bottom-nav-offset, 4.5rem)) + 1rem + env(safe-area-inset-bottom, 0px))`,
           }}
           aria-label={isListMode ? "Show map" : "Show list"}
         >

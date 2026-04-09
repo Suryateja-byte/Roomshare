@@ -129,6 +129,12 @@ interface ListingPageClientProps {
 
 // Status badge with pulse animation
 function StatusBadge({ status }: { status: string }) {
+  const [hasMounted, setHasMounted] = useState(false);
+
+  useEffect(() => {
+    setHasMounted(true);
+  }, []);
+
   const config = {
     ACTIVE: {
       bg: "bg-green-50",
@@ -171,7 +177,7 @@ function StatusBadge({ status }: { status: string }) {
       <span
         className={cn("w-1.5 h-1.5 rounded-full animate-pulse", config.dot)}
       />
-      {config.label}
+      {hasMounted ? config.label : null}
     </div>
   );
 }
@@ -772,6 +778,12 @@ export default function ListingPageClient({
                 {/* Guest Booking Card */}
                 {canRenderGuestControls && (
                   <>
+                    <div
+                      data-testid="contact-host-sidebar"
+                      className="hidden lg:block [&>button]:bg-transparent [&>button]:border [&>button]:border-outline-variant/30 [&>button]:text-on-surface [&>button]:hover:bg-surface-container-high [&>button]:shadow-none"
+                    >
+                      <ContactHostButton listingId={listing.id} />
+                    </div>
                     <BookingForm
                       listingId={listing.id}
                       price={listing.price}
@@ -786,12 +798,6 @@ export default function ListingPageClient({
                       bookingMode={listing.bookingMode}
                       holdTtlMinutes={listing.holdTtlMinutes}
                     />
-                    <div
-                      data-testid="contact-host-sidebar"
-                      className="hidden lg:block [&>button]:bg-transparent [&>button]:border [&>button]:border-outline-variant/30 [&>button]:text-on-surface [&>button]:hover:bg-surface-container-high [&>button]:shadow-none"
-                    >
-                      <ContactHostButton listingId={listing.id} />
-                    </div>
                   </>
                 )}
               </div>
