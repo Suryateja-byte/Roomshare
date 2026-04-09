@@ -493,6 +493,8 @@ export default function MobileBottomSheet({
         {/* Scrollable content with CSS scroll-snap enhancement */}
         <div
           ref={contentRef}
+          tabIndex={0}
+          aria-label="Search results"
           className={`flex-1 overflow-y-auto hide-scrollbar-mobile ${
             // P2-FIX (#134): Add safe area padding for notched devices when expanded
             isExpanded ? "pb-[env(safe-area-inset-bottom,0px)]" : ""
