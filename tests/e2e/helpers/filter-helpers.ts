@@ -225,16 +225,21 @@ export async function gotoSearchWithFilters(
  * Uses regex to match both "Filters" and "Filters (N active)" states.
  */
 export function filtersButton(page: Page): Locator {
-  // On desktop the redesigned filter strip renders a button with
-  // data-testid="quick-filter-more-filters" and aria-label^="Filters".
-  // On mobile it renders data-testid="mobile-filter-button".
-  // Both share aria-label^="Filters", but the mobile one lives inside a
-  // md:hidden parent, so we must filter to only the visible button.
-  // Using filter({ visible: true }) ensures we don't accidentally resolve
-  // to the hidden mobile button when running on a desktop viewport.
+  const viewport = page.viewportSize();
+  const isDesktop = !viewport || viewport.width >= 768;
+
+  if (isDesktop) {
+    return page
+      .locator(
+        'button[data-testid="quick-filter-more-filters"], button[data-hydrated][data-testid="quick-filter-more-filters"], button[data-hydrated][aria-label^="Filters"]'
+      )
+      .filter({ visible: true })
+      .first();
+  }
+
   return page
     .locator(
-      'button[data-testid="quick-filter-more-filters"], button[data-testid="mobile-filter-button"], button[data-hydrated][aria-label^="Filters"], button[aria-label^="Filters"]'
+      'button[data-testid="mobile-filter-button"], button[data-hydrated][data-testid="mobile-filter-button"], button[data-hydrated][aria-label^="Filters"], button[aria-label^="Filters"]'
     )
     .filter({ visible: true })
     .first();

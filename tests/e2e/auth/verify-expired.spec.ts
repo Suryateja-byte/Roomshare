@@ -28,7 +28,9 @@ test.describe("VE: Page Structure", () => {
     await expect(
       page.getByRole("heading", { name: /Verification Link Expired/i })
     ).toBeVisible({ timeout: timeouts.navigation });
-    await expect(page.getByText(/no longer valid/i)).toBeVisible();
+    await expect(
+      page.locator("p").filter({ hasText: /no longer valid/i })
+    ).toBeVisible();
   });
 
   test("VE-02  'Back to Home' footer link", async ({ page }) => {

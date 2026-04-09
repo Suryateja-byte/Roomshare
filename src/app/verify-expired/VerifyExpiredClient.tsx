@@ -140,12 +140,12 @@ export default function VerifyExpiredClient() {
                   </p>
                 </div>
 
-                <Link href="/login?callbackUrl=/verify-expired">
-                  <Button className="w-full" size="lg">
+                <Button asChild className="w-full" size="lg">
+                  <Link href="/login?callbackUrl=/verify-expired">
                     <LogIn className="w-4 h-4 mr-2" />
                     Log In to Continue
-                  </Button>
-                </Link>
+                  </Link>
+                </Button>
 
                 <p className="text-sm text-on-surface-variant mt-4">
                   Don&apos;t have an account?{" "}

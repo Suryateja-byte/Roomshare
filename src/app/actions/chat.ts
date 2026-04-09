@@ -73,51 +73,79 @@ export async function startConversation(listingId: string) {
       return { error: blockCheck.message };
     }
 
+    const isSerializationFailure = (error: unknown): boolean => {
+      if (!error || typeof error !== "object") return false;
+      const err = error as { code?: string; message?: string };
+      return (
+        err.code === "P2034" ||
+        err.code === "P40001" ||
+        err.message?.includes("40001") === true
+      );
+    };
+
     // P0-1 FIX: Wrap findFirst+create in SERIALIZABLE transaction with advisory lock
     // to prevent duplicate conversations from concurrent requests (TOCTOU race).
-    const result = await prisma.$transaction(
-      async (tx) => {
-        // Advisory lock keyed on listingId + sorted participant pair.
-        // Same pair always acquires the same lock, serializing concurrent calls.
-        const sortedIds = [userId, listing.ownerId].sort().join(":");
-        const lockKey = `conv:${listingId}:${sortedIds}`;
-        await tx.$executeRaw`SELECT pg_advisory_xact_lock(hashtext(${lockKey}))`;
+    // One retry is enough: the winner commits, the retry acquires the same lock
+    // and finds the conversation created by the winning transaction.
+    let result: { conversationId: string } | null = null;
+    for (let attempt = 1; attempt <= 2; attempt++) {
+      try {
+        result = await prisma.$transaction(
+          async (tx) => {
+            // Advisory lock keyed on listingId + sorted participant pair.
+            // Same pair always acquires the same lock, serializing concurrent calls.
+            const sortedIds = [userId, listing.ownerId].sort().join(":");
+            const lockKey = `conv:${listingId}:${sortedIds}`;
+            await tx.$executeRaw`SELECT pg_advisory_xact_lock(hashtext(${lockKey}))`;
 
-        // Check existing conversation (exclude admin-deleted, include per-user deleted for resurrection)
-        const existing = await tx.conversation.findFirst({
-          where: {
-            listingId,
-            deletedAt: null,
-            AND: [
-              { participants: { some: { id: userId } } },
-              { participants: { some: { id: listing.ownerId } } },
-            ],
+            // Check existing conversation (exclude admin-deleted, include per-user deleted for resurrection)
+            const existing = await tx.conversation.findFirst({
+              where: {
+                listingId,
+                deletedAt: null,
+                AND: [
+                  { participants: { some: { id: userId } } },
+                  { participants: { some: { id: listing.ownerId } } },
+                ],
+              },
+            });
+
+            if (existing) {
+              // Resurrect: clear per-user deletion record if it exists
+              await tx.conversationDeletion.deleteMany({
+                where: { conversationId: existing.id, userId },
+              });
+              return { conversationId: existing.id };
+            }
+
+            const conversation = await tx.conversation.create({
+              data: {
+                listingId,
+                participants: {
+                  connect: [{ id: userId }, { id: listing.ownerId }],
+                },
+              },
+            });
+
+            return { conversationId: conversation.id };
           },
-        });
-
-        if (existing) {
-          // Resurrect: clear per-user deletion record if it exists
-          await tx.conversationDeletion.deleteMany({
-            where: { conversationId: existing.id, userId },
+          { isolationLevel: "Serializable" }
+        );
+        break;
+      } catch (error) {
+        if (attempt === 1 && isSerializationFailure(error)) {
+          logger.sync.debug("startConversation serialization conflict, retrying", {
+            action: "startConversation",
+            listingId,
+            userId,
           });
-          return { conversationId: existing.id };
+          continue;
         }
+        throw error;
+      }
+    }
 
-        const conversation = await tx.conversation.create({
-          data: {
-            listingId,
-            participants: {
-              connect: [{ id: userId }, { id: listing.ownerId }],
-            },
-          },
-        });
-
-        return { conversationId: conversation.id };
-      },
-      { isolationLevel: "Serializable" }
-    );
-
-    return result;
+    return result ?? { error: "Failed to start conversation" };
   } catch (error: unknown) {
     logger.sync.error("Failed to start conversation", {
       action: "startConversation",

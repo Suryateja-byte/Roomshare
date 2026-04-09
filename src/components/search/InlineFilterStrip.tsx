@@ -219,6 +219,7 @@ export function InlineFilterStrip() {
     () => countActiveFilters(searchParams),
     [searchParams]
   );
+  const showDesktopQuickFilters = !hasMounted || isDesktopQuickFilters;
   const chips = useMemo(() => urlToFilterChips(searchParams), [searchParams]);
   const hasActiveFilters = activeCount > 0;
   const pendingActiveCount = useMemo(
@@ -410,11 +411,12 @@ export function InlineFilterStrip() {
   return (
     <>
       <div className="hide-scrollbar -mx-1 flex items-center gap-2 overflow-x-auto px-1 py-2">
-        {isDesktopQuickFilters ? (
+        {showDesktopQuickFilters ? (
           <DesktopQuickFilters
             disabled={isPending}
             hasMounted={hasMounted}
             activeCount={activeCount}
+            isAdvancedFiltersOpen={showFilterDrawer}
             openQuickFilter={openQuickFilter}
             onQuickFilterOpenChange={handleQuickFilterOpenChange}
             onOpenAdvancedFilters={handleOpenFilters}

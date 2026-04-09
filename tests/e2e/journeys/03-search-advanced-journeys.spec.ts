@@ -71,24 +71,6 @@ test.describe("30 Advanced Search Page Journeys", () => {
       timeout: 30000,
     });
 
-    // Wait for search results to fully load (budget inputs hydrate after mount)
-    await page.waitForLoadState("networkidle").catch(() => {});
-
-    // Set price range — wait for inputs to be ready under load
-    // Use pressSequentially for React controlled number inputs
-    // fill() can be overwritten by React re-renders during hydration
-    const minInput = page.getByLabel(/minimum budget/i);
-    const maxInput = page.getByLabel(/maximum budget/i);
-    await expect(minInput).toBeVisible({ timeout: 30000 });
-    await minInput.click();
-    await minInput.fill("");
-    await minInput.pressSequentially("800", { delay: 50 });
-    await expect(minInput).toHaveValue("800", { timeout: 30000 });
-    await maxInput.click();
-    await maxInput.fill("");
-    await maxInput.pressSequentially("2000", { delay: 50 });
-    await expect(maxInput).toHaveValue("2000", { timeout: 30000 });
-
     // Open filter modal and set lease + amenity
     const modal = await openFilterModal(page);
 
@@ -109,6 +91,21 @@ test.describe("30 Advanced Search Page Journeys", () => {
     }
 
     await applyFilters(page);
+    await page.waitForLoadState("networkidle").catch(() => {});
+
+    // Set price range after the modal closes so the inline inputs remain the
+    // source of truth for the URL update.
+    const minInput = page.getByLabel(/minimum budget/i);
+    const maxInput = page.getByLabel(/maximum budget/i);
+    await expect(minInput).toBeVisible({ timeout: 30000 });
+    await minInput.click();
+    await minInput.fill("");
+    await minInput.pressSequentially("800", { delay: 50 });
+    await expect(minInput).toHaveValue("800", { timeout: 30000 });
+    await maxInput.click();
+    await maxInput.fill("");
+    await maxInput.pressSequentially("2000", { delay: 50 });
+    await expect(maxInput).toHaveValue("2000", { timeout: 30000 });
     await expect
       .poll(
         () =>
@@ -1173,20 +1170,21 @@ test.describe("30 Advanced Search Page Journeys", () => {
   // ═══════════════════════════════════════════════════
 
   // ─────────────────────────────────────────────────
-  // J47: Tablet viewport layout (768px)
+  // J47: Tablet viewport layout (769px)
   // ─────────────────────────────────────────────────
-  test(`${tags.mobile} J47: Tablet viewport (768px) shows appropriate layout`, async ({
+  test(`${tags.mobile} J47: Tablet viewport (769px) shows appropriate layout`, async ({
     page,
     nav,
   }, testInfo) => {
-    // This test resizes to 768px but the Mobile Chrome project starts at
+    // Avoid the Tailwind md breakpoint boundary during CI re-layout.
+    // This test resizes to 769px but the Mobile Chrome project starts at
     // 412px (Pixel 7). The SearchForm component uses useMediaQuery which
     // may not re-evaluate after setViewportSize in CI. Skip on mobile projects.
     if (testInfo.project.name.includes("Mobile")) {
       test.skip(true, "Tablet layout test unreliable on mobile project (viewport resize timing)");
     }
     test.slow();
-    await page.setViewportSize({ width: 768, height: 1024 });
+    await page.setViewportSize({ width: 769, height: 1024 });
     await nav.goToSearch({ bounds: SF_BOUNDS });
     await page.waitForLoadState("domcontentloaded");
     await expect(page.getByRole("heading", { level: 1 }).first()).toBeVisible({

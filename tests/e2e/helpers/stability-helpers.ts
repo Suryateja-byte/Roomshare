@@ -236,31 +236,46 @@ export async function navigateToBookingsTab(
   page: Page,
   tab: "sent" | "received"
 ): Promise<void> {
-  // Wait for page hydration — tab button must be visible
-  const tabBtn = page
-    .getByRole("button", { name: new RegExp(tab, "i") })
+  const emptyState = page
+    .locator('[data-testid="empty-state"]')
+    .filter({ hasText: /No booking requests yet|No bookings made yet/i });
+
+  const readyState = page
+    .locator('[data-testid="booking-item"]')
+    .or(emptyState)
+    .or(page.locator('[aria-label="Loading bookings"]'))
     .first();
-  await tabBtn.waitFor({ state: "visible", timeout: 15_000 });
-  await tabBtn.click();
-  // Wait for tab panel content to render after tab switch
-  await expect(
-    page
-      .locator('[data-testid="booking-item"]')
-      .or(page.locator("text=No bookings"))
-      .or(page.locator('[role="tabpanel"]'))
-      .first()
-  ).toBeVisible({ timeout: 15_000 });
+
+  const settledState = page
+    .locator('[data-testid="booking-item"]')
+    .or(emptyState)
+    .first();
+
+  const openTab = async () => {
+    const tabBtn = page
+      .getByRole("button", { name: new RegExp(tab, "i") })
+      .first();
+    await tabBtn.waitFor({ state: "visible", timeout: 15_000 });
+    await tabBtn.click();
+  };
+
+  await openTab();
+  await page.reload({ waitUntil: "domcontentloaded" });
+  await openTab();
+
+  await expect(readyState).toBeVisible({ timeout: 15_000 });
+
+  const loadingSkeleton = page.locator('[aria-label="Loading bookings"]').first();
+  if (await loadingSkeleton.isVisible().catch(() => false)) {
+    await expect(settledState).toBeVisible({ timeout: 15_000 });
+  }
 
   // Click "All" filter to show all status bookings (page may have a filter active)
   const allFilter = page.getByRole("button", { name: /^all$/i }).first();
   if (await allFilter.isVisible({ timeout: 3_000 }).catch(() => false)) {
     await allFilter.click();
     // Wait for filtered list to update after clicking "All"
-    await expect(
-      page
-        .locator('[data-testid="booking-item"]')
-        .or(page.locator("text=No bookings"))
-    ).toBeVisible({ timeout: 10_000 });
+    await expect(settledState).toBeVisible({ timeout: 10_000 });
   }
 }
 
