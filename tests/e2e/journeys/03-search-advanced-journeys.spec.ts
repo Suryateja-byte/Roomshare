@@ -1196,11 +1196,14 @@ test.describe("30 Advanced Search Page Journeys", () => {
     try {
       await page.goto(
         `/search?minLat=${SF_BOUNDS.minLat}&maxLat=${SF_BOUNDS.maxLat}&minLng=${SF_BOUNDS.minLng}&maxLng=${SF_BOUNDS.maxLng}`,
-        { waitUntil: "domcontentloaded", timeout: 60_000 }
+        { waitUntil: "load", timeout: 60_000 }
       );
-      await expect(page.getByRole("heading", { level: 1 }).first()).toBeVisible({
-        timeout: 30_000,
-      });
+
+      // Wait for hydration — the desktop search-results-container should be visible at 769px
+      await page
+        .locator('[data-testid="search-results-container"]')
+        .first()
+        .waitFor({ state: "visible", timeout: 30_000 });
 
       // Search form should be visible at tablet width (desktop layout)
       const searchForm = page.locator('form[role="search"]');
