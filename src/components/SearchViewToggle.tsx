@@ -108,6 +108,12 @@ export default function SearchViewToggle({
   // hides the inactive one). After mount, render in exactly one container.
   // The inactive container gets aria-hidden + inert to prevent duplicate
   // selectors in E2E tests and assistive tech from seeing both copies.
+  //
+  // IMPORTANT: isDesktop is undefined until useMediaQuery resolves. We must
+  // wait for it to be a definitive boolean before applying inert, otherwise
+  // there's a race window where hasMounted=true but isDesktop=undefined
+  // causes inert to be applied to the mobile container on mobile viewports.
+  const isResolved = isDesktop !== undefined;
   const isMobileActive = isDesktop === false;
   const showChildrenInMobile = !hasMounted || isMobileActive;
   const showChildrenInDesktop = !hasMounted || !isMobileActive;
@@ -184,8 +190,8 @@ export default function SearchViewToggle({
     <>
       {/* Mobile: Map always visible with bottom sheet overlay */}
       <div
-        aria-hidden={hasMounted && !isMobileActive ? true : undefined}
-        {...(hasMounted && !isMobileActive ? { inert: true } : {})}
+        aria-hidden={isResolved && !isMobileActive ? true : undefined}
+        {...(isResolved && !isMobileActive ? { inert: true } : {})}
         className="md:hidden flex-1 flex flex-col overflow-hidden relative"
       >
         {/* Map fills the background */}
@@ -218,8 +224,8 @@ export default function SearchViewToggle({
 
       {/* Desktop Split View */}
       <div
-        aria-hidden={hasMounted && isMobileActive ? true : undefined}
-        {...(hasMounted && isMobileActive ? { inert: true } : {})}
+        aria-hidden={isResolved && isMobileActive ? true : undefined}
+        {...(isResolved && isMobileActive ? { inert: true } : {})}
         className="hidden md:flex flex-1 overflow-hidden"
       >
         {/* Left Panel: List View - Adjusts width based on map visibility */}

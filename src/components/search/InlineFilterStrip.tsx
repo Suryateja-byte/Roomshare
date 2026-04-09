@@ -219,7 +219,10 @@ export function InlineFilterStrip() {
     () => countActiveFilters(searchParams),
     [searchParams]
   );
-  const showDesktopQuickFilters = !hasMounted || isDesktopQuickFilters;
+  // Use the media query result directly. SSR hydration mismatch is handled
+  // by SearchViewToggle rendering children in both containers with inert on
+  // the inactive one — no need to force desktop layout pre-mount here.
+  const showDesktopQuickFilters = isDesktopQuickFilters;
   const chips = useMemo(() => urlToFilterChips(searchParams), [searchParams]);
   const hasActiveFilters = activeCount > 0;
   const pendingActiveCount = useMemo(
@@ -530,6 +533,7 @@ export function InlineFilterStrip() {
                 type="button"
                 onClick={() => handleRemoveChip(chip)}
                 disabled={isPending}
+                aria-label={`Remove filter: ${chip.label}`}
                 className="flex min-h-[36px] shrink-0 items-center gap-1 whitespace-nowrap rounded-full border border-primary/20 bg-primary/10 px-3 py-2 text-sm text-on-surface transition-colors hover:bg-primary/15"
               >
                 <span className="max-w-[150px] truncate">{chip.label}</span>
