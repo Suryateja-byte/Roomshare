@@ -58,18 +58,22 @@ function normalizeHashableSearchQuery(query: HashableSearchQuery) {
 
 function hashString64(value: string): string {
   const bytes = new TextEncoder().encode(value);
-  let hash = 0xcbf29ce484222325n;
+  let primary = 0x811c9dc5;
+  let secondary = 0x9e3779b9;
 
   for (const byte of bytes) {
-    hash ^= BigInt(byte);
-    hash = BigInt.asUintN(64, hash * 0x100000001b3n);
+    primary ^= byte;
+    primary = Math.imul(primary, 0x01000193) >>> 0;
+
+    secondary ^= byte;
+    secondary = Math.imul(secondary, 0x85ebca6b) >>> 0;
   }
 
-  return hash.toString(16).padStart(16, "0").slice(0, 16);
+  return `${primary.toString(16).padStart(8, "0")}${secondary
+    .toString(16)
+    .padStart(8, "0")}`;
 }
 
-export function generateSearchQueryHash(
-  query: HashableSearchQuery
-): string {
+export function generateSearchQueryHash(query: HashableSearchQuery): string {
   return hashString64(JSON.stringify(normalizeHashableSearchQuery(query)));
 }
