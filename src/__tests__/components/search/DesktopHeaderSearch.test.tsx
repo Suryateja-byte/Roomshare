@@ -128,6 +128,8 @@ describe("DesktopHeaderSearch", () => {
   it("blocks typed locations that were not selected from autocomplete", () => {
     render(<DesktopHeaderSearch collapsed={false} />);
 
+    expect(screen.queryByText("⌘")).not.toBeInTheDocument();
+
     fireEvent.change(screen.getByTestId("desktop-location-input"), {
       target: { value: "Chicago" },
     });
