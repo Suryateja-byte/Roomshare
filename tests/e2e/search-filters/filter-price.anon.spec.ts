@@ -97,7 +97,7 @@ test.describe("Price Range Filter", () => {
     page,
   }) => {
     await waitForSearchReady(page);
-    // Wait for map "Search as I move" URL updates to settle — useBatchedFilters
+    // Wait for map URL updates to settle — useBatchedFilters
     // resets pending state whenever searchParams change (committed → pending sync).
     // Generous settle for CI runners where map bounds updates are slower.
     await waitForUrlStable(page, 1500);

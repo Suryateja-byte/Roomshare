@@ -173,9 +173,8 @@ test.describe("Pagination Accessibility (Scenario 11)", () => {
       );
       expect(hasTouchTarget).toBe(true);
 
-      // NOTE: "Search as I move" is already disabled by the freezeMapNavigations
-      // option in setupPaginationMock (auto-enabled when delayMs > 0). The init
-      // script calls window.__e2eSetSearchAsMove(false) as soon as the map loads.
+      // NOTE: map-driven URL updates are already frozen by setupPaginationMock
+      // (auto-enabled when delayMs > 0) via window.__e2eMapSearchFrozen.
 
       // --- Loading state assertions ---
       // Click the button to trigger loading state
@@ -346,9 +345,8 @@ test.describe("Pagination Accessibility (Scenario 11)", () => {
       await expect(loadMoreBtn).toBeVisible({ timeout: 30_000 });
       await loadMoreBtn.scrollIntoViewIfNeeded();
 
-      // NOTE: "Search as I move" is already disabled by the freezeMapNavigations
-      // option in setupPaginationMock (auto-enabled when delayMs > 0). The init
-      // script calls window.__e2eSetSearchAsMove(false) as soon as the map loads,
+      // NOTE: map-driven URL updates are already frozen by setupPaginationMock
+      // (auto-enabled when delayMs > 0) via window.__e2eMapSearchFrozen,
       // preventing router.replace() during the 3-second mock delay.
 
       await loadMoreBtn.focus();

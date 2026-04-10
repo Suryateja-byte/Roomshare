@@ -85,7 +85,7 @@ test.describe("Filter Race Conditions", () => {
   }) => {
     test.setTimeout(90_000); // generous timeout for race test
     await waitForSearchReady(page);
-    // Wait for map "Search as I move" URL updates to settle — useBatchedFilters
+    // Wait for map URL updates to settle — useBatchedFilters
     // resets pending state whenever searchParams change (committed → pending sync)
     await waitForUrlStable(page);
 
@@ -98,7 +98,7 @@ test.describe("Filter Race Conditions", () => {
     }
     await searchInput.fill("San Francisco");
 
-    // Wait for search debounce (~600ms) + map "Search as I move" bounds update
+    // Wait for search debounce (~600ms) + map bounds update
     // to fully settle. useBatchedFilters resets pending state on any URL change,
     // so we need a generous settle window to avoid the toggle being wiped.
     // CI runners need extra time (map fly animation + geocode round-trip).

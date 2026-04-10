@@ -397,7 +397,7 @@ export default async function SearchPage({ searchParams }: SearchPageProps) {
         <InlineFilterStrip />
 
         <div className="flex flex-row items-center justify-between gap-4 py-2 mb-4">
-          <div className="flex-1 min-w-0">
+          <div className="hidden md:block flex-1 min-w-0">
             <div className="flex items-baseline gap-3 min-w-0">
               <h1
                 id="search-results-heading"
@@ -409,7 +409,7 @@ export default async function SearchPage({ searchParams }: SearchPageProps) {
                 {displayLocation ? ` in ${displayLocation}` : ""}
               </h1>
               {listings.length > 0 && (
-                <span className="text-xs bg-surface-container-high text-on-surface-variant px-2.5 py-1 rounded-full whitespace-nowrap shrink-0">
+                <span className="hidden md:inline-flex text-xs bg-surface-container-high text-on-surface-variant px-2.5 py-1 rounded-full whitespace-nowrap shrink-0">
                   Showing 1–{listings.length}
                 </span>
               )}
@@ -422,7 +422,9 @@ export default async function SearchPage({ searchParams }: SearchPageProps) {
           </div>
 
           <div className="flex items-center gap-2 shrink-0">
-            <SaveSearchButton />
+            <div className="hidden md:block">
+              <SaveSearchButton />
+            </div>
             <SortSelect currentSort={sortOption} />
           </div>
         </div>

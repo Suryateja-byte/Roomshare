@@ -40,8 +40,20 @@ describe("MobileSearchContext", () => {
 
     it("provides all expected methods", () => {
       const { result } = renderHook(() => useMobileSearch(), { wrapper });
+      expect(typeof result.current.searchResultsLabel).toBe("string");
+      expect(result.current.mobileSheetOverrideLabel).toBeNull();
+      expect(result.current.mobileResultsView).toBe("map");
+      expect(result.current.mobileResultsViewPreference).toBeNull();
       expect(typeof result.current.expand).toBe("function");
       expect(typeof result.current.collapse).toBe("function");
+      expect(typeof result.current.setSearchResultsLabel).toBe("function");
+      expect(typeof result.current.setMobileSheetOverrideLabel).toBe(
+        "function"
+      );
+      expect(typeof result.current.setMobileResultsView).toBe("function");
+      expect(typeof result.current.setMobileResultsViewPreference).toBe(
+        "function"
+      );
       expect(typeof result.current.openFilters).toBe("function");
       expect(typeof result.current.registerOpenFilters).toBe("function");
     });
@@ -203,14 +215,122 @@ describe("MobileSearchContext", () => {
     });
   });
 
+  describe("searchResultsLabel", () => {
+    it("defaults to a generic search results label", () => {
+      const { result } = renderHook(() => useMobileSearch(), { wrapper });
+      expect(result.current.searchResultsLabel).toBe("Search results");
+    });
+
+    it("updates the label and restores the default when cleared", () => {
+      const { result } = renderHook(() => useMobileSearch(), { wrapper });
+
+      act(() => {
+        result.current.setSearchResultsLabel("24 places");
+      });
+      expect(result.current.searchResultsLabel).toBe("24 places");
+
+      act(() => {
+        result.current.setSearchResultsLabel(null);
+      });
+      expect(result.current.searchResultsLabel).toBe("Search results");
+    });
+  });
+
+  describe("mobileSheetOverrideLabel", () => {
+    it("defaults to null", () => {
+      const { result } = renderHook(() => useMobileSearch(), { wrapper });
+      expect(result.current.mobileSheetOverrideLabel).toBeNull();
+    });
+
+    it("updates the override label and clears it back to null", () => {
+      const { result } = renderHook(() => useMobileSearch(), { wrapper });
+
+      act(() => {
+        result.current.setMobileSheetOverrideLabel("No places in this area");
+      });
+      expect(result.current.mobileSheetOverrideLabel).toBe(
+        "No places in this area"
+      );
+
+      act(() => {
+        result.current.setMobileSheetOverrideLabel(null);
+      });
+      expect(result.current.mobileSheetOverrideLabel).toBeNull();
+    });
+  });
+
+  describe("mobileResultsView", () => {
+    it('defaults to "map"', () => {
+      const { result } = renderHook(() => useMobileSearch(), { wrapper });
+      expect(result.current.mobileResultsView).toBe("map");
+    });
+
+    it("updates the view mode", () => {
+      const { result } = renderHook(() => useMobileSearch(), { wrapper });
+
+      act(() => {
+        result.current.setMobileResultsView("peek");
+      });
+      expect(result.current.mobileResultsView).toBe("peek");
+
+      act(() => {
+        result.current.setMobileResultsView("list");
+      });
+      expect(result.current.mobileResultsView).toBe("list");
+
+      act(() => {
+        result.current.setMobileResultsView("map");
+      });
+      expect(result.current.mobileResultsView).toBe("map");
+    });
+  });
+
+  describe("mobileResultsViewPreference", () => {
+    it("defaults to null", () => {
+      const { result } = renderHook(() => useMobileSearch(), { wrapper });
+      expect(result.current.mobileResultsViewPreference).toBeNull();
+    });
+
+    it("updates the preferred view and clears back to null", () => {
+      const { result } = renderHook(() => useMobileSearch(), { wrapper });
+
+      act(() => {
+        result.current.setMobileResultsViewPreference("map");
+      });
+      expect(result.current.mobileResultsViewPreference).toBe("map");
+
+      act(() => {
+        result.current.setMobileResultsViewPreference("peek");
+      });
+      expect(result.current.mobileResultsViewPreference).toBe("peek");
+
+      act(() => {
+        result.current.setMobileResultsViewPreference(null);
+      });
+      expect(result.current.mobileResultsViewPreference).toBeNull();
+    });
+  });
+
   describe("fallback when used outside provider", () => {
     it("returns stable fallback context", () => {
       const { result: result1 } = renderHook(() => useMobileSearch());
       const { result: result2 } = renderHook(() => useMobileSearch());
 
       expect(result1.current.isExpanded).toBe(false);
+      expect(result1.current.searchResultsLabel).toBe("Search results");
+      expect(result1.current.mobileSheetOverrideLabel).toBeNull();
+      expect(result1.current.mobileResultsView).toBe("map");
+      expect(result1.current.mobileResultsViewPreference).toBeNull();
       expect(typeof result1.current.expand).toBe("function");
       expect(typeof result1.current.collapse).toBe("function");
+      expect(typeof result1.current.setSearchResultsLabel).toBe("function");
+      expect(typeof result1.current.setMobileSheetOverrideLabel).toBe(
+        "function"
+      );
+      expect(typeof result1.current.setMobileResultsView).toBe("function");
+      expect(typeof result1.current.setMobileResultsViewPreference).toBe(
+        "function"
+      );
       expect(typeof result1.current.openFilters).toBe("function");
       expect(typeof result1.current.registerOpenFilters).toBe("function");
 
@@ -223,6 +343,14 @@ describe("MobileSearchContext", () => {
 
       expect(() => result.current.expand()).not.toThrow();
       expect(() => result.current.collapse()).not.toThrow();
+      expect(() => result.current.setSearchResultsLabel("12 places")).not.toThrow();
+      expect(() =>
+        result.current.setMobileSheetOverrideLabel("No places in this area")
+      ).not.toThrow();
+      expect(() => result.current.setMobileResultsView("list")).not.toThrow();
+      expect(() =>
+        result.current.setMobileResultsViewPreference("map")
+      ).not.toThrow();
       expect(() => result.current.openFilters()).not.toThrow();
       expect(() => result.current.registerOpenFilters(() => {})).not.toThrow();
     });

@@ -196,11 +196,13 @@ test.describe("Mobile Bottom Sheet - Content", () => {
     const handle = page.locator(mobileSelectors.sheetHandle);
     await expect(handle).toBeAttached();
 
-    // The "Pull up for listings" text should be visible when collapsed
-    const pullUpText = page.locator('text="Pull up for listings"');
-    const pullUpVisible = await pullUpText.isVisible().catch(() => false);
-    // This text is conditionally rendered only when isCollapsed
-    expect(pullUpVisible).toBeTruthy();
+    // The collapsed header should keep a compact result count instead of
+    // generic instructional copy.
+    const headerText = page.locator('[data-testid="sheet-header-text"]').first();
+    await expect(headerText).toBeVisible();
+    const text = (await headerText.textContent())?.trim() ?? "";
+    expect(text.length).toBeGreaterThan(0);
+    expect(text.toLowerCase()).not.toContain("pull up");
   });
 
   test("sheet header shows result count text", async ({ page }) => {

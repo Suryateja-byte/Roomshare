@@ -194,6 +194,18 @@ describe("SearchResultsClient", () => {
       expect(matches.length).toBeGreaterThanOrEqual(1);
     });
 
+    it("keeps the save-search callout desktop-only", async () => {
+      render(<SearchResultsClient {...defaultProps} />);
+
+      await waitFor(() => {
+        expect(screen.getByText("Don't miss out")).toBeInTheDocument();
+      });
+
+      const callout = screen.getByText("Don't miss out").closest("section");
+      expect(callout).toHaveClass("hidden");
+      expect(callout).toHaveClass("md:flex");
+    });
+
     it("renders zero results state when hasConfirmedZeroResults is true", () => {
       render(
         <SearchResultsClient

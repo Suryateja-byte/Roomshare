@@ -8,7 +8,7 @@
  * Architecture notes:
  * - SSR calls executeSearchV2() directly (not via HTTP) -- cannot mock initial page load
  * - Client-side "Load more" uses fetchMoreListings server action (POST with Next-Action header)
- * - "Search as I move" triggers router.replace() which is an RSC GET fetch
+ * - Map-driven auto-search triggers router.replace() which is an RSC GET fetch
  * - Rate limiting uses Upstash Redis; SSR rate limit renders inline
  * - Error boundary at src/app/search/error.tsx catches unrecoverable SSR errors
  *
@@ -217,7 +217,7 @@ test.describe("Group 1: Zero Results State", () => {
 // ---------------------------------------------------------------------------
 // Group 2: Client-Side Error Recovery
 //
-// "Search as I move" triggers router.replace() which sends an RSC GET fetch.
+// Map-driven auto-search triggers router.replace() which sends an RSC GET fetch.
 // We intercept these RSC fetches to simulate server failures during
 // client-side navigation. Server actions (load more) use POST.
 // ---------------------------------------------------------------------------

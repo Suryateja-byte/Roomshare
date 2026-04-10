@@ -46,14 +46,6 @@ test.describe("Amenities Filter", () => {
   }) => {
     await waitForSearchReady(page);
 
-    // Disable "Search as I move" to prevent map-triggered URL changes
-    const searchAsIMove = page.getByRole("switch", {
-      name: /search as i move/i,
-    });
-    if (await searchAsIMove.isChecked()) {
-      await searchAsIMove.click();
-    }
-
     await openFilterModal(page);
 
     // Toggle Wifi amenity

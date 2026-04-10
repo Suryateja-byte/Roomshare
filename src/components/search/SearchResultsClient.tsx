@@ -26,6 +26,7 @@ import { SplitStayCard } from "@/components/search/SplitStayCard";
 import { ExpandSearchSuggestions } from "@/components/search/ExpandSearchSuggestions";
 import { findSplitStays } from "@/lib/search/split-stay";
 import { getFilterSuggestions } from "@/app/actions/filter-suggestions";
+import { useMobileSearch } from "@/contexts/MobileSearchContext";
 import type { ListingData, FilterSuggestion } from "@/lib/data";
 import type { FilterParams } from "@/lib/search-types";
 
@@ -34,6 +35,17 @@ import type { FilterParams } from "@/lib/search-types";
  * Prevents excessive DOM size on low-end devices.
  */
 const MAX_ACCUMULATED = 60;
+
+function formatMobileResultsLabel(
+  total: number | null,
+  hasZeroResults: boolean,
+  location?: string
+): string {
+  const suffix = location ? ` in ${location}` : "";
+  if (hasZeroResults) return `0 places${suffix}`;
+  if (total === null) return `100+ places${suffix}`;
+  return `${total} ${total === 1 ? "place" : "places"}${suffix}`;
+}
 
 interface SearchResultsClientProps {
   initialListings: ListingData[];
@@ -72,6 +84,7 @@ export function SearchResultsClient({
   vibeAdvisory,
   clientSideSearchEnabled = false,
 }: SearchResultsClientProps) {
+  const { setSearchResultsLabel } = useMobileSearch();
   const [isHydrated, setIsHydrated] = useState(false);
   const [extraListings, setExtraListings] = useState<ListingData[]>([]);
   const [nextCursor, setNextCursor] = useState<string | null>(
@@ -399,6 +412,18 @@ export function SearchResultsClient({
     clientFetchedListings !== null
       ? effectiveTotal !== null && effectiveTotal === 0
       : hasConfirmedZeroResults;
+  const mobileResultsLabel = useMemo(
+    () => formatMobileResultsLabel(effectiveTotal, effectiveZeroResults, query),
+    [effectiveTotal, effectiveZeroResults, query]
+  );
+
+  useEffect(() => {
+    setSearchResultsLabel(mobileResultsLabel);
+
+    return () => {
+      setSearchResultsLabel(null);
+    };
+  }, [mobileResultsLabel, setSearchResultsLabel]);
 
   useEffect(() => {
     const allIds = allListings.map((listing) => listing.id);
@@ -487,7 +512,11 @@ export function SearchResultsClient({
   }, [filterParams, hasConfirmedZeroResults]);
 
   return (
-    <div id="search-results" tabIndex={-1} className="!outline-none">
+    <div
+      id="search-results"
+      tabIndex={-1}
+      className="!outline-none pb-24 md:pb-0"
+    >
       {/* Screen reader announcement for search results */}
       <div
         role="status"
@@ -559,7 +588,7 @@ export function SearchResultsClient({
           {allListings.length > 0 && (
             <div className="mb-4 flex flex-col gap-2 sm:flex-row sm:items-start sm:justify-between">
               <div className="min-w-0">
-                <p className="text-sm text-on-surface-variant">
+                <p className="hidden text-sm text-on-surface-variant md:block">
                   {isClientFetching
                     ? "Updating..."
                     : total !== null
@@ -583,22 +612,6 @@ export function SearchResultsClient({
                   onToggle={setShowTotalPrice}
                 />
               )}
-            </div>
-          )}
-
-          {/* Progress bar — shows proportion of results loaded */}
-          {total !== null && total > 0 && (
-            <div className="h-[3px] bg-surface-container-high rounded-full overflow-hidden mb-4">
-              <div
-                className="h-full bg-primary rounded-full transition-[width] duration-500"
-                style={{
-                  width: `${Math.min((allListings.length / Math.max(total, 1)) * 100, 100)}%`,
-                }}
-                role="progressbar"
-                aria-valuenow={allListings.length}
-                aria-valuemax={total}
-                aria-label={`Showing ${allListings.length} of ${total} results`}
-              />
             </div>
           )}
 
@@ -646,7 +659,9 @@ export function SearchResultsClient({
                       aria-setsize={total ?? -1}
                       aria-posinset={index + 1}
                       className="animate-card-entrance"
-                      style={{ animationDelay: `${index * 50}ms` }}
+                      style={{
+                        animationDelay: `${Math.min(index, 6) * 40}ms`,
+                      }}
                     >
                       <ListingCard
                         listing={listing}
@@ -758,17 +773,10 @@ export function SearchResultsClient({
             />
           )}
 
-          {/* Contextual footer */}
-          {allListings.length > 0 && (
-            <p className="text-center text-xs text-on-surface-variant mt-6 pb-4">
-              {total === null ? "100+" : total} places
-              {query ? ` in ${query}` : ""}
-            </p>
-          )}
           {allListings.length > 0 && !effectiveZeroResults && isHydrated && !isLoadingMore && (
             <section
               aria-label="Save search"
-              className="mt-12 mb-4 relative overflow-hidden bg-surface-container-high/40 rounded-2xl p-8 flex flex-col sm:flex-row items-center justify-between gap-6 border border-outline-variant/20"
+              className="hidden md:flex mt-12 mb-4 relative overflow-hidden bg-surface-container-high/40 rounded-2xl p-8 flex-col sm:flex-row items-center justify-between gap-6 border border-outline-variant/20"
             >
               <div>
                 <h3 className="text-lg font-display font-semibold text-on-surface mb-1">

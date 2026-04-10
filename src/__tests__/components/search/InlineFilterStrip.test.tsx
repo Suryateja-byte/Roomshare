@@ -5,6 +5,8 @@ import { emptyFilterValues } from "@/hooks/useBatchedFilters";
 
 const mockRouterPush = jest.fn();
 const mockRegisterOpenFilters = jest.fn();
+let mockSearchParams = new URLSearchParams();
+let mockMobileResultsView: "map" | "peek" | "list" = "list";
 const mockSetPending = jest.fn();
 const mockReset = jest.fn();
 const mockCommit = jest.fn();
@@ -17,7 +19,7 @@ jest.mock("next/navigation", () => ({
   useRouter: () => ({
     push: mockRouterPush,
   }),
-  useSearchParams: () => new URLSearchParams(),
+  useSearchParams: () => mockSearchParams,
 }));
 
 jest.mock("@/contexts/SearchTransitionContext", () => ({
@@ -26,6 +28,7 @@ jest.mock("@/contexts/SearchTransitionContext", () => ({
 
 jest.mock("@/contexts/MobileSearchContext", () => ({
   useMobileSearch: () => ({
+    mobileResultsView: mockMobileResultsView,
     registerOpenFilters: mockRegisterOpenFilters,
   }),
 }));
@@ -158,6 +161,10 @@ jest.mock("@radix-ui/react-popover", () => {
 describe("InlineFilterStrip", () => {
   beforeEach(() => {
     jest.clearAllMocks();
+    mockSearchParams = new URLSearchParams();
+    mockMobileResultsView = "list";
+    Object.assign(mockPending, emptyFilterValues);
+    Object.assign(mockCommitted, emptyFilterValues);
     mockUseMediaQuery.mockImplementation((query: string) =>
       query === "(min-width: 768px)" ? true : undefined
     );
@@ -193,11 +200,79 @@ describe("InlineFilterStrip", () => {
 
   it("keeps the mobile strip on the full drawer flow", () => {
     mockUseMediaQuery.mockReturnValue(false);
+    mockMobileResultsView = "list";
 
     render(<InlineFilterStrip />);
 
     fireEvent.click(screen.getByTestId("mobile-filter-price"));
 
     expect(screen.getByTestId("filter-modal")).toBeInTheDocument();
+  });
+
+  it('hides the mobile quick filters in "map" view', () => {
+    mockUseMediaQuery.mockReturnValue(false);
+    mockMobileResultsView = "map";
+
+    render(<InlineFilterStrip />);
+
+    expect(screen.queryByTestId("mobile-filter-price")).not.toBeInTheDocument();
+    expect(screen.queryByTestId("mobile-filter-move-in")).not.toBeInTheDocument();
+    expect(screen.queryByTestId("mobile-filter-room-type")).not.toBeInTheDocument();
+    expect(screen.queryByTestId("mobile-filter-button")).not.toBeInTheDocument();
+  });
+
+  it('hides the mobile quick filters in "peek" view', () => {
+    mockUseMediaQuery.mockReturnValue(false);
+    mockMobileResultsView = "peek";
+
+    render(<InlineFilterStrip />);
+
+    expect(screen.queryByTestId("mobile-filter-price")).not.toBeInTheDocument();
+    expect(screen.queryByTestId("mobile-filter-move-in")).not.toBeInTheDocument();
+    expect(screen.queryByTestId("mobile-filter-room-type")).not.toBeInTheDocument();
+    expect(screen.queryByTestId("mobile-filter-button")).not.toBeInTheDocument();
+  });
+
+  it("shows selected values in mobile quick filters", () => {
+    mockUseMediaQuery.mockReturnValue(false);
+    mockMobileResultsView = "list";
+    Object.assign(mockCommitted, {
+      minPrice: "1200",
+      maxPrice: "1800",
+      moveInDate: "2026-05-01",
+      roomType: "Private Room",
+    });
+    mockSearchParams = new URLSearchParams(
+      "minPrice=1200&maxPrice=1800&moveInDate=2026-05-01&roomType=Private+Room"
+    );
+
+    render(<InlineFilterStrip />);
+
+    expect(screen.getByTestId("mobile-filter-price")).toHaveTextContent(
+      "$1,200-$1,800"
+    );
+    expect(screen.getByTestId("mobile-filter-move-in")).toHaveTextContent(
+      "May 1"
+    );
+    expect(screen.getByTestId("mobile-filter-room-type")).toHaveTextContent(
+      "Private Room"
+    );
+  });
+
+  it("truncates applied chips on mobile after two chips", () => {
+    mockUseMediaQuery.mockReturnValue(false);
+    mockMobileResultsView = "list";
+    mockSearchParams = new URLSearchParams(
+      "minPrice=1200&maxPrice=1800&moveInDate=2026-05-01&roomType=Private+Room"
+    );
+
+    render(<InlineFilterStrip />);
+
+    const appliedRegion = screen.getByRole("region", {
+      name: "Applied filters",
+    });
+    expect(appliedRegion).toHaveTextContent("$1,200 - $1,800");
+    expect(appliedRegion).toHaveTextContent("Move-in: May 1, 2026");
+    expect(appliedRegion).toHaveTextContent("+1 more");
   });
 });

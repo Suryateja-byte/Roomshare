@@ -504,16 +504,6 @@ export const DesktopHeaderSearch = forwardRef<
           <Search className={cn(collapsed ? "h-4 w-4" : "h-5 w-5")} />
         </Button>
 
-        {!collapsed && (
-          <div className="ml-4 mr-2 hidden items-center gap-1 text-xs font-medium text-on-surface-variant lg:flex">
-            <kbd className="rounded-md border border-outline-variant/20 bg-surface-container-highest px-1.5 py-0.5 font-sans shadow-sm">
-              ⌘
-            </kbd>
-            <kbd className="rounded-md border border-outline-variant/20 bg-surface-container-highest px-1.5 py-0.5 font-sans shadow-sm">
-              K
-            </kbd>
-          </div>
-        )}
       </form>
     </div>
   );

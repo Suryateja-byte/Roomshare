@@ -378,7 +378,7 @@ export async function isMapAvailable(page: Page): Promise<boolean> {
 
 /**
  * Zoom in programmatically to expand clusters into individual markers.
- * Uses E2E hooks to avoid triggering "Search as I move" URL updates.
+ * Uses E2E hooks to avoid triggering auto-search URL updates.
  */
 export async function zoomToExpandClusters(page: Page): Promise<boolean> {
   // Check if individual markers are already visible

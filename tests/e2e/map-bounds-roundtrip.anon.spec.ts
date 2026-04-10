@@ -168,23 +168,6 @@ async function simulateMapPan(
   }
 }
 
-/**
- * Ensure "Search as I move" is ON.
- */
-async function ensureSearchAsMoveOn(page: Page) {
-  const toggle = page.locator(
-    'button[role="switch"]:has-text("Search as I move")'
-  );
-  if ((await toggle.count()) === 0) return;
-  const isChecked = await toggle.getAttribute("aria-checked");
-  if (isChecked === "false") {
-    await toggle.click();
-    await expect(toggle).toHaveAttribute("aria-checked", "true", {
-      timeout: 5_000,
-    });
-  }
-}
-
 // Map tests need extra time for WebGL rendering and tile loading in CI
 test.beforeEach(async () => {
   test.slow();
@@ -230,8 +213,6 @@ test.describe("Bounds round-trip: Bounds in URL", () => {
     const mapFullyLoaded = await isMapFullyLoaded(page);
     test.skip(!mapFullyLoaded, "Map not fully loaded");
 
-    await ensureSearchAsMoveOn(page);
-
     const initialBounds = getUrlBounds(page.url());
 
     // Pan the map
@@ -270,8 +251,6 @@ test.describe("Bounds round-trip: Bounds in URL", () => {
 
     const mapFullyLoaded = await isMapFullyLoaded(page);
     test.skip(!mapFullyLoaded, "Map not fully loaded");
-
-    await ensureSearchAsMoveOn(page);
 
     // Pan to trigger a URL update with new bounds
     const panned = await simulateMapPan(page, 100, 50);
@@ -319,8 +298,6 @@ test.describe("Bounds round-trip: Bounds in URL", () => {
 
     const mapFullyLoaded = await isMapFullyLoaded(page);
     test.skip(!mapFullyLoaded, "Map not fully loaded");
-
-    await ensureSearchAsMoveOn(page);
 
     // Track history length
     const initialHistoryLength = await page.evaluate(
@@ -484,8 +461,6 @@ test.describe("Bounds round-trip: Deep link with bounds", () => {
     const mapFullyLoaded = await isMapFullyLoaded(page);
     test.skip(!mapFullyLoaded, "Map not fully loaded");
 
-    await ensureSearchAsMoveOn(page);
-
     // Pan the map to generate new bounds
     const panned = await simulateMapPan(page, 120, 60);
     test.skip(!panned, "Map pan failed");
@@ -603,8 +578,6 @@ test.describe("Bounds round-trip: Bounds + filters", () => {
 
     const mapFullyLoaded = await isMapFullyLoaded(page);
     test.skip(!mapFullyLoaded, "Map not fully loaded");
-
-    await ensureSearchAsMoveOn(page);
 
     // Start with a filter applied
     await page.goto(`${SEARCH_URL}&roomType=Private+Room`);
