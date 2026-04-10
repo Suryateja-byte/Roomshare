@@ -6,8 +6,6 @@ import DesktopMapControls, {
 import type { POICategory } from "@/components/map/POILayer";
 
 const defaultProps = {
-  searchAsMove: true,
-  onToggleSearchAsMove: jest.fn(),
   activePOICategories: new Set<POICategory>(),
   onTogglePOICategory: jest.fn(),
   isDropMode: false,
@@ -46,9 +44,6 @@ describe("DesktopMapControls", () => {
     render(<DesktopMapControls {...defaultProps} />);
 
     expect(
-      screen.getByRole("switch", { name: /search as i move/i })
-    ).toBeInTheDocument();
-    expect(
       screen.getByRole("button", { name: /hide map/i })
     ).toBeInTheDocument();
     expect(
@@ -60,15 +55,9 @@ describe("DesktopMapControls", () => {
     expect(
       screen.queryByRole("button", { name: /show all results on map/i })
     ).not.toBeInTheDocument();
-  });
-
-  it("toggles search-as-move when the primary switch is clicked", async () => {
-    const user = userEvent.setup();
-    render(<DesktopMapControls {...defaultProps} />);
-
-    await user.click(screen.getByRole("switch", { name: /search as i move/i }));
-
-    expect(defaultProps.onToggleSearchAsMove).toHaveBeenCalledTimes(1);
+    expect(
+      screen.queryByRole("switch", { name: /search as i move/i })
+    ).not.toBeInTheDocument();
   });
 
   it("toggles fullscreen from the desktop rail", async () => {

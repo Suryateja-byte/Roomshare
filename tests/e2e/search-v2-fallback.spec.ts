@@ -230,7 +230,7 @@ test.describe("Search V2/V1 Fallback Behavior", () => {
     expect(headingText).toMatch(/\d+\+?\s+place/);
   });
 
-  // 7. Client-side V2 failure: search-as-I-move error handling
+  // 7. Client-side V2 failure: map auto-search error handling
   test("7. client-side V2 error handling for dynamic fetches", async ({
     page,
   }) => {
@@ -239,7 +239,7 @@ test.describe("Search V2/V1 Fallback Behavior", () => {
     await waitForResults(page);
 
     // Mock V2 API to fail for subsequent client-side requests
-    // This simulates "search as I move" failures
+    // This simulates map auto-search failures
     await page.route("**/api/search/v2**", (route) => {
       route.fulfill({
         status: 500,

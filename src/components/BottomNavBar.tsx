@@ -2,7 +2,6 @@
 
 import { useEffect, useRef, useState } from "react";
 import { usePathname } from "next/navigation";
-import { useSession } from "next-auth/react";
 import { triggerLightHaptic } from "@/lib/haptics";
 import Link from "next/link";
 import { Search, Heart, PlusCircle, MessageSquare, User } from "lucide-react";
@@ -49,7 +48,6 @@ const NAV_ITEMS: NavItem[] = [
 
 export default function BottomNavBar() {
   const pathname = usePathname();
-  const { data: session } = useSession();
   const [visible, setVisible] = useState(true);
   const lastScrollY = useRef(0);
   const ticking = useRef(false);
@@ -85,7 +83,8 @@ export default function BottomNavBar() {
 
   // Don't render on message thread - it has its own input bar
   const isMessageThread = pathname.startsWith("/messages/");
-  if (isMessageThread) return null;
+  const isSearchPage = pathname === "/search" || pathname.startsWith("/search/");
+  if (isMessageThread || isSearchPage) return null;
 
   return (
     <nav

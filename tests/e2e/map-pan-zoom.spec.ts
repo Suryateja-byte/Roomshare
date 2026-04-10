@@ -89,7 +89,7 @@ test.beforeEach(async () => {
 // 2.1: Pan map with mouse drag - viewport moves, URL updates
 // ---------------------------------------------------------------------------
 test.describe("2.1: Pan map with mouse drag", () => {
-  test("panning map updates URL bounds when 'Search as I move' is enabled", async ({
+  test("panning map updates URL bounds automatically", async ({
     page,
   }) => {
     await waitForSearchPage(page);
@@ -135,14 +135,12 @@ test.describe("2.1: Pan map with mouse drag", () => {
       initialBounds.minLng !== newBounds.minLng ||
       initialBounds.maxLng !== newBounds.maxLng;
 
-    // Note: If "Search as I move" is enabled (default), URL should update
-    // If disabled, URL won't change but banner should appear
     expect(page.url()).toContain("/search");
     // boundsChanged is informational - the test passes if we're still on the search page
     void boundsChanged;
   });
 
-  test("panning map shows 'search this area' banner when toggle is off", async ({
+  test("desktop map does not render the removed search-as-move toggle", async ({
     page,
   }) => {
     await waitForSearchPage(page);
@@ -155,54 +153,9 @@ test.describe("2.1: Pan map with mouse drag", () => {
       return;
     }
 
-    // Find and disable "Search as I move" toggle
-    const searchToggle = page
-      .locator('button[role="switch"]')
-      .filter({ hasText: /Search as I move/i });
-    const toggleExists = (await searchToggle.count()) > 0;
-
-    test.skip(!toggleExists, "Search as I move toggle not found");
-
-    // Check if toggle is ON (aria-checked="true")
-    const isOn = (await searchToggle.getAttribute("aria-checked")) === "true";
-    if (isOn) {
-      // Use evaluate click for reliability on mobile viewports
-      await searchToggle.evaluate((el) => (el as HTMLElement).click());
-      // Wait for toggle state to update
-      await expect(searchToggle).toHaveAttribute("aria-checked", "false", {
-        timeout: 10_000,
-      });
-    }
-
-    const mapBoxRaw = await getMapBoundingBox(page);
-    test.skip(!mapBoxRaw, "Could not get map bounding box");
-    const mapBox = mapBoxRaw!;
-
-    // Perform mouse drag
-    const centerX = mapBox.x + mapBox.width / 2;
-    const centerY = mapBox.y + mapBox.height / 2;
-
-    await page.mouse.move(centerX, centerY);
-    await page.mouse.down();
-    await page.mouse.move(centerX + 100, centerY + 50, { steps: 10 });
-    await page.mouse.up();
-
-    // Wait for map to settle after pan
-    await waitForMapReady(page);
-
-    // Look for "Search this area" or similar banner
-    const searchAreaButton = page
-      .locator("button")
-      .filter({ hasText: /search this area|search here/i });
-    const bannerVisible = await searchAreaButton
-      .first()
-      .waitFor({ state: "visible", timeout: 10_000 })
-      .then(() => true)
-      .catch(() => false);
-
-    // Either banner shows or URL updates (depending on implementation)
-    expect(await page.locator("body").isVisible()).toBe(true);
-    void bannerVisible; // Used for debugging; test passes if page is functional
+    await expect(
+      page.locator('button[role="switch"]:has-text("Search as I move")')
+    ).toHaveCount(0);
   });
 });
 
@@ -447,9 +400,8 @@ test.describe("2.4: Double-click to zoom in", () => {
     void initialBounds;
     void newBounds; // Used for debugging zoom behavior
 
-    // When zooming in via double-click, bounds should narrow
-    // (The difference between min/max should decrease)
-    // Note: This may not update URL if "Search as I move" is off
+    // When zooming in via double-click, bounds should narrow.
+    // (The difference between min/max should decrease.)
   });
 
   test("double-click zoom is smooth and does not cause errors", async ({
@@ -520,12 +472,12 @@ test.describe("2.4: Double-click to zoom in", () => {
 // 2.5: Map bounds update debounced (600ms)
 // ---------------------------------------------------------------------------
 test.describe("2.5: Map bounds update debounced (600ms)", () => {
-  test("rapid pan movements result in debounced API call", async ({ page }) => {
-    // Track API calls
+  test("rapid pan movements do not request removed area-count data", async ({
+    page,
+  }) => {
     const apiCalls: string[] = [];
     await page.route("**/api/search-count**", async (route) => {
       apiCalls.push(route.request().url());
-      // Continue to actual endpoint
       await route.continue();
     });
 
@@ -537,23 +489,6 @@ test.describe("2.5: Map bounds update debounced (600ms)", () => {
         "Map not available (WebGL may be unavailable in headless mode)"
       );
       return;
-    }
-
-    // Disable "Search as I move" to enable area count banner
-    const searchToggle = page
-      .locator('button[role="switch"]')
-      .filter({ hasText: /Search as I move/i });
-    const toggleExists = (await searchToggle.count()) > 0;
-
-    if (toggleExists) {
-      const isOn = (await searchToggle.getAttribute("aria-checked")) === "true";
-      if (isOn) {
-        // Use evaluate click for reliability on Mobile Chrome / headless CI
-        await searchToggle.evaluate((el) => (el as HTMLElement).click());
-        await expect(searchToggle).toHaveAttribute("aria-checked", "false", {
-          timeout: 10_000,
-        });
-      }
     }
 
     const mapBoxRaw = await getMapBoundingBox(page);
@@ -578,18 +513,14 @@ test.describe("2.5: Map bounds update debounced (600ms)", () => {
       await page.waitForTimeout(100); // sub-debounce delay between rapid drags to test batching
     }
 
-    // Wait for debounce to fire and map to settle
-    await page.waitForTimeout(AREA_COUNT_DEBOUNCE_MS + 500); // debounce wait: measuring that rapid drags are batched
+    // Wait long enough for any stale area-count request to appear.
+    await page.waitForTimeout(AREA_COUNT_DEBOUNCE_MS + 500);
 
-    // Verify debouncing: should have at most 1-2 calls despite 3 rapid movements
-    // (Multiple calls might occur if movements span debounce boundaries)
-    expect(apiCalls.length).toBeLessThanOrEqual(2);
+    expect(apiCalls).toHaveLength(0);
   });
 
-  test("single pan waits for debounce before API call", async ({ page }) => {
-    // Track API call timing
+  test("single pan keeps area-count endpoint idle", async ({ page }) => {
     let apiCallTime: number | null = null;
-    let panEndTime: number | null = null;
 
     await page.route("**/api/search-count**", async (route) => {
       apiCallTime = Date.now();
@@ -606,23 +537,6 @@ test.describe("2.5: Map bounds update debounced (600ms)", () => {
       return;
     }
 
-    // Disable "Search as I move" to enable area count
-    const searchToggle = page
-      .locator('button[role="switch"]')
-      .filter({ hasText: /Search as I move/i });
-    const toggleExists = (await searchToggle.count()) > 0;
-
-    if (toggleExists) {
-      const isOn = (await searchToggle.getAttribute("aria-checked")) === "true";
-      if (isOn) {
-        // Use evaluate click for reliability on Mobile Chrome / headless CI
-        await searchToggle.evaluate((el) => (el as HTMLElement).click());
-        await expect(searchToggle).toHaveAttribute("aria-checked", "false", {
-          timeout: 10_000,
-        });
-      }
-    }
-
     const mapBoxRaw = await getMapBoundingBox(page);
     test.skip(!mapBoxRaw, "Could not get map bounding box");
     const mapBox = mapBoxRaw!;
@@ -636,17 +550,10 @@ test.describe("2.5: Map bounds update debounced (600ms)", () => {
     await page.mouse.move(centerX + 100, centerY + 50, { steps: 10 });
     await page.mouse.up();
 
-    panEndTime = Date.now();
+    // Wait long enough for any stale area-count request to appear.
+    await page.waitForTimeout(AREA_COUNT_DEBOUNCE_MS + 500);
 
-    // Wait for debounce to fire so we can measure timing
-    await page.waitForTimeout(AREA_COUNT_DEBOUNCE_MS + 500); // debounce wait: measuring API call timing relative to pan end
-
-    // If API was called, verify it was after debounce period
-    if (apiCallTime && panEndTime) {
-      const delay = apiCallTime - panEndTime;
-      // Allow some tolerance for execution timing
-      expect(delay).toBeGreaterThanOrEqual(AREA_COUNT_DEBOUNCE_MS - 100);
-    }
+    expect(apiCallTime).toBeNull();
 
     // Verify page is still functional
     expect(await page.locator("body").isVisible()).toBe(true);

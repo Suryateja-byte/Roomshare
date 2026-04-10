@@ -112,65 +112,6 @@ test.describe("Map — Visual Regression", () => {
   });
 
   // -----------------------------------------------------------------------
-  // 4. "Search this area" banner
-  // -----------------------------------------------------------------------
-  test("search this area banner", async ({ page }) => {
-    await page.goto(searchUrl);
-    await page.waitForLoadState("domcontentloaded");
-
-    // Wait for map to be interactive
-    await page.waitForFunction(() => !!(window as any).__e2eMapRef, null, {
-      timeout: 15_000,
-    });
-    // Let initial auto-fly settle — wait for map idle
-    await page.waitForFunction(() => {
-      const map = (window as any).__e2eMapRef;
-      return map && !map.isMoving() && !map.isZooming();
-    }, null, { timeout: 10_000 }).catch(() => {});
-
-    // Turn OFF "search as I move" so panning triggers the banner
-    const toggle = page.getByRole("switch", { name: /search as i move/i });
-    await toggle.waitFor({ state: "visible", timeout: 5000 });
-    const isChecked = await toggle.getAttribute("aria-checked");
-    if (isChecked === "true") {
-      await toggle.click();
-      // Wait for toggle state to propagate
-      await expect(toggle).toHaveAttribute("aria-checked", "false", {
-        timeout: 3000,
-      });
-    }
-
-    // Use the dedicated E2E helper that clears the initial-move guard
-    // so the moveend is treated as a user interaction
-    await page.evaluate(() => {
-      const fn = (window as any).__e2eSimulateUserPan;
-      if (fn) fn(200, 0);
-    });
-    // Wait for moveend + React state update
-    await page.waitForFunction(() => {
-      const map = (window as any).__e2eMapRef;
-      return map && !map.isMoving();
-    }, null, { timeout: 10_000 }).catch(() => {});
-
-    // Scope to the map region — the list panel also has a "Search this area"
-    // banner (list variant) that comes first in DOM order but is hidden on desktop
-    const mapRegion = page.locator(
-      '[role="region"][aria-label*="Interactive map"]'
-    );
-    const banner = mapRegion.getByText("Search this area").first();
-    await banner.waitFor({ state: "visible", timeout: 10_000 });
-    await disableAnimations(page);
-
-    const bannerContainer = banner.locator("..").locator("..");
-    await expect(bannerContainer).toHaveScreenshot(
-      "map-banner-search-area.png",
-      {
-        ...SCREENSHOT_DEFAULTS.component,
-      }
-    );
-  });
-
-  // -----------------------------------------------------------------------
   // 5. "No listings in this area" overlay
   // -----------------------------------------------------------------------
   test("no listings in this area overlay", async ({ page }) => {

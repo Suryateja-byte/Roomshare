@@ -48,15 +48,6 @@ test.describe("Lease Duration Filter", () => {
     test.setTimeout(120_000);
     await waitForSearchReady(page);
 
-    // Disable "Search as I move" to prevent map-triggered URL changes
-    // from resetting pending filter state while the modal is open
-    const searchAsIMove = page.getByRole("switch", {
-      name: /search as i move/i,
-    });
-    if (await searchAsIMove.isChecked()) {
-      await searchAsIMove.click();
-    }
-
     for (const duration of LEASE_DURATIONS) {
       await openFilterModal(page);
       await selectDropdownOption(

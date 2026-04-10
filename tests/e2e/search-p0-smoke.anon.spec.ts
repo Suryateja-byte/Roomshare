@@ -431,12 +431,11 @@ test.describe("Search P0 Smoke Suite", () => {
     await expect(popup).toBeVisible({ timeout: 5_000 });
   });
 
-  // S10: Search-as-I-move toggle and banner
-  test("S10: search-as-I-move toggle", async ({ page }) => {
+  // S10: Desktop map uses always-on search without a toggle
+  test("S10: removed map auto-search toggle is absent", async ({ page }) => {
     await page.goto(SEARCH_URL);
     await page.waitForLoadState("domcontentloaded");
 
-    // The toggle is rendered inside the map component
     const mapContainer = page.locator(".maplibregl-map");
     const mapVisible = await mapContainer
       .first()
@@ -446,35 +445,14 @@ test.describe("Search P0 Smoke Suite", () => {
     if (!mapVisible) {
       test.skip(
         true,
-        "Map not visible -- search-as-I-move toggle lives inside map"
+        "Map not visible"
       );
       return;
     }
 
-    // Look for the "Search as I move" toggle button
-    const toggle = page.locator(
-      'button[role="switch"]:has-text("Search as I move")'
-    );
-    const toggleVisible = await toggle
-      .isVisible({ timeout: 5_000 })
-      .catch(() => false);
-
-    test.skip(!toggleVisible, "Search as I move toggle not visible");
-
-    // Read initial state
-    const initialChecked = await toggle.getAttribute("aria-checked");
-
-    // Click to toggle
-    await toggle.click();
-
-    // Verify the toggle state changed
-    const newChecked = await toggle.getAttribute("aria-checked");
-    expect(newChecked).not.toBe(initialChecked);
-
-    // Toggle back
-    await toggle.click();
-    const restoredChecked = await toggle.getAttribute("aria-checked");
-    expect(restoredChecked).toBe(initialChecked);
+    await expect(
+      page.locator('button[role="switch"]:has-text("Search as I move")')
+    ).toHaveCount(0);
   });
 
   // S11: Mobile layout with bottom sheet
@@ -499,7 +477,8 @@ test.describe("Search P0 Smoke Suite", () => {
 
     // Verify the slider has expected aria attributes
     await expect(sheetHandle).toHaveAttribute("aria-valuemin", "0");
-    await expect(sheetHandle).toHaveAttribute("aria-valuemax", "1");
+    await expect(sheetHandle).toHaveAttribute("aria-valuemax", "2");
+    await expect(sheetHandle).toHaveAttribute("aria-valuenow", "1");
   });
 
   // S12: URL shareability

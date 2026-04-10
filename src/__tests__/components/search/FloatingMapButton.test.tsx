@@ -54,25 +54,25 @@ describe("FloatingMapButton", () => {
     expect(button.className).toContain("mx-auto");
     expect(button.className).toContain("w-max");
     expect(button.className).not.toContain("-translate-x-1/2");
-    expect(button).toHaveTextContent("List · 12");
+    expect(button).toHaveTextContent("List");
   });
 
-  it("uses bottom offset for safe-area spacing in both modes", () => {
+  it("uses search-owned bottom offsets in both modes", () => {
     const { rerender } = render(
       <FloatingMapButton isListMode={true} onToggle={jest.fn()} />
     );
 
     let button = screen.getByRole("button", { name: "Show map" });
     expect(button.getAttribute("style")).toContain("bottom:");
-    expect(button.getAttribute("style")).toContain("1.5rem");
+    expect(button.getAttribute("style")).toContain("1rem");
     expect(button.getAttribute("style")).toContain("safe-area-inset-bottom");
-    expect(button.className).not.toContain("pb-[");
+    expect(button.getAttribute("style")).not.toContain("mobile-bottom-nav-offset");
 
     rerender(<FloatingMapButton isListMode={false} onToggle={jest.fn()} />);
 
     button = screen.getByRole("button", { name: "Show list" });
-    expect(button.getAttribute("style")).toContain("15dvh");
-    expect(button.getAttribute("style")).toContain("1rem");
+    expect(button.getAttribute("style")).toContain("11dvh");
+    expect(button.getAttribute("style")).toContain("0.875rem");
     expect(button.getAttribute("style")).toContain("safe-area-inset-bottom");
   });
 

@@ -29,8 +29,6 @@ import { cn } from "@/lib/utils";
 import type { POICategory } from "./POILayer";
 
 interface DesktopMapControlsProps {
-  searchAsMove: boolean;
-  onToggleSearchAsMove: () => void;
   activePOICategories: Set<POICategory>;
   onTogglePOICategory: (category: POICategory) => void;
   isDropMode: boolean;
@@ -319,8 +317,6 @@ function MapToolsPanelContent({
 }
 
 export default function DesktopMapControls({
-  searchAsMove,
-  onToggleSearchAsMove,
   activePOICategories,
   onTogglePOICategory,
   isDropMode,
@@ -392,30 +388,6 @@ export default function DesktopMapControls({
   return (
     <>
       <div className="absolute left-4 top-4 z-[50] flex flex-col gap-3">
-        <button
-          type="button"
-          role="switch"
-          aria-checked={searchAsMove}
-          onClick={onToggleSearchAsMove}
-          className={cn(
-            "inline-flex min-h-[44px] items-center gap-2 rounded-full border px-3.5 py-2 text-sm font-medium shadow-ambient backdrop-blur-md transition-all focus:outline-none focus-visible:ring-2 focus-visible:ring-primary/30 focus-visible:ring-offset-2",
-            searchAsMove
-              ? "border-white/20 bg-surface-container-lowest/95 text-on-surface ring-1 ring-green-500/40"
-              : "border-outline-variant/30 bg-surface-container-lowest/95 text-on-surface-variant hover:bg-surface-canvas"
-          )}
-        >
-          <span
-            data-testid="search-toggle-indicator"
-            className={cn(
-              "h-3 w-3 rounded-full transition-colors",
-              searchAsMove
-                ? "bg-green-500 shadow-[0_0_8px_rgba(34,197,94,0.6)]"
-                : "bg-on-surface-variant"
-            )}
-          />
-          <span className="whitespace-nowrap">Search as I move</span>
-        </button>
-
         {showResetToResults && (
           <button
             type="button"

@@ -108,7 +108,7 @@ function getUrlBounds(url: string): {
 
 /**
  * Jump the map to a specific zoom level programmatically via E2E hooks.
- * Flags the move as programmatic so "Search as I move" does not fire.
+ * Flags the move as programmatic so auto-search does not fire.
  * Waits for the map idle event (tiles loaded and rendered).
  */
 async function jumpToZoom(page: Page, zoom: number): Promise<boolean> {
@@ -208,23 +208,6 @@ async function programmaticMapPan(
     await waitForMapReady(page);
   }
   return result;
-}
-
-/**
- * Ensure "Search as I move" toggle is ON.
- */
-async function ensureSearchAsMoveOn(page: Page): Promise<void> {
-  const toggle = page.locator(
-    'button[role="switch"]:has-text("Search as I move")'
-  );
-  if ((await toggle.count()) === 0) return;
-  const isChecked = await toggle.getAttribute("aria-checked");
-  if (isChecked === "false") {
-    await toggle.click();
-    await expect(toggle).toHaveAttribute("aria-checked", "true", {
-      timeout: 5_000,
-    });
-  }
 }
 
 // ===========================================================================
@@ -670,8 +653,6 @@ test.describe("Map Interactions Advanced (Stories 5-8)", () => {
 
       test.skip(!(await isMapAvailable(page)), "Map not available (WebGL unavailable in headless)");
 
-      await ensureSearchAsMoveOn(page);
-
       // Record initial URL bounds
       const initialBounds = getUrlBounds(page.url());
       expect(initialBounds.minLng).not.toBeNull();
@@ -704,7 +685,7 @@ test.describe("Map Interactions Advanced (Stories 5-8)", () => {
       if (!boundsUpdated) {
         test.skip(
           true,
-          "URL bounds not updated after pan (Search as I move may not have triggered)"
+          "URL bounds not updated after pan"
         );
         return;
       }

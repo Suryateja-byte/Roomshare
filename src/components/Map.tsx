@@ -33,6 +33,7 @@ import Link from "next/link";
 import Image from "next/image";
 import { useRouter, useSearchParams } from "next/navigation";
 import {
+  Ellipsis,
   Home,
   Loader2,
   MapPin,
@@ -47,11 +48,15 @@ import { formatPrice } from "@/lib/format";
 import { Button } from "./ui/button";
 import { MAP_FLY_TO_EVENT, MapFlyToEventDetail } from "./SearchForm";
 import { useListingFocus } from "@/contexts/ListingFocusContext";
+import { useMobileSearch } from "@/contexts/MobileSearchContext";
 import { useSearchMapUI } from "@/contexts/SearchMapUIContext";
 import { useSearchTransitionSafe } from "@/contexts/SearchTransitionContext";
-import { useMapBounds, useMapMovedBanner } from "@/contexts/MapBoundsContext";
+import { useMapBounds } from "@/contexts/MapBoundsContext";
 import { useActivePanBoundsSetter } from "@/contexts/ActivePanBoundsContext";
-import { MapMovedBanner } from "./map/MapMovedBanner";
+import {
+  MobileMapStatusCard,
+  type MobileMapStatus,
+} from "./map/MobileMapStatusCard";
 import { MapGestureHint } from "./map/MapGestureHint";
 import { MapEmptyState } from "./map/MapEmptyState";
 import { hasAnyFilter, FILTER_PARAM_KEYS } from "./filters/filter-chip-utils";
@@ -60,7 +65,7 @@ import { fixMarkerWrapperRole } from "./map/fixMarkerA11y";
 import { BoundaryLayer } from "./map/BoundaryLayer";
 import { UserMarker, useUserPin } from "./map/UserMarker";
 import DesktopMapControls from "./map/DesktopMapControls";
-import { POILayer, usePOILayerState } from "./map/POILayer";
+import { POILayer, usePOILayerState, type POICategory } from "./map/POILayer";
 import {
   PROGRAMMATIC_MOVE_TIMEOUT_MS,
   USA_MAX_BOUNDS,
@@ -69,7 +74,10 @@ import {
   MAP_FETCH_MAX_LNG_SPAN,
 } from "@/lib/constants";
 import { groupExactMapListingClones } from "@/lib/maps/marker-utils";
-import { SNAP_COLLAPSED } from "@/lib/mobile-layout";
+import {
+  SEARCH_MOBILE_PREVIEW_CARD_OFFSET,
+  SNAP_COLLAPSED,
+} from "@/lib/mobile-layout";
 import { SEARCH_PHONE_MAX_QUERY } from "@/lib/search-layout";
 import { cn } from "@/lib/utils";
 import { useMediaQuery } from "@/hooks/useMediaQuery";
@@ -366,6 +374,8 @@ const DESKTOP_POPUP_SAFE_AREA = {
   left: 24,
 } as const;
 
+const DESKTOP_POPUP_FALLBACK_CARD_HEIGHT_PX = 320;
+const DESKTOP_POPUP_FALLBACK_TIP_HEIGHT_PX = 12;
 const POPUP_CONTAINMENT_TOLERANCE_PX = 2;
 const POPUP_CONTAINMENT_ANIMATION_MS = 250;
 
@@ -538,7 +548,9 @@ const MarkerPinContent = React.memo(function MarkerPinContent({
         <div
           className={cn(
             "w-3 h-3 rounded-full shadow-md transition-transform duration-200",
-            isViewed ? "bg-surface-container-highest ring-2 ring-outline-variant/50" : "bg-on-surface ring-2 ring-white shadow-lg",
+            isViewed
+              ? "bg-surface-container-highest ring-2 ring-outline-variant/50"
+              : "bg-on-surface ring-2 ring-white shadow-lg",
             "group-hover/marker:scale-125"
           )}
         />
@@ -552,8 +564,12 @@ const MarkerPinContent = React.memo(function MarkerPinContent({
       <div
         className={cn(
           "flex items-center justify-center bg-surface-container-lowest text-on-surface px-4 py-2 rounded-full font-display font-semibold text-sm transition-all duration-300 shadow-[0_10px_40px_0px_rgba(27,28,25,0.06)] border border-outline-variant/20 group-hover/marker:bg-on-surface group-hover/marker:text-surface-canvas group-hover/marker:scale-110 group-hover/marker:z-10",
-          (isHovered || isActive) && "bg-on-surface text-surface-canvas scale-[1.15] shadow-lg z-20 ring-2 ring-primary/40",
-          isViewed && !isHovered && !isActive && "bg-surface-container-high text-on-surface-variant border-outline-variant/10"
+          (isHovered || isActive) &&
+            "bg-on-surface text-surface-canvas scale-[1.15] shadow-lg z-20 ring-2 ring-primary/40",
+          isViewed &&
+            !isHovered &&
+            !isActive &&
+            "bg-surface-container-high text-on-surface-variant border-outline-variant/10"
         )}
       >
         {formatPrice(price)}
@@ -990,38 +1006,28 @@ export default function MapComponent({
   );
   const router = useRouter();
   const searchParams = useSearchParams();
+  const { setMobileSheetOverrideLabel, setMobileResultsViewPreference } =
+    useMobileSearch();
   const transitionContext = useSearchTransitionSafe();
   const {
     activeCategories: activePOICategories,
     toggleCategory: togglePOICategory,
   } = usePOILayerState();
+  const hiddenMobilePOICategories = useMemo<Set<POICategory>>(
+    () => new Set(),
+    []
+  );
+  const appliedPOICategories =
+    isPhoneViewport === true ? hiddenMobilePOICategories : activePOICategories;
 
-  // Map bounds context for "search as move" and dirty tracking
   const {
-    searchAsMove,
-    setSearchAsMove,
     hasUserMoved,
     setHasUserMoved,
-    setBoundsDirty,
-    setCurrentMapBounds,
-    setSearchHandler,
-    setResetHandler,
-    setSearchLocation,
     setProgrammaticMove,
     isProgrammaticMoveRef,
   } = useMapBounds();
 
   const { setActivePanBounds } = useActivePanBoundsSetter();
-
-  // Banner visibility from context
-  const {
-    showBanner,
-    showLocationConflict,
-    onSearch,
-    onReset,
-    areaCount,
-    isAreaCountLoading,
-  } = useMapMovedBanner();
 
   const mapRef = useRef<MapRef | null>(null);
   const mapContainerRef = useRef<HTMLDivElement | null>(null);
@@ -1030,6 +1036,7 @@ export default function MapComponent({
   const [mapPaneSize, setMapPaneSize] = useState({ width: 0, height: 0 });
   const selectedPopupCardRef = useRef<HTMLDivElement | null>(null);
   const [showResetToResults, setShowResetToResults] = useState(false);
+  const [showMobileToolsMenu, setShowMobileToolsMenu] = useState(false);
   const debounceTimer = useRef<NodeJS.Timeout | null>(null);
   const lastSearchTimeRef = useRef<number>(0);
   const pendingBoundsRef = useRef<{
@@ -1041,10 +1048,9 @@ export default function MapComponent({
   const throttleTimeoutRef = useRef<NodeJS.Timeout | null>(null);
   const searchSafetyTimeoutRef = useRef<NodeJS.Timeout | null>(null);
   const onMoveThrottleRef = useRef<NodeJS.Timeout | null>(null);
-  // Ref to hold the latest searchAsMove value for use inside debounce/throttle callbacks.
-  // These callbacks capture refs (not state), so they always see the current value
-  // even if searchAsMove state changed after the callback was scheduled.
-  const searchAsMoveRef = useRef<boolean>(true);
+  const hasCompletedInitialMobileViewportSyncRef = useRef(false);
+  const hasPendingRealUserMoveRef = useRef(false);
+  const hasPerformedInitialMobileResultsFitRef = useRef(false);
   const [isFullscreen, setIsFullscreen] = useState(false);
   const [canFullscreen, setCanFullscreen] = useState(false);
   // P2-FIX (#79): Ref to hold latest executeMapSearch to prevent stale closure in nested timeouts
@@ -1061,13 +1067,6 @@ export default function MapComponent({
   const pendingSearchAfterZoomRef = useRef(false);
   // Track last map center to detect resize-triggered moveEnd events (center barely moves)
   const lastCenterRef = useRef<{ lat: number; lng: number } | null>(null);
-  // Track URL bounds for reset functionality
-  const urlBoundsRef = useRef<{
-    minLng: number;
-    maxLng: number;
-    minLat: number;
-    maxLat: number;
-  } | null>(null);
   // P2-FIX (#154): Store numeric bounds for deduplication instead of string
   // String comparison with toFixed can have floating-point precision issues
   const lastSearchBoundsRef = useRef<{
@@ -1294,7 +1293,7 @@ export default function MapComponent({
         // P0 Issue #25: Guard against stale callback after unmount
         if (!isMountedRef.current) return;
 
-        // Mark as programmatic move to prevent banner showing
+        // Mark as programmatic move to prevent follow-up auto-search from firing.
         setProgrammaticMove(true);
         isClusterExpandingRef.current = true;
         pendingSearchAfterZoomRef.current = true;
@@ -1423,7 +1422,7 @@ export default function MapComponent({
     updateUnclusteredListings,
   ]);
 
-  // Refresh markers when listings data changes (search-as-move updates)
+  // Refresh markers when listings data changes after map-driven searches.
   useEffect(() => {
     if (!isMapLoaded || !useClustering || listings.length === 0) return;
 
@@ -1792,17 +1791,69 @@ export default function MapComponent({
   );
 
   // Mobile-aware fitBounds padding: on phone viewports the collapsed bottom
-  // sheet covers ~15% of the viewport, so we need extra bottom padding to
-  // keep markers visible above the sheet.
+  // sheet still obscures the lower edge of the map, so we add bottom padding
+  // to keep markers visible above the compact strip.
   const fitBoundsPadding = useMemo(() => {
     if (isPhoneViewport) {
       const bottomSheetPx = Math.round(
-        SNAP_COLLAPSED * (typeof window !== "undefined" ? window.innerHeight : 800)
+        SNAP_COLLAPSED *
+          (typeof window !== "undefined" ? window.innerHeight : 800)
       );
       return { top: 50, bottom: bottomSheetPx + 60, left: 50, right: 50 };
     }
     return { top: 50, bottom: 50, left: 50, right: 50 };
   }, [isPhoneViewport]);
+
+  const clusterConfig = useMemo(
+    () =>
+      isPhoneViewport === true
+        ? { maxZoom: 10, radius: 32 }
+        : { maxZoom: 14, radius: 50 },
+    [isPhoneViewport]
+  );
+
+  const getDesktopPopupFocusOffset = useCallback((): [number, number] | null => {
+    if (!usesPopupSelection || isPhoneViewport === true) {
+      return null;
+    }
+
+    const container = mapContainerRef.current;
+    const measuredPaneHeight =
+      mapPaneSize.height ||
+      container?.clientHeight ||
+      container?.getBoundingClientRect().height ||
+      0;
+
+    if (measuredPaneHeight <= 0) {
+      return null;
+    }
+
+    const popupCard = selectedPopupCardRef.current;
+    const popupCardHeightPx = popupCard?.getBoundingClientRect().height ?? 0;
+    const popupCardHeight =
+      popupCardHeightPx > 0
+        ? popupCardHeightPx
+        : DESKTOP_POPUP_FALLBACK_CARD_HEIGHT_PX;
+    const popupTip =
+      popupCard?.closest(".maplibregl-popup")?.querySelector(
+        ".maplibregl-popup-tip"
+      ) ?? null;
+    const popupTipHeightPx =
+      popupTip instanceof HTMLElement ? popupTip.getBoundingClientRect().height : 0;
+    const popupTipHeight =
+      popupTipHeightPx > 0
+        ? popupTipHeightPx
+        : DESKTOP_POPUP_FALLBACK_TIP_HEIGHT_PX;
+    const minimumMarkerY =
+      DESKTOP_POPUP_SAFE_AREA.top + popupCardHeight + popupTipHeight;
+    const centerY = measuredPaneHeight / 2;
+    const safeBottom = measuredPaneHeight - DESKTOP_POPUP_SAFE_AREA.bottom;
+    const maxOffsetY = Math.max(0, safeBottom - centerY);
+    const desiredOffsetY = Math.max(0, minimumMarkerY - centerY);
+    const offsetY = Math.min(desiredOffsetY, maxOffsetY);
+
+    return [0, offsetY];
+  }, [usesPopupSelection, isPhoneViewport, mapPaneSize.height]);
 
   const popupContainmentToken = useMemo(() => {
     if (!usesPopupSelection || !selectedListing) return null;
@@ -1846,9 +1897,9 @@ export default function MapComponent({
         return false;
       }
 
-      const popupRoot = popupCard.closest(".maplibregl-popup") as
-        | HTMLElement
-        | null;
+      const popupRoot = popupCard.closest(
+        ".maplibregl-popup"
+      ) as HTMLElement | null;
       const popupRect =
         popupRoot?.getBoundingClientRect() ?? popupCard.getBoundingClientRect();
 
@@ -2074,6 +2125,26 @@ export default function MapComponent({
     setShowResetToResults,
   ]);
 
+  useEffect(() => {
+    if (isPhoneViewport !== true || !isMapLoaded || listings.length === 0) {
+      return;
+    }
+    if (hasPerformedInitialMobileResultsFitRef.current || hasUserMoved) {
+      return;
+    }
+
+    hasPerformedInitialMobileResultsFitRef.current = true;
+    hasCompletedInitialMobileViewportSyncRef.current = false;
+    hasPendingRealUserMoveRef.current = false;
+    handleFitAllResults();
+  }, [
+    handleFitAllResults,
+    hasUserMoved,
+    isMapLoaded,
+    isPhoneViewport,
+    listings.length,
+  ]);
+
   const handleToggleFullscreen = useCallback(async () => {
     if (typeof document === "undefined") return;
 
@@ -2103,62 +2174,6 @@ export default function MapComponent({
 
     hideMap();
   }, [hideMap]);
-
-  // Auto-fly to listings on search (but not on map move)
-  useEffect(() => {
-    if (!mapRef.current || listings.length === 0) return;
-
-    // Skip auto-fit when controlled by parent or explicitly disabled
-    if (isControlledViewState || disableAutoFit) return;
-
-    // If "search as I move" is ON, the user controls the viewport — don't auto-fly
-    if (searchAsMove) return;
-
-    // If we have map bounds in the URL, it means the user is panning/zooming manually
-    // So we shouldn't auto-fly the map
-    if (searchParams.has("minLat")) return;
-
-    const points = listings.map((l) => ({
-      lng: l.location.lng,
-      lat: l.location.lat,
-    }));
-
-    // Mark as programmatic move to prevent banner showing
-    setProgrammaticMove(true);
-
-    if (points.length === 1) {
-      mapRef.current.flyTo({
-        center: [points[0].lng, points[0].lat],
-        zoom: 14,
-        duration: 2000,
-      });
-    } else {
-      // Calculate bounds
-      const minLng = Math.min(...points.map((p) => p.lng));
-      const maxLng = Math.max(...points.map((p) => p.lng));
-      const minLat = Math.min(...points.map((p) => p.lat));
-      const maxLat = Math.max(...points.map((p) => p.lat));
-
-      mapRef.current.fitBounds(
-        [
-          [minLng, minLat],
-          [maxLng, maxLat],
-        ],
-        {
-          padding: fitBoundsPadding,
-          duration: 2000,
-        }
-      );
-    }
-  }, [
-    listings,
-    searchParams,
-    searchAsMove,
-    setProgrammaticMove,
-    disableAutoFit,
-    isControlledViewState,
-    fitBoundsPadding,
-  ]);
 
   // Auto-zoom-out: when map loads empty with no active filters, zoom out once
   // Build a key from non-bounds params so we reset per search context
@@ -2235,20 +2250,6 @@ export default function MapComponent({
     win.__e2eMapRef = mapRef.current.getMap();
     win.__e2eSetProgrammaticMove = setProgrammaticMove;
     win.__e2eUpdateMarkers = updateUnclusteredListings;
-    // Allow E2E tests to disable "Search as I move" to prevent the map from
-    // calling router.replace() during pagination tests with load-more delays.
-    // The wrapper also updates searchAsMoveRef synchronously so that any
-    // already-scheduled debounce/throttle callbacks see the new value immediately
-    // without waiting for a React re-render cycle.
-    win.__e2eSetSearchAsMove = (value: boolean) => {
-      searchAsMoveRef.current = value;
-      // Also set the frozen flag that executeMapSearch checks directly.
-      // This provides a belt-and-suspenders guard: the ref prevents debounce
-      // callbacks from calling executeMapSearch, and the frozen flag prevents
-      // any remaining path from actually executing the search.
-      win["__e2eMapSearchFrozen"] = !value;
-      setSearchAsMove(value);
-    };
 
     // Signal to E2E tests that the map ref is ready (not just DOM-present).
     // waitForMapReady() waits for this attribute instead of falling back to
@@ -2276,7 +2277,6 @@ export default function MapComponent({
       delete win.__e2eMapRef;
       delete win.__e2eSetProgrammaticMove;
       delete win.__e2eUpdateMarkers;
-      delete win.__e2eSetSearchAsMove;
       delete win.__e2eSimulateUserPan;
       delete win.__e2eSimulateUserZoom;
       mapContainer?.removeAttribute("data-map-ready");
@@ -2290,7 +2290,7 @@ export default function MapComponent({
 
       const { lat, lng, bbox, zoom } = event.detail;
 
-      // Mark as programmatic move to prevent banner showing
+      // Mark as programmatic move to prevent follow-up auto-search from firing.
       setProgrammaticMove(true);
 
       // If bbox (bounding box) is available, use fitBounds for a better view
@@ -2454,7 +2454,6 @@ export default function MapComponent({
       webglCleanupRef.current?.();
       webglCleanupRef.current = null;
       pendingBoundsRef.current = null;
-      urlBoundsRef.current = null;
       lastSearchBoundsRef.current = null;
       lastMapActiveRef.current = null;
     };
@@ -2472,58 +2471,11 @@ export default function MapComponent({
     return () => window.removeEventListener("keydown", handleKeyDown);
   }, [selectedListing, handleSelectedListingClose]);
 
-  // Sync URL bounds to context and track for reset functionality
+  // Reset interaction-only state when the URL changes.
   useEffect(() => {
-    const minLat = searchParams.get("minLat");
-    const maxLat = searchParams.get("maxLat");
-    const minLng = searchParams.get("minLng");
-    const maxLng = searchParams.get("maxLng");
-
-    if (minLat && maxLat && minLng && maxLng) {
-      const pMinLat = safeParseFloat(minLat, -90, 90);
-      const pMaxLat = safeParseFloat(maxLat, -90, 90);
-      const pMinLng = safeParseFloat(minLng, -180, 180);
-      const pMaxLng = safeParseFloat(maxLng, -180, 180);
-      if (
-        pMinLat !== undefined &&
-        pMaxLat !== undefined &&
-        pMinLng !== undefined &&
-        pMaxLng !== undefined
-      ) {
-        urlBoundsRef.current = {
-          minLat: pMinLat,
-          maxLat: pMaxLat,
-          minLng: pMinLng,
-          maxLng: pMaxLng,
-        };
-      }
-    }
-
-    // Extract search location from URL for location conflict detection
-    const locationLabel = searchParams.get("where") || searchParams.get("q");
-    const lat = searchParams.get("lat");
-    const lng = searchParams.get("lng");
-
-    if (locationLabel && lat && lng) {
-      const pLat = safeParseFloat(lat, -90, 90);
-      const pLng = safeParseFloat(lng, -180, 180);
-      setSearchLocation(
-        locationLabel,
-        pLat !== undefined && pLng !== undefined
-          ? { lat: pLat, lng: pLng }
-          : null
-      );
-    } else if (locationLabel) {
-      setSearchLocation(locationLabel, null);
-    } else {
-      setSearchLocation(null, null);
-    }
-
-    // Reset dirty state when URL changes (new search performed)
     setHasUserMoved(false);
-    setBoundsDirty(false);
     setShowResetToResults(false);
-  }, [searchParams, setSearchLocation, setHasUserMoved, setBoundsDirty]);
+  }, [searchParams, setHasUserMoved]);
 
   useEffect(() => {
     setShowResetToResults(false);
@@ -2555,10 +2507,7 @@ export default function MapComponent({
       minLat: number;
       maxLat: number;
     }) => {
-      // E2E: If search-as-move is explicitly disabled via the E2E hook, skip.
-      // This is a secondary guard — the primary guard is in the debounce/throttle
-      // callbacks via searchAsMoveRef. This guard handles the case where
-      // executeMapSearch is called directly (e.g., setSearchHandler).
+      // E2E: allow tests to freeze map-driven URL updates during pagination flows.
       if (typeof window !== "undefined") {
         const win = window as unknown as Record<string, unknown>;
         if (win["__e2eMapSearchFrozen"] === true) return;
@@ -2640,71 +2589,6 @@ export default function MapComponent({
     executeMapSearchRef.current = executeMapSearch;
   }, [executeMapSearch]);
 
-  // Keep searchAsMoveRef in sync with searchAsMove state.
-  // Debounce/throttle callbacks use the ref so they always see the current value
-  // even if searchAsMove changed after the callback was scheduled.
-  useEffect(() => {
-    searchAsMoveRef.current = searchAsMove;
-  }, [searchAsMove]);
-
-  // Register search and reset handlers with context (after executeMapSearch is defined)
-  useEffect(() => {
-    // Search handler: execute search with current map bounds
-    setSearchHandler(() => {
-      if (!mapRef.current) return;
-      const map = mapRef.current.getMap();
-      if (!map) return;
-
-      const mapBounds = map.getBounds();
-      if (!mapBounds) return;
-
-      const bounds = {
-        minLng: mapBounds.getWest(),
-        maxLng: mapBounds.getEast(),
-        minLat: mapBounds.getSouth(),
-        maxLat: mapBounds.getNorth(),
-      };
-
-      executeMapSearch(bounds);
-      setHasUserMoved(false);
-      setBoundsDirty(false);
-    });
-
-    // Reset handler: fly back to URL bounds
-    setResetHandler(() => {
-      if (!mapRef.current || !urlBoundsRef.current) return;
-
-      // Mark as programmatic move to prevent banner showing
-      setProgrammaticMove(true);
-      // Safety: clear programmatic flag if moveEnd doesn't fire
-      if (programmaticClearTimeoutRef.current)
-        clearTimeout(programmaticClearTimeoutRef.current);
-      programmaticClearTimeoutRef.current = setTimeout(() => {
-        if (isProgrammaticMoveRef.current) setProgrammaticMove(false);
-      }, PROGRAMMATIC_MOVE_TIMEOUT_MS);
-
-      const { minLng, maxLng, minLat, maxLat } = urlBoundsRef.current;
-      mapRef.current.fitBounds(
-        [
-          [minLng, minLat],
-          [maxLng, maxLat],
-        ],
-        { padding: fitBoundsPadding, duration: 1000 }
-      );
-      setHasUserMoved(false);
-      setBoundsDirty(false);
-    });
-  }, [
-    executeMapSearch,
-    setSearchHandler,
-    setResetHandler,
-    setHasUserMoved,
-    setBoundsDirty,
-    setProgrammaticMove,
-    isProgrammaticMoveRef,
-    fitBoundsPadding,
-  ]);
-
   // When a card's "Show on Map" button sets activeId, reveal the active selection
   // presentation and center the map on the listing.
   // Zoom in past clusterMaxZoom (14) to ensure the individual pin is visible
@@ -2738,10 +2622,12 @@ export default function MapComponent({
     // clusterMaxZoom is 14 — zoom to at least 15 to guarantee the pin is unclustered
     const minZoomToBreakCluster = 15;
     const targetZoom = Math.max(currentZoom, minZoomToBreakCluster);
+    const popupOffset = getDesktopPopupFocusOffset();
     map?.easeTo({
       center: [listing.location.lng, listing.location.lat],
       zoom: targetZoom,
       duration: reducedMotion ? 0 : 400,
+      ...(popupOffset ? { offset: popupOffset } : {}),
     });
   }, [
     activeId,
@@ -2751,12 +2637,17 @@ export default function MapComponent({
     isProgrammaticMoveRef,
     setSelectedListing,
     reducedMotion,
+    getDesktopPopupFocusOffset,
   ]);
 
   // P1-FIX (#77): Wrap handleMoveEnd in useCallback to prevent stale closures.
   // Without this, the function captures state values at definition time which can become stale.
   const handleMoveEnd = useCallback(
     (e: ViewStateChangeEvent) => {
+      const isMobileViewport = isPhoneViewport === true;
+      const hasOriginalEvent = Boolean(
+        (e as ViewStateChangeEvent & { originalEvent?: Event }).originalEvent
+      );
       // Track zoom for two-tier pin display
       setCurrentZoom(e.viewState.zoom);
       // Debounce updateUnclusteredListings to batch rapid moveEnd events (100ms)
@@ -2794,9 +2685,6 @@ export default function MapComponent({
       // Fire onMoveEnd callback (controlled component API)
       onMoveEndProp?.(viewStateChangeEvent);
 
-      // Always update current bounds in context for location conflict detection
-      setCurrentMapBounds(bounds);
-
       // Track center for resize-triggered moveEnd detection
       const center = { lat: e.viewState.latitude, lng: e.viewState.longitude };
 
@@ -2812,6 +2700,10 @@ export default function MapComponent({
         setProgrammaticMove(false); // Clear immediately on moveend instead of waiting for timeout
         setShowResetToResults(false);
         setActivePanBounds(null); // Clear active pan bounds
+        if (isMobileViewport) {
+          hasCompletedInitialMobileViewportSyncRef.current = true;
+          hasPendingRealUserMoveRef.current = false;
+        }
         // CLUSTER FIX: Don't clear isClusterExpandingRef here - wait for onIdle
         // Tiles may not be loaded yet, clearing here causes empty markers
         // Zoom-out button is user-initiated — allow search to proceed
@@ -2842,40 +2734,45 @@ export default function MapComponent({
         return;
       }
 
+      const hasRealMobileGesture =
+        hasPendingRealUserMoveRef.current || hasOriginalEvent;
+
+      if (isMobileViewport && !hasRealMobileGesture) {
+        hasCompletedInitialMobileViewportSyncRef.current = true;
+        return;
+      }
+
+      hasPendingRealUserMoveRef.current = false;
+      if (isMobileViewport) {
+        hasCompletedInitialMobileViewportSyncRef.current = true;
+      }
+
       // Mark that user has manually moved the map
       setHasUserMoved(true);
-      setShowResetToResults(
-        shouldShowResetToResultsControl(bounds, listings)
-      );
+      setShowResetToResults(shouldShowResetToResultsControl(bounds, listings));
 
-      // If search-as-move is ON, trigger search with throttle/debounce
-      if (searchAsMove) {
-        // Don't trigger search when zoomed out too far — viewport exceeds server max span
-        const latSpan = bounds.maxLat - bounds.minLat;
-        // H2-MAP FIX: Handle antimeridian crossing (west > east when crossing 180/-180)
-        const crossesAntimeridian = bounds.minLng > bounds.maxLng;
-        const lngSpan = crossesAntimeridian
-          ? 180 - bounds.minLng + (bounds.maxLng + 180)
-          : bounds.maxLng - bounds.minLng;
-        if (
-          latSpan > MAP_FETCH_MAX_LAT_SPAN ||
-          lngSpan > MAP_FETCH_MAX_LNG_SPAN
-        ) {
-          setBoundsDirty(true);
-          setViewportInfoMessage("Zoom in further to update results");
-          return;
-        }
-        setViewportInfoMessage(null);
+      // Don't trigger search when zoomed out too far — viewport exceeds server max span
+      const latSpan = bounds.maxLat - bounds.minLat;
+      // H2-MAP FIX: Handle antimeridian crossing (west > east when crossing 180/-180)
+      const crossesAntimeridian = bounds.minLng > bounds.maxLng;
+      const lngSpan = crossesAntimeridian
+        ? 180 - bounds.minLng + (bounds.maxLng + 180)
+        : bounds.maxLng - bounds.minLng;
+      if (
+        latSpan > MAP_FETCH_MAX_LAT_SPAN ||
+        lngSpan > MAP_FETCH_MAX_LNG_SPAN
+      ) {
+        setViewportInfoMessage("Zoom in further to update results");
+        return;
+      }
+      setViewportInfoMessage(null);
 
-        if (debounceTimer.current) {
-          clearTimeout(debounceTimer.current);
-        }
+      if (debounceTimer.current) {
+        clearTimeout(debounceTimer.current);
+      }
 
-        debounceTimer.current = setTimeout(() => {
-          // Re-check searchAsMove via ref — it may have been toggled off
-          // after the debounce was scheduled (e.g., by E2E test hook or user toggle).
-          if (!searchAsMoveRef.current) return;
-
+      debounceTimer.current = setTimeout(
+        () => {
           const now = Date.now();
           const timeSinceLastSearch = now - lastSearchTimeRef.current;
 
@@ -2891,13 +2788,7 @@ export default function MapComponent({
             // Schedule the pending search for when the throttle window expires
             const delay = MIN_SEARCH_INTERVAL_MS - timeSinceLastSearch;
             throttleTimeoutRef.current = setTimeout(() => {
-              // P2-FIX (#79): Use ref to get latest executeMapSearch, preventing stale closure
-              // Re-check searchAsMove via ref in case it was toggled while throttle was pending.
-              if (
-                pendingBoundsRef.current &&
-                executeMapSearchRef.current &&
-                searchAsMoveRef.current
-              ) {
+              if (pendingBoundsRef.current && executeMapSearchRef.current) {
                 executeMapSearchRef.current(pendingBoundsRef.current);
               }
             }, delay);
@@ -2905,27 +2796,21 @@ export default function MapComponent({
           }
 
           // Execute immediately if outside throttle window
-          // P2-FIX (#79): Use ref to get latest executeMapSearch
           if (executeMapSearchRef.current) {
             executeMapSearchRef.current(bounds);
           }
-        }, MAP_MOVE_SEARCH_DEBOUNCE_MS);
-      } else {
-        // Search-as-move is OFF - mark bounds as dirty so banner shows
-        setBoundsDirty(true);
-        setViewportInfoMessage(null);
-      }
+        },
+        isMobileViewport ? 150 : MAP_MOVE_SEARCH_DEBOUNCE_MS
+      );
     },
     [
       updateUnclusteredListings,
-      setCurrentMapBounds,
       setActivePanBounds,
       isProgrammaticMoveRef,
       listings,
       setProgrammaticMove,
       setHasUserMoved,
-      searchAsMove,
-      setBoundsDirty,
+      isPhoneViewport,
       setShowResetToResults,
       setViewportInfoMessage,
       onMoveEndProp,
@@ -2941,6 +2826,28 @@ export default function MapComponent({
     setPin: setUserPin,
     handleMapClick: handleUserPinClick,
   } = useUserPin();
+  const hasConfirmedEmptyViewport =
+    isMapLoaded &&
+    isMapInitialized &&
+    !areTilesLoading &&
+    !isSearching &&
+    !suppressEmptyState &&
+    listings.length === 0;
+  const mobileMapStatus = useMemo<MobileMapStatus | null>(() => {
+    if (isPhoneViewport !== true || !hasConfirmedEmptyViewport) {
+      return null;
+    }
+
+    return "confirmed-empty";
+  }, [hasConfirmedEmptyViewport, isPhoneViewport]);
+  const hasPhonePreviewCard =
+    usesPreviewSelection &&
+    isPhoneViewport === true &&
+    selectedListing !== null;
+  const shouldShowMobileStatusCard =
+    mobileMapStatus !== null && !hasPhonePreviewCard;
+  const shouldShowDesktopEmptyState =
+    isPhoneViewport === false && hasConfirmedEmptyViewport;
   const [lightMapStyle, setLightMapStyle] = useState<
     string | StyleSpecification
   >(LIGHT_STYLE_FALLBACK);
@@ -3000,6 +2907,39 @@ export default function MapComponent({
       controller.abort();
     };
   }, [isDarkMode]);
+
+  useEffect(() => {
+    if (isPhoneViewport !== true || mobileMapStatus === null) {
+      setMobileSheetOverrideLabel(null);
+      setMobileResultsViewPreference(null);
+      return;
+    }
+
+    setMobileResultsViewPreference("map");
+    setMobileSheetOverrideLabel("No places here");
+  }, [
+    isPhoneViewport,
+    mobileMapStatus,
+    setMobileResultsViewPreference,
+    setMobileSheetOverrideLabel,
+  ]);
+
+  useEffect(() => {
+    return () => {
+      setMobileSheetOverrideLabel(null);
+      setMobileResultsViewPreference(null);
+    };
+  }, [setMobileResultsViewPreference, setMobileSheetOverrideLabel]);
+
+  useEffect(() => {
+    if (
+      isPhoneViewport !== true ||
+      shouldShowMobileStatusCard ||
+      hasPhonePreviewCard
+    ) {
+      setShowMobileToolsMenu(false);
+    }
+  }, [hasPhonePreviewCard, isPhoneViewport, shouldShowMobileStatusCard]);
 
   // Fetch and sanitize dark style as JSON object (same pattern as light style)
   // so zoom expression sanitization is applied before MapLibre processes it.
@@ -3094,7 +3034,7 @@ export default function MapComponent({
       // Fire controlled view state if provided
       handleControlledMove(e);
 
-      if (isProgrammaticMoveRef.current || !searchAsMove) return;
+      if (isProgrammaticMoveRef.current) return;
 
       if (onMoveThrottleRef.current) return; // Throttled
 
@@ -3113,12 +3053,7 @@ export default function MapComponent({
         maxLat: mapBounds.getNorth(),
       });
     },
-    [
-      isProgrammaticMoveRef,
-      searchAsMove,
-      setActivePanBounds,
-      handleControlledMove,
-    ]
+    [isProgrammaticMoveRef, setActivePanBounds, handleControlledMove]
   );
 
   // P1-FIX (#83): Memoize handleMarkerClick to prevent recreation on every render
@@ -3135,7 +3070,7 @@ export default function MapComponent({
       lastMapActiveRef.current = listing.id;
       setActive(listing.id);
       requestScrollTo(listing.id);
-      // Mark as programmatic move to prevent banner showing
+      // Mark as programmatic move to prevent follow-up auto-search from firing.
       setProgrammaticMove(true);
       // Safety: clear programmatic flag if moveEnd doesn't fire within 1.5s
       if (programmaticClearTimeoutRef.current)
@@ -3145,9 +3080,11 @@ export default function MapComponent({
           setProgrammaticMove(false);
         }
       }, PROGRAMMATIC_MOVE_TIMEOUT_MS);
+      const popupOffset = getDesktopPopupFocusOffset();
       mapRef.current?.easeTo({
         center: [coords.lng, coords.lat],
         duration: reducedMotion ? 0 : 400,
+        ...(popupOffset ? { offset: popupOffset } : {}),
       });
     },
     [
@@ -3160,6 +3097,7 @@ export default function MapComponent({
       setProgrammaticMove,
       isProgrammaticMoveRef,
       reducedMotion,
+      getDesktopPopupFocusOffset,
     ]
   );
 
@@ -3535,6 +3473,10 @@ export default function MapComponent({
                 [pMinLng, pMinLat],
                 [pMaxLng, pMaxLat],
               ];
+              if (isPhoneViewport === true) {
+                hasCompletedInitialMobileViewportSyncRef.current = false;
+                hasPendingRealUserMoveRef.current = false;
+              }
               setProgrammaticMove(true);
               // Safety: clear programmatic flag if moveEnd doesn't fire
               if (programmaticClearTimeoutRef.current)
@@ -3546,7 +3488,14 @@ export default function MapComponent({
             }
           }
         }}
-        onMoveStart={() => {
+        onMoveStart={(e) => {
+          if (
+            isPhoneViewport === true &&
+            !isProgrammaticMoveRef.current &&
+            Boolean(e?.originalEvent)
+          ) {
+            hasPendingRealUserMoveRef.current = true;
+          }
           if (
             usesPreviewSelection &&
             selectedListing &&
@@ -3684,8 +3633,8 @@ export default function MapComponent({
             type="geojson"
             data={geojsonData}
             cluster={true}
-            clusterMaxZoom={14}
-            clusterRadius={50}
+            clusterMaxZoom={clusterConfig.maxZoom}
+            clusterRadius={clusterConfig.radius}
             clusterProperties={{
               priceSum: ["+", ["get", "price"]],
             }}
@@ -3864,108 +3813,109 @@ export default function MapComponent({
           onSetPin={setUserPin}
           hoveredListingCoords={hoveredListingCoords}
           isDarkMode={isDarkMode}
-          showControl={isPhoneViewport === true}
+          showControl={false}
         />
       </Map>
 
       <LazyMotion features={domAnimation}>
         <AnimatePresence>
-          {usesPreviewSelection &&
-            isPhoneViewport === true &&
-            selectedListing && (
-              <m.div
-                key={selectedListing.id}
-                initial={reducedMotion ? { opacity: 0 } : { opacity: 0, y: 16 }}
-                animate={reducedMotion ? { opacity: 1 } : { opacity: 1, y: 0 }}
-                exit={
-                  reducedMotion
-                    ? { opacity: 0, transition: { duration: 0.15 } }
-                    : {
-                        opacity: 0,
-                        y: 8,
-                        transition: { type: "tween", duration: 0.15 },
-                      }
-                }
-                transition={
-                  reducedMotion
-                    ? { duration: 0.15 }
-                    : { type: "spring", stiffness: 400, damping: 30 }
-                }
-                className="pointer-events-none absolute inset-x-0 z-[45] px-4"
-                style={{
-                  bottom: `calc(${SNAP_COLLAPSED * 100}dvh + 4.75rem + env(safe-area-inset-bottom, 0px))`,
-                }}
+          {hasPhonePreviewCard && selectedListing && (
+            <m.div
+              key={selectedListing.id}
+              initial={reducedMotion ? { opacity: 0 } : { opacity: 0, y: 16 }}
+              animate={reducedMotion ? { opacity: 1 } : { opacity: 1, y: 0 }}
+              exit={
+                reducedMotion
+                  ? { opacity: 0, transition: { duration: 0.15 } }
+                  : {
+                      opacity: 0,
+                      y: 8,
+                      transition: { type: "tween", duration: 0.15 },
+                    }
+              }
+              transition={
+                reducedMotion
+                  ? { duration: 0.15 }
+                  : { type: "spring", stiffness: 400, damping: 30 }
+              }
+              className="pointer-events-none absolute inset-x-0 z-[45] px-4"
+              style={{
+                bottom: SEARCH_MOBILE_PREVIEW_CARD_OFFSET,
+              }}
+            >
+              <div
+                data-testid="map-preview-card"
+                className="pointer-events-auto relative overflow-hidden rounded-[1.75rem] border border-outline-variant/20 bg-surface-container-lowest shadow-[0_18px_45px_-20px_rgba(0,0,0,0.35)]"
               >
-                <div
-                  data-testid="map-preview-card"
-                  className="pointer-events-auto relative overflow-hidden rounded-[1.75rem] border border-outline-variant/20 bg-surface-container-lowest shadow-[0_18px_45px_-20px_rgba(0,0,0,0.35)]"
+                <button
+                  type="button"
+                  onClick={handleSelectedListingClose}
+                  className="absolute top-3 right-3 z-10 flex h-8 w-8 items-center justify-center rounded-full bg-on-surface/55 text-white backdrop-blur-sm transition-colors hover:bg-on-surface/70 focus:outline-none focus-visible:ring-2 focus-visible:ring-primary/30"
+                  aria-label="Close listing preview"
                 >
-                  <button
-                    type="button"
-                    onClick={handleSelectedListingClose}
-                    className="absolute top-3 right-3 z-10 flex h-8 w-8 items-center justify-center rounded-full bg-on-surface/55 text-white backdrop-blur-sm transition-colors hover:bg-on-surface/70 focus:outline-none focus-visible:ring-2 focus-visible:ring-primary/30"
-                    aria-label="Close listing preview"
-                  >
-                    <X className="w-4 h-4" />
-                  </button>
+                  <X className="w-4 h-4" />
+                </button>
 
-                  <Link
-                    href={`/listings/${selectedListing.id}`}
-                    className="flex items-stretch gap-3 p-3 pr-12"
-                  >
-                    <div className="relative h-24 w-24 shrink-0 overflow-hidden rounded-2xl bg-surface-container-high">
-                      {selectedListing.images && selectedListing.images[0] ? (
-                        <Image
-                          src={selectedListing.images[0]}
-                          alt={selectedListing.title}
-                          fill
-                          sizes="96px"
-                          className="object-cover"
-                        />
-                      ) : (
-                        <div className="flex h-full w-full items-center justify-center">
-                          <Home className="w-8 h-8 text-on-surface-variant" />
-                        </div>
-                      )}
-                    </div>
-
-                    <div className="min-w-0 flex-1 py-0.5">
-                      {Number.isFinite(selectedListing.avgRating) &&
-                      (selectedListing.reviewCount ?? 0) > 0 ? (
-                        <div className="mb-1 flex items-center gap-1 text-xs font-semibold text-on-surface">
-                          <Star className="h-3.5 w-3.5 fill-on-surface text-on-surface" />
-                          <span>{selectedListing.avgRating!.toFixed(2)}</span>
-                        </div>
-                      ) : null}
-
-                      <h3 className="line-clamp-2 text-sm font-semibold leading-tight text-on-surface">
-                        {selectedListing.title}
-                      </h3>
-
-                      <div className="mt-2 inline-flex items-center rounded-full bg-surface-container-high px-2.5 py-1 text-[11px] font-medium text-on-surface-variant">
-                        {selectedListing.availableSlots > 0
-                          ? `${selectedListing.availableSlots} available`
-                          : "Filled"}
+                <Link
+                  href={`/listings/${selectedListing.id}`}
+                  className="flex items-stretch gap-3 p-3 pr-12"
+                >
+                  <div className="relative h-24 w-24 shrink-0 overflow-hidden rounded-2xl bg-surface-container-high">
+                    {selectedListing.images && selectedListing.images[0] ? (
+                      <Image
+                        src={selectedListing.images[0]}
+                        alt={selectedListing.title}
+                        fill
+                        sizes="96px"
+                        className="object-cover"
+                      />
+                    ) : (
+                      <div className="flex h-full w-full items-center justify-center">
+                        <Home className="w-8 h-8 text-on-surface-variant" />
                       </div>
+                    )}
+                  </div>
 
-                      <p className="mt-2 flex items-baseline gap-1">
-                        <span className="text-lg font-bold text-on-surface">
-                          {formatPrice(selectedListing.price)}
-                        </span>
-                        <span className="text-sm text-on-surface-variant">
-                          /month
-                        </span>
-                      </p>
+                  <div className="min-w-0 flex-1 py-0.5">
+                    {Number.isFinite(selectedListing.avgRating) &&
+                    (selectedListing.reviewCount ?? 0) > 0 ? (
+                      <div className="mb-1 flex items-center gap-1 text-xs font-semibold text-on-surface">
+                        <Star className="h-3.5 w-3.5 fill-on-surface text-on-surface" />
+                        <span>{selectedListing.avgRating!.toFixed(2)}</span>
+                      </div>
+                    ) : null}
+
+                    <h3 className="line-clamp-2 text-sm font-semibold leading-tight text-on-surface">
+                      {selectedListing.title}
+                    </h3>
+
+                    <div className="mt-2 inline-flex items-center rounded-full bg-surface-container-high px-2.5 py-1 text-[11px] font-medium text-on-surface-variant">
+                      {selectedListing.availableSlots > 0
+                        ? `${selectedListing.availableSlots} available`
+                        : "Filled"}
                     </div>
-                  </Link>
-                </div>
-              </m.div>
-            )}
+
+                    <p className="mt-2 flex items-baseline gap-1">
+                      <span className="text-lg font-bold text-on-surface">
+                        {formatPrice(selectedListing.price)}
+                      </span>
+                      <span className="text-sm text-on-surface-variant">
+                        /month
+                      </span>
+                    </p>
+                  </div>
+                </Link>
+              </div>
+            </m.div>
+          )}
         </AnimatePresence>
       </LazyMotion>
 
       {/* Map Controls Group (Right Side) */}
-      <div className="absolute top-20 right-4 z-[50] flex flex-col gap-2">
+      <div
+        className="absolute right-4 z-[50] flex flex-col gap-2"
+        style={{ top: "calc(var(--header-height, 4rem) + 1rem)" }}
+      >
         {/* Zoom Controls (Mobile Only) */}
         {isPhoneViewport === true && (
           <div className="flex flex-col overflow-hidden rounded-2xl border border-outline-variant/20 bg-surface-container-lowest/95 shadow-ambient backdrop-blur-md">
@@ -3994,23 +3944,74 @@ export default function MapComponent({
           </div>
         )}
 
-        {/* Fit all results button - mobile only; desktop uses the compact control rail */}
-        {isPhoneViewport === true && listings.length >= 1 && isMapLoaded && (
-          <button
-            onClick={handleFitAllResults}
-            className="flex h-11 w-11 items-center justify-center rounded-full border border-outline-variant/20 bg-surface-container-lowest/95 text-on-surface-variant shadow-ambient backdrop-blur-md transition-colors hover:bg-surface-container-high focus:outline-none focus-visible:ring-2 focus-visible:ring-primary/30 focus-visible:ring-offset-2"
-            aria-label="Fit all results in view"
-            title="Fit all results"
-          >
-            <Maximize2 className="w-4 h-4" />
-          </button>
+        {isPhoneViewport === true && !shouldShowMobileStatusCard && (
+          <>
+            {showMobileToolsMenu && (
+              <div className="flex flex-col gap-2 rounded-[1.5rem] border border-outline-variant/20 bg-surface-container-lowest/95 p-2 shadow-ambient backdrop-blur-md">
+                {showResetToResults && listings.length >= 1 && isMapLoaded ? (
+                  <button
+                    type="button"
+                    onClick={() => {
+                      triggerHaptic();
+                      handleFitAllResults();
+                      setShowMobileToolsMenu(false);
+                    }}
+                    className="flex min-h-[44px] items-center gap-2 rounded-[1rem] px-3 py-2 text-sm font-medium text-on-surface transition-colors hover:bg-surface-container-high focus:outline-none focus-visible:ring-2 focus-visible:ring-primary/30"
+                    aria-label="Fit all results in view"
+                    title="Fit all results"
+                  >
+                    <Maximize2 className="w-4 h-4" />
+                    Fit all
+                  </button>
+                ) : null}
+                <button
+                  type="button"
+                  onClick={() => {
+                    triggerHaptic();
+                    toggleDropMode();
+                    setShowMobileToolsMenu(false);
+                  }}
+                  className={cn(
+                    "flex min-h-[44px] items-center gap-2 rounded-[1rem] px-3 py-2 text-sm font-medium transition-colors focus:outline-none focus-visible:ring-2 focus-visible:ring-primary/30",
+                    isDropMode
+                      ? "bg-rose-500/90 text-white"
+                      : "text-on-surface hover:bg-surface-container-high"
+                  )}
+                  aria-label={
+                    isDropMode ? "Cancel drop pin" : "Drop a pin on the map"
+                  }
+                  title={isDropMode ? "Cancel drop pin" : "Drop a pin"}
+                >
+                  <MapPin className="w-4 h-4" />
+                  {isDropMode ? "Cancel drop pin" : "Drop pin"}
+                </button>
+              </div>
+            )}
+
+            <button
+              type="button"
+              onClick={() => {
+                triggerHaptic();
+                setShowMobileToolsMenu((prev) => !prev);
+              }}
+              className={cn(
+                "flex h-11 w-11 items-center justify-center rounded-full border shadow-ambient backdrop-blur-md transition-colors focus:outline-none focus-visible:ring-2 focus-visible:ring-primary/30 focus-visible:ring-offset-2",
+                showMobileToolsMenu
+                  ? "border-on-surface/20 bg-on-surface text-white"
+                  : "border-outline-variant/20 bg-surface-container-lowest/95 text-on-surface-variant hover:bg-surface-container-high"
+              )}
+              aria-label="More map tools"
+              aria-expanded={showMobileToolsMenu ? "true" : "false"}
+              title="More map tools"
+            >
+              <Ellipsis className="w-4 h-4" />
+            </button>
+          </>
         )}
       </div>
 
       {isDesktopViewport && (
         <DesktopMapControls
-          searchAsMove={searchAsMove}
-          onToggleSearchAsMove={() => setSearchAsMove(!searchAsMove)}
           activePOICategories={activePOICategories}
           onTogglePOICategory={togglePOICategory}
           isDropMode={isDropMode}
@@ -4029,29 +4030,15 @@ export default function MapComponent({
         />
       )}
 
-      {/* POI layer visibility is always applied; inline strip only stays on phone viewports */}
+      {/* Apply POI visibility to the map; POI controls live in the map tools UI. */}
       <POILayer
         mapRef={mapRef}
         isMapLoaded={isMapLoaded}
-        activeCategories={activePOICategories}
-        onToggleCategory={togglePOICategory}
-        renderControls={isPhoneViewport === true}
+        activeCategories={appliedPOICategories}
       />
 
-      {/* MapMovedBanner - Shows when user panned with search-as-move OFF */}
-      {(showBanner || showLocationConflict) && (
-        <MapMovedBanner
-          variant="map"
-          onSearch={onSearch}
-          onReset={onReset}
-          areaCount={areaCount}
-          isAreaCountLoading={isAreaCountLoading}
-          isSearchLoading={isSearching}
-        />
-      )}
-
-      {/* Info banner when search-as-move is enabled but viewport is too wide */}
-      {searchAsMove && viewportInfoMessage && (
+      {/* Info banner when the viewport is too wide to issue a search */}
+      {viewportInfoMessage && (
         <div
           role="status"
           aria-live="polite"
@@ -4064,20 +4051,22 @@ export default function MapComponent({
       )}
 
       {/* Mobile gesture hint - shown once for first-time touch users */}
-      {isMapLoaded && <MapGestureHint />}
+      {isMapLoaded && !shouldShowMobileStatusCard && !hasPhonePreviewCard && (
+        <MapGestureHint />
+      )}
+
+      {shouldShowMobileStatusCard && mobileMapStatus && (
+        <MobileMapStatusCard
+          status={mobileMapStatus}
+          searchParams={searchParams}
+          onZoomOut={handleZoomOut}
+        />
+      )}
 
       {/* Empty state overlay - when map is loaded but no listings in viewport */}
-      {isMapLoaded &&
-        isMapInitialized &&
-        !areTilesLoading &&
-        !isSearching &&
-        !suppressEmptyState &&
-        listings.length === 0 && (
-          <MapEmptyState
-            searchParams={searchParams}
-            onZoomOut={handleZoomOut}
-          />
-        )}
+      {shouldShowDesktopEmptyState && (
+        <MapEmptyState searchParams={searchParams} onZoomOut={handleZoomOut} />
+      )}
     </div>
   );
 }

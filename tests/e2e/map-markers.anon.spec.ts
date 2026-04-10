@@ -157,7 +157,7 @@ async function waitForMapRef(page: Page, timeout = 30000): Promise<boolean> {
  * Zoom in to expand clusters and reveal individual markers.
  *
  * Uses the E2E testing hook (window.__e2eSetProgrammaticMove + __e2eMapRef.jumpTo)
- * to zoom programmatically WITHOUT triggering "Search as I move" URL updates.
+ * to zoom programmatically WITHOUT triggering auto-search URL updates.
  * This solves the chicken-and-egg problem where zooming in triggers a search
  * with narrow bounds that returns 0 results.
  *
@@ -319,7 +319,7 @@ test.describe("Map Marker Interactions", () => {
     if (!mapReady) return; // Tests will skip via isMapAvailable check
 
     // Zoom in programmatically to expand clusters into individual markers.
-    // Uses __e2eSetProgrammaticMove to prevent "Search as I move" from
+    // Uses __e2eSetProgrammaticMove to prevent auto-search from
     // updating the URL and wiping out SSR-rendered listing results.
     await zoomToExpandClusters(page);
   });

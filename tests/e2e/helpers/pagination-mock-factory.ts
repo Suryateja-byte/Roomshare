@@ -60,8 +60,7 @@ export interface PaginationMockOptions {
   /** Which load-more call index should fail, 1-based (0 = never fail) */
   failOnLoadMore?: number;
   /**
-   * When true, disable the map's "Search as I move" feature immediately after
-   * the map becomes ready (via window.__e2eSetSearchAsMove exposed by Map.tsx).
+   * When true, freeze map-driven URL updates during delayed pagination flows.
    * This prevents the map from calling router.replace() with new bounds during
    * pagination tests, which would cause SearchResultsClient to remount and reset
    * the accumulated card count.
@@ -287,31 +286,16 @@ export async function setupPaginationMock(
   const allMockListings = createListingBatch(0, totalLoadMoreItems);
 
   // -----------------------------------------------------------------------
-  // Freeze map navigations: disable "Search as I move" via E2E hook
+  // Freeze map navigations while delayed pagination responses are in flight.
   // -----------------------------------------------------------------------
-  // When freezeMapNavigations=true we inject a script that polls until the
-  // window.__e2eSetSearchAsMove hook (exposed by Map.tsx) is available, then
-  // immediately calls it with `false`. This stops the map from calling
+  // When freezeMapNavigations=true we set the narrow E2E freeze flag that
+  // executeMapSearch checks directly. This stops the map from calling
   // router.replace() with new bounds while a delayed load-more is in flight,
   // which would otherwise reset SearchResultsClient's accumulated listings.
   if (freezeMapNavigations) {
     await page.addInitScript(() => {
       const win = window as unknown as Record<string, unknown>;
-      // Set the frozen flag immediately so executeMapSearch sees it as soon as
-      // the Map component first tries to fire (before the hook is even available).
       win["__e2eMapSearchFrozen"] = true;
-      // Then poll until the React hook is ready and call it so the UI toggle
-      // also reflects the disabled state.
-      let elapsed = 0;
-      const iv = setInterval(() => {
-        elapsed += 10;
-        if (typeof win["__e2eSetSearchAsMove"] === "function") {
-          (win["__e2eSetSearchAsMove"] as (v: boolean) => void)(false);
-          clearInterval(iv);
-        } else if (elapsed >= 10_000) {
-          clearInterval(iv);
-        }
-      }, 10);
     });
   }
 

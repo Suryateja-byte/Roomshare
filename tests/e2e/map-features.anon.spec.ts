@@ -28,7 +28,10 @@ const SEARCH_URL = `/search?${boundsQS}`;
 async function waitForSearchPage(page: import("@playwright/test").Page) {
   await page.goto(SEARCH_URL);
   await page.waitForLoadState("domcontentloaded");
-  await page.locator("button").first().waitFor({ state: "visible", timeout: 30_000 });
+  await page
+    .locator("button")
+    .first()
+    .waitFor({ state: "visible", timeout: 30_000 });
   await waitForMapReady(page);
 }
 
@@ -221,6 +224,21 @@ test.describe("Map controls (requires WebGL)", () => {
     }
   });
 
+  test("desktop keeps POI controls inside Map tools instead of an inline strip", async ({
+    page,
+  }) => {
+    await expect(page.locator('[data-testid="poi-category"]')).toHaveCount(0);
+    await expect(
+      page.locator('button[aria-label^="Map tools"]').first()
+    ).toBeVisible();
+
+    await openMapTools(page);
+
+    await expect(
+      page.locator('[data-testid="poi-category"]').first()
+    ).toBeVisible();
+  });
+
   // 1.6: Drop-a-Pin
   test("drop pin button toggles to cancel state", async ({ page }) => {
     await openMapTools(page);
@@ -266,19 +284,30 @@ test.describe("Map controls (requires WebGL)", () => {
     await transitBtn.click();
     // After click, state should have toggled
     const expectedAfterClick = initialState === "true" ? "false" : "true";
-    await expect(transitBtn).toHaveAttribute("aria-checked", expectedAfterClick, {
-      timeout: 10_000,
-    });
+    await expect(transitBtn).toHaveAttribute(
+      "aria-checked",
+      expectedAfterClick,
+      {
+        timeout: 10_000,
+      }
+    );
     await transitBtn.click();
     // After second click, state should be back to initial
-    await expect(transitBtn).toHaveAttribute("aria-checked", initialState ?? "false", {
-      timeout: 10_000,
-    });
+    await expect(transitBtn).toHaveAttribute(
+      "aria-checked",
+      initialState ?? "false",
+      {
+        timeout: 10_000,
+      }
+    );
   });
 
   test("POIs master toggle activates all categories", async ({ page }) => {
     const poiMasterBtn = page.locator('button[aria-label*="Show all POIs"]');
-    test.skip((await poiMasterBtn.count()) === 0, "POI master toggle button not found in DOM");
+    test.skip(
+      (await poiMasterBtn.count()) === 0,
+      "POI master toggle button not found in DOM"
+    );
 
     const poiVisible = await poiMasterBtn
       .isVisible({ timeout: 5_000 })
@@ -294,7 +323,16 @@ test.describe("Map controls (requires WebGL)", () => {
     await poiMasterBtn.click();
 
     // After clicking master toggle, wait for category buttons to appear
-    await page.locator('[data-testid="poi-category"]').or(page.locator('button[aria-pressed]').filter({ hasText: /Transit|Parks|Grocery|Schools/i })).first().waitFor({ state: 'visible', timeout: 5000 }).catch(() => {});
+    await page
+      .locator('[data-testid="poi-category"]')
+      .or(
+        page
+          .locator("button[aria-pressed]")
+          .filter({ hasText: /Transit|Parks|Grocery|Schools/i })
+      )
+      .first()
+      .waitFor({ state: "visible", timeout: 5000 })
+      .catch(() => {});
 
     // Use broad locator for category controls — may be buttons or checkboxes
     const categories = page
@@ -326,7 +364,10 @@ test.describe("Map controls (requires WebGL)", () => {
     const hasTransit = (await transitBtn.count()) > 0;
     const hasParks = (await parksBtn.count()) > 0;
 
-    test.skip(!hasTransit && !hasParks, "No category buttons found after master toggle click");
+    test.skip(
+      !hasTransit && !hasParks,
+      "No category buttons found after master toggle click"
+    );
 
     if (hasTransit) {
       const transitPressed = await transitBtn
@@ -358,7 +399,9 @@ test.describe("Map controls (requires WebGL)", () => {
 
   // Keyboard accessibility
   test("map controls are keyboard accessible", async ({ page }) => {
-    const toolsTrigger = page.locator('button[aria-label^="Map tools"]').first();
+    const toolsTrigger = page
+      .locator('button[aria-label^="Map tools"]')
+      .first();
     await toolsTrigger.focus();
     await page.keyboard.press("Enter");
     await page.getByTestId("map-tools-drop-pin").waitFor({ timeout: 5_000 });
