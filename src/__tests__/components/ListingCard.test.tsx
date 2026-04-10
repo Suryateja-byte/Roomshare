@@ -1,5 +1,14 @@
 import { render, screen } from "@testing-library/react";
 import ListingCard from "@/components/listings/ListingCard";
+import {
+  useListingFocusActions,
+  useIsListingFocused,
+} from "@/contexts/ListingFocusContext";
+
+jest.mock("@/contexts/ListingFocusContext", () => ({
+  useListingFocusActions: jest.fn(),
+  useIsListingFocused: jest.fn(),
+}));
 
 // Mock FavoriteButton
 jest.mock("@/components/FavoriteButton", () => {
@@ -46,6 +55,23 @@ jest.mock("@/components/listings/ImageCarousel", () => ({
   },
 }));
 
+const mockUseListingFocusActions = jest.mocked(useListingFocusActions);
+const mockUseIsListingFocused = jest.mocked(useIsListingFocused);
+
+function mockFocusState({
+  isHovered = false,
+  isActive = false,
+}: {
+  isHovered?: boolean;
+  isActive?: boolean;
+} = {}) {
+  mockUseIsListingFocused.mockReturnValue({
+    isHovered,
+    isActive,
+    isFocused: isHovered || isActive,
+  });
+}
+
 const mockListing = {
   id: "listing-123",
   title: "Cozy Room in Downtown",
@@ -62,6 +88,19 @@ const mockListing = {
   avgRating: 4.9,
   reviewCount: 5,
 };
+
+beforeEach(() => {
+  mockUseListingFocusActions.mockReturnValue({
+    setHovered: jest.fn(),
+    setActive: jest.fn(),
+    requestScrollTo: jest.fn(),
+    ackScrollTo: jest.fn(),
+    clearFocus: jest.fn(),
+    hasProvider: false,
+    focusSourceRef: { current: null },
+  });
+  mockFocusState();
+});
 
 describe("ListingCard", () => {
   describe("rendering", () => {
@@ -256,6 +295,43 @@ describe("ListingCard", () => {
       const listing = { ...mockListing, images: undefined };
       render(<ListingCard listing={listing} />);
       expect(screen.getByText("No Photos")).toBeInTheDocument();
+    });
+  });
+
+  describe("focus state styling", () => {
+    it("renders a stronger hovered state without promoting the card to active", () => {
+      mockFocusState({ isHovered: true });
+
+      render(<ListingCard listing={mockListing} />);
+
+      const article = screen.getByTestId("listing-card");
+      expect(article).toHaveAttribute("data-focus-state", "hovered");
+      expect(article).toHaveClass("ring-2", "ring-primary/50", "shadow-lg");
+      expect(article).not.toHaveClass("ring-offset-2");
+    });
+
+    it("keeps the active state styling distinct from hover", () => {
+      mockFocusState({ isActive: true });
+
+      render(<ListingCard listing={mockListing} />);
+
+      const article = screen.getByTestId("listing-card");
+      expect(article).toHaveAttribute("data-focus-state", "active");
+      expect(article).toHaveClass(
+        "ring-2",
+        "ring-primary",
+        "ring-offset-2",
+        "shadow-xl"
+      );
+      expect(article).not.toHaveClass("ring-primary/50");
+    });
+
+    it("defaults to no focus styling when neither hovered nor active", () => {
+      render(<ListingCard listing={mockListing} />);
+
+      const article = screen.getByTestId("listing-card");
+      expect(article).toHaveAttribute("data-focus-state", "none");
+      expect(article).not.toHaveClass("ring-primary/50", "ring-offset-2");
     });
   });
 
