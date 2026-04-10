@@ -117,6 +117,7 @@ export default function SearchHeaderWrapper() {
   const { data: session } = useSession();
   const user = session?.user;
   const desktopSearchRef = useRef<DesktopHeaderSearchHandle>(null);
+  const mobileExpandButtonRef = useRef<HTMLButtonElement>(null);
 
   // Full-screen mobile search overlay (Option A — Airbnb pattern)
   const [isMobileOverlayOpen, setIsMobileOverlayOpen] = useState(false);
@@ -124,10 +125,12 @@ export default function SearchHeaderWrapper() {
     () => setIsMobileOverlayOpen(true),
     []
   );
-  const handleCloseMobileSearch = useCallback(
-    () => setIsMobileOverlayOpen(false),
-    []
-  );
+  const handleCloseMobileSearch = useCallback(() => {
+    setIsMobileOverlayOpen(false);
+    window.requestAnimationFrame(() => {
+      mobileExpandButtonRef.current?.focus();
+    });
+  }, []);
 
   const menuButtonId = useId();
   const menuId = useId();
@@ -606,6 +609,7 @@ export default function SearchHeaderWrapper() {
         <CollapsedMobileSearch
           onExpand={handleOpenMobileSearch}
           onOpenFilters={openFilters}
+          expandButtonRef={mobileExpandButtonRef}
         />
       </div>
 

@@ -24,6 +24,11 @@ import {
   type SearchLocationSelection,
 } from "@/lib/search/search-intent";
 import {
+  applySearchQueryChange,
+  buildCanonicalSearchUrl,
+  normalizeSearchQuery,
+} from "@/lib/search/search-query";
+import {
   MAP_FLY_TO_EVENT,
   type MapFlyToEventDetail,
 } from "@/components/SearchForm";
@@ -265,8 +270,7 @@ export const DesktopHeaderSearch = forwardRef<
   );
 
   const navigateToSearch = useCallback(
-    (queryString: string) => {
-      const searchUrl = `/search?${queryString}`;
+    (searchUrl: string) => {
       if (transitionContext) {
         transitionContext.navigateWithTransition(searchUrl);
       } else {
@@ -317,18 +321,16 @@ export const DesktopHeaderSearch = forwardRef<
       ) {
         [finalMinPrice, finalMaxPrice] = [finalMaxPrice, finalMinPrice];
       }
-
-      searchUrlParams.delete("minBudget");
-      searchUrlParams.delete("maxBudget");
-      searchUrlParams.delete("minPrice");
-      searchUrlParams.delete("maxPrice");
-
-      if (finalMinPrice !== null) {
-        searchUrlParams.set("minPrice", String(finalMinPrice));
-      }
-      if (finalMaxPrice !== null) {
-        searchUrlParams.set("maxPrice", String(finalMaxPrice));
-      }
+      const searchUrl = buildCanonicalSearchUrl(
+        applySearchQueryChange(
+          normalizeSearchQuery(searchUrlParams),
+          "filter",
+          {
+            minPrice: finalMinPrice ?? undefined,
+            maxPrice: finalMaxPrice ?? undefined,
+          }
+        )
+      );
 
       if (selectedLocation) {
         window.dispatchEvent(
@@ -347,7 +349,7 @@ export const DesktopHeaderSearch = forwardRef<
         setIsEditingCollapsedState(false);
       }
 
-      navigateToSearch(searchUrlParams.toString());
+      navigateToSearch(searchUrl);
     },
     [
       collapsed,

@@ -57,13 +57,15 @@ import {
   type FilterSuggestion,
 } from "@/lib/near-matches";
 import {
+  buildSearchIntentParams,
   readSearchIntentState,
   type SearchLocationSelection,
 } from "@/lib/search/search-intent";
 import {
-  deriveSearchBoundsFromPoint,
-  boundsTupleToObject,
-} from "@/lib/search/location-bounds";
+  applySearchQueryChange,
+  buildCanonicalSearchUrl,
+  normalizeSearchQuery,
+} from "@/lib/search/search-query";
 
 // Debounce delay in milliseconds
 const SEARCH_DEBOUNCE_MS = 300;
@@ -453,7 +455,9 @@ export default function SearchForm({
 
         setIsSearching(true);
         setShowFilters(false);
-        const searchUrl = `/search?${current.toString()}`;
+        const searchUrl = buildCanonicalSearchUrl(
+          normalizeSearchQuery(current)
+        );
         // STABILIZATION FIX: Use transitionContext for consistency with the normal
         // search path (lines 634-638). Previously used raw startTransition which
         // bypassed SearchTransitionContext, so the loading overlay never appeared
@@ -490,60 +494,7 @@ export default function SearchForm({
       // This prevents race conditions when filters change rapidly
       navigationVersionRef.current++;
 
-      // Clone existing URL params to preserve bounds, nearMatches, and sort
-      // These are set by the map and should persist across filter changes
-      const params = new URLSearchParams(searchParams.toString());
-
-      // Clear pagination params (filters changing = back to page 1)
-      params.delete("page");
-      params.delete("cursor");
-      params.delete("cursorStack");
-      params.delete("pageNumber");
-
-      // Clear ALL filter params BEFORE setting new values
-      // This prevents stale values from persisting when filters are cleared
-      const filterParamsToDelete = [
-        "q",
-        "where",
-        "what",
-        "minPrice",
-        "maxPrice",
-        "lat",
-        "lng",
-        "moveInDate",
-        "leaseDuration",
-        "roomType",
-        "amenities",
-        "houseRules",
-        "languages",
-        "genderPreference",
-        "householdGender",
-      ];
-      filterParamsToDelete.forEach((param) => params.delete(param));
-
-      // Clear bounds when a new location was selected from autocomplete
-      // This allows the map to fly to and set bounds for the new location
-      // (bounds are preserved for filter-only changes to maintain current map view)
-      if (selectedCoords) {
-        params.delete("minLat");
-        params.delete("maxLat");
-        params.delete("minLng");
-        params.delete("maxLng");
-      }
-
-      // Keep location and vibe separate in the URL.
-      // `where` is the selected location label, while `what` is the vibe intent.
       const trimmedWhat = whatQuery.trim();
-      if (selectedCoords && trimmedLocation.length >= 2) {
-        params.set("where", trimmedLocation);
-      } else {
-        params.delete("where");
-      }
-      if (trimmedWhat && trimmedWhat.length >= 2) {
-        params.set("what", trimmedWhat);
-      } else {
-        params.delete("what");
-      }
 
       // Price validation with auto-swap if inverted
       // IMPORTANT: Use pending.minPrice/maxPrice (primitives) not the full pending object.
@@ -574,53 +525,36 @@ export default function SearchForm({
       ) {
         [finalMinPrice, finalMaxPrice] = [finalMaxPrice, finalMinPrice];
       }
-
-      if (finalMinPrice !== null)
-        params.set("minPrice", finalMinPrice.toString());
-      if (finalMaxPrice !== null)
-        params.set("maxPrice", finalMaxPrice.toString());
-
-      // Include coordinates and a usable initial viewport when a location was selected.
-      if (selectedCoords) {
-        params.set("lat", selectedCoords.lat.toString());
-        params.set("lng", selectedCoords.lng.toString());
-        const bounds =
-          selectedCoords.bounds ??
-          deriveSearchBoundsFromPoint(selectedCoords.lat, selectedCoords.lng);
-        params.set("minLng", bounds[0].toString());
-        params.set("minLat", bounds[1].toString());
-        params.set("maxLng", bounds[2].toString());
-        params.set("maxLat", bounds[3].toString());
-      } else if (trimmedWhat.length >= 2 && !params.has("minLat")) {
-        // Vibe-only search with no location and no existing map bounds.
-        // Supply default bounds (SF area) to satisfy isBoundsRequired()
-        // and prevent the "Please select a location" error page.
-        const fallback = boundsTupleToObject(
-          deriveSearchBoundsFromPoint(37.7749, -122.4194)
-        );
-        params.set("minLat", fallback.minLat.toString());
-        params.set("maxLat", fallback.maxLat.toString());
-        params.set("minLng", fallback.minLng.toString());
-        params.set("maxLng", fallback.maxLng.toString());
-      }
-
-      const validatedMoveInDate = validateMoveInDate(committed.moveInDate);
-      if (validatedMoveInDate) params.set("moveInDate", validatedMoveInDate);
-      if (committed.leaseDuration)
-        params.set("leaseDuration", committed.leaseDuration);
-      if (committed.roomType) params.set("roomType", committed.roomType);
-      if (committed.amenities.length > 0)
-        params.set("amenities", committed.amenities.join(","));
-      if (committed.houseRules.length > 0)
-        params.set("houseRules", committed.houseRules.join(","));
-      if (committed.languages.length > 0)
-        params.set("languages", committed.languages.join(","));
-      if (committed.genderPreference)
-        params.set("genderPreference", committed.genderPreference);
-      if (committed.householdGender)
-        params.set("householdGender", committed.householdGender);
-
-      const searchUrl = `/search?${params.toString()}`;
+      const intentQuery = normalizeSearchQuery(
+        buildSearchIntentParams(new URLSearchParams(searchParams.toString()), {
+          location: trimmedLocation,
+          vibe: trimmedWhat,
+          selectedLocation: selectedCoords,
+        })
+      );
+      const searchUrl = buildCanonicalSearchUrl(
+        applySearchQueryChange(intentQuery, "filter", {
+          minPrice: finalMinPrice ?? undefined,
+          maxPrice: finalMaxPrice ?? undefined,
+          moveInDate: validateMoveInDate(committed.moveInDate) || undefined,
+          leaseDuration: committed.leaseDuration || undefined,
+          roomType: committed.roomType || undefined,
+          amenities:
+            committed.amenities.length > 0 ? committed.amenities : undefined,
+          houseRules:
+            committed.houseRules.length > 0
+              ? committed.houseRules
+              : undefined,
+          languages:
+            committed.languages.length > 0 ? committed.languages : undefined,
+          genderPreference: committed.genderPreference || undefined,
+          householdGender: committed.householdGender || undefined,
+          minSlots:
+            committed.minSlots && parseInt(committed.minSlots, 10) >= 2
+              ? parseInt(committed.minSlots, 10)
+              : undefined,
+        })
+      );
 
       // Prevent duplicate searches (same URL within debounce window)
       // H4 FIX: Read from ref instead of closure to avoid isSearching in deps

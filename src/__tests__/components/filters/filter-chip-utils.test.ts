@@ -392,7 +392,7 @@ describe("filter-chip-utils", () => {
 
         const result = removeFilterFromUrl(params, chip);
 
-        expect(result).toBe("amenities=Wifi%2CParking");
+        expect(result).toBe("amenities=Parking&amenities=Wifi");
       });
 
       it("removes entire param when last array value removed", () => {
@@ -420,7 +420,7 @@ describe("filter-chip-utils", () => {
 
         const result = removeFilterFromUrl(params, chip);
 
-        expect(result).toBe("languages=en%2Cte");
+        expect(result).toBe("languages=en&languages=te");
       });
 
       it("removes from repeated language params and normalizes result", () => {
@@ -434,7 +434,7 @@ describe("filter-chip-utils", () => {
 
         const result = removeFilterFromUrl(params, chip);
 
-        expect(result).toBe("languages=en%2Cte");
+        expect(result).toBe("languages=en&languages=te");
       });
     });
 
@@ -512,7 +512,7 @@ describe("filter-chip-utils", () => {
 
       const result = clearAllFilters(params);
 
-      expect(result).toContain("q=downtown");
+      expect(result).toContain("where=downtown");
       expect(result).toContain("lat=37.7");
       expect(result).toContain("lng=-122.4");
       expect(result).not.toContain("minPrice");
@@ -559,7 +559,7 @@ describe("filter-chip-utils", () => {
       const preserved = new URLSearchParams(result);
 
       // Should preserve these
-      expect(preserved.get("q")).toBe("downtown");
+      expect(preserved.get("where")).toBe("downtown");
       expect(preserved.get("lat")).toBe("37.7");
       expect(preserved.get("lng")).toBe("-122.4");
       expect(preserved.get("sort")).toBe("newest");

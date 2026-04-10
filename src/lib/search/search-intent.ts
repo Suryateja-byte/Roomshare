@@ -5,6 +5,11 @@ import {
   deriveSearchBoundsFromPoint,
   type SearchLocationBoundsTuple,
 } from "@/lib/search/location-bounds";
+import {
+  applySearchQueryChange,
+  normalizeSearchQuery,
+  serializeSearchQuery,
+} from "@/lib/search/search-query";
 
 export interface SearchLocationSelection {
   lat: number;
@@ -72,29 +77,11 @@ export function buildSearchIntentParams(
     selectedLocation: SearchLocationSelection | null;
   }
 ): URLSearchParams {
-  const params = new URLSearchParams(currentParams.toString());
+  const currentQuery = normalizeSearchQuery(currentParams);
   const trimmedLocation = values.location.trim();
   const trimmedVibe = values.vibe.trim();
 
-  params.delete("page");
-  params.delete("cursor");
-  params.delete("cursorStack");
-  params.delete("pageNumber");
-
-  params.delete("q");
-  params.delete("where");
-  params.delete("what");
-
-  if (values.selectedLocation && trimmedLocation.length >= 2) {
-    params.set("where", trimmedLocation);
-  }
-  if (trimmedVibe.length >= 2) {
-    params.set("what", trimmedVibe);
-  }
-
   if (values.selectedLocation) {
-    params.set("lat", values.selectedLocation.lat.toString());
-    params.set("lng", values.selectedLocation.lng.toString());
     const bounds = boundsTupleToObject(
       values.selectedLocation.bounds ??
         deriveSearchBoundsFromPoint(
@@ -102,38 +89,36 @@ export function buildSearchIntentParams(
           values.selectedLocation.lng
         )
     );
-    params.set("minLng", bounds.minLng.toString());
-    params.set("minLat", bounds.minLat.toString());
-    params.set("maxLng", bounds.maxLng.toString());
-    params.set("maxLat", bounds.maxLat.toString());
-  } else {
-    params.delete("lat");
-    params.delete("lng");
-    // When a vibe query is present, bounds are required to avoid full-table scans.
-    // Preserve existing URL bounds if available; otherwise fall back to defaults.
-    const hasVibe = trimmedVibe.length >= 2;
-    const hasExistingBounds =
-      params.has("minLat") &&
-      params.has("maxLat") &&
-      params.has("minLng") &&
-      params.has("maxLng");
-    if (hasVibe && !hasExistingBounds) {
-      const fallback = boundsTupleToObject(
-        deriveSearchBoundsFromPoint(37.7749, -122.4194)
-      );
-      params.set("minLat", fallback.minLat.toString());
-      params.set("maxLat", fallback.maxLat.toString());
-      params.set("minLng", fallback.minLng.toString());
-      params.set("maxLng", fallback.maxLng.toString());
-    } else if (!hasVibe) {
-      // No vibe and no location — clean slate (browse mode)
-      params.delete("minLat");
-      params.delete("maxLat");
-      params.delete("minLng");
-      params.delete("maxLng");
-    }
-    // When hasVibe && hasExistingBounds: bounds already in URL, leave them.
+    return serializeSearchQuery(
+      applySearchQueryChange(currentQuery, "location", {
+        query: undefined,
+        locationLabel:
+          trimmedLocation.length >= 2 ? trimmedLocation : undefined,
+        vibeQuery: trimmedVibe.length >= 2 ? trimmedVibe : undefined,
+        lat: values.selectedLocation.lat,
+        lng: values.selectedLocation.lng,
+        bounds,
+      })
+    );
   }
 
-  return params;
+  const nextQuery = applySearchQueryChange(currentQuery, "location", {
+    query: undefined,
+    locationLabel: undefined,
+    vibeQuery: trimmedVibe.length >= 2 ? trimmedVibe : undefined,
+    lat: undefined,
+    lng: undefined,
+  });
+
+  if (trimmedVibe.length >= 2) {
+    nextQuery.bounds =
+      currentQuery.bounds ??
+      boundsTupleToObject(deriveSearchBoundsFromPoint(37.7749, -122.4194));
+  } else {
+    nextQuery.bounds = undefined;
+  }
+  nextQuery.lat = undefined;
+  nextQuery.lng = undefined;
+
+  return serializeSearchQuery(nextQuery);
 }

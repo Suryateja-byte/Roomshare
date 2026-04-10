@@ -405,7 +405,7 @@ export function scopedCards(page: Page): Locator {
  * `useEffect` sets `mounted = true`. This helper gates on that hydration so
  * tests don't interact with the inert placeholder.
  *
- * - Desktop (>= 768px): waits for `button[role="combobox"]`
+ * - Desktop (>= 768px): waits for the hydrated Sort trigger
  * - Mobile  (< 768px):  waits for `button[aria-label^="Sort:"]`
  */
 export async function waitForSortHydrated(page: Page): Promise<void> {
@@ -416,7 +416,10 @@ export async function waitForSortHydrated(page: Page): Promise<void> {
     const sortBtn = page.locator('button[aria-label^="Sort:"]');
     await expect(sortBtn).toBeAttached({ timeout: 30_000 });
   } else {
-    const sortBtn = page.locator('button[role="combobox"]');
+    const sortBtn = page
+      .locator('button[aria-label="Sort by"], button[role="combobox"]')
+      .filter({ visible: true })
+      .first();
     await expect(sortBtn).toBeAttached({ timeout: 30_000 });
   }
 }

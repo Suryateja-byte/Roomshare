@@ -24,11 +24,41 @@ export function isMapPage(pathname: string): boolean {
   return MAP_PAGE_PATTERNS.some((p) => p.test(pathname));
 }
 
+function normalizeHost(host?: string | null): string | null {
+  if (!host) return null;
+
+  const trimmed = host.trim().toLowerCase();
+  if (!trimmed) return null;
+
+  if (trimmed.startsWith("[")) {
+    const endIndex = trimmed.indexOf("]");
+    return endIndex === -1 ? trimmed : trimmed.slice(1, endIndex);
+  }
+
+  const colonCount = (trimmed.match(/:/g) ?? []).length;
+  if (colonCount <= 1) {
+    return trimmed.split(":")[0] || null;
+  }
+
+  return trimmed;
+}
+
+export function isLocalHost(host?: string | null): boolean {
+  const normalized = normalizeHost(host);
+  return (
+    normalized === "localhost" ||
+    normalized === "127.0.0.1" ||
+    normalized === "0.0.0.0" ||
+    normalized === "::1"
+  );
+}
+
 export function buildCspHeader(
   nonce?: string,
-  options?: { pathname?: string }
+  options?: { pathname?: string; host?: string | null }
 ): string {
   const isDev = process.env.NODE_ENV !== "production";
+  const isLocalRequestHost = isLocalHost(options?.host);
   const needsUnsafeEval = isDev || isMapPage(options?.pathname ?? "");
 
   const scriptSrcTokens: string[] = ["'self'"];
@@ -62,6 +92,8 @@ export function buildCspHeader(
     "form-action 'self'",
   ];
 
-  if (!isDev) directives.push("upgrade-insecure-requests");
+  if (!isDev && !isLocalRequestHost) {
+    directives.push("upgrade-insecure-requests");
+  }
   return directives.join("; ");
 }

@@ -9,6 +9,11 @@ import { ArrowUpDown, Check } from "lucide-react";
 import { FocusTrap } from "@/components/ui/FocusTrap";
 import { useBodyScrollLock } from "@/hooks/useBodyScrollLock";
 import {
+  applySearchQueryChange,
+  buildCanonicalSearchUrl,
+  normalizeSearchQuery,
+} from "@/lib/search/search-query";
+import {
   Select,
   SelectContent,
   SelectItem,
@@ -56,18 +61,14 @@ export default function SortSelect({ currentSort }: SortSelectProps) {
   const handleSortChange = useCallback(
     (newSort: string) => {
       setDesktopOpen(false);
-      const params = new URLSearchParams(searchParams.toString());
-      if (newSort === "recommended") {
-        params.delete("sort");
-      } else {
-        params.set("sort", newSort);
-      }
-      // Reset pagination state when sort changes (keyset + offset)
-      params.delete("page");
-      params.delete("cursor");
-      params.delete("cursorStack");
-      params.delete("pageNumber");
-      const url = `/search?${params.toString()}`;
+      const currentQuery = normalizeSearchQuery(
+        new URLSearchParams(searchParams.toString())
+      );
+      const url = buildCanonicalSearchUrl(
+        applySearchQueryChange(currentQuery, "sort", {
+          sort: newSort === "recommended" ? undefined : (newSort as SortOption),
+        })
+      );
       if (transitionContext) {
         transitionContext.navigateWithTransition(url);
       } else {

@@ -1,0 +1,121 @@
+name: Playwright Search Release Gate
+
+on:
+  pull_request:
+    branches: [main]
+  push:
+    branches: [main]
+  workflow_dispatch:
+
+env:
+  NODE_VERSION: "20"
+
+jobs:
+  search-release-gate:
+    name: Search Release Gate (${{ matrix.mode }})
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+
+    strategy:
+      fail-fast: false
+      matrix:
+        mode: [ssr, client]
+
+    services:
+      db:
+        image: postgis/postgis:16-3.4
+        env:
+          POSTGRES_USER: postgres
+          POSTGRES_PASSWORD: password
+          POSTGRES_DB: roomshare
+        ports:
+          - 5433:5432
+        options: >-
+          --health-cmd "pg_isready -U postgres"
+          --health-interval 10s
+          --health-timeout 5s
+          --health-retries 5
+
+    env:
+      DATABASE_URL: postgresql://postgres:password@localhost:5433/roomshare?schema=public
+      NEXTAUTH_SECRET: ci-test-secret-at-least-32-characters-long
+      NEXTAUTH_URL: http://127.0.0.1:3101
+      AUTH_URL: http://127.0.0.1:3101
+      AUTH_TRUST_HOST: "true"
+      E2E_BASE_URL: http://127.0.0.1:3101
+      SEARCH_RELEASE_GATE_PORT: "3101"
+      E2E_TEST_EMAIL: test@example.com
+      E2E_TEST_PASSWORD: TestPassword123!
+      E2E_ADMIN_EMAIL: e2e-admin@roomshare.dev
+      E2E_ADMIN_PASSWORD: TestPassword123!
+      E2E_DISABLE_RATE_LIMIT: "true"
+      E2E_TEST_HELPERS: "true"
+      E2E_TEST_SECRET: ci-e2e-test-secret-minimum-16-chars
+      NODE_OPTIONS: --max-old-space-size=4096
+      CI: "true"
+      GOOGLE_CLIENT_ID: ci-placeholder-not-used-in-tests
+      GOOGLE_CLIENT_SECRET: ci-placeholder-not-used-in-tests
+      TURNSTILE_ENABLED: "false"
+      NEXT_PUBLIC_NEARBY_ENABLED: "true"
+      CRON_SECRET: ci-e2e-cron-secret-minimum-32-characters-long
+      ENABLE_SEARCH_TEST_SCENARIOS: "true"
+      ENABLE_CLIENT_SIDE_SEARCH: ${{ matrix.mode == 'client' && 'true' || 'false' }}
+      NEXT_PUBLIC_ENABLE_CLIENT_SIDE_SEARCH: ${{ matrix.mode == 'client' && 'true' || 'false' }}
+      SEARCH_RELEASE_GATE_SKIP_BUILD: "true"
+
+    steps:
+      - uses: actions/checkout@v6
+
+      - name: Install pgvector extension in PostgreSQL
+        run: |
+          bash .github/scripts/install-pgvector.sh
+
+      - uses: pnpm/action-setup@v5
+        with:
+          version: 10
+
+      - uses: actions/setup-node@v6
+        with:
+          node-version: ${{ env.NODE_VERSION }}
+          cache: pnpm
+
+      - name: Install dependencies
+        run: pnpm install --frozen-lockfile
+
+      - name: Generate Prisma client and run migrations
+        run: pnpm exec prisma generate && pnpm exec prisma migrate deploy
+
+      - name: Get Playwright version
+        id: pw-version
+        run: echo "version=$(pnpm exec playwright --version | awk '{print $2}')" >> "$GITHUB_OUTPUT"
+
+      - name: Cache Playwright browsers
+        uses: actions/cache@v5
+        with:
+          path: ~/.cache/ms-playwright
+          key: search-release-gate-${{ runner.os }}-${{ steps.pw-version.outputs.version }}
+
+      - name: Install Playwright browsers
+        run: pnpm exec playwright install --with-deps chromium webkit
+
+      - name: Build Next.js production bundle
+        run: pnpm run build
+
+      - name: Run search release gate
+        run: pnpm run test:e2e:search-release-gate:${{ matrix.mode }}
+
+      - name: Upload release-gate report
+        uses: actions/upload-artifact@v7
+        if: ${{ !cancelled() }}
+        with:
+          name: search-release-gate-report-${{ matrix.mode }}
+          path: playwright-report/
+          retention-days: 14
+
+      - name: Upload release-gate artifacts on failure
+        uses: actions/upload-artifact@v7
+        if: failure()
+        with:
+          name: search-release-gate-results-${{ matrix.mode }}
+          path: test-results/
+          retention-days: 14

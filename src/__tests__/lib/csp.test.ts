@@ -69,6 +69,17 @@ describe("buildCspHeader", () => {
       const { buildCspHeader } = require("@/lib/csp");
       expect(buildCspHeader("abc123")).toContain("upgrade-insecure-requests");
     });
+
+    it("does NOT include upgrade-insecure-requests for localhost hosts", () => {
+      jest.resetModules();
+      const { buildCspHeader } = require("@/lib/csp");
+      expect(
+        buildCspHeader("abc123", { host: "127.0.0.1:3000" })
+      ).not.toContain("upgrade-insecure-requests");
+      expect(
+        buildCspHeader("abc123", { host: "localhost:3000" })
+      ).not.toContain("upgrade-insecure-requests");
+    });
   });
 
   // SEC-002: Route-scoped unsafe-eval

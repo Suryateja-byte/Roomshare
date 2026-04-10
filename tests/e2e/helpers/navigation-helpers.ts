@@ -227,14 +227,74 @@ export function navigationHelpers(page: Page) {
      * Use the search form from any page
      */
     async search(location: string) {
+      const initialUrl = page.url();
       const searchInput = page
-        .getByPlaceholder(/location|city|area|where/i)
-        .or(page.locator('input[name="location"]'))
-        .or(page.locator('[data-testid="search-input"]'));
+        .locator(
+          [
+            'input[placeholder*="Search destinations" i]',
+            'input[placeholder*="location" i]',
+            'input[placeholder*="city" i]',
+            'input[placeholder*="area" i]',
+            'input[placeholder*="where" i]',
+            'input[name="location"]',
+            '[data-testid="search-input"] input',
+            '[data-testid="search-input"]',
+          ].join(", ")
+        )
+        .filter({ visible: true })
+        .first();
 
+      await searchInput.click();
       await searchInput.fill(location);
-      await searchInput.press("Enter");
-      await page.waitForURL(/\/search/, { timeout: timeouts.navigation });
+      const suggestionButton = page
+        .locator('[role="listbox"] button')
+        .filter({ visible: true })
+        .first();
+
+      const selectedSuggestion = await suggestionButton
+        .waitFor({ state: "visible", timeout: 5_000 })
+        .then(() => true)
+        .catch(() => false);
+
+      if (selectedSuggestion) {
+        await suggestionButton.click();
+      }
+
+      const form = searchInput.locator("xpath=ancestor::form[1]");
+      const searchButton = form
+        .getByRole("button", { name: /^search$/i })
+        .or(form.locator('button[aria-label="Search"]'))
+        .filter({ visible: true })
+        .first();
+
+      await searchInput.press("Enter").catch(() => {});
+
+      const navigated = await (initialUrl.includes("/search")
+        ? page.waitForFunction(
+            (previousUrl) => window.location.href !== previousUrl,
+            initialUrl,
+            {
+              timeout: 5_000,
+            }
+          )
+        : page.waitForURL(/\/search/, { timeout: 5_000 }))
+        .then(() => true)
+        .catch(() => false);
+
+      if (!navigated) {
+        await searchButton.click();
+        if (initialUrl.includes("/search")) {
+          await page.waitForFunction(
+            (previousUrl) => window.location.href !== previousUrl,
+            initialUrl,
+            {
+              timeout: timeouts.navigation,
+            }
+          );
+        } else {
+          await page.waitForURL(/\/search/, { timeout: timeouts.navigation });
+        }
+      }
     },
 
     /**

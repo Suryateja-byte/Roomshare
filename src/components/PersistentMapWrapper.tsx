@@ -25,17 +25,25 @@ import {
   useRef,
   useCallback,
   useMemo,
+  useId,
   lazy,
   Suspense,
 } from "react";
 import type { MapListingData } from "@/lib/data";
 import { buildCanonicalFilterParamsFromSearchParams } from "@/lib/search-params";
+import { normalizeSearchQuery } from "@/lib/search/search-query";
+import {
+  getSearchQueryHash,
+  type SearchMapState,
+  type SearchResponseMeta,
+} from "@/lib/search/search-response";
 import {
   useV2MapData,
   useIsV2Enabled,
   type V2MapData,
 } from "@/contexts/SearchV2DataContext";
 import { useActivePanBoundsState } from "@/contexts/ActivePanBoundsContext";
+import { useSearchTestScenario } from "@/contexts/SearchTestScenarioContext";
 import { MapErrorBoundary } from "@/components/map/MapErrorBoundary";
 import { useSearchTransitionSafe } from "@/contexts/SearchTransitionContext";
 import { useMediaQuery } from "@/hooks/useMediaQuery";
@@ -48,6 +56,7 @@ import {
   LNG_MIN,
   LNG_MAX,
 } from "@/lib/constants";
+import { getScenarioHeaderValue } from "@/lib/search/testing/search-scenarios";
 
 // CRITICAL: Lazy import - only loads when component renders
 // This defers the maplibre-gl bundle until user opts to see map
@@ -421,10 +430,12 @@ export default function PersistentMapWrapper({
   shouldRenderMap,
 }: PersistentMapWrapperProps) {
   const isDesktop = useMediaQuery("(min-width: 768px)");
+  const shellInstanceId = useId();
   const searchParams = useSearchParams();
+  const testScenario = useSearchTestScenario();
   const [listings, setListings] = useState<MapListingData[]>([]);
   // mapSource tracks whether the most recent data came from a client fetch ('v1') or SSR payload ('v2')
-  const [mapSource, setMapSource] = useState<"v1" | "v2">("v2");
+  const [mapSource, setMapSource] = useState<"v1" | "v2">("v1");
   const [isFetchingMapData, setIsFetchingMapData] = useState(false);
   const [error, setError] = useState<string | null>(null);
   // Stale-while-revalidate: keep last successful fetch visible during loading
@@ -591,13 +602,23 @@ export default function PersistentMapWrapper({
   // D3.1 FIX: Track whether a 429 retry is scheduled so the finally block
   // doesn't hide the loading bar during the retry delay.
   const isRetryScheduledRef = useRef<boolean>(false);
+  const latestMapRequestRef = useRef<string | null>(null);
+  const searchParamsString = searchParams.toString();
+  const currentQueryHash = useMemo(
+    () => getSearchQueryHash(normalizeSearchQuery(new URLSearchParams(searchParamsString))),
+    [searchParamsString]
+  );
 
   const fetchListings = useCallback(
     async (
       paramsString: string,
       signal?: AbortSignal,
-      fetchBounds?: ViewportBounds
+      fetchBounds?: ViewportBounds,
+      expectedQueryHash?: string
     ) => {
+      const requestQueryHash = expectedQueryHash ?? currentQueryHash;
+      const requestKey = `${requestQueryHash}:${paramsString}`;
+      latestMapRequestRef.current = requestKey;
       isRetryScheduledRef.current = false;
       setIsFetchingMapData(true);
       setError(null);
@@ -631,6 +652,10 @@ export default function PersistentMapWrapper({
       try {
         const response = await fetch(`/api/map-listings?${paramsString}`, {
           signal: timeoutController.signal,
+          headers: {
+            "x-search-query-hash": requestQueryHash,
+            ...getScenarioHeaderValue(testScenario),
+          },
         });
 
         if (!response.ok) {
@@ -673,9 +698,17 @@ export default function PersistentMapWrapper({
             // The original `signal` may have been aborted by effect cleanup
             // (e.g., user panned) between the 429 and the retry timeout firing.
             retryTimeoutRef.current = setTimeout(() => {
+              if (latestMapRequestRef.current !== requestKey) {
+                return;
+              }
               const retryController = new AbortController();
               searchAbortRef.current = retryController;
-              fetchListings(paramsString, retryController.signal, fetchBounds);
+              fetchListings(
+                paramsString,
+                retryController.signal,
+                fetchBounds,
+                requestQueryHash
+              );
             }, retryDelayMs);
 
             return; // Exit without throwing - retry will happen automatically
@@ -710,10 +743,43 @@ export default function PersistentMapWrapper({
           throw new Error(errorMessage);
         }
 
-        const data = await response.json();
-        const fetched = data.listings || [];
+        const data = (await response.json()) as
+          | SearchMapState
+          | {
+              kind: "ok";
+              data: { listings: MapListingData[]; truncated?: boolean };
+              meta: SearchResponseMeta;
+            };
+
+        if (
+          latestMapRequestRef.current !== requestKey ||
+          !("meta" in data) ||
+          data.meta.queryHash !== requestQueryHash
+        ) {
+          return;
+        }
+
+        if (data.kind === "location-required" || data.kind === "zero-results") {
+          setIsMapTruncated(false);
+          previousListingsRef.current = [];
+          setListings([]);
+          setMapSource("v1");
+          retryCountRef.current = 0;
+          return;
+        }
+
+        if (data.kind === "rate-limited") {
+          setError("Too many requests. Please wait a moment.");
+          return;
+        }
+
+        if (data.kind !== "ok" || !("data" in data)) {
+          return;
+        }
+
+        const fetched = data.data.listings || [];
         // UX-13 FIX: Read truncation flag from API response (LIMIT+1 detection)
-        setIsMapTruncated(data.truncated === true);
+        setIsMapTruncated(data.data.truncated === true);
         previousListingsRef.current = fetched;
         setListings(fetched);
         setMapSource("v1"); // Set v1 as active since we just fetched client-side
@@ -749,21 +815,28 @@ export default function PersistentMapWrapper({
       } catch (err) {
         if (didTimeout && (err as Error).name === "AbortError") {
           // Timeout-triggered abort — show user-friendly error
-          setError("Map data request timed out. Please try again.");
+          if (latestMapRequestRef.current === requestKey) {
+            setError("Map data request timed out. Please try again.");
+          }
         } else if ((err as Error).name !== "AbortError") {
-          console.error("Failed to fetch map listings:", err);
-          setError((err as Error).message || "Failed to load map data");
+          if (latestMapRequestRef.current === requestKey) {
+            console.error("Failed to fetch map listings:", err);
+            setError((err as Error).message || "Failed to load map data");
+          }
         }
       } finally {
         clearTimeout(timeoutId);
         // D3.1 FIX: Keep loading bar visible during 429 retry delay.
         // Only clear fetching state if no retry is pending.
-        if (!isRetryScheduledRef.current) {
+        if (
+          latestMapRequestRef.current === requestKey &&
+          !isRetryScheduledRef.current
+        ) {
           setIsFetchingMapData(false);
         }
       }
     },
-    []
+    [currentQueryHash, testScenario]
   );
 
   // Single effect that handles both initial fetch and param changes
@@ -907,7 +980,12 @@ export default function PersistentMapWrapper({
     // Small debounce to coalesce rapid URL updates without adding noticeable lag.
     fetchTimeoutRef.current = setTimeout(() => {
       lastFetchedParamsRef.current = paramsString;
-      fetchListings(paddedParamsString, abortController.signal, paddedBounds);
+      fetchListings(
+        paddedParamsString,
+        abortController.signal,
+        paddedBounds,
+        currentQueryHash
+      );
     }, MAP_FETCH_DEBOUNCE_MS);
 
     return () => {
@@ -922,7 +1000,7 @@ export default function PersistentMapWrapper({
       }
     };
     // eslint-disable-next-line react-hooks/exhaustive-deps -- intentional dependency omission to prevent infinite loops
-  }, [searchParams, fetchListings, shouldRenderMap, isV2Enabled, hasV2Data]);
+  }, [currentQueryHash, searchParams, fetchListings, shouldRenderMap, isV2Enabled, hasV2Data]);
 
   // Proactive fetching during map pan (triggered via activePanBounds)
   useEffect(() => {
@@ -968,7 +1046,12 @@ export default function PersistentMapWrapper({
     // Fast debounce for dragging
     fetchTimeoutRef.current = setTimeout(() => {
       lastFetchedParamsRef.current = paddedParamsString;
-      fetchListings(paddedParamsString, abortController.signal, paddedBounds);
+      fetchListings(
+        paddedParamsString,
+        abortController.signal,
+        paddedBounds,
+        currentQueryHash
+      );
     }, 100);
 
     return () => {
@@ -978,6 +1061,7 @@ export default function PersistentMapWrapper({
     };
   }, [
     activePanBounds,
+    currentQueryHash,
     searchParams,
     shouldRenderMap,
     isV2Enabled,
@@ -1004,8 +1088,13 @@ export default function PersistentMapWrapper({
     // Force a refetch by clearing the last fetched ref
     lastFetchedParamsRef.current = null;
     setError(null);
-    fetchListings(getMapRelevantParams(searchParams), abortController.signal);
-  }, [searchParams, fetchListings]);
+    fetchListings(
+      getMapRelevantParams(searchParams),
+      abortController.signal,
+      undefined,
+      currentQueryHash
+    );
+  }, [currentQueryHash, searchParams, fetchListings]);
 
   // P2-FIX (#115): Also show placeholder when data path hasn't been determined yet.
   // This prevents the brief empty map flash between mount and v2 signal.
@@ -1026,7 +1115,11 @@ export default function PersistentMapWrapper({
   // zero height (h-full chain issue) combined with overflow-hidden clipping
   if (showInitialPlaceholder) {
     return (
-      <div className="relative w-full h-full min-h-[300px]">
+      <div
+        data-testid="map-shell"
+        data-instance-id={shellInstanceId}
+        className="relative w-full h-full min-h-[300px]"
+      >
         {error ? (
           <MapErrorBanner message={error} onRetry={handleRetry} />
         ) : (
@@ -1037,7 +1130,11 @@ export default function PersistentMapWrapper({
   }
 
   return (
-    <div className="relative w-full h-full min-h-[300px]">
+    <div
+      data-testid="map-shell"
+      data-instance-id={shellInstanceId}
+      className="relative w-full h-full min-h-[300px]"
+    >
       {/* P2-FIX (#151): Show error banner for errors, info banner for non-error messages */}
       {error && <MapErrorBanner message={error} onRetry={handleRetry} />}
       {!error && infoMessage && <MapInfoBanner message={infoMessage} />}

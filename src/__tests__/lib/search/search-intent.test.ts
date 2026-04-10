@@ -48,14 +48,14 @@ describe("search-intent helpers", () => {
       }
     );
 
-    expect(params.get("sort")).toBe("recommended");
+    expect(params.get("sort")).toBeNull();
     expect(params.get("amenities")).toBe("Wifi");
     expect(params.get("where")).toBe("San Francisco");
     expect(params.get("what")).toBe("quiet roommates");
     expect(params.get("lat")).toBe("37.7749");
     expect(params.get("lng")).toBe("-122.4194");
-    expect(params.get("minLng")).toBe("-122.6");
-    expect(params.get("maxLat")).toBe("37.9");
+    expect(params.get("minLng")).toBe("-122.600");
+    expect(params.get("maxLat")).toBe("37.900");
     expect(params.get("page")).toBeNull();
     expect(params.get("cursor")).toBeNull();
   });

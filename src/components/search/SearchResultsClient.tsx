@@ -27,8 +27,21 @@ import { ExpandSearchSuggestions } from "@/components/search/ExpandSearchSuggest
 import { findSplitStays } from "@/lib/search/split-stay";
 import { getFilterSuggestions } from "@/app/actions/filter-suggestions";
 import { useMobileSearch } from "@/contexts/MobileSearchContext";
+import { useSearchTestScenario } from "@/contexts/SearchTestScenarioContext";
 import type { ListingData, FilterSuggestion } from "@/lib/data";
 import type { FilterParams } from "@/lib/search-types";
+import {
+  getSearchQueryHash,
+  SEARCH_RESPONSE_VERSION,
+  type SearchListPayload,
+  type SearchListState,
+  type SearchResponseMeta,
+} from "@/lib/search/search-response";
+import {
+  normalizeSearchQuery,
+  serializeSearchQuery,
+} from "@/lib/search/search-query";
+import { getScenarioHeaderValue } from "@/lib/search/testing/search-scenarios";
 
 /**
  * Maximum accumulated listings before showing a "continue" link.
@@ -64,6 +77,8 @@ interface SearchResultsClientProps {
   nearMatchExpansion?: string;
   /** Subtle advisory when vibe search falls back to broader area matches */
   vibeAdvisory?: string;
+  initialResponseMeta?: SearchResponseMeta;
+  initialStateKind?: SearchListState["kind"];
   /** When true, URL changes trigger client-side fetch instead of SSR */
   clientSideSearchEnabled?: boolean;
 }
@@ -82,9 +97,25 @@ export function SearchResultsClient({
   filterSuggestions,
   nearMatchExpansion,
   vibeAdvisory,
+  initialResponseMeta,
+  initialStateKind,
   clientSideSearchEnabled = false,
 }: SearchResultsClientProps) {
+  const resolvedInitialResponseMeta = useMemo(
+    () =>
+      initialResponseMeta ?? {
+        queryHash: getSearchQueryHash(
+          normalizeSearchQuery(new URLSearchParams(searchParamsString))
+        ),
+        backendSource: "v1-fallback",
+        responseVersion: SEARCH_RESPONSE_VERSION,
+      },
+    [initialResponseMeta, searchParamsString]
+  );
+  const resolvedInitialStateKind =
+    initialStateKind ?? (hasConfirmedZeroResults ? "zero-results" : "ok");
   const { setSearchResultsLabel } = useMobileSearch();
+  const testScenario = useSearchTestScenario();
   const [isHydrated, setIsHydrated] = useState(false);
   const [extraListings, setExtraListings] = useState<ListingData[]>([]);
   const [nextCursor, setNextCursor] = useState<string | null>(
@@ -106,6 +137,9 @@ export function SearchResultsClient({
     useState(savedListingIds);
   const [resolvedFilterSuggestions, setResolvedFilterSuggestions] =
     useState(filterSuggestions);
+  const [responseMeta, setResponseMeta] = useState(resolvedInitialResponseMeta);
+  const [searchStateKind, setSearchStateKind] =
+    useState<SearchListState["kind"]>(resolvedInitialStateKind);
 
   // Hydrate showTotalPrice from sessionStorage after mount to avoid hydration mismatch
   useEffect(() => {
@@ -141,6 +175,7 @@ export function SearchResultsClient({
   const [isClientFetching, setIsClientFetching] = useState(false);
   const clientFetchAbortRef = useRef<AbortController | null>(null);
   const previousSearchParamsRef = useRef<string | null>(null);
+  const latestQueryHashRef = useRef(resolvedInitialResponseMeta.queryHash);
 
   // Listen for URL search param changes (triggered by replaceState in Map.tsx)
   const currentSearchParams = useSearchParams();
@@ -148,6 +183,28 @@ export function SearchResultsClient({
     () => currentSearchParams.toString(),
     [currentSearchParams]
   );
+  const currentNormalizedQuery = useMemo(
+    () => normalizeSearchQuery(new URLSearchParams(currentSearchParamsString)),
+    [currentSearchParamsString]
+  );
+  const canonicalSearchParamsString = useMemo(
+    () =>
+      serializeSearchQuery(currentNormalizedQuery, {
+        includePagination: false,
+      }).toString(),
+    [currentNormalizedQuery]
+  );
+  const activeSearchParamsString = clientSideSearchEnabled
+    ? canonicalSearchParamsString
+    : searchParamsString;
+  const currentQueryHash = useMemo(
+    () => getSearchQueryHash(currentNormalizedQuery),
+    [currentNormalizedQuery]
+  );
+
+  useEffect(() => {
+    latestQueryHashRef.current = currentQueryHash;
+  }, [currentQueryHash]);
 
   useEffect(() => {
     if (!clientSideSearchEnabled) return;
@@ -166,21 +223,21 @@ export function SearchResultsClient({
     clientFetchAbortRef.current?.abort();
     const controller = new AbortController();
     clientFetchAbortRef.current = controller;
+    const requestQueryHash = currentQueryHash;
 
     setIsClientFetching(true);
-
-    // Strip cursor/page from params (fresh search, not pagination)
-    const fetchParams = new URLSearchParams(currentSearchParamsString);
-    fetchParams.delete("cursor");
-    fetchParams.delete("cursorStack");
-    fetchParams.delete("pageNumber");
-    fetchParams.delete("page");
 
     void (async () => {
       try {
         const response = await fetch(
-          `/api/search/listings?${fetchParams.toString()}`,
-          { signal: controller.signal }
+          `/api/search/listings?${canonicalSearchParamsString}`,
+          {
+            signal: controller.signal,
+            headers: {
+              "x-search-query-hash": requestQueryHash,
+              ...getScenarioHeaderValue(testScenario),
+            },
+          }
         );
 
         if (!response.ok) {
@@ -189,17 +246,28 @@ export function SearchResultsClient({
           return;
         }
 
-        const data = (await response.json()) as {
-          items: ListingData[];
-          nextCursor: string | null;
-          total: number | null;
-          nearMatchExpansion?: string;
-          vibeAdvisory?: string;
-          unboundedSearch?: boolean;
-        };
+        const data = (await response.json()) as
+          | SearchListState
+          | {
+              kind: "degraded";
+              source: "v1-fallback" | "partial";
+              data: SearchListPayload;
+              meta: SearchResponseMeta;
+            };
 
-        // Unbounded search: clear results
-        if (data.unboundedSearch) {
+        if (
+          controller.signal.aborted ||
+          !("meta" in data) ||
+          data.meta.queryHash !== requestQueryHash ||
+          latestQueryHashRef.current !== requestQueryHash
+        ) {
+          return;
+        }
+
+        setResponseMeta(data.meta);
+        setSearchStateKind(data.kind);
+
+        if (data.kind === "location-required" || data.kind === "zero-results") {
           setClientFetchedListings([]);
           setClientFetchedTotal(0);
           setNextCursor(null);
@@ -209,18 +277,22 @@ export function SearchResultsClient({
           return;
         }
 
+        if (data.kind === "rate-limited") {
+          return;
+        }
+
         // Replace listings in-place (no remount)
-        setClientFetchedListings(data.items);
-        setClientFetchedTotal(data.total);
-        setClientFetchedNearMatch(data.nearMatchExpansion);
-        setClientFetchedVibeAdvisory(data.vibeAdvisory);
+        setClientFetchedListings(data.data.items);
+        setClientFetchedTotal(data.data.total);
+        setClientFetchedNearMatch(data.data.nearMatchExpansion);
+        setClientFetchedVibeAdvisory(data.data.vibeAdvisory);
 
         // Reset pagination state for new results
         setExtraListings([]);
-        setNextCursor(data.nextCursor);
-        seenIdsRef.current = new Set(data.items.map((l) => l.id));
+        setNextCursor(data.data.nextCursor);
+        seenIdsRef.current = new Set(data.data.items.map((l) => l.id));
         fetchedFavIdsRef.current = new Set();
-        totalCountRef.current = data.items.length;
+        totalCountRef.current = data.data.items.length;
       } catch (err) {
         if ((err as Error).name === "AbortError") return;
         // Fetch failed: keep old listings visible, no crash
@@ -232,7 +304,7 @@ export function SearchResultsClient({
     })();
 
     return () => controller.abort();
-  }, [clientSideSearchEnabled, currentSearchParamsString]);
+  }, [canonicalSearchParamsString, clientSideSearchEnabled, currentQueryHash, currentSearchParamsString]);
 
   // Use client-fetched data when available, otherwise fall back to SSR props
   const effectiveListings = clientFetchedListings ?? initialListings;
@@ -261,6 +333,11 @@ export function SearchResultsClient({
     }
   }, [initialDataFingerprint, initialNextCursor, initialListings]);
 
+  useEffect(() => {
+    setResponseMeta(resolvedInitialResponseMeta);
+    setSearchStateKind(resolvedInitialStateKind);
+  }, [resolvedInitialResponseMeta, resolvedInitialStateKind]);
+
   const allListings = useMemo(
     () => [...effectiveListings, ...extraListings],
     [effectiveListings, extraListings]
@@ -286,7 +363,7 @@ export function SearchResultsClient({
 
   // Derive estimatedMonths from moveInDate/moveOutDate, falling back to leaseDuration
   const estimatedMonths = useMemo(() => {
-    const sp = new URLSearchParams(searchParamsString);
+    const sp = new URLSearchParams(activeSearchParamsString);
     const moveIn = sp.get("moveInDate");
     const moveOut = sp.get("moveOutDate");
     if (moveIn && moveOut) {
@@ -305,7 +382,7 @@ export function SearchResultsClient({
     if (!ld) return 1;
     const match = ld.match(/^(\d+)\s+months?$/i);
     return match ? parseInt(match[1], 10) : 1;
-  }, [searchParamsString]);
+  }, [activeSearchParamsString]);
 
   // Compute split stay pairs for long durations (6+ months)
   const splitStayPairs = useMemo(
@@ -317,7 +394,7 @@ export function SearchResultsClient({
   // Keep this in sync with URL updates so fetchMore uses current filters/bounds.
   const rawParams = useMemo(() => {
     const params: Record<string, string | string[] | undefined> = {};
-    const sp = new URLSearchParams(searchParamsString);
+    const sp = new URLSearchParams(activeSearchParamsString);
     for (const [key, value] of sp.entries()) {
       const existing = params[key];
       if (existing) {
@@ -329,7 +406,7 @@ export function SearchResultsClient({
       }
     }
     return params;
-  }, [searchParamsString]);
+  }, [activeSearchParamsString]);
 
   const handleLoadMore = useCallback(async () => {
     if (!nextCursor || isLoadingRef.current) return;
@@ -341,7 +418,21 @@ export function SearchResultsClient({
     safeMark("load-more-start");
 
     try {
-      const result = await fetchMoreListings(nextCursor, rawParams);
+      const requestQueryHash = latestQueryHashRef.current;
+      const result = await fetchMoreListings(
+        nextCursor,
+        rawParams,
+        requestQueryHash,
+        testScenario
+      );
+
+      if (
+        result.meta?.queryHash &&
+        (result.meta.queryHash !== requestQueryHash ||
+          latestQueryHashRef.current !== requestQueryHash)
+      ) {
+        return;
+      }
 
       // M14 FIX: Handle rate limit via discriminated field (not string matching)
       if (result.rateLimited) {
@@ -515,9 +606,24 @@ export function SearchResultsClient({
     <div
       id="search-results"
       tabIndex={-1}
+      data-testid="search-shell"
+      data-query-hash={responseMeta.queryHash}
+      data-search-query-hash={responseMeta.queryHash}
+      data-search-state={searchStateKind}
+      data-backend-source={responseMeta.backendSource}
+      data-search-backend-source={responseMeta.backendSource}
+      data-response-version={responseMeta.responseVersion}
+      data-search-response-version={responseMeta.responseVersion}
       className="!outline-none pb-24 md:pb-0"
     >
       {/* Screen reader announcement for search results */}
+      <div
+        data-testid="search-backend-source"
+        className="sr-only"
+        aria-hidden="true"
+      >
+        {responseMeta.backendSource}
+      </div>
       <div
         role="status"
         aria-live="polite"
@@ -572,7 +678,7 @@ export function SearchResultsClient({
             </div>
           ) : (
             <Link
-              href={`/search?${clearAllFilters(new URLSearchParams(searchParamsString))}`}
+              href={`/search?${clearAllFilters(new URLSearchParams(activeSearchParamsString))}`}
               className="mt-6 px-4 py-2.5 rounded-full border border-outline-variant/20 bg-transparent hover:bg-surface-canvas text-on-surface text-sm font-medium transition-colors touch-target"
             >
               Clear all filters
@@ -769,7 +875,7 @@ export function SearchResultsClient({
           {total !== null && total > 0 && total <= 5 && (
             <ExpandSearchSuggestions
               currentCount={total}
-              searchParamsString={searchParamsString}
+              searchParamsString={activeSearchParamsString}
             />
           )}
 

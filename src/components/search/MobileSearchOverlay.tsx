@@ -27,6 +27,11 @@ import {
   readSearchIntentState,
   type SearchLocationSelection,
 } from "@/lib/search/search-intent";
+import {
+  applySearchQueryChange,
+  buildCanonicalSearchUrl,
+  normalizeSearchQuery,
+} from "@/lib/search/search-query";
 
 interface MobileSearchOverlayProps {
   /** Whether the overlay is open */
@@ -91,12 +96,29 @@ export default function MobileSearchOverlay({
       setLocationCoords(intentState.selectedLocation);
       setMinPrice(searchParams.get("minPrice") || "");
       setMaxPrice(searchParams.get("maxPrice") || "");
-
-      // Auto-focus location input after animation
-      const timer = setTimeout(() => locationInputRef.current?.focus(), 200);
-      return () => clearTimeout(timer);
     }
   }, [isOpen, searchParams, searchParamsString]);
+
+  useEffect(() => {
+    if (!isOpen) return;
+
+    const focusLocationInput = () => {
+      if (
+        locationInputRef.current &&
+        document.activeElement !== locationInputRef.current
+      ) {
+        locationInputRef.current.focus();
+      }
+    };
+
+    const rafId = window.requestAnimationFrame(focusLocationInput);
+    const timer = window.setTimeout(focusLocationInput, 250);
+
+    return () => {
+      window.cancelAnimationFrame(rafId);
+      window.clearTimeout(timer);
+    };
+  }, [isOpen]);
 
   // Escape closes
   useEffect(() => {
@@ -132,11 +154,12 @@ export default function MobileSearchOverlay({
         vibe: currentIntent.vibeInput,
         selectedLocation,
       });
-
-      if (minPrice) params.set("minPrice", minPrice);
-      else params.delete("minPrice");
-      if (maxPrice) params.set("maxPrice", maxPrice);
-      else params.delete("maxPrice");
+      const nextUrl = buildCanonicalSearchUrl(
+        applySearchQueryChange(normalizeSearchQuery(params), "filter", {
+          minPrice: minPrice ? Number.parseFloat(minPrice) : undefined,
+          maxPrice: maxPrice ? Number.parseFloat(maxPrice) : undefined,
+        })
+      );
 
       window.dispatchEvent(
         new CustomEvent<MapFlyToEventDetail>(MAP_FLY_TO_EVENT, {
@@ -144,7 +167,7 @@ export default function MobileSearchOverlay({
         })
       );
 
-      router.push(`/search?${params.toString()}`);
+      router.push(nextUrl);
       onClose();
     },
     [searchParams, searchParamsString, minPrice, maxPrice, router, onClose]
@@ -185,18 +208,12 @@ export default function MobileSearchOverlay({
       vibe: currentIntent.vibeInput,
       selectedLocation: locationCoords,
     });
-
-    // Update price
-    if (minPrice) {
-      params.set("minPrice", minPrice);
-    } else {
-      params.delete("minPrice");
-    }
-    if (maxPrice) {
-      params.set("maxPrice", maxPrice);
-    } else {
-      params.delete("maxPrice");
-    }
+    const nextUrl = buildCanonicalSearchUrl(
+      applySearchQueryChange(normalizeSearchQuery(params), "filter", {
+        minPrice: minPrice ? Number.parseFloat(minPrice) : undefined,
+        maxPrice: maxPrice ? Number.parseFloat(maxPrice) : undefined,
+      })
+    );
 
     // Dispatch fly-to event so the persistent map flies to the new location.
     // On mobile the map never remounts (it lives in layout), so without this
@@ -213,7 +230,7 @@ export default function MobileSearchOverlay({
       window.dispatchEvent(event);
     }
 
-    router.push(`/search?${params.toString()}`);
+    router.push(nextUrl);
     onClose();
   }, [
     searchParams,
@@ -240,7 +257,9 @@ export default function MobileSearchOverlay({
             }
           : null,
       });
-      router.push(`/search?${params.toString()}`);
+      router.push(
+        buildCanonicalSearchUrl(normalizeSearchQuery(params))
+      );
       onClose();
     },
     [onClose, recentSearches, router, searchParams, searchParamsString]
@@ -261,11 +280,12 @@ export default function MobileSearchOverlay({
             exit={{ y: "100%" }}
             transition={reducedMotion ? { duration: 0 } : { type: "spring", damping: 25, stiffness: 300, mass: 0.8 }}
             className="fixed inset-0 z-[1200] bg-surface-container-lowest flex flex-col"
+            data-testid="mobile-search-overlay"
             role="dialog"
             aria-modal="true"
             aria-label="Search"
           >
-            <FocusTrap active={isOpen}>
+            <FocusTrap active={isOpen} initialFocusRef={locationInputRef}>
               {/* Header — back arrow + title */}
               <div className="flex items-center gap-3 px-4 pt-3 pb-3 border-b border-outline-variant/20">
                 <button
@@ -305,6 +325,8 @@ export default function MobileSearchOverlay({
                       <LocationSearchInput
                         id="mobile-search-where"
                         value={location}
+                        inputRef={locationInputRef}
+                        autoFocus={isOpen}
                         onChange={(nextLocation) => {
                           setLocation(nextLocation);
                           setLocationCoords(null);

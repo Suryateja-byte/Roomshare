@@ -14,10 +14,9 @@ import { Button } from "@/components/ui/button";
 import {
   parseSearchParams,
   buildRawParamsFromSearchParams,
-  buildCanonicalFilterParamsFromSearchParams,
+  type RawSearchParams,
 } from "@/lib/search-params";
 import { executeSearchV2 } from "@/lib/search/search-v2-service";
-import { V1PathResetSetter } from "@/components/search/V1PathResetSetter";
 import { SearchResultsLoadingWrapper } from "@/components/search/SearchResultsLoadingWrapper";
 import { InlineFilterStrip } from "@/components/search/InlineFilterStrip";
 import { features } from "@/lib/env";
@@ -29,6 +28,20 @@ import { checkServerComponentRateLimit } from "@/lib/with-rate-limit";
 import { headers } from "next/headers";
 import * as Sentry from "@sentry/nextjs";
 import type { Metadata } from "next";
+import {
+  createSearchResponseMeta,
+  type SearchListState,
+} from "@/lib/search/search-response";
+import {
+  buildCanonicalSearchUrl,
+  normalizeSearchQuery,
+  serializeSearchQuery,
+} from "@/lib/search/search-query";
+import {
+  buildScenarioSearchListState,
+  resolveSearchScenario,
+  SEARCH_SCENARIO_HEADER,
+} from "@/lib/search/testing/search-scenarios";
 
 type SearchPageSearchParams = {
   q?: string;
@@ -57,8 +70,77 @@ type SearchPageSearchParams = {
   v2?: string;
 };
 
+export const runtime = "nodejs";
+
 interface SearchPageProps {
   searchParams: Promise<SearchPageSearchParams>;
+}
+
+function renderLocationRequiredState(searchLabel: string) {
+  return (
+    <div className="px-4 sm:px-6 py-8 sm:py-12 max-w-[840px] mx-auto">
+      <div className="text-center py-12">
+        <div className="w-16 h-16 mx-auto mb-6 bg-primary/10 rounded-full flex items-center justify-center">
+          <Search className="w-8 h-8 text-primary" />
+        </div>
+        <h1 className="text-2xl font-display font-bold text-on-surface mb-3">
+          Please select a location
+        </h1>
+        <p className="text-on-surface-variant max-w-md mx-auto mb-6">
+          To search for &ldquo;{searchLabel}&rdquo;, please select a location
+          from the dropdown suggestions. This helps us find relevant listings in
+          your area.
+        </p>
+        <Button asChild>
+          <Link href="/">
+            <Search className="w-4 h-4" />
+            Try a new search
+          </Link>
+        </Button>
+      </div>
+    </div>
+  );
+}
+
+function renderRateLimitedState() {
+  return (
+    <div className="px-4 sm:px-6 py-8 sm:py-12 max-w-[840px] mx-auto">
+      <div className="text-center py-12">
+        <h1 className="text-2xl font-display font-bold text-on-surface mb-3">
+          Too many requests
+        </h1>
+        <p className="text-on-surface-variant max-w-md mx-auto mb-6">
+          Please wait a moment before searching again.
+        </p>
+      </div>
+    </div>
+  );
+}
+
+function getRenderableStateData(state: SearchListState) {
+  if (state.kind === "ok" || state.kind === "degraded") {
+    return {
+      listings: state.data.items,
+      total: state.data.total,
+      initialNextCursor: state.data.nextCursor,
+      nearMatchExpansion: state.data.nearMatchExpansion,
+      vibeAdvisory: state.data.vibeAdvisory,
+      hasConfirmedZeroResults: false,
+    };
+  }
+
+  if (state.kind === "zero-results") {
+    return {
+      listings: [],
+      total: 0,
+      initialNextCursor: null,
+      nearMatchExpansion: undefined,
+      vibeAdvisory: undefined,
+      hasConfirmedZeroResults: true,
+    };
+  }
+
+  return null;
 }
 
 export async function generateMetadata({
@@ -134,17 +216,17 @@ export async function generateMetadata({
         }
       : undefined,
     alternates: {
-      canonical: locationLabel
-        ? `/search?where=${encodeURIComponent(locationLabel)}`
-        : q
-          ? `/search?q=${encodeURIComponent(q)}`
-          : "/search",
+      canonical: buildCanonicalSearchUrl(
+        normalizeSearchQuery(rawParams as unknown as RawSearchParams),
+        { includePagination: false }
+      ),
     },
   };
 }
 
 export default async function SearchPage({ searchParams }: SearchPageProps) {
   const rawParams = await searchParams;
+  const normalizedQuery = normalizeSearchQuery(rawParams as RawSearchParams);
 
   const {
     q,
@@ -161,34 +243,105 @@ export default async function SearchPage({ searchParams }: SearchPageProps) {
   // This ensures friendly UX regardless of V2/V1 path or failures
   if (boundsRequired) {
     const searchLabel = locationLabel || q || what || "your search";
+    return renderLocationRequiredState(searchLabel);
+  }
+
+  const headersList = await headers();
+  const testScenario = resolveSearchScenario({
+    headerValue: headersList.get(SEARCH_SCENARIO_HEADER),
+  });
+
+  if (testScenario) {
+    const scenarioState = await buildScenarioSearchListState(testScenario, {
+      query: normalizedQuery,
+    });
+
+    if (scenarioState.kind === "location-required") {
+      return renderLocationRequiredState(locationLabel || q || what || "your search");
+    }
+
+    if (scenarioState.kind === "rate-limited") {
+      return renderRateLimitedState();
+    }
+
+    const renderableScenarioData = getRenderableStateData(scenarioState);
+    if (!renderableScenarioData) {
+      throw new Error(`Unhandled scenario state: ${scenarioState.kind}`);
+    }
+
+    const searchParamsString = serializeSearchQuery(normalizedQuery, {
+      includePagination: false,
+    }).toString();
+    const normalizedKeyString = searchParamsString;
+    const displayLocation = locationLabel || q || "";
+
     return (
-      <>
-        {/* P2b Fix: Reset v2 context state on bounds-required path.
-                    Without this, isV2Enabled stays true from a previous v2 search,
-                    causing PersistentMapWrapper's race guard to loop forever. */}
-        <V1PathResetSetter />
-        <div className="px-4 sm:px-6 py-8 sm:py-12 max-w-[840px] mx-auto">
-          <div className="text-center py-12">
-            <div className="w-16 h-16 mx-auto mb-6 bg-primary/10 rounded-full flex items-center justify-center">
-              <Search className="w-8 h-8 text-primary" />
+      <div className="max-w-[840px] mx-auto pb-24 md:pb-6">
+        <div className="px-4 sm:px-5 lg:px-8 pt-0">
+          <InlineFilterStrip />
+
+          <div className="flex flex-row items-center justify-between gap-4 py-2 mb-4">
+            <div className="hidden md:block flex-1 min-w-0">
+              <div className="flex items-baseline gap-3 min-w-0">
+                <h1
+                  id="search-results-heading"
+                  tabIndex={-1}
+                  className="text-lg md:text-xl font-display font-medium tracking-tight text-on-surface focus:outline-none focus-visible:ring-2 focus-visible:ring-primary/30 focus-visible:rounded-lg truncate"
+                >
+                  {renderableScenarioData.total === null
+                    ? "100+"
+                    : renderableScenarioData.total}{" "}
+                  {renderableScenarioData.total === 1 ? "place" : "places"}
+                  {displayLocation ? ` in ${displayLocation}` : ""}
+                </h1>
+                {renderableScenarioData.listings.length > 0 && (
+                  <span className="hidden md:inline-flex text-xs bg-surface-container-high text-on-surface-variant px-2.5 py-1 rounded-full whitespace-nowrap shrink-0">
+                    Showing 1–{renderableScenarioData.listings.length}
+                  </span>
+                )}
+              </div>
+              {browseMode && (
+                <p className="text-xs text-on-surface-variant mt-0.5">
+                  Showing top listings. Select a location for more results.
+                </p>
+              )}
             </div>
-            <h1 className="text-2xl font-display font-bold text-on-surface mb-3">
-              Please select a location
-            </h1>
-            <p className="text-on-surface-variant max-w-md mx-auto mb-6">
-              To search for &ldquo;{searchLabel}&rdquo;, please select a
-              location from the dropdown suggestions. This helps us find
-              relevant listings in your area.
-            </p>
-            <Button asChild>
-              <Link href="/">
-                <Search className="w-4 h-4" />
-                Try a new search
-              </Link>
-            </Button>
+
+            <div className="flex items-center gap-2 shrink-0">
+              <div className="hidden md:block">
+                <SaveSearchButton />
+              </div>
+              <SortSelect currentSort={sortOption} />
+            </div>
           </div>
+
+          <SearchResultsLoadingWrapper>
+            <SearchResultsErrorBoundary>
+              <SearchResultsClient
+                key={normalizedKeyString}
+                initialListings={renderableScenarioData.listings}
+                initialNextCursor={renderableScenarioData.initialNextCursor}
+                initialTotal={renderableScenarioData.total}
+                savedListingIds={[]}
+                searchParamsString={searchParamsString}
+                filterParams={filterParams}
+                query={displayLocation}
+                vibeQuery={what}
+                browseMode={browseMode}
+                hasConfirmedZeroResults={
+                  renderableScenarioData.hasConfirmedZeroResults
+                }
+                filterSuggestions={[]}
+                nearMatchExpansion={renderableScenarioData.nearMatchExpansion}
+                vibeAdvisory={renderableScenarioData.vibeAdvisory}
+                initialResponseMeta={scenarioState.meta}
+                initialStateKind={scenarioState.kind}
+                clientSideSearchEnabled={features.clientSideSearch}
+              />
+            </SearchResultsErrorBoundary>
+          </SearchResultsLoadingWrapper>
         </div>
-      </>
+      </div>
     );
   }
 
@@ -199,28 +352,13 @@ export default async function SearchPage({ searchParams }: SearchPageProps) {
   // - SSR page had nothing — bots could hammer /search with varying params
   // Uses dedicated "search-ssr" bucket (120/min) separate from "search" (60/min for server actions)
   // to prevent map panning (which generates SSR at 800ms intervals) from exhausting Load More budget.
-  const headersList = await headers();
   const ssrRateLimit = await checkServerComponentRateLimit(
     headersList,
     "search-ssr",
     "/search"
   );
   if (!ssrRateLimit.allowed) {
-    return (
-      <>
-        <V1PathResetSetter />
-        <div className="px-4 sm:px-6 py-8 sm:py-12 max-w-[840px] mx-auto">
-          <div className="text-center py-12">
-            <h1 className="text-2xl font-display font-bold text-on-surface mb-3">
-              Too many requests
-            </h1>
-            <p className="text-on-surface-variant max-w-md mx-auto mb-6">
-              Please wait a moment before searching again.
-            </p>
-          </div>
-        </div>
-      </>
-    );
+    return renderRateLimitedState();
   }
 
   // Track whether v2 was used successfully
@@ -347,40 +485,10 @@ export default async function SearchPage({ searchParams }: SearchPageProps) {
 
   // Build search params string for client-side "Load more" fetches
   // Include all filter/sort params but NOT cursor/page (those are managed client-side)
-  const apiParams = new URLSearchParams();
-  for (const [key, value] of Object.entries(rawParams)) {
-    if (["cursor", "cursorStack", "pageNumber", "page", "v2"].includes(key))
-      continue;
-    if (Array.isArray(value)) {
-      value.forEach((v) => apiParams.append(key, v));
-    } else if (value) {
-      apiParams.set(key, value);
-    }
-  }
-  const searchParamsString = apiParams.toString();
-
-  // P2-11 FIX: Build normalized key for SearchResultsClient's React key.
-  // Raw searchParamsString is kept for API calls (backward compatible).
-  // Normalized key prevents unnecessary remounts when URL has non-canonical values
-  // (e.g., roomType=PRIVATE vs roomType=Private+Room from manual URL editing).
-  // Uses buildCanonicalFilterParamsFromSearchParams (validated, sorted, aliased)
-  // plus sort and quantized bounds (which the canonical builder excludes).
-  const normalizedKey = buildCanonicalFilterParamsFromSearchParams(
-    new URLSearchParams(searchParamsString)
-  );
-  if (sortOption !== "recommended") {
-    normalizedKey.set("sort", sortOption);
-  }
-  if (filterParams.bounds) {
-    // Quantize to 3 decimal places (~100m precision) to avoid micro-remounts
-    // from sub-pixel map pans. Aligns with BOUNDS_EPSILON = 0.001 in constants.ts.
-    normalizedKey.set("minLat", filterParams.bounds.minLat.toFixed(3));
-    normalizedKey.set("maxLat", filterParams.bounds.maxLat.toFixed(3));
-    normalizedKey.set("minLng", filterParams.bounds.minLng.toFixed(3));
-    normalizedKey.set("maxLng", filterParams.bounds.maxLng.toFixed(3));
-  }
-  normalizedKey.sort();
-  const normalizedKeyString = normalizedKey.toString();
+  const searchParamsString = serializeSearchQuery(normalizedQuery, {
+    includePagination: false,
+  }).toString();
+  const normalizedKeyString = searchParamsString;
 
   // Extract nextCursor: prefer V2 response cursor, fallback to paginatedResult for keyset path
   const initialNextCursor =
@@ -390,6 +498,15 @@ export default async function SearchPage({ searchParams }: SearchPageProps) {
       : null);
 
   const displayLocation = locationLabel || q || "";
+  const responseMeta = createSearchResponseMeta(
+    normalizedQuery,
+    usedV2 ? "v2" : "v1-fallback"
+  );
+  const initialStateKind: SearchListState["kind"] = hasConfirmedZeroResults
+    ? "zero-results"
+    : usedV2 || !useV2Search
+      ? "ok"
+      : "degraded";
 
   const listContent = (
     <div className="max-w-[840px] mx-auto pb-24 md:pb-6">
@@ -446,6 +563,8 @@ export default async function SearchPage({ searchParams }: SearchPageProps) {
               filterSuggestions={[]}
               nearMatchExpansion={nearMatchExpansion}
               vibeAdvisory={vibeAdvisory}
+              initialResponseMeta={responseMeta}
+              initialStateKind={initialStateKind}
               clientSideSearchEnabled={features.clientSideSearch}
             />
           </SearchResultsErrorBoundary>
@@ -455,13 +574,6 @@ export default async function SearchPage({ searchParams }: SearchPageProps) {
   );
 
   return (
-    <>
-      {/* Keep the initial HTML list-first and let the persistent map fetch independently */}
-      {/* TODO: Wire V2MapDataSetter here when V2 map feature ships.
-          Currently V2MapDataSetter exists but has no render site — V2 map data path is dead code.
-          V1PathResetSetter runs on every render, keeping isV2Enabled=false. */}
-      <V1PathResetSetter />
-      {listContent}
-    </>
+    listContent
   );
 }

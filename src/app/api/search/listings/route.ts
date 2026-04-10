@@ -16,6 +16,7 @@ import { features } from "@/lib/env";
 import {
   buildRawParamsFromSearchParams,
   parseSearchParams,
+  type RawSearchParams,
 } from "@/lib/search-params";
 import { withRateLimitRedis } from "@/lib/with-rate-limit-redis";
 import { withTimeout, DEFAULT_TIMEOUTS } from "@/lib/timeout-wrapper";
@@ -34,6 +35,18 @@ import { DEFAULT_PAGE_SIZE } from "@/lib/constants";
 import { logger, sanitizeErrorMessage } from "@/lib/logger";
 import * as Sentry from "@sentry/nextjs";
 import { getSearchRateLimitIdentifier } from "@/lib/search-rate-limit-identifier";
+import {
+  createSearchResponseMeta,
+  type SearchListState,
+} from "@/lib/search/search-response";
+import { normalizeSearchQuery } from "@/lib/search/search-query";
+import {
+  buildScenarioSearchListState,
+  resolveSearchScenario,
+  SEARCH_SCENARIO_HEADER,
+} from "@/lib/search/testing/search-scenarios";
+
+export const runtime = "nodejs";
 
 export async function GET(request: NextRequest) {
   const context = createContextFromHeaders(request.headers);
@@ -51,16 +64,33 @@ export async function GET(request: NextRequest) {
         );
       }
 
+      const searchParams = request.nextUrl.searchParams;
+      const rawParams = buildRawParamsFromSearchParams(searchParams);
+      const parsed = parseSearchParams(rawParams);
+      const normalizedQuery = normalizeSearchQuery(rawParams as RawSearchParams);
+      const testScenario = resolveSearchScenario({
+        headerValue: request.headers.get(SEARCH_SCENARIO_HEADER),
+      });
+
+      if (testScenario) {
+        const scenarioState = await buildScenarioSearchListState(testScenario, {
+          query: normalizedQuery,
+        });
+
+        return NextResponse.json(scenarioState, {
+          headers: {
+            "Cache-Control": "no-store",
+            "x-request-id": requestId,
+          },
+        });
+      }
+
       // Rate limiting (separate bucket from SSR search)
       const rateLimitResponse = await withRateLimitRedis(request, {
         type: "search-list",
         getIdentifier: getSearchRateLimitIdentifier,
       });
       if (rateLimitResponse) return rateLimitResponse;
-
-      const searchParams = request.nextUrl.searchParams;
-      const rawParams = buildRawParamsFromSearchParams(searchParams);
-      const parsed = parseSearchParams(rawParams);
 
       // V2 path with circuit breaker + timeout (same pattern as page.tsx)
       let v2Result: SearchV2Result | null = null;
@@ -103,13 +133,9 @@ export async function GET(request: NextRequest) {
 
       // Unbounded search: text query without location
       if (v2Result?.unboundedSearch) {
+        const meta = createSearchResponseMeta(normalizedQuery, "v2");
         return NextResponse.json(
-          {
-            items: [],
-            nextCursor: null,
-            total: 0,
-            unboundedSearch: true,
-          },
+          { kind: "location-required", meta } satisfies SearchListState,
           {
             headers: {
               "x-request-id": requestId,
@@ -134,9 +160,22 @@ export async function GET(request: NextRequest) {
         )
           ? "Showing best matches for your vibe in this area"
           : undefined;
+        const meta = createSearchResponseMeta(normalizedQuery, "v2");
 
         return NextResponse.json(
-          { items: listings, nextCursor, total, nearMatchExpansion, vibeAdvisory },
+          total === 0
+            ? ({ kind: "zero-results", meta } satisfies SearchListState)
+            : ({
+                kind: "ok",
+                data: {
+                  items: listings,
+                  nextCursor,
+                  total,
+                  nearMatchExpansion,
+                  vibeAdvisory,
+                },
+                meta,
+              } satisfies SearchListState),
           {
             headers: {
               "Cache-Control":
@@ -158,13 +197,33 @@ export async function GET(request: NextRequest) {
         DEFAULT_TIMEOUTS.DATABASE,
         "api-search-listings-v1"
       );
+      const meta = createSearchResponseMeta(normalizedQuery, "v1-fallback");
+      const state =
+        paginatedResult.total === 0
+          ? ({ kind: "zero-results", meta } satisfies SearchListState)
+          : features.searchV2
+            ? ({
+                kind: "degraded",
+                source: "v1-fallback",
+                data: {
+                  items: paginatedResult.items,
+                  nextCursor: null,
+                  total: paginatedResult.total,
+                },
+                meta,
+              } satisfies SearchListState)
+            : ({
+                kind: "ok",
+                data: {
+                  items: paginatedResult.items,
+                  nextCursor: null,
+                  total: paginatedResult.total,
+                },
+                meta,
+              } satisfies SearchListState);
 
       return NextResponse.json(
-        {
-          items: paginatedResult.items,
-          nextCursor: null,
-          total: paginatedResult.total,
-        },
+        state,
         {
           headers: {
             "Cache-Control":

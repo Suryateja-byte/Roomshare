@@ -3,8 +3,10 @@
 import { prisma } from "@/lib/prisma";
 import { auth } from "@/auth";
 import { revalidatePath } from "next/cache";
-import type { SearchFilters } from "@/lib/search-utils";
-import { validateSearchFilters } from "@/lib/search-params";
+import {
+  normalizeSearchFilters,
+  type SearchFilters,
+} from "@/lib/search-utils";
 import type { Prisma } from "@prisma/client";
 import { logger } from "@/lib/logger";
 import { z } from "zod";
@@ -41,6 +43,9 @@ const savedSearchFiltersSchema = z
     leaseDuration: z.string().optional(),
     genderPreference: z.string().optional(),
     householdGender: z.string().optional(),
+    bookingMode: z.string().optional(),
+    minSlots: z.number().optional(),
+    nearMatches: z.boolean().optional(),
     sort: z.string().optional(),
     lat: z.number().optional(),
     lng: z.number().optional(),
@@ -71,6 +76,9 @@ const savedSearchFiltersWriteSchema = z
     leaseDuration: z.string().optional(),
     genderPreference: z.string().optional(),
     householdGender: z.string().optional(),
+    bookingMode: z.string().optional(),
+    minSlots: z.number().optional(),
+    nearMatches: z.boolean().optional(),
     sort: z.string().optional(),
     lat: z.number().optional(),
     lng: z.number().optional(),
@@ -86,7 +94,7 @@ const savedSearchFiltersWriteSchema = z
 function parseSavedSearchFilters(raw: unknown): SearchFilters {
   const result = savedSearchFiltersSchema.safeParse(raw);
   if (result.success) {
-    return result.data as SearchFilters;
+    return normalizeSearchFilters(result.data as SearchFilters);
   }
   logger.sync.warn(
     "Invalid saved search filters in DB, falling back to empty",
@@ -140,18 +148,17 @@ export async function saveSearch(input: SaveSearchInput) {
       };
     }
 
-    // Validate filters before storing (prevents malicious/malformed data)
-    // Two-layer validation: validateSearchFilters checks values against allowlists,
-    // savedSearchFiltersWriteSchema.strip() removes unknown fields from JSON
-    const validatedFilters = validateSearchFilters(input.filters);
+    // Canonicalize filters before storing so saved-search reopen flows always
+    // round-trip through the same normalized search schema as live URLs.
+    const normalizedFilters = normalizeSearchFilters(input.filters);
     const strippedFilters =
-      savedSearchFiltersWriteSchema.parse(validatedFilters);
+      savedSearchFiltersWriteSchema.parse(normalizedFilters);
 
     const savedSearch = await prisma.savedSearch.create({
       data: {
         userId: session.user.id,
         name: nameValidation.data,
-        query: validatedFilters.query,
+        query: normalizedFilters.query,
         filters: strippedFilters as Prisma.InputJsonValue,
         alertEnabled: input.alertEnabled ?? true,
         alertFrequency: input.alertFrequency ?? "DAILY",

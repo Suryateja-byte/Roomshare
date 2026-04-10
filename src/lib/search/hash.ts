@@ -5,7 +5,6 @@
  */
 
 import { createHmac, timingSafeEqual } from "crypto";
-import { BOUNDS_EPSILON } from "./types";
 import { getOptionalCursorSecret } from "@/lib/env";
 import {
   generateSearchQueryHash,
