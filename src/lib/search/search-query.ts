@@ -4,7 +4,7 @@ import {
   parseSearchParams,
   type RawSearchParams,
 } from "@/lib/search-params";
-import type { SortOption } from "@/lib/search-types";
+import type { FilterParams, SortOption } from "@/lib/search-types";
 
 export type QueryChangeKind =
   | "location"
@@ -298,4 +298,29 @@ export function applySearchQueryChange(
   }
 
   return next;
+}
+
+export function normalizedSearchQueryToFilterParams(
+  query: NormalizedSearchQuery
+): FilterParams {
+  return {
+    query: query.query,
+    locationLabel: query.locationLabel,
+    vibeQuery: query.vibeQuery,
+    minPrice: query.minPrice,
+    maxPrice: query.maxPrice,
+    amenities: query.amenities,
+    moveInDate: query.moveInDate,
+    leaseDuration: query.leaseDuration,
+    houseRules: query.houseRules,
+    languages: query.languages,
+    roomType: query.roomType,
+    genderPreference: query.genderPreference,
+    householdGender: query.householdGender,
+    bookingMode: query.bookingMode,
+    minAvailableSlots: query.minSlots,
+    bounds: query.bounds,
+    sort: query.sort,
+    nearMatches: query.nearMatches,
+  };
 }
