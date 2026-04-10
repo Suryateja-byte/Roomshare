@@ -114,6 +114,7 @@ const serverEnvSchema = z
     ENABLE_SEMANTIC_SEARCH: z.enum(["true", "false"]).optional(),
     ENABLE_IMAGE_EMBEDDINGS: z.enum(["true", "false"]).optional(),
     ENABLE_CLIENT_SIDE_SEARCH: z.enum(["true", "false"]).optional(),
+    ENABLE_SEARCH_TEST_SCENARIOS: z.enum(["true", "false"]).optional(),
     SEMANTIC_WEIGHT: z.coerce.number().min(0).max(1).optional(),
 
     // Node environment

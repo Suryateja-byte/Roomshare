@@ -3,7 +3,10 @@
 import { headers } from "next/headers";
 import { executeSearchV2 } from "@/lib/search/search-v2-service";
 import { type ListingData } from "@/lib/data";
-import { buildRawParamsFromSearchParams } from "@/lib/search-params";
+import {
+  buildRawParamsFromSearchParams,
+  type RawSearchParams,
+} from "@/lib/search-params";
 import { checkServerComponentRateLimit } from "@/lib/with-rate-limit";
 import { withTimeout, DEFAULT_TIMEOUTS } from "@/lib/timeout-wrapper";
 import { features } from "@/lib/env";
@@ -11,11 +14,22 @@ import { DEFAULT_PAGE_SIZE } from "@/lib/constants";
 import { logger, sanitizeErrorMessage } from "@/lib/logger";
 import { circuitBreakers, isCircuitOpenError } from "@/lib/circuit-breaker";
 import * as Sentry from "@sentry/nextjs";
+import {
+  createSearchResponseMeta,
+  type SearchResponseMeta,
+} from "@/lib/search/search-response";
+import { normalizeSearchQuery } from "@/lib/search/search-query";
+import {
+  buildScenarioLoadMoreResult,
+  resolveSearchScenario,
+  type SearchScenario,
+} from "@/lib/search/testing/search-scenarios";
 
 export interface FetchMoreResult {
   items: ListingData[];
   nextCursor: string | null;
   hasNextPage: boolean;
+  meta?: SearchResponseMeta;
   /** True when V2 is unavailable and V1 can't continue cursor pagination */
   degraded?: boolean;
   /** True when request was rate limited — client should show friendly message */
@@ -24,12 +38,33 @@ export interface FetchMoreResult {
 
 export async function fetchMoreListings(
   cursor: string,
-  rawParams: Record<string, string | string[] | undefined>
+  rawParams: Record<string, string | string[] | undefined>,
+  queryHash?: string,
+  scenarioOverride?: SearchScenario | null
 ): Promise<FetchMoreResult> {
   try {
+    const normalizedQuery = normalizeSearchQuery(rawParams as RawSearchParams);
+    const fallbackMeta = createSearchResponseMeta(normalizedQuery, "v1-fallback");
+    const testScenario = resolveSearchScenario({
+      override: scenarioOverride ?? null,
+    });
+
+    if (testScenario) {
+      return buildScenarioLoadMoreResult(testScenario, {
+        query: normalizedQuery,
+        cursor,
+        queryHashOverride: queryHash,
+      });
+    }
+
     // Validate cursor — return safe empty result instead of exposing error details
     if (!cursor || typeof cursor !== "string" || cursor.trim() === "") {
-      return { items: [], nextCursor: null, hasNextPage: false };
+      return {
+        items: [],
+        nextCursor: null,
+        hasNextPage: false,
+        meta: fallbackMeta,
+      };
     }
 
     // Rate limiting
@@ -45,6 +80,7 @@ export async function fetchMoreListings(
         nextCursor: null,
         hasNextPage: false,
         rateLimited: true,
+        meta: fallbackMeta,
       };
     }
 
@@ -86,10 +122,15 @@ export async function fetchMoreListings(
         });
 
         if (v2Result.paginatedResult) {
+          const meta = createSearchResponseMeta(normalizedQuery, "v2");
           return {
             items: v2Result.paginatedResult.items,
             nextCursor: v2Result.paginatedResult.nextCursor ?? null,
             hasNextPage: v2Result.paginatedResult.hasNextPage ?? false,
+            meta:
+              queryHash && queryHash.trim().length > 0
+                ? { ...meta, queryHash }
+                : meta,
           };
         }
       } catch (error) {
@@ -113,7 +154,16 @@ export async function fetchMoreListings(
     logger.sync.warn(
       "[fetchMoreListings] V1 fallback reached - cursor pagination not supported"
     );
-    return { items: [], nextCursor: null, hasNextPage: false, degraded: true };
+    return {
+      items: [],
+      nextCursor: null,
+      hasNextPage: false,
+      degraded: true,
+      meta:
+        queryHash && queryHash.trim().length > 0
+          ? { ...fallbackMeta, queryHash }
+          : fallbackMeta,
+    };
   } catch (error) {
     logger.sync.error("[fetchMoreListings] Unexpected error", {
       error: sanitizeErrorMessage(error),

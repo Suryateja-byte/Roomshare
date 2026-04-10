@@ -7,6 +7,7 @@ import {
   useCallback,
   useId,
   useMemo,
+  type MutableRefObject,
 } from "react";
 import { createPortal } from "react-dom";
 import {
@@ -62,6 +63,8 @@ interface LocationSearchInputProps {
   className?: string;
   inputClassName?: string;
   id?: string;
+  autoFocus?: boolean;
+  inputRef?: MutableRefObject<HTMLInputElement | null>;
   fallbackItems?: LocationSearchFallbackItem[];
   fallbackTitle?: string;
 }
@@ -220,6 +223,8 @@ export default function LocationSearchInput({
   className = "",
   inputClassName = "",
   id,
+  autoFocus = false,
+  inputRef: forwardedInputRef,
   fallbackItems = [],
   fallbackTitle = "Recent locations",
 }: LocationSearchInputProps) {
@@ -633,7 +638,12 @@ export default function LocationSearchInput({
     <div ref={containerRef} className={cn("relative", className)}>
       <div className="relative h-full">
         <input
-          ref={inputRef}
+          ref={(node) => {
+            inputRef.current = node;
+            if (forwardedInputRef) {
+              forwardedInputRef.current = node;
+            }
+          }}
           id={id}
           type="text"
           value={value}
@@ -649,6 +659,7 @@ export default function LocationSearchInput({
             "h-full w-full min-w-0 bg-transparent border-none p-0 pr-8 text-base text-on-surface placeholder:text-on-surface-variant focus:outline-none focus:ring-0 md:text-sm truncate",
             inputClassName
           )}
+          autoFocus={autoFocus}
           autoComplete="off"
           role="combobox"
           aria-expanded={isPopupOpen}

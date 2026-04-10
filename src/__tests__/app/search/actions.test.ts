@@ -21,7 +21,34 @@ jest.mock("@/lib/env", () => ({
 
 // Mock search-params helpers
 jest.mock("@/lib/search-params", () => ({
-  parseSearchParams: jest.fn(),
+  parseSearchParams: jest.fn((raw: { q?: string }) => ({
+    q: raw.q,
+    locationLabel: undefined,
+    what: undefined,
+    requestedPage: 1,
+    sortOption: "recommended",
+    boundsRequired: false,
+    browseMode: false,
+    filterParams: {
+      query: raw.q,
+      vibeQuery: undefined,
+      minPrice: undefined,
+      maxPrice: undefined,
+      amenities: undefined,
+      moveInDate: undefined,
+      leaseDuration: undefined,
+      houseRules: undefined,
+      languages: undefined,
+      roomType: undefined,
+      genderPreference: undefined,
+      householdGender: undefined,
+      bookingMode: undefined,
+      minAvailableSlots: undefined,
+      nearMatches: undefined,
+      bounds: undefined,
+      sort: "recommended",
+    },
+  })),
   buildRawParamsFromSearchParams: jest.fn().mockReturnValue({ q: "test" }),
 }));
 
@@ -78,11 +105,14 @@ describe("fetchMoreListings", () => {
     );
 
     // Result passes through from V2
-    expect(result).toEqual({
-      items: [{ id: "1" }],
-      nextCursor: "cursor-2",
-      hasNextPage: true,
-    });
+    expect(result).toEqual(
+      expect.objectContaining({
+        items: [{ id: "1" }],
+        nextCursor: "cursor-2",
+        hasNextPage: true,
+      })
+    );
+    expect(result.meta).toBeTruthy();
   });
 
   it("falls back gracefully when V2 times out", async () => {
@@ -99,12 +129,15 @@ describe("fetchMoreListings", () => {
     const result = await fetchMoreListings("cursor-1", { q: "test" });
 
     // Falls back to V1 empty result with degraded signal (cursor pagination not supported in V1)
-    expect(result).toEqual({
-      items: [],
-      nextCursor: null,
-      hasNextPage: false,
-      degraded: true,
-    });
+    expect(result).toEqual(
+      expect.objectContaining({
+        items: [],
+        nextCursor: null,
+        hasNextPage: false,
+        degraded: true,
+      })
+    );
+    expect(result.meta).toBeTruthy();
 
     // Warning was logged for V2 failure (via logger.sync.warn: "[timestamp] [WARN]", message, metadata)
     expect(warnSpy).toHaveBeenCalledWith(
@@ -129,10 +162,13 @@ describe("fetchMoreListings", () => {
 
     const result = await fetchMoreListings("c1", { q: "sf" });
 
-    expect(result).toEqual({
-      items: [{ id: "a" }, { id: "b" }],
-      nextCursor: "next",
-      hasNextPage: true,
-    });
+    expect(result).toEqual(
+      expect.objectContaining({
+        items: [{ id: "a" }, { id: "b" }],
+        nextCursor: "next",
+        hasNextPage: true,
+      })
+    );
+    expect(result.meta).toBeTruthy();
   });
 });

@@ -504,7 +504,9 @@ describe("SearchResultsClient", () => {
           maxLat: "37.85",
           minLng: "-122.5",
           maxLng: "-122.3",
-        })
+        }),
+        expect.any(String),
+        null
       );
       expect(
         (

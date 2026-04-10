@@ -14,7 +14,7 @@
 
 import { Search, SlidersHorizontal } from "lucide-react";
 import { useSearchParams } from "next/navigation";
-import { useMemo } from "react";
+import { useMemo, type RefObject } from "react";
 import { urlToFilterChips } from "@/components/filters/filter-chip-utils";
 import { readSearchIntentState } from "@/lib/search/search-intent";
 
@@ -23,6 +23,8 @@ interface CollapsedMobileSearchProps {
   onExpand: () => void;
   /** Optional: open filter drawer directly */
   onOpenFilters?: () => void;
+  /** Ref used to restore focus when the mobile overlay closes */
+  expandButtonRef?: RefObject<HTMLButtonElement | null>;
 }
 
 function formatMoveInSummary(moveInDate: string | null): string | null {
@@ -46,6 +48,7 @@ function formatRoomTypeSummary(roomType: string | null): string | null {
 export default function CollapsedMobileSearch({
   onExpand,
   onOpenFilters,
+  expandButtonRef,
 }: CollapsedMobileSearchProps) {
   const searchParams = useSearchParams();
 
@@ -125,6 +128,7 @@ export default function CollapsedMobileSearch({
     <div className="md:hidden flex items-center gap-2 w-full max-w-md mx-auto px-3">
       {/* Main search area - tap to expand */}
       <button
+        ref={expandButtonRef}
         onClick={onExpand}
         className="flex-1 flex items-center gap-3 min-h-[52px] px-4 py-2 bg-surface-container-lowest rounded-full shadow-ambient-sm border border-outline-variant/20 hover:shadow-ambient transition-shadow"
         aria-label="Expand search"

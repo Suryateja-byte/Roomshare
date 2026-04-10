@@ -16,6 +16,11 @@ import {
   getPriceParam,
 } from "@/lib/search-params";
 import { normalizeLanguages } from "@/lib/languages";
+import {
+  applySearchQueryChange,
+  buildCanonicalSearchUrl,
+  normalizeSearchQuery,
+} from "@/lib/search/search-query";
 
 /**
  * Batched filter values - represents pending filter state
@@ -356,68 +361,46 @@ export function useBatchedFilters(
     const FORCE_SYNC_WINDOW_MS = 10_000;
     forceSyncUntilRef.current = Date.now() + FORCE_SYNC_WINDOW_MS;
     const nextPending = overrides ? { ...pending, ...overrides } : pending;
+    const nextMinPrice = nextPending.minPrice
+      ? Number.parseFloat(nextPending.minPrice)
+      : undefined;
+    const nextMaxPrice = nextPending.maxPrice
+      ? Number.parseFloat(nextPending.maxPrice)
+      : undefined;
+    const parsedMinSlots = nextPending.minSlots
+      ? parseInt(nextPending.minSlots, 10)
+      : NaN;
 
     if (overrides) {
       setPendingState(nextPending);
     }
 
-    // Start from current URL to preserve non-filter params (bounds, sort, q, lat, lng, nearMatches)
-    const params = new URLSearchParams(searchParams.toString());
-
-    // Delete pagination
-    params.delete("page");
-    params.delete("cursor");
-    params.delete("cursorStack");
-    params.delete("pageNumber");
-
-    // Delete all filter params before re-setting
-    const filterKeys = [
-      "minPrice",
-      "maxPrice",
-      // HIGH-5 FIX: Clean up budget aliases so they don't persist alongside canonical params
-      "minBudget",
-      "maxBudget",
-      "moveInDate",
-      "leaseDuration",
-      "roomType",
-      "amenities",
-      "houseRules",
-      "languages",
-      "genderPreference",
-      "householdGender",
-      "minSlots",
-    ];
-    for (const key of filterKeys) {
-      params.delete(key);
-    }
-
-    // Set pending filter values
-    if (nextPending.minPrice) params.set("minPrice", nextPending.minPrice);
-    if (nextPending.maxPrice) params.set("maxPrice", nextPending.maxPrice);
-    if (nextPending.roomType) params.set("roomType", nextPending.roomType);
-    if (nextPending.leaseDuration)
-      params.set("leaseDuration", nextPending.leaseDuration);
-    if (nextPending.moveInDate) params.set("moveInDate", nextPending.moveInDate);
-    if (nextPending.amenities.length > 0) {
-      params.set("amenities", nextPending.amenities.join(","));
-    }
-    if (nextPending.houseRules.length > 0) {
-      params.set("houseRules", nextPending.houseRules.join(","));
-    }
-    if (nextPending.languages.length > 0) {
-      params.set("languages", nextPending.languages.join(","));
-    }
-    if (nextPending.genderPreference) {
-      params.set("genderPreference", nextPending.genderPreference);
-    }
-    if (nextPending.householdGender) {
-      params.set("householdGender", nextPending.householdGender);
-    }
-    if (nextPending.minSlots && parseInt(nextPending.minSlots, 10) >= 2) {
-      params.set("minSlots", nextPending.minSlots);
-    }
-
-    const searchUrl = `/search?${params.toString()}`;
+    const currentQuery = normalizeSearchQuery(
+      new URLSearchParams(searchParams.toString())
+    );
+    const searchUrl = buildCanonicalSearchUrl(
+      applySearchQueryChange(currentQuery, "filter", {
+        minPrice: Number.isFinite(nextMinPrice) ? nextMinPrice : undefined,
+        maxPrice: Number.isFinite(nextMaxPrice) ? nextMaxPrice : undefined,
+        roomType: nextPending.roomType || undefined,
+        leaseDuration: nextPending.leaseDuration || undefined,
+        moveInDate: nextPending.moveInDate || undefined,
+        amenities:
+          nextPending.amenities.length > 0 ? nextPending.amenities : undefined,
+        houseRules:
+          nextPending.houseRules.length > 0
+            ? nextPending.houseRules
+            : undefined,
+        languages:
+          nextPending.languages.length > 0 ? nextPending.languages : undefined,
+        genderPreference: nextPending.genderPreference || undefined,
+        householdGender: nextPending.householdGender || undefined,
+        minSlots:
+          Number.isFinite(parsedMinSlots) && parsedMinSlots >= 2
+            ? parsedMinSlots
+            : undefined,
+      })
+    );
 
     if (transitionContext) {
       transitionContext.navigateWithTransition(searchUrl);

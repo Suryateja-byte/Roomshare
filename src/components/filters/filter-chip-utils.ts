@@ -9,6 +9,11 @@ import { getLanguageName } from "@/lib/languages";
 import { getPriceParam } from "@/lib/search-params";
 import { formatPriceCompact } from "@/lib/format";
 import {
+  applySearchQueryChange,
+  normalizeSearchQuery,
+  serializeSearchQuery,
+} from "@/lib/search/search-query";
+import {
   LEASE_DURATION_ALIASES,
   ROOM_TYPE_ALIASES,
   VALID_LEASE_DURATIONS,
@@ -308,39 +313,68 @@ export function removeFilterFromUrl(
   searchParams: URLSearchParams,
   chip: FilterChipData
 ): string {
-  const newParams = new URLSearchParams(searchParams);
+  const currentQuery = normalizeSearchQuery(searchParams);
+  let nextQuery = currentQuery;
 
   // Handle combined price range (includes budget aliases)
   if (chip.paramKey === "price-range") {
-    newParams.delete("minPrice");
-    newParams.delete("maxPrice");
-    newParams.delete("minBudget");
-    newParams.delete("maxBudget");
+    nextQuery = applySearchQueryChange(currentQuery, "filter", {
+      minPrice: undefined,
+      maxPrice: undefined,
+    });
   }
   // Handle array params (amenities, houseRules, languages)
   else if (chip.paramValue) {
-    const values = parseArrayParam(newParams, chip.paramKey);
-    if (values.length > 0) {
-      const newValues = values.filter((v) => v !== chip.paramValue);
-      // Normalize to a single CSV param after removal for URL consistency.
-      newParams.delete(chip.paramKey);
-      if (newValues.length > 0) {
-        newParams.set(chip.paramKey, newValues.join(","));
-      }
-    }
+    const arrayPatch =
+      chip.paramKey === "amenities"
+        ? {
+            amenities:
+              currentQuery.amenities?.filter((v) => v !== chip.paramValue) ??
+              [],
+          }
+        : chip.paramKey === "houseRules"
+          ? {
+              houseRules:
+                currentQuery.houseRules?.filter(
+                  (v) => v !== chip.paramValue
+                ) ?? [],
+            }
+          : {
+              languages:
+                currentQuery.languages?.filter(
+                  (v) => v !== chip.paramValue
+                ) ?? [],
+            };
+
+    nextQuery = applySearchQueryChange(currentQuery, "filter", arrayPatch);
   }
   // Handle simple params
   else {
-    newParams.delete(chip.paramKey);
+    const simplePatch =
+      chip.paramKey === "minPrice"
+        ? { minPrice: undefined }
+        : chip.paramKey === "maxPrice"
+          ? { maxPrice: undefined }
+          : chip.paramKey === "moveInDate"
+            ? { moveInDate: undefined }
+            : chip.paramKey === "roomType"
+              ? { roomType: undefined }
+              : chip.paramKey === "leaseDuration"
+                ? { leaseDuration: undefined }
+                : chip.paramKey === "genderPreference"
+                  ? { genderPreference: undefined }
+                  : chip.paramKey === "householdGender"
+                    ? { householdGender: undefined }
+                    : chip.paramKey === "minSlots"
+                      ? { minSlots: undefined }
+                      : chip.paramKey === "nearMatches"
+                        ? { nearMatches: undefined }
+                        : {};
+
+    nextQuery = applySearchQueryChange(currentQuery, "filter", simplePatch);
   }
 
-  // Reset to page 1 when filters change
-  newParams.delete("page");
-  newParams.delete("cursor");
-  newParams.delete("cursorStack");
-  newParams.delete("pageNumber");
-
-  return newParams.toString();
+  return serializeSearchQuery(nextQuery).toString();
 }
 
 /**
@@ -348,17 +382,15 @@ export function removeFilterFromUrl(
  * Returns the new query string.
  */
 export function clearAllFilters(searchParams: URLSearchParams): string {
-  const newParams = new URLSearchParams();
-
-  // Preserve location and sort params
-  for (const key of PRESERVED_PARAMS) {
-    const value = searchParams.get(key);
-    if (value) {
-      newParams.set(key, value);
-    }
-  }
-
-  return newParams.toString();
+  const currentQuery = normalizeSearchQuery(searchParams);
+  return serializeSearchQuery({
+    query: currentQuery.query,
+    locationLabel: currentQuery.locationLabel,
+    lat: currentQuery.lat,
+    lng: currentQuery.lng,
+    bounds: currentQuery.bounds,
+    sort: currentQuery.sort,
+  }).toString();
 }
 
 /** Quick check — returns true if any filter param is set (no chip construction) */

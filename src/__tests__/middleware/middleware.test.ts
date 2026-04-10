@@ -42,7 +42,10 @@ describe("applySecurityHeaders", () => {
     jest.resetModules();
     const { applySecurityHeaders } = await import("@/lib/csp-middleware");
 
-    const request = { headers: new Headers() };
+    const request = {
+      headers: new Headers({ host: "roomshare.example" }),
+      nextUrl: { pathname: "/", host: "roomshare.example" },
+    };
     const { responseHeaders } = applySecurityHeaders(request);
 
     const hsts = responseHeaders.get("Strict-Transport-Security");
@@ -115,7 +118,10 @@ describe("applySecurityHeaders", () => {
     jest.resetModules();
     const { applySecurityHeaders } = await import("@/lib/csp-middleware");
 
-    const request = { headers: new Headers() };
+    const request = {
+      headers: new Headers({ host: "roomshare.example" }),
+      nextUrl: { pathname: "/", host: "roomshare.example" },
+    };
     const { requestHeaders, responseHeaders } = applySecurityHeaders(request);
 
     expect(requestHeaders.get("content-security-policy")).toBeTruthy();
@@ -265,6 +271,30 @@ describe("buildCspHeader", () => {
     const csp = buildCspHeader("testnonce");
 
     expect(csp).toContain("upgrade-insecure-requests");
+  });
+
+  it("does NOT include upgrade-insecure-requests for localhost in production", async () => {
+    setNodeEnv("production");
+    jest.resetModules();
+    const { buildCspHeader } = await import("@/lib/csp");
+
+    const csp = buildCspHeader("testnonce", { host: "127.0.0.1:3000" });
+
+    expect(csp).not.toContain("upgrade-insecure-requests");
+  });
+
+  it("does NOT set Strict-Transport-Security for localhost in production", async () => {
+    setNodeEnv("production");
+    jest.resetModules();
+    const { applySecurityHeaders } = await import("@/lib/csp-middleware");
+
+    const request = {
+      headers: new Headers({ host: "127.0.0.1:3000" }),
+      nextUrl: { pathname: "/", host: "127.0.0.1:3000" },
+    };
+    const { responseHeaders } = applySecurityHeaders(request);
+
+    expect(responseHeaders.get("Strict-Transport-Security")).toBeNull();
   });
 
   it("does NOT include upgrade-insecure-requests in development", async () => {

@@ -90,6 +90,9 @@ export interface RawSearchParams {
   lat?: string | string[];
   lng?: string | string[];
   page?: string | string[];
+  pageNumber?: string | string[];
+  cursor?: string | string[];
+  cursorStack?: string | string[];
   sort?: string | string[];
   nearMatches?: string | string[];
 }

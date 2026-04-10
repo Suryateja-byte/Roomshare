@@ -9,6 +9,11 @@ import {
   clearAllFilters,
 } from "@/components/filters/filter-chip-utils";
 import {
+  applySearchQueryChange,
+  buildCanonicalSearchUrl,
+  normalizeSearchQuery,
+} from "@/lib/search/search-query";
+import {
   getPriceParam,
   buildRawParamsFromSearchParams,
   parseSearchParams,
@@ -64,27 +69,43 @@ export function MapEmptyState({ onZoomOut, searchParams }: MapEmptyStateProps) {
 
   const handleClearFilters = () => {
     const cleared = clearAllFilters(searchParams);
-    router.push("/search?" + cleared);
+    router.push(`/search${cleared ? `?${cleared}` : ""}`);
   };
 
   const handleNearMatches = () => {
-    const newParams = new URLSearchParams(searchParams);
-    newParams.set("nearMatches", "1");
-    router.push("/search?" + newParams.toString());
+    const currentQuery = normalizeSearchQuery(searchParams);
+    router.push(
+      buildCanonicalSearchUrl(
+        applySearchQueryChange(currentQuery, "filter", {
+          nearMatches: true,
+        })
+      )
+    );
   };
 
   const handleRemoveSuggestion = (suggestion: FilterSuggestion) => {
-    const newParams = new URLSearchParams(searchParams);
-    const keysToRemove = SUGGESTION_TYPE_TO_PARAMS[suggestion.type];
-    for (const key of keysToRemove) {
-      newParams.delete(key);
-    }
-    // Reset pagination
-    newParams.delete("page");
-    newParams.delete("cursor");
-    newParams.delete("cursorStack");
-    newParams.delete("pageNumber");
-    router.push("/search?" + newParams.toString());
+    const currentQuery = normalizeSearchQuery(searchParams);
+    const keysToRemove = new Set(SUGGESTION_TYPE_TO_PARAMS[suggestion.type]);
+    router.push(
+      buildCanonicalSearchUrl(
+        applySearchQueryChange(currentQuery, "filter", {
+          minPrice: keysToRemove.has("minPrice") ? undefined : currentQuery.minPrice,
+          maxPrice: keysToRemove.has("maxPrice") ? undefined : currentQuery.maxPrice,
+          moveInDate: keysToRemove.has("moveInDate")
+            ? undefined
+            : currentQuery.moveInDate,
+          roomType: keysToRemove.has("roomType")
+            ? undefined
+            : currentQuery.roomType,
+          leaseDuration: keysToRemove.has("leaseDuration")
+            ? undefined
+            : currentQuery.leaseDuration,
+          amenities: keysToRemove.has("amenities")
+            ? undefined
+            : currentQuery.amenities,
+        })
+      )
+    );
   };
 
   return (

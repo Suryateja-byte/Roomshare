@@ -379,10 +379,11 @@ const DESKTOP_POPUP_SAFE_AREA = {
   left: 24,
 } as const;
 
+const DESKTOP_POPUP_MARKER_GUTTER_PX = 64;
+const DESKTOP_POPUP_FOCUS_ANIMATION_MS = 280;
 const DESKTOP_POPUP_FALLBACK_CARD_HEIGHT_PX = 320;
 const DESKTOP_POPUP_FALLBACK_TIP_HEIGHT_PX = 12;
 const POPUP_CONTAINMENT_TOLERANCE_PX = 2;
-const POPUP_CONTAINMENT_ANIMATION_MS = 250;
 
 // Price bucket colors for cluster rings (green = affordable, yellow = mid, red = expensive)
 const CLUSTER_RING_COLORS = {
@@ -1817,22 +1818,7 @@ export default function MapComponent({
     [isPhoneViewport]
   );
 
-  const getDesktopPopupFocusOffset = useCallback((): [number, number] | null => {
-    if (!usesPopupSelection || isPhoneViewport === true) {
-      return null;
-    }
-
-    const container = mapContainerRef.current;
-    const measuredPaneHeight =
-      mapPaneSize.height ||
-      container?.clientHeight ||
-      container?.getBoundingClientRect().height ||
-      0;
-
-    if (measuredPaneHeight <= 0) {
-      return null;
-    }
-
+  const getDesktopPopupMetrics = useCallback(() => {
     const popupCard = selectedPopupCardRef.current;
     const popupCardHeightPx = popupCard?.getBoundingClientRect().height ?? 0;
     const popupCardHeight =
@@ -1849,16 +1835,52 @@ export default function MapComponent({
       popupTipHeightPx > 0
         ? popupTipHeightPx
         : DESKTOP_POPUP_FALLBACK_TIP_HEIGHT_PX;
-    const minimumMarkerY =
-      DESKTOP_POPUP_SAFE_AREA.top + popupCardHeight + popupTipHeight;
+
+    return { popupCardHeight, popupTipHeight };
+  }, []);
+
+  const getDesktopPopupFocusOffset = useCallback((): [number, number] | null => {
+    if (!usesPopupSelection || isPhoneViewport === true) {
+      return null;
+    }
+
+    const container = mapContainerRef.current;
+    const measuredPaneHeight =
+      mapPaneSize.height ||
+      container?.clientHeight ||
+      container?.getBoundingClientRect().height ||
+      0;
+
+    if (measuredPaneHeight <= 0) {
+      return null;
+    }
+
+    const { popupCardHeight, popupTipHeight } = getDesktopPopupMetrics();
     const centerY = measuredPaneHeight / 2;
-    const safeBottom = measuredPaneHeight - DESKTOP_POPUP_SAFE_AREA.bottom;
-    const maxOffsetY = Math.max(0, safeBottom - centerY);
-    const desiredOffsetY = Math.max(0, minimumMarkerY - centerY);
-    const offsetY = Math.min(desiredOffsetY, maxOffsetY);
+    const desiredMarkerY =
+      measuredPaneHeight -
+      DESKTOP_POPUP_SAFE_AREA.bottom -
+      popupCardHeight -
+      popupTipHeight;
+    const minimumMarkerY =
+      DESKTOP_POPUP_SAFE_AREA.top + DESKTOP_POPUP_MARKER_GUTTER_PX;
+    const maximumMarkerY =
+      measuredPaneHeight -
+      DESKTOP_POPUP_SAFE_AREA.bottom -
+      DESKTOP_POPUP_MARKER_GUTTER_PX;
+    const clampedMarkerY = Math.min(
+      Math.max(desiredMarkerY, minimumMarkerY),
+      maximumMarkerY
+    );
+    const offsetY = clampedMarkerY - centerY;
 
     return [0, offsetY];
-  }, [usesPopupSelection, isPhoneViewport, mapPaneSize.height]);
+  }, [
+    usesPopupSelection,
+    isPhoneViewport,
+    mapPaneSize.height,
+    getDesktopPopupMetrics,
+  ]);
 
   const popupContainmentToken = useMemo(() => {
     if (!usesPopupSelection || !selectedListing) return null;
@@ -1949,6 +1971,9 @@ export default function MapComponent({
         containerHeight / 2 - deltaY,
       ]);
 
+      handledPopupContainmentTokenRef.current = token;
+      pendingPopupContainmentTokenRef.current = null;
+
       setProgrammaticMove(true);
       if (programmaticClearTimeoutRef.current) {
         clearTimeout(programmaticClearTimeoutRef.current);
@@ -1959,13 +1984,9 @@ export default function MapComponent({
         }
       }, PROGRAMMATIC_MOVE_TIMEOUT_MS);
 
-      mapInstance.easeTo({
+      mapInstance.jumpTo({
         center: [nextCenter.lng, nextCenter.lat],
-        duration: reducedMotion ? 0 : POPUP_CONTAINMENT_ANIMATION_MS,
       });
-
-      handledPopupContainmentTokenRef.current = token;
-      pendingPopupContainmentTokenRef.current = null;
       return true;
     },
     [
@@ -1975,7 +1996,6 @@ export default function MapComponent({
       selectedListing,
       setProgrammaticMove,
       isProgrammaticMoveRef,
-      reducedMotion,
     ]
   );
 
@@ -2613,7 +2633,7 @@ export default function MapComponent({
     map?.easeTo({
       center: [listing.location.lng, listing.location.lat],
       zoom: targetZoom,
-      duration: reducedMotion ? 0 : 400,
+      duration: reducedMotion ? 0 : DESKTOP_POPUP_FOCUS_ANIMATION_MS,
       ...(popupOffset ? { offset: popupOffset } : {}),
     });
   }, [
@@ -3070,7 +3090,7 @@ export default function MapComponent({
       const popupOffset = getDesktopPopupFocusOffset();
       mapRef.current?.easeTo({
         center: [coords.lng, coords.lat],
-        duration: reducedMotion ? 0 : 400,
+        duration: reducedMotion ? 0 : DESKTOP_POPUP_FOCUS_ANIMATION_MS,
         ...(popupOffset ? { offset: popupOffset } : {}),
       });
     },
@@ -3136,6 +3156,7 @@ export default function MapComponent({
   return (
     <div
       ref={mapContainerRef}
+      data-testid="map"
       className="w-full h-full overflow-hidden relative group"
       role="region"
       aria-label="Interactive map showing listing locations"
@@ -3688,6 +3709,8 @@ export default function MapComponent({
             onClose={handleSelectedListingClose}
             closeOnClick={false}
             maxWidth="320px"
+            padding={DESKTOP_POPUP_SAFE_AREA}
+            subpixelPositioning
             className={`z-[60] [&_.maplibregl-popup-content]:rounded-xl [&_.maplibregl-popup-content]:p-0 [&_.maplibregl-popup-content]:!bg-transparent [&_.maplibregl-popup-content]:!shadow-none [&_.maplibregl-popup-close-button]:hidden ${
               isDarkMode
                 ? "[&_.maplibregl-popup-tip]:border-t-on-surface"
