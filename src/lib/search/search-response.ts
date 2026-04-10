@@ -39,30 +39,37 @@ export type SearchState<TData extends SearchPayload = SearchPayload> =
       meta: SearchResponseMeta;
     };
 
+export type SearchListState = SearchState<SearchListPayload>;
+export type SearchMapState = SearchState<SearchMapPayload>;
+
 export function createSearchResponseMeta(
   query: NormalizedSearchQuery,
   backendSource: SearchBackendSource
 ): SearchResponseMeta {
   return {
-    queryHash: generateSearchQueryHash({
-      query: query.query,
-      vibeQuery: query.vibeQuery,
-      minPrice: query.minPrice,
-      maxPrice: query.maxPrice,
-      amenities: query.amenities,
-      houseRules: query.houseRules,
-      languages: query.languages,
-      roomType: query.roomType,
-      leaseDuration: query.leaseDuration,
-      moveInDate: query.moveInDate,
-      genderPreference: query.genderPreference,
-      householdGender: query.householdGender,
-      bookingMode: query.bookingMode,
-      minAvailableSlots: query.minSlots,
-      nearMatches: query.nearMatches,
-      bounds: query.bounds,
-    }),
+    queryHash: getSearchQueryHash(query),
     backendSource,
     responseVersion: SEARCH_RESPONSE_VERSION,
   };
+}
+
+export function getSearchQueryHash(query: NormalizedSearchQuery): string {
+  return generateSearchQueryHash({
+    query: query.query,
+    vibeQuery: query.vibeQuery,
+    minPrice: query.minPrice,
+    maxPrice: query.maxPrice,
+    amenities: query.amenities,
+    houseRules: query.houseRules,
+    languages: query.languages,
+    roomType: query.roomType,
+    leaseDuration: query.leaseDuration,
+    moveInDate: query.moveInDate,
+    genderPreference: query.genderPreference,
+    householdGender: query.householdGender,
+    bookingMode: query.bookingMode,
+    minAvailableSlots: query.minSlots,
+    nearMatches: query.nearMatches,
+    bounds: query.bounds,
+  });
 }

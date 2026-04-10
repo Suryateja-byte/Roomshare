@@ -79,6 +79,11 @@ import {
   SNAP_COLLAPSED,
 } from "@/lib/mobile-layout";
 import { SEARCH_PHONE_MAX_QUERY } from "@/lib/search-layout";
+import {
+  applySearchQueryChange,
+  buildCanonicalSearchUrl,
+  normalizeSearchQuery,
+} from "@/lib/search/search-query";
 import { cn } from "@/lib/utils";
 import { useMediaQuery } from "@/hooks/useMediaQuery";
 import {
@@ -2527,30 +2532,13 @@ export default function MapComponent({
         return; // Bounds haven't meaningfully changed, skip search
       }
       lastSearchBoundsRef.current = { ...bounds };
-
-      const params = new URLSearchParams(searchParams.toString());
-      const hadPointCoords = params.has("lat") && params.has("lng");
-      const legacyLocationLabel =
-        hadPointCoords && !params.has("where") ? params.get("q") : null;
-
-      // Remove single point coordinates since we now have bounds
-      params.delete("lat");
-      params.delete("lng");
-      // Canonicalize legacy selected-point URLs onto `where + bounds`.
-      if (legacyLocationLabel) {
-        params.set("where", legacyLocationLabel);
-        params.delete("q");
-      }
-      // Reset pagination state when bounds change (keyset + offset)
-      params.delete("page");
-      params.delete("cursor");
-      params.delete("cursorStack");
-      params.delete("pageNumber");
-
-      params.set("minLng", bounds.minLng.toString());
-      params.set("maxLng", bounds.maxLng.toString());
-      params.set("minLat", bounds.minLat.toString());
-      params.set("maxLat", bounds.maxLat.toString());
+      const url = buildCanonicalSearchUrl(
+        applySearchQueryChange(
+          normalizeSearchQuery(new URLSearchParams(searchParams.toString())),
+          "map-pan",
+          { bounds }
+        )
+      );
       setViewportInfoMessage(null);
 
       lastSearchTimeRef.current = Date.now();
@@ -2566,7 +2554,6 @@ export default function MapComponent({
       }, 8_000);
       // Use replace to update bounds without creating history entries
       // This prevents Back button from stepping through each map pan position
-      const url = `/search?${params.toString()}`;
       if (
         process.env.NEXT_PUBLIC_ENABLE_CLIENT_SIDE_SEARCH === "true" &&
         typeof window !== "undefined"
