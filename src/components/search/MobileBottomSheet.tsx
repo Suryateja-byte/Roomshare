@@ -46,7 +46,9 @@ interface MobileBottomSheetProps {
 
 /**
  * Draggable bottom sheet for mobile search results.
- * Overlays the map and snaps to 3 positions: collapsed, half, expanded.
+ * Overlays the map and snaps to 3 positions: collapsed (map-first), peek
+ * (half), and expanded (list-first). See `src/lib/mobile-layout.ts` for
+ * the shared fraction-of-viewport constants.
  *
  * Gesture handling:
  * - Drag the handle/header to resize
@@ -62,7 +64,9 @@ interface MobileBottomSheetProps {
  *
  * Accessibility:
  * - role="region" with aria-label
- * - Escape collapses to half
+ * - Escape returns the sheet to the collapsed (map-first) position; no-op
+ *   when already collapsed. Matches the existing e2e tests in
+ *   `tests/e2e/mobile-bottom-sheet.spec.ts` (section 7.5).
  * - Handle is a button for keyboard users
  */
 export default function MobileBottomSheet({
