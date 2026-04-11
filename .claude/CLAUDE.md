@@ -231,10 +231,10 @@ Secrets:
 ### Mobile bottom sheet rules
 
 - Map is always visible on mobile; list results appear in a draggable bottom sheet overlay.
-- Sheet has 3 snap points: collapsed (~15vh), half (~50vh), expanded (~85vh). Default is half.
+- Sheet has 3 snap points: collapsed/map-first (~11vh), peek/half (~42vh), expanded/list-first (~84vh). Default is peek. Exact values live in `src/lib/mobile-layout.ts` (`SNAP_COLLAPSED`, `SNAP_PEEK`, `SNAP_EXPANDED`).
 - Drag gestures are limited to the sheet handle/header — map receives all other touch events.
 - When expanded and list is scrolled to top, dragging down collapses the sheet.
-- Escape key collapses sheet to half position. Body scroll is locked when expanded.
+- Escape key returns the sheet to the collapsed (map-first) position; no-op when already collapsed. Body scroll is locked whenever the sheet is raised above collapsed (i.e., at peek or expanded).
 
 ---
 
