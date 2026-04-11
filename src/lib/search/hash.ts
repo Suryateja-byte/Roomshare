@@ -37,7 +37,7 @@ export {
  * Filter parameters used for hash generation.
  * Matches the shape from parseSearchParams().
  */
-export interface HashableFilterParams extends HashableSearchQuery {}
+export type HashableFilterParams = HashableSearchQuery;
 
 /**
  * Generate a stable 16-character hash from filter parameters.

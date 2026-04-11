@@ -84,7 +84,7 @@ describe("Map Listings API", () => {
 
         expect(response.status).toBe(400);
         const data = await response.json();
-        expect(data.error).toContain("bounds");
+        expect(data.kind).toBe("location-required");
       });
 
       it("returns 400 when only partial bounds provided", async () => {
@@ -98,7 +98,7 @@ describe("Map Listings API", () => {
 
         expect(response.status).toBe(400);
         const data = await response.json();
-        expect(data.error).toContain("bounds");
+        expect(data.kind).toBe("location-required");
       });
 
       it("returns 400 for NaN coordinate values", async () => {
@@ -113,7 +113,7 @@ describe("Map Listings API", () => {
 
         expect(response.status).toBe(400);
         const data = await response.json();
-        expect(data.error).toBe("Invalid coordinate values");
+        expect(data.kind).toBe("location-required");
       });
 
       it("returns 400 for non-numeric coordinate values", async () => {
@@ -128,7 +128,7 @@ describe("Map Listings API", () => {
 
         expect(response.status).toBe(400);
         const data = await response.json();
-        expect(data.error).toBe("Invalid coordinate values");
+        expect(data.kind).toBe("location-required");
       });
 
       it("clamps oversized viewport bounds instead of rejecting (P1-5)", async () => {
@@ -180,7 +180,7 @@ describe("Map Listings API", () => {
 
         expect(response.status).toBe(400);
         const data = await response.json();
-        expect(data.error).toContain("Latitude out of range");
+        expect(data.kind).toBe("location-required");
       });
 
       it("returns 400 for invalid latitude range (min >= max)", async () => {
@@ -195,7 +195,7 @@ describe("Map Listings API", () => {
 
         expect(response.status).toBe(400);
         const data = await response.json();
-        expect(data.error).toContain("Invalid latitude range");
+        expect(data.kind).toBe("location-required");
       });
     });
 
@@ -244,7 +244,8 @@ describe("Map Listings API", () => {
 
         expect(response.status).toBe(200);
         const data = await response.json();
-        expect(data.listings).toEqual(mockListings);
+        expect(data.kind).toBe("ok");
+        expect(data.data.listings).toEqual(mockListings);
       });
 
       it("includes x-request-id header in successful response", async () => {
