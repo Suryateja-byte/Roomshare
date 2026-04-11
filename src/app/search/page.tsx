@@ -30,6 +30,7 @@ import * as Sentry from "@sentry/nextjs";
 import type { Metadata } from "next";
 import {
   createSearchResponseMeta,
+  getSearchQueryHash,
   type SearchListState,
 } from "@/lib/search/search-response";
 import {
@@ -42,6 +43,11 @@ import {
   resolveSearchScenario,
   SEARCH_SCENARIO_HEADER,
 } from "@/lib/search/testing/search-scenarios";
+import {
+  recordSearchRequestLatency,
+  recordSearchV2Fallback,
+  recordSearchZeroResults,
+} from "@/lib/search/search-telemetry";
 
 type SearchPageSearchParams = {
   q?: string;
@@ -225,6 +231,7 @@ export async function generateMetadata({
 }
 
 export default async function SearchPage({ searchParams }: SearchPageProps) {
+  const requestStartTime = performance.now();
   const rawParams = await searchParams;
   const normalizedQuery = normalizeSearchQuery(rawParams as RawSearchParams);
 
@@ -242,6 +249,12 @@ export default async function SearchPage({ searchParams }: SearchPageProps) {
   // Early return for unbounded searches - check BEFORE any search attempt
   // This ensures friendly UX regardless of V2/V1 path or failures
   if (boundsRequired) {
+    recordSearchRequestLatency({
+      route: "search-page-ssr",
+      durationMs: performance.now() - requestStartTime,
+      stateKind: "location-required",
+      queryHash: getSearchQueryHash(normalizedQuery),
+    });
     const searchLabel = locationLabel || q || what || "your search";
     return renderLocationRequiredState(searchLabel);
   }
@@ -254,6 +267,29 @@ export default async function SearchPage({ searchParams }: SearchPageProps) {
   if (testScenario) {
     const scenarioState = await buildScenarioSearchListState(testScenario, {
       query: normalizedQuery,
+    });
+    const scenarioResultCount =
+      scenarioState.kind === "ok" || scenarioState.kind === "degraded"
+        ? scenarioState.data.total
+        : scenarioState.kind === "zero-results"
+          ? 0
+          : null;
+
+    if (scenarioState.kind === "zero-results") {
+      recordSearchZeroResults({
+        route: "search-page-ssr",
+        queryHash: scenarioState.meta.queryHash,
+        backendSource: scenarioState.meta.backendSource,
+      });
+    }
+
+    recordSearchRequestLatency({
+      route: "search-page-ssr",
+      durationMs: performance.now() - requestStartTime,
+      backendSource: scenarioState.meta.backendSource,
+      stateKind: scenarioState.kind,
+      queryHash: scenarioState.meta.queryHash,
+      resultCount: scenarioResultCount,
     });
 
     if (scenarioState.kind === "location-required") {
@@ -358,6 +394,12 @@ export default async function SearchPage({ searchParams }: SearchPageProps) {
     "/search"
   );
   if (!ssrRateLimit.allowed) {
+    recordSearchRequestLatency({
+      route: "search-page-ssr",
+      durationMs: performance.now() - requestStartTime,
+      stateKind: "rate-limited",
+      queryHash: getSearchQueryHash(normalizedQuery),
+    });
     return renderRateLimitedState();
   }
 
@@ -450,6 +492,14 @@ export default async function SearchPage({ searchParams }: SearchPageProps) {
   // V1 fallback path (when v2 disabled or failed)
   // Note: Map data is fetched by PersistentMapWrapper independently via /api/map-listings
   if (!usedV2) {
+    if (useV2Search) {
+      recordSearchV2Fallback({
+        route: "search-page-ssr",
+        queryHash: getSearchQueryHash(normalizedQuery),
+        reason: "v2_failed_or_unavailable",
+      });
+    }
+
     // P0 FIX: Add timeout protection to V1 fallback to prevent indefinite hangs
     // Critical data - let errors bubble up to error boundary
     paginatedResult = await withTimeout(
@@ -502,11 +552,26 @@ export default async function SearchPage({ searchParams }: SearchPageProps) {
     normalizedQuery,
     usedV2 ? "v2" : "v1-fallback"
   );
+  if (hasConfirmedZeroResults) {
+    recordSearchZeroResults({
+      route: "search-page-ssr",
+      queryHash: responseMeta.queryHash,
+      backendSource: responseMeta.backendSource,
+    });
+  }
   const initialStateKind: SearchListState["kind"] = hasConfirmedZeroResults
     ? "zero-results"
     : usedV2 || !useV2Search
       ? "ok"
       : "degraded";
+  recordSearchRequestLatency({
+    route: "search-page-ssr",
+    durationMs: performance.now() - requestStartTime,
+    backendSource: responseMeta.backendSource,
+    stateKind: initialStateKind,
+    queryHash: responseMeta.queryHash,
+    resultCount: total,
+  });
 
   const listContent = (
     <div className="max-w-[840px] mx-auto pb-24 md:pb-6">

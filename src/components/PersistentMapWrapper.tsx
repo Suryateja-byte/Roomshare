@@ -57,6 +57,7 @@ import {
   LNG_MAX,
 } from "@/lib/constants";
 import { getScenarioHeaderValue } from "@/lib/search/testing/search-scenarios";
+import { emitSearchClientMetric } from "@/lib/search/search-telemetry-client";
 
 // CRITICAL: Lazy import - only loads when component renders
 // This defers the maplibre-gl bundle until user opts to see map
@@ -608,6 +609,25 @@ export default function PersistentMapWrapper({
     () => getSearchQueryHash(normalizeSearchQuery(new URLSearchParams(searchParamsString))),
     [searchParamsString]
   );
+  const abortFetchController = useCallback(
+    (
+      controller: AbortController | null,
+      reason: "superseded" | "cleanup" | "retry"
+    ) => {
+      if (!controller || controller.signal.aborted) {
+        return;
+      }
+
+      controller.abort();
+      emitSearchClientMetric({
+        metric: "search_client_abort_total",
+        route: "persistent-map-wrapper",
+        queryHash: currentQueryHash,
+        reason,
+      });
+    },
+    [currentQueryHash]
+  );
 
   const fetchListings = useCallback(
     async (
@@ -756,6 +776,16 @@ export default function PersistentMapWrapper({
           !("meta" in data) ||
           data.meta.queryHash !== requestQueryHash
         ) {
+          emitSearchClientMetric({
+            metric: "search_map_list_mismatch_total",
+            route: "persistent-map-wrapper",
+            queryHash: requestQueryHash,
+            responseQueryHash: "meta" in data ? data.meta.queryHash : undefined,
+            reason:
+              "meta" in data && data.meta.queryHash !== requestQueryHash
+                ? "stale-query-hash"
+                : "stale-request-key",
+          });
           return;
         }
 
@@ -958,9 +988,7 @@ export default function PersistentMapWrapper({
     // M6-MAP: Client AbortController cancels the fetch but cannot cancel the
     // in-progress DB query on the server. Server-side statement_timeout provides
     // the safety net for runaway queries.
-    if (searchAbortRef.current) {
-      searchAbortRef.current.abort();
-    }
+    abortFetchController(searchAbortRef.current, "superseded");
 
     // Create abort controller for this search fetch
     const abortController = new AbortController();
@@ -995,12 +1023,10 @@ export default function PersistentMapWrapper({
       if (retryTimeoutRef.current) {
         clearTimeout(retryTimeoutRef.current);
       }
-      if (searchAbortRef.current) {
-        searchAbortRef.current.abort();
-      }
+      abortFetchController(searchAbortRef.current, "cleanup");
     };
     // eslint-disable-next-line react-hooks/exhaustive-deps -- intentional dependency omission to prevent infinite loops
-  }, [currentQueryHash, searchParams, fetchListings, shouldRenderMap, isV2Enabled, hasV2Data]);
+  }, [abortFetchController, currentQueryHash, searchParams, fetchListings, shouldRenderMap, isV2Enabled, hasV2Data]);
 
   // Proactive fetching during map pan (triggered via activePanBounds)
   useEffect(() => {
@@ -1038,7 +1064,7 @@ export default function PersistentMapWrapper({
     if (paddedParamsString === lastFetchedParamsRef.current) return;
 
     if (fetchTimeoutRef.current) clearTimeout(fetchTimeoutRef.current);
-    if (panAbortRef.current) panAbortRef.current.abort();
+    abortFetchController(panAbortRef.current, "superseded");
 
     const abortController = new AbortController();
     panAbortRef.current = abortController;
@@ -1055,12 +1081,11 @@ export default function PersistentMapWrapper({
     }, 100);
 
     return () => {
-      if (panAbortRef.current) {
-        panAbortRef.current.abort();
-      }
+      abortFetchController(panAbortRef.current, "cleanup");
     };
   }, [
     activePanBounds,
+    abortFetchController,
     currentQueryHash,
     searchParams,
     shouldRenderMap,
@@ -1077,9 +1102,7 @@ export default function PersistentMapWrapper({
     }
 
     // P1-1 FIX: Abort any existing request before starting retry
-    if (searchAbortRef.current) {
-      searchAbortRef.current.abort();
-    }
+    abortFetchController(searchAbortRef.current, "retry");
 
     // Create new AbortController for retry request
     const abortController = new AbortController();
@@ -1094,7 +1117,7 @@ export default function PersistentMapWrapper({
       undefined,
       currentQueryHash
     );
-  }, [currentQueryHash, searchParams, fetchListings]);
+  }, [abortFetchController, currentQueryHash, searchParams, fetchListings]);
 
   // P2-FIX (#115): Also show placeholder when data path hasn't been determined yet.
   // This prevents the brief empty map flash between mount and v2 signal.
