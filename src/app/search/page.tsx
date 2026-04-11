@@ -316,6 +316,23 @@ export default async function SearchPage({ searchParams }: SearchPageProps) {
         <div className="px-4 sm:px-5 lg:px-8 pt-0">
           <InlineFilterStrip />
 
+          {/*
+           * Mobile-only accessible heading. The visible desktop <h1> below is
+           * hidden on mobile (md:hidden wrapper), so mobile viewports would
+           * otherwise lose the level-1 landmark. This sr-only element keeps
+           * the a11y tree + Playwright heading selectors working without
+           * affecting the mobile visual design (the count renders in the
+           * MobileMapStatusCard / bottom sheet header). Removed from the a11y
+           * tree on md+ via md:hidden so only one h1 is active per viewport.
+           */}
+          <h1 className="sr-only md:hidden">
+            {renderableScenarioData.total === null
+              ? "100+"
+              : renderableScenarioData.total}{" "}
+            {renderableScenarioData.total === 1 ? "place" : "places"}
+            {displayLocation ? ` in ${displayLocation}` : ""}
+          </h1>
+
           <div className="flex flex-row items-center justify-between gap-4 py-2 mb-4">
             <div className="hidden md:block flex-1 min-w-0">
               <div className="flex items-baseline gap-3 min-w-0">
@@ -577,6 +594,17 @@ export default async function SearchPage({ searchParams }: SearchPageProps) {
     <div className="max-w-[840px] mx-auto pb-24 md:pb-6">
       <div className="px-4 sm:px-5 lg:px-8 pt-0">
         <InlineFilterStrip />
+
+        {/*
+         * Mobile-only accessible heading — see equivalent comment in the
+         * scenario render path above. Keeps the level-1 landmark in the a11y
+         * tree on mobile without affecting the visual design.
+         */}
+        <h1 className="sr-only md:hidden">
+          {total === null ? "100+" : total}{" "}
+          {total === 1 ? "place" : "places"}
+          {displayLocation ? ` in ${displayLocation}` : ""}
+        </h1>
 
         <div className="flex flex-row items-center justify-between gap-4 py-2 mb-4">
           <div className="hidden md:block flex-1 min-w-0">
