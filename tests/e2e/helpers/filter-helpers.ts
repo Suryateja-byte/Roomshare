@@ -170,7 +170,7 @@ export async function waitForFilterCommit(
   // Step 2: Wait for SearchForm hydration (data-hydrated on filter buttons)
   await page
     .locator(
-      'button[data-hydrated][aria-label^="Filters"], button[data-hydrated][data-testid="quick-filter-more-filters"], button[data-hydrated][data-testid="mobile-filter-button"]'
+      'button[data-hydrated][aria-label^="Filters"]:visible, button[data-hydrated][data-testid="quick-filter-more-filters"]:visible, button[data-hydrated][data-testid="mobile-filter-button"]:visible'
     )
     .first()
     .waitFor({ state: "visible", timeout: Math.floor(timeout * 0.4) })
