@@ -141,6 +141,19 @@ const serverEnvSchema = z
           path: ["TURNSTILE_ENABLED"],
         });
       }
+      // Defense-in-depth: the deterministic E2E scenario seam must never
+      // be armed in production. `resolveSearchScenario` already gates on
+      // this flag, but a misconfigured prod env var would silently expose
+      // fake listings to any request carrying `x-e2e-search-scenario`.
+      // Fail fast at boot instead.
+      if (data.ENABLE_SEARCH_TEST_SCENARIOS === "true") {
+        ctx.addIssue({
+          code: z.ZodIssueCode.custom,
+          message:
+            "ENABLE_SEARCH_TEST_SCENARIOS must not be 'true' in production",
+          path: ["ENABLE_SEARCH_TEST_SCENARIOS"],
+        });
+      }
     }
 
     // Multi-slot booking feature flag cross-validation
