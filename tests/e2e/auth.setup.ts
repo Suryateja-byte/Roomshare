@@ -1,12 +1,11 @@
 import { test as setup, expect, Page } from "@playwright/test";
 import path from "path";
-import { waitForTurnstileIfPresent } from "./helpers/auth-helpers";
 
 const authFile = path.join(__dirname, "../../playwright/.auth/user.json");
 
 /**
- * Shared login helper — navigates to /login, fills credentials, waits for
- * redirect, and saves the authenticated storage state to `authFile`.
+ * Shared login helper — authenticates via the Auth.js credentials callback,
+ * verifies the session, and saves the authenticated storage state.
  */
 async function loginAndSaveState(
   page: Page,
@@ -14,48 +13,60 @@ async function loginAndSaveState(
   password: string,
   stateFile: string
 ) {
-  await page.goto("/login");
+  const callbackUrl = new URL(
+    "/",
+    process.env.E2E_BASE_URL || "http://localhost:3000"
+  ).toString();
 
-  await expect(
-    page.getByRole("heading", { name: /log in|sign in|welcome back/i })
-  ).toBeVisible({ timeout: 30000 });
+  const csrfResponse = await page.request.get("/api/auth/csrf");
+  expect(csrfResponse.ok()).toBeTruthy();
 
-  await page.getByLabel(/email/i).fill(email);
-  await page.getByLabel(/password/i).first().fill(password);
+  const csrfData = (await csrfResponse.json()) as { csrfToken?: string };
+  expect(csrfData.csrfToken).toBeTruthy();
 
-  // waitForTurnstileIfPresent waits up to 30s for Turnstile to auto-solve.
-  // It catches timeout errors and proceeds — the server-side uses test keys
-  // that always pass regardless of the response field value.
-  await waitForTurnstileIfPresent(page);
-
-  const submitBtn = page.getByRole("button", { name: /sign in|log in|login/i });
-
-  const loginResponsePromise = page.waitForResponse(
-    (response) =>
-      response.url().includes("/api/auth") && response.status() === 200,
-    { timeout: 30000 }
+  const loginResponse = await page.request.post(
+    "/api/auth/callback/credentials",
+    {
+      form: {
+        email,
+        password,
+        csrfToken: csrfData.csrfToken!,
+        callbackUrl,
+        json: "true",
+        // Cloudflare's test keys accept deterministic fake tokens in E2E.
+        turnstileToken: "test-token",
+      },
+      failOnStatusCode: false,
+      maxRedirects: 0,
+    }
   );
 
-  // Try a normal click first (works when Turnstile has already resolved).
-  // If the button is still disabled (Turnstile "Verifying..."), dispatch a
-  // programmatic submit event on the form to bypass the disabled state.
-  // The server uses always-pass test keys so no valid token is required.
-  const clicked = await submitBtn.isEnabled().catch(() => false);
-  if (clicked) {
-    await submitBtn.click();
-  } else {
-    // Button disabled — submit the form programmatically via JS
-    await page.evaluate(() => {
-      const form = document.querySelector("form");
-      if (form) form.requestSubmit();
-    });
-  }
+  expect([200, 302]).toContain(loginResponse.status());
 
-  await loginResponsePromise;
+  await expect
+    .poll(
+      async () => {
+        const sessionResponse = await page.request.get("/api/auth/session");
+        if (!sessionResponse.ok()) return null;
 
-  await page.waitForURL((url) => !url.pathname.includes("/login"), {
-    timeout: 30000,
-  });
+        const sessionData = (await sessionResponse.json()) as
+          | {
+              user?: { email?: string };
+            }
+          | null;
+
+        return sessionData?.user?.email?.toLowerCase() ?? null;
+      },
+      {
+        timeout: 10_000,
+        message: `Waiting for authenticated session for ${email}`,
+      }
+    )
+    .toBe(email.toLowerCase());
+
+  // Hydrate a real page with the authenticated browser context before
+  // persisting storage state so downstream specs inherit verified cookies.
+  await page.goto("/");
 
   await page.context().storageState({ path: stateFile });
 }

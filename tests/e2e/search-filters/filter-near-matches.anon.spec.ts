@@ -14,6 +14,7 @@ import {
   scopedCards,
   buildSearchUrl,
   SEARCH_URL,
+  waitForFilterCommit,
 } from "../helpers";
 
 test.describe("Near Matches & Low Results Guidance", () => {
@@ -322,8 +323,10 @@ test.describe("Near Matches & Low Results Guidance", () => {
       nearMatches: "1",
     });
     await page.goto(url);
-
     await page.waitForLoadState("domcontentloaded");
+
+    // Wait for filter state to hydrate with nearMatches param
+    await waitForFilterCommit(page, "nearMatches", "1");
 
     // The guidance panel should NOT be visible (nearMatchesEnabled=true returns null)
     const guidancePanel = searchResultsContainer(page).locator(

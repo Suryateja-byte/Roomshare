@@ -15,7 +15,11 @@
  */
 
 import { test, expect, tags } from "../helpers";
-import { expireSession, expectLoginRedirect } from "../helpers";
+import {
+  clearAuthCookies,
+  expireSession,
+  expectLoginRedirect,
+} from "../helpers";
 
 test.describe("Session Expiry: Messaging", () => {
   test.use({ storageState: "playwright/.auth/user.json" });
@@ -114,13 +118,7 @@ test.describe("Session Expiry: Messaging", () => {
     // Clear auth cookies to simulate expired session.
     // Don't use expireSession() — its route mock for /api/auth/session is
     // irrelevant for server-side redirects and can interfere with navigation.
-    for (const cookie of [
-      "authjs.session-token",
-      "authjs.csrf-token",
-      "authjs.callback-url",
-    ]) {
-      await page.context().clearCookies({ name: cookie });
-    }
+    await clearAuthCookies(page);
 
     // Navigate to messages — server-side auth() finds no session → redirect.
     // Next.js App Router redirect() produces an RSC client-side navigation,

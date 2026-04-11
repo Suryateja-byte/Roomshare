@@ -145,6 +145,39 @@ export async function waitForNoUrlParam(
 }
 
 /**
+ * Wait for a filter to be fully committed to both URL and React state.
+ *
+ * Bridges the gap between URL update (router.push) and React hydration
+ * (useBatchedFilters 10-second force-sync window). Waits for:
+ * 1. URL parameter to match expected value (or be absent)
+ * 2. SearchForm to be hydrated (data-hydrated attribute on filter buttons)
+ */
+export async function waitForFilterCommit(
+  page: Page,
+  paramKey: string,
+  expectedValue?: string | null,
+  timeout = 30_000
+): Promise<void> {
+  // Step 1: Wait for URL param
+  if (expectedValue === null) {
+    await waitForNoUrlParam(page, paramKey, Math.floor(timeout * 0.6));
+  } else if (expectedValue !== undefined) {
+    await waitForUrlParam(page, paramKey, expectedValue, Math.floor(timeout * 0.6));
+  } else {
+    await waitForUrlParam(page, paramKey, undefined, Math.floor(timeout * 0.6));
+  }
+
+  // Step 2: Wait for SearchForm hydration (data-hydrated on filter buttons)
+  await page
+    .locator(
+      'button[data-hydrated][aria-label^="Filters"]:visible, button[data-hydrated][data-testid="quick-filter-more-filters"]:visible, button[data-hydrated][data-testid="mobile-filter-button"]:visible'
+    )
+    .first()
+    .waitFor({ state: "visible", timeout: Math.floor(timeout * 0.4) })
+    .catch(() => {});
+}
+
+/**
  * Assert a URL param equals a specific value (auto-retries via waitForURL).
  */
 export async function expectUrlParam(
@@ -225,16 +258,12 @@ export async function gotoSearchWithFilters(
  * Uses regex to match both "Filters" and "Filters (N active)" states.
  */
 export function filtersButton(page: Page): Locator {
-  // On desktop the redesigned filter strip renders a button with
-  // data-testid="quick-filter-more-filters" and aria-label^="Filters".
-  // On mobile it renders data-testid="mobile-filter-button".
-  // Both share aria-label^="Filters", but the mobile one lives inside a
-  // md:hidden parent, so we must filter to only the visible button.
-  // Using filter({ visible: true }) ensures we don't accidentally resolve
-  // to the hidden mobile button when running on a desktop viewport.
   return page
-    .locator(
-      'button[data-testid="quick-filter-more-filters"], button[data-testid="mobile-filter-button"], button[data-hydrated][aria-label^="Filters"], button[aria-label^="Filters"]'
+    .getByRole("button", { name: /^filters/i })
+    .or(
+      page.locator(
+        'button[data-testid="quick-filter-more-filters"], button[data-testid="mobile-filter-button"], button[data-hydrated][aria-label^="Filters"], button[aria-label^="Filters"]'
+      )
     )
     .filter({ visible: true })
     .first();
@@ -293,7 +322,10 @@ export async function clickFiltersButton(page: Page): Promise<void> {
     // to false (via useKeyboardShortcuts), then re-click for a real transition.
     await page.keyboard.press("Escape");
     await expect(dialog).not.toBeVisible({ timeout: 5_000 });
-    await btn.click({ force: true });
+    const retryButton = filtersButton(page);
+    await expect(retryButton).toBeVisible({ timeout: 15_000 });
+    await retryButton.scrollIntoViewIfNeeded().catch(() => {});
+    await retryButton.click();
     await expect(dialog).toBeVisible({ timeout: 15_000 });
   }
 }
@@ -345,7 +377,10 @@ export async function openFilterModal(page: Page): Promise<Locator> {
     // to false (via useKeyboardShortcuts), then re-click for a real transition.
     await page.keyboard.press("Escape");
     await expect(dialog).not.toBeVisible({ timeout: 5_000 });
-    await btn.click({ force: true });
+    const retryButton = filtersButton(page);
+    await expect(retryButton).toBeVisible({ timeout: 15_000 });
+    await retryButton.scrollIntoViewIfNeeded().catch(() => {});
+    await retryButton.click();
     await expect(dialog).toBeVisible({ timeout: 15_000 });
   }
 

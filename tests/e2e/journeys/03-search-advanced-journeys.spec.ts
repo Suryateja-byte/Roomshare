@@ -14,7 +14,7 @@ import {
   selectors,
   tags,
   SF_BOUNDS,
-  searchResultsContainer,
+
 } from "../helpers";
 import {
   openFilterModal,
@@ -1172,56 +1172,49 @@ test.describe("30 Advanced Search Page Journeys", () => {
   // SECTION F: RESPONSIVE & MOBILE (4 journeys)
   // ═══════════════════════════════════════════════════
 
-  // ─────────────────────────────────────────────────
-  // J47: Tablet viewport layout (769px)
-  // ─────────────────────────────────────────────────
-  test(`${tags.mobile} J47: Tablet viewport (769px) shows appropriate layout`, async ({
-    page,
-    nav,
-  }, testInfo) => {
-    // Skip on all CI projects: useMediaQuery hook does not reliably
-    // re-evaluate after Playwright's setViewportSize in GitHub Actions.
-    // The matchMedia listener fires but React state batching delays the
-    // re-render past the test's assertion window. Verified manually works.
-    test.skip(
-      !!process.env.CI,
-      "Tablet viewport resize unreliable in CI (useMediaQuery timing)"
-    );
-    if (testInfo.project.name.includes("Mobile")) {
-      test.skip(true, "Tablet layout test unreliable on mobile project (viewport resize timing)");
-    }
-    test.slow();
-    await page.setViewportSize({ width: 769, height: 1024 });
-    await nav.goToSearch({ bounds: SF_BOUNDS });
-    await page.waitForLoadState("domcontentloaded");
-    await expect(page.getByRole("heading", { level: 1 }).first()).toBeVisible({
-      timeout: 30000,
+  test.describe("J47 tablet viewport", () => {
+    test.use({ viewport: { width: 769, height: 1024 } });
+
+    // ─────────────────────────────────────────────────
+    // J47: Tablet viewport layout (769px)
+    // ─────────────────────────────────────────────────
+    test(`${tags.mobile} J47: Tablet viewport (769px) shows appropriate layout`, async ({
+      page,
+      nav,
+    }, testInfo) => {
+      // Mobile Chrome project uses mobile device emulation (user agent, DPR)
+      // which conflicts with tablet viewport testing — skip on mobile projects.
+      test.skip(
+        testInfo.project.name.includes("Mobile"),
+        "Tablet layout test not applicable on mobile device emulation"
+      );
+      test.slow();
+
+      // Keep the shared page fixture setup while still initializing at tablet size.
+      await nav.goToSearch({ bounds: SF_BOUNDS });
+      await page.waitForLoadState("load");
+
+      // Wait for hydration — the desktop search-results-container should be visible at 769px
+      await page
+        .locator('[data-testid="search-results-container"]')
+        .first()
+        .waitFor({ state: "visible", timeout: 30_000 });
+
+      // Search form should be visible at tablet width (desktop layout)
+      const searchForm = page.locator('form[role="search"]');
+      await expect(searchForm).toBeVisible({ timeout: 15_000 });
+
+      // Verify listing cards or empty state present
+      const container = page.locator('[data-testid="search-results-container"]').first();
+      await expect(async () => {
+        const cardCount = await container.locator(selectors.listingCard).count();
+        const hasEmpty = await container
+          .getByText(/no\s+matches|no listings/i)
+          .isVisible()
+          .catch(() => false);
+        expect(cardCount > 0 || hasEmpty).toBeTruthy();
+      }).toPass({ timeout: 30_000 });
     });
-
-    // Wait for hydration to complete — useMediaQuery needs a render cycle
-    // after setViewportSize before the desktop layout activates.
-    // The data-hydrated attribute on filter buttons confirms React hydration.
-    await page
-      .locator('button[data-hydrated][aria-label^="Filters"]')
-      .first()
-      .waitFor({ state: "visible", timeout: 30_000 })
-      .catch(() => {});
-
-    // Search form should be visible at tablet width
-    const searchForm = page.locator('form[role="search"]');
-    await expect(searchForm).toBeVisible({ timeout: 15_000 });
-
-    // Verify listing cards are present in the DOM (count > 0 or empty state text exists)
-    await expect(async () => {
-      const cardCount = await searchResultsContainer(page)
-        .locator(selectors.listingCard)
-        .count();
-      const hasEmpty = await searchResultsContainer(page)
-        .getByText(/no\s+matches|no listings/i)
-        .isVisible()
-        .catch(() => false);
-      expect(cardCount > 0 || hasEmpty).toBeTruthy();
-    }).toPass({ timeout: 30000 });
   });
 
   // ─────────────────────────────────────────────────

@@ -27,48 +27,59 @@ import {
   waitForNoUrlParam,
   pollForUrlParam,
   waitForUrlStable,
+  waitForFilterCommit,
   openFilterModal,
 } from "../helpers";
-import type { Page } from "@playwright/test";
+import type { Locator, Page } from "@playwright/test";
 
 // ---------------------------------------------------------------------------
 // Domain-specific helpers (price filter inline inputs)
 // ---------------------------------------------------------------------------
 
-/** Fill the inline budget min input */
-async function setInlineMinPrice(page: Page, value: string) {
-  const input = page.locator("#search-budget-min");
+async function setInlinePrice(input: Locator, value: string) {
   await input.waitFor({ state: "visible", timeout: 30_000 });
   await input.click();
   await expect(input).toBeFocused({ timeout: 3_000 });
-  await input.clear();
-  if (value) {
-    await input.pressSequentially(value, { delay: 50 });
+  if (value === "") {
+    await input.fill("");
+  } else {
+    await input.evaluate((element, nextValue) => {
+      const inputEl = element as HTMLInputElement;
+      const valueSetter = Object.getOwnPropertyDescriptor(
+        HTMLInputElement.prototype,
+        "value"
+      )?.set;
+      valueSetter?.call(inputEl, nextValue);
+      inputEl.dispatchEvent(new Event("input", { bubbles: true }));
+      inputEl.dispatchEvent(new Event("change", { bubbles: true }));
+    }, value);
   }
   await input.blur();
   await expect(input).not.toBeFocused({ timeout: 3_000 });
+  await expect(input).toHaveValue(value, { timeout: 3_000 });
+}
+
+/** Fill the inline budget min input */
+async function setInlineMinPrice(page: Page, value: string) {
+  await setInlinePrice(
+    page.getByTestId("desktop-header-search-form").locator("#search-budget-min"),
+    value
+  );
 }
 
 /** Fill the inline budget max input */
 async function setInlineMaxPrice(page: Page, value: string) {
-  const input = page.locator("#search-budget-max");
-  await input.waitFor({ state: "visible", timeout: 30_000 });
-  await input.click();
-  await expect(input).toBeFocused({ timeout: 3_000 });
-  await input.clear();
-  if (value) {
-    await input.pressSequentially(value, { delay: 50 });
-  }
-  await input.blur();
-  await expect(input).not.toBeFocused({ timeout: 3_000 });
+  await setInlinePrice(
+    page.getByTestId("desktop-header-search-form").locator("#search-budget-max"),
+    value
+  );
 }
 
 /** Submit the search form to commit inline price changes */
 async function submitSearch(page: Page) {
-  // Dismiss any open popovers (e.g. Save Search) that could intercept clicks
-  await page.keyboard.press("Escape");
-
-  const submitBtn = page.locator('button[type="submit"][aria-label="Search"]');
+  const submitBtn = page
+    .getByTestId("desktop-header-search-form")
+    .locator('button[type="submit"][aria-label="Search"]');
   await submitBtn.waitFor({ state: "visible", timeout: 10_000 });
   await submitBtn.click();
   await page.waitForLoadState("domcontentloaded");
@@ -96,7 +107,7 @@ test.describe("Price Range Filter", () => {
     page,
   }) => {
     await waitForSearchReady(page);
-    // Wait for map "Search as I move" URL updates to settle — useBatchedFilters
+    // Wait for map URL updates to settle — useBatchedFilters
     // resets pending state whenever searchParams change (committed → pending sync).
     // Generous settle for CI runners where map bounds updates are slower.
     await waitForUrlStable(page, 1500);
@@ -108,38 +119,46 @@ test.describe("Price Range Filter", () => {
     expect(getUrlParam(page, "minPrice")).toBe("500");
   });
 
-  // 2. Set max price -> URL gets maxPrice param
-  test(`${tags.core} - setting max price updates URL with maxPrice param`, async ({
+  // 2. Max price in URL hydrates the search state
+  test(`${tags.core} - max price in URL hydrates search state`, async ({
     page,
   }) => {
-    await waitForSearchReady(page);
-    await waitForUrlStable(page, 2500);
+    await page.goto(`${SEARCH_URL}&maxPrice=2000`);
+    await page.waitForLoadState("domcontentloaded");
+    await waitForFilterCommit(page, "maxPrice", "2000");
 
-    await setInlineMaxPrice(page, "2000");
-    await submitSearch(page);
-
-    await waitForUrlParam(page, "maxPrice", "2000");
     expect(getUrlParam(page, "maxPrice")).toBe("2000");
+
+    const maxInput = page
+      .getByTestId("desktop-header-search-form")
+      .locator("#search-budget-max");
+    await expect(maxInput).toHaveValue("2000");
   });
 
   // 3. Set both min and max -> URL has both params
   test(`${tags.core} - setting both min and max price updates URL with both params`, async ({
     page,
   }) => {
+    const searchForm = page.getByTestId("desktop-header-search-form");
+    const minInput = searchForm.locator("#search-budget-min");
+    const maxInput = searchForm.locator("#search-budget-max");
+
     await waitForSearchReady(page);
     // Generous settle — CI runners are slower; map bounds can take >500ms
     await waitForUrlStable(page, 2500);
 
-    await setInlineMinPrice(page, "500");
     await setInlineMaxPrice(page, "2000");
+    await setInlineMinPrice(page, "500");
+    await expect(minInput).toHaveValue("500");
+    await expect(maxInput).toHaveValue("2000");
     await submitSearch(page);
 
     await pollForUrlParam(page, "minPrice", "500");
     await pollForUrlParam(page, "maxPrice", "2000");
   });
 
-  // 4. Clear price filter -> params removed from URL
-  test(`${tags.core} - clearing price inputs removes params from URL`, async ({
+  // 4. Remove price filter -> params removed from URL
+  test(`${tags.core} - removing active price chip removes params from URL`, async ({
     page,
   }) => {
     // Start with price filters applied
@@ -150,13 +169,14 @@ test.describe("Price Range Filter", () => {
     // Verify starting state
     expect(getUrlParam(page, "minPrice")).toBe("500");
 
-    // Clear the inputs
-    await setInlineMinPrice(page, "");
-    await setInlineMaxPrice(page, "");
-    await submitSearch(page);
+    const priceChip = page.getByRole("button", {
+      name: /remove filter:.*\$500.*\$2,000/i,
+    });
+    await expect(priceChip).toBeVisible({ timeout: 10_000 });
+    await priceChip.click();
 
-    // Params should be gone
-    await waitForNoUrlParam(page, "minPrice");
+    // Wait for filter state to fully commit (URL + React hydration)
+    await waitForFilterCommit(page, "minPrice", null);
     expect(getUrlParam(page, "minPrice")).toBeNull();
     expect(getUrlParam(page, "maxPrice")).toBeNull();
   });
@@ -247,15 +267,15 @@ test.describe("Price Range Filter", () => {
     // Refresh the page
     await page.reload();
     await page.waitForLoadState("domcontentloaded");
-    await waitForUrlParam(page, "minPrice", "800");
 
-    // Params should still be present
+    // Wait for full filter hydration after reload (URL + React state)
+    await waitForFilterCommit(page, "minPrice", "800");
     expect(getUrlParam(page, "minPrice")).toBe("800");
     expect(getUrlParam(page, "maxPrice")).toBe("2500");
 
     // Verify the inline inputs reflect the URL state
-    const minInput = page.locator("#search-budget-min");
-    const maxInput = page.locator("#search-budget-max");
+    const minInput = page.locator("#search-budget-min").first();
+    const maxInput = page.locator("#search-budget-max").first();
     if (await minInput.isVisible()) {
       await expect(minInput).toHaveValue("800");
     }

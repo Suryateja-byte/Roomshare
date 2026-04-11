@@ -28,6 +28,7 @@ import {
   appliedFiltersRegion,
   filtersButton,
   filterDialog,
+  waitForFilterCommit,
 } from "../helpers";
 
 // ---------------------------------------------------------------------------
@@ -117,7 +118,8 @@ test.describe("Filter State Persistence", () => {
         await page.goBack();
         await page.waitForLoadState("domcontentloaded");
 
-        // Filters should be restored in the URL
+        // Wait for filter state to hydrate after back navigation
+        await waitForFilterCommit(page, "minPrice", "800");
         expect(getUrlParam(page, "minPrice")).toBe("800");
         expect(getUrlParam(page, "maxPrice")).toBe("2000");
 
@@ -133,7 +135,8 @@ test.describe("Filter State Persistence", () => {
       await page.goBack();
       await page.waitForLoadState("domcontentloaded");
 
-      // Filters should be restored
+      // Wait for filter state to hydrate after back navigation
+      await waitForFilterCommit(page, "minPrice", "800");
       expect(getUrlParam(page, "minPrice")).toBe("800");
       expect(getUrlParam(page, "maxPrice")).toBe("2000");
     }
