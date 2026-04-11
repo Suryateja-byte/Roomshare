@@ -14,7 +14,7 @@
  */
 
 import { test, expect, tags } from "../helpers";
-import { expectLoginRedirect } from "../helpers";
+import { clearAuthCookies, expectLoginRedirect } from "../helpers";
 
 test.describe("Session Expiry: Navigation & Redirects", () => {
   test.use({ storageState: "playwright/.auth/user.json" });
@@ -26,14 +26,7 @@ test.describe("Session Expiry: Navigation & Redirects", () => {
   test(`${tags.auth} ${tags.sessionExpiry} - SE-N01: Navigate to /bookings with expired cookie redirects to /login`, async ({
     page,
   }) => {
-    // Clear all auth cookies to simulate expired session
-    for (const cookie of [
-      "authjs.session-token",
-      "authjs.csrf-token",
-      "authjs.callback-url",
-    ]) {
-      await page.context().clearCookies({ name: cookie });
-    }
+    await clearAuthCookies(page);
 
     // Navigate to protected page
     await page.goto("/bookings");
@@ -45,13 +38,7 @@ test.describe("Session Expiry: Navigation & Redirects", () => {
   test(`${tags.auth} ${tags.sessionExpiry} - SE-N02: Navigate to /messages with expired cookie redirects to /login`, async ({
     page,
   }) => {
-    for (const cookie of [
-      "authjs.session-token",
-      "authjs.csrf-token",
-      "authjs.callback-url",
-    ]) {
-      await page.context().clearCookies({ name: cookie });
-    }
+    await clearAuthCookies(page);
     await page.goto("/messages");
     await expectLoginRedirect(page);
   });
@@ -59,13 +46,7 @@ test.describe("Session Expiry: Navigation & Redirects", () => {
   test(`${tags.auth} ${tags.sessionExpiry} - SE-N03: Navigate to /settings with expired cookie preserves callbackUrl`, async ({
     page,
   }) => {
-    for (const cookie of [
-      "authjs.session-token",
-      "authjs.csrf-token",
-      "authjs.callback-url",
-    ]) {
-      await page.context().clearCookies({ name: cookie });
-    }
+    await clearAuthCookies(page);
     await page.goto("/settings");
 
     // /settings page explicitly uses redirect('/login?callbackUrl=/settings')
@@ -75,13 +56,7 @@ test.describe("Session Expiry: Navigation & Redirects", () => {
   test(`${tags.auth} ${tags.sessionExpiry} - SE-N04: Navigate to /profile with expired cookie redirects to /login`, async ({
     page,
   }) => {
-    for (const cookie of [
-      "authjs.session-token",
-      "authjs.csrf-token",
-      "authjs.callback-url",
-    ]) {
-      await page.context().clearCookies({ name: cookie });
-    }
+    await clearAuthCookies(page);
     await page.goto("/profile");
     await expectLoginRedirect(page);
   });
@@ -97,13 +72,7 @@ test.describe("Session Expiry: Navigation & Redirects", () => {
     await expect(page).toHaveURL(/\/settings/, { timeout: 10000 });
 
     // Clear session cookies (same pattern as SE-N01..N04)
-    for (const cookie of [
-      "authjs.session-token",
-      "authjs.csrf-token",
-      "authjs.callback-url",
-    ]) {
-      await page.context().clearCookies({ name: cookie });
-    }
+    await clearAuthCookies(page);
 
     // Try navigating to settings again — should redirect to login
     await page.goto("/settings");

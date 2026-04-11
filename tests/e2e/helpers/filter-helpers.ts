@@ -258,16 +258,12 @@ export async function gotoSearchWithFilters(
  * Uses regex to match both "Filters" and "Filters (N active)" states.
  */
 export function filtersButton(page: Page): Locator {
-  // On desktop the redesigned filter strip renders a button with
-  // data-testid="quick-filter-more-filters" and aria-label^="Filters".
-  // On mobile it renders data-testid="mobile-filter-button".
-  // Both share aria-label^="Filters", but the mobile one lives inside a
-  // md:hidden parent, so we must filter to only the visible button.
-  // Using filter({ visible: true }) ensures we don't accidentally resolve
-  // to the hidden mobile button when running on a desktop viewport.
   return page
-    .locator(
-      'button[data-testid="quick-filter-more-filters"], button[data-testid="mobile-filter-button"], button[data-hydrated][aria-label^="Filters"], button[aria-label^="Filters"]'
+    .getByRole("button", { name: /^filters/i })
+    .or(
+      page.locator(
+        'button[data-testid="quick-filter-more-filters"], button[data-testid="mobile-filter-button"], button[data-hydrated][aria-label^="Filters"], button[aria-label^="Filters"]'
+      )
     )
     .filter({ visible: true })
     .first();
@@ -326,7 +322,10 @@ export async function clickFiltersButton(page: Page): Promise<void> {
     // to false (via useKeyboardShortcuts), then re-click for a real transition.
     await page.keyboard.press("Escape");
     await expect(dialog).not.toBeVisible({ timeout: 5_000 });
-    await btn.click({ force: true });
+    const retryButton = filtersButton(page);
+    await expect(retryButton).toBeVisible({ timeout: 15_000 });
+    await retryButton.scrollIntoViewIfNeeded().catch(() => {});
+    await retryButton.click();
     await expect(dialog).toBeVisible({ timeout: 15_000 });
   }
 }
@@ -378,7 +377,10 @@ export async function openFilterModal(page: Page): Promise<Locator> {
     // to false (via useKeyboardShortcuts), then re-click for a real transition.
     await page.keyboard.press("Escape");
     await expect(dialog).not.toBeVisible({ timeout: 5_000 });
-    await btn.click({ force: true });
+    const retryButton = filtersButton(page);
+    await expect(retryButton).toBeVisible({ timeout: 15_000 });
+    await retryButton.scrollIntoViewIfNeeded().catch(() => {});
+    await retryButton.click();
     await expect(dialog).toBeVisible({ timeout: 15_000 });
   }
 

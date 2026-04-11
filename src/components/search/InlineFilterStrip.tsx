@@ -413,7 +413,10 @@ export function InlineFilterStrip() {
 
   return (
     <>
-      <div className="hide-scrollbar -mx-1 flex items-center gap-2 overflow-x-auto px-1 py-2">
+      <div
+        className="hide-scrollbar -mx-1 flex items-center gap-2 overflow-x-auto px-1 py-2"
+        tabIndex={0}
+      >
         {showDesktopQuickFilters ? (
           <DesktopQuickFilters
             disabled={isPending}

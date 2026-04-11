@@ -289,14 +289,6 @@ test.describe("Room Type Filter", () => {
   }) => {
     await waitForSearchReady(page);
 
-    // Disable "Search as I move" to prevent map-triggered URL changes
-    const searchAsIMove = page.getByRole("switch", {
-      name: /search as i move/i,
-    });
-    if (await searchAsIMove.isChecked()) {
-      await searchAsIMove.click();
-    }
-
     const roomTypes = [
       { text: /^Private$/i, param: "Private Room" },
       { text: /^Shared$/i, param: "Shared Room" },
