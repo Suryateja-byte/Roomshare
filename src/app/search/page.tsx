@@ -34,7 +34,7 @@ import {
   type SearchListState,
 } from "@/lib/search/search-response";
 import {
-  buildCanonicalSearchUrl,
+  buildSeoCanonicalSearchUrl,
   normalizeSearchQuery,
   serializeSearchQuery,
 } from "@/lib/search/search-query";
@@ -222,9 +222,12 @@ export async function generateMetadata({
         }
       : undefined,
     alternates: {
-      canonical: buildCanonicalSearchUrl(
-        normalizeSearchQuery(rawParams as unknown as RawSearchParams),
-        { includePagination: false }
+      // SEO canonical: only `/search` or `/search?q=...` — strips all
+      // filter/sort/pagination params so every filter combination
+      // collapses to the same indexable canonical page. See SEO-04 in
+      // tests/e2e/seo/search-seo-meta.anon.spec.ts.
+      canonical: buildSeoCanonicalSearchUrl(
+        normalizeSearchQuery(rawParams as unknown as RawSearchParams)
       ),
     },
   };

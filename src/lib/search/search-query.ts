@@ -244,6 +244,33 @@ export function buildCanonicalSearchUrl(
   return queryString ? `/search?${queryString}` : "/search";
 }
 
+/**
+ * Build the SEO `<link rel="canonical">` URL for the search page.
+ *
+ * Strips *all* filter params (minPrice, maxPrice, amenities, roomType,
+ * genderPreference, bounds, sort, pagination, etc.) and keeps only the
+ * `q` location narrowing term. This collapses every filter and pagination
+ * combination into the same canonical page so search engines don't index
+ * thousands of near-duplicate variants.
+ *
+ * Distinct from `buildCanonicalSearchUrl`, which is a misnomer — that
+ * function is actually used by 14+ client-side callers (form submits,
+ * map updates, sort changes, filter batching, etc.) that all require
+ * filter params to be preserved. Renaming it is out-of-scope for this
+ * fix; this function exists to serve the single SEO caller without
+ * regressing anyone else.
+ *
+ * Covered by `tests/e2e/seo/search-seo-meta.anon.spec.ts:166` (SEO-04).
+ */
+export function buildSeoCanonicalSearchUrl(
+  query: NormalizedSearchQuery
+): string {
+  const params = new URLSearchParams();
+  if (query.query) params.set("q", query.query);
+  const queryString = params.toString();
+  return queryString ? `/search?${queryString}` : "/search";
+}
+
 export function applySearchQueryChange(
   current: NormalizedSearchQuery,
   change: QueryChangeKind,

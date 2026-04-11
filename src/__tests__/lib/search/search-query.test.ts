@@ -1,6 +1,7 @@
 import {
   applySearchQueryChange,
   buildCanonicalSearchUrl,
+  buildSeoCanonicalSearchUrl,
   normalizeSearchQuery,
   serializeSearchQuery,
 } from "@/lib/search/search-query";
@@ -109,5 +110,42 @@ describe("search-query", () => {
     expect(url).toBe(
       "/search?amenities=Parking&amenities=Wifi&what=quiet+roommates&where=San+Francisco"
     );
+  });
+
+  describe("buildSeoCanonicalSearchUrl", () => {
+    it("returns bare /search for an empty query", () => {
+      const url = buildSeoCanonicalSearchUrl(
+        normalizeSearchQuery(new URLSearchParams(""))
+      );
+      expect(url).toBe("/search");
+    });
+
+    it("keeps only the q param when present", () => {
+      const url = buildSeoCanonicalSearchUrl(
+        normalizeSearchQuery(new URLSearchParams("q=San+Francisco"))
+      );
+      expect(url).toBe("/search?q=San+Francisco");
+    });
+
+    it("strips filter, sort, and pagination params (SEO-04 contract)", () => {
+      // Mirrors tests/e2e/seo/search-seo-meta.anon.spec.ts:166
+      const url = buildSeoCanonicalSearchUrl(
+        normalizeSearchQuery(
+          new URLSearchParams(
+            "q=LA&minPrice=500&maxPrice=2000&roomType=Private Room&amenities=Wifi&amenities=Parking&sort=price_asc&cursor=abc123"
+          )
+        )
+      );
+      expect(url).toBe("/search?q=LA");
+    });
+
+    it("returns /search when only filter params are present without q", () => {
+      const url = buildSeoCanonicalSearchUrl(
+        normalizeSearchQuery(
+          new URLSearchParams("minPrice=500&roomType=Private Room")
+        )
+      );
+      expect(url).toBe("/search");
+    });
   });
 });
