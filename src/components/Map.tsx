@@ -68,6 +68,7 @@ import {
   MAP_FETCH_MAX_LAT_SPAN,
   MAP_FETCH_MAX_LNG_SPAN,
 } from "@/lib/constants";
+import { groupExactMapListingClones } from "@/lib/maps/marker-utils";
 import { SNAP_COLLAPSED } from "@/lib/mobile-layout";
 import { SEARCH_PHONE_MAX_QUERY } from "@/lib/search-layout";
 import { cn } from "@/lib/utils";
@@ -180,6 +181,7 @@ interface Listing {
 
 interface MarkerPosition {
   listing: Listing;
+  memberIds: string[];
   lat: number;
   lng: number;
 }
@@ -1438,33 +1440,47 @@ export default function MapComponent({
   // When clustering, use unclustered listings; otherwise use all listings
   const markersSource = useClustering ? unclusteredListings : listings;
 
-  // P2-FIX (#150): Create stable ID key to avoid recalculating markerPositions
-  // when array reference changes but listing IDs remain the same
-  const markersSourceKey = useMemo(() => {
+  // Build a stable marker signature so grouping recalculates only when the
+  // rendered marker payload changes, not when parent arrays are recreated.
+  const markersSourceSignature = useMemo(() => {
     return markersSource
-      .map((l) => l.id)
+      .map((listing) =>
+        [
+          listing.id,
+          listing.title.trim(),
+          listing.price,
+          listing.availableSlots,
+          listing.location.lat,
+          listing.location.lng,
+          listing.tier ?? "",
+        ].join(":")
+      )
       .sort()
       .join(",");
   }, [markersSource]);
 
-  // HIGH-1 FIX: Read markersSource via closure instead of ref.
-  // The ref-in-memo pattern was a React anti-pattern (stale data risk, React Compiler incompatible).
-  // markersSourceKey still controls when the memo recomputes (P2-FIX #150 preserved).
+  const groupedMarkers = useMemo(() => {
+    return groupExactMapListingClones(markersSource);
+    // markersSourceSignature controls recomputation while the closure reads the latest source.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [markersSourceSignature]);
+
   const markerPositions = useMemo(() => {
-    const source = markersSource;
+    const source = groupedMarkers;
     const positions: MarkerPosition[] = [];
     const coordsCounts: Record<string, number> = {};
 
     // First pass: count how many listings share each coordinate
-    source.forEach((listing) => {
-      const key = `${listing.location.lat},${listing.location.lng}`;
+    source.forEach((group) => {
+      const key = `${group.listing.location.lat},${group.listing.location.lng}`;
       coordsCounts[key] = (coordsCounts[key] || 0) + 1;
     });
 
     // Second pass: add offsets for overlapping markers
     const coordsIndices: Record<string, number> = {};
 
-    source.forEach((listing) => {
+    source.forEach((group) => {
+      const listing = group.listing;
       const key = `${listing.location.lat},${listing.location.lng}`;
       const count = coordsCounts[key] || 1;
 
@@ -1472,6 +1488,7 @@ export default function MapComponent({
         // No overlap, use original coordinates
         positions.push({
           listing,
+          memberIds: group.memberIds,
           lat: listing.location.lat,
           lng: listing.location.lng,
         });
@@ -1493,6 +1510,7 @@ export default function MapComponent({
 
         positions.push({
           listing,
+          memberIds: group.memberIds,
           lat: listing.location.lat + latOffset,
           lng: listing.location.lng + lngOffset,
         });
@@ -1500,18 +1518,28 @@ export default function MapComponent({
     });
 
     return positions;
-    // P2-FIX (#150): Depend on stable ID key instead of array reference
+    // Depend on the grouped marker signature instead of array reference churn.
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [markersSourceKey]);
+  }, [markersSourceSignature]);
 
   // CRIT-2 FIX: Synchronous ref for stable callback access to latest positions.
   // Synchronous assignment (not useEffect) avoids timing issues between render and effect.
   const markerPositionsRef = useRef(markerPositions);
   markerPositionsRef.current = markerPositions;
 
-  // O(1) lookup Set for ClusterHighlightMarker — avoids O(n) .some() scan
+  const markerPositionById = useMemo(() => {
+    const map = new globalThis.Map<string, MarkerPosition>();
+    markerPositions.forEach((position) => {
+      position.memberIds.forEach((memberId) => {
+        map.set(memberId, position);
+      });
+    });
+    return map;
+  }, [markerPositions]);
+
+  // O(1) lookup Set for ClusterHighlightMarker — includes alias IDs for clone groups.
   const markerPositionIds = useMemo(
-    () => new Set(markerPositions.map((p) => p.listing.id)),
+    () => new Set(markerPositions.flatMap((position) => position.memberIds)),
     [markerPositions]
   );
 
@@ -1542,7 +1570,7 @@ export default function MapComponent({
   const findMarkerIndex = useCallback(
     (id: string | null): number => {
       if (!id) return -1;
-      return sortedMarkerPositions.findIndex((p) => p.listing.id === id);
+      return sortedMarkerPositions.findIndex((p) => p.memberIds.includes(id));
     },
     [sortedMarkerPositions]
   );
@@ -1688,13 +1716,10 @@ export default function MapComponent({
 
   // Clear keyboard focus when clicking elsewhere or when markers change
   useEffect(() => {
-    if (
-      keyboardFocusedId &&
-      !markerPositions.find((p) => p.listing.id === keyboardFocusedId)
-    ) {
+    if (keyboardFocusedId && !markerPositionById.has(keyboardFocusedId)) {
       setKeyboardFocusedId(null);
     }
-  }, [keyboardFocusedId, markerPositions]);
+  }, [keyboardFocusedId, markerPositionById]);
 
   // Stabilize initial view state so it's only computed once on mount.
   // Prevents SF default from being re-applied when listings temporarily become empty.
@@ -3143,8 +3168,8 @@ export default function MapComponent({
   // so they don't depend on markerPositions and never change when listings change.
   const handleMarkerClickById = useCallback(
     (listingId: string) => {
-      const position = markerPositionsRef.current.find(
-        (p) => p.listing.id === listingId
+      const position = markerPositionsRef.current.find((p) =>
+        p.memberIds.includes(listingId)
       );
       if (!position) return;
       setViewedIds((prev) => new Set(prev).add(listingId));
@@ -3293,14 +3318,12 @@ export default function MapComponent({
         aria-atomic="true"
       >
         {keyboardFocusedId &&
-          markerPositions.find((p) => p.listing.id === keyboardFocusedId) &&
+          markerPositionById.has(keyboardFocusedId) &&
           (() => {
-            const focused = markerPositions.find(
-              (p) => p.listing.id === keyboardFocusedId
-            );
+            const focused = markerPositionById.get(keyboardFocusedId);
             if (!focused) return "";
-            const index = sortedMarkerPositions.findIndex(
-              (p) => p.listing.id === keyboardFocusedId
+            const index = sortedMarkerPositions.findIndex((p) =>
+              p.memberIds.includes(keyboardFocusedId)
             );
             return `Marker ${index + 1} of ${sortedMarkerPositions.length}: ${focused.listing.title || "Listing"}, ${formatPrice(focused.listing.price)} per month`;
           })()}
@@ -3691,10 +3714,16 @@ export default function MapComponent({
             availableSlots={position.listing.availableSlots}
             tier={position.listing.tier}
             currentZoom={currentZoom}
-            isHovered={hoveredId === position.listing.id}
-            isActive={activeId === position.listing.id}
-            isDimmed={!!hoveredId && hoveredId !== position.listing.id}
-            isKeyboardFocused={keyboardFocusedId === position.listing.id}
+            isHovered={
+              hoveredId ? position.memberIds.includes(hoveredId) : false
+            }
+            isActive={activeId ? position.memberIds.includes(activeId) : false}
+            isDimmed={!!hoveredId && !position.memberIds.includes(hoveredId)}
+            isKeyboardFocused={
+              keyboardFocusedId
+                ? position.memberIds.includes(keyboardFocusedId)
+                : false
+            }
             isViewed={viewedIds.has(position.listing.id)}
             onClickById={handleMarkerClickById}
             onPointerEnter={handleMarkerPointerEnter}

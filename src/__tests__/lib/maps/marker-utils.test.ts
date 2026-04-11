@@ -8,6 +8,7 @@
 import {
   COORD_PRECISION,
   groupListingsByCoord,
+  groupExactMapListingClones,
   formatStackPriceRange,
   type MapMarkerListing,
 } from "@/lib/maps/marker-utils";
@@ -202,6 +203,76 @@ describe("marker-utils", () => {
       const result = formatStackPriceRange(listings);
       expect(result).toContain("–"); // en-dash U+2013
       expect(result).not.toMatch(/\$\d+-\$\d+/); // not hyphen
+    });
+  });
+
+  describe("groupExactMapListingClones", () => {
+    const createCloneCandidate = (
+      id: string,
+      overrides: Partial<MapMarkerListing> = {}
+    ): MapMarkerListing => ({
+      id,
+      title: " Sunny Mission Room ",
+      price: 1200,
+      availableSlots: 1,
+      ownerId: `owner-${id}`,
+      location: { lat: 37.7599, lng: -122.4148 },
+      ...overrides,
+    });
+
+    it("collapses exact clones with different IDs into one canonical group", () => {
+      const groups = groupExactMapListingClones([
+        createCloneCandidate("clone-1"),
+        createCloneCandidate("clone-2", { title: "sunny mission room" }),
+      ]);
+
+      expect(groups).toHaveLength(1);
+      expect(groups[0].listing.id).toBe("clone-1");
+      expect(groups[0].memberIds).toEqual(["clone-1", "clone-2"]);
+      expect(groups[0].listings.map((listing) => listing.id)).toEqual([
+        "clone-1",
+        "clone-2",
+      ]);
+    });
+
+    it("preserves first-listing priority when choosing the canonical marker", () => {
+      const groups = groupExactMapListingClones([
+        createCloneCandidate("first"),
+        createCloneCandidate("second"),
+        createCloneCandidate("third"),
+      ]);
+
+      expect(groups).toHaveLength(1);
+      expect(groups[0].listing.id).toBe("first");
+      expect(groups[0].memberIds).toEqual(["first", "second", "third"]);
+    });
+
+    it("does not collapse distinct co-located listings", () => {
+      const groups = groupExactMapListingClones([
+        createCloneCandidate("clone-1"),
+        createCloneCandidate("different-title", { title: "Mission Room B" }),
+        createCloneCandidate("different-price", { price: 1300 }),
+      ]);
+
+      expect(groups).toHaveLength(3);
+      expect(groups.map((group) => group.listing.id)).toEqual([
+        "clone-1",
+        "different-title",
+        "different-price",
+      ]);
+    });
+
+    it("does not collapse listings that differ by visible marker tier", () => {
+      const groups = groupExactMapListingClones([
+        createCloneCandidate("primary", { tier: "primary" }),
+        createCloneCandidate("mini", { tier: "mini" }),
+      ]);
+
+      expect(groups).toHaveLength(2);
+      expect(groups.map((group) => group.listing.id)).toEqual([
+        "primary",
+        "mini",
+      ]);
     });
   });
 

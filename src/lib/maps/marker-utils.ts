@@ -18,6 +18,7 @@ export interface MapMarkerListing {
   title: string;
   price: number;
   availableSlots: number;
+  tier?: "primary" | "mini";
   ownerId?: string;
   images?: string[];
   location: {
@@ -38,6 +39,77 @@ export interface ListingGroup {
   lng: number;
   /** All listings at this coordinate */
   listings: MapMarkerListing[];
+}
+
+/**
+ * Group of exact-clone listings for map marker rendering.
+ * Distinct IDs can still collapse when the visible marker payload is identical.
+ */
+export interface ExactCloneGroup<T extends MapMarkerListing = MapMarkerListing> {
+  /** Stable key derived from the clone signature */
+  key: string;
+  /** First listing in source order, used as the visible canonical marker */
+  listing: T;
+  /** All listings collapsed into the canonical marker */
+  listings: T[];
+  /** All member listing IDs, including the canonical listing ID */
+  memberIds: string[];
+}
+
+function normalizeCloneTitle(title: string): string {
+  return title.trim().replace(/\s+/g, " ").toLowerCase();
+}
+
+function buildExactCloneKey(
+  listing: MapMarkerListing,
+  precision: number
+): string {
+  return [
+    normalizeCloneTitle(listing.title),
+    listing.price,
+    listing.availableSlots,
+    listing.tier ?? "",
+    listing.location.lat.toFixed(precision),
+    listing.location.lng.toFixed(precision),
+  ].join("|");
+}
+
+/**
+ * Collapse exact-clone listings into a single canonical marker entry.
+ * This is intentionally narrower than coordinate grouping and is used only by the map UI.
+ *
+ * @param listings - Array of listings in source order
+ * @param precision - Decimal places for coordinate comparison (default: 5)
+ * @returns Canonical marker groups preserving first-listing priority
+ */
+export function groupExactMapListingClones<T extends MapMarkerListing>(
+  listings: T[],
+  precision = COORD_PRECISION
+): ExactCloneGroup<T>[] {
+  const groups = new Map<string, ExactCloneGroup<T>>();
+  const orderedGroups: ExactCloneGroup<T>[] = [];
+
+  listings.forEach((listing) => {
+    const key = buildExactCloneKey(listing, precision);
+    const existing = groups.get(key);
+
+    if (existing) {
+      existing.listings.push(listing);
+      existing.memberIds.push(listing.id);
+      return;
+    }
+
+    const group: ExactCloneGroup<T> = {
+      key,
+      listing,
+      listings: [listing],
+      memberIds: [listing.id],
+    };
+    groups.set(key, group);
+    orderedGroups.push(group);
+  });
+
+  return orderedGroups;
 }
 
 /**

@@ -349,6 +349,8 @@ jest.mock("@/lib/haptics", () => ({
 const mockSetHovered = jest.fn();
 const mockSetActive = jest.fn();
 const mockRequestScrollTo = jest.fn();
+let mockHoveredId: string | null = null;
+let mockActiveId: string | null = null;
 const mockSetSearchAsMove = jest.fn();
 const mockSetHasUserMoved = jest.fn();
 const mockSetBoundsDirty = jest.fn();
@@ -370,8 +372,8 @@ const mockPrivacyCircle = jest.fn((props: PrivacyCircleProps) => null);
 
 jest.mock("@/contexts/ListingFocusContext", () => ({
   useListingFocus: () => ({
-    hoveredId: null,
-    activeId: null,
+    hoveredId: mockHoveredId,
+    activeId: mockActiveId,
     setHovered: mockSetHovered,
     setActive: mockSetActive,
     requestScrollTo: mockRequestScrollTo,
@@ -551,6 +553,8 @@ describe("Map Component", () => {
     mockReplaceWithTransition.mockClear();
     mockPrivacyCircle.mockClear();
     mockSearchParams = new URLSearchParams();
+    mockHoveredId = null;
+    mockActiveId = null;
 
     // Reset mock map instance
     mockCanvas = createMockCanvas();
@@ -1458,6 +1462,7 @@ describe("Map Component", () => {
       expect(lastCall).toBeDefined();
       if (!lastCall) return;
       expect(lastCall.listings).toHaveLength(2);
+      expect(screen.getAllByTestId("map-marker")).toHaveLength(2);
 
       // For overlapping points, displayed marker positions should be offset
       // (not collapsed to the same center coordinate).
@@ -1467,6 +1472,151 @@ describe("Map Component", () => {
         )
       );
       expect(uniqueCoords.size).toBe(2);
+    });
+
+    it("collapses exact cloned listings into one displayed marker and privacy circle", async () => {
+      const clonedListings = [
+        {
+          id: "clone-1",
+          title: "Sunny Mission Room",
+          price: 1200,
+          availableSlots: 1,
+          ownerId: "owner-1",
+          images: [],
+          location: { lat: 37.7599, lng: -122.4148 },
+        },
+        {
+          id: "clone-2",
+          title: " sunny mission room ",
+          price: 1200,
+          availableSlots: 1,
+          ownerId: "owner-2",
+          images: [],
+          location: { lat: 37.7599, lng: -122.4148 },
+        },
+      ];
+
+      mockQuerySourceFeaturesData = listingsToFeatures(clonedListings);
+      render(<MapComponent listings={clonedListings} />);
+
+      await act(async () => {
+        jest.advanceTimersByTime(100);
+      });
+
+      const handlers = (
+        window as unknown as Record<string, { onIdle?: () => void }>
+      ).__mapHandlers;
+      await act(async () => {
+        handlers?.onIdle?.();
+      });
+
+      await waitFor(() => {
+        expect(screen.getAllByTestId("map-marker")).toHaveLength(1);
+      });
+
+      const calls = mockPrivacyCircle.mock.calls;
+      const lastCall = calls[calls.length - 1]?.[0];
+
+      expect(lastCall).toBeDefined();
+      if (!lastCall) return;
+      expect(lastCall.listings).toHaveLength(1);
+    });
+
+    it("treats hidden clone IDs as aliases for the visible marker state", async () => {
+      const clonedListings = [
+        {
+          id: "clone-1",
+          title: "Sunny Mission Room",
+          price: 1200,
+          availableSlots: 1,
+          ownerId: "owner-1",
+          images: [],
+          location: { lat: 37.7599, lng: -122.4148 },
+        },
+        {
+          id: "clone-2",
+          title: "Sunny Mission Room",
+          price: 1200,
+          availableSlots: 1,
+          ownerId: "owner-2",
+          images: [],
+          location: { lat: 37.7599, lng: -122.4148 },
+        },
+      ];
+
+      mockHoveredId = "clone-2";
+      mockQuerySourceFeaturesData = listingsToFeatures(clonedListings);
+      render(<MapComponent listings={clonedListings} />);
+
+      await act(async () => {
+        jest.advanceTimersByTime(100);
+      });
+
+      const handlers = (
+        window as unknown as Record<string, { onIdle?: () => void }>
+      ).__mapHandlers;
+      await act(async () => {
+        handlers?.onIdle?.();
+      });
+
+      expect(screen.getAllByTestId("map-marker")).toHaveLength(1);
+      expect(screen.getByTestId("map-pin-primary-clone-1")).toHaveAttribute(
+        "data-focus-state",
+        "hovered"
+      );
+    });
+
+    it("keeps visually different tiered markers separate even when other fields match", async () => {
+      const tieredListings = [
+        {
+          id: "primary-pin",
+          title: "Sunny Mission Room",
+          price: 1200,
+          availableSlots: 1,
+          ownerId: "owner-1",
+          images: [],
+          location: { lat: 37.7599, lng: -122.4148 },
+          tier: "primary" as const,
+        },
+        {
+          id: "mini-pin",
+          title: "Sunny Mission Room",
+          price: 1200,
+          availableSlots: 1,
+          ownerId: "owner-2",
+          images: [],
+          location: { lat: 37.7599, lng: -122.4148 },
+          tier: "mini" as const,
+        },
+      ];
+
+      mockQuerySourceFeaturesData = listingsToFeatures(tieredListings);
+      render(<MapComponent listings={tieredListings} />);
+
+      await act(async () => {
+        jest.advanceTimersByTime(100);
+      });
+
+      const handlers = (
+        window as unknown as Record<string, { onIdle?: () => void }>
+      ).__mapHandlers;
+      await act(async () => {
+        handlers?.onIdle?.();
+      });
+
+      await waitFor(() => {
+        expect(screen.getAllByTestId("map-marker")).toHaveLength(2);
+      });
+
+      const calls = mockPrivacyCircle.mock.calls;
+      const lastCall = calls[calls.length - 1]?.[0];
+
+      expect(lastCall).toBeDefined();
+      if (!lastCall) return;
+      expect(lastCall.listings).toHaveLength(2);
+      expect(lastCall.listings.map((entry: { id: string }) => entry.id)).toEqual(
+        expect.arrayContaining(["primary-pin", "mini-pin"])
+      );
     });
   });
 
