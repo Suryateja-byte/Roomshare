@@ -43,11 +43,13 @@ import {
   resolveSearchScenario,
   SEARCH_SCENARIO_HEADER,
 } from "@/lib/search/testing/search-scenarios";
+import { recordSearchRequestLatency } from "@/lib/search/search-telemetry";
 
 export const runtime = "nodejs";
 
 export async function GET(request: NextRequest) {
   const context = createContextFromHeaders(request.headers);
+  const requestStartTime = performance.now();
 
   return runWithRequestContext(context, async () => {
     const requestId = getRequestId();
@@ -72,7 +74,15 @@ export async function GET(request: NextRequest) {
           type: "map",
           getIdentifier: getSearchRateLimitIdentifier,
         });
-        if (rateLimitResponse) return rateLimitResponse;
+        if (rateLimitResponse) {
+          recordSearchRequestLatency({
+            route: "map-listings-api",
+            durationMs: performance.now() - requestStartTime,
+            stateKind: "rate-limited",
+            queryHash: meta.queryHash,
+          });
+          return rateLimitResponse;
+        }
       }
 
       // Validate and parse explicit bounds first
@@ -112,6 +122,13 @@ export async function GET(request: NextRequest) {
 
       // Bounds are required - prevents full-table scans
       if (!bounds) {
+        recordSearchRequestLatency({
+          route: "map-listings-api",
+          durationMs: performance.now() - requestStartTime,
+          backendSource: meta.backendSource,
+          stateKind: "location-required",
+          queryHash: meta.queryHash,
+        });
         return NextResponse.json(
           {
             kind: "location-required",
@@ -128,6 +145,21 @@ export async function GET(request: NextRequest) {
         const scenarioState = await buildScenarioSearchMapState(testScenario, {
           query: normalizedQuery,
           queryHashOverride: requestedQueryHash,
+        });
+        const scenarioResultCount =
+          scenarioState.kind === "ok" || scenarioState.kind === "degraded"
+            ? scenarioState.data.listings.length
+            : scenarioState.kind === "zero-results"
+              ? 0
+              : null;
+
+        recordSearchRequestLatency({
+          route: "map-listings-api",
+          durationMs: performance.now() - requestStartTime,
+          backendSource: scenarioState.meta.backendSource,
+          stateKind: scenarioState.kind,
+          queryHash: scenarioState.meta.queryHash,
+          resultCount: scenarioResultCount,
         });
 
         return NextResponse.json(scenarioState, {
@@ -188,25 +220,33 @@ export async function GET(request: NextRequest) {
         );
       }
 
-      return NextResponse.json(
-        {
-          kind: "ok",
-          data: { listings },
-          meta,
-        } satisfies SearchMapState,
-        {
-          headers: {
-            // Fix #3: Use s-maxage for CDN caching (markers are NOT user-specific)
-            // s-maxage: CDN/edge cache duration (60s)
-            // max-age: browser cache duration (shorter to allow user refresh)
-            "Cache-Control":
-              "public, s-maxage=60, max-age=30, stale-while-revalidate=120",
-            "x-request-id": requestId,
-            // Vary by Accept-Encoding for proper CDN compression handling
-            Vary: "Accept-Encoding",
-          },
-        }
-      );
+      const state = {
+        kind: "ok",
+        data: { listings },
+        meta,
+      } satisfies SearchMapState;
+
+      recordSearchRequestLatency({
+        route: "map-listings-api",
+        durationMs: performance.now() - requestStartTime,
+        backendSource: meta.backendSource,
+        stateKind: listings.length === 0 ? "zero-results" : "ok",
+        queryHash: meta.queryHash,
+        resultCount: listings.length,
+      });
+
+      return NextResponse.json(state, {
+        headers: {
+          // Fix #3: Use s-maxage for CDN caching (markers are NOT user-specific)
+          // s-maxage: CDN/edge cache duration (60s)
+          // max-age: browser cache duration (shorter to allow user refresh)
+          "Cache-Control":
+            "public, s-maxage=60, max-age=30, stale-while-revalidate=120",
+          "x-request-id": requestId,
+          // Vary by Accept-Encoding for proper CDN compression handling
+          Vary: "Accept-Encoding",
+        },
+      });
     } catch (error) {
       logger.sync.error("Map listings API error", {
         error: sanitizeErrorMessage(error),

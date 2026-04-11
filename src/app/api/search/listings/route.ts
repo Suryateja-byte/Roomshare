@@ -37,6 +37,7 @@ import * as Sentry from "@sentry/nextjs";
 import { getSearchRateLimitIdentifier } from "@/lib/search-rate-limit-identifier";
 import {
   createSearchResponseMeta,
+  getSearchQueryHash,
   type SearchListState,
 } from "@/lib/search/search-response";
 import { normalizeSearchQuery } from "@/lib/search/search-query";
@@ -45,11 +46,17 @@ import {
   resolveSearchScenario,
   SEARCH_SCENARIO_HEADER,
 } from "@/lib/search/testing/search-scenarios";
+import {
+  recordSearchRequestLatency,
+  recordSearchV2Fallback,
+  recordSearchZeroResults,
+} from "@/lib/search/search-telemetry";
 
 export const runtime = "nodejs";
 
 export async function GET(request: NextRequest) {
   const context = createContextFromHeaders(request.headers);
+  const requestStartTime = performance.now();
 
   return runWithRequestContext(context, async () => {
     const requestId = getRequestId();
@@ -76,6 +83,29 @@ export async function GET(request: NextRequest) {
         const scenarioState = await buildScenarioSearchListState(testScenario, {
           query: normalizedQuery,
         });
+        const scenarioResultCount =
+          scenarioState.kind === "ok" || scenarioState.kind === "degraded"
+            ? scenarioState.data.total
+            : scenarioState.kind === "zero-results"
+              ? 0
+              : null;
+
+        if (scenarioState.kind === "zero-results") {
+          recordSearchZeroResults({
+            route: "search-listings-api",
+            queryHash: scenarioState.meta.queryHash,
+            backendSource: scenarioState.meta.backendSource,
+          });
+        }
+
+        recordSearchRequestLatency({
+          route: "search-listings-api",
+          durationMs: performance.now() - requestStartTime,
+          backendSource: scenarioState.meta.backendSource,
+          stateKind: scenarioState.kind,
+          queryHash: scenarioState.meta.queryHash,
+          resultCount: scenarioResultCount,
+        });
 
         return NextResponse.json(scenarioState, {
           headers: {
@@ -90,7 +120,15 @@ export async function GET(request: NextRequest) {
         type: "search-list",
         getIdentifier: getSearchRateLimitIdentifier,
       });
-      if (rateLimitResponse) return rateLimitResponse;
+      if (rateLimitResponse) {
+        recordSearchRequestLatency({
+          route: "search-listings-api",
+          durationMs: performance.now() - requestStartTime,
+          stateKind: "rate-limited",
+          queryHash: getSearchQueryHash(normalizedQuery),
+        });
+        return rateLimitResponse;
+      }
 
       // V2 path with circuit breaker + timeout (same pattern as page.tsx)
       let v2Result: SearchV2Result | null = null;
@@ -134,6 +172,13 @@ export async function GET(request: NextRequest) {
       // Unbounded search: text query without location
       if (v2Result?.unboundedSearch) {
         const meta = createSearchResponseMeta(normalizedQuery, "v2");
+        recordSearchRequestLatency({
+          route: "search-listings-api",
+          durationMs: performance.now() - requestStartTime,
+          backendSource: meta.backendSource,
+          stateKind: "location-required",
+          queryHash: meta.queryHash,
+        });
         return NextResponse.json(
           { kind: "location-required", meta } satisfies SearchListState,
           {
@@ -161,8 +206,7 @@ export async function GET(request: NextRequest) {
           ? "Showing best matches for your vibe in this area"
           : undefined;
         const meta = createSearchResponseMeta(normalizedQuery, "v2");
-
-        return NextResponse.json(
+        const state =
           total === 0
             ? ({ kind: "zero-results", meta } satisfies SearchListState)
             : ({
@@ -175,7 +219,26 @@ export async function GET(request: NextRequest) {
                   vibeAdvisory,
                 },
                 meta,
-              } satisfies SearchListState),
+              } satisfies SearchListState);
+
+        if (state.kind === "zero-results") {
+          recordSearchZeroResults({
+            route: "search-listings-api",
+            queryHash: meta.queryHash,
+            backendSource: meta.backendSource,
+          });
+        }
+        recordSearchRequestLatency({
+          route: "search-listings-api",
+          durationMs: performance.now() - requestStartTime,
+          backendSource: meta.backendSource,
+          stateKind: state.kind,
+          queryHash: meta.queryHash,
+          resultCount: total,
+        });
+
+        return NextResponse.json(
+          state,
           {
             headers: {
               "Cache-Control":
@@ -198,6 +261,13 @@ export async function GET(request: NextRequest) {
         "api-search-listings-v1"
       );
       const meta = createSearchResponseMeta(normalizedQuery, "v1-fallback");
+      if (features.searchV2) {
+        recordSearchV2Fallback({
+          route: "search-listings-api",
+          queryHash: meta.queryHash,
+          reason: "v2_failed_or_unavailable",
+        });
+      }
       const state =
         paginatedResult.total === 0
           ? ({ kind: "zero-results", meta } satisfies SearchListState)
@@ -221,6 +291,25 @@ export async function GET(request: NextRequest) {
                 },
                 meta,
               } satisfies SearchListState);
+
+      if (state.kind === "zero-results") {
+        recordSearchZeroResults({
+          route: "search-listings-api",
+          queryHash: meta.queryHash,
+          backendSource: meta.backendSource,
+        });
+      }
+      recordSearchRequestLatency({
+        route: "search-listings-api",
+        durationMs: performance.now() - requestStartTime,
+        backendSource: meta.backendSource,
+        stateKind: state.kind,
+        queryHash: meta.queryHash,
+        resultCount:
+          state.kind === "ok" || state.kind === "degraded"
+            ? state.data.total
+            : 0,
+      });
 
       return NextResponse.json(
         state,

@@ -42,6 +42,7 @@ import {
   serializeSearchQuery,
 } from "@/lib/search/search-query";
 import { getScenarioHeaderValue } from "@/lib/search/testing/search-scenarios";
+import { emitSearchClientMetric } from "@/lib/search/search-telemetry-client";
 
 /**
  * Maximum accumulated listings before showing a "continue" link.
@@ -220,7 +221,18 @@ export function SearchResultsClient({
     previousSearchParamsRef.current = currentSearchParamsString;
 
     // Cancel any in-flight request
-    clientFetchAbortRef.current?.abort();
+    if (
+      clientFetchAbortRef.current &&
+      !clientFetchAbortRef.current.signal.aborted
+    ) {
+      clientFetchAbortRef.current.abort();
+      emitSearchClientMetric({
+        metric: "search_client_abort_total",
+        route: "search-results-client",
+        queryHash: latestQueryHashRef.current,
+        reason: "superseded",
+      });
+    }
     const controller = new AbortController();
     clientFetchAbortRef.current = controller;
     const requestQueryHash = currentQueryHash;
@@ -261,6 +273,16 @@ export function SearchResultsClient({
           data.meta.queryHash !== requestQueryHash ||
           latestQueryHashRef.current !== requestQueryHash
         ) {
+          emitSearchClientMetric({
+            metric: "search_map_list_mismatch_total",
+            route: "search-results-client",
+            queryHash: requestQueryHash,
+            responseQueryHash: "meta" in data ? data.meta.queryHash : undefined,
+            reason:
+              "meta" in data && data.meta.queryHash !== requestQueryHash
+                ? "stale-query-hash"
+                : "stale-request-key",
+          });
           return;
         }
 
@@ -431,6 +453,16 @@ export function SearchResultsClient({
         (result.meta.queryHash !== requestQueryHash ||
           latestQueryHashRef.current !== requestQueryHash)
       ) {
+        emitSearchClientMetric({
+          metric: "search_map_list_mismatch_total",
+          route: "search-results-client",
+          queryHash: requestQueryHash,
+          responseQueryHash: result.meta.queryHash,
+          reason:
+            result.meta.queryHash !== requestQueryHash
+              ? "stale-query-hash"
+              : "stale-request-key",
+        });
         return;
       }
 

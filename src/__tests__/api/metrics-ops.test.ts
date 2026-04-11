@@ -14,12 +14,18 @@ jest.mock("@/lib/env", () => ({
 }));
 
 import { GET } from "@/app/api/metrics/ops/route";
+import {
+  recordSearchClientAbort,
+  recordSearchRequestLatency,
+  resetSearchTelemetryForTests,
+} from "@/lib/search/search-telemetry";
 
 describe("GET /api/metrics/ops", () => {
   const originalEnv = process.env;
 
   beforeEach(() => {
     jest.clearAllMocks();
+    resetSearchTelemetryForTests();
     process.env = {
       ...originalEnv,
       METRICS_SECRET: "test-metrics-secret-32-chars-min!!",
@@ -54,6 +60,20 @@ describe("GET /api/metrics/ops", () => {
   });
 
   it("returns 200 with Prometheus metrics when token matches", async () => {
+    recordSearchRequestLatency({
+      route: "search-page-ssr",
+      durationMs: 42,
+      backendSource: "v2",
+      stateKind: "ok",
+      queryHash: "hash-1",
+      resultCount: 5,
+    });
+    recordSearchClientAbort({
+      route: "search-client",
+      queryHash: "hash-1",
+      reason: "superseded",
+    });
+
     const req = new Request("http://localhost/api/metrics/ops", {
       headers: { authorization: "Bearer test-metrics-secret-32-chars-min!!" },
     });
@@ -62,5 +82,8 @@ describe("GET /api/metrics/ops", () => {
     const text = await res.text();
     expect(text).toContain("process_uptime_seconds");
     expect(text).toContain("nodejs_heap_size_used_bytes");
+    expect(text).toContain("search_request_latency_ms_count 1");
+    expect(text).toContain('search_backend_source{backend_source="v2"} 1');
+    expect(text).toContain("search_client_abort_total 1");
   });
 });
