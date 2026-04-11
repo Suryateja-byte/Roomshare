@@ -308,7 +308,7 @@ function ListingCardInner({
         "group relative flex flex-col rounded-2xl bg-surface-container-lowest mb-4 shadow-sm transition-all duration-500 overflow-hidden cursor-pointer",
         !isActive && "hover:shadow-xl hover:-translate-y-1",
         isActive && "ring-2 ring-primary ring-offset-2 -translate-y-0.5 shadow-xl",
-        isHovered && !isActive && "ring-1 ring-primary/20",
+        isHovered && !isActive && "ring-2 ring-primary/50 shadow-lg",
         className
       )}
     >
