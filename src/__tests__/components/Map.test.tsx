@@ -137,6 +137,7 @@ function createMockMapInstance() {
     flyTo: jest.fn(),
     fitBounds: jest.fn(),
     easeTo: jest.fn(),
+    jumpTo: jest.fn(),
     addSource: jest.fn(),
     addLayer: jest.fn(),
     removeSource: jest.fn(),
@@ -236,6 +237,7 @@ jest.mock("react-map-gl/maplibre", () => {
         flyTo: mockMapInstance.flyTo,
         fitBounds: mockMapInstance.fitBounds,
         easeTo: mockMapInstance.easeTo,
+        jumpTo: mockMapInstance.jumpTo,
       }));
 
       // Store handlers on window for tests to trigger
@@ -1203,8 +1205,8 @@ describe("Map Component", () => {
       expect(mockSetProgrammaticMove).toHaveBeenCalledWith(true);
       expect(mockMapInstance.easeTo).toHaveBeenCalledWith({
         center: [mockListings[0].location.lng, mockListings[0].location.lat],
-        duration: 400,
-        offset: [0, 128],
+        duration: 280,
+        offset: [0, -56],
       });
     });
 
@@ -1303,6 +1305,7 @@ describe("Map Component", () => {
         );
 
       mockMapInstance.easeTo.mockClear();
+      mockMapInstance.jumpTo.mockClear();
       mockMapInstance.unproject.mockClear();
 
       await act(async () => {
@@ -1311,6 +1314,7 @@ describe("Map Component", () => {
 
       expect(mockMapInstance.unproject).not.toHaveBeenCalled();
       expect(mockMapInstance.easeTo).not.toHaveBeenCalled();
+      expect(mockMapInstance.jumpTo).not.toHaveBeenCalled();
     });
 
     it("auto-pans when the popup would overflow the map safe area", async () => {
@@ -1346,6 +1350,7 @@ describe("Map Component", () => {
         lat: 37.88,
       });
       mockMapInstance.easeTo.mockClear();
+      mockMapInstance.jumpTo.mockClear();
       mockMapInstance.unproject.mockClear();
 
       await act(async () => {
@@ -1353,9 +1358,8 @@ describe("Map Component", () => {
       });
 
       expect(mockMapInstance.unproject).toHaveBeenCalledWith([336, 228]);
-      expect(mockMapInstance.easeTo).toHaveBeenCalledWith({
+      expect(mockMapInstance.jumpTo).toHaveBeenCalledWith({
         center: [-122.33, 37.88],
-        duration: 250,
       });
     });
 
@@ -1379,8 +1383,8 @@ describe("Map Component", () => {
       expect(mockMapInstance.easeTo).toHaveBeenCalledWith({
         center: [mockListings[0].location.lng, mockListings[0].location.lat],
         zoom: 15,
-        duration: 400,
-        offset: [0, 128],
+        duration: 280,
+        offset: [0, -56],
       });
     });
 
