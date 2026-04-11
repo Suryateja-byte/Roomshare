@@ -1565,6 +1565,59 @@ describe("Map Component", () => {
         "hovered"
       );
     });
+
+    it("keeps visually different tiered markers separate even when other fields match", async () => {
+      const tieredListings = [
+        {
+          id: "primary-pin",
+          title: "Sunny Mission Room",
+          price: 1200,
+          availableSlots: 1,
+          ownerId: "owner-1",
+          images: [],
+          location: { lat: 37.7599, lng: -122.4148 },
+          tier: "primary" as const,
+        },
+        {
+          id: "mini-pin",
+          title: "Sunny Mission Room",
+          price: 1200,
+          availableSlots: 1,
+          ownerId: "owner-2",
+          images: [],
+          location: { lat: 37.7599, lng: -122.4148 },
+          tier: "mini" as const,
+        },
+      ];
+
+      mockQuerySourceFeaturesData = listingsToFeatures(tieredListings);
+      render(<MapComponent listings={tieredListings} />);
+
+      await act(async () => {
+        jest.advanceTimersByTime(100);
+      });
+
+      const handlers = (
+        window as unknown as Record<string, { onIdle?: () => void }>
+      ).__mapHandlers;
+      await act(async () => {
+        handlers?.onIdle?.();
+      });
+
+      await waitFor(() => {
+        expect(screen.getAllByTestId("map-marker")).toHaveLength(2);
+      });
+
+      const calls = mockPrivacyCircle.mock.calls;
+      const lastCall = calls[calls.length - 1]?.[0];
+
+      expect(lastCall).toBeDefined();
+      if (!lastCall) return;
+      expect(lastCall.listings).toHaveLength(2);
+      expect(lastCall.listings.map((entry: { id: string }) => entry.id)).toEqual(
+        expect.arrayContaining(["primary-pin", "mini-pin"])
+      );
+    });
   });
 
   describe("marker retry mechanism", () => {

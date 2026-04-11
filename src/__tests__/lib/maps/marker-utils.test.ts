@@ -261,6 +261,19 @@ describe("marker-utils", () => {
         "different-price",
       ]);
     });
+
+    it("does not collapse listings that differ by visible marker tier", () => {
+      const groups = groupExactMapListingClones([
+        createCloneCandidate("primary", { tier: "primary" }),
+        createCloneCandidate("mini", { tier: "mini" }),
+      ]);
+
+      expect(groups).toHaveLength(2);
+      expect(groups.map((group) => group.listing.id)).toEqual([
+        "primary",
+        "mini",
+      ]);
+    });
   });
 
   /**

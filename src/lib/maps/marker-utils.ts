@@ -18,6 +18,7 @@ export interface MapMarkerListing {
   title: string;
   price: number;
   availableSlots: number;
+  tier?: "primary" | "mini";
   ownerId?: string;
   images?: string[];
   location: {
@@ -67,6 +68,7 @@ function buildExactCloneKey(
     normalizeCloneTitle(listing.title),
     listing.price,
     listing.availableSlots,
+    listing.tier ?? "",
     listing.location.lat.toFixed(precision),
     listing.location.lng.toFixed(precision),
   ].join("|");
