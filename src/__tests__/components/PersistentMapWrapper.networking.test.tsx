@@ -57,6 +57,53 @@ jest.mock("@/contexts/SearchTransitionContext", () => ({
 const mockFetch = jest.fn();
 global.fetch = mockFetch;
 
+type MockFetchOptions = {
+  headers?: HeadersInit;
+  signal?: AbortSignal;
+};
+
+function getRequestQueryHash(options?: MockFetchOptions): string {
+  const headers = options?.headers;
+
+  if (headers instanceof Headers) {
+    return headers.get("x-search-query-hash") ?? "test-query-hash";
+  }
+
+  if (Array.isArray(headers)) {
+    const entry = headers.find(
+      ([name]) => name.toLowerCase() === "x-search-query-hash"
+    );
+    return entry?.[1] ?? "test-query-hash";
+  }
+
+  if (headers && typeof headers === "object") {
+    const record = headers as Record<string, string | undefined>;
+    return (
+      record["x-search-query-hash"] ??
+      record["X-Search-Query-Hash"] ??
+      "test-query-hash"
+    );
+  }
+
+  return "test-query-hash";
+}
+
+function createSuccessfulMapResponse(
+  listings: unknown[],
+  options?: MockFetchOptions
+) {
+  return {
+    ok: true,
+    status: 200,
+    headers: new Headers({ "x-request-id": "test-123" }),
+    json: async () => ({
+      kind: "ok" as const,
+      data: { listings },
+      meta: { queryHash: getRequestQueryHash(options) },
+    }),
+  };
+}
+
 // Import component after mocks
 import PersistentMapWrapper from "@/components/PersistentMapWrapper";
 const MAP_FETCH_DEBOUNCE_MS = 250;
@@ -81,21 +128,21 @@ describe("PersistentMapWrapper - Networking & Race Conditions (P1-7)", () => {
     mockSearchParams.set("maxLat", "38.0");
 
     // Default successful response
-    mockFetch.mockResolvedValue({
-      ok: true,
-      status: 200,
-      headers: new Headers({ "x-request-id": "test-123" }),
-      json: async () => ({
-        listings: [
-          {
-            id: "1",
-            title: "Test",
-            price: 1000,
-            location: { lat: 37.7, lng: -122.4 },
-          },
-        ],
-      }),
-    });
+    mockFetch.mockImplementation((_url: string, options?: { headers?: HeadersInit }) =>
+      Promise.resolve(
+        createSuccessfulMapResponse(
+          [
+            {
+              id: "1",
+              title: "Test",
+              price: 1000,
+              location: { lat: 37.7, lng: -122.4 },
+            },
+          ],
+          options
+        )
+      )
+    );
   });
 
   afterEach(() => {
@@ -147,12 +194,7 @@ describe("PersistentMapWrapper - Networking & Race Conditions (P1-7)", () => {
                 reject(new DOMException("Aborted", "AbortError"));
                 return;
               }
-              resolve({
-                ok: true,
-                status: 200,
-                headers: new Headers(),
-                json: async () => ({ listings: [] }),
-              });
+              resolve(createSuccessfulMapResponse([], options));
             }, 500);
 
             options?.signal?.addEventListener("abort", () => {
@@ -220,12 +262,7 @@ describe("PersistentMapWrapper - Networking & Race Conditions (P1-7)", () => {
           if (options?.signal) {
             abortSignals.push(options.signal);
           }
-          return Promise.resolve({
-            ok: true,
-            status: 200,
-            headers: new Headers(),
-            json: async () => ({ listings: [] }),
-          });
+          return Promise.resolve(createSuccessfulMapResponse([], options));
         }
       );
 
@@ -503,12 +540,9 @@ describe("PersistentMapWrapper - Networking & Race Conditions (P1-7)", () => {
           headers: new Headers({ "Retry-After": "2" }),
           json: async () => ({ error: "Too many requests", retryAfter: 2 }),
         })
-        .mockResolvedValueOnce({
-          ok: true,
-          status: 200,
-          headers: new Headers(),
-          json: async () => ({ listings: [] }),
-        });
+        .mockImplementationOnce((_url: string, options?: { headers?: HeadersInit }) =>
+          Promise.resolve(createSuccessfulMapResponse([], options))
+        );
 
       const { container } = render(
         <PersistentMapWrapper shouldRenderMap={true} />
@@ -553,21 +587,21 @@ describe("PersistentMapWrapper - Networking & Race Conditions (P1-7)", () => {
           headers: new Headers({ "Retry-After": "2" }),
           json: async () => ({ error: "Too many requests" }),
         })
-        .mockResolvedValueOnce({
-          ok: true,
-          status: 200,
-          headers: new Headers(),
-          json: async () => ({
-            listings: [
-              {
-                id: "retry-ok",
-                title: "Retry Listing",
-                price: 500,
-                location: { lat: 37.7, lng: -122.4 },
-              },
-            ],
-          }),
-        });
+        .mockImplementationOnce((_url: string, options?: { headers?: HeadersInit }) =>
+          Promise.resolve(
+            createSuccessfulMapResponse(
+              [
+                {
+                  id: "retry-ok",
+                  title: "Retry Listing",
+                  price: 500,
+                  location: { lat: 37.7, lng: -122.4 },
+                },
+              ],
+              options
+            )
+          )
+        );
 
       const { container } = render(
         <PersistentMapWrapper shouldRenderMap={true} />
@@ -622,12 +656,9 @@ describe("PersistentMapWrapper - Networking & Race Conditions (P1-7)", () => {
             url,
             aborted: options?.signal?.aborted ?? false,
           });
-          return Promise.resolve({
-            ok: true,
-            status: 200,
-            headers: new Headers(),
-            json: async () => ({
-              listings: [
+          return Promise.resolve(
+            createSuccessfulMapResponse(
+              [
                 {
                   id: "1",
                   title: "Test",
@@ -635,8 +666,9 @@ describe("PersistentMapWrapper - Networking & Race Conditions (P1-7)", () => {
                   location: { lat: 37.7, lng: -122.4 },
                 },
               ],
-            }),
-          });
+              options
+            )
+          );
         }
       );
 
@@ -656,12 +688,9 @@ describe("PersistentMapWrapper - Networking & Race Conditions (P1-7)", () => {
       // First request fails
       mockFetch
         .mockRejectedValueOnce(new Error("Network error"))
-        .mockResolvedValueOnce({
-          ok: true,
-          status: 200,
-          headers: new Headers(),
-          json: async () => ({ listings: [] }),
-        });
+        .mockImplementationOnce((_url: string, options?: { headers?: HeadersInit }) =>
+          Promise.resolve(createSuccessfulMapResponse([], options))
+        );
 
       const consoleSpy = jest
         .spyOn(console, "error")

@@ -538,10 +538,13 @@ describe("useBatchedFilters hook", () => {
   });
 
   describe("commit preserves non-filter URL params", () => {
-    it("preserves bounds param on commit", () => {
+    it("preserves canonical map bounds on commit", () => {
       (useSearchParams as jest.Mock).mockReturnValue(
         createMockSearchParams({
-          bounds: "37.0,-122.5,38.0,-121.5",
+          minLat: "37.0",
+          maxLat: "38.0",
+          minLng: "-122.5",
+          maxLng: "-121.5",
           minPrice: "500",
         })
       );
@@ -558,14 +561,17 @@ describe("useBatchedFilters hook", () => {
 
       expect(mockRouter.push).toHaveBeenCalledTimes(1);
       const calledUrl = mockRouter.push.mock.calls[0][0] as string;
-      expect(calledUrl).toContain("bounds=");
+      expect(calledUrl).toContain("minLat=37.000");
+      expect(calledUrl).toContain("maxLat=38.000");
+      expect(calledUrl).toContain("minLng=-122.500");
+      expect(calledUrl).toContain("maxLng=-121.500");
       expect(calledUrl).toContain("minPrice=600");
     });
 
     it("preserves sort param on commit", () => {
       (useSearchParams as jest.Mock).mockReturnValue(
         createMockSearchParams({
-          sort: "price-asc",
+          sort: "price_asc",
           roomType: "Private Room",
         })
       );
@@ -581,7 +587,7 @@ describe("useBatchedFilters hook", () => {
       });
 
       const calledUrl = mockRouter.push.mock.calls[0][0] as string;
-      expect(calledUrl).toContain("sort=price-asc");
+      expect(calledUrl).toContain("sort=price_asc");
     });
 
     it("preserves q (query) param on commit", () => {
@@ -681,7 +687,7 @@ describe("useBatchedFilters hook", () => {
       const calledUrl = mockRouter.push.mock.calls[0][0] as string;
       const searchUrl = new URL(calledUrl, "http://localhost");
 
-      expect(searchUrl.searchParams.get("sort")).toBe("recommended");
+      expect(searchUrl.searchParams.get("sort")).toBeNull();
       expect(searchUrl.searchParams.get("roomType")).toBe("Private Room");
       expect(searchUrl.searchParams.get("moveInDate")).toBe("2026-05-01");
     });

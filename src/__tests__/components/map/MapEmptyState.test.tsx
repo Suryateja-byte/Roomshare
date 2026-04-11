@@ -92,7 +92,7 @@ describe("MapEmptyState", () => {
     // Should preserve q, lat, lng but remove maxPrice
     expect(mockPush).toHaveBeenCalledTimes(1);
     const pushedUrl = mockPush.mock.calls[0][0];
-    expect(pushedUrl).toContain("q=Austin");
+    expect(pushedUrl).toContain("where=Austin");
     expect(pushedUrl).toContain("lat=30");
     expect(pushedUrl).not.toContain("maxPrice");
   });
@@ -135,7 +135,7 @@ describe("MapEmptyState", () => {
     fireEvent.click(screen.getByText("Include near matches"));
     expect(mockPush).toHaveBeenCalledTimes(1);
     const pushedUrl = mockPush.mock.calls[0][0];
-    expect(pushedUrl).toContain("nearMatches=1");
+    expect(pushedUrl).toContain("nearMatches=true");
     expect(pushedUrl).toContain("maxPrice=1500");
   });
 

@@ -1077,7 +1077,7 @@ describe("SearchForm", () => {
     });
 
     describe("preserves map-related params", () => {
-      it("preserves bounds and sort across filter changes", async () => {
+      it("preserves canonical sort state while clearing stale map bounds", async () => {
         mockSearchParams.set("minLat", "37.5");
         mockSearchParams.set("maxLat", "38.0");
         mockSearchParams.set("minLng", "-123.0");
@@ -1091,9 +1091,9 @@ describe("SearchForm", () => {
         jest.advanceTimersByTime(500);
 
         const pushCall = mockPush.mock.calls[0]?.[0] ?? "";
-        expect(pushCall).toContain("minLat=");
+        expect(pushCall).not.toContain("minLat=");
         expect(pushCall).toContain("sort=price_asc");
-        expect(pushCall).toContain("nearMatches=1");
+        expect(pushCall).toContain("nearMatches=true");
       });
     });
   });

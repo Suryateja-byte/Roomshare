@@ -108,7 +108,7 @@ describe("SortSelect", () => {
 
     await userEvent.click(screen.getByTestId("select-item-recommended"));
 
-    expect(mockPush).toHaveBeenCalledWith("/search?");
+    expect(mockPush).toHaveBeenCalledWith("/search");
   });
 
   it("removes page param when changing sort", async () => {
