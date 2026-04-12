@@ -942,6 +942,7 @@ describe("Map Component", () => {
       await act(async () => {
         handlers?.onMoveEnd?.({
           viewState: { zoom: 12 },
+          originalEvent: new Event("pointermove"),
           target: {
             getBounds: () => ({
               getWest: () => -122.5,
@@ -959,6 +960,7 @@ describe("Map Component", () => {
       await act(async () => {
         handlers?.onMoveEnd?.({
           viewState: { zoom: 12 },
+          originalEvent: new Event("pointermove"),
           target: {
             getBounds: () => ({
               getWest: () => -122.5,
@@ -994,7 +996,12 @@ describe("Map Component", () => {
       // First moveEnd — no previous center tracked, so it's treated as a real move
       await act(async () => {
         handlers?.onMoveEnd?.({
-          viewState: { zoom: 12 },
+          viewState: {
+            longitude: -122.4094,
+            latitude: 37.7849,
+            zoom: 12,
+          },
+          originalEvent: new Event("pointermove"),
           target: {
             getBounds: () => ({
               getWest: () => -122.5,
@@ -1011,7 +1018,7 @@ describe("Map Component", () => {
       expect(mockSetHasUserMoved).toHaveBeenCalledWith(true);
     });
 
-    it("should respect debounce timing (300ms)", async () => {
+    it("should respect debounce timing (50ms)", async () => {
       render(<MapComponent listings={mockListings} />);
 
       await act(async () => {
@@ -1046,13 +1053,14 @@ describe("Map Component", () => {
       await act(async () => {
         handlers?.onMoveEnd?.({
           viewState: { zoom: 12 },
+          originalEvent: new Event("pointermove"),
           target: { getBounds: () => mockMapInstance.getBounds() },
         });
       });
 
-      // Advance only 150ms (less than debounce)
+      // Advance less than the desktop debounce window.
       await act(async () => {
-        jest.advanceTimersByTime(150);
+        jest.advanceTimersByTime(25);
       });
 
       expect(mockReplaceWithTransition).not.toHaveBeenCalled();
@@ -1094,6 +1102,7 @@ describe("Map Component", () => {
       await act(async () => {
         handlers?.onMoveEnd?.({
           viewState: { zoom: 12 },
+          originalEvent: new Event("pointermove"),
           target: {
             getBounds: () => ({
               getWest: () => -122.48,
@@ -1167,6 +1176,7 @@ describe("Map Component", () => {
       await act(async () => {
         handlers?.onMoveEnd?.({
           viewState: { zoom: 4 },
+          originalEvent: new Event("wheel"),
           target: {
             getBounds: () => ({
               getWest: () => -100,

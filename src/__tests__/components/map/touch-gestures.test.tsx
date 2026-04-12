@@ -585,6 +585,7 @@ describe("Map Touch Gestures", () => {
       await act(async () => {
         handlers?.onMoveEnd?.({
           viewState: { zoom: 14 },
+          originalEvent: new Event("pointermove"),
           target: { getBounds: () => mockMapInstance.getBounds() },
         });
       });
@@ -684,6 +685,7 @@ describe("Map Touch Gestures", () => {
       await act(async () => {
         handlers?.onMoveEnd?.({
           viewState: { zoom: 12 },
+          originalEvent: new Event("pointermove"),
           target: { getBounds: () => mockMapInstance.getBounds() },
         });
       });
