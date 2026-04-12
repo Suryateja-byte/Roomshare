@@ -20,6 +20,7 @@ export interface MapMarkerListing {
   availableSlots: number;
   ownerId?: string;
   images?: string[];
+  tier?: "primary" | "mini";
   location: {
     lat: number;
     lng: number;

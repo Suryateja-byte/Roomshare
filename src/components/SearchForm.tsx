@@ -527,6 +527,9 @@ export default function SearchForm({
       ) {
         [finalMinPrice, finalMaxPrice] = [finalMaxPrice, finalMinPrice];
       }
+      const currentQuery = normalizeSearchQuery(
+        new URLSearchParams(searchParams.toString())
+      );
       const intentQuery = normalizeSearchQuery(
         buildSearchIntentParams(new URLSearchParams(searchParams.toString()), {
           location: trimmedLocation,
@@ -534,6 +537,13 @@ export default function SearchForm({
           selectedLocation: selectedCoords,
         })
       );
+      if (
+        !selectedCoords &&
+        trimmedLocation.length === 0 &&
+        trimmedWhat.length === 0
+      ) {
+        intentQuery.bounds = currentQuery.bounds;
+      }
       const searchUrl = buildCanonicalSearchUrl(
         applySearchQueryChange(intentQuery, "filter", {
           minPrice: finalMinPrice ?? undefined,

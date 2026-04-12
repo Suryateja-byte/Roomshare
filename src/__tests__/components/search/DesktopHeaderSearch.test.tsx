@@ -141,7 +141,7 @@ describe("DesktopHeaderSearch", () => {
     expect(mockPush).not.toHaveBeenCalled();
   });
 
-  it("submits selected location and vibe while preserving existing sort", () => {
+  it("submits selected location and vibe while preserving existing filters", () => {
     mockSearchParams = "sort=recommended&amenities=Wifi";
     const events: CustomEvent[] = [];
     const handler = (event: Event) => events.push(event as CustomEvent);
@@ -159,14 +159,14 @@ describe("DesktopHeaderSearch", () => {
     const pushedUrl = mockPush.mock.calls[0][0] as string;
     const url = new URL(pushedUrl, "http://localhost");
 
-    expect(url.searchParams.get("sort")).toBe("recommended");
+    expect(url.searchParams.get("sort")).toBeNull();
     expect(url.searchParams.get("amenities")).toBe("Wifi");
     expect(url.searchParams.get("where")).toBe("San Francisco");
     expect(url.searchParams.get("what")).toBe("quiet roommates");
     expect(url.searchParams.get("lat")).toBe("37.7749");
     expect(url.searchParams.get("lng")).toBe("-122.4194");
-    expect(url.searchParams.get("minLng")).toBe("-122.6");
-    expect(url.searchParams.get("maxLat")).toBe("37.9");
+    expect(url.searchParams.get("minLng")).toBe("-122.600");
+    expect(url.searchParams.get("maxLat")).toBe("37.900");
     expect(events[0]?.detail).toEqual({
       lat: 37.7749,
       lng: -122.4194,

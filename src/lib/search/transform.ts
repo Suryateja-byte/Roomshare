@@ -151,6 +151,7 @@ function adaptToMarkerListing(listing: MapListingData): MapMarkerListing {
     price: listing.price,
     availableSlots: listing.availableSlots,
     images: listing.images,
+    tier: listing.tier,
     location: listing.location,
   };
 }

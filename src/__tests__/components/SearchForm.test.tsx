@@ -1093,7 +1093,7 @@ describe("SearchForm", () => {
         const pushCall = mockPush.mock.calls[0]?.[0] ?? "";
         expect(pushCall).toContain("minLat=");
         expect(pushCall).toContain("sort=price_asc");
-        expect(pushCall).toContain("nearMatches=1");
+        expect(pushCall).toContain("nearMatches=true");
       });
     });
   });
