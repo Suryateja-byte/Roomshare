@@ -71,6 +71,25 @@ describe("search-query", () => {
     expect(next.page).toBeUndefined();
   });
 
+  it("allows filter patches to clear array params explicitly", () => {
+    const current = normalizeSearchQuery(
+      new URLSearchParams(
+        "amenities=Wifi&amenities=Parking&houseRules=Pets%20allowed&languages=en&languages=es"
+      )
+    );
+
+    const next = applySearchQueryChange(current, "filter", {
+      amenities: undefined,
+      houseRules: [],
+      languages: undefined,
+    });
+
+    expect(next.amenities).toBeUndefined();
+    expect(next.houseRules).toBeUndefined();
+    expect(next.languages).toBeUndefined();
+    expect(serializeSearchQuery(next).toString()).toBe("");
+  });
+
   it("replaces bounds and clears point coordinates on map-pan changes", () => {
     const current = normalizeSearchQuery(
       new URLSearchParams(

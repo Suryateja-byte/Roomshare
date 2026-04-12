@@ -194,6 +194,18 @@ describe("SearchResultsClient", () => {
       expect(matches.length).toBeGreaterThanOrEqual(1);
     });
 
+    it("marks browse mode on the search shell without rendering suggested searches", () => {
+      const { container } = render(
+        <SearchResultsClient {...defaultProps} browseMode={true} query="" />
+      );
+
+      expect(container.querySelector('[data-testid="search-shell"]')).toHaveAttribute(
+        "data-browse-mode",
+        "true"
+      );
+      expect(screen.queryByTestId("suggested-searches")).not.toBeInTheDocument();
+    });
+
     it("keeps the save-search callout desktop-only", async () => {
       render(<SearchResultsClient {...defaultProps} />);
 

@@ -378,6 +378,23 @@ describe("filter-chip-utils", () => {
 
         expect(result).toBe("amenities=Wifi");
       });
+
+      it("removes budget aliases along with the canonical price chip", () => {
+        const params = new URLSearchParams(
+          "minBudget=500&maxBudget=1500&amenities=Wifi"
+        );
+        const chip: FilterChipData = {
+          id: "price-range",
+          label: "$500 - $1,500",
+          paramKey: "price-range",
+        };
+
+        const result = removeFilterFromUrl(params, chip);
+
+        expect(result).toBe("amenities=Wifi");
+        expect(result).not.toContain("minBudget");
+        expect(result).not.toContain("maxBudget");
+      });
     });
 
     describe("array param removal", () => {

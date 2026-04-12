@@ -17,7 +17,6 @@ import ListingCard from "@/components/listings/ListingCard";
 import { ListingCardErrorBoundary } from "@/components/search/ListingCardErrorBoundary";
 import NearMatchSeparator from "@/components/listings/NearMatchSeparator";
 import ZeroResultsSuggestions from "@/components/ZeroResultsSuggestions";
-import SuggestedSearches from "@/components/search/SuggestedSearches";
 import SaveSearchButton from "@/components/SaveSearchButton";
 import { fetchMoreListings } from "@/app/search/actions";
 import { TotalPriceToggle } from "@/components/search/TotalPriceToggle";
@@ -639,6 +638,7 @@ export function SearchResultsClient({
       id="search-results"
       tabIndex={-1}
       data-testid="search-shell"
+      data-browse-mode={browseMode ? "true" : undefined}
       data-query-hash={responseMeta.queryHash}
       data-search-query-hash={responseMeta.queryHash}
       data-search-state={searchStateKind}
@@ -719,9 +719,6 @@ export function SearchResultsClient({
         </div>
       ) : (
         <>
-          {/* Suggested searches when browsing without a query */}
-          {browseMode && !query && <SuggestedSearches />}
-
           {/* Price toggle */}
           {allListings.length > 0 && (
             <div className="mb-4 flex flex-col gap-2 sm:flex-row sm:items-start sm:justify-between">

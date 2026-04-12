@@ -336,7 +336,10 @@ export default async function SearchPage({ searchParams }: SearchPageProps) {
             {displayLocation ? ` in ${displayLocation}` : ""}
           </h1>
 
-          <div className="flex flex-row items-center justify-between gap-4 py-2 mb-4">
+          <div
+            data-testid="desktop-results-heading-section"
+            className="flex flex-row items-center justify-between gap-4 py-2 mb-4"
+          >
             <div className="hidden md:block flex-1 min-w-0">
               <div className="flex items-baseline gap-3 min-w-0">
                 <h1
@@ -609,7 +612,10 @@ export default async function SearchPage({ searchParams }: SearchPageProps) {
           {displayLocation ? ` in ${displayLocation}` : ""}
         </h1>
 
-        <div className="flex flex-row items-center justify-between gap-4 py-2 mb-4">
+        <div
+          data-testid="desktop-results-heading-section"
+          className="flex flex-row items-center justify-between gap-4 py-2 mb-4"
+        >
           <div className="hidden md:block flex-1 min-w-0">
             <div className="flex items-baseline gap-3 min-w-0">
               <h1

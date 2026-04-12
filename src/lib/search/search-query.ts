@@ -276,13 +276,18 @@ export function applySearchQueryChange(
   change: QueryChangeKind,
   patch: Partial<NormalizedSearchQuery>
 ): NormalizedSearchQuery {
+  const hasPatchKey = <K extends keyof NormalizedSearchQuery>(key: K) =>
+    Object.prototype.hasOwnProperty.call(patch, key);
+
   const next: NormalizedSearchQuery = normalizeSearchQuery(
     serializeSearchQuery({
       ...current,
       ...patch,
-      amenities: patch.amenities ?? current.amenities,
-      houseRules: patch.houseRules ?? current.houseRules,
-      languages: patch.languages ?? current.languages,
+      amenities: hasPatchKey("amenities") ? patch.amenities : current.amenities,
+      houseRules: hasPatchKey("houseRules")
+        ? patch.houseRules
+        : current.houseRules,
+      languages: hasPatchKey("languages") ? patch.languages : current.languages,
     })
   );
 
