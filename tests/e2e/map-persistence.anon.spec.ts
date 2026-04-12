@@ -377,18 +377,49 @@ test.describe("Map persistence: Map state recovery", () => {
 
     // URL bounds should still be present
     const refreshedUrl = new URL(page.url(), "http://localhost");
-    expect(
-      Number.parseFloat(refreshedUrl.searchParams.get("minLat") ?? "NaN")
-    ).toBeCloseTo(SF_BOUNDS.minLat, 2);
-    expect(
-      Number.parseFloat(refreshedUrl.searchParams.get("maxLat") ?? "NaN")
-    ).toBeCloseTo(SF_BOUNDS.maxLat, 2);
-    expect(
-      Number.parseFloat(refreshedUrl.searchParams.get("minLng") ?? "NaN")
-    ).toBeCloseTo(SF_BOUNDS.minLng, 2);
-    expect(
-      Number.parseFloat(refreshedUrl.searchParams.get("maxLng") ?? "NaN")
-    ).toBeCloseTo(SF_BOUNDS.maxLng, 2);
+    const refreshedBounds = {
+      minLat: Number.parseFloat(
+        refreshedUrl.searchParams.get("minLat") ?? "NaN"
+      ),
+      maxLat: Number.parseFloat(
+        refreshedUrl.searchParams.get("maxLat") ?? "NaN"
+      ),
+      minLng: Number.parseFloat(
+        refreshedUrl.searchParams.get("minLng") ?? "NaN"
+      ),
+      maxLng: Number.parseFloat(
+        refreshedUrl.searchParams.get("maxLng") ?? "NaN"
+      ),
+    };
+    const VIEWPORT_DRIFT_TOLERANCE = 0.05;
+
+    // fitBounds can normalize the stored bounds slightly after reload based on
+    // the restored viewport aspect ratio. Assert the refreshed URL still points
+    // to the same viewport neighborhood instead of requiring exact equality.
+    expect(refreshedBounds.minLat).toBeGreaterThanOrEqual(
+      SF_BOUNDS.minLat - VIEWPORT_DRIFT_TOLERANCE
+    );
+    expect(refreshedBounds.minLat).toBeLessThanOrEqual(
+      SF_BOUNDS.minLat + VIEWPORT_DRIFT_TOLERANCE
+    );
+    expect(refreshedBounds.maxLat).toBeGreaterThanOrEqual(
+      SF_BOUNDS.maxLat - VIEWPORT_DRIFT_TOLERANCE
+    );
+    expect(refreshedBounds.maxLat).toBeLessThanOrEqual(
+      SF_BOUNDS.maxLat + VIEWPORT_DRIFT_TOLERANCE
+    );
+    expect(refreshedBounds.minLng).toBeGreaterThanOrEqual(
+      SF_BOUNDS.minLng - VIEWPORT_DRIFT_TOLERANCE
+    );
+    expect(refreshedBounds.minLng).toBeLessThanOrEqual(
+      SF_BOUNDS.minLng + VIEWPORT_DRIFT_TOLERANCE
+    );
+    expect(refreshedBounds.maxLng).toBeGreaterThanOrEqual(
+      SF_BOUNDS.maxLng - VIEWPORT_DRIFT_TOLERANCE
+    );
+    expect(refreshedBounds.maxLng).toBeLessThanOrEqual(
+      SF_BOUNDS.maxLng + VIEWPORT_DRIFT_TOLERANCE
+    );
 
     // After map loads, center should be within the specified bounds
     const hasRef = await waitForMapRef(page, 15_000);

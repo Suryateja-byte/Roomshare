@@ -4,8 +4,9 @@
  * Tests pagination behavior in "browse mode" -- when the user visits
  * /search without specific bounds or query. In browse mode:
  * - MAX_UNBOUNDED_RESULTS = 48 (server cap, not client)
- * - An amber banner shows "Showing top listings. Select a location for more results."
- * - SuggestedSearches component appears (popular areas or recent searches)
+ * - The search shell is marked as browse mode and the standard desktop
+ *   heading renders immediately without the old SuggestedSearches block.
+ * - Results begin immediately without the old SuggestedSearches block
  *
  * Browse mode is detected when: !q && !bounds (src/lib/search-params.ts:463)
  *
@@ -25,9 +26,8 @@ const sel = {
   card: '[data-testid="listing-card"]',
   loadMoreBtn: 'button:has-text("Show more places")',
   feed: '[role="feed"][aria-label="Search results"]',
-  browseBanner: "text=/Showing top listings/",
-  suggestedSearches: "text=/Popular areas|Recent searches/",
-  popularAreaLink: 'a[href^="/search?q="]',
+  searchShell: '[data-testid="search-shell"]',
+  desktopHeading: '[data-testid="desktop-results-heading-section"]',
 } as const;
 
 // ---------------------------------------------------------------------------
@@ -107,25 +107,20 @@ test.describe("Pagination Browse Mode", () => {
     const cards = container.locator(sel.card);
     await expect(cards.first()).toBeVisible({ timeout: 30_000 });
 
-    // The amber browse mode banner should be visible.
-    // From search/page.tsx:300-303:
-    //   <p className="text-sm text-amber-600 dark:text-amber-400 mt-2">
-    //     Showing top listings. Select a location for more results.
-    //   </p>
-    const browseBanner = container
-      .getByText(/Showing top listings|Select a location for more results/i)
-      .filter({ visible: true })
-      .first();
-    await expect(browseBanner).toBeVisible({ timeout: 30_000 });
+    // Current desktop browse mode exposes state via the search shell attribute
+    // and shows the standard results heading instead of SuggestedSearches.
+    await expect(container.locator(sel.searchShell)).toHaveAttribute(
+      "data-browse-mode",
+      "true"
+    );
+    const browseHeading = page.locator(sel.desktopHeading);
+    await expect(browseHeading).toBeVisible({ timeout: 30_000 });
+    await expect(browseHeading.getByRole("heading", { level: 1 })).toContainText(
+      /places?/i
+    );
 
-    // Verify the banner text content
-    await expect(browseBanner).toContainText(/Select a location|top listings/i);
-
-    // SuggestedSearches component should be rendered (popular areas or recent searches).
-    // From SearchResultsClient.tsx:194: {browseMode && !query && <SuggestedSearches />}
-    // SuggestedSearches renders links with href="/search?q=..."
-    const suggestedLinks = container.locator(sel.popularAreaLink);
-    const suggestedCount = await suggestedLinks.count();
-    expect(suggestedCount).toBeGreaterThanOrEqual(1);
+    await expect(container.getByText(/Popular areas|Recent searches/i)).toHaveCount(
+      0
+    );
   });
 });

@@ -1069,11 +1069,20 @@ test.describe("Map-List Synchronization", () => {
       const initialCount = await waitForMarkersWithClusterExpansion(page);
       test.skip(initialCount === 0, "No markers");
 
-      // Click a marker to set active state
-      const listingId = await getMarkerListingId(page, 0);
-      test.skip(!listingId, "No marker ID");
-      await clickMarkerByIndex(page, 0);
-      await waitForCardHighlight(page, listingId!);
+      // Pick a marker that also has a rendered listing card. After cluster
+      // expansion the map can expose listings beyond the first paginated page,
+      // so clicking raw marker index 0 may open a preview for a listing whose
+      // card is not mounted in the current results pane.
+      const markerIds = await getAllMarkerListingIds(page);
+      const cardIds = new Set(await getAllCardListingIds(page));
+      const matchedIds = markerIds.filter((id) => cardIds.has(id));
+      test.skip(
+        matchedIds.length === 0,
+        "No visible marker with matching listing card"
+      );
+      const listingId = matchedIds[0];
+      await clickMarkerByListingId(page, listingId);
+      await waitForCardHighlight(page, listingId);
 
       // Zoom in programmatically
       await page.evaluate(() => {
@@ -1093,7 +1102,7 @@ test.describe("Map-List Synchronization", () => {
       await waitForMapReady(page);
 
       // Card highlight should still be present after zoom
-      const cardState = await getCardState(page, listingId!);
+      const cardState = await getCardState(page, listingId);
       expect(cardState.isActive).toBe(true);
 
       // Markers should still exist

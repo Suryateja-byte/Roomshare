@@ -77,8 +77,12 @@ test.describe("Mobile Bottom Sheet - Snap Transitions", () => {
     await setSheetSnap(page, 2);
     expect(await getSheetSnapIndex(page)).toBe(2);
 
-    // Press Escape -- should collapse to 0
-    await page.keyboard.press("Escape");
+    // Re-focus the handle before pressing Escape. setSheetSnap() uses keyboard
+    // interaction internally, but focus can drift during animation/layout work
+    // in CI; targeting the slider directly keeps this deterministic.
+    const handle = page.locator(mobileSelectors.sheetHandle);
+    await handle.focus();
+    await handle.press("Escape");
     await waitForSheetAnimation(page);
 
     expect(await getSheetSnapIndex(page)).toBe(0);

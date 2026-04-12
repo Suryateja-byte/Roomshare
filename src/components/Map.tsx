@@ -1296,6 +1296,10 @@ export default function MapComponent({
   >(null);
   // Track pending search after zoom-out (user-initiated zoom that should trigger search)
   const pendingSearchAfterZoomRef = useRef(false);
+  // Programmatic camera changes (marker focus, URL restore, cluster expand) can
+  // emit one extra synthetic moveend after the main animation settles. Ignore
+  // the follow-up event so it doesn't rewrite URL bounds or clear selection.
+  const suppressNextSyntheticMoveEndRef = useRef(false);
   // Track last map center to detect resize-triggered moveEnd events (center barely moves)
   const lastCenterRef = useRef<{ lat: number; lng: number } | null>(null);
   // P2-FIX (#154): Store numeric bounds for deduplication instead of string
@@ -3059,6 +3063,9 @@ export default function MapComponent({
       const hasOriginalEvent = Boolean(
         (e as ViewStateChangeEvent & { originalEvent?: Event }).originalEvent
       );
+      if (hasOriginalEvent) {
+        suppressNextSyntheticMoveEndRef.current = false;
+      }
       // Track zoom for two-tier pin display
       setCurrentZoom(e.viewState.zoom);
       // Debounce updateUnclusteredListings to batch rapid moveEnd events (100ms)
@@ -3118,12 +3125,33 @@ export default function MapComponent({
         // Tiles may not be loaded yet, clearing here causes empty markers
         // Zoom-out button is user-initiated — allow search to proceed
         if (!pendingSearchAfterZoomRef.current) {
+          suppressNextSyntheticMoveEndRef.current = true;
           lastCenterRef.current = center;
           return;
         }
         pendingSearchAfterZoomRef.current = false;
         skipCenterDedup = true;
         // Fall through to search logic below
+      }
+
+      if (!hasOriginalEvent && suppressNextSyntheticMoveEndRef.current) {
+        suppressNextSyntheticMoveEndRef.current = false;
+        lastCenterRef.current = center;
+        if (isMobileViewport) {
+          hasCompletedInitialMobileViewportSyncRef.current = true;
+          hasPendingRealUserMoveRef.current = false;
+        }
+        return;
+      }
+
+      // Desktop map lifecycle can emit synthetic moveend events after initial
+      // URL restoration, resize, popup placement correction, and other
+      // programmatic camera work. Those should never rewrite URL bounds or
+      // trigger a search unless we explicitly queued one (skipCenterDedup).
+      if (!isMobileViewport && !hasOriginalEvent && !skipCenterDedup) {
+        setActivePanBounds(null);
+        lastCenterRef.current = center;
+        return;
       }
 
       // Clear active pan bounds since move has ended
