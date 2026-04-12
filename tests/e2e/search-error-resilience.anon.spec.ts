@@ -200,16 +200,13 @@ test.describe("Group 1: Zero Results State", () => {
       'h3:has-text("No listings found")'
     );
     const noExactHeading = container.locator('h3:has-text("No exact matches")');
-    const zeroPlaces = container
-      .locator("h1")
-      .filter({ hasText: /^0\s+place/i });
 
-    // Either the zero-results heading or the "0 places" count should appear
+    // Zero-results UX is carried by the empty-state headings; the mobile
+    // accessible h1 stays hidden and should not count as a visible match.
     await expect(
       noMatchesHeading
         .or(noListingsHeading)
         .or(noExactHeading)
-        .or(zeroPlaces)
         .first()
     ).toBeVisible({ timeout: timeouts.navigation });
 

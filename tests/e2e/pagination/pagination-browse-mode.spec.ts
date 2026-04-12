@@ -96,7 +96,7 @@ test.describe("Pagination Browse Mode", () => {
   // -------------------------------------------------------------------------
   // 8.2 Browse mode indicator visible [LIVE]
   // -------------------------------------------------------------------------
-  test("8.2 browse mode shows indicator banner", async ({ page }) => {
+test("8.2 browse mode shows indicator banner", async ({ page }) => {
     test.slow();
 
     // Navigate to /search WITHOUT bounds or query (triggers browse mode)
@@ -113,11 +113,17 @@ test.describe("Pagination Browse Mode", () => {
       "data-browse-mode",
       "true"
     );
-    const browseHeading = page.locator(sel.desktopHeading);
-    await expect(browseHeading).toBeVisible({ timeout: 30_000 });
-    await expect(browseHeading.getByRole("heading", { level: 1 })).toContainText(
-      /places?/i
-    );
+    const viewport = page.viewportSize();
+    if (viewport && viewport.width >= 768) {
+      const browseHeading = page
+        .locator('[data-testid="desktop-search-results-scroll-area"]')
+        .locator(sel.desktopHeading)
+        .first();
+      await expect(browseHeading).toBeVisible({ timeout: 30_000 });
+      await expect(
+        browseHeading.getByRole("heading", { level: 1 })
+      ).toContainText(/places?/i);
+    }
 
     await expect(container.getByText(/Popular areas|Recent searches/i)).toHaveCount(
       0

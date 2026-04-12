@@ -130,7 +130,18 @@ export default function NearbyPlacesSection({
         <div
           aria-hidden={isResolved && !isMapPaneInteractive ? true : undefined}
           {...(isResolved && !isMapPaneInteractive ? { inert: true } : {})}
-          className="w-full h-full absolute inset-0 z-10 lg:static lg:flex-1 bg-surface-canvas"
+          className={`
+            w-full h-full
+            absolute inset-0 z-10
+            lg:static lg:flex-1
+            bg-surface-canvas
+            transition-all duration-300 ease-out
+            ${
+              isMapPaneInteractive
+                ? "opacity-100 visible"
+                : "opacity-0 invisible pointer-events-none lg:opacity-100 lg:visible lg:pointer-events-auto"
+            }
+          `}
         >
           <NearbyPlacesMap
             listingLat={listingLat}

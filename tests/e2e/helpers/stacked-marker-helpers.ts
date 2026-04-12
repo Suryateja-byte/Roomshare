@@ -114,6 +114,8 @@ export async function setupStackedMarkerMock(page: Page): Promise<{
   console.log(`[setupStackedMarkerMock] Setting up route interception`);
   const context = page.context();
   await context.route("**/api/map-listings**", async (route) => {
+    const requestQueryHash =
+      route.request().headers()["x-search-query-hash"] || "e2e-stacked-marker";
     console.log(
       `[setupStackedMarkerMock] Intercepting: ${route.request().url()}`
     );
@@ -123,7 +125,18 @@ export async function setupStackedMarkerMock(page: Page): Promise<{
     await route.fulfill({
       status: 200,
       contentType: "application/json",
-      body: JSON.stringify({ listings: mockListings }),
+      body: JSON.stringify({
+        kind: "ok",
+        data: {
+          listings: mockListings,
+          truncated: false,
+        },
+        meta: {
+          queryHash: requestQueryHash,
+          backendSource: "map-api",
+          responseVersion: "e2e-stacked-marker",
+        },
+      }),
     });
   });
 

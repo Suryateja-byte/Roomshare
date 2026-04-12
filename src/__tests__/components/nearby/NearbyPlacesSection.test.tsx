@@ -68,6 +68,7 @@ describe("NearbyPlacesSection", () => {
     expect(listPane).not.toHaveAttribute("aria-hidden");
     expect(mapPane).toHaveAttribute("aria-hidden", "true");
     expect(mapPane).toHaveAttribute("inert");
+    expect(mapPane?.className).toContain("invisible");
 
     fireEvent.click(toggle);
 
@@ -77,6 +78,7 @@ describe("NearbyPlacesSection", () => {
     expect(listPane).toHaveAttribute("aria-hidden", "true");
     expect(listPane).toHaveAttribute("inert");
     expect(mapPane).not.toHaveAttribute("aria-hidden");
+    expect(mapPane?.className).not.toContain("invisible");
   });
 
   it("measures mobile card height from available viewport space and clamps it", async () => {

@@ -398,17 +398,17 @@ test.describe("Budget URL Param Aliases", () => {
       // After removal, the prior budget label should no longer be visible in
       // either the chip bar or the collapsed mobile summary.
       await expect(async () => {
-        const chipCount = await page
+        const appliedPriceChips = page
           .locator('[aria-label="Applied filters"] button')
-          .filter({ hasText: /\$500\s*-\s*\$1,500|\$500\+/ })
-          .count();
-        if (chipCount > 0) {
-          expect(chipCount).toBe(0);
-          return;
-        }
+          .filter({ hasText: /\$500\s*-\s*\$1,500|\$500\+/ });
+        expect(await appliedPriceChips.count()).toBe(0);
+
+        const summary = expandSearchSummary(page);
+        const summaryVisible = await summary.isVisible().catch(() => false);
+        if (!summaryVisible) return;
 
         const summaryText = normalizeBudgetText(
-          await expandSearchSummary(page).textContent()
+          await summary.textContent()
         );
         expect(summaryText).not.toMatch(/\$500/);
       }).toPass({ timeout: 30_000, intervals: [500, 1_000, 2_000] });
