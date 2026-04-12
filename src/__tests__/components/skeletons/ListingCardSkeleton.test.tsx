@@ -2,6 +2,7 @@ import { render, screen } from "@testing-library/react";
 import {
   ListingCardSkeleton,
   ListingGridSkeleton,
+  SearchResultsBodySkeleton,
 } from "@/components/skeletons/ListingCardSkeleton";
 
 describe("ListingCardSkeleton", () => {
@@ -25,5 +26,13 @@ describe("ListingCardSkeleton", () => {
     expect(grid).toHaveClass("sm:gap-x-6");
     expect(grid).toHaveClass("sm:gap-y-9");
     expect(screen.getAllByTestId("listing-card-skeleton")).toHaveLength(3);
+  });
+
+  it("renders the shared search results body skeleton with meta row and grid", () => {
+    render(<SearchResultsBodySkeleton count={4} />);
+
+    expect(screen.getByTestId("search-results-body-skeleton")).toBeInTheDocument();
+    expect(screen.getByTestId("listing-card-skeleton-grid")).toBeInTheDocument();
+    expect(screen.getAllByTestId("listing-card-skeleton")).toHaveLength(4);
   });
 });

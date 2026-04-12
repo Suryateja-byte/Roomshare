@@ -4,9 +4,12 @@ import { useCallback, useEffect, useMemo, useState } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
 import { SlidersHorizontal, X } from "lucide-react";
 import FilterModal from "@/components/search/FilterModal";
-import DesktopQuickFilters, {
-  type QuickFilterKey,
-} from "@/components/search/DesktopQuickFilters";
+import type { SortOption } from "@/lib/data";
+import {
+  QUICK_FILTER_ACTIVE_BADGE_CLASSNAME,
+  QUICK_FILTER_ACTIVE_CLASSNAME,
+  QUICK_FILTER_INACTIVE_CLASSNAME,
+} from "@/components/search/quickFilterStyles";
 import {
   clearAllFilters,
   countActiveFilters,
@@ -32,39 +35,6 @@ import { formatPriceCompact } from "@/lib/format";
 import { cn } from "@/lib/utils";
 
 const LANGUAGE_CODES = Object.keys(SUPPORTED_LANGUAGES) as LanguageCode[];
-
-function validateMoveInDate(value: string | null): string {
-  if (!value) return "";
-  const trimmed = value.trim();
-  if (!/^\d{4}-\d{2}-\d{2}$/.test(trimmed)) return "";
-
-  const [yearStr, monthStr, dayStr] = trimmed.split("-");
-  const year = parseInt(yearStr, 10);
-  const month = parseInt(monthStr, 10);
-  const day = parseInt(dayStr, 10);
-
-  if (month < 1 || month > 12) return "";
-  if (day < 1 || day > 31) return "";
-
-  const date = new Date(year, month - 1, day);
-  if (
-    date.getFullYear() !== year ||
-    date.getMonth() !== month - 1 ||
-    date.getDate() !== day
-  ) {
-    return "";
-  }
-
-  const today = new Date();
-  today.setHours(0, 0, 0, 0);
-  if (date < today) return "";
-
-  const maxDate = new Date();
-  maxDate.setFullYear(maxDate.getFullYear() + 2);
-  if (date > maxDate) return "";
-
-  return trimmed;
-}
 
 function formatPriceQuickLabel(minPrice?: number, maxPrice?: number) {
   if (minPrice !== undefined && maxPrice !== undefined) {
@@ -134,8 +104,8 @@ function PrimaryFilterButton({
       className={cn(
         "flex items-center gap-1 px-4 py-2.5 min-h-[44px] rounded-full text-sm whitespace-nowrap transition-colors shrink-0 border",
         active
-          ? "bg-on-surface text-on-primary border-on-surface font-medium"
-          : "bg-surface-container-lowest text-on-surface-variant border-outline-variant hover:border-on-surface-variant"
+          ? cn(QUICK_FILTER_ACTIVE_CLASSNAME, "font-medium")
+          : QUICK_FILTER_INACTIVE_CLASSNAME
       )}
     >
       {label}
@@ -145,9 +115,20 @@ function PrimaryFilterButton({
 }
 
 /**
- * Desktop quick filters + mobile full-drawer launchers for the search results page.
+ * Desktop heading + mobile full-drawer launchers for the search results page.
  */
-export function InlineFilterStrip() {
+interface InlineFilterStripProps {
+  desktopSummary?: {
+    total: number | null;
+    visibleCount: number;
+    locationLabel?: string;
+    browseMode?: boolean;
+  };
+  currentSort?: SortOption;
+  hasResults?: boolean;
+}
+
+export function InlineFilterStrip({ desktopSummary }: InlineFilterStripProps) {
   const searchParams = useSearchParams();
   const router = useRouter();
   const transitionCtx = useSearchTransitionSafe();
@@ -157,24 +138,12 @@ export function InlineFilterStrip() {
 
   const [hasMounted, setHasMounted] = useState(false);
   const [showFilterDrawer, setShowFilterDrawer] = useState(false);
-  const [openQuickFilter, setOpenQuickFilter] = useState<QuickFilterKey | null>(
-    null
-  );
   const [languageSearch, setLanguageSearch] = useState("");
 
-  const isFacetsOpen = showFilterDrawer || openQuickFilter !== null;
-  const isCountPreviewOpen = showFilterDrawer || openQuickFilter === "price";
-
-  const {
-    pending,
-    committed,
-    isDirty,
-    setPending,
-    reset,
-    commit,
-  } = useBatchedFilters({
-    isDrawerOpen: isFacetsOpen,
-  });
+  const { pending, committed, isDirty, setPending, reset, commit } =
+    useBatchedFilters({
+      isDrawerOpen: showFilterDrawer,
+    });
 
   const {
     minPrice,
@@ -192,7 +161,7 @@ export function InlineFilterStrip() {
 
   const { facets } = useFacets({
     pending,
-    isDrawerOpen: isFacetsOpen,
+    isDrawerOpen: showFilterDrawer,
   });
 
   const {
@@ -203,7 +172,7 @@ export function InlineFilterStrip() {
   } = useDebouncedFilterCount({
     pending,
     isDirty,
-    isDrawerOpen: isCountPreviewOpen,
+    isDrawerOpen: showFilterDrawer,
   });
 
   useEffect(() => {
@@ -233,7 +202,7 @@ export function InlineFilterStrip() {
     !showDesktopQuickFilters && mobileResultsView === "list";
   const chips = useMemo(() => urlToFilterChips(searchParams), [searchParams]);
   const hasActiveFilters = activeCount > 0;
-  const showAppliedChips = chips.length > 0 && (showDesktopQuickFilters || showMobileInlineFilters);
+  const showAppliedChips = chips.length > 0 && showMobileInlineFilters;
   const showInlineFilterStrip =
     showDesktopQuickFilters || showMobileInlineFilters || showAppliedChips;
   const pendingActiveCount = useMemo(
@@ -249,7 +218,8 @@ export function InlineFilterStrip() {
     return LANGUAGE_CODES.filter((code) => {
       const name = getLanguageName(code);
       return (
-        name.toLowerCase().includes(search) || code.toLowerCase().includes(search)
+        name.toLowerCase().includes(search) ||
+        code.toLowerCase().includes(search)
       );
     }).map(String);
   }, [languageSearch]);
@@ -291,28 +261,8 @@ export function InlineFilterStrip() {
   }, [reset]);
 
   const handleOpenFilters = useCallback(() => {
-    setOpenQuickFilter(null);
     setShowFilterDrawer(true);
   }, []);
-
-  const handleQuickFilterOpenChange = useCallback(
-    (key: QuickFilterKey, open: boolean) => {
-      if (open) {
-        if (openQuickFilter === "price" && key !== "price") {
-          reset();
-        }
-        setOpenQuickFilter(key);
-        return;
-      }
-
-      if (key === "price" && openQuickFilter === "price" && !showFilterDrawer) {
-        reset();
-      }
-
-      setOpenQuickFilter((current) => (current === key ? null : current));
-    },
-    [openQuickFilter, reset, showFilterDrawer]
-  );
 
   const handleRemoveChip = useCallback(
     (chip: (typeof chips)[0]) => {
@@ -325,7 +275,6 @@ export function InlineFilterStrip() {
   const handleClearAll = useCallback(() => {
     const newQuery = clearAllFilters(searchParams);
     setPending({ ...emptyFilterValues });
-    setOpenQuickFilter(null);
     setLanguageSearch("");
 
     if (!showFilterDrawer) {
@@ -385,194 +334,142 @@ export function InlineFilterStrip() {
     [priceAbsoluteMax, priceAbsoluteMin, setPending]
   );
 
-  const handlePriceDraftClear = useCallback(() => {
-    setPending({
-      minPrice: "",
-      maxPrice: "",
-    });
-  }, [setPending]);
+  const renderDesktopHeading = () => {
+    const total = desktopSummary?.total ?? null;
+    const resolvedTotal = total === null ? "100+" : total;
+    const noun = total === 1 ? "place" : "places";
 
-  const handlePriceApply = useCallback(() => {
-    commit();
-    setOpenQuickFilter(null);
-  }, [commit]);
+    return (
+      <section
+        data-testid="desktop-results-heading-section"
+        aria-label="Search results heading"
+        className="border-b border-outline-variant/12 pb-4 pt-2 md:pb-5"
+      >
+        <h1
+          id="search-results-heading"
+          tabIndex={-1}
+          className="font-display text-[clamp(1.9rem,1.55rem+0.95vw,2.5rem)] leading-none tracking-[-0.045em] text-on-surface focus:outline-none focus-visible:ring-2 focus-visible:ring-primary/30 focus-visible:ring-offset-2 focus-visible:ring-offset-surface-canvas"
+        >
+          {resolvedTotal} {noun}
+        </h1>
+      </section>
+    );
+  };
 
-  const handleMoveInSelect = useCallback(
-    (value: string) => {
-      const normalized = validateMoveInDate(value);
-      if (!normalized) return;
-      commit({ moveInDate: normalized });
-      setOpenQuickFilter(null);
-    },
-    [commit]
-  );
-
-  const handleMoveInClear = useCallback(() => {
-    commit({ moveInDate: "" });
-    setOpenQuickFilter(null);
-  }, [commit]);
-
-  const handleRoomTypeSelect = useCallback(
-    (value: string) => {
-      commit({ roomType: value === "any" ? "" : value });
-      setOpenQuickFilter(null);
-    },
-    [commit]
-  );
-
-  const handleLeaseDurationSelect = useCallback(
-    (value: string) => {
-      commit({ leaseDuration: value === "any" ? "" : value });
-      setOpenQuickFilter(null);
-    },
-    [commit]
+  const renderAppliedFilters = () => (
+    <div
+      data-testid="inline-applied-filters-row"
+      role="region"
+      aria-label="Applied filters"
+      className="flex items-center gap-2 overflow-x-auto hide-scrollbar"
+    >
+      <div className="h-6 w-px shrink-0 bg-outline-variant/40" />
+      {visibleAppliedChips.map((chip) => (
+        <button
+          key={chip.id}
+          type="button"
+          onClick={() => handleRemoveChip(chip)}
+          disabled={isPending}
+          aria-label={`Remove filter: ${chip.label}`}
+          className="flex min-h-[36px] shrink-0 items-center gap-1 whitespace-nowrap rounded-full border border-primary/20 bg-primary/10 px-3 py-2 text-sm text-on-surface transition-colors hover:bg-primary/15"
+        >
+          <span className="max-w-[150px] truncate">{chip.label}</span>
+          <X className="h-3 w-3 shrink-0 text-on-surface-variant" />
+        </button>
+      ))}
+      {hiddenAppliedChipCount > 0 ? (
+        <span className="flex min-h-[36px] shrink-0 items-center whitespace-nowrap rounded-full border border-outline-variant/20 bg-surface-container-high px-3 py-2 text-sm text-on-surface-variant">
+          +{hiddenAppliedChipCount} more
+        </span>
+      ) : null}
+      {chips.length > 1 ? (
+        <button
+          type="button"
+          onClick={handleClearAll}
+          disabled={isPending}
+          aria-label="Clear all filters"
+          className="flex min-h-[44px] shrink-0 items-center whitespace-nowrap px-3 py-1.5 text-xs text-on-surface-variant transition-colors hover:text-on-surface"
+        >
+          Clear all
+        </button>
+      ) : null}
+    </div>
   );
 
   return (
     <>
       {showInlineFilterStrip ? (
-        <div className="hide-scrollbar -mx-1 flex items-center gap-2 overflow-x-auto px-1 py-2">
-          {showDesktopQuickFilters ? (
-            <DesktopQuickFilters
-              disabled={isPending}
-              hasMounted={hasMounted}
-              activeCount={activeCount}
-              isAdvancedFiltersOpen={showFilterDrawer}
-              openQuickFilter={openQuickFilter}
-              onQuickFilterOpenChange={handleQuickFilterOpenChange}
-              onOpenAdvancedFilters={handleOpenFilters}
-              priceLabel={formatPriceQuickLabel(
-                committedMinPrice,
-                committedMaxPrice
-              )}
-              moveInLabel={formatMoveInQuickLabel(committed.moveInDate)}
-              roomTypeLabel={committed.roomType || "Room Type"}
-              leaseDurationLabel={committed.leaseDuration || "Duration"}
-              isPriceActive={
-                committed.minPrice.length > 0 || committed.maxPrice.length > 0
-              }
-              isMoveInActive={committed.moveInDate.length > 0}
-              isRoomTypeActive={committed.roomType.length > 0}
-              isLeaseDurationActive={committed.leaseDuration.length > 0}
-              draftMinPrice={numericMinPrice}
-              draftMaxPrice={numericMaxPrice}
-              priceAbsoluteMin={priceAbsoluteMin}
-              priceAbsoluteMax={priceAbsoluteMax}
-              priceHistogram={facets?.priceHistogram?.buckets ?? null}
-              priceApplyLabel={formattedCount || "Show results"}
-              isPriceApplyLoading={isCountLoading}
-              isPriceApplyDisabled={boundsRequired}
-              onPriceDraftChange={handlePriceDraftChange}
-              onPriceDraftClear={handlePriceDraftClear}
-              onPriceApply={handlePriceApply}
-              moveInDateValue={committed.moveInDate}
-              minMoveInDate={minMoveInDate}
-              onMoveInSelect={handleMoveInSelect}
-              onMoveInClear={handleMoveInClear}
-              roomTypeValue={committed.roomType}
-              roomTypeCounts={facets?.roomTypes}
-              onRoomTypeSelect={handleRoomTypeSelect}
-              leaseDurationValue={committed.leaseDuration}
-              onLeaseDurationSelect={handleLeaseDurationSelect}
-            />
-          ) : showMobileInlineFilters ? (
-            <>
-              <PrimaryFilterButton
-                label={formatPriceQuickLabel(
-                  committedMinPrice,
-                  committedMaxPrice
-                )}
-                active={
-                  searchParams.has("minPrice") || searchParams.has("maxPrice")
-                }
-                onClick={handleOpenFilters}
-                disabled={isPending}
-                testId="mobile-filter-price"
-              />
-              <PrimaryFilterButton
-                label={formatMoveInQuickLabel(committed.moveInDate)}
-                active={searchParams.has("moveInDate")}
-                onClick={handleOpenFilters}
-                disabled={isPending}
-                testId="mobile-filter-move-in"
-              />
-              <PrimaryFilterButton
-                label={formatRoomTypeQuickLabel(committed.roomType)}
-                active={searchParams.has("roomType")}
-                onClick={handleOpenFilters}
-                disabled={isPending}
-                testId="mobile-filter-room-type"
-              />
-
-              <div className="h-6 w-px shrink-0 bg-outline-variant/40" />
-
-              <button
-                type="button"
-                onClick={handleOpenFilters}
-                disabled={isPending}
-                data-hydrated={hasMounted || undefined}
-                aria-label={`Filters${activeCount > 0 ? `, ${activeCount} active` : ""}`}
-                aria-expanded={showFilterDrawer ? "true" : "false"}
-                aria-controls="search-filters"
-                aria-haspopup="dialog"
-                data-testid="mobile-filter-button"
-                className={cn(
-                  "flex items-center gap-1.5 px-4 py-2.5 min-h-[44px] rounded-full text-sm font-medium whitespace-nowrap transition-colors shrink-0 border",
-                  activeCount > 0
-                    ? "bg-on-surface text-on-primary border-on-surface"
-                    : "bg-surface-container-lowest text-on-surface border-outline-variant hover:border-on-surface-variant"
-                )}
-              >
-                <SlidersHorizontal className="h-3.5 w-3.5" aria-hidden />
-                Filters
-                {activeCount > 0 ? (
-                  <span className="ml-0.5 flex h-5 w-5 items-center justify-center rounded-full bg-on-primary text-xs font-semibold text-on-surface">
-                    {activeCount}
-                  </span>
-                ) : null}
-              </button>
-            </>
-          ) : null}
-
-          {showAppliedChips ? (
-            <div
-              role="region"
-              aria-label="Applied filters"
-              className="flex items-center gap-2"
-            >
-              <div className="h-6 w-px shrink-0 bg-outline-variant/40" />
-              {visibleAppliedChips.map((chip) => (
-                <button
-                  key={chip.id}
-                  type="button"
-                  onClick={() => handleRemoveChip(chip)}
+        showDesktopQuickFilters ? (
+          renderDesktopHeading()
+        ) : (
+          <div className="hide-scrollbar -mx-1 flex items-center gap-2 overflow-x-auto px-1 py-2">
+            {showMobileInlineFilters ? (
+              <>
+                <PrimaryFilterButton
+                  label={formatPriceQuickLabel(
+                    committedMinPrice,
+                    committedMaxPrice
+                  )}
+                  active={
+                    searchParams.has("minPrice") || searchParams.has("maxPrice")
+                  }
+                  onClick={handleOpenFilters}
                   disabled={isPending}
-                  aria-label={`Remove filter: ${chip.label}`}
-                  className="flex min-h-[36px] shrink-0 items-center gap-1 whitespace-nowrap rounded-full border border-primary/20 bg-primary/10 px-3 py-2 text-sm text-on-surface transition-colors hover:bg-primary/15"
-                >
-                  <span className="max-w-[150px] truncate">{chip.label}</span>
-                  <X className="h-3 w-3 shrink-0 text-on-surface-variant" />
-                </button>
-              ))}
-              {hiddenAppliedChipCount > 0 ? (
-                <span className="flex min-h-[36px] shrink-0 items-center whitespace-nowrap rounded-full border border-outline-variant/20 bg-surface-container-high px-3 py-2 text-sm text-on-surface-variant">
-                  +{hiddenAppliedChipCount} more
-                </span>
-              ) : null}
-              {chips.length > 1 ? (
+                  testId="mobile-filter-price"
+                />
+                <PrimaryFilterButton
+                  label={formatMoveInQuickLabel(committed.moveInDate)}
+                  active={searchParams.has("moveInDate")}
+                  onClick={handleOpenFilters}
+                  disabled={isPending}
+                  testId="mobile-filter-move-in"
+                />
+                <PrimaryFilterButton
+                  label={formatRoomTypeQuickLabel(committed.roomType)}
+                  active={searchParams.has("roomType")}
+                  onClick={handleOpenFilters}
+                  disabled={isPending}
+                  testId="mobile-filter-room-type"
+                />
+
+                <div className="h-6 w-px shrink-0 bg-outline-variant/40" />
+
                 <button
                   type="button"
-                  onClick={handleClearAll}
+                  onClick={handleOpenFilters}
                   disabled={isPending}
-                  aria-label="Clear all filters"
-                  className="flex min-h-[44px] shrink-0 items-center whitespace-nowrap px-3 py-1.5 text-xs text-on-surface-variant transition-colors hover:text-on-surface"
+                  data-hydrated={hasMounted || undefined}
+                  aria-label={`Filters${activeCount > 0 ? `, ${activeCount} active` : ""}`}
+                  aria-expanded={showFilterDrawer ? "true" : "false"}
+                  aria-controls="search-filters"
+                  aria-haspopup="dialog"
+                  data-testid="mobile-filter-button"
+                  className={cn(
+                    "flex items-center gap-1.5 px-4 py-2.5 min-h-[44px] rounded-full text-sm font-medium whitespace-nowrap transition-colors shrink-0 border",
+                    activeCount > 0
+                      ? QUICK_FILTER_ACTIVE_CLASSNAME
+                      : "bg-surface-container-lowest text-on-surface border-outline-variant hover:border-on-surface-variant"
+                  )}
                 >
-                  Clear all
+                  <SlidersHorizontal className="h-3.5 w-3.5" aria-hidden />
+                  Filters
+                  {activeCount > 0 ? (
+                    <span
+                      className={cn(
+                        "ml-0.5 flex h-5 w-5 items-center justify-center rounded-full text-xs font-semibold",
+                        QUICK_FILTER_ACTIVE_BADGE_CLASSNAME
+                      )}
+                    >
+                      {activeCount}
+                    </span>
+                  ) : null}
                 </button>
-              ) : null}
-            </div>
-          ) : null}
-        </div>
+              </>
+            ) : null}
+
+            {showAppliedChips ? renderAppliedFilters() : null}
+          </div>
+        )
       ) : null}
 
       <FilterModal
@@ -583,7 +480,9 @@ export function InlineFilterStrip() {
           setShowFilterDrawer(false);
         }}
         onClearAll={handleClearAll}
-        hasActiveFilters={showFilterDrawer ? drawerHasActiveFilters : hasActiveFilters}
+        hasActiveFilters={
+          showFilterDrawer ? drawerHasActiveFilters : hasActiveFilters
+        }
         activeFilterCount={showFilterDrawer ? pendingActiveCount : activeCount}
         moveInDate={moveInDate}
         leaseDuration={leaseDuration}
@@ -597,7 +496,9 @@ export function InlineFilterStrip() {
         onMinSlotsChange={(value) =>
           setPending({ minSlots: value !== undefined ? String(value) : "" })
         }
-        onMoveInDateChange={(value: string) => setPending({ moveInDate: value })}
+        onMoveInDateChange={(value: string) =>
+          setPending({ moveInDate: value })
+        }
         onLeaseDurationChange={(value: string) =>
           setPending({ leaseDuration: value === "any" ? "" : value })
         }

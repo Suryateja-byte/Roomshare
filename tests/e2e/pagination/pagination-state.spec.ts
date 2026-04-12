@@ -59,6 +59,8 @@ test.describe("Pagination URL State", () => {
 
     const cards = container.locator(sel.card);
     await expect(cards.first()).toBeVisible({ timeout: 30_000 });
+    const initialCount = await cards.count();
+    expect(initialCount).toBeGreaterThanOrEqual(1);
 
     // Check URL before any load-more
     expect(page.url()).not.toContain("cursor");
@@ -68,8 +70,9 @@ test.describe("Pagination URL State", () => {
       const loadMoreBtn = container.locator(sel.loadMoreBtn);
       await expect(loadMoreBtn).toBeVisible({ timeout: 30_000 });
       await loadMoreBtn.click();
-      // 12 initial + (i+1)*12 mock items = (i+2)*12
-      await expect(cards).toHaveCount((i + 2) * 12, { timeout: 30_000 });
+      await expect(cards).toHaveCount(initialCount + (i + 1) * 12, {
+        timeout: 30_000,
+      });
 
       // Assert URL never contains cursor after each load-more
       const currentUrl = page.url();
@@ -94,12 +97,14 @@ test.describe("Pagination URL State", () => {
 
     const cards = container.locator(sel.card);
     await expect(cards.first()).toBeVisible({ timeout: 30_000 });
+    const initialCount = await cards.count();
+    expect(initialCount).toBeGreaterThanOrEqual(1);
 
     // Load more to accumulate 24 items (12 real + 12 mock)
     const loadMoreBtn = container.locator(sel.loadMoreBtn);
     await expect(loadMoreBtn).toBeVisible({ timeout: 30_000 });
     await loadMoreBtn.click();
-    await expect(cards).toHaveCount(24, { timeout: 30_000 });
+    await expect(cards).toHaveCount(initialCount + 12, { timeout: 30_000 });
 
     // Refresh the page
     await page.reload();
@@ -139,8 +144,8 @@ test.describe("Pagination URL State", () => {
     const initialCount = await cards.count();
     expect(initialCount).toBeGreaterThanOrEqual(1);
 
-    // Extract a listing link href from the first card to navigate directly.
-    // Using page.goto instead of clicking avoids carousel drag-handler interference.
+    // Activate the real card link via keyboard to avoid image-carousel pointer
+    // overlays without forcing a full page reload through page.goto().
     const firstCardLink = container
       .locator(`${sel.card} a[href^="/listings/"]`)
       .first();
@@ -148,13 +153,15 @@ test.describe("Pagination URL State", () => {
     if ((await firstCardLink.count()) > 0) {
       const href = await firstCardLink.getAttribute("href");
       expect(href).toBeTruthy();
+      await expect(firstCardLink).toBeVisible({ timeout: 30_000 });
 
-      // Navigate directly to the listing detail page
-      await page.goto(href!);
-      await page.waitForURL(/\/listings\//, {
-        timeout: 30_000,
-        waitUntil: "commit",
-      });
+      await Promise.all([
+        page.waitForURL(/\/listings\//, {
+          timeout: 30_000,
+          waitUntil: "commit",
+        }),
+        firstCardLink.press("Enter"),
+      ]);
 
       // Go back to search results
       await page.goBack();

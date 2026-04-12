@@ -319,22 +319,38 @@ export default function MobileBottomSheet({
     [snapIndex, handleTouchStart]
   );
 
-  // Escape key collapses the sheet (only when expanded and no higher-priority handlers)
+  // Escape key collapses the sheet (only when expanded and no higher-priority handlers).
+  // Use a capture-phase document listener so the shortcut still works when focus
+  // shifts away from the handle or another surface swallows the bubbling event.
   useEffect(() => {
     const handleKeyDown = (e: KeyboardEvent) => {
-      if (e.key === "Escape" && snapIndex !== 0) {
-        // Don't handle Escape if a dialog/modal or focus trap is already handling it
-        if (
-          document.querySelector('[role="dialog"][aria-modal="true"]') ||
-          document.querySelector("[data-focus-trap]")
+      if (e.key !== "Escape" || snapIndex === 0) return;
+
+      const target =
+        e.target instanceof HTMLElement
+          ? e.target
+          : document.activeElement instanceof HTMLElement
+            ? document.activeElement
+            : null;
+
+      // Don't handle Escape if a dialog/modal or focus trap is already
+      // responsible for this interaction, or if focus is inside a form control.
+      if (
+        document.querySelector('[role="dialog"][aria-modal="true"]') ||
+        document.querySelector("[data-focus-trap]") ||
+        target?.closest(
+          '[role="dialog"][aria-modal="true"], [data-focus-trap], input, textarea, select, [role="combobox"], [role="listbox"], [contenteditable="true"]'
         )
-          return;
-        // Collapse sheet when Escape is pressed.
-        setSnapIndex(0);
+      ) {
+        return;
       }
+
+      e.preventDefault();
+      setSnapIndex(0);
     };
-    window.addEventListener("keydown", handleKeyDown);
-    return () => window.removeEventListener("keydown", handleKeyDown);
+
+    document.addEventListener("keydown", handleKeyDown, true);
+    return () => document.removeEventListener("keydown", handleKeyDown, true);
   }, [snapIndex, setSnapIndex]);
 
   // Prevent body scroll when sheet is expanded or during drag.

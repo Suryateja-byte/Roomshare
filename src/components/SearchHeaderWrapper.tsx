@@ -15,14 +15,16 @@
 
 import {
   useCallback,
-  useState,
-  useRef,
   useEffect,
   useId,
+  useMemo,
+  useRef,
+  useState,
 } from "react";
 import Link from "next/link";
+import { useSearchParams } from "next/navigation";
 import {
-  MessageSquare,
+  SlidersHorizontal,
   Menu,
   User,
   Plus,
@@ -39,15 +41,10 @@ import MobileSearchOverlay from "@/components/search/MobileSearchOverlay";
 import DesktopHeaderSearch, {
   type DesktopHeaderSearchHandle,
 } from "@/components/search/DesktopHeaderSearch";
+import { countActiveFilters } from "@/components/filters/filter-chip-utils";
 import { useSession, signOut } from "next-auth/react";
 import { Button } from "@/components/ui/button";
 import UserAvatar from "@/components/UserAvatar";
-import NotificationCenter from "@/components/NotificationCenter";
-
-// Exponential backoff constants for unread message polling
-const BASE_POLL_INTERVAL = 30000; // 30 seconds
-const MAX_BACKOFF_INTERVAL = 300000; // 5 minutes max
-const BACKOFF_MULTIPLIER = 2;
 
 const MenuItem = ({
   icon,
@@ -114,8 +111,13 @@ export default function SearchHeaderWrapper() {
   const { isCollapsed } = useScrollHeader({ threshold: 80 });
   const { openFilters } = useMobileSearch();
   const isMobileViewport = useMediaQuery("(max-width: 767px)");
+  const searchParams = useSearchParams();
   const { data: session } = useSession();
   const user = session?.user;
+  const activeFilterCount = useMemo(
+    () => countActiveFilters(searchParams),
+    [searchParams]
+  );
   const desktopSearchRef = useRef<DesktopHeaderSearchHandle>(null);
   const mobileExpandButtonRef = useRef<HTMLButtonElement>(null);
 
@@ -137,88 +139,9 @@ export default function SearchHeaderWrapper() {
 
   const [isProfileOpen, setIsProfileOpen] = useState(false);
   const [activeMenuIndex, setActiveMenuIndex] = useState(-1);
-  const [currentUnreadCount, setCurrentUnreadCount] = useState(0);
   const profileRef = useRef<HTMLDivElement>(null);
   const menuItemsRef = useRef<HTMLElement[]>([]);
   const triggerButtonRef = useRef<HTMLButtonElement>(null);
-
-  // Refs for exponential backoff polling
-  const failureCountRef = useRef(0);
-  const currentIntervalRef = useRef(BASE_POLL_INTERVAL);
-  const intervalIdRef = useRef<NodeJS.Timeout | null>(null);
-
-  // Schedule next poll with dynamic interval
-  const scheduleNextPoll = useCallback(
-    (interval: number, fetchFn: () => Promise<void>) => {
-      if (intervalIdRef.current) {
-        clearInterval(intervalIdRef.current);
-      }
-      intervalIdRef.current = setInterval(() => {
-        if (document.visibilityState === "visible") {
-          fetchFn();
-        }
-      }, interval);
-    },
-    []
-  );
-
-  // Fetch unread count from API with exponential backoff
-  const fetchUnreadCount = useCallback(async () => {
-    if (!user) return;
-    try {
-      const response = await fetch("/api/messages?view=unreadCount", {
-        cache: "no-store",
-      });
-      if (response.ok) {
-        const data = await response.json();
-        setCurrentUnreadCount(data.count);
-
-        // Reset backoff on successful response
-        if (failureCountRef.current > 0) {
-          failureCountRef.current = 0;
-          currentIntervalRef.current = BASE_POLL_INTERVAL;
-          scheduleNextPoll(BASE_POLL_INTERVAL, fetchUnreadCount);
-        }
-      }
-    } catch {
-      // Network error - implement exponential backoff
-      failureCountRef.current += 1;
-      const newInterval = Math.min(
-        BASE_POLL_INTERVAL *
-          Math.pow(BACKOFF_MULTIPLIER, failureCountRef.current),
-        MAX_BACKOFF_INTERVAL
-      );
-
-      if (newInterval !== currentIntervalRef.current) {
-        currentIntervalRef.current = newInterval;
-        scheduleNextPoll(newInterval, fetchUnreadCount);
-      }
-    }
-  }, [user, scheduleNextPoll]);
-
-  // Poll for unread count updates
-  useEffect(() => {
-    if (!user) return;
-
-    failureCountRef.current = 0;
-    currentIntervalRef.current = BASE_POLL_INTERVAL;
-
-    fetchUnreadCount();
-    scheduleNextPoll(BASE_POLL_INTERVAL, fetchUnreadCount);
-
-    // Listen for custom event from messages page
-    const handleMessagesRead = () => {
-      fetchUnreadCount();
-    };
-    window.addEventListener("messagesRead", handleMessagesRead);
-
-    return () => {
-      if (intervalIdRef.current) {
-        clearInterval(intervalIdRef.current);
-      }
-      window.removeEventListener("messagesRead", handleMessagesRead);
-    };
-  }, [user, fetchUnreadCount, scheduleNextPoll]);
 
   useEffect(() => {
     const handleClickOutside = (event: MouseEvent) => {
@@ -427,9 +350,7 @@ export default function SearchHeaderWrapper() {
   return (
     <>
       {/* Full search form - hidden on mobile always, hidden on desktop when collapsed */}
-      <div
-        className={`transition-all duration-300 ease-out hidden md:block`}
-      >
+      <div className={`transition-all duration-300 ease-out hidden md:block`}>
         <div className="w-full max-w-[1920px] mx-auto px-3 sm:px-4 md:px-6 py-3 sm:py-4">
           <div className="flex items-center gap-2 sm:gap-3">
             {/* Logo — always visible */}
@@ -451,35 +372,31 @@ export default function SearchHeaderWrapper() {
               />
             </div>
 
-            {/* Right Actions - User Profile / Auth */}
-            <div className="hidden lg:flex items-center gap-2 flex-shrink-0 ml-2">
-              <div className="flex items-center gap-1 pr-2">
-                <NotificationCenter />
-                <Link
-                  href="/messages"
-                  className="p-2.5 min-w-[44px] min-h-[44px] flex items-center justify-center text-on-surface-variant hover:text-on-surface hover:bg-surface-container-high rounded-full transition-all relative focus-visible:ring-2 focus-visible:ring-primary/30 focus-visible:ring-offset-2"
-                  aria-label={
-                    currentUnreadCount > 0
-                      ? `Messages, ${currentUnreadCount} unread`
-                      : "Messages"
-                  }
-                >
-                  <MessageSquare size={18} strokeWidth={2} />
-                  {currentUnreadCount > 0 && (
-                    <span
-                      data-testid="unread-badge"
-                      className="absolute top-1.5 right-1.5 flex h-2.5 w-2.5"
-                    >
-                      <span className="animate-[pulse-ring_2s_ease-in-out_infinite] absolute inline-flex h-full w-full rounded-full bg-primary opacity-50"></span>
-                      <span className="relative inline-flex rounded-full h-2.5 w-2.5 bg-primary border border-surface-container-lowest"></span>
-                    </span>
-                  )}
-                </Link>
-              </div>
+            <div className="ml-2 flex items-center gap-2 flex-shrink-0">
+              <button
+                type="button"
+                onClick={openFilters}
+                data-testid="desktop-header-filters-button"
+                aria-label={`Filters${activeFilterCount > 0 ? ` (${activeFilterCount} active)` : ""}`}
+                aria-haspopup="dialog"
+                className={`relative hidden h-11 items-center gap-2 rounded-full border px-4 text-sm font-medium shadow-sm transition-all focus-visible:ring-2 focus-visible:ring-primary/30 focus-visible:ring-offset-2 md:inline-flex ${
+                  activeFilterCount > 0
+                    ? "border-primary/20 bg-primary/[0.08] text-on-surface hover:bg-primary/[0.12]"
+                    : "border-outline-variant/20 bg-surface-container-lowest text-on-surface-variant hover:bg-surface-container-high hover:text-on-surface"
+                }`}
+              >
+                <SlidersHorizontal className="h-4 w-4" aria-hidden="true" />
+                <span>Filters</span>
+                {activeFilterCount > 0 ? (
+                  <span className="absolute -right-1 -top-1 inline-flex min-w-[18px] items-center justify-center rounded-full bg-primary px-1.5 py-0.5 text-[10px] font-semibold leading-none text-on-primary">
+                    {activeFilterCount}
+                  </span>
+                ) : null}
+              </button>
 
               {/* Profile Dropdown / Auth Buttons */}
               {user ? (
-                <div className="relative" ref={profileRef}>
+                <div className="relative hidden lg:block" ref={profileRef}>
                   <button
                     ref={triggerButtonRef}
                     id={menuButtonId}
@@ -582,7 +499,7 @@ export default function SearchHeaderWrapper() {
                   </div>
                 </div>
               ) : (
-                <div className="flex items-center gap-1.5">
+                <div className="hidden items-center gap-1.5 lg:flex">
                   <Link
                     href="/login"
                     className="text-sm font-medium text-on-surface-variant hover:text-on-surface px-4 py-2 transition-all duration-300 rounded-full hover:bg-surface-container-high"
@@ -619,8 +536,6 @@ export default function SearchHeaderWrapper() {
         onClose={handleCloseMobileSearch}
         onOpenFilters={openFilters}
       />
-
-
     </>
   );
 }

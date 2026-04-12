@@ -2,11 +2,12 @@
 
 import { useRef, useState, useEffect, useCallback } from "react";
 import { useSearchParams } from "next/navigation";
-import { Map } from "lucide-react";
+import { Map as MapIcon } from "lucide-react";
 import MobileBottomSheet from "./search/MobileBottomSheet";
 import FloatingMapButton from "./search/FloatingMapButton";
 import { useListingFocus } from "@/contexts/ListingFocusContext";
 import { useMobileSearch } from "@/contexts/MobileSearchContext";
+import { useSearchMapUI } from "@/contexts/SearchMapUIContext";
 import { useMediaQuery } from "@/hooks/useMediaQuery";
 import { cn } from "@/lib/utils";
 
@@ -19,20 +20,36 @@ interface SearchViewToggleProps {
   mapComponent: React.ReactNode;
   /** Whether the map should be visible */
   shouldShowMap: boolean;
-  /** Toggle map visibility callback */
-  onToggle: () => void;
-  /** Whether the preference is still loading (hydrating from localStorage) */
-  isLoading: boolean;
   /** Result count text for mobile bottom sheet header */
   resultHeaderText?: string;
+}
+
+function DesktopMapVisibilityButton({
+  label,
+  onClick,
+  testId,
+}: {
+  label: string;
+  onClick: () => void;
+  testId: string;
+}) {
+  return (
+    <button
+      type="button"
+      onClick={onClick}
+      data-testid={testId}
+      className="inline-flex h-11 items-center gap-2 rounded-full border border-outline-variant/20 bg-surface-container-lowest/95 px-4 text-sm font-medium text-on-surface shadow-sm backdrop-blur-md transition-all hover:bg-surface-container-lowest hover:shadow-md focus:outline-none focus-visible:ring-2 focus-visible:ring-primary/30 focus-visible:ring-offset-2"
+    >
+      <MapIcon className="h-4 w-4" aria-hidden="true" />
+      <span>{label}</span>
+    </button>
+  );
 }
 
 export default function SearchViewToggle({
   children,
   mapComponent,
   shouldShowMap,
-  onToggle,
-  isLoading,
   resultHeaderText,
 }: SearchViewToggleProps) {
   const mobileListRef = useRef<HTMLDivElement>(null);
@@ -44,6 +61,7 @@ export default function SearchViewToggle({
   const [showDesktopTopFade, setShowDesktopTopFade] = useState(false);
   const [showDesktopBottomFade, setShowDesktopBottomFade] = useState(false);
   const { activeId } = useListingFocus();
+  const { toggleMap, hideMap } = useSearchMapUI();
   const {
     searchResultsLabel,
     mobileSheetOverrideLabel,
@@ -291,27 +309,33 @@ export default function SearchViewToggle({
                 )}
               />
             )}
+
+            {isDesktop === true && !shouldShowMap ? (
+              <div className="pointer-events-none absolute right-4 top-4 z-20">
+                <div className="pointer-events-auto">
+                  <DesktopMapVisibilityButton
+                    label="Show map"
+                    onClick={toggleMap}
+                    testId="desktop-show-map-button"
+                  />
+                </div>
+              </div>
+            ) : null}
           </div>
         </div>
 
         {/* Right Panel: Map View (45%) */}
         {renderMapInDesktop && (
-          <div className="relative w-[40%] lg:w-[45%] h-full min-h-0 flex-shrink-0 overflow-hidden border-l border-outline-variant/20 bg-surface-container-highest">
+          <div className="relative w-[40%] lg:w-[45%] h-full min-h-0 flex-shrink-0 overflow-hidden border-l border-outline-variant/10 bg-surface-container-highest/45">
+            <div className="absolute left-4 top-4 z-[55]" data-map-avoid>
+              <DesktopMapVisibilityButton
+                label="Hide map"
+                onClick={hideMap}
+                testId="desktop-hide-map-button"
+              />
+            </div>
             {mapComponent}
           </div>
-        )}
-
-        {/* Desktop Show Map Button - Only visible when map is hidden */}
-        {!shouldShowMap && (
-          <button
-            onClick={onToggle}
-            disabled={isLoading}
-            className="fixed top-[100px] right-6 z-[50] h-10 inline-flex items-center gap-2 px-4 bg-surface-container-lowest/90 backdrop-blur-md text-on-surface rounded-lg shadow-[0_2px_12px_rgba(0,0,0,0.12)] border border-outline-variant/30 hover:bg-surface-container-lowest hover:scale-[1.02] active:scale-[0.98] transition-all duration-200 disabled:opacity-60"
-            aria-label="Show map"
-          >
-            <Map className="w-4 h-4" />
-            <span className="text-sm font-semibold">Show map</span>
-          </button>
         )}
       </div>
     </>

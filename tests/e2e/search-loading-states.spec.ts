@@ -92,8 +92,8 @@ test.describe("Search Loading States", () => {
     await waitForResults(page);
   });
 
-  // 2. Pending state overlay during filter transitions
-  test("2. pending state overlay appears during filter transitions", async ({
+  // 2. Airbnb-style skeleton during filter transitions
+  test("2. Airbnb-style skeleton appears during filter transitions", async ({
     page,
   }) => {
     await page.goto(SEARCH_URL);
@@ -124,16 +124,15 @@ test.describe("Search Loading States", () => {
       const pendingRegion = page.locator(
         '[data-testid="search-results-pending-region"][aria-busy="true"]'
       );
+      const skeletonGrid = page.locator(
+        '[data-testid="search-results-body-skeleton"]'
+      );
       const isBusy = await pendingRegion.isVisible().catch(() => false);
+      const hasSkeleton = await skeletonGrid.isVisible().catch(() => false);
 
-      if (isBusy) {
-        expect(isBusy).toBe(true);
-        await expect(
-          page.getByTestId("search-results-pending-status")
-        ).toContainText(/updating results|still loading/i);
-        await expect(
-          page.locator('[data-testid="listing-card-skeleton-grid"]')
-        ).toHaveCount(0);
+      if (isBusy || hasSkeleton) {
+        expect(isBusy || hasSkeleton).toBe(true);
+        await expect(skeletonGrid).toBeVisible();
       } else {
         console.log(
           "Info: Transition completed too fast to observe pending state"

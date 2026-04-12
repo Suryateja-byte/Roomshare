@@ -1,10 +1,15 @@
 import React from "react";
-import { fireEvent, render, screen } from "@testing-library/react";
+import { act, fireEvent, render, screen, within } from "@testing-library/react";
 import { InlineFilterStrip } from "@/components/search/InlineFilterStrip";
 import { emptyFilterValues } from "@/hooks/useBatchedFilters";
+import {
+  QUICK_FILTER_ACTIVE_BADGE_CLASSNAME,
+  QUICK_FILTER_ACTIVE_CLASSNAME,
+} from "@/components/search/quickFilterStyles";
 
 const mockRouterPush = jest.fn();
 const mockRegisterOpenFilters = jest.fn();
+let registeredOpenFiltersHandler: (() => void) | null = null;
 let mockSearchParams = new URLSearchParams();
 let mockMobileResultsView: "map" | "peek" | "list" = "list";
 const mockSetPending = jest.fn();
@@ -91,7 +96,9 @@ jest.mock("@radix-ui/react-popover", () => {
     open: boolean;
     onOpenChange: (open: boolean) => void;
   };
-  const PopoverContext = React.createContext(null as PopoverContextValue | null);
+  const PopoverContext = React.createContext(
+    null as PopoverContextValue | null
+  );
 
   return {
     Root: ({
@@ -161,41 +168,64 @@ jest.mock("@radix-ui/react-popover", () => {
 describe("InlineFilterStrip", () => {
   beforeEach(() => {
     jest.clearAllMocks();
+    registeredOpenFiltersHandler = null;
     mockSearchParams = new URLSearchParams();
     mockMobileResultsView = "list";
     Object.assign(mockPending, emptyFilterValues);
     Object.assign(mockCommitted, emptyFilterValues);
+    mockRegisterOpenFilters.mockImplementation((handler: () => void) => {
+      registeredOpenFiltersHandler = handler;
+      return jest.fn();
+    });
     mockUseMediaQuery.mockImplementation((query: string) =>
       query === "(min-width: 768px)" ? true : undefined
     );
   });
 
-  it("opens the price quick filter on desktop without opening the full drawer", () => {
-    render(<InlineFilterStrip />);
+  it("renders only the desktop results heading on desktop", () => {
+    mockSearchParams = new URLSearchParams(
+      "roomType=Private+Room&languages=te"
+    );
 
-    fireEvent.click(screen.getByTestId("quick-filter-price"));
+    render(
+      <InlineFilterStrip
+        desktopSummary={{
+          total: 24,
+          visibleCount: 12,
+          locationLabel: "San Francisco",
+        }}
+      />
+    );
 
-    expect(screen.getByTestId("quick-filter-price-popover")).toBeInTheDocument();
-    expect(screen.queryByTestId("filter-modal")).not.toBeInTheDocument();
+    expect(
+      screen.getByRole("heading", { name: "24 places" })
+    ).toBeInTheDocument();
+    expect(
+      screen.getByTestId("desktop-results-heading-section")
+    ).toBeInTheDocument();
+    expect(screen.queryByTestId("quick-filter-price")).not.toBeInTheDocument();
+    expect(
+      screen.queryByTestId("desktop-primary-filters-row")
+    ).not.toBeInTheDocument();
+    expect(
+      screen.queryByRole("region", { name: "Applied filters" })
+    ).not.toBeInTheDocument();
   });
 
-  it("opens the advanced filter drawer from the desktop Filters button", () => {
+  it("registers a high-priority desktop drawer opener for the header filters button", () => {
     render(<InlineFilterStrip />);
 
-    fireEvent.click(screen.getByTestId("quick-filter-more-filters"));
+    expect(mockRegisterOpenFilters).toHaveBeenCalledWith(
+      expect.any(Function),
+      10
+    );
+    expect(registeredOpenFiltersHandler).not.toBeNull();
+
+    act(() => {
+      registeredOpenFiltersHandler?.();
+    });
 
     expect(screen.getByTestId("filter-modal")).toBeInTheDocument();
-  });
-
-  it("commits room type immediately from the desktop quick filter", () => {
-    render(<InlineFilterStrip />);
-
-    fireEvent.click(screen.getByTestId("quick-filter-room-type"));
-    fireEvent.click(screen.getByRole("button", { name: "Private Room" }));
-
-    expect(mockCommit).toHaveBeenCalledWith({ roomType: "Private Room" });
-    expect(screen.queryByTestId("quick-filter-room-type-popover")).not.toBeInTheDocument();
-    expect(screen.queryByTestId("filter-modal")).not.toBeInTheDocument();
   });
 
   it("keeps the mobile strip on the full drawer flow", () => {
@@ -216,9 +246,45 @@ describe("InlineFilterStrip", () => {
     render(<InlineFilterStrip />);
 
     expect(screen.queryByTestId("mobile-filter-price")).not.toBeInTheDocument();
-    expect(screen.queryByTestId("mobile-filter-move-in")).not.toBeInTheDocument();
-    expect(screen.queryByTestId("mobile-filter-room-type")).not.toBeInTheDocument();
-    expect(screen.queryByTestId("mobile-filter-button")).not.toBeInTheDocument();
+    expect(
+      screen.queryByTestId("mobile-filter-move-in")
+    ).not.toBeInTheDocument();
+    expect(
+      screen.queryByTestId("mobile-filter-room-type")
+    ).not.toBeInTheDocument();
+    expect(
+      screen.queryByTestId("mobile-filter-button")
+    ).not.toBeInTheDocument();
+  });
+
+  it("uses terracotta active styling for mobile quick filters and the filters button", () => {
+    mockUseMediaQuery.mockReturnValue(false);
+    mockMobileResultsView = "list";
+    Object.assign(mockCommitted, {
+      minPrice: "1200",
+      roomType: "Private Room",
+    });
+    mockSearchParams = new URLSearchParams(
+      "minPrice=1200&roomType=Private+Room"
+    );
+
+    render(<InlineFilterStrip />);
+
+    const priceButton = screen.getByTestId("mobile-filter-price");
+    const roomTypeButton = screen.getByTestId("mobile-filter-room-type");
+    const filtersButton = screen.getByTestId("mobile-filter-button");
+    const activeBadge = within(filtersButton).getByText("2");
+
+    for (const button of [priceButton, roomTypeButton, filtersButton]) {
+      for (const className of QUICK_FILTER_ACTIVE_CLASSNAME.split(" ")) {
+        expect(button).toHaveClass(className);
+      }
+      expect(button).not.toHaveClass("bg-on-surface");
+    }
+
+    for (const className of QUICK_FILTER_ACTIVE_BADGE_CLASSNAME.split(" ")) {
+      expect(activeBadge).toHaveClass(className);
+    }
   });
 
   it('hides the mobile quick filters in "peek" view', () => {
@@ -228,9 +294,15 @@ describe("InlineFilterStrip", () => {
     render(<InlineFilterStrip />);
 
     expect(screen.queryByTestId("mobile-filter-price")).not.toBeInTheDocument();
-    expect(screen.queryByTestId("mobile-filter-move-in")).not.toBeInTheDocument();
-    expect(screen.queryByTestId("mobile-filter-room-type")).not.toBeInTheDocument();
-    expect(screen.queryByTestId("mobile-filter-button")).not.toBeInTheDocument();
+    expect(
+      screen.queryByTestId("mobile-filter-move-in")
+    ).not.toBeInTheDocument();
+    expect(
+      screen.queryByTestId("mobile-filter-room-type")
+    ).not.toBeInTheDocument();
+    expect(
+      screen.queryByTestId("mobile-filter-button")
+    ).not.toBeInTheDocument();
   });
 
   it("shows selected values in mobile quick filters", () => {

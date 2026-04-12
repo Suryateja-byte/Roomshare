@@ -30,7 +30,9 @@ interface PendingMapFocus {
 }
 
 interface SearchMapUIContextValue {
+  shouldShowMap: boolean;
   pendingFocus: PendingMapFocus | null;
+  toggleMap: () => void;
   focusListingOnMap: (listingId: string) => void;
   acknowledgeFocus: (nonce: number) => void;
   clearPendingFocus: () => void;
@@ -46,7 +48,9 @@ const SearchMapUIContext = createContext<SearchMapUIContextValue | null>(null);
 // P2-FIX (#179): Stable no-op fallback for SSR/outside-provider usage
 // Prevents creating new object on every render
 const NOOP_CONTEXT_VALUE: SearchMapUIContextValue = {
+  shouldShowMap: false,
   pendingFocus: null,
+  toggleMap: () => {},
   focusListingOnMap: () => {},
   acknowledgeFocus: () => {},
   clearPendingFocus: () => {},
@@ -57,6 +61,7 @@ const NOOP_CONTEXT_VALUE: SearchMapUIContextValue = {
 
 interface SearchMapUIProviderProps {
   children: React.ReactNode;
+  toggleMap: () => void;
   showMap: () => void;
   hideMap: () => void;
   shouldShowMap: boolean;
@@ -64,6 +69,7 @@ interface SearchMapUIProviderProps {
 
 export function SearchMapUIProvider({
   children,
+  toggleMap,
   showMap,
   hideMap,
   shouldShowMap,
@@ -114,7 +120,9 @@ export function SearchMapUIProvider({
 
   const contextValue = useMemo(
     () => ({
+      shouldShowMap,
       pendingFocus,
+      toggleMap,
       focusListingOnMap,
       acknowledgeFocus,
       clearPendingFocus,
@@ -123,7 +131,9 @@ export function SearchMapUIProvider({
       dismiss,
     }),
     [
+      shouldShowMap,
       pendingFocus,
+      toggleMap,
       focusListingOnMap,
       acknowledgeFocus,
       clearPendingFocus,

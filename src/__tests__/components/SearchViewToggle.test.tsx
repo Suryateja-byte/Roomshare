@@ -4,6 +4,8 @@ import SearchViewToggle from "@/components/SearchViewToggle";
 let matchMediaMatches = true;
 let mockSearchParams = new URLSearchParams();
 const mockSetMobileResultsView = jest.fn();
+const mockToggleMap = jest.fn();
+const mockHideMap = jest.fn();
 let mockMobileSearchState = {
   mobileMapOverlayActive: false,
   searchResultsLabel: "486 homes",
@@ -31,6 +33,8 @@ beforeEach(() => {
     mobileResultsViewPreference: null,
     setMobileResultsView: mockSetMobileResultsView,
   };
+  mockToggleMap.mockReset();
+  mockHideMap.mockReset();
   Object.defineProperty(window, "matchMedia", {
     writable: true,
     value: jest.fn().mockImplementation((query: string) => ({
@@ -45,6 +49,13 @@ beforeEach(() => {
 
 jest.mock("@/contexts/ListingFocusContext", () => ({
   useListingFocus: () => ({ activeId: null }),
+}));
+
+jest.mock("@/contexts/SearchMapUIContext", () => ({
+  useSearchMapUI: () => ({
+    toggleMap: mockToggleMap,
+    hideMap: mockHideMap,
+  }),
 }));
 
 jest.mock("@/components/search/MobileBottomSheet", () => {
@@ -106,8 +117,6 @@ jest.mock("@/components/search/FloatingMapButton", () => {
 const props = {
   mapComponent: <div data-testid="map">Map</div>,
   shouldShowMap: true,
-  onToggle: jest.fn(),
-  isLoading: false,
 };
 
 function TestChild() {
@@ -307,6 +316,40 @@ describe("SearchViewToggle", () => {
     });
   });
 
+  it("renders a floating desktop show-map button when the map is hidden", async () => {
+    matchMediaMatches = true;
+
+    render(
+      <SearchViewToggle {...props} shouldShowMap={false}>
+        <TestChild />
+      </SearchViewToggle>
+    );
+
+    await waitFor(() => {
+      expect(screen.getByTestId("desktop-show-map-button")).toBeInTheDocument();
+    });
+
+    fireEvent.click(screen.getByTestId("desktop-show-map-button"));
+    expect(mockToggleMap).toHaveBeenCalledTimes(1);
+  });
+
+  it("renders a map overlay hide button when the desktop map is visible", async () => {
+    matchMediaMatches = true;
+
+    render(
+      <SearchViewToggle {...props}>
+        <TestChild />
+      </SearchViewToggle>
+    );
+
+    await waitFor(() => {
+      expect(screen.getByTestId("desktop-hide-map-button")).toBeInTheDocument();
+    });
+
+    fireEvent.click(screen.getByTestId("desktop-hide-map-button"));
+    expect(mockHideMap).toHaveBeenCalledTimes(1);
+  });
+
   it("uses an inner desktop scroll region instead of scrolling the split-view shell", () => {
     matchMediaMatches = true;
     render(
@@ -360,7 +403,9 @@ describe("SearchViewToggle", () => {
     expect(
       screen.queryByTestId("desktop-results-top-fade")
     ).not.toBeInTheDocument();
-    expect(screen.getByTestId("desktop-results-bottom-fade")).toBeInTheDocument();
+    expect(
+      screen.getByTestId("desktop-results-bottom-fade")
+    ).toBeInTheDocument();
 
     Object.defineProperty(scrollRegion, "scrollTop", {
       configurable: true,

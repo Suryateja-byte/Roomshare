@@ -4,8 +4,6 @@ import {
   PaginatedResultHybrid,
   ListingData,
 } from "@/lib/data";
-import SortSelect from "@/components/SortSelect";
-import SaveSearchButton from "@/components/SaveSearchButton";
 import { SearchResultsClient } from "@/components/search/SearchResultsClient";
 import { SearchResultsErrorBoundary } from "@/components/search/SearchResultsErrorBoundary";
 import Link from "next/link";
@@ -296,7 +294,9 @@ export default async function SearchPage({ searchParams }: SearchPageProps) {
     });
 
     if (scenarioState.kind === "location-required") {
-      return renderLocationRequiredState(locationLabel || q || what || "your search");
+      return renderLocationRequiredState(
+        locationLabel || q || what || "your search"
+      );
     }
 
     if (scenarioState.kind === "rate-limited") {
@@ -317,17 +317,18 @@ export default async function SearchPage({ searchParams }: SearchPageProps) {
     return (
       <div className="max-w-[840px] mx-auto pb-24 md:pb-6">
         <div className="px-4 sm:px-5 lg:px-8 pt-0">
-          <InlineFilterStrip />
+          <InlineFilterStrip
+            desktopSummary={{
+              total: renderableScenarioData.total,
+              visibleCount: renderableScenarioData.listings.length,
+              locationLabel: displayLocation,
+              browseMode,
+            }}
+            currentSort={sortOption}
+            hasResults={renderableScenarioData.total !== 0}
+          />
 
-          {/*
-           * Mobile-only accessible heading. The visible desktop <h1> below is
-           * hidden on mobile (md:hidden wrapper), so mobile viewports would
-           * otherwise lose the level-1 landmark. This sr-only element keeps
-           * the a11y tree + Playwright heading selectors working without
-           * affecting the mobile visual design (the count renders in the
-           * MobileMapStatusCard / bottom sheet header). Removed from the a11y
-           * tree on md+ via md:hidden so only one h1 is active per viewport.
-           */}
+          {/* Mobile-only accessible heading */}
           <h1 className="sr-only md:hidden">
             {renderableScenarioData.total === null
               ? "100+"
@@ -335,41 +336,6 @@ export default async function SearchPage({ searchParams }: SearchPageProps) {
             {renderableScenarioData.total === 1 ? "place" : "places"}
             {displayLocation ? ` in ${displayLocation}` : ""}
           </h1>
-
-          <div className="flex flex-row items-center justify-between gap-4 py-2 mb-4">
-            <div className="hidden md:block flex-1 min-w-0">
-              <div className="flex items-baseline gap-3 min-w-0">
-                <h1
-                  id="search-results-heading"
-                  tabIndex={-1}
-                  className="text-lg md:text-xl font-display font-medium tracking-tight text-on-surface focus:outline-none focus-visible:ring-2 focus-visible:ring-primary/30 focus-visible:rounded-lg truncate"
-                >
-                  {renderableScenarioData.total === null
-                    ? "100+"
-                    : renderableScenarioData.total}{" "}
-                  {renderableScenarioData.total === 1 ? "place" : "places"}
-                  {displayLocation ? ` in ${displayLocation}` : ""}
-                </h1>
-                {renderableScenarioData.listings.length > 0 && (
-                  <span className="hidden md:inline-flex text-xs bg-surface-container-high text-on-surface-variant px-2.5 py-1 rounded-full whitespace-nowrap shrink-0">
-                    Showing 1–{renderableScenarioData.listings.length}
-                  </span>
-                )}
-              </div>
-              {browseMode && (
-                <p className="text-xs text-on-surface-variant mt-0.5">
-                  Showing top listings. Select a location for more results.
-                </p>
-              )}
-            </div>
-
-            <div className="flex items-center gap-2 shrink-0">
-              <div className="hidden md:block">
-                <SaveSearchButton />
-              </div>
-              <SortSelect currentSort={sortOption} />
-            </div>
-          </div>
 
           <SearchResultsLoadingWrapper>
             <SearchResultsErrorBoundary>
@@ -596,51 +562,22 @@ export default async function SearchPage({ searchParams }: SearchPageProps) {
   const listContent = (
     <div className="max-w-[840px] mx-auto pb-24 md:pb-6">
       <div className="px-4 sm:px-5 lg:px-8 pt-0">
-        <InlineFilterStrip />
+        <InlineFilterStrip
+          desktopSummary={{
+            total,
+            visibleCount: listings.length,
+            locationLabel: displayLocation,
+            browseMode,
+          }}
+          currentSort={sortOption}
+          hasResults={total !== 0}
+        />
 
-        {/*
-         * Mobile-only accessible heading — see equivalent comment in the
-         * scenario render path above. Keeps the level-1 landmark in the a11y
-         * tree on mobile without affecting the visual design.
-         */}
+        {/* Mobile-only accessible heading */}
         <h1 className="sr-only md:hidden">
-          {total === null ? "100+" : total}{" "}
-          {total === 1 ? "place" : "places"}
+          {total === null ? "100+" : total} {total === 1 ? "place" : "places"}
           {displayLocation ? ` in ${displayLocation}` : ""}
         </h1>
-
-        <div className="flex flex-row items-center justify-between gap-4 py-2 mb-4">
-          <div className="hidden md:block flex-1 min-w-0">
-            <div className="flex items-baseline gap-3 min-w-0">
-              <h1
-                id="search-results-heading"
-                tabIndex={-1}
-                className="text-lg md:text-xl font-display font-medium tracking-tight text-on-surface focus:outline-none focus-visible:ring-2 focus-visible:ring-primary/30 focus-visible:rounded-lg truncate"
-              >
-                {total === null ? "100+" : total}{" "}
-                {total === 1 ? "place" : "places"}
-                {displayLocation ? ` in ${displayLocation}` : ""}
-              </h1>
-              {listings.length > 0 && (
-                <span className="hidden md:inline-flex text-xs bg-surface-container-high text-on-surface-variant px-2.5 py-1 rounded-full whitespace-nowrap shrink-0">
-                  Showing 1–{listings.length}
-                </span>
-              )}
-            </div>
-            {browseMode && (
-              <p className="text-xs text-on-surface-variant mt-0.5">
-                Showing top listings. Select a location for more results.
-              </p>
-            )}
-          </div>
-
-          <div className="flex items-center gap-2 shrink-0">
-            <div className="hidden md:block">
-              <SaveSearchButton />
-            </div>
-            <SortSelect currentSort={sortOption} />
-          </div>
-        </div>
 
         <SearchResultsLoadingWrapper>
           <SearchResultsErrorBoundary>
@@ -669,7 +606,5 @@ export default async function SearchPage({ searchParams }: SearchPageProps) {
     </div>
   );
 
-  return (
-    listContent
-  );
+  return listContent;
 }

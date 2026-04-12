@@ -7,9 +7,11 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { PriceRangeFilter } from "@/components/search/PriceRangeFilter";
 import {
-  VALID_LEASE_DURATIONS,
-  VALID_ROOM_TYPES,
-} from "@/lib/search-params";
+  QUICK_FILTER_ACTIVE_BADGE_CLASSNAME,
+  QUICK_FILTER_ACTIVE_CLASSNAME,
+  QUICK_FILTER_INACTIVE_CLASSNAME,
+} from "@/components/search/quickFilterStyles";
+import { VALID_LEASE_DURATIONS, VALID_ROOM_TYPES } from "@/lib/search-params";
 import { cn } from "@/lib/utils";
 import type { PriceHistogramBucket } from "@/app/api/search/facets/route";
 
@@ -63,36 +65,39 @@ const triggerClassName =
 const popoverContentClassName =
   "z-[1200] w-[min(360px,calc(100vw-32px))] rounded-[1.25rem] border border-outline-variant/20 bg-surface-container-lowest/98 p-4 shadow-ambient backdrop-blur-[20px] outline-none";
 
-interface QuickFilterTriggerProps
-  extends Omit<ButtonHTMLAttributes<HTMLButtonElement>, "children"> {
+interface QuickFilterTriggerProps extends Omit<
+  ButtonHTMLAttributes<HTMLButtonElement>,
+  "children"
+> {
   label: string;
   active: boolean;
   open: boolean;
   testId: string;
 }
 
-const QuickFilterTrigger = forwardRef<HTMLButtonElement, QuickFilterTriggerProps>(
-  ({ label, active, open, testId, className, ...buttonProps }, ref) => {
-    return (
-      <button
-        ref={ref}
-        type="button"
-        {...buttonProps}
-        data-testid={testId}
-        className={cn(
-          triggerClassName,
-          active || open
-            ? "bg-on-surface text-on-primary border-on-surface font-medium"
-            : "bg-surface-container-lowest text-on-surface-variant border-outline-variant hover:border-on-surface-variant",
-          className
-        )}
-      >
-        <span>{label}</span>
-        <ChevronDown className="h-3.5 w-3.5 opacity-60" aria-hidden />
-      </button>
-    );
-  }
-);
+const QuickFilterTrigger = forwardRef<
+  HTMLButtonElement,
+  QuickFilterTriggerProps
+>(({ label, active, open, testId, className, ...buttonProps }, ref) => {
+  return (
+    <button
+      ref={ref}
+      type="button"
+      {...buttonProps}
+      data-testid={testId}
+      className={cn(
+        triggerClassName,
+        active || open
+          ? cn(QUICK_FILTER_ACTIVE_CLASSNAME, "font-medium")
+          : QUICK_FILTER_INACTIVE_CLASSNAME,
+        className
+      )}
+    >
+      <span>{label}</span>
+      <ChevronDown className="h-3.5 w-3.5 opacity-60" aria-hidden />
+    </button>
+  );
+});
 
 QuickFilterTrigger.displayName = "QuickFilterTrigger";
 
@@ -382,8 +387,6 @@ export function DesktopQuickFilters({
         </Popover.Portal>
       </Popover.Root>
 
-      <div className="h-6 w-px shrink-0 bg-outline-variant/40" />
-
       <button
         type="button"
         onClick={onOpenAdvancedFilters}
@@ -397,14 +400,19 @@ export function DesktopQuickFilters({
         className={cn(
           "flex items-center gap-1.5 px-4 py-2.5 min-h-[44px] rounded-full text-sm font-medium whitespace-nowrap transition-colors shrink-0 border",
           activeCount > 0
-            ? "bg-on-surface text-on-primary border-on-surface"
-            : "bg-surface-container-lowest text-on-surface border-outline-variant hover:border-on-surface-variant"
+            ? QUICK_FILTER_ACTIVE_CLASSNAME
+            : QUICK_FILTER_INACTIVE_CLASSNAME
         )}
       >
         <SlidersHorizontal className="h-3.5 w-3.5" aria-hidden />
         Filters
         {activeCount > 0 ? (
-          <span className="ml-0.5 flex h-5 w-5 items-center justify-center rounded-full bg-on-primary text-xs font-semibold text-on-surface">
+          <span
+            className={cn(
+              "ml-0.5 flex h-5 w-5 items-center justify-center rounded-full text-xs font-semibold",
+              QUICK_FILTER_ACTIVE_BADGE_CLASSNAME
+            )}
+          >
             {activeCount}
           </span>
         ) : null}

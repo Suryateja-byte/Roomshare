@@ -20,6 +20,10 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
+import {
+  QUICK_FILTER_ACTIVE_CLASSNAME,
+  QUICK_FILTER_INACTIVE_CLASSNAME,
+} from "@/components/search/quickFilterStyles";
 
 const sortOptions: { value: SortOption; label: string }[] = [
   { value: "recommended", label: "Recommended" },
@@ -31,9 +35,35 @@ const sortOptions: { value: SortOption; label: string }[] = [
 
 interface SortSelectProps {
   currentSort: SortOption;
+  desktopVariant?: "default" | "toolbar";
 }
 
-export default function SortSelect({ currentSort }: SortSelectProps) {
+function getDesktopSortLabel(
+  currentSort: SortOption,
+  desktopVariant: SortSelectProps["desktopVariant"]
+) {
+  if (desktopVariant !== "toolbar") {
+    return sortOptions.find((opt) => opt.value === currentSort)?.label;
+  }
+
+  switch (currentSort) {
+    case "price_asc":
+      return "Price low";
+    case "price_desc":
+      return "Price high";
+    case "newest":
+      return "Newest";
+    case "rating":
+      return "Top rated";
+    default:
+      return "Recommended";
+  }
+}
+
+export default function SortSelect({
+  currentSort,
+  desktopVariant = "default",
+}: SortSelectProps) {
   const [mounted, setMounted] = useState(false);
   const [mobileOpen, setMobileOpen] = useState(false);
   const [desktopOpen, setDesktopOpen] = useState(false);
@@ -79,9 +109,11 @@ export default function SortSelect({ currentSort }: SortSelectProps) {
     [searchParams, transitionContext, router]
   );
 
-  const currentLabel =
+  const fullCurrentLabel =
     sortOptions.find((opt) => opt.value === currentSort)?.label ||
     "Recommended";
+  const currentLabel =
+    getDesktopSortLabel(currentSort, desktopVariant) || fullCurrentLabel;
   const isNonDefault = currentSort !== "recommended";
 
   // Render placeholder during SSR to prevent hydration mismatch
@@ -95,10 +127,16 @@ export default function SortSelect({ currentSort }: SortSelectProps) {
           <ArrowUpDown className="w-4 h-4" />
           <span className="hidden sm:inline">Sort</span>
         </button>
-        <div className="hidden md:flex items-center gap-2">
-          <span>Sort by:</span>
-          <div className="h-9 min-w-[140px] px-3 py-1.5 text-on-surface font-semibold text-xs flex items-center">
-            {currentLabel}
+        <div className="hidden md:flex">
+          <div
+            className={`inline-flex h-11 items-center gap-2 rounded-full border text-sm font-medium ${
+              desktopVariant === "toolbar"
+                ? `min-w-[132px] px-3.5 ${QUICK_FILTER_INACTIVE_CLASSNAME}`
+                : `min-w-[148px] px-4 ${QUICK_FILTER_INACTIVE_CLASSNAME}`
+            }`}
+          >
+            <ArrowUpDown className="w-4 h-4 text-on-surface-variant" />
+            <span>{currentLabel}</span>
           </div>
         </div>
       </div>
@@ -116,7 +154,7 @@ export default function SortSelect({ currentSort }: SortSelectProps) {
             ? "border-primary bg-primary text-on-primary"
             : "border-outline-variant/20 text-on-surface-variant hover:bg-surface-container-high"
         }`}
-        aria-label={`Sort: ${currentLabel}`}
+        aria-label={`Sort: ${fullCurrentLabel}`}
       >
         <ArrowUpDown className="w-4 h-4" />
         <span className="hidden sm:inline">Sort</span>
@@ -184,8 +222,7 @@ export default function SortSelect({ currentSort }: SortSelectProps) {
         )}
 
       {/* Desktop sort dropdown */}
-      <div className="hidden md:flex items-center gap-2 text-xs font-medium text-on-surface-variant">
-        <span>Sort by:</span>
+      <div className="hidden md:flex">
         <Select
           value={currentSort}
           onValueChange={handleSortChange}
@@ -193,12 +230,27 @@ export default function SortSelect({ currentSort }: SortSelectProps) {
           onOpenChange={setDesktopOpen}
         >
           <SelectTrigger
-            aria-label="Sort by"
-            className={`h-9 w-auto min-w-[140px] border-none bg-transparent hover:bg-surface-container-high px-3 py-1.5 font-semibold text-xs focus-visible:ring-2 focus-visible:ring-primary/30 ${
-              isNonDefault ? "text-on-surface" : "text-on-surface-variant"
+            aria-label={`Sort by: ${currentLabel}`}
+            data-testid="desktop-sort-trigger"
+            className={`h-11 w-auto rounded-full border text-sm font-medium transition-colors focus-visible:ring-2 focus-visible:ring-primary/30 ${
+              desktopVariant === "toolbar"
+                ? "min-w-[132px] px-3.5"
+                : "min-w-[148px] px-4"
+            } ${
+              isNonDefault
+                ? QUICK_FILTER_ACTIVE_CLASSNAME
+                : QUICK_FILTER_INACTIVE_CLASSNAME
             }`}
           >
-            <SelectValue placeholder="Recommended">{currentLabel}</SelectValue>
+            <span className="inline-flex items-center gap-2">
+              <ArrowUpDown
+                className="w-4 h-4 text-on-surface-variant"
+                aria-hidden="true"
+              />
+              <SelectValue placeholder="Recommended">
+                {currentLabel}
+              </SelectValue>
+            </span>
           </SelectTrigger>
           <SelectContent>
             {sortOptions.map((option) => (

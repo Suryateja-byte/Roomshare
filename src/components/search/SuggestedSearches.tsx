@@ -1,86 +1,52 @@
 "use client";
 
-import { MapPin, Clock, TrendingUp } from "lucide-react";
 import Link from "next/link";
-import { useRecentSearches } from "@/hooks/useRecentSearches";
 
-/**
- * Hardcoded popular areas for MVP.
- * TODO: Replace with DB-driven popular areas when available.
- */
-const POPULAR_AREAS = [
-  { label: "Austin, TX", q: "Austin, TX", lat: 30.2672, lng: -97.7431 },
+const SUGGESTED_SEARCHES = [
   {
-    label: "San Francisco, CA",
-    q: "San Francisco, CA",
-    lat: 37.7749,
-    lng: -122.4194,
+    label: "San Francisco",
+    href: "/search?q=San+Francisco",
   },
-  { label: "New York, NY", q: "New York, NY", lat: 40.7128, lng: -74.006 },
   {
-    label: "Los Angeles, CA",
-    q: "Los Angeles, CA",
-    lat: 34.0522,
-    lng: -118.2437,
+    label: "San Jose",
+    href: "/search?q=San+Jose",
   },
-  { label: "Chicago, IL", q: "Chicago, IL", lat: 41.8781, lng: -87.6298 },
-  { label: "Seattle, WA", q: "Seattle, WA", lat: 47.6062, lng: -122.3321 },
-  { label: "Denver, CO", q: "Denver, CO", lat: 39.7392, lng: -104.9903 },
-  { label: "Portland, OR", q: "Portland, OR", lat: 45.5152, lng: -122.6784 },
-];
+  {
+    label: "Fremont",
+    href: "/search?q=Fremont",
+  },
+  {
+    label: "Sunnyvale",
+    href: "/search?q=Sunnyvale",
+  },
+] as const;
 
-/**
- * Shows suggested searches when there's no active query.
- * Displays recent searches if available, otherwise popular areas.
- */
-export default function SuggestedSearches() {
-  const { recentSearches } = useRecentSearches();
+interface SuggestedSearchesProps {
+  className?: string;
+}
 
-  if (recentSearches.length > 0) {
-    return (
-      <div className="py-6">
-        <div className="flex items-center gap-2 mb-3">
-          <Clock className="w-4 h-4 text-on-surface-variant" />
-          <h3 className="text-sm font-medium text-on-surface-variant">
-            Recent searches
-          </h3>
-        </div>
-        <div className="flex flex-wrap gap-2">
-          {recentSearches.map((search) => (
-            <Link
-              key={search.location}
-              href={`/search?q=${encodeURIComponent(search.location)}${search.coords ? `&lat=${search.coords.lat}&lng=${search.coords.lng}` : ""}`}
-              className="inline-flex items-center gap-1.5 px-3 py-2 rounded-full bg-surface-container-high hover:bg-outline-variant/30 text-sm text-on-surface-variant transition-colors"
-            >
-              <MapPin className="w-3.5 h-3.5 text-on-surface-variant" />
-              {search.location}
-            </Link>
-          ))}
-        </div>
-      </div>
-    );
-  }
-
+export default function SuggestedSearches({
+  className = "",
+}: SuggestedSearchesProps) {
   return (
-    <div className="py-6">
-      <div className="flex items-center gap-2 mb-3">
-        <TrendingUp className="w-4 h-4 text-on-surface-variant" />
-        <h2 className="text-sm font-medium text-on-surface-variant">
-          Popular areas
-        </h2>
-      </div>
-      <div className="flex flex-wrap gap-2">
-        {POPULAR_AREAS.map((area) => (
+    <section
+      className={`rounded-3xl border border-outline-variant/15 bg-surface px-5 py-5 shadow-sm ${className}`.trim()}
+      data-testid="suggested-searches"
+    >
+      <p className="text-xs font-semibold uppercase tracking-[0.18em] text-muted-foreground">
+        Start with a popular area
+      </p>
+      <div className="mt-3 flex flex-wrap gap-2">
+        {SUGGESTED_SEARCHES.map((search) => (
           <Link
-            key={area.q}
-            href={`/search?q=${encodeURIComponent(area.q)}&lat=${area.lat}&lng=${area.lng}`}
-            className="inline-flex items-center gap-1.5 px-3 py-2 rounded-full bg-surface-container-high hover:bg-outline-variant/30 text-sm text-on-surface-variant transition-colors"
+            key={search.label}
+            href={search.href}
+            className="inline-flex min-h-11 items-center rounded-full border border-outline-variant/20 bg-background px-4 text-sm font-medium text-foreground transition-colors hover:border-outline-variant/40 hover:bg-surface-container focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring/60"
           >
-            <MapPin className="w-3.5 h-3.5 text-on-surface-variant" />
-            {area.label}
+            {search.label}
           </Link>
         ))}
       </div>
-    </div>
+    </section>
   );
 }

@@ -32,14 +32,8 @@ interface SearchLayoutViewProps {
  * - Preferences persist via localStorage
  */
 export default function SearchLayoutView({ children }: SearchLayoutViewProps) {
-  const {
-    shouldShowMap,
-    shouldRenderMap,
-    toggleMap,
-    showMap,
-    hideMap,
-    isLoading,
-  } = useMapPreference();
+  const { shouldShowMap, shouldRenderMap, toggleMap, showMap, hideMap } =
+    useMapPreference();
 
   useKeyboardShortcuts([
     {
@@ -52,6 +46,7 @@ export default function SearchLayoutView({ children }: SearchLayoutViewProps) {
 
   return (
     <SearchMapUIProvider
+      toggleMap={toggleMap}
       showMap={showMap}
       hideMap={hideMap}
       shouldShowMap={shouldShowMap}
@@ -64,8 +59,6 @@ export default function SearchLayoutView({ children }: SearchLayoutViewProps) {
           <PersistentMapWrapper shouldRenderMap={shouldRenderMap} />
         }
         shouldShowMap={shouldShowMap}
-        onToggle={toggleMap}
-        isLoading={isLoading}
       >
         {children}
       </SearchViewToggle>

@@ -13,6 +13,26 @@ import { SearchResultsClient } from "@/components/search/SearchResultsClient";
 import { fetchMoreListings } from "@/app/search/actions";
 import type { ListingData } from "@/lib/data";
 import { getFilterSuggestions } from "@/app/actions/filter-suggestions";
+import type { SearchTransitionReason } from "@/contexts/SearchTransitionContext";
+
+type MockSearchTransitionState = {
+  isPending: boolean;
+  pendingReason: SearchTransitionReason | null;
+};
+
+const createTransitionState = (
+  overrides: Partial<MockSearchTransitionState> = {}
+): MockSearchTransitionState => ({
+  isPending: false,
+  pendingReason: null,
+  ...overrides,
+});
+
+const mockUseSearchParams = jest.fn(() => new URLSearchParams("q=test"));
+const mockUseSearchTransitionSafe = jest.fn<
+  MockSearchTransitionState | null,
+  []
+>(() => createTransitionState());
 
 // Mock fetchMoreListings server action
 jest.mock("@/app/search/actions", () => ({
@@ -21,6 +41,14 @@ jest.mock("@/app/search/actions", () => ({
 
 jest.mock("@/app/actions/filter-suggestions", () => ({
   getFilterSuggestions: jest.fn(async () => []),
+}));
+
+jest.mock("next/navigation", () => ({
+  useSearchParams: () => mockUseSearchParams(),
+}));
+
+jest.mock("@/contexts/SearchTransitionContext", () => ({
+  useSearchTransitionSafe: () => mockUseSearchTransitionSafe(),
 }));
 
 // Mock next/link
@@ -59,13 +87,6 @@ jest.mock("@/components/ZeroResultsSuggestions", () => {
   };
 });
 
-// Mock SuggestedSearches
-jest.mock("@/components/search/SuggestedSearches", () => {
-  return function MockSuggestedSearches() {
-    return <div data-testid="suggested-searches">Suggested Searches</div>;
-  };
-});
-
 // Mock TotalPriceToggle
 jest.mock("@/components/search/TotalPriceToggle", () => ({
   TotalPriceToggle: function MockTotalPriceToggle({
@@ -100,8 +121,10 @@ jest.mock("@/lib/search/split-stay", () => ({
 
 // Mock SaveSearchButton (imports next-auth which uses ESM exports)
 jest.mock("@/components/SaveSearchButton", () => {
-  return function MockSaveSearchButton() {
-    return <button data-testid="save-search-button">Save Search</button>;
+  return function MockSaveSearchButton({ label }: { label?: string }) {
+    return (
+      <button data-testid="save-search-button">{label ?? "Save Search"}</button>
+    );
   };
 });
 
@@ -169,6 +192,8 @@ const defaultProps = {
 describe("SearchResultsClient", () => {
   beforeEach(() => {
     jest.clearAllMocks();
+    mockUseSearchParams.mockReturnValue(new URLSearchParams("q=test"));
+    mockUseSearchTransitionSafe.mockReturnValue(createTransitionState());
     Object.keys(mockSessionStorage).forEach(
       (key) => delete mockSessionStorage[key]
     );
@@ -185,13 +210,6 @@ describe("SearchResultsClient", () => {
 
       expect(screen.getByTestId("listing-1")).toBeInTheDocument();
       expect(screen.getByTestId("listing-2")).toBeInTheDocument();
-    });
-
-    it("renders result count", () => {
-      render(<SearchResultsClient {...defaultProps} />);
-
-      const matches = screen.getAllByText("10 places in test");
-      expect(matches.length).toBeGreaterThanOrEqual(1);
     });
 
     it("keeps the save-search callout desktop-only", async () => {
@@ -218,6 +236,42 @@ describe("SearchResultsClient", () => {
       );
 
       expect(screen.getByText("No matches found")).toBeInTheDocument();
+    });
+
+    it("does not render browse-mode suggested searches anymore", () => {
+      render(
+        <SearchResultsClient {...defaultProps} browseMode={true} query="" />
+      );
+
+      expect(screen.queryByText(/popular areas/i)).not.toBeInTheDocument();
+      expect(
+        screen.queryByTestId("suggested-searches")
+      ).not.toBeInTheDocument();
+    });
+
+    it("renders zero-results recovery actions and applied filters", () => {
+      render(
+        <SearchResultsClient
+          {...defaultProps}
+          initialListings={[]}
+          initialNextCursor={null}
+          initialTotal={0}
+          searchParamsString="roomType=Private+Room&languages=te"
+          hasConfirmedZeroResults={true}
+        />
+      );
+
+      expect(
+        screen.getByRole("button", { name: /adjust filters/i })
+      ).toBeInTheDocument();
+      expect(
+        screen.getByRole("link", { name: /clear all filters/i })
+      ).toBeInTheDocument();
+      expect(screen.getByTestId("save-search-button")).toHaveTextContent(
+        "Save search for alerts"
+      );
+      expect(screen.getByText("Private Room")).toBeInTheDocument();
+      expect(screen.getByText("Telugu")).toBeInTheDocument();
     });
 
     it("renders Show more button when there is a next cursor", () => {
@@ -723,6 +777,158 @@ describe("SearchResultsClient", () => {
 
       resolvePromise!({
         items: [],
+        nextCursor: null,
+        hasNextPage: false,
+      });
+    });
+
+    it.each(["filter", "sort", "search-submit"] as const)(
+      "shows the Airbnb skeleton during %s transitions",
+      async (pendingReason) => {
+        let resolvePromise: (value: unknown) => void;
+        const pending = new Promise((resolve) => {
+          resolvePromise = resolve;
+        });
+        (global.fetch as jest.Mock)
+          .mockResolvedValueOnce({
+            ok: true,
+            json: async () => ({ savedIds: [] }),
+          })
+          .mockReturnValueOnce(pending);
+
+        const { rerender } = render(
+          <SearchResultsClient
+            {...defaultProps}
+            clientSideSearchEnabled={true}
+          />
+        );
+
+        mockUseSearchTransitionSafe.mockReturnValue(
+          createTransitionState({
+            isPending: true,
+            pendingReason,
+          })
+        );
+        mockUseSearchParams.mockReturnValue(
+          new URLSearchParams("q=test&minPrice=1200")
+        );
+
+        rerender(
+          <SearchResultsClient
+            {...defaultProps}
+            clientSideSearchEnabled={true}
+          />
+        );
+
+        await waitFor(() => {
+          expect(
+            screen.getByTestId("search-results-body-skeleton")
+          ).toBeInTheDocument();
+        });
+
+        resolvePromise!({
+          ok: true,
+          json: async () => ({
+            kind: "ok",
+            data: {
+              items: [createMockListing("3")],
+              total: 1,
+              nextCursor: null,
+            },
+            meta: {
+              queryHash: "next-query-hash",
+              backendSource: "v2",
+              responseVersion: "test-version",
+            },
+          }),
+        });
+
+        await waitFor(() => {
+          expect(
+            screen.queryByTestId("search-results-body-skeleton")
+          ).not.toBeInTheDocument();
+        });
+      }
+    );
+
+    it("does not replace cards with the Airbnb skeleton during map-pan fetches", async () => {
+      let resolvePromise: (value: unknown) => void;
+      const pending = new Promise((resolve) => {
+        resolvePromise = resolve;
+      });
+      (global.fetch as jest.Mock)
+        .mockResolvedValueOnce({
+          ok: true,
+          json: async () => ({ savedIds: [] }),
+        })
+        .mockReturnValueOnce(pending);
+
+      const { rerender } = render(
+        <SearchResultsClient {...defaultProps} clientSideSearchEnabled={true} />
+      );
+
+      mockUseSearchTransitionSafe.mockReturnValue(
+        createTransitionState({
+          isPending: true,
+          pendingReason: "map-pan",
+        })
+      );
+      mockUseSearchParams.mockReturnValue(
+        new URLSearchParams(
+          "q=test&minLat=37.7&maxLat=37.8&minLng=-122.5&maxLng=-122.4"
+        )
+      );
+
+      rerender(
+        <SearchResultsClient {...defaultProps} clientSideSearchEnabled={true} />
+      );
+
+      await waitFor(() => {
+        expect(
+          screen.queryByTestId("search-results-body-skeleton")
+        ).not.toBeInTheDocument();
+        expect(screen.getByTestId("listing-1")).toBeInTheDocument();
+      });
+
+      resolvePromise!({
+        ok: true,
+        json: async () => ({
+          kind: "ok",
+          data: {
+            items: [createMockListing("3")],
+            total: 1,
+            nextCursor: null,
+          },
+          meta: {
+            queryHash: "map-pan-query-hash",
+            backendSource: "v2",
+            responseVersion: "test-version",
+          },
+        }),
+      });
+    });
+
+    it("keeps load-more loading local without rendering the search skeleton", async () => {
+      const mockFetch = fetchMoreListings as jest.Mock;
+      let resolvePromise: (value: unknown) => void;
+      const pending = new Promise((resolve) => {
+        resolvePromise = resolve;
+      });
+      mockFetch.mockReturnValueOnce(pending);
+
+      render(<SearchResultsClient {...defaultProps} />);
+
+      fireEvent.click(screen.getByRole("button", { name: /show more/i }));
+
+      await waitFor(() => {
+        expect(screen.getByRole("button", { name: /loading/i })).toBeDisabled();
+        expect(
+          screen.queryByTestId("search-results-body-skeleton")
+        ).not.toBeInTheDocument();
+      });
+
+      resolvePromise!({
+        items: [createMockListing("3")],
         nextCursor: null,
         hasNextPage: false,
       });

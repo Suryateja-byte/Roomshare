@@ -37,8 +37,16 @@ jest.mock("@/components/ui/select", () => ({
       </div>
     );
   },
-  SelectTrigger: ({ children }: { children: React.ReactNode }) => (
-    <button data-testid="select-trigger">{children}</button>
+  SelectTrigger: ({
+    children,
+    ...props
+  }: {
+    children: React.ReactNode;
+    [key: string]: unknown;
+  }) => (
+    <button data-testid="select-trigger" {...props}>
+      {children}
+    </button>
   ),
   SelectContent: ({ children }: { children: React.ReactNode }) => (
     <div>{children}</div>
@@ -75,7 +83,9 @@ describe("SortSelect", () => {
 
   it("renders sort select with label", () => {
     render(<SortSelect currentSort="recommended" />);
-    expect(screen.getByText("Sort by:")).toBeInTheDocument();
+    expect(screen.getByTestId("desktop-sort-trigger")).toHaveTextContent(
+      "Recommended"
+    );
   });
 
   it("renders all sort options", () => {
@@ -93,6 +103,17 @@ describe("SortSelect", () => {
     // The component renders the current label in SelectValue
     const selectRoot = screen.getByTestId("select-root");
     expect(selectRoot).toHaveAttribute("data-value", "price_asc");
+    expect(screen.getByTestId("desktop-sort-trigger")).toHaveTextContent(
+      "Price: Low to High"
+    );
+  });
+
+  it("uses shortened desktop labels in toolbar variant", () => {
+    render(<SortSelect currentSort="price_asc" desktopVariant="toolbar" />);
+
+    expect(screen.getByTestId("desktop-sort-trigger")).toHaveTextContent(
+      "Price low"
+    );
   });
 
   it("navigates with sort param on change", async () => {
@@ -108,7 +129,7 @@ describe("SortSelect", () => {
 
     await userEvent.click(screen.getByTestId("select-item-recommended"));
 
-    expect(mockPush).toHaveBeenCalledWith("/search?");
+    expect(mockPush).toHaveBeenCalledWith("/search");
   });
 
   it("removes page param when changing sort", async () => {
