@@ -10,7 +10,11 @@
  */
 
 import { test, expect, tags } from "../helpers";
-import { expireSession, expectLoginRedirect } from "../helpers";
+import {
+  clearAuthCookies,
+  expireSession,
+  expectLoginRedirect,
+} from "../helpers";
 
 test.describe("Session Expiry: Resilience", () => {
   test.use({ storageState: "playwright/.auth/user.json" });
@@ -71,13 +75,7 @@ test.describe("Session Expiry: Resilience", () => {
     await expect(page).toHaveURL(/\/settings/, { timeout: 10000 });
 
     // Clear auth cookies and navigate to trigger server-side redirect
-    for (const cookie of [
-      "authjs.session-token",
-      "authjs.csrf-token",
-      "authjs.callback-url",
-    ]) {
-      await page.context().clearCookies({ name: cookie });
-    }
+    await clearAuthCookies(page);
     await page.goto("/settings", { waitUntil: "domcontentloaded" });
     await expectLoginRedirect(page);
 

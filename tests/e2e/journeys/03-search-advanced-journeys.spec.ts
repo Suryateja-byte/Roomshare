@@ -1172,32 +1172,27 @@ test.describe("30 Advanced Search Page Journeys", () => {
   // SECTION F: RESPONSIVE & MOBILE (4 journeys)
   // ═══════════════════════════════════════════════════
 
-  // ─────────────────────────────────────────────────
-  // J47: Tablet viewport layout (769px)
-  // ─────────────────────────────────────────────────
-  test(`${tags.mobile} J47: Tablet viewport (769px) shows appropriate layout`, async ({
-    browser,
-  }, testInfo) => {
-    // Mobile Chrome project uses mobile device emulation (user agent, DPR)
-    // which conflicts with tablet viewport testing — skip on mobile projects.
-    test.skip(
-      testInfo.project.name.includes("Mobile"),
-      "Tablet layout test not applicable on mobile device emulation"
-    );
-    test.slow();
-    // Create a fresh browser context with tablet viewport so useMediaQuery
-    // initializes at the correct breakpoint during page load — avoids the
-    // setViewportSize + React state batching race that caused CI flake.
-    const ctx = await browser.newContext({
-      viewport: { width: 769, height: 1024 },
-    });
-    const page = await ctx.newPage();
+  test.describe("J47 tablet viewport", () => {
+    test.use({ viewport: { width: 769, height: 1024 } });
 
-    try {
-      await page.goto(
-        `/search?minLat=${SF_BOUNDS.minLat}&maxLat=${SF_BOUNDS.maxLat}&minLng=${SF_BOUNDS.minLng}&maxLng=${SF_BOUNDS.maxLng}`,
-        { waitUntil: "load", timeout: 60_000 }
+    // ─────────────────────────────────────────────────
+    // J47: Tablet viewport layout (769px)
+    // ─────────────────────────────────────────────────
+    test(`${tags.mobile} J47: Tablet viewport (769px) shows appropriate layout`, async ({
+      page,
+      nav,
+    }, testInfo) => {
+      // Mobile Chrome project uses mobile device emulation (user agent, DPR)
+      // which conflicts with tablet viewport testing — skip on mobile projects.
+      test.skip(
+        testInfo.project.name.includes("Mobile"),
+        "Tablet layout test not applicable on mobile device emulation"
       );
+      test.slow();
+
+      // Keep the shared page fixture setup while still initializing at tablet size.
+      await nav.goToSearch({ bounds: SF_BOUNDS });
+      await page.waitForLoadState("load");
 
       // Wait for hydration — the desktop search-results-container should be visible at 769px
       await page
@@ -1219,9 +1214,7 @@ test.describe("30 Advanced Search Page Journeys", () => {
           .catch(() => false);
         expect(cardCount > 0 || hasEmpty).toBeTruthy();
       }).toPass({ timeout: 30_000 });
-    } finally {
-      await ctx.close();
-    }
+    });
   });
 
   // ─────────────────────────────────────────────────

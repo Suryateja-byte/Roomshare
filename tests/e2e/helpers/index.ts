@@ -127,6 +127,7 @@ export {
 
 // Session expiry helpers for mid-session auth token expiry testing
 export {
+  clearAuthCookies,
   expireSession,
   mockApi401,
   triggerSessionPoll,

@@ -9,6 +9,7 @@ import {
   useRef,
   useState,
 } from "react";
+import { flushSync } from "react-dom";
 import { useRouter, useSearchParams } from "next/navigation";
 import { Search } from "lucide-react";
 import { toast } from "sonner";
@@ -97,6 +98,8 @@ export const DesktopHeaderSearch = forwardRef<
   const transitionContext = useSearchTransitionSafe();
   const { recentSearches } = useRecentSearches();
   const containerRef = useRef<HTMLDivElement>(null);
+  const minPriceInputRef = useRef<HTMLInputElement | null>(null);
+  const maxPriceInputRef = useRef<HTMLInputElement | null>(null);
   const searchParamsString = searchParams.toString();
   const intentState = useMemo(
     () => readSearchIntentState(new URLSearchParams(searchParamsString)),
@@ -122,6 +125,18 @@ export const DesktopHeaderSearch = forwardRef<
     );
     return parsed !== undefined ? String(parsed) : "";
   });
+
+  const handleMinPriceValueChange = useCallback((value: string) => {
+    flushSync(() => {
+      setMinPrice(value);
+    });
+  }, []);
+
+  const handleMaxPriceValueChange = useCallback((value: string) => {
+    flushSync(() => {
+      setMaxPrice(value);
+    });
+  }, []);
 
   const locationFallbackItems = useMemo(
     () =>
@@ -301,8 +316,11 @@ export const DesktopHeaderSearch = forwardRef<
         }
       );
 
-      let finalMinPrice = minPrice ? parseFloat(minPrice) : null;
-      let finalMaxPrice = maxPrice ? parseFloat(maxPrice) : null;
+      const liveMinPrice = minPriceInputRef.current?.value ?? minPrice;
+      const liveMaxPrice = maxPriceInputRef.current?.value ?? maxPrice;
+
+      let finalMinPrice = liveMinPrice ? parseFloat(liveMinPrice) : null;
+      let finalMaxPrice = liveMaxPrice ? parseFloat(liveMaxPrice) : null;
 
       if (finalMinPrice !== null && !Number.isFinite(finalMinPrice)) {
         finalMinPrice = null;
@@ -464,6 +482,7 @@ export const DesktopHeaderSearch = forwardRef<
               <div className="flex min-w-0 flex-1 items-center gap-1 rounded-full bg-surface-container-high px-3 py-2">
                 <span className="text-on-surface-variant">$</span>
                 <input
+                  ref={minPriceInputRef}
                   id={MIN_BUDGET_INPUT_ID}
                   aria-label="Minimum budget"
                   type="number"
@@ -471,7 +490,15 @@ export const DesktopHeaderSearch = forwardRef<
                   min="0"
                   step="50"
                   value={minPrice}
-                  onChange={(event) => setMinPrice(event.target.value)}
+                  onChange={(event) =>
+                    handleMinPriceValueChange(event.currentTarget.value)
+                  }
+                  onInput={(event) =>
+                    handleMinPriceValueChange(event.currentTarget.value)
+                  }
+                  onBlur={(event) =>
+                    handleMinPriceValueChange(event.currentTarget.value)
+                  }
                   placeholder="Min"
                   className="w-full bg-transparent border-none p-0 text-sm text-on-surface placeholder:text-on-surface-variant focus:outline-none focus:ring-0 [-moz-appearance:textfield] [&::-webkit-inner-spin-button]:appearance-none [&::-webkit-outer-spin-button]:appearance-none"
                 />
@@ -480,6 +507,7 @@ export const DesktopHeaderSearch = forwardRef<
               <div className="flex min-w-0 flex-1 items-center gap-1 rounded-full bg-surface-container-high px-3 py-2">
                 <span className="text-on-surface-variant">$</span>
                 <input
+                  ref={maxPriceInputRef}
                   id={MAX_BUDGET_INPUT_ID}
                   aria-label="Maximum budget"
                   type="number"
@@ -487,7 +515,15 @@ export const DesktopHeaderSearch = forwardRef<
                   min="0"
                   step="50"
                   value={maxPrice}
-                  onChange={(event) => setMaxPrice(event.target.value)}
+                  onChange={(event) =>
+                    handleMaxPriceValueChange(event.currentTarget.value)
+                  }
+                  onInput={(event) =>
+                    handleMaxPriceValueChange(event.currentTarget.value)
+                  }
+                  onBlur={(event) =>
+                    handleMaxPriceValueChange(event.currentTarget.value)
+                  }
                   placeholder="Max"
                   className="w-full bg-transparent border-none p-0 text-sm text-on-surface placeholder:text-on-surface-variant focus:outline-none focus:ring-0 [-moz-appearance:textfield] [&::-webkit-inner-spin-button]:appearance-none [&::-webkit-outer-spin-button]:appearance-none"
                 />

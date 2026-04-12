@@ -67,6 +67,7 @@ function buildExactCloneKey(
     normalizeCloneTitle(listing.title),
     listing.price,
     listing.availableSlots,
+    listing.tier ?? "",
     listing.location.lat.toFixed(precision),
     listing.location.lng.toFixed(precision),
   ].join("|");
