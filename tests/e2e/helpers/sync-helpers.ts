@@ -419,7 +419,7 @@ export async function zoomToExpandClusters(page: Page): Promise<boolean> {
         }
         setProgrammatic(true);
         map.once("idle", () => resolve(true));
-        const opts: any = { zoom: 14 };
+        const opts: any = { zoom: 15 };
         if (center) opts.center = [center.lng, center.lat];
         map.jumpTo(opts);
         setTimeout(() => resolve(true), 10000);

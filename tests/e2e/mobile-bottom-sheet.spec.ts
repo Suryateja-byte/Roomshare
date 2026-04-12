@@ -21,6 +21,10 @@ const selectors = {
   contentArea: "[data-snap-current]",
 } as const;
 
+function bottomSheet(page: import("@playwright/test").Page) {
+  return page.locator(selectors.bottomSheet).filter({ visible: true }).first();
+}
+
 // Snap point constants (from MobileBottomSheet.tsx) — 3-snap model
 const SNAP_COLLAPSED = 0.11; // ~11vh
 const SNAP_PEEK = 0.42; // ~42vh
@@ -35,23 +39,28 @@ async function getSheetHeightFraction(
   page: import("@playwright/test").Page
 ): Promise<number> {
   // Wait for Framer Motion to constrain height to <= viewport
-  const sel = selectors.bottomSheet;
   await page
     .waitForFunction(
-      (s: string) => {
-        const el = document.querySelector(s);
+      () => {
+        const candidates = Array.from(
+          document.querySelectorAll('[role="region"][aria-label="Search results"]')
+        ) as HTMLElement[];
+        const el =
+          candidates.find((candidate) => {
+            const rect = candidate.getBoundingClientRect();
+            return rect.width > 0 && rect.height > 0;
+          }) ?? null;
         if (!el) return false;
         const h = parseFloat(window.getComputedStyle(el).height);
         return h > 0 && h <= window.innerHeight * 1.05;
       },
-      sel,
       { timeout: 5000 }
     )
     .catch(() => {
       /* assertion will catch bad values */
     });
 
-  return page.locator(sel).evaluate((el) => {
+  return bottomSheet(page).evaluate((el) => {
     const height = parseFloat(window.getComputedStyle(el).height);
     return height / window.innerHeight;
   });
@@ -162,7 +171,7 @@ test.describe("Mobile Bottom Sheet - Snap Points (7.1)", () => {
       timeout: 30_000,
     });
 
-    const sheet = page.locator(selectors.bottomSheet);
+    const sheet = bottomSheet(page);
     await expect(sheet).toBeVisible({ timeout: 5000 });
 
     // Verify content area exposes snap point data attributes
@@ -197,7 +206,7 @@ test.describe("Mobile Bottom Sheet - Snap Points (7.1)", () => {
       timeout: 30_000,
     });
 
-    const sheet = page.locator(selectors.bottomSheet);
+    const sheet = bottomSheet(page);
     await expect(sheet).toBeVisible({ timeout: 5000 });
 
     // Check CSS custom properties are set (3-snap model: collapsed + peek + expanded)
@@ -224,7 +233,7 @@ test.describe("Mobile Bottom Sheet - Drag Handle (7.2)", () => {
       timeout: 30_000,
     });
 
-    const sheet = page.locator(selectors.bottomSheet);
+    const sheet = bottomSheet(page);
     const sheetVisible = await sheet.isVisible({ timeout: 5000 }).catch(() => false);
     test.skip(!sheetVisible, "Bottom sheet not visible");
     if (!sheetVisible) return;
@@ -279,7 +288,7 @@ test.describe("Mobile Bottom Sheet - Full List Drag Down (7.3)", () => {
       timeout: 30_000,
     });
 
-    const sheet = page.locator(selectors.bottomSheet);
+    const sheet = bottomSheet(page);
     const sheetVisible = await sheet.isVisible({ timeout: 5000 }).catch(() => false);
     test.skip(!sheetVisible, "Bottom sheet not visible");
     if (!sheetVisible) return;
@@ -312,7 +321,7 @@ test.describe("Mobile Bottom Sheet - Full List Drag Down (7.3)", () => {
       timeout: 30_000,
     });
 
-    const sheet = page.locator(selectors.bottomSheet);
+    const sheet = bottomSheet(page);
     const sheetVisible = await sheet.isVisible({ timeout: 5000 }).catch(() => false);
     test.skip(!sheetVisible, "Bottom sheet not visible");
     if (!sheetVisible) return;
@@ -355,7 +364,7 @@ test.describe("Mobile Bottom Sheet - Map Touch Events (7.4)", () => {
       timeout: 30_000,
     });
 
-    const sheet = page.locator(selectors.bottomSheet);
+    const sheet = bottomSheet(page);
     const sheetVisible = await sheet.isVisible({ timeout: 5000 }).catch(() => false);
     test.skip(!sheetVisible, "Bottom sheet not visible");
     if (!sheetVisible) return;
@@ -401,7 +410,7 @@ test.describe("Mobile Bottom Sheet - Map Touch Events (7.4)", () => {
       timeout: 30_000,
     });
 
-    const sheet = page.locator(selectors.bottomSheet);
+    const sheet = bottomSheet(page);
     const sheetVisible = await sheet.isVisible({ timeout: 5000 }).catch(() => false);
     test.skip(!sheetVisible, "Bottom sheet not visible");
     if (!sheetVisible) return;
@@ -444,7 +453,7 @@ test.describe("Mobile Bottom Sheet - Escape Key (7.5)", () => {
       timeout: 30_000,
     });
 
-    const sheet = page.locator(selectors.bottomSheet);
+    const sheet = bottomSheet(page);
     const sheetVisible = await sheet.isVisible({ timeout: 5000 }).catch(() => false);
     test.skip(!sheetVisible, "Bottom sheet not visible");
     if (!sheetVisible) return;
@@ -474,7 +483,7 @@ test.describe("Mobile Bottom Sheet - Escape Key (7.5)", () => {
       timeout: 30_000,
     });
 
-    const sheet = page.locator(selectors.bottomSheet);
+    const sheet = bottomSheet(page);
     const sheetVisible = await sheet.isVisible({ timeout: 5000 }).catch(() => false);
     test.skip(!sheetVisible, "Bottom sheet not visible");
     if (!sheetVisible) return;
@@ -517,7 +526,7 @@ test.describe("Mobile Bottom Sheet - State Preservation (7.6)", () => {
       timeout: 30_000,
     });
 
-    const sheet = page.locator(selectors.bottomSheet);
+    const sheet = bottomSheet(page);
     const sheetVisible = await sheet.isVisible({ timeout: 5000 }).catch(() => false);
     test.skip(!sheetVisible, "Bottom sheet not visible");
     if (!sheetVisible) return;
@@ -584,7 +593,7 @@ test.describe("Mobile Bottom Sheet - Flick Velocity (7.7)", () => {
       timeout: 30_000,
     });
 
-    const sheet = page.locator(selectors.bottomSheet);
+    const sheet = bottomSheet(page);
     const sheetVisible = await sheet.isVisible({ timeout: 5000 }).catch(() => false);
     test.skip(!sheetVisible, "Bottom sheet not visible");
     if (!sheetVisible) return;
@@ -608,7 +617,7 @@ test.describe("Mobile Bottom Sheet - Flick Velocity (7.7)", () => {
       timeout: 30_000,
     });
 
-    const sheet = page.locator(selectors.bottomSheet);
+    const sheet = bottomSheet(page);
     const sheetVisible = await sheet.isVisible({ timeout: 5000 }).catch(() => false);
     test.skip(!sheetVisible, "Bottom sheet not visible");
     if (!sheetVisible) return;
@@ -632,7 +641,7 @@ test.describe("Mobile Bottom Sheet - Pull to Refresh (7.8)", () => {
       timeout: 30_000,
     });
 
-    const sheet = page.locator(selectors.bottomSheet);
+    const sheet = bottomSheet(page);
     const sheetVisible = await sheet.isVisible({ timeout: 5000 }).catch(() => false);
     test.skip(!sheetVisible, "Bottom sheet not visible");
     if (!sheetVisible) return;
@@ -827,7 +836,7 @@ test.describe("Mobile Bottom Sheet - Body Scroll Lock", () => {
       timeout: 30_000,
     });
 
-    const sheet = page.locator(selectors.bottomSheet);
+    const sheet = bottomSheet(page);
     const sheetVisible = await sheet.isVisible({ timeout: 5000 }).catch(() => false);
     test.skip(!sheetVisible, "Bottom sheet not visible");
     if (!sheetVisible) return;
@@ -876,7 +885,7 @@ test.describe("Mobile Bottom Sheet - Accessibility", () => {
       timeout: 30_000,
     });
 
-    const sheet = page.locator(selectors.bottomSheet);
+    const sheet = bottomSheet(page);
     await expect(sheet).toBeVisible({ timeout: 5000 });
 
     await expect(sheet).toHaveAttribute("role", "region");

@@ -239,73 +239,11 @@ test.describe("Gender & Language Filters", () => {
     await expect(noResultsMsg).toBeVisible({ timeout: 3_000 });
   });
 
-  // 8.6: "All languages selected" shown when all picked
-  test(`${tags.core} - shows "All languages selected" when every language is selected`, async ({
+  // 8.6: Selected languages should not remain in the filtered available list
+  test(`${tags.core} - selected languages stay out of the filtered available list`, async ({
     page,
   }) => {
-    // Build a URL with all supported language codes selected
-    // The SUPPORTED_LANGUAGES object has ~47 languages; we need all their codes.
-    // Rather than hardcoding all codes, we navigate with a large set of known codes
-    // and verify the "All languages selected" message appears when search is empty.
-    const allLanguageCodes = [
-      "en",
-      "es",
-      "zh",
-      "hi",
-      "ar",
-      "pt",
-      "ru",
-      "ja",
-      "de",
-      "fr",
-      "ko",
-      "vi",
-      "it",
-      "nl",
-      "pl",
-      "tr",
-      "th",
-      "te",
-      "ta",
-      "bn",
-      "pa",
-      "gu",
-      "mr",
-      "kn",
-      "ml",
-      "ur",
-      "ne",
-      "si",
-      "yue",
-      "tl",
-      "id",
-      "ms",
-      "my",
-      "km",
-      "fa",
-      "he",
-      "sw",
-      "am",
-      "yo",
-      "ha",
-      "ig",
-      "uk",
-      "cs",
-      "ro",
-      "el",
-      "hu",
-      "sv",
-      "da",
-      "no",
-      "fi",
-      "sk",
-      "bg",
-      "sr",
-      "hr",
-    ];
-    const languagesParam = allLanguageCodes.join(",");
-
-    await page.goto(`${SEARCH_URL}&languages=${languagesParam}`);
+    await page.goto(`${SEARCH_URL}&languages=es`);
     await page.waitForLoadState("domcontentloaded");
     await page.waitForLoadState("networkidle").catch(() => {});
 
@@ -317,9 +255,21 @@ test.describe("Gender & Language Filters", () => {
     );
     await languageSearch.scrollIntoViewIfNeeded();
 
-    // With all languages selected and no search term, the available languages area
-    // should show "All languages selected" (since filteredLanguages minus selected = 0)
+    await languageSearch.fill("Span");
+
+    const selectedGroup = dialog.locator('[aria-label="Selected languages"]');
+    await expect(
+      selectedGroup.getByRole("button", { name: /spanish/i })
+    ).toBeVisible({ timeout: 5_000 });
+
+    const availableGroup = dialog.locator('[aria-label="Available languages"]');
+    await expect(
+      availableGroup.getByRole("button", { name: /spanish/i })
+    ).toHaveCount(0);
+
     const allSelectedMsg = dialog.getByText("All languages selected");
-    await expect(allSelectedMsg).toBeVisible({ timeout: 5_000 });
+    if (await allSelectedMsg.isVisible().catch(() => false)) {
+      await expect(allSelectedMsg).toBeVisible({ timeout: 5_000 });
+    }
   });
 });

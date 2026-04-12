@@ -161,17 +161,14 @@ test.describe("Filter + Pagination Interactions", () => {
     // Use the data-listing-id attribute rendered by ListingCard
     const cards = scopedCards(page);
     const cardCount = await cards.count();
-    const listingIds = new Set<string>();
-
-    for (let i = 0; i < cardCount; i++) {
-      const listingId = await cards.nth(i).getAttribute("data-listing-id");
-      if (listingId) {
-        listingIds.add(listingId);
-      }
-    }
+    const listingIds = await cards.evaluateAll((nodes) =>
+      nodes
+        .map((node) => node.getAttribute("data-listing-id"))
+        .filter((id): id is string => Boolean(id))
+    );
 
     // Number of unique IDs should equal total cards (no duplicates)
-    expect(listingIds.size).toBe(cardCount);
+    expect(new Set(listingIds).size).toBe(cardCount);
   });
 
   test(`${tags.filter} Rapid Load More clicks prevented by isLoadingMore guard`, async ({

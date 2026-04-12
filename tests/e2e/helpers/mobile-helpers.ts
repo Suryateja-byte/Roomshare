@@ -53,6 +53,10 @@ export const mobileSelectors = {
   mobileResults: '[data-testid="mobile-search-results-container"]',
 } as const;
 
+function bottomSheetLocator(page: Page) {
+  return page.locator(mobileSelectors.bottomSheet).filter({ visible: true }).first();
+}
+
 // ---------------------------------------------------------------------------
 // Snap point constants (mirroring src/lib/mobile-layout.ts)
 // ---------------------------------------------------------------------------
@@ -81,25 +85,26 @@ export async function getSheetSnapIndex(page: Page): Promise<number> {
  * Waits for framer-motion spring animation to settle (height <= viewport).
  */
 export async function getSheetHeightFraction(page: Page): Promise<number> {
-  const sel = mobileSelectors.bottomSheet;
-
   // Wait for framer-motion to constrain height to within viewport bounds
   await page
-    .waitForFunction(
-      (s: string) => {
-        const el = document.querySelector(s);
-        if (!el) return false;
-        const h = parseFloat(window.getComputedStyle(el).height);
-        return h > 0 && h <= window.innerHeight * 1.05;
-      },
-      sel,
-      { timeout: 5000 }
-    )
+    .waitForFunction(() => {
+      const candidates = Array.from(
+        document.querySelectorAll('[role="region"][aria-label="Search results"]')
+      ) as HTMLElement[];
+      const el =
+        candidates.find((candidate) => {
+          const rect = candidate.getBoundingClientRect();
+          return rect.width > 0 && rect.height > 0;
+        }) ?? null;
+      if (!el) return false;
+      const h = parseFloat(window.getComputedStyle(el).height);
+      return h > 0 && h <= window.innerHeight * 1.05;
+    }, { timeout: 5000 })
     .catch(() => {
       /* assertion will catch bad values */
     });
 
-  return page.locator(sel).evaluate((el) => {
+  return bottomSheetLocator(page).evaluate((el) => {
     const height = parseFloat(window.getComputedStyle(el).height);
     return height / window.innerHeight;
   });
@@ -187,11 +192,17 @@ export async function ensureMobileResultsVisible(
  * Falls back to a short timeout if the sheet element isn't found.
  */
 export async function waitForSheetAnimation(page: Page): Promise<void> {
-  const sel = mobileSelectors.bottomSheet;
   try {
     await page.waitForFunction(
-      (s: string) => {
-        const el = document.querySelector(s);
+      () => {
+        const candidates = Array.from(
+          document.querySelectorAll('[role="region"][aria-label="Search results"]')
+        ) as HTMLElement[];
+        const el =
+          candidates.find((candidate) => {
+            const rect = candidate.getBoundingClientRect();
+            return rect.width > 0 && rect.height > 0;
+          }) ?? null;
         if (!el) return true; // nothing to wait for
         const w = window as any;
         const prev = w.__sheetAnimH as number | undefined;
@@ -200,7 +211,6 @@ export async function waitForSheetAnimation(page: Page): Promise<void> {
         if (prev === undefined) return false; // need at least 2 samples
         return Math.abs(curr - prev) < 2; // settled when delta < 2px
       },
-      sel,
       { timeout: 5000, polling: 100 }
     );
   } catch {
@@ -270,7 +280,7 @@ export async function waitForMobileSheet(
   await waitForLayoutStable(page);
 
   // Check if bottom sheet is visible
-  const sheet = page.locator(mobileSelectors.bottomSheet);
+  const sheet = bottomSheetLocator(page);
   return sheet.isVisible({ timeout: 5000 }).catch(() => false);
 }
 

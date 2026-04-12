@@ -40,6 +40,13 @@ test.describe("Amenities Filter", () => {
     test.slow();
   });
 
+  function amenityValues(page: import("@playwright/test").Page): string[] {
+    return new URL(page.url(), "http://localhost")
+      .searchParams.getAll("amenities")
+      .flatMap((value) => value.split(","))
+      .filter(Boolean);
+  }
+
   // 1. Select amenity -> URL gets amenities param
   test(`${tags.core} - selecting an amenity and applying updates URL`, async ({
     page,
@@ -63,13 +70,7 @@ test.describe("Amenities Filter", () => {
     // URL should have amenities=Wifi
     await expect
       .poll(
-        () => {
-          const amenities = new URL(
-            page.url(),
-            "http://localhost"
-          ).searchParams.get("amenities");
-          return amenities !== null && amenities.includes("Wifi");
-        },
+        () => amenityValues(page).includes("Wifi"),
         { timeout: 30_000, message: 'URL param "amenities" to contain "Wifi"' }
       )
       .toBe(true);
@@ -94,15 +95,8 @@ test.describe("Amenities Filter", () => {
     await expect
       .poll(
         () => {
-          const amenities = new URL(
-            page.url(),
-            "http://localhost"
-          ).searchParams.get("amenities");
-          return (
-            amenities !== null &&
-            amenities.includes("Wifi") &&
-            amenities.includes("Parking")
-          );
+          const amenities = amenityValues(page);
+          return amenities.includes("Wifi") && amenities.includes("Parking");
         },
         {
           timeout: 30_000,
@@ -143,13 +137,7 @@ test.describe("Amenities Filter", () => {
     // URL should have Parking but not Wifi
     await expect
       .poll(
-        () => {
-          const amenities =
-            new URL(page.url(), "http://localhost").searchParams.get(
-              "amenities"
-            ) ?? "";
-          return !amenities.includes("Wifi");
-        },
+        () => !amenityValues(page).includes("Wifi"),
         {
           timeout: 30_000,
           message: 'URL param "amenities" to not contain "Wifi"',

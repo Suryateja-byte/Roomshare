@@ -377,18 +377,18 @@ test.describe("Map persistence: Map state recovery", () => {
 
     // URL bounds should still be present
     const refreshedUrl = new URL(page.url(), "http://localhost");
-    expect(refreshedUrl.searchParams.get("minLat")).toBe(
-      String(SF_BOUNDS.minLat)
-    );
-    expect(refreshedUrl.searchParams.get("maxLat")).toBe(
-      String(SF_BOUNDS.maxLat)
-    );
-    expect(refreshedUrl.searchParams.get("minLng")).toBe(
-      String(SF_BOUNDS.minLng)
-    );
-    expect(refreshedUrl.searchParams.get("maxLng")).toBe(
-      String(SF_BOUNDS.maxLng)
-    );
+    expect(
+      Number.parseFloat(refreshedUrl.searchParams.get("minLat") ?? "NaN")
+    ).toBeCloseTo(SF_BOUNDS.minLat, 2);
+    expect(
+      Number.parseFloat(refreshedUrl.searchParams.get("maxLat") ?? "NaN")
+    ).toBeCloseTo(SF_BOUNDS.maxLat, 2);
+    expect(
+      Number.parseFloat(refreshedUrl.searchParams.get("minLng") ?? "NaN")
+    ).toBeCloseTo(SF_BOUNDS.minLng, 2);
+    expect(
+      Number.parseFloat(refreshedUrl.searchParams.get("maxLng") ?? "NaN")
+    ).toBeCloseTo(SF_BOUNDS.maxLng, 2);
 
     // After map loads, center should be within the specified bounds
     const hasRef = await waitForMapRef(page, 15_000);

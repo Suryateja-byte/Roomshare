@@ -213,7 +213,7 @@ async function zoomToExpandClusters(page: Page): Promise<boolean> {
         });
 
         // jumpTo with center on a known listing location
-        const jumpOptions: any = { zoom: 14 };
+        const jumpOptions: any = { zoom: 15 };
         if (center) {
           jumpOptions.center = [center.lng, center.lat];
         }
@@ -823,11 +823,10 @@ test.describe("Map Marker Interactions", () => {
       expect(highlightCountAfter).toBe(0);
 
       const activeElementListingId = await page.evaluate(() => {
-        return (
-          (document.activeElement as HTMLElement | null)?.getAttribute(
-            "data-listing-id"
-          ) ?? null
-        );
+        const active = document.activeElement as HTMLElement | null;
+        return active?.closest("[data-listing-id]")?.getAttribute(
+          "data-listing-id"
+        ) ?? null;
       });
       expect(activeElementListingId).toBe(listingId);
     });

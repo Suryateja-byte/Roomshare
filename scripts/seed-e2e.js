@@ -908,14 +908,14 @@ async function main() {
       ])
     ),
   };
-  const testResultsDir = path.resolve(__dirname, '../test-results');
-  fs.mkdirSync(testResultsDir, { recursive: true });
+  const seedManifestDir = path.resolve(__dirname, '../playwright/.cache');
+  fs.mkdirSync(seedManifestDir, { recursive: true });
   fs.writeFileSync(
-    path.join(testResultsDir, 'e2e-seed.json'),
+    path.join(seedManifestDir, 'e2e-seed.json'),
     JSON.stringify(seedManifest, null, 2)
   );
   console.log(
-    `  ✓ E2E seed manifest written: ${path.join(testResultsDir, 'e2e-seed.json')}`
+    `  ✓ E2E seed manifest written: ${path.join(seedManifestDir, 'e2e-seed.json')}`
   );
 
   console.log('✅ E2E seed complete.');

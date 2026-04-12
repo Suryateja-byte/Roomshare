@@ -33,6 +33,53 @@ async function waitForPageReady(
   }
 }
 
+async function getSearchShellQueryHash(page: Page): Promise<string | null> {
+  return page
+    .locator(
+      '[data-testid="search-shell"], [data-search-query-hash], [data-query-hash]'
+    )
+    .first()
+    .getAttribute("data-search-query-hash")
+    .catch(async () => {
+      const shell = page
+        .locator(
+          '[data-testid="search-shell"], [data-search-query-hash], [data-query-hash]'
+        )
+        .first();
+      return (
+        (await shell.getAttribute("data-query-hash").catch(() => null)) ?? null
+      );
+    });
+}
+
+async function waitForSearchTransition(
+  page: Page,
+  previousUrl: string,
+  previousQueryHash: string | null,
+  timeout: number
+): Promise<boolean> {
+  return page
+    .waitForFunction(
+      ({ prevUrl, prevHash }) => {
+        const currentUrl = window.location.href;
+        const onSearchPage = window.location.pathname.startsWith("/search");
+        const shell = document.querySelector(
+          '[data-testid="search-shell"], [data-search-query-hash], [data-query-hash]'
+        );
+        const currentHash =
+          shell?.getAttribute("data-search-query-hash") ??
+          shell?.getAttribute("data-query-hash") ??
+          null;
+
+        return onSearchPage && (currentUrl !== prevUrl || currentHash !== prevHash);
+      },
+      { prevUrl: previousUrl, prevHash: previousQueryHash },
+      { timeout }
+    )
+    .then(() => true)
+    .catch(() => false);
+}
+
 /**
  * Check whether the page was redirected to /login (auth expired).
  * Returns true if we are on the intended page, false if redirected to login.
@@ -228,6 +275,7 @@ export function navigationHelpers(page: Page) {
      */
     async search(location: string) {
       const initialUrl = page.url();
+      const initialQueryHash = await getSearchShellQueryHash(page);
       const searchInput = page
         .locator(
           [
@@ -269,32 +317,24 @@ export function navigationHelpers(page: Page) {
 
       await searchInput.press("Enter").catch(() => {});
 
-      const navigated = await (initialUrl.includes("/search")
-        ? page.waitForFunction(
-            (previousUrl) => window.location.href !== previousUrl,
-            initialUrl,
-            {
-              timeout: 5_000,
-            }
-          )
-        : page.waitForURL(/\/search/, { timeout: 5_000 }))
-        .then(() => true)
-        .catch(() => false);
+      const navigated = await waitForSearchTransition(
+        page,
+        initialUrl,
+        initialQueryHash,
+        5_000
+      );
 
       if (!navigated) {
         await searchButton.click();
-        if (initialUrl.includes("/search")) {
-          await page.waitForFunction(
-            (previousUrl) => window.location.href !== previousUrl,
-            initialUrl,
-            {
-              timeout: timeouts.navigation,
-            }
-          );
-        } else {
-          await page.waitForURL(/\/search/, { timeout: timeouts.navigation });
-        }
+        await waitForSearchTransition(
+          page,
+          initialUrl,
+          initialQueryHash,
+          timeouts.navigation
+        );
       }
+
+      await waitForPageReady(page, { selector: "main" });
     },
 
     /**

@@ -65,6 +65,13 @@ function isBenignError(msg: string): boolean {
   return BENIGN_ERROR_PATTERNS.some((p) => lower.includes(p.toLowerCase()));
 }
 
+async function reloadViaGoto(page: import("@playwright/test").Page) {
+  await page.goto(page.url(), {
+    timeout: timeouts.navigation,
+    waitUntil: "domcontentloaded",
+  });
+}
+
 test.beforeEach(async () => {
   test.slow();
 });
@@ -376,7 +383,7 @@ test.describe("Group 2: Client-Side Error Recovery", () => {
       await tryAgainButton.click();
     } else {
       // Fallback: full page reload
-      await page.reload();
+      await reloadViaGoto(page);
     }
 
     // After recovery, results should be visible again
@@ -863,7 +870,7 @@ test.describe("Group 5: Network Resilience", () => {
     await network.goOnline();
 
     // Reload the page to verify recovery
-    await page.reload({ timeout: timeouts.navigation });
+    await reloadViaGoto(page);
     await page.waitForLoadState("domcontentloaded");
 
     // Results should be visible again after network recovery
@@ -1252,7 +1259,7 @@ test.describe("Group 8: Console Error Monitoring", () => {
     await page.unrouteAll();
 
     // Reload to recover
-    await page.reload({ timeout: timeouts.navigation });
+    await reloadViaGoto(page);
     await page.waitForLoadState("domcontentloaded");
     await page.waitForLoadState("domcontentloaded").catch(() => {});
 

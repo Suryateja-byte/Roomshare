@@ -101,7 +101,10 @@ test.describe("Mobile UX — Bottom Sheet (4.1)", () => {
     });
 
     // The bottom sheet should render with role="region"
-    const sheet = page.locator('[role="region"][aria-label="Search results"]');
+    const sheet = page
+      .locator('[role="region"][aria-label="Search results"]')
+      .filter({ visible: true })
+      .first();
     // If the sheet is visible, verify it
     const sheetVisible = await sheet
       .isVisible({ timeout: 5000 })
@@ -139,7 +142,10 @@ test.describe("Mobile UX — Bottom Sheet (4.1)", () => {
       timeout: 30_000,
     });
 
-    const sheet = page.locator('[role="region"][aria-label="Search results"]');
+    const sheet = page
+      .locator('[role="region"][aria-label="Search results"]')
+      .filter({ visible: true })
+      .first();
     const sheetVisible = await sheet.isVisible({ timeout: 5000 }).catch(() => false);
     test.skip(!sheetVisible, "Bottom sheet not visible");
     if (!sheetVisible) return;
@@ -169,7 +175,10 @@ test.describe("Mobile UX — Bottom Sheet (4.1)", () => {
       timeout: 30_000,
     });
 
-    const sheet = page.locator('[role="region"][aria-label="Search results"]');
+    const sheet = page
+      .locator('[role="region"][aria-label="Search results"]')
+      .filter({ visible: true })
+      .first();
     const sheetVisible = await sheet.isVisible({ timeout: 5000 }).catch(() => false);
     test.skip(!sheetVisible, "Bottom sheet not visible");
     if (!sheetVisible) return;
@@ -208,15 +217,24 @@ test.describe("Mobile UX — Floating Map Button (4.2)", () => {
     });
 
     await page.waitForLoadState("networkidle").catch(() => {});
-    const listBtn = page.locator('button[aria-label="Show list"]');
-    await expect(listBtn).toBeVisible({ timeout: 5_000 });
-    await listBtn.click();
 
-    const mapBtn = page.locator('button[aria-label="Show map"]');
-    await expect(mapBtn).toBeVisible({ timeout: 5_000 });
+    const showListBtn = page.locator('button[aria-label="Show list"]').first();
+    const showMapBtn = page.locator('button[aria-label="Show map"]').first();
+    const startedInMapMode = await showListBtn.isVisible().catch(() => false);
 
-    await mapBtn.click();
-    await expect(listBtn).toBeVisible({ timeout: 5_000 });
+    if (startedInMapMode) {
+      await showListBtn.click();
+      await expect(showMapBtn).toBeVisible({ timeout: 5_000 });
+      await showMapBtn.click();
+      await expect(showListBtn).toBeVisible({ timeout: 5_000 });
+      return;
+    }
+
+    await expect(showMapBtn).toBeVisible({ timeout: 5_000 });
+    await showMapBtn.click();
+    await expect(showListBtn).toBeVisible({ timeout: 5_000 });
+    await showListBtn.click();
+    await expect(showMapBtn).toBeVisible({ timeout: 5_000 });
   });
 
   test("floating button has correct positioning classes", async ({ page }) => {
@@ -269,7 +287,10 @@ test.describe("Mobile UX — Accessibility", () => {
     expect(toggleCount).toBeGreaterThanOrEqual(1);
 
     // Bottom sheet should have role and aria-label if visible
-    const sheet = page.locator('[role="region"][aria-label="Search results"]');
+    const sheet = page
+      .locator('[role="region"][aria-label="Search results"]')
+      .filter({ visible: true })
+      .first();
     if (await sheet.isVisible().catch(() => false)) {
       await expect(sheet).toHaveAttribute("role", "region");
     }

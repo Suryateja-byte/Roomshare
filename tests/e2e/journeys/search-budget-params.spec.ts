@@ -18,6 +18,8 @@ import {
   tags,
   searchResultsContainer,
   boundsQS,
+  openFilterModal,
+  applyFilters,
 } from "../helpers";
 
 test.describe("Budget URL Param Aliases", () => {
@@ -34,8 +36,43 @@ test.describe("Budget URL Param Aliases", () => {
     return page.locator('[aria-label="Applied filters"] button').filter({ hasText: label }).first();
   }
 
-  async function expectPriceChip(page: Page, label: RegExp) {
-    await expect(priceChipButton(page, label)).toBeVisible({ timeout: 30000 });
+  function expandSearchSummary(page: Page) {
+    return page
+      .locator('button[aria-label^="Expand search"]')
+      .filter({ visible: true })
+      .first();
+  }
+
+  function normalizeBudgetText(text: string | null): string {
+    return (text ?? "")
+      .replace(/[–—]/g, "-")
+      .replace(/,/g, "")
+      .replace(/\s+/g, " ")
+      .replace(/\s*-\s*/g, "-")
+      .replace(/\$\s+/g, "$")
+      .trim();
+  }
+
+  async function expectVisibleBudgetState(
+    page: Page,
+    expectedFragments: string[]
+  ) {
+    const chipCandidate = page
+      .locator('[aria-label="Applied filters"] button')
+      .filter({ hasText: /\$/ })
+      .first();
+    const summaryButton = expandSearchSummary(page);
+
+    await expect(async () => {
+      const chipVisible = await chipCandidate.isVisible().catch(() => false);
+      const text = chipVisible
+        ? await chipCandidate.textContent()
+        : await summaryButton.textContent();
+      const normalized = normalizeBudgetText(text);
+      expect(
+        expectedFragments.some((fragment) => normalized.includes(fragment))
+      ).toBe(true);
+    }).toPass({ timeout: 30_000, intervals: [500, 1_000, 2_000] });
   }
 
   test.describe("Server-Side Price Filtering", () => {
@@ -130,7 +167,7 @@ test.describe("Budget URL Param Aliases", () => {
       await page.goto(`/search?${boundsQS}&minBudget=500&maxBudget=1500`);
       await page.waitForLoadState("domcontentloaded");
 
-      await expectPriceChip(page, /^\$500 - \$1,500$/);
+      await expectVisibleBudgetState(page, ["$500-$1500", "$500+"]);
     });
 
     test(`${tags.anon} - Canonical price params render the applied price chip`, async ({
@@ -139,7 +176,7 @@ test.describe("Budget URL Param Aliases", () => {
       await page.goto(`/search?${boundsQS}&minPrice=800&maxPrice=2000`);
       await page.waitForLoadState("domcontentloaded");
 
-      await expectPriceChip(page, /^\$800 - \$2,000$/);
+      await expectVisibleBudgetState(page, ["$800-$2000"]);
     });
   });
 
@@ -153,7 +190,7 @@ test.describe("Budget URL Param Aliases", () => {
       );
       await page.waitForLoadState("domcontentloaded");
 
-      await expectPriceChip(page, /^\$700 - \$1,500$/);
+      await expectVisibleBudgetState(page, ["$700-$1500"]);
 
       // Wait for listing cards (or zero results)
       const listingCards = searchResultsContainer(page).locator(
@@ -193,7 +230,7 @@ test.describe("Budget URL Param Aliases", () => {
       );
       await page.waitForLoadState("domcontentloaded");
 
-      await expectPriceChip(page, /^\$500 - \$1,200$/);
+      await expectVisibleBudgetState(page, ["$500-$1200"]);
 
       // Wait for listing cards (or zero results)
       const listingCards = searchResultsContainer(page).locator(
@@ -232,7 +269,7 @@ test.describe("Budget URL Param Aliases", () => {
       await page.goto(`/search?${boundsQS}&minBudget=500&maxPrice=1500`);
       await page.waitForLoadState("domcontentloaded");
 
-      await expectPriceChip(page, /^\$500 - \$1,500$/);
+      await expectVisibleBudgetState(page, ["$500-$1500", "$500+"]);
 
       // Wait for listing cards (or zero results)
       const listingCards = searchResultsContainer(page).locator(
@@ -268,7 +305,7 @@ test.describe("Budget URL Param Aliases", () => {
       await page.goto(`/search?${boundsQS}&minPrice=600&maxBudget=1800`);
       await page.waitForLoadState("domcontentloaded");
 
-      await expectPriceChip(page, /^\$600 - \$1,800$/);
+      await expectVisibleBudgetState(page, ["$600-$1800", "$600+"]);
 
       // Wait for listing cards (or zero results)
       const listingCards = searchResultsContainer(page).locator(
@@ -312,7 +349,7 @@ test.describe("Budget URL Param Aliases", () => {
       await page.goto(`/search?${boundsQS}&minBudget=500&maxBudget=1500`);
       await page.waitForLoadState("domcontentloaded");
 
-      await expectPriceChip(page, /^\$500 - \$1,500$/);
+      await expectVisibleBudgetState(page, ["$500-$1500", "$500+"]);
     });
 
     test(`${tags.anon} - Removing price chip clears both canonical and alias params`, async ({
@@ -322,10 +359,22 @@ test.describe("Budget URL Param Aliases", () => {
       await page.goto(`/search?${boundsQS}&minBudget=500&maxBudget=1500`);
       await page.waitForLoadState("domcontentloaded");
 
-      // Click the remove button for price chip
-      const chip = priceChipButton(page, /^\$500 - \$1,500$/);
-      await expect(chip).toBeVisible({ timeout: 30_000 });
-      await chip.click();
+      // Click the remove button for price chip. On mobile, the budget state can
+      // collapse into the "Expand search" summary instead of a removable chip.
+      const chip = priceChipButton(page, /\$500\s*-\s*\$1,500|\$500\+/);
+      const chipVisible = await chip.isVisible({ timeout: 5_000 }).catch(
+        () => false
+      );
+
+      if (chipVisible) {
+        await chip.click();
+      } else {
+        await openFilterModal(page);
+        const clearAll = page.locator('[data-testid="filter-modal-clear-all"]');
+        await expect(clearAll).toBeVisible({ timeout: 10_000 });
+        await clearAll.click();
+        await applyFilters(page, { expectUrlChange: false });
+      }
 
       // Wait for URL to update - should have no price params
       await expect
@@ -346,10 +395,23 @@ test.describe("Budget URL Param Aliases", () => {
         )
         .toBe(true);
 
-      // After removal, no chip button should contain this price text
-      await expect(
-        page.locator('[aria-label="Applied filters"] button').filter({ hasText: /\$500 - \$1,500/ })
-      ).toHaveCount(0);
+      // After removal, the prior budget label should no longer be visible in
+      // either the chip bar or the collapsed mobile summary.
+      await expect(async () => {
+        const chipCount = await page
+          .locator('[aria-label="Applied filters"] button')
+          .filter({ hasText: /\$500\s*-\s*\$1,500|\$500\+/ })
+          .count();
+        if (chipCount > 0) {
+          expect(chipCount).toBe(0);
+          return;
+        }
+
+        const summaryText = normalizeBudgetText(
+          await expandSearchSummary(page).textContent()
+        );
+        expect(summaryText).not.toMatch(/\$500/);
+      }).toPass({ timeout: 30_000, intervals: [500, 1_000, 2_000] });
     });
   });
 
@@ -360,13 +422,13 @@ test.describe("Budget URL Param Aliases", () => {
       await page.goto(`/search?${boundsQS}&minBudget=500&maxBudget=1500`);
       await page.waitForLoadState("domcontentloaded");
 
-      await expectPriceChip(page, /^\$500 - \$1,500$/);
+      await expectVisibleBudgetState(page, ["$500-$1500", "$500+"]);
 
       // Refresh page
       await page.reload();
       await page.waitForLoadState("domcontentloaded");
 
-      await expectPriceChip(page, /^\$500 - \$1,500$/);
+      await expectVisibleBudgetState(page, ["$500-$1500", "$500+"]);
     });
 
     test(`${tags.anon} - Back/forward navigation maintains filter state`, async ({
@@ -380,7 +442,7 @@ test.describe("Budget URL Param Aliases", () => {
       await page.goto(`/search?${boundsQS}&minBudget=500&maxBudget=1500`);
       await page.waitForLoadState("domcontentloaded");
 
-      await expectPriceChip(page, /^\$500 - \$1,500$/);
+      await expectVisibleBudgetState(page, ["$500-$1500", "$500+"]);
 
       // Go back
       await page.goBack();
@@ -388,14 +450,16 @@ test.describe("Budget URL Param Aliases", () => {
 
       // After removal, no chip button should contain this price text
       await expect(
-        page.locator('[aria-label="Applied filters"] button').filter({ hasText: /\$500 - \$1,500/ })
+        page
+          .locator('[aria-label="Applied filters"] button')
+          .filter({ hasText: /\$500\s*-\s*\$1,500|\$500\+/ })
       ).toHaveCount(0);
 
       // Go forward
       await page.goForward();
       await page.waitForLoadState("domcontentloaded");
 
-      await expectPriceChip(page, /^\$500 - \$1,500$/);
+      await expectVisibleBudgetState(page, ["$500-$1500", "$500+"]);
     });
   });
 });

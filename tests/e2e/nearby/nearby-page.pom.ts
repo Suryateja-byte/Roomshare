@@ -15,7 +15,8 @@ import { Page, Locator, expect } from "@playwright/test";
 const NEARBY_SEED_LISTING_TITLE = "Sunny Mission Room";
 const E2E_SEED_MANIFEST_PATH = path.resolve(
   process.cwd(),
-  "test-results",
+  "playwright",
+  ".cache",
   "e2e-seed.json"
 );
 

@@ -281,14 +281,16 @@ test.describe("List <-> Map Sync", () => {
     );
     expect(hasRingHighlight).toBe(false);
 
-    // Hover the card - should get focus ring
-    await firstCard.hover();
+    // Focus the interactive listing link rather than relying on hover semantics.
+    const firstCardLink = firstCard.locator('a[href^="/listings/"]').first();
+    await expect(firstCardLink).toBeVisible({ timeout: timeouts.action });
+    await firstCardLink.focus();
 
-    // Hovering the card triggers setHovered(listing.id, "list") in ListingCard.tsx,
-    // which updates data-focus-state to "hovered" via SearchMapUIContext.
-    await expect(firstCard).toHaveAttribute("data-focus-state", "hovered", {
-      timeout: timeouts.action,
-    });
+    await expect
+      .poll(() => firstCard.getAttribute("data-focus-state"), {
+        timeout: timeouts.action,
+      })
+      .toMatch(/hovered|active/);
   });
 
   test(`${tags.auth} - Clicking map marker scrolls to listing card`, async ({

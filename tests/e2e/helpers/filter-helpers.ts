@@ -80,7 +80,9 @@ export const SORT_OPTIONS = [
 
 /** Read a single URL search param */
 export function getUrlParam(page: Page, key: string): string | null {
-  return new URL(page.url()).searchParams.get(key);
+  const values = new URL(page.url()).searchParams.getAll(key);
+  if (values.length === 0) return null;
+  return values.join(",");
 }
 
 /** Read all URL search params */

@@ -143,14 +143,35 @@ export async function waitForMapMarkers(
 ): Promise<number> {
   const timeout = options?.timeout ?? timeouts.action;
   const minCount = options?.minCount ?? 1;
+  const visibleMarkers = page.locator(`${selectors.mapMarker}:visible`);
 
-  await page.locator(selectors.mapMarker).first().waitFor({ state: 'attached', timeout });
+  await waitForMapReady(page, timeout);
 
-  // Wait for at least minCount markers
-  await expect.poll(() => page.locator(selectors.mapMarker).count(), { timeout }).toBeGreaterThanOrEqual(minCount);
+  await expect
+    .poll(
+      async () => {
+        const count = await visibleMarkers.count();
+        if (count >= minCount) return count;
 
-  const markers = page.locator(selectors.mapMarker);
-  return markers.count();
+        return page
+          .evaluate(() => {
+            const updateMarkers = (window as any).__e2eUpdateMarkers;
+            if (typeof updateMarkers === "function") {
+              updateMarkers();
+            }
+
+            return document.querySelectorAll(".maplibregl-marker").length;
+          })
+          .catch(() => count);
+      },
+      {
+        timeout,
+        message: `Expected at least ${minCount} visible map markers`,
+      }
+    )
+    .toBeGreaterThanOrEqual(minCount);
+
+  return visibleMarkers.count();
 }
 
 /**

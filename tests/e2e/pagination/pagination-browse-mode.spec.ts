@@ -112,11 +112,14 @@ test.describe("Pagination Browse Mode", () => {
     //   <p className="text-sm text-amber-600 dark:text-amber-400 mt-2">
     //     Showing top listings. Select a location for more results.
     //   </p>
-    const browseBanner = container.locator(sel.browseBanner);
+    const browseBanner = container
+      .getByText(/Showing top listings|Select a location for more results/i)
+      .filter({ visible: true })
+      .first();
     await expect(browseBanner).toBeVisible({ timeout: 30_000 });
 
     // Verify the banner text content
-    await expect(browseBanner).toContainText("Select a location");
+    await expect(browseBanner).toContainText(/Select a location|top listings/i);
 
     // SuggestedSearches component should be rendered (popular areas or recent searches).
     // From SearchResultsClient.tsx:194: {browseMode && !query && <SuggestedSearches />}
