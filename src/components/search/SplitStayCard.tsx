@@ -153,6 +153,7 @@ function SplitStayHalf({
               e.stopPropagation();
               setActive(listing.id);
             }}
+            data-show-on-map-id={listing.id}
             className="p-1 rounded-md text-on-surface-variant hover:text-primary hover:bg-surface-container-high transition-colors"
             aria-label={`Show ${listing.title} on map`}
           >

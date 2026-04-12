@@ -28,15 +28,34 @@ import {
 import { useRouter } from "next/navigation";
 import { SLOW_TRANSITION_THRESHOLD_MS } from "@/lib/constants";
 
+export type SearchTransitionReason =
+  | "search-submit"
+  | "filter"
+  | "sort"
+  | "map-pan";
+
+interface SearchTransitionOptions {
+  scroll?: boolean;
+  reason?: SearchTransitionReason;
+}
+
 interface SearchTransitionContextValue {
   /** Whether a transition is currently in progress */
   isPending: boolean;
+  /** The reason for the most recently requested transition */
+  pendingReason: SearchTransitionReason | null;
   /** Whether the transition has exceeded the slow threshold (6s) */
   isSlowTransition: boolean;
   /** Navigate to a URL within a transition (keeps old UI visible) */
-  navigateWithTransition: (url: string, options?: { scroll?: boolean }) => void;
+  navigateWithTransition: (
+    url: string,
+    options?: SearchTransitionOptions
+  ) => void;
   /** Navigate with replace (for map - avoids history pollution) */
-  replaceWithTransition: (url: string, options?: { scroll?: boolean }) => void;
+  replaceWithTransition: (
+    url: string,
+    options?: SearchTransitionOptions
+  ) => void;
   /** Raw startTransition for custom transition logic */
   startTransition: TransitionStartFunction;
   /** Replay the last navigation (available only during slow transitions) */
@@ -52,6 +71,8 @@ export function SearchTransitionProvider({
   children: ReactNode;
 }) {
   const [isPending, startTransition] = useTransition();
+  const [pendingReason, setPendingReason] =
+    useState<SearchTransitionReason | null>(null);
   const [isSlowTransition, setIsSlowTransition] = useState(false);
   const router = useRouter();
 
@@ -60,6 +81,7 @@ export function SearchTransitionProvider({
     url: string;
     method: "push" | "replace";
     scroll: boolean;
+    reason: SearchTransitionReason;
   } | null>(null);
 
   // Track slow transitions (>6s)
@@ -79,9 +101,11 @@ export function SearchTransitionProvider({
   }, [isPending]);
 
   const navigateWithTransition = useCallback(
-    (url: string, options?: { scroll?: boolean }) => {
+    (url: string, options?: SearchTransitionOptions) => {
       const scroll = options?.scroll ?? false;
-      lastNavRef.current = { url, method: "push", scroll };
+      const reason = options?.reason ?? "filter";
+      lastNavRef.current = { url, method: "push", scroll, reason };
+      setPendingReason(reason);
       startTransition(() => {
         router.push(url, { scroll });
       });
@@ -90,9 +114,11 @@ export function SearchTransitionProvider({
   );
 
   const replaceWithTransition = useCallback(
-    (url: string, options?: { scroll?: boolean }) => {
+    (url: string, options?: SearchTransitionOptions) => {
       const scroll = options?.scroll ?? false;
-      lastNavRef.current = { url, method: "replace", scroll };
+      const reason = options?.reason ?? "filter";
+      lastNavRef.current = { url, method: "replace", scroll, reason };
+      setPendingReason(reason);
       startTransition(() => {
         router.replace(url, { scroll });
       });
@@ -104,6 +130,7 @@ export function SearchTransitionProvider({
   const retryLastNavigation = useCallback(() => {
     const last = lastNavRef.current;
     if (!last) return;
+    setPendingReason(last.reason);
     startTransition(() => {
       if (last.method === "replace") {
         router.replace(last.url, { scroll: last.scroll });
@@ -117,6 +144,7 @@ export function SearchTransitionProvider({
   const contextValue = useMemo(
     () => ({
       isPending,
+      pendingReason,
       isSlowTransition,
       navigateWithTransition,
       replaceWithTransition,
@@ -127,6 +155,7 @@ export function SearchTransitionProvider({
     }),
     [
       isPending,
+      pendingReason,
       isSlowTransition,
       navigateWithTransition,
       replaceWithTransition,

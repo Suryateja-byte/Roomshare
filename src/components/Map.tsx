@@ -33,11 +33,9 @@ import Link from "next/link";
 import Image from "next/image";
 import { useRouter, useSearchParams } from "next/navigation";
 import {
-  Ellipsis,
   Home,
   Loader2,
   MapPin,
-  Maximize2,
   Minus,
   Plus,
   Star,
@@ -65,7 +63,9 @@ import { fixMarkerWrapperRole } from "./map/fixMarkerA11y";
 import { BoundaryLayer } from "./map/BoundaryLayer";
 import { UserMarker, useUserPin } from "./map/UserMarker";
 import DesktopMapControls from "./map/DesktopMapControls";
-import { POILayer, usePOILayerState, type POICategory } from "./map/POILayer";
+import DesktopListingPreviewCard from "./map/DesktopListingPreviewCard";
+import MobileMapToolsSheet from "./map/MobileMapToolsSheet";
+import { POILayer, usePOILayerState } from "./map/POILayer";
 import {
   PROGRAMMATIC_MOVE_TIMEOUT_MS,
   USA_MAX_BOUNDS,
@@ -127,55 +127,6 @@ function isLongitudeWithinBounds(lng: number, bounds: MapBounds): boolean {
   return lng >= bounds.minLng || lng <= bounds.maxLng;
 }
 
-function getListingsEnvelope(listings: Listing[]): MapBounds | null {
-  if (listings.length < 2) return null;
-
-  const lats = listings.map((listing) => listing.location.lat);
-  const lngs = listings.map((listing) => listing.location.lng);
-
-  return {
-    minLat: Math.min(...lats),
-    maxLat: Math.max(...lats),
-    minLng: Math.min(...lngs),
-    maxLng: Math.max(...lngs),
-  };
-}
-
-function shouldShowResetToResultsControl(
-  bounds: MapBounds,
-  listings: Listing[]
-): boolean {
-  const envelope = getListingsEnvelope(listings);
-  if (!envelope) return false;
-
-  const epsilon = 0.0001;
-  const allListingsVisible = listings.every((listing) => {
-    const { lat, lng } = listing.location;
-    return (
-      lat >= bounds.minLat - epsilon &&
-      lat <= bounds.maxLat + epsilon &&
-      isLongitudeWithinBounds(lng, bounds)
-    );
-  });
-
-  if (!allListingsVisible) {
-    return true;
-  }
-
-  const viewportLatSpan = Math.max(bounds.maxLat - bounds.minLat, 0.0001);
-  const viewportLngSpan = Math.max(getLongitudeSpan(bounds), 0.0001);
-  const envelopeLatSpan = Math.max(envelope.maxLat - envelope.minLat, 0.01);
-  const envelopeLngSpan = Math.max(getLongitudeSpan(envelope), 0.01);
-  const areaRatio =
-    (viewportLatSpan * viewportLngSpan) / (envelopeLatSpan * envelopeLngSpan);
-
-  return (
-    (viewportLatSpan > envelopeLatSpan * 3 ||
-      viewportLngSpan > envelopeLngSpan * 3) &&
-    areaRatio > 4.5
-  );
-}
-
 interface Listing {
   id: string;
   title: string;
@@ -184,13 +135,28 @@ interface Listing {
   images?: string[];
   avgRating?: number;
   reviewCount?: number;
+  roomType?: string;
   location: {
+    city?: string;
+    state?: string;
     lat: number;
     lng: number;
   };
   /** Pin tier for differentiated styling: primary = larger, mini = smaller */
   tier?: "primary" | "mini";
 }
+
+type DesktopPopupFocusOrigin =
+  | {
+      type: "marker";
+      listingId: string;
+    }
+  | {
+      type: "list";
+      listingId: string;
+      element: HTMLElement | null;
+    }
+  | null;
 
 interface MarkerPosition {
   listing: Listing;
@@ -372,18 +338,269 @@ const MAP_COLORS = {
   zinc800: "#27272a",
 };
 
+type DesktopPopupAnchor =
+  | "top"
+  | "right"
+  | "left"
+  | "bottom"
+  | "top-right"
+  | "top-left"
+  | "bottom-right"
+  | "bottom-left";
+
+interface PopupSize {
+  width: number;
+  height: number;
+}
+
+interface LocalRect {
+  left: number;
+  top: number;
+  right: number;
+  bottom: number;
+  width: number;
+  height: number;
+}
+
+interface DesktopPopupPlacement {
+  anchor: DesktopPopupAnchor;
+  popupRect: LocalRect;
+  overflowScore: number;
+  overlapScore: number;
+  requiresCameraShift: boolean;
+  deltaX: number;
+  deltaY: number;
+}
+
 const DESKTOP_POPUP_SAFE_AREA = {
-  top: 96,
+  top: 24,
   right: 24,
   bottom: 24,
   left: 24,
 } as const;
 
-const DESKTOP_POPUP_MARKER_GUTTER_PX = 64;
+// MapLibre anchors name the popup edge or corner closest to the coordinate.
+// Example: `bottom` renders the popup above the marker, while `right` renders
+// the popup to the left of the marker.
+const DESKTOP_POPUP_ANCHOR_PRIORITY: DesktopPopupAnchor[] = [
+  "bottom",
+  "right",
+  "left",
+  "top",
+  "bottom-right",
+  "bottom-left",
+  "top-right",
+  "top-left",
+];
 const DESKTOP_POPUP_FOCUS_ANIMATION_MS = 280;
-const DESKTOP_POPUP_FALLBACK_CARD_HEIGHT_PX = 320;
-const DESKTOP_POPUP_FALLBACK_TIP_HEIGHT_PX = 12;
+const DESKTOP_POPUP_CORRECTION_ANIMATION_MS = 250;
+const DESKTOP_POPUP_ANCHOR_GAP_PX = 20;
+const DESKTOP_POPUP_FALLBACK_CARD_WIDTH_PX = 304;
+const DESKTOP_POPUP_FALLBACK_CARD_HEIGHT_PX = 296;
 const POPUP_CONTAINMENT_TOLERANCE_PX = 2;
+const MAP_SEARCH_STATUS_DELAY_MS = 275;
+
+const DESKTOP_POPUP_OFFSETS: {
+  center: [number, number];
+} & Record<DesktopPopupAnchor, [number, number]> = {
+  center: [0, 0],
+  top: [0, DESKTOP_POPUP_ANCHOR_GAP_PX],
+  right: [-DESKTOP_POPUP_ANCHOR_GAP_PX, 0],
+  left: [DESKTOP_POPUP_ANCHOR_GAP_PX, 0],
+  bottom: [0, -DESKTOP_POPUP_ANCHOR_GAP_PX],
+  "top-right": [-DESKTOP_POPUP_ANCHOR_GAP_PX, DESKTOP_POPUP_ANCHOR_GAP_PX],
+  "top-left": [DESKTOP_POPUP_ANCHOR_GAP_PX, DESKTOP_POPUP_ANCHOR_GAP_PX],
+  "bottom-right": [-DESKTOP_POPUP_ANCHOR_GAP_PX, -DESKTOP_POPUP_ANCHOR_GAP_PX],
+  "bottom-left": [DESKTOP_POPUP_ANCHOR_GAP_PX, -DESKTOP_POPUP_ANCHOR_GAP_PX],
+};
+
+function createLocalRect({
+  left,
+  top,
+  width,
+  height,
+}: {
+  left: number;
+  top: number;
+  width: number;
+  height: number;
+}): LocalRect {
+  return {
+    left,
+    top,
+    width,
+    height,
+    right: left + width,
+    bottom: top + height,
+  };
+}
+
+function translateLocalRect(
+  rect: LocalRect,
+  deltaX: number,
+  deltaY: number
+): LocalRect {
+  return createLocalRect({
+    left: rect.left + deltaX,
+    top: rect.top + deltaY,
+    width: rect.width,
+    height: rect.height,
+  });
+}
+
+function getDesktopPopupRectForAnchor(
+  anchor: DesktopPopupAnchor,
+  point: { x: number; y: number },
+  popupSize: PopupSize
+): LocalRect {
+  switch (anchor) {
+    case "top":
+      return createLocalRect({
+        left: point.x - popupSize.width / 2,
+        top: point.y + DESKTOP_POPUP_ANCHOR_GAP_PX,
+        width: popupSize.width,
+        height: popupSize.height,
+      });
+    case "right":
+      return createLocalRect({
+        left: point.x - DESKTOP_POPUP_ANCHOR_GAP_PX - popupSize.width,
+        top: point.y - popupSize.height / 2,
+        width: popupSize.width,
+        height: popupSize.height,
+      });
+    case "left":
+      return createLocalRect({
+        left: point.x + DESKTOP_POPUP_ANCHOR_GAP_PX,
+        top: point.y - popupSize.height / 2,
+        width: popupSize.width,
+        height: popupSize.height,
+      });
+    case "bottom":
+      return createLocalRect({
+        left: point.x - popupSize.width / 2,
+        top: point.y - DESKTOP_POPUP_ANCHOR_GAP_PX - popupSize.height,
+        width: popupSize.width,
+        height: popupSize.height,
+      });
+    case "top-right":
+      return createLocalRect({
+        left: point.x - DESKTOP_POPUP_ANCHOR_GAP_PX - popupSize.width,
+        top: point.y + DESKTOP_POPUP_ANCHOR_GAP_PX,
+        width: popupSize.width,
+        height: popupSize.height,
+      });
+    case "top-left":
+      return createLocalRect({
+        left: point.x + DESKTOP_POPUP_ANCHOR_GAP_PX,
+        top: point.y + DESKTOP_POPUP_ANCHOR_GAP_PX,
+        width: popupSize.width,
+        height: popupSize.height,
+      });
+    case "bottom-right":
+      return createLocalRect({
+        left: point.x - DESKTOP_POPUP_ANCHOR_GAP_PX - popupSize.width,
+        top: point.y - DESKTOP_POPUP_ANCHOR_GAP_PX - popupSize.height,
+        width: popupSize.width,
+        height: popupSize.height,
+      });
+    case "bottom-left":
+      return createLocalRect({
+        left: point.x + DESKTOP_POPUP_ANCHOR_GAP_PX,
+        top: point.y - DESKTOP_POPUP_ANCHOR_GAP_PX - popupSize.height,
+        width: popupSize.width,
+        height: popupSize.height,
+      });
+  }
+}
+
+function getRectOverflowScore(rect: LocalRect, safeRect: LocalRect): number {
+  return (
+    Math.max(safeRect.left - rect.left, 0) +
+    Math.max(rect.right - safeRect.right, 0) +
+    Math.max(safeRect.top - rect.top, 0) +
+    Math.max(rect.bottom - safeRect.bottom, 0)
+  );
+}
+
+function getRectIntersectionArea(a: LocalRect, b: LocalRect): number {
+  const overlapWidth = Math.max(
+    0,
+    Math.min(a.right, b.right) - Math.max(a.left, b.left)
+  );
+  const overlapHeight = Math.max(
+    0,
+    Math.min(a.bottom, b.bottom) - Math.max(a.top, b.top)
+  );
+  return overlapWidth * overlapHeight;
+}
+
+function isRectInsideSafeArea(rect: LocalRect, safeRect: LocalRect): boolean {
+  return (
+    rect.left >= safeRect.left &&
+    rect.right <= safeRect.right &&
+    rect.top >= safeRect.top &&
+    rect.bottom <= safeRect.bottom
+  );
+}
+
+function getPopupAdjustmentDelta(
+  rect: LocalRect,
+  safeRect: LocalRect,
+  avoidRects: LocalRect[]
+): { deltaX: number; deltaY: number } {
+  let adjustedRect = rect;
+  let deltaX = 0;
+  let deltaY = 0;
+
+  if (adjustedRect.left < safeRect.left) {
+    deltaX += safeRect.left - adjustedRect.left;
+  } else if (adjustedRect.right > safeRect.right) {
+    deltaX += safeRect.right - adjustedRect.right;
+  }
+
+  if (adjustedRect.top < safeRect.top) {
+    deltaY += safeRect.top - adjustedRect.top;
+  } else if (adjustedRect.bottom > safeRect.bottom) {
+    deltaY += safeRect.bottom - adjustedRect.bottom;
+  }
+
+  adjustedRect = translateLocalRect(adjustedRect, deltaX, deltaY);
+
+  for (const avoidRect of avoidRects) {
+    if (getRectIntersectionArea(adjustedRect, avoidRect) === 0) continue;
+
+    const candidateAdjustments = [
+      { deltaX: avoidRect.left - adjustedRect.right, deltaY: 0 },
+      { deltaX: avoidRect.right - adjustedRect.left, deltaY: 0 },
+      { deltaX: 0, deltaY: avoidRect.top - adjustedRect.bottom },
+      { deltaX: 0, deltaY: avoidRect.bottom - adjustedRect.top },
+    ]
+      .map((candidate) => ({
+        ...candidate,
+        rect: translateLocalRect(
+          adjustedRect,
+          candidate.deltaX,
+          candidate.deltaY
+        ),
+      }))
+      .filter((candidate) => isRectInsideSafeArea(candidate.rect, safeRect))
+      .sort(
+        (a, b) =>
+          Math.abs(a.deltaX) +
+          Math.abs(a.deltaY) -
+          (Math.abs(b.deltaX) + Math.abs(b.deltaY))
+      );
+
+    const bestCandidate = candidateAdjustments[0];
+    if (!bestCandidate) continue;
+
+    deltaX += bestCandidate.deltaX;
+    deltaY += bestCandidate.deltaY;
+    adjustedRect = bestCandidate.rect;
+  }
+
+  return { deltaX, deltaY };
+}
 
 // Price bucket colors for cluster rings (green = affordable, yellow = mid, red = expensive)
 const CLUSTER_RING_COLORS = {
@@ -571,7 +788,7 @@ const MarkerPinContent = React.memo(function MarkerPinContent({
         className={cn(
           "flex items-center justify-center bg-surface-container-lowest text-on-surface px-4 py-2 rounded-full font-display font-semibold text-sm transition-all duration-300 shadow-[0_10px_40px_0px_rgba(27,28,25,0.06)] border border-outline-variant/20 group-hover/marker:bg-on-surface group-hover/marker:text-surface-canvas group-hover/marker:scale-110 group-hover/marker:z-10",
           (isHovered || isActive) &&
-            "bg-on-surface text-surface-canvas scale-[1.15] shadow-lg z-20 ring-2 ring-primary/40",
+            "bg-on-surface text-surface-canvas scale-[1.15] shadow-[0_14px_32px_rgba(27,28,25,0.16)] z-20",
           isViewed &&
             !isHovered &&
             !isActive &&
@@ -698,7 +915,7 @@ const MapMarkerItem = React.memo(function MapMarkerItem({
       <div
         ref={refCallback}
         className={cn(
-          "relative cursor-pointer group/marker animate-[fadeIn_200ms_ease-out] motion-reduce:animate-none min-w-[44px] min-h-[44px] flex items-center justify-center",
+          "relative cursor-pointer group/marker animate-[fadeIn_200ms_ease-out] motion-reduce:animate-none min-w-[44px] min-h-[44px] flex items-center justify-center outline-none",
           "transition-all duration-200 [transition-timing-function:cubic-bezier(0.34,1.56,0.64,1)]",
           isHovered && "scale-[1.15] z-50",
           isActive && !isHovered && "z-40",
@@ -746,10 +963,10 @@ const MapMarkerItem = React.memo(function MapMarkerItem({
             )}
           />
         )}
-        {/* Keyboard focus ring - solid visible ring distinct from hover animation */}
+        {/* Keyboard focus halo - neutral shadow without a bright accent border */}
         {isKeyboardFocused && (
           <div
-            className="absolute -inset-3 rounded-full border-[3px] border-blue-500 pointer-events-none shadow-[0_0_0_2px_rgba(59,130,246,0.3)]"
+            className="absolute -inset-2 rounded-full pointer-events-none shadow-[0_14px_32px_rgba(27,28,25,0.14)]"
             aria-hidden="true"
           />
         )}
@@ -993,6 +1210,7 @@ export default function MapComponent({
   // M3-MAP FIX: Debounce tile loading state to avoid visual flash on brief pans
   const tileLoadingTimerRef = useRef<NodeJS.Timeout | null>(null);
   const [isSearching, setIsSearching] = useState(false);
+  const [showSearchStatus, setShowSearchStatus] = useState(false);
   const [viewedIds, setViewedIds] = useState<Set<string>>(new Set());
   const [viewportInfoMessage, setViewportInfoMessage] = useState<string | null>(
     null
@@ -1012,19 +1230,18 @@ export default function MapComponent({
   );
   const router = useRouter();
   const searchParams = useSearchParams();
-  const { setMobileSheetOverrideLabel, setMobileResultsViewPreference } =
-    useMobileSearch();
+  const {
+    mobileResultsView,
+    setMobileMapOverlayActive,
+    setMobileSheetOverrideLabel,
+    setMobileResultsViewPreference,
+  } = useMobileSearch();
   const transitionContext = useSearchTransitionSafe();
   const {
     activeCategories: activePOICategories,
     toggleCategory: togglePOICategory,
   } = usePOILayerState();
-  const hiddenMobilePOICategories = useMemo<Set<POICategory>>(
-    () => new Set(),
-    []
-  );
-  const appliedPOICategories =
-    isPhoneViewport === true ? hiddenMobilePOICategories : activePOICategories;
+  const appliedPOICategories = activePOICategories;
 
   const {
     hasUserMoved,
@@ -1041,8 +1258,15 @@ export default function MapComponent({
     useState<HTMLDivElement | null>(null);
   const [mapPaneSize, setMapPaneSize] = useState({ width: 0, height: 0 });
   const selectedPopupCardRef = useRef<HTMLDivElement | null>(null);
-  const [showResetToResults, setShowResetToResults] = useState(false);
-  const [showMobileToolsMenu, setShowMobileToolsMenu] = useState(false);
+  const selectedPopupCloseButtonRef = useRef<HTMLButtonElement | null>(null);
+  const popupFocusOriginRef = useRef<DesktopPopupFocusOrigin>(null);
+  const [desktopPopupSize, setDesktopPopupSize] = useState<PopupSize>({
+    width: DESKTOP_POPUP_FALLBACK_CARD_WIDTH_PX,
+    height: DESKTOP_POPUP_FALLBACK_CARD_HEIGHT_PX,
+  });
+  const [popupPlacementRevision, setPopupPlacementRevision] = useState(0);
+  const handledDesktopPopupCorrectionTokenRef = useRef<string | null>(null);
+  const [showMobileToolsSheet, setShowMobileToolsSheet] = useState(false);
   const debounceTimer = useRef<NodeJS.Timeout | null>(null);
   const lastSearchTimeRef = useRef<number>(0);
   const pendingBoundsRef = useRef<{
@@ -1053,6 +1277,7 @@ export default function MapComponent({
   } | null>(null);
   const throttleTimeoutRef = useRef<NodeJS.Timeout | null>(null);
   const searchSafetyTimeoutRef = useRef<NodeJS.Timeout | null>(null);
+  const searchStatusTimerRef = useRef<NodeJS.Timeout | null>(null);
   const onMoveThrottleRef = useRef<NodeJS.Timeout | null>(null);
   const hasCompletedInitialMobileViewportSyncRef = useRef(false);
   const hasPendingRealUserMoveRef = useRef(false);
@@ -1108,6 +1333,47 @@ export default function MapComponent({
       previewBackgroundClickGuardTimeoutRef.current = null;
     }, 250);
   }, [clearPreviewBackgroundClickGuard, usesPreviewSelection]);
+  const captureDesktopPopupMarkerOrigin = useCallback((listingId: string) => {
+    popupFocusOriginRef.current = {
+      type: "marker",
+      listingId,
+    };
+  }, []);
+  const captureDesktopPopupListOrigin = useCallback((listingId: string) => {
+    if (typeof document === "undefined") {
+      popupFocusOriginRef.current = {
+        type: "list",
+        listingId,
+        element: null,
+      };
+      return;
+    }
+
+    const activeElement =
+      document.activeElement instanceof HTMLElement ? document.activeElement : null;
+    const trigger = activeElement?.closest(
+      `[data-show-on-map-id="${listingId}"]`
+    );
+
+    popupFocusOriginRef.current = {
+      type: "list",
+      listingId,
+      element: trigger instanceof HTMLElement ? trigger : null,
+    };
+  }, []);
+  const restoreDesktopPopupOriginFocus = useCallback(() => {
+    const origin = popupFocusOriginRef.current;
+    popupFocusOriginRef.current = null;
+    if (!origin) return;
+
+    if (origin.type === "list" && origin.element?.isConnected) {
+      origin.element.focus();
+      return;
+    }
+
+    const markerEl = markerRefs.current.get(origin.listingId);
+    markerEl?.focus();
+  }, []);
   const dismissPreviewSelection = useCallback(() => {
     if (!usesPreviewSelection) return;
     clearPreviewBackgroundClickGuard();
@@ -1120,18 +1386,38 @@ export default function MapComponent({
     setSelectedListing,
     setActive,
   ]);
-  const handleSelectedListingClose = useCallback(() => {
+  const dismissDesktopPopupSelection = useCallback(
+    ({ restoreFocus = false }: { restoreFocus?: boolean } = {}) => {
+      if (!usesPopupSelection) return;
+      lastMapActiveRef.current = null;
+      setSelectedListing(null);
+      setActive(null);
+
+      if (restoreFocus) {
+        setTimeout(() => {
+          if (!isMountedRef.current) return;
+          restoreDesktopPopupOriginFocus();
+        }, 0);
+      } else {
+        popupFocusOriginRef.current = null;
+      }
+    },
+    [
+      usesPopupSelection,
+      setSelectedListing,
+      setActive,
+      restoreDesktopPopupOriginFocus,
+    ]
+  );
+  const handleSelectedListingClose = useCallback((restoreFocus = true) => {
     if (usesPreviewSelection) {
       dismissPreviewSelection();
       return;
     }
-    setSelectedListing(null);
-  }, [usesPreviewSelection, dismissPreviewSelection, setSelectedListing]);
+    dismissDesktopPopupSelection({ restoreFocus });
+  }, [usesPreviewSelection, dismissPreviewSelection, dismissDesktopPopupSelection]);
   // Safety timeout: clear programmatic move flag if moveEnd doesn't fire
   const programmaticClearTimeoutRef = useRef<NodeJS.Timeout | null>(null);
-  const popupContainmentTimeoutRef = useRef<NodeJS.Timeout | null>(null);
-  const pendingPopupContainmentTokenRef = useRef<string | null>(null);
-  const handledPopupContainmentTokenRef = useRef<string | null>(null);
   // Auto-zoom: fire once per search context when results are empty and no filters active
   const hasAutoZoomedRef = useRef(false);
   // Ref for sourcedata handler cleanup
@@ -1818,235 +2104,277 @@ export default function MapComponent({
     [isPhoneViewport]
   );
 
-  const getDesktopPopupMetrics = useCallback(() => {
-    const popupCard = selectedPopupCardRef.current;
-    const popupCardHeightPx = popupCard?.getBoundingClientRect().height ?? 0;
-    const popupCardHeight =
-      popupCardHeightPx > 0
-        ? popupCardHeightPx
-        : DESKTOP_POPUP_FALLBACK_CARD_HEIGHT_PX;
-    const popupTip =
-      popupCard?.closest(".maplibregl-popup")?.querySelector(
-        ".maplibregl-popup-tip"
-      ) ?? null;
-    const popupTipHeightPx =
-      popupTip instanceof HTMLElement ? popupTip.getBoundingClientRect().height : 0;
-    const popupTipHeight =
-      popupTipHeightPx > 0
-        ? popupTipHeightPx
-        : DESKTOP_POPUP_FALLBACK_TIP_HEIGHT_PX;
-
-    return { popupCardHeight, popupTipHeight };
-  }, []);
-
-  const getDesktopPopupFocusOffset = useCallback((): [number, number] | null => {
-    if (!usesPopupSelection || isPhoneViewport === true) {
-      return null;
-    }
-
-    const container = mapContainerRef.current;
-    const measuredPaneHeight =
-      mapPaneSize.height ||
-      container?.clientHeight ||
-      container?.getBoundingClientRect().height ||
-      0;
-
-    if (measuredPaneHeight <= 0) {
-      return null;
-    }
-
-    const { popupCardHeight, popupTipHeight } = getDesktopPopupMetrics();
-    const centerY = measuredPaneHeight / 2;
-    const desiredMarkerY =
-      measuredPaneHeight -
-      DESKTOP_POPUP_SAFE_AREA.bottom -
-      popupCardHeight -
-      popupTipHeight;
-    const minimumMarkerY =
-      DESKTOP_POPUP_SAFE_AREA.top + DESKTOP_POPUP_MARKER_GUTTER_PX;
-    const maximumMarkerY =
-      measuredPaneHeight -
-      DESKTOP_POPUP_SAFE_AREA.bottom -
-      DESKTOP_POPUP_MARKER_GUTTER_PX;
-    const clampedMarkerY = Math.min(
-      Math.max(desiredMarkerY, minimumMarkerY),
-      maximumMarkerY
-    );
-    const offsetY = clampedMarkerY - centerY;
-
-    return [0, offsetY];
-  }, [
-    usesPopupSelection,
-    isPhoneViewport,
-    mapPaneSize.height,
-    getDesktopPopupMetrics,
-  ]);
-
-  const popupContainmentToken = useMemo(() => {
-    if (!usesPopupSelection || !selectedListing) return null;
-    return `${selectedListing.id}:${mapPaneSize.width}:${mapPaneSize.height}:${isFullscreen ? "1" : "0"}`;
-  }, [
-    usesPopupSelection,
-    selectedListing,
-    mapPaneSize.width,
-    mapPaneSize.height,
-    isFullscreen,
-  ]);
-
-  const clearPopupContainmentTimeout = useCallback(() => {
-    if (popupContainmentTimeoutRef.current) {
-      clearTimeout(popupContainmentTimeoutRef.current);
-      popupContainmentTimeoutRef.current = null;
-    }
-  }, []);
-
-  const runPopupContainmentCheck = useCallback(
-    (token: string | null = popupContainmentToken) => {
-      if (
-        !token ||
-        token === handledPopupContainmentTokenRef.current ||
-        !usesPopupSelection ||
-        isPhoneViewport ||
-        !selectedListing
-      ) {
-        return false;
-      }
-
-      const mapInstance = mapRef.current?.getMap();
-      const container = mapContainerRef.current;
-      const popupCard = selectedPopupCardRef.current;
-      if (!mapInstance || !container || !popupCard) {
-        return false;
-      }
-
-      const containerRect = container.getBoundingClientRect();
-      if (containerRect.width <= 0 || containerRect.height <= 0) {
-        return false;
-      }
-
-      const popupRoot = popupCard.closest(
-        ".maplibregl-popup"
-      ) as HTMLElement | null;
-      const popupRect =
-        popupRoot?.getBoundingClientRect() ?? popupCard.getBoundingClientRect();
-
-      if (popupRect.width <= 0 || popupRect.height <= 0) {
-        return false;
-      }
-
-      const safeRect = {
-        top: containerRect.top + DESKTOP_POPUP_SAFE_AREA.top,
-        right: containerRect.right - DESKTOP_POPUP_SAFE_AREA.right,
-        bottom: containerRect.bottom - DESKTOP_POPUP_SAFE_AREA.bottom,
-        left: containerRect.left + DESKTOP_POPUP_SAFE_AREA.left,
-      };
-
-      let deltaX = 0;
-      if (popupRect.left < safeRect.left) {
-        deltaX = safeRect.left - popupRect.left;
-      } else if (popupRect.right > safeRect.right) {
-        deltaX = safeRect.right - popupRect.right;
-      }
-
-      let deltaY = 0;
-      if (popupRect.top < safeRect.top) {
-        deltaY = safeRect.top - popupRect.top;
-      } else if (popupRect.bottom > safeRect.bottom) {
-        deltaY = safeRect.bottom - popupRect.bottom;
-      }
-
-      if (
-        Math.abs(deltaX) <= POPUP_CONTAINMENT_TOLERANCE_PX &&
-        Math.abs(deltaY) <= POPUP_CONTAINMENT_TOLERANCE_PX
-      ) {
-        handledPopupContainmentTokenRef.current = token;
-        pendingPopupContainmentTokenRef.current = null;
-        return false;
-      }
-
-      const containerWidth = container.clientWidth || containerRect.width;
-      const containerHeight = container.clientHeight || containerRect.height;
-      const nextCenter = mapInstance.unproject([
-        containerWidth / 2 - deltaX,
-        containerHeight / 2 - deltaY,
-      ]);
-
-      handledPopupContainmentTokenRef.current = token;
-      pendingPopupContainmentTokenRef.current = null;
-
-      setProgrammaticMove(true);
-      if (programmaticClearTimeoutRef.current) {
-        clearTimeout(programmaticClearTimeoutRef.current);
-      }
-      programmaticClearTimeoutRef.current = setTimeout(() => {
-        if (isProgrammaticMoveRef.current) {
-          setProgrammaticMove(false);
-        }
-      }, PROGRAMMATIC_MOVE_TIMEOUT_MS);
-
-      mapInstance.jumpTo({
-        center: [nextCenter.lng, nextCenter.lat],
-      });
-      return true;
-    },
-    [
-      popupContainmentToken,
-      usesPopupSelection,
-      isPhoneViewport,
-      selectedListing,
-      setProgrammaticMove,
-      isProgrammaticMoveRef,
-    ]
-  );
-
-  const schedulePopupContainmentCheck = useCallback(
-    (token: string | null = popupContainmentToken) => {
-      if (
-        !token ||
-        token === handledPopupContainmentTokenRef.current ||
-        !usesPopupSelection ||
-        isPhoneViewport
-      ) {
-        return;
-      }
-
-      clearPopupContainmentTimeout();
-
-      if (isProgrammaticMoveRef.current) {
-        pendingPopupContainmentTokenRef.current = token;
-        return;
-      }
-
-      popupContainmentTimeoutRef.current = setTimeout(() => {
-        popupContainmentTimeoutRef.current = null;
-        runPopupContainmentCheck(token);
-      }, 0);
-    },
-    [
-      popupContainmentToken,
-      usesPopupSelection,
-      isPhoneViewport,
-      clearPopupContainmentTimeout,
-      isProgrammaticMoveRef,
-      runPopupContainmentCheck,
-    ]
-  );
-
   useEffect(() => {
-    if (!popupContainmentToken) {
-      clearPopupContainmentTimeout();
-      pendingPopupContainmentTokenRef.current = null;
-      handledPopupContainmentTokenRef.current = null;
+    if (!usesPopupSelection || isPhoneViewport === true || !selectedListing) {
       return;
     }
 
-    pendingPopupContainmentTokenRef.current = popupContainmentToken;
-    schedulePopupContainmentCheck(popupContainmentToken);
+    const popupCard = selectedPopupCardRef.current;
+    if (!popupCard) return;
+
+    const updatePopupSize = () => {
+      const rect = popupCard.getBoundingClientRect();
+      if (rect.width <= 0 || rect.height <= 0) return;
+
+      setDesktopPopupSize((current) => {
+        const nextWidth = Math.round(rect.width);
+        const nextHeight = Math.round(rect.height);
+        if (
+          current.width === nextWidth &&
+          current.height === nextHeight
+        ) {
+          return current;
+        }
+
+        return {
+          width: nextWidth,
+          height: nextHeight,
+        };
+      });
+    };
+
+    updatePopupSize();
+
+    if (typeof ResizeObserver === "undefined") {
+      return;
+    }
+
+    const observer = new ResizeObserver(() => {
+      updatePopupSize();
+    });
+
+    observer.observe(popupCard);
+    return () => observer.disconnect();
+  }, [usesPopupSelection, isPhoneViewport, selectedListing?.id]);
+
+  const getDesktopPopupAvoidRects = useCallback((): LocalRect[] => {
+    const container = mapContainerRef.current;
+    if (!container) return [];
+
+    const containerRect = container.getBoundingClientRect();
+
+    return Array.from(
+      container.querySelectorAll<HTMLElement>("[data-map-avoid]")
+    )
+      .map((element) => {
+        const rect = element.getBoundingClientRect();
+        if (rect.width <= 0 || rect.height <= 0) return null;
+
+        return createLocalRect({
+          left: rect.left - containerRect.left,
+          top: rect.top - containerRect.top,
+          width: rect.width,
+          height: rect.height,
+        });
+      })
+      .filter((rect): rect is LocalRect => rect !== null);
+  }, []);
+
+  const getDesktopPopupPlacementForListing = useCallback(
+    (listing: Listing): DesktopPopupPlacement | null => {
+      const mapInstance = mapRef.current?.getMap();
+      const container = mapContainerRef.current;
+      if (!mapInstance || !container) return null;
+
+      const paneWidth =
+        mapPaneSize.width ||
+        container.clientWidth ||
+        container.getBoundingClientRect().width;
+      const paneHeight =
+        mapPaneSize.height ||
+        container.clientHeight ||
+        container.getBoundingClientRect().height;
+
+      if (paneWidth <= 0 || paneHeight <= 0) {
+        return null;
+      }
+
+      const projectedPoint = mapInstance.project([
+        listing.location.lng,
+        listing.location.lat,
+      ]);
+
+      const point = {
+        x: projectedPoint.x,
+        y: projectedPoint.y,
+      };
+      const safeRect = createLocalRect({
+        left: DESKTOP_POPUP_SAFE_AREA.left,
+        top: DESKTOP_POPUP_SAFE_AREA.top,
+        width:
+          paneWidth -
+          DESKTOP_POPUP_SAFE_AREA.left -
+          DESKTOP_POPUP_SAFE_AREA.right,
+        height:
+          paneHeight -
+          DESKTOP_POPUP_SAFE_AREA.top -
+          DESKTOP_POPUP_SAFE_AREA.bottom,
+      });
+      const avoidRects = getDesktopPopupAvoidRects();
+
+      let bestPlacement: DesktopPopupPlacement | null = null;
+
+      for (const [priorityIndex, anchor] of DESKTOP_POPUP_ANCHOR_PRIORITY.entries()) {
+        const popupRect = getDesktopPopupRectForAnchor(
+          anchor,
+          point,
+          desktopPopupSize
+        );
+        const overflowScore = getRectOverflowScore(popupRect, safeRect);
+        const overlapScore = avoidRects.reduce(
+          (total, avoidRect) => total + getRectIntersectionArea(popupRect, avoidRect),
+          0
+        );
+        const { deltaX, deltaY } = getPopupAdjustmentDelta(
+          popupRect,
+          safeRect,
+          avoidRects
+        );
+        const requiresCameraShift =
+          Math.abs(deltaX) > POPUP_CONTAINMENT_TOLERANCE_PX ||
+          Math.abs(deltaY) > POPUP_CONTAINMENT_TOLERANCE_PX;
+        const candidate: DesktopPopupPlacement = {
+          anchor,
+          popupRect,
+          overflowScore,
+          overlapScore,
+          requiresCameraShift,
+          deltaX,
+          deltaY,
+        };
+
+        const candidateScore =
+          overflowScore * 1_000_000 + overlapScore * 1_000 + priorityIndex;
+        const bestScore =
+          bestPlacement === null
+            ? Number.POSITIVE_INFINITY
+            : bestPlacement.overflowScore * 1_000_000 +
+              bestPlacement.overlapScore * 1_000 +
+              DESKTOP_POPUP_ANCHOR_PRIORITY.indexOf(bestPlacement.anchor);
+
+        if (candidateScore < bestScore) {
+          bestPlacement = candidate;
+        }
+      }
+
+      return bestPlacement;
+    },
+    [
+      desktopPopupSize,
+      getDesktopPopupAvoidRects,
+      mapPaneSize.height,
+      mapPaneSize.width,
+    ]
+  );
+
+  const desktopPopupPlacement = useMemo(() => {
+    if (!usesPopupSelection || isPhoneViewport === true || !selectedListing) {
+      return null;
+    }
+
+    return getDesktopPopupPlacementForListing(selectedListing);
   }, [
-    popupContainmentToken,
-    schedulePopupContainmentCheck,
-    clearPopupContainmentTimeout,
+    usesPopupSelection,
+    isPhoneViewport,
+    selectedListing,
+    getDesktopPopupPlacementForListing,
+    popupPlacementRevision,
   ]);
+
+  const desktopPopupCorrectionToken = useMemo(() => {
+    if (!usesPopupSelection || isPhoneViewport === true || !selectedListing) {
+      return null;
+    }
+
+    return `${selectedListing.id}:${mapPaneSize.width}:${mapPaneSize.height}:${desktopPopupSize.width}:${desktopPopupSize.height}:${isFullscreen ? "1" : "0"}:${popupPlacementRevision}`;
+  }, [
+    usesPopupSelection,
+    isPhoneViewport,
+    selectedListing,
+    mapPaneSize.width,
+    mapPaneSize.height,
+    desktopPopupSize.width,
+    desktopPopupSize.height,
+    isFullscreen,
+    popupPlacementRevision,
+  ]);
+
+  useEffect(() => {
+    if (!desktopPopupCorrectionToken) {
+      handledDesktopPopupCorrectionTokenRef.current = null;
+      return;
+    }
+
+    if (
+      handledDesktopPopupCorrectionTokenRef.current ===
+      desktopPopupCorrectionToken
+    ) {
+      return;
+    }
+
+    if (!desktopPopupPlacement) {
+      return;
+    }
+
+    if (isProgrammaticMoveRef.current) {
+      return;
+    }
+
+    if (!desktopPopupPlacement.requiresCameraShift) {
+      handledDesktopPopupCorrectionTokenRef.current =
+        desktopPopupCorrectionToken;
+      return;
+    }
+
+    const mapInstance = mapRef.current?.getMap();
+    const container = mapContainerRef.current;
+    if (!mapInstance || !container) {
+      return;
+    }
+
+    const containerWidth =
+      container.clientWidth || container.getBoundingClientRect().width;
+    const containerHeight =
+      container.clientHeight || container.getBoundingClientRect().height;
+    const nextCenter = mapInstance.unproject([
+      containerWidth / 2 - desktopPopupPlacement.deltaX,
+      containerHeight / 2 - desktopPopupPlacement.deltaY,
+    ]);
+
+    handledDesktopPopupCorrectionTokenRef.current = desktopPopupCorrectionToken;
+    setProgrammaticMove(true);
+    if (programmaticClearTimeoutRef.current) {
+      clearTimeout(programmaticClearTimeoutRef.current);
+    }
+    programmaticClearTimeoutRef.current = setTimeout(() => {
+      if (isProgrammaticMoveRef.current) {
+        setProgrammaticMove(false);
+      }
+    }, PROGRAMMATIC_MOVE_TIMEOUT_MS);
+
+    mapInstance.easeTo({
+      center: [nextCenter.lng, nextCenter.lat],
+      duration: reducedMotion ? 0 : DESKTOP_POPUP_CORRECTION_ANIMATION_MS,
+    });
+  }, [
+    desktopPopupCorrectionToken,
+    desktopPopupPlacement,
+    reducedMotion,
+    setProgrammaticMove,
+    isProgrammaticMoveRef,
+  ]);
+
+  useEffect(() => {
+    if (!usesPopupSelection || isPhoneViewport === true || !selectedListing) {
+      return;
+    }
+
+    const focusTimeout = setTimeout(() => {
+      selectedPopupCloseButtonRef.current?.focus({ preventScroll: true });
+    }, 0);
+
+    return () => clearTimeout(focusTimeout);
+  }, [usesPopupSelection, isPhoneViewport, selectedListing?.id]);
 
   useEffect(() => {
     if (typeof document === "undefined") return;
@@ -2134,7 +2462,6 @@ export default function MapComponent({
     programmaticClearTimeoutRef.current = setTimeout(() => {
       if (isProgrammaticMoveRef.current) setProgrammaticMove(false);
     }, PROGRAMMATIC_MOVE_TIMEOUT_MS);
-    setShowResetToResults(false);
     mapRef.current.fitBounds(
       [
         [minLng, minLat],
@@ -2147,7 +2474,6 @@ export default function MapComponent({
     isProgrammaticMoveRef,
     listings,
     setProgrammaticMove,
-    setShowResetToResults,
   ]);
 
   useEffect(() => {
@@ -2197,6 +2523,8 @@ export default function MapComponent({
       }
     }
 
+    setIsSearching(false);
+    setShowMobileToolsSheet(false);
     hideMap();
   }, [hideMap]);
 
@@ -2373,6 +2701,8 @@ export default function MapComponent({
     // P1-FIX (#106): Clear selectedListing popup if the listing no longer exists.
     // Prevents showing stale popup data after search results update.
     if (selectedListing && !listings.find((l) => l.id === selectedListing.id)) {
+      lastMapActiveRef.current = null;
+      popupFocusOriginRef.current = null;
       setSelectedListing(null);
     }
 
@@ -2386,7 +2716,35 @@ export default function MapComponent({
   }, [listings, activeId, setActive, selectedListing, setSelectedListing]);
 
   useEffect(() => {
+    if (searchStatusTimerRef.current) {
+      clearTimeout(searchStatusTimerRef.current);
+      searchStatusTimerRef.current = null;
+    }
+
+    if (!isSearching) {
+      setShowSearchStatus(false);
+      return;
+    }
+
+    setShowSearchStatus(false);
+    searchStatusTimerRef.current = setTimeout(() => {
+      if (isMountedRef.current && isSearching) {
+        setShowSearchStatus(true);
+      }
+    }, MAP_SEARCH_STATUS_DELAY_MS);
+
+    return () => {
+      if (searchStatusTimerRef.current) {
+        clearTimeout(searchStatusTimerRef.current);
+        searchStatusTimerRef.current = null;
+      }
+    };
+  }, [isSearching]);
+
+  useEffect(() => {
     if (!usesOverlaySelection && !isControlledSelection && selectedListing) {
+      lastMapActiveRef.current = null;
+      popupFocusOriginRef.current = null;
       setSelectedListing(null);
     }
   }, [
@@ -2434,12 +2792,12 @@ export default function MapComponent({
       if (searchSafetyTimeoutRef.current) {
         clearTimeout(searchSafetyTimeoutRef.current);
       }
+      if (searchStatusTimerRef.current) {
+        clearTimeout(searchStatusTimerRef.current);
+        searchStatusTimerRef.current = null;
+      }
       if (programmaticClearTimeoutRef.current) {
         clearTimeout(programmaticClearTimeoutRef.current);
-      }
-      if (popupContainmentTimeoutRef.current) {
-        clearTimeout(popupContainmentTimeoutRef.current);
-        popupContainmentTimeoutRef.current = null;
       }
       if (onMoveThrottleRef.current) {
         clearTimeout(onMoveThrottleRef.current);
@@ -2499,12 +2857,7 @@ export default function MapComponent({
   // Reset interaction-only state when the URL changes.
   useEffect(() => {
     setHasUserMoved(false);
-    setShowResetToResults(false);
   }, [searchParams, setHasUserMoved]);
-
-  useEffect(() => {
-    setShowResetToResults(false);
-  }, [listings]);
 
   // Suppress mapbox-gl worker communication errors during HMR/Turbopack
   // These are non-fatal and occur when the worker connection is lost during hot reload
@@ -2583,7 +2936,7 @@ export default function MapComponent({
         // so SearchResultsClient + PersistentMapWrapper react to the change.
         window.history.replaceState(null, "", url);
       } else if (transitionContext) {
-        transitionContext.replaceWithTransition(url);
+        transitionContext.replaceWithTransition(url, { reason: "map-pan" });
       } else {
         router.replace(url);
       }
@@ -2615,8 +2968,12 @@ export default function MapComponent({
       return;
     }
     if (usesOverlaySelection) {
+      if (usesPopupSelection) {
+        captureDesktopPopupListOrigin(listing.id);
+      }
       setSelectedListing(listing);
     }
+
     setProgrammaticMove(true);
     // Safety: clear programmatic flag if moveEnd doesn't fire
     if (programmaticClearTimeoutRef.current)
@@ -2625,32 +2982,79 @@ export default function MapComponent({
       if (isProgrammaticMoveRef.current) setProgrammaticMove(false);
     }, PROGRAMMATIC_MOVE_TIMEOUT_MS);
     const map = mapRef.current;
+    const mapInstance = map?.getMap();
     const currentZoom = map?.getZoom() ?? 12;
     // clusterMaxZoom is 14 — zoom to at least 15 to guarantee the pin is unclustered
     const minZoomToBreakCluster = 15;
     const targetZoom = Math.max(currentZoom, minZoomToBreakCluster);
-    const popupOffset = getDesktopPopupFocusOffset();
+    let targetCenter: [number, number] = [
+      listing.location.lng,
+      listing.location.lat,
+    ];
+
+    if (
+      usesPopupSelection &&
+      isPhoneViewport !== true &&
+      mapInstance &&
+      mapContainerRef.current
+    ) {
+      const placement = getDesktopPopupPlacementForListing(listing);
+      if (placement?.requiresCameraShift) {
+        const container = mapContainerRef.current;
+        const containerWidth =
+          container.clientWidth || container.getBoundingClientRect().width;
+        const containerHeight =
+          container.clientHeight || container.getBoundingClientRect().height;
+        const adjustedCenter = mapInstance.unproject([
+          containerWidth / 2 - placement.deltaX,
+          containerHeight / 2 - placement.deltaY,
+        ]);
+
+        targetCenter = [adjustedCenter.lng, adjustedCenter.lat];
+      }
+    }
     map?.easeTo({
-      center: [listing.location.lng, listing.location.lat],
+      center: targetCenter,
       zoom: targetZoom,
       duration: reducedMotion ? 0 : DESKTOP_POPUP_FOCUS_ANIMATION_MS,
-      ...(popupOffset ? { offset: popupOffset } : {}),
     });
+
+    if (usesPopupSelection && isPhoneViewport !== true && typeof window !== "undefined") {
+      const revisionTimers = [
+        window.setTimeout(() => {
+          setPopupPlacementRevision((current) => current + 1);
+        }, 0),
+        window.setTimeout(() => {
+          setPopupPlacementRevision((current) => current + 1);
+        }, Math.max(Math.round(DESKTOP_POPUP_FOCUS_ANIMATION_MS / 2), 120)),
+        window.setTimeout(() => {
+          setPopupPlacementRevision((current) => current + 1);
+        }, DESKTOP_POPUP_FOCUS_ANIMATION_MS + 40),
+      ];
+
+      return () => {
+        revisionTimers.forEach((timerId) => window.clearTimeout(timerId));
+      };
+    }
   }, [
     activeId,
     listings,
     usesOverlaySelection,
+    usesPopupSelection,
+    isPhoneViewport,
+    captureDesktopPopupListOrigin,
+    getDesktopPopupPlacementForListing,
     setProgrammaticMove,
     isProgrammaticMoveRef,
     setSelectedListing,
     reducedMotion,
-    getDesktopPopupFocusOffset,
   ]);
 
   // P1-FIX (#77): Wrap handleMoveEnd in useCallback to prevent stale closures.
   // Without this, the function captures state values at definition time which can become stale.
   const handleMoveEnd = useCallback(
     (e: ViewStateChangeEvent) => {
+      setPopupPlacementRevision((current) => current + 1);
       const isMobileViewport = isPhoneViewport === true;
       const hasOriginalEvent = Boolean(
         (e as ViewStateChangeEvent & { originalEvent?: Event }).originalEvent
@@ -2705,7 +3109,6 @@ export default function MapComponent({
           programmaticClearTimeoutRef.current = null;
         }
         setProgrammaticMove(false); // Clear immediately on moveend instead of waiting for timeout
-        setShowResetToResults(false);
         setActivePanBounds(null); // Clear active pan bounds
         if (isMobileViewport) {
           hasCompletedInitialMobileViewportSyncRef.current = true;
@@ -2756,7 +3159,6 @@ export default function MapComponent({
 
       // Mark that user has manually moved the map
       setHasUserMoved(true);
-      setShowResetToResults(shouldShowResetToResultsControl(bounds, listings));
 
       // Don't trigger search when zoomed out too far — viewport exceeds server max span
       const latSpan = bounds.maxLat - bounds.minLat;
@@ -2814,11 +3216,9 @@ export default function MapComponent({
       updateUnclusteredListings,
       setActivePanBounds,
       isProgrammaticMoveRef,
-      listings,
       setProgrammaticMove,
       setHasUserMoved,
       isPhoneViewport,
-      setShowResetToResults,
       setViewportInfoMessage,
       onMoveEndProp,
       MAP_MOVE_SEARCH_DEBOUNCE_MS,
@@ -2942,11 +3342,26 @@ export default function MapComponent({
     if (
       isPhoneViewport !== true ||
       shouldShowMobileStatusCard ||
-      hasPhonePreviewCard
+      hasPhonePreviewCard ||
+      mobileResultsView !== "map"
     ) {
-      setShowMobileToolsMenu(false);
+      setShowMobileToolsSheet(false);
     }
-  }, [hasPhonePreviewCard, isPhoneViewport, shouldShowMobileStatusCard]);
+  }, [
+    hasPhonePreviewCard,
+    isPhoneViewport,
+    mobileResultsView,
+    shouldShowMobileStatusCard,
+  ]);
+
+  useEffect(() => {
+    const isActive = isPhoneViewport === true && showMobileToolsSheet;
+    setMobileMapOverlayActive(isActive);
+
+    return () => {
+      setMobileMapOverlayActive(false);
+    };
+  }, [isPhoneViewport, setMobileMapOverlayActive, showMobileToolsSheet]);
 
   // Fetch and sanitize dark style as JSON object (same pattern as light style)
   // so zoom expression sanitization is applied before MapLibre processes it.
@@ -3041,6 +3456,14 @@ export default function MapComponent({
       // Fire controlled view state if provided
       handleControlledMove(e);
 
+      if (
+        usesPopupSelection &&
+        isPhoneViewport !== true &&
+        selectedListing
+      ) {
+        setPopupPlacementRevision((current) => current + 1);
+      }
+
       if (isProgrammaticMoveRef.current) return;
 
       if (onMoveThrottleRef.current) return; // Throttled
@@ -3060,7 +3483,14 @@ export default function MapComponent({
         maxLat: mapBounds.getNorth(),
       });
     },
-    [isProgrammaticMoveRef, setActivePanBounds, handleControlledMove]
+    [
+      handleControlledMove,
+      isPhoneViewport,
+      isProgrammaticMoveRef,
+      selectedListing,
+      setActivePanBounds,
+      usesPopupSelection,
+    ]
   );
 
   // P1-FIX (#83): Memoize handleMarkerClick to prevent recreation on every render
@@ -3071,40 +3501,48 @@ export default function MapComponent({
         if (usesPreviewSelection) {
           armPreviewBackgroundClickGuard();
         }
+        if (usesPopupSelection) {
+          captureDesktopPopupMarkerOrigin(listing.id);
+        }
         setSelectedListing(listing);
       }
       // Set active listing for card highlight and scroll-to
       lastMapActiveRef.current = listing.id;
       setActive(listing.id);
       requestScrollTo(listing.id);
-      // Mark as programmatic move to prevent follow-up auto-search from firing.
-      setProgrammaticMove(true);
-      // Safety: clear programmatic flag if moveEnd doesn't fire within 1.5s
-      if (programmaticClearTimeoutRef.current)
-        clearTimeout(programmaticClearTimeoutRef.current);
-      programmaticClearTimeoutRef.current = setTimeout(() => {
-        if (isProgrammaticMoveRef.current) {
-          setProgrammaticMove(false);
-        }
-      }, PROGRAMMATIC_MOVE_TIMEOUT_MS);
-      const popupOffset = getDesktopPopupFocusOffset();
-      mapRef.current?.easeTo({
-        center: [coords.lng, coords.lat],
-        duration: reducedMotion ? 0 : DESKTOP_POPUP_FOCUS_ANIMATION_MS,
-        ...(popupOffset ? { offset: popupOffset } : {}),
-      });
+      const shouldOpenDesktopPopupInPlace =
+        usesPopupSelection && isPhoneViewport !== true;
+
+      if (!shouldOpenDesktopPopupInPlace) {
+        // Mark as programmatic move to prevent follow-up auto-search from firing.
+        setProgrammaticMove(true);
+        // Safety: clear programmatic flag if moveEnd doesn't fire within 1.5s
+        if (programmaticClearTimeoutRef.current)
+          clearTimeout(programmaticClearTimeoutRef.current);
+        programmaticClearTimeoutRef.current = setTimeout(() => {
+          if (isProgrammaticMoveRef.current) {
+            setProgrammaticMove(false);
+          }
+        }, PROGRAMMATIC_MOVE_TIMEOUT_MS);
+        mapRef.current?.easeTo({
+          center: [coords.lng, coords.lat],
+          duration: reducedMotion ? 0 : DESKTOP_POPUP_FOCUS_ANIMATION_MS,
+        });
+      }
     },
     [
       armPreviewBackgroundClickGuard,
+      isPhoneViewport,
       usesOverlaySelection,
+      usesPopupSelection,
       usesPreviewSelection,
+      captureDesktopPopupMarkerOrigin,
       setSelectedListing,
       setActive,
       requestScrollTo,
       setProgrammaticMove,
       isProgrammaticMoveRef,
       reducedMotion,
-      getDesktopPopupFocusOffset,
     ]
   );
 
@@ -3198,32 +3636,12 @@ export default function MapComponent({
         </div>
       )}
 
-      {/* Tile loading indicator - transparent overlay with small centered pill */}
-      {isMapLoaded && areTilesLoading && (
-        <div
-          className="absolute inset-0 bg-transparent z-10 flex items-center justify-center pointer-events-none"
-          role="status"
-          aria-label="Loading map tiles"
-          aria-live="polite"
-        >
-          <div className="flex items-center gap-2 bg-surface-container-lowest/90 px-4 py-2 rounded-lg shadow-ambient-sm">
-            <Loader2
-              className="w-4 h-4 animate-spin text-on-surface-variant"
-              aria-hidden="true"
-            />
-            <span className="text-sm text-on-surface-variant">
-              Loading tiles...
-            </span>
-          </div>
-        </div>
-      )}
-
       {/* Search-as-move loading indicator */}
-      {isSearching && isMapLoaded && !areTilesLoading && (
+      {showSearchStatus && isMapLoaded && (
         <div
           className="absolute top-16 left-1/2 -translate-x-1/2 bg-surface-container-lowest/90 px-3 py-2 rounded-lg shadow-ambient-sm flex items-center gap-2 z-10 pointer-events-none"
           role="status"
-          aria-label="Searching area"
+          aria-label="Searching this area"
           aria-live="polite"
         >
           <Loader2
@@ -3231,7 +3649,7 @@ export default function MapComponent({
             aria-hidden="true"
           />
           <span className="text-sm text-on-surface-variant">
-            Searching area...
+            Searching this area...
           </span>
         </div>
       )}
@@ -3535,11 +3953,6 @@ export default function MapComponent({
           // Fix 2: Re-query unclustered features after all tiles rendered.
           // onIdle is the most reliable signal that tiles are fully loaded.
           updateUnclusteredListings();
-          if (pendingPopupContainmentTokenRef.current) {
-            schedulePopupContainmentCheck(
-              pendingPopupContainmentTokenRef.current
-            );
-          }
         }}
         onClick={async (e: MapLayerMouseEvent) => {
           // User pin drop takes priority
@@ -3564,6 +3977,9 @@ export default function MapComponent({
           }
           if (usesPreviewSelection && selectedListing) {
             dismissPreviewSelection();
+          }
+          if (usesPopupSelection && selectedListing) {
+            dismissDesktopPopupSelection({ restoreFocus: false });
           }
           // Otherwise handle cluster click
           if (useClustering) onClusterClick(e);
@@ -3705,113 +4121,22 @@ export default function MapComponent({
           <Popup
             longitude={selectedListing.location.lng}
             latitude={selectedListing.location.lat}
-            anchor="top"
-            onClose={handleSelectedListingClose}
+            anchor={desktopPopupPlacement?.anchor ?? "top"}
+            offset={DESKTOP_POPUP_OFFSETS}
+            onClose={() => handleSelectedListingClose(true)}
             closeOnClick={false}
             maxWidth="320px"
-            padding={DESKTOP_POPUP_SAFE_AREA}
             subpixelPositioning
-            className={`z-[60] [&_.maplibregl-popup-content]:rounded-xl [&_.maplibregl-popup-content]:p-0 [&_.maplibregl-popup-content]:!bg-transparent [&_.maplibregl-popup-content]:!shadow-none [&_.maplibregl-popup-close-button]:hidden ${
-              isDarkMode
-                ? "[&_.maplibregl-popup-tip]:border-t-on-surface"
-                : "[&_.maplibregl-popup-tip]:border-t-white"
-            }`}
+            className="z-[60] [&_.maplibregl-popup-content]:rounded-xl [&_.maplibregl-popup-content]:p-0 [&_.maplibregl-popup-content]:!bg-transparent [&_.maplibregl-popup-content]:!shadow-none [&_.maplibregl-popup-close-button]:hidden [&_.maplibregl-popup-tip]:hidden"
           >
-            {/* Premium Card Design */}
-            <div
-              ref={selectedPopupCardRef}
-              data-testid="map-popup-card"
-              className={`w-[280px] overflow-hidden rounded-xl ${
-                isDarkMode
-                  ? "bg-on-surface shadow-[0_10px_40px_-10px_rgba(0,0,0,0.5)]"
-                  : "bg-surface-container-lowest shadow-[0_10px_40px_-10px_rgba(0,0,0,0.15)]"
-              }`}
-            >
-              {/* Image Thumbnail - optimized with next/image */}
-              <div
-                className={`aspect-[16/9] relative overflow-hidden ${isDarkMode ? "bg-on-surface" : "bg-surface-container-high"}`}
-              >
-                {selectedListing.images && selectedListing.images[0] ? (
-                  <Image
-                    src={selectedListing.images[0]}
-                    alt={selectedListing.title}
-                    fill
-                    sizes="280px"
-                    className="object-cover"
-                  />
-                ) : (
-                  <div className="w-full h-full flex items-center justify-center">
-                    <Home
-                      className={`w-10 h-10 ${isDarkMode ? "text-on-surface-variant" : "text-on-surface-variant"}`}
-                    />
-                  </div>
-                )}
-                {/* Close button overlay */}
-                <div className="absolute top-2 right-2">
-                  <Button
-                    variant="ghost"
-                    size="icon"
-                    onClick={handleSelectedListingClose}
-                    className="rounded-full bg-on-surface/50 hover:bg-on-surface/70 text-white hover:text-white border-none"
-                    aria-label="Close listing preview"
-                  >
-                    <X className="w-4 h-4" />
-                  </Button>
-                </div>
-                {/* Availability badge */}
-                <div className="absolute bottom-2 left-2">
-                  <span
-                    className={`inline-flex px-2 py-0.5 rounded-md text-xs font-semibold uppercase ${
-                      selectedListing.availableSlots > 0
-                        ? "bg-emerald-500 text-white"
-                        : "bg-on-surface text-white"
-                    }`}
-                  >
-                    {selectedListing.availableSlots > 0
-                      ? `${selectedListing.availableSlots} Available`
-                      : "Filled"}
-                  </span>
-                </div>
-              </div>
-
-              {/* Content */}
-              <div className="p-3">
-                <h3
-                  className={`font-semibold text-sm line-clamp-1 mb-1 ${isDarkMode ? "text-white" : "text-on-surface"}`}
-                >
-                  {selectedListing.title}
-                </h3>
-                <p className="mb-3">
-                  <span
-                    className={`text-lg font-bold ${isDarkMode ? "text-white" : "text-on-surface"}`}
-                  >
-                    ${selectedListing.price}
-                  </span>
-                  <span
-                    className={`text-sm ${isDarkMode ? "text-on-surface-variant" : "text-on-surface-variant"}`}
-                  >
-                    /month
-                  </span>
-                </p>
-                <div className="flex gap-2">
-                  <Link
-                    href={`/listings/${selectedListing.id}`}
-                    className="flex-1"
-                  >
-                    <Button
-                      size="sm"
-                      className={`w-full h-9 text-xs-plus font-medium rounded-lg ${
-                        isDarkMode
-                          ? "bg-surface-container-lowest text-on-surface hover:bg-surface-container-high"
-                          : "bg-on-surface text-white hover:bg-on-surface"
-                      }`}
-                    >
-                      View Details
-                    </Button>
-                  </Link>
-                </div>
-              </div>
-            </div>
+            <DesktopListingPreviewCard
+              key={selectedListing.id}
+              listing={selectedListing}
+              isDarkMode={isDarkMode}
+              onClose={() => handleSelectedListingClose(true)}
+              cardRef={selectedPopupCardRef}
+              closeButtonRef={selectedPopupCloseButtonRef}
+            />
           </Popup>
         )}
 
@@ -3859,7 +4184,7 @@ export default function MapComponent({
               >
                 <button
                   type="button"
-                  onClick={handleSelectedListingClose}
+                  onClick={() => handleSelectedListingClose(true)}
                   className="absolute top-3 right-3 z-10 flex h-8 w-8 items-center justify-center rounded-full bg-on-surface/55 text-white backdrop-blur-sm transition-colors hover:bg-on-surface/70 focus:outline-none focus-visible:ring-2 focus-visible:ring-primary/30"
                   aria-label="Close listing preview"
                 >
@@ -3927,7 +4252,7 @@ export default function MapComponent({
         style={{ top: "calc(var(--header-height, 4rem) + 1rem)" }}
       >
         {/* Zoom Controls (Mobile Only) */}
-        {isPhoneViewport === true && (
+        {isPhoneViewport === true && !showMobileToolsSheet && (
           <div className="flex flex-col overflow-hidden rounded-2xl border border-outline-variant/20 bg-surface-container-lowest/95 shadow-ambient backdrop-blur-md">
             <button
               type="button"
@@ -3955,68 +4280,27 @@ export default function MapComponent({
         )}
 
         {isPhoneViewport === true && !shouldShowMobileStatusCard && (
-          <>
-            {showMobileToolsMenu && (
-              <div className="flex flex-col gap-2 rounded-[1.5rem] border border-outline-variant/20 bg-surface-container-lowest/95 p-2 shadow-ambient backdrop-blur-md">
-                {showResetToResults && listings.length >= 1 && isMapLoaded ? (
-                  <button
-                    type="button"
-                    onClick={() => {
-                      triggerHaptic();
-                      handleFitAllResults();
-                      setShowMobileToolsMenu(false);
-                    }}
-                    className="flex min-h-[44px] items-center gap-2 rounded-[1rem] px-3 py-2 text-sm font-medium text-on-surface transition-colors hover:bg-surface-container-high focus:outline-none focus-visible:ring-2 focus-visible:ring-primary/30"
-                    aria-label="Fit all results in view"
-                    title="Fit all results"
-                  >
-                    <Maximize2 className="w-4 h-4" />
-                    Fit all
-                  </button>
-                ) : null}
-                <button
-                  type="button"
-                  onClick={() => {
-                    triggerHaptic();
-                    toggleDropMode();
-                    setShowMobileToolsMenu(false);
-                  }}
-                  className={cn(
-                    "flex min-h-[44px] items-center gap-2 rounded-[1rem] px-3 py-2 text-sm font-medium transition-colors focus:outline-none focus-visible:ring-2 focus-visible:ring-primary/30",
-                    isDropMode
-                      ? "bg-rose-500/90 text-white"
-                      : "text-on-surface hover:bg-surface-container-high"
-                  )}
-                  aria-label={
-                    isDropMode ? "Cancel drop pin" : "Drop a pin on the map"
-                  }
-                  title={isDropMode ? "Cancel drop pin" : "Drop a pin"}
-                >
-                  <MapPin className="w-4 h-4" />
-                  {isDropMode ? "Cancel drop pin" : "Drop pin"}
-                </button>
-              </div>
-            )}
-
-            <button
-              type="button"
-              onClick={() => {
+          <MobileMapToolsSheet
+            open={showMobileToolsSheet}
+            onOpenChange={(open) => {
+              if (open) {
                 triggerHaptic();
-                setShowMobileToolsMenu((prev) => !prev);
-              }}
-              className={cn(
-                "flex h-11 w-11 items-center justify-center rounded-full border shadow-ambient backdrop-blur-md transition-colors focus:outline-none focus-visible:ring-2 focus-visible:ring-primary/30 focus-visible:ring-offset-2",
-                showMobileToolsMenu
-                  ? "border-on-surface/20 bg-on-surface text-white"
-                  : "border-outline-variant/20 bg-surface-container-lowest/95 text-on-surface-variant hover:bg-surface-container-high"
-              )}
-              aria-label="More map tools"
-              aria-expanded={showMobileToolsMenu ? "true" : "false"}
-              title="More map tools"
-            >
-              <Ellipsis className="w-4 h-4" />
-            </button>
-          </>
+              }
+              setShowMobileToolsSheet(open);
+            }}
+            activePOICategories={activePOICategories}
+            onTogglePOICategory={togglePOICategory}
+            isDropMode={isDropMode}
+            hasPin={Boolean(userPin)}
+            onToggleDropMode={() => {
+              triggerHaptic();
+              toggleDropMode();
+            }}
+            onClearPin={() => {
+              triggerHaptic();
+              setUserPin(null);
+            }}
+          />
         )}
       </div>
 
@@ -4029,8 +4313,6 @@ export default function MapComponent({
           onToggleDropMode={toggleDropMode}
           onClearPin={() => setUserPin(null)}
           onHideMap={handleHideMap}
-          showResetToResults={showResetToResults}
-          onResetToResults={handleFitAllResults}
           canFullscreen={canFullscreen}
           isFullscreen={isFullscreen}
           onToggleFullscreen={handleToggleFullscreen}
@@ -4061,7 +4343,10 @@ export default function MapComponent({
       )}
 
       {/* Mobile gesture hint - shown once for first-time touch users */}
-      {isMapLoaded && !shouldShowMobileStatusCard && !hasPhonePreviewCard && (
+      {isMapLoaded &&
+        !showMobileToolsSheet &&
+        !shouldShowMobileStatusCard &&
+        !hasPhonePreviewCard && (
         <MapGestureHint />
       )}
 

@@ -383,6 +383,7 @@ jest.mock("@/contexts/ListingFocusContext", () => ({
 jest.mock("@/contexts/SearchTransitionContext", () => ({
   useSearchTransitionSafe: () => ({
     isPending: false,
+    pendingReason: null,
     replaceWithTransition: jest.fn(),
   }),
 }));

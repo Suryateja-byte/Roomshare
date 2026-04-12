@@ -29,6 +29,8 @@ interface MobileSearchContextValue {
   mobileResultsView: MobileResultsView;
   /** Optional preferred mobile view requested by other surfaces (for example, stale map state) */
   mobileResultsViewPreference: MobileResultsView | null;
+  /** Whether a modal mobile map overlay is currently covering the phone viewport */
+  mobileMapOverlayActive: boolean;
   /** Expand the search bar */
   expand: () => void;
   /** Collapse the search bar (let scroll behavior take over) */
@@ -41,6 +43,8 @@ interface MobileSearchContextValue {
   setMobileResultsView: (view: MobileResultsView) => void;
   /** Request a preferred mobile results view without forcing future refinements to reset */
   setMobileResultsViewPreference: (view: MobileResultsView | null) => void;
+  /** Mark the phone viewport as covered by a modal map overlay */
+  setMobileMapOverlayActive: (active: boolean) => void;
   /** Callback to open the highest-priority registered filter drawer */
   openFilters: () => void;
   /** Register a filter drawer opener and return a cleanup callback */
@@ -63,12 +67,14 @@ const FALLBACK_CONTEXT: MobileSearchContextValue = {
   mobileSheetOverrideLabel: null,
   mobileResultsView: "map",
   mobileResultsViewPreference: null,
+  mobileMapOverlayActive: false,
   expand: () => {},
   collapse: () => {},
   setSearchResultsLabel: () => {},
   setMobileSheetOverrideLabel: () => {},
   setMobileResultsView: () => {},
   setMobileResultsViewPreference: () => {},
+  setMobileMapOverlayActive: () => {},
   openFilters: () => {},
   registerOpenFilters: () => () => {},
 };
@@ -87,6 +93,8 @@ export function MobileSearchProvider({
     useState<MobileResultsView>("map");
   const [mobileResultsViewPreference, setMobileResultsViewPreferenceState] =
     useState<MobileResultsView | null>(null);
+  const [mobileMapOverlayActive, setMobileMapOverlayActiveState] =
+    useState(false);
 
   // Store registrations in refs so handlers can be added/removed without re-rendering.
   const openFiltersRegistrationsRef = useRef<
@@ -123,6 +131,10 @@ export function MobileSearchProvider({
     },
     []
   );
+
+  const setMobileMapOverlayActive = useCallback((active: boolean) => {
+    setMobileMapOverlayActiveState(active);
+  }, []);
 
   const openFilters = useCallback(() => {
     const registrations = openFiltersRegistrationsRef.current;
@@ -168,12 +180,14 @@ export function MobileSearchProvider({
       mobileSheetOverrideLabel,
       mobileResultsView,
       mobileResultsViewPreference,
+      mobileMapOverlayActive,
       expand,
       collapse,
       setSearchResultsLabel,
       setMobileSheetOverrideLabel,
       setMobileResultsView,
       setMobileResultsViewPreference,
+      setMobileMapOverlayActive,
       openFilters,
       registerOpenFilters,
     }),
@@ -183,12 +197,14 @@ export function MobileSearchProvider({
       mobileSheetOverrideLabel,
       mobileResultsView,
       mobileResultsViewPreference,
+      mobileMapOverlayActive,
       expand,
       collapse,
       setSearchResultsLabel,
       setMobileSheetOverrideLabel,
       setMobileResultsView,
       setMobileResultsViewPreference,
+      setMobileMapOverlayActive,
       openFilters,
       registerOpenFilters,
     ]

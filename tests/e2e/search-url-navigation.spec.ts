@@ -70,9 +70,8 @@ test.describe("Search URL Browser Navigation (P1)", () => {
     // Go back -> should return to state A (no maxPrice)
     await page.goBack();
     await page.waitForLoadState("domcontentloaded");
-
-    const urlAfterBack = new URL(page.url());
-    expect(urlAfterBack.searchParams.has("maxPrice")).toBe(false);
+    await waitForSearchContent(page);
+    await pollForUrlParam(page, "maxPrice", null);
   });
 
   // -------------------------------------------------------------------------

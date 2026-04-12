@@ -289,6 +289,26 @@ async function getFirstCardId(page: Page): Promise<string | null> {
   return card.getAttribute("data-listing-id");
 }
 
+async function expectPopupWithinMapPane(page: Page): Promise<void> {
+  const mapBox = await page.locator('[data-testid="map"]').boundingBox();
+  const popupBox = await page
+    .locator('[data-testid="map-popup-card"]')
+    .boundingBox();
+
+  expect(mapBox).not.toBeNull();
+  expect(popupBox).not.toBeNull();
+
+  const tolerancePx = 2;
+  expect(popupBox!.x).toBeGreaterThanOrEqual(mapBox!.x - tolerancePx);
+  expect(popupBox!.y).toBeGreaterThanOrEqual(mapBox!.y - tolerancePx);
+  expect(popupBox!.x + popupBox!.width).toBeLessThanOrEqual(
+    mapBox!.x + mapBox!.width + tolerancePx
+  );
+  expect(popupBox!.y + popupBox!.height).toBeLessThanOrEqual(
+    mapBox!.y + mapBox!.height + tolerancePx
+  );
+}
+
 // ---------------------------------------------------------------------------
 // Test Suite
 // ---------------------------------------------------------------------------
@@ -452,9 +472,15 @@ test.describe("Map-List Synchronization", () => {
       expect(cardState.isActive).toBe(true);
       const popupVisible = await popup.isVisible();
       expect(popupVisible).toBe(true);
+      await expect(page.locator('[data-testid="map-popup-card"]')).toBeVisible({
+        timeout: timeouts.action,
+      });
+      await expect(async () => {
+        await expectPopupWithinMapPane(page);
+      }).toPass({ timeout: timeouts.action, intervals: [200, 500, 1000] });
     });
 
-    test("1.5 - Close popup -> card highlight persists (activeId independent from selectedListing)", async ({
+    test("1.5 - Close popup -> card highlight clears", async ({
       page,
     }) => {
       const listingId = await getFirstMarkerIdOrSkip(page);
@@ -482,9 +508,9 @@ test.describe("Map-List Synchronization", () => {
       // Popup should be gone
       await expect(popup).not.toBeVisible({ timeout: 2000 });
 
-      // Card highlight should STILL be present (activeId persists)
+      // Closing the popup clears the card highlight as well.
       const cardState = await getCardState(page, listingId);
-      expect(cardState.isActive).toBe(true);
+      expect(cardState.isActive).toBe(false);
     });
   });
 
@@ -1418,7 +1444,7 @@ test.describe("Map-List Synchronization", () => {
       expect(cardState.isActive).toBe(true);
     });
 
-    test("Escape closes popup but card highlight persists", async ({
+    test("Escape closes popup and clears card highlight", async ({
       page,
     }) => {
       const listingId = await getFirstMarkerIdOrSkip(page);
@@ -1453,10 +1479,9 @@ test.describe("Map-List Synchronization", () => {
       // Popup gone
       await expect(popup).not.toBeVisible({ timeout: 2000 });
 
-      // Card highlight persists (Escape only calls setSelectedListing(null),
-      // NOT setActive(null))
+      // Escape clears both popup state and the active card highlight.
       const cardState = await getCardState(page, listingId);
-      expect(cardState.isActive).toBe(true);
+      expect(cardState.isActive).toBe(false);
     });
 
     test("Marker hover debounces scroll request (300ms)", async ({ page }) => {
@@ -1565,7 +1590,7 @@ test.describe("Map-List Synchronization", () => {
       await page.mouse.move(0, 0);
     });
 
-    test("Clicking 'Show on map' button sets activeId on card", async ({
+    test("Clicking 'Show on map' opens the anchored popup and activates the card", async ({
       page,
     }) => {
       const cardId = await getFirstCardId(page);
@@ -1580,10 +1605,20 @@ test.describe("Map-List Synchronization", () => {
 
       await showOnMapBtn.click();
 
-      // Card should now have active ring (setActive was called)
+      // Card should now have active ring and the desktop popup should use the
+      // same anchored preview path as marker clicks.
       await waitForCardHighlight(page, cardId!, timeouts.action);
       const cardState = await getCardState(page, cardId!);
       expect(cardState.isActive).toBe(true);
+      await expect(page.locator(".maplibregl-popup")).toBeVisible({
+        timeout: timeouts.action,
+      });
+      await expect(page.locator('[data-testid="map-popup-card"]')).toBeVisible({
+        timeout: timeouts.action,
+      });
+      await expect(async () => {
+        await expectPopupWithinMapPane(page);
+      }).toPass({ timeout: timeouts.action, intervals: [200, 500, 1000] });
     });
   });
 });

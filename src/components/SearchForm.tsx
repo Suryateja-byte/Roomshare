@@ -463,7 +463,9 @@ export default function SearchForm({
         // bypassed SearchTransitionContext, so the loading overlay never appeared
         // during NLP-triggered navigations on the Search Page.
         if (transitionContext) {
-          transitionContext.navigateWithTransition(searchUrl);
+          transitionContext.navigateWithTransition(searchUrl, {
+            reason: "search-submit",
+          });
         } else {
           router.push(searchUrl);
         }
@@ -601,7 +603,9 @@ export default function SearchForm({
         }
 
         if (transitionContext) {
-          transitionContext.navigateWithTransition(searchUrl);
+          transitionContext.navigateWithTransition(searchUrl, {
+            reason: "search-submit",
+          });
         } else {
           router.push(searchUrl);
         }
@@ -701,7 +705,9 @@ export default function SearchForm({
     );
     const searchUrl = `/search${preserved ? `?${preserved}` : ""}`;
     if (transitionContext) {
-      transitionContext.navigateWithTransition(searchUrl);
+      transitionContext.navigateWithTransition(searchUrl, {
+        reason: "filter",
+      });
     } else {
       router.push(searchUrl);
     }

@@ -256,7 +256,7 @@ function isValidViewport(params: URLSearchParams): {
     : maxLng - minLng;
 
   if (latSpan > MAP_FETCH_MAX_LAT_SPAN || lngSpan > MAP_FETCH_MAX_LNG_SPAN) {
-    return { valid: false, error: "Zoom in further to see listings" };
+    return { valid: false, error: "Zoom in further to update results" };
   }
 
   return { valid: true };
@@ -319,30 +319,13 @@ function MapLoadingPlaceholder() {
   );
 }
 
-// Subtle loading overlay shown when list is transitioning (filter change)
-// This coordinates visual feedback between map and list
-function MapTransitionOverlay() {
-  return (
-    <div
-      className="absolute inset-0 z-10 bg-transparent pointer-events-none flex items-start justify-center pt-20"
-      role="status"
-      aria-label="Updating map results"
-    >
-      <span className="inline-flex items-center gap-1.5 px-3 py-1.5 bg-surface-container-lowest rounded-full shadow-md border border-outline-variant/20 text-xs font-medium text-on-surface-variant">
-        <span className="w-1.5 h-1.5 rounded-full bg-surface-container-high animate-pulse" />
-        Updating...
-      </span>
-    </div>
-  );
-}
-
 // Thin loading bar at top of map when fetching new marker data
 function MapDataLoadingBar() {
   return (
     <div
       className="absolute top-0 left-0 right-0 z-20 h-1 overflow-hidden pointer-events-none"
-      role="status"
-      aria-label="Loading map data"
+      aria-hidden="true"
+      data-testid="map-data-loading-bar"
     >
       <div className="h-full bg-on-surface/80 animate-[shimmer_1.5s_ease-in-out_infinite] origin-left" />
       <style jsx>{`
@@ -467,7 +450,11 @@ export default function PersistentMapWrapper({
 
   // Coordinate with list transitions - show overlay when list is loading
   const transitionContext = useSearchTransitionSafe();
-  const isListTransitioning = transitionContext?.isPending ?? false;
+  const isMapPanTransition =
+    transitionContext?.isPending === true &&
+    transitionContext?.pendingReason === "map-pan";
+  const isListTransitioning =
+    transitionContext?.isPending === true && !isMapPanTransition;
   // Only trust V2 data when V2 mode is explicitly enabled.
   // This prevents stale context data from masking fresh V1 filtered results.
   const hasV2Data = isV2Enabled && v2MapData !== null;
@@ -908,7 +895,7 @@ export default function PersistentMapWrapper({
         }
         // Oversized viewport: keep existing map data instead of fetching a tiny
         // center-clamped box that can appear empty and wipe visible clusters.
-        setInfoMessage("Zoom in further to load listings in this area");
+        setInfoMessage("Zoom in further to update results");
         setIsFetchingMapData(false);
         return;
       } else {
@@ -1039,7 +1026,7 @@ export default function PersistentMapWrapper({
       ? 180 - activePanBounds.minLng + (activePanBounds.maxLng + 180)
       : activePanBounds.maxLng - activePanBounds.minLng;
     if (latSpan > MAP_FETCH_MAX_LAT_SPAN || lngSpan > MAP_FETCH_MAX_LNG_SPAN) {
-      setInfoMessage("Zoom in further to load listings in this area");
+      setInfoMessage("Zoom in further to update results");
       return;
     }
 
@@ -1170,8 +1157,6 @@ export default function PersistentMapWrapper({
         <MapDataLoadingBar />
       )}
       {/* Marker loading shimmer removed - stale-while-revalidate keeps old markers visible */}
-      {/* Coordinated loading overlay - shows when list is transitioning (filter change) */}
-      {isListTransitioning && <MapTransitionOverlay />}
       <MapErrorBoundary>
         <Suspense fallback={<MapLoadingPlaceholder />}>
           <LazyDynamicMap

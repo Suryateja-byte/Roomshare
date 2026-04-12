@@ -8,9 +8,11 @@ import {
 
 // Mock useRouter
 const mockPush = jest.fn();
+const mockReplace = jest.fn();
 jest.mock("next/navigation", () => ({
   useRouter: () => ({
     push: mockPush,
+    replace: mockReplace,
   }),
 }));
 
@@ -25,19 +27,35 @@ function TestConsumer({
   return (
     <div>
       <span data-testid="is-pending">{String(context.isPending)}</span>
+      <span data-testid="pending-reason">{context.pendingReason ?? "none"}</span>
       <button
-        onClick={() => context.navigateWithTransition("/test-url")}
+        onClick={() =>
+          context.navigateWithTransition("/test-url", {
+            reason: "search-submit",
+          })
+        }
         data-testid="navigate-btn"
       >
         Navigate
       </button>
       <button
         onClick={() =>
-          context.navigateWithTransition("/scroll-test", { scroll: true })
+          context.navigateWithTransition("/scroll-test", {
+            scroll: true,
+            reason: "filter",
+          })
         }
         data-testid="navigate-scroll-btn"
       >
         Navigate with scroll
+      </button>
+      <button
+        onClick={() =>
+          context.replaceWithTransition("/replace-url", { reason: "map-pan" })
+        }
+        data-testid="replace-btn"
+      >
+        Replace
       </button>
     </div>
   );
@@ -70,6 +88,7 @@ describe("SearchTransitionContext", () => {
       );
 
       expect(screen.getByTestId("is-pending")).toHaveTextContent("false");
+      expect(screen.getByTestId("pending-reason")).toHaveTextContent("none");
     });
 
     it("provides navigateWithTransition function", async () => {
@@ -84,6 +103,9 @@ describe("SearchTransitionContext", () => {
 
       // Should call router.push with scroll: false by default
       expect(mockPush).toHaveBeenCalledWith("/test-url", { scroll: false });
+      expect(screen.getByTestId("pending-reason")).toHaveTextContent(
+        "search-submit"
+      );
     });
 
     it("respects scroll option when provided", async () => {
@@ -98,6 +120,25 @@ describe("SearchTransitionContext", () => {
 
       // Should call router.push with scroll: true when specified
       expect(mockPush).toHaveBeenCalledWith("/scroll-test", { scroll: true });
+      expect(screen.getByTestId("pending-reason")).toHaveTextContent("filter");
+    });
+
+    it("provides replaceWithTransition and tracks map-pan reason", async () => {
+      const user = userEvent.setup();
+      render(
+        <SearchTransitionProvider>
+          <TestConsumer />
+        </SearchTransitionProvider>
+      );
+
+      await user.click(screen.getByTestId("replace-btn"));
+
+      expect(mockReplace).toHaveBeenCalledWith("/replace-url", {
+        scroll: false,
+      });
+      expect(screen.getByTestId("pending-reason")).toHaveTextContent(
+        "map-pan"
+      );
     });
 
     it("provides startTransition function", () => {

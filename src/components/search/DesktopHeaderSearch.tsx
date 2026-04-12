@@ -272,7 +272,9 @@ export const DesktopHeaderSearch = forwardRef<
   const navigateToSearch = useCallback(
     (searchUrl: string) => {
       if (transitionContext) {
-        transitionContext.navigateWithTransition(searchUrl);
+        transitionContext.navigateWithTransition(searchUrl, {
+          reason: "search-submit",
+        });
       } else {
         router.push(searchUrl);
       }

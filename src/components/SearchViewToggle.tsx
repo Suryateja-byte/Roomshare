@@ -47,6 +47,7 @@ export default function SearchViewToggle({
   const {
     searchResultsLabel,
     mobileSheetOverrideLabel,
+    mobileMapOverlayActive,
     mobileResultsViewPreference,
     setMobileResultsView,
   } = useMobileSearch();
@@ -231,10 +232,12 @@ export default function SearchViewToggle({
         </MobileBottomSheet>
 
         {/* Floating toggle pill */}
-        <FloatingMapButton
-          isListMode={mobileSnap !== MOBILE_SNAP_MAP}
-          onToggle={handleFloatingToggle}
-        />
+        {!mobileMapOverlayActive ? (
+          <FloatingMapButton
+            isListMode={mobileSnap !== MOBILE_SNAP_MAP}
+            onToggle={handleFloatingToggle}
+          />
+        ) : null}
       </div>
 
       {/* Desktop Split View */}

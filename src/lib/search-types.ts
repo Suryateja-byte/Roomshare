@@ -122,7 +122,10 @@ export interface MapListingData {
   price: number;
   availableSlots: number;
   images: string[];
+  roomType?: string;
   location: {
+    city?: string;
+    state?: string;
     lat: number;
     lng: number;
   };

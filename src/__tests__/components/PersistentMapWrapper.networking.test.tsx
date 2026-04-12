@@ -5,7 +5,7 @@
  * in the PersistentMapWrapper component.
  */
 
-import { render, waitFor, act } from "@testing-library/react";
+import { render, screen, waitFor, act } from "@testing-library/react";
 
 // Mock next/navigation
 const mockSearchParams = new URLSearchParams();
@@ -34,6 +34,54 @@ const mockV2MapData = {
 
 let mockIsV2Enabled = false;
 let mockHasV2Data = false;
+let mockTransitionPending = false;
+let mockPendingReason: "search-submit" | "filter" | "sort" | "map-pan" | null =
+  null;
+
+function getRequestQueryHash(options?: {
+  headers?: RequestInit["headers"];
+}): string {
+  const headers = options?.headers;
+  if (!headers) return "test-query-hash";
+
+  if (headers instanceof Headers) {
+    return headers.get("x-search-query-hash") ?? "test-query-hash";
+  }
+
+  if (Array.isArray(headers)) {
+    return (
+      headers.find(([key]) => key === "x-search-query-hash")?.[1] ??
+      "test-query-hash"
+    );
+  }
+
+  return headers["x-search-query-hash"] ?? "test-query-hash";
+}
+
+function createOkMapResponse(
+  listings: Array<{
+    id: string;
+    title: string;
+    price: number;
+    location: { lat: number; lng: number };
+  }> = [],
+  options?: RequestInit
+) {
+  return {
+    ok: true,
+    status: 200,
+    headers: new Headers({ "x-request-id": "test-123" }),
+    json: async () => ({
+      kind: "ok" as const,
+      data: { listings, truncated: false },
+      meta: {
+        queryHash: getRequestQueryHash(options),
+        backendSource: "map-api" as const,
+        responseVersion: "test",
+      },
+    }),
+  };
+}
 
 jest.mock("@/contexts/SearchV2DataContext", () => ({
   useSearchV2Data: () => ({
@@ -50,7 +98,10 @@ jest.mock("@/contexts/SearchV2DataContext", () => ({
 
 // Mock SearchTransitionContext
 jest.mock("@/contexts/SearchTransitionContext", () => ({
-  useSearchTransitionSafe: () => ({ isPending: false }),
+  useSearchTransitionSafe: () => ({
+    isPending: mockTransitionPending,
+    pendingReason: mockPendingReason,
+  }),
 }));
 
 // Mock fetch
@@ -69,6 +120,8 @@ describe("PersistentMapWrapper - Networking & Race Conditions (P1-7)", () => {
     // Reset mocks
     mockIsV2Enabled = false;
     mockHasV2Data = false;
+    mockTransitionPending = false;
+    mockPendingReason = null;
 
     // Reset search params with valid bounds
     mockSearchParams.delete("minLng");
@@ -81,21 +134,20 @@ describe("PersistentMapWrapper - Networking & Race Conditions (P1-7)", () => {
     mockSearchParams.set("maxLat", "38.0");
 
     // Default successful response
-    mockFetch.mockResolvedValue({
-      ok: true,
-      status: 200,
-      headers: new Headers({ "x-request-id": "test-123" }),
-      json: async () => ({
-        listings: [
-          {
-            id: "1",
-            title: "Test",
-            price: 1000,
-            location: { lat: 37.7, lng: -122.4 },
-          },
-        ],
-      }),
-    });
+    mockFetch.mockImplementation(
+      async (_url: string, options?: { headers?: Record<string, string> }) =>
+        createOkMapResponse(
+          [
+            {
+              id: "1",
+              title: "Test",
+              price: 1000,
+              location: { lat: 37.7, lng: -122.4 },
+            },
+          ],
+          options
+        )
+    );
   });
 
   afterEach(() => {
@@ -147,12 +199,7 @@ describe("PersistentMapWrapper - Networking & Race Conditions (P1-7)", () => {
                 reject(new DOMException("Aborted", "AbortError"));
                 return;
               }
-              resolve({
-                ok: true,
-                status: 200,
-                headers: new Headers(),
-                json: async () => ({ listings: [] }),
-              });
+              resolve(createOkMapResponse([], options));
             }, 500);
 
             options?.signal?.addEventListener("abort", () => {
@@ -220,12 +267,7 @@ describe("PersistentMapWrapper - Networking & Race Conditions (P1-7)", () => {
           if (options?.signal) {
             abortSignals.push(options.signal);
           }
-          return Promise.resolve({
-            ok: true,
-            status: 200,
-            headers: new Headers(),
-            json: async () => ({ listings: [] }),
-          });
+          return Promise.resolve(createOkMapResponse([], options));
         }
       );
 
@@ -503,12 +545,10 @@ describe("PersistentMapWrapper - Networking & Race Conditions (P1-7)", () => {
           headers: new Headers({ "Retry-After": "2" }),
           json: async () => ({ error: "Too many requests", retryAfter: 2 }),
         })
-        .mockResolvedValueOnce({
-          ok: true,
-          status: 200,
-          headers: new Headers(),
-          json: async () => ({ listings: [] }),
-        });
+        .mockImplementationOnce(
+          async (_url: string, options?: { headers?: Record<string, string> }) =>
+            createOkMapResponse([], options)
+        );
 
       const { container } = render(
         <PersistentMapWrapper shouldRenderMap={true} />
@@ -520,9 +560,8 @@ describe("PersistentMapWrapper - Networking & Race Conditions (P1-7)", () => {
       });
 
       // After 429, loading bar should STILL be visible during retry delay
-      // The MapDataLoadingBar has role="status" and aria-label="Loading map data"
       const loadingBar = container.querySelector(
-        '[role="status"][aria-label="Loading map data"]'
+        '[data-testid="map-data-loading-bar"]'
       );
       expect(loadingBar).toBeInTheDocument();
 
@@ -534,7 +573,7 @@ describe("PersistentMapWrapper - Networking & Race Conditions (P1-7)", () => {
       // After successful retry, loading bar should be gone
       await waitFor(() => {
         const bar = container.querySelector(
-          '[role="status"][aria-label="Loading map data"]'
+          '[data-testid="map-data-loading-bar"]'
         );
         expect(bar).not.toBeInTheDocument();
       });
@@ -553,21 +592,20 @@ describe("PersistentMapWrapper - Networking & Race Conditions (P1-7)", () => {
           headers: new Headers({ "Retry-After": "2" }),
           json: async () => ({ error: "Too many requests" }),
         })
-        .mockResolvedValueOnce({
-          ok: true,
-          status: 200,
-          headers: new Headers(),
-          json: async () => ({
-            listings: [
-              {
-                id: "retry-ok",
-                title: "Retry Listing",
-                price: 500,
-                location: { lat: 37.7, lng: -122.4 },
-              },
-            ],
-          }),
-        });
+        .mockImplementationOnce(
+          async (_url: string, options?: { headers?: Record<string, string> }) =>
+            createOkMapResponse(
+              [
+                {
+                  id: "retry-ok",
+                  title: "Retry Listing",
+                  price: 500,
+                  location: { lat: 37.7, lng: -122.4 },
+                },
+              ],
+              options
+            )
+        );
 
       const { container } = render(
         <PersistentMapWrapper shouldRenderMap={true} />
@@ -583,9 +621,7 @@ describe("PersistentMapWrapper - Networking & Race Conditions (P1-7)", () => {
 
       // Loading bar should be visible during retry delay
       expect(
-        container.querySelector(
-          '[role="status"][aria-label="Loading map data"]'
-        )
+        container.querySelector('[data-testid="map-data-loading-bar"]')
       ).toBeInTheDocument();
 
       // Advance past retry delay — retry fires with fresh signal
@@ -606,9 +642,7 @@ describe("PersistentMapWrapper - Networking & Race Conditions (P1-7)", () => {
       // After successful retry, loading bar should be gone
       await waitFor(() => {
         expect(
-          container.querySelector(
-            '[role="status"][aria-label="Loading map data"]'
-          )
+          container.querySelector('[data-testid="map-data-loading-bar"]')
         ).not.toBeInTheDocument();
       });
     });
@@ -622,12 +656,9 @@ describe("PersistentMapWrapper - Networking & Race Conditions (P1-7)", () => {
             url,
             aborted: options?.signal?.aborted ?? false,
           });
-          return Promise.resolve({
-            ok: true,
-            status: 200,
-            headers: new Headers(),
-            json: async () => ({
-              listings: [
+          return Promise.resolve(
+            createOkMapResponse(
+              [
                 {
                   id: "1",
                   title: "Test",
@@ -635,8 +666,9 @@ describe("PersistentMapWrapper - Networking & Race Conditions (P1-7)", () => {
                   location: { lat: 37.7, lng: -122.4 },
                 },
               ],
-            }),
-          });
+              options
+            )
+          );
         }
       );
 
@@ -656,12 +688,10 @@ describe("PersistentMapWrapper - Networking & Race Conditions (P1-7)", () => {
       // First request fails
       mockFetch
         .mockRejectedValueOnce(new Error("Network error"))
-        .mockResolvedValueOnce({
-          ok: true,
-          status: 200,
-          headers: new Headers(),
-          json: async () => ({ listings: [] }),
-        });
+        .mockImplementationOnce(
+          async (_url: string, options?: { headers?: Record<string, string> }) =>
+            createOkMapResponse([], options)
+        );
 
       const consoleSpy = jest
         .spyOn(console, "error")
@@ -716,9 +746,7 @@ describe("PersistentMapWrapper - Networking & Race Conditions (P1-7)", () => {
       // P2-FIX (#151): Changed from alert to status role since this is informational, not an error
       const infoBanner = queryByRole("status");
       expect(infoBanner).toBeInTheDocument();
-      expect(infoBanner?.textContent).toContain(
-        "Zoom in further to load listings in this area"
-      );
+      expect(infoBanner?.textContent).toContain("Zoom in further to update results");
 
       // Should NOT fetch when viewport exceeds max span — early return preserves existing map data
       await act(async () => {
@@ -747,6 +775,22 @@ describe("PersistentMapWrapper - Networking & Race Conditions (P1-7)", () => {
       });
 
       expect(mockFetch).toHaveBeenCalled();
+    });
+
+    it("does not render a textual map transition overlay during list transitions", () => {
+      mockTransitionPending = true;
+      mockPendingReason = "filter";
+
+      const { container } = render(
+        <PersistentMapWrapper shouldRenderMap={true} />
+      );
+
+      expect(
+        screen.queryByLabelText("Updating map results")
+      ).not.toBeInTheDocument();
+      expect(
+        container.querySelector('[data-testid="map-data-loading-bar"]')
+      ).toBeInTheDocument();
     });
   });
 

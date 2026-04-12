@@ -15,6 +15,7 @@
 
 import { test, expect, SF_BOUNDS, timeouts } from "./helpers/test-utils";
 import type { Page, Locator } from "@playwright/test";
+import { ensureMobileResultsVisible } from "./helpers/mobile-helpers";
 
 // ---------------------------------------------------------------------------
 // Constants
@@ -114,6 +115,7 @@ async function waitForMobileResults(page: Page) {
  * viewport changes, so we use a generous timeout.
  */
 async function waitForMobileSortButton(page: Page): Promise<Locator> {
+  await ensureMobileResultsVisible(page);
   const sortBtn = page.locator(MOBILE).locator('button[aria-label^="Sort:"]');
   await expect(sortBtn).toBeAttached({ timeout: 30_000 });
   await sortBtn.scrollIntoViewIfNeeded();
@@ -794,7 +796,7 @@ test.describe("Group 4: Mobile Sort", () => {
     // child of the fixed overlay container (SortSelect.tsx:107-111).
     await page.evaluate(() => {
       const backdrop = document.querySelector(
-        '.fixed.inset-0.z-50 > div[aria-hidden="true"]'
+        '[role="dialog"][aria-modal="true"] > div[aria-hidden="true"]'
       ) as HTMLElement | null;
       if (backdrop) backdrop.click();
     });

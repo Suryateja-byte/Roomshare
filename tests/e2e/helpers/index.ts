@@ -91,8 +91,10 @@ export {
   isMobileViewport,
   waitForMobileSheet,
   navigateToMobileSearch,
+  ensureMobileResultsVisible,
   SNAP_COLLAPSED,
   SNAP_EXPANDED,
+  SNAP_PEEK,
   SNAP_POINTS,
 } from "./mobile-helpers";
 

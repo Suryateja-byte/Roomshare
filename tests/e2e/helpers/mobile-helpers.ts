@@ -6,7 +6,7 @@
  * MobileBottomSheet component's behavior for consistent test usage.
  *
  * Key concepts:
- * - Snap indices: 0=collapsed (~15vh), 1=expanded (~85vh)
+ * - Snap indices: 0=collapsed/map, 1=peek/list preview, 2=expanded/list
  * - The sheet uses framer-motion spring animations (~400-600ms)
  * - The slider handle supports keyboard navigation (ArrowUp/Down/Home/End)
  * - data-snap-current attribute on the content area reflects current snap
@@ -54,12 +54,13 @@ export const mobileSelectors = {
 } as const;
 
 // ---------------------------------------------------------------------------
-// Snap point constants (mirroring MobileBottomSheet.tsx)
+// Snap point constants (mirroring src/lib/mobile-layout.ts)
 // ---------------------------------------------------------------------------
 
-export const SNAP_COLLAPSED = 0.15;
-export const SNAP_EXPANDED = 0.85;
-export const SNAP_POINTS = [SNAP_COLLAPSED, SNAP_EXPANDED] as const;
+export const SNAP_COLLAPSED = 0.11;
+export const SNAP_PEEK = 0.42;
+export const SNAP_EXPANDED = 0.84;
+export const SNAP_POINTS = [SNAP_COLLAPSED, SNAP_PEEK, SNAP_EXPANDED] as const;
 
 // ---------------------------------------------------------------------------
 // Core helpers
@@ -111,7 +112,7 @@ export async function getSheetHeightFraction(page: Page): Promise<number> {
  */
 export async function setSheetSnap(
   page: Page,
-  targetSnap: 0 | 1
+  targetSnap: 0 | 1 | 2
 ): Promise<void> {
   const currentSnap = await getSheetSnapIndex(page);
   if (currentSnap === targetSnap) return;
@@ -125,7 +126,7 @@ export async function setSheetSnap(
 
   for (let i = 0; i < presses; i++) {
     const prevSnap = await getSheetSnapIndex(page);
-    await page.keyboard.press(key);
+    await handle.press(key);
     if (i < presses - 1) {
       // Wait for data-snap-current to update before next press
       await page
@@ -147,6 +148,36 @@ export async function setSheetSnap(
   }
 
   await waitForSheetAnimation(page);
+}
+
+/**
+ * Open the mobile results sheet to a visible list state when a test needs
+ * cards, filters, or sort controls that are hidden in map-first mode.
+ */
+export async function ensureMobileResultsVisible(
+  page: Page,
+  targetSnap: 1 | 2 = 1
+): Promise<void> {
+  if (!(await isMobileViewport(page))) return;
+
+  const results = page.locator(mobileSelectors.mobileResults).first();
+  const currentSnap = await getSheetSnapIndex(page);
+  if (currentSnap >= targetSnap) {
+    await results.waitFor({ state: "visible", timeout: 10_000 }).catch(() => {});
+    return;
+  }
+
+  const showListButton = page.locator('button[aria-label="Show list"]').first();
+  const canToggle = await showListButton.isVisible().catch(() => false);
+
+  if (canToggle) {
+    await showListButton.click();
+  } else {
+    await setSheetSnap(page, targetSnap);
+  }
+
+  await waitForSheetAnimation(page);
+  await results.waitFor({ state: "visible", timeout: 10_000 });
 }
 
 /**

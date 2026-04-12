@@ -227,6 +227,7 @@ export function useBatchedFilters(
 
   // Pending state — initialized from URL, updated locally
   const [pending, setPendingState] = useState<BatchedFilterValues>(committed);
+  const pendingRef = useRef(pending);
   const previousCommittedRef = useRef(committed);
   const forceSyncUntilRef = useRef(0);
   const prevDrawerOpenRef = useRef(false);
@@ -242,69 +243,68 @@ export function useBatchedFilters(
       // Without this merge, opening the drawer would wipe inline edits
       // (e.g. price typed into the search bar) because committed state
       // reflects the URL which hasn't been updated yet.
-      setPendingState((prevPending) => {
-        const prevCommitted = previousCommittedRef.current;
-        const merged: BatchedFilterValues = { ...committed };
-        const scalarKeys = [
-          "minPrice",
-          "maxPrice",
-          "roomType",
-          "leaseDuration",
-          "moveInDate",
-          "genderPreference",
-          "householdGender",
-          "minSlots",
-        ] as const;
-        for (const key of scalarKeys) {
-          if (prevPending[key] !== prevCommitted[key]) {
-            merged[key] = prevPending[key];
-          }
+      const prevPending = pendingRef.current;
+      const prevCommitted = previousCommittedRef.current;
+      const merged: BatchedFilterValues = { ...committed };
+      const scalarKeys = [
+        "minPrice",
+        "maxPrice",
+        "roomType",
+        "leaseDuration",
+        "moveInDate",
+        "genderPreference",
+        "householdGender",
+        "minSlots",
+      ] as const;
+      for (const key of scalarKeys) {
+        if (prevPending[key] !== prevCommitted[key]) {
+          merged[key] = prevPending[key];
         }
-        const arrayKeys = ["amenities", "houseRules", "languages"] as const;
-        for (const key of arrayKeys) {
-          if (!arraysEqual(prevPending[key], prevCommitted[key])) {
-            merged[key] = [...prevPending[key]];
-          }
+      }
+      const arrayKeys = ["amenities", "houseRules", "languages"] as const;
+      for (const key of arrayKeys) {
+        if (!arraysEqual(prevPending[key], prevCommitted[key])) {
+          merged[key] = [...prevPending[key]];
         }
-        return merged;
-      });
+      }
+      pendingRef.current = merged;
+      setPendingState(merged);
       previousCommittedRef.current = committed;
       return;
     }
 
-    setPendingState((prevPending) => {
-      const previousCommitted = previousCommittedRef.current;
-      const committedFiltersChanged = !filtersEqual(
-        committed,
-        previousCommitted
-      );
-      const hasUnsavedEdits = !filtersEqual(prevPending, previousCommitted);
-      const isPostCommitSyncActive = Date.now() < forceSyncUntilRef.current;
+    const prevPending = pendingRef.current;
+    const previousCommitted = previousCommittedRef.current;
+    const committedFiltersChanged = !filtersEqual(committed, previousCommitted);
+    const hasUnsavedEdits = !filtersEqual(prevPending, previousCommitted);
+    const isPostCommitSyncActive = Date.now() < forceSyncUntilRef.current;
 
-      // Guard: when the drawer is open and user has dirty edits,
-      // don't overwrite with force-sync — preserve the user's in-progress changes.
-      // STABILIZATION FIX: Added !committedFiltersChanged so that back/forward
-      // navigation (which changes committed filters) always syncs pending to URL,
-      // even within the forceSyncUntil window. Without this, pressing Back within
-      // 10s of committing filters while the drawer is open shows stale values.
-      if (
-        isPostCommitSyncActive &&
-        isDrawerOpen &&
-        hasUnsavedEdits &&
-        !committedFiltersChanged
-      ) {
-        return prevPending;
-      }
+    // Guard: when the drawer is open and user has dirty edits,
+    // don't overwrite with force-sync — preserve the user's in-progress changes.
+    // STABILIZATION FIX: Added !committedFiltersChanged so that back/forward
+    // navigation (which changes committed filters) always syncs pending to URL,
+    // even within the forceSyncUntil window. Without this, pressing Back within
+    // 10s of committing filters while the drawer is open shows stale values.
+    if (
+      isPostCommitSyncActive &&
+      isDrawerOpen &&
+      hasUnsavedEdits &&
+      !committedFiltersChanged
+    ) {
+      previousCommittedRef.current = committed;
+      return;
+    }
 
-      const shouldPreserveDirtyEdits =
-        !isPostCommitSyncActive && !committedFiltersChanged && hasUnsavedEdits;
+    const shouldPreserveDirtyEdits =
+      !isPostCommitSyncActive && !committedFiltersChanged && hasUnsavedEdits;
 
-      if (shouldPreserveDirtyEdits) {
-        return prevPending;
-      }
+    if (shouldPreserveDirtyEdits) {
+      previousCommittedRef.current = committed;
+      return;
+    }
 
-      return committed;
-    });
+    pendingRef.current = committed;
+    setPendingState(committed);
     previousCommittedRef.current = committed;
   }, [committed, isDrawerOpen]);
 
@@ -316,16 +316,16 @@ export function useBatchedFilters(
   useEffect(() => {
     if (hasRunDateCleanup.current) return;
     hasRunDateCleanup.current = true;
-    setPendingState((prev) => {
-      if (!prev.moveInDate) return prev;
-      const d = new Date(prev.moveInDate);
-      const today = new Date();
-      today.setHours(0, 0, 0, 0);
-      if (isNaN(d.getTime()) || d < today) {
-        return { ...prev, moveInDate: "" };
-      }
-      return prev;
-    });
+    const currentPending = pendingRef.current;
+    if (!currentPending.moveInDate) return;
+    const d = new Date(currentPending.moveInDate);
+    const today = new Date();
+    today.setHours(0, 0, 0, 0);
+    if (isNaN(d.getTime()) || d < today) {
+      const nextPending = { ...currentPending, moveInDate: "" };
+      pendingRef.current = nextPending;
+      setPendingState(nextPending);
+    }
   }, []);
 
   // F5 FIX: Suppress isDirty during active transitions to prevent flash of "pending changes" banner.
@@ -341,16 +341,20 @@ export function useBatchedFilters(
         | Partial<BatchedFilterValues>
         | ((prev: BatchedFilterValues) => Partial<BatchedFilterValues>)
     ) => {
-      setPendingState((prev) => {
-        const values =
-          typeof valuesOrFn === "function" ? valuesOrFn(prev) : valuesOrFn;
-        return { ...prev, ...values };
-      });
+      const currentPending = pendingRef.current;
+      const values =
+        typeof valuesOrFn === "function"
+          ? valuesOrFn(currentPending)
+          : valuesOrFn;
+      const nextPending = { ...currentPending, ...values };
+      pendingRef.current = nextPending;
+      setPendingState(nextPending);
     },
     []
   );
 
   const reset = useCallback(() => {
+    pendingRef.current = committed;
     setPendingState(committed);
   }, [committed]);
 
@@ -360,7 +364,8 @@ export function useBatchedFilters(
     // 10s covers typical back/forward navigation latency with margin.
     const FORCE_SYNC_WINDOW_MS = 10_000;
     forceSyncUntilRef.current = Date.now() + FORCE_SYNC_WINDOW_MS;
-    const nextPending = overrides ? { ...pending, ...overrides } : pending;
+    const basePending = pendingRef.current;
+    const nextPending = overrides ? { ...basePending, ...overrides } : basePending;
     const nextMinPrice = nextPending.minPrice
       ? Number.parseFloat(nextPending.minPrice)
       : undefined;
@@ -372,6 +377,7 @@ export function useBatchedFilters(
       : NaN;
 
     if (overrides) {
+      pendingRef.current = nextPending;
       setPendingState(nextPending);
     }
 
@@ -403,11 +409,13 @@ export function useBatchedFilters(
     );
 
     if (transitionContext) {
-      transitionContext.navigateWithTransition(searchUrl);
+      transitionContext.navigateWithTransition(searchUrl, {
+        reason: "filter",
+      });
     } else {
       router.push(searchUrl);
     }
-  }, [pending, searchParams, transitionContext, router]);
+  }, [searchParams, transitionContext, router]);
 
   return {
     pending,

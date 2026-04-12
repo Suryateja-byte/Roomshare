@@ -66,6 +66,9 @@ interface MapListingRaw {
   price: number | string;
   availableSlots: number;
   primaryImage: string | null;
+  roomType: string | null;
+  city: string | null;
+  state: string | null;
   lat: number | string;
   lng: number | string;
   avgRating: number | string | null;
@@ -809,6 +812,9 @@ async function getSearchDocMapListingsInternal(
       d.price,
       d.available_slots as "availableSlots",
       d.images[1] as "primaryImage",
+      d.room_type as "roomType",
+      d.city,
+      d.state,
       d.lat,
       d.lng,
       d.avg_rating as "avgRating",
@@ -840,7 +846,10 @@ async function getSearchDocMapListingsInternal(
         price: Number(l.price),
         availableSlots: l.availableSlots,
         images: l.primaryImage ? [l.primaryImage] : [],
+        roomType: l.roomType ?? undefined,
         location: {
+          city: l.city ?? undefined,
+          state: l.state ?? undefined,
           // MED-4 FIX: Explicit Number() conversion — PostgreSQL raw queries may return
           // numeric/float8 columns as strings depending on column type.
           lat: Number(l.lat),

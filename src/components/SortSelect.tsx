@@ -70,7 +70,7 @@ export default function SortSelect({ currentSort }: SortSelectProps) {
         })
       );
       if (transitionContext) {
-        transitionContext.navigateWithTransition(url);
+        transitionContext.navigateWithTransition(url, { reason: "sort" });
       } else {
         router.push(url);
       }

@@ -1161,15 +1161,10 @@ test.describe("List <-> Map Sync", () => {
     // Popup should be closed
     await expect(popup).not.toBeVisible({ timeout: timeouts.action });
 
-    // Escape closes popup (setSelectedListing(null)) but activeId persists
-    // (Escape does NOT call setActive(null)), so the card ring stays.
-    // This matches the behavior tested in search-map-list-sync.anon.spec.ts
-    // test "Escape closes popup but card highlight persists".
+    // Escape clears both the popup and the active card state.
     if (hadActiveCard) {
       const afterCount = await highlightedCard.count();
-      // Active card may or may not persist depending on implementation:
-      // allow either 0 (cleared) or 1 (persisted)
-      expect(afterCount).toBeLessThanOrEqual(1);
+      expect(afterCount).toBe(0);
     }
   });
 

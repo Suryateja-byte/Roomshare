@@ -19,6 +19,7 @@ import {
 } from "../helpers";
 import {
   mobileSelectors,
+  ensureMobileResultsVisible,
   navigateToMobileSearch,
   getSheetSnapIndex,
 } from "../helpers";
@@ -105,7 +106,7 @@ test.describe("Mobile Filter Experience", () => {
     // Verify snap position is reasonable (not broken)
     const snap = await getSheetSnapIndex(page);
     expect(snap).toBeGreaterThanOrEqual(0);
-    expect(snap).toBeLessThanOrEqual(1); // Valid snap indices: 0 (collapsed), 1 (expanded)
+    expect(snap).toBeLessThanOrEqual(2);
   });
 
   test(`${tags.filter}${tags.mobile} all filter sections scrollable on small viewport (P1)`, async ({
@@ -164,14 +165,21 @@ test.describe("Mobile Filter Experience", () => {
     const sheetVisible = await navigateToMobileSearch(page);
     test.skip(!sheetVisible, "Bottom sheet not visible on mobile");
 
-    // Look for sort button
-    const sortButton = page.locator('button[aria-label^="Sort"]');
-    const sortButtonVisible = await sortButton.isVisible().catch(() => false);
+    await ensureMobileResultsVisible(page);
 
-    test.skip(!sortButtonVisible, "Sort button not visible on mobile");
+    // Look for sort button
+    const sortButton = page
+      .locator(
+        '[data-testid="mobile-search-results-container"] button[aria-label^="Sort:"]'
+      )
+      .first();
+    await sortButton.scrollIntoViewIfNeeded().catch(() => {});
+    await expect(sortButton).toBeVisible({ timeout: 5_000 });
 
     // Click sort button
-    await sortButton.click();
+    await sortButton.evaluate((el) => {
+      (el as HTMLButtonElement).click();
+    });
 
     // The mobile sort sheet is a role="dialog" with "Sort by" heading and
     // plain <button> elements for each option (not role="option").

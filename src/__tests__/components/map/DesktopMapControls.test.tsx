@@ -13,8 +13,6 @@ const defaultProps = {
   onToggleDropMode: jest.fn(),
   onClearPin: jest.fn(),
   onHideMap: jest.fn(),
-  showResetToResults: false,
-  onResetToResults: jest.fn(),
   canFullscreen: true,
   isFullscreen: false,
   onToggleFullscreen: jest.fn(),
@@ -76,25 +74,6 @@ describe("DesktopMapControls", () => {
     await user.click(screen.getByRole("button", { name: /hide map/i }));
 
     expect(defaultProps.onHideMap).toHaveBeenCalledTimes(1);
-  });
-
-  it("renders a contextual show-all-results pill only when requested", async () => {
-    const user = userEvent.setup();
-    render(
-      <DesktopMapControls
-        {...defaultProps}
-        showResetToResults={true}
-      />
-    );
-
-    const button = screen.getByRole("button", {
-      name: /show all results on map/i,
-    });
-    expect(button).toBeInTheDocument();
-
-    await user.click(button);
-
-    expect(defaultProps.onResetToResults).toHaveBeenCalledTimes(1);
   });
 
   it("opens the tools menu and toggles POI categories in dropdown mode", async () => {

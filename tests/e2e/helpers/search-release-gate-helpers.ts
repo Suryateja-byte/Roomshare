@@ -85,7 +85,9 @@ export function mapShell(page: Page): Locator {
 
 export function searchStatus(page: Page): Locator {
   return page
-    .getByRole("status", { name: /searching area/i })
+    .getByRole("status", { name: /searching this area/i })
+    .or(page.locator('[aria-label="Searching this area"]'))
+    .or(page.getByRole("status", { name: /searching area/i }))
     .or(page.locator('[aria-label="Searching area"]'))
     .first();
 }

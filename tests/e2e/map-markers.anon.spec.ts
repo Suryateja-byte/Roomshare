@@ -19,6 +19,7 @@ import {
   SF_BOUNDS,
   waitForMapReady,
 } from "./helpers";
+import { getMarkerListingId } from "./helpers/sync-helpers";
 import type { Page } from "@playwright/test";
 
 // Build search URL with SF bounds
@@ -779,13 +780,16 @@ test.describe("Map Marker Interactions", () => {
       });
     });
 
-    test("3.8b - Escape closes popup but card highlight persists (activeId independent)", async ({
+    test("3.8b - Escape closes popup, clears card highlight, and restores focus", async ({
       page,
     }) => {
       test.skip(!(await isMapAvailable(page)), "Map not available");
 
       const markerCount = await waitForMarkersWithClusterExpansion(page);
       test.skip(markerCount === 0, "No markers available");
+
+      const listingId = await getMarkerListingId(page, 0);
+      test.skip(!listingId, "Could not read first marker listing ID");
 
       const marker = getFirstVisibleMarker(page);
       await marker.evaluate((el) => (el as HTMLElement).click());
@@ -808,17 +812,24 @@ test.describe("Map Marker Interactions", () => {
         timeout: 2000,
       });
 
-      // Card highlight persists after Escape because activeId is managed
-      // independently from selectedListing (popup state). Only setSelectedListing(null)
-      // is called on Escape — setActive(null) is NOT called.
-      // This is by design: the "last viewed" card stays highlighted.
+      // Escape clears the active card state along with the popup.
       const highlightCountAfter = await page.evaluate(() => {
         return Array.from(
           document.querySelectorAll('[data-testid="listing-card"]')
         ).filter((el) => el.getAttribute("data-focus-state") === "active")
           .length;
       });
-      expect(highlightCountAfter).toBe(highlightCountBefore);
+      expect(highlightCountBefore).toBeGreaterThan(0);
+      expect(highlightCountAfter).toBe(0);
+
+      const activeElementListingId = await page.evaluate(() => {
+        return (
+          (document.activeElement as HTMLElement | null)?.getAttribute(
+            "data-listing-id"
+          ) ?? null
+        );
+      });
+      expect(activeElementListingId).toBe(listingId);
     });
   });
 

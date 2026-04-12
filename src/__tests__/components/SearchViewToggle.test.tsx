@@ -5,6 +5,7 @@ let matchMediaMatches = true;
 let mockSearchParams = new URLSearchParams();
 const mockSetMobileResultsView = jest.fn();
 let mockMobileSearchState = {
+  mobileMapOverlayActive: false,
   searchResultsLabel: "486 homes",
   mobileSheetOverrideLabel: null as string | null,
   mobileResultsViewPreference: null as "map" | "peek" | "list" | null,
@@ -24,6 +25,7 @@ beforeEach(() => {
   mockSearchParams = new URLSearchParams();
   mockSetMobileResultsView.mockReset();
   mockMobileSearchState = {
+    mobileMapOverlayActive: false,
     searchResultsLabel: "486 homes",
     mobileSheetOverrideLabel: null,
     mobileResultsViewPreference: null,
@@ -237,6 +239,19 @@ describe("SearchViewToggle", () => {
         "0"
       );
     });
+  });
+
+  it("hides the floating toggle while a mobile map overlay is active", () => {
+    matchMediaMatches = false;
+    mockMobileSearchState.mobileMapOverlayActive = true;
+
+    render(
+      <SearchViewToggle {...props}>
+        <TestChild />
+      </SearchViewToggle>
+    );
+
+    expect(screen.queryByTestId("floating-btn")).not.toBeInTheDocument();
   });
 
   it("uses the floating toggle to switch between map and peek states", async () => {

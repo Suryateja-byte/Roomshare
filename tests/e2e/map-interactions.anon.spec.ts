@@ -7,7 +7,7 @@
  * Scenarios covered:
  * - 1.1 (P0): Marker click scrolls list to matching card
  * - 1.2 (P1): Marker hover triggers debounced scroll
- * - 1.3 (P1): Card highlight persists after popup close
+ * - 1.3 (P1): Card highlight clears after popup close
  * - 2.1 (P0): Pan with toggle ON updates listings (URL bounds verification)
  * - 2.2 (P1): Rapid pans coalesce into single update
  * - 4.1 (P0): Map stays mounted when price filter changes
@@ -405,7 +405,7 @@ test.describe("1.x: Map + List Scroll Sync", () => {
     await page.mouse.move(0, 0);
   });
 
-  test("1.3 - Card highlight persists after popup close (P1)", async ({
+  test("1.3 - Card highlight clears after popup close (P1)", async ({
     page,
   }) => {
     await waitForSearchPage(page);
@@ -441,10 +441,9 @@ test.describe("1.x: Map + List Scroll Sync", () => {
       await expect(popup).not.toBeVisible({ timeout: 3000 });
     }
 
-    // Card highlight (ring-2) should PERSIST after popup close
-    // activeId is independent from selectedListing/popup state
+    // Closing the popup clears the active card highlight as well.
     const cardStateAfter = await getCardState(page, listingId);
-    expect(cardStateAfter.isActive).toBe(true);
+    expect(cardStateAfter.isActive).toBe(false);
   });
 });
 

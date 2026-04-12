@@ -276,7 +276,7 @@ export function InlineFilterStrip() {
     (queryString: string) => {
       const url = `/search?${queryString}`;
       if (transitionCtx) {
-        transitionCtx.navigateWithTransition(url);
+        transitionCtx.navigateWithTransition(url, { reason: "filter" });
       } else {
         router.push(url);
       }

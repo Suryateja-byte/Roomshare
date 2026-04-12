@@ -15,7 +15,10 @@ import {
   searchShell,
   waitForSearchResolution,
 } from "../helpers/search-release-gate-helpers";
-import { waitForMobileSheet } from "../helpers/mobile-helpers";
+import {
+  ensureMobileResultsVisible,
+  waitForMobileSheet,
+} from "../helpers/mobile-helpers";
 
 test.use({ storageState: "playwright/.auth/user.json" });
 
@@ -81,6 +84,7 @@ test.describe("Search release gate - mobile", () => {
     await expect(page).toHaveURL(/minPrice=1000/);
     await expect(page).toHaveURL(/maxPrice=1500/);
     await expect(searchShell(page)).toBeVisible();
+    await ensureMobileResultsVisible(page);
     await expect(
       page.locator('[data-testid="mobile-search-results-container"]')
     ).toBeVisible();
