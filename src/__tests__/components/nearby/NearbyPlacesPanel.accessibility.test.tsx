@@ -146,10 +146,22 @@ describe("NearbyPlacesPanel - Accessibility", () => {
 
       const chips = screen.getAllByRole("button");
       chips.forEach((chip) => {
-        // Buttons without explicit type default to "submit" in forms
-        // But clicking them should not submit forms due to our event handling
-        expect(chip.tagName.toLowerCase()).toBe("button");
+        expect(chip).toHaveAttribute("type", "button");
       });
+    });
+
+    it("search action button is type button when visible", () => {
+      renderPanel();
+
+      const searchInput = screen.getByRole("textbox", {
+        name: /search nearby places/i,
+      });
+      fireEvent.change(searchInput, { target: { value: "coffee" } });
+
+      expect(screen.getByRole("button", { name: /^search$/i })).toHaveAttribute(
+        "type",
+        "button"
+      );
     });
   });
 
@@ -423,6 +435,45 @@ describe("NearbyPlacesPanel - Accessibility", () => {
         "Nearby places results"
       );
     });
+
+    it("restores focus to the exact triggering button after search completion", async () => {
+      let resolveRequest: (() => void) | null = null;
+      mockFetch.mockImplementation(
+        () =>
+          new Promise((resolve) => {
+            resolveRequest = () =>
+              resolve({
+                ok: true,
+                status: 200,
+                json: async () => ({
+                  places: [createMockPlace("place-1")],
+                  meta: { count: 1, cached: false },
+                }),
+              });
+          })
+      );
+
+      renderPanel();
+
+      const searchInput = screen.getByRole("textbox", {
+        name: /search nearby places/i,
+      });
+      fireEvent.change(searchInput, { target: { value: "coffee" } });
+
+      const searchButton = screen.getByRole("button", { name: /^search$/i });
+      searchButton.focus();
+      expect(searchButton).toHaveFocus();
+
+      await act(async () => {
+        fireEvent.click(searchButton);
+      });
+
+      await act(async () => {
+        resolveRequest?.();
+      });
+
+      expect(searchButton).toHaveFocus();
+    });
   });
 
   describe("Empty State Accessibility", () => {
@@ -495,6 +546,33 @@ describe("NearbyPlacesPanel - Accessibility", () => {
       // The icon itself should be present in the error container
       const alertIcon = screen.getByTestId("alert-icon");
       expect(alertIcon).toBeInTheDocument();
+    });
+
+    it("normalizes structured error details into safe text", async () => {
+      mockFetch.mockResolvedValue({
+        ok: false,
+        status: 400,
+        json: async () => ({
+          error: "Invalid request",
+          details: {
+            query: ["Must be at least 2 characters"],
+            radiusMeters: ["Required"],
+          },
+        }),
+      });
+
+      renderPanel();
+
+      const groceryChip = screen.getByRole("button", { name: /grocery/i });
+      await act(async () => {
+        fireEvent.click(groceryChip);
+      });
+
+      expect(
+        await screen.findByText(
+          /query: Must be at least 2 characters radiusMeters: Required/i
+        )
+      ).toBeInTheDocument();
     });
   });
 });

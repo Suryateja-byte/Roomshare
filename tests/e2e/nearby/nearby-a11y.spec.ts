@@ -105,6 +105,20 @@ test.describe("Nearby Places — Accessibility @nearby @a11y", () => {
     await page.keyboard.press("Tab");
     const firstChip = nearby.categoryChips.first();
     await expect(firstChip).toBeFocused();
+
+    // Continue tabbing until the first radius option is reached
+    for (let i = 0; i < 8; i += 1) {
+      const isFocused = await nearby
+        .radiusByLabel("1 mi")
+        .evaluate((element) => element === document.activeElement)
+        .catch(() => false);
+      if (isFocused) {
+        break;
+      }
+
+      await page.keyboard.press("Tab");
+    }
+    await expect(nearby.radiusByLabel("1 mi")).toBeFocused();
   });
 
   test("A-006: Keyboard — Enter triggers search from input", async ({
@@ -132,7 +146,13 @@ test.describe("Nearby Places — Accessibility @nearby @a11y", () => {
     await chip.focus();
     await expect(chip).toBeFocused();
 
-    // Press Enter to activate
+    // Press Space to activate
+    await page.keyboard.press(" ");
+    await expect(chip).toHaveAttribute("aria-pressed", "true");
+
+    // Press Enter to reactivate after moving away and back
+    await nearby.chipByName("Restaurants").focus();
+    await chip.focus();
     await page.keyboard.press("Enter");
     await expect(chip).toHaveAttribute("aria-pressed", "true");
   });
@@ -189,20 +209,51 @@ test.describe("Nearby Places — Accessibility @nearby @a11y", () => {
     await nearby.goto();
     await nearby.scrollToSection();
 
-    // Focus search input and search
-    await nearby.searchInput.focus();
-    await page.keyboard.type("Coffee");
-    await page.keyboard.press("Enter");
+    await nearby.searchInput.fill("Coffee");
+    const searchButton = nearby.searchButton;
+    await searchButton.focus();
+    await expect(searchButton).toBeFocused();
+    await searchButton.click();
     await nearby.waitForResults();
 
-    // Focus should still be within the nearby section (not lost to document body).
-    // Poll briefly — useEffect focus restoration runs after React commit.
-    await expect(async () => {
-      const isInSection = await nearby.section.locator(":focus").count();
-      const isOnInput = await nearby.searchInput.evaluate(
-        (el) => el === document.activeElement
-      );
-      expect(isInSection > 0 || isOnInput).toBe(true);
-    }).toPass({ timeout: 5_000, intervals: [100, 200, 500] });
+    await expect(searchButton).toBeFocused();
+  });
+
+  test("A-011: Mobile map mode removes the hidden list pane from the tab order", async ({
+    page,
+  }) => {
+    const viewport = page.viewportSize();
+    if (!viewport || viewport.width >= 1024) {
+      test.skip(true, "Test requires a mobile viewport");
+      return;
+    }
+
+    await mockNearbyApi(page, { body: buildNearbyResponse(groceryPlaces) });
+    await nearby.goto();
+    await nearby.scrollToSection();
+
+    await nearby.mobileToggleButton.click();
+    await expect(nearby.mobileToggleButton).toHaveText(/list/i);
+
+    await expect(
+      nearby.searchInput.evaluate(
+        (input) =>
+          Boolean(input.closest("[inert]")) &&
+          input.closest('[aria-hidden="true"]') !== null
+      )
+    ).resolves.toBe(true);
+
+    await nearby.zoomIn.focus();
+    await expect(nearby.zoomIn).toBeFocused();
+
+    await page.keyboard.press("Shift+Tab");
+    await expect(nearby.searchInput).not.toBeFocused();
+    await expect(
+      page.evaluate(() => {
+        const activeElement = document.activeElement as HTMLElement | null;
+        if (!activeElement) return false;
+        return activeElement.closest("[inert]") === null;
+      })
+    ).resolves.toBe(true);
   });
 });

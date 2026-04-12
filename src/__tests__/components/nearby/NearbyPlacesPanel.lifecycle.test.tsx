@@ -312,8 +312,18 @@ describe("NearbyPlacesPanel - UI State & React Lifecycle", () => {
         jest.runAllTimers();
       });
 
-      // Should have been called twice with different data
-      expect(onPlacesChange).toHaveBeenCalledTimes(2);
+      const populatedCalls = onPlacesChange.mock.calls.filter(
+        ([places]) => Array.isArray(places) && places.length > 0
+      );
+
+      expect(populatedCalls).toHaveLength(2);
+      expect(populatedCalls[0][0]).toEqual(
+        expect.arrayContaining([expect.objectContaining({ id: "grocery-1" })])
+      );
+      expect(populatedCalls[1][0]).toEqual(
+        expect.arrayContaining([expect.objectContaining({ id: "pharmacy-1" })])
+      );
+      expect(onPlacesChange).toHaveBeenCalledWith([]);
     });
   });
 
@@ -491,14 +501,7 @@ describe("NearbyPlacesPanel - UI State & React Lifecycle", () => {
   // E9: Rapid list/map toggle preserves scroll
   describe("E9: Scroll Position", () => {
     it("maintains scroll position on rerender", async () => {
-      const { rerender } = render(
-        <NearbyPlacesPanel
-          listingLat={listingLat}
-          listingLng={listingLng}
-          viewMode="list"
-          onViewModeChange={() => {}}
-        />
-      );
+      const { rerender } = renderPanel();
 
       // Trigger search
       const groceryChip = screen.getByRole("button", { name: /grocery/i });
@@ -508,14 +511,7 @@ describe("NearbyPlacesPanel - UI State & React Lifecycle", () => {
       });
 
       // Rerender with same viewMode
-      rerender(
-        <NearbyPlacesPanel
-          listingLat={listingLat}
-          listingLng={listingLng}
-          viewMode="list"
-          onViewModeChange={() => {}}
-        />
-      );
+      rerender(<NearbyPlacesPanel listingLat={listingLat} listingLng={listingLng} />);
 
       // Component should still be functional
       expect(screen.getByPlaceholderText(/search/i)).toBeInTheDocument();

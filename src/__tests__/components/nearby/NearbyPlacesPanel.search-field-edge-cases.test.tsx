@@ -1656,17 +1656,17 @@ describe("NearbyPlacesPanel - Search Field Edge Cases", () => {
       expect(getSearchInput().value).toBe("coffee");
     });
 
-    // H79: Mobile view toggle - query persists
-    it("H79: query persists when viewMode changes", async () => {
+    // H79: Parent rerender - query persists
+    it("H79: query persists when the parent rerenders", async () => {
       const user = userEvent.setup();
-      const { rerender } = renderPanel({ viewMode: "list" });
+      const { rerender } = renderPanel();
 
       // Type but don't submit
       const input = getSearchInput();
       await user.type(input, "coffee");
 
-      // Toggle view mode
-      rerender(<NearbyPlacesPanel {...defaultProps} viewMode="map" />);
+      // Parent rerender should not clear the controlled input state
+      rerender(<NearbyPlacesPanel {...defaultProps} />);
 
       // Query should persist
       expect(getSearchInput().value).toBe("coffee");

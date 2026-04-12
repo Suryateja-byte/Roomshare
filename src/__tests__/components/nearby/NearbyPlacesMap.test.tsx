@@ -278,8 +278,14 @@ describe("NearbyPlacesMap - Smoke Tests", () => {
       expect(mockMapInstance.fitBounds).toHaveBeenCalledWith(
         mockLngLatBoundsInstance,
         expect.objectContaining({
-          padding: 50,
+          padding: expect.objectContaining({
+            top: 24,
+            right: 24,
+            bottom: 24,
+            left: 24,
+          }),
           maxZoom: 15,
+          duration: 0,
         })
       );
     });
