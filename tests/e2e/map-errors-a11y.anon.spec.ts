@@ -507,7 +507,7 @@ test.describe("Map Error States and Accessibility", () => {
             );
             await expect(dragHandle.first()).toHaveAttribute(
               "aria-valuemax",
-              "1"
+              "2"
             );
           }
         } else {
