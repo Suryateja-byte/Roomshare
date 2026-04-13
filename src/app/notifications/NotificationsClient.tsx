@@ -200,7 +200,7 @@ export default function NotificationsClient({
             <Button
               variant="outline"
               onClick={() => setShowDeleteAllDialog(true)}
-              className="text-red-600 border-red-200 hover:bg-red-50"
+              className="text-red-600 border-outline-variant/20 hover:bg-red-50"
             >
               <Trash2 className="w-4 h-4 mr-2" />
               Delete all

@@ -72,7 +72,7 @@ export default function SaveListingButton({
     <Button
       variant="outline"
       size="icon"
-      className={`rounded-full transition-all ${isSaved ? "bg-red-50 border-red-200 hover:bg-red-100" : ""}`}
+      className={`rounded-full transition-all ${isSaved ? "bg-red-50 border-outline-variant/20 hover:bg-red-100" : ""}`}
       onClick={handleToggle}
       disabled={isToggling}
       aria-label={isSaved ? "Remove from saved listings" : "Save listing"}

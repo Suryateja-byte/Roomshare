@@ -4,7 +4,7 @@ import { Skeleton } from "./Skeleton";
  * Skeleton for ListingCard - dimensions must match ListingCard.tsx exactly to prevent CLS.
  *
  * CLS-critical dimensions (sync with ListingCard.tsx):
- * - Card shell: rounded-2xl with shadow-sm and no visible border
+ * - Card shell: rounded-2xl with shadow-ambient-sm and no visible border
  * - Image: aspect-[4/3]
  * - Title row: mb-0.5
  * - Content padding: p-4
@@ -14,7 +14,7 @@ export function ListingCardSkeleton() {
   return (
     <div
       data-testid="listing-card-skeleton"
-      className="group relative flex flex-col rounded-2xl bg-surface-container-lowest mb-4 shadow-sm overflow-hidden"
+      className="group relative flex flex-col rounded-2xl bg-surface-container-lowest mb-4 shadow-ambient-sm overflow-hidden"
       aria-hidden="true"
       role="presentation"
     >

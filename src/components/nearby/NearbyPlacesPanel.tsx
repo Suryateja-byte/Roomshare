@@ -394,7 +394,7 @@ export default function NearbyPlacesPanel({
   return (
     <div className="flex flex-col h-full">
       {/* Search & Filters (Sticky Header) */}
-      <div className="p-4 sm:p-6 space-y-4 shadow-sm z-20 bg-surface-container-lowest relative flex-shrink-0">
+      <div className="p-4 sm:p-6 space-y-4 shadow-ambient-sm z-20 bg-surface-container-lowest relative flex-shrink-0">
         {/* Search Input */}
         <div className="relative group">
           <div className="relative">
@@ -523,7 +523,7 @@ export default function NearbyPlacesPanel({
                   transition-all duration-200
                   ${
                     selectedRadius === option.meters
-                      ? "bg-surface-container-lowest shadow-sm text-on-surface"
+                      ? "bg-surface-container-lowest shadow-ambient-sm text-on-surface"
                       : "text-on-surface-variant hover:text-on-surface"
                   }
                   disabled:opacity-60 disabled:cursor-not-allowed

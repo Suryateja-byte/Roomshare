@@ -42,7 +42,7 @@ export default function EmailVerificationBanner({
 
   return (
     <section
-      className="border-b border-amber-200 bg-amber-50"
+      className="border-b border-outline-variant/20 bg-amber-50"
       aria-live="polite"
       data-testid="email-verification-banner"
     >

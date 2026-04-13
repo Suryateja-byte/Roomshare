@@ -306,7 +306,7 @@ describe("ListingCard", () => {
 
       const article = screen.getByTestId("listing-card");
       expect(article).toHaveAttribute("data-focus-state", "hovered");
-      expect(article).toHaveClass("ring-2", "ring-primary/50", "shadow-lg");
+      expect(article).toHaveClass("ring-2", "ring-primary/50", "shadow-ambient");
       expect(article).not.toHaveClass("ring-offset-2");
     });
 
@@ -321,7 +321,7 @@ describe("ListingCard", () => {
         "ring-2",
         "ring-primary",
         "ring-offset-2",
-        "shadow-xl"
+        "shadow-ambient-lg"
       );
       expect(article).not.toHaveClass("ring-primary/50");
     });

@@ -686,7 +686,7 @@ export function SearchResultsClient({
           data-testid="empty-state"
           className="flex flex-col items-center justify-center py-16 sm:py-24 border-2 border-dashed border-outline-variant/20 rounded-2xl sm:rounded-3xl bg-surface-canvas/50"
         >
-          <div className="w-14 h-14 sm:w-16 sm:h-16 rounded-full bg-surface-container-lowest flex items-center justify-center shadow-sm mb-4">
+          <div className="w-14 h-14 sm:w-16 sm:h-16 rounded-full bg-surface-container-lowest flex items-center justify-center shadow-ambient-sm mb-4">
             <Search className="w-5 h-5 sm:w-6 sm:h-6 text-on-surface-variant" />
           </div>
           <h2 className="text-base sm:text-lg font-semibold text-on-surface mb-2">

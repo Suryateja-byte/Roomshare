@@ -107,7 +107,7 @@ export function UserMarker({
         <button
           onClick={onToggleDropMode}
           className={cn(
-            "absolute bottom-4 left-4 z-[50] flex items-center justify-center gap-2 px-4 py-2.5 rounded-full shadow-lg border text-sm font-medium transition-all min-h-[44px] backdrop-blur-md focus:outline-none focus-visible:ring-2 focus-visible:ring-primary/30 focus-visible:ring-offset-2",
+            "absolute bottom-4 left-4 z-[50] flex items-center justify-center gap-2 px-4 py-2.5 rounded-full shadow-ambient border text-sm font-medium transition-all min-h-[44px] backdrop-blur-md focus:outline-none focus-visible:ring-2 focus-visible:ring-primary/30 focus-visible:ring-offset-2",
             isDropMode
               ? "bg-rose-500/90 text-white border-rose-500/90 ring-2 ring-rose-300/50"
               : "bg-white/90 text-on-surface-variant border-outline-variant/20/50 hover:bg-surface-canvas"
@@ -142,7 +142,7 @@ export function UserMarker({
             {/* Pin icon */}
             <div
               className={cn(
-                "w-8 h-8 rounded-full flex items-center justify-center shadow-lg",
+                "w-8 h-8 rounded-full flex items-center justify-center shadow-ambient",
                 "bg-rose-500 text-white ring-2 ring-white"
               )}
             >
@@ -154,7 +154,7 @@ export function UserMarker({
             {/* Address label + distance */}
             <div
               className={cn(
-                "absolute top-full mt-2 px-2 py-1 rounded-md shadow-md text-xs whitespace-nowrap max-w-[200px] truncate",
+                "absolute top-full mt-2 px-2 py-1 rounded-md shadow-ambient text-xs whitespace-nowrap max-w-[200px] truncate",
                 isDarkMode
                   ? "bg-on-surface text-on-surface-variant"
                   : "bg-surface-container-lowest text-on-surface"

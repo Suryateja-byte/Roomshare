@@ -192,7 +192,7 @@ export default function ListingList({
                 key={listing.id}
                 className={`bg-surface-container-lowest rounded-lg shadow-ambient-sm overflow-hidden ${
                   listing._count.reports > 0
-                    ? "border-red-200"
+                    ? "border-outline-variant/20"
                     : "border-outline-variant/20"
                 }`}
               >

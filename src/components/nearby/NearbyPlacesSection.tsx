@@ -92,7 +92,7 @@ export default function NearbyPlacesSection({
           bg-surface-container-lowest
           rounded-2xl
           border border-outline-variant/20/80
-          shadow-2xl
+          shadow-ghost
           overflow-hidden
           lg:flex lg:flex-row
         "
@@ -162,7 +162,7 @@ export default function NearbyPlacesSection({
           <button
             type="button"
             onClick={() => setViewMode(viewMode === "list" ? "map" : "list")}
-            className="inline-flex min-h-[44px] items-center gap-2 rounded-full bg-on-surface px-5 py-3 text-sm font-semibold text-white shadow-xl shadow-on-surface/20 transform transition-transform active:scale-95 hover:scale-105"
+            className="inline-flex min-h-[44px] items-center gap-2 rounded-full bg-on-surface px-5 py-3 text-sm font-semibold text-white shadow-ambient-lg shadow-on-surface/20 transform transition-transform active:scale-95 hover:scale-105"
           >
             <span>{viewMode === "list" ? "Map" : "List"}</span>
             {viewMode === "list" ? (

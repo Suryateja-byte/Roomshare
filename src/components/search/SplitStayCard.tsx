@@ -44,14 +44,14 @@ export function SplitStayCard({
   return (
     <div className="rounded-xl border border-outline-variant/20/60 bg-surface-container-lowest overflow-hidden">
       {/* Header */}
-      <div className="px-4 py-2.5 border-b border-outline-variant/20 bg-surface-canvas">
+      <div className="px-4 py-2.5 border-outline-variant/20 bg-surface-canvas">
         <p className="text-xs font-semibold text-on-surface-variant uppercase tracking-wide">
           Split Stay · {splitLabel}
         </p>
       </div>
 
       {/* Two listings side by side */}
-      <div className="grid grid-cols-2 divide-x divide-outline-variant/20">
+      <div className="grid grid-cols-2 divide-outline-variant/20">
         <SplitStayHalf
           listing={first}
           label="First stay"
@@ -88,7 +88,7 @@ export function SplitStayCard({
       </div>
 
       {/* Combined price footer */}
-      <div className="px-4 py-3 border-t border-outline-variant/20 flex items-baseline justify-between">
+      <div className="px-4 py-3 border-outline-variant/20 flex items-baseline justify-between">
         <span className="text-sm text-on-surface-variant">Combined total</span>
         <span className="font-bold text-lg text-on-surface">
           {formatPrice(combinedPrice)}

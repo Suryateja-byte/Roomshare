@@ -21,7 +21,7 @@ export default function ProfileWarningBanner({
   if (percentage >= 60) return null;
 
   return (
-    <div className="mb-6 bg-amber-50 border border-amber-200 rounded-xl p-4">
+    <div className="mb-6 bg-amber-50 border border-outline-variant/20 rounded-xl p-4">
       <div className="flex items-start gap-3">
         <div className="flex-shrink-0 p-2 bg-amber-100 rounded-lg">
           <User className="w-5 h-5 text-amber-600" />

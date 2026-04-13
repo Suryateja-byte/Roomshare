@@ -8,7 +8,7 @@ import { AlertOctagon } from "lucide-react";
 export default function SuspensionBanner() {
   return (
     <section
-      className="border-b border-red-200 bg-red-50"
+      className="border-b border-outline-variant/20 bg-red-50"
       role="alert"
       aria-live="polite"
       data-testid="suspension-banner"

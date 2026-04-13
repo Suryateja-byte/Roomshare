@@ -40,7 +40,7 @@ export function CategoryTabs({
               transition-all duration-200
               ${
                 isSelected
-                  ? "bg-surface-container-lowest text-on-surface shadow-sm"
+                  ? "bg-surface-container-lowest text-on-surface shadow-ambient-sm"
                   : "text-on-surface-variant hover:text-on-surface hover:bg-white/50"
               }
             `}

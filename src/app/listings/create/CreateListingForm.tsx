@@ -671,7 +671,7 @@ export default function CreateListingForm({
       {showDraftBanner && savedAt && (
         <div
           role="status"
-          className="bg-blue-50 border border-blue-100 px-4 py-4 rounded-xl mb-8 flex items-center justify-between gap-4"
+          className="bg-blue-50 border border-outline-variant/20 px-4 py-4 rounded-xl mb-8 flex items-center justify-between gap-4"
         >
           <div className="flex items-center gap-3">
             <FileText className="w-5 h-5 text-blue-600 flex-shrink-0" />
@@ -719,7 +719,7 @@ export default function CreateListingForm({
       )}
 
       {crossTabConflict && (
-        <div className="bg-yellow-50 border border-yellow-200 rounded-lg p-3 text-sm text-yellow-800 mb-4">
+        <div className="bg-yellow-50 border border-outline-variant/20 rounded-lg p-3 text-sm text-yellow-800 mb-4">
           <p>
             This draft was modified in another tab. Reload to see the latest
             version.
@@ -786,7 +786,7 @@ export default function CreateListingForm({
               aria-describedby={
                 fieldErrors.description ? "description-error" : undefined
               }
-              className={`w-full bg-surface-canvas hover:bg-surface-container-high focus:bg-surface-container-lowest border rounded-xl px-4 py-3 sm:py-3.5 text-on-surface placeholder:text-on-surface-variant outline-none focus:ring-2 focus:ring-black/5 focus:border-on-surface transition-all duration-200 disabled:cursor-not-allowed disabled:opacity-60 resize-none leading-relaxed ${fieldErrors.description ? "border-red-500" : "border-outline-variant/20"}`}
+              className={`w-full bg-surface-canvas hover:bg-surface-container-high focus:bg-surface-container-lowest border rounded-xl px-4 py-3 sm:py-3.5 text-on-surface placeholder:text-on-surface-variant outline-none focus:ring-2 focus:ring-on-surface/5 focus:border-on-surface transition-all duration-200 disabled:cursor-not-allowed disabled:opacity-60 resize-none leading-relaxed ${fieldErrors.description ? "border-red-500" : "border-outline-variant/20"}`}
               placeholder="What makes your place special? Describe the vibe, the light, and the lifestyle..."
               disabled={loading}
             />
@@ -1253,7 +1253,7 @@ export default function CreateListingForm({
             type="submit"
             disabled={loading || isAnyUploading}
             size="lg"
-            className="w-full rounded-xl shadow-xl shadow-on-surface/10"
+            className="w-full rounded-xl shadow-ambient-lg shadow-on-surface/10"
           >
             {loading ? (
               <>

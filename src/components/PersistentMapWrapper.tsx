@@ -274,7 +274,7 @@ function MapErrorBanner({
     <div
       role="alert"
       aria-live="polite"
-      className="absolute top-4 left-4 right-4 z-50 bg-amber-50 border border-amber-200 rounded-lg p-3 flex items-center justify-between gap-2"
+      className="absolute top-4 left-4 right-4 z-50 bg-amber-50 border border-outline-variant/20 rounded-lg p-3 flex items-center justify-between gap-2"
     >
       <span className="text-sm text-amber-700 block">{message}</span>
       <button

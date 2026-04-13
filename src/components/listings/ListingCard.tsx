@@ -305,10 +305,10 @@ function ListingCardInner({
       }}
       onBlur={() => setHovered(null)}
       className={cn(
-        "group relative flex flex-col rounded-2xl bg-surface-container-lowest mb-4 shadow-sm transition-all duration-500 overflow-hidden cursor-pointer",
-        !isActive && "hover:shadow-xl hover:-translate-y-1",
-        isActive && "ring-2 ring-primary ring-offset-2 -translate-y-0.5 shadow-xl",
-        isHovered && !isActive && "ring-2 ring-primary/50 shadow-lg",
+        "group relative flex flex-col rounded-2xl bg-surface-container-lowest mb-4 shadow-ambient-sm transition-all duration-500 overflow-hidden cursor-pointer",
+        !isActive && "hover:shadow-ambient-lg hover:-translate-y-1",
+        isActive && "ring-2 ring-primary ring-offset-2 -translate-y-0.5 shadow-ambient-lg",
+        isHovered && !isActive && "ring-2 ring-primary/50 shadow-ambient",
         className
       )}
     >
@@ -322,7 +322,7 @@ function ListingCardInner({
               setActive(listing.id);
             }}
             data-show-on-map-id={listing.id}
-            className="relative p-1.5 rounded-full bg-surface-container-lowest/80 backdrop-blur-sm shadow-sm hover:bg-surface-container-lowest transition-colors before:absolute before:inset-0 before:-m-[10px] before:content-['']"
+            className="relative p-1.5 rounded-full bg-surface-container-lowest/80 backdrop-blur-sm shadow-ambient-sm hover:bg-surface-container-lowest transition-colors before:absolute before:inset-0 before:-m-[10px] before:content-['']"
             aria-label="Show on map"
             title="Show on map"
           >
@@ -368,11 +368,11 @@ function ListingCardInner({
               overlay
             />
             {isTopRated ? (
-              <span className="inline-flex items-center px-2.5 py-1 rounded-md text-[11px] uppercase tracking-wider font-bold bg-surface-container-lowest/90 text-on-surface shadow-sm backdrop-blur-md">
+              <span className="inline-flex items-center px-2.5 py-1 rounded-md text-[11px] uppercase tracking-wider font-bold bg-surface-container-lowest/90 text-on-surface shadow-ambient-sm backdrop-blur-md">
                 Top Rated
               </span>
             ) : !hasRating ? (
-              <span className="inline-flex items-center px-2.5 py-1 rounded-md text-[11px] uppercase tracking-wider font-bold bg-amber-300 text-amber-950 shadow-sm backdrop-blur-md">
+              <span className="inline-flex items-center px-2.5 py-1 rounded-md text-[11px] uppercase tracking-wider font-bold bg-amber-300 text-amber-950 shadow-ambient-sm backdrop-blur-md">
                 New
               </span>
             ) : null}

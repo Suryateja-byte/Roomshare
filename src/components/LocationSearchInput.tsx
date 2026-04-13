@@ -722,7 +722,7 @@ export default function LocationSearchInput({
                 role="status"
                 aria-live="polite"
                 data-location-search-popup="true"
-                className="fixed z-[9999] overflow-hidden rounded-2xl bg-surface-container-lowest shadow-2xl backdrop-blur-xl animate-in fade-in-0 slide-in-from-top-2"
+                className="fixed z-[9999] overflow-hidden rounded-2xl bg-surface-container-lowest shadow-ghost backdrop-blur-xl animate-in fade-in-0 slide-in-from-top-2"
                 style={{
                   top: dropdownPos.top,
                   left: dropdownPos.left,
@@ -739,7 +739,7 @@ export default function LocationSearchInput({
               <div
                 ref={suggestionsRef}
                 data-location-search-popup="true"
-                className="fixed z-[9999] overflow-hidden rounded-2xl bg-surface-container-lowest shadow-2xl backdrop-blur-xl animate-in fade-in-0 slide-in-from-top-2"
+                className="fixed z-[9999] overflow-hidden rounded-2xl bg-surface-container-lowest shadow-ghost backdrop-blur-xl animate-in fade-in-0 slide-in-from-top-2"
                 style={{
                   top: dropdownPos.top,
                   left: dropdownPos.left,
@@ -805,14 +805,14 @@ export default function LocationSearchInput({
                   aria-live="polite"
                   data-location-search-popup="true"
                   data-location-search-unavailable="true"
-                  className="fixed z-[9999] overflow-hidden rounded-2xl bg-surface-container-lowest shadow-2xl backdrop-blur-xl animate-in fade-in-0 slide-in-from-top-2"
+                  className="fixed z-[9999] overflow-hidden rounded-2xl bg-surface-container-lowest shadow-ghost backdrop-blur-xl animate-in fade-in-0 slide-in-from-top-2"
                   style={{
                     top: dropdownPos.top,
                     left: dropdownPos.left,
                     width: dropdownPos.width,
                   }}
                 >
-                  <div className="flex items-start gap-3 border-b border-outline-variant/10 px-4 py-3">
+                  <div className="mx-2 mt-2 flex items-start gap-3 rounded-[1.25rem] bg-surface-container-high/50 px-4 py-3">
                     <div className="flex h-10 w-10 items-center justify-center rounded-full bg-surface-container-high text-on-surface-variant">
                       <WifiOff className="h-4 w-4" />
                     </div>
@@ -899,7 +899,7 @@ export default function LocationSearchInput({
                   role="status"
                   aria-live="polite"
                   data-location-search-popup="true"
-                  className="fixed z-[9999] overflow-hidden rounded-2xl bg-surface-container-lowest shadow-2xl backdrop-blur-xl animate-in fade-in-0 slide-in-from-top-2"
+                  className="fixed z-[9999] overflow-hidden rounded-2xl bg-surface-container-lowest shadow-ghost backdrop-blur-xl animate-in fade-in-0 slide-in-from-top-2"
                   style={{
                     top: dropdownPos.top,
                     left: dropdownPos.left,

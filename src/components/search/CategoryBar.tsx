@@ -252,8 +252,8 @@ export function CategoryBar() {
                 transition-all duration-200
                 ${
                   isActive
-                    ? "bg-primary text-on-primary border border-primary shadow-sm shadow-primary/20"
-                    : "bg-surface-container-lowest text-on-surface-variant border border-outline-variant/40 hover:border-primary-container hover:text-on-surface hover:shadow-sm"
+                    ? "bg-primary text-on-primary border border-primary shadow-ambient-sm shadow-primary/20"
+                    : "bg-surface-container-lowest text-on-surface-variant border border-outline-variant/40 hover:border-primary-container hover:text-on-surface hover:shadow-ambient-sm"
                 }
                 disabled:opacity-60 disabled:cursor-not-allowed
               `}

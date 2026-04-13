@@ -381,7 +381,7 @@ export default function ReviewForm({
           </div>
         </div>
         {/* Edit/Delete actions */}
-        <div className="flex gap-2 mt-4 pt-4 border-t border-outline-variant/20">
+        <div className="mt-4 flex gap-2 rounded-xl bg-surface-container-high/40 p-3">
           <Button
             variant="outline"
             size="sm"
@@ -397,7 +397,7 @@ export default function ReviewForm({
             onClick={() => setShowDeleteDialog(true)}
             disabled={isDeleting}
             aria-busy={isDeleting}
-            className="flex-1 text-red-600 hover:bg-red-50 border-red-200"
+            className="flex-1 text-red-600 hover:bg-red-50 border-outline-variant/20"
           >
             {isDeleting ? (
               <Loader2 className="w-4 h-4 animate-spin" aria-hidden="true" />

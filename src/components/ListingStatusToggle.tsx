@@ -25,7 +25,7 @@ const statusConfig = {
     label: "Paused",
     description: "Hidden from search",
     icon: EyeOff,
-    color: "bg-yellow-100 text-yellow-700 border-yellow-200",
+    color: "bg-yellow-100 text-yellow-700 border-outline-variant/20",
     dotColor: "bg-yellow-500",
   },
   RENTED: {
@@ -71,7 +71,7 @@ export default function ListingStatusToggle({
       <button
         onClick={() => setIsOpen(!isOpen)}
         disabled={isUpdating}
-        className={`flex items-center gap-2 px-4 py-2 rounded-xl border ${config.color} transition-all hover:shadow-md disabled:opacity-60`}
+        className={`flex items-center gap-2 px-4 py-2 rounded-xl border ${config.color} transition-all hover:shadow-ambient disabled:opacity-60`}
       >
         <span className={`w-2 h-2 rounded-full ${config.dotColor}`} />
         <span className="font-medium text-sm">{config.label}</span>
@@ -89,7 +89,7 @@ export default function ListingStatusToggle({
           />
 
           {/* Dropdown */}
-          <div className="absolute left-0 mt-2 w-56 bg-surface-container-lowest rounded-xl shadow-xl border border-outline-variant/20 py-2 z-50 animate-in fade-in zoom-in-95 duration-200">
+          <div className="absolute left-0 mt-2 w-56 bg-surface-container-lowest rounded-xl shadow-ambient-lg border border-outline-variant/20 py-2 z-50 animate-in fade-in zoom-in-95 duration-200">
             <p className="px-4 py-2 text-xs font-semibold text-on-surface-variant uppercase tracking-wider">
               Listing Status
             </p>

@@ -263,7 +263,7 @@ function ListingCardCarousel({
               className={cn(
                 "block w-1.5 h-1.5 rounded-full transition-all duration-200",
                 index === currentIndex
-                  ? "bg-surface-container-lowest w-3 shadow-sm"
+                  ? "bg-surface-container-lowest w-3 shadow-ambient-sm"
                   : "bg-white/60 group-hover/dot:bg-white/80"
               )}
             />

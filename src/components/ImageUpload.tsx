@@ -232,7 +232,7 @@ export default function ImageUpload({
                 <button
                   type="button"
                   onClick={() => handleRemove(url)}
-                  className="p-2 min-w-[44px] min-h-[44px] flex items-center justify-center bg-surface-container-lowest rounded-full shadow-lg hover:bg-red-50 transition-colors"
+                  className="p-2 min-w-[44px] min-h-[44px] flex items-center justify-center bg-surface-container-lowest rounded-full shadow-ambient hover:bg-red-50 transition-colors"
                   aria-label="Remove image"
                 >
                   <X className="w-4 h-4 text-red-500" />

@@ -43,7 +43,7 @@ export function RateLimitCountdown({
   }
 
   return (
-    <div className="flex items-center gap-2 px-3 py-2 bg-amber-50 border border-amber-200 rounded-lg text-amber-700 text-sm">
+    <div className="flex items-center gap-2 px-3 py-2 bg-amber-50 border border-outline-variant/20 rounded-lg text-amber-700 text-sm">
       <Clock className="w-4 h-4 flex-shrink-0" />
       <span>
         {message}. Try again in{" "}

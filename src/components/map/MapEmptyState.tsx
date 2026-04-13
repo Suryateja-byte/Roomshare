@@ -109,7 +109,7 @@ export function MapEmptyState({ onZoomOut, searchParams }: MapEmptyStateProps) {
   };
 
   return (
-    <div className="absolute bottom-20 left-1/2 -translate-x-1/2 z-10 bg-surface-container-lowest rounded-xl shadow-lg border border-outline-variant/20 px-5 py-4 max-w-[320px] text-center pointer-events-auto">
+    <div className="absolute bottom-20 left-1/2 -translate-x-1/2 z-10 bg-surface-container-lowest rounded-xl shadow-ambient border border-outline-variant/20 px-5 py-4 max-w-[320px] text-center pointer-events-auto">
       <MapPin
         className="w-8 h-8 text-on-surface-variant mx-auto mb-2"
         aria-hidden="true"

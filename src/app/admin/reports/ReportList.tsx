@@ -184,7 +184,7 @@ export default function ReportList({
                 key={report.id}
                 className={`bg-surface-container-lowest rounded-lg shadow-ambient-sm overflow-hidden ${
                   report.status === "OPEN"
-                    ? "border-amber-200"
+                    ? "border-outline-variant/20"
                     : "border-outline-variant/20"
                 }`}
               >

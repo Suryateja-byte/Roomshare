@@ -21,14 +21,15 @@ import {
   useId,
 } from "react";
 import Link from "next/link";
+import { useSearchParams } from "next/navigation";
 import {
-  MessageSquare,
   Menu,
   User,
   Plus,
   Heart,
   Settings,
   LogOut,
+  SlidersHorizontal,
 } from "lucide-react";
 import { useScrollHeader } from "@/hooks/useScrollHeader";
 import { useKeyboardShortcuts } from "@/hooks/useKeyboardShortcuts";
@@ -42,12 +43,9 @@ import DesktopHeaderSearch, {
 import { useSession, signOut } from "next-auth/react";
 import { Button } from "@/components/ui/button";
 import UserAvatar from "@/components/UserAvatar";
-import NotificationCenter from "@/components/NotificationCenter";
+import { countActiveFilters } from "@/components/filters/filter-chip-utils";
 
-// Exponential backoff constants for unread message polling
-const BASE_POLL_INTERVAL = 30000; // 30 seconds
-const MAX_BACKOFF_INTERVAL = 300000; // 5 minutes max
-const BACKOFF_MULTIPLIER = 2;
+
 
 const MenuItem = ({
   icon,
@@ -137,88 +135,12 @@ export default function SearchHeaderWrapper() {
 
   const [isProfileOpen, setIsProfileOpen] = useState(false);
   const [activeMenuIndex, setActiveMenuIndex] = useState(-1);
-  const [currentUnreadCount, setCurrentUnreadCount] = useState(0);
   const profileRef = useRef<HTMLDivElement>(null);
   const menuItemsRef = useRef<HTMLElement[]>([]);
   const triggerButtonRef = useRef<HTMLButtonElement>(null);
 
-  // Refs for exponential backoff polling
-  const failureCountRef = useRef(0);
-  const currentIntervalRef = useRef(BASE_POLL_INTERVAL);
-  const intervalIdRef = useRef<NodeJS.Timeout | null>(null);
-
-  // Schedule next poll with dynamic interval
-  const scheduleNextPoll = useCallback(
-    (interval: number, fetchFn: () => Promise<void>) => {
-      if (intervalIdRef.current) {
-        clearInterval(intervalIdRef.current);
-      }
-      intervalIdRef.current = setInterval(() => {
-        if (document.visibilityState === "visible") {
-          fetchFn();
-        }
-      }, interval);
-    },
-    []
-  );
-
-  // Fetch unread count from API with exponential backoff
-  const fetchUnreadCount = useCallback(async () => {
-    if (!user) return;
-    try {
-      const response = await fetch("/api/messages?view=unreadCount", {
-        cache: "no-store",
-      });
-      if (response.ok) {
-        const data = await response.json();
-        setCurrentUnreadCount(data.count);
-
-        // Reset backoff on successful response
-        if (failureCountRef.current > 0) {
-          failureCountRef.current = 0;
-          currentIntervalRef.current = BASE_POLL_INTERVAL;
-          scheduleNextPoll(BASE_POLL_INTERVAL, fetchUnreadCount);
-        }
-      }
-    } catch {
-      // Network error - implement exponential backoff
-      failureCountRef.current += 1;
-      const newInterval = Math.min(
-        BASE_POLL_INTERVAL *
-          Math.pow(BACKOFF_MULTIPLIER, failureCountRef.current),
-        MAX_BACKOFF_INTERVAL
-      );
-
-      if (newInterval !== currentIntervalRef.current) {
-        currentIntervalRef.current = newInterval;
-        scheduleNextPoll(newInterval, fetchUnreadCount);
-      }
-    }
-  }, [user, scheduleNextPoll]);
-
-  // Poll for unread count updates
-  useEffect(() => {
-    if (!user) return;
-
-    failureCountRef.current = 0;
-    currentIntervalRef.current = BASE_POLL_INTERVAL;
-
-    fetchUnreadCount();
-    scheduleNextPoll(BASE_POLL_INTERVAL, fetchUnreadCount);
-
-    // Listen for custom event from messages page
-    const handleMessagesRead = () => {
-      fetchUnreadCount();
-    };
-    window.addEventListener("messagesRead", handleMessagesRead);
-
-    return () => {
-      if (intervalIdRef.current) {
-        clearInterval(intervalIdRef.current);
-      }
-      window.removeEventListener("messagesRead", handleMessagesRead);
-    };
-  }, [user, fetchUnreadCount, scheduleNextPoll]);
+  const searchParams = useSearchParams();
+  const activeCount = countActiveFilters(searchParams);
 
   useEffect(() => {
     const handleClickOutside = (event: MouseEvent) => {
@@ -454,27 +376,27 @@ export default function SearchHeaderWrapper() {
             {/* Right Actions - User Profile / Auth */}
             <div className="hidden lg:flex items-center gap-2 flex-shrink-0 ml-2">
               <div className="flex items-center gap-1 pr-2">
-                <NotificationCenter />
-                <Link
-                  href="/messages"
-                  className="p-2.5 min-w-[44px] min-h-[44px] flex items-center justify-center text-on-surface-variant hover:text-on-surface hover:bg-surface-container-high rounded-full transition-all relative focus-visible:ring-2 focus-visible:ring-primary/30 focus-visible:ring-offset-2"
-                  aria-label={
-                    currentUnreadCount > 0
-                      ? `Messages, ${currentUnreadCount} unread`
-                      : "Messages"
-                  }
+                <button
+                  type="button"
+                  onClick={openFilters}
+                  aria-label={`Filters${activeCount > 0 ? `, ${activeCount} active` : ""}`}
+                  aria-expanded="false"
+                  aria-controls="search-filters"
+                  aria-haspopup="dialog"
+                  className={`flex items-center gap-2 px-4 py-2 min-h-[40px] rounded-full text-sm font-medium transition-colors focus-visible:ring-2 focus-visible:ring-primary/30 focus-visible:ring-offset-2 border ${
+                    activeCount > 0
+                      ? "bg-primary/10 text-primary border-primary/20 hover:bg-primary/15"
+                      : "bg-surface-container-lowest text-on-surface border-outline-variant/50 hover:border-on-surface-variant hover:bg-surface-container-high/50"
+                  }`}
                 >
-                  <MessageSquare size={18} strokeWidth={2} />
-                  {currentUnreadCount > 0 && (
-                    <span
-                      data-testid="unread-badge"
-                      className="absolute top-1.5 right-1.5 flex h-2.5 w-2.5"
-                    >
-                      <span className="animate-[pulse-ring_2s_ease-in-out_infinite] absolute inline-flex h-full w-full rounded-full bg-primary opacity-50"></span>
-                      <span className="relative inline-flex rounded-full h-2.5 w-2.5 bg-primary border border-surface-container-lowest"></span>
+                  <SlidersHorizontal size={16} />
+                  Filters
+                  {activeCount > 0 ? (
+                    <span className="ml-1 flex h-5 w-5 items-center justify-center rounded-full bg-primary text-on-primary text-[11px] font-bold">
+                      {activeCount}
                     </span>
-                  )}
-                </Link>
+                  ) : null}
+                </button>
               </div>
 
               {/* Profile Dropdown / Auth Buttons */}

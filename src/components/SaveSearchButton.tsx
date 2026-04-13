@@ -144,7 +144,7 @@ export default function SaveSearchButton({
 
             {/* Modal Content */}
             <div
-              className="relative bg-surface-container-lowest rounded-2xl shadow-xl max-w-md w-full p-6"
+              className="relative bg-surface-container-lowest rounded-2xl shadow-ambient-lg max-w-md w-full p-6"
               role="dialog"
               aria-modal="true"
               aria-labelledby="save-search-dialog-title"

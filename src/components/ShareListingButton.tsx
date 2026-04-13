@@ -122,7 +122,7 @@ export default function ShareListingButton({
           />
 
           {/* Dropdown */}
-          <div className="absolute right-0 mt-2 w-48 bg-surface-container-lowest rounded-xl shadow-xl border border-outline-variant/20 py-2 z-50 animate-in fade-in zoom-in-95 duration-200">
+          <div className="absolute right-0 mt-2 w-48 bg-surface-container-lowest rounded-xl shadow-ambient-lg border border-outline-variant/20 py-2 z-50 animate-in fade-in zoom-in-95 duration-200">
             <p className="px-4 py-2 text-xs font-semibold text-on-surface-variant uppercase tracking-wider">
               Share this listing
             </p>

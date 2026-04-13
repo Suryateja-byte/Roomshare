@@ -10,7 +10,7 @@ describe("ListingCardSkeleton", () => {
 
     const skeleton = screen.getByTestId("listing-card-skeleton");
     expect(skeleton).toHaveClass("rounded-2xl");
-    expect(skeleton).toHaveClass("shadow-sm");
+    expect(skeleton).toHaveClass("shadow-ambient-sm");
     expect(skeleton).toHaveClass("mb-4");
 
     const imageShell = skeleton.querySelector(".aspect-\\[4\\/3\\]");

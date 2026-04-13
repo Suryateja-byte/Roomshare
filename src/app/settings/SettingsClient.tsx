@@ -407,7 +407,7 @@ export default function SettingsClient({
       </section>
 
       {/* Delete Account */}
-      <section className="bg-surface-container-lowest rounded-lg border border-red-200 overflow-hidden">
+      <section className="bg-surface-container-lowest rounded-lg border border-outline-variant/20 overflow-hidden">
         <div className="p-6 pb-6">
           <div className="flex items-center gap-3">
             <div className="p-2 bg-red-50 rounded-lg">

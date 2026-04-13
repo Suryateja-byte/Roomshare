@@ -52,13 +52,13 @@ interface AuthGoogleButtonProps {
 }
 
 export const authPrimaryButtonClassName =
-  "h-14 w-full rounded-2xl bg-[#8A3D26] text-[15px] font-bold text-white shadow-lg shadow-[#8A3D26]/25 transition-all duration-300 hover:bg-[#73321f] hover:shadow-lg active:scale-[0.98] md:h-12 md:rounded-full md:bg-primary md:text-sm md:font-medium md:text-on-primary md:shadow-ambient-sm md:hover:bg-primary/90 md:hover:shadow-ambient md:active:scale-[0.97]";
+  "h-14 w-full rounded-2xl bg-gradient-to-br from-primary to-primary-container text-[15px] font-bold text-on-primary shadow-ambient-lg transition-all duration-300 hover:from-primary-container hover:to-primary hover:shadow-ambient active:scale-[0.98] md:h-12 md:rounded-full md:text-sm md:font-medium md:shadow-ambient-sm md:hover:shadow-ambient md:active:scale-[0.97]";
 
 export const authToggleButtonClassName =
-  "absolute inset-y-0 right-0 flex min-w-[44px] items-center justify-center pr-4 text-stone-400 transition-colors hover:text-stone-600 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#8A3D26]/20 md:pr-3 md:text-on-surface-variant md:hover:text-on-surface md:focus-visible:ring-primary/30 md:focus-visible:ring-offset-2";
+  "absolute inset-y-0 right-0 flex min-w-[44px] items-center justify-center pr-4 text-on-surface-variant transition-colors hover:text-on-surface focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/20 md:pr-3 md:focus-visible:ring-primary/30 md:focus-visible:ring-offset-2";
 
 export const authTurnstileSlotClassName =
-  "mb-8 flex w-full max-w-[320px] items-center justify-center self-center rounded-xl border border-stone-200 bg-white p-3 shadow-sm md:mb-5 md:max-w-none md:self-auto md:rounded-none md:border-0 md:bg-transparent md:p-0 md:shadow-none";
+  "mb-8 flex w-full max-w-[320px] items-center justify-center self-center rounded-xl border border-outline-variant/20 bg-surface-container-lowest p-3 shadow-ambient-sm md:mb-5 md:max-w-none md:self-auto md:border-0 md:bg-transparent md:p-0 md:shadow-none";
 
 export function AuthPageChrome({
   title,
@@ -77,15 +77,15 @@ export function AuthPageChrome({
   children,
 }: AuthPageChromeProps) {
   return (
-    <div className="min-h-screen flex bg-[#FBF8F1] font-body selection:bg-primary selection:text-surface-container-lowest md:bg-surface-canvas">
-      <div className="hidden lg:flex w-1/2 bg-gradient-to-br from-primary to-primary-container relative flex-col justify-between p-8 xl:p-12 text-white">
+    <div className="min-h-screen flex bg-surface-canvas font-body selection:bg-primary selection:text-surface-container-lowest">
+      <div className="hidden lg:flex w-1/2 bg-gradient-to-br from-primary to-primary-container relative flex-col justify-between p-8 xl:p-12 text-on-primary">
         <div className="absolute inset-0 bg-[radial-gradient(circle_at_top_right,_var(--tw-gradient-stops))] from-primary/80 to-primary-container opacity-50"></div>
         <div className="relative z-10">
           <Link
             href="/"
             className="text-xl font-display font-semibold tracking-tighter hover:opacity-80 transition-opacity"
           >
-            RoomShare<span className="text-white/70">.</span>
+            RoomShare<span className="text-on-primary/70">.</span>
           </Link>
         </div>
         <div className="relative z-10 max-w-md">
@@ -93,16 +93,16 @@ export function AuthPageChrome({
             {desktopQuote}
           </h2>
           <div className="mt-8 flex items-center gap-4">
-            <div className="w-10 h-10 rounded-full bg-white/10 flex items-center justify-center border border-white/20">
+            <div className="w-10 h-10 rounded-full bg-surface-container-lowest/12 flex items-center justify-center border border-surface-container-lowest/20">
               <span className="font-medium text-sm">{desktopInitials}</span>
             </div>
             <div>
-              <p className="font-medium text-white">{desktopName}</p>
-              <p className="text-sm text-white/60">{desktopLocation}</p>
+              <p className="font-medium text-on-primary">{desktopName}</p>
+              <p className="text-sm text-on-primary/70">{desktopLocation}</p>
             </div>
           </div>
         </div>
-        <p className="relative z-10 text-sm text-white/60">
+        <p className="relative z-10 text-sm text-on-primary/70">
           © {new Date().getFullYear()} RoomShare Inc.
         </p>
       </div>
@@ -113,7 +113,7 @@ export function AuthPageChrome({
           rightPanelClassName
         )}
       >
-        <div className="w-full max-w-[420px] rounded-[2.5rem] bg-[#FBF8F1] px-6 py-10 sm:px-8 sm:py-12 md:max-w-sm md:rounded-none md:bg-transparent md:px-0 md:py-0">
+        <div className="w-full max-w-[420px] rounded-[2.5rem] border border-outline-variant/15 bg-surface-container-lowest/88 px-6 py-10 shadow-ambient sm:px-8 sm:py-12 md:max-w-[440px] md:rounded-[2rem] md:bg-surface-container-lowest/78 md:px-8 md:py-10 md:shadow-ambient-lg md:backdrop-blur-[18px]">
           <div
             className={cn(
               "flex flex-col gap-8 md:gap-6 lg:gap-8",
@@ -122,11 +122,11 @@ export function AuthPageChrome({
           >
             <div className="flex flex-col items-center text-center md:items-stretch">
               <div className="mb-8 flex items-center gap-2.5 md:hidden">
-                <div className="flex h-10 w-10 items-center justify-center rounded-full bg-stone-900 font-display text-xl font-bold text-white shadow-md">
+                <div className="flex h-10 w-10 items-center justify-center rounded-full bg-on-surface font-display text-xl font-bold text-surface-container-lowest shadow-ambient">
                   R
                 </div>
-                <span className="font-display text-2xl font-bold tracking-tight text-stone-900">
-                  RoomShare<span className="text-[#8A3D26]">.</span>
+                <span className="font-display text-2xl font-bold tracking-tight text-on-surface">
+                  RoomShare<span className="text-primary">.</span>
                 </span>
               </div>
 
@@ -135,10 +135,10 @@ export function AuthPageChrome({
               </div>
 
               <div className="text-center lg:text-left">
-                <h1 className="font-display text-4xl font-semibold leading-none tracking-tight text-stone-900 md:text-3xl md:leading-tight md:text-on-surface">
+                <h1 className="font-display text-4xl font-semibold leading-none tracking-tight text-on-surface md:text-3xl md:leading-tight">
                   {title}
                 </h1>
-                <p className="mt-3 max-w-[260px] text-[15px] leading-relaxed text-stone-500 sm:text-base md:mt-2 md:max-w-none md:text-on-surface-variant">
+                <p className="mt-3 max-w-[260px] text-[15px] leading-relaxed text-on-surface-variant sm:text-base md:mt-2 md:max-w-none">
                   {subtitle}
                 </p>
               </div>
@@ -147,26 +147,26 @@ export function AuthPageChrome({
             {children}
 
             <div className="mt-2 flex flex-col gap-8 text-center md:mt-0 md:gap-0">
-              <p className="text-[15px] text-stone-600 md:text-sm md:text-on-surface-variant">
+              <p className="text-[15px] text-on-surface-variant md:text-sm">
                 {footerPrompt}{" "}
                 <Link
                   href={footerLinkHref}
-                  className="font-bold text-[#8A3D26] hover:underline underline-offset-4 md:font-semibold md:text-primary"
+                  className="font-bold text-primary hover:underline underline-offset-4 md:font-semibold"
                 >
                   {footerLinkLabel}
                 </Link>
               </p>
 
               <div className="flex flex-col items-center gap-3 md:hidden">
-                <p className="font-display text-[15px] italic text-stone-500">
+                <p className="font-display text-[15px] italic text-on-surface-variant">
                   {mobileTestimonialQuote}
                 </p>
-                <span className="text-xs font-bold uppercase tracking-[0.2em] text-stone-400">
+                <span className="text-xs font-bold uppercase tracking-[0.2em] text-on-surface-variant/80">
                   {mobileTestimonialAttribution}
                 </span>
               </div>
 
-              <p className="text-xs text-stone-400 md:hidden">
+              <p className="text-xs text-on-surface-variant/80 md:hidden">
                 &copy; {new Date().getFullYear()} RoomShare Inc.
               </p>
             </div>
@@ -179,14 +179,11 @@ export function AuthPageChrome({
 
 export function AuthDivider({ label = "Or continue with email" }) {
   return (
-    <div className="relative">
-      <div className="absolute inset-0 flex items-center">
-        <div className="w-full border-t border-stone-200 md:border-outline-variant/20"></div>
-      </div>
-      <div className="relative flex justify-center">
-        <span className="bg-[#FBF8F1] px-4 text-[11px] font-bold uppercase tracking-[0.2em] text-stone-400 md:bg-surface-canvas md:px-4 md:text-xs md:font-medium md:tracking-wider md:text-on-surface-variant">
-          {label}
-        </span>
+    <div className="flex justify-center">
+      <div className="inline-flex items-center gap-3 rounded-full bg-surface-container-high/55 px-4 py-1.5 text-[11px] font-bold uppercase tracking-[0.2em] text-on-surface-variant md:text-xs md:font-medium md:tracking-wider">
+        <span className="h-1.5 w-1.5 rounded-full bg-primary/35" aria-hidden />
+        <span>{label}</span>
+        <span className="h-1.5 w-1.5 rounded-full bg-primary/35" aria-hidden />
       </div>
     </div>
   );
@@ -214,7 +211,7 @@ export function AuthField({
           <label
             htmlFor={inputProps.id}
             className={cn(
-              "ml-1 text-xs font-semibold uppercase tracking-[0.18em] text-stone-500 md:ml-0.5 md:tracking-wide md:text-on-surface-variant",
+              "ml-1 text-xs font-semibold uppercase tracking-[0.18em] text-on-surface-variant md:ml-0.5 md:tracking-wide",
               labelClassName
             )}
           >
@@ -226,7 +223,7 @@ export function AuthField({
         <label
           htmlFor={inputProps.id}
           className={cn(
-            "ml-1 text-xs font-semibold uppercase tracking-[0.18em] text-stone-500 md:ml-0.5 md:tracking-wide md:text-on-surface-variant",
+            "ml-1 text-xs font-semibold uppercase tracking-[0.18em] text-on-surface-variant md:ml-0.5 md:tracking-wide",
             labelClassName
           )}
         >
@@ -235,13 +232,13 @@ export function AuthField({
       )}
 
       <div className={cn("group relative", inputWrapperClassName)}>
-        <div className="pointer-events-none absolute inset-y-0 left-0 flex items-center pl-4 text-stone-400 transition-colors group-focus-within:text-[#8A3D26] md:pl-3 md:text-on-surface-variant md:group-focus-within:text-on-surface-variant">
+        <div className="pointer-events-none absolute inset-y-0 left-0 flex items-center pl-4 text-on-surface-variant transition-colors group-focus-within:text-primary md:pl-3 md:group-focus-within:text-on-surface">
           <Icon className="h-[18px] w-[18px] md:h-5 md:w-5" strokeWidth={2.1} />
         </div>
         <input
           ref={inputRef}
           className={cn(
-            "block w-full rounded-2xl border-2 border-stone-100 bg-white py-3.5 pl-11 text-[15px] font-medium text-stone-800 shadow-sm transition-all duration-300 placeholder:text-stone-300 focus:border-[#8A3D26] focus:outline-none focus:ring-4 focus:ring-[#8A3D26]/10 md:rounded-lg md:border md:border-outline-variant/20 md:bg-surface-container-lowest md:py-2.5 md:pl-10 md:text-sm md:text-on-surface md:shadow-ambient-sm md:placeholder:text-on-surface-variant md:transition-shadow md:duration-200 md:ease-in-out md:focus:border-outline-variant/20 md:focus:ring-2 md:focus:ring-primary/30 md:focus:ring-offset-2",
+            "block w-full rounded-2xl border border-outline-variant/20 bg-surface-container-lowest py-3.5 pl-11 text-[15px] font-medium text-on-surface shadow-ambient-sm transition-all duration-300 placeholder:text-on-surface-variant/70 focus:border-primary/35 focus:outline-none focus:ring-4 focus:ring-primary/10 md:rounded-xl md:py-2.5 md:pl-10 md:text-sm md:transition-shadow md:duration-200 md:ease-in-out md:focus:ring-2 md:focus:ring-primary/20 md:focus:ring-offset-2",
             trailingControl ? "pr-12 md:pr-10" : "pr-4 md:pr-3",
             inputClassName
           )}
@@ -267,7 +264,7 @@ export function AuthGoogleButton({
       type="button"
       onClick={onClick}
       disabled={disabled}
-      className="flex w-full items-center justify-center gap-3 rounded-2xl border-2 border-stone-100 bg-white py-3.5 font-semibold text-stone-700 shadow-sm transition-all duration-300 hover:bg-stone-50 active:scale-[0.98] disabled:cursor-not-allowed disabled:opacity-60 md:h-12 md:rounded-full md:border md:border-outline-variant/20 md:bg-surface-container-lowest md:py-0 md:font-medium md:text-on-surface-variant md:shadow-ambient-sm md:transition-colors md:hover:bg-surface-container-high md:active:scale-[0.97]"
+      className="flex w-full items-center justify-center gap-3 rounded-2xl border border-outline-variant/20 bg-surface-container-lowest py-3.5 font-semibold text-on-surface shadow-ambient-sm transition-all duration-300 hover:bg-surface-container-high/45 active:scale-[0.98] disabled:cursor-not-allowed disabled:opacity-60 md:h-12 md:rounded-full md:py-0 md:font-medium md:shadow-ambient-sm md:transition-colors md:hover:bg-surface-container-high md:active:scale-[0.97]"
     >
       {loading ? <Loader2 className="h-5 w-5 animate-spin" /> : <GoogleMark />}
       {loading ? loadingLabel : label}

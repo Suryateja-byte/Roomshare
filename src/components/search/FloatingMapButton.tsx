@@ -42,7 +42,7 @@ export default function FloatingMapButton({
           animate={{ scale: 1, opacity: 1 }}
           exit={{ scale: 0.9, opacity: 0 }}
           transition={reducedMotion ? { duration: 0 } : { type: "spring", stiffness: 500, damping: 30 }}
-          className="fixed inset-x-0 z-50 z-[1201] mx-auto flex w-max items-center justify-center gap-2 rounded-full bg-on-surface px-5 py-3 text-white shadow-2xl shadow-on-surface/30 transition-all focus:outline-none focus-visible:ring-2 focus-visible:ring-primary/30 focus-visible:ring-offset-2 active:scale-95 md:hidden"
+          className="fixed inset-x-0 z-50 z-[1201] mx-auto flex w-max items-center justify-center gap-2 rounded-full bg-on-surface px-5 py-3 text-white shadow-ghost shadow-on-surface/30 transition-all focus:outline-none focus-visible:ring-2 focus-visible:ring-primary/30 focus-visible:ring-offset-2 active:scale-95 md:hidden"
           style={{
             bottom: isListMode
               ? SEARCH_MOBILE_LIST_TOGGLE_OFFSET

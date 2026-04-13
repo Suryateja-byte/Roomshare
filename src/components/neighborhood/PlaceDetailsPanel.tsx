@@ -154,7 +154,7 @@ export function PlaceDetailsPanel({
         ref={panelRef}
         className={`
           fixed right-0 top-0 bottom-0 w-full max-w-md
-          bg-surface-canvas border-l shadow-2xl z-50
+          bg-surface-canvas border-l shadow-ghost z-50
           animate-in slide-in-from-right duration-300
           flex flex-col
           ${className}

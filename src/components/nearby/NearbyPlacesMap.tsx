@@ -88,7 +88,7 @@ function createHomeMarkerElement(): HTMLDivElement {
   // Inner visual marker - scales on hover via group-hover
   const container = document.createElement("div");
   container.className =
-    "w-10 h-10 bg-on-surface rounded-full shadow-xl flex items-center justify-center transition-transform duration-200 ease-out group-hover:scale-110";
+    "w-10 h-10 bg-on-surface rounded-full shadow-ambient-lg flex items-center justify-center transition-transform duration-200 ease-out group-hover:scale-110";
 
   const svg = document.createElementNS("http://www.w3.org/2000/svg", "svg");
   svg.setAttribute("width", "20");
@@ -135,7 +135,7 @@ function createPOIMarkerVisual(category: string): HTMLDivElement {
   // Inner visual marker - scales on hover via group-hover
   const container = document.createElement("div");
   container.className =
-    "w-8 h-8 rounded-full shadow-lg flex items-center justify-center border-2 transition-all duration-200 ease-out group-hover:scale-110 group-active:scale-95";
+    "w-8 h-8 rounded-full shadow-ambient flex items-center justify-center border-2 transition-all duration-200 ease-out group-hover:scale-110 group-active:scale-95";
   container.style.backgroundColor = colors.markerBg;
   container.style.borderColor = colors.markerBorder;
 
@@ -663,7 +663,7 @@ export default function NearbyPlacesMap({
           className="
             min-w-[44px] min-h-[44px]
             bg-white/90 backdrop-blur-md
-            rounded-full shadow-lg border border-outline-variant/20/50
+            rounded-full shadow-ambient border border-outline-variant/20/50
             flex items-center justify-center
             text-on-surface-variant
             hover:bg-surface-container-lowest
@@ -681,7 +681,7 @@ export default function NearbyPlacesMap({
           className="
             min-w-[44px] min-h-[44px]
             bg-white/90 backdrop-blur-md
-            rounded-full shadow-lg border border-outline-variant/20/50
+            rounded-full shadow-ambient border border-outline-variant/20/50
             flex items-center justify-center
             text-on-surface-variant
             hover:bg-surface-container-lowest
@@ -699,7 +699,7 @@ export default function NearbyPlacesMap({
           className="
             min-w-[44px] min-h-[44px]
             bg-on-surface/90 backdrop-blur-md
-            rounded-full shadow-lg
+            rounded-full shadow-ambient
             flex items-center justify-center
             text-white
             hover:bg-on-surface
@@ -719,7 +719,7 @@ export default function NearbyPlacesMap({
             className="
               min-w-[44px] min-h-[44px]
               bg-white/90 backdrop-blur-md
-              rounded-full shadow-lg border border-outline-variant/20/50
+              rounded-full shadow-ambient border border-outline-variant/20/50
               flex items-center justify-center
               text-on-surface-variant
               hover:bg-surface-container-lowest

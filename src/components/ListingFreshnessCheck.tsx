@@ -135,7 +135,7 @@ export default function ListingFreshnessCheck({
   if (isDeleted) {
     return (
       <div className="fixed top-20 left-0 right-0 z-50 mx-4 sm:mx-auto sm:max-w-lg animate-in slide-in-from-top-4 fade-in duration-300">
-        <div className="bg-red-50 border border-red-200 rounded-xl p-4 shadow-lg">
+        <div className="bg-red-50 border border-outline-variant/20 rounded-xl p-4 shadow-ambient">
           <div className="flex items-start gap-3">
             <div className="flex-shrink-0 w-10 h-10 bg-red-100 rounded-full flex items-center justify-center">
               <AlertTriangle className="w-5 h-5 text-red-600" />
@@ -164,7 +164,7 @@ export default function ListingFreshnessCheck({
   if (isUnavailable) {
     return (
       <div className="fixed top-20 left-0 right-0 z-50 mx-4 sm:mx-auto sm:max-w-lg animate-in slide-in-from-top-4 fade-in duration-300">
-        <div className="bg-amber-50 border border-amber-200 rounded-xl p-4 shadow-lg">
+        <div className="bg-amber-50 border border-outline-variant/20 rounded-xl p-4 shadow-ambient">
           <div className="flex items-start gap-3">
             <div className="flex-shrink-0 w-10 h-10 bg-amber-100 rounded-full flex items-center justify-center">
               <AlertTriangle className="w-5 h-5 text-amber-600" />

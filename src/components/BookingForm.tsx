@@ -495,8 +495,8 @@ export default function BookingForm({
           errorType === "server" ||
           errorType === "network" ||
           errorType === "rate_limit"
-            ? "bg-amber-50 border border-amber-200"
-            : "bg-red-50 border border-red-200"
+            ? "bg-amber-50 border border-outline-variant/20"
+            : "bg-red-50 border border-outline-variant/20"
         }`}
       >
         <div className="flex items-start gap-3">
@@ -583,7 +583,7 @@ export default function BookingForm({
   };
 
   return (
-    <div className="bg-surface-container-lowest rounded-3xl shadow-xl p-6 sticky top-24">
+    <div className="bg-surface-container-lowest rounded-3xl shadow-ambient-lg p-6 sticky top-24">
       <div className="flex justify-between items-end mb-6">
         <div>
           <span className="text-3xl font-bold text-on-surface">${price}</span>
@@ -779,7 +779,7 @@ export default function BookingForm({
           {dateConflict?.overlaps && (
             <div
               role="alert"
-              className="rounded-xl p-3 bg-red-50 border border-red-200"
+              className="rounded-xl p-3 bg-red-50 border border-outline-variant/20"
             >
               <p className="text-xs text-red-700 font-medium">
                 ⚠️ Selected dates overlap with an existing booking
@@ -984,7 +984,7 @@ export default function BookingForm({
                 role="dialog"
                 aria-modal="true"
                 aria-labelledby="booking-confirm-title"
-                className="relative bg-surface-container-lowest rounded-3xl shadow-2xl max-w-md w-full p-6 animate-in zoom-in-95 fade-in duration-200"
+                className="relative bg-surface-container-lowest rounded-3xl shadow-ghost max-w-md w-full p-6 animate-in zoom-in-95 fade-in duration-200"
               >
                 <h3
                   id="booking-confirm-title"

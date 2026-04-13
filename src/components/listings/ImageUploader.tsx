@@ -400,7 +400,7 @@ export default function ImageUploader({
           {images.map((image, index) => (
             <div
               key={image.id}
-              className="group relative aspect-square rounded-xl overflow-hidden border border-outline-variant/20 bg-surface-container-high shadow-sm"
+              className="group relative aspect-square rounded-xl overflow-hidden border border-outline-variant/20 bg-surface-container-high shadow-ambient-sm"
             >
               {/* eslint-disable-next-line @next/next/no-img-element -- blob URL preview not compatible with next/image */}
               <img

@@ -30,7 +30,7 @@ export default function RadarAttribution({
         backdrop-blur-md
         border border-outline-variant/20/50
         rounded-lg
-        shadow-lg shadow-black/5
+        shadow-ambient shadow-black/5
         text-xs font-medium text-on-surface-variant
         hover:text-on-surface
         hover:border-outline-variant/30

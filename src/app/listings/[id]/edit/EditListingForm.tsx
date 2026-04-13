@@ -545,7 +545,7 @@ export default function EditListingForm({
               size="sm"
               onClick={handleRetry}
               disabled={loading}
-              className="flex-shrink-0 text-red-700 border-red-200 hover:bg-red-100"
+              className="flex-shrink-0 text-red-700 border-outline-variant/20 hover:bg-red-100"
             >
               <RefreshCcw className="w-4 h-4 mr-1" />
               Retry
@@ -556,7 +556,7 @@ export default function EditListingForm({
 
       {/* Draft Resume Banner */}
       {showDraftBanner && savedAt && (
-        <div className="bg-blue-50 border border-blue-100 px-4 py-4 rounded-xl mb-8 flex items-center justify-between gap-4">
+        <div className="bg-blue-50 border border-outline-variant/20 px-4 py-4 rounded-xl mb-8 flex items-center justify-between gap-4">
           <div className="flex items-center gap-3">
             <FileText className="w-5 h-5 text-blue-600 flex-shrink-0" />
             <div>
@@ -591,7 +591,7 @@ export default function EditListingForm({
       )}
 
       {crossTabConflict && (
-        <div className="bg-yellow-50 border border-yellow-200 rounded-lg p-3 text-sm text-yellow-800 mb-4">
+        <div className="bg-yellow-50 border border-outline-variant/20 rounded-lg p-3 text-sm text-yellow-800 mb-4">
           <p>
             This draft was modified in another tab. Reload to see the latest
             version.
@@ -646,7 +646,7 @@ export default function EditListingForm({
               required
               rows={5}
               maxLength={1000}
-              className="w-full bg-surface-canvas hover:bg-surface-container-high focus:bg-surface-container-lowest border border-outline-variant/20 rounded-xl px-4 py-3.5 text-on-surface placeholder:text-on-surface-variant outline-none focus:ring-2 focus:ring-black/5 focus:border-on-surface transition-all duration-200 disabled:cursor-not-allowed disabled:opacity-60 resize-none leading-relaxed"
+              className="w-full bg-surface-canvas hover:bg-surface-container-high focus:bg-surface-container-lowest border border-outline-variant/20 rounded-xl px-4 py-3.5 text-on-surface placeholder:text-on-surface-variant outline-none focus:ring-2 focus:ring-on-surface/5 focus:border-on-surface transition-all duration-200 disabled:cursor-not-allowed disabled:opacity-60 resize-none leading-relaxed"
               placeholder="What makes your place special? Describe the vibe, the light, and the lifestyle..."
               disabled={loading}
               value={description}
@@ -1042,7 +1042,7 @@ export default function EditListingForm({
               id="houseRules"
               name="houseRules"
               rows={3}
-              className="w-full bg-surface-canvas hover:bg-surface-container-high focus:bg-surface-container-lowest border border-outline-variant/20 rounded-xl px-4 py-3.5 text-on-surface placeholder:text-on-surface-variant outline-none focus:ring-2 focus:ring-black/5 focus:border-on-surface transition-all duration-200 disabled:cursor-not-allowed disabled:opacity-60 resize-none"
+              className="w-full bg-surface-canvas hover:bg-surface-container-high focus:bg-surface-container-lowest border border-outline-variant/20 rounded-xl px-4 py-3.5 text-on-surface placeholder:text-on-surface-variant outline-none focus:ring-2 focus:ring-on-surface/5 focus:border-on-surface transition-all duration-200 disabled:cursor-not-allowed disabled:opacity-60 resize-none"
               placeholder="No smoking, quiet hours after 10pm, no pets..."
               disabled={loading}
               defaultValue={listing.houseRules.join(", ")}
@@ -1066,7 +1066,7 @@ export default function EditListingForm({
             type="submit"
             disabled={loading || isAnyImageUploading || images.length === 0}
             size="lg"
-            className="flex-1 h-14 rounded-xl shadow-xl shadow-on-surface/10 text-lg"
+            className="flex-1 h-14 rounded-xl shadow-ambient-lg shadow-on-surface/10 text-lg"
             data-testid="listing-save-button"
           >
             {loading ? (

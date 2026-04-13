@@ -734,9 +734,9 @@ export default function MessagesPageClient({
     >
       {/* Sidebar */}
       <div
-        className={`w-full md:w-[400px] flex flex-col border-r border-outline-variant/20 bg-surface-container-lowest ${activeId ? "hidden md:flex" : "flex"}`}
+        className={`w-full md:w-[400px] flex flex-col border-outline-variant/20 bg-surface-container-lowest ${activeId ? "hidden md:flex" : "flex"}`}
       >
-        <div className="p-6 border-b border-outline-variant/20">
+        <div className="p-6 border-outline-variant/20">
           <div className="flex justify-between items-center mb-6">
             <div className="flex items-center gap-3">
               <h1 className="text-2xl font-bold tracking-tight text-on-surface">
@@ -894,7 +894,7 @@ export default function MessagesPageClient({
         {activeId && activeConversation ? (
           <>
             {/* Header */}
-            <header className="h-[72px] px-6 flex items-center justify-between border-b border-outline-variant/20">
+            <header className="h-[72px] px-6 flex items-center justify-between border-outline-variant/20">
               <div className="flex items-center gap-3">
                 <button
                   data-testid="back-button"
@@ -1075,7 +1075,7 @@ export default function MessagesPageClient({
                           : undefined
                       }
                       className={`
-                                                max-w-[70%] px-5 py-2.5 text-sm leading-relaxed shadow-sm
+                                                max-w-[70%] px-5 py-2.5 text-sm leading-relaxed shadow-ambient-sm
                                                 ${
                                                   m.senderId === currentUserId
                                                     ? "bg-on-surface text-white rounded-2xl rounded-tr-sm"
@@ -1154,7 +1154,7 @@ export default function MessagesPageClient({
                     });
                     setShowScrollToBottom(false);
                   }}
-                  className="fixed bottom-28 right-8 z-10 flex items-center gap-2 px-4 py-2 bg-on-surface text-white rounded-full shadow-lg hover:bg-on-surface transition-all animate-in fade-in slide-in-from-bottom-2 duration-200"
+                  className="fixed bottom-28 right-8 z-10 flex items-center gap-2 px-4 py-2 bg-on-surface text-white rounded-full shadow-ambient hover:bg-on-surface transition-all animate-in fade-in slide-in-from-bottom-2 duration-200"
                   aria-label="Scroll to latest messages"
                 >
                   <ArrowDown className="w-4 h-4" />
@@ -1187,7 +1187,7 @@ export default function MessagesPageClient({
                 )}
                 <form
                   onSubmit={handleSend}
-                  className="flex items-end gap-2 bg-surface-canvas p-2 rounded-[2rem] border border-outline-variant/20 focus-within:bg-surface-container-lowest focus-within:shadow-lg transition-all"
+                  className="flex items-end gap-2 bg-surface-canvas p-2 rounded-[2rem] border border-outline-variant/20 focus-within:bg-surface-container-lowest focus-within:shadow-ambient transition-all"
                 >
                   <button
                     type="button"

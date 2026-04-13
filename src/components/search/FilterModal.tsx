@@ -202,11 +202,11 @@ export function FilterModal({
                 className={
                   isMobile
                     ? "fixed inset-0 z-[1200] bg-surface-container-lowest flex flex-col md:hidden pt-[env(safe-area-inset-top,0px)]"
-                    : "absolute right-0 top-0 z-10 h-full w-full max-w-md bg-surface-container-lowest shadow-2xl overflow-hidden flex flex-col pt-[env(safe-area-inset-top,0px)]"
+                    : "absolute right-0 top-0 z-10 h-full w-full max-w-md bg-surface-container-lowest shadow-ghost overflow-hidden flex flex-col pt-[env(safe-area-inset-top,0px)]"
                 }
               >
           {/* Header */}
-          <div className="flex items-center justify-between px-6 py-4 border-b border-outline-variant/20 bg-surface-container-lowest">
+          <div className="flex items-center justify-between px-6 py-4 border-outline-variant/20 bg-surface-container-lowest">
             <h2
               id="filter-drawer-title"
               className="text-lg font-semibold text-on-surface"
@@ -467,7 +467,7 @@ export function FilterModal({
               {/* Selected languages */}
               {languages.length > 0 && (
                 <div
-                  className="flex flex-wrap gap-2 pb-2 border-b border-outline-variant/20"
+                  className="flex flex-wrap gap-2 pb-2 border-outline-variant/20"
                   role="group"
                   aria-label="Selected languages"
                 >
@@ -591,7 +591,7 @@ export function FilterModal({
           </div>
 
           {/* Footer */}
-          <div className="px-6 py-4 pb-[max(1rem,env(safe-area-inset-bottom,0px))] border-t border-outline-variant/20 bg-surface-container-lowest space-y-3">
+          <div className="px-6 py-4 pb-[max(1rem,env(safe-area-inset-bottom,0px))] border-outline-variant/20 bg-surface-container-lowest space-y-3">
             {count === 0 &&
               !isCountLoading &&
               drawerSuggestions &&
@@ -618,7 +618,7 @@ export function FilterModal({
                 type="button"
                 onClick={onApply}
                 disabled={boundsRequired}
-                className={`flex-1 rounded-xl h-12 text-white shadow-md disabled:opacity-60 disabled:cursor-not-allowed ${
+                className={`flex-1 rounded-xl h-12 text-white shadow-ambient disabled:opacity-60 disabled:cursor-not-allowed ${
                   count === 0 && !isCountLoading
                     ? "bg-amber-500 hover:bg-amber-600"
                     : "bg-primary hover:bg-primary"

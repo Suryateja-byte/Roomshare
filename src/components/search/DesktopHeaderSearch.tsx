@@ -389,9 +389,9 @@ export const DesktopHeaderSearch = forwardRef<
         type="button"
         onClick={handleSummaryClick}
         data-testid="desktop-header-search-summary"
-        className="mx-auto flex h-[56px] w-full max-w-lg items-center rounded-full border border-outline-variant/20 bg-surface-container-lowest p-2 shadow-sm transition-all duration-300 hover:shadow-md focus:outline-none focus-visible:ring-2 focus-visible:ring-primary/30 focus-visible:ring-offset-2"
+        className="mx-auto flex h-[56px] w-full max-w-lg items-center rounded-full border border-outline-variant/20 bg-surface-container-lowest p-2 shadow-ambient-sm transition-all duration-300 hover:shadow-ambient focus:outline-none focus-visible:ring-2 focus-visible:ring-primary/30 focus-visible:ring-offset-2"
       >
-        <div className="flex flex-1 items-center divide-x divide-outline-variant/20 px-4 text-left">
+        <div className="flex flex-1 items-center divide-outline-variant/20 px-4 text-left">
           <div className="min-w-0 flex-1 pr-4">
             <p className="mb-0.5 text-xs font-bold uppercase tracking-wider text-on-surface">
               Where
@@ -423,13 +423,13 @@ export const DesktopHeaderSearch = forwardRef<
         onSubmit={handleSubmit}
         data-testid="desktop-header-search-form"
         className={cn(
-          "flex w-full items-center border border-outline-variant/20 bg-surface-container-lowest shadow-sm transition-all duration-300 hover:shadow-md focus-within:shadow-md",
+          "flex w-full items-center border border-outline-variant/20 bg-surface-container-lowest shadow-ambient-sm transition-all duration-300 hover:shadow-ambient focus-within:shadow-ambient",
           collapsed ? "rounded-full p-2" : "rounded-[2rem] p-3"
         )}
         role="search"
         aria-label="Search listings"
       >
-        <div className="flex flex-1 items-center divide-x divide-outline-variant/20 px-4">
+        <div className="flex flex-1 items-center divide-outline-variant/20 px-4">
           <div className="min-w-0 flex-1 pr-4">
             <label
               htmlFor={LOCATION_INPUT_ID}

@@ -90,7 +90,7 @@ export function PasswordConfirmationModal({
         <div className="space-y-4 py-4">
           {hasPassword ? (
             <>
-              <div className="flex items-start gap-3 p-3 rounded-lg bg-amber-50 border border-amber-200">
+              <div className="flex items-start gap-3 p-3 rounded-lg bg-amber-50 border border-outline-variant/20">
                 <AlertTriangle className="h-5 w-5 text-amber-600 flex-shrink-0 mt-0.5" />
                 <p className="text-sm text-amber-700">
                   For your security, please enter your password to confirm this

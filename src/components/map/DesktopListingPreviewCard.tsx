@@ -113,12 +113,12 @@ export default function DesktopListingPreviewCard({
 
         <div className="absolute bottom-3 left-3 flex flex-wrap gap-2">
           {roomTypeLabel ? (
-            <span className="inline-flex rounded-full bg-surface-container-lowest/92 px-2.5 py-1 text-[11px] font-semibold text-on-surface shadow-sm">
+            <span className="inline-flex rounded-full bg-surface-container-lowest/92 px-2.5 py-1 text-[11px] font-semibold text-on-surface shadow-ambient-sm">
               {roomTypeLabel}
             </span>
           ) : null}
           <span
-            className={`inline-flex rounded-full px-2.5 py-1 text-[11px] font-semibold shadow-sm ${
+            className={`inline-flex rounded-full px-2.5 py-1 text-[11px] font-semibold shadow-ambient-sm ${
               listing.availableSlots > 0
                 ? "bg-emerald-500 text-white"
                 : "bg-on-surface text-white"

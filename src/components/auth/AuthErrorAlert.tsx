@@ -9,18 +9,21 @@ interface AuthErrorAlertProps {
 
 const severityStyles = {
   error: {
-    container: "bg-red-50 border-red-200",
+    container: "bg-red-50/90 border-outline-variant/20",
     text: "text-red-700",
+    iconText: "text-red-700",
     icon: AlertCircle,
   },
   warning: {
-    container: "bg-amber-50 border-amber-200",
+    container: "bg-amber-50/90 border-outline-variant/20",
     text: "text-amber-700",
+    iconText: "text-amber-700",
     icon: AlertTriangle,
   },
   info: {
-    container: "bg-blue-50 border-blue-200",
-    text: "text-blue-700",
+    container: "bg-surface-container-high/75 border-outline-variant/20",
+    text: "text-on-surface",
+    iconText: "text-info",
     icon: Info,
   },
 };
@@ -37,7 +40,7 @@ export function AuthErrorAlert({
     return (
       <div className={`${styles.container} border rounded-xl p-4`}>
         <div className="flex gap-3">
-          <Icon className={`h-5 w-5 flex-shrink-0 ${styles.text}`} />
+          <Icon className={`h-5 w-5 flex-shrink-0 ${styles.iconText}`} />
           <div className={`text-sm ${styles.text}`}>
             <p className="font-medium">{customError}</p>
           </div>
@@ -56,7 +59,7 @@ export function AuthErrorAlert({
   return (
     <div className={`${styles.container} border rounded-xl p-4`}>
       <div className="flex gap-3">
-        <Icon className={`h-5 w-5 flex-shrink-0 mt-0.5 ${styles.text}`} />
+        <Icon className={`h-5 w-5 flex-shrink-0 mt-0.5 ${styles.iconText}`} />
         <div className="flex-1 space-y-2">
           <p className={`text-sm font-medium ${styles.text}`}>
             {errorInfo.message}

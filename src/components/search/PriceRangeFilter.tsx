@@ -94,11 +94,11 @@ export function PriceRangeFilter({
             <Slider.Range className="absolute h-full rounded-full bg-on-surface" />
           </Slider.Track>
           <Slider.Thumb
-            className="block w-6 h-6 bg-surface-container-lowest border-2 border-outline-variant/20 rounded-full shadow-md hover:shadow-lg focus:outline-none focus:ring-2 focus:ring-primary/30 cursor-grab active:cursor-grabbing transition-shadow"
+            className="block w-6 h-6 bg-surface-container-lowest border-2 border-outline-variant/20 rounded-full shadow-ambient hover:shadow-ambient focus:outline-none focus:ring-2 focus:ring-primary/30 cursor-grab active:cursor-grabbing transition-shadow"
             aria-label="Minimum price"
           />
           <Slider.Thumb
-            className="block w-6 h-6 bg-surface-container-lowest border-2 border-outline-variant/20 rounded-full shadow-md hover:shadow-lg focus:outline-none focus:ring-2 focus:ring-primary/30 cursor-grab active:cursor-grabbing transition-shadow"
+            className="block w-6 h-6 bg-surface-container-lowest border-2 border-outline-variant/20 rounded-full shadow-ambient hover:shadow-ambient focus:outline-none focus:ring-2 focus:ring-primary/30 cursor-grab active:cursor-grabbing transition-shadow"
             aria-label="Maximum price"
           />
         </Slider.Root>

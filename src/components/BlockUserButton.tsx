@@ -136,7 +136,7 @@ export default function BlockUserButton({
               role="dialog"
               aria-modal="true"
               aria-labelledby="block-user-title"
-              className="relative bg-surface-container-lowest rounded-2xl shadow-xl max-w-sm w-full p-6"
+              className="relative bg-surface-container-lowest rounded-2xl shadow-ambient-lg max-w-sm w-full p-6"
             >
               <h3
                 id="block-user-title"

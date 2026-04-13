@@ -141,7 +141,7 @@ export default function SortSelect({ currentSort }: SortSelectProps) {
             />
             {/* Sheet */}
             <FocusTrap active={mobileOpen}>
-              <div className="absolute bottom-0 left-0 right-0 bg-surface-container-lowest rounded-t-2xl shadow-xl animate-in slide-in-from-bottom duration-200">
+              <div className="absolute bottom-0 left-0 right-0 bg-surface-container-lowest rounded-t-2xl shadow-ambient-lg animate-in slide-in-from-bottom duration-200">
                 <div className="flex justify-center py-3">
                   <div className="w-10 h-1 bg-surface-container-high rounded-full" />
                 </div>

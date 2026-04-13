@@ -236,7 +236,7 @@ export default function ZeroResultsSuggestions({
         </div>
 
         {/* Nearby area suggestions */}
-        <div className="mt-8 pt-6 border-t border-outline-variant/20 w-full max-w-sm">
+        <div className="mt-8 w-full max-w-sm rounded-[1.25rem] bg-surface-container-high/50 p-4">
           <div className="flex items-center gap-2 mb-3">
             <Navigation className="w-4 h-4 text-on-surface-variant" />
             <span className="text-sm font-medium text-on-surface-variant">
@@ -284,7 +284,7 @@ export default function ZeroResultsSuggestions({
           <button
             key={item.filter}
             onClick={() => handleRemoveFilter(item.filter)}
-            className="w-full flex items-center justify-between p-3 rounded-xl bg-surface-container-lowest border border-outline-variant/20 hover:border-outline-variant/30 hover:shadow-sm transition-all group"
+            className="w-full flex items-center justify-between p-3 rounded-xl bg-surface-container-lowest border border-outline-variant/20 hover:border-outline-variant/30 hover:shadow-ambient-sm transition-all group"
           >
             <div className="text-left">
               <span className="text-sm text-on-surface-variant group-hover:text-on-surface block">
@@ -308,7 +308,7 @@ export default function ZeroResultsSuggestions({
 
       {/* Nearby area suggestions */}
       {query && (
-        <div className="max-w-sm mx-auto mt-4 pt-4 border-t border-outline-variant/20">
+        <div className="max-w-sm mx-auto mt-4 rounded-xl bg-surface-container-high/40 p-3.5">
           <div className="flex items-center gap-2 mb-2">
             <Navigation className="w-3.5 h-3.5 text-on-surface-variant" />
             <span className="text-xs font-medium text-on-surface-variant">

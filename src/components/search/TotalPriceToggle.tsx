@@ -41,7 +41,7 @@ export function TotalPriceToggle({
       >
         <span
           className={`
-            inline-block h-3.5 w-3.5 rounded-full bg-surface-container-lowest shadow-sm
+            inline-block h-3.5 w-3.5 rounded-full bg-surface-container-lowest shadow-ambient-sm
             transition-transform duration-200
             ${showTotal ? "translate-x-[18px]" : "translate-x-[3px]"}
           `}

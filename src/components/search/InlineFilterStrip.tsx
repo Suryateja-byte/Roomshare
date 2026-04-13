@@ -504,183 +504,46 @@ export function InlineFilterStrip({
 
   return (
     <>
-      {showInlineFilterStrip ? (
-        showDesktopQuickFilters ? (
-          <div className="py-2">
-            <div className="space-y-3 rounded-[1.75rem] border border-outline-variant/20 bg-surface-container-lowest/95 px-4 py-4 shadow-sm shadow-on-surface/5">
-              {desktopSummaryHeading || toolbarSlot ? (
-                <div
-                  data-testid="desktop-results-heading-section"
-                  className="flex flex-col gap-3 lg:flex-row lg:items-start lg:justify-between"
-                >
-                  <div className="min-w-0">
-                    {desktopSummaryHeading ? (
-                      <div className="flex flex-wrap items-baseline gap-x-2 gap-y-1">
-                        <h1
-                          id="search-results-heading"
-                          tabIndex={-1}
-                          className="truncate text-base font-semibold text-on-surface focus:outline-none focus-visible:ring-2 focus-visible:ring-primary/30 focus-visible:ring-offset-2 focus-visible:ring-offset-surface-container-lowest focus-visible:rounded-lg"
-                        >
-                          {desktopSummaryHeading}
-                        </h1>
-                        {desktopSummaryRange ? (
-                          <span className="shrink-0 whitespace-nowrap text-xs text-on-surface-variant/70">
-                            &middot; {desktopSummaryRange}
-                          </span>
-                        ) : null}
-                        {desktopSummary?.browseMode ? (
-                          <span className="shrink-0 whitespace-nowrap text-xs text-on-surface-variant">
-                            &middot; Showing top listings
-                          </span>
-                        ) : null}
-                      </div>
-                    ) : null}
-                  </div>
-
-                  {toolbarSlot ? (
-                    <div
-                      data-testid="desktop-toolbar-cluster"
-                      className="flex flex-wrap items-center gap-2.5 lg:justify-end"
-                    >
-                      {toolbarSlot}
-                    </div>
+      {showDesktopQuickFilters && (desktopSummaryHeading || toolbarSlot) ? (
+        <div className="py-3">
+          <div
+            data-testid="desktop-results-heading-section"
+            className="flex flex-col gap-3 lg:flex-row lg:items-center lg:justify-between px-1"
+          >
+            <div className="min-w-0">
+              {desktopSummaryHeading ? (
+                <div className="flex flex-wrap items-baseline gap-x-2 gap-y-1">
+                  <h1
+                    id="search-results-heading"
+                    tabIndex={-1}
+                    className="truncate text-[1.35rem] font-semibold tracking-tight text-on-surface focus:outline-none focus-visible:ring-2 focus-visible:ring-primary/30 focus-visible:ring-offset-2 focus-visible:rounded-lg"
+                  >
+                    {desktopSummaryHeading}
+                  </h1>
+                  {desktopSummaryRange ? (
+                    <span className="shrink-0 whitespace-nowrap text-sm font-medium text-on-surface-variant/80">
+                      &middot; {desktopSummaryRange}
+                    </span>
                   ) : null}
-                </div>
-              ) : null}
-
-              <div
-                data-testid="desktop-primary-filters-row"
-                className="flex items-center gap-2"
-              >
-                <div className="relative min-w-0 flex-1">
-                  <div className="hide-scrollbar -mx-1 flex items-center gap-2 overflow-x-auto px-1">
-                    <DesktopQuickFilters
-                      disabled={isPending}
-                      hasMounted={hasMounted}
-                      activeCount={activeCount}
-                      isAdvancedFiltersOpen={showFilterDrawer}
-                      openQuickFilter={openQuickFilter}
-                      onQuickFilterOpenChange={handleQuickFilterOpenChange}
-                      onOpenAdvancedFilters={handleOpenFilters}
-                      priceLabel={formatPriceQuickLabel(
-                        committedMinPrice,
-                        committedMaxPrice
-                      )}
-                      moveInLabel={formatMoveInQuickLabel(committed.moveInDate)}
-                      roomTypeLabel={committed.roomType || "Room Type"}
-                      leaseDurationLabel={committed.leaseDuration || "Duration"}
-                      isPriceActive={
-                        committed.minPrice.length > 0 ||
-                        committed.maxPrice.length > 0
-                      }
-                      isMoveInActive={committed.moveInDate.length > 0}
-                      isRoomTypeActive={committed.roomType.length > 0}
-                      isLeaseDurationActive={committed.leaseDuration.length > 0}
-                      draftMinPrice={numericMinPrice}
-                      draftMaxPrice={numericMaxPrice}
-                      priceAbsoluteMin={priceAbsoluteMin}
-                      priceAbsoluteMax={priceAbsoluteMax}
-                      priceHistogram={facets?.priceHistogram?.buckets ?? null}
-                      priceApplyLabel={formattedCount || "Show results"}
-                      isPriceApplyLoading={isCountLoading}
-                      isPriceApplyDisabled={boundsRequired}
-                      onPriceDraftChange={handlePriceDraftChange}
-                      onPriceDraftClear={handlePriceDraftClear}
-                      onPriceApply={handlePriceApply}
-                      moveInDateValue={committed.moveInDate}
-                      minMoveInDate={minMoveInDate}
-                      onMoveInSelect={handleMoveInSelect}
-                      onMoveInClear={handleMoveInClear}
-                      roomTypeValue={committed.roomType}
-                      roomTypeCounts={facets?.roomTypes}
-                      onRoomTypeSelect={handleRoomTypeSelect}
-                      leaseDurationValue={committed.leaseDuration}
-                      onLeaseDurationSelect={handleLeaseDurationSelect}
-                    />
-                  </div>
-                  <div
-                    className="pointer-events-none absolute right-0 top-0 h-full w-10 bg-gradient-to-l from-surface-container-lowest via-surface-container-lowest/95 to-transparent"
-                    aria-hidden="true"
-                  />
-                </div>
-              </div>
-
-              {showAppliedChips ? (
-                <div className="border-t border-outline-variant/10 pt-3">
-                  {renderAppliedFilters(true)}
+                  {desktopSummary?.browseMode ? (
+                    <span className="shrink-0 whitespace-nowrap text-sm font-medium text-on-surface-variant">
+                      &middot; Showing top listings
+                    </span>
+                  ) : null}
                 </div>
               ) : null}
             </div>
-          </div>
-        ) : (
-          <div className="hide-scrollbar -mx-1 flex items-center gap-2 overflow-x-auto px-1 py-2">
-            {showMobileInlineFilters ? (
-              <>
-                <PrimaryFilterButton
-                  label={formatPriceQuickLabel(
-                    committedMinPrice,
-                    committedMaxPrice
-                  )}
-                  active={
-                    searchParams.has("minPrice") || searchParams.has("maxPrice")
-                  }
-                  onClick={handleOpenFilters}
-                  disabled={isPending}
-                  testId="mobile-filter-price"
-                />
-                <PrimaryFilterButton
-                  label={formatMoveInQuickLabel(committed.moveInDate)}
-                  active={searchParams.has("moveInDate")}
-                  onClick={handleOpenFilters}
-                  disabled={isPending}
-                  testId="mobile-filter-move-in"
-                />
-                <PrimaryFilterButton
-                  label={formatRoomTypeQuickLabel(committed.roomType)}
-                  active={searchParams.has("roomType")}
-                  onClick={handleOpenFilters}
-                  disabled={isPending}
-                  testId="mobile-filter-room-type"
-                />
 
-                <div className="h-6 w-px shrink-0 bg-outline-variant/40" />
-
-                <button
-                  type="button"
-                  onClick={handleOpenFilters}
-                  disabled={isPending}
-                  data-hydrated={hasMounted || undefined}
-                  aria-label={`Filters${activeCount > 0 ? `, ${activeCount} active` : ""}`}
-                  aria-expanded={showFilterDrawer ? "true" : "false"}
-                  aria-controls="search-filters"
-                  aria-haspopup="dialog"
-                  data-testid="mobile-filter-button"
-                  className={cn(
-                    "flex items-center gap-1.5 px-4 py-2.5 min-h-[44px] rounded-full text-sm font-medium whitespace-nowrap transition-colors shrink-0 border",
-                    activeCount > 0
-                      ? QUICK_FILTER_ACTIVE_CLASSNAME
-                      : "bg-surface-container-lowest text-on-surface border-outline-variant hover:border-on-surface-variant"
-                  )}
-                >
-                  <SlidersHorizontal className="h-3.5 w-3.5" aria-hidden />
-                  Filters
-                  {activeCount > 0 ? (
-                    <span
-                      className={cn(
-                        "ml-0.5 flex h-5 w-5 items-center justify-center rounded-full text-xs font-semibold",
-                        QUICK_FILTER_ACTIVE_BADGE_CLASSNAME
-                      )}
-                    >
-                      {activeCount}
-                    </span>
-                  ) : null}
-                </button>
-              </>
+            {toolbarSlot ? (
+              <div
+                data-testid="desktop-toolbar-cluster"
+                className="flex flex-wrap items-center gap-2.5 lg:justify-end"
+              >
+                {toolbarSlot}
+              </div>
             ) : null}
-
-            {showAppliedChips ? renderAppliedFilters(false) : null}
           </div>
-        )
+        </div>
       ) : null}
 
       <FilterModal

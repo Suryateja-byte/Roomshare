@@ -159,7 +159,7 @@ export default function VerificationList({
               key={request.id}
               className={`bg-surface-container-lowest rounded-lg shadow-ambient-sm overflow-hidden ${
                 request.status === "PENDING"
-                  ? "border-amber-200"
+                  ? "border-outline-variant/20"
                   : "border-outline-variant/20"
               }`}
             >

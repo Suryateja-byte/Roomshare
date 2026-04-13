@@ -770,10 +770,10 @@ const MarkerPinContent = React.memo(function MarkerPinContent({
       <m.div layout>
         <div
           className={cn(
-            "w-3 h-3 rounded-full shadow-md transition-transform duration-200",
+            "w-3 h-3 rounded-full shadow-ambient transition-transform duration-200",
             isViewed
               ? "bg-surface-container-highest ring-2 ring-outline-variant/50"
-              : "bg-on-surface ring-2 ring-white shadow-lg",
+              : "bg-on-surface ring-2 ring-white shadow-ambient",
             "group-hover/marker:scale-125"
           )}
         />
@@ -1001,7 +1001,7 @@ const ClusterHighlightMarker = React.memo(function ClusterHighlightMarker({
       anchor="center"
     >
       <div className="pointer-events-none flex items-center justify-center">
-        <div className="w-4 h-4 rounded-full bg-primary border-2 border-white shadow-lg animate-pulse" />
+        <div className="w-4 h-4 rounded-full bg-primary border-2 border-white shadow-ambient animate-pulse" />
         <div className="absolute w-8 h-8 rounded-full border-2 border-primary animate-ping opacity-40" />
       </div>
     </Marker>
@@ -4340,7 +4340,6 @@ export default function MapComponent({
           hasPin={Boolean(userPin)}
           onToggleDropMode={toggleDropMode}
           onClearPin={() => setUserPin(null)}
-          onHideMap={handleHideMap}
           canFullscreen={canFullscreen}
           isFullscreen={isFullscreen}
           onToggleFullscreen={handleToggleFullscreen}
@@ -4362,7 +4361,7 @@ export default function MapComponent({
         <div
           role="status"
           aria-live="polite"
-          className="absolute bottom-20 left-1/2 -translate-x-1/2 z-[50] bg-blue-50/90 backdrop-blur-md border border-blue-200/50 rounded-full px-4 py-2 shadow-lg pointer-events-none"
+          className="absolute bottom-20 left-1/2 -translate-x-1/2 z-[50] bg-blue-50/90 backdrop-blur-md border border-blue-200/50 rounded-full px-4 py-2 shadow-ambient pointer-events-none"
         >
           <p className="text-xs text-blue-800 font-medium">
             {viewportInfoMessage}

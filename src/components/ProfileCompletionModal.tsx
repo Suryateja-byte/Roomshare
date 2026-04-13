@@ -46,7 +46,7 @@ export default function ProfileCompletionModal({
 
       {/* Modal */}
       <FocusTrap active={isOpen}>
-        <div className="relative bg-surface-container-lowest rounded-2xl shadow-xl max-w-md w-full p-6">
+        <div className="relative bg-surface-container-lowest rounded-2xl shadow-ambient-lg max-w-md w-full p-6">
           <button
             onClick={onClose}
             className="absolute top-4 right-4 p-1 min-w-[44px] min-h-[44px] flex items-center justify-center text-on-surface-variant hover:text-on-surface-variant transition-colors focus-visible:ring-2 focus-visible:ring-primary/30 focus-visible:ring-offset-2 rounded-sm"

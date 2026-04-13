@@ -392,7 +392,7 @@ export default function MobileSearchOverlay({
                   <button
                     type="button"
                     onClick={handleSearch}
-                    className="flex items-center justify-center gap-2.5 w-full h-13 py-3.5 bg-primary hover:bg-primary/90 text-on-primary rounded-full text-base font-semibold shadow-lg shadow-primary/20 transition-colors active:scale-[0.98]"
+                    className="flex items-center justify-center gap-2.5 w-full h-13 py-3.5 bg-primary hover:bg-primary/90 text-on-primary rounded-full text-base font-semibold shadow-ambient shadow-primary/20 transition-colors active:scale-[0.98]"
                   >
                     <Search className="w-5 h-5" />
                     <span className="uppercase tracking-wider text-sm">

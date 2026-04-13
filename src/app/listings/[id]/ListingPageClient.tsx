@@ -152,7 +152,7 @@ function StatusBadge({ status }: { status: string }) {
     },
     RENTED: {
       bg: "bg-blue-50",
-      border: "border-blue-100",
+      border: "border-outline-variant/20",
       text: "text-blue-700",
       dot: "bg-blue-600",
       label: "Rented",

@@ -95,7 +95,7 @@ export function ProUpgradeCTA({
 
           {/* CTA Content */}
           <div className="absolute inset-0 flex flex-col items-center justify-center p-4 text-center">
-            <div className="bg-surface-canvas/90 rounded-xl p-4 shadow-lg border max-w-xs">
+            <div className="bg-surface-canvas/90 rounded-xl p-4 shadow-ambient border max-w-xs">
               <div className="flex items-center justify-center gap-2 mb-2">
                 <MapIcon className="h-5 w-5 text-primary" />
                 <span className="font-semibold text-lg">Pro Feature</span>

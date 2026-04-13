@@ -753,12 +753,12 @@ export default function NeighborhoodChat({
               className={cn(
                 "px-5 py-3 text-[15px] leading-relaxed relative transition-all duration-200",
                 isUser
-                  ? "bg-on-surface text-white rounded-[24px] rounded-tr-md shadow-lg shadow-on-surface/10"
+                  ? "bg-on-surface text-white rounded-[24px] rounded-tr-md shadow-ambient shadow-on-surface/10"
                   : item.kind === "policy-refusal"
                     ? "bg-amber-50 border border-amber-100 text-amber-900 rounded-[24px] rounded-tl-md"
                     : item.kind === "rate-limit" || item.kind === "debounce"
                       ? "bg-surface-container-high text-on-surface-variant rounded-[24px] rounded-tl-md"
-                      : "bg-surface-container-lowest text-on-surface rounded-[24px] rounded-tl-md shadow-sm border border-outline-variant/20"
+                      : "bg-surface-container-lowest text-on-surface rounded-[24px] rounded-tl-md shadow-ambient-sm border border-outline-variant/20"
               )}
             >
               {/* P1-04 FIX: Show live countdown for debounce messages */}
@@ -889,7 +889,7 @@ export default function NeighborhoodChat({
                     role="status"
                     aria-label="Loading response"
                   >
-                    <div className="bg-white/50 border border-outline-variant/20/50 px-4 py-3 rounded-2xl rounded-tl-sm shadow-sm flex gap-1 items-center">
+                    <div className="bg-white/50 border border-outline-variant/20/50 px-4 py-3 rounded-2xl rounded-tl-sm shadow-ambient-sm flex gap-1 items-center">
                       <div
                         className="w-1.5 h-1.5 bg-surface-container-high rounded-full animate-bounce [animation-delay:-0.3s]"
                         aria-hidden="true"
@@ -975,8 +975,8 @@ export default function NeighborhoodChat({
                         "whitespace-nowrap px-4 py-2 rounded-full text-xs font-medium",
                         "bg-white/50 hover:bg-surface-container-lowest",
                         "text-on-surface-variant",
-                        "border border-outline-variant/20 shadow-sm",
-                        "transition-all duration-300 hover:shadow-md hover:scale-[1.02]",
+                        "border border-outline-variant/20 shadow-ambient-sm",
+                        "transition-all duration-300 hover:shadow-ambient hover:scale-[1.02]",
                         "flex items-center gap-2",
                         // B10 FIX: Keyboard focus indicators
                         "focus-visible:ring-2 focus-visible:ring-primary/30 focus-visible:ring-offset-2 focus-visible:outline-none"
@@ -993,7 +993,7 @@ export default function NeighborhoodChat({
             {/* Input Area */}
             <div className="p-4 bg-gradient-to-t from-white/90 via-white/50 to-transparent">
               <form onSubmit={onSubmit} className="relative group">
-                <div className="absolute inset-0 bg-surface-container-lowest rounded-[28px] shadow-sm group-focus-within:shadow-md transition-shadow duration-300" />
+                <div className="absolute inset-0 bg-surface-container-lowest rounded-[28px] shadow-ambient-sm group-focus-within:shadow-ambient transition-shadow duration-300" />
                 <input
                   ref={inputRef}
                   value={input}

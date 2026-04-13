@@ -296,8 +296,12 @@ export default function SearchViewToggle({
 
         {/* Right Panel: Map View (45%) */}
         {renderMapInDesktop && (
-          <div className="relative w-[40%] lg:w-[45%] h-full min-h-0 flex-shrink-0 overflow-hidden border-l border-outline-variant/20 bg-surface-container-highest">
-            {mapComponent}
+          <div className="relative h-full min-h-0 w-[40%] flex-shrink-0 overflow-hidden bg-surface-container-high/55 lg:w-[45%]">
+            <div
+              aria-hidden="true"
+              className="pointer-events-none absolute inset-y-0 left-0 z-[1] w-3 bg-gradient-to-r from-surface-canvas via-surface-container-high/70 to-transparent lg:w-4"
+            />
+            <div className="h-full pl-2 lg:pl-3">{mapComponent}</div>
           </div>
         )}
 
@@ -306,7 +310,7 @@ export default function SearchViewToggle({
           <button
             onClick={onToggle}
             disabled={isLoading}
-            className="fixed top-[100px] right-6 z-[50] h-10 inline-flex items-center gap-2 px-4 bg-surface-container-lowest/90 backdrop-blur-md text-on-surface rounded-lg shadow-[0_2px_12px_rgba(0,0,0,0.12)] border border-outline-variant/30 hover:bg-surface-container-lowest hover:scale-[1.02] active:scale-[0.98] transition-all duration-200 disabled:opacity-60"
+            className="fixed top-[100px] right-6 z-[50] inline-flex h-10 items-center gap-2 rounded-lg border border-outline-variant/30 bg-surface-container-lowest/90 px-4 text-on-surface shadow-ambient-sm backdrop-blur-md transition-all duration-200 hover:bg-surface-container-lowest hover:scale-[1.02] active:scale-[0.98] disabled:opacity-60"
             aria-label="Show map"
           >
             <Map className="w-4 h-4" />

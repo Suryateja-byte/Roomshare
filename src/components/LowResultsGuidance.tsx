@@ -102,7 +102,7 @@ export function LowResultsGuidance({
   const suggestions = generateFilterSuggestions(filterParams, resultCount);
 
   return (
-    <div className="mb-6 rounded-lg border border-amber-200 bg-amber-50 p-4">
+    <div className="mb-6 rounded-[1.25rem] border border-outline-variant/20 bg-amber-50/90 p-4 shadow-ambient-sm">
       <div className="flex items-start gap-3">
         <div className="flex-shrink-0 rounded-full bg-amber-100 p-2">
           <Lightbulb className="h-5 w-5 text-amber-600" />
@@ -136,7 +136,7 @@ export function LowResultsGuidance({
           )}
 
           {/* Near matches toggle */}
-          <div className="mt-4 border-t border-amber-200 pt-4">
+          <div className="mt-4 rounded-xl bg-surface-container-lowest/75 p-3">
             <Button
               onClick={handleToggleNearMatches}
               disabled={isPending}

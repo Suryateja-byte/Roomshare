@@ -22,7 +22,7 @@ export default function NearMatchSeparator({
       <div className="flex-1 border-t-2 border-dashed border-amber-300" />
 
       {/* Badge */}
-      <div className="flex items-center gap-2 px-4 py-2 rounded-full bg-amber-50 border border-amber-200">
+      <div className="flex items-center gap-2 px-4 py-2 rounded-full bg-amber-50 border border-outline-variant/20">
         <AlertCircle className="w-4 h-4 text-amber-600" />
         <span className="text-sm font-medium text-amber-700">
           {nearMatchCount} near {nearMatchCount === 1 ? "match" : "matches"}
