@@ -52,6 +52,7 @@ export default function SearchLayoutView({ children }: SearchLayoutViewProps) {
 
   return (
     <SearchMapUIProvider
+      toggleMap={toggleMap}
       showMap={showMap}
       hideMap={hideMap}
       shouldShowMap={shouldShowMap}

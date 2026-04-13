@@ -198,6 +198,28 @@ describe("InlineFilterStrip", () => {
     expect(screen.queryByTestId("filter-modal")).not.toBeInTheDocument();
   });
 
+  it("renders the desktop summary row and toolbar slot when provided", () => {
+    render(
+      <InlineFilterStrip
+        desktopSummary={{
+          total: 24,
+          visibleCount: 12,
+          locationLabel: "Dallas",
+          browseMode: true,
+        }}
+        toolbarSlot={<div data-testid="toolbar-slot">Toolbar</div>}
+      />
+    );
+
+    expect(
+      screen.getByTestId("desktop-results-heading-section")
+    ).toBeInTheDocument();
+    expect(screen.getByRole("heading", { name: "24 places in Dallas" })).toBeInTheDocument();
+    expect(screen.getByText(/showing top listings/i)).toBeInTheDocument();
+    expect(screen.getByText(/1–12/)).toBeInTheDocument();
+    expect(screen.getByTestId("toolbar-slot")).toBeInTheDocument();
+  });
+
   it("keeps the mobile strip on the full drawer flow", () => {
     mockUseMediaQuery.mockReturnValue(false);
     mockMobileResultsView = "list";
