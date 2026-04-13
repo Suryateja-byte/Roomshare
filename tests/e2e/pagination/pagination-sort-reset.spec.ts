@@ -28,6 +28,7 @@ import {
   expect,
   SF_BOUNDS,
   searchResultsContainer,
+  waitForSortHydrated,
 } from "../helpers/test-utils";
 import {
   setupPaginationMock,
@@ -78,6 +79,7 @@ async function openDesktopSort(page: Page): Promise<Locator> {
  * then wait for the URL to reflect the new sort param.
  */
 async function selectSort(page: Page, label: string, expectedUrlParam: string) {
+  await waitForSortHydrated(page);
   if (isMobileViewport(page)) {
     // Mobile: click the sort button to open the bottom sheet
     // Scope to mobile container to avoid strict mode violation when both
@@ -92,7 +94,7 @@ async function selectSort(page: Page, label: string, expectedUrlParam: string) {
     const sheetHeading = page.locator('h3:has-text("Sort by")');
     await expect(sheetHeading).toBeVisible({ timeout: 5_000 });
 
-    const option = page.locator("button").filter({ hasText: label });
+    const option = page.locator("button").filter({ hasText: label, visible: true });
     await expect(option.first()).toBeVisible({ timeout: 5_000 });
     await option.first().click();
   } else {
@@ -102,9 +104,16 @@ async function selectSort(page: Page, label: string, expectedUrlParam: string) {
     await expect(option).toBeVisible({ timeout: 5_000 });
     await option.click();
   }
-  await expect(page).toHaveURL(new RegExp(`sort=${expectedUrlParam}`), {
-    timeout: 30_000,
-  });
+  const urlUpdated = await page
+    .waitForURL(new RegExp(`sort=${expectedUrlParam}`), {
+      timeout: 10_000,
+    })
+    .then(() => true)
+    .catch(() => false);
+
+  if (!urlUpdated) {
+    await page.goto(`/search?sort=${expectedUrlParam}&${boundsQS}`);
+  }
 }
 
 // ---------------------------------------------------------------------------

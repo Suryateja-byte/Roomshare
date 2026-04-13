@@ -289,6 +289,26 @@ async function getFirstCardId(page: Page): Promise<string | null> {
   return card.getAttribute("data-listing-id");
 }
 
+async function expectPopupWithinMapPane(page: Page): Promise<void> {
+  const mapBox = await page.locator('[data-testid="map"]').boundingBox();
+  const popupBox = await page
+    .locator('[data-testid="map-popup-card"]')
+    .boundingBox();
+
+  expect(mapBox).not.toBeNull();
+  expect(popupBox).not.toBeNull();
+
+  const tolerancePx = 2;
+  expect(popupBox!.x).toBeGreaterThanOrEqual(mapBox!.x - tolerancePx);
+  expect(popupBox!.y).toBeGreaterThanOrEqual(mapBox!.y - tolerancePx);
+  expect(popupBox!.x + popupBox!.width).toBeLessThanOrEqual(
+    mapBox!.x + mapBox!.width + tolerancePx
+  );
+  expect(popupBox!.y + popupBox!.height).toBeLessThanOrEqual(
+    mapBox!.y + mapBox!.height + tolerancePx
+  );
+}
+
 // ---------------------------------------------------------------------------
 // Test Suite
 // ---------------------------------------------------------------------------
@@ -452,9 +472,15 @@ test.describe("Map-List Synchronization", () => {
       expect(cardState.isActive).toBe(true);
       const popupVisible = await popup.isVisible();
       expect(popupVisible).toBe(true);
+      await expect(page.locator('[data-testid="map-popup-card"]')).toBeVisible({
+        timeout: timeouts.action,
+      });
+      await expect(async () => {
+        await expectPopupWithinMapPane(page);
+      }).toPass({ timeout: timeouts.action, intervals: [200, 500, 1000] });
     });
 
-    test("1.5 - Close popup -> card highlight persists (activeId independent from selectedListing)", async ({
+    test("1.5 - Close popup -> card highlight clears", async ({
       page,
     }) => {
       const listingId = await getFirstMarkerIdOrSkip(page);
@@ -482,9 +508,9 @@ test.describe("Map-List Synchronization", () => {
       // Popup should be gone
       await expect(popup).not.toBeVisible({ timeout: 2000 });
 
-      // Card highlight should STILL be present (activeId persists)
+      // Closing the popup clears the card highlight as well.
       const cardState = await getCardState(page, listingId);
-      expect(cardState.isActive).toBe(true);
+      expect(cardState.isActive).toBe(false);
     });
   });
 
@@ -855,7 +881,7 @@ test.describe("Map-List Synchronization", () => {
       }
     });
 
-    test("4.4 - After search-as-I-move -> new markers and new cards appear", async ({
+    test("4.4 - After map auto-search, map and list results remain available", async ({
       page,
     }) => {
       test.slow(); // Map pan + search reload can exceed 60s on mobile
@@ -887,23 +913,55 @@ test.describe("Map-List Synchronization", () => {
 
       test.skip(!moved, "Could not pan map");
 
-      // Wait for map to settle after pan, then for markers or cards to appear
+      // Wait for map to settle after pan, then for either marker DOM, map features,
+      // or cards to appear. Clustered mobile/headless runs do not always expose
+      // raw .maplibregl-marker elements immediately.
       await waitForMapReady(page);
-      // Wait for markers to appear after pan
-      await expect(
-        page.locator(".maplibregl-marker:visible").first()
-      ).toBeVisible({ timeout: timeouts.navigation });
+      await expect
+        .poll(
+          async () => {
+            const markerCount = await page
+              .locator(".maplibregl-marker:visible")
+              .count();
+            const cardCount = await searchResultsContainer(page)
+              .locator(selectors.listingCard)
+              .count();
+            const mapFeatureCount = await page.evaluate(() => {
+              const map = (window as any).__e2eMapRef;
+              if (!map) return 0;
+              try {
+                return map.querySourceFeatures("listings").length;
+              } catch {
+                return 0;
+              }
+            });
+            return Math.max(markerCount, cardCount, mapFeatureCount);
+          },
+          { timeout: timeouts.navigation }
+        )
+        .toBeGreaterThan(0);
 
-      // Page should still have markers and cards
+      // Page should still have map/list results after the search refresh
       const newMarkerCount = await page
         .locator(".maplibregl-marker:visible")
         .count();
       const newCardCount = await searchResultsContainer(page)
         .locator(selectors.listingCard)
         .count();
+      const newMapFeatureCount = await page.evaluate(() => {
+        const map = (window as any).__e2eMapRef;
+        if (!map) return 0;
+        try {
+          return map.querySourceFeatures("listings").length;
+        } catch {
+          return 0;
+        }
+      });
 
-      // At least one of markers or cards should exist
-      expect(newMarkerCount + newCardCount).toBeGreaterThan(0);
+      // At least one map/list representation should exist
+      expect(
+        Math.max(newMarkerCount, newCardCount, newMapFeatureCount)
+      ).toBeGreaterThan(0);
     });
   });
 
@@ -1011,11 +1069,20 @@ test.describe("Map-List Synchronization", () => {
       const initialCount = await waitForMarkersWithClusterExpansion(page);
       test.skip(initialCount === 0, "No markers");
 
-      // Click a marker to set active state
-      const listingId = await getMarkerListingId(page, 0);
-      test.skip(!listingId, "No marker ID");
-      await clickMarkerByIndex(page, 0);
-      await waitForCardHighlight(page, listingId!);
+      // Pick a marker that also has a rendered listing card. After cluster
+      // expansion the map can expose listings beyond the first paginated page,
+      // so clicking raw marker index 0 may open a preview for a listing whose
+      // card is not mounted in the current results pane.
+      const markerIds = await getAllMarkerListingIds(page);
+      const cardIds = new Set(await getAllCardListingIds(page));
+      const matchedIds = markerIds.filter((id) => cardIds.has(id));
+      test.skip(
+        matchedIds.length === 0,
+        "No visible marker with matching listing card"
+      );
+      const listingId = matchedIds[0];
+      await clickMarkerByListingId(page, listingId);
+      await waitForCardHighlight(page, listingId);
 
       // Zoom in programmatically
       await page.evaluate(() => {
@@ -1035,7 +1102,7 @@ test.describe("Map-List Synchronization", () => {
       await waitForMapReady(page);
 
       // Card highlight should still be present after zoom
-      const cardState = await getCardState(page, listingId!);
+      const cardState = await getCardState(page, listingId);
       expect(cardState.isActive).toBe(true);
 
       // Markers should still exist
@@ -1045,7 +1112,7 @@ test.describe("Map-List Synchronization", () => {
       expect(afterZoomCount).toBeGreaterThanOrEqual(0); // May change due to clustering
     });
 
-    test("5.4 - Mobile: marker click -> bottom sheet scrolls to card", async ({
+    test("5.4 - Mobile: marker click -> preview card appears in map-focused state", async ({
       page,
     }) => {
       // Set mobile viewport
@@ -1076,17 +1143,25 @@ test.describe("Map-List Synchronization", () => {
       const listingId = await getMarkerListingId(page, 0);
       test.skip(!listingId, "No marker ID");
 
-      // Click the marker
-      await clickMarkerByIndex(page, 0);
+      // Click the marker without desktop-only card verification.
+      // Mobile now promotes the selected listing into a preview card and
+      // returns to map focus instead of scrolling the sheet list to the card.
+      await clickMarkerFast(page, listingId!);
 
-      // Wait for card highlight to appear after marker click
-      await waitForCardHighlight(page, listingId!);
+      const previewCard = page.locator('[data-testid="map-preview-card"]');
+      await expect(previewCard).toBeVisible({ timeout: timeouts.action });
+      await expect(
+        previewCard.locator(`a[href="/listings/${listingId}"]`)
+      ).toBeVisible();
 
-      // Card should be highlighted
-      const cardState = await getCardState(page, listingId!);
-      // On mobile, the card may be in a bottom sheet/panel
-      // The highlight should still be applied via context
-      expect(cardState.isActive).toBe(true);
+      // Map-focused mobile state should expose the "List" toggle and collapse
+      // the results panel back to the map detent.
+      await expect(
+        page.locator('button[aria-label="Show list"]').first()
+      ).toBeVisible();
+      await expect(
+        page.locator('[role="slider"][aria-label="Results panel size"]').first()
+      ).toHaveAttribute("aria-valuenow", "0");
     });
   });
 
@@ -1378,7 +1453,7 @@ test.describe("Map-List Synchronization", () => {
       expect(cardState.isActive).toBe(true);
     });
 
-    test("Escape closes popup but card highlight persists", async ({
+    test("Escape closes popup and clears card highlight", async ({
       page,
     }) => {
       const listingId = await getFirstMarkerIdOrSkip(page);
@@ -1413,10 +1488,9 @@ test.describe("Map-List Synchronization", () => {
       // Popup gone
       await expect(popup).not.toBeVisible({ timeout: 2000 });
 
-      // Card highlight persists (Escape only calls setSelectedListing(null),
-      // NOT setActive(null))
+      // Escape clears both popup state and the active card highlight.
       const cardState = await getCardState(page, listingId);
-      expect(cardState.isActive).toBe(true);
+      expect(cardState.isActive).toBe(false);
     });
 
     test("Marker hover debounces scroll request (300ms)", async ({ page }) => {
@@ -1525,7 +1599,7 @@ test.describe("Map-List Synchronization", () => {
       await page.mouse.move(0, 0);
     });
 
-    test("Clicking 'Show on map' button sets activeId on card", async ({
+    test("Clicking 'Show on map' opens the anchored popup and activates the card", async ({
       page,
     }) => {
       const cardId = await getFirstCardId(page);
@@ -1540,10 +1614,20 @@ test.describe("Map-List Synchronization", () => {
 
       await showOnMapBtn.click();
 
-      // Card should now have active ring (setActive was called)
+      // Card should now have active ring and the desktop popup should use the
+      // same anchored preview path as marker clicks.
       await waitForCardHighlight(page, cardId!, timeouts.action);
       const cardState = await getCardState(page, cardId!);
       expect(cardState.isActive).toBe(true);
+      await expect(page.locator(".maplibregl-popup")).toBeVisible({
+        timeout: timeouts.action,
+      });
+      await expect(page.locator('[data-testid="map-popup-card"]')).toBeVisible({
+        timeout: timeouts.action,
+      });
+      await expect(async () => {
+        await expectPopupWithinMapPane(page);
+      }).toPass({ timeout: timeouts.action, intervals: [200, 500, 1000] });
     });
   });
 });

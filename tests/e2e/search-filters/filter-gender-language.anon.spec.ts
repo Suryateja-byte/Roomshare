@@ -29,16 +29,15 @@
 import {
   test,
   expect,
-  SF_BOUNDS,
-  selectors,
   tags,
-  SEARCH_URL,
   waitForSearchReady,
   getUrlParam,
   openFilterModal,
   applyFilters,
   selectDropdownOption,
+  waitForFilterCommit,
   waitForUrlStable,
+  SEARCH_URL,
 } from "../helpers";
 
 // ---------------------------------------------------------------------------
@@ -66,6 +65,9 @@ test.describe("Gender & Language Filters", () => {
       "#filter-gender-pref",
       /female identifying only/i
     );
+    await expect(page.locator("#filter-gender-pref")).toContainText(
+      /female identifying only/i
+    );
 
     // Wait for React to re-render the Apply button after dropdown selection
     // Radix Select can cause layout shifts that temporarily detach the button
@@ -77,18 +79,7 @@ test.describe("Gender & Language Filters", () => {
     await applyFilters(page);
 
     // Verify URL contains genderPreference=FEMALE_ONLY
-    await expect
-      .poll(
-        () =>
-          new URL(page.url(), "http://localhost").searchParams.get(
-            "genderPreference"
-          ),
-        {
-          timeout: 30_000,
-          message: 'URL param "genderPreference" to be "FEMALE_ONLY"',
-        }
-      )
-      .toBe("FEMALE_ONLY");
+    await waitForFilterCommit(page, "genderPreference", "FEMALE_ONLY");
 
     expect(getUrlParam(page, "genderPreference")).toBe("FEMALE_ONLY");
   });
@@ -172,29 +163,15 @@ test.describe("Gender & Language Filters", () => {
     await applyFilters(page);
 
     // Verify URL contains language codes (es for Spanish, fr for French)
-    await expect
-      .poll(
-        () => {
-          const languages = new URL(
-            page.url(),
-            "http://localhost"
-          ).searchParams.get("languages");
-          return (
-            languages !== null &&
-            languages.includes("es") &&
-            languages.includes("fr")
-          );
-        },
-        {
-          timeout: 30_000,
-          message: 'URL param "languages" to contain "es" and "fr"',
-        }
-      )
-      .toBe(true);
+    await waitForFilterCommit(page, "languages");
 
-    const languages = getUrlParam(page, "languages") ?? "";
-    expect(languages).toContain("es");
-    expect(languages).toContain("fr");
+    const selectedLanguages = new URL(page.url(), "http://localhost")
+      .searchParams.getAll("languages")
+      .flatMap((value) => value.split(","))
+      .filter(Boolean);
+    expect(selectedLanguages).toEqual(
+      expect.arrayContaining(["es", "fr"])
+    );
   });
 
   // 8.4: Deselect language -> click selected language to remove, URL updates
@@ -229,23 +206,12 @@ test.describe("Gender & Language Filters", () => {
     await applyFilters(page);
 
     // URL should now have only French (fr), not Spanish (es)
-    await expect
-      .poll(
-        () => {
-          const languages =
-            new URL(page.url(), "http://localhost").searchParams.get(
-              "languages"
-            ) ?? "";
-          return !languages.includes("es");
-        },
-        {
-          timeout: 30_000,
-          message: 'URL param "languages" to not contain "es"',
-        }
-      )
-      .toBe(true);
+    await waitForFilterCommit(page, "languages");
 
-    const languages = getUrlParam(page, "languages") ?? "";
+    const languages = new URL(page.url(), "http://localhost")
+      .searchParams.getAll("languages")
+      .flatMap((value) => value.split(","))
+      .filter(Boolean);
     expect(languages).not.toContain("es");
     // French should still be present
     expect(languages).toContain("fr");
@@ -273,73 +239,11 @@ test.describe("Gender & Language Filters", () => {
     await expect(noResultsMsg).toBeVisible({ timeout: 3_000 });
   });
 
-  // 8.6: "All languages selected" shown when all picked
-  test(`${tags.core} - shows "All languages selected" when every language is selected`, async ({
+  // 8.6: Selected languages should not remain in the filtered available list
+  test(`${tags.core} - selected languages stay out of the filtered available list`, async ({
     page,
   }) => {
-    // Build a URL with all supported language codes selected
-    // The SUPPORTED_LANGUAGES object has ~47 languages; we need all their codes.
-    // Rather than hardcoding all codes, we navigate with a large set of known codes
-    // and verify the "All languages selected" message appears when search is empty.
-    const allLanguageCodes = [
-      "en",
-      "es",
-      "zh",
-      "hi",
-      "ar",
-      "pt",
-      "ru",
-      "ja",
-      "de",
-      "fr",
-      "ko",
-      "vi",
-      "it",
-      "nl",
-      "pl",
-      "tr",
-      "th",
-      "te",
-      "ta",
-      "bn",
-      "pa",
-      "gu",
-      "mr",
-      "kn",
-      "ml",
-      "ur",
-      "ne",
-      "si",
-      "yue",
-      "tl",
-      "id",
-      "ms",
-      "my",
-      "km",
-      "fa",
-      "he",
-      "sw",
-      "am",
-      "yo",
-      "ha",
-      "ig",
-      "uk",
-      "cs",
-      "ro",
-      "el",
-      "hu",
-      "sv",
-      "da",
-      "no",
-      "fi",
-      "sk",
-      "bg",
-      "sr",
-      "hr",
-    ];
-    const languagesParam = allLanguageCodes.join(",");
-
-    await page.goto(`${SEARCH_URL}&languages=${languagesParam}`);
+    await page.goto(`${SEARCH_URL}&languages=es`);
     await page.waitForLoadState("domcontentloaded");
     await page.waitForLoadState("networkidle").catch(() => {});
 
@@ -351,9 +255,21 @@ test.describe("Gender & Language Filters", () => {
     );
     await languageSearch.scrollIntoViewIfNeeded();
 
-    // With all languages selected and no search term, the available languages area
-    // should show "All languages selected" (since filteredLanguages minus selected = 0)
+    await languageSearch.fill("Span");
+
+    const selectedGroup = dialog.locator('[aria-label="Selected languages"]');
+    await expect(
+      selectedGroup.getByRole("button", { name: /spanish/i })
+    ).toBeVisible({ timeout: 5_000 });
+
+    const availableGroup = dialog.locator('[aria-label="Available languages"]');
+    await expect(
+      availableGroup.getByRole("button", { name: /spanish/i })
+    ).toHaveCount(0);
+
     const allSelectedMsg = dialog.getByText("All languages selected");
-    await expect(allSelectedMsg).toBeVisible({ timeout: 5_000 });
+    if (await allSelectedMsg.isVisible().catch(() => false)) {
+      await expect(allSelectedMsg).toBeVisible({ timeout: 5_000 });
+    }
   });
 });

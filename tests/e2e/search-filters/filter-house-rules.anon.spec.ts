@@ -39,6 +39,13 @@ test.describe("House Rules Filter", () => {
     test.slow();
   });
 
+  function houseRuleValues(page: import("@playwright/test").Page): string[] {
+    return new URL(page.url(), "http://localhost")
+      .searchParams.getAll("houseRules")
+      .flatMap((value) => value.split(","))
+      .filter(Boolean);
+  }
+
   // 6.1: Select single house rule -> aria-pressed="true", URL has houseRules param
   test(`${tags.core} - selecting a single house rule updates URL`, async ({
     page,
@@ -61,13 +68,7 @@ test.describe("House Rules Filter", () => {
     // URL should have houseRules=Pets allowed
     await expect
       .poll(
-        () => {
-          const param = new URL(
-            page.url(),
-            "http://localhost"
-          ).searchParams.get("houseRules");
-          return param !== null && param.includes("Pets allowed");
-        },
+        () => houseRuleValues(page).includes("Pets allowed"),
         {
           timeout: 30_000,
           message: 'URL param "houseRules" to contain "Pets allowed"',
@@ -107,14 +108,10 @@ test.describe("House Rules Filter", () => {
     await expect
       .poll(
         () => {
-          const param = new URL(
-            page.url(),
-            "http://localhost"
-          ).searchParams.get("houseRules");
+          const values = houseRuleValues(page);
           return (
-            param !== null &&
-            param.includes("Pets allowed") &&
-            param.includes("Couples allowed")
+            values.includes("Pets allowed") &&
+            values.includes("Couples allowed")
           );
         },
         {
@@ -179,12 +176,10 @@ test.describe("House Rules Filter", () => {
     await expect
       .poll(
         () => {
-          const param =
-            new URL(page.url(), "http://localhost").searchParams.get(
-              "houseRules"
-            ) ?? "";
+          const values = houseRuleValues(page);
           return (
-            param.includes("Pets allowed") && !param.includes("Smoking allowed")
+            values.includes("Pets allowed") &&
+            !values.includes("Smoking allowed")
           );
         },
         {

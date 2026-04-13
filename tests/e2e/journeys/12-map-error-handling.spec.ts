@@ -7,7 +7,7 @@
  * - Error recovery with retry - V1 ONLY (v2 uses server-provided data)
  *
  * Note: Error messages from PersistentMapWrapper:
- * - Viewport too large: "Zoom in further to see listings"
+ * - Viewport too large: "Zoom in further to update results"
  * - Rate limited (429): "Too many requests. Please wait a moment."
  * - Server error (500): "Server error. Please try again."
  *
@@ -65,7 +65,7 @@ test.describe("Map Error Handling", () => {
       // In CI headless, the map canvas may exist but never fully initialize
       // the data path, so the viewport clamping effect may not fire.
       const banner = page.getByRole("status").filter({
-        hasText: /Zoom in further to load listings in this area/i,
+        hasText: /Zoom in further to update results/i,
       });
       const visible = await banner
         .waitFor({ state: "visible", timeout: timeouts.action })
@@ -86,7 +86,7 @@ test.describe("Map Error Handling", () => {
       // Should show info banner initially — but in CI headless the clamping
       // effect may never fire, so soft-check and skip if banner never appears.
       const bannerLocator = page.getByRole("status").filter({
-        hasText: /Zoom in further to load listings in this area/i,
+        hasText: /Zoom in further to update results/i,
       });
       const bannerAppeared = await bannerLocator
         .waitFor({ state: "visible", timeout: timeouts.action })
@@ -101,7 +101,7 @@ test.describe("Map Error Handling", () => {
 
       // Check that info message is no longer visible
       const infoBanner = page.getByText(
-        /Zoom in further to load listings in this area/i
+        /Zoom in further to update results/i
       );
       await expect(infoBanner).not.toBeVisible({ timeout: timeouts.action });
     });

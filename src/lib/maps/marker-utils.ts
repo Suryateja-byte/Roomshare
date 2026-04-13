@@ -18,9 +18,9 @@ export interface MapMarkerListing {
   title: string;
   price: number;
   availableSlots: number;
-  tier?: "primary" | "mini";
   ownerId?: string;
   images?: string[];
+  tier?: "primary" | "mini";
   location: {
     lat: number;
     lng: number;

@@ -194,6 +194,30 @@ describe("SearchResultsClient", () => {
       expect(matches.length).toBeGreaterThanOrEqual(1);
     });
 
+    it("marks browse mode on the search shell without rendering suggested searches", () => {
+      const { container } = render(
+        <SearchResultsClient {...defaultProps} browseMode={true} query="" />
+      );
+
+      expect(container.querySelector('[data-testid="search-shell"]')).toHaveAttribute(
+        "data-browse-mode",
+        "true"
+      );
+      expect(screen.queryByTestId("suggested-searches")).not.toBeInTheDocument();
+    });
+
+    it("keeps the save-search callout desktop-only", async () => {
+      render(<SearchResultsClient {...defaultProps} />);
+
+      await waitFor(() => {
+        expect(screen.getByText("Don't miss out")).toBeInTheDocument();
+      });
+
+      const callout = screen.getByText("Don't miss out").closest("section");
+      expect(callout).toHaveClass("hidden");
+      expect(callout).toHaveClass("md:flex");
+    });
+
     it("renders zero results state when hasConfirmedZeroResults is true", () => {
       render(
         <SearchResultsClient
@@ -492,7 +516,9 @@ describe("SearchResultsClient", () => {
           maxLat: "37.85",
           minLng: "-122.5",
           maxLng: "-122.3",
-        })
+        }),
+        expect.any(String),
+        null
       );
       expect(
         (

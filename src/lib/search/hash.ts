@@ -4,9 +4,12 @@
  * Provides stable cache key generation and cursor encoding for pagination.
  */
 
-import { createHash, createHmac, timingSafeEqual } from "crypto";
-import { BOUNDS_EPSILON } from "./types";
+import { createHmac, timingSafeEqual } from "crypto";
 import { getOptionalCursorSecret } from "@/lib/env";
+import {
+  generateSearchQueryHash,
+  type HashableSearchQuery,
+} from "./query-hash";
 
 // ============================================================================
 // Keyset Cursor Re-exports
@@ -34,33 +37,7 @@ export {
  * Filter parameters used for hash generation.
  * Matches the shape from parseSearchParams().
  */
-export interface HashableFilterParams {
-  query?: string;
-  vibeQuery?: string;
-  minPrice?: number;
-  maxPrice?: number;
-  amenities?: string[];
-  houseRules?: string[];
-  languages?: string[];
-  roomType?: string;
-  leaseDuration?: string;
-  moveInDate?: string;
-  bounds?: {
-    minLat: number;
-    maxLat: number;
-    minLng: number;
-    maxLng: number;
-  };
-  nearMatches?: boolean;
-}
-
-/**
- * Quantize a coordinate value using BOUNDS_EPSILON for cache stability.
- * This ensures nearby queries (within ~100m) hit the same cache key.
- */
-function quantizeBound(value: number): number {
-  return Math.round(value / BOUNDS_EPSILON) * BOUNDS_EPSILON;
-}
+export type HashableFilterParams = HashableSearchQuery;
 
 /**
  * Generate a stable 16-character hash from filter parameters.
@@ -72,36 +49,7 @@ function quantizeBound(value: number): number {
  * - Excludes pagination params (page, limit, cursor) for reusability
  */
 export function generateQueryHash(params: HashableFilterParams): string {
-  // Normalize params for stable hashing
-  const normalized = {
-    q: (params.query ?? "").toLowerCase().trim(),
-    what: (params.vibeQuery ?? "").toLowerCase().trim(),
-    minPrice: params.minPrice ?? null,
-    maxPrice: params.maxPrice ?? null,
-    amenities: [...(params.amenities ?? [])].sort(),
-    houseRules: [...(params.houseRules ?? [])].sort(),
-    languages: [...(params.languages ?? [])].sort(),
-    roomType: (params.roomType ?? "").toLowerCase(),
-    leaseDuration: (params.leaseDuration ?? "").toLowerCase(),
-    moveInDate: params.moveInDate ?? "",
-    nearMatches: params.nearMatches ?? false,
-    // Quantize bounds for cache stability
-    bounds: params.bounds
-      ? {
-          minLat: quantizeBound(params.bounds.minLat),
-          maxLat: quantizeBound(params.bounds.maxLat),
-          minLng: quantizeBound(params.bounds.minLng),
-          maxLng: quantizeBound(params.bounds.maxLng),
-        }
-      : null,
-  };
-
-  // Generate SHA256 hash and truncate to 16 chars
-  const hash = createHash("sha256")
-    .update(JSON.stringify(normalized))
-    .digest("hex");
-
-  return hash.slice(0, 16);
+  return generateSearchQueryHash(params);
 }
 
 // ============================================================================

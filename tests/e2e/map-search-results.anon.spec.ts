@@ -1,11 +1,11 @@
 /**
  * Map Search Results E2E Tests
  *
- * Verifies "Search as I move" with actual result verification, debounce behavior,
+ * Verifies map-driven search with actual result verification, debounce behavior,
  * and result synchronization between map markers and listing cards.
  *
  * Coverage:
- * - Group 1: Search as I move toggle behavior with results verification
+ * - Group 1: Always-on map search behavior with results verification
  * - Group 2: Result synchronization (map move updates listings, markers match results)
  * - Group 3: Debounce and performance (600ms debounce, rapid pan, AbortController)
  *
@@ -36,16 +36,10 @@ import type { Page, Route } from "@playwright/test";
 const boundsQS = `minLat=${SF_BOUNDS.minLat}&maxLat=${SF_BOUNDS.maxLat}&minLng=${SF_BOUNDS.minLng}&maxLng=${SF_BOUNDS.maxLng}`;
 const SEARCH_URL = `/search?${boundsQS}`;
 
-// Debounce for search-as-I-move (600ms in Map.tsx handleMoveEnd)
+// Debounce for map auto-search (600ms in Map.tsx handleMoveEnd)
 const MAP_SEARCH_DEBOUNCE_MS = 600;
-// Area count debounce (600ms in MapBoundsContext)
-const AREA_COUNT_DEBOUNCE_MS = 600;
-
-// Selectors for "Search as I move" feature
+// Selectors for map search feature
 const toggleSelectors = {
-  searchAsMoveToggle: 'button[role="switch"]:has-text("Search as I move")',
-  searchThisAreaBtn: 'button:has-text("Search this area")',
-  resetMapBtn: 'button[aria-label="Reset map view"]',
   mapContainer: selectors.map,
 } as const;
 
@@ -59,10 +53,6 @@ const toggleSelectors = {
 async function waitForSearchPage(page: Page) {
   await page.goto(SEARCH_URL);
   await page.waitForLoadState("domcontentloaded");
-  await page.locator(toggleSelectors.searchAsMoveToggle).waitFor({
-    state: "visible",
-    timeout: 30_000,
-  });
   await waitForMapReady(page);
 }
 
@@ -86,8 +76,8 @@ async function waitForMapRef(page: Page, timeout = 30_000): Promise<boolean> {
  * Check if the toggle is visible and map is interactive.
  */
 async function isMapInteractive(page: Page): Promise<boolean> {
-  const toggle = page.locator(toggleSelectors.searchAsMoveToggle);
-  return (await toggle.count()) > 0 && (await toggle.isVisible());
+  const map = page.locator(toggleSelectors.mapContainer).first();
+  return (await map.count()) > 0 && (await map.isVisible());
 }
 
 /**
@@ -104,34 +94,6 @@ async function isMapFullyLoaded(page: Page): Promise<boolean> {
     return hasCanvas;
   } catch {
     return false;
-  }
-}
-
-/**
- * Turn the "Search as I move" toggle OFF.
- */
-async function turnToggleOff(page: Page) {
-  const toggle = page.locator(toggleSelectors.searchAsMoveToggle);
-  const isChecked = await toggle.getAttribute("aria-checked");
-  if (isChecked === "true") {
-    await toggle.click();
-    await expect(toggle).toHaveAttribute("aria-checked", "false", {
-      timeout: 5_000,
-    });
-  }
-}
-
-/**
- * Turn the "Search as I move" toggle ON.
- */
-async function turnToggleOn(page: Page) {
-  const toggle = page.locator(toggleSelectors.searchAsMoveToggle);
-  const isChecked = await toggle.getAttribute("aria-checked");
-  if (isChecked === "false") {
-    await toggle.click();
-    await expect(toggle).toHaveAttribute("aria-checked", "true", {
-      timeout: 5_000,
-    });
   }
 }
 
@@ -229,27 +191,6 @@ function getUrlBounds(url: string) {
   };
 }
 
-/**
- * Mock the /api/search-count endpoint.
- */
-async function mockSearchCountApi(
-  page: Page,
-  options: { count?: number | null; delay?: number } = {}
-) {
-  const { count = 42, delay = 0 } = options;
-
-  await page.route("**/api/search-count*", async (route) => {
-    if (delay > 0) {
-      await new Promise((resolve) => setTimeout(resolve, delay));
-    }
-    await route.fulfill({
-      status: 200,
-      contentType: "application/json",
-      body: JSON.stringify({ count }),
-    });
-  });
-}
-
 // Map tests need extra time for WebGL rendering and tile loading in CI
 test.beforeEach(async () => {
   test.slow();
@@ -259,22 +200,16 @@ test.beforeEach(async () => {
 // Group 1: Search As I Move
 // ---------------------------------------------------------------------------
 
-test.describe("Search as I move: Toggle behavior", () => {
-  test("1 - Toggle is visible and defaults ON", async ({ page }) => {
+test.describe("Map search: always-on behavior", () => {
+  test("1 - Removed toggle is not rendered", async ({ page }) => {
     await waitForSearchPage(page);
 
     const mapInteractive = await isMapInteractive(page);
     test.skip(!mapInteractive, "Map controls not available (WebGL unavailable)");
 
-    const toggle = page.locator(toggleSelectors.searchAsMoveToggle);
-    await expect(toggle).toBeVisible();
-    await expect(toggle).toHaveAttribute("aria-checked", "true", {
-      timeout: 5_000,
-    });
-
-    // Green indicator dot should be visible when ON
-    const greenDot = toggle.locator('[data-testid="search-toggle-indicator"]');
-    await expect(greenDot).toBeVisible();
+    await expect(
+      page.getByRole("switch", { name: /search as i move/i })
+    ).toHaveCount(0);
   });
 
   test("2 - Pan map with toggle ON triggers URL bounds update", async ({
@@ -286,9 +221,6 @@ test.describe("Search as I move: Toggle behavior", () => {
     test.skip(!mapInteractive, "Map controls not available");
     const mapFullyLoaded = await isMapFullyLoaded(page);
     test.skip(!mapFullyLoaded, "Map not fully loaded (WebGL unavailable)");
-
-    // Ensure toggle is ON
-    await turnToggleOn(page);
 
     // Record initial URL bounds
     const initialBounds = getUrlBounds(page.url());
@@ -331,8 +263,6 @@ test.describe("Search as I move: Toggle behavior", () => {
     test.skip(!mapInteractive, "Map controls not available");
     const mapFullyLoaded = await isMapFullyLoaded(page);
     test.skip(!mapFullyLoaded, "Map not fully loaded");
-
-    await turnToggleOn(page);
 
     const initialBounds = getUrlBounds(page.url());
 
@@ -388,151 +318,13 @@ test.describe("Search as I move: Toggle behavior", () => {
     expect(boundsChanged).toBe(true);
   });
 
-  test("4 - Toggle OFF, move map, URL does NOT change", async ({ page }) => {
-    await waitForSearchPage(page);
-
-    const mapInteractive = await isMapInteractive(page);
-    test.skip(!mapInteractive, "Map controls not available");
-    const mapFullyLoaded = await isMapFullyLoaded(page);
-    test.skip(!mapFullyLoaded, "Map not fully loaded");
-
-    // Turn toggle OFF
-    await turnToggleOff(page);
-
-    // Record initial URL
-    const initialUrl = page.url();
-
-    // Pan the map
-    const panned = await simulateMapPan(page, 150, 75);
-    test.skip(!panned, "Map pan failed");
-
-    // Negative assertion: wait past debounce window to verify no search is triggered
-    await page.waitForTimeout(MAP_SEARCH_DEBOUNCE_MS + 500); // INTENTIONAL: negative assertion — must wait past debounce to prove URL stays unchanged
-
-    // URL should NOT have changed
-    expect(page.url()).toBe(initialUrl);
-  });
-
-  test("5 - Toggle OFF, move map, 'Search this area' banner appears", async ({
-    page,
-  }) => {
-    await mockSearchCountApi(page, { count: 15 });
-    await waitForSearchPage(page);
-
-    const mapInteractive = await isMapInteractive(page);
-    test.skip(!mapInteractive, "Map controls not available");
-    const mapFullyLoaded = await isMapFullyLoaded(page);
-    test.skip(!mapFullyLoaded, "Map not fully loaded");
-
-    await turnToggleOff(page);
-
-    // Pan the map
-    const panned = await simulateMapPan(page, 150, 75);
-    test.skip(!panned, "Map pan did not trigger state change");
-
-    // Scope to map region to avoid picking the mobile-hidden (md:hidden) variant
-    const mapRegion = page.locator(
-      '[aria-label="Interactive map showing listing locations"]'
-    );
-    const searchAreaBtn = mapRegion.locator(toggleSelectors.searchThisAreaBtn);
-    await expect(searchAreaBtn).toBeVisible({ timeout: 8000 });
-  });
-
-  test("6 - Click 'Search this area' triggers search with new bounds", async ({
-    page,
-  }) => {
-    await mockSearchCountApi(page, { count: 28 });
-    await waitForSearchPage(page);
-
-    const mapInteractive = await isMapInteractive(page);
-    test.skip(!mapInteractive, "Map controls not available");
-    const mapFullyLoaded = await isMapFullyLoaded(page);
-    test.skip(!mapFullyLoaded, "Map not fully loaded");
-
-    const initialUrl = page.url();
-
-    await turnToggleOff(page);
-    const panned = await simulateMapPan(page, 150, 75);
-    test.skip(!panned, "Map pan did not trigger state change");
-
-    // Scope to map region to avoid picking the mobile-hidden (md:hidden) variant
-    const mapRegion = page.locator(
-      '[aria-label="Interactive map showing listing locations"]'
-    );
-    const searchAreaBtn = mapRegion.locator(toggleSelectors.searchThisAreaBtn);
-    await expect(searchAreaBtn).toBeVisible({ timeout: 8000 });
-
-    // Click "Search this area"
-    await searchAreaBtn.click();
-
-    // URL should change to reflect new bounds
-    await page.waitForFunction(
-      (prevUrl: string) => window.location.href !== prevUrl,
-      initialUrl,
-      { timeout: 20_000 }
-    );
-    const newUrl = page.url();
-    expect(newUrl).not.toBe(initialUrl);
-
-    // Banner should disappear after search triggered
-    await expect(searchAreaBtn).not.toBeVisible({ timeout: 5000 });
-  });
-
-  test("7 - Re-enable toggle, future moves trigger search again", async ({
-    page,
-  }) => {
-    await waitForSearchPage(page);
-
-    const mapInteractive = await isMapInteractive(page);
-    test.skip(!mapInteractive, "Map controls not available");
-    const mapFullyLoaded = await isMapFullyLoaded(page);
-    test.skip(!mapFullyLoaded, "Map not fully loaded");
-
-    // Turn OFF
-    await turnToggleOff(page);
-
-    // Pan (URL should NOT change)
-    const initialUrl = page.url();
-    await simulateMapPan(page, 100, 50);
-    // Negative assertion: wait past debounce window to verify no search is triggered
-    await page.waitForTimeout(MAP_SEARCH_DEBOUNCE_MS + 500); // INTENTIONAL: negative assertion — must wait past debounce to prove URL stays unchanged
-    expect(page.url()).toBe(initialUrl);
-
-    // Turn ON again
-    await turnToggleOn(page);
-
-    // Now pan (URL SHOULD change)
-    const urlBeforePan = page.url();
-    const panned = await simulateMapPan(page, 100, 50);
-    test.skip(!panned, "Second map pan failed");
-
-    await page
-      .waitForFunction(
-        (prevUrl: string) => window.location.href !== prevUrl,
-        urlBeforePan,
-        { timeout: 20_000 }
-      )
-      .catch(() => {});
-    const urlAfterPan = page.url();
-
-    // URL bounds should have updated
-    const beforeBounds = getUrlBounds(urlBeforePan);
-    const afterBounds = getUrlBounds(urlAfterPan);
-    const boundsChanged =
-      beforeBounds.minLat !== afterBounds.minLat ||
-      beforeBounds.maxLat !== afterBounds.maxLat ||
-      beforeBounds.minLng !== afterBounds.minLng ||
-      beforeBounds.maxLng !== afterBounds.maxLng;
-
-    expect(boundsChanged).toBe(true);
-  });
 });
 
 // ---------------------------------------------------------------------------
 // Group 2: Result Synchronization
 // ---------------------------------------------------------------------------
 
-test.describe("Search as I move: Result synchronization", () => {
+test.describe("Map search: Result synchronization", () => {
   test("8 - Map move updates listing results (new cards appear)", async ({
     page,
   }) => {
@@ -542,8 +334,6 @@ test.describe("Search as I move: Result synchronization", () => {
     test.skip(!mapInteractive, "Map controls not available");
     const mapFullyLoaded = await isMapFullyLoaded(page);
     test.skip(!mapFullyLoaded, "Map not fully loaded");
-
-    await turnToggleOn(page);
 
     // Get initial listing card count
     const initialCards = await searchResultsContainer(page)
@@ -580,8 +370,6 @@ test.describe("Search as I move: Result synchronization", () => {
 
     const hasRef = await waitForMapRef(page);
     test.skip(!hasRef, "Map ref not available");
-
-    await turnToggleOn(page);
 
     // Pan the map
     await simulateMapPan(page, 100, 50);
@@ -627,8 +415,6 @@ test.describe("Search as I move: Result synchronization", () => {
     const mapFullyLoaded = await isMapFullyLoaded(page);
     test.skip(!mapFullyLoaded, "Map not fully loaded");
 
-    await turnToggleOn(page);
-
     // Clear tracked calls
     searchCalls.length = 0;
 
@@ -663,8 +449,6 @@ test.describe("Search as I move: Result synchronization", () => {
     const mapFullyLoaded = await isMapFullyLoaded(page);
     test.skip(!mapFullyLoaded, "Map not fully loaded");
 
-    await turnToggleOn(page);
-
     // Reset counter after page load
     searchApiCalls = 0;
 
@@ -688,7 +472,7 @@ test.describe("Search as I move: Result synchronization", () => {
 // Group 3: Debounce & Performance
 // ---------------------------------------------------------------------------
 
-test.describe("Search as I move: Debounce and performance", () => {
+test.describe("Map search: Debounce and performance", () => {
   test("12 - 600ms debounce: no immediate URL change, change after ~600ms", async ({
     page,
   }) => {
@@ -698,8 +482,6 @@ test.describe("Search as I move: Debounce and performance", () => {
     test.skip(!mapInteractive, "Map controls not available");
     const mapFullyLoaded = await isMapFullyLoaded(page);
     test.skip(!mapFullyLoaded, "Map not fully loaded");
-
-    await turnToggleOn(page);
 
     const initialUrl = page.url();
 
@@ -755,8 +537,6 @@ test.describe("Search as I move: Debounce and performance", () => {
     const mapFullyLoaded = await isMapFullyLoaded(page);
     test.skip(!mapFullyLoaded, "Map not fully loaded");
 
-    await turnToggleOn(page);
-
     // Inject URL change listener
     await page.evaluate(() => {
       const originalReplaceState = history.replaceState.bind(history);
@@ -785,62 +565,4 @@ test.describe("Search as I move: Debounce and performance", () => {
     expect(urlChanges.length).toBeLessThanOrEqual(3);
   });
 
-  test("14 - AbortController cancels stale search requests", async ({
-    page,
-  }) => {
-    const completedRequests: string[] = [];
-    const abortedRequests: string[] = [];
-
-    // Mock the search-count API with a delay
-    await page.route("**/api/search-count*", async (route) => {
-      // Add artificial delay to simulate slow API
-      await new Promise((resolve) => setTimeout(resolve, 800));
-      try {
-        await route.fulfill({
-          status: 200,
-          contentType: "application/json",
-          body: JSON.stringify({ count: 10 }),
-        });
-        completedRequests.push(route.request().url());
-      } catch {
-        abortedRequests.push(route.request().url());
-      }
-    });
-
-    await waitForSearchPage(page);
-
-    const mapInteractive = await isMapInteractive(page);
-    test.skip(!mapInteractive, "Map controls not available");
-    const mapFullyLoaded = await isMapFullyLoaded(page);
-    test.skip(!mapFullyLoaded, "Map not fully loaded");
-
-    // Turn toggle OFF so area count requests are triggered
-    await turnToggleOff(page);
-
-    // Pan multiple times rapidly
-    const panned1 = await simulateMapPan(page, 50, 25);
-    test.skip(!panned1, "Map pan failed");
-    // Wait for debounce to fire and search-count API to respond
-    await page.waitForResponse(resp => resp.url().includes("search-count")).catch(() => {});
-
-    await simulateMapPan(page, 50, 25);
-    // Wait for debounce to fire and search-count API to respond
-    await page.waitForResponse(resp => resp.url().includes("search-count")).catch(() => {});
-
-    await simulateMapPan(page, 50, 25);
-
-    // Wait for final debounce to fire and network activity to settle
-    await page.waitForResponse(resp => resp.url().includes("search-count")).catch(() => {});
-    await page.waitForLoadState("domcontentloaded").catch(() => {});
-
-    // If multiple requests were in-flight, earlier ones should have been aborted
-    const totalRequests = completedRequests.length + abortedRequests.length;
-    if (totalRequests > 1) {
-      // At least one request should have been aborted or only the last one completed
-      expect(completedRequests.length).toBeLessThanOrEqual(totalRequests);
-    }
-
-    // Page should still be functional
-    expect(await page.locator("body").isVisible()).toBe(true);
-  });
 });

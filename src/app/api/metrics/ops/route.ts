@@ -9,6 +9,7 @@
 
 import crypto from "crypto";
 import { getServerEnv } from "@/lib/env";
+import { getSearchTelemetrySnapshot } from "@/lib/search/search-telemetry";
 
 export const runtime = "nodejs";
 
@@ -54,6 +55,7 @@ export async function GET(request: Request) {
 
   const memory = process.memoryUsage();
   const version = process.env.VERCEL_GIT_COMMIT_SHA?.slice(0, 8) || "dev";
+  const searchTelemetry = getSearchTelemetrySnapshot();
 
   // Compute duration percentiles from samples
   const validSamples = durationSamples.filter((d) => d !== undefined);
@@ -105,6 +107,40 @@ export async function GET(request: Request) {
     `# HELP app_info Application information`,
     `# TYPE app_info gauge`,
     `app_info{version="${version}",node_version="${process.version}"} 1`,
+    ``,
+    `# HELP search_request_latency_ms Search request latency summary in milliseconds`,
+    `# TYPE search_request_latency_ms summary`,
+    `search_request_latency_ms{quantile="0.5"} ${searchTelemetry.requestLatency.p50}`,
+    `search_request_latency_ms{quantile="0.95"} ${searchTelemetry.requestLatency.p95}`,
+    `search_request_latency_ms{quantile="0.99"} ${searchTelemetry.requestLatency.p99}`,
+    `search_request_latency_ms_count ${searchTelemetry.requestLatency.count}`,
+    `search_request_latency_ms_sum ${searchTelemetry.requestLatency.sum}`,
+    ``,
+    `# HELP search_backend_source Search responses grouped by backend source`,
+    `# TYPE search_backend_source gauge`,
+    `search_backend_source{backend_source="v2"} ${searchTelemetry.backendSourceCounts.v2}`,
+    `search_backend_source{backend_source="v1-fallback"} ${searchTelemetry.backendSourceCounts["v1-fallback"]}`,
+    `search_backend_source{backend_source="map-api"} ${searchTelemetry.backendSourceCounts["map-api"]}`,
+    ``,
+    `# HELP search_v2_fallback_total Total number of search v2 fallbacks`,
+    `# TYPE search_v2_fallback_total counter`,
+    `search_v2_fallback_total ${searchTelemetry.v2FallbackTotal}`,
+    ``,
+    `# HELP search_map_list_mismatch_total Total number of stale search response mismatches`,
+    `# TYPE search_map_list_mismatch_total counter`,
+    `search_map_list_mismatch_total ${searchTelemetry.mapListMismatchTotal}`,
+    ``,
+    `# HELP search_load_more_error_total Total number of load more failures`,
+    `# TYPE search_load_more_error_total counter`,
+    `search_load_more_error_total ${searchTelemetry.loadMoreErrorTotal}`,
+    ``,
+    `# HELP search_zero_results_total Total number of zero-result search responses`,
+    `# TYPE search_zero_results_total counter`,
+    `search_zero_results_total ${searchTelemetry.zeroResultsTotal}`,
+    ``,
+    `# HELP search_client_abort_total Total number of aborted client search requests`,
+    `# TYPE search_client_abort_total counter`,
+    `search_client_abort_total ${searchTelemetry.clientAbortTotal}`,
   ].join("\n");
 
   return new Response(prometheusFormat, {

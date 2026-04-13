@@ -6,7 +6,7 @@
  * MobileBottomSheet component's behavior for consistent test usage.
  *
  * Key concepts:
- * - Snap indices: 0=collapsed (~15vh), 1=expanded (~85vh)
+ * - Snap indices: 0=collapsed/map, 1=peek/list preview, 2=expanded/list
  * - The sheet uses framer-motion spring animations (~400-600ms)
  * - The slider handle supports keyboard navigation (ArrowUp/Down/Home/End)
  * - data-snap-current attribute on the content area reflects current snap
@@ -53,13 +53,18 @@ export const mobileSelectors = {
   mobileResults: '[data-testid="mobile-search-results-container"]',
 } as const;
 
+function bottomSheetLocator(page: Page) {
+  return page.locator(mobileSelectors.bottomSheet).filter({ visible: true }).first();
+}
+
 // ---------------------------------------------------------------------------
-// Snap point constants (mirroring MobileBottomSheet.tsx)
+// Snap point constants (mirroring src/lib/mobile-layout.ts)
 // ---------------------------------------------------------------------------
 
-export const SNAP_COLLAPSED = 0.15;
-export const SNAP_EXPANDED = 0.85;
-export const SNAP_POINTS = [SNAP_COLLAPSED, SNAP_EXPANDED] as const;
+export const SNAP_COLLAPSED = 0.11;
+export const SNAP_PEEK = 0.42;
+export const SNAP_EXPANDED = 0.84;
+export const SNAP_POINTS = [SNAP_COLLAPSED, SNAP_PEEK, SNAP_EXPANDED] as const;
 
 // ---------------------------------------------------------------------------
 // Core helpers
@@ -80,25 +85,26 @@ export async function getSheetSnapIndex(page: Page): Promise<number> {
  * Waits for framer-motion spring animation to settle (height <= viewport).
  */
 export async function getSheetHeightFraction(page: Page): Promise<number> {
-  const sel = mobileSelectors.bottomSheet;
-
   // Wait for framer-motion to constrain height to within viewport bounds
   await page
-    .waitForFunction(
-      (s: string) => {
-        const el = document.querySelector(s);
-        if (!el) return false;
-        const h = parseFloat(window.getComputedStyle(el).height);
-        return h > 0 && h <= window.innerHeight * 1.05;
-      },
-      sel,
-      { timeout: 5000 }
-    )
+    .waitForFunction(() => {
+      const candidates = Array.from(
+        document.querySelectorAll('[role="region"][aria-label="Search results"]')
+      ) as HTMLElement[];
+      const el =
+        candidates.find((candidate) => {
+          const rect = candidate.getBoundingClientRect();
+          return rect.width > 0 && rect.height > 0;
+        }) ?? null;
+      if (!el) return false;
+      const h = parseFloat(window.getComputedStyle(el).height);
+      return h > 0 && h <= window.innerHeight * 1.05;
+    }, { timeout: 5000 })
     .catch(() => {
       /* assertion will catch bad values */
     });
 
-  return page.locator(sel).evaluate((el) => {
+  return bottomSheetLocator(page).evaluate((el) => {
     const height = parseFloat(window.getComputedStyle(el).height);
     return height / window.innerHeight;
   });
@@ -111,7 +117,7 @@ export async function getSheetHeightFraction(page: Page): Promise<number> {
  */
 export async function setSheetSnap(
   page: Page,
-  targetSnap: 0 | 1
+  targetSnap: 0 | 1 | 2
 ): Promise<void> {
   const currentSnap = await getSheetSnapIndex(page);
   if (currentSnap === targetSnap) return;
@@ -125,7 +131,7 @@ export async function setSheetSnap(
 
   for (let i = 0; i < presses; i++) {
     const prevSnap = await getSheetSnapIndex(page);
-    await page.keyboard.press(key);
+    await handle.press(key);
     if (i < presses - 1) {
       // Wait for data-snap-current to update before next press
       await page
@@ -150,17 +156,53 @@ export async function setSheetSnap(
 }
 
 /**
+ * Open the mobile results sheet to a visible list state when a test needs
+ * cards, filters, or sort controls that are hidden in map-first mode.
+ */
+export async function ensureMobileResultsVisible(
+  page: Page,
+  targetSnap: 1 | 2 = 1
+): Promise<void> {
+  if (!(await isMobileViewport(page))) return;
+
+  const results = page.locator(mobileSelectors.mobileResults).first();
+  const currentSnap = await getSheetSnapIndex(page);
+  if (currentSnap >= targetSnap) {
+    await results.waitFor({ state: "visible", timeout: 10_000 }).catch(() => {});
+    return;
+  }
+
+  const showListButton = page.locator('button[aria-label="Show list"]').first();
+  const canToggle = await showListButton.isVisible().catch(() => false);
+
+  if (canToggle) {
+    await showListButton.click();
+  } else {
+    await setSheetSnap(page, targetSnap);
+  }
+
+  await waitForSheetAnimation(page);
+  await results.waitFor({ state: "visible", timeout: 10_000 });
+}
+
+/**
  * Wait for framer-motion spring animation to complete.
  * Polls the sheet's computed height until it stabilizes (two consecutive
  * readings within 2px tolerance), indicating the spring has settled.
  * Falls back to a short timeout if the sheet element isn't found.
  */
 export async function waitForSheetAnimation(page: Page): Promise<void> {
-  const sel = mobileSelectors.bottomSheet;
   try {
     await page.waitForFunction(
-      (s: string) => {
-        const el = document.querySelector(s);
+      () => {
+        const candidates = Array.from(
+          document.querySelectorAll('[role="region"][aria-label="Search results"]')
+        ) as HTMLElement[];
+        const el =
+          candidates.find((candidate) => {
+            const rect = candidate.getBoundingClientRect();
+            return rect.width > 0 && rect.height > 0;
+          }) ?? null;
         if (!el) return true; // nothing to wait for
         const w = window as any;
         const prev = w.__sheetAnimH as number | undefined;
@@ -169,7 +211,6 @@ export async function waitForSheetAnimation(page: Page): Promise<void> {
         if (prev === undefined) return false; // need at least 2 samples
         return Math.abs(curr - prev) < 2; // settled when delta < 2px
       },
-      sel,
       { timeout: 5000, polling: 100 }
     );
   } catch {
@@ -239,7 +280,7 @@ export async function waitForMobileSheet(
   await waitForLayoutStable(page);
 
   // Check if bottom sheet is visible
-  const sheet = page.locator(mobileSelectors.bottomSheet);
+  const sheet = bottomSheetLocator(page);
   return sheet.isVisible({ timeout: 5000 }).catch(() => false);
 }
 

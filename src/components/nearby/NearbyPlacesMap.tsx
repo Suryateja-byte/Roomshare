@@ -14,7 +14,7 @@
  * - Attribution handled by MapLibre's built-in control (reads from style JSON)
  */
 
-import { useEffect, useRef, useCallback } from "react";
+import { useEffect, useRef, useCallback, type RefObject } from "react";
 
 import maplibregl from "maplibre-gl";
 import "maplibre-gl/dist/maplibre-gl.css";
@@ -128,15 +128,9 @@ function createHomeMarkerElement(): HTMLDivElement {
  *
  * @see https://css-tricks.com/avoid-css-jitter/
  */
-function createPOIMarkerElement(category: string): HTMLDivElement {
+function createPOIMarkerVisual(category: string): HTMLDivElement {
   const colors = getCategoryColors(category);
   const iconPath = getCategoryIconPath(category);
-
-  // Outer wrapper - stable hover zone, larger than visual marker
-  // This element captures hover events without changing size
-  const wrapper = document.createElement("div");
-  wrapper.className =
-    "group w-12 h-12 flex items-center justify-center cursor-pointer poi-marker";
 
   // Inner visual marker - scales on hover via group-hover
   const container = document.createElement("div");
@@ -161,9 +155,118 @@ function createPOIMarkerElement(category: string): HTMLDivElement {
   svg.appendChild(path);
   container.appendChild(svg);
 
-  wrapper.appendChild(container);
+  return container;
+}
 
-  return wrapper;
+function getCategoryLabel(category: string): string {
+  return category.replace(/-/g, " ");
+}
+
+function getMarkerAriaLabel(place: NearbyPlace): string {
+  return `${place.name}, ${getCategoryLabel(place.category)}, ${place.distanceMiles.toFixed(1)} miles away`;
+}
+
+function buildPopupHtml(place: NearbyPlace): string {
+  const categoryColors = getCategoryColors(place.category);
+
+  return `
+    <div class="nearby-popup-content">
+      <div class="nearby-popup-category">
+        <span class="nearby-popup-category-dot" style="background-color: ${categoryColors.markerBorder}"></span>
+        ${escapeHtml(getCategoryLabel(place.category))}
+      </div>
+      <div class="nearby-popup-name">${escapeHtml(place.name)}</div>
+      <div class="nearby-popup-address">${escapeHtml(place.address)}</div>
+      <div class="nearby-popup-distance">${place.distanceMiles.toFixed(1)} mi away</div>
+      <a class="nearby-popup-directions" href="https://www.google.com/maps/dir/?api=1&destination=${place.location.lat},${place.location.lng}" target="_blank" rel="noopener noreferrer">
+        <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 11l19-9-9 19-2-8-8-2z"/></svg>
+        Get directions
+      </a>
+    </div>
+  `;
+}
+
+function applyMarkerHighlight(
+  element: HTMLDivElement,
+  isHighlighted: boolean
+): void {
+  element.classList.toggle("highlighted", isHighlighted);
+}
+
+function renderPOIMarkerElement(
+  element: HTMLDivElement,
+  place: NearbyPlace,
+  isHighlighted: boolean
+): void {
+  element.className =
+    "group w-12 h-12 flex items-center justify-center cursor-pointer poi-marker focus:outline-none focus-visible:ring-2 focus-visible:ring-primary/30 focus-visible:ring-offset-2";
+  element.dataset.placeId = place.id;
+  element.tabIndex = 0;
+  element.setAttribute("role", "button");
+  element.setAttribute("aria-label", getMarkerAriaLabel(place));
+  element.replaceChildren(createPOIMarkerVisual(place.category));
+  applyMarkerHighlight(element, isHighlighted);
+}
+
+function getSafeAreaInsetBottom(): number {
+  if (typeof document === "undefined" || !document.body) {
+    return 0;
+  }
+
+  const probe = document.createElement("div");
+  probe.style.position = "fixed";
+  probe.style.bottom = "0";
+  probe.style.paddingBottom = "env(safe-area-inset-bottom)";
+  probe.style.visibility = "hidden";
+  probe.style.pointerEvents = "none";
+  document.body.appendChild(probe);
+
+  const safeAreaInsetBottom =
+    Number.parseFloat(window.getComputedStyle(probe).paddingBottom) || 0;
+
+  probe.remove();
+  return safeAreaInsetBottom;
+}
+
+type MarkerSnapshot = {
+  lat: number;
+  lng: number;
+  name: string;
+  address: string;
+  category: string;
+  distanceMiles: number;
+};
+
+type MarkerRegistryEntry = {
+  element: HTMLDivElement;
+  marker: maplibregl.Marker;
+  popup: maplibregl.Popup;
+  snapshot: MarkerSnapshot;
+};
+
+function createMarkerSnapshot(place: NearbyPlace): MarkerSnapshot {
+  return {
+    lat: place.location.lat,
+    lng: place.location.lng,
+    name: place.name,
+    address: place.address,
+    category: place.category,
+    distanceMiles: place.distanceMiles,
+  };
+}
+
+function hasMarkerSnapshotChanged(
+  previousSnapshot: MarkerSnapshot,
+  nextSnapshot: MarkerSnapshot
+): boolean {
+  return (
+    previousSnapshot.lat !== nextSnapshot.lat ||
+    previousSnapshot.lng !== nextSnapshot.lng ||
+    previousSnapshot.name !== nextSnapshot.name ||
+    previousSnapshot.address !== nextSnapshot.address ||
+    previousSnapshot.category !== nextSnapshot.category ||
+    previousSnapshot.distanceMiles !== nextSnapshot.distanceMiles
+  );
 }
 
 interface NearbyPlacesMapProps {
@@ -172,6 +275,8 @@ interface NearbyPlacesMapProps {
   places: NearbyPlace[];
   className?: string;
   highlightedPlaceId?: string | null;
+  isPaneInteractive?: boolean;
+  externalBottomOverlayRef?: RefObject<HTMLElement | null>;
 }
 
 export default function NearbyPlacesMap({
@@ -180,10 +285,13 @@ export default function NearbyPlacesMap({
   places,
   className = "",
   highlightedPlaceId,
+  isPaneInteractive = true,
+  externalBottomOverlayRef,
 }: NearbyPlacesMapProps) {
   const mapContainerRef = useRef<HTMLDivElement>(null);
+  const controlsRef = useRef<HTMLDivElement>(null);
   const mapRef = useRef<maplibregl.Map | null>(null);
-  const markersRef = useRef<maplibregl.Marker[]>([]);
+  const markersRef = useRef<Map<string, MarkerRegistryEntry>>(new Map());
   const listingMarkerRef = useRef<maplibregl.Marker | null>(null);
   const hasFitBoundsRef = useRef<boolean>(false);
   // Ref to hold the latest updateMarkers callback so async initMap can
@@ -197,90 +305,191 @@ export default function NearbyPlacesMap({
 
   // Single warm theme — always use light map style
 
+  const resizeMap = useCallback(() => {
+    const map = mapRef.current as (maplibregl.Map & { resize?: () => void }) | null;
+    if (typeof map?.resize === "function") {
+      map.resize();
+    }
+  }, []);
+
+  const clearMarkerRegistry = useCallback(() => {
+    markersRef.current.forEach((entry) => {
+      entry.marker.remove();
+    });
+    markersRef.current.clear();
+  }, []);
+
+  const toggleMarkerPopup = useCallback((entry: MarkerRegistryEntry) => {
+    const markerWithToggle = entry.marker as maplibregl.Marker & {
+      togglePopup?: () => maplibregl.Marker;
+    };
+
+    if (typeof markerWithToggle.togglePopup === "function") {
+      markerWithToggle.togglePopup();
+      return;
+    }
+
+    if (entry.popup.isOpen()) {
+      entry.popup.remove();
+      return;
+    }
+
+    if (mapRef.current) {
+      entry.popup.addTo(mapRef.current);
+    }
+  }, []);
+
+  const getFitBoundsPadding = useCallback(() => {
+    const fallbackPadding = 24;
+    const mapContainer = mapContainerRef.current;
+    const safeAreaInsetBottom = getSafeAreaInsetBottom();
+    const padding = {
+      top: fallbackPadding,
+      right: fallbackPadding,
+      bottom: fallbackPadding + safeAreaInsetBottom,
+      left: fallbackPadding,
+    };
+
+    if (!mapContainer) {
+      return padding;
+    }
+
+    const containerRect = mapContainer.getBoundingClientRect();
+    const controlsRect = controlsRef.current?.getBoundingClientRect();
+    const overlayRect = externalBottomOverlayRef?.current?.getBoundingClientRect();
+
+    if (controlsRect && controlsRef.current?.getClientRects().length) {
+      padding.right = Math.max(
+        padding.right,
+        Math.max(0, containerRect.right - controlsRect.left) + fallbackPadding
+      );
+      padding.bottom = Math.max(
+        padding.bottom,
+        Math.max(0, containerRect.bottom - controlsRect.top) +
+          fallbackPadding +
+          safeAreaInsetBottom
+      );
+    }
+
+    if (overlayRect && externalBottomOverlayRef?.current?.getClientRects().length) {
+      padding.bottom = Math.max(
+        padding.bottom,
+        Math.max(0, containerRect.bottom - overlayRect.top) +
+          fallbackPadding +
+          safeAreaInsetBottom
+      );
+    }
+
+    return padding;
+  }, [externalBottomOverlayRef]);
+
+  const fitMapToPlaces = useCallback(
+    (nextPlaces: NearbyPlace[], duration: number) => {
+      const map = mapRef.current;
+      if (!map || nextPlaces.length === 0) {
+        return;
+      }
+
+      const bounds = new maplibregl.LngLatBounds();
+      bounds.extend([listingLng, listingLat]);
+      nextPlaces.forEach((place) => {
+        bounds.extend([place.location.lng, place.location.lat]);
+      });
+
+      map.fitBounds(bounds, {
+        padding: getFitBoundsPadding(),
+        maxZoom: 15,
+        duration,
+      });
+    },
+    [getFitBoundsPadding, listingLat, listingLng]
+  );
+
   // Update POI markers when places change
   const updateMarkers = useCallback(
     (newPlaces: NearbyPlace[]) => {
       const map = mapRef.current;
       if (!map) return;
 
-      // Differential marker updates to preserve state and reduce DOM churn
-      // Get existing marker IDs
-      const existingMarkerMap = new Map<string, maplibregl.Marker>();
-      markersRef.current.forEach((marker) => {
-        const placeId = marker.getElement().dataset.placeId;
-        if (placeId) {
-          existingMarkerMap.set(placeId, marker);
-        }
-      });
-
-      // Track new place IDs
+      const existingMarkerMap = markersRef.current;
       const newPlaceIds = new Set(newPlaces.map((p) => p.id));
 
-      // Remove markers that no longer exist
-      markersRef.current = markersRef.current.filter((marker) => {
-        const placeId = marker.getElement().dataset.placeId;
-        if (!placeId || !newPlaceIds.has(placeId)) {
-          marker.remove();
-          return false;
+      Array.from(existingMarkerMap.entries()).forEach(([placeId, entry]) => {
+        if (!newPlaceIds.has(placeId)) {
+          entry.marker.remove();
+          existingMarkerMap.delete(placeId);
         }
-        return true;
       });
 
-      // Add only new markers (that don't already exist)
       newPlaces.forEach((place) => {
-        if (!existingMarkerMap.has(place.id)) {
-          // Create new marker with category icon and theme-aware colors
-          const markerEl = createPOIMarkerElement(place.category);
-          markerEl.dataset.placeId = place.id; // Track by ID
+        const snapshot = createMarkerSnapshot(place);
+        const existingEntry = existingMarkerMap.get(place.id);
+
+        if (!existingEntry) {
+          const markerEl = document.createElement("div");
+          const popup = new maplibregl.Popup({
+            offset: 25,
+            closeButton: false,
+            className: "nearby-popup",
+          }).setHTML(buildPopupHtml(place));
 
           const marker = new maplibregl.Marker({ element: markerEl })
             .setLngLat([place.location.lng, place.location.lat])
-            .setPopup(
-              new maplibregl.Popup({
-                offset: 25,
-                closeButton: false,
-                className: "nearby-popup",
-              }).setHTML(`
-              <div class="nearby-popup-content">
-                <div class="nearby-popup-category">
-                  <span class="nearby-popup-category-dot" style="background-color: ${getCategoryColors(place.category).markerBorder}"></span>
-                  ${escapeHtml(place.category.replace(/-/g, " "))}
-                </div>
-                <div class="nearby-popup-name">${escapeHtml(place.name)}</div>
-                <div class="nearby-popup-address">${escapeHtml(place.address)}</div>
-                <div class="nearby-popup-distance">${place.distanceMiles.toFixed(1)} mi away</div>
-                <a class="nearby-popup-directions" href="https://www.google.com/maps/dir/?api=1&destination=${place.location.lat},${place.location.lng}" target="_blank" rel="noopener noreferrer">
-                  <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 11l19-9-9 19-2-8-8-2z"/></svg>
-                  Get directions
-                </a>
-              </div>
-            `)
-            )
+            .setPopup(popup)
             .addTo(map);
 
-          markersRef.current.push(marker);
+          const entry: MarkerRegistryEntry = {
+            element: markerEl,
+            marker,
+            popup,
+            snapshot,
+          };
+
+          markerEl.onkeydown = (event: KeyboardEvent) => {
+            if (event.key === "Enter" || event.key === " ") {
+              event.preventDefault();
+              toggleMarkerPopup(entry);
+            }
+          };
+
+          renderPOIMarkerElement(
+            markerEl,
+            place,
+            place.id === highlightedPlaceId
+          );
+          existingMarkerMap.set(place.id, entry);
+          return;
         }
+
+        if (hasMarkerSnapshotChanged(existingEntry.snapshot, snapshot)) {
+          existingEntry.marker.setLngLat([place.location.lng, place.location.lat]);
+          existingEntry.popup.setHTML(buildPopupHtml(place));
+          existingEntry.snapshot = snapshot;
+          renderPOIMarkerElement(
+            existingEntry.element,
+            place,
+            place.id === highlightedPlaceId
+          );
+          return;
+        }
+
+        applyMarkerHighlight(
+          existingEntry.element,
+          place.id === highlightedPlaceId
+        );
       });
 
-      // Fit bounds to include all markers on initial load only
-      // Prevents camera animation from interfering with marker clicks
-      if (newPlaces.length > 0 && !hasFitBoundsRef.current) {
-        const bounds = new maplibregl.LngLatBounds();
-        bounds.extend([listingLng, listingLat]);
-        newPlaces.forEach((place) => {
-          bounds.extend([place.location.lng, place.location.lat]);
-        });
+      if (newPlaces.length === 0) {
+        hasFitBoundsRef.current = false;
+        return;
+      }
 
-        map.fitBounds(bounds, {
-          padding: 50,
-          maxZoom: 15,
-          duration: 0, // Disable animation to prevent marker movement during clicks
-        });
-
+      if (!hasFitBoundsRef.current) {
+        fitMapToPlaces(newPlaces, 0);
         hasFitBoundsRef.current = true;
       }
     },
-    [listingLat, listingLng]
+    [fitMapToPlaces, highlightedPlaceId, toggleMarkerPopup]
   );
 
   // Keep ref in sync so initMap can call it after async map creation
@@ -339,6 +548,8 @@ export default function NearbyPlacesMap({
           .addTo(map);
 
         listingMarkerRef.current = listingMarker;
+        resizeMap();
+        updateMarkersRef.current?.(placesRef.current);
       });
 
       // Handle any map errors
@@ -351,6 +562,8 @@ export default function NearbyPlacesMap({
 
     return () => {
       cancelled = true;
+      clearMarkerRegistry();
+      listingMarkerRef.current?.remove();
       if (mapRef.current) {
         mapRef.current.remove();
         mapRef.current = null;
@@ -358,7 +571,7 @@ export default function NearbyPlacesMap({
       listingMarkerRef.current = null;
       hasFitBoundsRef.current = false; // Reset for new map instance
     };
-  }, [listingLat, listingLng]); // Re-create map when coordinates change
+  }, [clearMarkerRegistry, listingLat, listingLng, resizeMap]); // Re-create map when coordinates change
 
   // Update markers when places change
   useEffect(() => {
@@ -367,16 +580,52 @@ export default function NearbyPlacesMap({
 
   // Highlight marker when hovering on list item
   useEffect(() => {
-    markersRef.current.forEach((marker) => {
-      const el = marker.getElement();
-      const placeId = el.dataset.placeId;
-      if (placeId === highlightedPlaceId) {
-        el.classList.add("highlighted");
-      } else {
-        el.classList.remove("highlighted");
-      }
+    markersRef.current.forEach((entry, placeId) => {
+      applyMarkerHighlight(entry.element, placeId === highlightedPlaceId);
     });
   }, [highlightedPlaceId]);
+
+  useEffect(() => {
+    const mapContainer = mapContainerRef.current;
+    if (!mapContainer) {
+      return;
+    }
+
+    const handleResize = () => {
+      resizeMap();
+    };
+
+    const handleVisibilityChange = () => {
+      if (document.visibilityState === "visible") {
+        resizeMap();
+      }
+    };
+
+    const resizeObserver =
+      typeof ResizeObserver === "undefined"
+        ? null
+        : new ResizeObserver(() => {
+            handleResize();
+          });
+
+    resizeObserver?.observe(mapContainer);
+    window.addEventListener("resize", handleResize);
+    window.addEventListener("orientationchange", handleResize);
+    document.addEventListener("visibilitychange", handleVisibilityChange);
+
+    return () => {
+      resizeObserver?.disconnect();
+      window.removeEventListener("resize", handleResize);
+      window.removeEventListener("orientationchange", handleResize);
+      document.removeEventListener("visibilitychange", handleVisibilityChange);
+    };
+  }, [resizeMap]);
+
+  useEffect(() => {
+    if (isPaneInteractive) {
+      resizeMap();
+    }
+  }, [isPaneInteractive, resizeMap]);
 
   // Map control handlers
   const handleZoomIn = () => {
@@ -396,33 +645,20 @@ export default function NearbyPlacesMap({
   };
 
   const handleFitAllMarkers = () => {
-    const map = mapRef.current;
-    if (!map || places.length === 0) return;
-
-    const bounds = new maplibregl.LngLatBounds();
-    bounds.extend([listingLng, listingLat]);
-    places.forEach((place) => {
-      bounds.extend([place.location.lng, place.location.lat]);
-    });
-
-    map.fitBounds(bounds, {
-      padding: 50,
-      maxZoom: 15,
-      duration: 500, // Smooth animation when user explicitly requests it
-    });
+    fitMapToPlaces(places, 500);
   };
 
   return (
     <div className={`relative h-full ${className}`}>
-      <div
-        ref={mapContainerRef}
-        className="w-full h-full"
-        style={{ minHeight: "400px" }}
-      />
+      <div ref={mapContainerRef} className="w-full h-full" />
 
       {/* Custom Floating Controls — glass-pill style matching search map */}
-      <div className="absolute bottom-24 lg:bottom-6 right-4 z-[400] flex flex-col gap-2">
+      <div
+        ref={controlsRef}
+        className="absolute bottom-24 lg:bottom-6 right-4 z-[400] flex flex-col gap-2"
+      >
         <button
+          type="button"
           onClick={handleZoomIn}
           className="
             min-w-[44px] min-h-[44px]
@@ -440,6 +676,7 @@ export default function NearbyPlacesMap({
           <Plus className="w-4 h-4" />
         </button>
         <button
+          type="button"
           onClick={handleZoomOut}
           className="
             min-w-[44px] min-h-[44px]
@@ -457,6 +694,7 @@ export default function NearbyPlacesMap({
           <Minus className="w-4 h-4" />
         </button>
         <button
+          type="button"
           onClick={handleResetView}
           className="
             min-w-[44px] min-h-[44px]
@@ -476,6 +714,7 @@ export default function NearbyPlacesMap({
         </button>
         {places.length > 0 && (
           <button
+            type="button"
             onClick={handleFitAllMarkers}
             className="
               min-w-[44px] min-h-[44px]

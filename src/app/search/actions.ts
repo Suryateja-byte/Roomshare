@@ -3,7 +3,10 @@
 import { headers } from "next/headers";
 import { executeSearchV2 } from "@/lib/search/search-v2-service";
 import { type ListingData } from "@/lib/data";
-import { buildRawParamsFromSearchParams } from "@/lib/search-params";
+import {
+  buildRawParamsFromSearchParams,
+  type RawSearchParams,
+} from "@/lib/search-params";
 import { checkServerComponentRateLimit } from "@/lib/with-rate-limit";
 import { withTimeout, DEFAULT_TIMEOUTS } from "@/lib/timeout-wrapper";
 import { features } from "@/lib/env";
@@ -11,11 +14,27 @@ import { DEFAULT_PAGE_SIZE } from "@/lib/constants";
 import { logger, sanitizeErrorMessage } from "@/lib/logger";
 import { circuitBreakers, isCircuitOpenError } from "@/lib/circuit-breaker";
 import * as Sentry from "@sentry/nextjs";
+import {
+  createSearchResponseMeta,
+  type SearchResponseMeta,
+} from "@/lib/search/search-response";
+import { normalizeSearchQuery } from "@/lib/search/search-query";
+import {
+  buildScenarioLoadMoreResult,
+  resolveSearchScenario,
+  type SearchScenario,
+} from "@/lib/search/testing/search-scenarios";
+import {
+  recordSearchLoadMoreError,
+  recordSearchRequestLatency,
+  recordSearchV2Fallback,
+} from "@/lib/search/search-telemetry";
 
 export interface FetchMoreResult {
   items: ListingData[];
   nextCursor: string | null;
   hasNextPage: boolean;
+  meta?: SearchResponseMeta;
   /** True when V2 is unavailable and V1 can't continue cursor pagination */
   degraded?: boolean;
   /** True when request was rate limited — client should show friendly message */
@@ -24,12 +43,69 @@ export interface FetchMoreResult {
 
 export async function fetchMoreListings(
   cursor: string,
-  rawParams: Record<string, string | string[] | undefined>
+  rawParams: Record<string, string | string[] | undefined>,
+  queryHash?: string,
+  scenarioOverride?: SearchScenario | null
 ): Promise<FetchMoreResult> {
+  const requestStartTime = performance.now();
   try {
+    const normalizedQuery = normalizeSearchQuery(rawParams as RawSearchParams);
+    const fallbackMeta = createSearchResponseMeta(normalizedQuery, "v1-fallback");
+    const testScenario = resolveSearchScenario({
+      override: scenarioOverride ?? null,
+    });
+
+    if (testScenario) {
+      const scenarioResult = await buildScenarioLoadMoreResult(testScenario, {
+        query: normalizedQuery,
+        cursor,
+        queryHashOverride: queryHash,
+      });
+      recordSearchRequestLatency({
+        route: "search-load-more",
+        durationMs: performance.now() - requestStartTime,
+        backendSource: scenarioResult.meta?.backendSource,
+        stateKind: scenarioResult.degraded
+          ? "degraded"
+          : scenarioResult.rateLimited
+            ? "rate-limited"
+            : "ok",
+        queryHash: scenarioResult.meta?.queryHash,
+        resultCount: scenarioResult.items.length,
+      });
+      if (scenarioResult.degraded || scenarioResult.rateLimited) {
+        recordSearchLoadMoreError({
+          route: "search-load-more",
+          queryHash: scenarioResult.meta?.queryHash,
+          reason: scenarioResult.rateLimited
+            ? "rate-limited"
+            : "degraded-fallback",
+        });
+      }
+      return scenarioResult;
+    }
+
     // Validate cursor — return safe empty result instead of exposing error details
     if (!cursor || typeof cursor !== "string" || cursor.trim() === "") {
-      return { items: [], nextCursor: null, hasNextPage: false };
+      recordSearchLoadMoreError({
+        route: "search-load-more",
+        queryHash: fallbackMeta.queryHash,
+        reason: "invalid-cursor",
+      });
+      recordSearchRequestLatency({
+        route: "search-load-more",
+        durationMs: performance.now() - requestStartTime,
+        backendSource: fallbackMeta.backendSource,
+        stateKind: "invalid-cursor",
+        queryHash: fallbackMeta.queryHash,
+        resultCount: 0,
+      });
+      return {
+        items: [],
+        nextCursor: null,
+        hasNextPage: false,
+        meta: fallbackMeta,
+      };
     }
 
     // Rate limiting
@@ -40,11 +116,24 @@ export async function fetchMoreListings(
       "/search"
     );
     if (!rateLimitResult.allowed) {
+      recordSearchLoadMoreError({
+        route: "search-load-more",
+        queryHash: fallbackMeta.queryHash,
+        reason: "rate-limited",
+      });
+      recordSearchRequestLatency({
+        route: "search-load-more",
+        durationMs: performance.now() - requestStartTime,
+        stateKind: "rate-limited",
+        queryHash: fallbackMeta.queryHash,
+        resultCount: 0,
+      });
       return {
         items: [],
         nextCursor: null,
         hasNextPage: false,
         rateLimited: true,
+        meta: fallbackMeta,
       };
     }
 
@@ -86,10 +175,24 @@ export async function fetchMoreListings(
         });
 
         if (v2Result.paginatedResult) {
+          const meta = createSearchResponseMeta(normalizedQuery, "v2");
+          const finalMeta =
+            queryHash && queryHash.trim().length > 0
+              ? { ...meta, queryHash }
+              : meta;
+          recordSearchRequestLatency({
+            route: "search-load-more",
+            durationMs: performance.now() - requestStartTime,
+            backendSource: finalMeta.backendSource,
+            stateKind: "ok",
+            queryHash: finalMeta.queryHash,
+            resultCount: v2Result.paginatedResult.items.length,
+          });
           return {
             items: v2Result.paginatedResult.items,
             nextCursor: v2Result.paginatedResult.nextCursor ?? null,
             hasNextPage: v2Result.paginatedResult.hasNextPage ?? false,
+            meta: finalMeta,
           };
         }
       } catch (error) {
@@ -104,6 +207,13 @@ export async function fetchMoreListings(
             }
           );
         }
+        recordSearchV2Fallback({
+          route: "search-load-more",
+          queryHash: queryHash || fallbackMeta.queryHash,
+          reason: isCircuitOpenError(error)
+            ? "v2_circuit_open"
+            : "v2_failed_or_unavailable",
+        });
       }
     }
 
@@ -113,8 +223,34 @@ export async function fetchMoreListings(
     logger.sync.warn(
       "[fetchMoreListings] V1 fallback reached - cursor pagination not supported"
     );
-    return { items: [], nextCursor: null, hasNextPage: false, degraded: true };
+    recordSearchLoadMoreError({
+      route: "search-load-more",
+      queryHash: queryHash || fallbackMeta.queryHash,
+      reason: "degraded-fallback",
+    });
+    recordSearchRequestLatency({
+      route: "search-load-more",
+      durationMs: performance.now() - requestStartTime,
+      backendSource: fallbackMeta.backendSource,
+      stateKind: "degraded",
+      queryHash: queryHash || fallbackMeta.queryHash,
+      resultCount: 0,
+    });
+    return {
+      items: [],
+      nextCursor: null,
+      hasNextPage: false,
+      degraded: true,
+      meta:
+        queryHash && queryHash.trim().length > 0
+          ? { ...fallbackMeta, queryHash }
+          : fallbackMeta,
+    };
   } catch (error) {
+    recordSearchLoadMoreError({
+      route: "search-load-more",
+      reason: "unexpected-error",
+    });
     logger.sync.error("[fetchMoreListings] Unexpected error", {
       error: sanitizeErrorMessage(error),
     });

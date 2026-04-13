@@ -321,6 +321,7 @@ function ListingCardInner({
               e.stopPropagation();
               setActive(listing.id);
             }}
+            data-show-on-map-id={listing.id}
             className="relative p-1.5 rounded-full bg-surface-container-lowest/80 backdrop-blur-sm shadow-sm hover:bg-surface-container-lowest transition-colors before:absolute before:inset-0 before:-m-[10px] before:content-['']"
             aria-label="Show on map"
             title="Show on map"

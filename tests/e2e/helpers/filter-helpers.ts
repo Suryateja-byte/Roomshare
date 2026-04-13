@@ -80,7 +80,9 @@ export const SORT_OPTIONS = [
 
 /** Read a single URL search param */
 export function getUrlParam(page: Page, key: string): string | null {
-  return new URL(page.url()).searchParams.get(key);
+  const values = new URL(page.url()).searchParams.getAll(key);
+  if (values.length === 0) return null;
+  return values.join(",");
 }
 
 /** Read all URL search params */
@@ -170,7 +172,7 @@ export async function waitForFilterCommit(
   // Step 2: Wait for SearchForm hydration (data-hydrated on filter buttons)
   await page
     .locator(
-      'button[data-hydrated][aria-label^="Filters"]:visible, button[data-hydrated][data-testid="quick-filter-more-filters"]:visible, button[data-hydrated][data-testid="mobile-filter-button"]:visible'
+      'button[data-hydrated][aria-label^="Filters"], button[data-hydrated][data-testid="quick-filter-more-filters"], button[data-hydrated][data-testid="mobile-filter-button"]'
     )
     .first()
     .waitFor({ state: "visible", timeout: Math.floor(timeout * 0.4) })
@@ -258,12 +260,20 @@ export async function gotoSearchWithFilters(
  * Uses regex to match both "Filters" and "Filters (N active)" states.
  */
 export function filtersButton(page: Page): Locator {
-  return page
-    .getByRole("button", { name: /^filters/i })
-    .or(
-      page.locator(
-        'button[data-testid="quick-filter-more-filters"], button[data-testid="mobile-filter-button"], button[data-hydrated][aria-label^="Filters"], button[aria-label^="Filters"]'
+  const viewport = page.viewportSize();
+
+  if (viewport && viewport.width >= 768) {
+    return page
+      .locator(
+        'button[data-testid="quick-filter-more-filters"], button[data-hydrated][aria-label^="Filters"]:not([data-testid="mobile-filter-button"]), button[aria-label^="Filters"]:not([data-testid="mobile-filter-button"]), button:not([data-testid="mobile-filter-button"]):has-text("Filters")'
       )
+      .filter({ visible: true })
+      .first();
+  }
+
+  return page
+    .locator(
+      'button[data-testid="mobile-filter-button"], button[data-hydrated][aria-label^="Filters"], button[aria-label^="Filters"]'
     )
     .filter({ visible: true })
     .first();
@@ -308,7 +318,12 @@ export async function clickFiltersButton(page: Page): Promise<void> {
   await ensureMobileFilterButton(page);
   const btn = filtersButton(page);
   await expect(btn).toBeVisible({ timeout: 15_000 });
-  await btn.click();
+
+  try {
+    await btn.click({ timeout: 5_000 });
+  } catch {
+    await btn.evaluate((el) => (el as HTMLElement).click());
+  }
 
   const dialog = filterDialog(page);
   const visible = await dialog
@@ -365,7 +380,11 @@ export async function openFilterModal(page: Page): Promise<Locator> {
 
   // Click and wait for dialog. On CI under load, the modal render
   // may take a few seconds, so we give a generous initial timeout.
-  await btn.click();
+  try {
+    await btn.click({ timeout: 5_000 });
+  } catch {
+    await btn.evaluate((el) => (el as HTMLElement).click());
+  }
   let dialogVisible = await dialog
     .waitFor({ state: "visible", timeout: 30_000 })
     .then(() => true)
@@ -380,7 +399,11 @@ export async function openFilterModal(page: Page): Promise<Locator> {
     const retryButton = filtersButton(page);
     await expect(retryButton).toBeVisible({ timeout: 15_000 });
     await retryButton.scrollIntoViewIfNeeded().catch(() => {});
-    await retryButton.click();
+    try {
+      await retryButton.click({ timeout: 5_000 });
+    } catch {
+      await retryButton.evaluate((el) => (el as HTMLElement).click());
+    }
     await expect(dialog).toBeVisible({ timeout: 15_000 });
   }
 

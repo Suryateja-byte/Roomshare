@@ -3,7 +3,10 @@
 import { LazyMotion, domAnimation, m, AnimatePresence, useReducedMotion } from "framer-motion";
 import { Map, List } from "lucide-react";
 import { triggerHaptic } from "@/lib/haptics";
-import { SNAP_COLLAPSED } from "@/lib/mobile-layout";
+import {
+  SEARCH_MOBILE_LIST_TOGGLE_OFFSET,
+  SEARCH_MOBILE_MAP_TOGGLE_OFFSET,
+} from "@/lib/mobile-layout";
 
 interface FloatingMapButtonProps {
   /** Whether the bottom sheet is showing list content (half or expanded) */
@@ -20,15 +23,11 @@ interface FloatingMapButtonProps {
  */
 export default function FloatingMapButton({
   isListMode,
-  resultCount,
+  resultCount: _resultCount,
   onToggle,
 }: FloatingMapButtonProps) {
   const reducedMotion = useReducedMotion();
-  const label = isListMode
-    ? "Map"
-    : resultCount != null
-      ? `List · ${resultCount}`
-      : "List";
+  const label = isListMode ? "Map" : "List";
 
   return (
     <LazyMotion features={domAnimation}>
@@ -46,8 +45,8 @@ export default function FloatingMapButton({
           className="fixed inset-x-0 z-50 z-[1201] mx-auto flex w-max items-center justify-center gap-2 rounded-full bg-on-surface px-5 py-3 text-white shadow-2xl shadow-on-surface/30 transition-all focus:outline-none focus-visible:ring-2 focus-visible:ring-primary/30 focus-visible:ring-offset-2 active:scale-95 md:hidden"
           style={{
             bottom: isListMode
-              ? "calc(var(--mobile-bottom-nav-offset, 4.5rem) + 1.5rem + env(safe-area-inset-bottom, 0px))"
-              : `calc(max(${SNAP_COLLAPSED * 100}dvh, var(--mobile-bottom-nav-offset, 4.5rem)) + 1rem + env(safe-area-inset-bottom, 0px))`,
+              ? SEARCH_MOBILE_LIST_TOGGLE_OFFSET
+              : SEARCH_MOBILE_MAP_TOGGLE_OFFSET,
           }}
           aria-label={isListMode ? "Show map" : "Show list"}
         >

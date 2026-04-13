@@ -143,14 +143,35 @@ export async function waitForMapMarkers(
 ): Promise<number> {
   const timeout = options?.timeout ?? timeouts.action;
   const minCount = options?.minCount ?? 1;
+  const visibleMarkers = page.locator(`${selectors.mapMarker}:visible`);
 
-  await page.locator(selectors.mapMarker).first().waitFor({ state: 'attached', timeout });
+  await waitForMapReady(page, timeout);
 
-  // Wait for at least minCount markers
-  await expect.poll(() => page.locator(selectors.mapMarker).count(), { timeout }).toBeGreaterThanOrEqual(minCount);
+  await expect
+    .poll(
+      async () => {
+        const count = await visibleMarkers.count();
+        if (count >= minCount) return count;
 
-  const markers = page.locator(selectors.mapMarker);
-  return markers.count();
+        return page
+          .evaluate(() => {
+            const updateMarkers = (window as any).__e2eUpdateMarkers;
+            if (typeof updateMarkers === "function") {
+              updateMarkers();
+            }
+
+            return document.querySelectorAll(".maplibregl-marker").length;
+          })
+          .catch(() => count);
+      },
+      {
+        timeout,
+        message: `Expected at least ${minCount} visible map markers`,
+      }
+    )
+    .toBeGreaterThanOrEqual(minCount);
+
+  return visibleMarkers.count();
 }
 
 /**
@@ -405,7 +426,7 @@ export function scopedCards(page: Page): Locator {
  * `useEffect` sets `mounted = true`. This helper gates on that hydration so
  * tests don't interact with the inert placeholder.
  *
- * - Desktop (>= 768px): waits for `button[role="combobox"]`
+ * - Desktop (>= 768px): waits for the hydrated Sort trigger
  * - Mobile  (< 768px):  waits for `button[aria-label^="Sort:"]`
  */
 export async function waitForSortHydrated(page: Page): Promise<void> {
@@ -416,7 +437,10 @@ export async function waitForSortHydrated(page: Page): Promise<void> {
     const sortBtn = page.locator('button[aria-label^="Sort:"]');
     await expect(sortBtn).toBeAttached({ timeout: 30_000 });
   } else {
-    const sortBtn = page.locator('button[role="combobox"]');
+    const sortBtn = page
+      .locator('button[aria-label="Sort by"], button[role="combobox"]')
+      .filter({ visible: true })
+      .first();
     await expect(sortBtn).toBeAttached({ timeout: 30_000 });
   }
 }

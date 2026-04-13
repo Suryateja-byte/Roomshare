@@ -17,7 +17,6 @@ import ListingCard from "@/components/listings/ListingCard";
 import { ListingCardErrorBoundary } from "@/components/search/ListingCardErrorBoundary";
 import NearMatchSeparator from "@/components/listings/NearMatchSeparator";
 import ZeroResultsSuggestions from "@/components/ZeroResultsSuggestions";
-import SuggestedSearches from "@/components/search/SuggestedSearches";
 import SaveSearchButton from "@/components/SaveSearchButton";
 import { fetchMoreListings } from "@/app/search/actions";
 import { TotalPriceToggle } from "@/components/search/TotalPriceToggle";
@@ -26,14 +25,40 @@ import { SplitStayCard } from "@/components/search/SplitStayCard";
 import { ExpandSearchSuggestions } from "@/components/search/ExpandSearchSuggestions";
 import { findSplitStays } from "@/lib/search/split-stay";
 import { getFilterSuggestions } from "@/app/actions/filter-suggestions";
+import { useMobileSearch } from "@/contexts/MobileSearchContext";
+import { useSearchTestScenario } from "@/contexts/SearchTestScenarioContext";
 import type { ListingData, FilterSuggestion } from "@/lib/data";
 import type { FilterParams } from "@/lib/search-types";
+import {
+  getSearchQueryHash,
+  SEARCH_RESPONSE_VERSION,
+  type SearchListPayload,
+  type SearchListState,
+  type SearchResponseMeta,
+} from "@/lib/search/search-response";
+import {
+  normalizeSearchQuery,
+  serializeSearchQuery,
+} from "@/lib/search/search-query";
+import { getScenarioHeaderValue } from "@/lib/search/testing/search-scenarios";
+import { emitSearchClientMetric } from "@/lib/search/search-telemetry-client";
 
 /**
  * Maximum accumulated listings before showing a "continue" link.
  * Prevents excessive DOM size on low-end devices.
  */
 const MAX_ACCUMULATED = 60;
+
+function formatMobileResultsLabel(
+  total: number | null,
+  hasZeroResults: boolean,
+  location?: string
+): string {
+  const suffix = location ? ` in ${location}` : "";
+  if (hasZeroResults) return `0 places${suffix}`;
+  if (total === null) return `100+ places${suffix}`;
+  return `${total} ${total === 1 ? "place" : "places"}${suffix}`;
+}
 
 interface SearchResultsClientProps {
   initialListings: ListingData[];
@@ -52,6 +77,8 @@ interface SearchResultsClientProps {
   nearMatchExpansion?: string;
   /** Subtle advisory when vibe search falls back to broader area matches */
   vibeAdvisory?: string;
+  initialResponseMeta?: SearchResponseMeta;
+  initialStateKind?: SearchListState["kind"];
   /** When true, URL changes trigger client-side fetch instead of SSR */
   clientSideSearchEnabled?: boolean;
 }
@@ -70,8 +97,25 @@ export function SearchResultsClient({
   filterSuggestions,
   nearMatchExpansion,
   vibeAdvisory,
+  initialResponseMeta,
+  initialStateKind,
   clientSideSearchEnabled = false,
 }: SearchResultsClientProps) {
+  const resolvedInitialResponseMeta = useMemo(
+    () =>
+      initialResponseMeta ?? {
+        queryHash: getSearchQueryHash(
+          normalizeSearchQuery(new URLSearchParams(searchParamsString))
+        ),
+        backendSource: "v1-fallback",
+        responseVersion: SEARCH_RESPONSE_VERSION,
+      },
+    [initialResponseMeta, searchParamsString]
+  );
+  const resolvedInitialStateKind =
+    initialStateKind ?? (hasConfirmedZeroResults ? "zero-results" : "ok");
+  const { setSearchResultsLabel } = useMobileSearch();
+  const testScenario = useSearchTestScenario();
   const [isHydrated, setIsHydrated] = useState(false);
   const [extraListings, setExtraListings] = useState<ListingData[]>([]);
   const [nextCursor, setNextCursor] = useState<string | null>(
@@ -93,6 +137,9 @@ export function SearchResultsClient({
     useState(savedListingIds);
   const [resolvedFilterSuggestions, setResolvedFilterSuggestions] =
     useState(filterSuggestions);
+  const [responseMeta, setResponseMeta] = useState(resolvedInitialResponseMeta);
+  const [searchStateKind, setSearchStateKind] =
+    useState<SearchListState["kind"]>(resolvedInitialStateKind);
 
   // Hydrate showTotalPrice from sessionStorage after mount to avoid hydration mismatch
   useEffect(() => {
@@ -128,6 +175,7 @@ export function SearchResultsClient({
   const [isClientFetching, setIsClientFetching] = useState(false);
   const clientFetchAbortRef = useRef<AbortController | null>(null);
   const previousSearchParamsRef = useRef<string | null>(null);
+  const latestQueryHashRef = useRef(resolvedInitialResponseMeta.queryHash);
 
   // Listen for URL search param changes (triggered by replaceState in Map.tsx)
   const currentSearchParams = useSearchParams();
@@ -135,6 +183,28 @@ export function SearchResultsClient({
     () => currentSearchParams.toString(),
     [currentSearchParams]
   );
+  const currentNormalizedQuery = useMemo(
+    () => normalizeSearchQuery(new URLSearchParams(currentSearchParamsString)),
+    [currentSearchParamsString]
+  );
+  const canonicalSearchParamsString = useMemo(
+    () =>
+      serializeSearchQuery(currentNormalizedQuery, {
+        includePagination: false,
+      }).toString(),
+    [currentNormalizedQuery]
+  );
+  const activeSearchParamsString = clientSideSearchEnabled
+    ? canonicalSearchParamsString
+    : searchParamsString;
+  const currentQueryHash = useMemo(
+    () => getSearchQueryHash(currentNormalizedQuery),
+    [currentNormalizedQuery]
+  );
+
+  useEffect(() => {
+    latestQueryHashRef.current = currentQueryHash;
+  }, [currentQueryHash]);
 
   useEffect(() => {
     if (!clientSideSearchEnabled) return;
@@ -150,24 +220,35 @@ export function SearchResultsClient({
     previousSearchParamsRef.current = currentSearchParamsString;
 
     // Cancel any in-flight request
-    clientFetchAbortRef.current?.abort();
+    if (
+      clientFetchAbortRef.current &&
+      !clientFetchAbortRef.current.signal.aborted
+    ) {
+      clientFetchAbortRef.current.abort();
+      emitSearchClientMetric({
+        metric: "search_client_abort_total",
+        route: "search-results-client",
+        queryHash: latestQueryHashRef.current,
+        reason: "superseded",
+      });
+    }
     const controller = new AbortController();
     clientFetchAbortRef.current = controller;
+    const requestQueryHash = currentQueryHash;
 
     setIsClientFetching(true);
-
-    // Strip cursor/page from params (fresh search, not pagination)
-    const fetchParams = new URLSearchParams(currentSearchParamsString);
-    fetchParams.delete("cursor");
-    fetchParams.delete("cursorStack");
-    fetchParams.delete("pageNumber");
-    fetchParams.delete("page");
 
     void (async () => {
       try {
         const response = await fetch(
-          `/api/search/listings?${fetchParams.toString()}`,
-          { signal: controller.signal }
+          `/api/search/listings?${canonicalSearchParamsString}`,
+          {
+            signal: controller.signal,
+            headers: {
+              "x-search-query-hash": requestQueryHash,
+              ...getScenarioHeaderValue(testScenario),
+            },
+          }
         );
 
         if (!response.ok) {
@@ -176,17 +257,38 @@ export function SearchResultsClient({
           return;
         }
 
-        const data = (await response.json()) as {
-          items: ListingData[];
-          nextCursor: string | null;
-          total: number | null;
-          nearMatchExpansion?: string;
-          vibeAdvisory?: string;
-          unboundedSearch?: boolean;
-        };
+        const data = (await response.json()) as
+          | SearchListState
+          | {
+              kind: "degraded";
+              source: "v1-fallback" | "partial";
+              data: SearchListPayload;
+              meta: SearchResponseMeta;
+            };
 
-        // Unbounded search: clear results
-        if (data.unboundedSearch) {
+        if (
+          controller.signal.aborted ||
+          !("meta" in data) ||
+          data.meta.queryHash !== requestQueryHash ||
+          latestQueryHashRef.current !== requestQueryHash
+        ) {
+          emitSearchClientMetric({
+            metric: "search_map_list_mismatch_total",
+            route: "search-results-client",
+            queryHash: requestQueryHash,
+            responseQueryHash: "meta" in data ? data.meta.queryHash : undefined,
+            reason:
+              "meta" in data && data.meta.queryHash !== requestQueryHash
+                ? "stale-query-hash"
+                : "stale-request-key",
+          });
+          return;
+        }
+
+        setResponseMeta(data.meta);
+        setSearchStateKind(data.kind);
+
+        if (data.kind === "location-required" || data.kind === "zero-results") {
           setClientFetchedListings([]);
           setClientFetchedTotal(0);
           setNextCursor(null);
@@ -196,18 +298,22 @@ export function SearchResultsClient({
           return;
         }
 
+        if (data.kind === "rate-limited") {
+          return;
+        }
+
         // Replace listings in-place (no remount)
-        setClientFetchedListings(data.items);
-        setClientFetchedTotal(data.total);
-        setClientFetchedNearMatch(data.nearMatchExpansion);
-        setClientFetchedVibeAdvisory(data.vibeAdvisory);
+        setClientFetchedListings(data.data.items);
+        setClientFetchedTotal(data.data.total);
+        setClientFetchedNearMatch(data.data.nearMatchExpansion);
+        setClientFetchedVibeAdvisory(data.data.vibeAdvisory);
 
         // Reset pagination state for new results
         setExtraListings([]);
-        setNextCursor(data.nextCursor);
-        seenIdsRef.current = new Set(data.items.map((l) => l.id));
+        setNextCursor(data.data.nextCursor);
+        seenIdsRef.current = new Set(data.data.items.map((l) => l.id));
         fetchedFavIdsRef.current = new Set();
-        totalCountRef.current = data.items.length;
+        totalCountRef.current = data.data.items.length;
       } catch (err) {
         if ((err as Error).name === "AbortError") return;
         // Fetch failed: keep old listings visible, no crash
@@ -219,7 +325,7 @@ export function SearchResultsClient({
     })();
 
     return () => controller.abort();
-  }, [clientSideSearchEnabled, currentSearchParamsString]);
+  }, [canonicalSearchParamsString, clientSideSearchEnabled, currentQueryHash, currentSearchParamsString]);
 
   // Use client-fetched data when available, otherwise fall back to SSR props
   const effectiveListings = clientFetchedListings ?? initialListings;
@@ -248,6 +354,11 @@ export function SearchResultsClient({
     }
   }, [initialDataFingerprint, initialNextCursor, initialListings]);
 
+  useEffect(() => {
+    setResponseMeta(resolvedInitialResponseMeta);
+    setSearchStateKind(resolvedInitialStateKind);
+  }, [resolvedInitialResponseMeta, resolvedInitialStateKind]);
+
   const allListings = useMemo(
     () => [...effectiveListings, ...extraListings],
     [effectiveListings, extraListings]
@@ -273,7 +384,7 @@ export function SearchResultsClient({
 
   // Derive estimatedMonths from moveInDate/moveOutDate, falling back to leaseDuration
   const estimatedMonths = useMemo(() => {
-    const sp = new URLSearchParams(searchParamsString);
+    const sp = new URLSearchParams(activeSearchParamsString);
     const moveIn = sp.get("moveInDate");
     const moveOut = sp.get("moveOutDate");
     if (moveIn && moveOut) {
@@ -292,7 +403,7 @@ export function SearchResultsClient({
     if (!ld) return 1;
     const match = ld.match(/^(\d+)\s+months?$/i);
     return match ? parseInt(match[1], 10) : 1;
-  }, [searchParamsString]);
+  }, [activeSearchParamsString]);
 
   // Compute split stay pairs for long durations (6+ months)
   const splitStayPairs = useMemo(
@@ -304,7 +415,7 @@ export function SearchResultsClient({
   // Keep this in sync with URL updates so fetchMore uses current filters/bounds.
   const rawParams = useMemo(() => {
     const params: Record<string, string | string[] | undefined> = {};
-    const sp = new URLSearchParams(searchParamsString);
+    const sp = new URLSearchParams(activeSearchParamsString);
     for (const [key, value] of sp.entries()) {
       const existing = params[key];
       if (existing) {
@@ -316,7 +427,7 @@ export function SearchResultsClient({
       }
     }
     return params;
-  }, [searchParamsString]);
+  }, [activeSearchParamsString]);
 
   const handleLoadMore = useCallback(async () => {
     if (!nextCursor || isLoadingRef.current) return;
@@ -328,7 +439,31 @@ export function SearchResultsClient({
     safeMark("load-more-start");
 
     try {
-      const result = await fetchMoreListings(nextCursor, rawParams);
+      const requestQueryHash = latestQueryHashRef.current;
+      const result = await fetchMoreListings(
+        nextCursor,
+        rawParams,
+        requestQueryHash,
+        testScenario
+      );
+
+      if (
+        result.meta?.queryHash &&
+        (result.meta.queryHash !== requestQueryHash ||
+          latestQueryHashRef.current !== requestQueryHash)
+      ) {
+        emitSearchClientMetric({
+          metric: "search_map_list_mismatch_total",
+          route: "search-results-client",
+          queryHash: requestQueryHash,
+          responseQueryHash: result.meta.queryHash,
+          reason:
+            result.meta.queryHash !== requestQueryHash
+              ? "stale-query-hash"
+              : "stale-request-key",
+        });
+        return;
+      }
 
       // M14 FIX: Handle rate limit via discriminated field (not string matching)
       if (result.rateLimited) {
@@ -399,6 +534,18 @@ export function SearchResultsClient({
     clientFetchedListings !== null
       ? effectiveTotal !== null && effectiveTotal === 0
       : hasConfirmedZeroResults;
+  const mobileResultsLabel = useMemo(
+    () => formatMobileResultsLabel(effectiveTotal, effectiveZeroResults, query),
+    [effectiveTotal, effectiveZeroResults, query]
+  );
+
+  useEffect(() => {
+    setSearchResultsLabel(mobileResultsLabel);
+
+    return () => {
+      setSearchResultsLabel(null);
+    };
+  }, [mobileResultsLabel, setSearchResultsLabel]);
 
   useEffect(() => {
     const allIds = allListings.map((listing) => listing.id);
@@ -487,8 +634,28 @@ export function SearchResultsClient({
   }, [filterParams, hasConfirmedZeroResults]);
 
   return (
-    <div id="search-results" tabIndex={-1} className="!outline-none">
+    <div
+      id="search-results"
+      tabIndex={-1}
+      data-testid="search-shell"
+      data-browse-mode={browseMode ? "true" : undefined}
+      data-query-hash={responseMeta.queryHash}
+      data-search-query-hash={responseMeta.queryHash}
+      data-search-state={searchStateKind}
+      data-backend-source={responseMeta.backendSource}
+      data-search-backend-source={responseMeta.backendSource}
+      data-response-version={responseMeta.responseVersion}
+      data-search-response-version={responseMeta.responseVersion}
+      className="!outline-none pb-24 md:pb-0"
+    >
       {/* Screen reader announcement for search results */}
+      <div
+        data-testid="search-backend-source"
+        className="sr-only"
+        aria-hidden="true"
+      >
+        {responseMeta.backendSource}
+      </div>
       <div
         role="status"
         aria-live="polite"
@@ -543,7 +710,7 @@ export function SearchResultsClient({
             </div>
           ) : (
             <Link
-              href={`/search?${clearAllFilters(new URLSearchParams(searchParamsString))}`}
+              href={`/search?${clearAllFilters(new URLSearchParams(activeSearchParamsString))}`}
               className="mt-6 px-4 py-2.5 rounded-full border border-outline-variant/20 bg-transparent hover:bg-surface-canvas text-on-surface text-sm font-medium transition-colors touch-target"
             >
               Clear all filters
@@ -552,14 +719,11 @@ export function SearchResultsClient({
         </div>
       ) : (
         <>
-          {/* Suggested searches when browsing without a query */}
-          {browseMode && !query && <SuggestedSearches />}
-
           {/* Price toggle */}
           {allListings.length > 0 && (
             <div className="mb-4 flex flex-col gap-2 sm:flex-row sm:items-start sm:justify-between">
               <div className="min-w-0">
-                <p className="text-sm text-on-surface-variant">
+                <p className="hidden text-sm text-on-surface-variant md:block">
                   {isClientFetching
                     ? "Updating..."
                     : total !== null
@@ -583,22 +747,6 @@ export function SearchResultsClient({
                   onToggle={setShowTotalPrice}
                 />
               )}
-            </div>
-          )}
-
-          {/* Progress bar — shows proportion of results loaded */}
-          {total !== null && total > 0 && (
-            <div className="h-[3px] bg-surface-container-high rounded-full overflow-hidden mb-4">
-              <div
-                className="h-full bg-primary rounded-full transition-[width] duration-500"
-                style={{
-                  width: `${Math.min((allListings.length / Math.max(total, 1)) * 100, 100)}%`,
-                }}
-                role="progressbar"
-                aria-valuenow={allListings.length}
-                aria-valuemax={total}
-                aria-label={`Showing ${allListings.length} of ${total} results`}
-              />
             </div>
           )}
 
@@ -646,7 +794,9 @@ export function SearchResultsClient({
                       aria-setsize={total ?? -1}
                       aria-posinset={index + 1}
                       className="animate-card-entrance"
-                      style={{ animationDelay: `${index * 50}ms` }}
+                      style={{
+                        animationDelay: `${Math.min(index, 6) * 40}ms`,
+                      }}
                     >
                       <ListingCard
                         listing={listing}
@@ -754,21 +904,14 @@ export function SearchResultsClient({
           {total !== null && total > 0 && total <= 5 && (
             <ExpandSearchSuggestions
               currentCount={total}
-              searchParamsString={searchParamsString}
+              searchParamsString={activeSearchParamsString}
             />
           )}
 
-          {/* Contextual footer */}
-          {allListings.length > 0 && (
-            <p className="text-center text-xs text-on-surface-variant mt-6 pb-4">
-              {total === null ? "100+" : total} places
-              {query ? ` in ${query}` : ""}
-            </p>
-          )}
           {allListings.length > 0 && !effectiveZeroResults && isHydrated && !isLoadingMore && (
             <section
               aria-label="Save search"
-              className="mt-12 mb-4 relative overflow-hidden bg-surface-container-high/40 rounded-2xl p-8 flex flex-col sm:flex-row items-center justify-between gap-6 border border-outline-variant/20"
+              className="hidden md:flex mt-12 mb-4 relative overflow-hidden bg-surface-container-high/40 rounded-2xl p-8 flex-col sm:flex-row items-center justify-between gap-6 border border-outline-variant/20"
             >
               <div>
                 <h3 className="text-lg font-display font-semibold text-on-surface mb-1">

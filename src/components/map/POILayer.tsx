@@ -1,15 +1,11 @@
 "use client";
 
 /**
- * POILayer — toggle-able layer that shows curated POIs (transit, landmarks,
- * parks) by controlling visibility of Mapbox built-in layers. Also renders
- * neighborhood "vibe" labels as a symbol layer.
+ * POILayer — synchronizes curated POI visibility with the active category set.
  */
 
-import type { ReactNode, RefObject } from "react";
+import type { RefObject } from "react";
 import { useEffect, useCallback, useState } from "react";
-import { Bus, Trees, Landmark } from "lucide-react";
-import { cn } from "@/lib/utils";
 
 interface POILayerProps {
   /** Reference to the Mapbox map instance */
@@ -19,12 +15,6 @@ interface POILayerProps {
   isMapLoaded: boolean;
   /** Currently active categories */
   activeCategories: Set<POICategory>;
-  /** Toggle a category when inline controls are rendered */
-  onToggleCategory?: (category: POICategory) => void;
-  /** Whether to render the inline control strip */
-  renderControls?: boolean;
-  /** Optional className override for the inline control strip */
-  className?: string;
 }
 
 // OpenMapTiles (Liberty style) layer IDs for POI categories
@@ -100,9 +90,6 @@ export function POILayer({
   mapRef,
   isMapLoaded,
   activeCategories,
-  onToggleCategory,
-  renderControls = true,
-  className,
 }: POILayerProps) {
   // Apply layer visibility when categories change
   useEffect(() => {
@@ -134,48 +121,5 @@ export function POILayer({
     setVisibility(PARK_LAYERS, activeCategories.has("parks"));
   }, [activeCategories, mapRef, isMapLoaded]);
 
-  if (!renderControls || !onToggleCategory || !isMapLoaded) {
-    return null;
-  }
-
-  const categories: Array<{
-    id: POICategory;
-    label: string;
-    icon: ReactNode;
-  }> = [
-    { id: "transit", label: "Transit", icon: <Bus className="w-4 h-4" /> },
-    { id: "landmarks", label: "POIs", icon: <Landmark className="w-4 h-4" /> },
-    { id: "parks", label: "Parks", icon: <Trees className="w-4 h-4" /> },
-  ];
-
-  return (
-    <div
-      className={cn(
-        "absolute top-20 left-4 z-[30] md:z-[50] flex flex-row overflow-hidden rounded-full border border-outline-variant/20 bg-surface-container-lowest/95 shadow-ambient backdrop-blur-md",
-        className
-      )}
-    >
-      {/* Grouped category toggles */}
-      {categories.map((cat, index) => (
-        <button
-          key={cat.id}
-          onClick={() => onToggleCategory(cat.id)}
-          className={cn(
-            "flex items-center justify-center h-11 px-3.5 transition-colors focus:outline-none focus-visible:ring-2 focus-visible:ring-primary/30 focus-visible:ring-inset",
-            index !== categories.length - 1 && "border-r border-outline-variant/20",
-            activeCategories.has(cat.id)
-              ? "bg-on-surface/10 text-on-surface"
-              : "text-on-surface-variant hover:bg-surface-container-high"
-          )}
-          title={cat.label}
-          aria-label={`${activeCategories.has(cat.id) ? "Hide" : "Show"} ${cat.label}`}
-          aria-pressed={activeCategories.has(cat.id)}
-          data-testid="poi-category"
-        >
-          {cat.icon}
-          <span className="ml-2 hidden md:inline text-sm font-medium">{cat.label}</span>
-        </button>
-      ))}
-    </div>
-  );
+  return null;
 }

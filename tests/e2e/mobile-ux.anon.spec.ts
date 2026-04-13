@@ -7,7 +7,10 @@
  */
 
 import { test, expect, SF_BOUNDS } from "./helpers/test-utils";
-import { waitForSheetAnimation } from "./helpers/mobile-helpers";
+import {
+  ensureMobileResultsVisible,
+  waitForSheetAnimation,
+} from "./helpers/mobile-helpers";
 
 const boundsQS = `minLat=${SF_BOUNDS.minLat}&maxLat=${SF_BOUNDS.maxLat}&minLng=${SF_BOUNDS.minLng}&maxLng=${SF_BOUNDS.maxLng}`;
 
@@ -58,6 +61,7 @@ test.describe("Mobile UX — Page Load", () => {
     page,
   }) => {
     await page.goto(`/search?${boundsQS}`);
+    await ensureMobileResultsVisible(page);
 
     const mobileContainer = page.locator(
       '[data-testid="mobile-search-results-container"]'
@@ -97,7 +101,10 @@ test.describe("Mobile UX — Bottom Sheet (4.1)", () => {
     });
 
     // The bottom sheet should render with role="region"
-    const sheet = page.locator('[role="region"][aria-label="Search results"]');
+    const sheet = page
+      .locator('[role="region"][aria-label="Search results"]')
+      .filter({ visible: true })
+      .first();
     // If the sheet is visible, verify it
     const sheetVisible = await sheet
       .isVisible({ timeout: 5000 })
@@ -135,45 +142,31 @@ test.describe("Mobile UX — Bottom Sheet (4.1)", () => {
       timeout: 30_000,
     });
 
-    const sheet = page.locator('[role="region"][aria-label="Search results"]');
+    const sheet = page
+      .locator('[role="region"][aria-label="Search results"]')
+      .filter({ visible: true })
+      .first();
     const sheetVisible = await sheet.isVisible({ timeout: 5000 }).catch(() => false);
     test.skip(!sheetVisible, "Bottom sheet not visible");
     if (!sheetVisible) return;
 
     // Wait for sheet animation to fully settle before measuring
     await waitForSheetAnimation(page);
+    const beforeBox = await sheet.boundingBox();
+    const beforeHeight = beforeBox?.height ?? 0;
 
-    const expandBtn = sheet.locator('button[aria-label="Expand results"]');
-    if (await expandBtn.isVisible({ timeout: 5000 }).catch(() => false)) {
-      const beforeBox = await sheet.boundingBox();
-      const beforeHeight = beforeBox?.height ?? 0;
-      await expandBtn.evaluate((el) => (el as HTMLElement).click());
-      await waitForSheetAnimation(page);
+    await ensureMobileResultsVisible(page);
 
-      const afterBox = await sheet.boundingBox();
-      const afterHeight = afterBox?.height ?? 0;
-      // When expanded, sheet height should increase (or Y should decrease)
-      // Use height comparison which is more reliable than Y position
-      expect(afterHeight).toBeGreaterThanOrEqual(beforeHeight);
+    const expandedBox = await sheet.boundingBox();
+    const expandedHeight = expandedBox?.height ?? 0;
+    expect(expandedHeight).toBeGreaterThanOrEqual(beforeHeight);
 
-      // Collapse
-      const collapseBtn = sheet.locator(
-        'button[aria-label="Collapse results"]'
-      );
-      if (await collapseBtn.isVisible({ timeout: 3000 }).catch(() => false)) {
-        await collapseBtn.evaluate((el) => (el as HTMLElement).click());
-        await waitForSheetAnimation(page);
+    await page.keyboard.press("Escape");
+    await waitForSheetAnimation(page);
 
-        const collapsedBox = await sheet.boundingBox();
-        const collapsedHeight = collapsedBox?.height ?? 0;
-        // When collapsed, height should decrease
-        expect(collapsedHeight).toBeLessThanOrEqual(afterHeight);
-      }
-    } else {
-      // Expand button not available at current snap position, skip gracefully
-      test.skip(true, "Expand button not available");
-      return;
-    }
+    const collapsedBox = await sheet.boundingBox();
+    const collapsedHeight = collapsedBox?.height ?? 0;
+    expect(collapsedHeight).toBeLessThanOrEqual(expandedHeight);
   });
 
   test("escape key collapses expanded sheet", async ({ page }) => {
@@ -182,25 +175,23 @@ test.describe("Mobile UX — Bottom Sheet (4.1)", () => {
       timeout: 30_000,
     });
 
-    const sheet = page.locator('[role="region"][aria-label="Search results"]');
+    const sheet = page
+      .locator('[role="region"][aria-label="Search results"]')
+      .filter({ visible: true })
+      .first();
     const sheetVisible = await sheet.isVisible({ timeout: 5000 }).catch(() => false);
     test.skip(!sheetVisible, "Bottom sheet not visible");
     if (!sheetVisible) return;
 
-    const expandBtn = sheet.locator('button[aria-label="Expand results"]');
-    if (await expandBtn.isVisible({ timeout: 3000 }).catch(() => false)) {
-      await expandBtn.click();
-      await waitForSheetAnimation(page);
+    await ensureMobileResultsVisible(page);
+    const expandedBox = await sheet.boundingBox();
 
-      const expandedBox = await sheet.boundingBox();
+    await page.keyboard.press("Escape");
+    await waitForSheetAnimation(page);
 
-      await page.keyboard.press("Escape");
-      await waitForSheetAnimation(page);
-
-      const afterEscBox = await sheet.boundingBox();
-      if (expandedBox && afterEscBox) {
-        expect(afterEscBox.height).toBeLessThan(expandedBox.height);
-      }
+    const afterEscBox = await sheet.boundingBox();
+    if (expandedBox && afterEscBox) {
+      expect(afterEscBox.height).toBeLessThan(expandedBox.height);
     }
   });
 });
@@ -226,27 +217,24 @@ test.describe("Mobile UX — Floating Map Button (4.2)", () => {
     });
 
     await page.waitForLoadState("networkidle").catch(() => {});
-    const mapBtn = page.locator('button[aria-label="Show map"]');
-    if (await mapBtn.isVisible().catch(() => false)) {
-      await mapBtn.click();
 
-      // After clicking "Show map", should now show "Show list"
-      const listBtn = page.locator('button[aria-label="Show list"]');
-      const listVisible = await listBtn
-        .waitFor({ state: "visible", timeout: 5000 })
-        .then(() => true)
-        .catch(() => false);
-      expect(listVisible).toBeTruthy();
+    const showListBtn = page.locator('button[aria-label="Show list"]').first();
+    const showMapBtn = page.locator('button[aria-label="Show map"]').first();
+    const startedInMapMode = await showListBtn.isVisible().catch(() => false);
 
-      // Click back
-      if (listVisible) {
-        await listBtn.click();
-
-        // Should show "Show map" again
-        const mapBtnAgain = page.locator('button[aria-label="Show map"]');
-        await expect(mapBtnAgain).toBeVisible({ timeout: 5000 });
-      }
+    if (startedInMapMode) {
+      await showListBtn.click();
+      await expect(showMapBtn).toBeVisible({ timeout: 5_000 });
+      await showMapBtn.click();
+      await expect(showListBtn).toBeVisible({ timeout: 5_000 });
+      return;
     }
+
+    await expect(showMapBtn).toBeVisible({ timeout: 5_000 });
+    await showMapBtn.click();
+    await expect(showListBtn).toBeVisible({ timeout: 5_000 });
+    await showListBtn.click();
+    await expect(showMapBtn).toBeVisible({ timeout: 5_000 });
   });
 
   test("floating button has correct positioning classes", async ({ page }) => {
@@ -299,7 +287,10 @@ test.describe("Mobile UX — Accessibility", () => {
     expect(toggleCount).toBeGreaterThanOrEqual(1);
 
     // Bottom sheet should have role and aria-label if visible
-    const sheet = page.locator('[role="region"][aria-label="Search results"]');
+    const sheet = page
+      .locator('[role="region"][aria-label="Search results"]')
+      .filter({ visible: true })
+      .first();
     if (await sheet.isVisible().catch(() => false)) {
       await expect(sheet).toHaveAttribute("role", "region");
     }

@@ -8,7 +8,42 @@
  * - RadarAttribution.tsx (Radar branding link)
  */
 
+import fs from "node:fs";
+import path from "node:path";
 import { Page, Locator, expect } from "@playwright/test";
+
+const NEARBY_SEED_LISTING_TITLE = "Sunny Mission Room";
+const E2E_SEED_MANIFEST_PATH = path.resolve(
+  process.cwd(),
+  "playwright",
+  ".cache",
+  "e2e-seed.json"
+);
+
+type E2ESeedManifest = {
+  listingsByTitle?: Record<string, string>;
+};
+
+function getSeedListingId(title = NEARBY_SEED_LISTING_TITLE): string {
+  if (!fs.existsSync(E2E_SEED_MANIFEST_PATH)) {
+    throw new Error(
+      `Missing nearby E2E seed manifest at ${E2E_SEED_MANIFEST_PATH}. Run the E2E seed first.`
+    );
+  }
+
+  const manifest = JSON.parse(
+    fs.readFileSync(E2E_SEED_MANIFEST_PATH, "utf8")
+  ) as E2ESeedManifest;
+  const listingId = manifest.listingsByTitle?.[title];
+
+  if (!listingId) {
+    throw new Error(
+      `No listing id found for "${title}" in ${E2E_SEED_MANIFEST_PATH}.`
+    );
+  }
+
+  return listingId;
+}
 
 export class NearbyPlacesPage {
   readonly page: Page;
@@ -83,9 +118,9 @@ export class NearbyPlacesPage {
       ".hide-scrollbar button[aria-pressed]"
     );
 
-    // Radius options: buttons with aria-pressed inside the radius selector (bg-zinc-100 container)
+    // Radius options: buttons with aria-pressed inside the surface-container-high selector
     this.radiusOptions = this.section.locator(
-      ".flex.bg-zinc-100 button[aria-pressed], .flex.dark\\:bg-zinc-800 button[aria-pressed]"
+      ".bg-surface-container-high button[aria-pressed]"
     );
 
     this.resultsArea = page.locator('[data-testid="results-area"]');
@@ -111,7 +146,9 @@ export class NearbyPlacesPage {
     });
     this.fitAll = page.getByRole("button", { name: "Fit all markers in view" });
 
-    this.mobileToggleButton = this.section.locator(".lg\\:hidden button");
+    this.mobileToggleButton = this.section.getByRole("button", {
+      name: /^(Map|List)$/,
+    });
 
     this.radarAttribution = page.locator('a[href*="radar.com"]');
   }
@@ -148,21 +185,11 @@ export class NearbyPlacesPage {
 
   /**
    * Navigate to a listing detail page that has the nearby section.
-   * Finds the first listing via search, then navigates to its detail page.
+   * Uses the deterministic E2E seed manifest instead of search-page card markup.
    */
   async goto(): Promise<void> {
-    // Navigate to search first to find a listing
-    await this.page.goto("/search");
-    // Wait for at least one listing card
-    const firstCard = this.page.locator('[data-testid="listing-card"]').first();
-    await expect(firstCard).toBeVisible({ timeout: 30_000 });
-    // Get the listing link
-    const link = firstCard.locator('a[href^="/listings/"]').first();
-    const href = await link.getAttribute("href");
-    if (!href) throw new Error("No listing link found");
-    // Navigate to listing detail
-    await this.page.goto(href);
-    // Wait for the page to load
+    const listingId = getSeedListingId();
+    await this.page.goto(`/listings/${listingId}`);
     await this.page.waitForLoadState("domcontentloaded");
   }
 
@@ -170,6 +197,7 @@ export class NearbyPlacesPage {
    * Scroll to the nearby places section and wait for it to be visible.
    */
   async scrollToSection(): Promise<void> {
+    await this.section.waitFor({ state: "attached", timeout: 15_000 });
     await this.section.scrollIntoViewIfNeeded();
     await expect(this.section).toBeVisible({ timeout: 15_000 });
   }
@@ -197,19 +225,43 @@ export class NearbyPlacesPage {
   }
 
   /**
-   * Wait for search results to finish loading (aria-busy transitions to false).
+   * Wait for a nearby request to reach a terminal post-search state.
    */
   async waitForResults(): Promise<void> {
-    // Wait for loading to start (aria-busy="true") then finish (aria-busy="false").
-    // If loading already completed before we check, go straight to the "false" assertion.
-    await expect(this.resultsArea).toHaveAttribute("aria-busy", "true", {
-      timeout: 2_000,
-    }).catch(() => {
-      // Loading may have already completed — proceed to wait for "false"
-    });
+    await expect(async () => {
+      const busy = (await this.resultsArea.getAttribute("aria-busy")) === "true";
+      const loadingVisible = await this.loadingSkeleton
+        .isVisible()
+        .catch(() => false);
+      const initialVisible = await this.initialState.isVisible().catch(
+        () => false
+      );
+      const errorVisible = await this.errorState.isVisible().catch(() => false);
+      const emptyVisible = await this.emptyState.isVisible().catch(() => false);
+      const resultCount = await this.placeLinks.count();
+
+      expect(
+        busy ||
+          loadingVisible ||
+          (!initialVisible && (errorVisible || emptyVisible || resultCount > 0))
+      ).toBe(true);
+    }).toPass({ timeout: 5_000, intervals: [100, 200, 500] });
+
     await expect(this.resultsArea).toHaveAttribute("aria-busy", "false", {
       timeout: 15_000,
     });
+    await expect(async () => {
+      const initialVisible = await this.initialState.isVisible().catch(
+        () => false
+      );
+      const errorVisible = await this.errorState.isVisible().catch(() => false);
+      const emptyVisible = await this.emptyState.isVisible().catch(() => false);
+      const resultCount = await this.placeLinks.count();
+
+      expect(
+        !initialVisible && (errorVisible || emptyVisible || resultCount > 0)
+      ).toBe(true);
+    }).toPass({ timeout: 15_000, intervals: [100, 200, 500] });
   }
 
   /**

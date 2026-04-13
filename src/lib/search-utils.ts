@@ -1,5 +1,13 @@
 // Search utility functions and types (client-safe)
 
+import {
+  buildCanonicalSearchUrl,
+  normalizeSearchQuery,
+  serializeSearchQuery,
+  type NormalizedSearchQuery,
+} from "@/lib/search/search-query";
+import type { SortOption } from "@/lib/search-types";
+
 export interface SearchFilters {
   query?: string;
   locationLabel?: string;
@@ -14,65 +22,126 @@ export interface SearchFilters {
   languages?: string[];
   genderPreference?: string;
   householdGender?: string;
+  bookingMode?: string;
+  minSlots?: number;
+  nearMatches?: boolean;
   lat?: number;
   lng?: number;
   minLat?: number;
   maxLat?: number;
   minLng?: number;
   maxLng?: number;
-  sort?: string;
+  sort?: SortOption;
   city?: string;
+}
+
+function buildBoundsFromFilters(
+  filters: SearchFilters
+): NormalizedSearchQuery["bounds"] {
+  if (
+    typeof filters.minLat !== "number" ||
+    !Number.isFinite(filters.minLat) ||
+    typeof filters.maxLat !== "number" ||
+    !Number.isFinite(filters.maxLat) ||
+    typeof filters.minLng !== "number" ||
+    !Number.isFinite(filters.minLng) ||
+    typeof filters.maxLng !== "number" ||
+    !Number.isFinite(filters.maxLng)
+  ) {
+    return undefined;
+  }
+
+  const minLat = Math.min(filters.minLat, filters.maxLat);
+  const maxLat = Math.max(filters.minLat, filters.maxLat);
+
+  return {
+    minLat,
+    maxLat,
+    minLng: filters.minLng,
+    maxLng: filters.maxLng,
+  };
+}
+
+export function searchFiltersToNormalizedQuery(
+  filters: SearchFilters
+): NormalizedSearchQuery {
+  return normalizeSearchQuery(
+    serializeSearchQuery({
+      query: filters.query,
+      locationLabel: filters.locationLabel,
+      vibeQuery: filters.vibeQuery,
+      minPrice: filters.minPrice,
+      maxPrice: filters.maxPrice,
+      amenities: filters.amenities,
+      moveInDate: filters.moveInDate,
+      leaseDuration: filters.leaseDuration,
+      houseRules: filters.houseRules,
+      languages: filters.languages,
+      roomType: filters.roomType,
+      genderPreference: filters.genderPreference,
+      householdGender: filters.householdGender,
+      bookingMode: filters.bookingMode,
+      minSlots: filters.minSlots,
+      nearMatches: filters.nearMatches,
+      lat: filters.lat,
+      lng: filters.lng,
+      bounds: buildBoundsFromFilters(filters),
+      sort: filters.sort,
+    })
+  );
+}
+
+export function normalizedSearchQueryToSearchFilters(
+  query: NormalizedSearchQuery
+): SearchFilters {
+  return {
+    query: query.query,
+    locationLabel: query.locationLabel,
+    vibeQuery: query.vibeQuery,
+    minPrice: query.minPrice,
+    maxPrice: query.maxPrice,
+    amenities: query.amenities,
+    moveInDate: query.moveInDate,
+    leaseDuration: query.leaseDuration,
+    houseRules: query.houseRules,
+    roomType: query.roomType,
+    languages: query.languages,
+    genderPreference: query.genderPreference,
+    householdGender: query.householdGender,
+    bookingMode: query.bookingMode,
+    minSlots: query.minSlots,
+    nearMatches: query.nearMatches,
+    lat: query.lat,
+    lng: query.lng,
+    minLat: query.bounds?.minLat,
+    maxLat: query.bounds?.maxLat,
+    minLng: query.bounds?.minLng,
+    maxLng: query.bounds?.maxLng,
+    sort: query.sort,
+  };
+}
+
+export function normalizeSearchFilters(filters: SearchFilters): SearchFilters {
+  const normalized = normalizedSearchQueryToSearchFilters(
+    searchFiltersToNormalizedQuery(filters)
+  );
+
+  if (filters.city) {
+    normalized.city = filters.city;
+  }
+
+  return normalized;
+}
+
+export function searchParamsToSearchFilters(
+  searchParams: URLSearchParams
+): SearchFilters {
+  return normalizedSearchQueryToSearchFilters(normalizeSearchQuery(searchParams));
 }
 
 // Build search URL from filters
 export function buildSearchUrl(filters: SearchFilters): string {
-  const params = new URLSearchParams();
-
-  if (filters.query) params.set("q", filters.query);
-  if (filters.locationLabel) params.set("where", filters.locationLabel);
-  if (filters.vibeQuery) params.set("what", filters.vibeQuery);
-  if (filters.minPrice !== undefined)
-    params.set("minPrice", filters.minPrice.toString());
-  if (filters.maxPrice !== undefined)
-    params.set("maxPrice", filters.maxPrice.toString());
-  if (filters.amenities?.length)
-    params.set("amenities", filters.amenities.join(","));
-  if (filters.moveInDate) params.set("moveInDate", filters.moveInDate);
-  if (filters.leaseDuration) params.set("leaseDuration", filters.leaseDuration);
-  if (filters.houseRules?.length)
-    params.set("houseRules", filters.houseRules.join(","));
-  if (filters.roomType) params.set("roomType", filters.roomType);
-  if (filters.languages?.length)
-    params.set("languages", filters.languages.join(","));
-  if (filters.genderPreference)
-    params.set("genderPreference", filters.genderPreference);
-  if (filters.householdGender)
-    params.set("householdGender", filters.householdGender);
-  if (filters.sort) params.set("sort", filters.sort);
-  if (typeof filters.lat === "number" && Number.isFinite(filters.lat))
-    params.set("lat", filters.lat.toString());
-  if (typeof filters.lng === "number" && Number.isFinite(filters.lng))
-    params.set("lng", filters.lng.toString());
-  // Normalize lat bounds client-side to prevent invalid URLs (server throws on inverted lat)
-  let normalizedMinLat = filters.minLat;
-  let normalizedMaxLat = filters.maxLat;
-  if (
-    typeof normalizedMinLat === "number" &&
-    Number.isFinite(normalizedMinLat) &&
-    typeof normalizedMaxLat === "number" &&
-    Number.isFinite(normalizedMaxLat) &&
-    normalizedMinLat > normalizedMaxLat
-  ) {
-    [normalizedMinLat, normalizedMaxLat] = [normalizedMaxLat, normalizedMinLat];
-  }
-  if (typeof normalizedMinLat === "number" && Number.isFinite(normalizedMinLat))
-    params.set("minLat", normalizedMinLat.toString());
-  if (typeof normalizedMaxLat === "number" && Number.isFinite(normalizedMaxLat))
-    params.set("maxLat", normalizedMaxLat.toString());
-  if (typeof filters.minLng === "number" && Number.isFinite(filters.minLng))
-    params.set("minLng", filters.minLng.toString());
-  if (typeof filters.maxLng === "number" && Number.isFinite(filters.maxLng))
-    params.set("maxLng", filters.maxLng.toString());
-
-  return `/search?${params.toString()}`;
+  return buildCanonicalSearchUrl(searchFiltersToNormalizedQuery(filters), {
+    includePagination: false,
+  });
 }

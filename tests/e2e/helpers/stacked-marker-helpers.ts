@@ -114,6 +114,8 @@ export async function setupStackedMarkerMock(page: Page): Promise<{
   console.log(`[setupStackedMarkerMock] Setting up route interception`);
   const context = page.context();
   await context.route("**/api/map-listings**", async (route) => {
+    const requestQueryHash =
+      route.request().headers()["x-search-query-hash"] || "e2e-stacked-marker";
     console.log(
       `[setupStackedMarkerMock] Intercepting: ${route.request().url()}`
     );
@@ -123,7 +125,18 @@ export async function setupStackedMarkerMock(page: Page): Promise<{
     await route.fulfill({
       status: 200,
       contentType: "application/json",
-      body: JSON.stringify({ listings: mockListings }),
+      body: JSON.stringify({
+        kind: "ok",
+        data: {
+          listings: mockListings,
+          truncated: false,
+        },
+        meta: {
+          queryHash: requestQueryHash,
+          backendSource: "map-api",
+          responseVersion: "e2e-stacked-marker",
+        },
+      }),
     });
   });
 
@@ -136,17 +149,38 @@ export async function setupStackedMarkerMock(page: Page): Promise<{
       await context.unroute("**/api/map-listings**");
     },
     triggerRefetch: async () => {
+      const mapListingsResponsePromise = page
+        .waitForResponse(
+          (response) =>
+            response.url().includes("/api/map-listings") &&
+            response.request().method() === "GET",
+          { timeout: 30_000 }
+        )
+        .catch(() => null);
+
       // Navigate away to clear component state
       await page.goto("/");
       await page.waitForLoadState("domcontentloaded");
       // Navigate to search with different bounds - triggers fresh fetch with mock
       await page.goto(searchUrl, { waitUntil: "domcontentloaded" });
+      await mapListingsResponsePromise;
 
       // Wait for map E2E hook to be available, then zoom in to uncluster markers
       try {
         await page.waitForFunction(() => !!(window as any).__e2eMapRef, {
           timeout: 30000,
         });
+        await page
+          .waitForFunction(() => {
+            const map = (window as any).__e2eMapRef;
+            return (
+              !!map &&
+              !!map.getSource?.("listings") &&
+              typeof map.isSourceLoaded === "function" &&
+              map.isSourceLoaded("listings")
+            );
+          }, { timeout: 10_000 })
+          .catch(() => {});
         // Zoom in programmatically to the stacked coords and wait for idle
         await page.evaluate((coords) => {
           return new Promise<void>((resolve) => {
@@ -170,6 +204,12 @@ export async function setupStackedMarkerMock(page: Page): Promise<{
             updateMarkers();
           }
         });
+        await page
+          .waitForFunction(() => {
+            const updateMarkers = (window as any).__e2eUpdateMarkers;
+            return typeof updateMarkers === "function" && updateMarkers() > 0;
+          }, { timeout: 10_000 })
+          .catch(() => {});
       } catch {
         // Fallback: just wait for map to settle
       }
@@ -206,6 +246,12 @@ export async function waitForStackedMarker(
       updateMarkers();
     }
   });
+  await page
+    .waitForFunction(() => {
+      const updateMarkers = (window as any).__e2eUpdateMarkers;
+      return typeof updateMarkers === "function" && updateMarkers() > 0;
+    }, { timeout })
+    .catch(() => {});
 
   // Wait for markers to render after update trigger
   await pollForMarkers(page, 1, timeout);

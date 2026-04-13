@@ -1,64 +1,32 @@
 "use client";
 
 /**
- * MapBoundsContext - Shared state for map bounds dirty tracking
+ * MapBoundsContext - Shared map state that still matters after removing the
+ * deferred "Search this area" flow.
  *
- * This context enables the "Map moved - results not updated" banner to show
- * in BOTH locations:
- * 1. On the map itself (floating overlay)
- * 2. Above the list results (inline banner)
+ * The map remains the source of truth for:
+ * - hasUserMoved: whether the user manually panned/zoomed
+ * - isProgrammaticMove: whether the current motion is map-driven
  *
- * The Map component is the source of truth for:
- * - hasUserMoved: Whether user has manually panned/zoomed
- * - boundsDirty: Whether current map bounds differ from URL bounds
- * - searchAsMove: Whether auto-search on move is enabled
- * - locationConflict: Whether map has been panned away from search location
- *
- * SearchLayoutView consumes this to show the list banner.
- *
- * SELECTOR PATTERN USAGE:
- * This context is split into State and Actions for optimal re-render behavior.
- * Use these hooks instead of the full `useMapBounds()`:
- *
- * - `useMapBoundsState()` - State only, re-renders when state changes
- * - `useMapBoundsActions()` - Actions only, stable refs that never cause re-renders
- * - `useMapMovedBanner()` - Derived state for banner display logic
- * - `useAreaCount()` - Area count state only
- * - `useSearchAsMove()` - Toggle state and setter only
- *
- * Example:
- * ```tsx
- * // BAD: Re-renders on ANY context change
- * const { setHasUserMoved, setBoundsDirty } = useMapBounds();
- *
- * // GOOD: Actions are stable, never cause re-renders
- * const { setHasUserMoved, setBoundsDirty } = useMapBoundsActions();
- * ```
+ * Active pan bounds moved to ActivePanBoundsContext and are re-exported here
+ * for backward compatibility.
  */
 
 import {
   createContext,
-  useContext,
-  useState,
   useCallback,
+  useContext,
+  useEffect,
   useMemo,
   useRef,
-  useEffect,
+  useState,
+  type ReactNode,
+  type RefObject,
 } from "react";
 import { useSearchParams } from "next/navigation";
-import { rateLimitedFetch, RateLimitError } from "@/lib/rate-limit-client";
-import { setRateLimited } from "@/hooks/useRateLimitStatus";
-import { buildCanonicalFilterParamsFromSearchParams } from "@/lib/search-params";
-import {
-  PROGRAMMATIC_MOVE_TIMEOUT_MS,
-  AREA_COUNT_DEBOUNCE_MS,
-  AREA_COUNT_CACHE_TTL_MS,
-} from "@/lib/constants";
+import { PROGRAMMATIC_MOVE_TIMEOUT_MS } from "@/lib/constants";
 
-/** Maximum area count cache entries before LRU eviction */
-const AREA_COUNT_CACHE_MAX_ENTRIES = 50;
-
-/** Coordinates for map bounds */
+/** Coordinates for map bounds. Re-exported for ActivePanBoundsContext. */
 export interface MapBoundsCoords {
   minLng: number;
   maxLng: number;
@@ -66,268 +34,65 @@ export interface MapBoundsCoords {
   maxLat: number;
 }
 
-/** Coordinates for a point */
-export interface PointCoords {
-  lat: number;
-  lng: number;
-}
-
-interface MapBoundsState {
-  /** Whether user has manually moved the map (not programmatic flyTo) */
-  hasUserMoved: boolean;
-  /** Whether map bounds differ from URL bounds (results stale) */
-  boundsDirty: boolean;
-  /** Whether "search as I move" toggle is ON */
-  searchAsMove: boolean;
-  /** Whether current map movement is programmatic (flyTo/fitBounds/easeTo) */
-  isProgrammaticMove: boolean;
-  /** Original search location name (from q param) */
-  searchLocationName: string | null;
-  /** Original search location center coordinates */
-  searchLocationCenter: PointCoords | null;
-  /** Whether map viewport no longer contains the search location */
-  locationConflict: boolean;
-  /** Trigger search with current map bounds */
-  searchCurrentArea: () => void;
-  /** Reset map view to URL bounds */
-  resetToUrlBounds: () => void;
-  // activePanBounds moved to dedicated ActivePanBoundsContext (F4-NEW perf fix)
-}
-
-interface MapAreaCount {
-  /** Count of listings in current map area (null = 100+) */
-  areaCount: number | null;
-  /** Whether area count is loading */
-  isAreaCountLoading: boolean;
-}
-
-interface MapBoundsContextValue extends MapBoundsState, MapAreaCount {
-  /** Update hasUserMoved (called by Map) */
-  setHasUserMoved: (value: boolean) => void;
-  /** Update boundsDirty (called by Map) */
-  setBoundsDirty: (value: boolean) => void;
-  /** Update searchAsMove (called by Map) */
-  setSearchAsMove: (value: boolean) => void;
-  /** Set programmatic move flag (called before flyTo/fitBounds/easeTo) */
-  setProgrammaticMove: (value: boolean) => void;
-  /** Update search location info (called when URL changes) */
-  setSearchLocation: (name: string | null, center: PointCoords | null) => void;
-  /** Update current map bounds (called by Map on moveend) */
-  setCurrentMapBounds: (bounds: MapBoundsCoords | null) => void;
-  /** Register search handler (called by Map) */
-  setSearchHandler: (handler: () => void) => void;
-  /** Register reset handler (called by Map) */
-  setResetHandler: (handler: () => void) => void;
-  // setActivePanBounds moved to ActivePanBoundsContext (F4-NEW perf fix)
-  /** Ref for synchronous programmatic move check (used in Mapbox event handlers) */
-  isProgrammaticMoveRef: React.RefObject<boolean>;
-}
-
-const MapBoundsContext = createContext<MapBoundsContextValue | null>(null);
-
-// ============================================================================
-// SPLIT CONTEXTS - Separate State (changes frequently) from Actions (stable)
-// ============================================================================
-
-/**
- * State-only context value for consumers that only need to read state.
- * Changes when any state value changes.
- */
 interface MapBoundsStateValue {
   hasUserMoved: boolean;
-  boundsDirty: boolean;
-  searchAsMove: boolean;
   isProgrammaticMove: boolean;
-  searchLocationName: string | null;
-  searchLocationCenter: PointCoords | null;
-  locationConflict: boolean;
-  areaCount: number | null;
-  isAreaCountLoading: boolean;
-  // activePanBounds moved to dedicated ActivePanBoundsContext (F4-NEW perf fix)
 }
 
-/**
- * Actions-only context value for consumers that only need to dispatch actions.
- * These are stable callbacks that never change, so consumers won't re-render.
- */
 interface MapBoundsActionsValue {
-  searchCurrentArea: () => void;
-  resetToUrlBounds: () => void;
   setHasUserMoved: (value: boolean) => void;
-  setBoundsDirty: (value: boolean) => void;
-  setSearchAsMove: (value: boolean) => void;
   setProgrammaticMove: (value: boolean) => void;
-  setSearchLocation: (name: string | null, center: PointCoords | null) => void;
-  setCurrentMapBounds: (bounds: MapBoundsCoords | null) => void;
-  setSearchHandler: (handler: () => void) => void;
-  setResetHandler: (handler: () => void) => void;
-  // setActivePanBounds moved to ActivePanBoundsContext (F4-NEW perf fix)
-  isProgrammaticMoveRef: React.RefObject<boolean>;
+  isProgrammaticMoveRef: RefObject<boolean>;
 }
 
+interface MapBoundsContextValue
+  extends MapBoundsStateValue,
+    MapBoundsActionsValue {}
+
+const FALLBACK_PROGRAMMATIC_REF = { current: false } as RefObject<boolean>;
+
+const MapBoundsContext = createContext<MapBoundsContextValue | null>(null);
 const MapBoundsStateContext = createContext<MapBoundsStateValue | null>(null);
 const MapBoundsActionsContext = createContext<MapBoundsActionsValue | null>(
   null
 );
 
-/**
- * Module-level SSR fallback for state context.
- */
 const SSR_STATE_FALLBACK: MapBoundsStateValue = {
   hasUserMoved: false,
-  boundsDirty: false,
-  searchAsMove: false,
   isProgrammaticMove: false,
-  searchLocationName: null,
-  searchLocationCenter: null,
-  locationConflict: false,
-  areaCount: null,
-  isAreaCountLoading: false,
 };
 
-/**
- * Module-level SSR fallback for actions context.
- */
 const SSR_ACTIONS_FALLBACK: MapBoundsActionsValue = {
-  searchCurrentArea: () => {},
-  resetToUrlBounds: () => {},
   setHasUserMoved: () => {},
-  setBoundsDirty: () => {},
-  setSearchAsMove: () => {},
   setProgrammaticMove: () => {},
-  setSearchLocation: () => {},
-  setCurrentMapBounds: () => {},
-  setSearchHandler: () => {},
-  setResetHandler: () => {},
-  isProgrammaticMoveRef: { current: false },
+  isProgrammaticMoveRef: FALLBACK_PROGRAMMATIC_REF,
 };
 
-/**
- * Module-level SSR fallback to avoid creating new objects per call.
- * Used when useMapBounds() is called outside the provider (e.g., during SSR).
- */
 const SSR_FALLBACK: MapBoundsContextValue = {
-  hasUserMoved: false,
-  boundsDirty: false,
-  searchAsMove: false,
-  isProgrammaticMove: false,
-  searchLocationName: null,
-  searchLocationCenter: null,
-  locationConflict: false,
-  areaCount: null,
-  isAreaCountLoading: false,
-  searchCurrentArea: () => {},
-  resetToUrlBounds: () => {},
-  setHasUserMoved: () => {},
-  setBoundsDirty: () => {},
-  setSearchAsMove: () => {},
-  setProgrammaticMove: () => {},
-  setSearchLocation: () => {},
-  setCurrentMapBounds: () => {},
-  setSearchHandler: () => {},
-  setResetHandler: () => {},
-  isProgrammaticMoveRef: { current: false },
+  ...SSR_STATE_FALLBACK,
+  ...SSR_ACTIONS_FALLBACK,
 };
 
-/**
- * Check if a point is within map bounds.
- * Handles antimeridian crossing (minLng > maxLng) where the viewport
- * wraps around ±180° — e.g., minLng=170, maxLng=-170 for Pacific views.
- */
-function isPointInBounds(point: PointCoords, bounds: MapBoundsCoords): boolean {
-  const latInBounds = point.lat >= bounds.minLat && point.lat <= bounds.maxLat;
-  if (!latInBounds) return false;
-
-  // Antimeridian crossing: viewport wraps around ±180°
-  if (bounds.minLng > bounds.maxLng) {
-    return point.lng >= bounds.minLng || point.lng <= bounds.maxLng;
-  }
-  return point.lng >= bounds.minLng && point.lng <= bounds.maxLng;
-}
-
-export function MapBoundsProvider({ children }: { children: React.ReactNode }) {
+export function MapBoundsProvider({ children }: { children: ReactNode }) {
   const [hasUserMoved, setHasUserMovedState] = useState(false);
-  const [boundsDirty, setBoundsDirtyState] = useState(false);
-  const [searchAsMove, setSearchAsMoveState] = useState(true);
-
-  // P2-4 FIX: Wrap setters in useCallback with empty deps to prevent unnecessary re-renders
-  const setBoundsDirty = useCallback((value: boolean) => {
-    setBoundsDirtyState(value);
-  }, []);
-
-  const setSearchAsMove = useCallback((value: boolean) => {
-    setSearchAsMoveState(value);
-  }, []);
   const [isProgrammaticMove, setIsProgrammaticMoveState] = useState(false);
-  const [searchLocationName, setSearchLocationName] = useState<string | null>(
-    null
-  );
-  const [searchLocationCenter, setSearchLocationCenter] =
-    useState<PointCoords | null>(null);
-  const [currentMapBounds, setCurrentMapBoundsState] =
-    useState<MapBoundsCoords | null>(null);
-  // activePanBounds state moved to ActivePanBoundsContext (F4-NEW perf fix)
-  // P1-FIX (#68): Use refs instead of state for handler storage.
-  // Refs don't cause re-renders when updated and always hold the current handler.
-  // This prevents stale closure issues where handlers capture outdated state.
-  const searchHandlerRef = useRef<(() => void) | null>(null);
-  const resetHandlerRef = useRef<(() => void) | null>(null);
-
-  // Ref to track programmatic move state for the safe setter callback
   const isProgrammaticMoveRef = useRef(false);
-  // P2-16 FIX: Counter to handle overlapping programmatic moves correctly.
-  // A single boolean flag fails when two animations overlap (e.g., cluster click
-  // immediately followed by card "Show on Map") — the first moveEnd clears the
-  // flag for both, causing a false "user moved" detection.
   const programmaticMoveCountRef = useRef(0);
-  // Ref to track timeout for cleanup
   const programmaticMoveTimeoutRef = useRef<NodeJS.Timeout | null>(null);
-  // Ref to track previous search params for route change detection
   const prevSearchParamsRef = useRef<string | null>(null);
-  // P2-FIX (#67): Track mount state to prevent state updates after unmount
-  const isMountedRef = useRef(true);
-
-  // Get search params for route change detection
   const searchParams = useSearchParams();
 
-  // Reset map state when route changes to prevent stale state
-  // (e.g., showing "map moved" banner from NYC when user navigates to LA)
-  // Only reset on non-bounds param changes — bounds changes from map panning
-  // should NOT reset handlers or the search-as-move cycle breaks.
   useEffect(() => {
     const currentParams = searchParams.toString();
     if (
       prevSearchParamsRef.current !== null &&
       prevSearchParamsRef.current !== currentParams
     ) {
-      // Compare non-bounds params to detect true route changes
-      const BOUNDS_KEYS = ["minLat", "maxLat", "minLng", "maxLng"];
-      const stripBounds = (raw: string) => {
-        const sp = new URLSearchParams(raw);
-        BOUNDS_KEYS.forEach((k) => sp.delete(k));
-        sp.sort();
-        return sp.toString();
-      };
-      const prevNonBounds = stripBounds(prevSearchParamsRef.current);
-      const currNonBounds = stripBounds(currentParams);
-
-      if (prevNonBounds !== currNonBounds) {
-        // True route change (filters, query, etc.) — reset everything
-        setHasUserMovedState(false);
-        setBoundsDirtyState(false);
-        // P1-FIX (#68): Clear refs instead of state
-        searchHandlerRef.current = null;
-        resetHandlerRef.current = null;
-      } else {
-        // Bounds-only change from map panning — reset dirty state but keep handlers
-        setHasUserMovedState(false);
-        setBoundsDirtyState(false);
-      }
+      setHasUserMovedState(false);
     }
     prevSearchParamsRef.current = currentParams;
   }, [searchParams]);
 
-  // Cleanup timeout on unmount
   useEffect(() => {
     return () => {
       if (programmaticMoveTimeoutRef.current) {
@@ -336,15 +101,6 @@ export function MapBoundsProvider({ children }: { children: React.ReactNode }) {
     };
   }, []);
 
-  /**
-   * Set programmatic move flag with auto-clear timeout.
-   * Call this BEFORE flyTo/fitBounds/easeTo to prevent banner showing.
-   *
-   * P2-16 FIX: Uses a counter instead of a boolean to handle overlapping
-   * programmatic moves. Each setProgrammaticMove(true) increments the counter,
-   * each setProgrammaticMove(false) decrements it. The flag only clears when
-   * all overlapping moves have completed (counter reaches 0).
-   */
   const setProgrammaticMove = useCallback((value: boolean) => {
     if (value) {
       programmaticMoveCountRef.current += 1;
@@ -354,18 +110,16 @@ export function MapBoundsProvider({ children }: { children: React.ReactNode }) {
         programmaticMoveCountRef.current - 1
       );
     }
+
     const isActive = programmaticMoveCountRef.current > 0;
     setIsProgrammaticMoveState(isActive);
     isProgrammaticMoveRef.current = isActive;
 
-    // Clear any existing timeout
     if (programmaticMoveTimeoutRef.current) {
       clearTimeout(programmaticMoveTimeoutRef.current);
       programmaticMoveTimeoutRef.current = null;
     }
 
-    // Safety timeout: force-clear all if moveEnd events don't fire
-    // (e.g., animation cancelled by MapLibre without firing moveEnd)
     if (isActive) {
       programmaticMoveTimeoutRef.current = setTimeout(() => {
         programmaticMoveCountRef.current = 0;
@@ -375,292 +129,34 @@ export function MapBoundsProvider({ children }: { children: React.ReactNode }) {
     }
   }, []);
 
-  /**
-   * Safe setter for hasUserMoved that checks programmatic move flag
-   * Only sets hasUserMoved to true if NOT a programmatic move
-   */
   const setHasUserMoved = useCallback((value: boolean) => {
-    // Always allow setting to false (reset)
     if (!value) {
       setHasUserMovedState(false);
       return;
     }
-    // Only set to true if NOT a programmatic move
+
     if (!isProgrammaticMoveRef.current) {
       setHasUserMovedState(true);
     }
   }, []);
 
-  // P1-FIX (#68): Handlers now update refs instead of state.
-  // This ensures the latest handler is always called, not a stale closure.
-  const setSearchHandler = useCallback((handler: () => void) => {
-    searchHandlerRef.current = handler;
-  }, []);
-
-  const setResetHandler = useCallback((handler: () => void) => {
-    resetHandlerRef.current = handler;
-  }, []);
-
-  // P1-FIX (#68): Call the current ref value to always use the latest handler.
-  // Empty deps array is intentional - the ref itself is stable, we read .current at call time.
-  const searchCurrentArea = useCallback(() => {
-    searchHandlerRef.current?.();
-  }, []);
-
-  const resetToUrlBounds = useCallback(() => {
-    resetHandlerRef.current?.();
-  }, []);
-
-  const setSearchLocation = useCallback(
-    (name: string | null, center: PointCoords | null) => {
-      setSearchLocationName(name);
-      setSearchLocationCenter(center);
-    },
-    []
-  );
-
-  const setCurrentMapBounds = useCallback((bounds: MapBoundsCoords | null) => {
-    setCurrentMapBoundsState(bounds);
-  }, []);
-
-  // setActivePanBounds moved to ActivePanBoundsContext (F4-NEW perf fix)
-
-  // Compute whether there's a location conflict
-  // (map panned away from search location center)
-  const locationConflict = useMemo(() => {
-    // No conflict if no search location or no current bounds
-    if (!searchLocationCenter || !currentMapBounds) return false;
-    // No conflict if user hasn't manually moved the map
-    if (!hasUserMoved) return false;
-    // Conflict if search center is outside current map viewport
-    return !isPointInBounds(searchLocationCenter, currentMapBounds);
-  }, [searchLocationCenter, currentMapBounds, hasUserMoved]);
-
-  // --- Area count: fetch listing count for current map bounds when banner is showing ---
-
-  const [areaCount, setAreaCount] = useState<number | null>(null);
-  const [isAreaCountLoading, setIsAreaCountLoading] = useState(false);
-  const areaCountAbortRef = useRef<AbortController | null>(null);
-  const areaCountDebounceRef = useRef<ReturnType<typeof setTimeout> | null>(
-    null
-  );
-  const areaCountCacheRef = useRef<
-    Map<string, { count: number | null; expiresAt: number }>
-  >(new Map());
-
-  // Area count is enabled only when banner would show (toggle OFF + bounds dirty)
-  const areaCountEnabled = hasUserMoved && boundsDirty && !searchAsMove;
-
-  // F4 FIX: Serialize bounds to string for stable effect dep.
-  // Object reference changes on every setCurrentMapBoundsState call even when values are the same.
-  const currentMapBoundsKey = currentMapBounds
-    ? `${currentMapBounds.minLat},${currentMapBounds.maxLat},${currentMapBounds.minLng},${currentMapBounds.maxLng}`
-    : null;
-  // Ref to read current bounds inside the effect without adding object to deps
-  const currentMapBoundsRef = useRef(currentMapBounds);
-  currentMapBoundsRef.current = currentMapBounds;
-
-  useEffect(() => {
-    // Cleanup debounce/abort
-    if (areaCountDebounceRef.current) {
-      clearTimeout(areaCountDebounceRef.current);
-      areaCountDebounceRef.current = null;
-    }
-
-    const currentBounds = currentMapBoundsRef.current;
-    if (!areaCountEnabled || !currentBounds) {
-      // Abort in-flight, reset state
-      if (areaCountAbortRef.current) {
-        areaCountAbortRef.current.abort();
-        areaCountAbortRef.current = null;
-      }
-      setAreaCount(null);
-      setIsAreaCountLoading(false);
-      return;
-    }
-
-    // Build cache key from current map bounds + URL filter params.
-    // P2-17 FIX: Quantize bounds to 4 decimal places (~11m precision) so that
-    // sub-pixel map movements produce the same cache key. Without this, raw
-    // IEEE 754 floats from MapLibre create unique keys on every moveEnd,
-    // making the cache nearly useless during panning.
-    const boundsKey = `${currentBounds.minLat.toFixed(4)},${currentBounds.maxLat.toFixed(4)},${currentBounds.minLng.toFixed(4)},${currentBounds.maxLng.toFixed(4)}`;
-    // Canonical filter key (shared parser output) avoids stale cache hits from non-filter URL noise.
-    const filterKey =
-      buildCanonicalFilterParamsFromSearchParams(searchParams).toString();
-    const cacheKey = `${boundsKey}|${filterKey}`;
-
-    // Check cache
-    const cached = areaCountCacheRef.current.get(cacheKey);
-    if (cached && Date.now() < cached.expiresAt) {
-      // P2-FIX (#71): Abort any in-flight request when we have a cache hit
-      if (areaCountAbortRef.current) {
-        areaCountAbortRef.current.abort();
-        areaCountAbortRef.current = null;
-      }
-      setAreaCount(cached.count);
-      setIsAreaCountLoading(false);
-      return;
-    }
-
-    areaCountDebounceRef.current = setTimeout(() => {
-      // P1-4 FIX: Abort previous request and clear reference
-      if (areaCountAbortRef.current) {
-        areaCountAbortRef.current.abort();
-        areaCountAbortRef.current = null;
-      }
-      const controller = new AbortController();
-      areaCountAbortRef.current = controller;
-
-      // P1-4 FIX: Set loading AFTER abort is complete to prevent state flicker
-      setIsAreaCountLoading(true);
-
-      // Build URL from current URL params, overriding bounds with map bounds
-      const params = new URLSearchParams(searchParams.toString());
-      params.set("minLat", String(currentBounds.minLat));
-      params.set("maxLat", String(currentBounds.maxLat));
-      params.set("minLng", String(currentBounds.minLng));
-      params.set("maxLng", String(currentBounds.maxLng));
-      // Remove pagination params
-      params.delete("page");
-      params.delete("cursor");
-
-      rateLimitedFetch(`/api/search-count?${params.toString()}`, {
-        signal: controller.signal,
-        cache: "no-store",
-      })
-        .then((res) => {
-          if (!res.ok) throw new Error(`${res.status}`);
-          return res.json();
-        })
-        .then((data) => {
-          // P2-FIX (#67): Guard against state update after unmount
-          if (!controller.signal.aborted && isMountedRef.current) {
-            const count = data.count as number | null;
-            setAreaCount(count);
-            setIsAreaCountLoading(false);
-            areaCountCacheRef.current.set(cacheKey, {
-              count,
-              expiresAt: Date.now() + AREA_COUNT_CACHE_TTL_MS,
-            });
-            // LRU eviction: remove soonest-to-expire entry beyond limit
-            if (areaCountCacheRef.current.size > AREA_COUNT_CACHE_MAX_ENTRIES) {
-              let oldestKey: string | null = null;
-              let oldestTime = Infinity;
-              for (const [k, entry] of areaCountCacheRef.current) {
-                if (entry.expiresAt < oldestTime) {
-                  oldestTime = entry.expiresAt;
-                  oldestKey = k;
-                }
-              }
-              if (oldestKey) areaCountCacheRef.current.delete(oldestKey);
-            }
-          }
-        })
-        .catch((err) => {
-          // P0 FIX: Clear loading state on AbortError to prevent stuck loading indicator
-          if (err instanceof Error && err.name === "AbortError") {
-            if (isMountedRef.current) setIsAreaCountLoading(false);
-            return;
-          }
-          if (err instanceof RateLimitError) {
-            if (!controller.signal.aborted && isMountedRef.current)
-              setIsAreaCountLoading(false);
-            setRateLimited(err.retryAfterMs);
-            return;
-          }
-          if (!controller.signal.aborted && isMountedRef.current) {
-            setIsAreaCountLoading(false);
-          }
-        });
-    }, AREA_COUNT_DEBOUNCE_MS);
-
-    return () => {
-      if (areaCountDebounceRef.current) {
-        clearTimeout(areaCountDebounceRef.current);
-        areaCountDebounceRef.current = null;
-      }
-      if (areaCountAbortRef.current) {
-        areaCountAbortRef.current.abort();
-        areaCountAbortRef.current = null;
-      }
-      // P1 FIX: Reset loading state on cleanup to prevent orphaned loading indicator
-      setIsAreaCountLoading(false);
-    };
-    // F4 FIX: Use serialized string key instead of object reference
-     
-    // MED-1 FIX: Use serialized searchParams string instead of object reference.
-    // useSearchParams() returns a new URLSearchParams object on every render,
-    // causing this effect to re-run unnecessarily. The string is stable when params haven't changed.
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [areaCountEnabled, currentMapBoundsKey, searchParams.toString()]);
-
-  // P2-FIX (#67): Cleanup on unmount to prevent state updates
-  useEffect(() => {
-    return () => {
-      isMountedRef.current = false;
-    };
-  }, []);
-
-  // Memoize STATE value separately - changes when any state changes
-  // Consumers using useMapBoundsState() will re-render only on state changes
   const stateValue = useMemo<MapBoundsStateValue>(
     () => ({
       hasUserMoved,
-      boundsDirty,
-      searchAsMove,
       isProgrammaticMove,
-      searchLocationName,
-      searchLocationCenter,
-      locationConflict,
-      areaCount,
-      isAreaCountLoading,
     }),
-    [
-      hasUserMoved,
-      boundsDirty,
-      searchAsMove,
-      isProgrammaticMove,
-      searchLocationName,
-      searchLocationCenter,
-      locationConflict,
-      areaCount,
-      isAreaCountLoading,
-    ]
+    [hasUserMoved, isProgrammaticMove]
   );
 
-  // Memoize ACTIONS value separately - these are stable callbacks
-  // Consumers using useMapBoundsActions() will almost never re-render
   const actionsValue = useMemo<MapBoundsActionsValue>(
     () => ({
-      searchCurrentArea,
-      resetToUrlBounds,
       setHasUserMoved,
-      setBoundsDirty,
-      setSearchAsMove,
       setProgrammaticMove,
-      setSearchLocation,
-      setCurrentMapBounds,
-      setSearchHandler,
-      setResetHandler,
       isProgrammaticMoveRef,
     }),
-    [
-      searchCurrentArea,
-      resetToUrlBounds,
-      setHasUserMoved,
-      setBoundsDirty,
-      setSearchAsMove,
-      setProgrammaticMove,
-      setSearchLocation,
-      setCurrentMapBounds,
-      setSearchHandler,
-      setResetHandler,
-      isProgrammaticMoveRef,
-    ]
+    [setHasUserMoved, setProgrammaticMove]
   );
 
-  // Combined context value for backward compatibility with useMapBounds()
   const contextValue = useMemo<MapBoundsContextValue>(
     () => ({
       ...stateValue,
@@ -680,127 +176,25 @@ export function MapBoundsProvider({ children }: { children: React.ReactNode }) {
   );
 }
 
-export function useMapBounds() {
+export function useMapBounds(): MapBoundsContextValue {
   const context = useContext(MapBoundsContext);
-  // Return module-level constant to avoid creating new objects per call
   return context ?? SSR_FALLBACK;
 }
 
-/**
- * Hook for checking if banner should be shown
- * Used by both Map (overlay) and SearchLayoutView (inline)
- */
-export function useMapMovedBanner() {
-  // Use split hooks to avoid re-renders from action changes (#18).
-  // State hook re-renders when state changes; actions hook is stable.
-  const {
-    hasUserMoved,
-    boundsDirty,
-    searchAsMove,
-    locationConflict,
-    searchLocationName,
-    areaCount,
-    isAreaCountLoading,
-  } = useMapBoundsState();
-  const { searchCurrentArea, resetToUrlBounds } = useMapBoundsActions();
-
-  // Show "results not updated" banner when bounds differ but location is still visible
-  const showBanner = hasUserMoved && boundsDirty && !searchAsMove;
-
-  // Show "location conflict" banner when map no longer contains search location
-  // This takes priority over the regular bounds dirty banner
-  const showLocationConflict = locationConflict && !searchAsMove;
-
-  return {
-    showBanner: showBanner && !showLocationConflict,
-    showLocationConflict,
-    locationName: searchLocationName,
-    onSearch: searchCurrentArea,
-    onReset: resetToUrlBounds,
-    areaCount,
-    isAreaCountLoading,
-  };
-}
-
-// ============================================================================
-// SELECTOR HOOKS - Use these for fine-grained subscriptions to minimize re-renders
-// ============================================================================
-
-/**
- * Selector hook for state values only.
- * Use when you need to read state but don't need to dispatch actions.
- * Re-renders when any state value changes.
- */
 export function useMapBoundsState(): MapBoundsStateValue {
   const context = useContext(MapBoundsStateContext);
   return context ?? SSR_STATE_FALLBACK;
 }
 
-/**
- * Selector hook for action callbacks only.
- * Use when you only need to dispatch actions (setters, handlers).
- * These are stable callbacks - components using this hook will almost never re-render.
- */
 export function useMapBoundsActions(): MapBoundsActionsValue {
   const context = useContext(MapBoundsActionsContext);
   return context ?? SSR_ACTIONS_FALLBACK;
 }
 
-/**
- * Selector hook for area count only.
- * Use when you only need the listing count for the current map area.
- */
-export function useAreaCount(): {
-  areaCount: number | null;
-  isAreaCountLoading: boolean;
-} {
-  const { areaCount, isAreaCountLoading } = useMapBoundsState();
-  return useMemo(
-    () => ({ areaCount, isAreaCountLoading }),
-    [areaCount, isAreaCountLoading]
-  );
-}
-
-/**
- * Selector hook for searchAsMove toggle state and setter.
- * Use for the "Search as I move" toggle component.
- */
-export function useSearchAsMove(): {
-  searchAsMove: boolean;
-  setSearchAsMove: (value: boolean) => void;
-} {
-  const { searchAsMove } = useMapBoundsState();
-  const { setSearchAsMove } = useMapBoundsActions();
-  return useMemo(
-    () => ({ searchAsMove, setSearchAsMove }),
-    [searchAsMove, setSearchAsMove]
-  );
-}
-
-/**
- * Selector hook for bounds dirty state.
- * Use when you only need to know if map bounds differ from URL bounds.
- */
-export function useBoundsDirty(): {
-  boundsDirty: boolean;
-  setBoundsDirty: (value: boolean) => void;
-} {
-  const { boundsDirty } = useMapBoundsState();
-  const { setBoundsDirty } = useMapBoundsActions();
-  return useMemo(
-    () => ({ boundsDirty, setBoundsDirty }),
-    [boundsDirty, setBoundsDirty]
-  );
-}
-
-/**
- * Selector hook for programmatic move flag.
- * Use when coordinating map animations to prevent false "user moved" detection.
- */
 export function useProgrammaticMove(): {
   isProgrammaticMove: boolean;
   setProgrammaticMove: (value: boolean) => void;
-  isProgrammaticMoveRef: React.RefObject<boolean>;
+  isProgrammaticMoveRef: RefObject<boolean>;
 } {
   const { isProgrammaticMove } = useMapBoundsState();
   const { setProgrammaticMove, isProgrammaticMoveRef } = useMapBoundsActions();
@@ -810,27 +204,4 @@ export function useProgrammaticMove(): {
   );
 }
 
-/**
- * Selector hook for search location info.
- * Use when displaying or checking the original search location.
- */
-export function useSearchLocation(): {
-  searchLocationName: string | null;
-  searchLocationCenter: PointCoords | null;
-  setSearchLocation: (name: string | null, center: PointCoords | null) => void;
-} {
-  const { searchLocationName, searchLocationCenter } = useMapBoundsState();
-  const { setSearchLocation } = useMapBoundsActions();
-  return useMemo(
-    () => ({ searchLocationName, searchLocationCenter, setSearchLocation }),
-    [searchLocationName, searchLocationCenter, setSearchLocation]
-  );
-}
-
-/**
- * Selector hook for active pan bounds.
- * Use for proactive fetching during dragging.
- */
-// useActivePanBounds moved to ActivePanBoundsContext.tsx (F4-NEW perf fix)
-// Re-exported here for backward compatibility
 export { useActivePanBounds } from "./ActivePanBoundsContext";

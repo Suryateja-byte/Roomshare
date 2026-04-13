@@ -23,6 +23,7 @@ import {
 import {
   buildRawParamsFromSearchParams,
   parseSearchParams,
+  type RawSearchParams,
 } from "@/lib/search-params";
 import {
   MAP_FETCH_MAX_LAT_SPAN,
@@ -32,22 +33,57 @@ import { boundsTupleToObject, deriveSearchBoundsFromPoint } from "@/lib/search/l
 import { logger, sanitizeErrorMessage } from "@/lib/logger";
 import * as Sentry from "@sentry/nextjs";
 import { getSearchRateLimitIdentifier } from "@/lib/search-rate-limit-identifier";
+import {
+  createSearchResponseMeta,
+  type SearchMapState,
+} from "@/lib/search/search-response";
+import { normalizeSearchQuery } from "@/lib/search/search-query";
+import {
+  buildScenarioSearchMapState,
+  resolveSearchScenario,
+  SEARCH_SCENARIO_HEADER,
+} from "@/lib/search/testing/search-scenarios";
+import { recordSearchRequestLatency } from "@/lib/search/search-telemetry";
+
+export const runtime = "nodejs";
 
 export async function GET(request: NextRequest) {
   const context = createContextFromHeaders(request.headers);
+  const requestStartTime = performance.now();
 
   return runWithRequestContext(context, async () => {
     const requestId = getRequestId();
 
     try {
-      // Rate limiting via Redis (falls back to DB rate limiting when Redis unavailable)
-      const rateLimitResponse = await withRateLimitRedis(request, {
-        type: "map",
-        getIdentifier: getSearchRateLimitIdentifier,
-      });
-      if (rateLimitResponse) return rateLimitResponse;
-
       const searchParams = request.nextUrl.searchParams;
+      const rawParams = buildRawParamsFromSearchParams(searchParams);
+      const requestedQueryHash =
+        request.headers.get("x-search-query-hash")?.trim() || null;
+      const normalizedQuery = normalizeSearchQuery(rawParams as RawSearchParams);
+      const baseMeta = createSearchResponseMeta(normalizedQuery, "map-api");
+      const meta = requestedQueryHash
+        ? { ...baseMeta, queryHash: requestedQueryHash }
+        : baseMeta;
+      const testScenario = resolveSearchScenario({
+        headerValue: request.headers.get(SEARCH_SCENARIO_HEADER),
+      });
+
+      if (!testScenario) {
+        // Rate limiting via Redis (falls back to DB rate limiting when Redis unavailable)
+        const rateLimitResponse = await withRateLimitRedis(request, {
+          type: "map",
+          getIdentifier: getSearchRateLimitIdentifier,
+        });
+        if (rateLimitResponse) {
+          recordSearchRequestLatency({
+            route: "map-listings-api",
+            durationMs: performance.now() - requestStartTime,
+            stateKind: "rate-limited",
+            queryHash: meta.queryHash,
+          });
+          return rateLimitResponse;
+        }
+      }
 
       // Validate and parse explicit bounds first
       const boundsResult = validateAndParseBounds(
@@ -86,12 +122,18 @@ export async function GET(request: NextRequest) {
 
       // Bounds are required - prevents full-table scans
       if (!bounds) {
+        recordSearchRequestLatency({
+          route: "map-listings-api",
+          durationMs: performance.now() - requestStartTime,
+          backendSource: meta.backendSource,
+          stateKind: "location-required",
+          queryHash: meta.queryHash,
+        });
         return NextResponse.json(
           {
-            error:
-              boundsResult.error ||
-              "Bounds required: provide minLat/maxLat/minLng/maxLng or lat/lng",
-          },
+            kind: "location-required",
+            meta,
+          } satisfies SearchMapState,
           {
             status: 400,
             headers: { "x-request-id": requestId },
@@ -99,10 +141,38 @@ export async function GET(request: NextRequest) {
         );
       }
 
+      if (testScenario) {
+        const scenarioState = await buildScenarioSearchMapState(testScenario, {
+          query: normalizedQuery,
+          queryHashOverride: requestedQueryHash,
+        });
+        const scenarioResultCount =
+          scenarioState.kind === "ok" || scenarioState.kind === "degraded"
+            ? scenarioState.data.listings.length
+            : scenarioState.kind === "zero-results"
+              ? 0
+              : null;
+
+        recordSearchRequestLatency({
+          route: "map-listings-api",
+          durationMs: performance.now() - requestStartTime,
+          backendSource: scenarioState.meta.backendSource,
+          stateKind: scenarioState.kind,
+          queryHash: scenarioState.meta.queryHash,
+          resultCount: scenarioResultCount,
+        });
+
+        return NextResponse.json(scenarioState, {
+          headers: {
+            "Cache-Control": "no-store",
+            "x-request-id": requestId,
+          },
+        });
+      }
+
       // Use canonical parsing for all filter params
       // This handles: repeated params, CSV splitting, alias resolution,
       // numeric validation, and allowlist filtering
-      const rawParams = buildRawParamsFromSearchParams(searchParams);
       const parsed = parseSearchParams(rawParams);
 
       // Capture sort before overriding — needed for semantic search check
@@ -150,21 +220,33 @@ export async function GET(request: NextRequest) {
         );
       }
 
-      return NextResponse.json(
-        { listings },
-        {
-          headers: {
-            // Fix #3: Use s-maxage for CDN caching (markers are NOT user-specific)
-            // s-maxage: CDN/edge cache duration (60s)
-            // max-age: browser cache duration (shorter to allow user refresh)
-            "Cache-Control":
-              "public, s-maxage=60, max-age=30, stale-while-revalidate=120",
-            "x-request-id": requestId,
-            // Vary by Accept-Encoding for proper CDN compression handling
-            Vary: "Accept-Encoding",
-          },
-        }
-      );
+      const state = {
+        kind: "ok",
+        data: { listings },
+        meta,
+      } satisfies SearchMapState;
+
+      recordSearchRequestLatency({
+        route: "map-listings-api",
+        durationMs: performance.now() - requestStartTime,
+        backendSource: meta.backendSource,
+        stateKind: listings.length === 0 ? "zero-results" : "ok",
+        queryHash: meta.queryHash,
+        resultCount: listings.length,
+      });
+
+      return NextResponse.json(state, {
+        headers: {
+          // Fix #3: Use s-maxage for CDN caching (markers are NOT user-specific)
+          // s-maxage: CDN/edge cache duration (60s)
+          // max-age: browser cache duration (shorter to allow user refresh)
+          "Cache-Control":
+            "public, s-maxage=60, max-age=30, stale-while-revalidate=120",
+          "x-request-id": requestId,
+          // Vary by Accept-Encoding for proper CDN compression handling
+          Vary: "Accept-Encoding",
+        },
+      });
     } catch (error) {
       logger.sync.error("Map listings API error", {
         error: sanitizeErrorMessage(error),

@@ -19,6 +19,7 @@ import {
   SF_BOUNDS,
   waitForMapReady,
 } from "./helpers";
+import { getMarkerListingId } from "./helpers/sync-helpers";
 import type { Page } from "@playwright/test";
 
 // Build search URL with SF bounds
@@ -157,7 +158,7 @@ async function waitForMapRef(page: Page, timeout = 30000): Promise<boolean> {
  * Zoom in to expand clusters and reveal individual markers.
  *
  * Uses the E2E testing hook (window.__e2eSetProgrammaticMove + __e2eMapRef.jumpTo)
- * to zoom programmatically WITHOUT triggering "Search as I move" URL updates.
+ * to zoom programmatically WITHOUT triggering auto-search URL updates.
  * This solves the chicken-and-egg problem where zooming in triggers a search
  * with narrow bounds that returns 0 results.
  *
@@ -212,7 +213,7 @@ async function zoomToExpandClusters(page: Page): Promise<boolean> {
         });
 
         // jumpTo with center on a known listing location
-        const jumpOptions: any = { zoom: 14 };
+        const jumpOptions: any = { zoom: 15 };
         if (center) {
           jumpOptions.center = [center.lng, center.lat];
         }
@@ -319,7 +320,7 @@ test.describe("Map Marker Interactions", () => {
     if (!mapReady) return; // Tests will skip via isMapAvailable check
 
     // Zoom in programmatically to expand clusters into individual markers.
-    // Uses __e2eSetProgrammaticMove to prevent "Search as I move" from
+    // Uses __e2eSetProgrammaticMove to prevent auto-search from
     // updating the URL and wiping out SSR-rendered listing results.
     await zoomToExpandClusters(page);
   });
@@ -779,13 +780,16 @@ test.describe("Map Marker Interactions", () => {
       });
     });
 
-    test("3.8b - Escape closes popup but card highlight persists (activeId independent)", async ({
+    test("3.8b - Escape closes popup, clears card highlight, and restores focus", async ({
       page,
     }) => {
       test.skip(!(await isMapAvailable(page)), "Map not available");
 
       const markerCount = await waitForMarkersWithClusterExpansion(page);
       test.skip(markerCount === 0, "No markers available");
+
+      const listingId = await getMarkerListingId(page, 0);
+      test.skip(!listingId, "Could not read first marker listing ID");
 
       const marker = getFirstVisibleMarker(page);
       await marker.evaluate((el) => (el as HTMLElement).click());
@@ -808,17 +812,23 @@ test.describe("Map Marker Interactions", () => {
         timeout: 2000,
       });
 
-      // Card highlight persists after Escape because activeId is managed
-      // independently from selectedListing (popup state). Only setSelectedListing(null)
-      // is called on Escape — setActive(null) is NOT called.
-      // This is by design: the "last viewed" card stays highlighted.
+      // Escape clears the active card state along with the popup.
       const highlightCountAfter = await page.evaluate(() => {
         return Array.from(
           document.querySelectorAll('[data-testid="listing-card"]')
         ).filter((el) => el.getAttribute("data-focus-state") === "active")
           .length;
       });
-      expect(highlightCountAfter).toBe(highlightCountBefore);
+      expect(highlightCountBefore).toBeGreaterThan(0);
+      expect(highlightCountAfter).toBe(0);
+
+      const activeElementListingId = await page.evaluate(() => {
+        const active = document.activeElement as HTMLElement | null;
+        return active?.closest("[data-listing-id]")?.getAttribute(
+          "data-listing-id"
+        ) ?? null;
+      });
+      expect(activeElementListingId).toBe(listingId);
     });
   });
 

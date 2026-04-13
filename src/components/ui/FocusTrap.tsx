@@ -1,11 +1,12 @@
 "use client";
 
-import { useEffect, useRef, type ReactNode } from "react";
+import { useEffect, useRef, type ReactNode, type RefObject } from "react";
 
 interface FocusTrapProps {
   children: ReactNode;
   active?: boolean;
   returnFocus?: boolean;
+  initialFocusRef?: RefObject<HTMLElement | null>;
 }
 
 const FOCUSABLE_SELECTORS = [
@@ -24,6 +25,7 @@ export function FocusTrap({
   children,
   active = true,
   returnFocus = true,
+  initialFocusRef,
 }: FocusTrapProps) {
   const containerRef = useRef<HTMLDivElement>(null);
   const previousActiveElement = useRef<HTMLElement | null>(null);
@@ -40,8 +42,9 @@ export function FocusTrap({
     // Focus the first focusable element
     const focusableElements =
       container.querySelectorAll<HTMLElement>(FOCUSABLE_SELECTORS);
-    if (focusableElements.length > 0) {
-      focusableElements[0].focus();
+    const initialTarget = initialFocusRef?.current ?? focusableElements[0];
+    if (initialTarget) {
+      initialTarget.focus();
     }
 
     const handleKeyDown = (event: KeyboardEvent) => {
@@ -79,7 +82,7 @@ export function FocusTrap({
         previousActiveElement.current.focus();
       }
     };
-  }, [active, returnFocus]);
+  }, [active, initialFocusRef, returnFocus]);
 
   return (
     <div ref={containerRef} data-focus-trap={active ? "" : undefined}>

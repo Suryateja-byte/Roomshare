@@ -36,7 +36,6 @@ import {
   Home,
   Loader2,
   MapPin,
-  Maximize2,
   Minus,
   Plus,
   Star,
@@ -47,11 +46,15 @@ import { formatPrice } from "@/lib/format";
 import { Button } from "./ui/button";
 import { MAP_FLY_TO_EVENT, MapFlyToEventDetail } from "./SearchForm";
 import { useListingFocus } from "@/contexts/ListingFocusContext";
+import { useMobileSearch } from "@/contexts/MobileSearchContext";
 import { useSearchMapUI } from "@/contexts/SearchMapUIContext";
 import { useSearchTransitionSafe } from "@/contexts/SearchTransitionContext";
-import { useMapBounds, useMapMovedBanner } from "@/contexts/MapBoundsContext";
+import { useMapBounds } from "@/contexts/MapBoundsContext";
 import { useActivePanBoundsSetter } from "@/contexts/ActivePanBoundsContext";
-import { MapMovedBanner } from "./map/MapMovedBanner";
+import {
+  MobileMapStatusCard,
+  type MobileMapStatus,
+} from "./map/MobileMapStatusCard";
 import { MapGestureHint } from "./map/MapGestureHint";
 import { MapEmptyState } from "./map/MapEmptyState";
 import { hasAnyFilter, FILTER_PARAM_KEYS } from "./filters/filter-chip-utils";
@@ -60,6 +63,8 @@ import { fixMarkerWrapperRole } from "./map/fixMarkerA11y";
 import { BoundaryLayer } from "./map/BoundaryLayer";
 import { UserMarker, useUserPin } from "./map/UserMarker";
 import DesktopMapControls from "./map/DesktopMapControls";
+import DesktopListingPreviewCard from "./map/DesktopListingPreviewCard";
+import MobileMapToolsSheet from "./map/MobileMapToolsSheet";
 import { POILayer, usePOILayerState } from "./map/POILayer";
 import {
   PROGRAMMATIC_MOVE_TIMEOUT_MS,
@@ -69,8 +74,16 @@ import {
   MAP_FETCH_MAX_LNG_SPAN,
 } from "@/lib/constants";
 import { groupExactMapListingClones } from "@/lib/maps/marker-utils";
-import { SNAP_COLLAPSED } from "@/lib/mobile-layout";
+import {
+  SEARCH_MOBILE_PREVIEW_CARD_OFFSET,
+  SNAP_COLLAPSED,
+} from "@/lib/mobile-layout";
 import { SEARCH_PHONE_MAX_QUERY } from "@/lib/search-layout";
+import {
+  applySearchQueryChange,
+  buildCanonicalSearchUrl,
+  normalizeSearchQuery,
+} from "@/lib/search/search-query";
 import { cn } from "@/lib/utils";
 import { useMediaQuery } from "@/hooks/useMediaQuery";
 import {
@@ -114,55 +127,6 @@ function isLongitudeWithinBounds(lng: number, bounds: MapBounds): boolean {
   return lng >= bounds.minLng || lng <= bounds.maxLng;
 }
 
-function getListingsEnvelope(listings: Listing[]): MapBounds | null {
-  if (listings.length < 2) return null;
-
-  const lats = listings.map((listing) => listing.location.lat);
-  const lngs = listings.map((listing) => listing.location.lng);
-
-  return {
-    minLat: Math.min(...lats),
-    maxLat: Math.max(...lats),
-    minLng: Math.min(...lngs),
-    maxLng: Math.max(...lngs),
-  };
-}
-
-function shouldShowResetToResultsControl(
-  bounds: MapBounds,
-  listings: Listing[]
-): boolean {
-  const envelope = getListingsEnvelope(listings);
-  if (!envelope) return false;
-
-  const epsilon = 0.0001;
-  const allListingsVisible = listings.every((listing) => {
-    const { lat, lng } = listing.location;
-    return (
-      lat >= bounds.minLat - epsilon &&
-      lat <= bounds.maxLat + epsilon &&
-      isLongitudeWithinBounds(lng, bounds)
-    );
-  });
-
-  if (!allListingsVisible) {
-    return true;
-  }
-
-  const viewportLatSpan = Math.max(bounds.maxLat - bounds.minLat, 0.0001);
-  const viewportLngSpan = Math.max(getLongitudeSpan(bounds), 0.0001);
-  const envelopeLatSpan = Math.max(envelope.maxLat - envelope.minLat, 0.01);
-  const envelopeLngSpan = Math.max(getLongitudeSpan(envelope), 0.01);
-  const areaRatio =
-    (viewportLatSpan * viewportLngSpan) / (envelopeLatSpan * envelopeLngSpan);
-
-  return (
-    (viewportLatSpan > envelopeLatSpan * 3 ||
-      viewportLngSpan > envelopeLngSpan * 3) &&
-    areaRatio > 4.5
-  );
-}
-
 interface Listing {
   id: string;
   title: string;
@@ -171,13 +135,28 @@ interface Listing {
   images?: string[];
   avgRating?: number;
   reviewCount?: number;
+  roomType?: string;
   location: {
+    city?: string;
+    state?: string;
     lat: number;
     lng: number;
   };
   /** Pin tier for differentiated styling: primary = larger, mini = smaller */
   tier?: "primary" | "mini";
 }
+
+type DesktopPopupFocusOrigin =
+  | {
+      type: "marker";
+      listingId: string;
+    }
+  | {
+      type: "list";
+      listingId: string;
+      element: HTMLElement | null;
+    }
+  | null;
 
 interface MarkerPosition {
   listing: Listing;
@@ -359,15 +338,269 @@ const MAP_COLORS = {
   zinc800: "#27272a",
 };
 
+type DesktopPopupAnchor =
+  | "top"
+  | "right"
+  | "left"
+  | "bottom"
+  | "top-right"
+  | "top-left"
+  | "bottom-right"
+  | "bottom-left";
+
+interface PopupSize {
+  width: number;
+  height: number;
+}
+
+interface LocalRect {
+  left: number;
+  top: number;
+  right: number;
+  bottom: number;
+  width: number;
+  height: number;
+}
+
+interface DesktopPopupPlacement {
+  anchor: DesktopPopupAnchor;
+  popupRect: LocalRect;
+  overflowScore: number;
+  overlapScore: number;
+  requiresCameraShift: boolean;
+  deltaX: number;
+  deltaY: number;
+}
+
 const DESKTOP_POPUP_SAFE_AREA = {
-  top: 96,
+  top: 24,
   right: 24,
   bottom: 24,
   left: 24,
 } as const;
 
+// MapLibre anchors name the popup edge or corner closest to the coordinate.
+// Example: `bottom` renders the popup above the marker, while `right` renders
+// the popup to the left of the marker.
+const DESKTOP_POPUP_ANCHOR_PRIORITY: DesktopPopupAnchor[] = [
+  "bottom",
+  "right",
+  "left",
+  "top",
+  "bottom-right",
+  "bottom-left",
+  "top-right",
+  "top-left",
+];
+const DESKTOP_POPUP_FOCUS_ANIMATION_MS = 280;
+const DESKTOP_POPUP_CORRECTION_ANIMATION_MS = 250;
+const DESKTOP_POPUP_ANCHOR_GAP_PX = 20;
+const DESKTOP_POPUP_FALLBACK_CARD_WIDTH_PX = 304;
+const DESKTOP_POPUP_FALLBACK_CARD_HEIGHT_PX = 296;
 const POPUP_CONTAINMENT_TOLERANCE_PX = 2;
-const POPUP_CONTAINMENT_ANIMATION_MS = 250;
+const MAP_SEARCH_STATUS_DELAY_MS = 275;
+
+const DESKTOP_POPUP_OFFSETS: {
+  center: [number, number];
+} & Record<DesktopPopupAnchor, [number, number]> = {
+  center: [0, 0],
+  top: [0, DESKTOP_POPUP_ANCHOR_GAP_PX],
+  right: [-DESKTOP_POPUP_ANCHOR_GAP_PX, 0],
+  left: [DESKTOP_POPUP_ANCHOR_GAP_PX, 0],
+  bottom: [0, -DESKTOP_POPUP_ANCHOR_GAP_PX],
+  "top-right": [-DESKTOP_POPUP_ANCHOR_GAP_PX, DESKTOP_POPUP_ANCHOR_GAP_PX],
+  "top-left": [DESKTOP_POPUP_ANCHOR_GAP_PX, DESKTOP_POPUP_ANCHOR_GAP_PX],
+  "bottom-right": [-DESKTOP_POPUP_ANCHOR_GAP_PX, -DESKTOP_POPUP_ANCHOR_GAP_PX],
+  "bottom-left": [DESKTOP_POPUP_ANCHOR_GAP_PX, -DESKTOP_POPUP_ANCHOR_GAP_PX],
+};
+
+function createLocalRect({
+  left,
+  top,
+  width,
+  height,
+}: {
+  left: number;
+  top: number;
+  width: number;
+  height: number;
+}): LocalRect {
+  return {
+    left,
+    top,
+    width,
+    height,
+    right: left + width,
+    bottom: top + height,
+  };
+}
+
+function translateLocalRect(
+  rect: LocalRect,
+  deltaX: number,
+  deltaY: number
+): LocalRect {
+  return createLocalRect({
+    left: rect.left + deltaX,
+    top: rect.top + deltaY,
+    width: rect.width,
+    height: rect.height,
+  });
+}
+
+function getDesktopPopupRectForAnchor(
+  anchor: DesktopPopupAnchor,
+  point: { x: number; y: number },
+  popupSize: PopupSize
+): LocalRect {
+  switch (anchor) {
+    case "top":
+      return createLocalRect({
+        left: point.x - popupSize.width / 2,
+        top: point.y + DESKTOP_POPUP_ANCHOR_GAP_PX,
+        width: popupSize.width,
+        height: popupSize.height,
+      });
+    case "right":
+      return createLocalRect({
+        left: point.x - DESKTOP_POPUP_ANCHOR_GAP_PX - popupSize.width,
+        top: point.y - popupSize.height / 2,
+        width: popupSize.width,
+        height: popupSize.height,
+      });
+    case "left":
+      return createLocalRect({
+        left: point.x + DESKTOP_POPUP_ANCHOR_GAP_PX,
+        top: point.y - popupSize.height / 2,
+        width: popupSize.width,
+        height: popupSize.height,
+      });
+    case "bottom":
+      return createLocalRect({
+        left: point.x - popupSize.width / 2,
+        top: point.y - DESKTOP_POPUP_ANCHOR_GAP_PX - popupSize.height,
+        width: popupSize.width,
+        height: popupSize.height,
+      });
+    case "top-right":
+      return createLocalRect({
+        left: point.x - DESKTOP_POPUP_ANCHOR_GAP_PX - popupSize.width,
+        top: point.y + DESKTOP_POPUP_ANCHOR_GAP_PX,
+        width: popupSize.width,
+        height: popupSize.height,
+      });
+    case "top-left":
+      return createLocalRect({
+        left: point.x + DESKTOP_POPUP_ANCHOR_GAP_PX,
+        top: point.y + DESKTOP_POPUP_ANCHOR_GAP_PX,
+        width: popupSize.width,
+        height: popupSize.height,
+      });
+    case "bottom-right":
+      return createLocalRect({
+        left: point.x - DESKTOP_POPUP_ANCHOR_GAP_PX - popupSize.width,
+        top: point.y - DESKTOP_POPUP_ANCHOR_GAP_PX - popupSize.height,
+        width: popupSize.width,
+        height: popupSize.height,
+      });
+    case "bottom-left":
+      return createLocalRect({
+        left: point.x + DESKTOP_POPUP_ANCHOR_GAP_PX,
+        top: point.y - DESKTOP_POPUP_ANCHOR_GAP_PX - popupSize.height,
+        width: popupSize.width,
+        height: popupSize.height,
+      });
+  }
+}
+
+function getRectOverflowScore(rect: LocalRect, safeRect: LocalRect): number {
+  return (
+    Math.max(safeRect.left - rect.left, 0) +
+    Math.max(rect.right - safeRect.right, 0) +
+    Math.max(safeRect.top - rect.top, 0) +
+    Math.max(rect.bottom - safeRect.bottom, 0)
+  );
+}
+
+function getRectIntersectionArea(a: LocalRect, b: LocalRect): number {
+  const overlapWidth = Math.max(
+    0,
+    Math.min(a.right, b.right) - Math.max(a.left, b.left)
+  );
+  const overlapHeight = Math.max(
+    0,
+    Math.min(a.bottom, b.bottom) - Math.max(a.top, b.top)
+  );
+  return overlapWidth * overlapHeight;
+}
+
+function isRectInsideSafeArea(rect: LocalRect, safeRect: LocalRect): boolean {
+  return (
+    rect.left >= safeRect.left &&
+    rect.right <= safeRect.right &&
+    rect.top >= safeRect.top &&
+    rect.bottom <= safeRect.bottom
+  );
+}
+
+function getPopupAdjustmentDelta(
+  rect: LocalRect,
+  safeRect: LocalRect,
+  avoidRects: LocalRect[]
+): { deltaX: number; deltaY: number } {
+  let adjustedRect = rect;
+  let deltaX = 0;
+  let deltaY = 0;
+
+  if (adjustedRect.left < safeRect.left) {
+    deltaX += safeRect.left - adjustedRect.left;
+  } else if (adjustedRect.right > safeRect.right) {
+    deltaX += safeRect.right - adjustedRect.right;
+  }
+
+  if (adjustedRect.top < safeRect.top) {
+    deltaY += safeRect.top - adjustedRect.top;
+  } else if (adjustedRect.bottom > safeRect.bottom) {
+    deltaY += safeRect.bottom - adjustedRect.bottom;
+  }
+
+  adjustedRect = translateLocalRect(adjustedRect, deltaX, deltaY);
+
+  for (const avoidRect of avoidRects) {
+    if (getRectIntersectionArea(adjustedRect, avoidRect) === 0) continue;
+
+    const candidateAdjustments = [
+      { deltaX: avoidRect.left - adjustedRect.right, deltaY: 0 },
+      { deltaX: avoidRect.right - adjustedRect.left, deltaY: 0 },
+      { deltaX: 0, deltaY: avoidRect.top - adjustedRect.bottom },
+      { deltaX: 0, deltaY: avoidRect.bottom - adjustedRect.top },
+    ]
+      .map((candidate) => ({
+        ...candidate,
+        rect: translateLocalRect(
+          adjustedRect,
+          candidate.deltaX,
+          candidate.deltaY
+        ),
+      }))
+      .filter((candidate) => isRectInsideSafeArea(candidate.rect, safeRect))
+      .sort(
+        (a, b) =>
+          Math.abs(a.deltaX) +
+          Math.abs(a.deltaY) -
+          (Math.abs(b.deltaX) + Math.abs(b.deltaY))
+      );
+
+    const bestCandidate = candidateAdjustments[0];
+    if (!bestCandidate) continue;
+
+    deltaX += bestCandidate.deltaX;
+    deltaY += bestCandidate.deltaY;
+    adjustedRect = bestCandidate.rect;
+  }
+
+  return { deltaX, deltaY };
+}
 
 // Price bucket colors for cluster rings (green = affordable, yellow = mid, red = expensive)
 const CLUSTER_RING_COLORS = {
@@ -538,7 +771,9 @@ const MarkerPinContent = React.memo(function MarkerPinContent({
         <div
           className={cn(
             "w-3 h-3 rounded-full shadow-md transition-transform duration-200",
-            isViewed ? "bg-surface-container-highest ring-2 ring-outline-variant/50" : "bg-on-surface ring-2 ring-white shadow-lg",
+            isViewed
+              ? "bg-surface-container-highest ring-2 ring-outline-variant/50"
+              : "bg-on-surface ring-2 ring-white shadow-lg",
             "group-hover/marker:scale-125"
           )}
         />
@@ -552,8 +787,12 @@ const MarkerPinContent = React.memo(function MarkerPinContent({
       <div
         className={cn(
           "flex items-center justify-center bg-surface-container-lowest text-on-surface px-4 py-2 rounded-full font-display font-semibold text-sm transition-all duration-300 shadow-[0_10px_40px_0px_rgba(27,28,25,0.06)] border border-outline-variant/20 group-hover/marker:bg-on-surface group-hover/marker:text-surface-canvas group-hover/marker:scale-110 group-hover/marker:z-10",
-          (isHovered || isActive) && "bg-on-surface text-surface-canvas scale-[1.15] shadow-lg z-20 ring-2 ring-primary/40",
-          isViewed && !isHovered && !isActive && "bg-surface-container-high text-on-surface-variant border-outline-variant/10"
+          (isHovered || isActive) &&
+            "bg-on-surface text-surface-canvas scale-[1.15] shadow-[0_14px_32px_rgba(27,28,25,0.16)] z-20",
+          isViewed &&
+            !isHovered &&
+            !isActive &&
+            "bg-surface-container-high text-on-surface-variant border-outline-variant/10"
         )}
       >
         {formatPrice(price)}
@@ -676,7 +915,7 @@ const MapMarkerItem = React.memo(function MapMarkerItem({
       <div
         ref={refCallback}
         className={cn(
-          "relative cursor-pointer group/marker animate-[fadeIn_200ms_ease-out] motion-reduce:animate-none min-w-[44px] min-h-[44px] flex items-center justify-center",
+          "relative cursor-pointer group/marker animate-[fadeIn_200ms_ease-out] motion-reduce:animate-none min-w-[44px] min-h-[44px] flex items-center justify-center outline-none",
           "transition-all duration-200 [transition-timing-function:cubic-bezier(0.34,1.56,0.64,1)]",
           isHovered && "scale-[1.15] z-50",
           isActive && !isHovered && "z-40",
@@ -724,10 +963,10 @@ const MapMarkerItem = React.memo(function MapMarkerItem({
             )}
           />
         )}
-        {/* Keyboard focus ring - solid visible ring distinct from hover animation */}
+        {/* Keyboard focus halo - neutral shadow without a bright accent border */}
         {isKeyboardFocused && (
           <div
-            className="absolute -inset-3 rounded-full border-[3px] border-blue-500 pointer-events-none shadow-[0_0_0_2px_rgba(59,130,246,0.3)]"
+            className="absolute -inset-2 rounded-full pointer-events-none shadow-[0_14px_32px_rgba(27,28,25,0.14)]"
             aria-hidden="true"
           />
         )}
@@ -971,6 +1210,7 @@ export default function MapComponent({
   // M3-MAP FIX: Debounce tile loading state to avoid visual flash on brief pans
   const tileLoadingTimerRef = useRef<NodeJS.Timeout | null>(null);
   const [isSearching, setIsSearching] = useState(false);
+  const [showSearchStatus, setShowSearchStatus] = useState(false);
   const [viewedIds, setViewedIds] = useState<Set<string>>(new Set());
   const [viewportInfoMessage, setViewportInfoMessage] = useState<string | null>(
     null
@@ -990,38 +1230,27 @@ export default function MapComponent({
   );
   const router = useRouter();
   const searchParams = useSearchParams();
+  const {
+    mobileResultsView,
+    setMobileMapOverlayActive,
+    setMobileSheetOverrideLabel,
+    setMobileResultsViewPreference,
+  } = useMobileSearch();
   const transitionContext = useSearchTransitionSafe();
   const {
     activeCategories: activePOICategories,
     toggleCategory: togglePOICategory,
   } = usePOILayerState();
+  const appliedPOICategories = activePOICategories;
 
-  // Map bounds context for "search as move" and dirty tracking
   const {
-    searchAsMove,
-    setSearchAsMove,
     hasUserMoved,
     setHasUserMoved,
-    setBoundsDirty,
-    setCurrentMapBounds,
-    setSearchHandler,
-    setResetHandler,
-    setSearchLocation,
     setProgrammaticMove,
     isProgrammaticMoveRef,
   } = useMapBounds();
 
   const { setActivePanBounds } = useActivePanBoundsSetter();
-
-  // Banner visibility from context
-  const {
-    showBanner,
-    showLocationConflict,
-    onSearch,
-    onReset,
-    areaCount,
-    isAreaCountLoading,
-  } = useMapMovedBanner();
 
   const mapRef = useRef<MapRef | null>(null);
   const mapContainerRef = useRef<HTMLDivElement | null>(null);
@@ -1029,7 +1258,15 @@ export default function MapComponent({
     useState<HTMLDivElement | null>(null);
   const [mapPaneSize, setMapPaneSize] = useState({ width: 0, height: 0 });
   const selectedPopupCardRef = useRef<HTMLDivElement | null>(null);
-  const [showResetToResults, setShowResetToResults] = useState(false);
+  const selectedPopupCloseButtonRef = useRef<HTMLButtonElement | null>(null);
+  const popupFocusOriginRef = useRef<DesktopPopupFocusOrigin>(null);
+  const [desktopPopupSize, setDesktopPopupSize] = useState<PopupSize>({
+    width: DESKTOP_POPUP_FALLBACK_CARD_WIDTH_PX,
+    height: DESKTOP_POPUP_FALLBACK_CARD_HEIGHT_PX,
+  });
+  const [popupPlacementRevision, setPopupPlacementRevision] = useState(0);
+  const handledDesktopPopupCorrectionTokenRef = useRef<string | null>(null);
+  const [showMobileToolsSheet, setShowMobileToolsSheet] = useState(false);
   const debounceTimer = useRef<NodeJS.Timeout | null>(null);
   const lastSearchTimeRef = useRef<number>(0);
   const pendingBoundsRef = useRef<{
@@ -1040,11 +1277,11 @@ export default function MapComponent({
   } | null>(null);
   const throttleTimeoutRef = useRef<NodeJS.Timeout | null>(null);
   const searchSafetyTimeoutRef = useRef<NodeJS.Timeout | null>(null);
+  const searchStatusTimerRef = useRef<NodeJS.Timeout | null>(null);
   const onMoveThrottleRef = useRef<NodeJS.Timeout | null>(null);
-  // Ref to hold the latest searchAsMove value for use inside debounce/throttle callbacks.
-  // These callbacks capture refs (not state), so they always see the current value
-  // even if searchAsMove state changed after the callback was scheduled.
-  const searchAsMoveRef = useRef<boolean>(true);
+  const hasCompletedInitialMobileViewportSyncRef = useRef(false);
+  const hasPendingRealUserMoveRef = useRef(false);
+  const hasPerformedInitialMobileResultsFitRef = useRef(false);
   const [isFullscreen, setIsFullscreen] = useState(false);
   const [canFullscreen, setCanFullscreen] = useState(false);
   // P2-FIX (#79): Ref to hold latest executeMapSearch to prevent stale closure in nested timeouts
@@ -1059,15 +1296,12 @@ export default function MapComponent({
   >(null);
   // Track pending search after zoom-out (user-initiated zoom that should trigger search)
   const pendingSearchAfterZoomRef = useRef(false);
+  // Programmatic camera changes (marker focus, URL restore, cluster expand) can
+  // emit one extra synthetic moveend after the main animation settles. Ignore
+  // the follow-up event so it doesn't rewrite URL bounds or clear selection.
+  const suppressNextSyntheticMoveEndRef = useRef(false);
   // Track last map center to detect resize-triggered moveEnd events (center barely moves)
   const lastCenterRef = useRef<{ lat: number; lng: number } | null>(null);
-  // Track URL bounds for reset functionality
-  const urlBoundsRef = useRef<{
-    minLng: number;
-    maxLng: number;
-    minLat: number;
-    maxLat: number;
-  } | null>(null);
   // P2-FIX (#154): Store numeric bounds for deduplication instead of string
   // String comparison with toFixed can have floating-point precision issues
   const lastSearchBoundsRef = useRef<{
@@ -1103,6 +1337,47 @@ export default function MapComponent({
       previewBackgroundClickGuardTimeoutRef.current = null;
     }, 250);
   }, [clearPreviewBackgroundClickGuard, usesPreviewSelection]);
+  const captureDesktopPopupMarkerOrigin = useCallback((listingId: string) => {
+    popupFocusOriginRef.current = {
+      type: "marker",
+      listingId,
+    };
+  }, []);
+  const captureDesktopPopupListOrigin = useCallback((listingId: string) => {
+    if (typeof document === "undefined") {
+      popupFocusOriginRef.current = {
+        type: "list",
+        listingId,
+        element: null,
+      };
+      return;
+    }
+
+    const activeElement =
+      document.activeElement instanceof HTMLElement ? document.activeElement : null;
+    const trigger = activeElement?.closest(
+      `[data-show-on-map-id="${listingId}"]`
+    );
+
+    popupFocusOriginRef.current = {
+      type: "list",
+      listingId,
+      element: trigger instanceof HTMLElement ? trigger : null,
+    };
+  }, []);
+  const restoreDesktopPopupOriginFocus = useCallback(() => {
+    const origin = popupFocusOriginRef.current;
+    popupFocusOriginRef.current = null;
+    if (!origin) return;
+
+    if (origin.type === "list" && origin.element?.isConnected) {
+      origin.element.focus();
+      return;
+    }
+
+    const markerEl = markerRefs.current.get(origin.listingId);
+    markerEl?.focus();
+  }, []);
   const dismissPreviewSelection = useCallback(() => {
     if (!usesPreviewSelection) return;
     clearPreviewBackgroundClickGuard();
@@ -1115,18 +1390,38 @@ export default function MapComponent({
     setSelectedListing,
     setActive,
   ]);
-  const handleSelectedListingClose = useCallback(() => {
+  const dismissDesktopPopupSelection = useCallback(
+    ({ restoreFocus = false }: { restoreFocus?: boolean } = {}) => {
+      if (!usesPopupSelection) return;
+      lastMapActiveRef.current = null;
+      setSelectedListing(null);
+      setActive(null);
+
+      if (restoreFocus) {
+        setTimeout(() => {
+          if (!isMountedRef.current) return;
+          restoreDesktopPopupOriginFocus();
+        }, 0);
+      } else {
+        popupFocusOriginRef.current = null;
+      }
+    },
+    [
+      usesPopupSelection,
+      setSelectedListing,
+      setActive,
+      restoreDesktopPopupOriginFocus,
+    ]
+  );
+  const handleSelectedListingClose = useCallback((restoreFocus = true) => {
     if (usesPreviewSelection) {
       dismissPreviewSelection();
       return;
     }
-    setSelectedListing(null);
-  }, [usesPreviewSelection, dismissPreviewSelection, setSelectedListing]);
+    dismissDesktopPopupSelection({ restoreFocus });
+  }, [usesPreviewSelection, dismissPreviewSelection, dismissDesktopPopupSelection]);
   // Safety timeout: clear programmatic move flag if moveEnd doesn't fire
   const programmaticClearTimeoutRef = useRef<NodeJS.Timeout | null>(null);
-  const popupContainmentTimeoutRef = useRef<NodeJS.Timeout | null>(null);
-  const pendingPopupContainmentTokenRef = useRef<string | null>(null);
-  const handledPopupContainmentTokenRef = useRef<string | null>(null);
   // Auto-zoom: fire once per search context when results are empty and no filters active
   const hasAutoZoomedRef = useRef(false);
   // Ref for sourcedata handler cleanup
@@ -1294,7 +1589,7 @@ export default function MapComponent({
         // P0 Issue #25: Guard against stale callback after unmount
         if (!isMountedRef.current) return;
 
-        // Mark as programmatic move to prevent banner showing
+        // Mark as programmatic move to prevent follow-up auto-search from firing.
         setProgrammaticMove(true);
         isClusterExpandingRef.current = true;
         pendingSearchAfterZoomRef.current = true;
@@ -1423,7 +1718,7 @@ export default function MapComponent({
     updateUnclusteredListings,
   ]);
 
-  // Refresh markers when listings data changes (search-as-move updates)
+  // Refresh markers when listings data changes after map-driven searches.
   useEffect(() => {
     if (!isMapLoaded || !useClustering || listings.length === 0) return;
 
@@ -1792,185 +2087,298 @@ export default function MapComponent({
   );
 
   // Mobile-aware fitBounds padding: on phone viewports the collapsed bottom
-  // sheet covers ~15% of the viewport, so we need extra bottom padding to
-  // keep markers visible above the sheet.
+  // sheet still obscures the lower edge of the map, so we add bottom padding
+  // to keep markers visible above the compact strip.
   const fitBoundsPadding = useMemo(() => {
     if (isPhoneViewport) {
       const bottomSheetPx = Math.round(
-        SNAP_COLLAPSED * (typeof window !== "undefined" ? window.innerHeight : 800)
+        SNAP_COLLAPSED *
+          (typeof window !== "undefined" ? window.innerHeight : 800)
       );
       return { top: 50, bottom: bottomSheetPx + 60, left: 50, right: 50 };
     }
     return { top: 50, bottom: 50, left: 50, right: 50 };
   }, [isPhoneViewport]);
 
-  const popupContainmentToken = useMemo(() => {
-    if (!usesPopupSelection || !selectedListing) return null;
-    return `${selectedListing.id}:${mapPaneSize.width}:${mapPaneSize.height}:${isFullscreen ? "1" : "0"}`;
-  }, [
-    usesPopupSelection,
-    selectedListing,
-    mapPaneSize.width,
-    mapPaneSize.height,
-    isFullscreen,
-  ]);
-
-  const clearPopupContainmentTimeout = useCallback(() => {
-    if (popupContainmentTimeoutRef.current) {
-      clearTimeout(popupContainmentTimeoutRef.current);
-      popupContainmentTimeoutRef.current = null;
-    }
-  }, []);
-
-  const runPopupContainmentCheck = useCallback(
-    (token: string | null = popupContainmentToken) => {
-      if (
-        !token ||
-        token === handledPopupContainmentTokenRef.current ||
-        !usesPopupSelection ||
-        isPhoneViewport ||
-        !selectedListing
-      ) {
-        return false;
-      }
-
-      const mapInstance = mapRef.current?.getMap();
-      const container = mapContainerRef.current;
-      const popupCard = selectedPopupCardRef.current;
-      if (!mapInstance || !container || !popupCard) {
-        return false;
-      }
-
-      const containerRect = container.getBoundingClientRect();
-      if (containerRect.width <= 0 || containerRect.height <= 0) {
-        return false;
-      }
-
-      const popupRoot = popupCard.closest(".maplibregl-popup") as
-        | HTMLElement
-        | null;
-      const popupRect =
-        popupRoot?.getBoundingClientRect() ?? popupCard.getBoundingClientRect();
-
-      if (popupRect.width <= 0 || popupRect.height <= 0) {
-        return false;
-      }
-
-      const safeRect = {
-        top: containerRect.top + DESKTOP_POPUP_SAFE_AREA.top,
-        right: containerRect.right - DESKTOP_POPUP_SAFE_AREA.right,
-        bottom: containerRect.bottom - DESKTOP_POPUP_SAFE_AREA.bottom,
-        left: containerRect.left + DESKTOP_POPUP_SAFE_AREA.left,
-      };
-
-      let deltaX = 0;
-      if (popupRect.left < safeRect.left) {
-        deltaX = safeRect.left - popupRect.left;
-      } else if (popupRect.right > safeRect.right) {
-        deltaX = safeRect.right - popupRect.right;
-      }
-
-      let deltaY = 0;
-      if (popupRect.top < safeRect.top) {
-        deltaY = safeRect.top - popupRect.top;
-      } else if (popupRect.bottom > safeRect.bottom) {
-        deltaY = safeRect.bottom - popupRect.bottom;
-      }
-
-      if (
-        Math.abs(deltaX) <= POPUP_CONTAINMENT_TOLERANCE_PX &&
-        Math.abs(deltaY) <= POPUP_CONTAINMENT_TOLERANCE_PX
-      ) {
-        handledPopupContainmentTokenRef.current = token;
-        pendingPopupContainmentTokenRef.current = null;
-        return false;
-      }
-
-      const containerWidth = container.clientWidth || containerRect.width;
-      const containerHeight = container.clientHeight || containerRect.height;
-      const nextCenter = mapInstance.unproject([
-        containerWidth / 2 - deltaX,
-        containerHeight / 2 - deltaY,
-      ]);
-
-      setProgrammaticMove(true);
-      if (programmaticClearTimeoutRef.current) {
-        clearTimeout(programmaticClearTimeoutRef.current);
-      }
-      programmaticClearTimeoutRef.current = setTimeout(() => {
-        if (isProgrammaticMoveRef.current) {
-          setProgrammaticMove(false);
-        }
-      }, PROGRAMMATIC_MOVE_TIMEOUT_MS);
-
-      mapInstance.easeTo({
-        center: [nextCenter.lng, nextCenter.lat],
-        duration: reducedMotion ? 0 : POPUP_CONTAINMENT_ANIMATION_MS,
-      });
-
-      handledPopupContainmentTokenRef.current = token;
-      pendingPopupContainmentTokenRef.current = null;
-      return true;
-    },
-    [
-      popupContainmentToken,
-      usesPopupSelection,
-      isPhoneViewport,
-      selectedListing,
-      setProgrammaticMove,
-      isProgrammaticMoveRef,
-      reducedMotion,
-    ]
-  );
-
-  const schedulePopupContainmentCheck = useCallback(
-    (token: string | null = popupContainmentToken) => {
-      if (
-        !token ||
-        token === handledPopupContainmentTokenRef.current ||
-        !usesPopupSelection ||
-        isPhoneViewport
-      ) {
-        return;
-      }
-
-      clearPopupContainmentTimeout();
-
-      if (isProgrammaticMoveRef.current) {
-        pendingPopupContainmentTokenRef.current = token;
-        return;
-      }
-
-      popupContainmentTimeoutRef.current = setTimeout(() => {
-        popupContainmentTimeoutRef.current = null;
-        runPopupContainmentCheck(token);
-      }, 0);
-    },
-    [
-      popupContainmentToken,
-      usesPopupSelection,
-      isPhoneViewport,
-      clearPopupContainmentTimeout,
-      isProgrammaticMoveRef,
-      runPopupContainmentCheck,
-    ]
+  const clusterConfig = useMemo(
+    () =>
+      isPhoneViewport === true
+        ? { maxZoom: 10, radius: 32 }
+        : { maxZoom: 14, radius: 50 },
+    [isPhoneViewport]
   );
 
   useEffect(() => {
-    if (!popupContainmentToken) {
-      clearPopupContainmentTimeout();
-      pendingPopupContainmentTokenRef.current = null;
-      handledPopupContainmentTokenRef.current = null;
+    if (!usesPopupSelection || isPhoneViewport === true || !selectedListing) {
       return;
     }
 
-    pendingPopupContainmentTokenRef.current = popupContainmentToken;
-    schedulePopupContainmentCheck(popupContainmentToken);
+    const popupCard = selectedPopupCardRef.current;
+    if (!popupCard) return;
+
+    const updatePopupSize = () => {
+      const rect = popupCard.getBoundingClientRect();
+      if (rect.width <= 0 || rect.height <= 0) return;
+
+      setDesktopPopupSize((current) => {
+        const nextWidth = Math.round(rect.width);
+        const nextHeight = Math.round(rect.height);
+        if (
+          current.width === nextWidth &&
+          current.height === nextHeight
+        ) {
+          return current;
+        }
+
+        return {
+          width: nextWidth,
+          height: nextHeight,
+        };
+      });
+    };
+
+    updatePopupSize();
+
+    if (typeof ResizeObserver === "undefined") {
+      return;
+    }
+
+    const observer = new ResizeObserver(() => {
+      updatePopupSize();
+    });
+
+    observer.observe(popupCard);
+    return () => observer.disconnect();
+  }, [usesPopupSelection, isPhoneViewport, selectedListing?.id]);
+
+  const getDesktopPopupAvoidRects = useCallback((): LocalRect[] => {
+    const container = mapContainerRef.current;
+    if (!container) return [];
+
+    const containerRect = container.getBoundingClientRect();
+
+    return Array.from(
+      container.querySelectorAll<HTMLElement>("[data-map-avoid]")
+    )
+      .map((element) => {
+        const rect = element.getBoundingClientRect();
+        if (rect.width <= 0 || rect.height <= 0) return null;
+
+        return createLocalRect({
+          left: rect.left - containerRect.left,
+          top: rect.top - containerRect.top,
+          width: rect.width,
+          height: rect.height,
+        });
+      })
+      .filter((rect): rect is LocalRect => rect !== null);
+  }, []);
+
+  const getDesktopPopupPlacementForListing = useCallback(
+    (listing: Listing): DesktopPopupPlacement | null => {
+      const mapInstance = mapRef.current?.getMap();
+      const container = mapContainerRef.current;
+      if (!mapInstance || !container) return null;
+
+      const paneWidth =
+        mapPaneSize.width ||
+        container.clientWidth ||
+        container.getBoundingClientRect().width;
+      const paneHeight =
+        mapPaneSize.height ||
+        container.clientHeight ||
+        container.getBoundingClientRect().height;
+
+      if (paneWidth <= 0 || paneHeight <= 0) {
+        return null;
+      }
+
+      const projectedPoint = mapInstance.project([
+        listing.location.lng,
+        listing.location.lat,
+      ]);
+
+      const point = {
+        x: projectedPoint.x,
+        y: projectedPoint.y,
+      };
+      const safeRect = createLocalRect({
+        left: DESKTOP_POPUP_SAFE_AREA.left,
+        top: DESKTOP_POPUP_SAFE_AREA.top,
+        width:
+          paneWidth -
+          DESKTOP_POPUP_SAFE_AREA.left -
+          DESKTOP_POPUP_SAFE_AREA.right,
+        height:
+          paneHeight -
+          DESKTOP_POPUP_SAFE_AREA.top -
+          DESKTOP_POPUP_SAFE_AREA.bottom,
+      });
+      const avoidRects = getDesktopPopupAvoidRects();
+
+      let bestPlacement: DesktopPopupPlacement | null = null;
+
+      for (const [priorityIndex, anchor] of DESKTOP_POPUP_ANCHOR_PRIORITY.entries()) {
+        const popupRect = getDesktopPopupRectForAnchor(
+          anchor,
+          point,
+          desktopPopupSize
+        );
+        const overflowScore = getRectOverflowScore(popupRect, safeRect);
+        const overlapScore = avoidRects.reduce(
+          (total, avoidRect) => total + getRectIntersectionArea(popupRect, avoidRect),
+          0
+        );
+        const { deltaX, deltaY } = getPopupAdjustmentDelta(
+          popupRect,
+          safeRect,
+          avoidRects
+        );
+        const requiresCameraShift =
+          Math.abs(deltaX) > POPUP_CONTAINMENT_TOLERANCE_PX ||
+          Math.abs(deltaY) > POPUP_CONTAINMENT_TOLERANCE_PX;
+        const candidate: DesktopPopupPlacement = {
+          anchor,
+          popupRect,
+          overflowScore,
+          overlapScore,
+          requiresCameraShift,
+          deltaX,
+          deltaY,
+        };
+
+        const candidateScore =
+          overflowScore * 1_000_000 + overlapScore * 1_000 + priorityIndex;
+        const bestScore =
+          bestPlacement === null
+            ? Number.POSITIVE_INFINITY
+            : bestPlacement.overflowScore * 1_000_000 +
+              bestPlacement.overlapScore * 1_000 +
+              DESKTOP_POPUP_ANCHOR_PRIORITY.indexOf(bestPlacement.anchor);
+
+        if (candidateScore < bestScore) {
+          bestPlacement = candidate;
+        }
+      }
+
+      return bestPlacement;
+    },
+    [
+      desktopPopupSize,
+      getDesktopPopupAvoidRects,
+      mapPaneSize.height,
+      mapPaneSize.width,
+    ]
+  );
+
+  const desktopPopupPlacement = useMemo(() => {
+    if (!usesPopupSelection || isPhoneViewport === true || !selectedListing) {
+      return null;
+    }
+
+    return getDesktopPopupPlacementForListing(selectedListing);
   }, [
-    popupContainmentToken,
-    schedulePopupContainmentCheck,
-    clearPopupContainmentTimeout,
+    usesPopupSelection,
+    isPhoneViewport,
+    selectedListing,
+    getDesktopPopupPlacementForListing,
+    popupPlacementRevision,
   ]);
+
+  const desktopPopupCorrectionToken = useMemo(() => {
+    if (!usesPopupSelection || isPhoneViewport === true || !selectedListing) {
+      return null;
+    }
+
+    return `${selectedListing.id}:${mapPaneSize.width}:${mapPaneSize.height}:${desktopPopupSize.width}:${desktopPopupSize.height}:${isFullscreen ? "1" : "0"}:${popupPlacementRevision}`;
+  }, [
+    usesPopupSelection,
+    isPhoneViewport,
+    selectedListing,
+    mapPaneSize.width,
+    mapPaneSize.height,
+    desktopPopupSize.width,
+    desktopPopupSize.height,
+    isFullscreen,
+    popupPlacementRevision,
+  ]);
+
+  useEffect(() => {
+    if (!desktopPopupCorrectionToken) {
+      handledDesktopPopupCorrectionTokenRef.current = null;
+      return;
+    }
+
+    if (
+      handledDesktopPopupCorrectionTokenRef.current ===
+      desktopPopupCorrectionToken
+    ) {
+      return;
+    }
+
+    if (!desktopPopupPlacement) {
+      return;
+    }
+
+    if (isProgrammaticMoveRef.current) {
+      return;
+    }
+
+    if (!desktopPopupPlacement.requiresCameraShift) {
+      handledDesktopPopupCorrectionTokenRef.current =
+        desktopPopupCorrectionToken;
+      return;
+    }
+
+    const mapInstance = mapRef.current?.getMap();
+    const container = mapContainerRef.current;
+    if (!mapInstance || !container) {
+      return;
+    }
+
+    const containerWidth =
+      container.clientWidth || container.getBoundingClientRect().width;
+    const containerHeight =
+      container.clientHeight || container.getBoundingClientRect().height;
+    const nextCenter = mapInstance.unproject([
+      containerWidth / 2 - desktopPopupPlacement.deltaX,
+      containerHeight / 2 - desktopPopupPlacement.deltaY,
+    ]);
+
+    handledDesktopPopupCorrectionTokenRef.current = desktopPopupCorrectionToken;
+    setProgrammaticMove(true);
+    if (programmaticClearTimeoutRef.current) {
+      clearTimeout(programmaticClearTimeoutRef.current);
+    }
+    programmaticClearTimeoutRef.current = setTimeout(() => {
+      if (isProgrammaticMoveRef.current) {
+        setProgrammaticMove(false);
+      }
+    }, PROGRAMMATIC_MOVE_TIMEOUT_MS);
+
+    mapInstance.easeTo({
+      center: [nextCenter.lng, nextCenter.lat],
+      duration: reducedMotion ? 0 : DESKTOP_POPUP_CORRECTION_ANIMATION_MS,
+    });
+  }, [
+    desktopPopupCorrectionToken,
+    desktopPopupPlacement,
+    reducedMotion,
+    setProgrammaticMove,
+    isProgrammaticMoveRef,
+  ]);
+
+  useEffect(() => {
+    if (!usesPopupSelection || isPhoneViewport === true || !selectedListing) {
+      return;
+    }
+
+    const focusTimeout = setTimeout(() => {
+      selectedPopupCloseButtonRef.current?.focus({ preventScroll: true });
+    }, 0);
+
+    return () => clearTimeout(focusTimeout);
+  }, [usesPopupSelection, isPhoneViewport, selectedListing?.id]);
 
   useEffect(() => {
     if (typeof document === "undefined") return;
@@ -2058,7 +2466,6 @@ export default function MapComponent({
     programmaticClearTimeoutRef.current = setTimeout(() => {
       if (isProgrammaticMoveRef.current) setProgrammaticMove(false);
     }, PROGRAMMATIC_MOVE_TIMEOUT_MS);
-    setShowResetToResults(false);
     mapRef.current.fitBounds(
       [
         [minLng, minLat],
@@ -2071,7 +2478,26 @@ export default function MapComponent({
     isProgrammaticMoveRef,
     listings,
     setProgrammaticMove,
-    setShowResetToResults,
+  ]);
+
+  useEffect(() => {
+    if (isPhoneViewport !== true || !isMapLoaded || listings.length === 0) {
+      return;
+    }
+    if (hasPerformedInitialMobileResultsFitRef.current || hasUserMoved) {
+      return;
+    }
+
+    hasPerformedInitialMobileResultsFitRef.current = true;
+    hasCompletedInitialMobileViewportSyncRef.current = false;
+    hasPendingRealUserMoveRef.current = false;
+    handleFitAllResults();
+  }, [
+    handleFitAllResults,
+    hasUserMoved,
+    isMapLoaded,
+    isPhoneViewport,
+    listings.length,
   ]);
 
   const handleToggleFullscreen = useCallback(async () => {
@@ -2101,64 +2527,10 @@ export default function MapComponent({
       }
     }
 
+    setIsSearching(false);
+    setShowMobileToolsSheet(false);
     hideMap();
   }, [hideMap]);
-
-  // Auto-fly to listings on search (but not on map move)
-  useEffect(() => {
-    if (!mapRef.current || listings.length === 0) return;
-
-    // Skip auto-fit when controlled by parent or explicitly disabled
-    if (isControlledViewState || disableAutoFit) return;
-
-    // If "search as I move" is ON, the user controls the viewport — don't auto-fly
-    if (searchAsMove) return;
-
-    // If we have map bounds in the URL, it means the user is panning/zooming manually
-    // So we shouldn't auto-fly the map
-    if (searchParams.has("minLat")) return;
-
-    const points = listings.map((l) => ({
-      lng: l.location.lng,
-      lat: l.location.lat,
-    }));
-
-    // Mark as programmatic move to prevent banner showing
-    setProgrammaticMove(true);
-
-    if (points.length === 1) {
-      mapRef.current.flyTo({
-        center: [points[0].lng, points[0].lat],
-        zoom: 14,
-        duration: 2000,
-      });
-    } else {
-      // Calculate bounds
-      const minLng = Math.min(...points.map((p) => p.lng));
-      const maxLng = Math.max(...points.map((p) => p.lng));
-      const minLat = Math.min(...points.map((p) => p.lat));
-      const maxLat = Math.max(...points.map((p) => p.lat));
-
-      mapRef.current.fitBounds(
-        [
-          [minLng, minLat],
-          [maxLng, maxLat],
-        ],
-        {
-          padding: fitBoundsPadding,
-          duration: 2000,
-        }
-      );
-    }
-  }, [
-    listings,
-    searchParams,
-    searchAsMove,
-    setProgrammaticMove,
-    disableAutoFit,
-    isControlledViewState,
-    fitBoundsPadding,
-  ]);
 
   // Auto-zoom-out: when map loads empty with no active filters, zoom out once
   // Build a key from non-bounds params so we reset per search context
@@ -2235,20 +2607,6 @@ export default function MapComponent({
     win.__e2eMapRef = mapRef.current.getMap();
     win.__e2eSetProgrammaticMove = setProgrammaticMove;
     win.__e2eUpdateMarkers = updateUnclusteredListings;
-    // Allow E2E tests to disable "Search as I move" to prevent the map from
-    // calling router.replace() during pagination tests with load-more delays.
-    // The wrapper also updates searchAsMoveRef synchronously so that any
-    // already-scheduled debounce/throttle callbacks see the new value immediately
-    // without waiting for a React re-render cycle.
-    win.__e2eSetSearchAsMove = (value: boolean) => {
-      searchAsMoveRef.current = value;
-      // Also set the frozen flag that executeMapSearch checks directly.
-      // This provides a belt-and-suspenders guard: the ref prevents debounce
-      // callbacks from calling executeMapSearch, and the frozen flag prevents
-      // any remaining path from actually executing the search.
-      win["__e2eMapSearchFrozen"] = !value;
-      setSearchAsMove(value);
-    };
 
     // Signal to E2E tests that the map ref is ready (not just DOM-present).
     // waitForMapReady() waits for this attribute instead of falling back to
@@ -2276,7 +2634,6 @@ export default function MapComponent({
       delete win.__e2eMapRef;
       delete win.__e2eSetProgrammaticMove;
       delete win.__e2eUpdateMarkers;
-      delete win.__e2eSetSearchAsMove;
       delete win.__e2eSimulateUserPan;
       delete win.__e2eSimulateUserZoom;
       mapContainer?.removeAttribute("data-map-ready");
@@ -2290,7 +2647,7 @@ export default function MapComponent({
 
       const { lat, lng, bbox, zoom } = event.detail;
 
-      // Mark as programmatic move to prevent banner showing
+      // Mark as programmatic move to prevent follow-up auto-search from firing.
       setProgrammaticMove(true);
 
       // If bbox (bounding box) is available, use fitBounds for a better view
@@ -2348,6 +2705,8 @@ export default function MapComponent({
     // P1-FIX (#106): Clear selectedListing popup if the listing no longer exists.
     // Prevents showing stale popup data after search results update.
     if (selectedListing && !listings.find((l) => l.id === selectedListing.id)) {
+      lastMapActiveRef.current = null;
+      popupFocusOriginRef.current = null;
       setSelectedListing(null);
     }
 
@@ -2361,7 +2720,35 @@ export default function MapComponent({
   }, [listings, activeId, setActive, selectedListing, setSelectedListing]);
 
   useEffect(() => {
+    if (searchStatusTimerRef.current) {
+      clearTimeout(searchStatusTimerRef.current);
+      searchStatusTimerRef.current = null;
+    }
+
+    if (!isSearching) {
+      setShowSearchStatus(false);
+      return;
+    }
+
+    setShowSearchStatus(false);
+    searchStatusTimerRef.current = setTimeout(() => {
+      if (isMountedRef.current && isSearching) {
+        setShowSearchStatus(true);
+      }
+    }, MAP_SEARCH_STATUS_DELAY_MS);
+
+    return () => {
+      if (searchStatusTimerRef.current) {
+        clearTimeout(searchStatusTimerRef.current);
+        searchStatusTimerRef.current = null;
+      }
+    };
+  }, [isSearching]);
+
+  useEffect(() => {
     if (!usesOverlaySelection && !isControlledSelection && selectedListing) {
+      lastMapActiveRef.current = null;
+      popupFocusOriginRef.current = null;
       setSelectedListing(null);
     }
   }, [
@@ -2409,12 +2796,12 @@ export default function MapComponent({
       if (searchSafetyTimeoutRef.current) {
         clearTimeout(searchSafetyTimeoutRef.current);
       }
+      if (searchStatusTimerRef.current) {
+        clearTimeout(searchStatusTimerRef.current);
+        searchStatusTimerRef.current = null;
+      }
       if (programmaticClearTimeoutRef.current) {
         clearTimeout(programmaticClearTimeoutRef.current);
-      }
-      if (popupContainmentTimeoutRef.current) {
-        clearTimeout(popupContainmentTimeoutRef.current);
-        popupContainmentTimeoutRef.current = null;
       }
       if (onMoveThrottleRef.current) {
         clearTimeout(onMoveThrottleRef.current);
@@ -2454,7 +2841,6 @@ export default function MapComponent({
       webglCleanupRef.current?.();
       webglCleanupRef.current = null;
       pendingBoundsRef.current = null;
-      urlBoundsRef.current = null;
       lastSearchBoundsRef.current = null;
       lastMapActiveRef.current = null;
     };
@@ -2472,62 +2858,10 @@ export default function MapComponent({
     return () => window.removeEventListener("keydown", handleKeyDown);
   }, [selectedListing, handleSelectedListingClose]);
 
-  // Sync URL bounds to context and track for reset functionality
+  // Reset interaction-only state when the URL changes.
   useEffect(() => {
-    const minLat = searchParams.get("minLat");
-    const maxLat = searchParams.get("maxLat");
-    const minLng = searchParams.get("minLng");
-    const maxLng = searchParams.get("maxLng");
-
-    if (minLat && maxLat && minLng && maxLng) {
-      const pMinLat = safeParseFloat(minLat, -90, 90);
-      const pMaxLat = safeParseFloat(maxLat, -90, 90);
-      const pMinLng = safeParseFloat(minLng, -180, 180);
-      const pMaxLng = safeParseFloat(maxLng, -180, 180);
-      if (
-        pMinLat !== undefined &&
-        pMaxLat !== undefined &&
-        pMinLng !== undefined &&
-        pMaxLng !== undefined
-      ) {
-        urlBoundsRef.current = {
-          minLat: pMinLat,
-          maxLat: pMaxLat,
-          minLng: pMinLng,
-          maxLng: pMaxLng,
-        };
-      }
-    }
-
-    // Extract search location from URL for location conflict detection
-    const locationLabel = searchParams.get("where") || searchParams.get("q");
-    const lat = searchParams.get("lat");
-    const lng = searchParams.get("lng");
-
-    if (locationLabel && lat && lng) {
-      const pLat = safeParseFloat(lat, -90, 90);
-      const pLng = safeParseFloat(lng, -180, 180);
-      setSearchLocation(
-        locationLabel,
-        pLat !== undefined && pLng !== undefined
-          ? { lat: pLat, lng: pLng }
-          : null
-      );
-    } else if (locationLabel) {
-      setSearchLocation(locationLabel, null);
-    } else {
-      setSearchLocation(null, null);
-    }
-
-    // Reset dirty state when URL changes (new search performed)
     setHasUserMoved(false);
-    setBoundsDirty(false);
-    setShowResetToResults(false);
-  }, [searchParams, setSearchLocation, setHasUserMoved, setBoundsDirty]);
-
-  useEffect(() => {
-    setShowResetToResults(false);
-  }, [listings]);
+  }, [searchParams, setHasUserMoved]);
 
   // Suppress mapbox-gl worker communication errors during HMR/Turbopack
   // These are non-fatal and occur when the worker connection is lost during hot reload
@@ -2555,10 +2889,7 @@ export default function MapComponent({
       minLat: number;
       maxLat: number;
     }) => {
-      // E2E: If search-as-move is explicitly disabled via the E2E hook, skip.
-      // This is a secondary guard — the primary guard is in the debounce/throttle
-      // callbacks via searchAsMoveRef. This guard handles the case where
-      // executeMapSearch is called directly (e.g., setSearchHandler).
+      // E2E: allow tests to freeze map-driven URL updates during pagination flows.
       if (typeof window !== "undefined") {
         const win = window as unknown as Record<string, unknown>;
         if (win["__e2eMapSearchFrozen"] === true) return;
@@ -2578,30 +2909,13 @@ export default function MapComponent({
         return; // Bounds haven't meaningfully changed, skip search
       }
       lastSearchBoundsRef.current = { ...bounds };
-
-      const params = new URLSearchParams(searchParams.toString());
-      const hadPointCoords = params.has("lat") && params.has("lng");
-      const legacyLocationLabel =
-        hadPointCoords && !params.has("where") ? params.get("q") : null;
-
-      // Remove single point coordinates since we now have bounds
-      params.delete("lat");
-      params.delete("lng");
-      // Canonicalize legacy selected-point URLs onto `where + bounds`.
-      if (legacyLocationLabel) {
-        params.set("where", legacyLocationLabel);
-        params.delete("q");
-      }
-      // Reset pagination state when bounds change (keyset + offset)
-      params.delete("page");
-      params.delete("cursor");
-      params.delete("cursorStack");
-      params.delete("pageNumber");
-
-      params.set("minLng", bounds.minLng.toString());
-      params.set("maxLng", bounds.maxLng.toString());
-      params.set("minLat", bounds.minLat.toString());
-      params.set("maxLat", bounds.maxLat.toString());
+      const url = buildCanonicalSearchUrl(
+        applySearchQueryChange(
+          normalizeSearchQuery(new URLSearchParams(searchParams.toString())),
+          "map-pan",
+          { bounds }
+        )
+      );
       setViewportInfoMessage(null);
 
       lastSearchTimeRef.current = Date.now();
@@ -2617,7 +2931,6 @@ export default function MapComponent({
       }, 8_000);
       // Use replace to update bounds without creating history entries
       // This prevents Back button from stepping through each map pan position
-      const url = `/search?${params.toString()}`;
       if (
         process.env.NEXT_PUBLIC_ENABLE_CLIENT_SIDE_SEARCH === "true" &&
         typeof window !== "undefined"
@@ -2627,7 +2940,7 @@ export default function MapComponent({
         // so SearchResultsClient + PersistentMapWrapper react to the change.
         window.history.replaceState(null, "", url);
       } else if (transitionContext) {
-        transitionContext.replaceWithTransition(url);
+        transitionContext.replaceWithTransition(url, { reason: "map-pan" });
       } else {
         router.replace(url);
       }
@@ -2639,71 +2952,6 @@ export default function MapComponent({
   useEffect(() => {
     executeMapSearchRef.current = executeMapSearch;
   }, [executeMapSearch]);
-
-  // Keep searchAsMoveRef in sync with searchAsMove state.
-  // Debounce/throttle callbacks use the ref so they always see the current value
-  // even if searchAsMove changed after the callback was scheduled.
-  useEffect(() => {
-    searchAsMoveRef.current = searchAsMove;
-  }, [searchAsMove]);
-
-  // Register search and reset handlers with context (after executeMapSearch is defined)
-  useEffect(() => {
-    // Search handler: execute search with current map bounds
-    setSearchHandler(() => {
-      if (!mapRef.current) return;
-      const map = mapRef.current.getMap();
-      if (!map) return;
-
-      const mapBounds = map.getBounds();
-      if (!mapBounds) return;
-
-      const bounds = {
-        minLng: mapBounds.getWest(),
-        maxLng: mapBounds.getEast(),
-        minLat: mapBounds.getSouth(),
-        maxLat: mapBounds.getNorth(),
-      };
-
-      executeMapSearch(bounds);
-      setHasUserMoved(false);
-      setBoundsDirty(false);
-    });
-
-    // Reset handler: fly back to URL bounds
-    setResetHandler(() => {
-      if (!mapRef.current || !urlBoundsRef.current) return;
-
-      // Mark as programmatic move to prevent banner showing
-      setProgrammaticMove(true);
-      // Safety: clear programmatic flag if moveEnd doesn't fire
-      if (programmaticClearTimeoutRef.current)
-        clearTimeout(programmaticClearTimeoutRef.current);
-      programmaticClearTimeoutRef.current = setTimeout(() => {
-        if (isProgrammaticMoveRef.current) setProgrammaticMove(false);
-      }, PROGRAMMATIC_MOVE_TIMEOUT_MS);
-
-      const { minLng, maxLng, minLat, maxLat } = urlBoundsRef.current;
-      mapRef.current.fitBounds(
-        [
-          [minLng, minLat],
-          [maxLng, maxLat],
-        ],
-        { padding: fitBoundsPadding, duration: 1000 }
-      );
-      setHasUserMoved(false);
-      setBoundsDirty(false);
-    });
-  }, [
-    executeMapSearch,
-    setSearchHandler,
-    setResetHandler,
-    setHasUserMoved,
-    setBoundsDirty,
-    setProgrammaticMove,
-    isProgrammaticMoveRef,
-    fitBoundsPadding,
-  ]);
 
   // When a card's "Show on Map" button sets activeId, reveal the active selection
   // presentation and center the map on the listing.
@@ -2724,8 +2972,12 @@ export default function MapComponent({
       return;
     }
     if (usesOverlaySelection) {
+      if (usesPopupSelection) {
+        captureDesktopPopupListOrigin(listing.id);
+      }
       setSelectedListing(listing);
     }
+
     setProgrammaticMove(true);
     // Safety: clear programmatic flag if moveEnd doesn't fire
     if (programmaticClearTimeoutRef.current)
@@ -2734,19 +2986,68 @@ export default function MapComponent({
       if (isProgrammaticMoveRef.current) setProgrammaticMove(false);
     }, PROGRAMMATIC_MOVE_TIMEOUT_MS);
     const map = mapRef.current;
+    const mapInstance = map?.getMap();
     const currentZoom = map?.getZoom() ?? 12;
     // clusterMaxZoom is 14 — zoom to at least 15 to guarantee the pin is unclustered
     const minZoomToBreakCluster = 15;
     const targetZoom = Math.max(currentZoom, minZoomToBreakCluster);
+    let targetCenter: [number, number] = [
+      listing.location.lng,
+      listing.location.lat,
+    ];
+
+    if (
+      usesPopupSelection &&
+      isPhoneViewport !== true &&
+      mapInstance &&
+      mapContainerRef.current
+    ) {
+      const placement = getDesktopPopupPlacementForListing(listing);
+      if (placement?.requiresCameraShift) {
+        const container = mapContainerRef.current;
+        const containerWidth =
+          container.clientWidth || container.getBoundingClientRect().width;
+        const containerHeight =
+          container.clientHeight || container.getBoundingClientRect().height;
+        const adjustedCenter = mapInstance.unproject([
+          containerWidth / 2 - placement.deltaX,
+          containerHeight / 2 - placement.deltaY,
+        ]);
+
+        targetCenter = [adjustedCenter.lng, adjustedCenter.lat];
+      }
+    }
     map?.easeTo({
-      center: [listing.location.lng, listing.location.lat],
+      center: targetCenter,
       zoom: targetZoom,
-      duration: reducedMotion ? 0 : 400,
+      duration: reducedMotion ? 0 : DESKTOP_POPUP_FOCUS_ANIMATION_MS,
     });
+
+    if (usesPopupSelection && isPhoneViewport !== true && typeof window !== "undefined") {
+      const revisionTimers = [
+        window.setTimeout(() => {
+          setPopupPlacementRevision((current) => current + 1);
+        }, 0),
+        window.setTimeout(() => {
+          setPopupPlacementRevision((current) => current + 1);
+        }, Math.max(Math.round(DESKTOP_POPUP_FOCUS_ANIMATION_MS / 2), 120)),
+        window.setTimeout(() => {
+          setPopupPlacementRevision((current) => current + 1);
+        }, DESKTOP_POPUP_FOCUS_ANIMATION_MS + 40),
+      ];
+
+      return () => {
+        revisionTimers.forEach((timerId) => window.clearTimeout(timerId));
+      };
+    }
   }, [
     activeId,
     listings,
     usesOverlaySelection,
+    usesPopupSelection,
+    isPhoneViewport,
+    captureDesktopPopupListOrigin,
+    getDesktopPopupPlacementForListing,
     setProgrammaticMove,
     isProgrammaticMoveRef,
     setSelectedListing,
@@ -2757,6 +3058,14 @@ export default function MapComponent({
   // Without this, the function captures state values at definition time which can become stale.
   const handleMoveEnd = useCallback(
     (e: ViewStateChangeEvent) => {
+      setPopupPlacementRevision((current) => current + 1);
+      const isMobileViewport = isPhoneViewport === true;
+      const hasOriginalEvent = Boolean(
+        (e as ViewStateChangeEvent & { originalEvent?: Event }).originalEvent
+      );
+      if (hasOriginalEvent) {
+        suppressNextSyntheticMoveEndRef.current = false;
+      }
       // Track zoom for two-tier pin display
       setCurrentZoom(e.viewState.zoom);
       // Debounce updateUnclusteredListings to batch rapid moveEnd events (100ms)
@@ -2794,9 +3103,6 @@ export default function MapComponent({
       // Fire onMoveEnd callback (controlled component API)
       onMoveEndProp?.(viewStateChangeEvent);
 
-      // Always update current bounds in context for location conflict detection
-      setCurrentMapBounds(bounds);
-
       // Track center for resize-triggered moveEnd detection
       const center = { lat: e.viewState.latitude, lng: e.viewState.longitude };
 
@@ -2810,18 +3116,42 @@ export default function MapComponent({
           programmaticClearTimeoutRef.current = null;
         }
         setProgrammaticMove(false); // Clear immediately on moveend instead of waiting for timeout
-        setShowResetToResults(false);
         setActivePanBounds(null); // Clear active pan bounds
+        if (isMobileViewport) {
+          hasCompletedInitialMobileViewportSyncRef.current = true;
+          hasPendingRealUserMoveRef.current = false;
+        }
         // CLUSTER FIX: Don't clear isClusterExpandingRef here - wait for onIdle
         // Tiles may not be loaded yet, clearing here causes empty markers
         // Zoom-out button is user-initiated — allow search to proceed
         if (!pendingSearchAfterZoomRef.current) {
+          suppressNextSyntheticMoveEndRef.current = true;
           lastCenterRef.current = center;
           return;
         }
         pendingSearchAfterZoomRef.current = false;
         skipCenterDedup = true;
         // Fall through to search logic below
+      }
+
+      if (!hasOriginalEvent && suppressNextSyntheticMoveEndRef.current) {
+        suppressNextSyntheticMoveEndRef.current = false;
+        lastCenterRef.current = center;
+        if (isMobileViewport) {
+          hasCompletedInitialMobileViewportSyncRef.current = true;
+          hasPendingRealUserMoveRef.current = false;
+        }
+        return;
+      }
+
+      // Desktop map lifecycle can emit synthetic moveend events after initial
+      // URL restoration, resize, popup placement correction, and other
+      // programmatic camera work. Those should never rewrite URL bounds or
+      // trigger a search unless we explicitly queued one (skipCenterDedup).
+      if (!isMobileViewport && !hasOriginalEvent && !skipCenterDedup) {
+        setActivePanBounds(null);
+        lastCenterRef.current = center;
+        return;
       }
 
       // Clear active pan bounds since move has ended
@@ -2842,40 +3172,44 @@ export default function MapComponent({
         return;
       }
 
+      const hasRealMobileGesture =
+        hasPendingRealUserMoveRef.current || hasOriginalEvent;
+
+      if (isMobileViewport && !hasRealMobileGesture) {
+        hasCompletedInitialMobileViewportSyncRef.current = true;
+        return;
+      }
+
+      hasPendingRealUserMoveRef.current = false;
+      if (isMobileViewport) {
+        hasCompletedInitialMobileViewportSyncRef.current = true;
+      }
+
       // Mark that user has manually moved the map
       setHasUserMoved(true);
-      setShowResetToResults(
-        shouldShowResetToResultsControl(bounds, listings)
-      );
 
-      // If search-as-move is ON, trigger search with throttle/debounce
-      if (searchAsMove) {
-        // Don't trigger search when zoomed out too far — viewport exceeds server max span
-        const latSpan = bounds.maxLat - bounds.minLat;
-        // H2-MAP FIX: Handle antimeridian crossing (west > east when crossing 180/-180)
-        const crossesAntimeridian = bounds.minLng > bounds.maxLng;
-        const lngSpan = crossesAntimeridian
-          ? 180 - bounds.minLng + (bounds.maxLng + 180)
-          : bounds.maxLng - bounds.minLng;
-        if (
-          latSpan > MAP_FETCH_MAX_LAT_SPAN ||
-          lngSpan > MAP_FETCH_MAX_LNG_SPAN
-        ) {
-          setBoundsDirty(true);
-          setViewportInfoMessage("Zoom in further to update results");
-          return;
-        }
-        setViewportInfoMessage(null);
+      // Don't trigger search when zoomed out too far — viewport exceeds server max span
+      const latSpan = bounds.maxLat - bounds.minLat;
+      // H2-MAP FIX: Handle antimeridian crossing (west > east when crossing 180/-180)
+      const crossesAntimeridian = bounds.minLng > bounds.maxLng;
+      const lngSpan = crossesAntimeridian
+        ? 180 - bounds.minLng + (bounds.maxLng + 180)
+        : bounds.maxLng - bounds.minLng;
+      if (
+        latSpan > MAP_FETCH_MAX_LAT_SPAN ||
+        lngSpan > MAP_FETCH_MAX_LNG_SPAN
+      ) {
+        setViewportInfoMessage("Zoom in further to update results");
+        return;
+      }
+      setViewportInfoMessage(null);
 
-        if (debounceTimer.current) {
-          clearTimeout(debounceTimer.current);
-        }
+      if (debounceTimer.current) {
+        clearTimeout(debounceTimer.current);
+      }
 
-        debounceTimer.current = setTimeout(() => {
-          // Re-check searchAsMove via ref — it may have been toggled off
-          // after the debounce was scheduled (e.g., by E2E test hook or user toggle).
-          if (!searchAsMoveRef.current) return;
-
+      debounceTimer.current = setTimeout(
+        () => {
           const now = Date.now();
           const timeSinceLastSearch = now - lastSearchTimeRef.current;
 
@@ -2891,13 +3225,7 @@ export default function MapComponent({
             // Schedule the pending search for when the throttle window expires
             const delay = MIN_SEARCH_INTERVAL_MS - timeSinceLastSearch;
             throttleTimeoutRef.current = setTimeout(() => {
-              // P2-FIX (#79): Use ref to get latest executeMapSearch, preventing stale closure
-              // Re-check searchAsMove via ref in case it was toggled while throttle was pending.
-              if (
-                pendingBoundsRef.current &&
-                executeMapSearchRef.current &&
-                searchAsMoveRef.current
-              ) {
+              if (pendingBoundsRef.current && executeMapSearchRef.current) {
                 executeMapSearchRef.current(pendingBoundsRef.current);
               }
             }, delay);
@@ -2905,28 +3233,20 @@ export default function MapComponent({
           }
 
           // Execute immediately if outside throttle window
-          // P2-FIX (#79): Use ref to get latest executeMapSearch
           if (executeMapSearchRef.current) {
             executeMapSearchRef.current(bounds);
           }
-        }, MAP_MOVE_SEARCH_DEBOUNCE_MS);
-      } else {
-        // Search-as-move is OFF - mark bounds as dirty so banner shows
-        setBoundsDirty(true);
-        setViewportInfoMessage(null);
-      }
+        },
+        isMobileViewport ? 150 : MAP_MOVE_SEARCH_DEBOUNCE_MS
+      );
     },
     [
       updateUnclusteredListings,
-      setCurrentMapBounds,
       setActivePanBounds,
       isProgrammaticMoveRef,
-      listings,
       setProgrammaticMove,
       setHasUserMoved,
-      searchAsMove,
-      setBoundsDirty,
-      setShowResetToResults,
+      isPhoneViewport,
       setViewportInfoMessage,
       onMoveEndProp,
       MAP_MOVE_SEARCH_DEBOUNCE_MS,
@@ -2941,6 +3261,28 @@ export default function MapComponent({
     setPin: setUserPin,
     handleMapClick: handleUserPinClick,
   } = useUserPin();
+  const hasConfirmedEmptyViewport =
+    isMapLoaded &&
+    isMapInitialized &&
+    !areTilesLoading &&
+    !isSearching &&
+    !suppressEmptyState &&
+    listings.length === 0;
+  const mobileMapStatus = useMemo<MobileMapStatus | null>(() => {
+    if (isPhoneViewport !== true || !hasConfirmedEmptyViewport) {
+      return null;
+    }
+
+    return "confirmed-empty";
+  }, [hasConfirmedEmptyViewport, isPhoneViewport]);
+  const hasPhonePreviewCard =
+    usesPreviewSelection &&
+    isPhoneViewport === true &&
+    selectedListing !== null;
+  const shouldShowMobileStatusCard =
+    mobileMapStatus !== null && !hasPhonePreviewCard;
+  const shouldShowDesktopEmptyState =
+    isPhoneViewport === false && hasConfirmedEmptyViewport;
   const [lightMapStyle, setLightMapStyle] = useState<
     string | StyleSpecification
   >(LIGHT_STYLE_FALLBACK);
@@ -3000,6 +3342,54 @@ export default function MapComponent({
       controller.abort();
     };
   }, [isDarkMode]);
+
+  useEffect(() => {
+    if (isPhoneViewport !== true || mobileMapStatus === null) {
+      setMobileSheetOverrideLabel(null);
+      setMobileResultsViewPreference(null);
+      return;
+    }
+
+    setMobileResultsViewPreference("map");
+    setMobileSheetOverrideLabel("No places here");
+  }, [
+    isPhoneViewport,
+    mobileMapStatus,
+    setMobileResultsViewPreference,
+    setMobileSheetOverrideLabel,
+  ]);
+
+  useEffect(() => {
+    return () => {
+      setMobileSheetOverrideLabel(null);
+      setMobileResultsViewPreference(null);
+    };
+  }, [setMobileResultsViewPreference, setMobileSheetOverrideLabel]);
+
+  useEffect(() => {
+    if (
+      isPhoneViewport !== true ||
+      shouldShowMobileStatusCard ||
+      hasPhonePreviewCard ||
+      mobileResultsView !== "map"
+    ) {
+      setShowMobileToolsSheet(false);
+    }
+  }, [
+    hasPhonePreviewCard,
+    isPhoneViewport,
+    mobileResultsView,
+    shouldShowMobileStatusCard,
+  ]);
+
+  useEffect(() => {
+    const isActive = isPhoneViewport === true && showMobileToolsSheet;
+    setMobileMapOverlayActive(isActive);
+
+    return () => {
+      setMobileMapOverlayActive(false);
+    };
+  }, [isPhoneViewport, setMobileMapOverlayActive, showMobileToolsSheet]);
 
   // Fetch and sanitize dark style as JSON object (same pattern as light style)
   // so zoom expression sanitization is applied before MapLibre processes it.
@@ -3094,7 +3484,15 @@ export default function MapComponent({
       // Fire controlled view state if provided
       handleControlledMove(e);
 
-      if (isProgrammaticMoveRef.current || !searchAsMove) return;
+      if (
+        usesPopupSelection &&
+        isPhoneViewport !== true &&
+        selectedListing
+      ) {
+        setPopupPlacementRevision((current) => current + 1);
+      }
+
+      if (isProgrammaticMoveRef.current) return;
 
       if (onMoveThrottleRef.current) return; // Throttled
 
@@ -3114,10 +3512,12 @@ export default function MapComponent({
       });
     },
     [
-      isProgrammaticMoveRef,
-      searchAsMove,
-      setActivePanBounds,
       handleControlledMove,
+      isPhoneViewport,
+      isProgrammaticMoveRef,
+      selectedListing,
+      setActivePanBounds,
+      usesPopupSelection,
     ]
   );
 
@@ -3129,31 +3529,42 @@ export default function MapComponent({
         if (usesPreviewSelection) {
           armPreviewBackgroundClickGuard();
         }
+        if (usesPopupSelection) {
+          captureDesktopPopupMarkerOrigin(listing.id);
+        }
         setSelectedListing(listing);
       }
       // Set active listing for card highlight and scroll-to
       lastMapActiveRef.current = listing.id;
       setActive(listing.id);
       requestScrollTo(listing.id);
-      // Mark as programmatic move to prevent banner showing
-      setProgrammaticMove(true);
-      // Safety: clear programmatic flag if moveEnd doesn't fire within 1.5s
-      if (programmaticClearTimeoutRef.current)
-        clearTimeout(programmaticClearTimeoutRef.current);
-      programmaticClearTimeoutRef.current = setTimeout(() => {
-        if (isProgrammaticMoveRef.current) {
-          setProgrammaticMove(false);
-        }
-      }, PROGRAMMATIC_MOVE_TIMEOUT_MS);
-      mapRef.current?.easeTo({
-        center: [coords.lng, coords.lat],
-        duration: reducedMotion ? 0 : 400,
-      });
+      const shouldOpenDesktopPopupInPlace =
+        usesPopupSelection && isPhoneViewport !== true;
+
+      if (!shouldOpenDesktopPopupInPlace) {
+        // Mark as programmatic move to prevent follow-up auto-search from firing.
+        setProgrammaticMove(true);
+        // Safety: clear programmatic flag if moveEnd doesn't fire within 1.5s
+        if (programmaticClearTimeoutRef.current)
+          clearTimeout(programmaticClearTimeoutRef.current);
+        programmaticClearTimeoutRef.current = setTimeout(() => {
+          if (isProgrammaticMoveRef.current) {
+            setProgrammaticMove(false);
+          }
+        }, PROGRAMMATIC_MOVE_TIMEOUT_MS);
+        mapRef.current?.easeTo({
+          center: [coords.lng, coords.lat],
+          duration: reducedMotion ? 0 : DESKTOP_POPUP_FOCUS_ANIMATION_MS,
+        });
+      }
     },
     [
       armPreviewBackgroundClickGuard,
+      isPhoneViewport,
       usesOverlaySelection,
+      usesPopupSelection,
       usesPreviewSelection,
+      captureDesktopPopupMarkerOrigin,
       setSelectedListing,
       setActive,
       requestScrollTo,
@@ -3211,6 +3622,7 @@ export default function MapComponent({
   return (
     <div
       ref={mapContainerRef}
+      data-testid="map"
       className="w-full h-full overflow-hidden relative group"
       role="region"
       aria-label="Interactive map showing listing locations"
@@ -3252,32 +3664,12 @@ export default function MapComponent({
         </div>
       )}
 
-      {/* Tile loading indicator - transparent overlay with small centered pill */}
-      {isMapLoaded && areTilesLoading && (
-        <div
-          className="absolute inset-0 bg-transparent z-10 flex items-center justify-center pointer-events-none"
-          role="status"
-          aria-label="Loading map tiles"
-          aria-live="polite"
-        >
-          <div className="flex items-center gap-2 bg-surface-container-lowest/90 px-4 py-2 rounded-lg shadow-ambient-sm">
-            <Loader2
-              className="w-4 h-4 animate-spin text-on-surface-variant"
-              aria-hidden="true"
-            />
-            <span className="text-sm text-on-surface-variant">
-              Loading tiles...
-            </span>
-          </div>
-        </div>
-      )}
-
       {/* Search-as-move loading indicator */}
-      {isSearching && isMapLoaded && !areTilesLoading && (
+      {showSearchStatus && isMapLoaded && (
         <div
           className="absolute top-16 left-1/2 -translate-x-1/2 bg-surface-container-lowest/90 px-3 py-2 rounded-lg shadow-ambient-sm flex items-center gap-2 z-10 pointer-events-none"
           role="status"
-          aria-label="Searching area"
+          aria-label="Searching this area"
           aria-live="polite"
         >
           <Loader2
@@ -3285,7 +3677,7 @@ export default function MapComponent({
             aria-hidden="true"
           />
           <span className="text-sm text-on-surface-variant">
-            Searching area...
+            Searching this area...
           </span>
         </div>
       )}
@@ -3535,6 +3927,10 @@ export default function MapComponent({
                 [pMinLng, pMinLat],
                 [pMaxLng, pMaxLat],
               ];
+              if (isPhoneViewport === true) {
+                hasCompletedInitialMobileViewportSyncRef.current = false;
+                hasPendingRealUserMoveRef.current = false;
+              }
               setProgrammaticMove(true);
               // Safety: clear programmatic flag if moveEnd doesn't fire
               if (programmaticClearTimeoutRef.current)
@@ -3546,7 +3942,14 @@ export default function MapComponent({
             }
           }
         }}
-        onMoveStart={() => {
+        onMoveStart={(e) => {
+          if (
+            isPhoneViewport === true &&
+            !isProgrammaticMoveRef.current &&
+            Boolean(e?.originalEvent)
+          ) {
+            hasPendingRealUserMoveRef.current = true;
+          }
           if (
             usesPreviewSelection &&
             selectedListing &&
@@ -3578,11 +3981,6 @@ export default function MapComponent({
           // Fix 2: Re-query unclustered features after all tiles rendered.
           // onIdle is the most reliable signal that tiles are fully loaded.
           updateUnclusteredListings();
-          if (pendingPopupContainmentTokenRef.current) {
-            schedulePopupContainmentCheck(
-              pendingPopupContainmentTokenRef.current
-            );
-          }
         }}
         onClick={async (e: MapLayerMouseEvent) => {
           // User pin drop takes priority
@@ -3607,6 +4005,9 @@ export default function MapComponent({
           }
           if (usesPreviewSelection && selectedListing) {
             dismissPreviewSelection();
+          }
+          if (usesPopupSelection && selectedListing) {
+            dismissDesktopPopupSelection({ restoreFocus: false });
           }
           // Otherwise handle cluster click
           if (useClustering) onClusterClick(e);
@@ -3684,8 +4085,8 @@ export default function MapComponent({
             type="geojson"
             data={geojsonData}
             cluster={true}
-            clusterMaxZoom={14}
-            clusterRadius={50}
+            clusterMaxZoom={clusterConfig.maxZoom}
+            clusterRadius={clusterConfig.radius}
             clusterProperties={{
               priceSum: ["+", ["get", "price"]],
             }}
@@ -3748,111 +4149,22 @@ export default function MapComponent({
           <Popup
             longitude={selectedListing.location.lng}
             latitude={selectedListing.location.lat}
-            anchor="top"
-            onClose={handleSelectedListingClose}
+            anchor={desktopPopupPlacement?.anchor ?? "top"}
+            offset={DESKTOP_POPUP_OFFSETS}
+            onClose={() => handleSelectedListingClose(true)}
             closeOnClick={false}
             maxWidth="320px"
-            className={`z-[60] [&_.maplibregl-popup-content]:rounded-xl [&_.maplibregl-popup-content]:p-0 [&_.maplibregl-popup-content]:!bg-transparent [&_.maplibregl-popup-content]:!shadow-none [&_.maplibregl-popup-close-button]:hidden ${
-              isDarkMode
-                ? "[&_.maplibregl-popup-tip]:border-t-on-surface"
-                : "[&_.maplibregl-popup-tip]:border-t-white"
-            }`}
+            subpixelPositioning
+            className="z-[60] [&_.maplibregl-popup-content]:rounded-xl [&_.maplibregl-popup-content]:p-0 [&_.maplibregl-popup-content]:!bg-transparent [&_.maplibregl-popup-content]:!shadow-none [&_.maplibregl-popup-close-button]:hidden [&_.maplibregl-popup-tip]:hidden"
           >
-            {/* Premium Card Design */}
-            <div
-              ref={selectedPopupCardRef}
-              data-testid="map-popup-card"
-              className={`w-[280px] overflow-hidden rounded-xl ${
-                isDarkMode
-                  ? "bg-on-surface shadow-[0_10px_40px_-10px_rgba(0,0,0,0.5)]"
-                  : "bg-surface-container-lowest shadow-[0_10px_40px_-10px_rgba(0,0,0,0.15)]"
-              }`}
-            >
-              {/* Image Thumbnail - optimized with next/image */}
-              <div
-                className={`aspect-[16/9] relative overflow-hidden ${isDarkMode ? "bg-on-surface" : "bg-surface-container-high"}`}
-              >
-                {selectedListing.images && selectedListing.images[0] ? (
-                  <Image
-                    src={selectedListing.images[0]}
-                    alt={selectedListing.title}
-                    fill
-                    sizes="280px"
-                    className="object-cover"
-                  />
-                ) : (
-                  <div className="w-full h-full flex items-center justify-center">
-                    <Home
-                      className={`w-10 h-10 ${isDarkMode ? "text-on-surface-variant" : "text-on-surface-variant"}`}
-                    />
-                  </div>
-                )}
-                {/* Close button overlay */}
-                <div className="absolute top-2 right-2">
-                  <Button
-                    variant="ghost"
-                    size="icon"
-                    onClick={handleSelectedListingClose}
-                    className="rounded-full bg-on-surface/50 hover:bg-on-surface/70 text-white hover:text-white border-none"
-                    aria-label="Close listing preview"
-                  >
-                    <X className="w-4 h-4" />
-                  </Button>
-                </div>
-                {/* Availability badge */}
-                <div className="absolute bottom-2 left-2">
-                  <span
-                    className={`inline-flex px-2 py-0.5 rounded-md text-xs font-semibold uppercase ${
-                      selectedListing.availableSlots > 0
-                        ? "bg-emerald-500 text-white"
-                        : "bg-on-surface text-white"
-                    }`}
-                  >
-                    {selectedListing.availableSlots > 0
-                      ? `${selectedListing.availableSlots} Available`
-                      : "Filled"}
-                  </span>
-                </div>
-              </div>
-
-              {/* Content */}
-              <div className="p-3">
-                <h3
-                  className={`font-semibold text-sm line-clamp-1 mb-1 ${isDarkMode ? "text-white" : "text-on-surface"}`}
-                >
-                  {selectedListing.title}
-                </h3>
-                <p className="mb-3">
-                  <span
-                    className={`text-lg font-bold ${isDarkMode ? "text-white" : "text-on-surface"}`}
-                  >
-                    ${selectedListing.price}
-                  </span>
-                  <span
-                    className={`text-sm ${isDarkMode ? "text-on-surface-variant" : "text-on-surface-variant"}`}
-                  >
-                    /month
-                  </span>
-                </p>
-                <div className="flex gap-2">
-                  <Link
-                    href={`/listings/${selectedListing.id}`}
-                    className="flex-1"
-                  >
-                    <Button
-                      size="sm"
-                      className={`w-full h-9 text-xs-plus font-medium rounded-lg ${
-                        isDarkMode
-                          ? "bg-surface-container-lowest text-on-surface hover:bg-surface-container-high"
-                          : "bg-on-surface text-white hover:bg-on-surface"
-                      }`}
-                    >
-                      View Details
-                    </Button>
-                  </Link>
-                </div>
-              </div>
-            </div>
+            <DesktopListingPreviewCard
+              key={selectedListing.id}
+              listing={selectedListing}
+              isDarkMode={isDarkMode}
+              onClose={() => handleSelectedListingClose(true)}
+              cardRef={selectedPopupCardRef}
+              closeButtonRef={selectedPopupCloseButtonRef}
+            />
           </Popup>
         )}
 
@@ -3864,110 +4176,111 @@ export default function MapComponent({
           onSetPin={setUserPin}
           hoveredListingCoords={hoveredListingCoords}
           isDarkMode={isDarkMode}
-          showControl={isPhoneViewport === true}
+          showControl={false}
         />
       </Map>
 
       <LazyMotion features={domAnimation}>
         <AnimatePresence>
-          {usesPreviewSelection &&
-            isPhoneViewport === true &&
-            selectedListing && (
-              <m.div
-                key={selectedListing.id}
-                initial={reducedMotion ? { opacity: 0 } : { opacity: 0, y: 16 }}
-                animate={reducedMotion ? { opacity: 1 } : { opacity: 1, y: 0 }}
-                exit={
-                  reducedMotion
-                    ? { opacity: 0, transition: { duration: 0.15 } }
-                    : {
-                        opacity: 0,
-                        y: 8,
-                        transition: { type: "tween", duration: 0.15 },
-                      }
-                }
-                transition={
-                  reducedMotion
-                    ? { duration: 0.15 }
-                    : { type: "spring", stiffness: 400, damping: 30 }
-                }
-                className="pointer-events-none absolute inset-x-0 z-[45] px-4"
-                style={{
-                  bottom: `calc(${SNAP_COLLAPSED * 100}dvh + 4.75rem + env(safe-area-inset-bottom, 0px))`,
-                }}
+          {hasPhonePreviewCard && selectedListing && (
+            <m.div
+              key={selectedListing.id}
+              initial={reducedMotion ? { opacity: 0 } : { opacity: 0, y: 16 }}
+              animate={reducedMotion ? { opacity: 1 } : { opacity: 1, y: 0 }}
+              exit={
+                reducedMotion
+                  ? { opacity: 0, transition: { duration: 0.15 } }
+                  : {
+                      opacity: 0,
+                      y: 8,
+                      transition: { type: "tween", duration: 0.15 },
+                    }
+              }
+              transition={
+                reducedMotion
+                  ? { duration: 0.15 }
+                  : { type: "spring", stiffness: 400, damping: 30 }
+              }
+              className="pointer-events-none absolute inset-x-0 z-[45] px-4"
+              style={{
+                bottom: SEARCH_MOBILE_PREVIEW_CARD_OFFSET,
+              }}
+            >
+              <div
+                data-testid="map-preview-card"
+                className="pointer-events-auto relative overflow-hidden rounded-[1.75rem] border border-outline-variant/20 bg-surface-container-lowest shadow-[0_18px_45px_-20px_rgba(0,0,0,0.35)]"
               >
-                <div
-                  data-testid="map-preview-card"
-                  className="pointer-events-auto relative overflow-hidden rounded-[1.75rem] border border-outline-variant/20 bg-surface-container-lowest shadow-[0_18px_45px_-20px_rgba(0,0,0,0.35)]"
+                <button
+                  type="button"
+                  onClick={() => handleSelectedListingClose(true)}
+                  className="absolute top-3 right-3 z-10 flex h-8 w-8 items-center justify-center rounded-full bg-on-surface/55 text-white backdrop-blur-sm transition-colors hover:bg-on-surface/70 focus:outline-none focus-visible:ring-2 focus-visible:ring-primary/30"
+                  aria-label="Close listing preview"
                 >
-                  <button
-                    type="button"
-                    onClick={handleSelectedListingClose}
-                    className="absolute top-3 right-3 z-10 flex h-8 w-8 items-center justify-center rounded-full bg-on-surface/55 text-white backdrop-blur-sm transition-colors hover:bg-on-surface/70 focus:outline-none focus-visible:ring-2 focus-visible:ring-primary/30"
-                    aria-label="Close listing preview"
-                  >
-                    <X className="w-4 h-4" />
-                  </button>
+                  <X className="w-4 h-4" />
+                </button>
 
-                  <Link
-                    href={`/listings/${selectedListing.id}`}
-                    className="flex items-stretch gap-3 p-3 pr-12"
-                  >
-                    <div className="relative h-24 w-24 shrink-0 overflow-hidden rounded-2xl bg-surface-container-high">
-                      {selectedListing.images && selectedListing.images[0] ? (
-                        <Image
-                          src={selectedListing.images[0]}
-                          alt={selectedListing.title}
-                          fill
-                          sizes="96px"
-                          className="object-cover"
-                        />
-                      ) : (
-                        <div className="flex h-full w-full items-center justify-center">
-                          <Home className="w-8 h-8 text-on-surface-variant" />
-                        </div>
-                      )}
-                    </div>
-
-                    <div className="min-w-0 flex-1 py-0.5">
-                      {Number.isFinite(selectedListing.avgRating) &&
-                      (selectedListing.reviewCount ?? 0) > 0 ? (
-                        <div className="mb-1 flex items-center gap-1 text-xs font-semibold text-on-surface">
-                          <Star className="h-3.5 w-3.5 fill-on-surface text-on-surface" />
-                          <span>{selectedListing.avgRating!.toFixed(2)}</span>
-                        </div>
-                      ) : null}
-
-                      <h3 className="line-clamp-2 text-sm font-semibold leading-tight text-on-surface">
-                        {selectedListing.title}
-                      </h3>
-
-                      <div className="mt-2 inline-flex items-center rounded-full bg-surface-container-high px-2.5 py-1 text-[11px] font-medium text-on-surface-variant">
-                        {selectedListing.availableSlots > 0
-                          ? `${selectedListing.availableSlots} available`
-                          : "Filled"}
+                <Link
+                  href={`/listings/${selectedListing.id}`}
+                  className="flex items-stretch gap-3 p-3 pr-12"
+                >
+                  <div className="relative h-24 w-24 shrink-0 overflow-hidden rounded-2xl bg-surface-container-high">
+                    {selectedListing.images && selectedListing.images[0] ? (
+                      <Image
+                        src={selectedListing.images[0]}
+                        alt={selectedListing.title}
+                        fill
+                        sizes="96px"
+                        className="object-cover"
+                      />
+                    ) : (
+                      <div className="flex h-full w-full items-center justify-center">
+                        <Home className="w-8 h-8 text-on-surface-variant" />
                       </div>
+                    )}
+                  </div>
 
-                      <p className="mt-2 flex items-baseline gap-1">
-                        <span className="text-lg font-bold text-on-surface">
-                          {formatPrice(selectedListing.price)}
-                        </span>
-                        <span className="text-sm text-on-surface-variant">
-                          /month
-                        </span>
-                      </p>
+                  <div className="min-w-0 flex-1 py-0.5">
+                    {Number.isFinite(selectedListing.avgRating) &&
+                    (selectedListing.reviewCount ?? 0) > 0 ? (
+                      <div className="mb-1 flex items-center gap-1 text-xs font-semibold text-on-surface">
+                        <Star className="h-3.5 w-3.5 fill-on-surface text-on-surface" />
+                        <span>{selectedListing.avgRating!.toFixed(2)}</span>
+                      </div>
+                    ) : null}
+
+                    <h3 className="line-clamp-2 text-sm font-semibold leading-tight text-on-surface">
+                      {selectedListing.title}
+                    </h3>
+
+                    <div className="mt-2 inline-flex items-center rounded-full bg-surface-container-high px-2.5 py-1 text-[11px] font-medium text-on-surface-variant">
+                      {selectedListing.availableSlots > 0
+                        ? `${selectedListing.availableSlots} available`
+                        : "Filled"}
                     </div>
-                  </Link>
-                </div>
-              </m.div>
-            )}
+
+                    <p className="mt-2 flex items-baseline gap-1">
+                      <span className="text-lg font-bold text-on-surface">
+                        {formatPrice(selectedListing.price)}
+                      </span>
+                      <span className="text-sm text-on-surface-variant">
+                        /month
+                      </span>
+                    </p>
+                  </div>
+                </Link>
+              </div>
+            </m.div>
+          )}
         </AnimatePresence>
       </LazyMotion>
 
       {/* Map Controls Group (Right Side) */}
-      <div className="absolute top-20 right-4 z-[50] flex flex-col gap-2">
+      <div
+        className="absolute right-4 z-[50] flex flex-col gap-2"
+        style={{ top: "calc(var(--header-height, 4rem) + 1rem)" }}
+      >
         {/* Zoom Controls (Mobile Only) */}
-        {isPhoneViewport === true && (
+        {isPhoneViewport === true && !showMobileToolsSheet && (
           <div className="flex flex-col overflow-hidden rounded-2xl border border-outline-variant/20 bg-surface-container-lowest/95 shadow-ambient backdrop-blur-md">
             <button
               type="button"
@@ -3994,23 +4307,33 @@ export default function MapComponent({
           </div>
         )}
 
-        {/* Fit all results button - mobile only; desktop uses the compact control rail */}
-        {isPhoneViewport === true && listings.length >= 1 && isMapLoaded && (
-          <button
-            onClick={handleFitAllResults}
-            className="flex h-11 w-11 items-center justify-center rounded-full border border-outline-variant/20 bg-surface-container-lowest/95 text-on-surface-variant shadow-ambient backdrop-blur-md transition-colors hover:bg-surface-container-high focus:outline-none focus-visible:ring-2 focus-visible:ring-primary/30 focus-visible:ring-offset-2"
-            aria-label="Fit all results in view"
-            title="Fit all results"
-          >
-            <Maximize2 className="w-4 h-4" />
-          </button>
+        {isPhoneViewport === true && !shouldShowMobileStatusCard && (
+          <MobileMapToolsSheet
+            open={showMobileToolsSheet}
+            onOpenChange={(open) => {
+              if (open) {
+                triggerHaptic();
+              }
+              setShowMobileToolsSheet(open);
+            }}
+            activePOICategories={activePOICategories}
+            onTogglePOICategory={togglePOICategory}
+            isDropMode={isDropMode}
+            hasPin={Boolean(userPin)}
+            onToggleDropMode={() => {
+              triggerHaptic();
+              toggleDropMode();
+            }}
+            onClearPin={() => {
+              triggerHaptic();
+              setUserPin(null);
+            }}
+          />
         )}
       </div>
 
       {isDesktopViewport && (
         <DesktopMapControls
-          searchAsMove={searchAsMove}
-          onToggleSearchAsMove={() => setSearchAsMove(!searchAsMove)}
           activePOICategories={activePOICategories}
           onTogglePOICategory={togglePOICategory}
           isDropMode={isDropMode}
@@ -4018,8 +4341,6 @@ export default function MapComponent({
           onToggleDropMode={toggleDropMode}
           onClearPin={() => setUserPin(null)}
           onHideMap={handleHideMap}
-          showResetToResults={showResetToResults}
-          onResetToResults={handleFitAllResults}
           canFullscreen={canFullscreen}
           isFullscreen={isFullscreen}
           onToggleFullscreen={handleToggleFullscreen}
@@ -4029,29 +4350,15 @@ export default function MapComponent({
         />
       )}
 
-      {/* POI layer visibility is always applied; inline strip only stays on phone viewports */}
+      {/* Apply POI visibility to the map; POI controls live in the map tools UI. */}
       <POILayer
         mapRef={mapRef}
         isMapLoaded={isMapLoaded}
-        activeCategories={activePOICategories}
-        onToggleCategory={togglePOICategory}
-        renderControls={isPhoneViewport === true}
+        activeCategories={appliedPOICategories}
       />
 
-      {/* MapMovedBanner - Shows when user panned with search-as-move OFF */}
-      {(showBanner || showLocationConflict) && (
-        <MapMovedBanner
-          variant="map"
-          onSearch={onSearch}
-          onReset={onReset}
-          areaCount={areaCount}
-          isAreaCountLoading={isAreaCountLoading}
-          isSearchLoading={isSearching}
-        />
-      )}
-
-      {/* Info banner when search-as-move is enabled but viewport is too wide */}
-      {searchAsMove && viewportInfoMessage && (
+      {/* Info banner when the viewport is too wide to issue a search */}
+      {viewportInfoMessage && (
         <div
           role="status"
           aria-live="polite"
@@ -4064,20 +4371,25 @@ export default function MapComponent({
       )}
 
       {/* Mobile gesture hint - shown once for first-time touch users */}
-      {isMapLoaded && <MapGestureHint />}
+      {isMapLoaded &&
+        !showMobileToolsSheet &&
+        !shouldShowMobileStatusCard &&
+        !hasPhonePreviewCard && (
+        <MapGestureHint />
+      )}
+
+      {shouldShowMobileStatusCard && mobileMapStatus && (
+        <MobileMapStatusCard
+          status={mobileMapStatus}
+          searchParams={searchParams}
+          onZoomOut={handleZoomOut}
+        />
+      )}
 
       {/* Empty state overlay - when map is loaded but no listings in viewport */}
-      {isMapLoaded &&
-        isMapInitialized &&
-        !areTilesLoading &&
-        !isSearching &&
-        !suppressEmptyState &&
-        listings.length === 0 && (
-          <MapEmptyState
-            searchParams={searchParams}
-            onZoomOut={handleZoomOut}
-          />
-        )}
+      {shouldShowDesktopEmptyState && (
+        <MapEmptyState searchParams={searchParams} onZoomOut={handleZoomOut} />
+      )}
     </div>
   );
 }

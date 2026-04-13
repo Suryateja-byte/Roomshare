@@ -1,0 +1,354 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Duplicate Text Fix - 3 Options</title>
+<style>
+  * { margin: 0; padding: 0; box-sizing: border-box; }
+  body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', system-ui, sans-serif; background: #0a0a0a; color: #e5e5e5; padding: 24px; }
+  h1 { font-size: 24px; font-weight: 700; margin-bottom: 8px; color: #fff; }
+  h2 { font-size: 18px; font-weight: 600; margin: 32px 0 12px; color: #fff; }
+  .subtitle { color: #737373; font-size: 13px; margin-bottom: 24px; }
+  .row { display: flex; gap: 24px; flex-wrap: wrap; margin-bottom: 32px; }
+  .label { text-align: center; font-size: 12px; color: #a3a3a3; margin-top: 10px; max-width: 280px; line-height: 1.4; }
+  .badge { display: inline-block; padding: 2px 8px; border-radius: 4px; font-size: 11px; font-weight: 600; margin-bottom: 8px; }
+  .badge-problem { background: #7f1d1d; color: #fca5a5; }
+  .badge-a { background: #065f46; color: #6ee7b7; }
+  .badge-b { background: #1e3a5f; color: #93c5fd; }
+  .badge-c { background: #581c87; color: #d8b4fe; }
+  .badge-rec { background: #92400e; color: #fde68a; }
+  .desc { background: #1a1a1a; border: 1px solid #262626; border-radius: 12px; padding: 16px; margin-bottom: 16px; max-width: 640px; }
+  .desc p { font-size: 13px; color: #a3a3a3; line-height: 1.5; }
+  .desc strong { color: #e5e5e5; }
+  .divider { border-top: 1px solid #262626; margin: 40px 0 32px; }
+
+  .phone {
+    width: 280px; height: 520px; background: #111; border-radius: 32px;
+    border: 3px solid #333; position: relative; overflow: hidden;
+    box-shadow: 0 20px 40px rgba(0,0,0,0.5); flex-shrink: 0;
+  }
+  .phone-notch { position: absolute; top: 0; left: 50%; transform: translateX(-50%); width: 90px; height: 22px; background: #111; border-radius: 0 0 14px 14px; z-index: 50; }
+  .phone-status { position: absolute; top: 4px; left: 14px; right: 14px; height: 18px; display: flex; justify-content: space-between; align-items: center; font-size: 10px; color: #fff; z-index: 51; font-weight: 600; }
+  .phone-home { position: absolute; bottom: 5px; left: 50%; transform: translateX(-50%); width: 90px; height: 4px; background: #555; border-radius: 2px; z-index: 50; }
+
+  .map-bg { position: absolute; top: 0; left: 0; right: 0; bottom: 0; background: #1e293b; background-image: linear-gradient(rgba(255,255,255,0.03) 1px, transparent 1px), linear-gradient(90deg, rgba(255,255,255,0.03) 1px, transparent 1px); background-size: 40px 40px; }
+  .marker { position: absolute; background: #3b82f6; color: #fff; font-size: 10px; font-weight: 700; padding: 3px 7px; border-radius: 6px; box-shadow: 0 2px 4px rgba(0,0,0,0.3); z-index: 10; }
+  .marker::after { content: ''; position: absolute; bottom: -5px; left: 50%; transform: translateX(-50%); border-left: 5px solid transparent; border-right: 5px solid transparent; border-top: 5px solid #3b82f6; }
+
+  .search-bar { position: absolute; top: 26px; left: 8px; right: 8px; z-index: 30; background: #262626; border-radius: 12px; padding: 9px 12px; display: flex; align-items: center; gap: 8px; box-shadow: 0 4px 12px rgba(0,0,0,0.3); }
+  .search-icon { width: 14px; height: 14px; border: 2px solid #737373; border-radius: 50%; }
+  .search-text { font-size: 12px; color: #a3a3a3; }
+
+  .sheet { position: absolute; left: 0; right: 0; bottom: 0; background: #1a1a1a; border-radius: 16px 16px 0 0; z-index: 20; box-shadow: 0 -4px 20px rgba(0,0,0,0.4); }
+  .sheet-handle-area { display: flex; flex-direction: column; align-items: center; padding: 10px 16px 6px; }
+  .sheet-handle { width: 36px; height: 4px; background: #525252; border-radius: 2px; }
+  .sheet-header { display: flex; justify-content: space-between; align-items: center; padding: 0 14px 8px; }
+  .sheet-title { font-weight: 600; color: #e5e5e5; font-size: 13px; }
+  .sheet-close { width: 22px; height: 22px; background: #333; border-radius: 50%; display: flex; align-items: center; justify-content: center; font-size: 12px; color: #a3a3a3; }
+
+  .filter-strip { display: flex; gap: 5px; padding: 0 14px 8px; }
+  .filter-chip { padding: 4px 8px; background: #262626; border: 1px solid #404040; border-radius: 14px; font-size: 10px; color: #d4d4d4; white-space: nowrap; }
+  .filter-chip.active { background: #1e3a5f; border-color: #3b82f6; color: #93c5fd; }
+
+  .listing-card { display: flex; gap: 8px; padding: 8px 14px; border-bottom: 1px solid #262626; }
+  .listing-img { width: 70px; height: 52px; background: #333; border-radius: 8px; flex-shrink: 0; display: flex; align-items: center; justify-content: center; font-size: 16px; color: #555; }
+  .listing-info { flex: 1; }
+  .listing-title { font-size: 11px; font-weight: 600; color: #e5e5e5; margin-bottom: 1px; }
+  .listing-meta { font-size: 9px; color: #737373; }
+  .listing-price { font-size: 12px; font-weight: 700; color: #fff; margin-top: 2px; }
+
+  /* Highlight for problem area */
+  .highlight-red { outline: 2px dashed #ef4444; outline-offset: 2px; position: relative; }
+  .highlight-red::before { content: 'DUPLICATE'; position: absolute; top: -14px; left: 4px; font-size: 8px; color: #ef4444; font-weight: 700; letter-spacing: 0.5px; }
+
+  /* Page h1 inside sheet */
+  .page-h1 { padding: 2px 14px 6px; }
+  .page-h1 h1 { font-size: 15px; font-weight: 500; color: #e5e5e5; }
+
+  .flow-arrow { display: flex; align-items: center; justify-content: center; font-size: 24px; color: #525252; padding: 0 8px; align-self: center; }
+
+  .sort-area { display: flex; align-items: center; justify-content: space-between; padding: 0 14px 6px; }
+  .sort-btn { font-size: 11px; color: #3b82f6; font-weight: 500; }
+  .save-btn { font-size: 11px; color: #3b82f6; font-weight: 500; }
+</style>
+</head>
+<body>
+
+<h1>Fix: Duplicate Result Count on Mobile</h1>
+<p class="subtitle">Two texts show the same count. Pick which approach you prefer.</p>
+
+<!-- PROBLEM -->
+<h2>The Problem (Current)</h2>
+<div class="row">
+  <div>
+    <span class="badge badge-problem">CURRENT BUG</span>
+    <h3 style="font-size:13px;color:#a3a3a3;margin-bottom:8px">Peek state — two counts visible</h3>
+    <div class="phone">
+      <div class="phone-notch"></div>
+      <div class="phone-status"><span>9:41</span><span>LTE</span></div>
+      <div class="map-bg">
+        <div class="marker" style="top:100px;left:50px">$1,200</div>
+        <div class="marker" style="top:130px;left:170px">$950</div>
+        <div class="marker" style="top:160px;left:100px">$1,450</div>
+      </div>
+      <div class="search-bar">
+        <div class="search-icon"></div>
+        <span class="search-text">San Francisco, CA</span>
+      </div>
+      <div class="sheet" style="height:300px">
+        <div class="sheet-handle-area"><div class="sheet-handle"></div></div>
+        <div class="sheet-header">
+          <span class="sheet-title highlight-red">24 places</span>
+          <div class="sheet-close">X</div>
+        </div>
+        <div class="filter-strip">
+          <div class="filter-chip active">$800-1500</div>
+          <div class="filter-chip">Room type</div>
+        </div>
+        <!-- page.tsx h1 also visible -->
+        <div class="page-h1 highlight-red" style="margin-bottom:4px">
+          <h1>24 places in San Francisco</h1>
+        </div>
+        <div class="sort-area">
+          <span class="save-btn">Save search</span>
+          <span class="sort-btn">Sort: Relevance</span>
+        </div>
+        <div class="listing-card">
+          <div class="listing-img">img</div>
+          <div class="listing-info">
+            <div class="listing-title">Sunny room in Mission</div>
+            <div class="listing-meta">Private room - Available May 1</div>
+            <div class="listing-price">$1,200/mo</div>
+          </div>
+        </div>
+      </div>
+      <div class="phone-home"></div>
+    </div>
+    <div class="label" style="color:#fca5a5">Sheet header says "24 places".<br>Page h1 also says "24 places in San Francisco".<br>Same info twice.</div>
+  </div>
+</div>
+
+<div class="divider"></div>
+
+<!-- OPTION A -->
+<h2>Option A: Hide h1 on mobile, keep sheet header</h2>
+<div class="desc">
+  <p><strong>What:</strong> Add <code>hidden md:block</code> to the page.tsx &lt;h1&gt;. Sheet header becomes the only count on mobile. Desktop unchanged.</p>
+  <p style="margin-top:6px"><strong>Pros:</strong> Simplest fix (1 class change). Sheet header is more natural on mobile.</p>
+  <p style="margin-top:6px"><strong>Cons:</strong> Loses "in San Francisco" location context on mobile.</p>
+</div>
+<div class="row">
+  <div>
+    <span class="badge badge-a">OPTION A</span>
+    <h3 style="font-size:13px;color:#a3a3a3;margin-bottom:8px">Peek — sheet header only</h3>
+    <div class="phone">
+      <div class="phone-notch"></div>
+      <div class="phone-status"><span>9:41</span><span>LTE</span></div>
+      <div class="map-bg">
+        <div class="marker" style="top:100px;left:50px">$1,200</div>
+        <div class="marker" style="top:130px;left:170px">$950</div>
+        <div class="marker" style="top:160px;left:100px">$1,450</div>
+      </div>
+      <div class="search-bar">
+        <div class="search-icon"></div>
+        <span class="search-text">San Francisco, CA</span>
+      </div>
+      <div class="sheet" style="height:300px">
+        <div class="sheet-handle-area"><div class="sheet-handle"></div></div>
+        <div class="sheet-header">
+          <span class="sheet-title">24 places</span>
+          <div class="sheet-close">X</div>
+        </div>
+        <div class="filter-strip">
+          <div class="filter-chip active">$800-1500</div>
+          <div class="filter-chip">Room type</div>
+        </div>
+        <!-- h1 HIDDEN on mobile -->
+        <div class="sort-area">
+          <span class="save-btn">Save search</span>
+          <span class="sort-btn">Sort: Relevance</span>
+        </div>
+        <div class="listing-card">
+          <div class="listing-img">img</div>
+          <div class="listing-info">
+            <div class="listing-title">Sunny room in Mission</div>
+            <div class="listing-meta">Private room - Available May 1</div>
+            <div class="listing-price">$1,200/mo</div>
+          </div>
+        </div>
+        <div class="listing-card">
+          <div class="listing-img">img</div>
+          <div class="listing-info">
+            <div class="listing-title">Cozy studio near BART</div>
+            <div class="listing-meta">Shared room - Available now</div>
+            <div class="listing-price">$950/mo</div>
+          </div>
+        </div>
+      </div>
+      <div class="phone-home"></div>
+    </div>
+    <div class="label">Clean. Sheet header shows count. Location visible in search bar. More room for listings.</div>
+  </div>
+</div>
+
+<div class="divider"></div>
+
+<!-- OPTION B -->
+<h2>Option B: Hide sheet header text, keep page h1</h2>
+<div class="desc">
+  <p><strong>What:</strong> Remove the count from the sheet header on peek/expanded states. Keep "24 places in San Francisco" from page.tsx as the primary heading.</p>
+  <p style="margin-top:6px"><strong>Pros:</strong> Preserves location context. H1 is more SEO-friendly.</p>
+  <p style="margin-top:6px"><strong>Cons:</strong> Sheet header area feels empty. Need different collapsed-state text.</p>
+</div>
+<div class="row">
+  <div>
+    <span class="badge badge-b">OPTION B</span>
+    <h3 style="font-size:13px;color:#a3a3a3;margin-bottom:8px">Peek — page h1 only</h3>
+    <div class="phone">
+      <div class="phone-notch"></div>
+      <div class="phone-status"><span>9:41</span><span>LTE</span></div>
+      <div class="map-bg">
+        <div class="marker" style="top:100px;left:50px">$1,200</div>
+        <div class="marker" style="top:130px;left:170px">$950</div>
+        <div class="marker" style="top:160px;left:100px">$1,450</div>
+      </div>
+      <div class="search-bar">
+        <div class="search-icon"></div>
+        <span class="search-text">San Francisco, CA</span>
+      </div>
+      <div class="sheet" style="height:300px">
+        <div class="sheet-handle-area"><div class="sheet-handle"></div></div>
+        <!-- Sheet header: just handle + close, no text -->
+        <div class="sheet-header">
+          <span style="font-size:1px;color:transparent">.</span>
+          <div class="sheet-close">X</div>
+        </div>
+        <div class="filter-strip">
+          <div class="filter-chip active">$800-1500</div>
+          <div class="filter-chip">Room type</div>
+        </div>
+        <div class="page-h1" style="margin-bottom:4px">
+          <h1>24 places in San Francisco</h1>
+        </div>
+        <div class="sort-area">
+          <span class="save-btn">Save search</span>
+          <span class="sort-btn">Sort: Relevance</span>
+        </div>
+        <div class="listing-card">
+          <div class="listing-img">img</div>
+          <div class="listing-info">
+            <div class="listing-title">Sunny room in Mission</div>
+            <div class="listing-meta">Private room - Available May 1</div>
+            <div class="listing-price">$1,200/mo</div>
+          </div>
+        </div>
+        <div class="listing-card">
+          <div class="listing-img">img</div>
+          <div class="listing-info">
+            <div class="listing-title">Cozy studio near BART</div>
+            <div class="listing-meta">Shared room - Available now</div>
+            <div class="listing-price">$950/mo</div>
+          </div>
+        </div>
+      </div>
+      <div class="phone-home"></div>
+    </div>
+    <div class="label">H1 with location context. But sheet header feels empty next to the close button.</div>
+  </div>
+</div>
+
+<div class="divider"></div>
+
+<!-- OPTION C -->
+<h2>Option C: Merge — sheet header gets location, h1 hidden on mobile</h2>
+<div class="desc">
+  <p><strong>What:</strong> Hide page.tsx h1 on mobile. Enrich sheet header text to include location: "24 places in San Francisco". Best of both worlds.</p>
+  <p style="margin-top:6px"><strong>Pros:</strong> Single source of count + location. Clean. Natural position for mobile.</p>
+  <p style="margin-top:6px"><strong>Cons:</strong> Slightly more code change (update sheet header text source).</p>
+</div>
+<div class="row">
+  <div>
+    <span class="badge badge-c">OPTION C</span> <span class="badge badge-rec">RECOMMENDED</span>
+    <h3 style="font-size:13px;color:#a3a3a3;margin-bottom:8px">Peek — enriched sheet header</h3>
+    <div class="phone">
+      <div class="phone-notch"></div>
+      <div class="phone-status"><span>9:41</span><span>LTE</span></div>
+      <div class="map-bg">
+        <div class="marker" style="top:100px;left:50px">$1,200</div>
+        <div class="marker" style="top:130px;left:170px">$950</div>
+        <div class="marker" style="top:160px;left:100px">$1,450</div>
+      </div>
+      <div class="search-bar">
+        <div class="search-icon"></div>
+        <span class="search-text">San Francisco, CA</span>
+      </div>
+      <div class="sheet" style="height:300px">
+        <div class="sheet-handle-area"><div class="sheet-handle"></div></div>
+        <div class="sheet-header">
+          <span class="sheet-title">24 places in San Francisco</span>
+          <div class="sheet-close">X</div>
+        </div>
+        <div class="filter-strip">
+          <div class="filter-chip active">$800-1500</div>
+          <div class="filter-chip">Room type</div>
+        </div>
+        <div class="sort-area">
+          <span class="save-btn">Save search</span>
+          <span class="sort-btn">Sort: Relevance</span>
+        </div>
+        <div class="listing-card">
+          <div class="listing-img">img</div>
+          <div class="listing-info">
+            <div class="listing-title">Sunny room in Mission</div>
+            <div class="listing-meta">Private room - Available May 1</div>
+            <div class="listing-price">$1,200/mo</div>
+          </div>
+        </div>
+        <div class="listing-card">
+          <div class="listing-img">img</div>
+          <div class="listing-info">
+            <div class="listing-title">Cozy studio near BART</div>
+            <div class="listing-meta">Shared room - Available now</div>
+            <div class="listing-price">$950/mo</div>
+          </div>
+        </div>
+      </div>
+      <div class="phone-home"></div>
+    </div>
+    <div class="label">Clean single source. Count + location in sheet header. Most room for listing cards.</div>
+  </div>
+
+  <!-- Collapsed state -->
+  <div>
+    <span class="badge badge-c">OPTION C</span>
+    <h3 style="font-size:13px;color:#a3a3a3;margin-bottom:8px">Collapsed — short count</h3>
+    <div class="phone">
+      <div class="phone-notch"></div>
+      <div class="phone-status"><span>9:41</span><span>LTE</span></div>
+      <div class="map-bg">
+        <div class="marker" style="top:140px;left:50px">$1,200</div>
+        <div class="marker" style="top:200px;left:170px">$950</div>
+        <div class="marker" style="top:260px;left:100px">$1,450</div>
+        <div class="marker" style="top:180px;left:220px">$875</div>
+        <div class="marker" style="top:320px;left:60px">$1,100</div>
+      </div>
+      <div class="search-bar">
+        <div class="search-icon"></div>
+        <span class="search-text">San Francisco, CA</span>
+      </div>
+      <div style="position:absolute;bottom:84px;left:50%;transform:translateX(-50%);background:#262626;color:#e5e5e5;padding:8px 20px;border-radius:20px;font-size:12px;font-weight:600;box-shadow:0 4px 12px rgba(0,0,0,0.4);z-index:22;border:1px solid #404040">List</div>
+      <div class="sheet" style="height:80px">
+        <div class="sheet-handle-area"><div class="sheet-handle"></div></div>
+        <div class="sheet-header">
+          <span class="sheet-title" style="font-size:14px">24 places</span>
+        </div>
+      </div>
+      <div class="phone-home"></div>
+    </div>
+    <div class="label">Collapsed shows short "24 places". Full text in peek/expanded.</div>
+  </div>
+</div>
+
+</body>
+</html>

@@ -178,6 +178,7 @@ jest.mock("react-map-gl/maplibre", () => {
       {
         children,
         onLoad,
+        onMove,
         onMoveEnd,
         onMoveStart,
         onIdle,
@@ -191,6 +192,10 @@ jest.mock("react-map-gl/maplibre", () => {
       }: {
         children?: React.ReactNode;
         onLoad?: () => void;
+        onMove?: (e: {
+          viewState: { zoom: number };
+          target: { getBounds: () => unknown };
+        }) => void;
         onMoveEnd?: (e: {
           viewState: { zoom: number };
           target: { getBounds: () => unknown };
@@ -239,6 +244,7 @@ jest.mock("react-map-gl/maplibre", () => {
       // Store handlers on window for tests to trigger
       Object.assign(window, {
         __mapHandlers: {
+          onMove,
           onMoveEnd,
           onMoveStart,
           onIdle,
@@ -359,14 +365,9 @@ jest.mock("@/lib/haptics", () => ({
 const mockSetHovered = jest.fn();
 const mockSetActive = jest.fn();
 const mockRequestScrollTo = jest.fn();
-const mockSetSearchAsMove = jest.fn();
 const mockSetHasUserMoved = jest.fn();
-const mockSetBoundsDirty = jest.fn();
-const mockSetCurrentMapBounds = jest.fn();
-const mockSetSearchHandler = jest.fn();
-const mockSetResetHandler = jest.fn();
-const mockSetSearchLocation = jest.fn();
 const mockSetProgrammaticMove = jest.fn();
+const mockSetActivePanBounds = jest.fn();
 const mockIsProgrammaticMoveRef = { current: false };
 
 jest.mock("@/contexts/ListingFocusContext", () => ({
@@ -382,48 +383,31 @@ jest.mock("@/contexts/ListingFocusContext", () => ({
 jest.mock("@/contexts/SearchTransitionContext", () => ({
   useSearchTransitionSafe: () => ({
     isPending: false,
+    pendingReason: null,
     replaceWithTransition: jest.fn(),
   }),
 }));
 
 jest.mock("@/contexts/MapBoundsContext", () => ({
   useMapBounds: () => ({
-    searchAsMove: false,
-    setSearchAsMove: mockSetSearchAsMove,
+    hasUserMoved: false,
     setHasUserMoved: mockSetHasUserMoved,
-    setBoundsDirty: mockSetBoundsDirty,
-    setCurrentMapBounds: mockSetCurrentMapBounds,
-    setSearchHandler: mockSetSearchHandler,
-    setResetHandler: mockSetResetHandler,
-    setSearchLocation: mockSetSearchLocation,
     setProgrammaticMove: mockSetProgrammaticMove,
     isProgrammaticMoveRef: mockIsProgrammaticMoveRef,
   }),
-  useMapMovedBanner: () => ({
-    showBanner: false,
-    showLocationConflict: false,
-    onSearch: jest.fn(),
-    onReset: jest.fn(),
-    areaCount: null,
-    isAreaCountLoading: false,
-  }),
   useActivePanBounds: () => ({
     activePanBounds: null,
-    setActivePanBounds: jest.fn(),
+    setActivePanBounds: mockSetActivePanBounds,
   }),
 }));
 
 jest.mock("@/contexts/ActivePanBoundsContext", () => ({
   useActivePanBoundsSetter: () => ({
-    setActivePanBounds: jest.fn(),
+    setActivePanBounds: mockSetActivePanBounds,
   }),
 }));
 
 // Mock child components
-jest.mock("@/components/map/MapMovedBanner", () => ({
-  MapMovedBanner: () => null,
-}));
-
 jest.mock("@/components/map/MapGestureHint", () => ({
   MapGestureHint: () => null,
 }));
@@ -532,6 +516,7 @@ describe("Map Touch Gestures", () => {
         window as unknown as Record<
           string,
           {
+            onMove?: (e: unknown) => void;
             onMoveEnd?: (e: unknown) => void;
             onMoveStart?: () => void;
           }
@@ -566,8 +551,8 @@ describe("Map Touch Gestures", () => {
         });
       });
 
-      // Should update current map bounds
-      expect(mockSetCurrentMapBounds).toHaveBeenCalled();
+      // Active pan bounds should clear once the move completes.
+      expect(mockSetActivePanBounds).toHaveBeenCalledWith(null);
     });
 
     it("should mark user has moved after pinch-zoom", async () => {
@@ -600,6 +585,7 @@ describe("Map Touch Gestures", () => {
       await act(async () => {
         handlers?.onMoveEnd?.({
           viewState: { zoom: 14 },
+          originalEvent: new Event("pointermove"),
           target: { getBounds: () => mockMapInstance.getBounds() },
         });
       });
@@ -622,7 +608,16 @@ describe("Map Touch Gestures", () => {
     });
 
     it("should update map bounds after pan gesture", async () => {
-      render(<MapComponent listings={mockListings} />);
+      render(
+        <MapComponent
+          listings={mockListings}
+          viewState={{
+            longitude: -122.4194,
+            latitude: 37.7749,
+            zoom: 12,
+          }}
+        />
+      );
 
       await act(async () => {
         jest.advanceTimersByTime(100);
@@ -632,37 +627,27 @@ describe("Map Touch Gestures", () => {
         window as unknown as Record<
           string,
           {
-            onMoveEnd?: (e: unknown) => void;
+            onMove?: (e: unknown) => void;
           }
         >
       ).__mapHandlers;
 
-      // Skip initial moveEnd
+      // Simulate pan to new location while the gesture is in progress.
       await act(async () => {
-        handlers?.onMoveEnd?.({
+        handlers?.onMove?.({
           viewState: { zoom: 12 },
-          target: { getBounds: () => mockMapInstance.getBounds() },
+          target: {
+            getBounds: () => ({
+              getWest: () => -122.6,
+              getEast: () => -122.4,
+              getSouth: () => 37.65,
+              getNorth: () => 37.8,
+            }),
+          },
         });
       });
 
-      jest.clearAllMocks();
-
-      // Simulate pan to new location
-      const newBounds = {
-        getWest: () => -122.6,
-        getEast: () => -122.4,
-        getSouth: () => 37.65,
-        getNorth: () => 37.8,
-      };
-
-      await act(async () => {
-        handlers?.onMoveEnd?.({
-          viewState: { zoom: 12 },
-          target: { getBounds: () => newBounds },
-        });
-      });
-
-      expect(mockSetCurrentMapBounds).toHaveBeenCalledWith({
+      expect(mockSetActivePanBounds).toHaveBeenCalledWith({
         minLng: -122.6,
         maxLng: -122.4,
         minLat: 37.65,
@@ -670,7 +655,7 @@ describe("Map Touch Gestures", () => {
       });
     });
 
-    it("should mark bounds dirty when search-as-move is OFF", async () => {
+    it("should mark user has moved after a pan gesture completes", async () => {
       render(<MapComponent listings={mockListings} />);
 
       await act(async () => {
@@ -700,15 +685,15 @@ describe("Map Touch Gestures", () => {
       await act(async () => {
         handlers?.onMoveEnd?.({
           viewState: { zoom: 12 },
+          originalEvent: new Event("pointermove"),
           target: { getBounds: () => mockMapInstance.getBounds() },
         });
       });
 
-      // With search-as-move OFF (default in mock), bounds should be dirty
-      expect(mockSetBoundsDirty).toHaveBeenCalledWith(true);
+      expect(mockSetHasUserMoved).toHaveBeenCalledWith(true);
     });
 
-    it("should not trigger search when programmatic pan", async () => {
+    it("should skip user-move updates during a programmatic pan", async () => {
       render(<MapComponent listings={mockListings} />);
 
       await act(async () => {
@@ -744,9 +729,8 @@ describe("Map Touch Gestures", () => {
         });
       });
 
-      // When programmatic move, should NOT mark bounds as dirty (i.e., search not triggered)
-      // Note: setBoundsDirty(false) may be called from init effects, but setBoundsDirty(true) should not be called
-      expect(mockSetBoundsDirty).not.toHaveBeenCalledWith(true);
+      expect(mockSetHasUserMoved).not.toHaveBeenCalledWith(true);
+      expect(mockSetActivePanBounds).toHaveBeenCalledWith(null);
       // Should clear programmatic flag
       expect(mockSetProgrammaticMove).toHaveBeenCalledWith(false);
     });

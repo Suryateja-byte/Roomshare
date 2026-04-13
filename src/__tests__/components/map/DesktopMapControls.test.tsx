@@ -6,8 +6,6 @@ import DesktopMapControls, {
 import type { POICategory } from "@/components/map/POILayer";
 
 const defaultProps = {
-  searchAsMove: true,
-  onToggleSearchAsMove: jest.fn(),
   activePOICategories: new Set<POICategory>(),
   onTogglePOICategory: jest.fn(),
   isDropMode: false,
@@ -15,8 +13,6 @@ const defaultProps = {
   onToggleDropMode: jest.fn(),
   onClearPin: jest.fn(),
   onHideMap: jest.fn(),
-  showResetToResults: false,
-  onResetToResults: jest.fn(),
   canFullscreen: true,
   isFullscreen: false,
   onToggleFullscreen: jest.fn(),
@@ -46,9 +42,6 @@ describe("DesktopMapControls", () => {
     render(<DesktopMapControls {...defaultProps} />);
 
     expect(
-      screen.getByRole("switch", { name: /search as i move/i })
-    ).toBeInTheDocument();
-    expect(
       screen.getByRole("button", { name: /hide map/i })
     ).toBeInTheDocument();
     expect(
@@ -60,15 +53,9 @@ describe("DesktopMapControls", () => {
     expect(
       screen.queryByRole("button", { name: /show all results on map/i })
     ).not.toBeInTheDocument();
-  });
-
-  it("toggles search-as-move when the primary switch is clicked", async () => {
-    const user = userEvent.setup();
-    render(<DesktopMapControls {...defaultProps} />);
-
-    await user.click(screen.getByRole("switch", { name: /search as i move/i }));
-
-    expect(defaultProps.onToggleSearchAsMove).toHaveBeenCalledTimes(1);
+    expect(
+      screen.queryByRole("switch", { name: /search as i move/i })
+    ).not.toBeInTheDocument();
   });
 
   it("toggles fullscreen from the desktop rail", async () => {
@@ -87,25 +74,6 @@ describe("DesktopMapControls", () => {
     await user.click(screen.getByRole("button", { name: /hide map/i }));
 
     expect(defaultProps.onHideMap).toHaveBeenCalledTimes(1);
-  });
-
-  it("renders a contextual show-all-results pill only when requested", async () => {
-    const user = userEvent.setup();
-    render(
-      <DesktopMapControls
-        {...defaultProps}
-        showResetToResults={true}
-      />
-    );
-
-    const button = screen.getByRole("button", {
-      name: /show all results on map/i,
-    });
-    expect(button).toBeInTheDocument();
-
-    await user.click(button);
-
-    expect(defaultProps.onResetToResults).toHaveBeenCalledTimes(1);
   });
 
   it("opens the tools menu and toggles POI categories in dropdown mode", async () => {

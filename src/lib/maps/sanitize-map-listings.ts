@@ -6,7 +6,10 @@ type MapListingInput = {
   price?: unknown;
   availableSlots?: unknown;
   images?: unknown;
+  roomType?: unknown;
   location?: {
+    city?: unknown;
+    state?: unknown;
     lat?: unknown;
     lng?: unknown;
   } | null;
@@ -43,6 +46,12 @@ function toSafeDate(value: unknown): Date | null {
   return null;
 }
 
+function toOptionalTrimmedString(value: unknown): string | undefined {
+  return typeof value === "string" && value.trim().length > 0
+    ? value.trim()
+    : undefined;
+}
+
 function hasValidCoordinateRange(lat: number, lng: number): boolean {
   return (
     Number.isFinite(lat) &&
@@ -75,7 +84,13 @@ export function sanitizeMapListing(
           (image): image is string => typeof image === "string"
         )
       : [],
-    location: { lat, lng },
+    roomType: toOptionalTrimmedString(listing.roomType),
+    location: {
+      city: toOptionalTrimmedString(listing.location?.city),
+      state: toOptionalTrimmedString(listing.location?.state),
+      lat,
+      lng,
+    },
     tier: listing.tier,
     avgRating: toFiniteNumber(listing.avgRating, 0),
     reviewCount: Math.max(

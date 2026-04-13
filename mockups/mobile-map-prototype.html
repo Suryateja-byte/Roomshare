@@ -1,0 +1,827 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Roomshare Mobile Map - Visual Plan</title>
+<style>
+  * { margin: 0; padding: 0; box-sizing: border-box; }
+  body {
+    font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', system-ui, sans-serif;
+    background: #0a0a0a; color: #e5e5e5; padding: 24px;
+  }
+  h1 { font-size: 28px; font-weight: 700; margin-bottom: 8px; color: #fff; }
+  h2 { font-size: 20px; font-weight: 600; margin: 40px 0 16px; color: #fff; }
+  h3 { font-size: 14px; font-weight: 600; margin-bottom: 8px; color: #a3a3a3; text-transform: uppercase; letter-spacing: 0.5px; }
+  .subtitle { color: #737373; font-size: 14px; margin-bottom: 32px; }
+  .row { display: flex; gap: 24px; flex-wrap: wrap; margin-bottom: 40px; }
+  .label { text-align: center; font-size: 13px; color: #a3a3a3; margin-top: 12px; max-width: 280px; }
+  .badge {
+    display: inline-block; padding: 2px 8px; border-radius: 4px; font-size: 11px;
+    font-weight: 600; margin-bottom: 8px;
+  }
+  .badge-new { background: #065f46; color: #6ee7b7; }
+  .badge-current { background: #1e3a5f; color: #93c5fd; }
+  .badge-sprint1 { background: #7c2d12; color: #fdba74; }
+  .badge-sprint2 { background: #581c87; color: #d8b4fe; }
+
+  /* Phone frame */
+  .phone {
+    width: 280px; height: 560px; background: #1a1a1a; border-radius: 32px;
+    border: 3px solid #333; position: relative; overflow: hidden;
+    box-shadow: 0 20px 40px rgba(0,0,0,0.5);
+    flex-shrink: 0;
+  }
+  .phone-notch {
+    position: absolute; top: 0; left: 50%; transform: translateX(-50%);
+    width: 100px; height: 24px; background: #1a1a1a; border-radius: 0 0 16px 16px;
+    z-index: 50;
+  }
+  .phone-status {
+    position: absolute; top: 4px; left: 16px; right: 16px; height: 20px;
+    display: flex; justify-content: space-between; align-items: center;
+    font-size: 11px; color: #fff; z-index: 51; font-weight: 600;
+  }
+  .phone-home {
+    position: absolute; bottom: 6px; left: 50%; transform: translateX(-50%);
+    width: 100px; height: 4px; background: #555; border-radius: 2px; z-index: 50;
+  }
+
+  /* Map area */
+  .map-area {
+    position: absolute; top: 0; left: 0; right: 0; bottom: 0;
+    background: #1e293b;
+    background-image:
+      linear-gradient(rgba(255,255,255,0.03) 1px, transparent 1px),
+      linear-gradient(90deg, rgba(255,255,255,0.03) 1px, transparent 1px);
+    background-size: 40px 40px;
+  }
+  .map-label {
+    position: absolute; font-size: 9px; color: #475569; font-weight: 500;
+  }
+  .map-road {
+    position: absolute; background: #334155; border-radius: 1px;
+  }
+  .map-road.h { height: 2px; }
+  .map-road.v { width: 2px; }
+  .map-park {
+    position: absolute; background: #064e3b; border-radius: 8px; opacity: 0.4;
+  }
+
+  /* Map markers */
+  .marker {
+    position: absolute; background: #3b82f6; color: #fff; font-size: 10px;
+    font-weight: 700; padding: 3px 7px; border-radius: 6px;
+    box-shadow: 0 2px 4px rgba(0,0,0,0.3); cursor: pointer;
+    white-space: nowrap; z-index: 10;
+  }
+  .marker::after {
+    content: ''; position: absolute; bottom: -5px; left: 50%; transform: translateX(-50%);
+    border-left: 5px solid transparent; border-right: 5px solid transparent;
+    border-top: 5px solid #3b82f6;
+  }
+  .marker.selected {
+    background: #1d1d1d; transform: scale(1.2); z-index: 20;
+    box-shadow: 0 4px 12px rgba(0,0,0,0.4);
+  }
+  .marker.selected::after { border-top-color: #1d1d1d; }
+  .marker.visited { background: #6b7280; }
+  .marker.visited::after { border-top-color: #6b7280; }
+
+  /* Cluster */
+  .cluster {
+    position: absolute; width: 36px; height: 36px; background: #3b82f6;
+    border-radius: 50%; display: flex; align-items: center; justify-content: center;
+    font-size: 12px; font-weight: 700; color: #fff;
+    box-shadow: 0 0 0 4px rgba(59,130,246,0.3);
+  }
+
+  /* Search header */
+  .search-header {
+    position: absolute; top: 28px; left: 8px; right: 8px; z-index: 30;
+    background: #262626; border-radius: 12px; padding: 10px 12px;
+    display: flex; align-items: center; gap: 8px;
+    box-shadow: 0 4px 12px rgba(0,0,0,0.3);
+  }
+  .search-icon { width: 16px; height: 16px; border: 2px solid #737373; border-radius: 50%; position: relative; }
+  .search-icon::after { content: ''; position: absolute; bottom: -4px; right: -4px; width: 2px; height: 6px; background: #737373; transform: rotate(-45deg); }
+  .search-text { font-size: 13px; color: #a3a3a3; flex: 1; }
+  .search-filter-btn {
+    padding: 4px 8px; background: #404040; border-radius: 6px;
+    font-size: 11px; color: #d4d4d4; display: flex; align-items: center; gap: 4px;
+  }
+
+  /* Bottom sheet */
+  .sheet {
+    position: absolute; left: 0; right: 0; background: #1a1a1a;
+    border-radius: 16px 16px 0 0; z-index: 20;
+    box-shadow: 0 -4px 20px rgba(0,0,0,0.4);
+    transition: bottom 0.3s ease;
+  }
+  .sheet-handle-area {
+    display: flex; flex-direction: column; align-items: center; padding: 10px 16px 8px;
+    cursor: grab;
+  }
+  .sheet-handle {
+    width: 40px; height: 4px; background: #525252; border-radius: 2px;
+  }
+  .sheet-header {
+    display: flex; justify-content: space-between; align-items: center;
+    padding: 0 16px 8px; font-size: 13px;
+  }
+  .sheet-title { font-weight: 600; color: #e5e5e5; }
+  .sheet-action { color: #3b82f6; font-size: 12px; font-weight: 500; }
+  .sheet-close {
+    width: 24px; height: 24px; background: #333; border-radius: 50%;
+    display: flex; align-items: center; justify-content: center;
+    font-size: 14px; color: #a3a3a3;
+  }
+
+  /* Filter strip */
+  .filter-strip {
+    display: flex; gap: 6px; padding: 0 16px 10px; overflow-x: auto;
+  }
+  .filter-chip {
+    padding: 5px 10px; background: #262626; border: 1px solid #404040;
+    border-radius: 16px; font-size: 11px; color: #d4d4d4; white-space: nowrap;
+  }
+  .filter-chip.active {
+    background: #1e3a5f; border-color: #3b82f6; color: #93c5fd;
+  }
+
+  /* Listing card */
+  .listing-card {
+    display: flex; gap: 10px; padding: 10px 16px; border-bottom: 1px solid #262626;
+  }
+  .listing-img {
+    width: 80px; height: 60px; background: #333; border-radius: 8px;
+    flex-shrink: 0; display: flex; align-items: center; justify-content: center;
+    font-size: 20px;
+  }
+  .listing-info { flex: 1; min-width: 0; }
+  .listing-title { font-size: 12px; font-weight: 600; color: #e5e5e5; margin-bottom: 2px; }
+  .listing-meta { font-size: 10px; color: #737373; margin-bottom: 3px; }
+  .listing-price { font-size: 13px; font-weight: 700; color: #fff; }
+  .listing-heart { color: #ef4444; font-size: 14px; }
+
+  /* Preview card strip (NEW - S1-1) */
+  .preview-strip {
+    position: absolute; left: 0; right: 0; z-index: 25;
+    display: flex; gap: 8px; padding: 0 12px; overflow-x: auto;
+    scroll-snap-type: x mandatory;
+  }
+  .preview-card {
+    width: 248px; flex-shrink: 0; background: #1a1a1a; border-radius: 12px;
+    overflow: hidden; box-shadow: 0 4px 16px rgba(0,0,0,0.4);
+    scroll-snap-align: center;
+  }
+  .preview-img {
+    width: 100%; height: 100px; background: #333; display: flex;
+    align-items: center; justify-content: center; font-size: 28px;
+    position: relative;
+  }
+  .preview-dots {
+    position: absolute; bottom: 6px; left: 50%; transform: translateX(-50%);
+    display: flex; gap: 4px;
+  }
+  .preview-dot {
+    width: 5px; height: 5px; border-radius: 50%; background: rgba(255,255,255,0.4);
+  }
+  .preview-dot.active { background: #fff; }
+  .preview-info {
+    padding: 8px 10px;
+  }
+  .preview-title { font-size: 12px; font-weight: 600; color: #e5e5e5; margin-bottom: 2px; }
+  .preview-meta { font-size: 10px; color: #737373; }
+  .preview-price { font-size: 14px; font-weight: 700; color: #fff; margin-top: 4px; }
+  .preview-heart {
+    position: absolute; top: 8px; right: 8px; font-size: 16px;
+  }
+
+  /* Floating map button */
+  .float-btn {
+    position: absolute; z-index: 22; left: 50%; transform: translateX(-50%);
+    background: #262626; color: #e5e5e5; padding: 8px 20px; border-radius: 20px;
+    font-size: 12px; font-weight: 600; box-shadow: 0 4px 12px rgba(0,0,0,0.4);
+    display: flex; align-items: center; gap: 6px;
+    border: 1px solid #404040;
+  }
+
+  /* Search as I move toggle (NEW - S1-3) */
+  .search-toggle {
+    position: absolute; z-index: 22;
+    background: #262626; border-radius: 8px; padding: 6px 10px;
+    font-size: 10px; color: #a3a3a3; display: flex; align-items: center; gap: 6px;
+    box-shadow: 0 2px 8px rgba(0,0,0,0.3);
+    border: 1px solid #333;
+  }
+  .toggle-switch {
+    width: 28px; height: 16px; background: #404040; border-radius: 8px;
+    position: relative;
+  }
+  .toggle-switch.on { background: #3b82f6; }
+  .toggle-switch::after {
+    content: ''; position: absolute; top: 2px; left: 2px;
+    width: 12px; height: 12px; background: #fff; border-radius: 50%;
+    transition: left 0.2s;
+  }
+  .toggle-switch.on::after { left: 14px; }
+
+  /* Map moved banner */
+  .map-moved {
+    position: absolute; z-index: 22; left: 50%; transform: translateX(-50%);
+    background: #3b82f6; color: #fff; padding: 8px 16px; border-radius: 20px;
+    font-size: 12px; font-weight: 600; box-shadow: 0 4px 12px rgba(0,0,0,0.3);
+    white-space: nowrap;
+  }
+
+  /* Status card (mobile) */
+  .status-card {
+    position: absolute; left: 12px; right: 12px; z-index: 22;
+    background: #262626; border-radius: 12px; padding: 12px;
+    box-shadow: 0 4px 16px rgba(0,0,0,0.4);
+    border: 1px solid #333;
+  }
+  .status-text { font-size: 12px; color: #a3a3a3; margin-bottom: 8px; }
+  .status-btn {
+    background: #3b82f6; color: #fff; padding: 8px 16px; border-radius: 8px;
+    font-size: 12px; font-weight: 600; text-align: center; width: 100%;
+  }
+
+  /* Back button indicator */
+  .back-indicator {
+    position: absolute; bottom: 16px; left: 50%; transform: translateX(-50%);
+    background: rgba(0,0,0,0.7); color: #a3a3a3; padding: 4px 12px;
+    border-radius: 12px; font-size: 10px; z-index: 55; white-space: nowrap;
+  }
+
+  /* Annotation arrow */
+  .annotation {
+    position: absolute; z-index: 60;
+    background: #fbbf24; color: #1a1a1a; padding: 4px 8px; border-radius: 4px;
+    font-size: 10px; font-weight: 700; white-space: nowrap;
+  }
+
+  /* Section divider */
+  .divider { border-top: 1px solid #262626; margin: 48px 0 32px; }
+
+  /* Description card */
+  .desc {
+    background: #1a1a1a; border: 1px solid #262626; border-radius: 12px;
+    padding: 16px; margin-bottom: 16px; max-width: 600px;
+  }
+  .desc p { font-size: 13px; color: #a3a3a3; line-height: 1.5; }
+  .desc strong { color: #e5e5e5; }
+
+  /* Flow arrow */
+  .flow-arrow {
+    display: flex; align-items: center; justify-content: center;
+    font-size: 24px; color: #525252; padding: 0 8px; align-self: center;
+  }
+</style>
+</head>
+<body>
+
+<h1>Roomshare Mobile Map - Visual Plan</h1>
+<p class="subtitle">How the mobile search experience will look after Sprint 1 + Sprint 2</p>
+
+<!-- ============================================================ -->
+<h2>1. Bottom Sheet: 3 Snap Points (Current - Preserved)</h2>
+<p class="subtitle">These work correctly today. The plan preserves them.</p>
+
+<div class="row">
+  <!-- Collapsed -->
+  <div>
+    <span class="badge badge-current">CURRENT</span>
+    <h3>Collapsed (16vh) - Map Focused</h3>
+    <div class="phone">
+      <div class="phone-notch"></div>
+      <div class="phone-status"><span>9:41</span><span>LTE</span></div>
+      <div class="map-area">
+        <div class="map-road h" style="top:180px;left:0;right:0"></div>
+        <div class="map-road h" style="top:280px;left:0;right:0"></div>
+        <div class="map-road v" style="left:100px;top:0;bottom:0"></div>
+        <div class="map-road v" style="left:200px;top:0;bottom:0"></div>
+        <div class="map-park" style="top:120px;left:130px;width:60px;height:40px"></div>
+        <div class="map-label" style="top:145px;left:140px">Park</div>
+        <div class="marker" style="top:160px;left:40px">$1,200</div>
+        <div class="marker" style="top:200px;left:150px">$950</div>
+        <div class="marker visited" style="top:250px;left:80px">$1,100</div>
+        <div class="marker" style="top:300px;left:200px">$875</div>
+        <div class="marker" style="top:180px;left:220px">$1,450</div>
+        <div class="cluster" style="top:340px;left:120px">5</div>
+      </div>
+      <div class="search-header">
+        <div class="search-icon"></div>
+        <span class="search-text">San Francisco, CA</span>
+        <div class="search-filter-btn">Filters</div>
+      </div>
+      <div class="float-btn" style="bottom:110px">
+        <span>List</span>
+      </div>
+      <div class="sheet" style="bottom:0;top:auto;height:90px">
+        <div class="sheet-handle-area">
+          <div class="sheet-handle"></div>
+        </div>
+        <div class="sheet-header">
+          <span class="sheet-title">24 rooms</span>
+          <span class="sheet-action">Sort</span>
+        </div>
+      </div>
+      <div class="phone-home"></div>
+    </div>
+    <div class="label">Map dominates. Sheet shows count only. "List" pill toggles to peek.</div>
+  </div>
+
+  <!-- Peek -->
+  <div>
+    <span class="badge badge-current">CURRENT</span>
+    <h3>Peek (42vh) - Split View</h3>
+    <div class="phone">
+      <div class="phone-notch"></div>
+      <div class="phone-status"><span>9:41</span><span>LTE</span></div>
+      <div class="map-area">
+        <div class="map-road h" style="top:130px;left:0;right:0"></div>
+        <div class="map-road v" style="left:100px;top:0;bottom:0"></div>
+        <div class="map-road v" style="left:200px;top:0;bottom:0"></div>
+        <div class="marker" style="top:100px;left:40px">$1,200</div>
+        <div class="marker" style="top:140px;left:150px">$950</div>
+        <div class="marker" style="top:170px;left:220px">$1,450</div>
+      </div>
+      <div class="search-header">
+        <div class="search-icon"></div>
+        <span class="search-text">San Francisco, CA</span>
+        <div class="search-filter-btn">Filters</div>
+      </div>
+      <div class="float-btn" style="bottom:260px">
+        <span>Map</span>
+      </div>
+      <div class="sheet" style="bottom:0;top:auto;height:235px">
+        <div class="sheet-handle-area">
+          <div class="sheet-handle"></div>
+        </div>
+        <div class="sheet-header">
+          <span class="sheet-title">24 rooms</span>
+          <div style="display:flex;gap:8px;align-items:center">
+            <span class="sheet-action">Sort</span>
+            <div class="sheet-close">X</div>
+          </div>
+        </div>
+        <div class="filter-strip">
+          <div class="filter-chip active">$800-1500</div>
+          <div class="filter-chip">Room type</div>
+          <div class="filter-chip">Move-in</div>
+        </div>
+        <div class="listing-card">
+          <div class="listing-img">img</div>
+          <div class="listing-info">
+            <div class="listing-title">Sunny room in Mission</div>
+            <div class="listing-meta">Private room - Available May 1</div>
+            <div class="listing-price">$1,200/mo</div>
+          </div>
+        </div>
+        <div class="listing-card">
+          <div class="listing-img">img</div>
+          <div class="listing-info">
+            <div class="listing-title">Cozy studio near BART</div>
+            <div class="listing-meta">Shared room - Available now</div>
+            <div class="listing-price">$950/mo</div>
+          </div>
+        </div>
+      </div>
+      <div class="phone-home"></div>
+    </div>
+    <div class="label">Default state. Map + list visible. Filter chips in sheet header.</div>
+  </div>
+
+  <!-- Expanded -->
+  <div>
+    <span class="badge badge-current">CURRENT</span>
+    <h3>Expanded (84vh) - List Focused</h3>
+    <div class="phone">
+      <div class="phone-notch"></div>
+      <div class="phone-status"><span>9:41</span><span>LTE</span></div>
+      <div class="map-area">
+        <div class="map-road h" style="top:60px;left:0;right:0"></div>
+      </div>
+      <div class="sheet" style="bottom:0;top:auto;height:470px">
+        <div class="sheet-handle-area">
+          <div class="sheet-handle"></div>
+        </div>
+        <div class="sheet-header">
+          <span class="sheet-title">24 rooms in San Francisco</span>
+          <div style="display:flex;gap:8px;align-items:center">
+            <span class="sheet-action">Sort</span>
+            <div class="sheet-close">X</div>
+          </div>
+        </div>
+        <div class="filter-strip">
+          <div class="filter-chip active">$800-1500</div>
+          <div class="filter-chip">Room type</div>
+          <div class="filter-chip">Move-in</div>
+          <div class="filter-chip">More</div>
+        </div>
+        <div class="listing-card">
+          <div class="listing-img">img</div>
+          <div class="listing-info">
+            <div class="listing-title">Sunny room in Mission</div>
+            <div class="listing-meta">Private room - Available May 1</div>
+            <div class="listing-price">$1,200/mo</div>
+          </div>
+        </div>
+        <div class="listing-card">
+          <div class="listing-img">img</div>
+          <div class="listing-info">
+            <div class="listing-title">Cozy studio near BART</div>
+            <div class="listing-meta">Shared room - Available now</div>
+            <div class="listing-price">$950/mo</div>
+          </div>
+        </div>
+        <div class="listing-card">
+          <div class="listing-img">img</div>
+          <div class="listing-info">
+            <div class="listing-title">Bright room in Hayes Valley</div>
+            <div class="listing-meta">Private room - Available Jun 1</div>
+            <div class="listing-price">$1,450/mo</div>
+          </div>
+        </div>
+        <div class="listing-card">
+          <div class="listing-img">img</div>
+          <div class="listing-info">
+            <div class="listing-title">Shared space in SoMa</div>
+            <div class="listing-meta">Shared room - Available now</div>
+            <div class="listing-price">$875/mo</div>
+          </div>
+        </div>
+      </div>
+      <div class="phone-home"></div>
+    </div>
+    <div class="label">Full list. Map barely visible. Scrollable list with all cards.</div>
+  </div>
+</div>
+
+<div class="divider"></div>
+
+<!-- ============================================================ -->
+<h2>2. Sprint 1: MobileListingPreview (S1-1) - NEW</h2>
+<p class="subtitle">When a marker is tapped, a swipeable preview card appears above the collapsed sheet.</p>
+
+<div class="row">
+  <!-- Before: marker tapped -->
+  <div>
+    <span class="badge badge-current">BEFORE</span>
+    <h3>Marker Tapped (Current)</h3>
+    <div class="phone">
+      <div class="phone-notch"></div>
+      <div class="phone-status"><span>9:41</span><span>LTE</span></div>
+      <div class="map-area">
+        <div class="map-road h" style="top:200px;left:0;right:0"></div>
+        <div class="map-road v" style="left:140px;top:0;bottom:0"></div>
+        <div class="marker" style="top:160px;left:40px">$1,200</div>
+        <div class="marker selected" style="top:240px;left:120px">$950</div>
+        <div class="marker" style="top:300px;left:200px">$875</div>
+        <div class="marker" style="top:180px;left:220px">$1,450</div>
+      </div>
+      <div class="search-header">
+        <div class="search-icon"></div>
+        <span class="search-text">San Francisco, CA</span>
+      </div>
+      <!-- No preview card - just selected marker -->
+      <div style="position:absolute;top:50%;left:50%;transform:translate(-50%,-50%);color:#525252;font-size:13px;z-index:30;text-align:center;background:rgba(0,0,0,0.6);padding:12px;border-radius:8px">
+        Marker selected but<br>no preview card shown<br>(must open full list)
+      </div>
+      <div class="sheet" style="bottom:0;top:auto;height:90px">
+        <div class="sheet-handle-area"><div class="sheet-handle"></div></div>
+        <div class="sheet-header">
+          <span class="sheet-title">24 rooms</span>
+        </div>
+      </div>
+      <div class="phone-home"></div>
+    </div>
+    <div class="label">No preview card. User must expand the sheet to see listing details.</div>
+  </div>
+
+  <div class="flow-arrow">&rarr;</div>
+
+  <!-- After: preview card -->
+  <div>
+    <span class="badge badge-new">AFTER (S1-1)</span>
+    <h3>Marker Tapped - Preview Strip</h3>
+    <div class="phone">
+      <div class="phone-notch"></div>
+      <div class="phone-status"><span>9:41</span><span>LTE</span></div>
+      <div class="map-area">
+        <div class="map-road h" style="top:200px;left:0;right:0"></div>
+        <div class="map-road v" style="left:140px;top:0;bottom:0"></div>
+        <div class="marker" style="top:160px;left:40px">$1,200</div>
+        <div class="marker selected" style="top:240px;left:120px">$950</div>
+        <div class="marker" style="top:300px;left:200px">$875</div>
+        <div class="marker" style="top:180px;left:220px">$1,450</div>
+      </div>
+      <div class="search-header">
+        <div class="search-icon"></div>
+        <span class="search-text">San Francisco, CA</span>
+      </div>
+      <!-- Preview strip -->
+      <div class="preview-strip" style="bottom:108px">
+        <div class="preview-card">
+          <div class="preview-img">
+            img
+            <div class="preview-heart">&hearts;</div>
+            <div class="preview-dots">
+              <div class="preview-dot active"></div>
+              <div class="preview-dot"></div>
+              <div class="preview-dot"></div>
+            </div>
+          </div>
+          <div class="preview-info">
+            <div class="preview-title">Cozy studio near BART</div>
+            <div class="preview-meta">Shared room - SoMa - Available now</div>
+            <div class="preview-price">$950/mo</div>
+          </div>
+        </div>
+      </div>
+      <!-- Swipe hint -->
+      <div style="position:absolute;bottom:260px;right:16px;color:#525252;font-size:10px;z-index:30">&larr; swipe for more</div>
+      <div class="sheet" style="bottom:0;top:auto;height:90px">
+        <div class="sheet-handle-area"><div class="sheet-handle"></div></div>
+        <div class="sheet-header">
+          <span class="sheet-title" style="color:#3b82f6">1 of 24 selected</span>
+        </div>
+      </div>
+      <div class="phone-home"></div>
+    </div>
+    <div class="label">Horizontal snap-scroll preview card. Swipe between markers. Tap card to open detail.</div>
+  </div>
+
+  <!-- Dismiss paths -->
+  <div>
+    <span class="badge badge-new">DISMISS PATHS</span>
+    <h3>How Preview Dismisses</h3>
+    <div class="desc">
+      <p><strong>Tap map background</strong> &rarr; clears activeId &rarr; preview hides</p>
+      <p style="margin-top:8px"><strong>Drag sheet up to peek</strong> &rarr; snap changes to 1 &rarr; preview hides, full list shows</p>
+      <p style="margin-top:8px"><strong>Swipe between cards</strong> &rarr; map pans to marker, activeId updates</p>
+      <p style="margin-top:8px"><strong>Tap the card</strong> &rarr; navigates to listing detail page</p>
+    </div>
+  </div>
+</div>
+
+<div class="divider"></div>
+
+<!-- ============================================================ -->
+<h2>3. Sprint 1: Search-as-I-Move Fix (S1-3) - NEW</h2>
+<p class="subtitle">Currently force-disabled on mobile. After fix: toggle works honestly, with mobile-appropriate debounce.</p>
+
+<div class="row">
+  <!-- Toggle OFF (default) -->
+  <div>
+    <span class="badge badge-sprint1">S1-3</span>
+    <h3>Default: Toggle OFF (Manual Search)</h3>
+    <div class="phone">
+      <div class="phone-notch"></div>
+      <div class="phone-status"><span>9:41</span><span>LTE</span></div>
+      <div class="map-area">
+        <div class="map-road h" style="top:200px;left:0;right:0"></div>
+        <div class="map-road v" style="left:140px;top:0;bottom:0"></div>
+        <div class="marker" style="top:160px;left:40px;opacity:0.5">$1,200</div>
+        <div class="marker" style="top:240px;left:170px;opacity:0.5">$950</div>
+        <div class="marker" style="top:300px;left:80px;opacity:0.5">$875</div>
+      </div>
+      <div class="search-header">
+        <div class="search-icon"></div>
+        <span class="search-text">San Francisco, CA</span>
+      </div>
+      <!-- Search toggle -->
+      <div class="search-toggle" style="top:80px;left:8px">
+        <div class="toggle-switch"></div>
+        <span>Search as I move</span>
+      </div>
+      <!-- Status card -->
+      <div class="status-card" style="bottom:110px">
+        <div class="status-text">Results are outdated - Map moved</div>
+        <div class="status-btn">Search this area</div>
+      </div>
+      <div class="sheet" style="bottom:0;top:auto;height:90px">
+        <div class="sheet-handle-area"><div class="sheet-handle"></div></div>
+        <div class="sheet-header">
+          <span class="sheet-title" style="color:#f59e0b">Results outdated</span>
+        </div>
+      </div>
+      <div class="phone-home"></div>
+    </div>
+    <div class="label">After panning, "Search this area" button appears. Markers fade to show staleness.</div>
+  </div>
+
+  <!-- Toggle ON -->
+  <div>
+    <span class="badge badge-sprint1">S1-3</span>
+    <h3>Toggle ON (Auto Search)</h3>
+    <div class="phone">
+      <div class="phone-notch"></div>
+      <div class="phone-status"><span>9:41</span><span>LTE</span></div>
+      <div class="map-area">
+        <div class="map-road h" style="top:200px;left:0;right:0"></div>
+        <div class="map-road v" style="left:140px;top:0;bottom:0"></div>
+        <div class="marker" style="top:160px;left:60px">$1,350</div>
+        <div class="marker" style="top:230px;left:180px">$1,100</div>
+        <div class="marker" style="top:280px;left:100px">$990</div>
+        <div class="marker" style="top:190px;left:220px">$1,250</div>
+      </div>
+      <div class="search-header">
+        <div class="search-icon"></div>
+        <span class="search-text">San Francisco, CA</span>
+      </div>
+      <!-- Search toggle ON -->
+      <div class="search-toggle" style="top:80px;left:8px">
+        <div class="toggle-switch on"></div>
+        <span style="color:#3b82f6">Search as I move</span>
+      </div>
+      <div class="sheet" style="bottom:0;top:auto;height:90px">
+        <div class="sheet-handle-area"><div class="sheet-handle"></div></div>
+        <div class="sheet-header">
+          <span class="sheet-title">18 rooms</span>
+        </div>
+      </div>
+      <div class="phone-home"></div>
+    </div>
+    <div class="label">Toggle ON: results auto-update as you pan (150ms debounce on mobile, 50ms desktop).</div>
+  </div>
+</div>
+
+<div class="divider"></div>
+
+<!-- ============================================================ -->
+<h2>4. Sprint 2: Back Button Behavior (S2-5) - NEW</h2>
+<p class="subtitle">Android back button steps through sheet states instead of navigating away.</p>
+
+<div class="row">
+  <div>
+    <span class="badge badge-sprint2">S2-5</span>
+    <h3>Expanded &rarr; Back</h3>
+    <div class="phone">
+      <div class="phone-notch"></div>
+      <div class="phone-status"><span>9:41</span><span>LTE</span></div>
+      <div class="map-area"></div>
+      <div class="sheet" style="bottom:0;top:auto;height:470px">
+        <div class="sheet-handle-area"><div class="sheet-handle"></div></div>
+        <div class="sheet-header">
+          <span class="sheet-title">24 rooms</span>
+          <div class="sheet-close">X</div>
+        </div>
+        <div class="listing-card">
+          <div class="listing-img">img</div>
+          <div class="listing-info">
+            <div class="listing-title">Sunny room in Mission</div>
+            <div class="listing-meta">Private room</div>
+            <div class="listing-price">$1,200/mo</div>
+          </div>
+        </div>
+        <div class="listing-card">
+          <div class="listing-img">img</div>
+          <div class="listing-info">
+            <div class="listing-title">Cozy studio</div>
+            <div class="listing-meta">Shared room</div>
+            <div class="listing-price">$950/mo</div>
+          </div>
+        </div>
+      </div>
+      <div class="back-indicator">Back &rarr; goes to Peek (not away)</div>
+      <div class="phone-home"></div>
+    </div>
+    <div class="label">Back from expanded goes to peek.</div>
+  </div>
+
+  <div class="flow-arrow">&rarr;</div>
+
+  <div>
+    <span class="badge badge-sprint2">S2-5</span>
+    <h3>Peek &rarr; Back</h3>
+    <div class="phone">
+      <div class="phone-notch"></div>
+      <div class="phone-status"><span>9:41</span><span>LTE</span></div>
+      <div class="map-area">
+        <div class="map-road h" style="top:130px;left:0;right:0"></div>
+        <div class="marker" style="top:100px;left:60px">$1,200</div>
+        <div class="marker" style="top:150px;left:180px">$950</div>
+      </div>
+      <div class="search-header">
+        <div class="search-icon"></div>
+        <span class="search-text">San Francisco, CA</span>
+      </div>
+      <div class="sheet" style="bottom:0;top:auto;height:235px">
+        <div class="sheet-handle-area"><div class="sheet-handle"></div></div>
+        <div class="sheet-header">
+          <span class="sheet-title">24 rooms</span>
+        </div>
+        <div class="listing-card">
+          <div class="listing-img">img</div>
+          <div class="listing-info">
+            <div class="listing-title">Sunny room in Mission</div>
+            <div class="listing-meta">Private room</div>
+            <div class="listing-price">$1,200/mo</div>
+          </div>
+        </div>
+      </div>
+      <div class="back-indicator">Back &rarr; goes to Collapsed</div>
+      <div class="phone-home"></div>
+    </div>
+    <div class="label">Back from peek goes to collapsed.</div>
+  </div>
+
+  <div class="flow-arrow">&rarr;</div>
+
+  <div>
+    <span class="badge badge-sprint2">S2-5</span>
+    <h3>Collapsed &rarr; Back</h3>
+    <div class="phone">
+      <div class="phone-notch"></div>
+      <div class="phone-status"><span>9:41</span><span>LTE</span></div>
+      <div class="map-area">
+        <div class="map-road h" style="top:200px;left:0;right:0"></div>
+        <div class="map-road v" style="left:140px;top:0;bottom:0"></div>
+        <div class="marker" style="top:160px;left:60px">$1,200</div>
+        <div class="marker" style="top:240px;left:180px">$950</div>
+        <div class="marker" style="top:300px;left:100px">$875</div>
+      </div>
+      <div class="search-header">
+        <div class="search-icon"></div>
+        <span class="search-text">San Francisco, CA</span>
+      </div>
+      <div class="sheet" style="bottom:0;top:auto;height:90px">
+        <div class="sheet-handle-area"><div class="sheet-handle"></div></div>
+        <div class="sheet-header">
+          <span class="sheet-title">24 rooms</span>
+        </div>
+      </div>
+      <div class="back-indicator">Back &rarr; normal navigation (leaves search)</div>
+      <div class="phone-home"></div>
+    </div>
+    <div class="label">Back from collapsed navigates away normally.</div>
+  </div>
+</div>
+
+<div class="divider"></div>
+
+<!-- ============================================================ -->
+<h2>5. Sprint 2: State Coordination (S2-1) - Flow Diagram</h2>
+<p class="subtitle">One-directional data flow via useReducer in MobileSearchContext.</p>
+
+<div class="desc" style="max-width:800px">
+  <pre style="font-size:11px;color:#a3a3a3;line-height:1.6;overflow-x:auto">
+  User Actions                    MobileSearchContext              UI Updates
+  ============                    ===================              ==========
+
+  Tap marker --------dispatch---> MARKER_TAP {id}
+                                    snap: collapsed              -> Sheet collapses
+                                    activeId: id                 -> Preview card shows
+                                    focusSource: 'map'           -> Map centers on marker
+
+  Drag sheet --------dispatch---> SHEET_DRAG {snap}
+                                    snap: new value              -> Sheet animates
+                                    activeId: null (if peek)     -> Preview hides
+
+  Tap "List" pill ---dispatch---> TOGGLE_PRESS
+                                    snap: peek (from collapsed)  -> Sheet expands to peek
+                                       or collapsed (from peek)  -> Sheet collapses
+
+  Tap map bg --------dispatch---> CLEAR_FOCUS
+                                    activeId: null               -> Preview hides
+                                    snap: unchanged              -> Sheet stays
+
+  Apply filter ------dispatch---> FILTER_APPLY
+                                    snap: peek                   -> Sheet shows results
+                                                                 -> URL navigation fires
+
+  Back button -------dispatch---> BACK_PRESS
+                                    snap: snap - 1               -> Sheet steps down
+                                    activeId: null (if needed)   -> Preview hides
+  </pre>
+</div>
+
+<div class="divider"></div>
+
+<!-- ============================================================ -->
+<h2>6. Full Sprint Summary</h2>
+
+<div class="row" style="gap:16px">
+  <div class="desc" style="flex:1;min-width:280px">
+    <h3 style="color:#fdba74">Sprint 1 (Week 1)</h3>
+    <p><strong>S1-1:</strong> Wire MobileListingPreview - swipeable preview on marker tap</p>
+    <p style="margin-top:6px"><strong>S1-2:</strong> overscroll-behavior: contain on search page</p>
+    <p style="margin-top:6px"><strong>S1-3:</strong> Fix search-as-move toggle + viewport-conditional debounce</p>
+    <p style="margin-top:12px;color:#6ee7b7;font-size:11px">3 items. All independently shippable. 4-5 working days.</p>
+  </div>
+  <div class="desc" style="flex:1;min-width:280px">
+    <h3 style="color:#d8b4fe">Sprint 2 (Weeks 2-3)</h3>
+    <p><strong>S2-1:</strong> useReducer coordination in MobileSearchContext (3-day timebox)</p>
+    <p style="margin-top:6px"><strong>S2-2:</strong> Lazy-load listing images below fold</p>
+    <p style="margin-top:6px"><strong>S2-3:</strong> content-visibility: auto when sheet collapsed</p>
+    <p style="margin-top:6px"><strong>S2-4:</strong> Dynamic touch-action (Safari-safe, between-gesture only)</p>
+    <p style="margin-top:6px"><strong>S2-5:</strong> Android back button history sentinels</p>
+    <p style="margin-top:12px;color:#6ee7b7;font-size:11px">5 items. 8-10 working days. S2-1 timeboxed.</p>
+  </div>
+</div>
+
+</body>
+</html>

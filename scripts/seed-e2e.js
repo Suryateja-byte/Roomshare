@@ -5,6 +5,8 @@
  * Run with: node scripts/seed-e2e.js
  */
 
+const fs = require('fs');
+const path = require('path');
 const { PrismaClient } = require('@prisma/client');
 const bcrypt = require('bcryptjs');
 
@@ -896,6 +898,25 @@ async function main() {
   } else {
     console.log(`  ⏭ RecentlyViewed ${existingRecent ? 'exists' : 'skipped (need 3+ listings)'}`);
   }
+
+  const seedManifest = {
+    generatedAt: new Date().toISOString(),
+    listingsByTitle: Object.fromEntries(
+      [...createdListings, reviewerListing].map((listing) => [
+        listing.title,
+        listing.id,
+      ])
+    ),
+  };
+  const seedManifestDir = path.resolve(__dirname, '../playwright/.cache');
+  fs.mkdirSync(seedManifestDir, { recursive: true });
+  fs.writeFileSync(
+    path.join(seedManifestDir, 'e2e-seed.json'),
+    JSON.stringify(seedManifest, null, 2)
+  );
+  console.log(
+    `  ✓ E2E seed manifest written: ${path.join(seedManifestDir, 'e2e-seed.json')}`
+  );
 
   console.log('✅ E2E seed complete.');
 }

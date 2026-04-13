@@ -1,15 +1,20 @@
-import { buildCspHeader } from "@/lib/csp";
+import { buildCspHeader, isLocalHost } from "@/lib/csp";
 
 export function applySecurityHeaders(request: {
   headers: Headers;
-  nextUrl?: { pathname: string };
+  nextUrl?: { pathname: string; host?: string };
 }) {
   const isDev = process.env.NODE_ENV !== "production";
   const nonce = isDev
     ? undefined
     : crypto.randomUUID().replace(/-/g, "").slice(0, 24);
   const pathname = request.nextUrl?.pathname ?? "";
-  const cspHeader = buildCspHeader(nonce, { pathname });
+  const requestHost = request.headers.get("host") ?? request.nextUrl?.host;
+  const isLocalRequestHost = isLocalHost(requestHost);
+  const cspHeader = buildCspHeader(nonce, {
+    pathname,
+    host: requestHost,
+  });
 
   const requestHeaders = new Headers(request.headers);
   requestHeaders.set("content-security-policy", cspHeader);
@@ -19,7 +24,7 @@ export function applySecurityHeaders(request: {
   responseHeaders.set("X-Frame-Options", "DENY");
   // HSTS is production-only. Setting it on local HTTP can cause browsers
   // to force HTTPS for localhost/127.0.0.1 and break dev access.
-  if (!isDev) {
+  if (!isDev && !isLocalRequestHost) {
     responseHeaders.set(
       "Strict-Transport-Security",
       "max-age=63072000; includeSubDomains; preload"

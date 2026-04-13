@@ -33,6 +33,53 @@ async function waitForPageReady(
   }
 }
 
+async function getSearchShellQueryHash(page: Page): Promise<string | null> {
+  return page
+    .locator(
+      '[data-testid="search-shell"], [data-search-query-hash], [data-query-hash]'
+    )
+    .first()
+    .getAttribute("data-search-query-hash")
+    .catch(async () => {
+      const shell = page
+        .locator(
+          '[data-testid="search-shell"], [data-search-query-hash], [data-query-hash]'
+        )
+        .first();
+      return (
+        (await shell.getAttribute("data-query-hash").catch(() => null)) ?? null
+      );
+    });
+}
+
+async function waitForSearchTransition(
+  page: Page,
+  previousUrl: string,
+  previousQueryHash: string | null,
+  timeout: number
+): Promise<boolean> {
+  return page
+    .waitForFunction(
+      ({ prevUrl, prevHash }) => {
+        const currentUrl = window.location.href;
+        const onSearchPage = window.location.pathname.startsWith("/search");
+        const shell = document.querySelector(
+          '[data-testid="search-shell"], [data-search-query-hash], [data-query-hash]'
+        );
+        const currentHash =
+          shell?.getAttribute("data-search-query-hash") ??
+          shell?.getAttribute("data-query-hash") ??
+          null;
+
+        return onSearchPage && (currentUrl !== prevUrl || currentHash !== prevHash);
+      },
+      { prevUrl: previousUrl, prevHash: previousQueryHash },
+      { timeout }
+    )
+    .then(() => true)
+    .catch(() => false);
+}
+
 /**
  * Check whether the page was redirected to /login (auth expired).
  * Returns true if we are on the intended page, false if redirected to login.
@@ -227,14 +274,67 @@ export function navigationHelpers(page: Page) {
      * Use the search form from any page
      */
     async search(location: string) {
+      const initialUrl = page.url();
+      const initialQueryHash = await getSearchShellQueryHash(page);
       const searchInput = page
-        .getByPlaceholder(/location|city|area|where/i)
-        .or(page.locator('input[name="location"]'))
-        .or(page.locator('[data-testid="search-input"]'));
+        .locator(
+          [
+            'input[placeholder*="Search destinations" i]',
+            'input[placeholder*="location" i]',
+            'input[placeholder*="city" i]',
+            'input[placeholder*="area" i]',
+            'input[placeholder*="where" i]',
+            'input[name="location"]',
+            '[data-testid="search-input"] input',
+            '[data-testid="search-input"]',
+          ].join(", ")
+        )
+        .filter({ visible: true })
+        .first();
 
+      await searchInput.click();
       await searchInput.fill(location);
-      await searchInput.press("Enter");
-      await page.waitForURL(/\/search/, { timeout: timeouts.navigation });
+      const suggestionButton = page
+        .locator('[role="listbox"] button')
+        .filter({ visible: true })
+        .first();
+
+      const selectedSuggestion = await suggestionButton
+        .waitFor({ state: "visible", timeout: 5_000 })
+        .then(() => true)
+        .catch(() => false);
+
+      if (selectedSuggestion) {
+        await suggestionButton.click();
+      }
+
+      const form = searchInput.locator("xpath=ancestor::form[1]");
+      const searchButton = form
+        .getByRole("button", { name: /^search$/i })
+        .or(form.locator('button[aria-label="Search"]'))
+        .filter({ visible: true })
+        .first();
+
+      await searchInput.press("Enter").catch(() => {});
+
+      const navigated = await waitForSearchTransition(
+        page,
+        initialUrl,
+        initialQueryHash,
+        5_000
+      );
+
+      if (!navigated) {
+        await searchButton.click();
+        await waitForSearchTransition(
+          page,
+          initialUrl,
+          initialQueryHash,
+          timeouts.navigation
+        );
+      }
+
+      await waitForPageReady(page, { selector: "main" });
     },
 
     /**

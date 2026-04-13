@@ -14,9 +14,13 @@ import { useBodyScrollLock } from "@/hooks/useBodyScrollLock";
 import { useMediaQuery } from "@/hooks/useMediaQuery";
 // P2-18 FIX: Import snap points from shared constants so FloatingMapButton
 // and MobileBottomSheet stay in sync. Previously hardcoded locally.
-import { SNAP_COLLAPSED, SNAP_EXPANDED } from "@/lib/mobile-layout";
+import {
+  SNAP_COLLAPSED,
+  SNAP_EXPANDED,
+  SNAP_PEEK,
+} from "@/lib/mobile-layout";
 
-const SNAP_POINTS = [SNAP_COLLAPSED, SNAP_EXPANDED] as const;
+const SNAP_POINTS = [SNAP_COLLAPSED, SNAP_PEEK, SNAP_EXPANDED] as const;
 
 /** Minimum drag distance (px) to trigger a snap change */
 const DRAG_THRESHOLD = 40;
@@ -42,7 +46,9 @@ interface MobileBottomSheetProps {
 
 /**
  * Draggable bottom sheet for mobile search results.
- * Overlays the map and snaps to 3 positions: collapsed, half, expanded.
+ * Overlays the map and snaps to 3 positions: collapsed (map-first), peek
+ * (half), and expanded (list-first). See `src/lib/mobile-layout.ts` for
+ * the shared fraction-of-viewport constants.
  *
  * Gesture handling:
  * - Drag the handle/header to resize
@@ -58,7 +64,9 @@ interface MobileBottomSheetProps {
  *
  * Accessibility:
  * - role="region" with aria-label
- * - Escape collapses to half
+ * - Escape returns the sheet to the collapsed (map-first) position; no-op
+ *   when already collapsed. Matches the existing e2e tests in
+ *   `tests/e2e/mobile-bottom-sheet.spec.ts` (section 7.5).
  * - Handle is a button for keyboard users
  */
 export default function MobileBottomSheet({
@@ -69,7 +77,7 @@ export default function MobileBottomSheet({
   onRefresh,
 }: MobileBottomSheetProps) {
   const reducedMotion = useReducedMotion();
-  const [internalSnap, setInternalSnap] = useState(1); // Start at half
+  const [internalSnap, setInternalSnap] = useState(1); // Start at preview
   const snapIndex = controlledSnap ?? internalSnap;
   const setSnapIndex = useCallback(
     (valOrFn: number | ((prev: number) => number)) => {
@@ -311,22 +319,38 @@ export default function MobileBottomSheet({
     [snapIndex, handleTouchStart]
   );
 
-  // Escape key collapses the sheet (only when expanded and no higher-priority handlers)
+  // Escape key collapses the sheet (only when expanded and no higher-priority handlers).
+  // Use a capture-phase document listener so the shortcut still works when focus
+  // shifts away from the handle or another surface swallows the bubbling event.
   useEffect(() => {
     const handleKeyDown = (e: KeyboardEvent) => {
-      if (e.key === "Escape" && snapIndex !== 0) {
-        // Don't handle Escape if a dialog/modal or focus trap is already handling it
-        if (
-          document.querySelector('[role="dialog"][aria-modal="true"]') ||
-          document.querySelector("[data-focus-trap]")
+      if (e.key !== "Escape" || snapIndex === 0) return;
+
+      const target =
+        e.target instanceof HTMLElement
+          ? e.target
+          : document.activeElement instanceof HTMLElement
+            ? document.activeElement
+            : null;
+
+      // Don't handle Escape if a dialog/modal or focus trap is already
+      // responsible for this interaction, or if focus is inside a form control.
+      if (
+        document.querySelector('[role="dialog"][aria-modal="true"]') ||
+        document.querySelector("[data-focus-trap]") ||
+        target?.closest(
+          '[role="dialog"][aria-modal="true"], [data-focus-trap], input, textarea, select, [role="combobox"], [role="listbox"], [contenteditable="true"]'
         )
-          return;
-        // Collapse sheet when Escape is pressed (2-snap model: 0=collapsed, 1=expanded)
-        setSnapIndex(0);
+      ) {
+        return;
       }
+
+      e.preventDefault();
+      setSnapIndex(0);
     };
-    window.addEventListener("keydown", handleKeyDown);
-    return () => window.removeEventListener("keydown", handleKeyDown);
+
+    document.addEventListener("keydown", handleKeyDown, true);
+    return () => document.removeEventListener("keydown", handleKeyDown, true);
   }, [snapIndex, setSnapIndex]);
 
   // Prevent body scroll when sheet is expanded or during drag.
@@ -336,10 +360,11 @@ export default function MobileBottomSheet({
   // useMediaQuery returns undefined during SSR — strict equality with false ensures
   // no lock fires during SSR/hydration (safe because sheet starts at snapIndex 1).
   const isDesktop = useMediaQuery("(min-width: 768px)");
-  useBodyScrollLock((snapIndex === 1 || isDragging) && isDesktop === false);
+  useBodyScrollLock((snapIndex !== 0 || isDragging) && isDesktop === false);
 
-  const isExpanded = snapIndex === 1;
+  const isExpanded = snapIndex === 2;
   const isCollapsed = snapIndex === 0;
+  const resolvedHeaderText = headerText || "Search results";
 
   // Bug #3 fix: When expanded, raise sheet above the fixed header (z-[1100])
   // so minimize/collapse buttons receive pointer events.
@@ -371,6 +396,7 @@ export default function MobileBottomSheet({
 
       <m.div
         ref={sheetRef}
+        data-testid="results-bottom-sheet"
         role="region"
         aria-label="Search results"
         className="fixed bottom-0 left-0 right-0 flex flex-col bg-surface-container-lowest rounded-t-2xl shadow-[0_-4px_24px_rgba(0,0,0,0.12)]"
@@ -401,6 +427,7 @@ export default function MobileBottomSheet({
             // Exposed as CSS variables so child components or global styles can use them.
             // Example usage: .listing-card { scroll-snap-align: start; }
             "--snap-collapsed": `${SNAP_COLLAPSED * 100}dvh`,
+            "--snap-peek": `${SNAP_PEEK * 100}dvh`,
             "--snap-expanded": `${SNAP_EXPANDED * 100}dvh`,
             "--snap-current-index": snapIndex,
             "--snap-current-height": `${SNAP_POINTS[snapIndex] * 100}dvh`,
@@ -409,7 +436,9 @@ export default function MobileBottomSheet({
       >
         {/* Drag handle area */}
         <div
-          className="group flex-shrink-0 py-5 px-4 cursor-grab active:cursor-grabbing select-none"
+          className={`group flex-shrink-0 px-4 cursor-grab active:cursor-grabbing select-none ${
+            isCollapsed ? "pt-3 pb-2.5" : "py-5"
+          }`}
           onTouchStart={handleTouchStart}
           onTouchMove={handleTouchMove}
           onTouchEnd={handleTouchEnd}
@@ -434,20 +463,31 @@ export default function MobileBottomSheet({
             tabIndex={0}
             aria-label="Results panel size"
             aria-valuemin={0}
-            aria-valuemax={1}
+            aria-valuemax={2}
             aria-valuenow={snapIndex}
             aria-valuetext={
               snapIndex === 0
-                ? "collapsed"
-                : "expanded"
+                ? "map"
+                : snapIndex === 1
+                  ? "peek"
+                  : "list"
             }
             onKeyDown={(e) => {
               if (e.key === "Enter" || e.key === " ") {
                 e.preventDefault();
-                setSnapIndex(snapIndex === 1 ? 0 : 1);
+                setSnapIndex(
+                  snapIndex === SNAP_POINTS.length - 1 ? 0 : snapIndex + 1
+                );
+              } else if (e.key === "Escape") {
+                e.preventDefault();
+                if (snapIndex !== 0) {
+                  setSnapIndex(0);
+                }
               } else if (e.key === "ArrowUp" || e.key === "ArrowRight") {
                 e.preventDefault();
-                if (snapIndex < 1) setSnapIndex(snapIndex + 1);
+                if (snapIndex < SNAP_POINTS.length - 1) {
+                  setSnapIndex(snapIndex + 1);
+                }
               } else if (e.key === "ArrowDown" || e.key === "ArrowLeft") {
                 e.preventDefault();
                 if (snapIndex > 0) setSnapIndex(snapIndex - 1);
@@ -456,25 +496,28 @@ export default function MobileBottomSheet({
                 setSnapIndex(0);
               } else if (e.key === "End") {
                 e.preventDefault();
-                setSnapIndex(1);
+                setSnapIndex(SNAP_POINTS.length - 1);
               }
             }}
-            className="w-16 h-2 rounded-full bg-on-surface-variant/40 group-active:scale-x-110 group-active:bg-on-surface-variant/80 transition-all duration-300 mx-auto mb-2 cursor-pointer focus:outline-none focus-visible:ring-2 focus-visible:ring-primary/70 focus-visible:ring-offset-2"
+            className={`rounded-full bg-on-surface-variant/40 group-active:scale-x-110 group-active:bg-on-surface-variant/80 transition-all duration-300 mx-auto cursor-pointer focus:outline-none focus-visible:ring-2 focus-visible:ring-primary/70 focus-visible:ring-offset-2 ${
+              isCollapsed ? "mb-1.5 h-1.5 w-14" : "mb-2 h-2 w-16"
+            }`}
           />
 
           {/* Header content */}
-          <div className="flex items-center justify-between">
+          <div
+            className={`flex items-center ${
+              isCollapsed ? "justify-center" : "justify-between"
+            }`}
+          >
             <span
               data-testid="sheet-header-text"
-              className="text-sm font-semibold text-on-surface"
+              className={`font-semibold tracking-tight text-on-surface ${
+                isCollapsed ? "max-w-full truncate text-[15px] leading-none" : "text-sm"
+              }`}
             >
-              {headerText || "Search results"}
+              {resolvedHeaderText}
             </span>
-            {isCollapsed && (
-              <span className="text-xs text-on-surface-variant">
-                Pull up for listings
-              </span>
-            )}
             {!isCollapsed && (
               <div className="flex items-center gap-1">
                 {/* P2-FIX (#123): Visible close button to dismiss sheet */}
@@ -526,11 +569,12 @@ export default function MobileBottomSheet({
           }}
           // P2-FIX (#128): Data attributes for snap points (used by tests/debugging)
           data-snap-collapsed={SNAP_COLLAPSED}
+          data-snap-peek={SNAP_PEEK}
           data-snap-expanded={SNAP_EXPANDED}
           data-snap-current={snapIndex}
         >
-          {/* P1-FIX (#75): Only enable PTR when EXPANDED (not half).
-              At half position, drag-down collapses the sheet - PTR would conflict.
+          {/* P1-FIX (#75): Only enable PTR when fully expanded.
+              At preview position, drag-down collapses the sheet - PTR would conflict.
               User must expand to full screen to access pull-to-refresh. */}
           {/* P2-FIX (#162): Pass contentRef as scrollContainerRef so PullToRefresh
               checks scrollTop on the actual scrollable element, not its wrapper. */}

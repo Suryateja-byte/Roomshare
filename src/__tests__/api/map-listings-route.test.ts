@@ -218,7 +218,14 @@ describe("GET /api/map-listings (C2.2)", () => {
 
     expect(res.status).toBe(400);
     const body = await res.json();
-    expect(body.error).toContain("bounds");
+    expect(body.kind).toBe("location-required");
+    expect(body.meta).toEqual(
+      expect.objectContaining({
+        backendSource: "map-api",
+        responseVersion: expect.any(String),
+        queryHash: expect.any(String),
+      })
+    );
   });
 
   it("returns listings with cache headers when bounds are valid", async () => {
@@ -235,7 +242,15 @@ describe("GET /api/map-listings (C2.2)", () => {
 
     // Verify response body
     const body = await res.json();
-    expect(body.listings).toEqual(SAMPLE_MAP_LISTINGS);
+    expect(body.kind).toBe("ok");
+    expect(body.data.listings).toEqual(SAMPLE_MAP_LISTINGS);
+    expect(body.meta).toEqual(
+      expect.objectContaining({
+        backendSource: "map-api",
+        responseVersion: expect.any(String),
+        queryHash: expect.any(String),
+      })
+    );
 
     // C2.2: CDN cache headers present (s-maxage for edge caching)
     const cacheControl = res.headers.get("Cache-Control");
@@ -319,7 +334,8 @@ describe("GET /api/map-listings (C2.2)", () => {
 
       expect(res.status).toBe(200);
       const body = await res.json();
-      expect(body.listings).toEqual(SAMPLE_MAP_LISTINGS);
+      expect(body.kind).toBe("ok");
+      expect(body.data.listings).toEqual(SAMPLE_MAP_LISTINGS);
 
       // SearchDoc path should be called, not legacy path
       expect(getSearchDocMapListings).toHaveBeenCalledTimes(1);

@@ -22,10 +22,9 @@ interface PrivacyCircleProps {
   isDarkMode: boolean;
 }
 
-// Build circle layer paint props based on dark mode.
-// Keep the approximate-location cue visible, but cap the close-zoom footprint
-// so the circles read as intentional privacy halos instead of visual artifacts.
-function getCircleLayer(isDarkMode: boolean): LayerProps {
+// Keep the layer mounted for existing map logic/tests, but make the privacy
+// halo visually transparent so price pills read cleanly on the basemap.
+function getCircleLayer(_isDarkMode: boolean): LayerProps {
   return {
     id: "privacy-circles",
     type: "circle",
@@ -49,7 +48,7 @@ function getCircleLayer(isDarkMode: boolean): LayerProps {
         18,
         48,
       ],
-      "circle-color": isDarkMode ? "#a1a1aa" : "#71717a",
+      "circle-color": "rgba(0, 0, 0, 0)",
       "circle-opacity": [
         "interpolate",
         ["linear"],
@@ -66,7 +65,7 @@ function getCircleLayer(isDarkMode: boolean): LayerProps {
         0.05,
       ],
       "circle-stroke-width": 1,
-      "circle-stroke-color": isDarkMode ? "#a1a1aa" : "#71717a",
+      "circle-stroke-color": "rgba(0, 0, 0, 0)",
       "circle-stroke-opacity": [
         "interpolate",
         ["linear"],

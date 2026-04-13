@@ -88,6 +88,12 @@ function formatMoveInQuickLabel(moveInDate: string) {
   });
 }
 
+function formatRoomTypeQuickLabel(roomType: string) {
+  if (!roomType) return "Room Type";
+  if (roomType === "Entire Place") return "Entire place";
+  return roomType;
+}
+
 function countPendingActiveFilters(values: typeof emptyFilterValues): number {
   let count = 0;
 
@@ -145,7 +151,7 @@ export function InlineFilterStrip() {
   const searchParams = useSearchParams();
   const router = useRouter();
   const transitionCtx = useSearchTransitionSafe();
-  const { registerOpenFilters } = useMobileSearch();
+  const { mobileResultsView, registerOpenFilters } = useMobileSearch();
   const isPending = transitionCtx?.isPending ?? false;
   const isDesktopQuickFilters = useMediaQuery("(min-width: 768px)") === true;
 
@@ -223,8 +229,13 @@ export function InlineFilterStrip() {
   // by SearchViewToggle rendering children in both containers with inert on
   // the inactive one — no need to force desktop layout pre-mount here.
   const showDesktopQuickFilters = isDesktopQuickFilters;
+  const showMobileInlineFilters =
+    !showDesktopQuickFilters && mobileResultsView === "list";
   const chips = useMemo(() => urlToFilterChips(searchParams), [searchParams]);
   const hasActiveFilters = activeCount > 0;
+  const showAppliedChips = chips.length > 0 && (showDesktopQuickFilters || showMobileInlineFilters);
+  const showInlineFilterStrip =
+    showDesktopQuickFilters || showMobileInlineFilters || showAppliedChips;
   const pendingActiveCount = useMemo(
     () => countPendingActiveFilters(pending),
     [pending]
@@ -254,12 +265,18 @@ export function InlineFilterStrip() {
     ? parseFloat(committed.maxPrice)
     : undefined;
   const minMoveInDate = new Date().toLocaleDateString("en-CA");
+  const visibleAppliedChips = showMobileInlineFilters
+    ? chips.slice(0, 2)
+    : chips;
+  const hiddenAppliedChipCount = showMobileInlineFilters
+    ? Math.max(chips.length - visibleAppliedChips.length, 0)
+    : 0;
 
   const navigateToSearch = useCallback(
     (queryString: string) => {
       const url = `/search?${queryString}`;
       if (transitionCtx) {
-        transitionCtx.navigateWithTransition(url);
+        transitionCtx.navigateWithTransition(url, { reason: "filter" });
       } else {
         router.push(url);
       }
@@ -413,150 +430,150 @@ export function InlineFilterStrip() {
 
   return (
     <>
-      <div
-        className="hide-scrollbar -mx-1 flex items-center gap-2 overflow-x-auto px-1 py-2"
-        tabIndex={0}
-      >
-        {showDesktopQuickFilters ? (
-          <DesktopQuickFilters
-            disabled={isPending}
-            hasMounted={hasMounted}
-            activeCount={activeCount}
-            isAdvancedFiltersOpen={showFilterDrawer}
-            openQuickFilter={openQuickFilter}
-            onQuickFilterOpenChange={handleQuickFilterOpenChange}
-            onOpenAdvancedFilters={handleOpenFilters}
-            priceLabel={formatPriceQuickLabel(
-              committedMinPrice,
-              committedMaxPrice
-            )}
-            moveInLabel={formatMoveInQuickLabel(committed.moveInDate)}
-            roomTypeLabel={committed.roomType || "Room Type"}
-            leaseDurationLabel={committed.leaseDuration || "Duration"}
-            isPriceActive={
-              committed.minPrice.length > 0 || committed.maxPrice.length > 0
-            }
-            isMoveInActive={committed.moveInDate.length > 0}
-            isRoomTypeActive={committed.roomType.length > 0}
-            isLeaseDurationActive={committed.leaseDuration.length > 0}
-            draftMinPrice={numericMinPrice}
-            draftMaxPrice={numericMaxPrice}
-            priceAbsoluteMin={priceAbsoluteMin}
-            priceAbsoluteMax={priceAbsoluteMax}
-            priceHistogram={facets?.priceHistogram?.buckets ?? null}
-            priceApplyLabel={formattedCount || "Show results"}
-            isPriceApplyLoading={isCountLoading}
-            isPriceApplyDisabled={boundsRequired}
-            onPriceDraftChange={handlePriceDraftChange}
-            onPriceDraftClear={handlePriceDraftClear}
-            onPriceApply={handlePriceApply}
-            moveInDateValue={committed.moveInDate}
-            minMoveInDate={minMoveInDate}
-            onMoveInSelect={handleMoveInSelect}
-            onMoveInClear={handleMoveInClear}
-            roomTypeValue={committed.roomType}
-            roomTypeCounts={facets?.roomTypes}
-            onRoomTypeSelect={handleRoomTypeSelect}
-            leaseDurationValue={committed.leaseDuration}
-            onLeaseDurationSelect={handleLeaseDurationSelect}
-          />
-        ) : (
-          <>
-            <PrimaryFilterButton
-              label="Price"
-              active={
-                searchParams.has("minPrice") || searchParams.has("maxPrice")
-              }
-              onClick={handleOpenFilters}
+      {showInlineFilterStrip ? (
+        <div className="hide-scrollbar -mx-1 flex items-center gap-2 overflow-x-auto px-1 py-2">
+          {showDesktopQuickFilters ? (
+            <DesktopQuickFilters
               disabled={isPending}
-              testId="mobile-filter-price"
-            />
-            <PrimaryFilterButton
-              label="Move-in"
-              active={searchParams.has("moveInDate")}
-              onClick={handleOpenFilters}
-              disabled={isPending}
-              testId="mobile-filter-move-in"
-            />
-            <PrimaryFilterButton
-              label="Room Type"
-              active={searchParams.has("roomType")}
-              onClick={handleOpenFilters}
-              disabled={isPending}
-              testId="mobile-filter-room-type"
-            />
-            <PrimaryFilterButton
-              label="Duration"
-              active={searchParams.has("leaseDuration")}
-              onClick={handleOpenFilters}
-              disabled={isPending}
-              testId="mobile-filter-duration"
-            />
-
-            <div className="h-6 w-px shrink-0 bg-outline-variant/40" />
-
-            <button
-              type="button"
-              onClick={handleOpenFilters}
-              disabled={isPending}
-              data-hydrated={hasMounted || undefined}
-              aria-label={`Filters${activeCount > 0 ? `, ${activeCount} active` : ""}`}
-              aria-expanded={showFilterDrawer ? "true" : "false"}
-              aria-controls="search-filters"
-              aria-haspopup="dialog"
-              data-testid="mobile-filter-button"
-              className={cn(
-                "flex items-center gap-1.5 px-4 py-2.5 min-h-[44px] rounded-full text-sm font-medium whitespace-nowrap transition-colors shrink-0 border",
-                activeCount > 0
-                  ? "bg-on-surface text-on-primary border-on-surface"
-                  : "bg-surface-container-lowest text-on-surface border-outline-variant hover:border-on-surface-variant"
+              hasMounted={hasMounted}
+              activeCount={activeCount}
+              isAdvancedFiltersOpen={showFilterDrawer}
+              openQuickFilter={openQuickFilter}
+              onQuickFilterOpenChange={handleQuickFilterOpenChange}
+              onOpenAdvancedFilters={handleOpenFilters}
+              priceLabel={formatPriceQuickLabel(
+                committedMinPrice,
+                committedMaxPrice
               )}
+              moveInLabel={formatMoveInQuickLabel(committed.moveInDate)}
+              roomTypeLabel={committed.roomType || "Room Type"}
+              leaseDurationLabel={committed.leaseDuration || "Duration"}
+              isPriceActive={
+                committed.minPrice.length > 0 || committed.maxPrice.length > 0
+              }
+              isMoveInActive={committed.moveInDate.length > 0}
+              isRoomTypeActive={committed.roomType.length > 0}
+              isLeaseDurationActive={committed.leaseDuration.length > 0}
+              draftMinPrice={numericMinPrice}
+              draftMaxPrice={numericMaxPrice}
+              priceAbsoluteMin={priceAbsoluteMin}
+              priceAbsoluteMax={priceAbsoluteMax}
+              priceHistogram={facets?.priceHistogram?.buckets ?? null}
+              priceApplyLabel={formattedCount || "Show results"}
+              isPriceApplyLoading={isCountLoading}
+              isPriceApplyDisabled={boundsRequired}
+              onPriceDraftChange={handlePriceDraftChange}
+              onPriceDraftClear={handlePriceDraftClear}
+              onPriceApply={handlePriceApply}
+              moveInDateValue={committed.moveInDate}
+              minMoveInDate={minMoveInDate}
+              onMoveInSelect={handleMoveInSelect}
+              onMoveInClear={handleMoveInClear}
+              roomTypeValue={committed.roomType}
+              roomTypeCounts={facets?.roomTypes}
+              onRoomTypeSelect={handleRoomTypeSelect}
+              leaseDurationValue={committed.leaseDuration}
+              onLeaseDurationSelect={handleLeaseDurationSelect}
+            />
+          ) : showMobileInlineFilters ? (
+            <>
+              <PrimaryFilterButton
+                label={formatPriceQuickLabel(
+                  committedMinPrice,
+                  committedMaxPrice
+                )}
+                active={
+                  searchParams.has("minPrice") || searchParams.has("maxPrice")
+                }
+                onClick={handleOpenFilters}
+                disabled={isPending}
+                testId="mobile-filter-price"
+              />
+              <PrimaryFilterButton
+                label={formatMoveInQuickLabel(committed.moveInDate)}
+                active={searchParams.has("moveInDate")}
+                onClick={handleOpenFilters}
+                disabled={isPending}
+                testId="mobile-filter-move-in"
+              />
+              <PrimaryFilterButton
+                label={formatRoomTypeQuickLabel(committed.roomType)}
+                active={searchParams.has("roomType")}
+                onClick={handleOpenFilters}
+                disabled={isPending}
+                testId="mobile-filter-room-type"
+              />
+
+              <div className="h-6 w-px shrink-0 bg-outline-variant/40" />
+
+              <button
+                type="button"
+                onClick={handleOpenFilters}
+                disabled={isPending}
+                data-hydrated={hasMounted || undefined}
+                aria-label={`Filters${activeCount > 0 ? `, ${activeCount} active` : ""}`}
+                aria-expanded={showFilterDrawer ? "true" : "false"}
+                aria-controls="search-filters"
+                aria-haspopup="dialog"
+                data-testid="mobile-filter-button"
+                className={cn(
+                  "flex items-center gap-1.5 px-4 py-2.5 min-h-[44px] rounded-full text-sm font-medium whitespace-nowrap transition-colors shrink-0 border",
+                  activeCount > 0
+                    ? "bg-on-surface text-on-primary border-on-surface"
+                    : "bg-surface-container-lowest text-on-surface border-outline-variant hover:border-on-surface-variant"
+                )}
+              >
+                <SlidersHorizontal className="h-3.5 w-3.5" aria-hidden />
+                Filters
+                {activeCount > 0 ? (
+                  <span className="ml-0.5 flex h-5 w-5 items-center justify-center rounded-full bg-on-primary text-xs font-semibold text-on-surface">
+                    {activeCount}
+                  </span>
+                ) : null}
+              </button>
+            </>
+          ) : null}
+
+          {showAppliedChips ? (
+            <div
+              role="region"
+              aria-label="Applied filters"
+              className="flex items-center gap-2"
             >
-              <SlidersHorizontal className="h-3.5 w-3.5" aria-hidden />
-              Filters
-              {activeCount > 0 ? (
-                <span className="ml-0.5 flex h-5 w-5 items-center justify-center rounded-full bg-on-primary text-xs font-semibold text-on-surface">
-                  {activeCount}
+              <div className="h-6 w-px shrink-0 bg-outline-variant/40" />
+              {visibleAppliedChips.map((chip) => (
+                <button
+                  key={chip.id}
+                  type="button"
+                  onClick={() => handleRemoveChip(chip)}
+                  disabled={isPending}
+                  aria-label={`Remove filter: ${chip.label}`}
+                  className="flex min-h-[36px] shrink-0 items-center gap-1 whitespace-nowrap rounded-full border border-primary/20 bg-primary/10 px-3 py-2 text-sm text-on-surface transition-colors hover:bg-primary/15"
+                >
+                  <span className="max-w-[150px] truncate">{chip.label}</span>
+                  <X className="h-3 w-3 shrink-0 text-on-surface-variant" />
+                </button>
+              ))}
+              {hiddenAppliedChipCount > 0 ? (
+                <span className="flex min-h-[36px] shrink-0 items-center whitespace-nowrap rounded-full border border-outline-variant/20 bg-surface-container-high px-3 py-2 text-sm text-on-surface-variant">
+                  +{hiddenAppliedChipCount} more
                 </span>
               ) : null}
-            </button>
-          </>
-        )}
-
-        {chips.length > 0 ? (
-          <div
-            role="region"
-            aria-label="Applied filters"
-            className="flex items-center gap-2"
-          >
-            <div className="h-6 w-px shrink-0 bg-outline-variant/40" />
-            {chips.map((chip) => (
-              <button
-                key={chip.id}
-                type="button"
-                onClick={() => handleRemoveChip(chip)}
-                disabled={isPending}
-                aria-label={`Remove filter: ${chip.label}`}
-                className="flex min-h-[36px] shrink-0 items-center gap-1 whitespace-nowrap rounded-full border border-primary/20 bg-primary/10 px-3 py-2 text-sm text-on-surface transition-colors hover:bg-primary/15"
-              >
-                <span className="max-w-[150px] truncate">{chip.label}</span>
-                <X className="h-3 w-3 shrink-0 text-on-surface-variant" />
-              </button>
-            ))}
-            {chips.length > 1 ? (
-              <button
-                type="button"
-                onClick={handleClearAll}
-                disabled={isPending}
-                aria-label="Clear all filters"
-                className="flex min-h-[44px] shrink-0 items-center whitespace-nowrap px-3 py-1.5 text-xs text-on-surface-variant transition-colors hover:text-on-surface"
-              >
-                Clear all
-              </button>
-            ) : null}
-          </div>
-        ) : null}
-      </div>
+              {chips.length > 1 ? (
+                <button
+                  type="button"
+                  onClick={handleClearAll}
+                  disabled={isPending}
+                  aria-label="Clear all filters"
+                  className="flex min-h-[44px] shrink-0 items-center whitespace-nowrap px-3 py-1.5 text-xs text-on-surface-variant transition-colors hover:text-on-surface"
+                >
+                  Clear all
+                </button>
+              ) : null}
+            </div>
+          ) : null}
+        </div>
+      ) : null}
 
       <FilterModal
         isOpen={showFilterDrawer}

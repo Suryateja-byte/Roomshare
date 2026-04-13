@@ -281,14 +281,16 @@ test.describe("List <-> Map Sync", () => {
     );
     expect(hasRingHighlight).toBe(false);
 
-    // Hover the card - should get focus ring
-    await firstCard.hover();
+    // Focus the interactive listing link rather than relying on hover semantics.
+    const firstCardLink = firstCard.locator('a[href^="/listings/"]').first();
+    await expect(firstCardLink).toBeVisible({ timeout: timeouts.action });
+    await firstCardLink.focus();
 
-    // Hovering the card triggers setHovered(listing.id, "list") in ListingCard.tsx,
-    // which updates data-focus-state to "hovered" via SearchMapUIContext.
-    await expect(firstCard).toHaveAttribute("data-focus-state", "hovered", {
-      timeout: timeouts.action,
-    });
+    await expect
+      .poll(() => firstCard.getAttribute("data-focus-state"), {
+        timeout: timeouts.action,
+      })
+      .toMatch(/hovered|active/);
   });
 
   test(`${tags.auth} - Clicking map marker scrolls to listing card`, async ({
@@ -1161,15 +1163,10 @@ test.describe("List <-> Map Sync", () => {
     // Popup should be closed
     await expect(popup).not.toBeVisible({ timeout: timeouts.action });
 
-    // Escape closes popup (setSelectedListing(null)) but activeId persists
-    // (Escape does NOT call setActive(null)), so the card ring stays.
-    // This matches the behavior tested in search-map-list-sync.anon.spec.ts
-    // test "Escape closes popup but card highlight persists".
+    // Escape clears both the popup and the active card state.
     if (hadActiveCard) {
       const afterCount = await highlightedCard.count();
-      // Active card may or may not persist depending on implementation:
-      // allow either 0 (cleared) or 1 (persisted)
-      expect(afterCount).toBeLessThanOrEqual(1);
+      expect(afterCount).toBe(0);
     }
   });
 

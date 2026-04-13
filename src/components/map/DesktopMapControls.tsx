@@ -1,19 +1,14 @@
 "use client";
 
-import type { ComponentType } from "react";
 import { useEffect, useMemo, useState } from "react";
 import * as DialogPrimitive from "@radix-ui/react-dialog";
 import * as DropdownMenuPrimitive from "@radix-ui/react-dropdown-menu";
 import {
-  Bus,
-  LocateFixed,
-  Landmark,
   MapPin,
   MapPinOff,
   Maximize2,
   Minimize2,
   SlidersHorizontal,
-  Trees,
   X,
 } from "lucide-react";
 import {
@@ -27,10 +22,16 @@ import {
 } from "@/components/ui/dropdown-menu";
 import { cn } from "@/lib/utils";
 import type { POICategory } from "./POILayer";
+import {
+  getMapToolsActiveCount,
+  getPinActionCopy,
+  MapToolsPanelSections,
+  MapToolsRowContent,
+  POI_ICONS,
+  POI_LABELS,
+} from "./MapToolsContent";
 
 interface DesktopMapControlsProps {
-  searchAsMove: boolean;
-  onToggleSearchAsMove: () => void;
   activePOICategories: Set<POICategory>;
   onTogglePOICategory: (category: POICategory) => void;
   isDropMode: boolean;
@@ -38,8 +39,6 @@ interface DesktopMapControlsProps {
   onToggleDropMode: () => void;
   onClearPin: () => void;
   onHideMap: () => void;
-  showResetToResults: boolean;
-  onResetToResults: () => void;
   canFullscreen: boolean;
   isFullscreen: boolean;
   onToggleFullscreen: () => void;
@@ -63,18 +62,6 @@ const dropdownBaseClassName =
 const MAP_TOOLS_DROPDOWN_MIN_WIDTH = 540;
 const MAP_TOOLS_DROPDOWN_MIN_HEIGHT = 560;
 const MAP_TOOLS_VIEWPORT_GUTTER = 12;
-
-const POI_LABELS: Record<POICategory, string> = {
-  transit: "Transit",
-  landmarks: "POIs",
-  parks: "Parks",
-};
-
-const POI_ICONS: Record<POICategory, ComponentType<{ className?: string }>> = {
-  transit: Bus,
-  landmarks: Landmark,
-  parks: Trees,
-};
 
 export type MapToolsPresentationMode = "dropdown" | "sheet";
 
@@ -106,44 +93,6 @@ function readHeaderHeight() {
   return Number.isFinite(parsedValue) ? parsedValue : 0;
 }
 
-function MapToolsRowContent({
-  icon: Icon,
-  label,
-  hint,
-}: {
-  icon: ComponentType<{ className?: string }>;
-  label: string;
-  hint?: string;
-}) {
-  return (
-    <>
-      <span className="flex h-8 w-8 shrink-0 items-center justify-center rounded-full bg-surface-container-high text-on-surface-variant">
-        <Icon className="h-4 w-4" aria-hidden />
-      </span>
-      <span className="min-w-0">
-        <span className="block font-medium text-on-surface">{label}</span>
-        {hint ? (
-          <span className="block text-xs text-on-surface-variant">{hint}</span>
-        ) : null}
-      </span>
-    </>
-  );
-}
-
-function SheetSectionLabel({
-  children,
-  id,
-}: {
-  children: string;
-  id: string;
-}) {
-  return (
-    <p id={id} className={sectionLabelClassName}>
-      {children}
-    </p>
-  );
-}
-
 interface MapToolsPanelContentProps {
   presentation: MapToolsPresentationMode;
   activePOICategories: Set<POICategory>;
@@ -165,16 +114,10 @@ function MapToolsPanelContent({
   onClearPin,
   onRequestClose,
 }: MapToolsPanelContentProps) {
-  const pinActionLabel = isDropMode
-    ? "Cancel drop pin"
-    : hasPin
-      ? "Move pin"
-      : "Drop pin";
-  const pinActionHint = isDropMode
-    ? "Exit pin placement mode"
-    : hasPin
-      ? "Place the pin somewhere else"
-      : "Add a custom reference point";
+  const { label: pinActionLabel, hint: pinActionHint } = getPinActionCopy({
+    hasPin,
+    isDropMode,
+  });
 
   if (presentation === "dropdown") {
     return (
@@ -239,88 +182,20 @@ function MapToolsPanelContent({
   }
 
   return (
-    <div className="space-y-2">
-      <section aria-labelledby="map-tools-layers-heading">
-        <SheetSectionLabel id="map-tools-layers-heading">
-          Layers
-        </SheetSectionLabel>
-        <div className="space-y-1">
-          {Object.entries(POI_LABELS).map(([id, label]) => {
-            const category = id as POICategory;
-            const Icon = POI_ICONS[category];
-            const checked = activePOICategories.has(category);
-
-            return (
-              <button
-                key={category}
-                type="button"
-                onClick={() => onTogglePOICategory(category)}
-                aria-pressed={checked}
-                aria-label={`${checked ? "Hide" : "Show"} ${label}`}
-                data-testid="poi-category"
-                className={cn(
-                  "flex min-h-[52px] w-full items-center gap-3 rounded-[1.125rem] px-3 py-2.5 text-left transition-colors focus:outline-none focus-visible:ring-2 focus-visible:ring-primary/30 focus-visible:ring-offset-2",
-                  checked
-                    ? "bg-primary/8 text-on-surface"
-                    : "text-on-surface-variant hover:bg-surface-container-high"
-                )}
-              >
-                <MapToolsRowContent icon={Icon} label={label} />
-              </button>
-            );
-          })}
-        </div>
-      </section>
-
-      <div className="mx-1 h-px bg-surface-container-high" />
-
-      <section aria-labelledby="map-tools-actions-heading">
-        <SheetSectionLabel id="map-tools-actions-heading">
-          Map Actions
-        </SheetSectionLabel>
-        <div className="space-y-1">
-          <button
-            type="button"
-            onClick={() => {
-              onToggleDropMode();
-              onRequestClose();
-            }}
-            className="flex min-h-[52px] w-full items-center gap-3 rounded-[1.125rem] px-3 py-2.5 text-left text-on-surface-variant transition-colors hover:bg-surface-container-high focus:outline-none focus-visible:ring-2 focus-visible:ring-primary/30 focus-visible:ring-offset-2"
-            data-testid="map-tools-drop-pin"
-          >
-            <MapToolsRowContent
-              icon={MapPin}
-              label={pinActionLabel}
-              hint={pinActionHint}
-            />
-          </button>
-
-          {hasPin ? (
-            <button
-              type="button"
-              onClick={() => {
-                onClearPin();
-                onRequestClose();
-              }}
-              className="flex min-h-[52px] w-full items-center gap-3 rounded-[1.125rem] px-3 py-2.5 text-left text-on-surface-variant transition-colors hover:bg-surface-container-high focus:outline-none focus-visible:ring-2 focus-visible:ring-primary/30 focus-visible:ring-offset-2"
-              data-testid="map-tools-clear-pin"
-            >
-              <MapToolsRowContent
-                icon={MapPinOff}
-                label="Clear pin"
-                hint="Remove your custom location marker"
-              />
-            </button>
-          ) : null}
-        </div>
-      </section>
-    </div>
+    <MapToolsPanelSections
+      activePOICategories={activePOICategories}
+      onTogglePOICategory={onTogglePOICategory}
+      isDropMode={isDropMode}
+      hasPin={hasPin}
+      onToggleDropMode={onToggleDropMode}
+      onClearPin={onClearPin}
+      onRequestClose={onRequestClose}
+      order="layers-first"
+    />
   );
 }
 
 export default function DesktopMapControls({
-  searchAsMove,
-  onToggleSearchAsMove,
   activePOICategories,
   onTogglePOICategory,
   isDropMode,
@@ -328,8 +203,6 @@ export default function DesktopMapControls({
   onToggleDropMode,
   onClearPin,
   onHideMap,
-  showResetToResults,
-  onResetToResults,
   canFullscreen,
   isFullscreen,
   onToggleFullscreen,
@@ -371,8 +244,11 @@ export default function DesktopMapControls({
     paneWidth,
     paneHeight,
   });
-  const activeToolCount =
-    activePOICategories.size + (hasPin || isDropMode ? 1 : 0);
+  const activeToolCount = getMapToolsActiveCount({
+    activePOICategories,
+    hasPin,
+    isDropMode,
+  });
   const toolsLabel =
     activeToolCount > 0
       ? `Map tools, ${activeToolCount} active`
@@ -391,45 +267,7 @@ export default function DesktopMapControls({
 
   return (
     <>
-      <div className="absolute left-4 top-4 z-[50] flex flex-col gap-3">
-        <button
-          type="button"
-          role="switch"
-          aria-checked={searchAsMove}
-          onClick={onToggleSearchAsMove}
-          className={cn(
-            "inline-flex min-h-[44px] items-center gap-2 rounded-full border px-3.5 py-2 text-sm font-medium shadow-ambient backdrop-blur-md transition-all focus:outline-none focus-visible:ring-2 focus-visible:ring-primary/30 focus-visible:ring-offset-2",
-            searchAsMove
-              ? "border-white/20 bg-surface-container-lowest/95 text-on-surface ring-1 ring-green-500/40"
-              : "border-outline-variant/30 bg-surface-container-lowest/95 text-on-surface-variant hover:bg-surface-canvas"
-          )}
-        >
-          <span
-            data-testid="search-toggle-indicator"
-            className={cn(
-              "h-3 w-3 rounded-full transition-colors",
-              searchAsMove
-                ? "bg-green-500 shadow-[0_0_8px_rgba(34,197,94,0.6)]"
-                : "bg-on-surface-variant"
-            )}
-          />
-          <span className="whitespace-nowrap">Search as I move</span>
-        </button>
-
-        {showResetToResults && (
-          <button
-            type="button"
-            onClick={onResetToResults}
-            className={pillButtonClassName}
-            aria-label="Show all results on map"
-          >
-            <LocateFixed className="h-4 w-4 text-on-surface-variant" aria-hidden />
-            <span className="whitespace-nowrap">Show all results</span>
-          </button>
-        )}
-      </div>
-
-      <div className="absolute right-4 top-4 z-[50]">
+      <div className="absolute right-4 top-4 z-[50]" data-map-avoid>
         <button
           type="button"
           onClick={onHideMap}
@@ -442,7 +280,10 @@ export default function DesktopMapControls({
         </button>
       </div>
 
-      <div className="absolute right-4 top-20 z-[50] flex flex-col gap-2">
+      <div
+        className="absolute right-4 top-20 z-[50] flex flex-col gap-2"
+        data-map-avoid
+      >
         {canFullscreen && (
           <button
             type="button"

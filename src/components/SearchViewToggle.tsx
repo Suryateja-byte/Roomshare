@@ -1,13 +1,18 @@
 "use client";
 
-import { useRef, useState, useEffect, useCallback, useMemo } from "react";
+import { useRef, useState, useEffect, useCallback } from "react";
 import { useSearchParams } from "next/navigation";
 import { Map } from "lucide-react";
 import MobileBottomSheet from "./search/MobileBottomSheet";
 import FloatingMapButton from "./search/FloatingMapButton";
 import { useListingFocus } from "@/contexts/ListingFocusContext";
+import { useMobileSearch } from "@/contexts/MobileSearchContext";
 import { useMediaQuery } from "@/hooks/useMediaQuery";
 import { cn } from "@/lib/utils";
+
+const MOBILE_SNAP_MAP = 0;
+const MOBILE_SNAP_PEEK = 1;
+const MOBILE_SNAP_LIST = 2;
 
 interface SearchViewToggleProps {
   children: React.ReactNode;
@@ -35,46 +40,25 @@ export default function SearchViewToggle({
   const desktopListContentRef = useRef<HTMLDivElement>(null);
   const isDesktop = useMediaQuery("(min-width: 768px)");
   const [hasMounted, setHasMounted] = useState(false);
-  const [mobileSnap, setMobileSnap] = useState(1); // 0=collapsed, 1=expanded
+  const [mobileSnap, setMobileSnap] = useState(MOBILE_SNAP_PEEK);
   const [showDesktopTopFade, setShowDesktopTopFade] = useState(false);
   const [showDesktopBottomFade, setShowDesktopBottomFade] = useState(false);
   const { activeId } = useListingFocus();
+  const {
+    searchResultsLabel,
+    mobileSheetOverrideLabel,
+    mobileMapOverlayActive,
+    mobileResultsViewPreference,
+    setMobileResultsView,
+  } = useMobileSearch();
   const searchParams = useSearchParams();
+  const searchParamsKey = searchParams.toString();
+  const mobileHeaderText =
+    resultHeaderText ?? mobileSheetOverrideLabel ?? searchResultsLabel;
 
   useEffect(() => {
     setHasMounted(true);
   }, []);
-
-  // Compute a key from filter/sort/query params only — excludes geographic bounds.
-  // Same pattern as SearchResultsLoadingWrapper.tsx:33-48.
-  const filterParamsKey = useMemo(() => {
-    const filterOnly = new URLSearchParams(searchParams.toString());
-    for (const k of [
-      "minLat",
-      "maxLat",
-      "minLng",
-      "maxLng",
-      "lat",
-      "lng",
-      "zoom",
-    ]) {
-      filterOnly.delete(k);
-    }
-    filterOnly.sort();
-    return filterOnly.toString();
-  }, [searchParams]);
-
-  // Reset bottom sheet to expanded when search results change (filter/sort/query).
-  // Prevents the sheet staying collapsed after the user navigates to a new search.
-  // Skips initial mount (mobileSnap is already 1) and bounds-only changes (map pans).
-  const isInitialFilterKey = useRef(true);
-  useEffect(() => {
-    if (isInitialFilterKey.current) {
-      isInitialFilterKey.current = false;
-      return;
-    }
-    setMobileSnap(1);
-  }, [filterParamsKey]);
 
   // When a map pin is tapped (activeId changes to a non-null value) on mobile,
   // collapse the sheet so the map and preview card are visible.
@@ -86,15 +70,47 @@ export default function SearchViewToggle({
       activeId != null &&
       activeId !== prevActiveIdRef.current
     ) {
-      setMobileSnap(0);
+      setMobileSnap(MOBILE_SNAP_MAP);
     }
     prevActiveIdRef.current = activeId;
   }, [activeId, isDesktop]);
 
+  useEffect(() => {
+    if (isDesktop !== false || mobileResultsViewPreference == null) return;
+
+    const preferredSnap =
+      mobileResultsViewPreference === "map"
+        ? MOBILE_SNAP_MAP
+        : mobileResultsViewPreference === "peek"
+          ? MOBILE_SNAP_PEEK
+          : MOBILE_SNAP_LIST;
+
+    if (mobileSnap !== preferredSnap) {
+      setMobileSnap(preferredSnap);
+    }
+  }, [isDesktop, mobileResultsViewPreference, mobileSnap]);
+
+  useEffect(() => {
+    if (isDesktop === false) {
+      setMobileResultsView(
+        mobileSnap === MOBILE_SNAP_MAP
+          ? "map"
+          : mobileSnap === MOBILE_SNAP_PEEK
+            ? "peek"
+            : "list"
+      );
+      return;
+    }
+
+    if (isDesktop === true) {
+      setMobileResultsView("list");
+    }
+  }, [isDesktop, mobileSnap, setMobileResultsView]);
+
   const handleFloatingToggle = useCallback(() => {
-    // If sheet is showing list (expanded), collapse to show map
-    // If collapsed, expand to show list
-    setMobileSnap((prev) => (prev > 0 ? 0 : 1));
+    setMobileSnap((prev) =>
+      prev === MOBILE_SNAP_MAP ? MOBILE_SNAP_PEEK : MOBILE_SNAP_MAP
+    );
   }, []);
 
   // Prevent dual Mapbox mount: render map in exactly one container.
@@ -179,8 +195,8 @@ export default function SearchViewToggle({
       resizeObserver?.disconnect();
     };
   }, [
-    filterParamsKey,
     isDesktop,
+    searchParamsKey,
     shouldShowMap,
     showChildrenInDesktop,
     updateDesktopOverflowState,
@@ -201,7 +217,7 @@ export default function SearchViewToggle({
 
         {/* Bottom sheet with list results */}
         <MobileBottomSheet
-          headerText={resultHeaderText}
+          headerText={mobileHeaderText}
           snapIndex={mobileSnap}
           onSnapChange={setMobileSnap}
         >
@@ -216,10 +232,12 @@ export default function SearchViewToggle({
         </MobileBottomSheet>
 
         {/* Floating toggle pill */}
-        <FloatingMapButton
-          isListMode={mobileSnap > 0}
-          onToggle={handleFloatingToggle}
-        />
+        {!mobileMapOverlayActive ? (
+          <FloatingMapButton
+            isListMode={mobileSnap !== MOBILE_SNAP_MAP}
+            onToggle={handleFloatingToggle}
+          />
+        ) : null}
       </div>
 
       {/* Desktop Split View */}

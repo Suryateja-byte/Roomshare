@@ -36,6 +36,8 @@ const mockReplaceWithTransition = jest.fn();
 let mockSearchParams = new URLSearchParams();
 let mockCanvas: ReturnType<typeof createMockCanvas>;
 let phoneViewportMatches = false;
+let mockActivePOICategories = new Set<string>();
+const mockTogglePOICategory = jest.fn();
 
 function createMockCanvas() {
   const listeners: Record<string, EventListener[]> = {};
@@ -156,6 +158,10 @@ function createMockMapInstance() {
     resize: jest.fn(),
     loaded: jest.fn(() => true),
     isSourceLoaded: jest.fn(() => true),
+    project: jest.fn(([lng, lat]: [number, number]) => ({
+      x: 400 + (lng + 122.4194) * 1000,
+      y: 300 - (lat - 37.7749) * 1000,
+    })),
     unproject: jest.fn(([x, y]: [number, number]) => ({
       lng: -122.4194 + (x - 400) / 1000,
       lat: 37.7749 - (y - 300) / 1000,
@@ -208,7 +214,7 @@ jest.mock("react-map-gl/maplibre", () => {
           viewState: { zoom: number };
           target: { getBounds: () => unknown };
         }) => void;
-        onMoveStart?: () => void;
+        onMoveStart?: (e?: { originalEvent?: Event }) => void;
         onIdle?: () => void;
         onClick?: (e: unknown) => void;
         onError?: (e: unknown) => void;
@@ -216,6 +222,7 @@ jest.mock("react-map-gl/maplibre", () => {
       },
       ref: React.Ref<{
         getMap: () => typeof mockMapInstance;
+        getZoom: typeof mockMapInstance.getZoom;
         flyTo: typeof mockMapInstance.flyTo;
         fitBounds: typeof mockMapInstance.fitBounds;
         easeTo: typeof mockMapInstance.easeTo;
@@ -230,6 +237,7 @@ jest.mock("react-map-gl/maplibre", () => {
 
       React.useImperativeHandle(ref, () => ({
         getMap: () => mockMapInstance,
+        getZoom: mockMapInstance.getZoom,
         getSource: mockMapInstance.getSource,
         flyTo: mockMapInstance.flyTo,
         fitBounds: mockMapInstance.fitBounds,
@@ -351,15 +359,19 @@ const mockSetActive = jest.fn();
 const mockRequestScrollTo = jest.fn();
 let mockHoveredId: string | null = null;
 let mockActiveId: string | null = null;
-const mockSetSearchAsMove = jest.fn();
 const mockSetHasUserMoved = jest.fn();
-const mockSetBoundsDirty = jest.fn();
-const mockSetCurrentMapBounds = jest.fn();
-const mockSetSearchHandler = jest.fn();
-const mockSetResetHandler = jest.fn();
-const mockSetSearchLocation = jest.fn();
 const mockSetProgrammaticMove = jest.fn();
 const mockIsProgrammaticMoveRef = { current: false };
+const mockToggleDropMode = jest.fn();
+const mockSetUserPin = jest.fn();
+const mockHandleUserPinClick = jest.fn();
+let mockUserPinState = {
+  isDropMode: false,
+  toggleDropMode: mockToggleDropMode,
+  pin: null,
+  setPin: mockSetUserPin,
+  handleMapClick: mockHandleUserPinClick,
+};
 type PrivacyCircleListing = {
   id: string;
   location: { lat: number; lng: number };
@@ -383,31 +395,17 @@ jest.mock("@/contexts/ListingFocusContext", () => ({
 jest.mock("@/contexts/SearchTransitionContext", () => ({
   useSearchTransitionSafe: () => ({
     isPending: false,
+    pendingReason: null,
     replaceWithTransition: mockReplaceWithTransition,
   }),
 }));
 
 jest.mock("@/contexts/MapBoundsContext", () => ({
   useMapBounds: () => ({
-    searchAsMove: false,
     hasUserMoved: false,
-    setSearchAsMove: mockSetSearchAsMove,
     setHasUserMoved: mockSetHasUserMoved,
-    setBoundsDirty: mockSetBoundsDirty,
-    setCurrentMapBounds: mockSetCurrentMapBounds,
-    setSearchHandler: mockSetSearchHandler,
-    setResetHandler: mockSetResetHandler,
-    setSearchLocation: mockSetSearchLocation,
     setProgrammaticMove: mockSetProgrammaticMove,
     isProgrammaticMoveRef: mockIsProgrammaticMoveRef,
-  }),
-  useMapMovedBanner: () => ({
-    showBanner: false,
-    showLocationConflict: false,
-    onSearch: jest.fn(),
-    onReset: jest.fn(),
-    areaCount: null,
-    isAreaCountLoading: false,
   }),
   useActivePanBounds: () => ({
     activePanBounds: null,
@@ -422,8 +420,10 @@ jest.mock("@/contexts/ActivePanBoundsContext", () => ({
 }));
 
 // Mock child components
-jest.mock("@/components/map/MapMovedBanner", () => ({
-  MapMovedBanner: () => null,
+jest.mock("@/components/map/MobileMapStatusCard", () => ({
+  MobileMapStatusCard: ({ status }: { status: string }) => (
+    <div data-testid="mobile-map-status-card" data-status={status} />
+  ),
 }));
 
 jest.mock("@/components/map/MapGestureHint", () => ({
@@ -443,20 +443,14 @@ jest.mock("@/components/map/BoundaryLayer", () => ({
 
 jest.mock("@/components/map/UserMarker", () => ({
   UserMarker: () => null,
-  useUserPin: () => ({
-    isDropMode: false,
-    toggleDropMode: jest.fn(),
-    pin: null,
-    setPin: jest.fn(),
-    handleMapClick: jest.fn(),
-  }),
+  useUserPin: () => mockUserPinState,
 }));
 
 jest.mock("@/components/map/POILayer", () => ({
   POILayer: () => null,
   usePOILayerState: () => ({
-    activeCategories: new Set(),
-    toggleCategory: jest.fn(),
+    activeCategories: mockActivePOICategories,
+    toggleCategory: mockTogglePOICategory,
   }),
 }));
 
@@ -541,6 +535,41 @@ function createMockRect({
   } as DOMRect;
 }
 
+function setDesktopMapPaneRect({ width = 800, height = 600 } = {}) {
+  const mapRegion = screen.getByRole("region", {
+    name: /interactive map showing listing locations/i,
+  });
+  Object.defineProperty(mapRegion, "clientWidth", {
+    configurable: true,
+    value: width,
+  });
+  Object.defineProperty(mapRegion, "clientHeight", {
+    configurable: true,
+    value: height,
+  });
+  mapRegion.getBoundingClientRect = jest
+    .fn()
+    .mockReturnValue(createMockRect({ left: 0, top: 0, width, height }));
+
+  return mapRegion;
+}
+
+function setDesktopAvoidRects(
+  rects: Array<{ left: number; top: number; width: number; height: number }>
+) {
+  const avoidElements = Array.from(
+    document.querySelectorAll<HTMLElement>("[data-map-avoid]")
+  );
+
+  rects.slice(0, avoidElements.length).forEach((rect, index) => {
+    const element = avoidElements[index];
+    if (!element) return;
+    element.getBoundingClientRect = jest
+      .fn()
+      .mockReturnValue(createMockRect(rect));
+  });
+}
+
 // --------------------------------------------------------------------------
 // Test Suite
 // --------------------------------------------------------------------------
@@ -552,13 +581,22 @@ describe("Map Component", () => {
     mockReplace.mockClear();
     mockReplaceWithTransition.mockClear();
     mockPrivacyCircle.mockClear();
+    mockTogglePOICategory.mockClear();
     mockSearchParams = new URLSearchParams();
     mockHoveredId = null;
     mockActiveId = null;
+    mockActivePOICategories = new Set();
 
     // Reset mock map instance
     mockCanvas = createMockCanvas();
     mockMapInstance = createMockMapInstance();
+    mockUserPinState = {
+      isDropMode: false,
+      toggleDropMode: mockToggleDropMode,
+      pin: null,
+      setPin: mockSetUserPin,
+      handleMapClick: mockHandleUserPinClick,
+    };
 
     // Clear callback tracking
     Object.keys(onCallbacks).forEach((key) => delete onCallbacks[key]);
@@ -623,7 +661,7 @@ describe("Map Component", () => {
       });
     });
 
-    it("renders search-as-move toggle button", async () => {
+    it("does not render the removed search-as-move toggle", async () => {
       render(<MapComponent listings={mockListings} />);
 
       await act(async () => {
@@ -631,8 +669,8 @@ describe("Map Component", () => {
       });
 
       expect(
-        screen.getByRole("switch", { name: /search as i move/i })
-      ).toBeInTheDocument();
+        screen.queryByRole("switch", { name: /search as i move/i })
+      ).not.toBeInTheDocument();
     });
   });
 
@@ -677,6 +715,188 @@ describe("Map Component", () => {
     });
   });
 
+  describe("mobile map behavior", () => {
+    it("uses lighter clustering on phone viewports", async () => {
+      phoneViewportMatches = true;
+
+      render(<MapComponent listings={mockListings} />);
+
+      await act(async () => {
+        jest.advanceTimersByTime(100);
+      });
+
+      expect(latestSourceProps?.clusterMaxZoom).toBe(10);
+      expect(latestSourceProps?.clusterRadius).toBe(32);
+    });
+
+    it("auto-fits current results once on initial phone load", async () => {
+      phoneViewportMatches = true;
+
+      render(<MapComponent listings={mockListings} />);
+
+      await act(async () => {
+        jest.advanceTimersByTime(100);
+      });
+
+      expect(mockSetProgrammaticMove).toHaveBeenCalledWith(true);
+      expect(mockMapInstance.fitBounds).toHaveBeenCalledWith(
+        [
+          [-122.4294, 37.7649],
+          [-122.4094, 37.7849],
+        ],
+        expect.objectContaining({
+          duration: 1000,
+          padding: expect.objectContaining({
+            top: 50,
+            left: 50,
+            right: 50,
+          }),
+        })
+      );
+    });
+
+    it("only treats a phone move as user-driven after a real gesture starts", async () => {
+      phoneViewportMatches = true;
+
+      render(<MapComponent listings={mockListings} />);
+
+      await act(async () => {
+        jest.advanceTimersByTime(100);
+      });
+
+      jest.clearAllMocks();
+
+      const handlers = (
+        window as unknown as Record<
+          string,
+          {
+            onMoveEnd?: (e: unknown) => void;
+            onMoveStart?: (e?: unknown) => void;
+          }
+        >
+      ).__mapHandlers;
+
+      await act(async () => {
+        handlers?.onMoveEnd?.({
+          viewState: {
+            longitude: -122.4194,
+            latitude: 37.7749,
+            zoom: 12,
+          },
+          target: { getBounds: () => mockMapInstance.getBounds() },
+        });
+      });
+
+      expect(mockSetHasUserMoved).not.toHaveBeenCalled();
+      expect(mockReplaceWithTransition).not.toHaveBeenCalled();
+
+      await act(async () => {
+        handlers?.onMoveStart?.({ originalEvent: new Event("pointermove") });
+        handlers?.onMoveEnd?.({
+          viewState: {
+            longitude: -122.4094,
+            latitude: 37.7849,
+            zoom: 12,
+          },
+          target: { getBounds: () => mockMapInstance.getBounds() },
+        });
+      });
+
+      expect(mockSetHasUserMoved).toHaveBeenCalledWith(true);
+      await act(async () => {
+        jest.advanceTimersByTime(200);
+      });
+
+      expect(mockReplaceWithTransition).toHaveBeenCalled();
+    });
+
+    it("uses the confirmed-empty mobile status card when the phone viewport has no listings", async () => {
+      phoneViewportMatches = true;
+      mockQuerySourceFeaturesData = [];
+
+      render(<MapComponent listings={[]} />);
+
+      await act(async () => {
+        jest.advanceTimersByTime(2000);
+      });
+
+      expect(screen.getByTestId("mobile-map-status-card")).toHaveAttribute(
+        "data-status",
+        "confirmed-empty"
+      );
+      expect(
+        screen.queryByText(/no listings in this area/i)
+      ).not.toBeInTheDocument();
+    });
+
+    it("opens the mobile tools sheet, exposes map actions and layers, and hides it during status-card states", async () => {
+      phoneViewportMatches = true;
+
+      const { rerender } = render(<MapComponent listings={mockListings} />);
+
+      await act(async () => {
+        jest.advanceTimersByTime(100);
+      });
+
+      const moreToolsButton = screen.getByRole("button", {
+        name: /more map tools/i,
+      });
+      expect(moreToolsButton).toBeInTheDocument();
+      expect(screen.queryByTestId("mobile-map-tools-sheet")).not.toBeInTheDocument();
+
+      await act(async () => {
+        fireEvent.click(moreToolsButton);
+      });
+
+      expect(screen.getByTestId("mobile-map-tools-sheet")).toBeInTheDocument();
+      expect(screen.getByTestId("mobile-map-tools-overlay")).toBeInTheDocument();
+      expect(
+        screen.queryByRole("button", { name: /zoom in on map/i })
+      ).not.toBeInTheDocument();
+
+      const transitToggle = screen.getByRole("button", {
+        name: /show transit/i,
+      });
+      await act(async () => {
+        fireEvent.click(transitToggle);
+      });
+      expect(mockTogglePOICategory).toHaveBeenCalledWith("transit");
+
+      const dropPinAction = screen.getByRole("button", {
+        name: /drop pin/i,
+      });
+
+      await act(async () => {
+        fireEvent.click(dropPinAction);
+      });
+      expect(mockToggleDropMode).toHaveBeenCalledTimes(1);
+      await waitFor(() => {
+        expect(
+          screen.queryByTestId("mobile-map-tools-sheet")
+        ).not.toBeInTheDocument();
+      });
+
+      await act(async () => {
+        fireEvent.click(screen.getByRole("button", { name: /more map tools/i }));
+      });
+      expect(screen.getByTestId("mobile-map-tools-sheet")).toBeInTheDocument();
+
+      mockQuerySourceFeaturesData = [];
+      rerender(<MapComponent listings={[]} />);
+
+      await act(async () => {
+        jest.advanceTimersByTime(2000);
+      });
+
+      expect(
+        screen.queryByRole("button", { name: /more map tools/i })
+      ).not.toBeInTheDocument();
+      expect(
+        screen.queryByTestId("mobile-map-tools-sheet")
+      ).not.toBeInTheDocument();
+    });
+  });
+
   describe("handleMoveEnd state transitions", () => {
     it("should distinguish programmatic vs user-initiated moves", async () => {
       render(<MapComponent listings={mockListings} />);
@@ -712,8 +932,7 @@ describe("Map Component", () => {
         });
       });
 
-      // Programmatic move should NOT mark bounds as dirty (with true)
-      expect(mockSetBoundsDirty).not.toHaveBeenCalledWith(true);
+      expect(mockSetHasUserMoved).not.toHaveBeenCalledWith(true);
 
       // Clear and test user-initiated move
       jest.clearAllMocks();
@@ -723,6 +942,7 @@ describe("Map Component", () => {
       await act(async () => {
         handlers?.onMoveEnd?.({
           viewState: { zoom: 12 },
+          originalEvent: new Event("pointermove"),
           target: {
             getBounds: () => ({
               getWest: () => -122.5,
@@ -740,6 +960,7 @@ describe("Map Component", () => {
       await act(async () => {
         handlers?.onMoveEnd?.({
           viewState: { zoom: 12 },
+          originalEvent: new Event("pointermove"),
           target: {
             getBounds: () => ({
               getWest: () => -122.5,
@@ -775,7 +996,12 @@ describe("Map Component", () => {
       // First moveEnd — no previous center tracked, so it's treated as a real move
       await act(async () => {
         handlers?.onMoveEnd?.({
-          viewState: { zoom: 12 },
+          viewState: {
+            longitude: -122.4094,
+            latitude: 37.7849,
+            zoom: 12,
+          },
+          originalEvent: new Event("pointermove"),
           target: {
             getBounds: () => ({
               getWest: () => -122.5,
@@ -792,27 +1018,14 @@ describe("Map Component", () => {
       expect(mockSetHasUserMoved).toHaveBeenCalledWith(true);
     });
 
-    it("should respect debounce timing (300ms)", async () => {
-      // Enable search as move for this test
-      jest
-        .spyOn(require("@/contexts/MapBoundsContext"), "useMapBounds")
-        .mockReturnValue({
-          searchAsMove: true,
-          setSearchAsMove: mockSetSearchAsMove,
-          setHasUserMoved: mockSetHasUserMoved,
-          setBoundsDirty: mockSetBoundsDirty,
-          setCurrentMapBounds: mockSetCurrentMapBounds,
-          setSearchHandler: mockSetSearchHandler,
-          setResetHandler: mockSetResetHandler,
-          setSearchLocation: mockSetSearchLocation,
-          setProgrammaticMove: mockSetProgrammaticMove,
-          isProgrammaticMoveRef: mockIsProgrammaticMoveRef,
-        });
-
+    it("should respect debounce timing (50ms)", async () => {
       render(<MapComponent listings={mockListings} />);
 
       await act(async () => {
         jest.advanceTimersByTime(100);
+      });
+      await waitFor(() => {
+        expect(screen.queryByText(/loading map/i)).not.toBeInTheDocument();
       });
 
       const handlers = (
@@ -830,41 +1043,30 @@ describe("Map Component", () => {
         });
       });
 
+      await act(async () => {
+        jest.advanceTimersByTime(700);
+      });
+
       jest.clearAllMocks();
 
       // Second moveEnd (user pan)
       await act(async () => {
         handlers?.onMoveEnd?.({
           viewState: { zoom: 12 },
+          originalEvent: new Event("pointermove"),
           target: { getBounds: () => mockMapInstance.getBounds() },
         });
       });
 
-      // Advance only 150ms (less than debounce)
+      // Advance less than the desktop debounce window.
       await act(async () => {
-        jest.advanceTimersByTime(150);
+        jest.advanceTimersByTime(25);
       });
 
-      // Bounds should be updated immediately (for location conflict detection)
-      expect(mockSetCurrentMapBounds).toHaveBeenCalled();
+      expect(mockReplaceWithTransition).not.toHaveBeenCalled();
     });
 
     it("clears location query when map search starts from lat/lng and preserves active filters", async () => {
-      jest
-        .spyOn(require("@/contexts/MapBoundsContext"), "useMapBounds")
-        .mockReturnValue({
-          searchAsMove: true,
-          setSearchAsMove: mockSetSearchAsMove,
-          setHasUserMoved: mockSetHasUserMoved,
-          setBoundsDirty: mockSetBoundsDirty,
-          setCurrentMapBounds: mockSetCurrentMapBounds,
-          setSearchHandler: mockSetSearchHandler,
-          setResetHandler: mockSetResetHandler,
-          setSearchLocation: mockSetSearchLocation,
-          setProgrammaticMove: mockSetProgrammaticMove,
-          isProgrammaticMoveRef: mockIsProgrammaticMoveRef,
-        });
-
       mockSearchParams = new URLSearchParams(
         "q=Austin&lat=30.2672&lng=-97.7431&languages=te&minPrice=500"
       );
@@ -900,6 +1102,7 @@ describe("Map Component", () => {
       await act(async () => {
         handlers?.onMoveEnd?.({
           viewState: { zoom: 12 },
+          originalEvent: new Event("pointermove"),
           target: {
             getBounds: () => ({
               getWest: () => -122.48,
@@ -930,22 +1133,7 @@ describe("Map Component", () => {
       expect(params.has("maxLng")).toBe(true);
     });
 
-    it("shows guidance when viewport is too wide with search-as-move enabled", async () => {
-      jest
-        .spyOn(require("@/contexts/MapBoundsContext"), "useMapBounds")
-        .mockReturnValue({
-          searchAsMove: true,
-          setSearchAsMove: mockSetSearchAsMove,
-          setHasUserMoved: mockSetHasUserMoved,
-          setBoundsDirty: mockSetBoundsDirty,
-          setCurrentMapBounds: mockSetCurrentMapBounds,
-          setSearchHandler: mockSetSearchHandler,
-          setResetHandler: mockSetResetHandler,
-          setSearchLocation: mockSetSearchLocation,
-          setProgrammaticMove: mockSetProgrammaticMove,
-          isProgrammaticMoveRef: mockIsProgrammaticMoveRef,
-        });
-
+    it("shows guidance when viewport is too wide", async () => {
       mockSearchParams = new URLSearchParams("languages=te");
 
       render(<MapComponent listings={mockListings} />);
@@ -988,6 +1176,7 @@ describe("Map Component", () => {
       await act(async () => {
         handlers?.onMoveEnd?.({
           viewState: { zoom: 4 },
+          originalEvent: new Event("wheel"),
           target: {
             getBounds: () => ({
               getWest: () => -100,
@@ -1039,7 +1228,7 @@ describe("Map Component", () => {
   });
 
   describe("marker interactions", () => {
-    it("should handle marker click correctly", async () => {
+    it("opens the desktop popup in place when a marker is clicked", async () => {
       render(<MapComponent listings={mockListings} />);
 
       // Wait for map load
@@ -1054,6 +1243,8 @@ describe("Map Component", () => {
       await act(async () => {
         handlers?.onIdle?.();
       });
+
+      setDesktopMapPaneRect();
 
       // Find marker elements
       const markers = screen.getAllByTestId("map-marker");
@@ -1073,8 +1264,10 @@ describe("Map Component", () => {
       // Should request scroll to listing
       expect(mockRequestScrollTo).toHaveBeenCalledWith(mockListings[0].id);
 
-      // Should mark as programmatic move (for popup centering)
-      expect(mockSetProgrammaticMove).toHaveBeenCalledWith(true);
+      // Desktop popup selection should open in place instead of recentering first.
+      expect(mockSetProgrammaticMove).not.toHaveBeenCalledWith(true);
+      expect(mockMapInstance.easeTo).not.toHaveBeenCalled();
+      expect(screen.getByTestId("map-popup")).toBeInTheDocument();
     });
 
     it("should handle marker hover state (non-touch)", async () => {
@@ -1143,7 +1336,7 @@ describe("Map Component", () => {
       expect(screen.getByTestId("map-popup")).toBeInTheDocument();
     });
 
-    it("does not auto-pan again when the popup already fits inside the map pane", async () => {
+    it("keeps a centered marker above the point without camera correction", async () => {
       render(<MapComponent listings={mockListings} />);
 
       await act(async () => {
@@ -1157,47 +1350,21 @@ describe("Map Component", () => {
         handlers?.onIdle?.();
       });
 
-      const mapRegion = screen.getByRole("region", {
-        name: /interactive map showing listing locations/i,
-      });
-      Object.defineProperty(mapRegion, "clientWidth", {
-        configurable: true,
-        value: 800,
-      });
-      Object.defineProperty(mapRegion, "clientHeight", {
-        configurable: true,
-        value: 600,
-      });
-      mapRegion.getBoundingClientRect = jest
-        .fn()
-        .mockReturnValue(
-          createMockRect({ left: 0, top: 0, width: 800, height: 600 })
-        );
+      setDesktopMapPaneRect();
+
+      mockMapInstance.project.mockReturnValue({ x: 400, y: 360 });
 
       const markers = screen.getAllByTestId("map-marker");
       await act(async () => {
         fireEvent.click(markers[0]);
       });
 
-      const popupCard = screen.getByTestId("map-popup-card");
-      popupCard.getBoundingClientRect = jest
-        .fn()
-        .mockReturnValue(
-          createMockRect({ left: 140, top: 140, width: 280, height: 220 })
-        );
-
-      mockMapInstance.easeTo.mockClear();
-      mockMapInstance.unproject.mockClear();
-
-      await act(async () => {
-        jest.runOnlyPendingTimers();
-      });
-
+      expect(screen.getByTestId("map-popup")).toHaveAttribute("anchor", "bottom");
       expect(mockMapInstance.unproject).not.toHaveBeenCalled();
       expect(mockMapInstance.easeTo).not.toHaveBeenCalled();
     });
 
-    it("auto-pans when the popup would overflow the map safe area", async () => {
+    it("flips the popup to the left of the marker when it is near the right edge", async () => {
       render(<MapComponent listings={mockListings} />);
 
       await act(async () => {
@@ -1211,50 +1378,173 @@ describe("Map Component", () => {
         handlers?.onIdle?.();
       });
 
-      const mapRegion = screen.getByRole("region", {
-        name: /interactive map showing listing locations/i,
-      });
-      Object.defineProperty(mapRegion, "clientWidth", {
-        configurable: true,
-        value: 800,
-      });
-      Object.defineProperty(mapRegion, "clientHeight", {
-        configurable: true,
-        value: 600,
-      });
-      mapRegion.getBoundingClientRect = jest
-        .fn()
-        .mockReturnValue(
-          createMockRect({ left: 0, top: 0, width: 800, height: 600 })
-        );
+      setDesktopMapPaneRect();
+
+      mockMapInstance.project.mockReturnValue({ x: 760, y: 360 });
 
       const markers = screen.getAllByTestId("map-marker");
       await act(async () => {
         fireEvent.click(markers[0]);
       });
 
-      const popupCard = screen.getByTestId("map-popup-card");
-      popupCard.getBoundingClientRect = jest
-        .fn()
-        .mockReturnValue(
-          createMockRect({ left: -40, top: 24, width: 280, height: 220 })
-        );
+      expect(screen.getByTestId("map-popup")).toHaveAttribute("anchor", "right");
+      expect(mockMapInstance.easeTo).not.toHaveBeenCalled();
+      expect(mockMapInstance.unproject).not.toHaveBeenCalled();
+    });
 
-      mockMapInstance.unproject.mockReturnValue({
-        lng: -122.33,
-        lat: 37.88,
+    it("flips the popup to the right of the marker when it is near the left edge", async () => {
+      render(<MapComponent listings={mockListings} />);
+
+      await act(async () => {
+        jest.advanceTimersByTime(100);
       });
-      mockMapInstance.easeTo.mockClear();
-      mockMapInstance.unproject.mockClear();
+
+      const handlers = (
+        window as unknown as Record<string, { onIdle?: () => void }>
+      ).__mapHandlers;
+      await act(async () => {
+        handlers?.onIdle?.();
+      });
+
+      setDesktopMapPaneRect();
+      mockMapInstance.project.mockReturnValue({ x: 40, y: 360 });
+
+      const markers = screen.getAllByTestId("map-marker");
+      await act(async () => {
+        fireEvent.click(markers[0]);
+      });
+
+      expect(screen.getByTestId("map-popup")).toHaveAttribute("anchor", "left");
+      expect(mockMapInstance.easeTo).not.toHaveBeenCalled();
+      expect(mockMapInstance.unproject).not.toHaveBeenCalled();
+    });
+
+    it("moves the popup below the marker when the marker is near the top edge", async () => {
+      render(<MapComponent listings={mockListings} />);
+
+      await act(async () => {
+        jest.advanceTimersByTime(100);
+      });
+
+      const handlers = (
+        window as unknown as Record<string, { onIdle?: () => void }>
+      ).__mapHandlers;
+      await act(async () => {
+        handlers?.onIdle?.();
+      });
+
+      setDesktopMapPaneRect();
+      mockMapInstance.project.mockReturnValue({ x: 400, y: 120 });
+
+      const markers = screen.getAllByTestId("map-marker");
+      await act(async () => {
+        fireEvent.click(markers[0]);
+      });
+
+      expect(screen.getByTestId("map-popup")).toHaveAttribute("anchor", "top");
+      expect(mockMapInstance.easeTo).not.toHaveBeenCalled();
+      expect(mockMapInstance.unproject).not.toHaveBeenCalled();
+    });
+
+    it("avoids reserved desktop controls when choosing a popup anchor", async () => {
+      render(<MapComponent listings={mockListings} />);
+
+      await act(async () => {
+        jest.advanceTimersByTime(100);
+      });
+
+      const handlers = (
+        window as unknown as Record<string, { onIdle?: () => void }>
+      ).__mapHandlers;
+      await act(async () => {
+        handlers?.onIdle?.();
+      });
+
+      setDesktopMapPaneRect();
+      setDesktopAvoidRects([
+        { left: 0, top: 0, width: 0, height: 0 },
+        { left: 560, top: 20, width: 200, height: 240 },
+        { left: 560, top: 20, width: 200, height: 240 },
+      ]);
+      mockMapInstance.project.mockReturnValue({ x: 500, y: 340 });
+
+      const markers = screen.getAllByTestId("map-marker");
+      await act(async () => {
+        fireEvent.click(markers[0]);
+      });
+
+      expect(screen.getByTestId("map-popup")).toHaveAttribute("anchor", "right");
+      expect(mockMapInstance.easeTo).not.toHaveBeenCalled();
+      expect(mockMapInstance.unproject).not.toHaveBeenCalled();
+    });
+
+    it("runs a single fallback camera correction when the popup cannot fit locally", async () => {
+      render(<MapComponent listings={mockListings} />);
+
+      await act(async () => {
+        jest.advanceTimersByTime(100);
+      });
+
+      const handlers = (
+        window as unknown as Record<string, { onIdle?: () => void }>
+      ).__mapHandlers;
+      await act(async () => {
+        handlers?.onIdle?.();
+      });
+
+      setDesktopMapPaneRect({ width: 220, height: 180 });
+      mockMapInstance.project.mockReturnValue({ x: 110, y: 90 });
+
+      const markers = screen.getAllByTestId("map-marker");
+      await act(async () => {
+        fireEvent.click(markers[0]);
+      });
+
+      await waitFor(() => {
+        expect(mockMapInstance.unproject).toHaveBeenCalledTimes(1);
+      });
+      expect(mockMapInstance.easeTo).toHaveBeenCalledTimes(1);
+      expect(mockMapInstance.easeTo).toHaveBeenCalledWith(
+        expect.objectContaining({
+          center: [expect.any(Number), expect.any(Number)],
+          duration: 250,
+        })
+      );
 
       await act(async () => {
         jest.runOnlyPendingTimers();
       });
 
-      expect(mockMapInstance.unproject).toHaveBeenCalledWith([336, 228]);
+      expect(mockMapInstance.unproject).toHaveBeenCalledTimes(1);
+      expect(mockMapInstance.easeTo).toHaveBeenCalledTimes(1);
+    });
+
+    it("uses the same popup placement engine when activeId focuses a listing from the list", async () => {
+      const { rerender } = render(<MapComponent listings={mockListings} />);
+
+      await act(async () => {
+        jest.advanceTimersByTime(100);
+      });
+
+      setDesktopMapPaneRect();
+      mockMapInstance.project.mockReturnValue({ x: 760, y: 360 });
+      mockMapInstance.easeTo.mockClear();
+
+      mockActiveId = mockListings[0].id;
+
+      await act(async () => {
+        rerender(<MapComponent listings={mockListings} />);
+      });
+
+      expect(mockSetProgrammaticMove).toHaveBeenCalledWith(true);
       expect(mockMapInstance.easeTo).toHaveBeenCalledWith({
-        center: [-122.33, 37.88],
-        duration: 250,
+        center: [mockListings[0].location.lng, mockListings[0].location.lat],
+        zoom: 15,
+        duration: 280,
+      });
+      expect(mockMapInstance.easeTo.mock.calls[0][0]).not.toHaveProperty("offset");
+      await waitFor(() => {
+        expect(screen.getByTestId("map-popup")).toHaveAttribute("anchor", "right");
       });
     });
 
@@ -1563,59 +1853,6 @@ describe("Map Component", () => {
       expect(screen.getByTestId("map-pin-primary-clone-1")).toHaveAttribute(
         "data-focus-state",
         "hovered"
-      );
-    });
-
-    it("keeps visually different tiered markers separate even when other fields match", async () => {
-      const tieredListings = [
-        {
-          id: "primary-pin",
-          title: "Sunny Mission Room",
-          price: 1200,
-          availableSlots: 1,
-          ownerId: "owner-1",
-          images: [],
-          location: { lat: 37.7599, lng: -122.4148 },
-          tier: "primary" as const,
-        },
-        {
-          id: "mini-pin",
-          title: "Sunny Mission Room",
-          price: 1200,
-          availableSlots: 1,
-          ownerId: "owner-2",
-          images: [],
-          location: { lat: 37.7599, lng: -122.4148 },
-          tier: "mini" as const,
-        },
-      ];
-
-      mockQuerySourceFeaturesData = listingsToFeatures(tieredListings);
-      render(<MapComponent listings={tieredListings} />);
-
-      await act(async () => {
-        jest.advanceTimersByTime(100);
-      });
-
-      const handlers = (
-        window as unknown as Record<string, { onIdle?: () => void }>
-      ).__mapHandlers;
-      await act(async () => {
-        handlers?.onIdle?.();
-      });
-
-      await waitFor(() => {
-        expect(screen.getAllByTestId("map-marker")).toHaveLength(2);
-      });
-
-      const calls = mockPrivacyCircle.mock.calls;
-      const lastCall = calls[calls.length - 1]?.[0];
-
-      expect(lastCall).toBeDefined();
-      if (!lastCall) return;
-      expect(lastCall.listings).toHaveLength(2);
-      expect(lastCall.listings.map((entry: { id: string }) => entry.id)).toEqual(
-        expect.arrayContaining(["primary-pin", "mini-pin"])
       );
     });
   });
@@ -1930,24 +2167,6 @@ describe("Map Component", () => {
     });
   });
 
-  describe("search-as-move toggle", () => {
-    it("toggles search-as-move on click", async () => {
-      render(<MapComponent listings={mockListings} />);
-
-      await act(async () => {
-        jest.advanceTimersByTime(100);
-      });
-
-      const toggle = screen.getByRole("switch", { name: /search as i move/i });
-
-      await act(async () => {
-        fireEvent.click(toggle);
-      });
-
-      expect(mockSetSearchAsMove).toHaveBeenCalled();
-    });
-  });
-
   describe("desktop map controls", () => {
     it("renders the hide map button on desktop", async () => {
       render(<MapComponent listings={mockListings} />);
@@ -1961,7 +2180,7 @@ describe("Map Component", () => {
       ).toBeInTheDocument();
     });
 
-    it("shows a contextual reset pill after the user drifts away from the results", async () => {
+    it("does not render a reset-results pill after the user drifts away from the results", async () => {
       render(<MapComponent listings={mockListings} />);
 
       await act(async () => {
@@ -1997,16 +2216,11 @@ describe("Map Component", () => {
         });
       });
 
-      const resetButton = screen.getByRole("button", {
-        name: /show all results on map/i,
-      });
-      expect(resetButton).toBeInTheDocument();
-
-      await act(async () => {
-        fireEvent.click(resetButton);
-      });
-
-      expect(mockSetProgrammaticMove).toHaveBeenCalledWith(true);
+      expect(
+        screen.queryByRole("button", {
+          name: /show all results on map/i,
+        })
+      ).not.toBeInTheDocument();
     });
   });
 

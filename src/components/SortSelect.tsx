@@ -1,12 +1,18 @@
 "use client";
 
 import { useState, useEffect, useCallback } from "react";
+import { createPortal } from "react-dom";
 import { useRouter, useSearchParams } from "next/navigation";
 import type { SortOption } from "@/lib/data";
 import { useSearchTransitionSafe } from "@/contexts/SearchTransitionContext";
 import { ArrowUpDown, Check } from "lucide-react";
 import { FocusTrap } from "@/components/ui/FocusTrap";
 import { useBodyScrollLock } from "@/hooks/useBodyScrollLock";
+import {
+  applySearchQueryChange,
+  buildCanonicalSearchUrl,
+  normalizeSearchQuery,
+} from "@/lib/search/search-query";
 import {
   Select,
   SelectContent,
@@ -55,20 +61,16 @@ export default function SortSelect({ currentSort }: SortSelectProps) {
   const handleSortChange = useCallback(
     (newSort: string) => {
       setDesktopOpen(false);
-      const params = new URLSearchParams(searchParams.toString());
-      if (newSort === "recommended") {
-        params.delete("sort");
-      } else {
-        params.set("sort", newSort);
-      }
-      // Reset pagination state when sort changes (keyset + offset)
-      params.delete("page");
-      params.delete("cursor");
-      params.delete("cursorStack");
-      params.delete("pageNumber");
-      const url = `/search?${params.toString()}`;
+      const currentQuery = normalizeSearchQuery(
+        new URLSearchParams(searchParams.toString())
+      );
+      const url = buildCanonicalSearchUrl(
+        applySearchQueryChange(currentQuery, "sort", {
+          sort: newSort === "recommended" ? undefined : (newSort as SortOption),
+        })
+      );
       if (transitionContext) {
-        transitionContext.navigateWithTransition(url);
+        transitionContext.navigateWithTransition(url, { reason: "sort" });
       } else {
         router.push(url);
       }
@@ -121,62 +123,65 @@ export default function SortSelect({ currentSort }: SortSelectProps) {
       </button>
 
       {/* Mobile sort sheet */}
-      {mobileOpen && (
-        <div
-          className="md:hidden fixed inset-0 z-50"
-          role="dialog"
-          aria-modal="true"
-          aria-labelledby="sort-sheet-title"
-          tabIndex={-1}
-        >
-          {/* Backdrop */}
+      {mobileOpen &&
+        typeof document !== "undefined" &&
+        createPortal(
           <div
-            className="absolute inset-0 bg-on-surface/40"
-            onClick={() => setMobileOpen(false)}
-            aria-hidden="true"
-          />
-          {/* Sheet */}
-          <FocusTrap active={mobileOpen}>
-            <div className="absolute bottom-0 left-0 right-0 bg-surface-container-lowest rounded-t-2xl shadow-xl animate-in slide-in-from-bottom duration-200">
-              <div className="flex justify-center py-3">
-                <div className="w-10 h-1 bg-surface-container-high rounded-full" />
+            className="md:hidden fixed inset-0 z-modal"
+            role="dialog"
+            aria-modal="true"
+            aria-labelledby="sort-sheet-title"
+            tabIndex={-1}
+          >
+            {/* Backdrop */}
+            <div
+              className="absolute inset-0 bg-on-surface/40"
+              onClick={() => setMobileOpen(false)}
+              aria-hidden="true"
+            />
+            {/* Sheet */}
+            <FocusTrap active={mobileOpen}>
+              <div className="absolute bottom-0 left-0 right-0 bg-surface-container-lowest rounded-t-2xl shadow-xl animate-in slide-in-from-bottom duration-200">
+                <div className="flex justify-center py-3">
+                  <div className="w-10 h-1 bg-surface-container-high rounded-full" />
+                </div>
+                <div className="px-4 pb-2">
+                  <h3
+                    id="sort-sheet-title"
+                    className="text-lg font-semibold text-on-surface"
+                  >
+                    Sort by
+                  </h3>
+                </div>
+                <div className="px-2 pb-6">
+                  {sortOptions.map((option) => {
+                    const isActive = option.value === currentSort;
+                    return (
+                      <button
+                        key={option.value}
+                        type="button"
+                        onClick={() => handleSortChange(option.value)}
+                        className={`flex items-center justify-between w-full px-4 py-3.5 min-h-[44px] rounded-xl text-sm font-medium transition-colors ${
+                          isActive
+                            ? "bg-primary/10 text-primary"
+                            : "text-on-surface-variant hover:bg-surface-canvas"
+                        }`}
+                      >
+                        <span>{option.label}</span>
+                        {isActive && (
+                          <Check className="w-4 h-4 text-on-surface" />
+                        )}
+                      </button>
+                    );
+                  })}
+                </div>
+                {/* Safe area spacer for phones with home indicator */}
+                <div className="h-safe-area-inset-bottom" />
               </div>
-              <div className="px-4 pb-2">
-                <h3
-                  id="sort-sheet-title"
-                  className="text-lg font-semibold text-on-surface"
-                >
-                  Sort by
-                </h3>
-              </div>
-              <div className="px-2 pb-6">
-                {sortOptions.map((option) => {
-                  const isActive = option.value === currentSort;
-                  return (
-                    <button
-                      key={option.value}
-                      type="button"
-                      onClick={() => handleSortChange(option.value)}
-                      className={`flex items-center justify-between w-full px-4 py-3.5 min-h-[44px] rounded-xl text-sm font-medium transition-colors ${
-                        isActive
-                          ? "bg-primary/10 text-primary"
-                          : "text-on-surface-variant hover:bg-surface-canvas"
-                      }`}
-                    >
-                      <span>{option.label}</span>
-                      {isActive && (
-                        <Check className="w-4 h-4 text-on-surface" />
-                      )}
-                    </button>
-                  );
-                })}
-              </div>
-              {/* Safe area spacer for phones with home indicator */}
-              <div className="h-safe-area-inset-bottom" />
-            </div>
-          </FocusTrap>
-        </div>
-      )}
+            </FocusTrap>
+          </div>,
+          document.body
+        )}
 
       {/* Desktop sort dropdown */}
       <div className="hidden md:flex items-center gap-2 text-xs font-medium text-on-surface-variant">

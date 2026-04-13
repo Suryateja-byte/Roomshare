@@ -6,8 +6,6 @@ import PersistentMapWrapper from "./PersistentMapWrapper";
 import ListScrollBridge from "./listings/ListScrollBridge";
 import { useMapPreference } from "@/hooks/useMapPreference";
 import { useKeyboardShortcuts } from "@/hooks/useKeyboardShortcuts";
-import { useMapMovedBanner } from "@/contexts/MapBoundsContext";
-import { MapMovedBanner } from "./map/MapMovedBanner";
 import { SearchMapUIProvider } from "@/contexts/SearchMapUIContext";
 
 interface SearchLayoutViewProps {
@@ -52,21 +50,6 @@ export default function SearchLayoutView({ children }: SearchLayoutViewProps) {
     },
   ]);
 
-  // Banner state for "search this area" / "reset" when user pans with search-as-move OFF
-  const {
-    showBanner,
-    showLocationConflict,
-    onSearch,
-    onReset,
-    areaCount,
-    isAreaCountLoading,
-  } = useMapMovedBanner();
-
-  // On mobile with bottom sheet, map stays visible — just trigger the search
-  const handleSearch = () => {
-    onSearch();
-  };
-
   return (
     <SearchMapUIProvider
       showMap={showMap}
@@ -84,16 +67,6 @@ export default function SearchLayoutView({ children }: SearchLayoutViewProps) {
         onToggle={toggleMap}
         isLoading={isLoading}
       >
-        {/* List variant banner - shows above results when map is hidden or on mobile */}
-        {(showBanner || showLocationConflict) && (
-          <MapMovedBanner
-            variant="list"
-            onSearch={handleSearch}
-            onReset={onReset}
-            areaCount={areaCount}
-            isAreaCountLoading={isAreaCountLoading}
-          />
-        )}
         {children}
       </SearchViewToggle>
     </SearchMapUIProvider>

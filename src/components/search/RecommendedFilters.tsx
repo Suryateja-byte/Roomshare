@@ -77,7 +77,7 @@ export function RecommendedFilters() {
 
     const url = `${pathname}${params.size ? `?${params.toString()}` : ""}`;
     if (transitionContext) {
-      transitionContext.navigateWithTransition(url);
+      transitionContext.navigateWithTransition(url, { reason: "filter" });
     } else {
       startTransition(() => {
         router.push(url);

@@ -114,6 +114,7 @@ const serverEnvSchema = z
     ENABLE_SEMANTIC_SEARCH: z.enum(["true", "false"]).optional(),
     ENABLE_IMAGE_EMBEDDINGS: z.enum(["true", "false"]).optional(),
     ENABLE_CLIENT_SIDE_SEARCH: z.enum(["true", "false"]).optional(),
+    ENABLE_SEARCH_TEST_SCENARIOS: z.enum(["true", "false"]).optional(),
     SEMANTIC_WEIGHT: z.coerce.number().min(0).max(1).optional(),
 
     // Node environment
@@ -138,6 +139,19 @@ const serverEnvSchema = z
           code: z.ZodIssueCode.custom,
           message: "TURNSTILE_ENABLED must be 'true' in production",
           path: ["TURNSTILE_ENABLED"],
+        });
+      }
+      // Defense-in-depth: the deterministic E2E scenario seam must never
+      // be armed in production. `resolveSearchScenario` already gates on
+      // this flag, but a misconfigured prod env var would silently expose
+      // fake listings to any request carrying `x-e2e-search-scenario`.
+      // Fail fast at boot instead.
+      if (data.ENABLE_SEARCH_TEST_SCENARIOS === "true") {
+        ctx.addIssue({
+          code: z.ZodIssueCode.custom,
+          message:
+            "ENABLE_SEARCH_TEST_SCENARIOS must not be 'true' in production",
+          path: ["ENABLE_SEARCH_TEST_SCENARIOS"],
         });
       }
     }

@@ -48,8 +48,74 @@ interface NearbyPlacesPanelProps {
   listingLng: number;
   onPlacesChange?: (places: NearbyPlace[]) => void;
   onPlaceHover?: (placeId: string | null) => void;
-  viewMode?: "list" | "map";
-  onViewModeChange?: (mode: "list" | "map") => void;
+  isPaneInteractive?: boolean;
+}
+
+type FocusRestoreTarget = HTMLButtonElement | HTMLInputElement | null;
+
+function normalizeErrorDetails(details: unknown): string | null {
+  if (typeof details === "string") {
+    const trimmed = details.trim();
+    return trimmed.length > 0 ? trimmed : null;
+  }
+
+  if (Array.isArray(details)) {
+    const messages = details
+      .filter((value): value is string => typeof value === "string")
+      .map((value) => value.trim())
+      .filter(Boolean);
+
+    return messages.length > 0 ? messages.join(" ") : null;
+  }
+
+  if (details && typeof details === "object") {
+    const fieldMessages = Object.entries(details as Record<string, unknown>)
+      .flatMap(([field, value]) => {
+        if (Array.isArray(value)) {
+          return value
+            .filter((item): item is string => typeof item === "string")
+            .map((item) => item.trim())
+            .filter(Boolean)
+            .map((item) => `${field}: ${item}`);
+        }
+
+        if (typeof value === "string" && value.trim().length > 0) {
+          return [`${field}: ${value.trim()}`];
+        }
+
+        return [];
+      });
+
+    if (fieldMessages.length > 0) {
+      return fieldMessages.join(" ");
+    }
+  }
+
+  return null;
+}
+
+function canRestoreFocus(
+  element: FocusRestoreTarget,
+  isPaneInteractive: boolean
+): element is HTMLButtonElement | HTMLInputElement {
+  if (!element || !isPaneInteractive || !element.isConnected) {
+    return false;
+  }
+
+  if (
+    element.closest("[inert]") ||
+    element.closest('[aria-hidden="true"]') ||
+    element.closest("[hidden]")
+  ) {
+    return false;
+  }
+
+  const style = window.getComputedStyle(element);
+  if (style.display === "none" || style.visibility === "hidden") {
+    return false;
+  }
+
+  return element.getClientRects().length > 0;
 }
 
 export default function NearbyPlacesPanel({
@@ -57,6 +123,7 @@ export default function NearbyPlacesPanel({
   listingLng,
   onPlacesChange,
   onPlaceHover,
+  isPaneInteractive = true,
 }: NearbyPlacesPanelProps) {
   const [searchQuery, setSearchQuery] = useState("");
   const [selectedChip, setSelectedChip] = useState<CategoryChip | null>(null);
@@ -70,20 +137,54 @@ export default function NearbyPlacesPanel({
   const [hasSearched, setHasSearched] = useState(false);
 
   const abortControllerRef = useRef<AbortController | null>(null);
+  const activeRequestIdRef = useRef(0);
   const isMountedRef = useRef(true);
+  const isPaneInteractiveRef = useRef(isPaneInteractive);
   const searchInputRef = useRef<HTMLInputElement>(null);
-  const shouldRestoreFocusRef = useRef(false);
+  const focusRestoreTargetRef = useRef<{
+    requestId: number;
+    element: FocusRestoreTarget;
+  } | null>(null);
+
+  useEffect(() => {
+    isPaneInteractiveRef.current = isPaneInteractive;
+  }, [isPaneInteractive]);
+
+  const clearSharedResults = useCallback(() => {
+    setPlaces([]);
+    onPlacesChange?.([]);
+    onPlaceHover?.(null);
+  }, [onPlaceHover, onPlacesChange]);
 
   // Fetch places from API with "latest request wins" pattern
   const fetchPlaces = useCallback(
-    async (categories?: string[], query?: string, radius?: number) => {
+    async ({
+      categories,
+      query,
+      radius,
+      initiator,
+    }: {
+      categories?: string[];
+      query?: string;
+      radius?: number;
+      initiator?: FocusRestoreTarget;
+    }) => {
+      const requestId = activeRequestIdRef.current + 1;
+      activeRequestIdRef.current = requestId;
+
       // Cancel any in-flight request
       abortControllerRef.current?.abort();
-      abortControllerRef.current = new AbortController();
+      const controller = new AbortController();
+      abortControllerRef.current = controller;
+      focusRestoreTargetRef.current = {
+        requestId,
+        element: initiator ?? null,
+      };
 
       setIsLoading(true);
       setError(null);
       setErrorDetails(null);
+      clearSharedResults();
 
       try {
         const response = await fetch("/api/nearby", {
@@ -96,51 +197,112 @@ export default function NearbyPlacesPanel({
             query,
             radiusMeters: radius || selectedRadius,
           }),
-          signal: abortControllerRef.current.signal,
+          signal: controller.signal,
         });
 
         const data = await response.json();
 
         // Check if still mounted before updating state
-        if (!isMountedRef.current) return;
-
-        if (!response.ok) {
-          setError(data.error || "Failed to fetch nearby places");
-          setErrorDetails(data.details || null);
-          setPlaces([]);
+        if (
+          !isMountedRef.current ||
+          activeRequestIdRef.current !== requestId ||
+          abortControllerRef.current !== controller
+        ) {
           return;
         }
 
-        setPlaces(data.places);
+        if (!response.ok) {
+          setError(data.error || "Failed to fetch nearby places");
+          setErrorDetails(normalizeErrorDetails(data.details));
+          clearSharedResults();
+          return;
+        }
+
+        const nextPlaces = Array.isArray(data.places) ? data.places : [];
+        setPlaces(nextPlaces);
         setHasSearched(true);
-        onPlacesChange?.(data.places);
+        onPlacesChange?.(nextPlaces);
+        onPlaceHover?.(null);
       } catch (err) {
         // Ignore abort errors - this is expected when cancelling in-flight requests
         if (err instanceof Error && err.name === "AbortError") {
           return;
         }
         // Check if still mounted before updating state
-        if (!isMountedRef.current) return;
+        if (
+          !isMountedRef.current ||
+          activeRequestIdRef.current !== requestId ||
+          abortControllerRef.current !== controller
+        ) {
+          return;
+        }
         console.error("Nearby search error:", err);
         setError(err instanceof Error ? err.message : "An error occurred");
         setErrorDetails(null);
-        setPlaces([]);
+        clearSharedResults();
       } finally {
-        if (isMountedRef.current) {
-          shouldRestoreFocusRef.current = true;
+        if (
+          isMountedRef.current &&
+          activeRequestIdRef.current === requestId &&
+          abortControllerRef.current === controller
+        ) {
           setIsLoading(false);
+
+          const restoreTarget = focusRestoreTargetRef.current;
+          if (restoreTarget?.requestId === requestId) {
+            const restoreFocus = () => {
+              if (
+                focusRestoreTargetRef.current?.requestId !== requestId ||
+                activeRequestIdRef.current !== requestId
+              ) {
+                return;
+              }
+
+              if (
+                canRestoreFocus(
+                  restoreTarget.element,
+                  isPaneInteractiveRef.current
+                )
+              ) {
+                restoreTarget.element.focus();
+              }
+
+              focusRestoreTargetRef.current = null;
+            };
+
+            if (typeof window !== "undefined" && window.requestAnimationFrame) {
+              window.requestAnimationFrame(() => {
+                restoreFocus();
+              });
+            } else {
+              setTimeout(restoreFocus, 0);
+            }
+          } else {
+            focusRestoreTargetRef.current = null;
+          }
         }
       }
     },
-    [listingLat, listingLng, selectedRadius, onPlacesChange]
+    [
+      clearSharedResults,
+      listingLat,
+      listingLng,
+      onPlaceHover,
+      onPlacesChange,
+      selectedRadius,
+    ]
   );
 
   // Handle chip click
   const handleChipClick = useCallback(
-    (chip: CategoryChip) => {
+    (chip: CategoryChip, trigger: HTMLButtonElement) => {
       setSelectedChip(chip);
       setSearchQuery("");
-      fetchPlaces(chip.categories, chip.query);
+      void fetchPlaces({
+        categories: chip.categories,
+        query: chip.query,
+        initiator: trigger,
+      });
     },
     [fetchPlaces]
   );
@@ -158,55 +320,76 @@ export default function NearbyPlacesPanel({
   const handleSearch = useCallback(() => {
     const trimmedQuery = searchQuery.trim();
     if (trimmedQuery.length >= 2) {
-      fetchPlaces(undefined, trimmedQuery);
+      void fetchPlaces({
+        query: trimmedQuery,
+        initiator: searchInputRef.current,
+      });
     }
   }, [searchQuery, fetchPlaces]);
 
+  const handleSearchButtonClick = useCallback(
+    (trigger: HTMLButtonElement) => {
+      const trimmedQuery = searchQuery.trim();
+      if (trimmedQuery.length >= 2) {
+        void fetchPlaces({
+          query: trimmedQuery,
+          initiator: trigger,
+        });
+      }
+    },
+    [fetchPlaces, searchQuery]
+  );
+
   // Handle radius change
   const handleRadiusChange = useCallback(
-    (newRadius: number) => {
+    (newRadius: number, trigger: HTMLButtonElement) => {
       setSelectedRadius(newRadius);
       // Only refetch if we have an active search
       const trimmedQuery = searchQuery.trim();
       if (selectedChip) {
-        fetchPlaces(selectedChip.categories, selectedChip.query, newRadius);
+        void fetchPlaces({
+          categories: selectedChip.categories,
+          query: selectedChip.query,
+          radius: newRadius,
+          initiator: trigger,
+        });
       } else if (trimmedQuery.length >= 2) {
-        fetchPlaces(undefined, trimmedQuery, newRadius);
+        void fetchPlaces({
+          query: trimmedQuery,
+          radius: newRadius,
+          initiator: trigger,
+        });
       }
     },
     [selectedChip, searchQuery, fetchPlaces]
   );
-
-  // Restore focus to search input after loading completes (WCAG focus management).
-  // Runs as a useEffect so React has committed the render (input no longer disabled).
-  useEffect(() => {
-    if (!isLoading && shouldRestoreFocusRef.current) {
-      shouldRestoreFocusRef.current = false;
-      searchInputRef.current?.focus();
-    }
-  }, [isLoading]);
 
   // Cleanup abort controller on unmount
   useEffect(() => {
     isMountedRef.current = true;
     return () => {
       isMountedRef.current = false;
+      activeRequestIdRef.current += 1;
+      focusRestoreTargetRef.current = null;
       // Cancel any in-flight request on unmount
       abortControllerRef.current?.abort();
     };
-  }, []);
+  }, [clearSharedResults]);
 
   // Reset state when listing coordinates change (new listing context)
   useEffect(() => {
+    activeRequestIdRef.current += 1;
+    focusRestoreTargetRef.current = null;
+    setIsLoading(false);
     setSearchQuery("");
     setSelectedChip(null);
-    setPlaces([]);
+    clearSharedResults();
     setHasSearched(false);
     setError(null);
     setErrorDetails(null);
     // Cancel any in-flight request
     abortControllerRef.current?.abort();
-  }, [listingLat, listingLng]);
+  }, [clearSharedResults, listingLat, listingLng]);
 
   return (
     <div className="flex flex-col h-full">
@@ -255,12 +438,13 @@ export default function NearbyPlacesPanel({
             {/* Search icon button - appears when 2+ chars typed */}
             {searchQuery.trim().length >= 2 && (
               <button
-                onClick={handleSearch}
+                type="button"
+                onClick={(event) => handleSearchButtonClick(event.currentTarget)}
                 disabled={isLoading}
                 aria-label="Search"
                 className="
                   absolute right-2 top-1/2 -translate-y-1/2
-                  w-7 h-7
+                  min-h-[44px] min-w-[44px]
                   flex items-center justify-center
                   bg-on-surface
                   text-white
@@ -289,12 +473,13 @@ export default function NearbyPlacesPanel({
               return (
                 <button
                   key={chip.label}
-                  onClick={() => handleChipClick(chip)}
+                  type="button"
+                  onClick={(event) => handleChipClick(chip, event.currentTarget)}
                   disabled={isLoading}
                   aria-pressed={isSelected}
                   className={`
                     group relative inline-flex items-center gap-2
-                    px-3 py-1.5 rounded-lg flex-shrink-0
+                    min-h-[44px] px-3 py-2 rounded-lg flex-shrink-0
                     text-xs font-medium whitespace-nowrap
                     border
                     transition-all duration-200 ease-out
@@ -326,11 +511,14 @@ export default function NearbyPlacesPanel({
             {RADIUS_OPTIONS.map((option) => (
               <button
                 key={option.label}
-                onClick={() => handleRadiusChange(option.meters)}
+                type="button"
+                onClick={(event) =>
+                  handleRadiusChange(option.meters, event.currentTarget)
+                }
                 disabled={isLoading}
                 aria-pressed={selectedRadius === option.meters}
                 className={`
-                  px-2 py-0.5 rounded-md
+                  min-h-[44px] px-3 py-2 rounded-md
                   text-xs font-medium
                   transition-all duration-200
                   ${
@@ -432,6 +620,8 @@ export default function NearbyPlacesPanel({
                       aria-label={`Get directions to ${place.name}`}
                       onMouseEnter={() => onPlaceHover?.(place.id)}
                       onMouseLeave={() => onPlaceHover?.(null)}
+                      onFocus={() => onPlaceHover?.(place.id)}
+                      onBlur={() => onPlaceHover?.(null)}
                       className="
                         group relative
                         flex items-center gap-3

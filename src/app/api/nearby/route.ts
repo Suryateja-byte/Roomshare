@@ -82,6 +82,17 @@ function sanitizeNearbyPlace(
   };
 }
 
+function normalizeAutocompleteIdPart(value: string | undefined): string {
+  const normalized = (value || "")
+    .trim()
+    .toLowerCase()
+    .replace(/[^a-z0-9]+/g, "-")
+    .replace(/^-+|-+$/g, "")
+    .slice(0, 48);
+
+  return normalized || "unknown";
+}
+
 // Validation schema for request body
 const requestSchema = z.object({
   listingLat: z.number().min(-90).max(90),
@@ -263,8 +274,12 @@ export async function POST(request: Request) {
             isFiniteLongitude(addr.longitude)
         )
         .map(
-          (addr): NearbyPlace => ({
-            id: `ac-${addr.latitude.toFixed(6)}-${addr.longitude.toFixed(6)}`,
+          (addr, index): NearbyPlace => ({
+            id: `ac-${index}-${normalizeAutocompleteIdPart(
+              addr.placeLabel || addr.addressLabel
+            )}-${normalizeAutocompleteIdPart(
+              addr.formattedAddress
+            )}-${addr.latitude.toFixed(6)}-${addr.longitude.toFixed(6)}`,
             name:
               addr.placeLabel ||
               addr.addressLabel ||

@@ -217,6 +217,16 @@ Prometheus-compatible metrics endpoint for infrastructure monitoring.
 | `nodejs_external_memory_bytes` | gauge | External memory |
 | `nodejs_rss_bytes` | gauge | Resident set size |
 | `nodejs_array_buffers_bytes` | gauge | ArrayBuffer memory |
+| `http_requests_total` | counter | Total HTTP requests seen by the in-process metrics collector |
+| `http_errors_total` | counter | Total HTTP error responses tracked by the in-process metrics collector |
+| `http_request_duration_ms` | summary | Request duration percentiles from the in-process metrics collector |
+| `search_request_latency_ms` | summary | Search request latency across SSR, list API, map API, and load-more |
+| `search_backend_source{backend_source=...}` | gauge | Count of search responses by backend source (`v2`, `v1-fallback`, `map-api`) |
+| `search_v2_fallback_total` | counter | Number of times search dropped from V2 to fallback behavior |
+| `search_map_list_mismatch_total` | counter | Number of stale list/map responses rejected due to query mismatch |
+| `search_load_more_error_total` | counter | Number of load-more failures or degraded load-more responses |
+| `search_zero_results_total` | counter | Number of zero-result search responses |
+| `search_client_abort_total` | counter | Number of aborted/superseded client search or map requests |
 | `app_info` | gauge | Application version and Node.js version labels |
 
 **Response format:** Prometheus text exposition format (`text/plain`)
@@ -224,6 +234,47 @@ Prometheus-compatible metrics endpoint for infrastructure monitoring.
 **Headers:** `Cache-Control: no-cache, no-store, must-revalidate`
 
 **Integration:** Scrape with Prometheus, Grafana Agent, or Datadog Agent.
+
+### Search Telemetry
+
+Search telemetry is emitted from the following runtime paths:
+
+- SSR search render in `src/app/search/page.tsx`
+- Client listings API in `src/app/api/search/listings/route.ts`
+- Map API in `src/app/api/map-listings/route.ts`
+- Load-more server action in `src/app/search/actions.ts`
+- Client stale/abort paths in `src/components/search/SearchResultsClient.tsx`
+- Client stale/abort paths in `src/components/PersistentMapWrapper.tsx`
+
+The client-side stale/abort signals are sent to `POST /api/metrics/search`. That endpoint is privacy-safe and only accepts:
+
+- metric name
+- logical route (`search-results-client` or `persistent-map-wrapper`)
+- query hash
+- safe reason code such as `superseded`, `cleanup`, `retry`, `stale-query-hash`, or `stale-request-key`
+
+No raw search text, location labels, user-entered filters, or listing identifiers are sent.
+
+### Search Dashboard Starter
+
+Use these panels first:
+
+| Panel | Query Idea | Why it matters |
+|------|------------|----------------|
+| Search latency p95 | `search_request_latency_ms{quantile="0.95"}` | Detect slow SSR/list/map responses |
+| Backend source mix | `search_backend_source` split by `backend_source` | Shows whether V2 is healthy or fallback is dominating |
+| V2 fallback rate | `rate(search_v2_fallback_total[15m])` | Detect backend instability before users report it |
+| Map/list mismatch rate | `rate(search_map_list_mismatch_total[15m])` | Detect stale-response churn and sync drift |
+| Load-more error rate | `rate(search_load_more_error_total[15m])` | Detect pagination regressions |
+| Zero-results trend | `rate(search_zero_results_total[15m])` | Detect query normalization or search relevance regressions |
+| Client abort rate | `rate(search_client_abort_total[15m])` | High values may be normal during rapid interaction, but spikes can reveal churny UI flows |
+
+### Scrape Example
+
+```bash
+curl -H "Authorization: Bearer $METRICS_SECRET" \
+  https://<your-domain>/api/metrics/ops
+```
 
 ### Neighborhood Analytics
 
@@ -493,6 +544,20 @@ Monitor `[RateLimit]` log prefixes for:
 ### Startup Warnings
 
 On production startup, the application logs warnings for missing optional services (see `src/lib/env.ts`). Monitor for `[ENV] Optional services not configured` messages to ensure all expected services are properly configured.
+
+### Search Alerts
+
+Create these alerts first for the search surface:
+
+| Alert Type | Suggested Trigger | Priority |
+|------------|-------------------|----------|
+| Search V2 fallback spike | `rate(search_v2_fallback_total[15m]) > 0.1` for 15 minutes | High |
+| Search latency regression | `search_request_latency_ms{quantile="0.95"} > 2000` for 15 minutes | High |
+| Map/list mismatch spike | `rate(search_map_list_mismatch_total[15m]) > 0.05` for 15 minutes | High |
+| Load-more failures | `rate(search_load_more_error_total[15m]) > 0.05` for 15 minutes | Medium |
+| Zero-results anomaly | `rate(search_zero_results_total[30m])` materially above normal baseline | Medium |
+
+Use the first week after deployment to establish a baseline before tightening thresholds. The fallback, mismatch, and load-more alerts should page only when they sustain; short spikes during deploys or brief backend turbulence are not enough by themselves.
 
 ### Cron Job Monitoring
 

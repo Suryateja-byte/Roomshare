@@ -8,7 +8,7 @@
  * Architecture notes:
  * - SSR calls executeSearchV2() directly (not via HTTP) -- cannot mock initial page load
  * - Client-side "Load more" uses fetchMoreListings server action (POST with Next-Action header)
- * - "Search as I move" triggers router.replace() which is an RSC GET fetch
+ * - Map-driven auto-search triggers router.replace() which is an RSC GET fetch
  * - Rate limiting uses Upstash Redis; SSR rate limit renders inline
  * - Error boundary at src/app/search/error.tsx catches unrecoverable SSR errors
  *
@@ -63,6 +63,13 @@ const BENIGN_ERROR_PATTERNS = [
 function isBenignError(msg: string): boolean {
   const lower = msg.toLowerCase();
   return BENIGN_ERROR_PATTERNS.some((p) => lower.includes(p.toLowerCase()));
+}
+
+async function reloadViaGoto(page: import("@playwright/test").Page) {
+  await page.goto(page.url(), {
+    timeout: timeouts.navigation,
+    waitUntil: "domcontentloaded",
+  });
 }
 
 test.beforeEach(async () => {
@@ -193,16 +200,13 @@ test.describe("Group 1: Zero Results State", () => {
       'h3:has-text("No listings found")'
     );
     const noExactHeading = container.locator('h3:has-text("No exact matches")');
-    const zeroPlaces = container
-      .locator("h1")
-      .filter({ hasText: /^0\s+place/i });
 
-    // Either the zero-results heading or the "0 places" count should appear
+    // Zero-results UX is carried by the empty-state headings; the mobile
+    // accessible h1 stays hidden and should not count as a visible match.
     await expect(
       noMatchesHeading
         .or(noListingsHeading)
         .or(noExactHeading)
-        .or(zeroPlaces)
         .first()
     ).toBeVisible({ timeout: timeouts.navigation });
 
@@ -217,7 +221,7 @@ test.describe("Group 1: Zero Results State", () => {
 // ---------------------------------------------------------------------------
 // Group 2: Client-Side Error Recovery
 //
-// "Search as I move" triggers router.replace() which sends an RSC GET fetch.
+// Map-driven auto-search triggers router.replace() which sends an RSC GET fetch.
 // We intercept these RSC fetches to simulate server failures during
 // client-side navigation. Server actions (load more) use POST.
 // ---------------------------------------------------------------------------
@@ -376,7 +380,7 @@ test.describe("Group 2: Client-Side Error Recovery", () => {
       await tryAgainButton.click();
     } else {
       // Fallback: full page reload
-      await page.reload();
+      await reloadViaGoto(page);
     }
 
     // After recovery, results should be visible again
@@ -863,7 +867,7 @@ test.describe("Group 5: Network Resilience", () => {
     await network.goOnline();
 
     // Reload the page to verify recovery
-    await page.reload({ timeout: timeouts.navigation });
+    await reloadViaGoto(page);
     await page.waitForLoadState("domcontentloaded");
 
     // Results should be visible again after network recovery
@@ -1252,7 +1256,7 @@ test.describe("Group 8: Console Error Monitoring", () => {
     await page.unrouteAll();
 
     // Reload to recover
-    await page.reload({ timeout: timeouts.navigation });
+    await reloadViaGoto(page);
     await page.waitForLoadState("domcontentloaded");
     await page.waitForLoadState("domcontentloaded").catch(() => {});
 

@@ -1,4 +1,11 @@
+import { VALID_AMENITIES, VALID_HOUSE_RULES } from "@/lib/search-params";
 import { buildSearchUrl, SearchFilters } from "@/lib/search-utils";
+
+const [AMENITY_ONE = "Wifi", AMENITY_TWO = "Parking", AMENITY_THREE = "AC"] =
+  VALID_AMENITIES;
+const [HOUSE_RULE_ONE = "No smoking", HOUSE_RULE_TWO = "No pets", HOUSE_RULE_THREE = "No parties"] =
+  VALID_HOUSE_RULES;
+const FUTURE_MOVE_IN_DATE = "2027-02-01";
 
 describe("buildSearchUrl", () => {
   it("should build URL with query parameter", () => {
@@ -26,18 +33,19 @@ describe("buildSearchUrl", () => {
     expect(url).toContain("maxPrice=1000");
   });
 
-  it("should build URL with amenities (comma-separated)", () => {
-    const filters: SearchFilters = { amenities: ["WiFi", "Parking"] };
+  it("should build URL with canonical repeated amenities params", () => {
+    const filters: SearchFilters = {
+      amenities: [AMENITY_TWO, AMENITY_ONE],
+    };
     const url = buildSearchUrl(filters);
-    // Comma-separated format for cache key consistency (#8)
     const params = new URLSearchParams(url.split("?")[1]);
-    expect(params.get("amenities")).toBe("WiFi,Parking");
+    expect(params.getAll("amenities")).toEqual([AMENITY_TWO, AMENITY_ONE].sort());
   });
 
   it("should build URL with moveInDate", () => {
-    const filters: SearchFilters = { moveInDate: "2024-02-01" };
+    const filters: SearchFilters = { moveInDate: FUTURE_MOVE_IN_DATE };
     const url = buildSearchUrl(filters);
-    expect(url).toContain("moveInDate=2024-02-01");
+    expect(url).toContain(`moveInDate=${FUTURE_MOVE_IN_DATE}`);
   });
 
   it("should build URL with leaseDuration", () => {
@@ -46,11 +54,15 @@ describe("buildSearchUrl", () => {
     expect(url).toContain("leaseDuration=6+months");
   });
 
-  it("should build URL with houseRules (comma-separated)", () => {
-    const filters: SearchFilters = { houseRules: ["No Smoking", "No Pets"] };
+  it("should build URL with canonical repeated houseRules params", () => {
+    const filters: SearchFilters = {
+      houseRules: [HOUSE_RULE_TWO, HOUSE_RULE_ONE],
+    };
     const url = buildSearchUrl(filters);
     const params = new URLSearchParams(url.split("?")[1]);
-    expect(params.get("houseRules")).toBe("No Smoking,No Pets");
+    expect(params.getAll("houseRules")).toEqual(
+      [HOUSE_RULE_ONE, HOUSE_RULE_TWO].sort()
+    );
   });
 
   it("should build URL with roomType", () => {
@@ -64,27 +76,29 @@ describe("buildSearchUrl", () => {
       query: "downtown",
       minPrice: 500,
       maxPrice: 1000,
-      amenities: ["WiFi"],
-      moveInDate: "2024-02-01",
+      amenities: [AMENITY_ONE],
+      moveInDate: FUTURE_MOVE_IN_DATE,
       leaseDuration: "6 months",
-      houseRules: ["No Smoking"],
-      roomType: "Private",
+      houseRules: [HOUSE_RULE_ONE],
+      roomType: "Private Room",
     };
     const url = buildSearchUrl(filters);
     expect(url).toContain("q=downtown");
     expect(url).toContain("minPrice=500");
     expect(url).toContain("maxPrice=1000");
-    expect(url).toContain("amenities=WiFi");
-    expect(url).toContain("moveInDate=2024-02-01");
+    expect(url).toContain(`amenities=${encodeURIComponent(AMENITY_ONE).replace(/%20/g, "+")}`);
+    expect(url).toContain(`moveInDate=${FUTURE_MOVE_IN_DATE}`);
     expect(url).toContain("leaseDuration=6+months");
-    expect(url).toContain("houseRules=No+Smoking");
-    expect(url).toContain("roomType=Private");
+    expect(url).toContain(
+      `houseRules=${encodeURIComponent(HOUSE_RULE_ONE).replace(/%20/g, "+")}`
+    );
+    expect(url).toContain("roomType=Private+Room");
   });
 
   it("should handle empty filters", () => {
     const filters: SearchFilters = {};
     const url = buildSearchUrl(filters);
-    expect(url).toBe("/search?");
+    expect(url).toBe("/search");
   });
 
   it("should not include undefined values", () => {
@@ -116,7 +130,7 @@ describe("buildSearchUrl", () => {
     const filters: SearchFilters = { city: "San Francisco" };
     const url = buildSearchUrl(filters);
     // city is not added to URL in current implementation
-    expect(url).toBe("/search?");
+    expect(url).toBe("/search");
   });
 
   it("should handle zero minPrice", () => {
@@ -139,29 +153,34 @@ describe("buildSearchUrl", () => {
     expect(url).not.toContain("minPrice");
   });
 
-  it("should set comma-separated amenities (single param)", () => {
-    const filters: SearchFilters = { amenities: ["WiFi", "Parking", "AC"] };
-    const url = buildSearchUrl(filters);
-    const params = new URLSearchParams(url.split("?")[1]);
-    expect(params.get("amenities")).toBe("WiFi,Parking,AC");
-    // Should be a single param, not repeated
-    expect(params.getAll("amenities")).toHaveLength(1);
-  });
-
-  it("should set comma-separated house rules (single param)", () => {
+  it("should set repeated canonical amenities params", () => {
     const filters: SearchFilters = {
-      houseRules: ["No Smoking", "No Pets", "No Parties"],
+      amenities: [AMENITY_ONE, AMENITY_TWO, AMENITY_THREE],
     };
     const url = buildSearchUrl(filters);
     const params = new URLSearchParams(url.split("?")[1]);
-    expect(params.get("houseRules")).toBe("No Smoking,No Pets,No Parties");
-    expect(params.getAll("houseRules")).toHaveLength(1);
+    expect(params.getAll("amenities")).toEqual(
+      [AMENITY_ONE, AMENITY_TWO, AMENITY_THREE].sort()
+    );
+  });
+
+  it("should set repeated canonical houseRules params", () => {
+    const filters: SearchFilters = {
+      houseRules: [HOUSE_RULE_ONE, HOUSE_RULE_TWO, HOUSE_RULE_THREE],
+    };
+    const url = buildSearchUrl(filters);
+    const params = new URLSearchParams(url.split("?")[1]);
+    expect(params.getAll("houseRules")).toEqual(
+      [HOUSE_RULE_ONE, HOUSE_RULE_TWO, HOUSE_RULE_THREE].sort()
+    );
   });
 
   it("should handle special characters in amenities", () => {
-    const filters: SearchFilters = { amenities: ["WiFi & Fast Internet"] };
+    const filters: SearchFilters = { amenities: [AMENITY_ONE] };
     const url = buildSearchUrl(filters);
-    expect(url).toContain("amenities=WiFi+%26+Fast+Internet");
+    expect(url).toContain(
+      `amenities=${encodeURIComponent(AMENITY_ONE).replace(/%20/g, "+")}`
+    );
   });
 
   it("should handle special characters in query", () => {
@@ -196,20 +215,20 @@ describe("SearchFilters interface", () => {
       query: "test",
       minPrice: 100,
       maxPrice: 1000,
-      amenities: ["WiFi"],
-      moveInDate: "2024-01-01",
+      amenities: [AMENITY_ONE],
+      moveInDate: FUTURE_MOVE_IN_DATE,
       leaseDuration: "12 months",
-      houseRules: ["No Pets"],
+      houseRules: [HOUSE_RULE_TWO],
       roomType: "Shared",
       city: "NYC",
     };
     expect(filters.query).toBe("test");
     expect(filters.minPrice).toBe(100);
     expect(filters.maxPrice).toBe(1000);
-    expect(filters.amenities).toEqual(["WiFi"]);
-    expect(filters.moveInDate).toBe("2024-01-01");
+    expect(filters.amenities).toEqual([AMENITY_ONE]);
+    expect(filters.moveInDate).toBe(FUTURE_MOVE_IN_DATE);
     expect(filters.leaseDuration).toBe("12 months");
-    expect(filters.houseRules).toEqual(["No Pets"]);
+    expect(filters.houseRules).toEqual([HOUSE_RULE_TWO]);
     expect(filters.roomType).toBe("Shared");
     expect(filters.city).toBe("NYC");
   });

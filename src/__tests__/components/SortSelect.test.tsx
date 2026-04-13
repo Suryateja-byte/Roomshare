@@ -1,6 +1,11 @@
-import { render, screen } from "@testing-library/react";
+import { render, screen, waitFor, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import SortSelect from "@/components/SortSelect";
+
+jest.mock("react-dom", () => ({
+  ...jest.requireActual("react-dom"),
+  createPortal: (node: unknown) => node,
+}));
 
 // Mock next/navigation
 const mockPush = jest.fn();
@@ -103,7 +108,7 @@ describe("SortSelect", () => {
 
     await userEvent.click(screen.getByTestId("select-item-recommended"));
 
-    expect(mockPush).toHaveBeenCalledWith("/search?");
+    expect(mockPush).toHaveBeenCalledWith("/search");
   });
 
   it("removes page param when changing sort", async () => {
@@ -116,5 +121,38 @@ describe("SortSelect", () => {
     expect(mockPush).toHaveBeenCalled();
     const url = mockPush.mock.calls[0][0] as string;
     expect(url).not.toContain("page=");
+  });
+
+  it("opens the mobile sort sheet in the modal layer", async () => {
+    render(<SortSelect currentSort="recommended" />);
+
+    const mobileTrigger = await screen.findByRole("button", {
+      name: /sort: recommended/i,
+    });
+
+    await userEvent.click(mobileTrigger);
+
+    const dialog = screen.getByRole("dialog");
+    expect(dialog).toHaveClass("z-modal");
+    expect(within(dialog).getByText("Sort by")).toBeInTheDocument();
+  });
+
+  it("closes the mobile sort sheet after picking an option", async () => {
+    render(<SortSelect currentSort="recommended" />);
+
+    const mobileTrigger = await screen.findByRole("button", {
+      name: /sort: recommended/i,
+    });
+    await userEvent.click(mobileTrigger);
+
+    const dialog = screen.getByRole("dialog");
+    await userEvent.click(
+      within(dialog).getByRole("button", { name: "Newest First" })
+    );
+
+    await waitFor(() => {
+      expect(screen.queryByRole("dialog")).not.toBeInTheDocument();
+    });
+    expect(mockPush).toHaveBeenCalledWith("/search?sort=newest");
   });
 });

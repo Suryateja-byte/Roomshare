@@ -55,6 +55,32 @@ export {
   type ReviewData,
 } from "./data-helpers";
 
+export {
+  SEARCH_SCENARIO_HEADER,
+  applyFilterModal,
+  applySearchScenario,
+  assertNoDuplicateListingIds,
+  cancelFilterModal,
+  defaultSearchUrl,
+  getListingIds,
+  gotoSearchPage,
+  isSearchReleaseGateEnabled,
+  isSearchReleaseGateProject,
+  loadMoreButton,
+  mapShell,
+  mobileExpandSearchButton,
+  mobileSearchDialog,
+  openMobileSearchOverlay,
+  openSortMenu,
+  readSearchShellMeta,
+  searchShell,
+  searchStatus,
+  selectSortOption,
+  scenarioHeaders,
+  type SearchScenario,
+  waitForSearchResolution,
+} from "./search-release-gate-helpers";
+
 // Mobile helpers for bottom sheet and viewport utilities
 export {
   mobileSelectors,
@@ -65,8 +91,10 @@ export {
   isMobileViewport,
   waitForMobileSheet,
   navigateToMobileSearch,
+  ensureMobileResultsVisible,
   SNAP_COLLAPSED,
   SNAP_EXPANDED,
+  SNAP_PEEK,
   SNAP_POINTS,
 } from "./mobile-helpers";
 

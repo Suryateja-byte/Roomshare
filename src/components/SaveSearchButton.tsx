@@ -2,8 +2,11 @@
 
 import { useEffect, useRef, useState } from "react";
 import { saveSearch } from "@/app/actions/saved-search";
-import type { SearchFilters } from "@/lib/search-utils";
-import { parseSearchParams, type RawSearchParams } from "@/lib/search-params";
+import {
+  normalizeSearchFilters,
+  searchParamsToSearchFilters,
+  type SearchFilters,
+} from "@/lib/search-utils";
 import { Bookmark, Loader2, X, Bell, BellOff } from "lucide-react";
 import { toast } from "sonner";
 import { useSearchParams } from "next/navigation";
@@ -48,59 +51,9 @@ export default function SaveSearchButton({
 
   // Get current filters from URL using centralized validation
   const getCurrentFilters = (): SearchFilters => {
-    // Build RawSearchParams from URL
-    const raw: RawSearchParams = {
-      q: searchParams.get("q") ?? undefined,
-      where: searchParams.get("where") ?? undefined,
-      what: searchParams.get("what") ?? undefined,
-      minPrice: searchParams.get("minPrice") ?? undefined,
-      maxPrice: searchParams.get("maxPrice") ?? undefined,
-      amenities: searchParams.getAll("amenities"),
-      moveInDate: searchParams.get("moveInDate") ?? undefined,
-      leaseDuration: searchParams.get("leaseDuration") ?? undefined,
-      houseRules: searchParams.getAll("houseRules"),
-      roomType: searchParams.get("roomType") ?? undefined,
-      languages: searchParams.getAll("languages"),
-      genderPreference: searchParams.get("genderPreference") ?? undefined,
-      householdGender: searchParams.get("householdGender") ?? undefined,
-      lat: searchParams.get("lat") ?? undefined,
-      lng: searchParams.get("lng") ?? undefined,
-      minLat: searchParams.get("minLat") ?? undefined,
-      maxLat: searchParams.get("maxLat") ?? undefined,
-      minLng: searchParams.get("minLng") ?? undefined,
-      maxLng: searchParams.get("maxLng") ?? undefined,
-      sort: searchParams.get("sort") ?? undefined,
-    };
-
-    // Use centralized parser for validation (MAX_SAFE_PRICE, date validation, allowlists, etc.)
-    const parsed = parseSearchParams(raw);
-    const fp = parsed.filterParams;
-
-    // Convert FilterParams to SearchFilters format
-    const filters: SearchFilters = {};
-    if (fp.query) filters.query = fp.query;
-    if (parsed.locationLabel) filters.locationLabel = parsed.locationLabel;
-    if (fp.vibeQuery) filters.vibeQuery = fp.vibeQuery;
-    if (fp.minPrice !== undefined) filters.minPrice = fp.minPrice;
-    if (fp.maxPrice !== undefined) filters.maxPrice = fp.maxPrice;
-    if (fp.amenities) filters.amenities = fp.amenities;
-    if (fp.moveInDate) filters.moveInDate = fp.moveInDate;
-    if (fp.leaseDuration) filters.leaseDuration = fp.leaseDuration;
-    if (fp.houseRules) filters.houseRules = fp.houseRules;
-    if (fp.roomType) filters.roomType = fp.roomType;
-    if (fp.languages) filters.languages = fp.languages;
-    if (fp.genderPreference) filters.genderPreference = fp.genderPreference;
-    if (fp.householdGender) filters.householdGender = fp.householdGender;
-    if (fp.sort) filters.sort = fp.sort;
-    // Convert bounds back to flat coordinate fields for SearchFilters
-    if (fp.bounds) {
-      filters.minLat = fp.bounds.minLat;
-      filters.maxLat = fp.bounds.maxLat;
-      filters.minLng = fp.bounds.minLng;
-      filters.maxLng = fp.bounds.maxLng;
-    }
-
-    return filters;
+    return normalizeSearchFilters(
+      searchParamsToSearchFilters(new URLSearchParams(searchParams.toString()))
+    );
   };
 
   // Generate a default name based on filters
