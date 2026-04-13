@@ -4,8 +4,10 @@ import {
   PaginatedResultHybrid,
   ListingData,
 } from "@/lib/data";
+import SortSelect from "@/components/SortSelect";
 import { SearchResultsClient } from "@/components/search/SearchResultsClient";
 import { SearchResultsErrorBoundary } from "@/components/search/SearchResultsErrorBoundary";
+import SearchResultsMobileHeading from "@/components/search/SearchResultsMobileHeading";
 import SearchResultsToolbar from "@/components/search/SearchResultsToolbar";
 import Link from "next/link";
 import { Search } from "lucide-react";
@@ -331,20 +333,13 @@ export default async function SearchPage({ searchParams }: SearchPageProps) {
             }
           />
 
-          {/*
-           * Mobile-only accessible heading. The visible desktop <h1> below is
-           * desktop results summary above is hidden on mobile, so mobile
-           * viewports would otherwise lose the level-1 landmark. This sr-only
-           * element keeps the a11y tree + Playwright heading selectors working
-           * without affecting the mobile visual design.
-           */}
-          <h1 className="sr-only md:hidden">
-            {renderableScenarioData.total === null
-              ? "100+"
-              : renderableScenarioData.total}{" "}
-            {renderableScenarioData.total === 1 ? "place" : "places"}
-            {displayLocation ? ` in ${displayLocation}` : ""}
-          </h1>
+          <SearchResultsMobileHeading
+            total={renderableScenarioData.total}
+            locationLabel={displayLocation}
+          />
+          <div className="flex justify-end py-2 md:hidden">
+            <SortSelect currentSort={sortOption} />
+          </div>
 
           <SearchResultsLoadingWrapper>
             <SearchResultsErrorBoundary>
@@ -586,16 +581,13 @@ export default async function SearchPage({ searchParams }: SearchPageProps) {
           }
         />
 
-        {/*
-         * Mobile-only accessible heading — see equivalent comment in the
-         * scenario render path above. Keeps the level-1 landmark in the a11y
-         * tree on mobile without affecting the visual design.
-         */}
-        <h1 className="sr-only md:hidden">
-          {total === null ? "100+" : total}{" "}
-          {total === 1 ? "place" : "places"}
-          {displayLocation ? ` in ${displayLocation}` : ""}
-        </h1>
+        <SearchResultsMobileHeading
+          total={total}
+          locationLabel={displayLocation}
+        />
+        <div className="flex justify-end py-2 md:hidden">
+          <SortSelect currentSort={sortOption} />
+        </div>
 
         <SearchResultsLoadingWrapper>
           <SearchResultsErrorBoundary>

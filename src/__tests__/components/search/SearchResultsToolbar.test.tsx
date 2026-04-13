@@ -33,26 +33,27 @@ describe("SearchResultsToolbar", () => {
     mockShouldShowMap = false;
   });
 
-  it("renders the desktop map toggle with sort and save actions when results exist", () => {
+  it("renders the desktop map toggle with sort and save actions when results exist", async () => {
     render(
       <SearchResultsToolbar currentSort="recommended" hasResults={true} />
     );
 
     expect(screen.getByTestId("desktop-search-toolbar")).toBeInTheDocument();
-    expect(
-      screen.getByRole("button", { name: "Show map" })
-    ).toBeInTheDocument();
+    const mapToggle = await screen.findByTestId("desktop-toolbar-map-toggle");
+    expect(mapToggle).toHaveAttribute("aria-label", "Show results map");
+    expect(mapToggle).toHaveTextContent("Show map");
     expect(screen.getByTestId("toolbar-sort-select")).toHaveTextContent(
       "recommended"
     );
     expect(screen.getByTestId("toolbar-save-search")).toBeInTheDocument();
   });
 
-  it("renders sort, save search, and map toggle in that order", () => {
+  it("renders sort, save search, and map toggle in that order", async () => {
     render(
       <SearchResultsToolbar currentSort="recommended" hasResults={true} />
     );
 
+    await screen.findByTestId("desktop-toolbar-map-toggle");
     const toolbar = screen.getByTestId("desktop-search-toolbar");
     const children = Array.from(toolbar.children).map((element) =>
       element.getAttribute("data-testid")
@@ -65,13 +66,13 @@ describe("SearchResultsToolbar", () => {
     ]);
   });
 
-  it("keeps the map toggle in place and updates its label across states", () => {
+  it("keeps the map toggle in place and updates its label across states", async () => {
     const { rerender } = render(
       <SearchResultsToolbar currentSort="recommended" hasResults={true} />
     );
 
     const toolbar = screen.getByTestId("desktop-search-toolbar");
-    const initialToggle = screen.getByTestId("desktop-toolbar-map-toggle");
+    const initialToggle = await screen.findByTestId("desktop-toolbar-map-toggle");
     expect(toolbar).toContainElement(initialToggle);
     expect(initialToggle).toHaveTextContent("Show map");
 
@@ -83,20 +84,20 @@ describe("SearchResultsToolbar", () => {
       <SearchResultsToolbar currentSort="recommended" hasResults={true} />
     );
 
-    const nextToggle = screen.getByTestId("desktop-toolbar-map-toggle");
+    const nextToggle = await screen.findByTestId("desktop-toolbar-map-toggle");
     expect(toolbar).toContainElement(nextToggle);
     expect(nextToggle).toHaveTextContent("Hide map");
     expect(nextToggle).toHaveAttribute("aria-pressed", "true");
   });
 
-  it("hides sort and save actions when there are no results", () => {
+  it("hides sort and save actions when there are no results", async () => {
     render(
       <SearchResultsToolbar currentSort="recommended" hasResults={false} />
     );
 
     expect(
-      screen.getByRole("button", { name: "Show map" })
-    ).toBeInTheDocument();
+      await screen.findByTestId("desktop-toolbar-map-toggle")
+    ).toHaveAttribute("aria-label", "Show results map");
     expect(screen.queryByTestId("toolbar-sort-select")).not.toBeInTheDocument();
     expect(screen.queryByTestId("toolbar-save-search")).not.toBeInTheDocument();
     expect(screen.getByTestId("desktop-search-toolbar").children).toHaveLength(

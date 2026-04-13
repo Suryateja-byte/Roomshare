@@ -56,8 +56,10 @@ const SEARCH_URL = `/search?${boundsQS}`;
 // ---------------------------------------------------------------------------
 
 /**
- * Get the first visible marker and return its listing ID.
- * Skips the test if map or markers are unavailable.
+ * Get the first visible marker that also has a rendered listing card and
+ * return its listing ID. Map markers can represent a broader dataset than the
+ * first page of list results, so raw marker index 0 is not guaranteed to have
+ * a matching card in the DOM.
  */
 async function getFirstMarkerIdOrSkip(page: Page): Promise<string> {
   test.skip(!(await isMapAvailable(page)), "Map not available (WebGL unavailable in headless)");
@@ -65,9 +67,16 @@ async function getFirstMarkerIdOrSkip(page: Page): Promise<string> {
   const markerCount = await waitForMarkersWithClusterExpansion(page);
   test.skip(markerCount === 0, "No markers available after cluster expansion");
 
-  const id = await getMarkerListingId(page, 0);
-  test.skip(!id, "Could not read listing ID from first marker");
-  return id!;
+  const markerIds = await getAllMarkerListingIds(page);
+  const cardIds = new Set(await getAllCardListingIds(page));
+  const overlappingId = markerIds.find((id) => cardIds.has(id));
+
+  test.skip(
+    !overlappingId,
+    "No visible map marker has a matching rendered listing card"
+  );
+
+  return overlappingId!;
 }
 
 /**
@@ -370,8 +379,9 @@ test.describe("Map-List Synchronization", () => {
       const initialActiveId = await getActiveListingId(page);
       expect(initialActiveId).toBeNull();
 
-      // Click the marker
-      await clickMarkerByIndex(page, 0);
+      // Click the same marker ID we captured above. Re-resolving "index 0"
+      // is brittle because Mapbox marker DOM order can shift between reads.
+      await clickMarkerByListingId(page, listingId);
 
       // Card should now have the active ring-2 highlight
       await waitForCardHighlight(page, listingId);
@@ -396,8 +406,9 @@ test.describe("Map-List Synchronization", () => {
         (page.viewportSize()?.width ?? 1024) < 768
       );
 
-      // Click the marker
-      await clickMarkerByIndex(page, 0);
+      // Click the same marker ID we captured above. Re-resolving "index 0"
+      // is brittle because Mapbox marker DOM order can shift between reads.
+      await clickMarkerByListingId(page, listingId);
 
       // Wait for smooth scroll to complete by polling card viewport position
       await expect
@@ -457,8 +468,9 @@ test.describe("Map-List Synchronization", () => {
     }) => {
       const listingId = await getFirstMarkerIdOrSkip(page);
 
-      // Click marker
-      await clickMarkerByIndex(page, 0);
+      // Click the same marker ID we captured above. Re-resolving "index 0"
+      // is brittle because Mapbox marker DOM order can shift between reads.
+      await clickMarkerByListingId(page, listingId);
 
       // Popup should appear
       const popup = page.locator(".maplibregl-popup");
@@ -485,8 +497,9 @@ test.describe("Map-List Synchronization", () => {
     }) => {
       const listingId = await getFirstMarkerIdOrSkip(page);
 
-      // Click marker to open popup and highlight card
-      await clickMarkerByIndex(page, 0);
+      // Click the same marker ID we captured above. Re-resolving "index 0"
+      // is brittle because Mapbox marker DOM order can shift between reads.
+      await clickMarkerByListingId(page, listingId);
       await waitForCardHighlight(page, listingId);
 
       const popup = page.locator(".maplibregl-popup");
@@ -717,8 +730,9 @@ test.describe("Map-List Synchronization", () => {
       const cardIds = await getAllCardListingIds(page);
       test.skip(!cardIds.includes(listingId) || !markerIds.includes(listingId), "Listing not in both cards and markers");
 
-      // Click marker to activate
-      await clickMarkerByIndex(page, 0);
+      // Click the same marker ID we captured above. Re-resolving "index 0"
+      // is brittle because Mapbox marker DOM order can shift between reads.
+      await clickMarkerByListingId(page, listingId);
       await waitForCardHighlight(page, listingId);
 
       // Now hover the same card (uses evaluate on mobile to bypass bottom sheet overlay)
@@ -748,8 +762,9 @@ test.describe("Map-List Synchronization", () => {
     }) => {
       const listingId = await getFirstMarkerIdOrSkip(page);
 
-      // Click marker to activate
-      await clickMarkerByIndex(page, 0);
+      // Click the same marker ID we captured above. Re-resolving "index 0"
+      // is brittle because Mapbox marker DOM order can shift between reads.
+      await clickMarkerByListingId(page, listingId);
       await waitForCardHighlight(page, listingId);
 
       // Click on map canvas background (corner area, away from markers)
@@ -998,8 +1013,9 @@ test.describe("Map-List Synchronization", () => {
         (page.viewportSize()?.width ?? 1024) < 768
       );
 
-      // Click the marker
-      await clickMarkerByIndex(page, 0);
+      // Click the same marker ID we captured above. Re-resolving "index 0"
+      // is brittle because Mapbox marker DOM order can shift between reads.
+      await clickMarkerByListingId(page, listingId);
 
       // Wait for smooth scroll to bring card into viewport
       await expect
@@ -1175,8 +1191,9 @@ test.describe("Map-List Synchronization", () => {
     }) => {
       const listingId = await getFirstMarkerIdOrSkip(page);
 
-      // Click marker to activate
-      await clickMarkerByIndex(page, 0);
+      // Click the same marker ID we captured above. Re-resolving "index 0"
+      // is brittle because Mapbox marker DOM order can shift between reads.
+      await clickMarkerByListingId(page, listingId);
       await waitForCardHighlight(page, listingId);
 
       // Verify focus state via data attribute (filter by visibility to skip hidden dual-container duplicate)
@@ -1435,7 +1452,7 @@ test.describe("Map-List Synchronization", () => {
 
       // Click marker
       try {
-        await clickMarkerByIndex(page, 0);
+        await clickMarkerByListingId(page, listingId);
         await waitForCardHighlight(page, listingId);
       } catch {
         test.skip(
@@ -1460,7 +1477,7 @@ test.describe("Map-List Synchronization", () => {
 
       // Click marker
       try {
-        await clickMarkerByIndex(page, 0);
+        await clickMarkerByListingId(page, listingId);
         await waitForCardHighlight(page, listingId);
       } catch {
         test.skip(

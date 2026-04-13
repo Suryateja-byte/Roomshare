@@ -1,5 +1,6 @@
 "use client";
 
+import { useEffect, useState } from "react";
 import { Map } from "lucide-react";
 import type { SortOption } from "@/lib/data";
 import SaveSearchButton from "@/components/SaveSearchButton";
@@ -19,8 +20,14 @@ export default function SearchResultsToolbar({
   currentSort,
   hasResults,
 }: SearchResultsToolbarProps) {
+  const [isHydrated, setIsHydrated] = useState(false);
   const { shouldShowMap, toggleMap } = useSearchMapUI();
+  const mapAriaLabel = shouldShowMap ? "Hide results map" : "Show results map";
   const mapLabel = shouldShowMap ? "Hide map" : "Show map";
+
+  useEffect(() => {
+    setIsHydrated(true);
+  }, []);
 
   return (
     <div
@@ -38,28 +45,30 @@ export default function SearchResultsToolbar({
         </>
       ) : null}
 
-      <button
-        type="button"
-        onClick={toggleMap}
-        data-testid="desktop-toolbar-map-toggle"
-        aria-label={mapLabel}
-        aria-pressed={shouldShowMap}
-        className={cn(
-          toolbarButtonClassName,
-          "min-w-[124px]",
-          shouldShowMap &&
-            "border-outline-variant/50 bg-surface-container text-on-surface hover:border-on-surface-variant"
-        )}
-      >
-        <Map
+      {isHydrated ? (
+        <button
+          type="button"
+          onClick={toggleMap}
+          data-testid="desktop-toolbar-map-toggle"
+          aria-label={mapAriaLabel}
+          aria-pressed={shouldShowMap}
           className={cn(
-            "h-4 w-4",
-            shouldShowMap ? "text-on-surface/80" : "text-on-surface-variant"
+            toolbarButtonClassName,
+            "min-w-[124px]",
+            shouldShowMap &&
+              "border-outline-variant/50 bg-surface-container text-on-surface hover:border-on-surface-variant"
           )}
-          aria-hidden="true"
-        />
-        <span>{mapLabel}</span>
-      </button>
+        >
+          <Map
+            className={cn(
+              "h-4 w-4",
+              shouldShowMap ? "text-on-surface/80" : "text-on-surface-variant"
+            )}
+            aria-hidden="true"
+          />
+          <span>{mapLabel}</span>
+        </button>
+      ) : null}
     </div>
   );
 }

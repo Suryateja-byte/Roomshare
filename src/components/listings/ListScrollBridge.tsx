@@ -47,10 +47,15 @@ export default function ListScrollBridge() {
         ? CSS.escape(id)
         : id.replace(/[^\w-]/g, "");
 
-    // Find target card using data-testid (preferred) with fallback to data-listing-id
+    // Target the actual list card element first. Falling back to a bare
+    // [data-listing-id] selector can accidentally match the map marker or
+    // popup preview instead of the results card.
     const targetCard =
-      document.querySelector(`[data-testid="listing-card-${safeId}"]`) ??
-      document.querySelector(`[data-listing-id="${safeId}"]`);
+      document.querySelector(`[data-listing-card-id="${safeId}"]`) ??
+      document.querySelector(
+        `[data-testid="listing-card"][data-listing-id="${safeId}"]`
+      ) ??
+      document.querySelector(`[data-testid="listing-card-${safeId}"]`);
 
     // If element not found, increment retry counter and allow retry on next render
     // (card may not be rendered yet due to virtualization or lazy loading)
