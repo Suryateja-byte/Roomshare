@@ -163,6 +163,25 @@ describe("LocationSearchInput - Integration Tests", () => {
   });
 
   describe("Complete User Flow", () => {
+    it("prefills suggestions without opening the popup until the input is focused", async () => {
+      renderInput({ initialValue: "San Francisco" });
+
+      jest.advanceTimersByTime(350);
+
+      await waitFor(() => {
+        expect(mockFetch).toHaveBeenCalled();
+      });
+
+      expect(screen.queryByRole("listbox")).not.toBeInTheDocument();
+
+      const input = screen.getByRole("combobox");
+      await user.click(input);
+
+      await waitFor(() => {
+        expect(screen.getByRole("listbox")).toBeInTheDocument();
+      });
+    });
+
     it("complete flow: type → select → submit", async () => {
       renderInput();
       const input = screen.getByRole("combobox");

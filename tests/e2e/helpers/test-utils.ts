@@ -434,7 +434,10 @@ export async function waitForSortHydrated(page: Page): Promise<void> {
   const isMobile = viewport ? viewport.width < 768 : false;
 
   if (isMobile) {
-    const sortBtn = page.locator('button[aria-label^="Sort:"]');
+    const sortBtn = page
+      .locator('[data-testid="mobile-search-results-container"]')
+      .locator('button[aria-label^="Sort:"]')
+      .first();
     await expect(sortBtn).toBeAttached({ timeout: 30_000 });
   } else {
     const sortBtn = page

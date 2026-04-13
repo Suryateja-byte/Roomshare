@@ -32,6 +32,34 @@ const USER1_STATE = "playwright/.auth/user.json";
 const USER2_EMAIL = "e2e-other@roomshare.dev";
 const USER2_STATE = "playwright/.auth/user2.json";
 
+async function expectBookingStatus(
+  page: Parameters<typeof testApi>[0],
+  bookingId: string,
+  status: string
+) {
+  await expect
+    .poll(
+      async () => {
+        const bookingResult = await testApi<{ status?: string }>(
+          page,
+          "getBooking",
+          { bookingId }
+        );
+
+        if (!bookingResult.ok) {
+          return `HTTP_${bookingResult.status}`;
+        }
+
+        return bookingResult.data.status ?? "UNKNOWN";
+      },
+      {
+        timeout: 20_000,
+        message: `Expected booking ${bookingId} to reach ${status}`,
+      }
+    )
+    .toBe(status);
+}
+
 test.describe.serial(
   "Host Actions: Accept/Reject with DB Verification @critical @booking",
   () => {
@@ -224,14 +252,9 @@ test.describe.serial(
           bookingItem.getByText(/rejected/i).first()
         ).toBeVisible({ timeout: 15_000 });
 
-        // Verify DB state: booking status = REJECTED
-        const bookingResult = await testApi<{ status: string }>(
-          hostPage,
-          "getBooking",
-          { bookingId }
-        );
-        expect(bookingResult.ok).toBe(true);
-        expect(bookingResult.data.status).toBe("REJECTED");
+        // The bookings UI flips to "Rejected" optimistically before the
+        // server action commit is durable, so poll the DB for ground truth.
+        await expectBookingStatus(hostPage, bookingId, "REJECTED");
 
         // Verify slots unchanged (PENDING never consumed slots)
         const slotsAfterReject = await getSlotInfoViaApi(hostPage, listingId);
@@ -417,14 +440,7 @@ test.describe.serial(
           bookingItem.getByText(/rejected/i).first()
         ).toBeVisible({ timeout: 15_000 });
 
-        // Verify DB state
-        const bookingResult = await testApi<{ status: string }>(
-          hostPage,
-          "getBooking",
-          { bookingId }
-        );
-        expect(bookingResult.ok).toBe(true);
-        expect(bookingResult.data.status).toBe("REJECTED");
+        await expectBookingStatus(hostPage, bookingId, "REJECTED");
 
         // Slots should be RESTORED to initial value (hold gave them back)
         const slotsAfterReject = await getSlotInfoViaApi(hostPage, listingId);
@@ -521,14 +537,7 @@ test.describe.serial(
           bookingItem.getByText(/cancelled/i).first()
         ).toBeVisible({ timeout: 15_000 });
 
-        // Verify DB state
-        const bookingResult = await testApi<{ status: string }>(
-          tenantPage,
-          "getBooking",
-          { bookingId }
-        );
-        expect(bookingResult.ok).toBe(true);
-        expect(bookingResult.data.status).toBe("CANCELLED");
+        await expectBookingStatus(tenantPage, bookingId, "CANCELLED");
 
         // Slots should be RESTORED
         const slotsAfterCancel = await getSlotInfoViaApi(

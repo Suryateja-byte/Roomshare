@@ -238,6 +238,7 @@ export default function LocationSearchInput({
   const inputRef = useRef<HTMLInputElement>(null);
   const suggestionsRef = useRef<HTMLDivElement>(null);
   const containerRef = useRef<HTMLDivElement>(null);
+  const showSuggestionsRef = useRef(false);
   const requestIdRef = useRef(0);
   const abortRef = useRef<AbortController | null>(null);
   const pendingQueryRef = useRef<string | null>(null);
@@ -257,6 +258,10 @@ export default function LocationSearchInput({
   useEffect(() => {
     setIsMounted(true);
   }, []);
+
+  useEffect(() => {
+    showSuggestionsRef.current = showSuggestions;
+  }, [showSuggestions]);
 
   useEffect(() => {
     return () => {
@@ -343,12 +348,16 @@ export default function LocationSearchInput({
           sanitized,
           controller.signal
         );
+        const shouldRevealSuggestions =
+          showSuggestionsRef.current || document.activeElement === inputRef.current;
 
         if (requestId !== requestIdRef.current) return;
 
         setSuggestions(results);
         setSelectedIndex(-1);
-        setShowSuggestions(true);
+        if (shouldRevealSuggestions) {
+          setShowSuggestions(true);
+        }
 
         if (sanitized.length >= 3 && results.length === 0) {
           setNoResults(true);
@@ -370,16 +379,25 @@ export default function LocationSearchInput({
           error instanceof TypeError ||
           error instanceof FetchTimeoutError
         ) {
+          const shouldRevealSuggestions =
+            showSuggestionsRef.current ||
+            document.activeElement === inputRef.current;
           setSuggestions([]);
           setServiceUnavailable(true);
-          setShowSuggestions(true);
+          if (shouldRevealSuggestions) {
+            setShowSuggestions(true);
+          }
           setSelectedIndex(-1);
           return;
         }
 
+        const shouldRevealSuggestions =
+          showSuggestionsRef.current || document.activeElement === inputRef.current;
         setSuggestions([]);
         setServiceUnavailable(true);
-        setShowSuggestions(true);
+        if (shouldRevealSuggestions) {
+          setShowSuggestions(true);
+        }
         setSelectedIndex(-1);
       } finally {
         if (pendingQueryRef.current === sanitized) {
