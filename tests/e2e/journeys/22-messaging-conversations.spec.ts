@@ -129,15 +129,36 @@ test.describe("J26: Start Conversation from Listing", () => {
     test.skip(!canContact, "No contact host button — skipping");
 
     await contactBtn.first().click();
-    // Wait for message dialog/form to appear
-    await page.getByPlaceholder(/message|type|write/i).or(page.locator("textarea")).or(page.locator('[data-testid="message-input"]')).first().waitFor({ state: "visible", timeout: 10_000 }).catch(() => {});
 
-    // Step 4: Type a message in the dialog/form/page
     const msgInput = page
       .getByPlaceholder(/message|type|write/i)
       .or(page.locator("textarea"))
       .or(page.locator('[data-testid="message-input"]'));
 
+    const toast = page.locator(selectors.toast).first();
+
+    await expect
+      .poll(
+        async () => {
+          const onMessages = page.url().includes("/messages");
+          const hasToast = await toast.isVisible().catch(() => false);
+          const canType = await msgInput.first().isVisible().catch(() => false);
+          return onMessages || hasToast || canType;
+        },
+        {
+          timeout: 30_000,
+          message:
+            "Expected Contact Host to open a conversation, show feedback, or render the composer",
+        }
+      )
+      .toBe(true);
+
+    await msgInput
+      .first()
+      .waitFor({ state: "visible", timeout: 10_000 })
+      .catch(() => {});
+
+    // Step 4: Type a message in the dialog/form/page
     const canType = await msgInput
       .first()
       .isVisible()
@@ -162,10 +183,7 @@ test.describe("J26: Start Conversation from Listing", () => {
 
     // Step 5: Verify we're on messages page or got confirmation
     const onMessages = page.url().includes("/messages");
-    const hasToast = await page
-      .locator(selectors.toast)
-      .isVisible()
-      .catch(() => false);
+    const hasToast = await toast.isVisible().catch(() => false);
     expect(onMessages || hasToast || canType).toBeTruthy();
   });
 });

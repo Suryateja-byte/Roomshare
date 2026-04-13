@@ -36,6 +36,24 @@ async function getVisibleContactHostButton(page: Page): Promise<Locator> {
   return sidebarButton;
 }
 
+async function waitForConversationId(
+  page: Page,
+  timeout = 30_000
+): Promise<string> {
+  // Mobile Chrome can reach the messages route before Playwright observes a
+  // full "load" event, so poll the URL instead of waiting on navigation load.
+  await expect
+    .poll(() => page.url(), {
+      timeout,
+      message: "Expected Contact Host flow to reach a conversation URL",
+    })
+    .toMatch(/\/messages\/[a-zA-Z0-9_-]+/);
+
+  const convId = page.url().match(/\/messages\/([a-zA-Z0-9_-]+)/)?.[1];
+  expect(convId).toBeTruthy();
+  return convId!;
+}
+
 test.describe("P0-1: Conversation Deduplication", () => {
   test.describe.configure({ mode: "serial", retries: 0 });
 
@@ -105,17 +123,10 @@ test.describe("P0-1: Conversation Deduplication", () => {
 
     // Both should navigate to /messages/<conversationId>.
     // Wait for both pages to land on a messages URL.
-    await Promise.all([
-      page1.waitForURL(/\/messages\/[a-zA-Z0-9_-]+/, { timeout: 30_000 }),
-      page2.waitForURL(/\/messages\/[a-zA-Z0-9_-]+/, { timeout: 30_000 }),
+    const [convId1, convId2] = await Promise.all([
+      waitForConversationId(page1),
+      waitForConversationId(page2),
     ]);
-
-    // Extract conversation IDs from both URLs.
-    const convId1 = page1.url().match(/\/messages\/([a-zA-Z0-9_-]+)/)?.[1];
-    const convId2 = page2.url().match(/\/messages\/([a-zA-Z0-9_-]+)/)?.[1];
-
-    expect(convId1).toBeTruthy();
-    expect(convId2).toBeTruthy();
 
     // The fix guarantees both return the SAME conversation.
     expect(convId1).toBe(convId2);
@@ -155,12 +166,7 @@ test.describe("P0-1: Conversation Deduplication", () => {
     // ensures only one conversation is created.
     await contactBtn.dblclick();
 
-    // Wait for navigation to /messages/<id>.
-    await page.waitForURL(/\/messages\/[a-zA-Z0-9_-]+/, { timeout: 30_000 });
-
-    const conversationUrl = page.url();
-    const convId = conversationUrl.match(/\/messages\/([a-zA-Z0-9_-]+)/)?.[1];
-    expect(convId).toBeTruthy();
+    const convId = await waitForConversationId(page);
 
     // The UI guard should have prevented the second request entirely.
     // But even if two requests fired, they both return the same conversation.
@@ -219,9 +225,7 @@ test.describe("P0-1: Conversation Deduplication", () => {
     await expect(contactBtn).toBeVisible({ timeout: 15_000 });
     await contactBtn.click();
 
-    await page.waitForURL(/\/messages\/[a-zA-Z0-9_-]+/, { timeout: 30_000 });
-    const firstConvId = page.url().match(/\/messages\/([a-zA-Z0-9_-]+)/)?.[1];
-    expect(firstConvId).toBeTruthy();
+    const firstConvId = await waitForConversationId(page);
 
     // Navigate away — go back to listing.
     await page.goto(`/listings/${listingId}`, {
@@ -234,9 +238,7 @@ test.describe("P0-1: Conversation Deduplication", () => {
     await expect(contactBtn2).toBeVisible({ timeout: 15_000 });
     await contactBtn2.click();
 
-    await page.waitForURL(/\/messages\/[a-zA-Z0-9_-]+/, { timeout: 30_000 });
-    const secondConvId = page.url().match(/\/messages\/([a-zA-Z0-9_-]+)/)?.[1];
-    expect(secondConvId).toBeTruthy();
+    const secondConvId = await waitForConversationId(page);
 
     // Both visits must return the same conversation — no duplicate created.
     expect(secondConvId).toBe(firstConvId);
