@@ -16,4 +16,8 @@ export {
   ListingSkeleton,
 } from "./PageSkeleton";
 
-export { ListingCardSkeleton, ListingGridSkeleton } from "./ListingCardSkeleton";
+export {
+  ListingCardSkeleton,
+  ListingGridSkeleton,
+  SearchResultsBodySkeleton,
+} from "./ListingCardSkeleton";

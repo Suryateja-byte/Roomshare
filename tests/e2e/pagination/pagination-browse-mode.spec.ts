@@ -5,7 +5,7 @@
  * /search without specific bounds or query. In browse mode:
  * - MAX_UNBOUNDED_RESULTS = 48 (server cap, not client)
  * - An amber banner shows "Showing top listings. Select a location for more results."
- * - SuggestedSearches component appears (popular areas or recent searches)
+ * - Results begin immediately without the old SuggestedSearches block
  *
  * Browse mode is detected when: !q && !bounds (src/lib/search-params.ts:463)
  *
@@ -25,9 +25,7 @@ const sel = {
   card: '[data-testid="listing-card"]',
   loadMoreBtn: 'button:has-text("Show more places")',
   feed: '[role="feed"][aria-label="Search results"]',
-  browseBanner: "text=/Showing top listings/",
-  suggestedSearches: "text=/Popular areas|Recent searches/",
-  popularAreaLink: 'a[href^="/search?q="]',
+  browseBanner: '[data-testid="desktop-search-results-scroll-area"]',
 } as const;
 
 // ---------------------------------------------------------------------------
@@ -107,25 +105,19 @@ test.describe("Pagination Browse Mode", () => {
     const cards = container.locator(sel.card);
     await expect(cards.first()).toBeVisible({ timeout: 30_000 });
 
-    // The amber browse mode banner should be visible.
-    // From search/page.tsx:300-303:
-    //   <p className="text-sm text-amber-600 dark:text-amber-400 mt-2">
-    //     Showing top listings. Select a location for more results.
-    //   </p>
-    const browseBanner = container
-      .getByText(/Showing top listings|Select a location for more results/i)
-      .filter({ visible: true })
-      .first();
+    // The browse mode indicator should be visible. The refactor now renders
+    // the summary as compact toolbar copy instead of the previous full-sentence
+    // banner inside the results container.
+    const browseBanner = page
+      .locator(sel.browseBanner)
+      .getByText(/Showing top listings/);
     await expect(browseBanner).toBeVisible({ timeout: 30_000 });
 
-    // Verify the banner text content
-    await expect(browseBanner).toContainText(/Select a location|top listings/i);
+    // Verify the indicator text content
+    await expect(browseBanner).toContainText("Showing top listings");
 
-    // SuggestedSearches component should be rendered (popular areas or recent searches).
-    // From SearchResultsClient.tsx:194: {browseMode && !query && <SuggestedSearches />}
-    // SuggestedSearches renders links with href="/search?q=..."
-    const suggestedLinks = container.locator(sel.popularAreaLink);
-    const suggestedCount = await suggestedLinks.count();
-    expect(suggestedCount).toBeGreaterThanOrEqual(1);
+    await expect(container.getByText(/Popular areas|Recent searches/i)).toHaveCount(
+      0
+    );
   });
 });

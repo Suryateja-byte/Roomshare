@@ -7,6 +7,11 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { PriceRangeFilter } from "@/components/search/PriceRangeFilter";
 import {
+  QUICK_FILTER_ACTIVE_BADGE_CLASSNAME,
+  QUICK_FILTER_ACTIVE_CLASSNAME,
+  QUICK_FILTER_INACTIVE_CLASSNAME,
+} from "@/components/search/quickFilterStyles";
+import {
   VALID_LEASE_DURATIONS,
   VALID_ROOM_TYPES,
 } from "@/lib/search-params";
@@ -82,8 +87,8 @@ const QuickFilterTrigger = forwardRef<HTMLButtonElement, QuickFilterTriggerProps
         className={cn(
           triggerClassName,
           active || open
-            ? "bg-on-surface text-on-primary border-on-surface font-medium"
-            : "bg-surface-container-lowest text-on-surface-variant border-outline-variant hover:border-on-surface-variant",
+            ? cn(QUICK_FILTER_ACTIVE_CLASSNAME, "font-medium")
+            : QUICK_FILTER_INACTIVE_CLASSNAME,
           className
         )}
       >
@@ -397,14 +402,19 @@ export function DesktopQuickFilters({
         className={cn(
           "flex items-center gap-1.5 px-4 py-2.5 min-h-[44px] rounded-full text-sm font-medium whitespace-nowrap transition-colors shrink-0 border",
           activeCount > 0
-            ? "bg-on-surface text-on-primary border-on-surface"
+            ? QUICK_FILTER_ACTIVE_CLASSNAME
             : "bg-surface-container-lowest text-on-surface border-outline-variant hover:border-on-surface-variant"
         )}
       >
         <SlidersHorizontal className="h-3.5 w-3.5" aria-hidden />
         Filters
         {activeCount > 0 ? (
-          <span className="ml-0.5 flex h-5 w-5 items-center justify-center rounded-full bg-on-primary text-xs font-semibold text-on-surface">
+          <span
+            className={cn(
+              "ml-0.5 flex h-5 w-5 items-center justify-center rounded-full text-xs font-semibold",
+              QUICK_FILTER_ACTIVE_BADGE_CLASSNAME
+            )}
+          >
             {activeCount}
           </span>
         ) : null}

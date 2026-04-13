@@ -14,12 +14,16 @@ import { FocusTrap } from "@/components/ui/FocusTrap";
 
 interface SaveSearchButtonProps {
   className?: string;
+  label?: string;
+  forceShowLabel?: boolean;
 }
 
 type AlertFrequency = "INSTANT" | "DAILY" | "WEEKLY";
 
 export default function SaveSearchButton({
   className = "",
+  label = "Save Search",
+  forceShowLabel = false,
 }: SaveSearchButtonProps) {
   const [isOpen, setIsOpen] = useState(false);
   const [name, setName] = useState("");
@@ -122,12 +126,15 @@ export default function SaveSearchButton({
       <button
         ref={triggerButtonRef}
         onClick={handleOpen}
-        aria-label="Save search"
+        aria-label={label}
         className={`inline-flex items-center gap-2 h-11 text-sm font-medium text-on-surface-variant hover:text-on-surface transition-colors whitespace-nowrap ${className}`}
       >
         <Bookmark className="w-4 h-4" aria-hidden="true" />
-        <span className="hidden sm:inline" aria-hidden="true">
-          Save Search
+        <span
+          className={forceShowLabel ? "" : "hidden sm:inline"}
+          aria-hidden="true"
+        >
+          {label}
         </span>
       </button>
 

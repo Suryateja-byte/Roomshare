@@ -59,6 +59,8 @@ test.describe("Pagination URL State", () => {
 
     const cards = container.locator(sel.card);
     await expect(cards.first()).toBeVisible({ timeout: 30_000 });
+    const initialCount = await cards.count();
+    expect(initialCount).toBeGreaterThanOrEqual(1);
 
     // Check URL before any load-more
     expect(page.url()).not.toContain("cursor");
@@ -96,6 +98,8 @@ test.describe("Pagination URL State", () => {
 
     const cards = container.locator(sel.card);
     await expect(cards.first()).toBeVisible({ timeout: 30_000 });
+    const initialCount = await cards.count();
+    expect(initialCount).toBeGreaterThanOrEqual(1);
 
     // Load more to accumulate 24 items (12 real + 12 mock)
     const loadMoreBtn = container.locator(sel.loadMoreBtn);

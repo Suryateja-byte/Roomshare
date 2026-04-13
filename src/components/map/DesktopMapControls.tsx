@@ -38,7 +38,6 @@ interface DesktopMapControlsProps {
   hasPin: boolean;
   onToggleDropMode: () => void;
   onClearPin: () => void;
-  onHideMap: () => void;
   canFullscreen: boolean;
   isFullscreen: boolean;
   onToggleFullscreen: () => void;
@@ -49,9 +48,6 @@ interface DesktopMapControlsProps {
 
 const controlButtonClassName =
   "relative flex h-11 w-11 items-center justify-center rounded-2xl border border-outline-variant/20 bg-surface-container-lowest/95 text-on-surface-variant shadow-ambient backdrop-blur-md transition-colors hover:bg-surface-container-high hover:text-on-surface focus:outline-none focus-visible:ring-2 focus-visible:ring-primary/30 focus-visible:ring-offset-2";
-
-const pillButtonClassName =
-  "inline-flex min-h-[44px] items-center gap-2 rounded-full border border-outline-variant/20 bg-surface-container-lowest/95 px-4 py-2 text-sm font-medium text-on-surface shadow-ambient backdrop-blur-md transition-colors hover:bg-surface-container-high focus:outline-none focus-visible:ring-2 focus-visible:ring-primary/30 focus-visible:ring-offset-2";
 
 const sectionLabelClassName =
   "px-3 pb-1 pt-2 text-[11px] uppercase tracking-[0.16em] text-on-surface-variant";
@@ -202,7 +198,6 @@ export default function DesktopMapControls({
   hasPin,
   onToggleDropMode,
   onClearPin,
-  onHideMap,
   canFullscreen,
   isFullscreen,
   onToggleFullscreen,
@@ -250,9 +245,7 @@ export default function DesktopMapControls({
     isDropMode,
   });
   const toolsLabel =
-    activeToolCount > 0
-      ? `Map tools, ${activeToolCount} active`
-      : "Map tools";
+    activeToolCount > 0 ? `Map tools, ${activeToolCount} active` : "Map tools";
   const headerOffset = isFullscreen ? 0 : headerHeight;
   const collisionPadding = useMemo(
     () => ({
@@ -267,21 +260,8 @@ export default function DesktopMapControls({
 
   return (
     <>
-      <div className="absolute right-4 top-4 z-[50]" data-map-avoid>
-        <button
-          type="button"
-          onClick={onHideMap}
-          className={cn(pillButtonClassName, "min-h-[56px] px-6 text-[0.95rem] font-semibold")}
-          aria-label="Hide map"
-          title="Hide map"
-        >
-          <MapPinOff className="h-5 w-5 text-on-surface-variant" aria-hidden />
-          <span className="whitespace-nowrap">Hide map</span>
-        </button>
-      </div>
-
       <div
-        className="absolute right-4 top-20 z-[50] flex flex-col gap-2"
+        className="absolute right-4 top-4 z-[50] flex flex-col gap-2"
         data-map-avoid
       >
         {canFullscreen && (
@@ -289,7 +269,9 @@ export default function DesktopMapControls({
             type="button"
             onClick={onToggleFullscreen}
             className={controlButtonClassName}
-            aria-label={isFullscreen ? "Exit fullscreen map" : "Enter fullscreen map"}
+            aria-label={
+              isFullscreen ? "Exit fullscreen map" : "Enter fullscreen map"
+            }
             title={isFullscreen ? "Exit fullscreen" : "Fullscreen map"}
           >
             {isFullscreen ? (
@@ -301,7 +283,11 @@ export default function DesktopMapControls({
         )}
 
         {presentation === "dropdown" ? (
-          <DropdownMenu modal={false} open={toolsOpen} onOpenChange={setToolsOpen}>
+          <DropdownMenu
+            modal={false}
+            open={toolsOpen}
+            onOpenChange={setToolsOpen}
+          >
             <DropdownMenuTrigger asChild>
               <button
                 type="button"

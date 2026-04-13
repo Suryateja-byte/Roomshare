@@ -1,17 +1,15 @@
 /**
  * E2E Test Suite: Breathing Pending State (PR1)
  *
- * Tests the non-blocking pending state during search transitions:
- * - Old results stay visible with translucent overlay
- * - No duplicate skeleton grid rendered during transitions
+ * Tests the Airbnb-style pending state during search transitions:
+ * - Filter/sort/search transitions replace the results body with card skeletons
+ * - No spinner pill or translucent overlay is rendered
  * - aria-busy attribute during transition
- * - Compact pending status for slow transitions
  *
  * Implementation note:
  * - SearchViewToggle renders `data-testid="search-results-container"` (width/scroll wrapper)
  * - SearchResultsLoadingWrapper renders `data-testid="search-results-pending-region"` INSIDE the container
- * - Pending state uses a compact status pill + subtle scrim
- * - pointer-events-none is applied to the stale results body, not the outer container
+ * - Visual loading treatment now lives in SearchResultsClient via `SearchResultsBodySkeleton`
  */
 
 import {
@@ -40,7 +38,7 @@ test.describe("Breathing Pending State (PR1)", () => {
   });
 
   test.describe("Pending State Styling", () => {
-    test(`${tags.anon} ${tags.smoke} - Results container shows breathing fade during filter transition`, async ({
+    test(`${tags.anon} ${tags.smoke} - Results container enters the refreshed pending state during filter transition`, async ({
       page,
       nav,
     }) => {
@@ -117,15 +115,15 @@ test.describe("Breathing Pending State (PR1)", () => {
       );
       const wasBusy = await busyElement.isVisible().catch(() => false);
 
-      if (wasBusy) {
-        // Pending state was observed -- good
-        expect(wasBusy).toBe(true);
-        await expect(
-          page.getByTestId("search-results-pending-status")
-        ).toContainText(/updating results|still loading/i);
-        await expect(
-          page.locator('[data-testid="listing-card-skeleton-grid"]')
-        ).toHaveCount(0);
+      const skeletonBody = page.locator(
+        '[data-testid="search-results-body-skeleton"]'
+      );
+      const hasSkeleton = await skeletonBody.isVisible().catch(() => false);
+
+      if (wasBusy || hasSkeleton) {
+        // Dedicated loading-state coverage asserts the skeleton itself.
+        // Here we only need to prove the refreshed pending state was entered.
+        expect(wasBusy || hasSkeleton).toBe(true);
       } else {
         // Transition was too fast to observe -- acceptable
         console.log(
@@ -145,7 +143,7 @@ test.describe("Breathing Pending State (PR1)", () => {
       await page.unroute("**/search**");
     });
 
-    test(`${tags.anon} - Results remain visible during transition (no blocking overlay)`, async ({
+    test(`${tags.anon} - Idle state shows live cards instead of skeletons`, async ({
       page,
     }) => {
       // Navigate with initial filter
@@ -163,12 +161,12 @@ test.describe("Breathing Pending State (PR1)", () => {
         .catch(() => false);
 
       if (hasListings) {
-        // Count initial listings
         const initialCount = await listingCards.count();
         expect(initialCount).toBeGreaterThan(0);
-
-        // Listing cards should be visible (not replaced by skeleton or hidden by overlay)
         await expect(listingCards.first()).toBeVisible();
+        await expect(
+          page.locator('[data-testid="search-results-body-skeleton"]')
+        ).toHaveCount(0);
       } else {
         // Zero results scenario -- verify the container still renders
         console.log("Info: No listing cards found; zero results is acceptable");
@@ -178,7 +176,7 @@ test.describe("Breathing Pending State (PR1)", () => {
       await expect(container).toBeVisible();
     });
 
-    test(`${tags.anon} - Container has pointer-events-none during pending state`, async ({
+    test(`${tags.anon} - Pending wrapper exposes aria-busy without legacy overlay chrome`, async ({
       page,
       nav,
     }) => {
@@ -189,20 +187,20 @@ test.describe("Breathing Pending State (PR1)", () => {
       const resultsContainer = searchResultsContainer(page);
       await expect(resultsContainer).toBeVisible({ timeout: 10000 });
 
-      // The SearchResultsLoadingWrapper is inside the container.
-      // When NOT pending, the outer results container should still accept pointer events.
-      const containerPointerEvents = await resultsContainer.evaluate((el) => {
-        return window.getComputedStyle(el).pointerEvents;
-      });
-      expect(containerPointerEvents).not.toBe("none");
-
-      // Also verify that aria-busy wrapper (if present) is not busy
+      // Verify that aria-busy wrapper (if present) is not busy while idle
       const ariaBusyWrapper = resultsContainer
         .locator('[data-testid="search-results-pending-region"]')
         .first();
       if ((await ariaBusyWrapper.count()) > 0) {
         await expect(ariaBusyWrapper).toHaveAttribute("aria-busy", "false");
       }
+
+      await expect(
+        page.locator('[data-testid="search-results-pending-overlay"]')
+      ).toHaveCount(0);
+      await expect(
+        page.locator('[data-testid="search-results-pending-status"]')
+      ).toHaveCount(0);
     });
   });
 

@@ -32,22 +32,13 @@ import React, {
 import Link from "next/link";
 import Image from "next/image";
 import { useRouter, useSearchParams } from "next/navigation";
-import {
-  Home,
-  Loader2,
-  MapPin,
-  Minus,
-  Plus,
-  Star,
-  X,
-} from "lucide-react";
+import { Home, Loader2, MapPin, Minus, Plus, Star, X } from "lucide-react";
 import { triggerHaptic } from "@/lib/haptics";
 import { formatPrice } from "@/lib/format";
 import { Button } from "./ui/button";
 import { MAP_FLY_TO_EVENT, MapFlyToEventDetail } from "./SearchForm";
 import { useListingFocus } from "@/contexts/ListingFocusContext";
 import { useMobileSearch } from "@/contexts/MobileSearchContext";
-import { useSearchMapUI } from "@/contexts/SearchMapUIContext";
 import { useSearchTransitionSafe } from "@/contexts/SearchTransitionContext";
 import { useMapBounds } from "@/contexts/MapBoundsContext";
 import { useActivePanBoundsSetter } from "@/contexts/ActivePanBoundsContext";
@@ -1220,7 +1211,6 @@ export default function MapComponent({
   const reducedMotion = useReducedMotion();
   const { hoveredId, activeId, setHovered, setActive, requestScrollTo } =
     useListingFocus();
-  const { hideMap } = useSearchMapUI();
   // Keyboard navigation state for arrow key navigation between markers
   const [keyboardFocusedId, setKeyboardFocusedId] = useState<string | null>(
     null
@@ -1296,6 +1286,10 @@ export default function MapComponent({
   >(null);
   // Track pending search after zoom-out (user-initiated zoom that should trigger search)
   const pendingSearchAfterZoomRef = useRef(false);
+  // Programmatic camera changes (marker focus, URL restore, cluster expand) can
+  // emit one extra synthetic moveend after the main animation settles. Ignore
+  // the follow-up event so it doesn't rewrite URL bounds or clear selection.
+  const suppressNextSyntheticMoveEndRef = useRef(false);
   // Track last map center to detect resize-triggered moveEnd events (center barely moves)
   const lastCenterRef = useRef<{ lat: number; lng: number } | null>(null);
   // P2-FIX (#154): Store numeric bounds for deduplication instead of string
@@ -1350,7 +1344,9 @@ export default function MapComponent({
     }
 
     const activeElement =
-      document.activeElement instanceof HTMLElement ? document.activeElement : null;
+      document.activeElement instanceof HTMLElement
+        ? document.activeElement
+        : null;
     const trigger = activeElement?.closest(
       `[data-show-on-map-id="${listingId}"]`
     );
@@ -1409,13 +1405,20 @@ export default function MapComponent({
       restoreDesktopPopupOriginFocus,
     ]
   );
-  const handleSelectedListingClose = useCallback((restoreFocus = true) => {
-    if (usesPreviewSelection) {
-      dismissPreviewSelection();
-      return;
-    }
-    dismissDesktopPopupSelection({ restoreFocus });
-  }, [usesPreviewSelection, dismissPreviewSelection, dismissDesktopPopupSelection]);
+  const handleSelectedListingClose = useCallback(
+    (restoreFocus = true) => {
+      if (usesPreviewSelection) {
+        dismissPreviewSelection();
+        return;
+      }
+      dismissDesktopPopupSelection({ restoreFocus });
+    },
+    [
+      usesPreviewSelection,
+      dismissPreviewSelection,
+      dismissDesktopPopupSelection,
+    ]
+  );
   // Safety timeout: clear programmatic move flag if moveEnd doesn't fire
   const programmaticClearTimeoutRef = useRef<NodeJS.Timeout | null>(null);
   // Auto-zoom: fire once per search context when results are empty and no filters active
@@ -2119,10 +2122,7 @@ export default function MapComponent({
       setDesktopPopupSize((current) => {
         const nextWidth = Math.round(rect.width);
         const nextHeight = Math.round(rect.height);
-        if (
-          current.width === nextWidth &&
-          current.height === nextHeight
-        ) {
+        if (current.width === nextWidth && current.height === nextHeight) {
           return current;
         }
 
@@ -2214,7 +2214,10 @@ export default function MapComponent({
 
       let bestPlacement: DesktopPopupPlacement | null = null;
 
-      for (const [priorityIndex, anchor] of DESKTOP_POPUP_ANCHOR_PRIORITY.entries()) {
+      for (const [
+        priorityIndex,
+        anchor,
+      ] of DESKTOP_POPUP_ANCHOR_PRIORITY.entries()) {
         const popupRect = getDesktopPopupRectForAnchor(
           anchor,
           point,
@@ -2222,7 +2225,8 @@ export default function MapComponent({
         );
         const overflowScore = getRectOverflowScore(popupRect, safeRect);
         const overlapScore = avoidRects.reduce(
-          (total, avoidRect) => total + getRectIntersectionArea(popupRect, avoidRect),
+          (total, avoidRect) =>
+            total + getRectIntersectionArea(popupRect, avoidRect),
           0
         );
         const { deltaX, deltaY } = getPopupAdjustmentDelta(
@@ -2469,12 +2473,7 @@ export default function MapComponent({
       ],
       { padding: fitBoundsPadding, duration: 1000 }
     );
-  }, [
-    fitBoundsPadding,
-    isProgrammaticMoveRef,
-    listings,
-    setProgrammaticMove,
-  ]);
+  }, [fitBoundsPadding, isProgrammaticMoveRef, listings, setProgrammaticMove]);
 
   useEffect(() => {
     if (isPhoneViewport !== true || !isMapLoaded || listings.length === 0) {
@@ -2513,20 +2512,6 @@ export default function MapComponent({
       // Ignore fullscreen API failures and leave the inline layout intact.
     }
   }, []);
-
-  const handleHideMap = useCallback(async () => {
-    if (typeof document !== "undefined" && document.fullscreenElement) {
-      try {
-        await document.exitFullscreen();
-      } catch {
-        // Ignore fullscreen API failures and continue hiding the inline map.
-      }
-    }
-
-    setIsSearching(false);
-    setShowMobileToolsSheet(false);
-    hideMap();
-  }, [hideMap]);
 
   // Auto-zoom-out: when map loads empty with no active filters, zoom out once
   // Build a key from non-bounds params so we reset per search context
@@ -3019,14 +3004,21 @@ export default function MapComponent({
       duration: reducedMotion ? 0 : DESKTOP_POPUP_FOCUS_ANIMATION_MS,
     });
 
-    if (usesPopupSelection && isPhoneViewport !== true && typeof window !== "undefined") {
+    if (
+      usesPopupSelection &&
+      isPhoneViewport !== true &&
+      typeof window !== "undefined"
+    ) {
       const revisionTimers = [
         window.setTimeout(() => {
           setPopupPlacementRevision((current) => current + 1);
         }, 0),
-        window.setTimeout(() => {
-          setPopupPlacementRevision((current) => current + 1);
-        }, Math.max(Math.round(DESKTOP_POPUP_FOCUS_ANIMATION_MS / 2), 120)),
+        window.setTimeout(
+          () => {
+            setPopupPlacementRevision((current) => current + 1);
+          },
+          Math.max(Math.round(DESKTOP_POPUP_FOCUS_ANIMATION_MS / 2), 120)
+        ),
         window.setTimeout(() => {
           setPopupPlacementRevision((current) => current + 1);
         }, DESKTOP_POPUP_FOCUS_ANIMATION_MS + 40),
@@ -3059,6 +3051,9 @@ export default function MapComponent({
       const hasOriginalEvent = Boolean(
         (e as ViewStateChangeEvent & { originalEvent?: Event }).originalEvent
       );
+      if (hasOriginalEvent) {
+        suppressNextSyntheticMoveEndRef.current = false;
+      }
       // Track zoom for two-tier pin display
       setCurrentZoom(e.viewState.zoom);
       // Debounce updateUnclusteredListings to batch rapid moveEnd events (100ms)
@@ -3118,12 +3113,33 @@ export default function MapComponent({
         // Tiles may not be loaded yet, clearing here causes empty markers
         // Zoom-out button is user-initiated — allow search to proceed
         if (!pendingSearchAfterZoomRef.current) {
+          suppressNextSyntheticMoveEndRef.current = true;
           lastCenterRef.current = center;
           return;
         }
         pendingSearchAfterZoomRef.current = false;
         skipCenterDedup = true;
         // Fall through to search logic below
+      }
+
+      if (!hasOriginalEvent && suppressNextSyntheticMoveEndRef.current) {
+        suppressNextSyntheticMoveEndRef.current = false;
+        lastCenterRef.current = center;
+        if (isMobileViewport) {
+          hasCompletedInitialMobileViewportSyncRef.current = true;
+          hasPendingRealUserMoveRef.current = false;
+        }
+        return;
+      }
+
+      // Desktop map lifecycle can emit synthetic moveend events after initial
+      // URL restoration, resize, popup placement correction, and other
+      // programmatic camera work. Those should never rewrite URL bounds or
+      // trigger a search unless we explicitly queued one (skipCenterDedup).
+      if (!isMobileViewport && !hasOriginalEvent && !skipCenterDedup) {
+        setActivePanBounds(null);
+        lastCenterRef.current = center;
+        return;
       }
 
       // Clear active pan bounds since move has ended
@@ -3456,11 +3472,7 @@ export default function MapComponent({
       // Fire controlled view state if provided
       handleControlledMove(e);
 
-      if (
-        usesPopupSelection &&
-        isPhoneViewport !== true &&
-        selectedListing
-      ) {
+      if (usesPopupSelection && isPhoneViewport !== true && selectedListing) {
         setPopupPlacementRevision((current) => current + 1);
       }
 
@@ -4312,7 +4324,6 @@ export default function MapComponent({
           hasPin={Boolean(userPin)}
           onToggleDropMode={toggleDropMode}
           onClearPin={() => setUserPin(null)}
-          onHideMap={handleHideMap}
           canFullscreen={canFullscreen}
           isFullscreen={isFullscreen}
           onToggleFullscreen={handleToggleFullscreen}
@@ -4346,9 +4357,7 @@ export default function MapComponent({
       {isMapLoaded &&
         !showMobileToolsSheet &&
         !shouldShowMobileStatusCard &&
-        !hasPhonePreviewCard && (
-        <MapGestureHint />
-      )}
+        !hasPhonePreviewCard && <MapGestureHint />}
 
       {shouldShowMobileStatusCard && mobileMapStatus && (
         <MobileMapStatusCard

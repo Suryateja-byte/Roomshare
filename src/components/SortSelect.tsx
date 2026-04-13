@@ -20,6 +20,10 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
+import {
+  QUICK_FILTER_ACTIVE_CLASSNAME,
+  QUICK_FILTER_INACTIVE_CLASSNAME,
+} from "@/components/search/quickFilterStyles";
 
 const sortOptions: { value: SortOption; label: string }[] = [
   { value: "recommended", label: "Recommended" },
@@ -95,10 +99,12 @@ export default function SortSelect({ currentSort }: SortSelectProps) {
           <ArrowUpDown className="w-4 h-4" />
           <span className="hidden sm:inline">Sort</span>
         </button>
-        <div className="hidden md:flex items-center gap-2">
-          <span>Sort by:</span>
-          <div className="h-9 min-w-[140px] px-3 py-1.5 text-on-surface font-semibold text-xs flex items-center">
-            {currentLabel}
+        <div className="hidden md:flex">
+          <div
+            className={`inline-flex h-11 min-w-[148px] items-center gap-2 rounded-full border px-4 text-sm font-medium ${QUICK_FILTER_INACTIVE_CLASSNAME}`}
+          >
+            <ArrowUpDown className="w-4 h-4 text-on-surface-variant" />
+            <span>{currentLabel}</span>
           </div>
         </div>
       </div>
@@ -184,8 +190,7 @@ export default function SortSelect({ currentSort }: SortSelectProps) {
         )}
 
       {/* Desktop sort dropdown */}
-      <div className="hidden md:flex items-center gap-2 text-xs font-medium text-on-surface-variant">
-        <span>Sort by:</span>
+      <div className="hidden md:flex">
         <Select
           value={currentSort}
           onValueChange={handleSortChange}
@@ -193,12 +198,23 @@ export default function SortSelect({ currentSort }: SortSelectProps) {
           onOpenChange={setDesktopOpen}
         >
           <SelectTrigger
-            aria-label="Sort by"
-            className={`h-9 w-auto min-w-[140px] border-none bg-transparent hover:bg-surface-container-high px-3 py-1.5 font-semibold text-xs focus-visible:ring-2 focus-visible:ring-primary/30 ${
-              isNonDefault ? "text-on-surface" : "text-on-surface-variant"
+            aria-label={`Sort by: ${currentLabel}`}
+            data-testid="desktop-sort-trigger"
+            className={`h-11 w-auto min-w-[148px] rounded-full border px-4 text-sm font-medium transition-colors focus-visible:ring-2 focus-visible:ring-primary/30 ${
+              isNonDefault
+                ? QUICK_FILTER_ACTIVE_CLASSNAME
+                : QUICK_FILTER_INACTIVE_CLASSNAME
             }`}
           >
-            <SelectValue placeholder="Recommended">{currentLabel}</SelectValue>
+            <span className="inline-flex items-center gap-2">
+              <ArrowUpDown
+                className="w-4 h-4 text-on-surface-variant"
+                aria-hidden="true"
+              />
+              <SelectValue placeholder="Recommended">
+                {currentLabel}
+              </SelectValue>
+            </span>
           </SelectTrigger>
           <SelectContent>
             {sortOptions.map((option) => (

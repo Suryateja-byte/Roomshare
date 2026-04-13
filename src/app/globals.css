@@ -203,7 +203,7 @@
 }
 
 .animate-hero-fade-in {
-  animation: heroFadeIn 0.4s cubic-bezier(0.25, 0.1, 0.25, 1.0) both;
+  animation: heroFadeIn 0.4s cubic-bezier(0.25, 0.1, 0.25, 1) both;
 }
 
 @keyframes slideDown {
@@ -722,11 +722,11 @@ input:autofill {
   .desktop-search-results-scroll {
     scrollbar-gutter: stable;
     scrollbar-width: thin;
-    scrollbar-color: rgb(74 73 65 / 0.34) transparent;
+    scrollbar-color: rgb(74 73 65 / 0.22) transparent;
   }
 
   .desktop-search-results-scroll::-webkit-scrollbar {
-    width: 10px;
+    width: 8px;
   }
 
   .desktop-search-results-scroll::-webkit-scrollbar-track {
@@ -734,7 +734,7 @@ input:autofill {
   }
 
   .desktop-search-results-scroll::-webkit-scrollbar-thumb {
-    background: rgb(74 73 65 / 0.28);
+    background: rgb(74 73 65 / 0.18);
     border: 2px solid transparent;
     border-radius: 9999px;
     background-clip: padding-box;
@@ -742,7 +742,7 @@ input:autofill {
 
   .desktop-search-results-scroll:hover::-webkit-scrollbar-thumb,
   .desktop-search-results-scroll:focus-visible::-webkit-scrollbar-thumb {
-    background: rgb(74 73 65 / 0.45);
+    background: rgb(74 73 65 / 0.32);
     background-clip: padding-box;
   }
 }

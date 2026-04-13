@@ -106,8 +106,6 @@ jest.mock("@/components/search/FloatingMapButton", () => {
 const props = {
   mapComponent: <div data-testid="map">Map</div>,
   shouldShowMap: true,
-  onToggle: jest.fn(),
-  isLoading: false,
 };
 
 function TestChild() {
@@ -307,6 +305,20 @@ describe("SearchViewToggle", () => {
     });
   });
 
+  it("does not render a desktop show-map button inside the results pane", () => {
+    matchMediaMatches = true;
+
+    render(
+      <SearchViewToggle {...props} shouldShowMap={false}>
+        <TestChild />
+      </SearchViewToggle>
+    );
+
+    expect(
+      screen.queryByTestId("desktop-show-map-button")
+    ).not.toBeInTheDocument();
+  });
+
   it("uses an inner desktop scroll region instead of scrolling the split-view shell", () => {
     matchMediaMatches = true;
     render(
@@ -360,7 +372,9 @@ describe("SearchViewToggle", () => {
     expect(
       screen.queryByTestId("desktop-results-top-fade")
     ).not.toBeInTheDocument();
-    expect(screen.getByTestId("desktop-results-bottom-fade")).toBeInTheDocument();
+    expect(
+      screen.getByTestId("desktop-results-bottom-fade")
+    ).toBeInTheDocument();
 
     Object.defineProperty(scrollRegion, "scrollTop", {
       configurable: true,

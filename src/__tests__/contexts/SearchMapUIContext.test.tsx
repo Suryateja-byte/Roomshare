@@ -23,10 +23,12 @@ import {
 const createWrapper = (
   showMap: () => void,
   shouldShowMap: boolean,
-  hideMap: () => void = jest.fn()
+  hideMap: () => void = jest.fn(),
+  toggleMap: () => void = jest.fn()
 ) => {
   return ({ children }: { children: React.ReactNode }) => (
     <SearchMapUIProvider
+      toggleMap={toggleMap}
       showMap={showMap}
       hideMap={hideMap}
       shouldShowMap={shouldShowMap}

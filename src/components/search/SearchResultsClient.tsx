@@ -10,20 +10,27 @@ import {
 } from "react";
 import { useSearchParams } from "next/navigation";
 import { safeMark, safeMeasure } from "@/lib/perf";
-import { Search, Loader2 } from "lucide-react";
+import { Loader2, Search } from "lucide-react";
 import Link from "next/link";
 import { Suspense } from "react";
 import ListingCard from "@/components/listings/ListingCard";
 import { ListingCardErrorBoundary } from "@/components/search/ListingCardErrorBoundary";
 import NearMatchSeparator from "@/components/listings/NearMatchSeparator";
 import ZeroResultsSuggestions from "@/components/ZeroResultsSuggestions";
-import SuggestedSearches from "@/components/search/SuggestedSearches";
 import SaveSearchButton from "@/components/SaveSearchButton";
 import { fetchMoreListings } from "@/app/search/actions";
 import { TotalPriceToggle } from "@/components/search/TotalPriceToggle";
-import { clearAllFilters } from "@/components/filters/filter-chip-utils";
+import {
+  clearAllFilters,
+  urlToFilterChips,
+} from "@/components/filters/filter-chip-utils";
 import { SplitStayCard } from "@/components/search/SplitStayCard";
 import { ExpandSearchSuggestions } from "@/components/search/ExpandSearchSuggestions";
+import { SearchResultsBodySkeleton } from "@/components/skeletons/ListingCardSkeleton";
+import {
+  useSearchTransitionSafe,
+  type SearchTransitionReason,
+} from "@/contexts/SearchTransitionContext";
 import { findSplitStays } from "@/lib/search/split-stay";
 import { getFilterSuggestions } from "@/app/actions/filter-suggestions";
 import { useMobileSearch } from "@/contexts/MobileSearchContext";
@@ -49,6 +56,41 @@ import { emitSearchClientMetric } from "@/lib/search/search-telemetry-client";
  * Prevents excessive DOM size on low-end devices.
  */
 const MAX_ACCUMULATED = 60;
+const MAP_VIEWPORT_PARAM_KEYS = [
+  "minLat",
+  "maxLat",
+  "minLng",
+  "maxLng",
+  "lat",
+  "lng",
+  "zoom",
+] as const;
+
+function stripMapViewportParams(searchParamsString: string): string {
+  const params = new URLSearchParams(searchParamsString);
+
+  for (const key of MAP_VIEWPORT_PARAM_KEYS) {
+    params.delete(key);
+  }
+
+  params.sort();
+  return params.toString();
+}
+
+function inferClientFetchReason(
+  previousSearchParamsString: string,
+  nextSearchParamsString: string,
+  transitionReason: SearchTransitionReason | null
+): SearchTransitionReason {
+  if (transitionReason) {
+    return transitionReason;
+  }
+
+  return stripMapViewportParams(previousSearchParamsString) ===
+    stripMapViewportParams(nextSearchParamsString)
+    ? "map-pan"
+    : "filter";
+}
 
 function formatMobileResultsLabel(
   total: number | null,
@@ -115,7 +157,9 @@ export function SearchResultsClient({
   );
   const resolvedInitialStateKind =
     initialStateKind ?? (hasConfirmedZeroResults ? "zero-results" : "ok");
-  const { setSearchResultsLabel } = useMobileSearch();
+  const { openFilters, setSearchResultsLabel } = useMobileSearch();
+  const transitionContext = useSearchTransitionSafe();
+  const transitionReason = transitionContext?.pendingReason ?? null;
   const testScenario = useSearchTestScenario();
   const [isHydrated, setIsHydrated] = useState(false);
   const [extraListings, setExtraListings] = useState<ListingData[]>([]);
@@ -139,8 +183,9 @@ export function SearchResultsClient({
   const [resolvedFilterSuggestions, setResolvedFilterSuggestions] =
     useState(filterSuggestions);
   const [responseMeta, setResponseMeta] = useState(resolvedInitialResponseMeta);
-  const [searchStateKind, setSearchStateKind] =
-    useState<SearchListState["kind"]>(resolvedInitialStateKind);
+  const [searchStateKind, setSearchStateKind] = useState<
+    SearchListState["kind"]
+  >(resolvedInitialStateKind);
 
   // Hydrate showTotalPrice from sessionStorage after mount to avoid hydration mismatch
   useEffect(() => {
@@ -174,8 +219,10 @@ export function SearchResultsClient({
     string | undefined
   >(undefined);
   const [isClientFetching, setIsClientFetching] = useState(false);
+  const [activeClientFetchReason, setActiveClientFetchReason] =
+    useState<SearchTransitionReason | null>(null);
   const clientFetchAbortRef = useRef<AbortController | null>(null);
-  const previousSearchParamsRef = useRef<string | null>(null);
+  const previousSearchParamsRef = useRef<string>(searchParamsString);
   const latestQueryHashRef = useRef(resolvedInitialResponseMeta.queryHash);
 
   // Listen for URL search param changes (triggered by replaceState in Map.tsx)
@@ -198,6 +245,10 @@ export function SearchResultsClient({
   const activeSearchParamsString = clientSideSearchEnabled
     ? canonicalSearchParamsString
     : searchParamsString;
+  const appliedFilterChips = useMemo(
+    () => urlToFilterChips(new URLSearchParams(activeSearchParamsString)),
+    [activeSearchParamsString]
+  );
   const currentQueryHash = useMemo(
     () => getSearchQueryHash(currentNormalizedQuery),
     [currentNormalizedQuery]
@@ -210,7 +261,7 @@ export function SearchResultsClient({
   useEffect(() => {
     if (!clientSideSearchEnabled) return;
 
-    // Skip the initial render — SSR data covers the first load
+    // Skip the initial render — SSR data covers the first load.
     if (previousSearchParamsRef.current === null) {
       previousSearchParamsRef.current = currentSearchParamsString;
       return;
@@ -218,6 +269,7 @@ export function SearchResultsClient({
 
     // No change
     if (previousSearchParamsRef.current === currentSearchParamsString) return;
+    const previousSearchParamsString = previousSearchParamsRef.current;
     previousSearchParamsRef.current = currentSearchParamsString;
 
     // Cancel any in-flight request
@@ -236,7 +288,13 @@ export function SearchResultsClient({
     const controller = new AbortController();
     clientFetchAbortRef.current = controller;
     const requestQueryHash = currentQueryHash;
+    const fetchReason = inferClientFetchReason(
+      previousSearchParamsString,
+      currentSearchParamsString,
+      transitionReason
+    );
 
+    setActiveClientFetchReason(fetchReason);
     setIsClientFetching(true);
 
     void (async () => {
@@ -254,7 +312,6 @@ export function SearchResultsClient({
 
         if (!response.ok) {
           // Non-OK response: silently degrade, SSR data remains visible
-          setIsClientFetching(false);
           return;
         }
 
@@ -295,7 +352,6 @@ export function SearchResultsClient({
           setNextCursor(null);
           setClientFetchedNearMatch(undefined);
           setClientFetchedVibeAdvisory(undefined);
-          setIsClientFetching(false);
           return;
         }
 
@@ -326,13 +382,25 @@ export function SearchResultsClient({
     })();
 
     return () => controller.abort();
-  }, [canonicalSearchParamsString, clientSideSearchEnabled, currentQueryHash, currentSearchParamsString]);
+  }, [
+    canonicalSearchParamsString,
+    clientSideSearchEnabled,
+    currentQueryHash,
+    currentSearchParamsString,
+    testScenario,
+    transitionReason,
+  ]);
 
   // Use client-fetched data when available, otherwise fall back to SSR props
   const effectiveListings = clientFetchedListings ?? initialListings;
-  const effectiveTotal = clientFetchedListings !== null ? clientFetchedTotal : initialTotal;
-  const effectiveNearMatch = clientFetchedListings !== null ? clientFetchedNearMatch : nearMatchExpansion;
-  const effectiveVibeAdvisory = clientFetchedListings !== null ? clientFetchedVibeAdvisory : vibeAdvisory;
+  const effectiveTotal =
+    clientFetchedListings !== null ? clientFetchedTotal : initialTotal;
+  const effectiveNearMatch =
+    clientFetchedListings !== null
+      ? clientFetchedNearMatch
+      : nearMatchExpansion;
+  const effectiveVibeAdvisory =
+    clientFetchedListings !== null ? clientFetchedVibeAdvisory : vibeAdvisory;
 
   // Derive a stable fingerprint of the initial data to detect server-side changes
   const initialDataFingerprint = useMemo(
@@ -506,7 +574,8 @@ export function SearchResultsClient({
       // Announce to screen readers (after state update)
       // F2 FIX: Use ref for count instead of stale allListings closure
       const newCount = totalCountRef.current;
-      const totalLabel = effectiveTotal !== null ? ` of ~${effectiveTotal}` : "";
+      const totalLabel =
+        effectiveTotal !== null ? ` of ~${effectiveTotal}` : "";
       setLoadMoreAnnouncement(
         `Loaded ${dedupedItems.length} more listing${dedupedItems.length === 1 ? "" : "s"}, showing ${newCount}${totalLabel}`
       );
@@ -527,7 +596,13 @@ export function SearchResultsClient({
       setIsLoadingMore(false);
     }
     // F2 FIX: Removed allListings dep — count read from totalCountRef instead
-  }, [nextCursor, rawParams, effectiveTotal, effectiveListings.length]);
+  }, [
+    nextCursor,
+    rawParams,
+    effectiveTotal,
+    effectiveListings.length,
+    testScenario,
+  ]);
 
   const total = effectiveTotal;
   // When client-fetched data is active, derive zero-results from effective total
@@ -535,6 +610,9 @@ export function SearchResultsClient({
     clientFetchedListings !== null
       ? effectiveTotal !== null && effectiveTotal === 0
       : hasConfirmedZeroResults;
+  const showAirbnbSkeleton =
+    isClientFetching && activeClientFetchReason !== "map-pan";
+  const shouldShowEmptyState = effectiveZeroResults && !showAirbnbSkeleton;
   const mobileResultsLabel = useMemo(
     () => formatMobileResultsLabel(effectiveTotal, effectiveZeroResults, query),
     [effectiveTotal, effectiveZeroResults, query]
@@ -646,6 +724,7 @@ export function SearchResultsClient({
       data-search-backend-source={responseMeta.backendSource}
       data-response-version={responseMeta.responseVersion}
       data-search-response-version={responseMeta.responseVersion}
+      data-browse-mode={browseMode || undefined}
       className="!outline-none pb-24 md:pb-0"
     >
       {/* Screen reader announcement for search results */}
@@ -681,26 +760,73 @@ export function SearchResultsClient({
         </div>
       )}
 
-      {effectiveZeroResults ? (
+      {shouldShowEmptyState ? (
         <div
           data-testid="empty-state"
-          className="flex flex-col items-center justify-center py-16 sm:py-24 border-2 border-dashed border-outline-variant/20 rounded-2xl sm:rounded-3xl bg-surface-canvas/50"
+          className="flex flex-col gap-6 py-8 sm:py-10 rounded-2xl sm:rounded-3xl border border-outline-variant/20 bg-surface-container-lowest/80 px-5 sm:px-8"
         >
-          <div className="w-14 h-14 sm:w-16 sm:h-16 rounded-full bg-surface-container-lowest flex items-center justify-center shadow-sm mb-4">
-            <Search className="w-5 h-5 sm:w-6 sm:h-6 text-on-surface-variant" />
+          <div className="flex flex-col gap-4 sm:flex-row sm:items-start sm:justify-between">
+            <div className="flex items-start gap-4">
+              <div className="flex h-14 w-14 shrink-0 items-center justify-center rounded-full bg-surface-canvas shadow-sm">
+                <Search className="w-5 h-5 text-on-surface-variant" />
+              </div>
+              <div className="space-y-2">
+                <h2 className="text-lg font-semibold text-on-surface">
+                  No matches found
+                </h2>
+                <p className="max-w-xl text-sm text-on-surface-variant">
+                  {appliedFilterChips.length > 0
+                    ? "Your current filters are too narrow for this area."
+                    : "We could not find any places that match this search yet."}{" "}
+                  Try broadening the search, clearing a few filters, or saving
+                  it for alerts.
+                  {query ? ` No results for "${query}".` : ""}
+                </p>
+              </div>
+            </div>
+
+            <div className="flex flex-col gap-2 sm:items-end">
+              <button
+                type="button"
+                onClick={openFilters}
+                className="inline-flex min-h-[44px] items-center justify-center rounded-full bg-primary px-4 py-2.5 text-sm font-medium text-on-primary transition-colors hover:bg-primary/90"
+              >
+                Adjust filters
+              </button>
+              <Link
+                href={`/search?${clearAllFilters(new URLSearchParams(activeSearchParamsString))}`}
+                className="inline-flex min-h-[44px] items-center justify-center rounded-full border border-outline-variant/20 bg-transparent px-4 py-2.5 text-sm font-medium text-on-surface transition-colors hover:bg-surface-canvas"
+              >
+                Clear all filters
+              </Link>
+              <SaveSearchButton
+                label="Save search for alerts"
+                forceShowLabel={true}
+                className="justify-center rounded-full border border-outline-variant/20 bg-surface-container-lowest px-4 text-on-surface hover:bg-surface-canvas"
+              />
+            </div>
           </div>
-          <h2 className="text-base sm:text-lg font-semibold text-on-surface mb-2">
-            No matches found
-          </h2>
-          <p className="text-on-surface-variant text-sm max-w-xs text-center px-4">
-            Try adjusting your filters, expanding your price range, or searching
-            a nearby area.
-            {query ? ` No results for "${query}".` : ""}
-          </p>
+
+          {appliedFilterChips.length > 0 ? (
+            <div
+              role="region"
+              aria-label="Applied filters"
+              className="flex flex-wrap items-center gap-2"
+            >
+              {appliedFilterChips.map((chip) => (
+                <span
+                  key={chip.id}
+                  className="inline-flex min-h-[36px] items-center rounded-full border border-primary/20 bg-primary/10 px-3 py-2 text-sm text-on-surface"
+                >
+                  {chip.label}
+                </span>
+              ))}
+            </div>
+          ) : null}
 
           {/* Smart filter suggestions */}
           {resolvedFilterSuggestions.length > 0 ? (
-            <div className="w-full max-w-sm px-4 mt-4">
+            <div className="w-full max-w-sm">
               <Suspense fallback={null}>
                 <ZeroResultsSuggestions
                   suggestions={resolvedFilterSuggestions}
@@ -708,133 +834,119 @@ export function SearchResultsClient({
                 />
               </Suspense>
             </div>
-          ) : (
-            <Link
-              href={`/search?${clearAllFilters(new URLSearchParams(activeSearchParamsString))}`}
-              className="mt-6 px-4 py-2.5 rounded-full border border-outline-variant/20 bg-transparent hover:bg-surface-canvas text-on-surface text-sm font-medium transition-colors touch-target"
-            >
-              Clear all filters
-            </Link>
-          )}
+          ) : null}
         </div>
       ) : (
         <>
-          {/* Suggested searches when browsing without a query */}
-          {browseMode && !query && <SuggestedSearches />}
-
-          {/* Price toggle */}
-          {allListings.length > 0 && (
-            <div className="mb-4 flex flex-col gap-2 sm:flex-row sm:items-start sm:justify-between">
-              <div className="min-w-0">
-                <p className="hidden text-sm text-on-surface-variant md:block">
-                  {isClientFetching
-                    ? "Updating..."
-                    : total !== null
-                      ? `${total} ${total === 1 ? "place" : "places"}${query ? ` in ${query}` : ""}`
-                      : `100+ places${query ? ` in ${query}` : ""}`}
-                </p>
-                {vibeQuery ? (
-                  <p className="mt-1 text-xs text-on-surface-variant/90">
-                    Matching vibe: {vibeQuery}
-                  </p>
-                ) : null}
-                {effectiveVibeAdvisory ? (
-                  <p className="mt-2 inline-flex rounded-full bg-surface-container-high px-3 py-1 text-xs font-medium text-on-surface-variant">
-                    {effectiveVibeAdvisory}
-                  </p>
-                ) : null}
-              </div>
-              {estimatedMonths > 1 && (
-                <TotalPriceToggle
-                  showTotal={effectiveShowTotalPrice}
-                  onToggle={setShowTotalPrice}
-                />
-              )}
-            </div>
-          )}
-
-          {/* Client-side fetch loading bar */}
-          {isClientFetching && (
-            <div className="h-[3px] bg-surface-container-high rounded-full overflow-hidden mb-4">
-              <div
-                className="h-full bg-primary rounded-full animate-[indeterminate_1.5s_ease-in-out_infinite] motion-reduce:animate-none"
-                style={{ width: "40%" }}
-                role="progressbar"
-                aria-label="Loading new search results"
-              />
-            </div>
-          )}
-
-          <h2 className="sr-only">Available listings</h2>
-          <div
-            role="feed"
-            aria-label="Search results"
-            aria-busy={isLoadingMore || isClientFetching}
-            data-hydrated={isHydrated || undefined}
-            className="grid grid-cols-1 sm:grid-cols-2 gap-5 sm:gap-x-6 sm:gap-y-9 transition-opacity duration-200 ease-out motion-reduce:transition-none"
-            style={isClientFetching ? { opacity: 0.6 } : undefined}
-          >
-            {allListings.map((listing, index) => {
-              // Insert separator before the first near-match item
-              const isFirstNearMatch =
-                listing.isNearMatch &&
-                (index === 0 || !allListings[index - 1]?.isNearMatch);
-
-              return (
-                <Fragment key={listing.id}>
-                  {isFirstNearMatch && nearMatchCount > 0 && (
-                    <>
-                      <NearMatchSeparator nearMatchCount={nearMatchCount} />
-                      {effectiveNearMatch && (
-                        <p className="col-span-full text-sm text-amber-600 -mt-2 mb-2">
-                          {effectiveNearMatch}
-                        </p>
-                      )}
-                    </>
-                  )}
-                  <ListingCardErrorBoundary listingId={listing.id}>
-                    <div
-                      aria-setsize={total ?? -1}
-                      aria-posinset={index + 1}
-                      className="animate-card-entrance"
-                      style={{
-                        animationDelay: `${Math.min(index, 6) * 40}ms`,
-                      }}
-                    >
-                      <ListingCard
-                        listing={listing}
-                        isSaved={savedIdsSet.has(listing.id)}
-                        priority={index === 0}
-                        showTotalPrice={effectiveShowTotalPrice}
-                        estimatedMonths={estimatedMonths}
-                      />
-                    </div>
-                  </ListingCardErrorBoundary>
-                </Fragment>
-              );
-            })}
-          </div>
-
-          {/* Split stay suggestions for long durations */}
-          {splitStayPairs.length > 0 && (
-            <div className="mt-8">
-              <h3 className="text-sm font-medium text-on-surface-variant mb-3">
-                Split your stay
-              </h3>
-              <div className="grid grid-cols-1 gap-4">
-                {splitStayPairs.map((pair) => (
-                  <ListingCardErrorBoundary
-                    key={`${pair.first.id}-${pair.second.id}`}
-                    listingId={`split-${pair.first.id}-${pair.second.id}`}
-                  >
-                    <SplitStayCard
-                      pair={pair}
-                      showTotalPrice={effectiveShowTotalPrice}
-                      estimatedMonths={estimatedMonths}
+          {showAirbnbSkeleton ? (
+            <SearchResultsBodySkeleton
+              count={Math.max(allListings.length, 6)}
+            />
+          ) : (
+            <div
+              className={
+                activeClientFetchReason &&
+                activeClientFetchReason !== "map-pan" &&
+                clientFetchedListings !== null
+                  ? "animate-[fadeUp_0.22s_ease-out]"
+                  : undefined
+              }
+            >
+              {/* Price toggle */}
+              {allListings.length > 0 && (
+                <div className="mb-4 flex flex-col gap-2 sm:flex-row sm:items-start sm:justify-between">
+                  <div className="min-w-0">
+                    {vibeQuery ? (
+                      <p className="mt-1 text-xs text-on-surface-variant/90">
+                        Matching vibe: {vibeQuery}
+                      </p>
+                    ) : null}
+                    {effectiveVibeAdvisory ? (
+                      <p className="mt-2 inline-flex rounded-full bg-surface-container-high px-3 py-1 text-xs font-medium text-on-surface-variant">
+                        {effectiveVibeAdvisory}
+                      </p>
+                    ) : null}
+                  </div>
+                  {estimatedMonths > 1 && (
+                    <TotalPriceToggle
+                      showTotal={effectiveShowTotalPrice}
+                      onToggle={setShowTotalPrice}
                     />
-                  </ListingCardErrorBoundary>
-                ))}
+                  )}
+                </div>
+              )}
+
+              <h2 className="sr-only">Available listings</h2>
+              <div
+                role="feed"
+                aria-label="Search results"
+                aria-busy={isLoadingMore || isClientFetching}
+                data-hydrated={isHydrated || undefined}
+                className="grid grid-cols-1 gap-5 sm:grid-cols-2 sm:gap-x-6 sm:gap-y-9"
+              >
+                {allListings.map((listing, index) => {
+                  // Insert separator before the first near-match item
+                  const isFirstNearMatch =
+                    listing.isNearMatch &&
+                    (index === 0 || !allListings[index - 1]?.isNearMatch);
+
+                  return (
+                    <Fragment key={listing.id}>
+                      {isFirstNearMatch && nearMatchCount > 0 && (
+                        <>
+                          <NearMatchSeparator nearMatchCount={nearMatchCount} />
+                          {effectiveNearMatch && (
+                            <p className="col-span-full mb-2 -mt-2 text-sm text-amber-600">
+                              {effectiveNearMatch}
+                            </p>
+                          )}
+                        </>
+                      )}
+                      <ListingCardErrorBoundary listingId={listing.id}>
+                        <div
+                          aria-setsize={total ?? -1}
+                          aria-posinset={index + 1}
+                          className="animate-card-entrance"
+                          style={{
+                            animationDelay: `${Math.min(index, 6) * 40}ms`,
+                          }}
+                        >
+                          <ListingCard
+                            listing={listing}
+                            isSaved={savedIdsSet.has(listing.id)}
+                            priority={index === 0}
+                            showTotalPrice={effectiveShowTotalPrice}
+                            estimatedMonths={estimatedMonths}
+                          />
+                        </div>
+                      </ListingCardErrorBoundary>
+                    </Fragment>
+                  );
+                })}
               </div>
+
+              {/* Split stay suggestions for long durations */}
+              {splitStayPairs.length > 0 && (
+                <div className="mt-8">
+                  <h3 className="mb-3 text-sm font-medium text-on-surface-variant">
+                    Split your stay
+                  </h3>
+                  <div className="grid grid-cols-1 gap-4">
+                    {splitStayPairs.map((pair) => (
+                      <ListingCardErrorBoundary
+                        key={`${pair.first.id}-${pair.second.id}`}
+                        listingId={`split-${pair.first.id}-${pair.second.id}`}
+                      >
+                        <SplitStayCard
+                          pair={pair}
+                          showTotalPrice={effectiveShowTotalPrice}
+                          estimatedMonths={estimatedMonths}
+                        />
+                      </ListingCardErrorBoundary>
+                    ))}
+                  </div>
+                </div>
+              )}
             </div>
           )}
 
@@ -911,22 +1023,26 @@ export function SearchResultsClient({
             />
           )}
 
-          {allListings.length > 0 && !effectiveZeroResults && isHydrated && !isLoadingMore && (
-            <section
-              aria-label="Save search"
-              className="hidden md:flex mt-12 mb-4 relative overflow-hidden bg-surface-container-high/40 rounded-2xl p-8 flex-col sm:flex-row items-center justify-between gap-6 border border-outline-variant/20"
-            >
-              <div>
-                <h3 className="text-lg font-display font-semibold text-on-surface mb-1">
-                  Don&apos;t miss out
-                </h3>
-                <p className="text-sm text-on-surface-variant">
-                  We add new spaces daily. Save this search to get notified first.
-                </p>
-              </div>
-              <SaveSearchButton />
-            </section>
-          )}
+          {allListings.length > 0 &&
+            !effectiveZeroResults &&
+            isHydrated &&
+            !isLoadingMore && (
+              <section
+                aria-label="Save search"
+                className="hidden md:flex mt-12 mb-4 relative overflow-hidden bg-surface-container-high/40 rounded-2xl p-8 flex-col sm:flex-row items-center justify-between gap-6 border border-outline-variant/20"
+              >
+                <div>
+                  <h3 className="text-lg font-display font-semibold text-on-surface mb-1">
+                    Don&apos;t miss out
+                  </h3>
+                  <p className="text-sm text-on-surface-variant">
+                    We add new spaces daily. Save this search to get notified
+                    first.
+                  </p>
+                </div>
+                <SaveSearchButton />
+              </section>
+            )}
         </>
       )}
     </div>
