@@ -73,8 +73,11 @@ test.describe("20 Critical Search Page Journeys", () => {
     const viewport = page.viewportSize();
     if (viewport && viewport.width >= 768) {
       // On desktop, the price quick-filter button label shows the active range.
-      // Wait for hydration — the label updates after useBatchedFilters syncs.
-      const priceBtn = page.locator('[data-testid="quick-filter-price"]');
+      // Scope to the active results container to avoid the duplicate mobile/desktop
+      // copy during SearchViewToggle hydration.
+      const priceBtn = searchResultsContainer(page)
+        .locator('[data-testid="quick-filter-price"]')
+        .first();
       await expect(priceBtn).toBeVisible({ timeout: 15_000 });
       await expect
         .poll(() => priceBtn.textContent(), { timeout: 15_000 })
@@ -589,7 +592,9 @@ test.describe("20 Critical Search Page Journeys", () => {
     // On desktop, also verify the filter bar price button reflects the active value.
     const viewport = page.viewportSize();
     if (viewport && viewport.width >= 768) {
-      const priceBtn = page.locator('[data-testid="quick-filter-price"]');
+      const priceBtn = searchResultsContainer(page)
+        .locator('[data-testid="quick-filter-price"]')
+        .first();
       await expect(priceBtn).toBeVisible({ timeout: 15_000 });
       await expect
         .poll(() => priceBtn.textContent(), { timeout: 15_000 })

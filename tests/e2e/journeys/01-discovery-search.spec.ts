@@ -6,7 +6,14 @@
  * search with filters, map view, sorting, and pagination.
  */
 
-import { test, expect, selectors, tags, SF_BOUNDS } from "../helpers";
+import {
+  test,
+  expect,
+  selectors,
+  tags,
+  SF_BOUNDS,
+  searchResultsContainer,
+} from "../helpers";
 
 test.describe("Discovery & Search Journeys", () => {
   test.beforeEach(async () => {
@@ -130,7 +137,9 @@ test.describe("Discovery & Search Journeys", () => {
 
       if (!isMobile) {
         // Desktop: the quick-filter price pill reflects the committed price range
-        const priceBtn = page.locator('[data-testid="quick-filter-price"]');
+        const priceBtn = searchResultsContainer(page)
+          .locator('[data-testid="quick-filter-price"]')
+          .first();
         const priceBtnVisible = await priceBtn
           .isVisible({ timeout: 10_000 })
           .catch(() => false);
