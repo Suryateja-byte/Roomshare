@@ -4,10 +4,10 @@ import {
   PaginatedResultHybrid,
   ListingData,
 } from "@/lib/data";
-import SortSelect from "@/components/SortSelect";
 import { SearchResultsClient } from "@/components/search/SearchResultsClient";
 import { SearchResultsErrorBoundary } from "@/components/search/SearchResultsErrorBoundary";
 import SearchResultsMobileHeading from "@/components/search/SearchResultsMobileHeading";
+import SearchResultsMobileSort from "@/components/search/SearchResultsMobileSort";
 import SearchResultsToolbar from "@/components/search/SearchResultsToolbar";
 import Link from "next/link";
 import { Search } from "lucide-react";
@@ -337,9 +337,7 @@ export default async function SearchPage({ searchParams }: SearchPageProps) {
             total={renderableScenarioData.total}
             locationLabel={displayLocation}
           />
-          <div className="flex justify-end py-2 md:hidden">
-            <SortSelect currentSort={sortOption} />
-          </div>
+          <SearchResultsMobileSort currentSort={sortOption} />
 
           <SearchResultsLoadingWrapper>
             <SearchResultsErrorBoundary>
@@ -585,9 +583,7 @@ export default async function SearchPage({ searchParams }: SearchPageProps) {
           total={total}
           locationLabel={displayLocation}
         />
-        <div className="flex justify-end py-2 md:hidden">
-          <SortSelect currentSort={sortOption} />
-        </div>
+        <SearchResultsMobileSort currentSort={sortOption} />
 
         <SearchResultsLoadingWrapper>
           <SearchResultsErrorBoundary>

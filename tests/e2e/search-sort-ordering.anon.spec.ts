@@ -51,16 +51,20 @@ const SORT_OPTIONS = [
 // Scoped helpers — desktop (default for Groups 1-3, 5-7)
 // ---------------------------------------------------------------------------
 
+function desktopResults(page: Page): Locator {
+  return page.locator(DESKTOP).first();
+}
+
 /** Wait for listing cards inside the desktop results container. */
 async function waitForCards(page: Page) {
-  const cards = page.locator(DESKTOP).locator(CARDS);
+  const cards = desktopResults(page).locator(CARDS);
   await expect(cards.first()).toBeAttached({ timeout: 30_000 });
   return cards;
 }
 
 /** Wait for either cards or zero-results inside the desktop container. */
 async function waitForResults(page: Page) {
-  const container = page.locator(DESKTOP);
+  const container = desktopResults(page);
   const cards = container.locator(CARDS);
   const zeroResults = container.locator(
     'h2:has-text("No matches found"), h3:has-text("No exact matches")'
@@ -71,8 +75,7 @@ async function waitForResults(page: Page) {
 
 /** Extract numeric prices from the desktop container's listing cards. */
 async function extractPrices(page: Page): Promise<number[]> {
-  const priceTexts = await page
-    .locator(DESKTOP)
+  const priceTexts = await desktopResults(page)
     .locator(CARDS)
     .locator(PRICE)
     .allTextContents();
@@ -164,7 +167,7 @@ async function mobileNavigate(
  * identical combobox rendered in the mobile container.
  */
 function getDesktopSortTrigger(page: Page): Locator {
-  return page.locator(DESKTOP).locator('button[role="combobox"]');
+  return desktopResults(page).locator('button[role="combobox"]').first();
 }
 
 /** Open the desktop sort dropdown and return the listbox locator. */
@@ -183,7 +186,10 @@ async function openDesktopSort(page: Page): Promise<Locator> {
 
 /** Pick a sort option from the already-open desktop dropdown. */
 async function pickDesktopSortOption(page: Page, label: string) {
-  const option = page.locator('[role="option"]').filter({ hasText: label });
+  const option = page
+    .locator('[role="listbox"]')
+    .getByRole("option", { name: label, exact: true })
+    .first();
   await expect(option).toBeVisible({ timeout: 5_000 });
   await option.click();
 }
@@ -244,7 +250,7 @@ test.describe("Group 1: Desktop Sort Interaction", () => {
     await expect(trigger).toBeVisible();
 
     // "Sort by:" label should accompany the dropdown
-    const sortLabel = page.locator(DESKTOP).locator("text=Sort by:");
+    const sortLabel = desktopResults(page).locator("text=Sort by:").first();
     await expect(sortLabel).toBeVisible();
   });
 
@@ -437,7 +443,7 @@ test.describe("Group 2: Price Sort Verification", () => {
     await page.goto(`/search?sort=price_asc&maxPrice=1500&${boundsQS}`);
     await waitForResults(page);
 
-    const count = await page.locator(DESKTOP).locator(CARDS).count();
+    const count = await desktopResults(page).locator(CARDS).count();
 
     if (count >= 2) {
       const prices = await extractPrices(page);
@@ -494,25 +500,22 @@ test.describe("Group 3: Sort + Pagination", () => {
     await waitForCards(page);
 
     // "Show more" lives inside the desktop container
-    const loadMore = page
-      .locator(DESKTOP)
-      .locator('button:has-text("Show more places")');
+    const loadMore = desktopResults(page).locator(
+      'button:has-text("Show more places")'
+    );
     const hasLoadMore = await loadMore.isVisible().catch(() => false);
 
     if (hasLoadMore) {
       await loadMore.click();
       // Wait for new cards to load after load-more click
       await expect(loadMore).not.toHaveAttribute("aria-busy", "true", { timeout: 10_000 }).catch(() => {});
-      const countBeforeSort = await page
-        .locator(DESKTOP)
-        .locator(CARDS)
-        .count();
+      const countBeforeSort = await desktopResults(page).locator(CARDS).count();
 
       // Change sort -- component remounts, load-more state resets
       await selectDesktopSort(page, "Price: Low to High", "price_asc");
       await waitForCards(page);
 
-      const countAfterSort = await page.locator(DESKTOP).locator(CARDS).count();
+      const countAfterSort = await desktopResults(page).locator(CARDS).count();
       expect(countAfterSort).toBeLessThanOrEqual(countBeforeSort);
       expect(countAfterSort).toBeGreaterThanOrEqual(1);
     } else {
@@ -552,9 +555,9 @@ test.describe("Group 3: Sort + Pagination", () => {
     await page.goto(`/search?sort=price_asc&${boundsQS}`);
     await waitForCards(page);
 
-    const loadMore = page
-      .locator(DESKTOP)
-      .locator('button:has-text("Show more places")');
+    const loadMore = desktopResults(page).locator(
+      'button:has-text("Show more places")'
+    );
     const hasLoadMore = await loadMore.isVisible().catch(() => false);
 
     if (hasLoadMore) {
@@ -591,9 +594,9 @@ test.describe("Group 3: Sort + Pagination", () => {
     await page.goto(`/search?sort=price_desc&${boundsQS}`);
     await waitForCards(page);
 
-    const loadMore = page
-      .locator(DESKTOP)
-      .locator('button:has-text("Show more places")');
+    const loadMore = desktopResults(page).locator(
+      'button:has-text("Show more places")'
+    );
     const hasLoadMore = await loadMore.isVisible().catch(() => false);
 
     if (hasLoadMore) {
@@ -678,9 +681,9 @@ test.describe("Group 4: Mobile Sort", () => {
     await expect(sortBtn).toBeVisible();
 
     // Desktop combobox should NOT be visible (parent has hidden md:flex)
-    const desktopTrigger = page
-      .locator(DESKTOP)
-      .locator('button[role="combobox"]');
+    const desktopTrigger = desktopResults(page).locator(
+      'button[role="combobox"]'
+    );
     await expect(desktopTrigger).not.toBeVisible();
   });
 
@@ -940,7 +943,7 @@ test.describe("Group 6: Sort Edge Cases", () => {
     // the full query before returning empty.  Wait for either cards, the
     // zero-results heading, OR the container itself to confirm the page
     // rendered without crashing.
-    const container = page.locator(DESKTOP);
+    const container = desktopResults(page);
     await expect(container).toBeAttached({ timeout: 30_000 });
 
     const { cards, zeroResults } = await waitForResults(page);
@@ -956,7 +959,7 @@ test.describe("Group 6: Sort Edge Cases", () => {
     );
     await waitForResults(page);
 
-    const count = await page.locator(DESKTOP).locator(CARDS).count();
+    const count = await desktopResults(page).locator(CARDS).count();
     expect(count).toBeGreaterThanOrEqual(0);
   });
 
@@ -1111,13 +1114,12 @@ test.describe("Group 7: Sort Accessibility", () => {
     const triggerText = await trigger.textContent();
     expect(triggerText).toContain("Newest First");
 
-    // Mobile button (rendered inside desktop container at desktop viewport,
-    // hidden via md:hidden CSS but still in DOM) has descriptive aria-label.
-    // At desktop viewport, children render only in the desktop container,
-    // so scope to DESKTOP (not MOBILE which has no children at this viewport).
-    const mobileBtn = page
-      .locator(DESKTOP)
-      .locator('button[aria-label^="Sort:"]');
+    // The desktop SortSelect still renders a mobile button variant in the DOM,
+    // hidden via CSS. Verify its accessible label without depending on broader
+    // page-level duplicate containers.
+    const mobileBtn = desktopResults(page)
+      .locator('button[aria-label^="Sort:"]')
+      .first();
     const ariaLabel = await mobileBtn.getAttribute("aria-label");
     expect(ariaLabel).toBe("Sort: Newest First");
   });
