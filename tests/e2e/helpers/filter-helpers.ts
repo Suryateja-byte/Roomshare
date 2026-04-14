@@ -263,20 +263,10 @@ export function filtersButton(page: Page): Locator {
   const viewport = page.viewportSize();
 
   if (viewport && viewport.width >= 768) {
-    return page
-      .locator(
-        'button[data-testid="quick-filter-more-filters"], button[data-hydrated][aria-label^="Filters"]:not([data-testid="mobile-filter-button"]), button[aria-label^="Filters"]:not([data-testid="mobile-filter-button"]), button:not([data-testid="mobile-filter-button"]):has-text("Filters")'
-      )
-      .filter({ visible: true })
-      .first();
+    return page.getByTestId("quick-filter-more-filters");
   }
 
-  return page
-    .locator(
-      'button[data-testid="mobile-filter-button"], button[data-hydrated][aria-label^="Filters"], button[aria-label^="Filters"]'
-    )
-    .filter({ visible: true })
-    .first();
+  return page.getByTestId("mobile-filter-button");
 }
 
 /**

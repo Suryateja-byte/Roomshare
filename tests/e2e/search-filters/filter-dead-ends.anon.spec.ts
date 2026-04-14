@@ -47,6 +47,9 @@ test.describe("Filter Dead-Ends & Edge Cases", () => {
     const clearAllButton = container.getByRole("button", {
       name: /clear all/i,
     });
+    const clearAllLink = container.getByRole("link", {
+      name: /clear all/i,
+    });
     const browseAllLink = container.getByRole("link", {
       name: /browse all/i,
     });
@@ -55,11 +58,16 @@ test.describe("Filter Dead-Ends & Edge Cases", () => {
       .filter({ hasText: /remove/i });
 
     // At least one recovery option should be visible
-    const hasClearAll = await clearAllButton.isVisible().catch(() => false);
+    const hasClearAllButton = await clearAllButton
+      .isVisible()
+      .catch(() => false);
+    const hasClearAllLink = await clearAllLink.isVisible().catch(() => false);
     const hasBrowseAll = await browseAllLink.isVisible().catch(() => false);
     const hasSuggestions = (await suggestionButtons.count().catch(() => 0)) > 0;
 
-    expect(hasClearAll || hasBrowseAll || hasSuggestions).toBe(true);
+    expect(
+      hasClearAllButton || hasClearAllLink || hasBrowseAll || hasSuggestions
+    ).toBe(true);
 
     // If suggestions exist, verify clicking one navigates correctly
     if (hasSuggestions) {

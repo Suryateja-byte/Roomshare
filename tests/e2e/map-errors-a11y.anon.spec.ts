@@ -62,8 +62,8 @@ test.describe("Map Error States and Accessibility", () => {
     await page.waitForLoadState("domcontentloaded");
 
     // Wait for map panel to render
-    const hideMapButton = page.getByRole("button", { name: /hide map/i });
-    await expect(hideMapButton).toBeVisible({ timeout: timeouts.navigation });
+    const mapToggle = page.getByTestId("desktop-toolbar-map-toggle");
+    await expect(mapToggle).toBeVisible({ timeout: timeouts.navigation });
 
     // Wait for loading to complete
     const loadingText = page.getByText("Loading map...");
@@ -208,8 +208,8 @@ test.describe("Map Error States and Accessibility", () => {
       // so we check for either the error message or the info message
       await page.waitForLoadState("domcontentloaded");
 
-      const hideMapButton = page.getByRole("button", { name: /hide map/i });
-      await expect(hideMapButton).toBeVisible({ timeout: timeouts.navigation });
+      const mapToggle = page.getByTestId("desktop-toolbar-map-toggle");
+      await expect(mapToggle).toBeVisible({ timeout: timeouts.navigation });
 
       // Wait for map to be ready before checking for messages
       await waitForMapReady(page);
@@ -257,14 +257,12 @@ test.describe("Map Error States and Accessibility", () => {
       });
 
       // Try to interact with map controls
-      const hideMapBtn = page.getByRole("button", { name: /hide map/i });
-      await hideMapBtn.click();
-
-      const showMapBtn = page.getByRole("button", { name: /show map/i });
-      if (await showMapBtn.isVisible({ timeout: 2000 }).catch(() => false)) {
-        await showMapBtn.click();
-        await expect(hideMapBtn).toBeVisible({ timeout: 2000 });
-      }
+      const mapToggle = page.getByTestId("desktop-toolbar-map-toggle");
+      await expect(mapToggle).toContainText(/hide map/i, { timeout: 5_000 });
+      await mapToggle.click();
+      await expect(mapToggle).toContainText(/show map/i, { timeout: 5_000 });
+      await mapToggle.click();
+      await expect(mapToggle).toContainText(/hide map/i, { timeout: 5_000 });
 
       // Filter out expected/benign errors
       const criticalErrors = consoleErrors.filter(

@@ -417,17 +417,26 @@ test.describe("Map controls (requires WebGL)", () => {
       .locator('[data-testid="poi-category"]')
       .filter({ hasText: /Transit/i })
       .first();
-    if (
-      (await transitBtn.count()) > 0 &&
-      (await transitBtn.isVisible().catch(() => false))
-    ) {
-      const prevState = await transitBtn.getAttribute("aria-checked");
-      await transitBtn.focus();
-      await page.keyboard.press("Enter");
-      const expectedState = prevState === "true" ? "false" : "true";
-      await expect(transitBtn).toHaveAttribute("aria-checked", expectedState, {
-        timeout: 10_000,
+    const transitVisible = await transitBtn
+      .waitFor({ state: "visible", timeout: 5_000 })
+      .then(() => true)
+      .catch(() => false);
+
+    if (!transitVisible) {
+      test.info().annotations.push({
+        type: "info",
+        description:
+          "Transit POI toggle did not render after reopening map tools in headless mode",
       });
+      return;
     }
+
+    const prevState = await transitBtn.getAttribute("aria-checked");
+    await transitBtn.focus();
+    await page.keyboard.press("Enter");
+    const expectedState = prevState === "true" ? "false" : "true";
+    await expect(transitBtn).toHaveAttribute("aria-checked", expectedState, {
+      timeout: 10_000,
+    });
   });
 });
