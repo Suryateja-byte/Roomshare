@@ -42,9 +42,8 @@ export const mobileSelectors = {
   sortSheetHeading: 'h3:has-text("Sort by")',
   /** Mobile filter button in collapsed search bar */
   mobileFilterButton: '[data-testid="mobile-filter-button"]',
-  /** Filters button inside the mobile results panel */
-  filtersButton:
-    '[data-testid="mobile-search-results-container"] button[data-testid="mobile-filter-button"]',
+  /** Visible filters button on mobile, regardless of whether it renders in the header or sheet */
+  filtersButton: '[data-testid="mobile-filter-button"]',
   /** Filter modal dialog */
   filterModal: '[role="dialog"]',
   /** Desktop sidebar results container */

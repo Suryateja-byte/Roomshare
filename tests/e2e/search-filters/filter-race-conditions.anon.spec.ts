@@ -18,6 +18,7 @@ import {
   applyButton,
   filterDialog,
   buildSearchUrl,
+  waitForFilterCommit,
   waitForUrlStable,
   rapidClick,
   captureNavigationCount,
@@ -222,25 +223,23 @@ test.describe("Filter Race Conditions", () => {
       await expect(wifiToggle).toHaveAttribute("aria-pressed", "true");
     }).toPass({ timeout: 10_000 });
 
-    // Double-click Apply button rapidly — the second click may fail because
-    // the modal closes after the first click (this IS the correct behavior)
-    try {
-      await rapidClick(applyButton(page), 2, 50);
-    } catch {
-      // Expected: second click may throw if modal closed after first click
-    }
+    // Dispatch the rapid double-click on the same DOM node before React unmounts
+    // the modal. This is closer to the real race being tested than re-resolving
+    // the locator after the first click starts the close transition.
+    const apply = applyButton(page);
+    await expect(apply).toBeVisible({ timeout: 10_000 });
+    await apply.evaluate((el) => {
+      const button = el as HTMLButtonElement;
+      button.click();
+      button.click();
+    });
 
     // Wait for modal to close — if the double-click dismissed without applying,
     // the modal may already be closed. Either way wait for it.
     await expect(filterDialog(page)).not.toBeVisible({ timeout: 30_000 });
 
-    // Wait for URL to update via soft navigation
-    await expect
-      .poll(() => page.url().includes("amenities=Wifi"), {
-        timeout: 30_000,
-        message: "URL to contain amenities=Wifi",
-      })
-      .toBe(true);
+    // Wait for the committed filter state to land in the URL and the filter UI.
+    await waitForFilterCommit(page, "amenities", "Wifi", 30_000);
 
     // Verify URL contains amenities=Wifi
     expect(page.url()).toContain("amenities=Wifi");
