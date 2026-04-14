@@ -11,6 +11,7 @@ export interface HashableSearchQuery {
   roomType?: string;
   leaseDuration?: string;
   moveInDate?: string;
+  endDate?: string;
   genderPreference?: string;
   householdGender?: string;
   bookingMode?: string;
@@ -40,6 +41,7 @@ function normalizeHashableSearchQuery(query: HashableSearchQuery) {
     roomType: (query.roomType ?? "").toLowerCase(),
     leaseDuration: (query.leaseDuration ?? "").toLowerCase(),
     moveInDate: query.moveInDate ?? "",
+    endDate: query.endDate ?? "",
     genderPreference: (query.genderPreference ?? "").toLowerCase(),
     householdGender: (query.householdGender ?? "").toLowerCase(),
     bookingMode: (query.bookingMode ?? "").toLowerCase(),

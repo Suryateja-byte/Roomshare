@@ -29,6 +29,10 @@ import { normalizeStringList } from "@/lib/utils";
 import { z } from "zod";
 import { features } from "@/lib/env";
 import { syncListingEmbedding } from "@/lib/embeddings/sync";
+import {
+  getFuturePeakReservedLoad,
+  syncFutureInventoryTotalSlots,
+} from "@/lib/availability";
 
 const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL;
 const supabaseServiceKey = process.env.SUPABASE_SERVICE_ROLE_KEY;
@@ -618,15 +622,8 @@ export async function PATCH(
           totalSlots !== null &&
           totalSlots < lockedListing.totalSlots
         ) {
-          const [committedSlots] = await tx.$queryRaw<[{ total: bigint }]>`
-                        SELECT COALESCE(SUM("slotsRequested"), 0) AS total
-                        FROM "Booking"
-                        WHERE "listingId" = ${id}
-                        AND (status = 'ACCEPTED' OR (status = 'HELD' AND "heldUntil" > NOW()))
-                        AND "endDate" >= NOW()
-                    `;
-          const committed = Number(committedSlots.total);
-          if (totalSlots < committed) {
+          const peakReservedLoad = await getFuturePeakReservedLoad(tx, id);
+          if (totalSlots < peakReservedLoad) {
             throw new Error("SLOTS_REDUCTION_BLOCKED");
           }
         }
@@ -666,6 +663,14 @@ export async function PATCH(
               bookingMode !== null && { bookingMode }),
           },
         });
+
+        if (
+          totalSlots !== undefined &&
+          totalSlots !== null &&
+          totalSlots !== lockedListing.totalSlots
+        ) {
+          await syncFutureInventoryTotalSlots(tx, id, totalSlots);
+        }
 
         // Update location if it exists and address changed
         if (addressChanged && listing.location && coords) {

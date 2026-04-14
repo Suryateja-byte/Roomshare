@@ -462,7 +462,9 @@ export default function ListingPageClient({
                   totalSlots={listing.totalSlots}
                 />
                 {listing.bookingMode === "WHOLE_UNIT" && (
-                  <Badge variant="purple">Whole Unit</Badge>
+                  <Badge variant="purple" data-testid="whole-unit-badge">
+                    Whole Unit
+                  </Badge>
                 )}
                 <div className="h-4 w-[1px] bg-outline-variant/20" />
                 <InfoStat icon={Bed}>Furnished</InfoStat>

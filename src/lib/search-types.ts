@@ -60,6 +60,7 @@ export interface FilterParams {
   maxPrice?: number;
   amenities?: string[];
   moveInDate?: string;
+  endDate?: string;
   leaseDuration?: string;
   houseRules?: string[];
   roomType?: string;

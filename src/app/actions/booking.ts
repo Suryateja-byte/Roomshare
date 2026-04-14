@@ -19,6 +19,13 @@ import {
 import { headers } from "next/headers";
 import { HOLD_TTL_MINUTES, MAX_HOLDS_PER_USER } from "@/lib/hold-constants";
 import { logBookingAudit } from "@/lib/booking-audit";
+import {
+  applyInventoryDeltas,
+  expireOverlappingExpiredHolds,
+  getAvailability,
+} from "@/lib/availability";
+import { markListingsDirty } from "@/lib/search/search-doc-dirty";
+import { waitForTestBarrier } from "@/lib/test-barriers";
 
 // Booking result type for structured error handling
 export type BookingResult = {
@@ -70,26 +77,6 @@ async function executeBookingTransaction(
   clientPricePerMonth: number,
   slotsRequested: number
 ): Promise<InternalBookingResult> {
-  // Check for existing duplicate booking (same tenant, listing, dates)
-  // This serves as server-side idempotency - if same booking already exists, treat as duplicate
-  // Phase 4: Include HELD in duplicate check to prevent booking when hold exists
-  const existingDuplicate = await tx.booking.findFirst({
-    where: {
-      tenantId: userId,
-      listingId,
-      startDate,
-      endDate,
-      status: { in: ["PENDING", "ACCEPTED", "HELD"] },
-    },
-  });
-
-  if (existingDuplicate) {
-    return {
-      success: false,
-      error: "You already have a booking request for these exact dates.",
-    };
-  }
-
   // Get the listing with FOR UPDATE lock to prevent concurrent booking race conditions
   // This locks the row until the transaction completes, ensuring atomic check-and-create
   const [listing] = await tx.$queryRaw<
@@ -170,22 +157,52 @@ async function executeBookingTransaction(
   const effectiveSlotsRequested =
     listing.bookingMode === "WHOLE_UNIT" ? listing.totalSlots : slotsRequested;
 
-  // Phase 2: Sum slotsRequested for accurate capacity check
-  // Count ACCEPTED bookings AND active HELD bookings (not yet expired)
-  const overlappingAcceptedSlots = await tx.$queryRaw<[{ total: bigint }]>`
-        SELECT COALESCE(SUM("slotsRequested"), 0) AS total
-        FROM "Booking"
-        WHERE "listingId" = ${listingId}
-        AND ("status" = 'ACCEPTED' OR ("status" = 'HELD' AND "heldUntil" > NOW()))
-        AND "startDate" <= ${endDate}
-        AND "endDate" >= ${startDate}
-    `;
-  const usedSlots = Number(overlappingAcceptedSlots[0].total);
+  await expireOverlappingExpiredHolds(tx, {
+    listingId,
+    startDate,
+    endDate,
+  });
+  await waitForTestBarrier("booking:create:before-availability-check");
 
-  if (usedSlots + effectiveSlotsRequested > listing.totalSlots) {
+  const now = new Date();
+
+  const existingDuplicate = await tx.booking.findFirst({
+    where: {
+      tenantId: userId,
+      listingId,
+      startDate,
+      endDate,
+      OR: [
+        { status: { in: ["PENDING", "ACCEPTED"] } },
+        {
+          status: "HELD",
+          heldUntil: { gt: now },
+        },
+      ],
+    },
+  });
+
+  if (existingDuplicate) {
     return {
       success: false,
-      error: `Not enough available slots. ${listing.totalSlots - usedSlots} of ${listing.totalSlots} slots available.`,
+      error: "You already have a booking request for these exact dates.",
+    };
+  }
+
+  const availability = await getAvailability(listingId, {
+    startDate,
+    endDate,
+    now,
+    tx,
+  });
+
+  if (
+    !availability ||
+    availability.effectiveAvailableSlots < effectiveSlotsRequested
+  ) {
+    return {
+      success: false,
+      error: `Not enough available slots. ${availability?.effectiveAvailableSlots ?? 0} of ${listing.totalSlots} slots available.`,
       fieldErrors: {
         startDate: "Insufficient capacity",
         endDate: "Insufficient capacity",
@@ -199,8 +216,14 @@ async function executeBookingTransaction(
     where: {
       listingId,
       tenantId: userId,
-      status: { in: ["PENDING", "ACCEPTED", "HELD"] },
-      AND: [{ startDate: { lte: endDate } }, { endDate: { gte: startDate } }],
+      OR: [
+        { status: { in: ["PENDING", "ACCEPTED"] } },
+        {
+          status: "HELD",
+          heldUntil: { gt: now },
+        },
+      ],
+      AND: [{ startDate: { lt: endDate } }, { endDate: { gt: startDate } }],
     },
   });
 
@@ -760,24 +783,28 @@ async function executeHoldTransaction(
   const effectiveSlotsRequested =
     listing.bookingMode === "WHOLE_UNIT" ? listing.totalSlots : slotsRequested;
 
-  // Capacity check: include BOTH ACCEPTED and active HELD (D2)
-  const overlappingSlots = await tx.$queryRaw<[{ total: bigint }]>`
-        SELECT COALESCE(SUM("slotsRequested"), 0) AS total
-        FROM "Booking"
-        WHERE "listingId" = ${listingId}
-        AND (
-            "status" = 'ACCEPTED'
-            OR ("status" = 'HELD' AND "heldUntil" > NOW())
-        )
-        AND "startDate" <= ${endDate}
-        AND "endDate" >= ${startDate}
-    `;
-  const usedSlots = Number(overlappingSlots[0].total);
+  await expireOverlappingExpiredHolds(tx, {
+    listingId,
+    startDate,
+    endDate,
+  });
+  await waitForTestBarrier("booking:hold:before-availability-check");
 
-  if (usedSlots + effectiveSlotsRequested > listing.totalSlots) {
+  const now = new Date();
+  const availability = await getAvailability(listingId, {
+    startDate,
+    endDate,
+    now,
+    tx,
+  });
+
+  if (
+    !availability ||
+    availability.effectiveAvailableSlots < effectiveSlotsRequested
+  ) {
     return {
       success: false,
-      error: `Not enough available slots. ${listing.totalSlots - usedSlots} of ${listing.totalSlots} slots available.`,
+      error: `Not enough available slots. ${availability?.effectiveAvailableSlots ?? 0} of ${listing.totalSlots} slots available.`,
       fieldErrors: {
         startDate: "Insufficient capacity",
         endDate: "Insufficient capacity",
@@ -785,25 +812,19 @@ async function executeHoldTransaction(
     };
   }
 
-  // Simple guard: check availableSlots (defense-in-depth)
-  if (listing.availableSlots < effectiveSlotsRequested) {
-    return { success: false, error: "No available slots for this listing." };
-  }
-
   // Duplicate booking/hold check: same user, same listing, overlapping dates, any active status
   const existingBooking = await tx.booking.findFirst({
     where: {
       tenantId: userId,
       listingId,
-      status: { in: ["PENDING", "HELD", "ACCEPTED"] },
-      AND: [
-        { startDate: { lte: endDate } },
-        { endDate: { gte: startDate } },
-        // For HELD, also check it hasn't expired (PENDING/ACCEPTED don't have heldUntil)
+      OR: [
+        { status: { in: ["PENDING", "ACCEPTED"] } },
         {
-          OR: [{ status: { not: "HELD" } }, { heldUntil: { gt: new Date() } }],
+          status: "HELD",
+          heldUntil: { gt: now },
         },
       ],
+      AND: [{ startDate: { lt: endDate } }, { endDate: { gt: startDate } }],
     },
   });
   if (existingBooking) {
@@ -855,6 +876,14 @@ async function executeHoldTransaction(
       heldUntil,
       heldAt: new Date(),
     },
+  });
+
+  await applyInventoryDeltas(tx, {
+    listingId,
+    startDate,
+    endDate,
+    totalSlots: listing.totalSlots,
+    heldDelta: effectiveSlotsRequested,
   });
 
   await logBookingAudit(tx, {
@@ -923,6 +952,7 @@ async function runHoldSideEffects(
 
   revalidatePath(`/listings/${result.listingId}`);
   revalidatePath("/bookings");
+  await markListingsDirty([result.listingId], "listing_updated");
 }
 
 /**

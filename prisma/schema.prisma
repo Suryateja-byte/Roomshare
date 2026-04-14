@@ -130,6 +130,7 @@ model Listing {
   savedBy             SavedListing[]
   reviews             Review[]
   bookings            Booking[]
+  dayInventory        ListingDayInventory[]
   reports             Report[]
   recentlyViewed      RecentlyViewed[]
 
@@ -213,6 +214,21 @@ model Booking {
   @@index([tenantId])
   @@index([listingId, status, startDate, endDate])
   @@index([status, heldUntil]) // Cron sweep-expired-holds: WHERE status='HELD' AND heldUntil <= NOW()
+}
+
+model ListingDayInventory {
+  listingId      String   @map("listing_id")
+  day            DateTime @db.Date
+  totalSlots     Int      @map("total_slots")
+  heldSlots      Int      @default(0) @map("held_slots")
+  acceptedSlots  Int      @default(0) @map("accepted_slots")
+  version        BigInt   @default(0)
+  updatedAt      DateTime @default(now()) @map("updated_at")
+
+  listing Listing @relation(fields: [listingId], references: [id], onDelete: Cascade)
+
+  @@id([listingId, day])
+  @@map("listing_day_inventory")
 }
 
 enum ReportStatus {

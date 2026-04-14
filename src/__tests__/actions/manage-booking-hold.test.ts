@@ -90,6 +90,12 @@ jest.mock("@/lib/logger", () => ({
   },
 }));
 
+jest.mock("@/lib/availability", () => ({
+  getAvailability: jest.fn(),
+  expireOverlappingExpiredHolds: jest.fn().mockResolvedValue(0),
+  applyInventoryDeltas: jest.fn().mockResolvedValue(undefined),
+}));
+
 import { updateBookingStatus } from "@/app/actions/manage-booking";
 import { prisma } from "@/lib/prisma";
 import { auth } from "@/auth";
@@ -102,6 +108,10 @@ import {
 } from "@/lib/booking-state-machine";
 import { checkRateLimit } from "@/lib/rate-limit";
 import { logBookingAudit } from "@/lib/booking-audit";
+import {
+  expireOverlappingExpiredHolds,
+  getAvailability,
+} from "@/lib/availability";
 
 describe("manage-booking-hold — Phase 4 hold management paths", () => {
   const mockOwnerSession = {
@@ -166,6 +176,15 @@ describe("manage-booking-hold — Phase 4 hold management paths", () => {
 
   beforeEach(() => {
     jest.clearAllMocks();
+    (getAvailability as jest.Mock).mockResolvedValue({
+      listingId: "listing-123",
+      totalSlots: 3,
+      effectiveAvailableSlots: 3,
+      heldSlots: 0,
+      acceptedSlots: 0,
+      rangeVersion: 1,
+      asOf: new Date().toISOString(),
+    });
     (auth as jest.Mock).mockResolvedValue(mockOwnerSession);
     (createInternalNotification as jest.Mock).mockResolvedValue({
       success: true,
@@ -329,15 +348,14 @@ describe("manage-booking-hold — Phase 4 hold management paths", () => {
     (prisma.booking.findUnique as jest.Mock).mockResolvedValue(
       mockExpiredHeldBooking
     );
-
-    const mockTxUpdateMany = jest.fn().mockResolvedValue({ count: 1 });
-    const mockTxExecuteRaw = jest.fn().mockResolvedValue(1);
+    (expireOverlappingExpiredHolds as jest.Mock).mockResolvedValueOnce(1);
+    const mockTxQueryRaw = jest.fn().mockResolvedValue([{ id: "listing-123" }]);
 
     (prisma.$transaction as jest.Mock).mockImplementation(async (callback) => {
       const tx = {
-        $queryRaw: jest.fn().mockResolvedValue([{ id: "listing-123" }]),
-        $executeRaw: mockTxExecuteRaw,
-        booking: { updateMany: mockTxUpdateMany },
+        $queryRaw: mockTxQueryRaw,
+        $executeRaw: jest.fn(),
+        booking: { updateMany: jest.fn() },
       };
       return callback(tx);
     });
@@ -351,23 +369,20 @@ describe("manage-booking-hold — Phase 4 hold management paths", () => {
 
     // Inline expiry should have attempted to expire the booking
     expect(prisma.$transaction).toHaveBeenCalled();
-
-    // The inline expiry tx updates status to EXPIRED
-    expect(mockTxUpdateMany).toHaveBeenCalledWith({
-      where: {
-        id: "booking-held-expired",
-        status: "HELD",
-        version: 1,
-      },
-      data: {
-        status: "EXPIRED",
-        heldUntil: null,
-        version: { increment: 1 },
-      },
-    });
-
-    // Slots restored as part of inline expiry
-    expect(mockTxExecuteRaw).toHaveBeenCalled();
+    expect(mockTxQueryRaw).toHaveBeenCalledWith(
+      expect.anything(),
+      "listing-123"
+    );
+    expect(expireOverlappingExpiredHolds).toHaveBeenCalledWith(
+      expect.objectContaining({
+        $queryRaw: mockTxQueryRaw,
+      }),
+      {
+        listingId: "listing-123",
+        startDate: mockExpiredHeldBooking.startDate,
+        endDate: mockExpiredHeldBooking.endDate,
+      }
+    );
   });
 
   // -----------------------------------------------------------------------
@@ -561,9 +576,18 @@ describe("manage-booking-hold — Phase 4 hold management paths", () => {
     };
 
     (prisma.booking.findUnique as jest.Mock).mockResolvedValue(pendingBooking);
+    (getAvailability as jest.Mock).mockResolvedValueOnce({
+      listingId: "listing-123",
+      totalSlots: 3,
+      effectiveAvailableSlots: 0,
+      heldSlots: 1,
+      acceptedSlots: 2,
+      rangeVersion: 2,
+      asOf: new Date().toISOString(),
+    });
 
-    // The PENDING->ACCEPTED path queries overlapping slots including HELD bookings
-    // totalSlots=3, already used=3 (including HELD) => capacity exceeded
+    // The PENDING->ACCEPTED path now rechecks range-aware availability,
+    // which includes active HELD reservations.
     (prisma.$transaction as jest.Mock).mockImplementation(async (callback) => {
       const tx = {
         $queryRaw: jest
@@ -578,9 +602,7 @@ describe("manage-booking-hold — Phase 4 hold management paths", () => {
               bookingMode: "SHARED",
               status: "ACTIVE",
             },
-          ])
-          // Second call: SUM of overlapping ACCEPTED + active HELD = 3
-          .mockResolvedValueOnce([{ total: BigInt(3) }]),
+          ]),
         $executeRaw: jest.fn().mockResolvedValue(1),
         booking: {
           updateMany: jest.fn().mockResolvedValue({ count: 1 }),
@@ -591,7 +613,7 @@ describe("manage-booking-hold — Phase 4 hold management paths", () => {
 
     const result = await updateBookingStatus("booking-pending-cap", "ACCEPTED");
 
-    // Capacity exceeded because HELD bookings are counted
+    // Capacity exceeded because active HELD inventory is included
     expect(result.error).toBe(
       "Cannot accept: all slots for these dates are already booked"
     );

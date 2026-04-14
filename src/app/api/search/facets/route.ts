@@ -42,6 +42,7 @@ import { withTimeout, DEFAULT_TIMEOUTS } from "@/lib/timeout-wrapper";
 import { parseLocalDate } from "@/lib/utils";
 import { features } from "@/lib/env";
 import { joinWhereClauseWithSecurityInvariant } from "@/lib/sql-safety";
+import { buildAvailabilitySqlFragments } from "@/lib/availability";
 
 // Cache TTL in seconds
 const CACHE_TTL = 30;
@@ -119,6 +120,7 @@ function buildFacetWhereConditions(
     maxPrice?: number;
     amenities?: string[];
     moveInDate?: string;
+    endDate?: string;
     leaseDuration?: string;
     houseRules?: string[];
     roomType?: string;
@@ -146,6 +148,7 @@ function buildFacetWhereConditions(
     maxPrice,
     amenities,
     moveInDate,
+    endDate,
     leaseDuration,
     houseRules,
     roomType,
@@ -154,23 +157,25 @@ function buildFacetWhereConditions(
     // Note: genderPreference and householdGender accessed via filterParams below
   } = filterParams;
 
-  // Base conditions
-  const slotThreshold = Math.max(filterParams.minAvailableSlots ?? 1, 1);
+  const {
+    slotConditionSql,
+    params,
+    nextParamIndex,
+  } = buildAvailabilitySqlFragments({
+    listingIdRef: "d.id",
+    totalSlotsRef: "d.total_slots",
+    minAvailableSlots: filterParams.minAvailableSlots,
+    startDate: moveInDate,
+    endDate,
+    startParamIndex: 1,
+  });
   const conditions: string[] = [
-    features.softHoldsEnabled || features.softHoldsDraining
-      ? `(d.available_slots - COALESCE((
-          SELECT SUM("slotsRequested") FROM "Booking" b
-          WHERE b."listingId" = d.id
-            AND b.status = 'HELD'
-            AND b."heldUntil" > NOW()
-        ), 0)) >= $1`
-      : `d.available_slots >= $1`,
+    slotConditionSql,
     "d.status = 'ACTIVE'",
     "d.lat IS NOT NULL",
     "d.lng IS NOT NULL",
   ];
-  const params: unknown[] = [slotThreshold];
-  let paramIndex = 2;
+  let paramIndex = nextParamIndex;
 
   // Geographic bounds filter
   if (bounds) {

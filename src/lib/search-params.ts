@@ -53,6 +53,7 @@ export function hasActiveFilters(params: FilterParams): boolean {
     params.maxPrice != null ||
     (params.amenities && params.amenities.length > 0) ||
     params.moveInDate ||
+    params.endDate ||
     params.leaseDuration ||
     (params.houseRules && params.houseRules.length > 0) ||
     params.roomType ||
@@ -75,6 +76,7 @@ export interface RawSearchParams {
   maxBudget?: string | string[];
   amenities?: string | string[];
   moveInDate?: string | string[];
+  endDate?: string | string[];
   leaseDuration?: string | string[];
   houseRules?: string | string[];
   languages?: string | string[];
@@ -129,6 +131,7 @@ export const FILTER_QUERY_KEYS = [
   "maxPrice",
   "amenities",
   "moveInDate",
+  "endDate",
   "leaseDuration",
   "houseRules",
   "languages",
@@ -208,6 +211,9 @@ export function buildCanonicalFilterParamsFromSearchParams(
 
     if (filterParams.moveInDate) {
       canonical.set("moveInDate", filterParams.moveInDate);
+    }
+    if (filterParams.endDate) {
+      canonical.set("endDate", filterParams.endDate);
     }
     if (filterParams.leaseDuration) {
       canonical.set("leaseDuration", filterParams.leaseDuration);
@@ -481,6 +487,7 @@ export function parseSearchParams(raw: RawSearchParams): ParsedSearchParams {
     : "recommended";
 
   const validMoveInDate = safeParseDate(getFirstValue(raw.moveInDate));
+  const validEndDate = safeParseDate(getFirstValue(raw.endDate));
   const validRoomType = safeParseEnum(
     getFirstValue(raw.roomType),
     VALID_ROOM_TYPES as readonly string[],
@@ -536,6 +543,10 @@ export function parseSearchParams(raw: RawSearchParams): ParsedSearchParams {
     maxPrice: effectiveMaxPrice,
     amenities: amenitiesList,
     moveInDate: validMoveInDate,
+    endDate:
+      validMoveInDate && validEndDate && validEndDate > validMoveInDate
+        ? validEndDate
+        : undefined,
     leaseDuration: validLeaseDuration,
     houseRules: houseRulesList,
     languages: languagesList.length > 0 ? languagesList : undefined,
@@ -633,6 +644,19 @@ export function validateSearchFilters(filters: unknown): FilterParams {
     }
   }
 
+  if (typeof input.moveInDate === "string") {
+    const parsed = safeParseDate(input.moveInDate);
+    if (parsed) {
+      validated.moveInDate = parsed;
+    }
+  }
+  if (typeof input.endDate === "string") {
+    const parsed = safeParseDate(input.endDate);
+    if (parsed) {
+      validated.endDate = parsed;
+    }
+  }
+
   // Price validation with MAX_SAFE_PRICE clamping
   if (typeof input.minPrice === "number" && Number.isFinite(input.minPrice)) {
     validated.minPrice = Math.max(0, Math.min(input.minPrice, MAX_SAFE_PRICE));
@@ -726,6 +750,9 @@ export function validateSearchFilters(filters: unknown): FilterParams {
   // Move-in date validation (reuse safeParseDate logic)
   if (typeof input.moveInDate === "string") {
     validated.moveInDate = safeParseDate(input.moveInDate);
+  }
+  if (typeof input.endDate === "string") {
+    validated.endDate = safeParseDate(input.endDate);
   }
 
   // Sort validation

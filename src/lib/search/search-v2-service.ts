@@ -60,6 +60,7 @@ import {
 } from "@/lib/constants";
 import { logger, sanitizeErrorMessage } from "@/lib/logger";
 import { withTimeout, DEFAULT_TIMEOUTS } from "@/lib/timeout-wrapper";
+import { getAvailabilityForListings } from "@/lib/availability";
 
 const VIBE_SOFT_FALLBACK_WARNING = "VIBE_SOFT_FALLBACK";
 
@@ -147,6 +148,11 @@ function getFirstValue(
     return value[0];
   }
   return value;
+}
+
+function parseDateParam(value?: string): Date | undefined {
+  if (!value) return undefined;
+  return new Date(`${value}T00:00:00.000Z`);
 }
 
 export interface SearchV2Params {
@@ -286,16 +292,39 @@ export async function executeSearchV2(
         const pageSize = filterParams.limit || DEFAULT_PAGE_SIZE;
         const offset = (page - 1) * pageSize;
         const semanticRows = await semanticSearchQuery(
-          filterParams,
+          {
+            ...filterParams,
+            minAvailableSlots: 0,
+          },
           pageSize + 1,
           offset
         );
 
         if (semanticRows && semanticRows.length > 0) {
           const hasNextPage = semanticRows.length > pageSize;
-          const items = mapSemanticRowsToListingData(
+          let items = mapSemanticRowsToListingData(
             semanticRows.slice(0, pageSize)
           );
+          const availabilityByListing = await getAvailabilityForListings(
+            items.map((item) => item.id),
+            {
+              startDate: parseDateParam(filterParams.moveInDate),
+              endDate: parseDateParam(filterParams.endDate),
+            }
+          );
+          const requiredSlots = Math.max(filterParams.minAvailableSlots ?? 1, 1);
+          items = items
+            .map((item) => {
+              const availability = availabilityByListing.get(item.id);
+              return availability
+                ? {
+                    ...item,
+                    availableSlots: availability.effectiveAvailableSlots,
+                    totalSlots: availability.totalSlots,
+                  }
+                : item;
+            })
+            .filter((item) => item.availableSlots >= requiredSlots);
           const semanticResult: PaginatedResultHybrid<ListingData> = {
             items,
             total: hasNextPage ? null : items.length,
@@ -483,6 +512,7 @@ export async function executeSearchV2(
       roomType: parsed.filterParams.roomType,
       leaseDuration: parsed.filterParams.leaseDuration,
       moveInDate: parsed.filterParams.moveInDate,
+      endDate: parsed.filterParams.endDate,
       bounds: parsed.filterParams.bounds,
       nearMatches: parsed.filterParams.nearMatches,
     });

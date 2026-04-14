@@ -10,6 +10,13 @@ import { logger } from "@/lib/logger";
 import { logBookingAudit } from "@/lib/booking-audit";
 import { checkRateLimit, RATE_LIMITS } from "@/lib/rate-limit";
 import {
+  applyInventoryDeltas,
+  expireOverlappingExpiredHolds,
+  getAvailability,
+} from "@/lib/availability";
+import { markListingsDirty } from "@/lib/search/search-doc-dirty";
+import { waitForTestBarrier } from "@/lib/test-barriers";
+import {
   validateTransition,
   isInvalidStateTransitionError,
   type BookingStatus,
@@ -61,6 +68,7 @@ export async function updateBookingStatus(
           select: {
             ownerId: true,
             availableSlots: true,
+            totalSlots: true,
             id: true,
             title: true,
             owner: {
@@ -107,37 +115,12 @@ export async function updateBookingStatus(
       // Best-effort inline expiry — sweeper is the primary mechanism
       try {
         await prisma.$transaction(async (tx) => {
-          // FOR UPDATE on Listing to coordinate with sweeper
           await tx.$queryRaw`SELECT 1 FROM "Listing" WHERE "id" = ${booking.listing.id} FOR UPDATE`;
-
-          const result = await tx.booking.updateMany({
-            where: { id: booking.id, status: "HELD", version: booking.version },
-            data: {
-              status: "EXPIRED",
-              heldUntil: null,
-              version: { increment: 1 },
-            },
+          await expireOverlappingExpiredHolds(tx, {
+            listingId: booking.listing.id,
+            startDate: booking.startDate,
+            endDate: booking.endDate,
           });
-          if (result.count > 0) {
-            await tx.$executeRaw`
-                            UPDATE "Listing"
-                            SET "availableSlots" = LEAST("availableSlots" + ${booking.slotsRequested}, "totalSlots")
-                            WHERE "id" = ${booking.listing.id}
-                        `;
-            await logBookingAudit(tx, {
-              bookingId: booking.id,
-              action: "EXPIRED",
-              previousStatus: "HELD",
-              newStatus: "EXPIRED",
-              actorId: null,
-              actorType: "SYSTEM",
-              details: {
-                mechanism: "inline_expiry",
-                slotsRequested: booking.slotsRequested,
-                heldUntil: booking.heldUntil,
-              },
-            });
-          }
         });
       } catch (err) {
         logger.sync.debug("Inline expiry failed (sweeper will handle)", {
@@ -162,6 +145,8 @@ export async function updateBookingStatus(
       }
       throw error;
     }
+
+    let capacityChanged = false;
 
     // Handle ACCEPTED status with atomic transaction to prevent double-booking
     if (status === "ACCEPTED") {
@@ -197,6 +182,12 @@ export async function updateBookingStatus(
               throw new Error("LISTING_NOT_ACTIVE");
             }
 
+            await expireOverlappingExpiredHolds(tx, {
+              listingId: booking.listing.id,
+              startDate: booking.startDate,
+              endDate: booking.endDate,
+            });
+
             // Verify booking is still HELD and not expired (atomic check)
             const updateResult = await tx.booking.updateMany({
               where: {
@@ -228,8 +219,16 @@ export async function updateBookingStatus(
               },
             });
 
-            // NO slot decrement — slots were consumed at hold creation (D4)
+            await applyInventoryDeltas(tx, {
+              listingId: booking.listing.id,
+              startDate: booking.startDate,
+              endDate: booking.endDate,
+              totalSlots: booking.listing.totalSlots,
+              heldDelta: -booking.slotsRequested,
+              acceptedDelta: booking.slotsRequested,
+            });
           });
+          capacityChanged = true;
         } catch (error) {
           if (error instanceof Error) {
             if (error.message === "UNAUTHORIZED_IN_TRANSACTION") {
@@ -298,26 +297,26 @@ export async function updateBookingStatus(
               listing.bookingMode === "WHOLE_UNIT"
                 ? listing.totalSlots
                 : booking.slotsRequested;
-            if (listing.availableSlots < slotsNeeded) {
-              throw new Error("NO_SLOTS_AVAILABLE");
-            }
 
-            // Phase 4 (6a-ii): Capacity check includes ACCEPTED + active HELD bookings
-            const overlappingSlots = await tx.$queryRaw<[{ total: bigint }]>`
-                            SELECT COALESCE(SUM("slotsRequested"), 0) AS total
-                            FROM "Booking"
-                            WHERE "listingId" = ${booking.listingId}
-                            AND "id" != ${bookingId}
-                            AND (
-                                "status" = 'ACCEPTED'
-                                OR ("status" = 'HELD' AND "heldUntil" > NOW())
-                            )
-                            AND "startDate" <= ${booking.endDate}
-                            AND "endDate" >= ${booking.startDate}
-                        `;
-            const usedSlots = Number(overlappingSlots[0].total);
+            await expireOverlappingExpiredHolds(tx, {
+              listingId: booking.listing.id,
+              startDate: booking.startDate,
+              endDate: booking.endDate,
+            });
+            await waitForTestBarrier(
+              "booking:accept:before-availability-check"
+            );
 
-            if (usedSlots + slotsNeeded > listing.totalSlots) {
+            const availability = await getAvailability(booking.listingId, {
+              startDate: booking.startDate,
+              endDate: booking.endDate,
+              tx,
+            });
+
+            if (
+              !availability ||
+              availability.effectiveAvailableSlots < slotsNeeded
+            ) {
               throw new Error("CAPACITY_EXCEEDED");
             }
 
@@ -350,6 +349,14 @@ export async function updateBookingStatus(
               throw new Error("SLOT_UNDERFLOW");
             }
 
+            await applyInventoryDeltas(tx, {
+              listingId: booking.listing.id,
+              startDate: booking.startDate,
+              endDate: booking.endDate,
+              totalSlots: listing.totalSlots,
+              acceptedDelta: slotsNeeded,
+            });
+
             await logBookingAudit(tx, {
               bookingId: bookingId,
               action: "ACCEPTED",
@@ -363,6 +370,7 @@ export async function updateBookingStatus(
               },
             });
           });
+          capacityChanged = true;
         } catch (error) {
           if (error instanceof Error) {
             if (error.message === "UNAUTHORIZED_IN_TRANSACTION") {
@@ -495,6 +503,14 @@ export async function updateBookingStatus(
                             SET "availableSlots" = LEAST("availableSlots" + ${slotsToRestore}, "totalSlots")
                             WHERE "id" = ${booking.listing.id}
                         `;
+
+            await applyInventoryDeltas(tx, {
+              listingId: booking.listing.id,
+              startDate: booking.startDate,
+              endDate: booking.endDate,
+              totalSlots: booking.listing.totalSlots,
+              heldDelta: -slotsToRestore,
+            });
           }
 
           await logBookingAudit(tx, {
@@ -507,6 +523,9 @@ export async function updateBookingStatus(
             details: { rejectionReason, version: booking.version },
           });
         });
+        if (booking.status === "HELD") {
+          capacityChanged = true;
+        }
       } catch (error) {
         if (error instanceof Error) {
           if (error.message === "UNAUTHORIZED_IN_TRANSACTION") {
@@ -605,6 +624,16 @@ export async function updateBookingStatus(
                             WHERE "id" = ${booking.listing.id}
                         `;
 
+            await applyInventoryDeltas(tx, {
+              listingId: booking.listing.id,
+              startDate: booking.startDate,
+              endDate: booking.endDate,
+              totalSlots: booking.listing.totalSlots,
+              ...(booking.status === "HELD"
+                ? { heldDelta: -slotsToRestore }
+                : { acceptedDelta: -slotsToRestore }),
+            });
+
             await logBookingAudit(tx, {
               bookingId: bookingId,
               action: "CANCELLED",
@@ -618,6 +647,7 @@ export async function updateBookingStatus(
               },
             });
           });
+          capacityChanged = true;
         } catch (error) {
           if (
             error instanceof Error &&
@@ -698,6 +728,9 @@ export async function updateBookingStatus(
 
     revalidatePath("/bookings");
     revalidatePath(`/listings/${booking.listing.id}`);
+    if (capacityChanged) {
+      await markListingsDirty([booking.listing.id], "listing_updated");
+    }
 
     return { success: true };
   } catch (error: unknown) {

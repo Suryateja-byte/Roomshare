@@ -16,7 +16,7 @@ export function SlotSelector({
   disabled = false,
 }: SlotSelectorProps) {
   return (
-    <div className="flex items-center gap-3">
+    <div className="flex items-center gap-3" data-testid="slot-selector">
       <label
         htmlFor="slot-selector"
         className="text-sm font-medium text-on-surface-variant"

@@ -25,6 +25,7 @@ import {
   SWEEPER_ADVISORY_LOCK_KEY,
 } from "@/lib/hold-constants";
 import { logBookingAudit } from "@/lib/booking-audit";
+import { applyInventoryDeltas } from "@/lib/availability";
 
 interface ExpiredHoldInfo {
   bookingId: string;
@@ -77,6 +78,9 @@ export async function GET(request: NextRequest) {
           slotsRequested: number;
           version: number;
           heldUntil: Date;
+          startDate: Date;
+          endDate: Date;
+          totalSlots: number;
           tenantEmail: string | null;
           tenantName: string | null;
           listingTitle: string;
@@ -87,6 +91,8 @@ export async function GET(request: NextRequest) {
       >`
         SELECT b.id, b."listingId", b."tenantId", b."slotsRequested", b.version,
                b."heldUntil",
+               b."startDate", b."endDate",
+               l."totalSlots" as "totalSlots",
                t.email as "tenantEmail", t.name as "tenantName",
                l.title as "listingTitle", l."ownerId" as "hostId",
                o.email as "hostEmail", o.name as "hostName"
@@ -124,6 +130,14 @@ export async function GET(request: NextRequest) {
           SET "availableSlots" = LEAST("availableSlots" + ${hold.slotsRequested}, "totalSlots")
           WHERE id = ${hold.listingId}
         `;
+
+        await applyInventoryDeltas(tx, {
+          listingId: hold.listingId,
+          startDate: hold.startDate,
+          endDate: hold.endDate,
+          totalSlots: hold.totalSlots,
+          heldDelta: -hold.slotsRequested,
+        });
 
         await logBookingAudit(tx, {
           bookingId: hold.id,

@@ -51,6 +51,7 @@ import pgvector from "pgvector";
 import { getCachedQueryEmbedding } from "@/lib/embeddings/query-cache";
 import { logger } from "@/lib/logger";
 import { joinWhereClauseWithSecurityInvariant } from "@/lib/sql-safety";
+import { buildAvailabilitySqlFragments } from "@/lib/availability";
 
 // Statement timeout for search queries (5 seconds)
 const SEARCH_QUERY_TIMEOUT_MS = 5000;
@@ -167,6 +168,7 @@ function buildBaseCacheFields(params: FilterParams) {
     roomType: params.roomType?.toLowerCase() || "",
     leaseDuration: params.leaseDuration?.toLowerCase() || "",
     moveInDate: params.moveInDate || "",
+    endDate: params.endDate || "",
     genderPreference: params.genderPreference || "",
     householdGender: params.householdGender || "",
     bookingMode: params.bookingMode || "",
@@ -426,6 +428,7 @@ export interface WhereBuilder {
   paramIndex: number;
   /** Index of the FTS query param (if FTS is active), used for ts_rank_cd */
   ftsQueryParamIndex: number | null;
+  effectiveAvailableSql: string;
 }
 
 export function buildSearchDocWhereConditions(
@@ -450,25 +453,30 @@ export function buildSearchDocWhereConditions(
     bookingMode,
     bounds,
     minAvailableSlots,
+    endDate,
   } = filterParams;
 
-  // Base conditions for SearchDoc
-  const slotThreshold = Math.max(minAvailableSlots ?? 1, 1);
+  const {
+    effectiveAvailableSql,
+    slotConditionSql,
+    params,
+    nextParamIndex,
+  } = buildAvailabilitySqlFragments({
+    listingIdRef: "d.id",
+    totalSlotsRef: "d.total_slots",
+    minAvailableSlots,
+    startDate: moveInDate,
+    endDate,
+    startParamIndex: 1,
+  });
+
   const conditions: string[] = [
-    features.softHoldsEnabled || features.softHoldsDraining
-      ? `(d.available_slots - COALESCE((
-          SELECT SUM("slotsRequested") FROM "Booking" b
-          WHERE b."listingId" = d.id
-            AND b.status = 'HELD'
-            AND b."heldUntil" > NOW()
-        ), 0)) >= $1`
-      : `d.available_slots >= $1`,
+    slotConditionSql,
     "d.status = 'ACTIVE'",
     "d.lat IS NOT NULL",
     "d.lng IS NOT NULL",
   ];
-  const params: unknown[] = [slotThreshold];
-  let paramIndex = 2;
+  let paramIndex = nextParamIndex;
   let ftsQueryParamIndex: number | null = null;
 
   // Geographic bounds filter using PostGIS geography
@@ -594,7 +602,13 @@ export function buildSearchDocWhereConditions(
     params.push(bookingMode);
   }
 
-  return { conditions, params, paramIndex, ftsQueryParamIndex };
+  return {
+    conditions,
+    params,
+    paramIndex,
+    ftsQueryParamIndex,
+    effectiveAvailableSql,
+  };
 }
 
 // ============================================
@@ -795,6 +809,7 @@ async function getSearchDocMapListingsInternal(
     params: queryParams,
     paramIndex,
     ftsQueryParamIndex,
+    effectiveAvailableSql,
   } = buildSearchDocWhereConditions(effectiveParams);
   const whereClause = joinWhereClauseWithSecurityInvariant(conditions);
   const sortOption = (effectiveParams.sort || "recommended") as SortOption;
@@ -810,7 +825,7 @@ async function getSearchDocMapListingsInternal(
       d.id,
       d.title,
       d.price,
-      d.available_slots as "availableSlots",
+      ${effectiveAvailableSql} as "availableSlots",
       d.images[1] as "primaryImage",
       d.room_type as "roomType",
       d.city,
@@ -986,6 +1001,7 @@ async function getSearchDocListingsPaginatedInternal(
       params: queryParams,
       paramIndex: startParamIndex,
       ftsQueryParamIndex,
+      effectiveAvailableSql,
     } = buildSearchDocWhereConditions(params);
     const whereClause = joinWhereClauseWithSecurityInvariant(conditions);
 
@@ -1030,7 +1046,7 @@ async function getSearchDocListingsPaginatedInternal(
         d.description,
         d.price,
         d.images,
-        d.available_slots as "availableSlots",
+        ${effectiveAvailableSql} as "availableSlots",
         d.total_slots as "totalSlots",
         d.amenities,
         d.house_rules as "houseRules",
@@ -1189,6 +1205,7 @@ export async function getSearchDocListingsWithKeyset(
       params: queryParams,
       paramIndex: startParamIndex,
       ftsQueryParamIndex,
+      effectiveAvailableSql,
     } = buildSearchDocWhereConditions(params);
 
     // Add keyset WHERE clause
@@ -1222,7 +1239,7 @@ export async function getSearchDocListingsWithKeyset(
         d.description,
         d.price,
         d.images,
-        d.available_slots as "availableSlots",
+        ${effectiveAvailableSql} as "availableSlots",
         d.total_slots as "totalSlots",
         d.amenities,
         d.house_rules as "houseRules",
@@ -1376,6 +1393,7 @@ export async function getSearchDocListingsFirstPage(
       params: queryParams,
       paramIndex: startParamIndex,
       ftsQueryParamIndex,
+      effectiveAvailableSql,
     } = buildSearchDocWhereConditions(params);
     const whereClause = joinWhereClauseWithSecurityInvariant(conditions);
 
@@ -1404,7 +1422,7 @@ export async function getSearchDocListingsFirstPage(
         d.description,
         d.price,
         d.images,
-        d.available_slots as "availableSlots",
+        ${effectiveAvailableSql} as "availableSlots",
         d.total_slots as "totalSlots",
         d.amenities,
         d.house_rules as "houseRules",

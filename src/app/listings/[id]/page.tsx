@@ -8,6 +8,7 @@ import { logger, sanitizeErrorMessage } from "@/lib/logger";
 import { sanitizeUnicode } from "@/lib/schemas";
 import { features } from "@/lib/env";
 import { generateViewToken } from "@/app/api/metrics/hmac";
+import { getAvailability } from "@/lib/availability";
 import ListingPageClient from "./ListingPageClient";
 
 const getListingWithLocation = cache(async (id: string) => {
@@ -141,7 +142,7 @@ export default async function ListingPage({ params }: PageProps) {
   // Start similar listings fetch early (runs in parallel with remaining queries)
   const similarListingsPromise = getSimilarListings(id);
 
-  const [coordinates, acceptedBookings, reviews] = await Promise.all([
+  const [coordinates, acceptedBookings, reviews, availability] = await Promise.all([
     (async () => {
       if (!listing.location) {
         return null;
@@ -180,10 +181,16 @@ export default async function ListingPage({ params }: PageProps) {
     prisma.booking.findMany({
       where: {
         listingId: id,
-        status: { in: ["ACCEPTED", "HELD"] },
-        endDate: {
-          gte: new Date(),
-        },
+        OR: [
+          { status: "ACCEPTED" },
+          {
+            status: "HELD",
+            heldUntil: {
+              gt: new Date(),
+            },
+          },
+        ],
+        endDate: { gte: new Date() },
       },
       select: {
         startDate: true,
@@ -194,6 +201,7 @@ export default async function ListingPage({ params }: PageProps) {
       },
     }),
     getReviews(listing.id),
+    getAvailability(listing.id),
   ]);
 
   const similarListingsRaw = await similarListingsPromise;
@@ -290,7 +298,8 @@ export default async function ListingPage({ params }: PageProps) {
           amenities: listing.amenities,
           householdLanguages: listing.householdLanguages,
           totalSlots: listing.totalSlots,
-          availableSlots: listing.availableSlots,
+          availableSlots:
+            availability?.effectiveAvailableSlots ?? listing.availableSlots,
           bookingMode: listing.bookingMode ?? "SHARED",
           status: listing.status,
           viewCount: listing.viewCount,

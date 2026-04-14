@@ -111,6 +111,12 @@ jest.mock("@/lib/env", () => ({
 
 jest.mock("@/lib/idempotency", () => ({ withIdempotency: jest.fn() }));
 
+jest.mock("@/lib/availability", () => ({
+  getAvailability: jest.fn(),
+  expireOverlappingExpiredHolds: jest.fn().mockResolvedValue(0),
+  applyInventoryDeltas: jest.fn().mockResolvedValue(undefined),
+}));
+
 // ─── imports (after all mocks) ─────────────────────────────────────────────
 
 import { createBooking, createHold } from "@/app/actions/booking";
@@ -119,6 +125,7 @@ import { prisma } from "@/lib/prisma";
 import { auth } from "@/auth";
 import { createInternalNotification } from "@/lib/notifications";
 import { sendNotificationEmailWithPreference } from "@/lib/email";
+import { getAvailability } from "@/lib/availability";
 
 // ─── shared fixtures ────────────────────────────────────────────────────────
 
@@ -178,14 +185,14 @@ function makeBookingTx(opts: {
   } = opts;
 
   let findFirstCallCount = 0;
+  mockAvailability((listing as typeof sharedListing).totalSlots, usedSlots);
 
   return {
     $queryRaw: jest
       .fn()
       // First call: SELECT ... FOR UPDATE (listing)
-      .mockResolvedValueOnce([listing])
-      // Second call: SUM of ACCEPTED slots
-      .mockResolvedValueOnce([{ total: usedSlots }]),
+      .mockResolvedValueOnce([listing]),
+    $executeRaw: jest.fn().mockResolvedValue(1),
     booking: {
       findFirst: jest.fn().mockImplementation(() => {
         findFirstCallCount++;
@@ -227,18 +234,33 @@ function makeAcceptTx(opts: {
     executeRawResult = 1,
   } = opts;
 
+  mockAvailability(
+    (listingRow as { totalSlots: number }).totalSlots,
+    usedSlots
+  );
+
   return {
     $queryRaw: jest
       .fn()
       // First call: FOR UPDATE (listing for ACCEPT)
-      .mockResolvedValueOnce([listingRow])
-      // Second call: SUM(ACCEPTED + HELD excluding current)
-      .mockResolvedValueOnce([{ total: usedSlots }]),
+      .mockResolvedValueOnce([listingRow]),
     $executeRaw: jest.fn().mockResolvedValue(executeRawResult),
     booking: {
       updateMany: jest.fn().mockResolvedValue({ count: updateManyCount }),
     },
   };
+}
+
+function mockAvailability(totalSlots: number, usedSlots: bigint | number) {
+  (getAvailability as jest.Mock).mockResolvedValue({
+    listingId: LISTING_ID,
+    totalSlots,
+    effectiveAvailableSlots: totalSlots - Number(usedSlots),
+    heldSlots: 0,
+    acceptedSlots: Number(usedSlots),
+    rangeVersion: 1,
+    asOf: new Date().toISOString(),
+  });
 }
 
 /** Build a booking findUnique result for updateBookingStatus tests. */
@@ -274,6 +296,7 @@ function makeBookingRecord(opts?: {
       ownerId: OWNER_ID,
       title: "Test Listing",
       availableSlots: 5,
+      totalSlots: 5,
       owner: { name: "Host" },
       ...listingOverrides,
     },
@@ -303,6 +326,7 @@ describe("Two bookings competing for last slots", () => {
 
   beforeEach(() => {
     jest.clearAllMocks();
+    mockAvailability(sharedListing.totalSlots, BigInt(0));
     (createInternalNotification as jest.Mock).mockResolvedValue({
       success: true,
     });
@@ -438,6 +462,7 @@ describe("Hold + booking competing for last slots", () => {
 
   beforeEach(() => {
     jest.clearAllMocks();
+    mockAvailability(sharedListing.totalSlots, BigInt(0));
     (createInternalNotification as jest.Mock).mockResolvedValue({
       success: true,
     });
@@ -624,6 +649,7 @@ describe("Hold + booking competing for last slots", () => {
 
   it("createHold fails when ACCEPTED + active HELD already fill capacity", async () => {
     (auth as jest.Mock).mockResolvedValue(tenantSession);
+    mockAvailability(sharedListing.totalSlots, BigInt(5));
 
     (prisma.$transaction as jest.Mock).mockImplementation(async (callback) => {
       const tx = {
@@ -710,6 +736,7 @@ describe("Accept race for WHOLE_UNIT listing", () => {
 
   beforeEach(() => {
     jest.clearAllMocks();
+    mockAvailability(4, BigInt(0));
     (createInternalNotification as jest.Mock).mockResolvedValue({
       success: true,
     });
@@ -742,7 +769,7 @@ describe("Accept race for WHOLE_UNIT listing", () => {
     expect(result.success).toBe(true);
   });
 
-  it("second ACCEPT fails with NO_SLOTS_AVAILABLE when availableSlots=0", async () => {
+  it("second ACCEPT fails with CAPACITY_EXCEEDED when no whole-unit capacity remains", async () => {
     (prisma.booking.findUnique as jest.Mock).mockResolvedValue(bookingB);
 
     (prisma.$transaction as jest.Mock).mockImplementation(async (callback) => {
@@ -763,9 +790,11 @@ describe("Accept race for WHOLE_UNIT listing", () => {
 
     const result = await updateBookingStatus("booking-wu-b", "ACCEPTED");
 
-    // WHOLE_UNIT: slotsNeeded=totalSlots=4; availableSlots=0 < 4 → NO_SLOTS_AVAILABLE
+    // WHOLE_UNIT: live range-aware availability is exhausted, regardless of the scalar cache.
     expect(result.success).toBeUndefined();
-    expect(result.error).toBe("No available slots for this listing");
+    expect(result.error).toBe(
+      "Cannot accept: all slots for these dates are already booked"
+    );
   });
 
   it("ACCEPT fails with CAPACITY_EXCEEDED when availableSlots>0 but SUM blocks it", async () => {
@@ -887,6 +916,7 @@ describe("Expired hold does not block subsequent booking", () => {
 
   beforeEach(() => {
     jest.clearAllMocks();
+    mockAvailability(sharedListing.totalSlots, BigInt(0));
     (createInternalNotification as jest.Mock).mockResolvedValue({
       success: true,
     });

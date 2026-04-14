@@ -14,6 +14,8 @@
  */
 
 import { NextRequest, NextResponse } from "next/server";
+
+import { getAvailability } from "@/lib/availability";
 import { prisma } from "@/lib/prisma";
 import { logger, sanitizeErrorMessage } from "@/lib/logger";
 import { computeRecommendedScore } from "@/lib/search/recommended-score";
@@ -120,6 +122,7 @@ async function fetchListingsWithData(
  * Upsert a single search doc
  */
 async function upsertSearchDoc(listing: ListingWithData): Promise<void> {
+  const availability = await getAvailability(listing.id);
   const recommendedScore = computeRecommendedScore(
     listing.avgRating,
     listing.viewCount,
@@ -152,7 +155,7 @@ async function upsertSearchDoc(listing: ListingWithData): Promise<void> {
     ) VALUES (
       ${listing.id}, ${listing.ownerId}, ${listing.title}, ${listing.description}, ${listing.price}, ${listing.images},
       ${listing.amenities}, ${listing.houseRules}, ${listing.householdLanguages}, ${listing.primaryHomeLanguage},
-      ${listing.leaseDuration}, ${listing.roomType}, ${listing.moveInDate}, ${listing.totalSlots}, ${listing.availableSlots},
+      ${listing.leaseDuration}, ${listing.roomType}, ${listing.moveInDate}, ${listing.totalSlots}, ${availability?.effectiveAvailableSlots ?? listing.availableSlots},
       ${listing.viewCount}, ${listing.status}, ${listing.createdAt},
       ${listing.address}, ${listing.city}, ${listing.state}, ${listing.zip},
       ST_SetSRID(ST_MakePoint(${listing.lng}, ${listing.lat}), 4326)::geography,

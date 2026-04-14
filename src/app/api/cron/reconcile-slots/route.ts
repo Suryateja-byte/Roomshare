@@ -1,132 +1,81 @@
 /**
- * Reconcile Slots Cron Route (Phase 5 - Audit Trail)
+ * Reconcile inventory projection and scalar slot cache.
  *
- * Weekly safety net detecting and fixing availableSlots drift.
- * Uses SUM(slotsRequested) to correctly count consumed slots.
- *
- * Schedule: 0 5 * * 0 (Sunday 5:00 AM UTC)
+ * The day-level projection is rebuilt from authoritative bookings and then the
+ * transitional Listing.availableSlots cache is refreshed from live availability.
  */
 
 import { NextRequest, NextResponse } from "next/server";
-import { prisma } from "@/lib/prisma";
-import { Prisma } from "@prisma/client";
+
 import { logger } from "@/lib/logger";
 import { validateCronAuth } from "@/lib/cron-auth";
-import { markListingsDirty } from "@/lib/search/search-doc-dirty";
-import * as Sentry from "@sentry/nextjs";
+import { prisma } from "@/lib/prisma";
 import { RECONCILER_ADVISORY_LOCK_KEY } from "@/lib/hold-constants";
-
-interface DriftRow {
-  id: string;
-  actual: number;
-  expected: number;
-}
-
-const AUTO_FIX_THRESHOLD = 5;
+import { markListingsDirty } from "@/lib/search/search-doc-dirty";
+import {
+  getAvailability,
+  rebuildListingDayInventory,
+} from "@/lib/availability";
 
 export async function GET(request: NextRequest) {
   try {
     const authError = validateCronAuth(request);
     if (authError) return authError;
 
-    // Slot reconciliation always runs — it is a safety net for availableSlots
-    // drift and must not be gated behind the audit feature flag.
-
     const startTime = Date.now();
 
-    const result = await prisma.$transaction(
-      async (tx: Prisma.TransactionClient) => {
-        // Acquire advisory lock (transaction-scoped, auto-releases on commit)
-        const [lockResult] = await tx.$queryRaw<[{ locked: boolean }]>`
+    const result = await prisma.$transaction(async (tx) => {
+      const [lockResult] = await tx.$queryRaw<[{ locked: boolean }]>`
         SELECT pg_try_advisory_xact_lock(hashtext(${RECONCILER_ADVISORY_LOCK_KEY})) as locked
       `;
 
-        if (!lockResult.locked) {
-          return { skipped: true, reason: "lock_held" } as const;
-        }
-
-        // Detect drift using SUM(slotsRequested), not COUNT
-        // DATA-006 FIX: Only count bookings whose date range overlaps NOW
-        // - ACCEPTED: startDate <= NOW AND endDate >= NOW (currently active)
-        // - HELD: heldUntil > NOW (hold still valid)
-        // Previously used endDate >= NOW which counted future non-overlapping bookings
-        const driftRows = await tx.$queryRaw<DriftRow[]>`
-        SELECT
-          l.id,
-          l."availableSlots" AS actual,
-          l."totalSlots" - COALESCE(SUM(b."slotsRequested") FILTER (
-            WHERE (b.status = 'ACCEPTED' AND b."startDate" <= NOW() AND b."endDate" >= NOW())
-            OR (b.status = 'HELD' AND b."heldUntil" > NOW())
-          ), 0) AS expected
-        FROM "Listing" l
-        LEFT JOIN "Booking" b ON b."listingId" = l.id
-        WHERE l.status = 'ACTIVE'
-        GROUP BY l.id
-        HAVING l."availableSlots" != l."totalSlots" - COALESCE(SUM(b."slotsRequested") FILTER (
-          WHERE (b.status = 'ACCEPTED' AND b."startDate" <= NOW() AND b."endDate" >= NOW())
-          OR (b.status = 'HELD' AND b."heldUntil" > NOW())
-        ), 0)
-      `;
-
-        const fixedIds: string[] = [];
-        let alertedOnly = 0;
-
-        for (const row of driftRows) {
-          const delta = Math.abs(Number(row.actual) - Number(row.expected));
-
-          logger.sync.info("[reconcile-slots] Drift detected", {
-            event: "slot_drift_detected",
-            listingId: row.id.slice(0, 8) + "...",
-            actual: Number(row.actual),
-            expected: Number(row.expected),
-            delta,
-          });
-
-          if (delta <= AUTO_FIX_THRESHOLD) {
-            // Fix 2: GREATEST guard prevents negative availableSlots
-            await tx.$executeRaw`
-            UPDATE "Listing"
-            SET "availableSlots" = GREATEST(0, ${Number(row.expected)})
-            WHERE id = ${row.id}
-          `;
-            fixedIds.push(row.id);
-          } else {
-            // Fix 7: Truncate listing ID in Sentry call
-            Sentry.captureMessage(
-              `[reconcile-slots] Large slot drift detected (delta=${delta})`,
-              {
-                level: "warning",
-                extra: {
-                  listingId: row.id.slice(0, 8) + "...",
-                  actual: row.actual,
-                  expected: row.expected,
-                  delta,
-                },
-              }
-            );
-            alertedOnly++;
-          }
-        }
-
-        return {
-          skipped: false,
-          drifted: driftRows.length,
-          fixedIds,
-          alertedOnly,
-        } as const;
+      if (!lockResult.locked) {
+        return { skipped: true, reason: "lock_held" } as const;
       }
-    );
+
+      const listings = await tx.listing.findMany({
+        where: { status: "ACTIVE" },
+        select: { id: true, availableSlots: true },
+      });
+
+      const fixedIds: string[] = [];
+      let drifted = 0;
+
+      for (const listing of listings) {
+        await rebuildListingDayInventory(tx, listing.id, new Date());
+
+        const availability = await getAvailability(listing.id, { tx });
+        if (!availability) {
+          continue;
+        }
+
+        if (availability.effectiveAvailableSlots !== listing.availableSlots) {
+          drifted += 1;
+          await tx.listing.update({
+            where: { id: listing.id },
+            data: { availableSlots: availability.effectiveAvailableSlots },
+          });
+          fixedIds.push(listing.id);
+        }
+      }
+
+      return {
+        skipped: false,
+        drifted,
+        fixedIds,
+      } as const;
+    });
 
     if (result.skipped) {
       return NextResponse.json({
         success: true,
+        drifted: 0,
         reconciled: 0,
         skipped: true,
         reason: result.reason,
       });
     }
 
-    // Mark fixed listings dirty for search doc refresh (OUTSIDE TX)
     if (result.fixedIds.length > 0) {
       await markListingsDirty(result.fixedIds, "reconcile_slots");
     }
@@ -134,10 +83,9 @@ export async function GET(request: NextRequest) {
     const durationMs = Date.now() - startTime;
 
     logger.sync.info("[reconcile-slots] Reconciliation complete", {
-      event: "reconcile_slots_complete",
+      event: "availability_drift_fixed",
       drifted: result.drifted,
       reconciled: result.fixedIds.length,
-      alertedOnly: result.alertedOnly,
       durationMs,
     });
 
@@ -145,7 +93,6 @@ export async function GET(request: NextRequest) {
       success: true,
       drifted: result.drifted,
       reconciled: result.fixedIds.length,
-      alertedOnly: result.alertedOnly,
       skipped: false,
       durationMs,
       timestamp: new Date().toISOString(),

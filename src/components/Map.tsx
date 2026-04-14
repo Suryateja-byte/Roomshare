@@ -4252,7 +4252,10 @@ export default function MapComponent({
                       {selectedListing.title}
                     </h3>
 
-                    <div className="mt-2 inline-flex items-center rounded-full bg-surface-container-high px-2.5 py-1 text-[11px] font-medium text-on-surface-variant">
+                    <div
+                      data-testid="map-popup-availability"
+                      className="mt-2 inline-flex items-center rounded-full bg-surface-container-high px-2.5 py-1 text-[11px] font-medium text-on-surface-variant"
+                    >
                       {selectedListing.availableSlots > 0
                         ? `${selectedListing.availableSlots} available`
                         : "Filled"}

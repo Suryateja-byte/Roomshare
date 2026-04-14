@@ -31,10 +31,11 @@ describe("buildSearchDocWhereConditions", () => {
     expect(statusConditions).toHaveLength(1);
   });
 
-  it("requires available slots >= $1 in base conditions (parameterized)", () => {
+  it("requires range-aware availability >= $1 in base conditions", () => {
     const { conditions } = buildSearchDocWhereConditions({});
 
-    expect(conditions).toContain("d.available_slots >= $1");
+    expect(conditions[0]).toContain(">= $1");
+    expect(conditions[0]).toContain("generate_series");
   });
 
   it("defaults to >= 1 when minAvailableSlots is undefined", () => {
@@ -47,7 +48,7 @@ describe("buildSearchDocWhereConditions", () => {
     const result = buildSearchDocWhereConditions({ minAvailableSlots: 3 });
 
     expect(result.params[0]).toBe(3);
-    expect(result.conditions).toContain("d.available_slots >= $1");
+    expect(result.conditions[0]).toContain(">= $1");
   });
 
   it("starts with paramIndex 2 and no FTS when no filters applied", () => {

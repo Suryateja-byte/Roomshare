@@ -10,7 +10,7 @@ import {
   createHold,
   BookingResult,
 } from "@/app/actions/booking";
-import { useRouter } from "next/navigation";
+import { useRouter, useSearchParams } from "next/navigation";
 import {
   Loader2,
   LogIn,
@@ -25,6 +25,7 @@ import {
 import Link from "next/link";
 import { toast } from "sonner";
 import { useNetworkStatus } from "@/hooks/useNetworkStatus";
+import { useAvailability } from "@/hooks/useAvailability";
 import { parseLocalDate, parseISODateAsLocal } from "@/lib/utils";
 import { SlotSelector } from "@/components/SlotSelector";
 
@@ -102,6 +103,8 @@ export default function BookingForm({
   const [endDate, setEndDate] = useState("");
 
   // Slot selector state: only show for multi-slot PER_SLOT listings
+  const blocksWholeRange =
+    bookingMode === "WHOLE_UNIT" || (totalSlots ?? 1) <= 1;
   const showSlotSelector =
     (totalSlots ?? 1) > 1 && bookingMode !== "WHOLE_UNIT";
   const [slotsRequested, setSlotsRequested] = useState(1);
@@ -114,8 +117,21 @@ export default function BookingForm({
   const [hasSubmittedSuccessfully, setHasSubmittedSuccessfully] =
     useState(false);
   const [showConfirmModal, setShowConfirmModal] = useState(false);
+  const [availabilityAdjustmentMessage, setAvailabilityAdjustmentMessage] =
+    useState("");
   const router = useRouter();
+  const searchParams = useSearchParams();
   const { isOffline } = useNetworkStatus();
+  const { availability, refresh: refreshAvailability } = useAvailability(
+    listingId,
+    startDate || undefined,
+    endDate || undefined,
+    {
+      enabled: status === "ACTIVE",
+    }
+  );
+  const effectiveAvailableSlots =
+    availability?.effectiveAvailableSlots ?? availableSlots ?? totalSlots ?? 1;
 
   // Ref to prevent concurrent submissions (debounce protection)
   const isSubmittingRef = useRef(false);
@@ -152,6 +168,21 @@ export default function BookingForm({
       );
     }
   }, [listingId]);
+
+  useEffect(() => {
+    const queryStartDate = searchParams.get("startDate");
+    const queryEndDate = searchParams.get("endDate");
+
+    if (
+      queryStartDate &&
+      queryEndDate &&
+      /^\d{4}-\d{2}-\d{2}$/.test(queryStartDate) &&
+      /^\d{4}-\d{2}-\d{2}$/.test(queryEndDate)
+    ) {
+      setStartDate((currentValue) => currentValue || queryStartDate);
+      setEndDate((currentValue) => currentValue || queryEndDate);
+    }
+  }, [searchParams]);
 
   // Warn user when navigating away during active submission
   useEffect(() => {
@@ -225,11 +256,28 @@ export default function BookingForm({
 
   // Check if selected dates have any conflicts
   const dateConflict = useMemo(() => {
-    if (!startDate || !endDate) return null;
+    if (!blocksWholeRange || !startDate || !endDate) return null;
     const start = parseLocalDate(startDate);
     const end = parseLocalDate(endDate);
     return checkDateOverlap(start, end);
-  }, [startDate, endDate, checkDateOverlap]);
+  }, [blocksWholeRange, startDate, endDate, checkDateOverlap]);
+
+  useEffect(() => {
+    if (!showSlotSelector) {
+      return;
+    }
+
+    if (effectiveAvailableSlots <= 0) {
+      return;
+    }
+
+    if (slotsRequested > effectiveAvailableSlots) {
+      setAvailabilityAdjustmentMessage(
+        `Availability changed; your selection was adjusted from ${slotsRequested} to ${effectiveAvailableSlots}.`
+      );
+      setSlotsRequested(effectiveAvailableSlots);
+    }
+  }, [effectiveAvailableSlots, showSlotSelector, slotsRequested]);
 
   // Determine error type from error message/code
   const categorizeError = (result: BookingResult): ErrorType => {
@@ -319,7 +367,11 @@ export default function BookingForm({
       }
 
       // Check for date conflicts with existing bookings
-      if (dateConflict?.overlaps && dateConflict.conflictingBooking) {
+      if (
+        blocksWholeRange &&
+        dateConflict?.overlaps &&
+        dateConflict.conflictingBooking
+      ) {
         const conflictStart = new Date(
           dateConflict.conflictingBooking.startDate
         ).toLocaleDateString();
@@ -329,6 +381,12 @@ export default function BookingForm({
         setMessage(
           `Selected dates overlap with an existing booking (${conflictStart} - ${conflictEnd})`
         );
+        setErrorType("validation");
+        return;
+      }
+
+      if (startDate && endDate && effectiveAvailableSlots < effectiveSlots) {
+        setMessage("No slots are available for the selected dates.");
         setErrorType("validation");
         return;
       }
@@ -346,6 +404,9 @@ export default function BookingForm({
       startDate,
       endDate,
       bookingInfo,
+      blocksWholeRange,
+      effectiveAvailableSlots,
+      effectiveSlots,
       hasSubmittedSuccessfully,
       isOffline,
       dateConflict,
@@ -405,7 +466,9 @@ export default function BookingForm({
         );
         // Clear the pending key since submission succeeded
         sessionStorage.removeItem(`booking_pending_key_${listingId}`);
-        setMessage("Request sent successfully!");
+        setMessage(
+          "Request sent. This does not reserve inventory until the host accepts."
+        );
         setErrorType(null);
         setHasSubmittedSuccessfully(true);
         // Mark as submitted to prevent browser back resubmission
@@ -480,7 +543,7 @@ export default function BookingForm({
 
   // Render error banner with retry option for server/network errors
   const renderErrorBanner = () => {
-    if (!message || message.includes("success")) return null;
+    if (!message || hasSubmittedSuccessfully) return null;
 
     const isRetryable =
       errorType === "server" ||
@@ -491,6 +554,7 @@ export default function BookingForm({
     return (
       <div
         role="alert"
+        data-testid="booking-error"
         className={`rounded-xl p-4 animate-error-in ${
           errorType === "server" ||
           errorType === "network" ||
@@ -560,10 +624,13 @@ export default function BookingForm({
 
   // Render success message with celebration
   const renderSuccessMessage = () => {
-    if (!message.includes("success")) return null;
+    if (!message || !hasSubmittedSuccessfully) return null;
 
     return (
-      <div className="rounded-xl p-4 bg-green-50 border border-green-200">
+      <div
+        className="rounded-xl p-4 bg-green-50 border border-green-200"
+        data-testid="booking-success"
+      >
         <div className="flex items-center gap-3">
           <div className="relative flex-shrink-0 w-8 h-8">
             <div className="absolute inset-0 rounded-full animate-[booking-glow_600ms_cubic-bezier(0.16,1,0.3,1)] motion-reduce:animate-none" />
@@ -599,8 +666,33 @@ export default function BookingForm({
         </div>
       </div>
 
+      <div
+        className="mb-4 rounded-xl border border-outline-variant/20 bg-surface-canvas px-4 py-3"
+        data-testid="availability-badge"
+      >
+        <p className="text-sm font-semibold text-on-surface">
+          {bookingMode === "WHOLE_UNIT"
+            ? effectiveAvailableSlots > 0
+              ? startDate && endDate
+                ? "Whole unit available for selected dates"
+                : "Whole unit available"
+              : startDate && endDate
+                ? "Whole unit unavailable for selected dates"
+                : "Whole unit unavailable"
+            : `${effectiveAvailableSlots} slot${effectiveAvailableSlots === 1 ? "" : "s"} ${
+                startDate && endDate ? "available for selected dates" : "available now"
+              }`}
+        </p>
+        {startDate && endDate && (
+          <p className="mt-1 text-xs text-on-surface-variant">
+            Held: {availability?.heldSlots ?? 0} · Accepted:{" "}
+            {availability?.acceptedSlots ?? 0}
+          </p>
+        )}
+      </div>
+
       {/* Booked Dates Display */}
-      {bookedDates.length > 0 && (
+      {blocksWholeRange && bookedDates.length > 0 && (
         <div className="mb-4 p-4 rounded-xl bg-surface-canvas border border-outline-variant/20">
           <div className="flex items-center gap-2 mb-3">
             <Calendar className="w-4 h-4 text-on-surface-variant" />
@@ -640,6 +732,12 @@ export default function BookingForm({
             <Info className="w-3 h-3" />
             Select dates that don&apos;t overlap with booked periods
           </p>
+        </div>
+      )}
+
+      {availabilityAdjustmentMessage && (
+        <div className="mb-4 rounded-xl border border-amber-200 bg-amber-50 px-4 py-3 text-sm text-amber-800">
+          {availabilityAdjustmentMessage}
         </div>
       )}
 
@@ -776,7 +874,7 @@ export default function BookingForm({
           </div>
 
           {/* Date Conflict Warning */}
-          {dateConflict?.overlaps && (
+          {blocksWholeRange && dateConflict?.overlaps && (
             <div
               role="alert"
               className="rounded-xl p-3 bg-red-50 border border-outline-variant/20"
@@ -788,13 +886,19 @@ export default function BookingForm({
           )}
 
           {/* Slot selector for multi-slot PER_SLOT listings */}
-          {showSlotSelector && (
+          {showSlotSelector && effectiveAvailableSlots > 0 && (
             <SlotSelector
               value={slotsRequested}
               onChange={setSlotsRequested}
-              max={availableSlots ?? 1}
+              max={effectiveAvailableSlots}
               disabled={isLoading || hasSubmittedSuccessfully}
             />
+          )}
+
+          {showSlotSelector && effectiveAvailableSlots <= 0 && startDate && endDate && (
+            <div className="rounded-xl border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-700">
+              No slots are available for the selected dates.
+            </div>
           )}
 
           {/* Duration indicator */}
@@ -821,12 +925,16 @@ export default function BookingForm({
             type="submit"
             size="lg"
             className="w-full rounded-xl"
+            data-testid="book-button"
             disabled={
               isLoading ||
               isOffline ||
               hasSubmittedSuccessfully ||
               (bookingInfo !== null && !bookingInfo.isValid) ||
-              (dateConflict?.overlaps ?? false)
+              (blocksWholeRange && (dateConflict?.overlaps ?? false)) ||
+              (startDate !== "" &&
+                endDate !== "" &&
+                effectiveAvailableSlots < effectiveSlots)
             }
             aria-busy={isLoading}
           >
@@ -846,12 +954,16 @@ export default function BookingForm({
               size="lg"
               variant="outline"
               className="w-full rounded-xl"
+              data-testid="hold-button"
               disabled={
                 isLoading ||
                 isOffline ||
                 hasSubmittedSuccessfully ||
                 (bookingInfo !== null && !bookingInfo.isValid) ||
-                (dateConflict?.overlaps ?? false)
+                (blocksWholeRange && (dateConflict?.overlaps ?? false)) ||
+                (startDate !== "" &&
+                  endDate !== "" &&
+                  effectiveAvailableSlots < effectiveSlots)
               }
               onClick={async () => {
                 if (!startDate || !endDate || !bookingInfo?.isValid) return;
@@ -867,9 +979,12 @@ export default function BookingForm({
                     effectiveSlots
                   );
                   if (result.success) {
-                    setMessage("Hold placed successfully!");
+                    setMessage(
+                      "Hold placed. Availability is reserved until the hold expires or the host accepts."
+                    );
                     setErrorType(null);
                     setHasSubmittedSuccessfully(true);
+                    await refreshAvailability();
                     setTimeout(() => router.push("/bookings"), 1500);
                   } else {
                     setErrorType(categorizeError(result));
@@ -894,7 +1009,7 @@ export default function BookingForm({
               : renderErrorBanner())}
 
           <p className="text-center text-xs text-on-surface-variant">
-            You won&apos;t be charged yet
+            You won&apos;t be charged yet. A booking request stays pending until the host accepts.
           </p>
         </form>
       )}

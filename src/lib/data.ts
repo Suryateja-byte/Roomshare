@@ -18,6 +18,7 @@ import {
   MAP_FETCH_MAX_LNG_SPAN,
 } from "@/lib/constants";
 import { queryWithTimeout } from "@/lib/query-timeout";
+import { buildAvailabilitySqlFragments } from "@/lib/availability";
 
 // Re-export types and utilities from search-types for backward compatibility.
 // These were extracted to break the circular dependency: data.ts <-> search-doc-queries.ts.
@@ -332,6 +333,7 @@ export async function getMapListings(
     amenities,
     houseRules,
     moveInDate,
+    endDate,
     leaseDuration,
     roomType,
     genderPreference,
@@ -348,15 +350,26 @@ export async function getMapListings(
     );
   }
 
-  // Build WHERE conditions dynamically
-  // minAvailableSlots defaults to 1 (at least one slot available)
-  const slotThreshold = Math.max(minAvailableSlots ?? 1, 1);
-  const queryParams: (string | number | boolean | null | Date | string[])[] = [
-    slotThreshold,
-  ];
-  let paramIndex = 2;
+  const {
+    effectiveAvailableSql,
+    slotConditionSql,
+    params: availabilityParams,
+    nextParamIndex,
+  } = buildAvailabilitySqlFragments({
+    listingIdRef: 'l.id',
+    totalSlotsRef: 'l."totalSlots"',
+    minAvailableSlots,
+    startDate: moveInDate,
+    endDate,
+    startParamIndex: 1,
+  });
+
+  const queryParams = availabilityParams as Array<
+    string | number | boolean | null | Date | string[]
+  >;
+  let paramIndex = nextParamIndex;
   const conditions: string[] = [
-    'l."availableSlots" >= $1',
+    slotConditionSql,
     "l.status = 'ACTIVE'",
     "ST_X(loc.coords::geometry) IS NOT NULL",
     "ST_Y(loc.coords::geometry) IS NOT NULL",
@@ -510,7 +523,7 @@ export async function getMapListings(
             l.id,
             l.title,
             l.price,
-            l."availableSlots",
+            ${effectiveAvailableSql} as "availableSlots",
             l."roomType",
             l.images,
             loc.city,
@@ -572,6 +585,7 @@ export async function getListingsPaginated(
     maxPrice,
     amenities,
     moveInDate,
+    endDate,
     leaseDuration,
     houseRules,
     roomType,
@@ -624,14 +638,25 @@ export async function getListingsPaginated(
       );
     }
 
-    // Build dynamic WHERE conditions for SQL
-    // minAvailableSlots defaults to 1 (at least one slot available)
-    const slotThreshold = Math.max(minAvailableSlots ?? 1, 1);
-    const queryParams: (string | number | boolean | null | Date | string[])[] =
-      [slotThreshold];
-    let paramIndex = 2;
+    const {
+      effectiveAvailableSql,
+      slotConditionSql,
+      params: availabilityParams,
+      nextParamIndex,
+    } = buildAvailabilitySqlFragments({
+      listingIdRef: 'l.id',
+      totalSlotsRef: 'l."totalSlots"',
+      minAvailableSlots,
+      startDate: moveInDate,
+      endDate,
+      startParamIndex: 1,
+    });
+    const queryParams = availabilityParams as Array<
+      string | number | boolean | null | Date | string[]
+    >;
+    let paramIndex = nextParamIndex;
     const conditions: string[] = [
-      'l."availableSlots" >= $1',
+      slotConditionSql,
       "l.status = 'ACTIVE'",
       // Exclude listings with invalid coordinates (null, zero, or out of range)
       "ST_X(loc.coords::geometry) IS NOT NULL",
@@ -827,7 +852,7 @@ export async function getListingsPaginated(
             l.description,
             l.price,
             l.images,
-            l."availableSlots",
+            ${effectiveAvailableSql} as "availableSlots",
             l."totalSlots",
             l.amenities,
             l."houseRules",
@@ -946,6 +971,7 @@ async function getListingsCountEfficient(
     maxPrice,
     amenities,
     moveInDate,
+    endDate,
     leaseDuration,
     houseRules,
     roomType,
@@ -957,9 +983,20 @@ async function getListingsCountEfficient(
   } = params;
 
   // Build dynamic WHERE conditions for SQL (same logic as getListingsPaginated)
-  const slotThreshold = Math.max(minAvailableSlots ?? 1, 1);
+  const {
+    slotConditionSql,
+    params: availabilityParams,
+    nextParamIndex,
+  } = buildAvailabilitySqlFragments({
+    listingIdRef: 'l.id',
+    totalSlotsRef: 'l."totalSlots"',
+    minAvailableSlots,
+    startDate: moveInDate,
+    endDate,
+    startParamIndex: 1,
+  });
   const conditions: string[] = [
-    `l."availableSlots" >= $1`,
+    slotConditionSql,
     "l.status = 'ACTIVE'",
     // Exclude listings with invalid coordinates
     "ST_X(loc.coords::geometry) IS NOT NULL",
@@ -968,10 +1005,10 @@ async function getListingsCountEfficient(
     "ST_Y(loc.coords::geometry) BETWEEN -90 AND 90",
     "ST_X(loc.coords::geometry) BETWEEN -180 AND 180",
   ];
-  const queryParams: (string | number | boolean | null | Date | string[])[] = [
-    slotThreshold,
-  ];
-  let paramIndex = 2;
+  const queryParams = availabilityParams as Array<
+    string | number | boolean | null | Date | string[]
+  >;
+  let paramIndex = nextParamIndex;
 
   // Geographic bounds filter with antimeridian support
   if (bounds) {
