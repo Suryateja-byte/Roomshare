@@ -5,7 +5,11 @@ import { prisma } from "@/lib/prisma";
 import bcrypt from "bcryptjs";
 import { revalidatePath } from "next/cache";
 import { logger } from "@/lib/logger";
-import { updateUserPassword } from "@/lib/password-security";
+import {
+  invalidatePasswordState,
+  preparePasswordUpdate,
+  updateUserPassword,
+} from "@/lib/password-security";
 import { z } from "zod";
 import {
   checkRateLimit,
@@ -150,6 +154,8 @@ export async function changePassword(
       return { success: false, error: "Current password is incorrect" };
     }
 
+    const passwordUpdate = await preparePasswordUpdate(newPassword);
+
     await prisma.$transaction(async (tx) => {
       if (user.email) {
         await tx.passwordResetToken.deleteMany({
@@ -157,8 +163,10 @@ export async function changePassword(
         });
       }
 
-      await updateUserPassword(tx, session.user.id, newPassword);
+      await updateUserPassword(tx, session.user.id, passwordUpdate);
     });
+
+    invalidatePasswordState(session.user.id);
 
     return { success: true };
   } catch (error: unknown) {

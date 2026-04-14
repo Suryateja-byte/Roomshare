@@ -5,7 +5,11 @@ import { withRateLimit } from "@/lib/with-rate-limit";
 import { hashToken, isValidTokenFormat } from "@/lib/token-security";
 import { logger, sanitizeErrorMessage } from "@/lib/logger";
 import { validateCsrf } from "@/lib/csrf";
-import { updateUserPassword } from "@/lib/password-security";
+import {
+  invalidatePasswordState,
+  preparePasswordUpdate,
+  updateUserPassword,
+} from "@/lib/password-security";
 import * as Sentry from "@sentry/nextjs";
 
 const resetPasswordSchema = z.object({
@@ -174,6 +178,8 @@ export async function POST(request: NextRequest) {
       return buildPostError(validation.code);
     }
 
+    const passwordUpdate = await preparePasswordUpdate(password);
+
     // Atomic password reset: consume the token and write the new password
     // under one transaction so stale links cannot win a race.
     await prisma.$transaction(async (tx) => {
@@ -196,8 +202,10 @@ export async function POST(request: NextRequest) {
         throw new Error("RESET_LINK_INVALIDATED");
       }
 
-      await updateUserPassword(tx, validation.user.id, password);
+      await updateUserPassword(tx, validation.user.id, passwordUpdate);
     });
+
+    invalidatePasswordState(validation.user.id);
 
     return NextResponse.json({
       message: "Password has been reset successfully",

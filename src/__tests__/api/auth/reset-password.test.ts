@@ -48,6 +48,15 @@ jest.mock("@/lib/with-rate-limit", () => ({
 }));
 
 jest.mock("@/lib/password-security", () => ({
+  preparePasswordUpdate: jest.fn(async (newPassword: string) => {
+    const bcrypt = require("bcryptjs") as {
+      hash: (password: string, rounds: number) => Promise<string>;
+    };
+    return {
+      hashedPassword: await bcrypt.hash(newPassword, 12),
+      passwordChangedAt: new Date(),
+    };
+  }),
   updateUserPassword: jest.fn(
     async (
       client: {
@@ -56,29 +65,31 @@ jest.mock("@/lib/password-security", () => ({
         };
       },
       userId: string,
-      newPassword: string
+      passwordUpdate: {
+        hashedPassword: string;
+        passwordChangedAt: Date;
+      }
     ) => {
-      const bcrypt = require("bcryptjs") as {
-        hash: (password: string, rounds: number) => Promise<string>;
-      };
-      const hashedPassword = await bcrypt.hash(newPassword, 12);
-      const passwordChangedAt = new Date();
-
       await client.user.update({
         where: { id: userId },
         data: {
-          password: hashedPassword,
-          passwordChangedAt,
+          password: passwordUpdate.hashedPassword,
+          passwordChangedAt: passwordUpdate.passwordChangedAt,
         },
       });
 
-      return { passwordChangedAt };
+      return { passwordChangedAt: passwordUpdate.passwordChangedAt };
     }
   ),
+  invalidatePasswordState: jest.fn(),
 }));
 
 import { POST, GET } from "@/app/api/auth/reset-password/route";
 import { prisma } from "@/lib/prisma";
+import {
+  invalidatePasswordState,
+  preparePasswordUpdate,
+} from "@/lib/password-security";
 import { hashToken } from "@/lib/token-security";
 import type { NextRequest } from "next/server";
 
@@ -162,6 +173,13 @@ describe("Reset Password API", () => {
       });
       // P0-2: Now uses deleteMany inside transaction
       expect(prisma.passwordResetToken.deleteMany).toHaveBeenCalled();
+      expect(preparePasswordUpdate).toHaveBeenCalledWith("newpassword123");
+      expect(invalidatePasswordState).toHaveBeenCalledWith("user-123");
+      expect(
+        (preparePasswordUpdate as jest.Mock).mock.invocationCallOrder[0]
+      ).toBeLessThan(
+        (prisma.$transaction as jest.Mock).mock.invocationCallOrder[0]
+      );
     });
 
     it("returns error for missing token", async () => {

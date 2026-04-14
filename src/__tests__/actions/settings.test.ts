@@ -77,6 +77,7 @@ import {
 import { prisma } from "@/lib/prisma";
 import { auth } from "@/auth";
 import { revalidatePath } from "next/cache";
+import { invalidateLiveSecurityStatusCache } from "@/lib/auth-helpers";
 import bcrypt from "bcryptjs";
 
 describe("settings actions", () => {
@@ -308,6 +309,9 @@ describe("settings actions", () => {
       await changePassword("correctpass", "newpass123!!");
 
       expect(prisma.$transaction).toHaveBeenCalledTimes(1);
+      expect((bcrypt.hash as jest.Mock).mock.invocationCallOrder[0]).toBeLessThan(
+        (prisma.$transaction as jest.Mock).mock.invocationCallOrder[0]
+      );
     });
 
     it("updates user password in database", async () => {
@@ -332,6 +336,9 @@ describe("settings actions", () => {
         where: { email: "test@example.com" },
       });
       expect(prisma.$transaction).toHaveBeenCalledTimes(1);
+      expect(invalidateLiveSecurityStatusCache).toHaveBeenCalledWith(
+        "user-123"
+      );
       expect(result.success).toBe(true);
     });
 
@@ -349,6 +356,9 @@ describe("settings actions", () => {
       expect(result.success).toBe(true);
       expect(prisma.passwordResetToken.deleteMany).not.toHaveBeenCalled();
       expect(prisma.$transaction).toHaveBeenCalledTimes(1);
+      expect(invalidateLiveSecurityStatusCache).toHaveBeenCalledWith(
+        "user-123"
+      );
       expect(prisma.user.update).toHaveBeenCalledWith({
         where: { id: "user-123" },
         data: { password: "newhashed", passwordChangedAt: expect.any(Date) },
