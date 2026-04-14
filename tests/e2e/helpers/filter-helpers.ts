@@ -263,10 +263,16 @@ export function filtersButton(page: Page): Locator {
   const viewport = page.viewportSize();
 
   if (viewport && viewport.width >= 768) {
-    return page.getByTestId("quick-filter-more-filters");
+    return page
+      .getByTestId("search-results-container")
+      .getByTestId("quick-filter-more-filters")
+      .first();
   }
 
-  return page.getByTestId("mobile-filter-button");
+  return page
+    .getByTestId("mobile-search-results-container")
+    .getByTestId("mobile-filter-button")
+    .first();
 }
 
 /**

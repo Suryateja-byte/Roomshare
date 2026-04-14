@@ -22,7 +22,7 @@ export const mobileSelectors = {
   /** The bottom sheet region container */
   bottomSheet: '[role="region"][aria-label="Search results"]',
   /** Keyboard-accessible drag handle (slider role) */
-  sheetHandle: '[role="slider"][aria-label="Results panel size"]',
+  sheetHandle: '[role="slider"][aria-label="Results panel size"]:visible',
   /** Content area that exposes data-snap-current attribute */
   snapContent: "[data-snap-current]",
   /** Minimize (X) button to dismiss sheet */

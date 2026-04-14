@@ -14,7 +14,7 @@ const boundsQS = `minLat=${SF_BOUNDS.minLat}&maxLat=${SF_BOUNDS.maxLat}&minLng=$
 // Selectors
 const selectors = {
   bottomSheet: '[role="region"][aria-label="Search results"]',
-  bottomSheetHandle: '[role="slider"][aria-label="Results panel size"]',
+  bottomSheetHandle: '[role="slider"][aria-label="Results panel size"]:visible',
   mapContainer: '[data-testid="map"], .maplibregl-map',
   listingCard: '[data-testid="listing-card"]',
   minimizeButton: 'button[aria-label="Minimize results panel"]',
