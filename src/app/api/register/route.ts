@@ -1,4 +1,5 @@
 import { NextResponse } from "next/server";
+import { Prisma } from "@prisma/client";
 import { prisma } from "@/lib/prisma";
 import bcrypt from "bcryptjs";
 import { z } from "zod";
@@ -19,6 +20,53 @@ const registerSchema = z.object({
     .min(12, "Password must be at least 12 characters")
     .max(128),
 });
+
+const DUPLICATE_REGISTRATION_ERROR =
+  "Registration failed. Please try again or use forgot password if you already have an account.";
+
+async function duplicateRegistrationResponse() {
+  // Add artificial delay to match successful registration timing.
+  await new Promise((resolve) => setTimeout(resolve, 100 + Math.random() * 50));
+
+  return NextResponse.json(
+    { error: DUPLICATE_REGISTRATION_ERROR },
+    { status: 400 }
+  );
+}
+
+function isDuplicateRegistrationUniqueConstraintError(error: unknown) {
+  if (
+    !(error instanceof Prisma.PrismaClientKnownRequestError) ||
+    error.code !== "P2002"
+  ) {
+    return false;
+  }
+
+  const target = error.meta?.target;
+  const rawTargets = (
+    Array.isArray(target) ? target : typeof target === "string" ? [target] : []
+  ).map((value) => String(value).toLowerCase());
+  const targetTokens = rawTargets.flatMap((value) =>
+    value.split(/[^a-z0-9]+/).filter(Boolean)
+  );
+  const tokenSet = new Set(targetTokens);
+  const modelName =
+    typeof error.meta?.modelName === "string"
+      ? error.meta.modelName.toLowerCase()
+      : undefined;
+
+  const isUserEmailConstraint =
+    tokenSet.has("email") &&
+    (!modelName || modelName === "user" || tokenSet.has("user"));
+
+  const isVerificationIdentifierConstraint =
+    tokenSet.has("identifier") &&
+    (modelName === "verificationtoken" ||
+      tokenSet.has("verificationtoken") ||
+      rawTargets.every((value) => value === "identifier"));
+
+  return isUserEmailConstraint || isVerificationIdentifierConstraint;
+}
 
 export async function POST(request: Request) {
   const csrfResponse = validateCsrf(request);
@@ -73,17 +121,7 @@ export async function POST(request: Request) {
     // P1-06/P1-07 FIX: Prevent user enumeration with generic error message
     // and timing-safe delay to prevent timing attacks
     if (existingUser) {
-      // Add artificial delay to match successful registration timing
-      await new Promise((resolve) =>
-        setTimeout(resolve, 100 + Math.random() * 50)
-      );
-      return NextResponse.json(
-        {
-          error:
-            "Registration failed. Please try again or use forgot password if you already have an account.",
-        },
-        { status: 400 }
-      );
+      return duplicateRegistrationResponse();
     }
 
     // Hash password
@@ -96,30 +134,38 @@ export async function POST(request: Request) {
 
     // Atomic: create user + verification token in single transaction
     // Prevents orphaned users who can't verify email on partial failure
-    await prisma.$transaction([
-      prisma.user.create({
-        data: {
-          name,
-          email,
-          password: hashedPassword,
-          emailVerified: null,
-        },
-      }),
-      prisma.verificationToken.create({
-        data: {
-          identifier: email,
-          tokenHash: verificationTokenHash,
-          expires,
-        },
-      }),
-    ]);
+    try {
+      await prisma.$transaction([
+        prisma.user.create({
+          data: {
+            name,
+            email,
+            password: hashedPassword,
+            emailVerified: null,
+          },
+        }),
+        prisma.verificationToken.create({
+          data: {
+            identifier: email,
+            tokenHash: verificationTokenHash,
+            expires,
+          },
+        }),
+      ]);
+    } catch (error) {
+      if (isDuplicateRegistrationUniqueConstraintError(error)) {
+        return duplicateRegistrationResponse();
+      }
+
+      throw error;
+    }
 
     // Build verification URL
     const baseUrl =
       process.env.AUTH_URL ||
       process.env.NEXTAUTH_URL ||
       "http://localhost:3000";
-    const verificationUrl = `${baseUrl}/api/auth/verify-email?token=${verificationToken}`;
+    const verificationUrl = `${baseUrl}/verify-email?token=${verificationToken}`;
 
     const emailResult = await sendNotificationEmail("welcomeEmail", email, {
       userName: name,

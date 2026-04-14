@@ -23,6 +23,7 @@ import {
   act,
 } from "@testing-library/react";
 import "@testing-library/jest-dom";
+import type { CSSProperties, MouseEventHandler, ReactNode } from "react";
 
 // --------------------------------------------------------------------------
 // Mock Modules - Must be before component import
@@ -72,7 +73,10 @@ jest.mock("next/navigation", () => ({
 
 jest.mock("next/image", () => ({
   __esModule: true,
-  default: (props: Record<string, unknown>) => {
+  default: ({
+    fill,
+    ...props
+  }: Record<string, unknown> & { fill?: boolean }) => {
     // eslint-disable-next-line @next/next/no-img-element, jsx-a11y/alt-text
     return <img {...props} />;
   },
@@ -255,7 +259,15 @@ jest.mock("react-map-gl/maplibre", () => {
 
       return React.createElement(
         "div",
-        { "data-testid": "map-container", ...props },
+        {
+          "data-testid": "map-container",
+          className:
+            typeof props.className === "string" ? props.className : undefined,
+          style:
+            props.style && typeof props.style === "object"
+              ? props.style
+              : undefined,
+        },
         children
       );
     }
@@ -281,6 +293,8 @@ jest.mock("react-map-gl/maplibre", () => {
         "data-testid": "map-marker",
         "data-longitude": longitude,
         "data-latitude": latitude,
+        className:
+          typeof props.className === "string" ? props.className : undefined,
         onClick: (e: MouseEvent) => {
           if (onClick) {
             onClick({
@@ -288,7 +302,6 @@ jest.mock("react-map-gl/maplibre", () => {
             });
           }
         },
-        ...props,
       },
       children
     );
@@ -296,11 +309,11 @@ jest.mock("react-map-gl/maplibre", () => {
 
   const MockPopup = ({
     children,
-    onClose,
+    anchor,
     ...props
   }: {
     children?: React.ReactNode;
-    onClose?: () => void;
+    anchor?: string;
     [key: string]: unknown;
   }) => {
     const React = require("react");
@@ -308,7 +321,9 @@ jest.mock("react-map-gl/maplibre", () => {
       "div",
       {
         "data-testid": "map-popup",
-        ...props,
+        anchor,
+        className:
+          typeof props.className === "string" ? props.className : undefined,
       },
       children
     );
@@ -325,14 +340,14 @@ jest.mock("react-map-gl/maplibre", () => {
     latestSourceProps = props as Record<string, unknown>;
     return React.createElement(
       "div",
-      { "data-testid": "map-source", ...props },
+      { "data-testid": "map-source" },
       children
     );
   };
 
   const MockLayer = (props: Record<string, unknown>) => {
     const React = require("react");
-    return React.createElement("div", { "data-testid": "map-layer", ...props });
+    return React.createElement("div", { "data-testid": "map-layer" });
   };
 
   return {
@@ -463,10 +478,35 @@ jest.mock("framer-motion", () => ({
   m: {
     div: ({
       children,
-      ...props
-    }: Record<string, unknown> & { children?: React.ReactNode }) => (
-      <div {...props}>{children}</div>
-    ),
+      className,
+      style,
+      onClick,
+      role,
+      "data-testid": testId,
+      "aria-label": ariaLabel,
+      "aria-hidden": ariaHidden,
+    }: {
+      children?: ReactNode;
+      className?: string;
+      style?: CSSProperties;
+      onClick?: MouseEventHandler<HTMLDivElement>;
+      role?: string;
+      "data-testid"?: string;
+      "aria-label"?: string;
+      "aria-hidden"?: boolean;
+    }) => (
+      <div
+        className={className}
+        style={style}
+        onClick={onClick}
+        role={role}
+        data-testid={testId}
+        aria-label={ariaLabel}
+        aria-hidden={ariaHidden}
+      >
+        {children}
+      </div>
+    )
   },
   useReducedMotion: () => false,
 }));
@@ -1462,8 +1502,6 @@ describe("Map Component", () => {
 
       setDesktopMapPaneRect();
       setDesktopAvoidRects([
-        { left: 0, top: 0, width: 0, height: 0 },
-        { left: 560, top: 20, width: 200, height: 240 },
         { left: 560, top: 20, width: 200, height: 240 },
       ]);
       mockMapInstance.project.mockReturnValue({ x: 500, y: 340 });
@@ -2168,7 +2206,7 @@ describe("Map Component", () => {
   });
 
   describe("desktop map controls", () => {
-    it("renders the hide map button on desktop", async () => {
+    it("renders the map tools trigger on desktop", async () => {
       render(<MapComponent listings={mockListings} />);
 
       await act(async () => {
@@ -2176,7 +2214,7 @@ describe("Map Component", () => {
       });
 
       expect(
-        screen.getByRole("button", { name: /hide map/i })
+        screen.getByRole("button", { name: /map tools/i })
       ).toBeInTheDocument();
     });
 

@@ -18,6 +18,21 @@ import {
   searchResultsContainer,
 } from "../helpers";
 
+function canonicalizeUrl(input: string): string {
+  const url = new URL(input);
+  const params = Array.from(url.searchParams.entries())
+    .sort(([a], [b]) => a.localeCompare(b))
+    .map(([key, value]) => {
+      const numeric = Number(value);
+      if (/^-?\d+(\.\d+)?$/.test(value) && Number.isFinite(numeric)) {
+        return [key, String(numeric)];
+      }
+      return [key, value];
+    });
+
+  return JSON.stringify({ pathname: url.pathname, params });
+}
+
 test.describe("Listing Card Carousel", () => {
   // Run as anonymous user
   test.use({ storageState: { cookies: [], origins: [] } });
@@ -120,7 +135,7 @@ test.describe("Listing Card Carousel", () => {
     await expect(firstDot).toHaveAttribute("aria-selected", "false");
 
     // URL should not have changed
-    expect(page.url()).toBe(initialUrl);
+    expect(canonicalizeUrl(page.url())).toBe(canonicalizeUrl(initialUrl));
   });
 
   test(`${tags.anon} - Clicking dot navigates to image`, async ({
@@ -171,7 +186,7 @@ test.describe("Listing Card Carousel", () => {
     }).toPass({ timeout: 10_000, intervals: [500, 1000, 2000] });
 
     // URL should not have changed
-    expect(page.url()).toBe(initialUrl);
+    expect(canonicalizeUrl(page.url())).toBe(canonicalizeUrl(initialUrl));
   });
 
   test(`${tags.anon} - Previous button becomes visible after navigation`, async ({

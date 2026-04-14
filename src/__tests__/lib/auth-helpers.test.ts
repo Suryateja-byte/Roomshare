@@ -16,6 +16,14 @@ jest.mock("next/server", () => ({
       json: async () => data,
       headers: new Map(Object.entries(init?.headers || {})),
     }),
+    redirect: (url: URL | string) => {
+      const location = url instanceof URL ? url.toString() : url;
+      return {
+        status: 307,
+        headers: new Map([["location", location]]),
+        json: async () => ({}),
+      };
+    },
   },
 }));
 
@@ -35,8 +43,12 @@ import { getToken } from "next-auth/jwt";
 import { prisma } from "@/lib/prisma";
 
 // Helper to create a minimal mock NextRequest
-function createMockRequest(pathname: string, method = "GET") {
-  return { nextUrl: { pathname }, method } as any;
+function createMockRequest(
+  pathname: string,
+  method = "GET",
+  origin = "http://localhost:3000"
+) {
+  return { nextUrl: { pathname, origin }, method } as any;
 }
 
 // ── isPublicRoute ──
@@ -369,7 +381,83 @@ describe("checkSuspension", () => {
 
     expect(prisma.user.findUnique).toHaveBeenCalledWith({
       where: { id: "user-789" },
-      select: { isSuspended: true, passwordChangedAt: true },
+      select: { isSuspended: true },
+    });
+  });
+
+  it("redirects immediately when token.passwordInvalidated is already set", async () => {
+    (getToken as jest.Mock).mockResolvedValue({
+      sub: "user-123",
+      passwordInvalidated: true,
+    });
+
+    const result = await checkSuspension(createMockRequest("/dashboard"));
+
+    expect(result).not.toBeNull();
+    expect(result!.status).toBe(307);
+    expect(result!.headers.get("location")).toBe(
+      "http://localhost:3000/login?reason=password_changed"
+    );
+  });
+
+  it("redirects immediately when passwordChangedAt is newer than authTime", async () => {
+    (getToken as jest.Mock).mockResolvedValue({
+      sub: "user-123",
+      isSuspended: false,
+      authTime: 100,
+    });
+    (prisma.user.findUnique as jest.Mock)
+      .mockResolvedValueOnce({ isSuspended: false })
+      .mockResolvedValueOnce({
+        passwordChangedAt: new Date(200 * 1000),
+      });
+
+    const result = await checkSuspension(
+      createMockRequest("/api/bookings", "POST")
+    );
+
+    expect(result).not.toBeNull();
+    expect(result!.status).toBe(307);
+    expect(result!.headers.get("location")).toBe(
+      "http://localhost:3000/login?reason=password_changed"
+    );
+  });
+
+  it("does not let a warmed suspension cache hide a newer password change", async () => {
+    (getToken as jest.Mock).mockResolvedValue({
+      sub: "user-123",
+      isSuspended: false,
+      authTime: 100,
+    });
+    (prisma.user.findUnique as jest.Mock)
+      .mockResolvedValueOnce({ isSuspended: false })
+      .mockResolvedValueOnce({ passwordChangedAt: null })
+      .mockResolvedValueOnce({
+        passwordChangedAt: new Date(200 * 1000),
+      });
+
+    const firstResult = await checkSuspension(
+      createMockRequest("/api/bookings", "POST")
+    );
+    expect(firstResult).toBeNull();
+
+    const secondResult = await checkSuspension(
+      createMockRequest("/api/bookings", "POST")
+    );
+    expect(secondResult).not.toBeNull();
+    expect(secondResult!.status).toBe(307);
+
+    expect(prisma.user.findUnique).toHaveBeenNthCalledWith(1, {
+      where: { id: "user-123" },
+      select: { isSuspended: true },
+    });
+    expect(prisma.user.findUnique).toHaveBeenNthCalledWith(2, {
+      where: { id: "user-123" },
+      select: { passwordChangedAt: true },
+    });
+    expect(prisma.user.findUnique).toHaveBeenNthCalledWith(3, {
+      where: { id: "user-123" },
+      select: { passwordChangedAt: true },
     });
   });
 
@@ -391,10 +479,11 @@ describe("checkSuspension", () => {
     expect(result).toBeNull();
   });
 
-  it("returns null on DB error (graceful degradation)", async () => {
+  it("allows access when password revocation state cannot be verified", async () => {
     (getToken as jest.Mock).mockResolvedValue({
       sub: "user-123",
       isSuspended: false,
+      authTime: 100,
     });
     (prisma.user.findUnique as jest.Mock).mockRejectedValue(
       new Error("DB connection lost")

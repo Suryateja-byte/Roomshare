@@ -28,7 +28,14 @@ export default function EmailVerificationBanner({
       const data = await response.json();
 
       if (!response.ok) {
-        setError(data.error || "Failed to send verification email");
+        if (response.status === 409) {
+          setError(
+            data.error ||
+              "A verification email is already being prepared. Please wait a moment and try again if it doesn't arrive."
+          );
+        } else {
+          setError(data.error || "Failed to send verification email");
+        }
       } else {
         setResendSuccess(true);
         setTimeout(() => setResendSuccess(false), 5000);

@@ -172,7 +172,7 @@ export async function waitForFilterCommit(
   // Step 2: Wait for SearchForm hydration (data-hydrated on filter buttons)
   await page
     .locator(
-      'button[data-hydrated][aria-label^="Filters"], button[data-hydrated][data-testid="quick-filter-more-filters"], button[data-hydrated][data-testid="mobile-filter-button"]'
+      'button[data-hydrated][aria-label^="Filters"]:visible, button[data-hydrated][data-testid="quick-filter-more-filters"]:visible, button[data-hydrated][data-testid="mobile-filter-button"]:visible, button[data-testid="mobile-filter-button"]:visible'
     )
     .first()
     .waitFor({ state: "visible", timeout: Math.floor(timeout * 0.4) })
@@ -264,26 +264,19 @@ export function filtersButton(page: Page): Locator {
 
   if (viewport && viewport.width >= 768) {
     return page
-      .locator(
-        'button[data-testid="quick-filter-more-filters"], button[data-hydrated][aria-label^="Filters"]:not([data-testid="mobile-filter-button"]), button[aria-label^="Filters"]:not([data-testid="mobile-filter-button"]), button:not([data-testid="mobile-filter-button"]):has-text("Filters")'
-      )
-      .filter({ visible: true })
+      .getByTestId("search-results-container")
+      .getByTestId("quick-filter-more-filters")
       .first();
   }
 
-  return page
-    .locator(
-      'button[data-testid="mobile-filter-button"], button[data-hydrated][aria-label^="Filters"], button[aria-label^="Filters"]'
-    )
-    .filter({ visible: true })
-    .first();
+  return page.locator('[data-testid="mobile-filter-button"]:visible').first();
 }
 
 /**
  * Ensure filter button is visible on mobile.
- * On mobile viewports, the Filters button lives in CollapsedMobileSearch which
- * appears after useMediaQuery hydrates (may take 1-2s after page load).
- * Falls back to scrolling if the button doesn't appear after waiting.
+ * On mobile viewports, the Filters trigger can live either in the collapsed
+ * header search bar or in the inline filter strip inside the bottom sheet.
+ * Falls back to scrolling if neither visible trigger appears after waiting.
  */
 async function ensureMobileFilterButton(page: Page): Promise<void> {
   const viewport = page.viewportSize();

@@ -2,6 +2,8 @@
  * Tests for register API route
  */
 
+import { Prisma } from "@prisma/client";
+
 jest.mock("@/lib/prisma", () => ({
   prisma: {
     user: {
@@ -29,8 +31,16 @@ jest.mock("@/lib/with-rate-limit", () => ({
   withRateLimit: jest.fn().mockResolvedValue(null),
 }));
 
+jest.mock("@/lib/api-error-handler", () => ({
+  captureApiError: jest.fn((_error: unknown, _context: unknown) => ({
+    status: 500,
+    json: async () => ({ error: "Internal server error" }),
+    headers: new Map(),
+  })),
+}));
+
 jest.mock("@/lib/email", () => ({
-  sendNotificationEmail: jest.fn().mockResolvedValue(undefined),
+  sendNotificationEmail: jest.fn().mockResolvedValue({ success: true }),
 }));
 
 jest.mock("bcryptjs", () => ({
@@ -50,8 +60,12 @@ jest.mock("next/server", () => ({
 }));
 
 import { POST } from "@/app/api/register/route";
+import { captureApiError } from "@/lib/api-error-handler";
 import { prisma } from "@/lib/prisma";
 import bcrypt from "bcryptjs";
+
+const DUPLICATE_REGISTRATION_ERROR =
+  "Registration failed. Please try again or use forgot password if you already have an account.";
 
 describe("Register API", () => {
   beforeEach(() => {
@@ -118,9 +132,7 @@ describe("Register API", () => {
       expect(response.status).toBe(400);
       const data = await response.json();
       // P1-06/P1-07: Generic message prevents user enumeration
-      expect(data.error).toBe(
-        "Registration failed. Please try again or use forgot password if you already have an account."
-      );
+      expect(data.error).toBe(DUPLICATE_REGISTRATION_ERROR);
     });
 
     it("creates user successfully", async () => {
@@ -152,6 +164,35 @@ describe("Register API", () => {
       expect(data.password).toBeUndefined();
     });
 
+    it("returns 400 when transaction loses the email uniqueness race", async () => {
+      (prisma.user.findUnique as jest.Mock).mockResolvedValue(null);
+      (prisma.$transaction as jest.Mock).mockRejectedValue(
+        new Prisma.PrismaClientKnownRequestError(
+          "Unique constraint failed on the fields: (`email`)",
+          {
+            code: "P2002",
+            clientVersion: "test",
+            meta: { modelName: "User", target: ["email"] },
+          }
+        )
+      );
+
+      const request = new Request("http://localhost/api/register", {
+        method: "POST",
+        body: JSON.stringify({
+          name: "Test User",
+          email: "test@test.com",
+          password: "password12345",
+        }),
+      });
+      const response = await POST(request);
+      const data = await response.json();
+
+      expect(response.status).toBe(400);
+      expect(data.error).toBe(DUPLICATE_REGISTRATION_ERROR);
+      expect(captureApiError).not.toHaveBeenCalled();
+    });
+
     it("handles database errors", async () => {
       (prisma.user.findUnique as jest.Mock).mockRejectedValue(
         new Error("DB Error")
@@ -168,6 +209,10 @@ describe("Register API", () => {
       const response = await POST(request);
 
       expect(response.status).toBe(500);
+      expect(captureApiError).toHaveBeenCalledWith(
+        expect.any(Error),
+        expect.objectContaining({ route: "/api/register", method: "POST" })
+      );
     });
   });
 });

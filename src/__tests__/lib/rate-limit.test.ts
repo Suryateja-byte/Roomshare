@@ -343,6 +343,11 @@ describe("rate-limit", () => {
       expect(RATE_LIMITS.forgotPassword.windowMs).toBe(60 * 60 * 1000);
     });
 
+    it("has forgotPasswordByIp limit of 10 per hour", () => {
+      expect(RATE_LIMITS.forgotPasswordByIp.limit).toBe(10);
+      expect(RATE_LIMITS.forgotPasswordByIp.windowMs).toBe(60 * 60 * 1000);
+    });
+
     it("has resendVerification limit of 3 per hour", () => {
       expect(RATE_LIMITS.resendVerification.limit).toBe(3);
       expect(RATE_LIMITS.resendVerification.windowMs).toBe(60 * 60 * 1000);

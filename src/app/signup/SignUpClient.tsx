@@ -380,7 +380,7 @@ function SignUpForm() {
           {loading ? (
             <>
               <Loader2 className="w-5 h-5 animate-spin" aria-hidden="true" />
-              <span className="sr-only">Creating account...</span>
+              Creating account...
             </>
           ) : !turnstileToken && isTurnstileEnabled ? (
             <>

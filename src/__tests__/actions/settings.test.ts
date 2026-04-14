@@ -5,11 +5,25 @@
 // Mock dependencies before imports
 jest.mock("@/lib/prisma", () => ({
   prisma: {
+    passwordResetToken: {
+      deleteMany: jest.fn(),
+    },
     user: {
       findUnique: jest.fn(),
       update: jest.fn(),
       delete: jest.fn(),
     },
+    $transaction: jest.fn((fn: (tx: unknown) => Promise<unknown>) => {
+      const tx = {
+        passwordResetToken: {
+          deleteMany: (prisma as any).passwordResetToken.deleteMany,
+        },
+        user: {
+          update: (prisma as any).user.update,
+        },
+      };
+      return fn(tx);
+    }),
   },
 }));
 
@@ -49,6 +63,10 @@ jest.mock("@/lib/logger", () => ({
   logger: { sync: { error: jest.fn(), warn: jest.fn(), info: jest.fn() } },
 }));
 
+jest.mock("@/lib/auth-helpers", () => ({
+  invalidateLiveSecurityStatusCache: jest.fn(),
+}));
+
 import {
   getNotificationPreferences,
   updateNotificationPreferences,
@@ -59,6 +77,7 @@ import {
 import { prisma } from "@/lib/prisma";
 import { auth } from "@/auth";
 import { revalidatePath } from "next/cache";
+import { invalidateLiveSecurityStatusCache } from "@/lib/auth-helpers";
 import bcrypt from "bcryptjs";
 
 describe("settings actions", () => {
@@ -84,6 +103,21 @@ describe("settings actions", () => {
   beforeEach(() => {
     jest.clearAllMocks();
     (auth as jest.Mock).mockResolvedValue(mockSession);
+    (prisma.$transaction as jest.Mock).mockImplementation(
+      async (fn: (tx: unknown) => Promise<unknown>) => {
+        const tx = {
+          passwordResetToken: {
+            deleteMany: (...args: unknown[]) =>
+              (prisma.passwordResetToken.deleteMany as jest.Mock)(...args),
+          },
+          user: {
+            update: (...args: unknown[]) =>
+              (prisma.user.update as jest.Mock)(...args),
+          },
+        };
+        return fn(tx);
+      }
+    );
   });
 
   describe("getNotificationPreferences", () => {
@@ -216,6 +250,7 @@ describe("settings actions", () => {
     it("returns error when user has no password (OAuth account)", async () => {
       (prisma.user.findUnique as jest.Mock).mockResolvedValue({
         password: null,
+        email: "test@example.com",
       });
 
       const result = await changePassword("oldpass", "newpass123!!");
@@ -229,6 +264,7 @@ describe("settings actions", () => {
     it("returns error when current password is incorrect", async () => {
       (prisma.user.findUnique as jest.Mock).mockResolvedValue({
         password: "hashedpassword",
+        email: "test@example.com",
       });
       (bcrypt.compare as jest.Mock).mockResolvedValue(false);
 
@@ -241,9 +277,13 @@ describe("settings actions", () => {
     it("validates current password with bcrypt.compare", async () => {
       (prisma.user.findUnique as jest.Mock).mockResolvedValue({
         password: "hashedpassword",
+        email: "test@example.com",
       });
       (bcrypt.compare as jest.Mock).mockResolvedValue(true);
       (bcrypt.hash as jest.Mock).mockResolvedValue("newhashed");
+      (prisma.passwordResetToken.deleteMany as jest.Mock).mockResolvedValue({
+        count: 1,
+      });
       (prisma.user.update as jest.Mock).mockResolvedValue({ id: "user-123" });
 
       await changePassword("correctpass", "newpass123!!");
@@ -254,25 +294,36 @@ describe("settings actions", () => {
       );
     });
 
-    it("hashes new password with bcrypt", async () => {
+    it("runs the password change inside a transaction", async () => {
       (prisma.user.findUnique as jest.Mock).mockResolvedValue({
         password: "hashedpassword",
+        email: "test@example.com",
       });
       (bcrypt.compare as jest.Mock).mockResolvedValue(true);
+      (prisma.passwordResetToken.deleteMany as jest.Mock).mockResolvedValue({
+        count: 1,
+      });
       (bcrypt.hash as jest.Mock).mockResolvedValue("newhashed");
       (prisma.user.update as jest.Mock).mockResolvedValue({ id: "user-123" });
 
       await changePassword("correctpass", "newpass123!!");
 
-      expect(bcrypt.hash).toHaveBeenCalledWith("newpass123!!", 12);
+      expect(prisma.$transaction).toHaveBeenCalledTimes(1);
+      expect((bcrypt.hash as jest.Mock).mock.invocationCallOrder[0]).toBeLessThan(
+        (prisma.$transaction as jest.Mock).mock.invocationCallOrder[0]
+      );
     });
 
     it("updates user password in database", async () => {
       (prisma.user.findUnique as jest.Mock).mockResolvedValue({
         password: "hashedpassword",
+        email: "test@example.com",
       });
       (bcrypt.compare as jest.Mock).mockResolvedValue(true);
       (bcrypt.hash as jest.Mock).mockResolvedValue("newhashed");
+      (prisma.passwordResetToken.deleteMany as jest.Mock).mockResolvedValue({
+        count: 2,
+      });
       (prisma.user.update as jest.Mock).mockResolvedValue({ id: "user-123" });
 
       const result = await changePassword("correctpass", "newpass123!!");
@@ -281,7 +332,37 @@ describe("settings actions", () => {
         where: { id: "user-123" },
         data: { password: "newhashed", passwordChangedAt: expect.any(Date) },
       });
+      expect(prisma.passwordResetToken.deleteMany).toHaveBeenCalledWith({
+        where: { email: "test@example.com" },
+      });
+      expect(prisma.$transaction).toHaveBeenCalledTimes(1);
+      expect(invalidateLiveSecurityStatusCache).toHaveBeenCalledWith(
+        "user-123"
+      );
       expect(result.success).toBe(true);
+    });
+
+    it("skips reset token revocation when the user has no email", async () => {
+      (prisma.user.findUnique as jest.Mock).mockResolvedValue({
+        password: "hashedpassword",
+        email: null,
+      });
+      (bcrypt.compare as jest.Mock).mockResolvedValue(true);
+      (bcrypt.hash as jest.Mock).mockResolvedValue("newhashed");
+      (prisma.user.update as jest.Mock).mockResolvedValue({ id: "user-123" });
+
+      const result = await changePassword("correctpass", "newpass123!!");
+
+      expect(result.success).toBe(true);
+      expect(prisma.passwordResetToken.deleteMany).not.toHaveBeenCalled();
+      expect(prisma.$transaction).toHaveBeenCalledTimes(1);
+      expect(invalidateLiveSecurityStatusCache).toHaveBeenCalledWith(
+        "user-123"
+      );
+      expect(prisma.user.update).toHaveBeenCalledWith({
+        where: { id: "user-123" },
+        data: { password: "newhashed", passwordChangedAt: expect.any(Date) },
+      });
     });
 
     it("returns error on database failure", async () => {

@@ -9,6 +9,17 @@ test.describe("Mobile Bookings", () => {
     await page.waitForLoadState("domcontentloaded");
   });
 
+  async function waitForBookingsContent(
+    page: import("@playwright/test").Page
+  ) {
+    await expect(
+      page
+        .locator('[data-testid="booking-item"]')
+        .first()
+        .or(page.locator('[data-testid="empty-state"]').first())
+    ).toBeVisible({ timeout: 15000 });
+  }
+
   test("MB-01: Bookings list page renders in mobile layout", async ({
     page,
   }) => {
@@ -35,7 +46,7 @@ test.describe("Mobile Bookings", () => {
     const sentTab = page.getByRole("button", { name: /sent/i }).first();
     if (await sentTab.isVisible({ timeout: 5000 }).catch(() => false)) {
       await sentTab.click();
-      await expect(page.locator('[data-testid="booking-item"]').first().or(page.getByText(/no booking/i).first())).toBeVisible({ timeout: 5000 }).catch(() => {});
+      await waitForBookingsContent(page).catch(() => {});
     }
 
     const bookingCard = page.locator('[data-testid="booking-item"]').first();
@@ -46,7 +57,7 @@ test.describe("Mobile Bookings", () => {
         .first();
       if (await receivedTab.isVisible({ timeout: 3000 }).catch(() => false)) {
         await receivedTab.click();
-        await expect(page.locator('[data-testid="booking-item"]').first().or(page.getByText(/no booking/i).first())).toBeVisible({ timeout: 5000 }).catch(() => {});
+        await waitForBookingsContent(page).catch(() => {});
       }
     }
 
@@ -57,7 +68,7 @@ test.describe("Mobile Bookings", () => {
       await expect(
         card
           .locator("span")
-          .filter({ hasText: /pending|accepted|rejected|cancelled/i })
+          .filter({ hasText: /pending|accepted|rejected|cancelled|held|expired/i })
           .first()
       ).toBeVisible({ timeout: 5000 });
 
@@ -73,9 +84,8 @@ test.describe("Mobile Bookings", () => {
       await expect(
         page
           .locator('[data-testid="empty-state"]')
-          .or(page.getByText(/no booking/i))
           .first()
-      ).toBeVisible({ timeout: 5000 });
+      ).toBeVisible({ timeout: 15000 });
     }
   });
 

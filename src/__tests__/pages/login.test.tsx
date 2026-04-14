@@ -98,6 +98,16 @@ describe("LoginPage", () => {
     ).toBeInTheDocument();
   });
 
+  it("shows a password-changed message when redirected after revocation", () => {
+    mockSearchParams = new URLSearchParams("reason=password_changed");
+
+    render(<LoginPage />);
+
+    expect(
+      screen.getByText("Your password changed. Sign in again.")
+    ).toBeInTheDocument();
+  });
+
   it("calls signIn on form submit", async () => {
     mockSignIn.mockResolvedValue({ error: null });
 

@@ -546,6 +546,130 @@ export function InlineFilterStrip({
         </div>
       ) : null}
 
+      {showInlineFilterStrip ? (
+        <div className="space-y-2">
+          {(showDesktopQuickFilters || showMobileInlineFilters) ? (
+            <div className="hide-scrollbar -mx-1 flex items-center gap-2 overflow-x-auto px-1 py-2">
+              {showDesktopQuickFilters ? (
+                <DesktopQuickFilters
+                  disabled={isPending}
+                  hasMounted={hasMounted}
+                  activeCount={activeCount}
+                  isAdvancedFiltersOpen={showFilterDrawer}
+                  openQuickFilter={openQuickFilter}
+                  onQuickFilterOpenChange={handleQuickFilterOpenChange}
+                  onOpenAdvancedFilters={handleOpenFilters}
+                  priceLabel={formatPriceQuickLabel(
+                    committedMinPrice,
+                    committedMaxPrice
+                  )}
+                  moveInLabel={formatMoveInQuickLabel(committed.moveInDate)}
+                  roomTypeLabel={formatRoomTypeQuickLabel(committed.roomType)}
+                  leaseDurationLabel={committed.leaseDuration || "Duration"}
+                  isPriceActive={
+                    committed.minPrice.length > 0 || committed.maxPrice.length > 0
+                  }
+                  isMoveInActive={committed.moveInDate.length > 0}
+                  isRoomTypeActive={committed.roomType.length > 0}
+                  isLeaseDurationActive={committed.leaseDuration.length > 0}
+                  draftMinPrice={numericMinPrice}
+                  draftMaxPrice={numericMaxPrice}
+                  priceAbsoluteMin={priceAbsoluteMin}
+                  priceAbsoluteMax={priceAbsoluteMax}
+                  priceHistogram={facets?.priceHistogram?.buckets ?? null}
+                  priceApplyLabel={formattedCount || "Show results"}
+                  isPriceApplyLoading={isCountLoading}
+                  isPriceApplyDisabled={boundsRequired}
+                  onPriceDraftChange={handlePriceDraftChange}
+                  onPriceDraftClear={handlePriceDraftClear}
+                  onPriceApply={handlePriceApply}
+                  moveInDateValue={committed.moveInDate}
+                  minMoveInDate={minMoveInDate}
+                  onMoveInSelect={handleMoveInSelect}
+                  onMoveInClear={handleMoveInClear}
+                  roomTypeValue={committed.roomType}
+                  roomTypeCounts={facets?.roomTypes}
+                  onRoomTypeSelect={handleRoomTypeSelect}
+                  leaseDurationValue={committed.leaseDuration}
+                  onLeaseDurationSelect={handleLeaseDurationSelect}
+                />
+              ) : null}
+
+              {showMobileInlineFilters ? (
+                <>
+                  <PrimaryFilterButton
+                    label={formatPriceQuickLabel(
+                      committedMinPrice,
+                      committedMaxPrice
+                    )}
+                    active={
+                      committed.minPrice.length > 0 ||
+                      committed.maxPrice.length > 0
+                    }
+                    onClick={handleOpenFilters}
+                    disabled={isPending}
+                    testId="mobile-filter-price"
+                  />
+                  <PrimaryFilterButton
+                    label={formatMoveInQuickLabel(committed.moveInDate)}
+                    active={committed.moveInDate.length > 0}
+                    onClick={handleOpenFilters}
+                    disabled={isPending}
+                    testId="mobile-filter-move-in"
+                  />
+                  <PrimaryFilterButton
+                    label={formatRoomTypeQuickLabel(committed.roomType)}
+                    active={committed.roomType.length > 0}
+                    onClick={handleOpenFilters}
+                    disabled={isPending}
+                    testId="mobile-filter-room-type"
+                  />
+                  <PrimaryFilterButton
+                    label={committed.leaseDuration || "Duration"}
+                    active={committed.leaseDuration.length > 0}
+                    onClick={handleOpenFilters}
+                    disabled={isPending}
+                    testId="mobile-filter-duration"
+                  />
+
+                  <div className="h-6 w-px shrink-0 bg-outline-variant/40" />
+
+                  <button
+                    type="button"
+                    onClick={handleOpenFilters}
+                    disabled={isPending}
+                    data-hydrated={hasMounted || undefined}
+                    aria-label={`Filters${
+                      activeCount > 0 ? `, ${activeCount} active` : ""
+                    }`}
+                    aria-expanded={showFilterDrawer ? "true" : "false"}
+                    aria-controls="search-filters"
+                    aria-haspopup="dialog"
+                    data-testid="mobile-filter-button"
+                    className={cn(
+                      "flex items-center gap-1.5 px-4 py-2.5 min-h-[44px] rounded-full text-sm font-medium whitespace-nowrap transition-colors shrink-0 border",
+                      activeCount > 0
+                        ? "bg-on-surface text-on-primary border-on-surface"
+                        : "bg-surface-container-lowest text-on-surface border-outline-variant hover:border-on-surface-variant"
+                    )}
+                  >
+                    <SlidersHorizontal className="h-3.5 w-3.5" aria-hidden />
+                    Filters
+                    {activeCount > 0 ? (
+                      <span className="ml-0.5 flex h-5 w-5 items-center justify-center rounded-full bg-on-primary text-xs font-semibold text-on-surface">
+                        {activeCount}
+                      </span>
+                    ) : null}
+                  </button>
+                </>
+              ) : null}
+            </div>
+          ) : null}
+
+          {showAppliedChips ? renderAppliedFilters(true) : null}
+        </div>
+      ) : null}
+
       <FilterModal
         isOpen={showFilterDrawer}
         onClose={closeAdvancedDrawer}

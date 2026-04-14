@@ -230,7 +230,8 @@ export const RATE_LIMITS = {
   login: { limit: 10, windowMs: 15 * 60 * 1000 }, // 10 per 15 min (per email)
   loginByIp: { limit: 30, windowMs: 15 * 60 * 1000 }, // 30 per 15 min (per IP)
   register: { limit: 5, windowMs: 60 * 60 * 1000 }, // 5 per hour
-  forgotPassword: { limit: 3, windowMs: 60 * 60 * 1000 }, // 3 per hour
+  forgotPassword: { limit: 3, windowMs: 60 * 60 * 1000 }, // 3 per hour (per normalized email)
+  forgotPasswordByIp: { limit: 10, windowMs: 60 * 60 * 1000 }, // 10 per hour (per IP)
   resendVerification: { limit: 3, windowMs: 60 * 60 * 1000 }, // 3 per hour
   upload: { limit: 20, windowMs: 60 * 60 * 1000 }, // 20 per hour
   messages: { limit: 60, windowMs: 60 * 60 * 1000 }, // 60 per hour

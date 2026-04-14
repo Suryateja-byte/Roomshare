@@ -27,7 +27,6 @@ declare module "next-auth/jwt" {
     isSuspended?: boolean;
     image?: string | null;
     authTime?: number; // P0-5: Actual sign-in timestamp (not token refresh)
-    passwordInvalidated?: boolean; // H-1: set true when passwordChangedAt > authTime
-    lastSecurityCheck?: number; // H-1: epoch seconds of last DB check in jwt callback
+    passwordInvalidated?: boolean; // Set true when the session must be treated as logged out
   }
 }

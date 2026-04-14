@@ -111,6 +111,11 @@ export async function openConversation(page: Page, index = 0): Promise<void> {
       `Blocked conversation banner appeared after delay at index ${index}. The blocked-user seed may conflict with this conversation.`
     );
   }
+
+  await page
+    .getByRole("status", { name: /loading messages/i })
+    .waitFor({ state: "hidden", timeout: 10_000 })
+    .catch(() => {});
 }
 
 /** Navigate directly to a conversation by ID */

@@ -218,6 +218,11 @@ test.describe("Filter + Pagination Interactions", () => {
     // Check that loadMoreCallCount is exactly 1 (isLoadingMore guard prevented concurrent calls)
     expect(mock.loadMoreCallCount()).toBe(1);
 
+    // Wait for the appended results to render before asserting the exact count.
+    await expect(scopedCards(page)).toHaveCount(initialCardCount + 12, {
+      timeout: 10_000,
+    });
+
     // Card count should have increased by exactly one page worth (~12)
     const finalCardCount = await scopedCards(page).count();
     expect(finalCardCount).toBe(initialCardCount + 12);
