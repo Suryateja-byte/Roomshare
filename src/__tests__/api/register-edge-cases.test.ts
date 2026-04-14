@@ -363,6 +363,41 @@ describe("POST /api/register — edge cases", () => {
     expect(captureApiError).not.toHaveBeenCalled();
   });
 
+  it("accepts identifier-only array targets as duplicate races when Prisma omits modelName", async () => {
+    (prisma.$transaction as jest.Mock).mockRejectedValueOnce(
+      createP2002Error(["identifier"])
+    );
+
+    const response = await POST(
+      new Request("http://localhost/api/register", {
+        method: "POST",
+        body: JSON.stringify(validBody),
+      })
+    );
+    const data = await response.json();
+
+    expect(response.status).toBe(400);
+    expect(data.error).toBe(DUPLICATE_REGISTRATION_ERROR);
+    expect(sendNotificationEmail).not.toHaveBeenCalled();
+    expect(captureApiError).not.toHaveBeenCalled();
+  });
+
+  it("accepts identifier-only string targets as duplicate races when Prisma omits modelName", async () => {
+    (prisma.$transaction as jest.Mock).mockRejectedValueOnce(
+      createP2002Error("identifier")
+    );
+
+    const response = await POST(
+      new Request("http://localhost/api/register", {
+        method: "POST",
+        body: JSON.stringify(validBody),
+      })
+    );
+
+    expect(response.status).toBe(400);
+    expect(captureApiError).not.toHaveBeenCalled();
+  });
+
   it("still routes non-email P2002 errors through the generic 500 handler", async () => {
     (prisma.$transaction as jest.Mock).mockRejectedValueOnce(
       createP2002Error(["tokenHash"])

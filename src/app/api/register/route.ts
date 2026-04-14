@@ -43,23 +43,27 @@ function isDuplicateRegistrationUniqueConstraintError(error: unknown) {
   }
 
   const target = error.meta?.target;
-  const targets = (
+  const rawTargets = (
     Array.isArray(target) ? target : typeof target === "string" ? [target] : []
   ).map((value) => String(value).toLowerCase());
-  const targetText = targets.join(" ");
+  const targetTokens = rawTargets.flatMap((value) =>
+    value.split(/[^a-z0-9]+/).filter(Boolean)
+  );
+  const tokenSet = new Set(targetTokens);
   const modelName =
     typeof error.meta?.modelName === "string"
       ? error.meta.modelName.toLowerCase()
       : undefined;
 
   const isUserEmailConstraint =
-    targetText.includes("email") &&
-    (!modelName || modelName === "user" || targetText.includes("user"));
+    tokenSet.has("email") &&
+    (!modelName || modelName === "user" || tokenSet.has("user"));
 
   const isVerificationIdentifierConstraint =
-    targetText.includes("identifier") &&
-    ((modelName && modelName === "verificationtoken") ||
-      targetText.includes("verificationtoken"));
+    tokenSet.has("identifier") &&
+    (modelName === "verificationtoken" ||
+      tokenSet.has("verificationtoken") ||
+      rawTargets.every((value) => value === "identifier"));
 
   return isUserEmailConstraint || isVerificationIdentifierConstraint;
 }
