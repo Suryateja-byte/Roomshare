@@ -347,12 +347,12 @@ export const emailTemplates = {
               data.verificationUrl
                 ? `
             <div style="background-color: #fef3c7; border-radius: 12px; padding: 20px; margin-bottom: 24px; border: 1px solid #fcd34d;">
-                <p style="margin: 0 0 12px; color: #92400e; font-size: 14px; font-weight: 600;">Please verify your email address</p>
+                <p style="margin: 0 0 12px; color: #92400e; font-size: 14px; font-weight: 600;">Please confirm your email address</p>
                 <p style="margin: 0 0 16px; color: #78350f; font-size: 14px;">
-                    Click the button below to verify your email and unlock all features.
+                    Open the confirmation page, then click Verify Email to unlock all features safely.
                 </p>
                 <a href="${safeVerificationUrl}" style="display: inline-block; background-color: #18181b; color: #ffffff; text-decoration: none; padding: 12px 24px; border-radius: 8px; font-weight: 600; font-size: 14px;">
-                    Verify Email Address
+                    Confirm Email Address
                 </a>
             </div>
             `
@@ -379,17 +379,17 @@ export const emailTemplates = {
     const safeVerificationUrl = escapeHtml(data.verificationUrl);
 
     return {
-      subject: "Verify your RoomShare email address",
+      subject: "Confirm your RoomShare email address",
       html: baseTemplate(`
-            <h2 style="margin: 0 0 16px; color: #18181b; font-size: 20px;">Verify Your Email Address</h2>
+            <h2 style="margin: 0 0 16px; color: #18181b; font-size: 20px;">Confirm Your Email Address</h2>
             <p style="margin: 0 0 24px; color: #52525b; font-size: 16px; line-height: 1.6;">
                 Hi ${safeUserName},
             </p>
             <p style="margin: 0 0 24px; color: #52525b; font-size: 16px; line-height: 1.6;">
-                Please verify your email address to unlock all RoomShare features, including creating listings and sending messages.
+                Please open the confirmation page below and click Verify Email to unlock all RoomShare features, including creating listings and sending messages.
             </p>
             <a href="${safeVerificationUrl}" style="display: inline-block; background-color: #18181b; color: #ffffff; text-decoration: none; padding: 14px 28px; border-radius: 8px; font-weight: 600; font-size: 14px;">
-                Verify Email Address
+                Confirm Email Address
             </a>
             <p style="margin: 24px 0 0; color: #71717a; font-size: 14px;">
                 This link will expire in 24 hours. If it expires, simply log in to your account and request a new verification email.

@@ -46,7 +46,7 @@ model User {
   emailVerified           DateTime?
   image                   String?
   password                String?
-  passwordChangedAt       DateTime?              // H-1: session invalidation on password change
+  passwordChangedAt       DateTime? // H-1: session invalidation on password change
   bio                     String?
   countryOfOrigin         String?
   languages               String[]
@@ -80,12 +80,15 @@ model User {
 }
 
 model VerificationToken {
-  identifier String
-  tokenHash  String   @unique @map("token_hash")
-  expires    DateTime
+  identifier        String    @unique
+  tokenHash         String?   @unique @map("token_hash")
+  expires           DateTime?
+  pendingTokenHash  String?   @unique @map("pending_token_hash")
+  pendingExpires    DateTime? @map("pending_expires")
+  pendingPreparedAt DateTime? @map("pending_prepared_at")
 
-  @@unique([identifier, tokenHash])
   @@index([expires])
+  @@index([pendingExpires])
 }
 
 model PasswordResetToken {
@@ -104,7 +107,7 @@ model Listing {
   ownerId             String
   title               String
   description         String
-  price               Decimal            @db.Decimal(10, 2)
+  price               Decimal          @db.Decimal(10, 2)
   images              String[]         @default([])
   amenities           String[]
   houseRules          String[]
@@ -119,7 +122,7 @@ model Listing {
   moveInDate          DateTime?
   status              ListingStatus    @default(ACTIVE)
   viewCount           Int              @default(0)
-  version             Int              @default(1)  // Optimistic locking for race-safe updates
+  version             Int              @default(1) // Optimistic locking for race-safe updates
   bookingMode         String           @default("SHARED") @map("booking_mode")
   holdTtlMinutes      Int              @default(15) @map("hold_ttl_minutes")
   createdAt           DateTime         @default(now())
@@ -198,13 +201,13 @@ model Booking {
   rejectionReason String? // Optional reason when host rejects booking
   slotsRequested  Int           @default(1) // Phase 2: Number of slots this booking reserves
   version         Int           @default(1) // P0-04: Optimistic locking for race-safe updates
-  heldUntil       DateTime?                 // Phase 4: Expiry time for HELD bookings (null for non-holds)
-  heldAt          DateTime?                 // Phase 1: Timestamp when hold was created
+  heldUntil       DateTime? // Phase 4: Expiry time for HELD bookings (null for non-holds)
+  heldAt          DateTime? // Phase 1: Timestamp when hold was created
   createdAt       DateTime      @default(now())
   updatedAt       DateTime      @updatedAt
 
-  listing          Listing          @relation(fields: [listingId], references: [id], onDelete: Restrict)
-  tenant           User?            @relation(fields: [tenantId], references: [id], onDelete: SetNull)
+  listing          Listing           @relation(fields: [listingId], references: [id], onDelete: Restrict)
+  tenant           User?             @relation(fields: [tenantId], references: [id], onDelete: SetNull)
   bookingAuditLogs BookingAuditLog[]
 
   // Duplicate prevention: partial unique index in raw SQL migration (allows re-application after EXPIRED/REJECTED/CANCELLED)
@@ -400,18 +403,18 @@ model ReviewResponse {
 // Booking Audit Trail - Immutable append-only log of booking state transitions
 model BookingAuditLog {
   id             String   @id @default(cuid())
-  bookingId      String?  // H-2: nullable for orphaned audit records after user/booking deletion
-  action         String   // CREATED, HELD, ACCEPTED, REJECTED, CANCELLED, EXPIRED
-  previousStatus String?  // null for CREATED
+  bookingId      String? // H-2: nullable for orphaned audit records after user/booking deletion
+  action         String // CREATED, HELD, ACCEPTED, REJECTED, CANCELLED, EXPIRED
+  previousStatus String? // null for CREATED
   newStatus      String
-  actorId        String?  // null for system actions (cron sweeper)
+  actorId        String? // null for system actions (cron sweeper)
   actorType      String   @default("USER") // USER, HOST, SYSTEM, ADMIN
-  details        Json?    // slotsRequested, rejectionReason, heldUntil, version, etc.
-  ipAddress      String?  // GDPR: if populated in future, must be scrubbed in deleteAccount()
+  details        Json? // slotsRequested, rejectionReason, heldUntil, version, etc.
+  ipAddress      String? // GDPR: if populated in future, must be scrubbed in deleteAccount()
   createdAt      DateTime @default(now())
 
   booking Booking? @relation(fields: [bookingId], references: [id], onDelete: SetNull)
-  actor   User?   @relation("BookingAuditActor", fields: [actorId], references: [id], onDelete: SetNull)
+  actor   User?    @relation("BookingAuditActor", fields: [actorId], references: [id], onDelete: SetNull)
 
   @@index([bookingId])
   @@index([bookingId, createdAt])

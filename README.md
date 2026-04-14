@@ -70,23 +70,49 @@ graph TB
 | Email                 | Resend                                           |
 | Testing               | Jest 30, Playwright, Testing Library, fast-check |
 
-## Features
+## Core Product Features
 
-- **Search with Map** -- Full-text search with interactive map, 10+ filter types, faceted results, natural language parsing, cursor-based pagination, near-match suggestions, and split-stay matching
-- **Listings** -- Create, edit, view, and manage listings with multi-image upload, status toggling (Active/Paused/Rented), and privacy-circle location display
-- **Bookings** -- Server-validated booking state machine (Pending/Accepted/Rejected/Cancelled) with idempotency keys, optimistic locking, and race-safe transitions
-- **Messaging** -- Real-time messaging between hosts and guests with user blocking, soft delete, typing indicators, and unread counts
-- **AI Chatbot** -- Neighborhood intelligence chatbot powered by Groq for local area information
-- **User Profiles** -- Profile completion tracking, avatar upload, verification requests, and account settings
-- **Reviews** -- Review cards with host responses, one-review-per-listing enforcement
-- **Favorites & Saved Searches** -- Save listings and create search alerts with configurable frequency (instant/daily/weekly)
-- **Admin Panel** -- Dashboard with immutable audit logs, listing management, user suspension, report resolution, and identity verifications
-- **Auth** -- Email/password with bcrypt hashing, email verification, password reset, Google OAuth, and Turnstile CAPTCHA
-- **Rate Limiting** -- Dual-layer system: Upstash Redis primary with database fallback for serverless compatibility
-- **Nearby Places** -- Radar-powered points of interest near listings
-- **Health Monitoring** -- Liveness and readiness probes, metrics endpoints, Web Vitals tracking, circuit breaker patterns
-- **Offline Support** -- Service worker with offline fallback page
-- **Reporting** -- User reporting system with admin review workflow (Open/Resolved/Dismissed)
+- **Authentication and account recovery** -- Email/password auth, Google OAuth, email verification, password reset, and CAPTCHA-protected signup/login flows
+- **Listings lifecycle** -- Create, edit, publish, pause, rent, and manage listings with image upload, pricing, amenities, and privacy-aware map display
+- **Search and discovery** -- Interactive map search with faceted filters, cursor pagination, natural-language parsing, near matches, split-stay matching, and list/map focus sync
+- **Bookings workflow** -- Server-enforced booking lifecycle with validation, idempotency, optimistic locking, and capacity-safe transitions
+- **Messaging** -- Direct host/guest messaging with unread counts, blocking controls, and conversation management
+- **Profiles and trust signals** -- User profiles, completion prompts, verification flows, reviews, ratings, and host responses
+- **Favorites, saved searches, and alerts** -- Saved listings plus recurring search alerts and notification preferences
+- **Neighborhood intelligence** -- Nearby places, neighborhood maps, and AI-powered local-area assistance
+- **Trust and safety** -- Reporting, suspension enforcement, moderation workflows, and admin review queues
+- **Admin operations** -- Admin dashboards for listings, reports, users, verifications, and audit logging
+- **Reliability and operations** -- Health probes, metrics, background jobs, rate limiting, offline support, and observability
+
+## Stability-Critical Features
+
+These are the features that matter most when judging whether the app is stable. If these areas are healthy, most of the product is healthy because they cover the primary user journey, trust/safety controls, and operational backbone.
+
+| Stability-Critical Feature | Why It Is Critical |
+| --- | --- |
+| **1. Authentication, signup, and recovery** | If users cannot sign up, log in, verify email, or reset passwords, nothing else in the app matters. This is the gateway to every protected flow. |
+| **2. Listing creation and listing management** | Hosts need to create, edit, and manage listings reliably. If listing CRUD or image upload breaks, supply disappears and search quality collapses. |
+| **3. Search, filters, and map discovery** | Search is the main discovery engine of the product. Broken filters, bad pagination, or unstable map/list sync make the marketplace feel unusable even if data still exists. |
+| **4. Booking lifecycle and slot safety** | Booking logic is one of the most correctness-sensitive areas in the codebase. It must prevent invalid transitions, race conditions, double-booking, and stale state. |
+| **5. Messaging between guests and hosts** | Once discovery works, messaging is the next core conversion step. If conversations fail, users cannot coordinate tours, confirm interest, or resolve booking details. |
+| **6. Reviews, profiles, and verification signals** | Trust is central to Roomshare. Ratings, profile completeness, and verification state help users decide whether a person or listing is credible. |
+| **7. Favorites, saved searches, and notifications** | These keep users engaged after the first session. If they fail, the app becomes much weaker as a repeat-use marketplace product. |
+| **8. Reporting, blocking, suspension, and moderation** | These are the safety valves of the platform. If moderation features are unstable, abuse handling and policy enforcement break down quickly. |
+| **9. Admin panel and audit trail** | Admin tooling is how the team resolves problems in production. If the backoffice is unstable, operational response slows down even when the public app still works. |
+| **10. Nearby places and neighborhood intelligence** | This is a meaningful product differentiator in this codebase. It helps users evaluate neighborhoods, not just listings, and supports the “find your people, not just a place” positioning. |
+| **11. Reliability layer: health, metrics, cron, and rate limiting** | These are not flashy user features, but they are what keep the platform trustworthy under load, during incidents, and during background maintenance tasks. |
+
+## What “App Stability” Means In This Repo
+
+For Roomshare, the highest-signal stability check is:
+
+1. Users can authenticate and recover accounts.
+2. Hosts can create and manage listings.
+3. Guests can discover listings through search and maps.
+4. Both sides can message and move into a booking flow.
+5. Safety systems, moderation, and admin tooling still work when something goes wrong.
+
+If those five layers are stable, the app is usually stable in the ways that matter most to real users and operators.
 
 ## Documentation
 

@@ -1,11 +1,11 @@
 import { NextRequest, NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
-import bcrypt from "bcryptjs";
 import { z } from "zod";
 import { withRateLimit } from "@/lib/with-rate-limit";
 import { hashToken, isValidTokenFormat } from "@/lib/token-security";
 import { logger, sanitizeErrorMessage } from "@/lib/logger";
 import { validateCsrf } from "@/lib/csrf";
+import { updateUserPassword } from "@/lib/password-security";
 import * as Sentry from "@sentry/nextjs";
 
 const resetPasswordSchema = z.object({
@@ -13,6 +13,127 @@ const resetPasswordSchema = z.object({
   // P0-02 FIX: Enforce same 12-char minimum as register endpoint
   password: z.string().min(12, "Password must be at least 12 characters"),
 });
+
+const RESET_LINK_INVALIDATED_ERROR =
+  "This reset link is no longer valid. Please request a new one.";
+
+type ResetValidationErrorCode =
+  | "invalid"
+  | "expired"
+  | "stale"
+  | "userNotFound";
+
+type ResetValidationResult =
+  | {
+      ok: true;
+      resetToken: {
+        id: string;
+        email: string;
+        expires: Date;
+        createdAt: Date;
+      };
+      user: {
+        id: string;
+        passwordChangedAt: Date | null;
+      };
+    }
+  | {
+      ok: false;
+      code: ResetValidationErrorCode;
+    };
+
+async function validateResetToken(
+  tokenHash: string,
+  options: { deleteExpired?: boolean } = {}
+): Promise<ResetValidationResult> {
+  const resetToken = await prisma.passwordResetToken.findUnique({
+    where: { tokenHash },
+  });
+
+  if (!resetToken) {
+    return { ok: false, code: "invalid" };
+  }
+
+  if (resetToken.expires < new Date()) {
+    if (options.deleteExpired) {
+      await prisma.passwordResetToken.deleteMany({
+        where: { id: resetToken.id },
+      });
+    }
+
+    return { ok: false, code: "expired" };
+  }
+
+  const user = await prisma.user.findUnique({
+    where: { email: resetToken.email },
+    select: { id: true, passwordChangedAt: true },
+  });
+
+  if (!user) {
+    return { ok: false, code: "userNotFound" };
+  }
+
+  if (
+    user.passwordChangedAt &&
+    user.passwordChangedAt.getTime() > resetToken.createdAt.getTime()
+  ) {
+    return { ok: false, code: "stale" };
+  }
+
+  return {
+    ok: true,
+    resetToken,
+    user: {
+      id: user.id,
+      passwordChangedAt: user.passwordChangedAt ?? null,
+    },
+  };
+}
+
+function buildPostError(code: ResetValidationErrorCode) {
+  switch (code) {
+    case "expired":
+      return NextResponse.json(
+        { error: "Reset link has expired. Please request a new one." },
+        { status: 400 }
+      );
+    case "stale":
+      return NextResponse.json(
+        { error: RESET_LINK_INVALIDATED_ERROR },
+        { status: 400 }
+      );
+    case "userNotFound":
+      return NextResponse.json({ error: "User not found" }, { status: 404 });
+    case "invalid":
+    default:
+      return NextResponse.json(
+        { error: "Invalid or expired reset link" },
+        { status: 400 }
+      );
+  }
+}
+
+function buildGetError(code: ResetValidationErrorCode) {
+  switch (code) {
+    case "expired":
+      return NextResponse.json(
+        { valid: false, error: "Reset link has expired" },
+        { status: 400 }
+      );
+    case "stale":
+      return NextResponse.json(
+        { valid: false, error: RESET_LINK_INVALIDATED_ERROR },
+        { status: 400 }
+      );
+    case "userNotFound":
+    case "invalid":
+    default:
+      return NextResponse.json(
+        { valid: false, error: "Invalid reset link" },
+        { status: 400 }
+      );
+  }
+}
 
 export async function POST(request: NextRequest) {
   const csrfResponse = validateCsrf(request);
@@ -46,56 +167,36 @@ export async function POST(request: NextRequest) {
 
     const tokenHash = hashToken(token);
 
-    // Find the reset token
-    const resetToken = await prisma.passwordResetToken.findUnique({
-      where: { tokenHash },
+    const validation = await validateResetToken(tokenHash, {
+      deleteExpired: true,
     });
-
-    if (!resetToken) {
-      return NextResponse.json(
-        { error: "Invalid or expired reset link" },
-        { status: 400 }
-      );
+    if (!validation.ok) {
+      return buildPostError(validation.code);
     }
 
-    // Check if token has expired
-    if (resetToken.expires < new Date()) {
-      // Delete expired token
-      await prisma.passwordResetToken.delete({
-        where: { id: resetToken.id },
-      });
-
-      return NextResponse.json(
-        { error: "Reset link has expired. Please request a new one." },
-        { status: 400 }
-      );
-    }
-
-    // Find the user
-    const user = await prisma.user.findUnique({
-      where: { email: resetToken.email },
-    });
-
-    if (!user) {
-      return NextResponse.json({ error: "User not found" }, { status: 404 });
-    }
-
-    // Hash the new password
-    const hashedPassword = await bcrypt.hash(password, 12);
-
-    // P0-2 FIX: Atomic password reset — delete token + update password in one transaction
-    // bcrypt hash stays outside transaction (CPU-intensive, 100-500ms)
+    // Atomic password reset: consume the token and write the new password
+    // under one transaction so stale links cannot win a race.
     await prisma.$transaction(async (tx) => {
       const deleted = await tx.passwordResetToken.deleteMany({
-        where: { id: resetToken.id },
+        where: { id: validation.resetToken.id },
       });
       if (deleted.count === 0) {
-        throw new Error("TOKEN_ALREADY_USED");
+        throw new Error("RESET_LINK_INVALIDATED");
       }
-      await tx.user.update({
-        where: { id: user.id },
-        data: { password: hashedPassword, passwordChangedAt: new Date() },
+
+      const liveUser = await tx.user.findUnique({
+        where: { id: validation.user.id },
+        select: { passwordChangedAt: true },
       });
+      if (
+        liveUser?.passwordChangedAt &&
+        liveUser.passwordChangedAt.getTime() >
+          validation.resetToken.createdAt.getTime()
+      ) {
+        throw new Error("RESET_LINK_INVALIDATED");
+      }
+
+      await updateUserPassword(tx, validation.user.id, password);
     });
 
     return NextResponse.json({
@@ -103,12 +204,9 @@ export async function POST(request: NextRequest) {
     });
   } catch (error) {
     // P0-2 FIX: Discriminate expected race condition from real errors
-    if (error instanceof Error && error.message === "TOKEN_ALREADY_USED") {
+    if (error instanceof Error && error.message === "RESET_LINK_INVALIDATED") {
       return NextResponse.json(
-        {
-          error:
-            "This reset link has already been used. Please request a new one.",
-        },
+        { error: RESET_LINK_INVALIDATED_ERROR },
         { status: 400 }
       );
     }
@@ -150,22 +248,9 @@ export async function GET(request: NextRequest) {
     );
   }
 
-  const resetToken = await prisma.passwordResetToken.findUnique({
-    where: { tokenHash: hashToken(token) },
-  });
-
-  if (!resetToken) {
-    return NextResponse.json(
-      { valid: false, error: "Invalid reset link" },
-      { status: 400 }
-    );
-  }
-
-  if (resetToken.expires < new Date()) {
-    return NextResponse.json(
-      { valid: false, error: "Reset link has expired" },
-      { status: 400 }
-    );
+  const validation = await validateResetToken(hashToken(token));
+  if (!validation.ok) {
+    return buildGetError(validation.code);
   }
 
   return NextResponse.json({ valid: true });

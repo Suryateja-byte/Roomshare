@@ -30,11 +30,11 @@ Complete reference for all Roomshare API endpoints. All routes are implemented a
 
 Create a new user account with email verification.
 
-| Field | Value |
-|-------|-------|
-| **Auth** | Public |
-| **Rate Limit** | 5 per hour per IP (`register`) |
-| **Bot Protection** | Cloudflare Turnstile |
+| Field              | Value                          |
+| ------------------ | ------------------------------ |
+| **Auth**           | Public                         |
+| **Rate Limit**     | 5 per hour per IP (`register`) |
+| **Bot Protection** | Cloudflare Turnstile           |
 
 **Request Body:**
 
@@ -47,11 +47,11 @@ Create a new user account with email verification.
 }
 ```
 
-| Field | Type | Rules |
-|-------|------|-------|
-| `name` | string | min 2 chars |
-| `email` | string | valid email, normalized |
-| `password` | string | min 12 chars |
+| Field            | Type   | Rules                                   |
+| ---------------- | ------ | --------------------------------------- |
+| `name`           | string | min 2 chars                             |
+| `email`          | string | valid email, normalized                 |
+| `password`       | string | min 12 chars                            |
 | `turnstileToken` | string | Cloudflare Turnstile verification token |
 
 **Success Response (201):**
@@ -68,15 +68,16 @@ Create a new user account with email verification.
 
 **Error Responses:**
 
-| Status | Error | Condition |
-|--------|-------|-----------|
-| 400 | `"Invalid input"` | Validation failure |
-| 400 | `"Registration failed..."` | Email already exists (generic to prevent enumeration) |
-| 403 | `"Bot verification failed..."` | Turnstile check failed |
-| 429 | Rate limited | Exceeds 5/hour |
-| 500 | `"Internal Server Error"` | Server error |
+| Status | Error                          | Condition                                             |
+| ------ | ------------------------------ | ----------------------------------------------------- |
+| 400    | `"Invalid input"`              | Validation failure                                    |
+| 400    | `"Registration failed..."`     | Email already exists (generic to prevent enumeration) |
+| 403    | `"Bot verification failed..."` | Turnstile check failed                                |
+| 429    | Rate limited                   | Exceeds 5/hour                                        |
+| 500    | `"Internal Server Error"`      | Server error                                          |
 
 **Notes:**
+
 - Email is normalized (lowercased, trimmed) before storage.
 - A timing-safe delay is applied on duplicate email to prevent enumeration attacks.
 - Sends a welcome/verification email on success.
@@ -101,9 +102,9 @@ curl -X POST http://localhost:3000/api/register \
 
 NextAuth.js catch-all route. Handles OAuth flows, session management, CSRF tokens, and credential sign-in.
 
-| Field | Value |
-|-------|-------|
-| **Auth** | Public |
+| Field          | Value                      |
+| -------------- | -------------------------- |
+| **Auth**       | Public                     |
 | **Rate Limit** | None (handled by NextAuth) |
 
 **Endpoints served:**
@@ -121,11 +122,11 @@ NextAuth.js catch-all route. Handles OAuth flows, session management, CSRF token
 
 Request a password reset link. Always returns success to prevent email enumeration.
 
-| Field | Value |
-|-------|-------|
-| **Auth** | Public |
-| **Rate Limit** | 3 per hour per IP (`forgotPassword`) |
-| **Bot Protection** | Cloudflare Turnstile |
+| Field              | Value                                                |
+| ------------------ | ---------------------------------------------------- |
+| **Auth**           | Public                                               |
+| **Rate Limit**     | 10 per hour per IP (`forgotPasswordByIp`) + 3 per hour per normalized email after successful Turnstile verification (`forgotPassword`) |
+| **Bot Protection** | Cloudflare Turnstile                                 |
 
 **Request Body:**
 
@@ -146,17 +147,18 @@ Request a password reset link. Always returns success to prevent email enumerati
 
 **Error Responses:**
 
-| Status | Error | Condition |
-|--------|-------|-----------|
-| 400 | `"Email is required"` | Missing email |
-| 403 | `"Bot verification failed..."` | Turnstile check failed |
-| 429 | Rate limited | Exceeds 3/hour |
-| 503 | `"Password reset is temporarily unavailable"` | Email service not configured (production) |
+| Status | Error                                         | Condition                                 |
+| ------ | --------------------------------------------- | ----------------------------------------- |
+| 400    | `"Invalid input"`                             | Validation failure                        |
+| 403    | `"Bot verification failed..."`                | Turnstile check failed                    |
+| 429    | Rate limited                                  | Exceeds the IP or email quota             |
+| 503    | `"Password reset is temporarily unavailable"` | Email service not configured (production) |
 
 **Notes:**
+
 - Token is stored as SHA-256 hash (never plain text).
 - Token expires in 1 hour.
-- In development, the reset URL is included in the response.
+- The success path is padded to a minimum duration to reduce account-enumeration timing leaks.
 
 ---
 
@@ -164,16 +166,16 @@ Request a password reset link. Always returns success to prevent email enumerati
 
 Verify that a password reset token is valid.
 
-| Field | Value |
-|-------|-------|
-| **Auth** | Public |
-| **Rate Limit** | Shared with `resetPassword` type |
+| Field          | Value                                    |
+| -------------- | ---------------------------------------- |
+| **Auth**       | Public                                   |
+| **Rate Limit** | 15 per hour (`resetPasswordVerify`)      |
 
 **Query Parameters:**
 
-| Param | Type | Required | Description |
-|-------|------|----------|-------------|
-| `token` | string | Yes | Reset token from email link |
+| Param   | Type   | Required | Description                 |
+| ------- | ------ | -------- | --------------------------- |
+| `token` | string | Yes      | Reset token from email link |
 
 **Success Response (200):**
 
@@ -193,9 +195,9 @@ Verify that a password reset token is valid.
 
 Reset the user's password using a valid token.
 
-| Field | Value |
-|-------|-------|
-| **Auth** | Public |
+| Field          | Value                 |
+| -------------- | --------------------- |
+| **Auth**       | Public                |
 | **Rate Limit** | Yes (`resetPassword`) |
 
 **Request Body:**
@@ -207,10 +209,10 @@ Reset the user's password using a valid token.
 }
 ```
 
-| Field | Type | Rules |
-|-------|------|-------|
-| `token` | string | Required, from email link |
-| `password` | string | min 12 chars |
+| Field      | Type   | Rules                     |
+| ---------- | ------ | ------------------------- |
+| `token`    | string | Required, from email link |
+| `password` | string | min 12 chars              |
 
 **Success Response (200):**
 
@@ -220,35 +222,80 @@ Reset the user's password using a valid token.
 
 **Error Responses:**
 
-| Status | Error | Condition |
-|--------|-------|-----------|
-| 400 | Validation error | Invalid input |
-| 400 | `"Invalid or expired reset link"` | Token not found or bad format |
-| 400 | `"Reset link has expired..."` | Token expired |
-| 404 | `"User not found"` | User deleted |
+| Status | Error                             | Condition                     |
+| ------ | --------------------------------- | ----------------------------- |
+| 400    | Validation error                  | Invalid input                 |
+| 400    | `"Invalid or expired reset link"` | Token not found or bad format |
+| 400    | `"Reset link has expired..."`     | Token expired                 |
+| 404    | `"User not found"`                | User deleted                  |
 
 ---
 
 ### GET /api/auth/verify-email
 
-Verify a user's email address. Redirects to the app with status query params.
+Legacy email-verification links redirect to the confirmation page without mutating account state.
 
-| Field | Value |
-|-------|-------|
-| **Auth** | Public |
-| **Rate Limit** | Yes (`verifyEmail`) |
+| Field          | Value     |
+| -------------- | --------- |
+| **Auth**       | Public    |
+| **Rate Limit** | None      |
 
 **Query Parameters:**
 
-| Param | Type | Required | Description |
-|-------|------|----------|-------------|
-| `token` | string | Yes | Verification token from email |
+| Param   | Type   | Required | Description                   |
+| ------- | ------ | -------- | ----------------------------- |
+| `token` | string | No       | Verification token from email |
 
 **Behavior:**
-- Valid token: Redirects to `/?verified=true`
-- Missing token: Redirects to `/?error=missing_token`
-- Invalid/expired token: Redirects to `/verify-expired`
-- Error: Redirects to `/?error=verification_failed`
+
+- Redirects to `/verify-email?token=...` when a token is present.
+- Redirects to `/verify-email` when no token is provided.
+
+---
+
+### POST /api/auth/verify-email
+
+Confirm a user's email address after they open the verification page and explicitly submit the token.
+
+| Field          | Value               |
+| -------------- | ------------------- |
+| **Auth**       | Public              |
+| **Rate Limit** | Yes (`verifyEmail`) |
+
+**Request Body:**
+
+```json
+{
+  "token": "<verification-token>"
+}
+```
+
+**Success Responses:**
+
+```json
+{
+  "status": "verified",
+  "message": "Your email address has been verified."
+}
+```
+
+```json
+{
+  "status": "already_verified",
+  "message": "This email address has already been verified."
+}
+```
+
+**Error Responses:**
+
+| Status | Code                  | Condition                                |
+| ------ | --------------------- | ---------------------------------------- |
+| 400    | `missing_token`       | Request body omitted the token           |
+| 400    | `invalid_token`       | Token malformed, missing, or rotated out |
+| 400    | `expired_token`       | Token expired                            |
+| 404    | `user_not_found`      | Account for token identifier is missing  |
+| 429    | Rate limited          | Exceeds `verifyEmail` limit              |
+| 500    | `verification_failed` | Unexpected server error                  |
 
 ---
 
@@ -256,9 +303,9 @@ Verify a user's email address. Redirects to the app with status query params.
 
 Resend the email verification link for the currently authenticated user.
 
-| Field | Value |
-|-------|-------|
-| **Auth** | Authenticated |
+| Field          | Value                             |
+| -------------- | --------------------------------- |
+| **Auth**       | Authenticated                     |
 | **Rate Limit** | 3 per hour (`resendVerification`) |
 
 **Request Body:** None (uses session email)
@@ -271,12 +318,13 @@ Resend the email verification link for the currently authenticated user.
 
 **Error Responses:**
 
-| Status | Error | Condition |
-|--------|-------|-----------|
-| 400 | `"Email is already verified"` | Already verified |
-| 401 | `"You must be logged in..."` | No session |
-| 404 | `"User not found"` | User deleted |
-| 503 | `"Email service temporarily unavailable"` | Email send failed |
+| Status | Error                                                 | Condition                           |
+| ------ | ----------------------------------------------------- | ----------------------------------- |
+| 400    | `"Email is already verified"`                         | Already verified                    |
+| 401    | `"You must be logged in..."`                          | No session                          |
+| 404    | `"User not found"`                                    | User deleted                        |
+| 409    | `"A verification email is already being prepared..."` | Another resend is already in flight |
+| 503    | `"Email service temporarily unavailable"`             | Email send failed                   |
 
 ---
 
@@ -284,11 +332,11 @@ Resend the email verification link for the currently authenticated user.
 
 Development-only test endpoint for verifying test data. Blocked in production.
 
-| Field | Value |
-|-------|-------|
-| **Auth** | Dev key (`x-dev-verify-key` header must match `NEXTAUTH_SECRET`) |
-| **Rate Limit** | None |
-| **Availability** | Development only (returns 404 in production) |
+| Field            | Value                                                            |
+| ---------------- | ---------------------------------------------------------------- |
+| **Auth**         | Dev key (`x-dev-verify-key` header must match `NEXTAUTH_SECRET`) |
+| **Rate Limit**   | None                                                             |
+| **Availability** | Development only (returns 404 in production)                     |
 
 ---
 
@@ -298,17 +346,17 @@ Development-only test endpoint for verifying test data. Blocked in production.
 
 Fetch all active listings with optional text search.
 
-| Field | Value |
-|-------|-------|
-| **Auth** | Public |
-| **Rate Limit** | Yes (`listingsRead`) |
-| **Caching** | `Cache-Control: private, no-store` |
+| Field          | Value                              |
+| -------------- | ---------------------------------- |
+| **Auth**       | Public                             |
+| **Rate Limit** | Yes (`listingsRead`)               |
+| **Caching**    | `Cache-Control: private, no-store` |
 
 **Query Parameters:**
 
-| Param | Type | Required | Description |
-|-------|------|----------|-------------|
-| `q` | string | No | Text search query |
+| Param | Type   | Required | Description       |
+| ----- | ------ | -------- | ----------------- |
+| `q`   | string | No       | Text search query |
 
 **Success Response (200):**
 
@@ -340,11 +388,11 @@ Fetch all active listings with optional text search.
 
 Create a new listing with location geocoding.
 
-| Field | Value |
-|-------|-------|
-| **Auth** | Authenticated (email verified, not suspended) |
-| **Rate Limit** | Yes (`createListing`) |
-| **Idempotency** | Supported via `X-Idempotency-Key` header |
+| Field           | Value                                         |
+| --------------- | --------------------------------------------- |
+| **Auth**        | Authenticated (email verified, not suspended) |
+| **Rate Limit**  | Yes (`createListing`)                         |
+| **Idempotency** | Supported via `X-Idempotency-Key` header      |
 
 **Request Body:**
 
@@ -360,7 +408,9 @@ Create a new listing with location geocoding.
   "city": "Denver",
   "state": "CO",
   "zip": "80202",
-  "images": ["https://<project>.supabase.co/storage/v1/object/public/images/listings/...jpg"],
+  "images": [
+    "https://<project>.supabase.co/storage/v1/object/public/images/listings/...jpg"
+  ],
   "roomType": "Private Room",
   "leaseDuration": "6 months",
   "genderPreference": "NO_PREFERENCE",
@@ -370,25 +420,25 @@ Create a new listing with location geocoding.
 }
 ```
 
-| Field | Type | Rules |
-|-------|------|-------|
-| `title` | string | 1-100 chars |
-| `description` | string | 10-1000 chars |
-| `price` | number | > 0, max 50000 |
-| `amenities` | string or string[] | Comma-separated or array, max 20 items |
-| `houseRules` | string or string[] | Optional, max 20 items |
-| `totalSlots` | number | 1-20, integer |
-| `address` | string | 1-200 chars |
-| `city` | string | 1-100 chars |
-| `state` | string | 1-50 chars |
-| `zip` | string | US format: `12345` or `12345-6789` |
-| `images` | string[] | 1-10 Supabase storage URLs |
-| `roomType` | string? | `"Private Room"`, `"Shared Room"`, `"Entire Place"` |
-| `leaseDuration` | string? | `"Month-to-month"`, `"3 months"`, `"6 months"`, `"12 months"`, `"Flexible"` |
-| `genderPreference` | string? | `"MALE_ONLY"`, `"FEMALE_ONLY"`, `"NO_PREFERENCE"` |
-| `householdGender` | string? | `"ALL_MALE"`, `"ALL_FEMALE"`, `"MIXED"` |
-| `householdLanguages` | string[]? | ISO 639-1 codes, max 20 |
-| `moveInDate` | string? | `YYYY-MM-DD`, today to 2 years ahead |
+| Field                | Type               | Rules                                                                       |
+| -------------------- | ------------------ | --------------------------------------------------------------------------- |
+| `title`              | string             | 1-100 chars                                                                 |
+| `description`        | string             | 10-1000 chars                                                               |
+| `price`              | number             | > 0, max 50000                                                              |
+| `amenities`          | string or string[] | Comma-separated or array, max 20 items                                      |
+| `houseRules`         | string or string[] | Optional, max 20 items                                                      |
+| `totalSlots`         | number             | 1-20, integer                                                               |
+| `address`            | string             | 1-200 chars                                                                 |
+| `city`               | string             | 1-100 chars                                                                 |
+| `state`              | string             | 1-50 chars                                                                  |
+| `zip`                | string             | US format: `12345` or `12345-6789`                                          |
+| `images`             | string[]           | 1-10 Supabase storage URLs                                                  |
+| `roomType`           | string?            | `"Private Room"`, `"Shared Room"`, `"Entire Place"`                         |
+| `leaseDuration`      | string?            | `"Month-to-month"`, `"3 months"`, `"6 months"`, `"12 months"`, `"Flexible"` |
+| `genderPreference`   | string?            | `"MALE_ONLY"`, `"FEMALE_ONLY"`, `"NO_PREFERENCE"`                           |
+| `householdGender`    | string?            | `"ALL_MALE"`, `"ALL_FEMALE"`, `"MIXED"`                                     |
+| `householdLanguages` | string[]?          | ISO 639-1 codes, max 20                                                     |
+| `moveInDate`         | string?            | `YYYY-MM-DD`, today to 2 years ahead                                        |
 
 **Success Response (201):**
 
@@ -396,17 +446,18 @@ Returns the created listing object. If `X-Idempotency-Key` was provided and the 
 
 **Error Responses:**
 
-| Status | Error | Condition |
-|--------|-------|-----------|
-| 400 | `"Validation failed"` | Schema validation error (includes `fields` object) |
-| 400 | Language compliance error | Discriminatory language detected |
-| 400 | `"Maximum 10 active listings per user"` | Limit reached |
-| 400 | `"Could not geocode address"` | Geocoding failed |
-| 401 | `"Unauthorized"` | Not authenticated |
-| 403 | `"Account suspended"` | User suspended |
-| 403 | `"Please verify your email"` | Email not verified |
+| Status | Error                                   | Condition                                          |
+| ------ | --------------------------------------- | -------------------------------------------------- |
+| 400    | `"Validation failed"`                   | Schema validation error (includes `fields` object) |
+| 400    | Language compliance error               | Discriminatory language detected                   |
+| 400    | `"Maximum 10 active listings per user"` | Limit reached                                      |
+| 400    | `"Could not geocode address"`           | Geocoding failed                                   |
+| 401    | `"Unauthorized"`                        | Not authenticated                                  |
+| 403    | `"Account suspended"`                   | User suspended                                     |
+| 403    | `"Please verify your email"`            | Email not verified                                 |
 
 **Notes:**
+
 - Creates listing + location + PostGIS geometry in a transaction.
 - Triggers search index update synchronously and search alerts asynchronously.
 - Max 10 active/paused listings per user.
@@ -439,16 +490,16 @@ curl -X POST http://localhost:3000/api/listings \
 
 Update an existing listing. Only the owner can update.
 
-| Field | Value |
-|-------|-------|
-| **Auth** | Authenticated (owner only) |
-| **Rate Limit** | Yes (`updateListing`) |
+| Field          | Value                      |
+| -------------- | -------------------------- |
+| **Auth**       | Authenticated (owner only) |
+| **Rate Limit** | Yes (`updateListing`)      |
 
 **Path Parameters:**
 
 | Param | Description |
-|-------|-------------|
-| `id` | Listing ID |
+| ----- | ----------- |
+| `id`  | Listing ID  |
 
 **Request Body:** Same fields as create (all required in the request body for full replacement).
 
@@ -456,17 +507,18 @@ Update an existing listing. Only the owner can update.
 
 **Error Responses:**
 
-| Status | Error | Condition |
-|--------|-------|-----------|
-| 400 | `"Invalid request payload"` | Validation error (includes `details`) |
-| 400 | `"Invalid language codes"` | Bad household language codes |
-| 400 | Language compliance error | Discriminatory language in description |
-| 400 | `"Could not geocode new address"` | Geocoding failed for new address |
-| 401 | `"Unauthorized"` | Not authenticated |
-| 403 | `"Forbidden"` | Not the owner |
-| 404 | `"Listing not found"` | Invalid ID |
+| Status | Error                             | Condition                              |
+| ------ | --------------------------------- | -------------------------------------- |
+| 400    | `"Invalid request payload"`       | Validation error (includes `details`)  |
+| 400    | `"Invalid language codes"`        | Bad household language codes           |
+| 400    | Language compliance error         | Discriminatory language in description |
+| 400    | `"Could not geocode new address"` | Geocoding failed for new address       |
+| 401    | `"Unauthorized"`                  | Not authenticated                      |
+| 403    | `"Forbidden"`                     | Not the owner                          |
+| 404    | `"Listing not found"`             | Invalid ID                             |
 
 **Notes:**
+
 - Address change triggers re-geocoding before the database transaction.
 - Available slots are adjusted proportionally when total slots change.
 - Marks listing dirty for search index refresh.
@@ -477,16 +529,16 @@ Update an existing listing. Only the owner can update.
 
 Delete a listing and its associated data. Only the owner can delete.
 
-| Field | Value |
-|-------|-------|
-| **Auth** | Authenticated (owner only) |
-| **Rate Limit** | Yes (`deleteListing`) |
+| Field          | Value                      |
+| -------------- | -------------------------- |
+| **Auth**       | Authenticated (owner only) |
+| **Rate Limit** | Yes (`deleteListing`)      |
 
 **Path Parameters:**
 
 | Param | Description |
-|-------|-------------|
-| `id` | Listing ID |
+| ----- | ----------- |
+| `id`  | Listing ID  |
 
 **Success Response (200):**
 
@@ -499,14 +551,15 @@ Delete a listing and its associated data. Only the owner can delete.
 
 **Error Responses:**
 
-| Status | Error | Condition |
-|--------|-------|-----------|
-| 400 | `"Cannot delete listing with active bookings"` | Has active ACCEPTED bookings |
-| 401 | `"Unauthorized"` | Not authenticated |
-| 403 | `"Forbidden"` | Not the owner |
-| 404 | `"Listing not found"` | Invalid ID |
+| Status | Error                                          | Condition                    |
+| ------ | ---------------------------------------------- | ---------------------------- |
+| 400    | `"Cannot delete listing with active bookings"` | Has active ACCEPTED bookings |
+| 401    | `"Unauthorized"`                               | Not authenticated            |
+| 403    | `"Forbidden"`                                  | Not the owner                |
+| 404    | `"Listing not found"`                          | Invalid ID                   |
 
 **Notes:**
+
 - Blocks deletion if active ACCEPTED bookings exist.
 - Notifies tenants with PENDING bookings before deletion.
 - Cleans up images from Supabase storage.
@@ -519,16 +572,16 @@ Delete a listing and its associated data. Only the owner can delete.
 
 Check if a listing can be safely deleted. Returns booking and conversation counts.
 
-| Field | Value |
-|-------|-------|
-| **Auth** | Authenticated (owner only) |
-| **Rate Limit** | None |
+| Field          | Value                      |
+| -------------- | -------------------------- |
+| **Auth**       | Authenticated (owner only) |
+| **Rate Limit** | None                       |
 
 **Path Parameters:**
 
 | Param | Description |
-|-------|-------------|
-| `id` | Listing ID |
+| ----- | ----------- |
+| `id`  | Listing ID  |
 
 **Success Response (200):**
 
@@ -541,12 +594,12 @@ Check if a listing can be safely deleted. Returns booking and conversation count
 }
 ```
 
-| Field | Description |
-|-------|-------------|
-| `canDelete` | `true` if no active ACCEPTED bookings |
-| `activeBookings` | Count of ACCEPTED bookings with future end date |
-| `pendingBookings` | Count of PENDING bookings (will be cancelled) |
-| `activeConversations` | Count of conversations (will be deleted) |
+| Field                 | Description                                     |
+| --------------------- | ----------------------------------------------- |
+| `canDelete`           | `true` if no active ACCEPTED bookings           |
+| `activeBookings`      | Count of ACCEPTED bookings with future end date |
+| `pendingBookings`     | Count of PENDING bookings (will be cancelled)   |
+| `activeConversations` | Count of conversations (will be deleted)        |
 
 ---
 
@@ -554,10 +607,10 @@ Check if a listing can be safely deleted. Returns booking and conversation count
 
 Public endpoint to check a listing's current status and last update time. Used for freshness checks.
 
-| Field | Value |
-|-------|-------|
-| **Auth** | Public |
-| **Rate Limit** | None |
+| Field          | Value  |
+| -------------- | ------ |
+| **Auth**       | Public |
+| **Rate Limit** | None   |
 
 **Success Response (200):**
 
@@ -577,34 +630,34 @@ Public endpoint to check a listing's current status and last update time. Used f
 
 Unified search endpoint returning both list results and map data. Feature-flagged via `ENABLE_SEARCH_V2` env var or `?v2=1` query param.
 
-| Field | Value |
-|-------|-------|
-| **Auth** | Public |
-| **Rate Limit** | Redis-based (`map` type) |
-| **Caching** | `public, s-maxage=60, max-age=30, stale-while-revalidate=120` |
-| **Timeout** | Database timeout protection |
+| Field          | Value                                                         |
+| -------------- | ------------------------------------------------------------- |
+| **Auth**       | Public                                                        |
+| **Rate Limit** | Redis-based (`map` type)                                      |
+| **Caching**    | `public, s-maxage=60, max-age=30, stale-while-revalidate=120` |
+| **Timeout**    | Database timeout protection                                   |
 
 **Query Parameters (all optional):**
 
-| Param | Type | Description |
-|-------|------|-------------|
-| `q` | string | Text search query (max 200 chars) |
-| `minPrice` | number | Minimum price filter |
-| `maxPrice` | number | Maximum price filter |
-| `amenities` | string | Comma-separated: `Wifi,AC,Parking` |
-| `houseRules` | string | Comma-separated: `Pets allowed,Smoking allowed` |
-| `roomType` | string | `Private Room`, `Shared Room`, `Entire Place` (case-insensitive, aliases supported) |
-| `leaseDuration` | string | `Month-to-month`, `3 months`, `6 months`, `12 months`, `Flexible` |
-| `genderPreference` | string | `MALE_ONLY`, `FEMALE_ONLY`, `NO_PREFERENCE` |
-| `householdGender` | string | `ALL_MALE`, `ALL_FEMALE`, `MIXED` |
-| `languages` | string | Comma-separated ISO 639-1 codes |
-| `moveInDate` | string | `YYYY-MM-DD` (today to 2 years ahead) |
-| `minLat`, `maxLat`, `minLng`, `maxLng` | number | Geographic bounding box |
-| `lat`, `lng` | number | Point coordinates (auto-derives ~10km radius bounds) |
-| `sort` | string | `recommended`, `price_asc`, `price_desc`, `newest`, `rating` |
-| `cursor` | string | Keyset pagination cursor |
-| `limit` | number | Results per page (default 12, max 100) |
-| `v2` | string | `"1"` or `"true"` to enable when feature flag is off |
+| Param                                  | Type   | Description                                                                         |
+| -------------------------------------- | ------ | ----------------------------------------------------------------------------------- |
+| `q`                                    | string | Text search query (max 200 chars)                                                   |
+| `minPrice`                             | number | Minimum price filter                                                                |
+| `maxPrice`                             | number | Maximum price filter                                                                |
+| `amenities`                            | string | Comma-separated: `Wifi,AC,Parking`                                                  |
+| `houseRules`                           | string | Comma-separated: `Pets allowed,Smoking allowed`                                     |
+| `roomType`                             | string | `Private Room`, `Shared Room`, `Entire Place` (case-insensitive, aliases supported) |
+| `leaseDuration`                        | string | `Month-to-month`, `3 months`, `6 months`, `12 months`, `Flexible`                   |
+| `genderPreference`                     | string | `MALE_ONLY`, `FEMALE_ONLY`, `NO_PREFERENCE`                                         |
+| `householdGender`                      | string | `ALL_MALE`, `ALL_FEMALE`, `MIXED`                                                   |
+| `languages`                            | string | Comma-separated ISO 639-1 codes                                                     |
+| `moveInDate`                           | string | `YYYY-MM-DD` (today to 2 years ahead)                                               |
+| `minLat`, `maxLat`, `minLng`, `maxLng` | number | Geographic bounding box                                                             |
+| `lat`, `lng`                           | number | Point coordinates (auto-derives ~10km radius bounds)                                |
+| `sort`                                 | string | `recommended`, `price_asc`, `price_desc`, `newest`, `rating`                        |
+| `cursor`                               | string | Keyset pagination cursor                                                            |
+| `limit`                                | number | Results per page (default 12, max 100)                                              |
+| `v2`                                   | string | `"1"` or `"true"` to enable when feature flag is off                                |
 
 **Success Response (200):**
 
@@ -626,11 +679,11 @@ Unified search endpoint returning both list results and map data. Feature-flagge
 }
 ```
 
-| Meta Field | Description |
-|------------|-------------|
-| `mode` | `"geojson"` (>=50 results, clustering) or `"pins"` (<50, individual markers) |
-| `map.geojson` | Always present. GeoJSON FeatureCollection. |
-| `map.pins` | Only present in `pins` mode. Tiered pin data. |
+| Meta Field    | Description                                                                  |
+| ------------- | ---------------------------------------------------------------------------- |
+| `mode`        | `"geojson"` (>=50 results, clustering) or `"pins"` (<50, individual markers) |
+| `map.geojson` | Always present. GeoJSON FeatureCollection.                                   |
+| `map.pins`    | Only present in `pins` mode. Tiered pin data.                                |
 
 **Unbounded Search Response (200):**
 
@@ -647,11 +700,11 @@ When a text query is provided without geographic bounds:
 
 **Error Responses:**
 
-| Status | Error | Condition |
-|--------|-------|-----------|
-| 400 | Validation error message | Invalid filter values |
-| 404 | `"Search v2 endpoint not enabled"` | Feature flag off and no `v2` param |
-| 503 | `"Search temporarily unavailable"` | Service error |
+| Status | Error                              | Condition                          |
+| ------ | ---------------------------------- | ---------------------------------- |
+| 400    | Validation error message           | Invalid filter values              |
+| 404    | `"Search v2 endpoint not enabled"` | Feature flag off and no `v2` param |
+| 503    | `"Search temporarily unavailable"` | Service error                      |
 
 **Example:**
 
@@ -665,11 +718,11 @@ curl "http://localhost:3000/api/search/v2?q=downtown&minPrice=500&maxPrice=1500&
 
 Returns facet counts for filter options based on current filter state. Used for filter UI to show option counts.
 
-| Field | Value |
-|-------|-------|
-| **Auth** | Public |
-| **Rate Limit** | Redis-based (`search-count` type) |
-| **Caching** | Server-side: `unstable_cache` with 30s TTL. Response: `private, no-store` |
+| Field          | Value                                                                     |
+| -------------- | ------------------------------------------------------------------------- |
+| **Auth**       | Public                                                                    |
+| **Rate Limit** | Redis-based (`search-count` type)                                         |
+| **Caching**    | Server-side: `unstable_cache` with 30s TTL. Response: `private, no-store` |
 
 **Query Parameters:** Same filter params as `/api/search/v2` (except pagination).
 
@@ -692,6 +745,7 @@ Returns facet counts for filter options based on current filter state. Used for 
 ```
 
 **Notes:**
+
 - Uses "sticky faceting": each facet excludes its own filter to show all options.
 - Queries run in parallel for efficiency.
 - Price histogram uses adaptive bucket sizing (50/250/500/1000 based on range).
@@ -704,11 +758,11 @@ Returns facet counts for filter options based on current filter state. Used for 
 
 Returns a count of listings matching filter parameters. Used by the filter drawer for "Show X listings" preview.
 
-| Field | Value |
-|-------|-------|
-| **Auth** | Public |
-| **Rate Limit** | Redis-based (`search-count` type) |
-| **Caching** | `private, no-store` (force-dynamic) |
+| Field          | Value                               |
+| -------------- | ----------------------------------- |
+| **Auth**       | Public                              |
+| **Rate Limit** | Redis-based (`search-count` type)   |
+| **Caching**    | `private, no-store` (force-dynamic) |
 
 **Query Parameters:** Same filter params as `/api/search/v2`.
 
@@ -726,10 +780,10 @@ When count exceeds 100:
 
 **Special Responses:**
 
-| Scenario | Response |
-|----------|----------|
-| Text query without bounds | `{ "count": null, "boundsRequired": true }` |
-| No query, no bounds (browse mode) | `{ "count": null, "browseMode": true }` |
+| Scenario                          | Response                                    |
+| --------------------------------- | ------------------------------------------- |
+| Text query without bounds         | `{ "count": null, "boundsRequired": true }` |
+| No query, no bounds (browse mode) | `{ "count": null, "browseMode": true }`     |
 
 ---
 
@@ -737,19 +791,19 @@ When count exceeds 100:
 
 Fetch listings for map display with geographic bounds filtering.
 
-| Field | Value |
-|-------|-------|
-| **Auth** | Public |
-| **Rate Limit** | Redis-based (`map` type) |
-| **Caching** | `public, s-maxage=60, max-age=30, stale-while-revalidate=120` |
-| **Timeout** | Database timeout protection |
+| Field          | Value                                                         |
+| -------------- | ------------------------------------------------------------- |
+| **Auth**       | Public                                                        |
+| **Rate Limit** | Redis-based (`map` type)                                      |
+| **Caching**    | `public, s-maxage=60, max-age=30, stale-while-revalidate=120` |
+| **Timeout**    | Database timeout protection                                   |
 
 **Query Parameters:**
 
-| Param | Type | Required | Description |
-|-------|------|----------|-------------|
-| `minLat`, `maxLat`, `minLng`, `maxLng` | number | Conditional | Explicit bounding box |
-| `lat`, `lng` | number | Conditional | Point (auto-derives ~10km radius) |
+| Param                                  | Type   | Required    | Description                       |
+| -------------------------------------- | ------ | ----------- | --------------------------------- |
+| `minLat`, `maxLat`, `minLng`, `maxLng` | number | Conditional | Explicit bounding box             |
+| `lat`, `lng`                           | number | Conditional | Point (auto-derives ~10km radius) |
 
 One of the above is required. Plus all standard filter params (same as search/v2).
 
@@ -781,20 +835,20 @@ One of the above is required. Plus all standard filter params (same as search/v2
 
 Fetch conversations or messages within a conversation. Supports cursor-based pagination.
 
-| Field | Value |
-|-------|-------|
-| **Auth** | Authenticated |
-| **Rate Limit** | Yes (`messages`) |
-| **Caching** | `private, no-store` |
-| **Pagination** | Cursor-based |
+| Field          | Value               |
+| -------------- | ------------------- |
+| **Auth**       | Authenticated       |
+| **Rate Limit** | Yes (`messages`)    |
+| **Caching**    | `private, no-store` |
+| **Pagination** | Cursor-based        |
 
 **Query Parameters:**
 
-| Param | Type | Required | Description |
-|-------|------|----------|-------------|
-| `conversationId` | string | No | If provided, fetch messages for this conversation |
-| `cursor` | string | No | Pagination cursor (alphanumeric + hyphens) |
-| `limit` | number | No | Results per page (default 20, max 100) |
+| Param            | Type   | Required | Description                                       |
+| ---------------- | ------ | -------- | ------------------------------------------------- |
+| `conversationId` | string | No       | If provided, fetch messages for this conversation |
+| `cursor`         | string | No       | Pagination cursor (alphanumeric + hyphens)        |
+| `limit`          | number | No       | Results per page (default 20, max 100)            |
 
 **Response without conversationId (conversation list):**
 
@@ -830,6 +884,7 @@ Fetch conversations or messages within a conversation. Supports cursor-based pag
 ```
 
 **Notes:**
+
 - Messages are ordered by `createdAt desc`.
 - Excludes admin-deleted and per-user-deleted conversations.
 - User must be a participant in the conversation.
@@ -840,10 +895,10 @@ Fetch conversations or messages within a conversation. Supports cursor-based pag
 
 Send a message in an existing conversation.
 
-| Field | Value |
-|-------|-------|
-| **Auth** | Authenticated (email verified, not suspended, not blocked) |
-| **Rate Limit** | Yes (`sendMessage`) |
+| Field          | Value                                                      |
+| -------------- | ---------------------------------------------------------- |
+| **Auth**       | Authenticated (email verified, not suspended, not blocked) |
+| **Rate Limit** | Yes (`sendMessage`)                                        |
 
 **Request Body:**
 
@@ -854,10 +909,10 @@ Send a message in an existing conversation.
 }
 ```
 
-| Field | Type | Rules |
-|-------|------|-------|
+| Field            | Type   | Rules                           |
+| ---------------- | ------ | ------------------------------- |
 | `conversationId` | string | Required, valid conversation ID |
-| `content` | string | 1-2000 chars (trimmed) |
+| `content`        | string | 1-2000 chars (trimmed)          |
 
 **Success Response (201):**
 
@@ -872,17 +927,18 @@ Send a message in an existing conversation.
 
 **Error Responses:**
 
-| Status | Error | Condition |
-|--------|-------|-----------|
-| 400 | `"Missing required fields"` | Missing conversationId or content |
-| 400 | `"Message cannot be empty"` | Empty after trim |
-| 400 | `"Message must not exceed 2000 characters"` | Too long |
-| 401 | `"Unauthorized"` | Not authenticated |
-| 403 | `"Account suspended"` | User suspended |
-| 403 | `"Please verify your email..."` | Email not verified |
-| 403 | Block message | User is blocked by/has blocked other participant |
+| Status | Error                                       | Condition                                        |
+| ------ | ------------------------------------------- | ------------------------------------------------ |
+| 400    | `"Missing required fields"`                 | Missing conversationId or content                |
+| 400    | `"Message cannot be empty"`                 | Empty after trim                                 |
+| 400    | `"Message must not exceed 2000 characters"` | Too long                                         |
+| 401    | `"Unauthorized"`                            | Not authenticated                                |
+| 403    | `"Account suspended"`                       | User suspended                                   |
+| 403    | `"Please verify your email..."`             | Email not verified                               |
+| 403    | Block message                               | User is blocked by/has blocked other participant |
 
 **Notes:**
+
 - Sending a new message resurrects per-user-deleted conversations for all participants.
 - Updates conversation `updatedAt` timestamp in parallel.
 
@@ -901,9 +957,9 @@ curl -X POST http://localhost:3000/api/messages \
 
 Get the count of unread messages for the authenticated user.
 
-| Field | Value |
-|-------|-------|
-| **Auth** | Authenticated |
+| Field          | Value               |
+| -------------- | ------------------- |
+| **Auth**       | Authenticated       |
 | **Rate Limit** | Yes (`unreadCount`) |
 
 **Success Response (200):**
@@ -920,10 +976,10 @@ Get the count of unread messages for the authenticated user.
 
 Create a review for a listing or user. Requires a booking history for listing reviews.
 
-| Field | Value |
-|-------|-------|
-| **Auth** | Authenticated (not suspended) |
-| **Rate Limit** | Yes (`createReview`) |
+| Field          | Value                         |
+| -------------- | ----------------------------- |
+| **Auth**       | Authenticated (not suspended) |
+| **Rate Limit** | Yes (`createReview`)          |
 
 **Request Body:**
 
@@ -945,26 +1001,27 @@ Or for user reviews:
 }
 ```
 
-| Field | Type | Rules |
-|-------|------|-------|
-| `listingId` | string? | Max 100 chars. Required if no `targetUserId`. |
-| `targetUserId` | string? | Max 100 chars. Required if no `listingId`. |
-| `rating` | number | 1-5, integer |
-| `comment` | string | 1-5000 chars |
+| Field          | Type    | Rules                                         |
+| -------------- | ------- | --------------------------------------------- |
+| `listingId`    | string? | Max 100 chars. Required if no `targetUserId`. |
+| `targetUserId` | string? | Max 100 chars. Required if no `listingId`.    |
+| `rating`       | number  | 1-5, integer                                  |
+| `comment`      | string  | 1-5000 chars                                  |
 
 **Success Response (201):** Returns review with author info.
 
 **Error Responses:**
 
-| Status | Error | Condition |
-|--------|-------|-----------|
-| 400 | `"Must specify listingId or targetUserId"` | Neither provided |
-| 403 | `"Account suspended"` | User suspended |
-| 403 | `"You must have a booking to review this listing"` | No booking history |
-| 409 | `"You have already reviewed this listing"` | Duplicate review |
-| 409 | `"You have already reviewed this user"` | Duplicate user review |
+| Status | Error                                              | Condition             |
+| ------ | -------------------------------------------------- | --------------------- |
+| 400    | `"Must specify listingId or targetUserId"`         | Neither provided      |
+| 403    | `"Account suspended"`                              | User suspended        |
+| 403    | `"You must have a booking to review this listing"` | No booking history    |
+| 409    | `"You have already reviewed this listing"`         | Duplicate review      |
+| 409    | `"You have already reviewed this user"`            | Duplicate user review |
 
 **Notes:**
+
 - Triggers in-app notification and email to listing owner (fire-and-forget).
 - Marks listing dirty for search doc refresh (updates average rating).
 
@@ -974,20 +1031,20 @@ Or for user reviews:
 
 Fetch reviews for a listing or user. Supports cursor-based pagination.
 
-| Field | Value |
-|-------|-------|
-| **Auth** | Public |
+| Field          | Value                      |
+| -------------- | -------------------------- |
+| **Auth**       | Public                     |
 | **Rate Limit** | Yes, 60/min (`getReviews`) |
-| **Pagination** | Cursor-based |
+| **Pagination** | Cursor-based               |
 
 **Query Parameters:**
 
-| Param | Type | Required | Description |
-|-------|------|----------|-------------|
+| Param       | Type   | Required    | Description               |
+| ----------- | ------ | ----------- | ------------------------- |
 | `listingId` | string | Conditional | Fetch reviews for listing |
-| `userId` | string | Conditional | Fetch reviews for user |
-| `cursor` | string | No | Pagination cursor |
-| `limit` | number | No | Default 20, max 100 |
+| `userId`    | string | Conditional | Fetch reviews for user    |
+| `cursor`    | string | No          | Pagination cursor         |
+| `limit`     | number | No          | Default 20, max 100       |
 
 One of `listingId` or `userId` is required.
 
@@ -1014,10 +1071,10 @@ One of `listingId` or `userId` is required.
 
 Update an existing review. Only the author can update.
 
-| Field | Value |
-|-------|-------|
-| **Auth** | Authenticated (author only) |
-| **Rate Limit** | Yes (`updateReview`) |
+| Field          | Value                       |
+| -------------- | --------------------------- |
+| **Auth**       | Authenticated (author only) |
+| **Rate Limit** | Yes (`updateReview`)        |
 
 **Request Body:**
 
@@ -1031,10 +1088,10 @@ Update an existing review. Only the author can update.
 
 **Error Responses:**
 
-| Status | Error | Condition |
-|--------|-------|-----------|
-| 403 | `"You can only edit your own reviews"` | Not the author |
-| 404 | `"Review not found"` | Invalid ID |
+| Status | Error                                  | Condition      |
+| ------ | -------------------------------------- | -------------- |
+| 403    | `"You can only edit your own reviews"` | Not the author |
+| 404    | `"Review not found"`                   | Invalid ID     |
 
 ---
 
@@ -1042,16 +1099,16 @@ Update an existing review. Only the author can update.
 
 Delete a review. Only the author can delete.
 
-| Field | Value |
-|-------|-------|
-| **Auth** | Authenticated (author only) |
-| **Rate Limit** | Yes (`deleteReview`) |
+| Field          | Value                       |
+| -------------- | --------------------------- |
+| **Auth**       | Authenticated (author only) |
+| **Rate Limit** | Yes (`deleteReview`)        |
 
 **Query Parameters:**
 
-| Param | Type | Required | Description |
-|-------|------|----------|-------------|
-| `reviewId` | string | Yes | Review to delete |
+| Param      | Type   | Required | Description      |
+| ---------- | ------ | -------- | ---------------- |
+| `reviewId` | string | Yes      | Review to delete |
 
 **Success Response (200):**
 
@@ -1067,11 +1124,11 @@ Delete a review. Only the author can delete.
 
 Toggle a listing as saved/unsaved for the authenticated user.
 
-| Field | Value |
-|-------|-------|
-| **Auth** | Authenticated |
+| Field          | Value                  |
+| -------------- | ---------------------- |
+| **Auth**       | Authenticated          |
 | **Rate Limit** | Yes (`toggleFavorite`) |
-| **Caching** | `private, no-store` |
+| **Caching**    | `private, no-store`    |
 
 **Request Body:**
 
@@ -1079,8 +1136,8 @@ Toggle a listing as saved/unsaved for the authenticated user.
 { "listingId": "clx..." }
 ```
 
-| Field | Type | Rules |
-|-------|------|-------|
+| Field       | Type   | Rules       |
+| ----------- | ------ | ----------- |
 | `listingId` | string | 1-100 chars |
 
 **Success Response (200):**
@@ -1103,9 +1160,9 @@ Or if already saved (toggled off):
 
 Report a listing for policy violations.
 
-| Field | Value |
-|-------|-------|
-| **Auth** | Authenticated |
+| Field          | Value                |
+| -------------- | -------------------- |
+| **Auth**       | Authenticated        |
 | **Rate Limit** | Yes (`createReport`) |
 
 **Request Body:**
@@ -1118,21 +1175,22 @@ Report a listing for policy violations.
 }
 ```
 
-| Field | Type | Rules |
-|-------|------|-------|
-| `listingId` | string | 1-100 chars |
-| `reason` | string | 1-100 chars |
-| `details` | string? | Max 2000 chars |
+| Field       | Type    | Rules          |
+| ----------- | ------- | -------------- |
+| `listingId` | string  | 1-100 chars    |
+| `reason`    | string  | 1-100 chars    |
+| `details`   | string? | Max 2000 chars |
 
 **Success Response (200):** Returns the created report object.
 
 **Error Responses:**
 
-| Status | Error | Condition |
-|--------|-------|-----------|
-| 409 | `"You have already reported this listing..."` | Active report exists (OPEN or RESOLVED) |
+| Status | Error                                         | Condition                               |
+| ------ | --------------------------------------------- | --------------------------------------- |
+| 409    | `"You have already reported this listing..."` | Active report exists (OPEN or RESOLVED) |
 
 **Notes:**
+
 - Allows re-reporting only if previous report was DISMISSED.
 - Report statuses: OPEN, RESOLVED, DISMISSED.
 
@@ -1144,19 +1202,20 @@ Report a listing for policy violations.
 
 Upload an image file to Supabase storage. Validates file type using magic bytes.
 
-| Field | Value |
-|-------|-------|
-| **Auth** | Authenticated |
+| Field          | Value          |
+| -------------- | -------------- |
+| **Auth**       | Authenticated  |
 | **Rate Limit** | Yes (`upload`) |
 
 **Request:** `multipart/form-data`
 
-| Field | Type | Description |
-|-------|------|-------------|
-| `file` | File | Image file (JPEG, PNG, WebP, GIF) |
-| `type` | string | `"profile"` or `"listing"` |
+| Field  | Type   | Description                       |
+| ------ | ------ | --------------------------------- |
+| `file` | File   | Image file (JPEG, PNG, WebP, GIF) |
+| `type` | string | `"profile"` or `"listing"`        |
 
 **Constraints:**
+
 - Max file size: 5MB
 - Allowed types: `image/jpeg`, `image/png`, `image/webp`, `image/gif`
 - Magic bytes validated (prevents MIME spoofing)
@@ -1172,14 +1231,14 @@ Upload an image file to Supabase storage. Validates file type using magic bytes.
 
 **Error Responses:**
 
-| Status | Error | Condition |
-|--------|-------|-----------|
-| 400 | `"No file provided"` | Missing file |
-| 400 | `"File too large..."` | >5MB |
-| 400 | `"Invalid file type..."` | Not an allowed image type |
-| 400 | `"File content does not match declared type..."` | Magic bytes mismatch |
-| 401 | `"Unauthorized"` | Not authenticated |
-| 500 | `"Storage not configured"` | Supabase not configured |
+| Status | Error                                            | Condition                 |
+| ------ | ------------------------------------------------ | ------------------------- |
+| 400    | `"No file provided"`                             | Missing file              |
+| 400    | `"File too large..."`                            | >5MB                      |
+| 400    | `"Invalid file type..."`                         | Not an allowed image type |
+| 400    | `"File content does not match declared type..."` | Magic bytes mismatch      |
+| 401    | `"Unauthorized"`                                 | Not authenticated         |
+| 500    | `"Storage not configured"`                       | Supabase not configured   |
 
 ---
 
@@ -1187,10 +1246,10 @@ Upload an image file to Supabase storage. Validates file type using magic bytes.
 
 Delete an uploaded image from Supabase storage.
 
-| Field | Value |
-|-------|-------|
-| **Auth** | Authenticated (owner only) |
-| **Rate Limit** | Yes (`uploadDelete`) |
+| Field          | Value                      |
+| -------------- | -------------------------- |
+| **Auth**       | Authenticated (owner only) |
+| **Rate Limit** | Yes (`uploadDelete`)       |
 
 **Request Body:**
 
@@ -1198,8 +1257,8 @@ Delete an uploaded image from Supabase storage.
 { "path": "listings/<userId>/filename.jpg" }
 ```
 
-| Field | Type | Rules |
-|-------|------|-------|
+| Field  | Type   | Rules                                                                     |
+| ------ | ------ | ------------------------------------------------------------------------- |
 | `path` | string | 1-500 chars, must start with `profiles/<userId>/` or `listings/<userId>/` |
 
 **Success Response (200):**
@@ -1209,6 +1268,7 @@ Delete an uploaded image from Supabase storage.
 ```
 
 **Notes:**
+
 - Strict prefix validation prevents path traversal attacks (`startsWith` not `includes`).
 - Users can only delete their own files.
 
@@ -1220,12 +1280,12 @@ Delete an uploaded image from Supabase storage.
 
 Search for nearby places using the Radar API. Supports both text search (autocomplete) and category-based search.
 
-| Field | Value |
-|-------|-------|
-| **Auth** | Authenticated |
-| **Rate Limit** | Yes (`nearbySearch`) |
-| **Caching** | `no-store, no-cache, must-revalidate` (compliance requirement) |
-| **Resilience** | Circuit breaker + timeout on Radar API calls |
+| Field          | Value                                                          |
+| -------------- | -------------------------------------------------------------- |
+| **Auth**       | Authenticated                                                  |
+| **Rate Limit** | Yes (`nearbySearch`)                                           |
+| **Caching**    | `no-store, no-cache, must-revalidate` (compliance requirement) |
+| **Resilience** | Circuit breaker + timeout on Radar API calls                   |
 
 **Request Body:**
 
@@ -1239,34 +1299,34 @@ Search for nearby places using the Radar API. Supports both text search (autocom
 }
 ```
 
-| Field | Type | Rules |
-|-------|------|-------|
-| `listingLat` | number | -90 to 90 |
-| `listingLng` | number | -180 to 180 |
-| `query` | string? | Max 100 chars. Text search query. |
-| `categories` | string[]? | Radar category codes (e.g., `["gym", "pharmacy"]`) |
-| `radiusMeters` | number | Must be exactly `1609` (1mi), `3218` (2mi), or `8046` (5mi) |
-| `limit` | number? | 1-50, default 20 |
+| Field          | Type      | Rules                                                       |
+| -------------- | --------- | ----------------------------------------------------------- |
+| `listingLat`   | number    | -90 to 90                                                   |
+| `listingLng`   | number    | -180 to 180                                                 |
+| `query`        | string?   | Max 100 chars. Text search query.                           |
+| `categories`   | string[]? | Radar category codes (e.g., `["gym", "pharmacy"]`)          |
+| `radiusMeters` | number    | Must be exactly `1609` (1mi), `3218` (2mi), or `8046` (5mi) |
+| `limit`        | number?   | 1-50, default 20                                            |
 
 **Search Modes:**
 
-| Input | Mode | API Used |
-|-------|------|----------|
-| `query` only (text search) | Autocomplete | Radar Autocomplete |
-| `query` matching keyword (e.g., "gym") | Category | Radar Places Search |
-| `categories` provided | Category | Radar Places Search |
-| Neither query nor categories | Default categories | Radar Places Search |
+| Input                                  | Mode               | API Used            |
+| -------------------------------------- | ------------------ | ------------------- |
+| `query` only (text search)             | Autocomplete       | Radar Autocomplete  |
+| `query` matching keyword (e.g., "gym") | Category           | Radar Places Search |
+| `categories` provided                  | Category           | Radar Places Search |
+| Neither query nor categories           | Default categories | Radar Places Search |
 
 **Keyword-to-Category Mapping (partial):**
 
-| Keyword | Categories |
-|---------|------------|
-| `gym`, `fitness` | `gym`, `fitness-recreation` |
+| Keyword                  | Categories                    |
+| ------------------------ | ----------------------------- |
+| `gym`, `fitness`         | `gym`, `fitness-recreation`   |
 | `grocery`, `supermarket` | `food-grocery`, `supermarket` |
-| `restaurant` | `restaurant`, `food-beverage` |
-| `coffee`, `cafe` | `coffee-shop`, `cafe` |
-| `pharmacy` | `pharmacy` |
-| `gas`, `gas station` | `gas-station` |
+| `restaurant`             | `restaurant`, `food-beverage` |
+| `coffee`, `cafe`         | `coffee-shop`, `cafe`         |
+| `pharmacy`               | `pharmacy`                    |
+| `gas`, `gas station`     | `gas-station`                 |
 
 **Success Response (200):**
 
@@ -1289,14 +1349,15 @@ Search for nearby places using the Radar API. Supports both text search (autocom
 
 **Error Responses:**
 
-| Status | Error | Condition |
-|--------|-------|-----------|
-| 401 | `"Unauthorized"` | Not authenticated |
-| 503 | `"Nearby search temporarily unavailable"` | Circuit breaker open |
-| 503 | `"Nearby search is not configured"` | RADAR_SECRET_KEY missing |
-| 504 | `"Nearby search timed out"` | Request timeout |
+| Status | Error                                     | Condition                |
+| ------ | ----------------------------------------- | ------------------------ |
+| 401    | `"Unauthorized"`                          | Not authenticated        |
+| 503    | `"Nearby search temporarily unavailable"` | Circuit breaker open     |
+| 503    | `"Nearby search is not configured"`       | RADAR_SECRET_KEY missing |
+| 504    | `"Nearby search timed out"`               | Request timeout          |
 
 **Notes:**
+
 - Category-specific filtering (blocklists/allowlists) removes irrelevant results (e.g., cannabis dispensaries from pharmacy results).
 - Results are sorted by distance from listing.
 - No POI data is stored (compliance requirement).
@@ -1309,15 +1370,16 @@ Search for nearby places using the Radar API. Supports both text search (autocom
 
 Neighborhood chat endpoint powered by Groq (Llama 3.1). Streams AI responses about a listing's neighborhood.
 
-| Field | Value |
-|-------|-------|
-| **Auth** | Public (origin/host enforced in production) |
-| **Rate Limit** | Redis-based (burst + sustained), IP-based |
-| **Max Body Size** | 100KB |
-| **Runtime** | Node.js |
-| **LLM Timeout** | Configurable via `DEFAULT_TIMEOUTS.LLM_STREAM` |
+| Field             | Value                                          |
+| ----------------- | ---------------------------------------------- |
+| **Auth**          | Public (origin/host enforced in production)    |
+| **Rate Limit**    | Redis-based (burst + sustained), IP-based      |
+| **Max Body Size** | 100KB                                          |
+| **Runtime**       | Node.js                                        |
+| **LLM Timeout**   | Configurable via `DEFAULT_TIMEOUTS.LLM_STREAM` |
 
 **Security Stack (in order):**
+
 1. Origin/Host enforcement (exact match from env allowlist)
 2. Content-Type: `application/json` enforcement
 3. Rate limit check (Redis-backed)
@@ -1333,40 +1395,39 @@ Neighborhood chat endpoint powered by Groq (Llama 3.1). Streams AI responses abo
 
 ```json
 {
-  "messages": [
-    { "role": "user", "content": "What gyms are nearby?" }
-  ],
+  "messages": [{ "role": "user", "content": "What gyms are nearby?" }],
   "latitude": 39.7392,
   "longitude": -104.9903
 }
 ```
 
-| Field | Type | Rules |
-|-------|------|-------|
-| `messages` | array | Max 50 messages. Roles: `user`, `assistant`. |
-| `messages[].content` | string | Max 2000 chars for user messages |
-| `latitude` | number | -90 to 90 |
-| `longitude` | number | -180 to 180 |
+| Field                | Type   | Rules                                        |
+| -------------------- | ------ | -------------------------------------------- |
+| `messages`           | array  | Max 50 messages. Roles: `user`, `assistant`. |
+| `messages[].content` | string | Max 2000 chars for user messages             |
+| `latitude`           | number | -90 to 90                                    |
+| `longitude`          | number | -180 to 180                                  |
 
 **Success Response:** Streaming `UIMessageStreamResponse` (Server-Sent Events).
 
 **Error Responses:**
 
-| Status | Error | Condition |
-|--------|-------|-----------|
-| 400 | `"Invalid JSON"` | Parse error |
-| 400 | `"Invalid payload"` | Schema validation failed |
-| 400 | `"Invalid coordinates"` | Out of range |
-| 400 | `"No valid messages"` | Empty after conversion |
-| 403 | `"Forbidden"` | Origin/host not allowed |
-| 403 | `{ "error": "request_blocked", "message": "..." }` | Fair Housing policy violation |
-| 413 | `"Request too large"` | Body > 100KB |
-| 415 | `"Invalid content type"` | Not application/json |
-| 429 | `"Too many requests"` | Rate limited (includes `Retry-After`) |
-| 503 | `"Chat service temporarily unavailable"` | GROQ_API_KEY not configured |
-| 504 | `"Chat response timed out..."` | LLM stream timeout |
+| Status | Error                                              | Condition                             |
+| ------ | -------------------------------------------------- | ------------------------------------- |
+| 400    | `"Invalid JSON"`                                   | Parse error                           |
+| 400    | `"Invalid payload"`                                | Schema validation failed              |
+| 400    | `"Invalid coordinates"`                            | Out of range                          |
+| 400    | `"No valid messages"`                              | Empty after conversion                |
+| 403    | `"Forbidden"`                                      | Origin/host not allowed               |
+| 403    | `{ "error": "request_blocked", "message": "..." }` | Fair Housing policy violation         |
+| 413    | `"Request too large"`                              | Body > 100KB                          |
+| 415    | `"Invalid content type"`                           | Not application/json                  |
+| 429    | `"Too many requests"`                              | Rate limited (includes `Retry-After`) |
+| 503    | `"Chat service temporarily unavailable"`           | GROQ_API_KEY not configured           |
+| 504    | `"Chat response timed out..."`                     | LLM stream timeout                    |
 
 **Notes:**
+
 - Has a `nearbyPlaceSearch` tool that returns structured metadata for client-side rendering.
 - Fair Housing compliance: blocks queries about demographic/protected-class information.
 - Max 5 LLM steps per request.
@@ -1377,11 +1438,11 @@ Neighborhood chat endpoint powered by Groq (Llama 3.1). Streams AI responses abo
 
 Forward questions to an n8n webhook for AI-powered answers about a listing.
 
-| Field | Value |
-|-------|-------|
-| **Auth** | Public |
+| Field          | Value         |
+| -------------- | ------------- |
+| **Auth**       | Public        |
 | **Rate Limit** | Yes (`agent`) |
-| **Timeout** | 30 seconds |
+| **Timeout**    | 30 seconds    |
 
 **Request Body:**
 
@@ -1393,11 +1454,11 @@ Forward questions to an n8n webhook for AI-powered answers about a listing.
 }
 ```
 
-| Field | Type | Rules |
-|-------|------|-------|
+| Field      | Type   | Rules       |
+| ---------- | ------ | ----------- |
 | `question` | string | 2-500 chars |
-| `lat` | number | -90 to 90 |
-| `lng` | number | -180 to 180 |
+| `lat`      | number | -90 to 90   |
+| `lng`      | number | -180 to 180 |
 
 **Success Response (200):**
 
@@ -1416,13 +1477,13 @@ Forward questions to an n8n webhook for AI-powered answers about a listing.
 
 **Error Responses:**
 
-| Status | Error | Condition |
-|--------|-------|-----------|
-| 400 | `"Question is required"` | Missing question |
-| 400 | `"Question is too short"` | < 2 chars |
-| 400 | `"Question is too long..."` | > 500 chars |
-| 400 | `"Invalid coordinates"` | Out of range |
-| 503 | `"Service temporarily unavailable"` | N8N_WEBHOOK_URL not configured |
+| Status | Error                               | Condition                      |
+| ------ | ----------------------------------- | ------------------------------ |
+| 400    | `"Question is required"`            | Missing question               |
+| 400    | `"Question is too short"`           | < 2 chars                      |
+| 400    | `"Question is too long..."`         | > 500 chars                    |
+| 400    | `"Invalid coordinates"`             | Out of range                   |
+| 503    | `"Service temporarily unavailable"` | N8N_WEBHOOK_URL not configured |
 
 ---
 
@@ -1432,11 +1493,11 @@ Forward questions to an n8n webhook for AI-powered answers about a listing.
 
 Liveness probe. Returns 200 if the process is running. Use for load balancer health checks.
 
-| Field | Value |
-|-------|-------|
-| **Auth** | Public |
-| **Rate Limit** | None |
-| **Caching** | `no-cache, no-store, must-revalidate` |
+| Field          | Value                                 |
+| -------------- | ------------------------------------- |
+| **Auth**       | Public                                |
+| **Rate Limit** | None                                  |
+| **Caching**    | `no-cache, no-store, must-revalidate` |
 
 **Success Response (200):**
 
@@ -1454,12 +1515,12 @@ Liveness probe. Returns 200 if the process is running. Use for load balancer hea
 
 Readiness probe. Checks database and Redis connectivity. Returns 503 during graceful shutdown.
 
-| Field | Value |
-|-------|-------|
-| **Auth** | Public |
-| **Rate Limit** | None |
-| **Caching** | `no-cache, no-store, must-revalidate` |
-| **Runtime** | Node.js |
+| Field          | Value                                 |
+| -------------- | ------------------------------------- |
+| **Auth**       | Public                                |
+| **Rate Limit** | None                                  |
+| **Caching**    | `no-cache, no-store, must-revalidate` |
+| **Runtime**    | Node.js                               |
 
 **Success Response (200):**
 
@@ -1498,6 +1559,7 @@ Readiness probe. Checks database and Redis connectivity. Returns 503 during grac
 ```
 
 **Notes:**
+
 - Database check is critical (fails readiness if down).
 - Redis is optional (has DB fallback for rate limiting).
 - Supabase is checked for configuration only.
@@ -1508,12 +1570,12 @@ Readiness probe. Checks database and Redis connectivity. Returns 503 during grac
 
 Privacy-safe metrics logging endpoint. Computes HMAC of listing IDs so raw IDs are never stored.
 
-| Field | Value |
-|-------|-------|
-| **Auth** | Origin/Host enforced in production |
-| **Rate Limit** | Redis-based (separate prefix from chat) |
-| **Max Body Size** | 10KB |
-| **Runtime** | Node.js |
+| Field             | Value                                   |
+| ----------------- | --------------------------------------- |
+| **Auth**          | Origin/Host enforced in production      |
+| **Rate Limit**    | Redis-based (separate prefix from chat) |
+| **Max Body Size** | 10KB                                    |
+| **Runtime**       | Node.js                                 |
 
 **Request Body:**
 
@@ -1529,15 +1591,15 @@ Privacy-safe metrics logging endpoint. Computes HMAC of listing IDs so raw IDs a
 }
 ```
 
-| Field | Type | Rules |
-|-------|------|-------|
-| `listingId` | string | Max 64 chars |
-| `sid` | string | Session ID, max 64 chars |
-| `route` | string | `"nearby"` or `"llm"` |
-| `blocked` | boolean | Whether the request was blocked |
-| `type` | string? | `"type"` or `"text"` |
-| `types` | string[]? | Max 8 items, each from allowlist of Google Place types |
-| `count` | number? | 0-100 |
+| Field       | Type      | Rules                                                  |
+| ----------- | --------- | ------------------------------------------------------ |
+| `listingId` | string    | Max 64 chars                                           |
+| `sid`       | string    | Session ID, max 64 chars                               |
+| `route`     | string    | `"nearby"` or `"llm"`                                  |
+| `blocked`   | boolean   | Whether the request was blocked                        |
+| `type`      | string?   | `"type"` or `"text"`                                   |
+| `types`     | string[]? | Max 8 items, each from allowlist of Google Place types |
+| `count`     | number?   | 0-100                                                  |
 
 **Success Response (200):**
 
@@ -1546,6 +1608,7 @@ Privacy-safe metrics logging endpoint. Computes HMAC of listing IDs so raw IDs a
 ```
 
 **Notes:**
+
 - Uses HMAC-SHA256 to hash listing IDs -- raw IDs never stored.
 - Strict allowlist of place types (excludes religion, education).
 - If `LOG_HMAC_SECRET` is not set, accepts request but skips logging (fail closed).
@@ -1557,12 +1620,12 @@ Privacy-safe metrics logging endpoint. Computes HMAC of listing IDs so raw IDs a
 
 Prometheus-compatible system metrics. Returns process stats in Prometheus text format.
 
-| Field | Value |
-|-------|-------|
-| **Auth** | Bearer token (`METRICS_SECRET` env var) |
-| **Rate Limit** | None |
-| **Runtime** | Node.js |
-| **Caching** | `no-cache, no-store, must-revalidate` |
+| Field          | Value                                   |
+| -------------- | --------------------------------------- |
+| **Auth**       | Bearer token (`METRICS_SECRET` env var) |
+| **Rate Limit** | None                                    |
+| **Runtime**    | Node.js                                 |
+| **Caching**    | `no-cache, no-store, must-revalidate`   |
 
 **Headers Required:**
 
@@ -1587,6 +1650,7 @@ app_info{version="87ad11e",node_version="v20.11.0"} 1
 ```
 
 **Metrics Exposed:**
+
 - `process_uptime_seconds`
 - `nodejs_heap_size_used_bytes`
 - `nodejs_heap_size_total_bytes`
@@ -1607,9 +1671,9 @@ All cron endpoints are secured with `CRON_SECRET` (Bearer token, min 32 chars, p
 
 Delete expired rate limit entries from the database.
 
-| Field | Value |
-|-------|-------|
-| **Auth** | Bearer token (`CRON_SECRET`) |
+| Field        | Value                                    |
+| ------------ | ---------------------------------------- |
+| **Auth**     | Bearer token (`CRON_SECRET`)             |
 | **Schedule** | Periodic (recommended: every 15 minutes) |
 
 **Success Response (200):**
@@ -1628,10 +1692,10 @@ Delete expired rate limit entries from the database.
 
 Process dirty listings and update search index documents. Uses a dirty-flag sweeper pattern for incremental updates.
 
-| Field | Value |
-|-------|-------|
-| **Auth** | Bearer token (`CRON_SECRET`) |
-| **Schedule** | Every 5 minutes (recommended) |
+| Field          | Value                                          |
+| -------------- | ---------------------------------------------- |
+| **Auth**       | Bearer token (`CRON_SECRET`)                   |
+| **Schedule**   | Every 5 minutes (recommended)                  |
 | **Batch Size** | 100 (configurable via `SEARCH_DOC_BATCH_SIZE`) |
 
 **Success Response (200):**
@@ -1647,13 +1711,14 @@ Process dirty listings and update search index documents. Uses a dirty-flag swee
 }
 ```
 
-| Field | Description |
-|-------|-------------|
-| `processed` | Number of search docs updated |
-| `orphans` | Number of dirty flags for deleted listings (cleaned up) |
-| `errors` | Number of individual upsert failures |
+| Field       | Description                                             |
+| ----------- | ------------------------------------------------------- |
+| `processed` | Number of search docs updated                           |
+| `orphans`   | Number of dirty flags for deleted listings (cleaned up) |
+| `errors`    | Number of individual upsert failures                    |
 
 **Notes:**
+
 - Processes oldest dirty flags first (fairness).
 - Computes recommended score with time decay, freshness boost, and log-scaled views.
 - Handles orphan dirty flags (deleted listings) by cleaning up search docs.
@@ -1664,11 +1729,11 @@ Process dirty listings and update search index documents. Uses a dirty-flag swee
 
 Process saved search alerts. Matches new listings against user-saved search criteria and sends notifications.
 
-| Field | Value |
-|-------|-------|
-| **Auth** | Bearer token (`CRON_SECRET`) |
-| **Schedule** | Periodic (recommended: every 15-30 minutes) |
-| **Also supports** | POST (same behavior) |
+| Field             | Value                                       |
+| ----------------- | ------------------------------------------- |
+| **Auth**          | Bearer token (`CRON_SECRET`)                |
+| **Schedule**      | Periodic (recommended: every 15-30 minutes) |
+| **Also supports** | POST (same behavior)                        |
 
 **Success Response (200):**
 
@@ -1691,13 +1756,13 @@ Most endpoints use NextAuth.js session-based authentication. The session is obta
 
 **Auth levels:**
 
-| Level | Description |
-|-------|-------------|
-| Public | No authentication required |
-| Authenticated | Valid session required (returns 401 if missing) |
-| Owner | Authenticated + must own the resource (returns 403 if not owner) |
-| Email Verified | Authenticated + email must be verified (returns 403 if not) |
-| Not Suspended | Authenticated + account must not be suspended (returns 403 if suspended) |
+| Level          | Description                                                              |
+| -------------- | ------------------------------------------------------------------------ |
+| Public         | No authentication required                                               |
+| Authenticated  | Valid session required (returns 401 if missing)                          |
+| Owner          | Authenticated + must own the resource (returns 403 if not owner)         |
+| Email Verified | Authenticated + email must be verified (returns 403 if not)              |
+| Not Suspended  | Authenticated + account must not be suspended (returns 403 if suspended) |
 
 ### Rate Limiting
 
@@ -1712,10 +1777,10 @@ Rate limit responses return HTTP 429 with details in the response body.
 
 Endpoints supporting pagination accept:
 
-| Param | Type | Default | Max | Description |
-|-------|------|---------|-----|-------------|
-| `cursor` | string | - | - | ID of last item (alphanumeric + hyphens only) |
-| `limit` | number | 20 | 100 | Items per page |
+| Param    | Type   | Default | Max | Description                                   |
+| -------- | ------ | ------- | --- | --------------------------------------------- |
+| `cursor` | string | -       | -   | ID of last item (alphanumeric + hyphens only) |
+| `limit`  | number | 20      | 100 | Items per page                                |
 
 Response format:
 
@@ -1754,17 +1819,18 @@ Some endpoints include additional fields:
 
 ### Cache-Control Headers
 
-| Pattern | Header | Use Case |
-|---------|--------|----------|
-| User-specific data | `private, no-store` | Messages, favorites, conversations |
-| Public search data | `public, s-maxage=60, max-age=30, stale-while-revalidate=120` | Search results, map listings |
-| Health checks | `no-cache, no-store, must-revalidate` | Liveness, readiness |
-| Mutations | `no-store` | Creates, updates, deletes |
-| Compliance | `no-store, no-cache, must-revalidate` | Nearby places (no POI caching) |
+| Pattern            | Header                                                        | Use Case                           |
+| ------------------ | ------------------------------------------------------------- | ---------------------------------- |
+| User-specific data | `private, no-store`                                           | Messages, favorites, conversations |
+| Public search data | `public, s-maxage=60, max-age=30, stale-while-revalidate=120` | Search results, map listings       |
+| Health checks      | `no-cache, no-store, must-revalidate`                         | Liveness, readiness                |
+| Mutations          | `no-store`                                                    | Creates, updates, deletes          |
+| Compliance         | `no-store, no-cache, must-revalidate`                         | Nearby places (no POI caching)     |
 
 ### Idempotency
 
 The `POST /api/listings` endpoint supports idempotency via the `X-Idempotency-Key` header. When provided:
+
 - First request: Executes the operation and caches the result.
 - Subsequent requests with the same key + user + body hash: Returns cached result with `X-Idempotency-Replayed: true` header.
 - Mismatched body: Returns a 400 error.
@@ -1772,5 +1838,6 @@ The `POST /api/listings` endpoint supports idempotency via the `X-Idempotency-Ke
 ### Request Context
 
 Search endpoints use request context tracking:
+
 - `x-request-id` header is set on all responses for debugging.
 - Context is created from incoming request headers and propagated through the request lifecycle.

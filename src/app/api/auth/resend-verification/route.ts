@@ -4,10 +4,17 @@ import { auth } from "@/auth";
 import { sendNotificationEmail } from "@/lib/email";
 import { withRateLimit } from "@/lib/with-rate-limit";
 import { normalizeEmail } from "@/lib/normalize-email";
-import { createTokenPair } from "@/lib/token-security";
 import { logger, sanitizeErrorMessage } from "@/lib/logger";
 import { validateCsrf } from "@/lib/csrf";
+import {
+  clearPendingVerificationToken,
+  prepareVerificationTokenRotation,
+  promotePendingVerificationToken,
+} from "@/lib/verification-token-store";
 import * as Sentry from "@sentry/nextjs";
+
+const RESEND_VERIFICATION_IN_PROGRESS_ERROR =
+  "A verification email is already being prepared. Please wait a moment and try again if it doesn't arrive.";
 
 export async function POST(request: NextRequest) {
   const csrfResponse = validateCsrf(request);
@@ -44,30 +51,20 @@ export async function POST(request: NextRequest) {
       );
     }
 
-    // Delete any existing verification tokens for this email
-    await prisma.verificationToken.deleteMany({
-      where: { identifier: user.email! },
-    });
-
-    // Generate new verification token (store only SHA-256 hash)
-    const { token: verificationToken, tokenHash: verificationTokenHash } =
-      createTokenPair();
-    const expires = new Date(Date.now() + 24 * 60 * 60 * 1000); // 24 hours
-
-    await prisma.verificationToken.create({
-      data: {
-        identifier: user.email!,
-        tokenHash: verificationTokenHash,
-        expires,
-      },
-    });
+    const preparedToken = await prepareVerificationTokenRotation(user.email!);
+    if (preparedToken.status === "conflict") {
+      return NextResponse.json(
+        { error: RESEND_VERIFICATION_IN_PROGRESS_ERROR },
+        { status: 409 }
+      );
+    }
 
     // Build verification URL
     const baseUrl =
       process.env.AUTH_URL ||
       process.env.NEXTAUTH_URL ||
       "http://localhost:3000";
-    const verificationUrl = `${baseUrl}/api/auth/verify-email?token=${verificationToken}`;
+    const verificationUrl = `${baseUrl}/verify-email?token=${preparedToken.token}`;
 
     // Send verification email
     const emailResult = await sendNotificationEmail(
@@ -79,10 +76,41 @@ export async function POST(request: NextRequest) {
       }
     );
     if (!emailResult.success) {
+      try {
+        await clearPendingVerificationToken(
+          user.email!,
+          preparedToken.tokenHash
+        );
+      } catch (cleanupError) {
+        logger.sync.warn("Failed to clear pending verification token", {
+          error: sanitizeErrorMessage(cleanupError),
+          route: "/api/auth/resend-verification",
+        });
+      }
+
       return NextResponse.json(
         { error: "Email service temporarily unavailable" },
         { status: 503 }
       );
+    }
+
+    try {
+      const promoted = await promotePendingVerificationToken(
+        user.email!,
+        preparedToken.tokenHash
+      );
+
+      if (!promoted) {
+        logger.sync.warn("Verification token promotion skipped", {
+          route: "/api/auth/resend-verification",
+        });
+      }
+    } catch (promotionError) {
+      logger.sync.warn("Failed to promote verification token", {
+        error: sanitizeErrorMessage(promotionError),
+        route: "/api/auth/resend-verification",
+      });
+      Sentry.captureException(promotionError);
     }
 
     return NextResponse.json({

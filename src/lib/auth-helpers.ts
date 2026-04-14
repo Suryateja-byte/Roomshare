@@ -8,6 +8,7 @@ import "server-only";
 import { NextRequest, NextResponse } from "next/server";
 import { getToken } from "next-auth/jwt";
 import { prisma } from "@/lib/prisma";
+import { getPasswordRevocationState } from "@/lib/password-revocation";
 
 // Re-export from standalone module for backward compatibility (auth.ts imports from here)
 export { normalizeEmail } from "./normalize-email";
@@ -119,6 +120,14 @@ function buildSuspensionBlockedResponse(): NextResponse {
   );
 }
 
+function buildPasswordChangedRedirectResponse(
+  request: NextRequest
+): NextResponse {
+  const loginUrl = new URL("/login", request.nextUrl.origin);
+  loginUrl.searchParams.set("reason", "password_changed");
+  return NextResponse.redirect(loginUrl);
+}
+
 /**
  * Check current suspension status directly from the database.
  * This reduces token staleness for recently suspended users.
@@ -133,22 +142,20 @@ function buildSuspensionBlockedResponse(): NextResponse {
 // In-memory cache for suspension status — reduces DB queries on warm instances.
 // In Edge Runtime this cache is per-invocation (no benefit); in Node.js Runtime
 // it persists across warm invocations within the same function instance.
-// H-1: Extended security status (suspension + password change) with shared cache
-interface LiveUserSecurityStatus {
-  isSuspended: boolean | undefined;
-  passwordChangedAt: Date | null | undefined;
-}
-
 /** @internal Exported for test cleanup only */
 export const _suspensionCache = new Map<
   string,
-  { value: LiveUserSecurityStatus; expiresAt: number }
+  { value: boolean | undefined; expiresAt: number }
 >();
 const SUSPENSION_CACHE_TTL = 5 * 60 * 1000; // 5 minutes
 
-async function getLiveSecurityStatus(
+export function invalidateLiveSecurityStatusCache(userId: string): void {
+  _suspensionCache.delete(userId);
+}
+
+async function getLiveSuspensionStatus(
   userId: string
-): Promise<LiveUserSecurityStatus> {
+): Promise<boolean | undefined> {
   const cached = _suspensionCache.get(userId);
   if (cached && cached.expiresAt > Date.now()) {
     return cached.value;
@@ -157,13 +164,10 @@ async function getLiveSecurityStatus(
   try {
     const user = await prisma.user.findUnique({
       where: { id: userId },
-      select: { isSuspended: true, passwordChangedAt: true },
+      select: { isSuspended: true },
     });
 
-    const value: LiveUserSecurityStatus = {
-      isSuspended: user?.isSuspended === true,
-      passwordChangedAt: user?.passwordChangedAt ?? null,
-    };
+    const value = user?.isSuspended === true;
     _suspensionCache.set(userId, {
       value,
       expiresAt: Date.now() + SUSPENSION_CACHE_TTL,
@@ -177,7 +181,7 @@ async function getLiveSecurityStatus(
 
     return value;
   } catch {
-    return { isSuspended: undefined, passwordChangedAt: undefined };
+    return undefined;
   }
 }
 
@@ -224,26 +228,29 @@ export async function checkSuspension(
     return buildSuspensionBlockedResponse();
   }
 
+  if (token.passwordInvalidated === true) {
+    return buildPasswordChangedRedirectResponse(request);
+  }
+
   // Live check: catch newly suspended users before token refresh.
   const userId = typeof token.sub === "string" ? token.sub : undefined;
   if (!userId) {
     return null;
   }
 
-  const securityStatus = await getLiveSecurityStatus(userId);
-  if (securityStatus.isSuspended) {
+  const isSuspended = await getLiveSuspensionStatus(userId);
+  if (isSuspended) {
     return buildSuspensionBlockedResponse();
   }
 
-  // H-1: Password change invalidation (piggyback on existing DB query, zero new cost)
-  if (securityStatus.passwordChangedAt && token.authTime) {
-    const changedAtEpoch = Math.floor(
-      securityStatus.passwordChangedAt.getTime() / 1000
-    );
-    if (changedAtEpoch > (token.authTime as number)) {
-      const loginUrl = new URL("/login", request.nextUrl.origin);
-      loginUrl.searchParams.set("reason", "password_changed");
-      return NextResponse.redirect(loginUrl);
+  const authTime =
+    typeof token.authTime === "number" ? token.authTime : undefined;
+
+  // Password revocation uses a live DB read on every authenticated protected request.
+  if (authTime) {
+    const revocationCheck = await getPasswordRevocationState(userId, authTime);
+    if (revocationCheck.state === "revoked") {
+      return buildPasswordChangedRedirectResponse(request);
     }
   }
 

@@ -4,6 +4,8 @@
  * Turnstile verification, email normalization, token-security, response shape
  */
 
+import { Prisma } from "@prisma/client";
+
 jest.mock("@/lib/prisma", () => ({
   prisma: {
     user: {
@@ -71,6 +73,24 @@ import { verifyTurnstileToken } from "@/lib/turnstile";
 import { normalizeEmail } from "@/lib/normalize-email";
 import { createTokenPair } from "@/lib/token-security";
 import { sendNotificationEmail } from "@/lib/email";
+import { captureApiError } from "@/lib/api-error-handler";
+
+const DUPLICATE_REGISTRATION_ERROR =
+  "Registration failed. Please try again or use forgot password if you already have an account.";
+
+function createP2002Error(
+  target: string[] | string,
+  modelName?: string
+) {
+  return new Prisma.PrismaClientKnownRequestError("Unique constraint failed", {
+    code: "P2002",
+    clientVersion: "test",
+    meta: {
+      target,
+      ...(modelName ? { modelName } : {}),
+    },
+  });
+}
 
 describe("POST /api/register — edge cases", () => {
   const validBody = {
@@ -187,6 +207,25 @@ describe("POST /api/register — edge cases", () => {
     expect(data.verificationEmailSent).toBe(false);
   });
 
+  it("sends signup verification links to the confirm page", async () => {
+    const request = new Request("http://localhost/api/register", {
+      method: "POST",
+      body: JSON.stringify(validBody),
+    });
+
+    await POST(request);
+
+    expect(sendNotificationEmail).toHaveBeenCalledWith(
+      "welcomeEmail",
+      "test@example.com",
+      expect.objectContaining({
+        verificationUrl: expect.stringContaining(
+          "/verify-email?token=mock-token"
+        ),
+      })
+    );
+  });
+
   it("returns 400 for password shorter than 12 characters", async () => {
     const request = new Request("http://localhost/api/register", {
       method: "POST",
@@ -234,10 +273,110 @@ describe("POST /api/register — edge cases", () => {
 
     expect(response.status).toBe(400);
     // Must not say "email already in use" or similar — generic message only
-    expect(data.error).toBe(
-      "Registration failed. Please try again or use forgot password if you already have an account."
-    );
+    expect(data.error).toBe(DUPLICATE_REGISTRATION_ERROR);
     expect(data.error).not.toContain("exists");
     expect(data.error).not.toContain("taken");
+  });
+
+  it("returns the same duplicate response for precheck and raced duplicate paths", async () => {
+    (prisma.user.findUnique as jest.Mock).mockResolvedValueOnce(null);
+    (prisma.$transaction as jest.Mock).mockRejectedValueOnce(
+      createP2002Error(["email"])
+    );
+
+    const racedResponse = await POST(
+      new Request("http://localhost/api/register", {
+        method: "POST",
+        body: JSON.stringify(validBody),
+      })
+    );
+    const racedBody = await racedResponse.json();
+
+    (prisma.user.findUnique as jest.Mock).mockResolvedValueOnce({
+      id: "existing-user",
+    });
+
+    const existingResponse = await POST(
+      new Request("http://localhost/api/register", {
+        method: "POST",
+        body: JSON.stringify(validBody),
+      })
+    );
+    const existingBody = await existingResponse.json();
+
+    expect(racedResponse.status).toBe(400);
+    expect(racedResponse.status).toBe(existingResponse.status);
+    expect(racedBody).toEqual(existingBody);
+  });
+
+  it("does not send welcome email when transaction loses the duplicate race", async () => {
+    (prisma.$transaction as jest.Mock).mockRejectedValueOnce(
+      createP2002Error(["email"])
+    );
+
+    const response = await POST(
+      new Request("http://localhost/api/register", {
+        method: "POST",
+        body: JSON.stringify(validBody),
+      })
+    );
+    const data = await response.json();
+
+    expect(response.status).toBe(400);
+    expect(data.error).toBe(DUPLICATE_REGISTRATION_ERROR);
+    expect(sendNotificationEmail).not.toHaveBeenCalled();
+    expect(captureApiError).not.toHaveBeenCalled();
+  });
+
+  it("returns the duplicate response when the verification token identifier loses the race", async () => {
+    (prisma.$transaction as jest.Mock).mockRejectedValueOnce(
+      createP2002Error(["identifier"], "VerificationToken")
+    );
+
+    const response = await POST(
+      new Request("http://localhost/api/register", {
+        method: "POST",
+        body: JSON.stringify(validBody),
+      })
+    );
+    const data = await response.json();
+
+    expect(response.status).toBe(400);
+    expect(data.error).toBe(DUPLICATE_REGISTRATION_ERROR);
+    expect(sendNotificationEmail).not.toHaveBeenCalled();
+    expect(captureApiError).not.toHaveBeenCalled();
+  });
+
+  it("accepts string-form verification token identifier targets as duplicate races", async () => {
+    (prisma.$transaction as jest.Mock).mockRejectedValueOnce(
+      createP2002Error("VerificationToken.identifier")
+    );
+
+    const response = await POST(
+      new Request("http://localhost/api/register", {
+        method: "POST",
+        body: JSON.stringify(validBody),
+      })
+    );
+
+    expect(response.status).toBe(400);
+    expect(captureApiError).not.toHaveBeenCalled();
+  });
+
+  it("still routes non-email P2002 errors through the generic 500 handler", async () => {
+    (prisma.$transaction as jest.Mock).mockRejectedValueOnce(
+      createP2002Error(["tokenHash"])
+    );
+
+    const response = await POST(
+      new Request("http://localhost/api/register", {
+        method: "POST",
+        body: JSON.stringify(validBody),
+      })
+    );
+
+    expect(response.status).toBe(500);
+    expect(captureApiError).toHaveBeenCalled();
+    expect(sendNotificationEmail).not.toHaveBeenCalled();
   });
 });
