@@ -562,7 +562,9 @@ function setDesktopAvoidRects(
     document.querySelectorAll<HTMLElement>("[data-map-avoid]")
   );
 
-  rects.slice(0, avoidElements.length).forEach((rect, index) => {
+  expect(rects).toHaveLength(avoidElements.length);
+
+  rects.forEach((rect, index) => {
     const element = avoidElements[index];
     if (!element) return;
     element.getBoundingClientRect = jest
@@ -1498,8 +1500,6 @@ describe("Map Component", () => {
 
       setDesktopMapPaneRect();
       setDesktopAvoidRects([
-        { left: 0, top: 0, width: 0, height: 0 },
-        { left: 560, top: 20, width: 200, height: 240 },
         { left: 560, top: 20, width: 200, height: 240 },
       ]);
       mockMapInstance.project.mockReturnValue({ x: 500, y: 340 });
@@ -2238,7 +2238,7 @@ describe("Map Component", () => {
   });
 
   describe("desktop map controls", () => {
-    it("renders the hide map button on desktop", async () => {
+    it("renders the desktop map tools trigger on desktop", async () => {
       render(<MapComponent listings={mockListings} />);
 
       await act(async () => {
@@ -2246,7 +2246,7 @@ describe("Map Component", () => {
       });
 
       expect(
-        screen.getByRole("button", { name: /hide map/i })
+        screen.getByRole("button", { name: /map tools/i })
       ).toBeInTheDocument();
     });
 
