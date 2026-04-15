@@ -14,6 +14,10 @@ import {
   getClientIPFromHeaders,
 } from "@/lib/rate-limit";
 import { headers } from "next/headers";
+import {
+  HOST_MANAGED_WRITE_ERROR_MESSAGES,
+  prepareHostManagedListingWrite,
+} from "@/lib/listings/host-managed-write";
 
 // Helper to check admin status — exported for use in other admin action files (verification.ts etc.)
 export async function requireAdmin() {
@@ -306,6 +310,7 @@ export async function getListingsForAdmin(options?: {
           title: true,
           price: true,
           status: true,
+          version: true,
           images: true,
           viewCount: true,
           createdAt: true,
@@ -350,7 +355,8 @@ export async function getListingsForAdmin(options?: {
 
 export async function updateListingStatus(
   listingId: string,
-  status: ListingStatus
+  status: ListingStatus,
+  expectedVersion: number
 ) {
   const adminCheck = await requireAdmin();
   if (adminCheck.error) {
@@ -370,19 +376,119 @@ export async function updateListingStatus(
   }
 
   try {
-    const listing = await prisma.listing.findUnique({
-      where: { id: listingId },
-      select: { status: true, title: true, ownerId: true },
+    const result = await prisma.$transaction(async (tx) => {
+      const [listing] = await tx.$queryRaw<
+        Array<{
+          id: string;
+          status: ListingStatus;
+          title: string;
+          ownerId: string;
+          version: number;
+          availabilitySource: "LEGACY_BOOKING" | "HOST_MANAGED";
+          statusReason: string | null;
+          needsMigrationReview: boolean;
+          openSlots: number | null;
+          availableSlots: number;
+          totalSlots: number;
+          moveInDate: Date | null;
+          availableUntil: Date | null;
+          minStayMonths: number;
+          lastConfirmedAt: Date | null;
+          freshnessReminderSentAt: Date | null;
+          freshnessWarningSentAt: Date | null;
+          autoPausedAt: Date | null;
+        }>
+      >`
+        SELECT
+          id,
+          status,
+          title,
+          "ownerId",
+          version,
+          "availabilitySource",
+          "statusReason",
+          "needsMigrationReview",
+          "openSlots",
+          "availableSlots",
+          "totalSlots",
+          "moveInDate",
+          "availableUntil",
+          "minStayMonths",
+          "lastConfirmedAt",
+          "freshnessReminderSentAt",
+          "freshnessWarningSentAt",
+          "autoPausedAt"
+        FROM "Listing"
+        WHERE id = ${listingId}
+        FOR UPDATE
+      `;
+
+      if (!listing) {
+        return { error: "Listing not found" } as const;
+      }
+
+      if (listing.version !== expectedVersion) {
+        return {
+          error: HOST_MANAGED_WRITE_ERROR_MESSAGES.VERSION_CONFLICT,
+          code: "VERSION_CONFLICT",
+        } as const;
+      }
+
+      if (listing.availabilitySource === "HOST_MANAGED") {
+        const preparedWrite = prepareHostManagedListingWrite(
+          listing,
+          {
+            expectedVersion,
+            status,
+          },
+          {
+            actor: "admin",
+            now: new Date(),
+          }
+        );
+
+        if (!preparedWrite.ok) {
+          return {
+            error: preparedWrite.error,
+            code: preparedWrite.code,
+          } as const;
+        }
+
+        await tx.listing.update({
+          where: { id: listingId },
+          data: preparedWrite.data,
+        });
+
+        return {
+          success: true,
+          listingTitle: listing.title,
+          ownerId: listing.ownerId,
+          previousStatus: listing.status,
+          status: preparedWrite.status,
+          statusReason: preparedWrite.statusReason,
+          version: preparedWrite.nextVersion,
+        } as const;
+      }
+
+      await tx.listing.update({
+        where: { id: listingId },
+        data: { status, version: listing.version + 1 },
+      });
+
+      return {
+        success: true,
+        listingTitle: listing.title,
+        ownerId: listing.ownerId,
+        previousStatus: listing.status,
+        status,
+        statusReason: listing.statusReason,
+        version: listing.version + 1,
+      } as const;
     });
 
-    if (!listing) {
-      return { error: "Listing not found" };
+    if ("error" in result) {
+      return result;
     }
-
-    await prisma.listing.update({
-      where: { id: listingId },
-      data: { status },
-    });
 
     // Fire-and-forget: mark listing dirty for search doc refresh
     markListingDirty(listingId, "status_changed").catch((err) => {
@@ -397,24 +503,30 @@ export async function updateListingStatus(
     // Audit log
     await logAdminAction({
       adminId: adminCheck.userId!,
-      action:
-        status === "PAUSED"
+        action:
+        result.status === "PAUSED"
           ? "LISTING_HIDDEN"
-          : status === "RENTED"
+          : result.status === "RENTED"
             ? "LISTING_RENTED"
             : "LISTING_RESTORED",
       targetType: "Listing",
       targetId: listingId,
       details: {
-        previousStatus: listing.status,
-        newStatus: status,
-        listingTitle: listing.title,
-        ownerId: listing.ownerId,
+        previousStatus: result.previousStatus,
+        newStatus: result.status,
+        statusReason: result.statusReason,
+        listingTitle: result.listingTitle,
+        ownerId: result.ownerId,
       },
     });
 
     revalidatePath("/admin/listings");
-    return { success: true };
+    return {
+      success: true,
+      status: result.status,
+      statusReason: result.statusReason,
+      version: result.version,
+    };
   } catch (error) {
     logger.sync.error("Failed to update listing status (admin)", {
       action: "updateListingStatus",

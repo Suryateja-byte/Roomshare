@@ -34,6 +34,7 @@ import {
   getFuturePeakReservedLoad,
   syncFutureInventoryTotalSlots,
 } from "@/lib/availability";
+import { requiresDedicatedHostManagedWritePath } from "@/lib/listings/host-managed-write";
 
 const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL;
 const supabaseServiceKey = process.env.SUPABASE_SERVICE_ROLE_KEY;
@@ -610,8 +611,12 @@ export async function PATCH(
           bookingMode !== lockedListing.bookingMode;
         const totalSlotsChanged = totalSlots !== lockedListing.totalSlots;
         const hostManagedInventoryMutation =
-          lockedListing.availabilitySource === "HOST_MANAGED" &&
-          (moveInDateChanged || bookingModeChanged || totalSlotsChanged);
+          requiresDedicatedHostManagedWritePath({
+            availabilitySource: lockedListing.availabilitySource,
+            moveInDateChanged,
+            bookingModeChanged,
+            totalSlotsChanged,
+          });
 
         if (hostManagedInventoryMutation) {
           throw new Error("HOST_MANAGED_WRITE_PATH_REQUIRED");

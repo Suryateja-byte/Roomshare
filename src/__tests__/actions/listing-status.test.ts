@@ -34,6 +34,7 @@ jest.mock("@/lib/prisma", () => ({
     $transaction: jest.fn((fn: (tx: typeof mockTx) => Promise<unknown>) =>
       fn(mockTx)
     ),
+    $executeRaw: jest.fn(),
   },
 }));
 
@@ -72,6 +73,48 @@ describe("listing-status actions", () => {
     status: "ACTIVE",
   };
 
+  function makeLockedListingRow(
+    overrides: Partial<{
+      ownerId: string;
+      version: number;
+      availabilitySource: "LEGACY_BOOKING" | "HOST_MANAGED";
+      status: "ACTIVE" | "PAUSED" | "RENTED";
+      statusReason: string | null;
+      needsMigrationReview: boolean;
+      openSlots: number | null;
+      availableSlots: number;
+      totalSlots: number;
+      moveInDate: Date | null;
+      availableUntil: Date | null;
+      minStayMonths: number;
+      lastConfirmedAt: Date | null;
+      freshnessReminderSentAt: Date | null;
+      freshnessWarningSentAt: Date | null;
+      autoPausedAt: Date | null;
+    }> = {}
+  ) {
+    return {
+      id: "listing-123",
+      ownerId: "user-123",
+      version: 3,
+      availabilitySource: "LEGACY_BOOKING" as const,
+      status: "ACTIVE" as const,
+      statusReason: null,
+      needsMigrationReview: false,
+      openSlots: null,
+      availableSlots: 2,
+      totalSlots: 2,
+      moveInDate: new Date("2026-05-01T00:00:00.000Z"),
+      availableUntil: null,
+      minStayMonths: 1,
+      lastConfirmedAt: null,
+      freshnessReminderSentAt: null,
+      freshnessWarningSentAt: null,
+      autoPausedAt: null,
+      ...overrides,
+    };
+  }
+
   beforeEach(() => {
     jest.clearAllMocks();
     (auth as jest.Mock).mockResolvedValue(mockSession);
@@ -87,7 +130,7 @@ describe("listing-status actions", () => {
       it("returns error when not authenticated", async () => {
         (auth as jest.Mock).mockResolvedValue(null);
 
-        const result = await updateListingStatus("listing-123", "PAUSED");
+        const result = await updateListingStatus("listing-123", "PAUSED", 3);
 
         expect(result.error).toBe("Unauthorized");
       });
@@ -95,7 +138,7 @@ describe("listing-status actions", () => {
       it("returns error when user id is missing", async () => {
         (auth as jest.Mock).mockResolvedValue({ user: {} });
 
-        const result = await updateListingStatus("listing-123", "PAUSED");
+        const result = await updateListingStatus("listing-123", "PAUSED", 3);
 
         expect(result.error).toBe("Unauthorized");
       });
@@ -105,17 +148,17 @@ describe("listing-status actions", () => {
       it("returns error when listing not found", async () => {
         (mockTx.$queryRaw as jest.Mock).mockResolvedValue([]);
 
-        const result = await updateListingStatus("invalid-listing", "PAUSED");
+        const result = await updateListingStatus("invalid-listing", "PAUSED", 3);
 
         expect(result.error).toBe("Listing not found");
       });
 
       it("returns error when not owner", async () => {
         (mockTx.$queryRaw as jest.Mock).mockResolvedValue([
-          { ownerId: "other-user" },
+          makeLockedListingRow({ ownerId: "other-user" }),
         ]);
 
-        const result = await updateListingStatus("listing-123", "PAUSED");
+        const result = await updateListingStatus("listing-123", "PAUSED", 3);
 
         expect(result.error).toBe("You can only update your own listings");
       });
@@ -124,7 +167,7 @@ describe("listing-status actions", () => {
     describe("successful update", () => {
       beforeEach(() => {
         (mockTx.$queryRaw as jest.Mock).mockResolvedValue([
-          { ownerId: "user-123" },
+          makeLockedListingRow(),
         ]);
         (mockTx.listing.update as jest.Mock).mockResolvedValue({
           ...mockListing,
@@ -134,47 +177,47 @@ describe("listing-status actions", () => {
       });
 
       it("updates status to PAUSED", async () => {
-        const result = await updateListingStatus("listing-123", "PAUSED");
+        const result = await updateListingStatus("listing-123", "PAUSED", 3);
 
         expect(result.success).toBe(true);
         expect(mockTx.listing.update).toHaveBeenCalledWith({
           where: { id: "listing-123" },
-          data: { status: "PAUSED" },
+          data: { status: "PAUSED", version: 4 },
         });
       });
 
       it("updates status to RENTED", async () => {
-        await updateListingStatus("listing-123", "RENTED");
+        await updateListingStatus("listing-123", "RENTED", 3);
 
         expect(mockTx.listing.update).toHaveBeenCalledWith({
           where: { id: "listing-123" },
-          data: { status: "RENTED" },
+          data: { status: "RENTED", version: 4 },
         });
       });
 
       it("updates status to ACTIVE", async () => {
-        await updateListingStatus("listing-123", "ACTIVE");
+        await updateListingStatus("listing-123", "ACTIVE", 3);
 
         expect(mockTx.listing.update).toHaveBeenCalledWith({
           where: { id: "listing-123" },
-          data: { status: "ACTIVE" },
+          data: { status: "ACTIVE", version: 4 },
         });
       });
 
       it("revalidates listing path", async () => {
-        await updateListingStatus("listing-123", "PAUSED");
+        await updateListingStatus("listing-123", "PAUSED", 3);
 
         expect(revalidatePath).toHaveBeenCalledWith("/listings/listing-123");
       });
 
       it("revalidates profile path", async () => {
-        await updateListingStatus("listing-123", "PAUSED");
+        await updateListingStatus("listing-123", "PAUSED", 3);
 
         expect(revalidatePath).toHaveBeenCalledWith("/profile");
       });
 
       it("revalidates search path", async () => {
-        await updateListingStatus("listing-123", "PAUSED");
+        await updateListingStatus("listing-123", "PAUSED", 3);
 
         expect(revalidatePath).toHaveBeenCalledWith("/search");
       });
@@ -183,7 +226,7 @@ describe("listing-status actions", () => {
     describe("RENTED status and availableSlots (F2.2)", () => {
       it("setting RENTED status only updates the status field, not availableSlots", async () => {
         (mockTx.$queryRaw as jest.Mock).mockResolvedValue([
-          { ownerId: "user-123" },
+          makeLockedListingRow(),
         ]);
         (mockTx.listing.update as jest.Mock).mockResolvedValue({
           ...mockListing,
@@ -191,27 +234,85 @@ describe("listing-status actions", () => {
         });
         (mockTx.booking.count as jest.Mock).mockResolvedValue(0);
 
-        await updateListingStatus("listing-123", "RENTED");
+        await updateListingStatus("listing-123", "RENTED", 3);
 
         // updateListingStatus only sets { status: 'RENTED' } — availableSlots is not modified
         expect(mockTx.listing.update).toHaveBeenCalledWith({
           where: { id: "listing-123" },
-          data: { status: "RENTED" },
+          data: { status: "RENTED", version: 4 },
         });
+      });
+
+      it("returns version conflict when expectedVersion is stale", async () => {
+        (mockTx.$queryRaw as jest.Mock).mockResolvedValue([makeLockedListingRow()]);
+
+        const result = await updateListingStatus("listing-123", "PAUSED", 2);
+
+        expect(result).toEqual({
+          error: "This listing was updated elsewhere. Reload and try again.",
+          code: "VERSION_CONFLICT",
+        });
+        expect(mockTx.listing.update).not.toHaveBeenCalled();
+      });
+
+      it("uses shared helper for HOST_MANAGED listings", async () => {
+        (mockTx.$queryRaw as jest.Mock).mockResolvedValue([
+          makeLockedListingRow({
+            availabilitySource: "HOST_MANAGED",
+            openSlots: 2,
+            availableSlots: 2,
+            totalSlots: 2,
+            status: "PAUSED",
+            statusReason: "HOST_PAUSED",
+          }),
+        ]);
+
+        await updateListingStatus("listing-123", "ACTIVE", 3);
+
+        expect(mockTx.booking.count).not.toHaveBeenCalled();
+        expect(mockTx.listing.update).toHaveBeenCalledWith({
+          where: { id: "listing-123" },
+          data: expect.objectContaining({
+            status: "ACTIVE",
+            statusReason: null,
+            version: 4,
+          }),
+        });
+      });
+
+      it("blocks HOST_MANAGED ACTIVE when migration review is still required", async () => {
+        (mockTx.$queryRaw as jest.Mock).mockResolvedValue([
+          makeLockedListingRow({
+            availabilitySource: "HOST_MANAGED",
+            openSlots: 2,
+            availableSlots: 2,
+            needsMigrationReview: true,
+            status: "PAUSED",
+          }),
+        ]);
+
+        const result = await updateListingStatus("listing-123", "ACTIVE", 3);
+
+        expect(result).toEqual({
+          error:
+            "This listing must finish migration review before it can be made active.",
+          code: "HOST_MANAGED_MIGRATION_REVIEW_REQUIRED",
+        });
+        expect(mockTx.listing.update).not.toHaveBeenCalled();
       });
     });
 
     describe("error handling", () => {
       it("returns error on database failure", async () => {
         (mockTx.$queryRaw as jest.Mock).mockResolvedValue([
-          { ownerId: "user-123" },
+          makeLockedListingRow(),
         ]);
         (mockTx.booking.count as jest.Mock).mockResolvedValue(0);
         (mockTx.listing.update as jest.Mock).mockRejectedValue(
           new Error("DB Error")
         );
 
-        const result = await updateListingStatus("listing-123", "PAUSED");
+        const result = await updateListingStatus("listing-123", "PAUSED", 3);
 
         expect(result.error).toBe("Failed to update listing status");
       });
@@ -220,7 +321,7 @@ describe("listing-status actions", () => {
     describe("transaction safety (FOR UPDATE)", () => {
       beforeEach(() => {
         (mockTx.$queryRaw as jest.Mock).mockResolvedValue([
-          { ownerId: "user-123" },
+          makeLockedListingRow(),
         ]);
         (mockTx.booking.count as jest.Mock).mockResolvedValue(0);
         (mockTx.listing.update as jest.Mock).mockResolvedValue({
@@ -230,7 +331,7 @@ describe("listing-status actions", () => {
       });
 
       it("uses a transaction with FOR UPDATE when updating status", async () => {
-        await updateListingStatus("listing-123", "PAUSED");
+        await updateListingStatus("listing-123", "PAUSED", 3);
 
         // Verify prisma.$transaction is called
         expect(prisma.$transaction).toHaveBeenCalledTimes(1);
@@ -246,12 +347,12 @@ describe("listing-status actions", () => {
         expect(mockTx.booking.count).toHaveBeenCalled();
         expect(mockTx.listing.update).toHaveBeenCalledWith({
           where: { id: "listing-123" },
-          data: { status: "PAUSED" },
+          data: { status: "PAUSED", version: 4 },
         });
       });
 
       it("keeps revalidatePath outside the transaction", async () => {
-        await updateListingStatus("listing-123", "ACTIVE");
+        await updateListingStatus("listing-123", "ACTIVE", 3);
 
         // revalidatePath should still be called (outside transaction)
         expect(revalidatePath).toHaveBeenCalledWith("/listings/listing-123");
@@ -270,17 +371,17 @@ describe("listing-status actions", () => {
       it("returns listing not found when FOR UPDATE returns empty", async () => {
         (mockTx.$queryRaw as jest.Mock).mockResolvedValue([]);
 
-        const result = await updateListingStatus("nonexistent", "PAUSED");
+        const result = await updateListingStatus("nonexistent", "PAUSED", 3);
 
         expect(result.error).toBe("Listing not found");
       });
 
       it("returns ownership error via transaction when not owner", async () => {
         (mockTx.$queryRaw as jest.Mock).mockResolvedValue([
-          { ownerId: "other-user" },
+          makeLockedListingRow({ ownerId: "other-user" }),
         ]);
 
-        const result = await updateListingStatus("listing-123", "PAUSED");
+        const result = await updateListingStatus("listing-123", "PAUSED", 3);
 
         expect(result.error).toBe("You can only update your own listings");
       });

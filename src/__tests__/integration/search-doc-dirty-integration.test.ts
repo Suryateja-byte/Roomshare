@@ -113,12 +113,32 @@ describe("markListingDirty integration", () => {
 
   describe("listing-status actions", () => {
     it("marks dirty on status change", async () => {
-      mockTx.$queryRaw.mockResolvedValue([{ ownerId: "user-1" }]);
+      mockTx.$queryRaw.mockResolvedValue([
+        {
+          id: "listing-1",
+          ownerId: "user-1",
+          version: 3,
+          availabilitySource: "LEGACY_BOOKING",
+          status: "ACTIVE",
+          statusReason: null,
+          needsMigrationReview: false,
+          openSlots: null,
+          availableSlots: 2,
+          totalSlots: 2,
+          moveInDate: new Date("2026-05-01T00:00:00.000Z"),
+          availableUntil: null,
+          minStayMonths: 1,
+          lastConfirmedAt: null,
+          freshnessReminderSentAt: null,
+          freshnessWarningSentAt: null,
+          autoPausedAt: null,
+        },
+      ]);
       mockTx.listing.update.mockResolvedValue({ id: "listing-1" });
 
       const { updateListingStatus } =
         await import("@/app/actions/listing-status");
-      await updateListingStatus("listing-1", "PAUSED");
+      await updateListingStatus("listing-1", "PAUSED", 3);
 
       expect(mockMarkListingDirty).toHaveBeenCalledWith(
         "listing-1",
@@ -143,15 +163,40 @@ describe("markListingDirty integration", () => {
   describe("fire-and-forget safety", () => {
     it("does not fail parent mutation when markListingDirty rejects", async () => {
       mockMarkListingDirty.mockRejectedValueOnce(new Error("DB down"));
-      mockTx.$queryRaw.mockResolvedValue([{ ownerId: "user-1" }]);
+      mockTx.$queryRaw.mockResolvedValue([
+        {
+          id: "listing-1",
+          ownerId: "user-1",
+          version: 3,
+          availabilitySource: "LEGACY_BOOKING",
+          status: "ACTIVE",
+          statusReason: null,
+          needsMigrationReview: false,
+          openSlots: null,
+          availableSlots: 2,
+          totalSlots: 2,
+          moveInDate: new Date("2026-05-01T00:00:00.000Z"),
+          availableUntil: null,
+          minStayMonths: 1,
+          lastConfirmedAt: null,
+          freshnessReminderSentAt: null,
+          freshnessWarningSentAt: null,
+          autoPausedAt: null,
+        },
+      ]);
       mockTx.listing.update.mockResolvedValue({ id: "listing-1" });
 
       const { updateListingStatus } =
         await import("@/app/actions/listing-status");
-      const result = await updateListingStatus("listing-1", "ACTIVE");
+      const result = await updateListingStatus("listing-1", "ACTIVE", 3);
 
       // Parent mutation should still succeed
-      expect(result).toEqual({ success: true });
+      expect(result).toEqual({
+        success: true,
+        status: "ACTIVE",
+        statusReason: null,
+        version: 4,
+      });
     });
   });
 });

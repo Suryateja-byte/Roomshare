@@ -11,6 +11,7 @@ import {
 interface ListingStatusToggleProps {
   listingId: string;
   currentStatus: ListingStatus;
+  currentVersion: number;
 }
 
 const statusConfig = {
@@ -40,8 +41,10 @@ const statusConfig = {
 export default function ListingStatusToggle({
   listingId,
   currentStatus,
+  currentVersion,
 }: ListingStatusToggleProps) {
   const [status, setStatus] = useState<ListingStatus>(currentStatus);
+  const [version, setVersion] = useState(currentVersion);
   const [isOpen, setIsOpen] = useState(false);
   const [isUpdating, setIsUpdating] = useState(false);
 
@@ -54,12 +57,15 @@ export default function ListingStatusToggle({
     }
 
     setIsUpdating(true);
-    const result = await updateListingStatus(listingId, newStatus);
+    const result = await updateListingStatus(listingId, newStatus, version);
 
     if (result.error) {
       toast.error(result.error);
     } else {
-      setStatus(newStatus);
+      setStatus(result.status ?? newStatus);
+      if (typeof result.version === "number") {
+        setVersion(result.version);
+      }
     }
 
     setIsUpdating(false);

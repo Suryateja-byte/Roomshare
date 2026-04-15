@@ -12,6 +12,11 @@ import {
   RATE_LIMITS,
   getClientIPFromHeaders,
 } from "@/lib/rate-limit";
+import {
+  HOST_MANAGED_WRITE_ERROR_MESSAGES,
+  type HostManagedListingWriteCurrent,
+  prepareHostManagedListingWrite,
+} from "@/lib/listings/host-managed-write";
 // Basic listingId format check — rejects empty/absurdly long strings
 // without being as strict as CUID/UUID validation (allows test IDs)
 const isReasonableId = (id: string) =>
@@ -23,10 +28,13 @@ const isReasonableId = (id: string) =>
 export type ListingStatus = "ACTIVE" | "PAUSED" | "RENTED";
 
 const statusSchema = z.enum(["ACTIVE", "PAUSED", "RENTED"]);
+const versionSchema = z.number().int().min(0);
+type LockedListingRow = HostManagedListingWriteCurrent & { ownerId: string };
 
 export async function updateListingStatus(
   listingId: string,
-  status: ListingStatus
+  status: ListingStatus,
+  expectedVersion: number
 ) {
   // Validate listingId format to avoid unnecessary DB round-trips
   if (!isReasonableId(listingId)) {
@@ -37,6 +45,9 @@ export async function updateListingStatus(
   const parsed = statusSchema.safeParse(status);
   if (!parsed.success) {
     return { error: "Invalid status value" };
+  }
+  if (!versionSchema.safeParse(expectedVersion).success) {
+    return { error: "Invalid listing version", code: "INVALID_VERSION" };
   }
 
   const session = await auth();
@@ -53,8 +64,26 @@ export async function updateListingStatus(
     const result = await prisma.$transaction(
       async (tx) => {
         // Lock listing row to prevent concurrent modifications
-        const rows = await tx.$queryRaw<{ ownerId: string }[]>`
-        SELECT "ownerId" FROM "Listing"
+        const rows = await tx.$queryRaw<LockedListingRow[]>`
+        SELECT
+          "id",
+          "ownerId",
+          "version",
+          "availabilitySource",
+          "status",
+          "statusReason",
+          "needsMigrationReview",
+          "openSlots",
+          "availableSlots",
+          "totalSlots",
+          "moveInDate",
+          "availableUntil",
+          "minStayMonths",
+          "lastConfirmedAt",
+          "freshnessReminderSentAt",
+          "freshnessWarningSentAt",
+          "autoPausedAt"
+        FROM "Listing"
         WHERE id = ${listingId}
         FOR UPDATE
       `;
@@ -67,7 +96,19 @@ export async function updateListingStatus(
           return { error: "You can only update your own listings" } as const;
         }
 
-        if (status === "PAUSED") {
+        const currentListing = rows[0];
+
+        if (currentListing.version !== expectedVersion) {
+          return {
+            error: HOST_MANAGED_WRITE_ERROR_MESSAGES.VERSION_CONFLICT,
+            code: "VERSION_CONFLICT",
+          } as const;
+        }
+
+        if (
+          currentListing.availabilitySource === "LEGACY_BOOKING" &&
+          status === "PAUSED"
+        ) {
           const activeBookings = await tx.booking.count({
             where: {
               listingId,
@@ -82,12 +123,50 @@ export async function updateListingStatus(
           }
         }
 
+        if (currentListing.availabilitySource === "HOST_MANAGED") {
+          const preparedWrite = prepareHostManagedListingWrite(
+            currentListing,
+            {
+              expectedVersion,
+              status,
+            },
+            {
+              actor: "host",
+              now: new Date(),
+            }
+          );
+
+          if (!preparedWrite.ok) {
+            return {
+              error: preparedWrite.error,
+              code: preparedWrite.code,
+            } as const;
+          }
+
+          await tx.listing.update({
+            where: { id: listingId },
+            data: preparedWrite.data,
+          });
+
+          return {
+            success: true,
+            status: preparedWrite.status,
+            statusReason: preparedWrite.statusReason,
+            version: preparedWrite.nextVersion,
+          } as const;
+        }
+
         await tx.listing.update({
           where: { id: listingId },
-          data: { status },
+          data: { status, version: currentListing.version + 1 },
         });
 
-        return { success: true } as const;
+        return {
+          success: true,
+          status,
+          version: currentListing.version + 1,
+          statusReason: currentListing.statusReason ?? null,
+        } as const;
       },
       { timeout: 10000 }
     );
@@ -110,7 +189,12 @@ export async function updateListingStatus(
     revalidatePath("/profile");
     revalidatePath("/search");
 
-    return { success: true };
+    return {
+      success: true,
+      status: result.status,
+      statusReason: result.statusReason,
+      version: result.version,
+    };
   } catch (error) {
     logger.sync.error("Failed to update listing status", {
       action: "updateListingStatus",

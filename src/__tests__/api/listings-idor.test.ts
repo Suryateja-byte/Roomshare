@@ -159,6 +159,8 @@ function makeLockedListing(
     totalSlots: number;
     availableSlots: number;
     bookingMode: string;
+    availabilitySource: "LEGACY_BOOKING" | "HOST_MANAGED";
+    moveInDate: Date | null;
   }> = {}
 ) {
   return {
@@ -166,6 +168,8 @@ function makeLockedListing(
     totalSlots: 2,
     availableSlots: 2,
     bookingMode: "SHARED",
+    availabilitySource: "LEGACY_BOOKING" as const,
+    moveInDate: new Date("2026-05-01T00:00:00.000Z"),
     ...overrides,
   };
 }
@@ -290,6 +294,49 @@ describe("Listings API IDOR Protection", () => {
       const sqlStrings = queryRawMock.mock.calls[0][0].join("");
       expect(sqlStrings).toContain("FOR UPDATE");
       expect(updateMock).toHaveBeenCalled();
+    });
+
+    it("returns 409 for legacy inventory writes against HOST_MANAGED listings", async () => {
+      (auth as jest.Mock).mockResolvedValue(ownerSession);
+      (prisma.listing.findUnique as jest.Mock).mockResolvedValue(mockListing);
+      const queryRawMock = jest.fn().mockResolvedValue([
+        makeLockedListing({
+          availabilitySource: "HOST_MANAGED",
+          moveInDate: new Date("2026-05-01T00:00:00.000Z"),
+        }),
+      ]);
+      const updateMock = jest.fn();
+
+      (prisma.$transaction as jest.Mock).mockImplementation(async (callback) => {
+        const tx = {
+          $queryRaw: queryRawMock,
+          listing: { update: updateMock },
+          location: { update: jest.fn() },
+          $executeRaw: jest.fn(),
+          booking: { count: jest.fn() },
+        };
+        return callback(tx);
+      });
+
+      const request = new Request("http://localhost/api/listings/listing-abc", {
+        method: "PATCH",
+        body: JSON.stringify({
+          ...validPatchPayload,
+          totalSlots: "3",
+        }),
+      });
+
+      const response = await PATCH(request, {
+        params: Promise.resolve({ id: "listing-abc" }),
+      });
+
+      expect(response.status).toBe(409);
+      await expect(response.json()).resolves.toEqual({
+        error:
+          "This listing now uses host-managed availability. Reload and use the new availability editor.",
+        code: "HOST_MANAGED_WRITE_PATH_REQUIRED",
+      });
+      expect(updateMock).not.toHaveBeenCalled();
     });
 
     it("recomputes availableSlots from live availability when cached value is stale high", async () => {

@@ -440,40 +440,94 @@ describe("admin actions", () => {
   });
 
   describe("updateListingStatus", () => {
-    const mockListing = {
-      status: "ACTIVE",
-      title: "Test Listing",
-      ownerId: "owner-123",
-    };
+    function makeStatusListing(
+      overrides: Partial<{
+        id: string;
+        status: "ACTIVE" | "PAUSED" | "RENTED";
+        title: string;
+        ownerId: string;
+        version: number;
+        availabilitySource: "LEGACY_BOOKING" | "HOST_MANAGED";
+        statusReason: string | null;
+        needsMigrationReview: boolean;
+        openSlots: number | null;
+        availableSlots: number;
+        totalSlots: number;
+        moveInDate: Date | null;
+        availableUntil: Date | null;
+        minStayMonths: number;
+        lastConfirmedAt: Date | null;
+        freshnessReminderSentAt: Date | null;
+        freshnessWarningSentAt: Date | null;
+        autoPausedAt: Date | null;
+      }> = {}
+    ) {
+      return {
+        id: "listing-123",
+        status: "ACTIVE" as const,
+        title: "Test Listing",
+        ownerId: "owner-123",
+        version: 7,
+        availabilitySource: "LEGACY_BOOKING" as const,
+        statusReason: null,
+        needsMigrationReview: false,
+        openSlots: null,
+        availableSlots: 2,
+        totalSlots: 2,
+        moveInDate: new Date("2026-05-01T00:00:00.000Z"),
+        availableUntil: null,
+        minStayMonths: 1,
+        lastConfirmedAt: null,
+        freshnessReminderSentAt: null,
+        freshnessWarningSentAt: null,
+        autoPausedAt: null,
+        ...overrides,
+      };
+    }
+
+    function mockListingStatusTx(
+      listingRow: ReturnType<typeof makeStatusListing> | null,
+      overrides?: {
+        update?: jest.Mock;
+      }
+    ) {
+      const update = overrides?.update ?? jest.fn().mockResolvedValue({});
+      (prisma.$transaction as jest.Mock).mockImplementation(
+        async (fn: (tx: unknown) => Promise<unknown>) =>
+          fn({
+            $queryRaw: jest.fn().mockResolvedValue(listingRow ? [listingRow] : []),
+            listing: { update },
+          })
+      );
+      return { update };
+    }
 
     it("returns error when listing not found", async () => {
-      (prisma.listing.findUnique as jest.Mock).mockResolvedValue(null);
+      mockListingStatusTx(null);
 
-      const result = await updateListingStatus("nonexistent", "PAUSED");
+      const result = await updateListingStatus("nonexistent", "PAUSED", 7);
 
       expect(result.error).toBe("Listing not found");
     });
 
     it("updates listing status", async () => {
-      (prisma.listing.findUnique as jest.Mock).mockResolvedValue(mockListing);
-      (prisma.listing.update as jest.Mock).mockResolvedValue({});
+      const { update } = mockListingStatusTx(makeStatusListing());
       (logAdminAction as jest.Mock).mockResolvedValue({});
 
-      const result = await updateListingStatus("listing-123", "PAUSED");
+      const result = await updateListingStatus("listing-123", "PAUSED", 7);
 
       expect(result.success).toBe(true);
-      expect(prisma.listing.update).toHaveBeenCalledWith({
+      expect(update).toHaveBeenCalledWith({
         where: { id: "listing-123" },
-        data: { status: "PAUSED" },
+        data: { status: "PAUSED", version: 8 },
       });
     });
 
     it("logs action with previous status", async () => {
-      (prisma.listing.findUnique as jest.Mock).mockResolvedValue(mockListing);
-      (prisma.listing.update as jest.Mock).mockResolvedValue({});
+      mockListingStatusTx(makeStatusListing());
       (logAdminAction as jest.Mock).mockResolvedValue({});
 
-      await updateListingStatus("listing-123", "PAUSED");
+      await updateListingStatus("listing-123", "PAUSED", 7);
 
       expect(logAdminAction).toHaveBeenCalledWith(
         expect.objectContaining({
@@ -487,11 +541,10 @@ describe("admin actions", () => {
     });
 
     it("logs LISTING_HIDDEN action for PAUSED status", async () => {
-      (prisma.listing.findUnique as jest.Mock).mockResolvedValue(mockListing);
-      (prisma.listing.update as jest.Mock).mockResolvedValue({});
+      mockListingStatusTx(makeStatusListing());
       (logAdminAction as jest.Mock).mockResolvedValue({});
 
-      await updateListingStatus("listing-123", "PAUSED");
+      await updateListingStatus("listing-123", "PAUSED", 7);
 
       expect(logAdminAction).toHaveBeenCalledWith(
         expect.objectContaining({ action: "LISTING_HIDDEN" })
@@ -499,11 +552,10 @@ describe("admin actions", () => {
     });
 
     it("logs LISTING_RESTORED action for ACTIVE status", async () => {
-      (prisma.listing.findUnique as jest.Mock).mockResolvedValue(mockListing);
-      (prisma.listing.update as jest.Mock).mockResolvedValue({});
+      mockListingStatusTx(makeStatusListing());
       (logAdminAction as jest.Mock).mockResolvedValue({});
 
-      await updateListingStatus("listing-123", "ACTIVE");
+      await updateListingStatus("listing-123", "ACTIVE", 7);
 
       expect(logAdminAction).toHaveBeenCalledWith(
         expect.objectContaining({ action: "LISTING_RESTORED" })
@@ -511,11 +563,10 @@ describe("admin actions", () => {
     });
 
     it("logs LISTING_RENTED action for RENTED status", async () => {
-      (prisma.listing.findUnique as jest.Mock).mockResolvedValue(mockListing);
-      (prisma.listing.update as jest.Mock).mockResolvedValue({});
+      mockListingStatusTx(makeStatusListing());
       (logAdminAction as jest.Mock).mockResolvedValue({});
 
-      await updateListingStatus("listing-123", "RENTED");
+      await updateListingStatus("listing-123", "RENTED", 7);
 
       expect(logAdminAction).toHaveBeenCalledWith(
         expect.objectContaining({ action: "LISTING_RENTED" })
@@ -523,13 +574,47 @@ describe("admin actions", () => {
     });
 
     it("revalidates admin listings path", async () => {
-      (prisma.listing.findUnique as jest.Mock).mockResolvedValue(mockListing);
-      (prisma.listing.update as jest.Mock).mockResolvedValue({});
+      mockListingStatusTx(makeStatusListing());
       (logAdminAction as jest.Mock).mockResolvedValue({});
 
-      await updateListingStatus("listing-123", "ACTIVE");
+      await updateListingStatus("listing-123", "ACTIVE", 7);
 
       expect(revalidatePath).toHaveBeenCalledWith("/admin/listings");
+    });
+
+    it("returns version conflict on stale expectedVersion", async () => {
+      mockListingStatusTx(makeStatusListing());
+
+      const result = await updateListingStatus("listing-123", "PAUSED", 6);
+
+      expect(result).toEqual({
+        error: "This listing was updated elsewhere. Reload and try again.",
+        code: "VERSION_CONFLICT",
+      });
+    });
+
+    it("uses shared helper for HOST_MANAGED admin writes", async () => {
+      const { update } = mockListingStatusTx({
+        ...makeStatusListing(),
+        availabilitySource: "HOST_MANAGED",
+        status: "PAUSED",
+        statusReason: "ADMIN_PAUSED",
+        openSlots: 2,
+        availableSlots: 2,
+      });
+      (logAdminAction as jest.Mock).mockResolvedValue({});
+
+      const result = await updateListingStatus("listing-123", "ACTIVE", 7);
+
+      expect(result.success).toBe(true);
+      expect(update).toHaveBeenCalledWith({
+        where: { id: "listing-123" },
+        data: expect.objectContaining({
+          status: "ACTIVE",
+          statusReason: null,
+          version: 8,
+        }),
+      });
     });
   });
 
@@ -950,7 +1035,7 @@ describe("admin actions", () => {
         retryAfter: 60,
       });
 
-      const result = await updateListingStatus("listing-123", "PAUSED");
+      const result = await updateListingStatus("listing-123", "PAUSED", 7);
 
       expect(result.error).toBe("Too many requests. Please slow down.");
       expect(checkRateLimit).toHaveBeenCalled();

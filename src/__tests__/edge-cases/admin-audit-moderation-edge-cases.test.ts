@@ -237,18 +237,17 @@ describe("Category I: Admin + Audit Logs + Moderation Edge Cases", () => {
    */
   describe("I3: Concurrent admin actions", () => {
     it("handles optimistic concurrency with stale data detection", async () => {
-      const listing = {
-        status: "ACTIVE",
-        title: "Test Listing",
-        ownerId: "owner-123",
-      };
-
-      // Simulate listing already deleted when trying to update
-      (prisma.listing.findUnique as jest.Mock).mockResolvedValue(null);
+      (prisma.$transaction as jest.Mock).mockImplementation(
+        async (fn: (tx: unknown) => Promise<unknown>) =>
+          fn({
+            $queryRaw: jest.fn().mockResolvedValue([]),
+            listing: { update: jest.fn() },
+          })
+      );
 
       // Import dynamically to test updateListingStatus
       const { updateListingStatus } = await import("@/app/actions/admin");
-      const result = await updateListingStatus("listing-123", "PAUSED");
+      const result = await updateListingStatus("listing-123", "PAUSED", 1);
 
       expect(result.error).toBe("Listing not found");
     });

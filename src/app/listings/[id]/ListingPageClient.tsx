@@ -94,6 +94,7 @@ interface ListingPageClientProps {
     householdLanguages: string[];
     totalSlots: number;
     availableSlots: number;
+    version: number;
     availabilitySource: AvailabilitySource;
     bookingMode: string;
     holdTtlMinutes: number;
@@ -832,6 +833,7 @@ export default function ListingPageClient({
                       currentStatus={
                         listing.status as "ACTIVE" | "PAUSED" | "RENTED"
                       }
+                      currentVersion={listing.version}
                     />
                     <div className="h-4 w-[1px] bg-outline-variant/20" />
                   </>
@@ -1093,6 +1095,7 @@ export default function ListingPageClient({
                         currentStatus={
                           listing.status as "ACTIVE" | "PAUSED" | "RENTED"
                         }
+                        currentVersion={listing.version}
                       />
                     </div>
 

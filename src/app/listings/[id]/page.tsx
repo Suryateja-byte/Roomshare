@@ -382,6 +382,7 @@ export default async function ListingPage({ params, searchParams }: PageProps) {
           householdLanguages: listing.householdLanguages,
           totalSlots: listing.totalSlots,
           availableSlots: resolvedAvailability.effectiveAvailableSlots,
+          version: listing.version,
           availabilitySource: resolvedAvailability.availabilitySource,
           bookingMode: listing.bookingMode ?? "SHARED",
           status: listing.status,
