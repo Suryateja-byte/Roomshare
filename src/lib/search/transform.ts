@@ -23,6 +23,7 @@ import {
   type SearchV2Mode,
   type SearchV2FeatureProperties,
 } from "./types";
+import { buildPublicAvailability } from "./public-availability";
 
 // ============================================================================
 // Mode Determination
@@ -83,6 +84,13 @@ export function transformToListItem(listing: ListingData): SearchV2ListItem {
     badges: badges.length > 0 ? badges : undefined,
     availableSlots: listing.availableSlots,
     totalSlots: listing.totalSlots,
+    publicAvailability:
+      listing.publicAvailability ??
+      buildPublicAvailability({
+        availableSlots: listing.availableSlots,
+        totalSlots: listing.totalSlots,
+        moveInDate: listing.moveInDate,
+      }),
     // scoreHint is reserved for future relevance scoring
   };
 }
@@ -128,6 +136,13 @@ export function transformToGeoJSON(
       price: listing.price,
       image: listing.images[0] ?? null,
       availableSlots: listing.availableSlots,
+      publicAvailability:
+        listing.publicAvailability ??
+        buildPublicAvailability({
+          availableSlots: listing.availableSlots,
+          totalSlots: listing.totalSlots ?? listing.availableSlots,
+          moveInDate: listing.moveInDate,
+        }),
     } satisfies SearchV2FeatureProperties,
   }));
 
@@ -195,11 +210,19 @@ export function transformToPins(
   return tieredGroups.map((group) => {
     // Explicitly pick best listing by lowest rank (highest score), not just [0]
     const bestListing = getBestListingInGroup(group.listings, rankMap);
+    const sourceListing = listings.find((listing) => listing.id === bestListing.id);
     return {
       id: bestListing.id,
       lat: group.lat,
       lng: group.lng,
       price: bestListing.price,
+      publicAvailability:
+        sourceListing?.publicAvailability ??
+        buildPublicAvailability({
+          availableSlots: bestListing.availableSlots,
+          totalSlots: sourceListing?.totalSlots ?? bestListing.availableSlots,
+          moveInDate: sourceListing?.moveInDate,
+        }),
       tier: group.tier,
       stackCount: group.listings.length > 1 ? group.listings.length : undefined,
     };

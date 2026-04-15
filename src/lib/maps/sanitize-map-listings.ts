@@ -1,12 +1,15 @@
 import type { MapListingData } from "@/lib/search-types";
+import { buildPublicAvailability } from "@/lib/search/public-availability";
 
 type MapListingInput = {
   id: string;
   title?: string | null;
   price?: unknown;
   availableSlots?: unknown;
+  totalSlots?: unknown;
   images?: unknown;
   roomType?: unknown;
+  moveInDate?: unknown;
   location?: {
     city?: unknown;
     state?: unknown;
@@ -33,8 +36,8 @@ function toFiniteNumber(value: unknown, fallback = 0): number {
   return Number.isFinite(parsed) ? parsed : fallback;
 }
 
-function toSafeSlotCount(value: unknown): number {
-  return Math.max(0, Math.trunc(toFiniteNumber(value, 0)));
+function toSafeSlotCount(value: unknown, fallback = 0): number {
+  return Math.max(0, Math.trunc(toFiniteNumber(value, fallback)));
 }
 
 function toSafeDate(value: unknown): Date | null {
@@ -79,18 +82,31 @@ export function sanitizeMapListing(
     title: listing.title?.trim() || "",
     price: Math.max(0, toFiniteNumber(listing.price, 0)),
     availableSlots: toSafeSlotCount(listing.availableSlots),
+    totalSlots: toSafeSlotCount(
+      listing.totalSlots,
+      toSafeSlotCount(listing.availableSlots)
+    ),
     images: Array.isArray(listing.images)
       ? listing.images.filter(
           (image): image is string => typeof image === "string"
         )
       : [],
     roomType: toOptionalTrimmedString(listing.roomType),
+    moveInDate: toSafeDate(listing.moveInDate) ?? undefined,
     location: {
       city: toOptionalTrimmedString(listing.location?.city),
       state: toOptionalTrimmedString(listing.location?.state),
       lat,
       lng,
     },
+    publicAvailability: buildPublicAvailability({
+      availableSlots: toSafeSlotCount(listing.availableSlots),
+      totalSlots: toSafeSlotCount(
+        listing.totalSlots,
+        toSafeSlotCount(listing.availableSlots)
+      ),
+      moveInDate: toSafeDate(listing.moveInDate),
+    }),
     tier: listing.tier,
     avgRating: toFiniteNumber(listing.avgRating, 0),
     reviewCount: Math.max(

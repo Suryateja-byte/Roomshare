@@ -12,6 +12,7 @@ import {
   useSearchV2Data,
 } from "@/contexts/SearchV2DataContext";
 import type { V2MapData } from "@/contexts/SearchV2DataContext";
+import { buildPublicAvailability } from "@/lib/search/public-availability";
 
 // ── Issue A: MAP_RELEVANT_KEYS includes nearMatches ──
 
@@ -102,6 +103,10 @@ describe("SearchV2DataContext version guard", () => {
               price: 100,
               image: null,
               availableSlots: 1,
+              publicAvailability: buildPublicAvailability({
+                availableSlots: 1,
+                totalSlots: 1,
+              }),
               ownerId: "u1",
             },
           },

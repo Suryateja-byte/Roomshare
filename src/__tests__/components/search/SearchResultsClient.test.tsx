@@ -14,6 +14,7 @@ import { fetchMoreListings } from "@/app/search/actions";
 import type { ListingData } from "@/lib/data";
 import { getFilterSuggestions } from "@/app/actions/filter-suggestions";
 import { findSplitStays } from "@/lib/search/split-stay";
+import { buildPublicAvailability } from "@/lib/search/public-availability";
 
 const mockListingCard = jest.fn(
   ({
@@ -177,6 +178,10 @@ const createMockListing = (id: string, title?: string): ListingData => ({
   images: ["/test.jpg"],
   houseRules: [],
   householdLanguages: [],
+  publicAvailability: buildPublicAvailability({
+    availableSlots: 1,
+    totalSlots: 2,
+  }),
 });
 
 const defaultProps = {

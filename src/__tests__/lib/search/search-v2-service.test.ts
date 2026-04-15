@@ -159,6 +159,7 @@ import { features } from "@/lib/env";
 import { logger } from "@/lib/logger";
 import { withTimeout } from "@/lib/timeout-wrapper";
 import type { ListingData, MapListingData } from "@/lib/data";
+import { buildPublicAvailability } from "@/lib/search/public-availability";
 
 // ============================================================================
 // Cast mocks for type-safe access
@@ -254,7 +255,7 @@ const BOUNDS = {
 };
 
 function makeListingData(overrides: Partial<ListingData> = {}): ListingData {
-  return {
+  const listing = {
     id: "listing-1",
     title: "Test Listing",
     description: "A test listing",
@@ -273,20 +274,42 @@ function makeListingData(overrides: Partial<ListingData> = {}): ListingData {
     },
     ...overrides,
   };
+
+  return {
+    ...listing,
+    publicAvailability:
+      overrides.publicAvailability ??
+      buildPublicAvailability({
+        availableSlots: listing.availableSlots,
+        totalSlots: listing.totalSlots,
+        moveInDate: listing.moveInDate,
+      }),
+  };
 }
 
 function makeMapListingData(
   overrides: Partial<MapListingData> = {}
 ): MapListingData {
-  return {
+  const listing = {
     id: "map-listing-1",
     title: "Map Listing",
     price: 1500,
     availableSlots: 1,
-
+    totalSlots: 2,
     images: ["img1.jpg"],
     location: { lat: 37.77, lng: -122.42 },
     ...overrides,
+  };
+
+  return {
+    ...listing,
+    publicAvailability:
+      overrides.publicAvailability ??
+      buildPublicAvailability({
+        availableSlots: listing.availableSlots,
+        totalSlots: listing.totalSlots ?? listing.availableSlots,
+        moveInDate: listing.moveInDate,
+      }),
   };
 }
 
@@ -375,6 +398,9 @@ function setupDefaultMocks({
       image: l.images[0] ?? null,
       lat: l.location.lat,
       lng: l.location.lng,
+      availableSlots: l.availableSlots,
+      totalSlots: l.totalSlots,
+      publicAvailability: l.publicAvailability,
     }))
   );
   mockTransformToMapResponse.mockReturnValue({
@@ -384,6 +410,7 @@ function setupDefaultMocks({
       lat: m.location.lat,
       lng: m.location.lng,
       price: m.price,
+      publicAvailability: m.publicAvailability,
     })),
   });
   mockEncodeCursor.mockReturnValue("cursor-page-2");
@@ -428,12 +455,24 @@ describe("search-v2-service", () => {
       expect(result.response!.meta.mode).toBe("pins");
       expect(result.response!.list.items).toHaveLength(1);
       expect(result.response!.list.items[0].id).toBe("l-1");
+      expect(result.response!.list.items[0].publicAvailability).toEqual(
+        buildPublicAvailability({
+          availableSlots: 1,
+          totalSlots: 2,
+        })
+      );
       expect(result.response!.list.total).toBe(1);
       expect(result.response!.map).toBeDefined();
 
       // paginatedResult has the raw listing data
       expect(result.paginatedResult!.items).toHaveLength(1);
       expect(result.paginatedResult!.items[0].id).toBe("l-1");
+      expect(result.paginatedResult!.items[0].publicAvailability).toEqual(
+        buildPublicAvailability({
+          availableSlots: 1,
+          totalSlots: 2,
+        })
+      );
     });
 
     it("uses vibeQuery for semantic ranking while preserving the location query", async () => {

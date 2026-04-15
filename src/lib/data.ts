@@ -19,6 +19,7 @@ import {
 } from "@/lib/constants";
 import { queryWithTimeout } from "@/lib/query-timeout";
 import { buildAvailabilitySqlFragments } from "@/lib/availability";
+import { buildPublicAvailability } from "@/lib/search/public-availability";
 
 // Re-export types and utilities from search-types for backward compatibility.
 // These were extracted to break the circular dependency: data.ts <-> search-doc-queries.ts.
@@ -524,6 +525,8 @@ export async function getMapListings(
             l.title,
             l.price,
             ${effectiveAvailableSql} as "availableSlots",
+            l."totalSlots",
+            l."moveInDate",
             l."roomType",
             l.images,
             loc.city,
@@ -554,14 +557,21 @@ export async function getMapListings(
         title: l.title,
         price: Number(l.price),
         availableSlots: l.availableSlots,
+        totalSlots: l.totalSlots,
         images: l.images || [],
         roomType: l.roomType ?? undefined,
+        moveInDate: l.moveInDate ? new Date(l.moveInDate) : undefined,
         location: {
           city: l.city ?? undefined,
           state: l.state ?? undefined,
           lat: l.lat,
           lng: l.lng,
         },
+        publicAvailability: buildPublicAvailability({
+          availableSlots: l.availableSlots,
+          totalSlots: l.totalSlots,
+          moveInDate: l.moveInDate ? new Date(l.moveInDate) : undefined,
+        }),
         avgRating: Number(l.avgRating) || 0,
         reviewCount: Number(l.reviewCount) || 0,
       }))
@@ -918,6 +928,11 @@ export async function getListingsPaginated(
       leaseDuration: l.leaseDuration,
       roomType: l.roomType,
       moveInDate: l.moveInDate ? new Date(l.moveInDate) : undefined,
+      publicAvailability: buildPublicAvailability({
+        availableSlots: l.availableSlots,
+        totalSlots: l.totalSlots,
+        moveInDate: l.moveInDate ? new Date(l.moveInDate) : undefined,
+      }),
       createdAt: l.createdAt ? new Date(l.createdAt) : new Date(),
       viewCount: Number(l.viewCount) || 0,
       avgRating: Number(l.avg_rating) || 0,
@@ -1374,6 +1389,11 @@ export async function getSavedListings(userId: string): Promise<ListingData[]> {
       leaseDuration: l.leaseDuration ?? undefined,
       roomType: l.roomType ?? undefined,
       moveInDate: l.moveInDate ? new Date(l.moveInDate) : undefined,
+      publicAvailability: buildPublicAvailability({
+        availableSlots: l.availableSlots,
+        totalSlots: l.totalSlots,
+        moveInDate: l.moveInDate ? new Date(l.moveInDate) : undefined,
+      }),
       location: {
         address: l.address,
         city: l.city,

@@ -2,7 +2,7 @@ import type { ListingData, MapListingData } from "@/lib/search-types";
 import { generateSearchQueryHash } from "./query-hash";
 import type { NormalizedSearchQuery } from "./search-query";
 
-export const SEARCH_RESPONSE_VERSION = "2026-04-09.phase1";
+export const SEARCH_RESPONSE_VERSION = "2026-04-15.phase2-public-availability";
 
 export type SearchBackendSource = "v2" | "v1-fallback" | "map-api";
 

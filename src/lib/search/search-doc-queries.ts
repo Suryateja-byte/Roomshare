@@ -47,6 +47,7 @@ import { features } from "@/lib/env";
 import { parseLocalDate } from "@/lib/utils";
 import type { KeysetCursor, SortOption, CursorRowData } from "./cursor";
 import { buildCursorFromRow, encodeKeysetCursor } from "./cursor";
+import { buildPublicAvailability } from "./public-availability";
 import pgvector from "pgvector";
 import { getCachedQueryEmbedding } from "@/lib/embeddings/query-cache";
 import { logger } from "@/lib/logger";
@@ -66,8 +67,10 @@ interface MapListingRaw {
   title: string;
   price: number | string;
   availableSlots: number;
+  totalSlots: number;
   primaryImage: string | null;
   roomType: string | null;
+  moveInDate: string | Date | null;
   city: string | null;
   state: string | null;
   lat: number | string;
@@ -759,6 +762,14 @@ function mapRawListingsToPublic(listings: ListingRaw[]): ListingData[] {
         l.moveInDate && !isNaN(new Date(l.moveInDate).getTime())
           ? new Date(l.moveInDate)
           : undefined,
+      publicAvailability: buildPublicAvailability({
+        availableSlots: l.availableSlots,
+        totalSlots: l.totalSlots,
+        moveInDate:
+          l.moveInDate && !isNaN(new Date(l.moveInDate).getTime())
+            ? new Date(l.moveInDate)
+            : undefined,
+      }),
       createdAt: l.createdAt ? new Date(l.createdAt) : new Date(),
       viewCount: Number(l.viewCount) || 0,
       avgRating: Number(l.avgRating) || 0,
@@ -826,8 +837,10 @@ async function getSearchDocMapListingsInternal(
       d.title,
       d.price,
       ${effectiveAvailableSql} as "availableSlots",
+      d.total_slots as "totalSlots",
       d.images[1] as "primaryImage",
       d.room_type as "roomType",
+      d.move_in_date as "moveInDate",
       d.city,
       d.state,
       d.lat,
@@ -860,8 +873,13 @@ async function getSearchDocMapListingsInternal(
         title: l.title,
         price: Number(l.price),
         availableSlots: l.availableSlots,
+        totalSlots: l.totalSlots,
         images: l.primaryImage ? [l.primaryImage] : [],
         roomType: l.roomType ?? undefined,
+        moveInDate:
+          l.moveInDate && !isNaN(new Date(l.moveInDate).getTime())
+            ? new Date(l.moveInDate)
+            : undefined,
         location: {
           city: l.city ?? undefined,
           state: l.state ?? undefined,
@@ -870,6 +888,14 @@ async function getSearchDocMapListingsInternal(
           lat: Number(l.lat),
           lng: Number(l.lng),
         },
+        publicAvailability: buildPublicAvailability({
+          availableSlots: l.availableSlots,
+          totalSlots: l.totalSlots,
+          moveInDate:
+            l.moveInDate && !isNaN(new Date(l.moveInDate).getTime())
+              ? new Date(l.moveInDate)
+              : undefined,
+        }),
         avgRating: Number(l.avgRating) || 0,
         reviewCount: Number(l.reviewCount) || 0,
         // L-9 FIX: Use explicit null check instead of falsy coalescing.
@@ -1716,6 +1742,11 @@ export function mapSemanticRowsToListingData(
       genderPreference: row.gender_preference ?? undefined,
       householdGender: row.household_gender ?? undefined,
       moveInDate: row.move_in_date ?? undefined,
+      publicAvailability: buildPublicAvailability({
+        availableSlots: row.available_slots,
+        totalSlots: row.total_slots,
+        moveInDate: row.move_in_date ?? undefined,
+      }),
       // ownerId intentionally omitted — @deprecated, S3 security fix (types/listing.ts:28)
       // Match mapRawListingsToPublic: include rating/review/view/createdAt fields
       // for ListingCard rendering (star ratings, review counts, recency)

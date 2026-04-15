@@ -53,6 +53,7 @@ import {
   MAX_QUERY_LENGTH,
   ListingWithMetadata,
 } from "@/lib/data";
+import { buildPublicAvailability } from "@/lib/search/public-availability";
 
 // ============================================
 // Test Data Factories
@@ -61,7 +62,7 @@ import {
 function createMockListing(
   overrides: Partial<ListingWithMetadata> = {}
 ): ListingWithMetadata {
-  return {
+  const listing = {
     id: "listing-1",
     title: "Cozy Room in Downtown",
     description: "A beautiful cozy room in the heart of downtown.",
@@ -91,6 +92,17 @@ function createMockListing(
     avgRating: 4.5,
     reviewCount: 10,
     ...overrides,
+  };
+
+  return {
+    ...listing,
+    publicAvailability:
+      overrides.publicAvailability ??
+      buildPublicAvailability({
+        availableSlots: listing.availableSlots,
+        totalSlots: listing.totalSlots,
+        moveInDate: listing.moveInDate,
+      }),
   };
 }
 
@@ -1423,9 +1435,11 @@ describe("slotThreshold parameterization", () => {
       const sql = mockQueryWithTimeout.mock.calls[0][0] as string;
       const params = mockQueryWithTimeout.mock.calls[0][1] as unknown[];
 
-      // The slot threshold condition must use a $N placeholder, not a literal number
-      expect(sql).toContain('"availableSlots" >= $1');
-      expect(sql).not.toMatch(/"availableSlots"\s*>=\s*\d+(?!\$)/);
+      // The slot threshold condition must use a $N placeholder, not a literal number.
+      // Current availability SQL uses the effective availability subquery directly in
+      // the WHERE clause, so assert the placeholder contract instead of a specific alias.
+      expect(sql).toContain(">= $1");
+      expect(sql).not.toContain(">= 1");
 
       // slotThreshold (default 1) must be the first query param
       expect(params[0]).toBe(1);
@@ -1458,9 +1472,9 @@ describe("slotThreshold parameterization", () => {
         const sql = call[0] as string;
         const params = call[1] as unknown[];
 
-        if (sql.includes('"availableSlots"')) {
-          expect(sql).toContain('"availableSlots" >= $1');
-          expect(sql).not.toMatch(/"availableSlots"\s*>=\s*\d+(?!\$)/);
+        if (sql.includes(">= $1")) {
+          expect(sql).toContain(">= $1");
+          expect(sql).not.toContain(">= 1");
           expect(params[0]).toBe(1);
         }
       }

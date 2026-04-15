@@ -6,6 +6,7 @@
  */
 
 import type { Feature, FeatureCollection, Point } from "geojson";
+import type { PublicAvailability } from "./public-availability";
 
 // ============================================================================
 // Constants (re-exported from canonical source for backward compatibility)
@@ -28,6 +29,7 @@ export interface SearchV2FeatureProperties {
   price: number;
   image: string | null;
   availableSlots: number;
+  publicAvailability: PublicAvailability;
   /** @deprecated No longer populated in API responses (S3 security fix) */
   ownerId?: string;
 }
@@ -55,6 +57,8 @@ export interface SearchV2ListItem {
   availableSlots?: number;
   /** Total slots for badge rendering */
   totalSlots?: number;
+  /** Normalized additive availability contract for future readers */
+  publicAvailability: PublicAvailability;
   /** Relevance score hint for debugging/sorting */
   scoreHint?: number | null;
 }
@@ -65,6 +69,7 @@ export interface SearchV2Pin {
   lat: number;
   lng: number;
   price?: number | null;
+  publicAvailability: PublicAvailability;
   /** Primary pins are larger, mini pins are smaller */
   tier?: "primary" | "mini";
   /** Number of listings at this location */

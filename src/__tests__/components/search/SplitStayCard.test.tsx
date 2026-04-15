@@ -1,6 +1,7 @@
 import { render, screen } from "@testing-library/react";
 import { SplitStayCard } from "@/components/search/SplitStayCard";
 import type { ListingData } from "@/lib/data";
+import { buildPublicAvailability } from "@/lib/search/public-availability";
 
 jest.mock("next/link", () => ({
   __esModule: true,
@@ -57,6 +58,10 @@ function createListing(id: string, title: string, price: number): ListingData {
     amenities: [],
     houseRules: [],
     householdLanguages: [],
+    publicAvailability: buildPublicAvailability({
+      availableSlots: 1,
+      totalSlots: 1,
+    }),
     location: {
       city: "San Francisco",
       state: "CA",

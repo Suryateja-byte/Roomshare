@@ -109,6 +109,7 @@ import { buildRawParamsFromSearchParams } from "@/lib/search-params";
 import { NextRequest } from "next/server";
 import type { SearchV2Response } from "@/lib/search/types";
 import type { SearchV2Result } from "@/lib/search/search-v2-service";
+import { buildPublicAvailability } from "@/lib/search/public-availability";
 
 // --- Helpers ---
 
@@ -175,6 +176,27 @@ function createMockListItem(
     image: "img.jpg",
     lat: 37.7749,
     lng: -122.4194,
+    publicAvailability: buildPublicAvailability({
+      availableSlots: 1,
+      totalSlots: 1,
+    }),
+    ...overrides,
+  };
+}
+
+function createMockPin(
+  id: string,
+  overrides: Record<string, unknown> = {}
+) {
+  return {
+    id,
+    lat: 37.7749,
+    lng: -122.4194,
+    price: 1500,
+    publicAvailability: buildPublicAvailability({
+      availableSlots: 1,
+      totalSlots: 1,
+    }),
     ...overrides,
   };
 }
@@ -197,6 +219,10 @@ function createMockGeoFeature(
       price: 1500,
       image: "img.jpg",
       availableSlots: 1,
+      publicAvailability: buildPublicAvailability({
+        availableSlots: 1,
+        totalSlots: 1,
+      }),
     },
   };
 }
@@ -314,7 +340,7 @@ describe("Search API v2 route", () => {
               type: "FeatureCollection",
               features: geoFeatures,
             },
-            pins: [{ id: "1", lat: 37.7749, lng: -122.4194, price: 1500 }],
+            pins: [createMockPin("1")],
           },
         })
       );
@@ -372,7 +398,7 @@ describe("Search API v2 route", () => {
           },
           map: {
             geojson: { type: "FeatureCollection", features: [] },
-            pins: [{ id: "1", lat: 37.7749, lng: -122.4194 }],
+            pins: [createMockPin("1", { price: undefined })],
           },
         })
       );

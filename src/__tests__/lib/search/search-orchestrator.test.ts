@@ -11,6 +11,7 @@ import { getListingsPaginated } from "@/lib/data";
 import type { FilterParams } from "@/lib/search-params";
 import type { PaginatedResult, ListingData } from "@/lib/data";
 import type { SearchV2Result } from "@/lib/search/search-v2-service";
+import { buildPublicAvailability } from "@/lib/search/public-availability";
 
 jest.mock("@/lib/search/search-v2-service");
 jest.mock("@/lib/data");
@@ -52,6 +53,10 @@ describe("orchestrateSearch - v2→v1 fallback behavior", () => {
         amenities: [],
         houseRules: [],
         householdLanguages: [],
+        publicAvailability: buildPublicAvailability({
+          availableSlots: 1,
+          totalSlots: 2,
+        }),
         location: {
           address: "123 Main St",
           city: "San Francisco",
@@ -132,6 +137,10 @@ describe("orchestrateSearch - v2→v1 fallback behavior", () => {
               lat: 37.77,
               lng: -122.42,
               price: 1500,
+              publicAvailability: buildPublicAvailability({
+                availableSlots: 2,
+                totalSlots: 3,
+              }),
               tier: "primary",
             },
           ],
@@ -150,6 +159,10 @@ describe("orchestrateSearch - v2→v1 fallback behavior", () => {
             amenities: ["wifi"],
             houseRules: [],
             householdLanguages: [],
+            publicAvailability: buildPublicAvailability({
+              availableSlots: 2,
+              totalSlots: 3,
+            }),
             location: {
               address: "456 Market St",
               city: "San Francisco",

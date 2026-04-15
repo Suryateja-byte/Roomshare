@@ -9,6 +9,7 @@
  */
 
 import { MIN_QUERY_LENGTH, MAX_QUERY_LENGTH } from "@/lib/constants";
+import type { PublicAvailability } from "@/lib/search/public-availability";
 
 // ============================================
 // Core Types
@@ -40,6 +41,7 @@ export interface ListingData {
     lat: number;
     lng: number;
   };
+  publicAvailability: PublicAvailability;
   // Near-match indicator for search results that partially match filters
   isNearMatch?: boolean;
 }
@@ -122,14 +124,17 @@ export interface MapListingData {
   title: string;
   price: number;
   availableSlots: number;
+  totalSlots?: number;
   images: string[];
   roomType?: string;
+  moveInDate?: Date;
   location: {
     city?: string;
     state?: string;
     lat: number;
     lng: number;
   };
+  publicAvailability: PublicAvailability;
   /** Pin tier for V2 mode: primary = larger pin, mini = smaller pin */
   tier?: "primary" | "mini";
   /** Average rating for ranking pins (optional — not all query paths populate this) */
