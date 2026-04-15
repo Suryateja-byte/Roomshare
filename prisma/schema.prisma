@@ -100,45 +100,57 @@ model PasswordResetToken {
 }
 
 model Listing {
-  id                  String           @id @default(cuid())
-  ownerId             String
-  title               String
-  description         String
-  price               Decimal            @db.Decimal(10, 2)
-  images              String[]         @default([])
-  amenities           String[]
-  houseRules          String[]
-  leaseDuration       String?
-  roomType            String?
-  householdLanguages  String[]         @default([]) @map("household_languages")
-  primaryHomeLanguage String?          @map("primary_home_language")
-  genderPreference    String?
-  householdGender     String?
-  totalSlots          Int
-  availableSlots      Int
-  moveInDate          DateTime?
-  status              ListingStatus    @default(ACTIVE)
-  viewCount           Int              @default(0)
-  version             Int              @default(1)  // Optimistic locking for race-safe updates
-  bookingMode         String           @default("SHARED") @map("booking_mode")
-  holdTtlMinutes      Int              @default(15) @map("hold_ttl_minutes")
-  createdAt           DateTime         @default(now())
-  updatedAt           DateTime         @updatedAt
-  owner               User             @relation(fields: [ownerId], references: [id], onDelete: Cascade)
-  location            Location?
-  conversations       Conversation[]
-  savedBy             SavedListing[]
-  reviews             Review[]
-  bookings            Booking[]
-  dayInventory        ListingDayInventory[]
-  reports             Report[]
-  recentlyViewed      RecentlyViewed[]
+  id                      String                    @id @default(cuid())
+  ownerId                 String
+  title                   String
+  description             String
+  price                   Decimal                   @db.Decimal(10, 2)
+  images                  String[]                  @default([])
+  amenities               String[]
+  houseRules              String[]
+  leaseDuration           String?
+  roomType                String?
+  householdLanguages      String[]                  @default([]) @map("household_languages")
+  primaryHomeLanguage     String?                   @map("primary_home_language")
+  genderPreference        String?
+  householdGender         String?
+  totalSlots              Int
+  availableSlots          Int
+  openSlots               Int?
+  moveInDate              DateTime?
+  availableUntil          DateTime?                 @db.Date
+  minStayMonths           Int                       @default(1)
+  lastConfirmedAt         DateTime?
+  availabilitySource      ListingAvailabilitySource @default(LEGACY_BOOKING)
+  needsMigrationReview    Boolean                   @default(false)
+  statusReason            String?                   @db.VarChar(64)
+  freshnessReminderSentAt DateTime?
+  freshnessWarningSentAt  DateTime?
+  autoPausedAt            DateTime?
+  status                  ListingStatus             @default(ACTIVE)
+  viewCount               Int                       @default(0)
+  version                 Int                       @default(1) // Optimistic locking for race-safe updates
+  bookingMode             String                    @default("SHARED") @map("booking_mode")
+  holdTtlMinutes          Int                       @default(15) @map("hold_ttl_minutes")
+  createdAt               DateTime                  @default(now())
+  updatedAt               DateTime                  @updatedAt
+  owner                   User                      @relation(fields: [ownerId], references: [id], onDelete: Cascade)
+  location                Location?
+  conversations           Conversation[]
+  savedBy                 SavedListing[]
+  reviews                 Review[]
+  bookings                Booking[]
+  dayInventory            ListingDayInventory[]
+  reports                 Report[]
+  recentlyViewed          RecentlyViewed[]
 
   @@index([ownerId])
   @@index([status])
   @@index([createdAt])
   @@index([status, createdAt])
   @@index([status, price])
+  @@index([availabilitySource, status])
+  @@index([lastConfirmedAt])
 }
 
 model SavedListing {
@@ -186,6 +198,11 @@ enum ListingStatus {
   ACTIVE
   PAUSED
   RENTED
+}
+
+enum ListingAvailabilitySource {
+  LEGACY_BOOKING
+  HOST_MANAGED
 }
 
 model Booking {
