@@ -80,6 +80,15 @@ describe("GET /api/listings/[id]/viewer-state", () => {
     (prisma.listing.findUnique as jest.Mock).mockResolvedValue({
       ownerId: "owner-456",
       status: "ACTIVE",
+      availabilitySource: "LEGACY_BOOKING",
+      availableSlots: 2,
+      totalSlots: 3,
+      openSlots: null,
+      moveInDate: new Date("2026-05-01T00:00:00.000Z"),
+      availableUntil: null,
+      minStayMonths: 1,
+      lastConfirmedAt: null,
+      statusReason: null,
     });
     (prisma.review.findFirst as jest.Mock).mockResolvedValue(null);
     (prisma.booking.findFirst as jest.Mock).mockResolvedValue(null);
@@ -222,7 +231,7 @@ describe("GET /api/listings/[id]/viewer-state", () => {
     expect(response.headers.get("Cache-Control")).toBe("private, no-store");
   });
 
-  it("returns contact-first compatibility flags when contact-first listings are enabled", async () => {
+  it("keeps row-driven LEGACY_BOOKING source when contact-first listings are enabled", async () => {
     mockedFeatures.contactFirstListings = true;
 
     const response = await GET(createRequest(), routeContext);
@@ -231,10 +240,36 @@ describe("GET /api/listings/[id]/viewer-state", () => {
     expect(response.status).toBe(200);
     expect(data.primaryCta).toBe("CONTACT_HOST");
     expect(data.canContact).toBe(true);
-    expect(data.availabilitySource).toBe("HOST_MANAGED");
+    expect(data.availabilitySource).toBe("LEGACY_BOOKING");
     expect(data.canBook).toBe(false);
     expect(data.canHold).toBe(false);
     expect(data.bookingDisabledReason).toBe("CONTACT_ONLY");
+  });
+
+  it("returns HOST_MANAGED from the listing row and hides unavailable host-managed listings", async () => {
+    (prisma.listing.findUnique as jest.Mock).mockResolvedValue({
+      ownerId: "owner-456",
+      status: "ACTIVE",
+      availabilitySource: "HOST_MANAGED",
+      availableSlots: 2,
+      totalSlots: 3,
+      openSlots: 0,
+      moveInDate: new Date("2026-05-01T00:00:00.000Z"),
+      availableUntil: null,
+      minStayMonths: 1,
+      lastConfirmedAt: null,
+      statusReason: null,
+    });
+
+    const response = await GET(createRequest(), routeContext);
+    const data = await response.json();
+
+    expect(response.status).toBe(200);
+    expect(data.availabilitySource).toBe("HOST_MANAGED");
+    expect(data.canContact).toBe(false);
+    expect(data.canBook).toBe(false);
+    expect(data.canHold).toBe(false);
+    expect(data.bookingDisabledReason).toBe("LISTING_UNAVAILABLE");
   });
 
   it("returns verify-email CTA when the viewer is logged in but unverified", async () => {

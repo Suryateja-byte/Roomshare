@@ -10,6 +10,9 @@ export interface AvailabilitySnapshot {
   acceptedSlots: number;
   rangeVersion: number;
   asOf: string;
+  availabilitySource?: "LEGACY_BOOKING" | "HOST_MANAGED";
+  isValid?: boolean;
+  isPubliclyAvailable?: boolean;
 }
 
 export function useAvailability(

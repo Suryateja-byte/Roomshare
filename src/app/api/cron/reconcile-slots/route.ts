@@ -35,13 +35,19 @@ export async function GET(request: NextRequest) {
 
       const listings = await tx.listing.findMany({
         where: { status: "ACTIVE" },
-        select: { id: true, availableSlots: true },
+        select: { id: true, availableSlots: true, availabilitySource: true },
       });
 
       const fixedIds: string[] = [];
       let drifted = 0;
+      let skippedHostManaged = 0;
 
       for (const listing of listings) {
+        if (listing.availabilitySource === "HOST_MANAGED") {
+          skippedHostManaged += 1;
+          continue;
+        }
+
         await rebuildListingDayInventory(tx, listing.id, new Date());
 
         const availability = await getAvailability(listing.id, { tx });
@@ -63,6 +69,7 @@ export async function GET(request: NextRequest) {
         skipped: false,
         drifted,
         fixedIds,
+        skippedHostManaged,
       } as const;
     });
 
@@ -86,6 +93,7 @@ export async function GET(request: NextRequest) {
       event: "availability_drift_fixed",
       drifted: result.drifted,
       reconciled: result.fixedIds.length,
+      skippedHostManaged: result.skippedHostManaged,
       durationMs,
     });
 
@@ -94,6 +102,7 @@ export async function GET(request: NextRequest) {
       drifted: result.drifted,
       reconciled: result.fixedIds.length,
       skipped: false,
+      skippedHostManaged: result.skippedHostManaged,
       durationMs,
       timestamp: new Date().toISOString(),
     });

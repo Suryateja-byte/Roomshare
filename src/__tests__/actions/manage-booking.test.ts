@@ -253,6 +253,30 @@ describe("manage-booking actions", () => {
       });
     });
 
+    describe("host-managed listing guard", () => {
+      it("rejects legacy booking lifecycle updates for HOST_MANAGED listings", async () => {
+        (auth as jest.Mock).mockResolvedValue(mockOwnerSession);
+        (prisma.booking.findUnique as jest.Mock).mockResolvedValue({
+          ...mockBooking,
+          listing: {
+            ...mockListing,
+            availabilitySource: "HOST_MANAGED",
+          },
+        });
+
+        const result = await updateBookingStatus("booking-123", "ACCEPTED");
+
+        expect(result).toEqual({
+          success: false,
+          error:
+            "This listing now uses host-managed availability. Contact the host instead.",
+          code: "HOST_MANAGED_BOOKING_FORBIDDEN",
+        });
+        expect(validateTransition).not.toHaveBeenCalled();
+        expect(prisma.$transaction).not.toHaveBeenCalled();
+      });
+    });
+
     describe("authorization", () => {
       beforeEach(() => {
         (prisma.booking.findUnique as jest.Mock).mockResolvedValue(mockBooking);

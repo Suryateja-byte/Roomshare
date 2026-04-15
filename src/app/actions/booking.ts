@@ -64,6 +64,19 @@ type TransactionClient = Parameters<
   Parameters<typeof prisma.$transaction>[0]
 >[0];
 
+function hostManagedBookingForbiddenResult(): {
+  success: false;
+  error: string;
+  code: string;
+} {
+  return {
+    success: false,
+    error:
+      "This listing now uses host-managed availability. Contact the host instead.",
+    code: "HOST_MANAGED_BOOKING_FORBIDDEN",
+  };
+}
+
 /**
  * Core booking logic that runs inside a transaction.
  * Returns InternalBookingResult with all data needed for side effects.
@@ -89,9 +102,10 @@ async function executeBookingTransaction(
       status: string;
       price: number;
       bookingMode: string;
+      availabilitySource: "LEGACY_BOOKING" | "HOST_MANAGED";
     }>
   >`
-        SELECT "id", "title", "ownerId", "totalSlots", "availableSlots", "status", "price", "booking_mode" as "bookingMode"
+        SELECT "id", "title", "ownerId", "totalSlots", "availableSlots", "status", "price", "booking_mode" as "bookingMode", "availabilitySource"
         FROM "Listing"
         WHERE "id" = ${listingId}
         FOR UPDATE
@@ -99,6 +113,10 @@ async function executeBookingTransaction(
 
   if (!listing) {
     return { success: false, error: "Listing not found" };
+  }
+
+  if (listing.availabilitySource === "HOST_MANAGED") {
+    return hostManagedBookingForbiddenResult();
   }
 
   // P1 FIX: Validate client-provided price against authoritative DB price
@@ -731,10 +749,11 @@ async function executeHoldTransaction(
       price: number;
       bookingMode: string;
       holdTtlMinutes: number;
+      availabilitySource: "LEGACY_BOOKING" | "HOST_MANAGED";
     }>
   >`
-        SELECT "id", "title", "ownerId", "totalSlots", "availableSlots", "status", "price",
-               "booking_mode" as "bookingMode", "hold_ttl_minutes" as "holdTtlMinutes"
+            SELECT "id", "title", "ownerId", "totalSlots", "availableSlots", "status", "price",
+               "booking_mode" as "bookingMode", "hold_ttl_minutes" as "holdTtlMinutes", "availabilitySource"
         FROM "Listing"
         WHERE "id" = ${listingId}
         FOR UPDATE
@@ -742,6 +761,10 @@ async function executeHoldTransaction(
 
   if (!listing) {
     return { success: false, error: "Listing not found" };
+  }
+
+  if (listing.availabilitySource === "HOST_MANAGED") {
+    return hostManagedBookingForbiddenResult();
   }
 
   // Price validation

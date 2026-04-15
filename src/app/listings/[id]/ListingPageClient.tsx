@@ -94,6 +94,7 @@ interface ListingPageClientProps {
     householdLanguages: string[];
     totalSlots: number;
     availableSlots: number;
+    availabilitySource: AvailabilitySource;
     bookingMode: string;
     holdTtlMinutes: number;
     status: string;
@@ -215,6 +216,7 @@ function buildFallbackViewerState(options: {
   existingReview: ListingPageClientProps["userExistingReview"];
   contactFirstEnabled: boolean;
   holdEnabled: boolean;
+  availabilitySource: AvailabilitySource;
 }): ViewerState {
   const primaryCta: PrimaryCta = options.isOwner
     ? "EDIT_LISTING"
@@ -231,6 +233,7 @@ function buildFallbackViewerState(options: {
     options.isListingActive;
 
   const canBook =
+    options.availabilitySource !== "HOST_MANAGED" &&
     !options.contactFirstEnabled &&
     !options.isOwner &&
     options.isLoggedIn &&
@@ -239,7 +242,11 @@ function buildFallbackViewerState(options: {
 
   let bookingDisabledReason: BookingDisabledReason = null;
   if (!canBook) {
-    if (options.contactFirstEnabled) {
+    if (options.availabilitySource === "HOST_MANAGED") {
+      bookingDisabledReason = options.isListingActive
+        ? "CONTACT_ONLY"
+        : "LISTING_UNAVAILABLE";
+    } else if (options.contactFirstEnabled) {
       bookingDisabledReason = "CONTACT_ONLY";
     } else if (options.isOwner) {
       bookingDisabledReason = "OWNER_VIEW";
@@ -258,9 +265,7 @@ function buildFallbackViewerState(options: {
     existingReview: options.existingReview,
     primaryCta,
     canContact,
-    availabilitySource: options.contactFirstEnabled
-      ? "HOST_MANAGED"
-      : "LEGACY_BOOKING",
+    availabilitySource: options.availabilitySource,
     canBook,
     canHold: canBook && options.holdEnabled,
     bookingDisabledReason,
@@ -587,6 +592,7 @@ export default function ListingPageClient({
       existingReview: userExistingReview,
       contactFirstEnabled,
       holdEnabled: holdEnabled === true,
+      availabilitySource: listing.availabilitySource,
     })
   );
   const { availability, refresh: refreshAvailability } = useAvailability(
@@ -594,7 +600,9 @@ export default function ListingPageClient({
     startDate || undefined,
     endDate || undefined,
     {
-      enabled: listing.status === "ACTIVE",
+      enabled:
+        listing.status === "ACTIVE" &&
+        listing.availabilitySource === "LEGACY_BOOKING",
       initialData: initialAvailability ?? null,
     }
   );
@@ -605,7 +613,8 @@ export default function ListingPageClient({
   const reviewBookingHistory =
     viewerState.reviewEligibility.hasLegacyAcceptedBooking;
   const usesContactFirstAvailability =
-    viewerState.availabilitySource === "HOST_MANAGED" || contactFirstEnabled;
+    viewerState.availabilitySource === "HOST_MANAGED" ||
+    viewerState.bookingDisabledReason === "CONTACT_ONLY";
 
   // Format gender preference for display
   const formatGenderPreference = (pref: string | null) => {
@@ -651,6 +660,7 @@ export default function ListingPageClient({
       existingReview: userExistingReview,
       contactFirstEnabled,
       holdEnabled: holdEnabled === true,
+      availabilitySource: listing.availabilitySource,
     });
 
     if (resolvedIsOwner) {
@@ -705,6 +715,7 @@ export default function ListingPageClient({
     contactFirstEnabled,
     holdEnabled,
     listing.id,
+    listing.availabilitySource,
     listing.status,
     resolvedIsEmailVerified,
     resolvedIsLoggedIn,

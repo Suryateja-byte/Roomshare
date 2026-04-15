@@ -4,6 +4,7 @@ import { prisma } from "@/lib/prisma";
 import { features } from "@/lib/env";
 import { withRateLimit } from "@/lib/with-rate-limit";
 import { logger, sanitizeErrorMessage } from "@/lib/logger";
+import { resolvePublicAvailability } from "@/lib/search/public-availability";
 
 interface RouteContext {
   params: Promise<{ id: string }>;
@@ -60,7 +61,8 @@ function buildViewerContract(options: {
   isLoggedIn: boolean;
   isOwner: boolean;
   isEmailVerified: boolean;
-  isListingActive: boolean;
+  isListingPubliclyAvailable: boolean;
+  availabilitySource: AvailabilitySource;
 }): {
   primaryCta: PrimaryCta;
   canContact: boolean;
@@ -69,10 +71,6 @@ function buildViewerContract(options: {
   canHold: boolean;
   bookingDisabledReason: BookingDisabledReason;
 } {
-  const availabilitySource: AvailabilitySource = features.contactFirstListings
-    ? "HOST_MANAGED"
-    : "LEGACY_BOOKING";
-
   const primaryCta: PrimaryCta = options.isOwner
     ? "EDIT_LISTING"
     : !options.isLoggedIn
@@ -85,24 +83,29 @@ function buildViewerContract(options: {
     !options.isOwner &&
     options.isLoggedIn &&
     options.isEmailVerified &&
-    options.isListingActive;
+    options.isListingPubliclyAvailable;
 
   const canBook =
+    options.availabilitySource !== "HOST_MANAGED" &&
     !features.contactFirstListings &&
     !options.isOwner &&
     options.isLoggedIn &&
     options.isEmailVerified &&
-    options.isListingActive;
+    options.isListingPubliclyAvailable;
 
   const canHold = canBook && features.softHoldsEnabled;
 
   let bookingDisabledReason: BookingDisabledReason = null;
   if (!canBook) {
-    if (features.contactFirstListings) {
+    if (options.availabilitySource === "HOST_MANAGED") {
+      bookingDisabledReason = options.isListingPubliclyAvailable
+        ? "CONTACT_ONLY"
+        : "LISTING_UNAVAILABLE";
+    } else if (features.contactFirstListings) {
       bookingDisabledReason = "CONTACT_ONLY";
     } else if (options.isOwner) {
       bookingDisabledReason = "OWNER_VIEW";
-    } else if (!options.isListingActive) {
+    } else if (!options.isListingPubliclyAvailable) {
       bookingDisabledReason = "LISTING_UNAVAILABLE";
     } else if (!options.isLoggedIn) {
       bookingDisabledReason = "LOGIN_REQUIRED";
@@ -114,7 +117,7 @@ function buildViewerContract(options: {
   return {
     primaryCta,
     canContact,
-    availabilitySource,
+    availabilitySource: options.availabilitySource,
     canBook,
     canHold,
     bookingDisabledReason,
@@ -135,19 +138,35 @@ export async function GET(request: Request, { params }: RouteContext) {
     select: {
       ownerId: true,
       status: true,
+      availabilitySource: true,
+      availableSlots: true,
+      totalSlots: true,
+      openSlots: true,
+      moveInDate: true,
+      availableUntil: true,
+      minStayMonths: true,
+      lastConfirmedAt: true,
+      statusReason: true,
     },
   });
 
   const isOwner = !!session?.user?.id && listing?.ownerId === session.user.id;
-  const isListingActive = listing?.status === "ACTIVE";
   const isEmailVerified = !!session?.user?.emailVerified;
+  const resolvedAvailability = listing
+    ? resolvePublicAvailability(listing)
+    : null;
+  const availabilitySource: AvailabilitySource =
+    resolvedAvailability?.availabilitySource ?? "LEGACY_BOOKING";
+  const isListingPubliclyAvailable =
+    resolvedAvailability?.isPubliclyAvailable ?? false;
 
   if (!session?.user?.id) {
     const viewerContract = buildViewerContract({
       isLoggedIn: false,
       isOwner: false,
       isEmailVerified: false,
-      isListingActive,
+      isListingPubliclyAvailable,
+      availabilitySource,
     });
     const response = NextResponse.json({
       isLoggedIn: false,
@@ -194,7 +213,8 @@ export async function GET(request: Request, { params }: RouteContext) {
       isLoggedIn: true,
       isOwner,
       isEmailVerified,
-      isListingActive,
+      isListingPubliclyAvailable,
+      availabilitySource,
     });
 
     const response = NextResponse.json({
@@ -233,7 +253,8 @@ export async function GET(request: Request, { params }: RouteContext) {
           isLoggedIn: true,
           isOwner,
           isEmailVerified,
-          isListingActive,
+          isListingPubliclyAvailable,
+          availabilitySource,
         }),
         reviewEligibility: buildReviewEligibility({
           isLoggedIn: true,

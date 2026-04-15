@@ -72,6 +72,13 @@ import { createBooking, createHold } from "@/app/actions/booking";
 import { prisma } from "@/lib/prisma";
 import { auth } from "@/auth";
 import { checkRateLimit } from "@/lib/rate-limit";
+import { features } from "@/lib/env";
+
+const mockedFeatures = features as {
+  contactFirstListings: boolean;
+  multiSlotBooking: boolean;
+  softHoldsEnabled: boolean;
+};
 
 describe("booking actions when contact-first listings are enabled", () => {
   const mockSession = {
@@ -88,6 +95,14 @@ describe("booking actions when contact-first listings are enabled", () => {
   beforeEach(() => {
     jest.clearAllMocks();
     (auth as jest.Mock).mockResolvedValue(mockSession);
+    mockedFeatures.contactFirstListings = true;
+    mockedFeatures.multiSlotBooking = true;
+    mockedFeatures.softHoldsEnabled = true;
+    (checkRateLimit as jest.Mock).mockResolvedValue({
+      success: true,
+      remaining: 10,
+      resetAt: new Date(),
+    });
   });
 
   it("blocks createBooking with a stable CONTACT_ONLY response before DB work", async () => {
@@ -122,5 +137,74 @@ describe("booking actions when contact-first listings are enabled", () => {
     });
     expect(checkRateLimit).not.toHaveBeenCalled();
     expect(prisma.$transaction).not.toHaveBeenCalled();
+  });
+
+  it("rejects createBooking for HOST_MANAGED listings even when contact-first flag is off", async () => {
+    mockedFeatures.contactFirstListings = false;
+    (prisma.$transaction as jest.Mock).mockImplementation(async (fn: any) =>
+      fn({
+        $queryRaw: jest.fn().mockResolvedValueOnce([
+          {
+            id: "listing-123",
+            title: "Host managed room",
+            ownerId: "owner-456",
+            totalSlots: 2,
+            availableSlots: 1,
+            status: "ACTIVE",
+            price: 1200,
+            bookingMode: "REQUEST",
+            availabilitySource: "HOST_MANAGED",
+          },
+        ]),
+      })
+    );
+
+    const result = await createBooking(
+      "listing-123",
+      futureStart,
+      futureEnd,
+      1200
+    );
+
+    expect(result).toEqual({
+      success: false,
+      error:
+        "This listing now uses host-managed availability. Contact the host instead.",
+      code: "HOST_MANAGED_BOOKING_FORBIDDEN",
+    });
+  });
+
+  it("rejects createHold for HOST_MANAGED listings even when contact-first flag is off", async () => {
+    mockedFeatures.contactFirstListings = false;
+    (prisma.$transaction as jest.Mock).mockImplementation(async (fn: any) =>
+      fn({
+        $queryRaw: jest
+          .fn()
+          .mockResolvedValueOnce([{ count: BigInt(0) }])
+          .mockResolvedValueOnce([
+            {
+              id: "listing-123",
+              ownerId: "owner-456",
+              title: "Host managed room",
+              totalSlots: 2,
+              availableSlots: 1,
+              status: "ACTIVE",
+              price: 1200,
+              bookingMode: "REQUEST",
+              holdTtlMinutes: 15,
+              availabilitySource: "HOST_MANAGED",
+            },
+          ]),
+      })
+    );
+
+    const result = await createHold("listing-123", futureStart, futureEnd, 1200);
+
+    expect(result).toEqual({
+      success: false,
+      error:
+        "This listing now uses host-managed availability. Contact the host instead.",
+      code: "HOST_MANAGED_BOOKING_FORBIDDEN",
+    });
   });
 });

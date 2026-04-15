@@ -47,7 +47,10 @@ import { features } from "@/lib/env";
 import { parseLocalDate } from "@/lib/utils";
 import type { KeysetCursor, SortOption, CursorRowData } from "./cursor";
 import { buildCursorFromRow, encodeKeysetCursor } from "./cursor";
-import { buildPublicAvailability } from "./public-availability";
+import {
+  buildPublicAvailability,
+  resolvePublicAvailability,
+} from "./public-availability";
 import pgvector from "pgvector";
 import { getCachedQueryEmbedding } from "@/lib/embeddings/query-cache";
 import { logger } from "@/lib/logger";
@@ -56,6 +59,10 @@ import { buildAvailabilitySqlFragments } from "@/lib/availability";
 
 // Statement timeout for search queries (5 seconds)
 const SEARCH_QUERY_TIMEOUT_MS = 5000;
+
+function isPresent<T>(value: T | null | undefined): value is T {
+  return value != null;
+}
 
 // ============================================
 // Raw Query Result Interfaces (M6 fix)
@@ -68,6 +75,13 @@ interface MapListingRaw {
   price: number | string;
   availableSlots: number;
   totalSlots: number;
+  availabilitySource: "LEGACY_BOOKING" | "HOST_MANAGED";
+  openSlots: number | null;
+  availableUntil: string | Date | null;
+  minStayMonths: number | string | null;
+  lastConfirmedAt: string | Date | null;
+  status: string;
+  statusReason: string | null;
   primaryImage: string | null;
   roomType: string | null;
   moveInDate: string | Date | null;
@@ -90,6 +104,13 @@ interface ListingRaw {
   images: string[];
   availableSlots: number;
   totalSlots: number;
+  availabilitySource: "LEGACY_BOOKING" | "HOST_MANAGED";
+  openSlots: number | null;
+  availableUntil?: string | Date | null;
+  minStayMonths?: number | string | null;
+  lastConfirmedAt?: string | Date | null;
+  status?: string;
+  statusReason?: string | null;
   amenities: string[];
   houseRules: string[];
   householdLanguages: string[];
@@ -744,43 +765,76 @@ export async function getSearchDocLimitedCount(
 function mapRawListingsToPublic(listings: ListingRaw[]): ListingData[] {
   return listings
     .filter((l) => hasValidCoordinates(Number(l.lat), Number(l.lng)))
-    .map((l) => ({
-      id: l.id,
-      title: l.title,
-      description: l.description,
-      price: Number(l.price),
-      images: l.images || [],
-      availableSlots: l.availableSlots,
-      totalSlots: l.totalSlots,
-      amenities: l.amenities || [],
-      houseRules: l.houseRules || [],
-      householdLanguages: l.householdLanguages || [],
-      primaryHomeLanguage: l.primaryHomeLanguage,
-      leaseDuration: l.leaseDuration,
-      roomType: l.roomType,
-      moveInDate:
+    .map((l) => {
+      const moveInDate =
         l.moveInDate && !isNaN(new Date(l.moveInDate).getTime())
           ? new Date(l.moveInDate)
-          : undefined,
-      publicAvailability: buildPublicAvailability({
-        availableSlots: l.availableSlots,
-        totalSlots: l.totalSlots,
-        moveInDate:
-          l.moveInDate && !isNaN(new Date(l.moveInDate).getTime())
-            ? new Date(l.moveInDate)
-            : undefined,
-      }),
-      createdAt: l.createdAt ? new Date(l.createdAt) : new Date(),
-      viewCount: Number(l.viewCount) || 0,
-      avgRating: Number(l.avgRating) || 0,
-      reviewCount: Number(l.reviewCount) || 0,
-      location: {
-        city: l.city,
-        state: l.state,
-        lat: Number(l.lat),
-        lng: Number(l.lng),
-      },
-    }));
+          : undefined;
+      const availableUntil =
+        l.availableUntil && !isNaN(new Date(l.availableUntil).getTime())
+          ? new Date(l.availableUntil)
+          : null;
+      const lastConfirmedAt =
+        l.lastConfirmedAt && !isNaN(new Date(l.lastConfirmedAt).getTime())
+          ? new Date(l.lastConfirmedAt)
+          : null;
+      const resolvedAvailability = resolvePublicAvailability(
+        {
+          ...l,
+          moveInDate,
+          availableUntil,
+          lastConfirmedAt,
+          minStayMonths:
+            l.minStayMonths != null ? Number(l.minStayMonths) : undefined,
+        },
+        {
+          legacySnapshot: {
+            totalSlots: l.totalSlots,
+            effectiveAvailableSlots: l.availableSlots,
+          },
+        }
+      );
+
+      if (!resolvedAvailability.isPubliclyAvailable) {
+        return null;
+      }
+
+      return {
+        id: l.id,
+        title: l.title,
+        description: l.description,
+        price: Number(l.price),
+        images: l.images || [],
+        availableSlots: resolvedAvailability.effectiveAvailableSlots,
+        totalSlots: resolvedAvailability.totalSlots,
+        availabilitySource: resolvedAvailability.availabilitySource,
+        openSlots: resolvedAvailability.openSlots,
+        availableUntil,
+        minStayMonths: resolvedAvailability.minStayMonths,
+        lastConfirmedAt,
+        status: l.status,
+        statusReason: l.statusReason,
+        amenities: l.amenities || [],
+        houseRules: l.houseRules || [],
+        householdLanguages: l.householdLanguages || [],
+        primaryHomeLanguage: l.primaryHomeLanguage,
+        leaseDuration: l.leaseDuration,
+        roomType: l.roomType,
+        moveInDate,
+        publicAvailability: resolvedAvailability,
+        createdAt: l.createdAt ? new Date(l.createdAt) : new Date(),
+        viewCount: Number(l.viewCount) || 0,
+        avgRating: Number(l.avgRating) || 0,
+        reviewCount: Number(l.reviewCount) || 0,
+        location: {
+          city: l.city,
+          state: l.state,
+          lat: Number(l.lat),
+          lng: Number(l.lng),
+        },
+      };
+    })
+    .filter(isPresent);
 }
 
 // ============================================
@@ -837,10 +891,17 @@ async function getSearchDocMapListingsInternal(
       d.title,
       d.price,
       ${effectiveAvailableSql} as "availableSlots",
-      d.total_slots as "totalSlots",
+      l."totalSlots" as "totalSlots",
+      l."availabilitySource" as "availabilitySource",
+      l."openSlots" as "openSlots",
+      l."availableUntil" as "availableUntil",
+      l."minStayMonths" as "minStayMonths",
+      l."lastConfirmedAt" as "lastConfirmedAt",
+      l.status::text as status,
+      l."statusReason" as "statusReason",
       d.images[1] as "primaryImage",
       d.room_type as "roomType",
-      d.move_in_date as "moveInDate",
+      l."moveInDate" as "moveInDate",
       d.city,
       d.state,
       d.lat,
@@ -850,6 +911,7 @@ async function getSearchDocMapListingsInternal(
       d.recommended_score as "recommendedScore",
       d.listing_created_at as "createdAt"
     FROM listing_search_docs d
+    JOIN "Listing" l ON l.id = d.id
     WHERE ${whereClause}
     ORDER BY ${orderByClause}
     LIMIT $${paramIndex}
@@ -868,42 +930,76 @@ async function getSearchDocMapListingsInternal(
       : listings;
 
     const mappedListings = sanitizeMapListings(
-      trimmedListings.map((l) => ({
-        id: l.id,
-        title: l.title,
-        price: Number(l.price),
-        availableSlots: l.availableSlots,
-        totalSlots: l.totalSlots,
-        images: l.primaryImage ? [l.primaryImage] : [],
-        roomType: l.roomType ?? undefined,
-        moveInDate:
-          l.moveInDate && !isNaN(new Date(l.moveInDate).getTime())
-            ? new Date(l.moveInDate)
-            : undefined,
-        location: {
-          city: l.city ?? undefined,
-          state: l.state ?? undefined,
-          // MED-4 FIX: Explicit Number() conversion — PostgreSQL raw queries may return
-          // numeric/float8 columns as strings depending on column type.
-          lat: Number(l.lat),
-          lng: Number(l.lng),
-        },
-        publicAvailability: buildPublicAvailability({
-          availableSlots: l.availableSlots,
-          totalSlots: l.totalSlots,
-          moveInDate:
+      trimmedListings
+        .map((l) => {
+          const moveInDate =
             l.moveInDate && !isNaN(new Date(l.moveInDate).getTime())
               ? new Date(l.moveInDate)
-              : undefined,
-        }),
-        avgRating: Number(l.avgRating) || 0,
-        reviewCount: Number(l.reviewCount) || 0,
-        // L-9 FIX: Use explicit null check instead of falsy coalescing.
-        // `Number(0) || null` falsely converts a valid score of 0 to null.
-        recommendedScore:
-          l.recommendedScore != null ? Number(l.recommendedScore) : null,
-        createdAt: l.createdAt ? new Date(l.createdAt) : null,
-      }))
+              : undefined;
+          const availableUntil =
+            l.availableUntil && !isNaN(new Date(l.availableUntil).getTime())
+              ? new Date(l.availableUntil)
+              : null;
+          const lastConfirmedAt =
+            l.lastConfirmedAt && !isNaN(new Date(l.lastConfirmedAt).getTime())
+              ? new Date(l.lastConfirmedAt)
+              : null;
+          const resolvedAvailability = resolvePublicAvailability(
+            {
+              ...l,
+              moveInDate,
+              availableUntil,
+              lastConfirmedAt,
+              minStayMonths:
+                l.minStayMonths != null ? Number(l.minStayMonths) : undefined,
+            },
+            {
+              legacySnapshot: {
+                totalSlots: l.totalSlots,
+                effectiveAvailableSlots: l.availableSlots,
+              },
+            }
+          );
+
+          if (!resolvedAvailability.isPubliclyAvailable) {
+            return null;
+          }
+
+          return {
+            id: l.id,
+            title: l.title,
+            price: Number(l.price),
+            availableSlots: resolvedAvailability.effectiveAvailableSlots,
+            totalSlots: resolvedAvailability.totalSlots,
+            images: l.primaryImage ? [l.primaryImage] : [],
+            roomType: l.roomType ?? undefined,
+            moveInDate,
+            availabilitySource: resolvedAvailability.availabilitySource,
+            openSlots: resolvedAvailability.openSlots,
+            availableUntil,
+            minStayMonths: resolvedAvailability.minStayMonths,
+            lastConfirmedAt,
+            status: l.status,
+            statusReason: l.statusReason,
+            location: {
+              city: l.city ?? undefined,
+              state: l.state ?? undefined,
+              // MED-4 FIX: Explicit Number() conversion — PostgreSQL raw queries may return
+              // numeric/float8 columns as strings depending on column type.
+              lat: Number(l.lat),
+              lng: Number(l.lng),
+            },
+            publicAvailability: resolvedAvailability,
+            avgRating: Number(l.avgRating) || 0,
+            reviewCount: Number(l.reviewCount) || 0,
+            // L-9 FIX: Use explicit null check instead of falsy coalescing.
+            // `Number(0) || null` falsely converts a valid score of 0 to null.
+            recommendedScore:
+              l.recommendedScore != null ? Number(l.recommendedScore) : null,
+            createdAt: l.createdAt ? new Date(l.createdAt) : null,
+          };
+        })
+        .filter(isPresent)
     );
 
     return {
@@ -1073,14 +1169,21 @@ async function getSearchDocListingsPaginatedInternal(
         d.price,
         d.images,
         ${effectiveAvailableSql} as "availableSlots",
-        d.total_slots as "totalSlots",
+        l."totalSlots" as "totalSlots",
+        l."availabilitySource" as "availabilitySource",
+        l."openSlots" as "openSlots",
+        l."availableUntil" as "availableUntil",
+        l."minStayMonths" as "minStayMonths",
+        l."lastConfirmedAt" as "lastConfirmedAt",
+        l.status::text as status,
+        l."statusReason" as "statusReason",
         d.amenities,
         d.house_rules as "houseRules",
         d.household_languages as "householdLanguages",
         d.primary_home_language as "primaryHomeLanguage",
         d.lease_duration as "leaseDuration",
         d.room_type as "roomType",
-        d.move_in_date as "moveInDate",
+        l."moveInDate" as "moveInDate",
         d.listing_created_at as "createdAt",
         d.view_count as "viewCount",
         d.city,
@@ -1090,6 +1193,7 @@ async function getSearchDocListingsPaginatedInternal(
         d.avg_rating as "avgRating",
         d.review_count as "reviewCount"
       FROM listing_search_docs d
+      JOIN "Listing" l ON l.id = d.id
       WHERE ${whereClause}
       ORDER BY ${orderByClause}
       LIMIT $${paramIndex++} OFFSET $${paramIndex++}
@@ -1266,14 +1370,21 @@ export async function getSearchDocListingsWithKeyset(
         d.price,
         d.images,
         ${effectiveAvailableSql} as "availableSlots",
-        d.total_slots as "totalSlots",
+        l."totalSlots" as "totalSlots",
+        l."availabilitySource" as "availabilitySource",
+        l."openSlots" as "openSlots",
+        l."availableUntil" as "availableUntil",
+        l."minStayMonths" as "minStayMonths",
+        l."lastConfirmedAt" as "lastConfirmedAt",
+        l.status::text as status,
+        l."statusReason" as "statusReason",
         d.amenities,
         d.house_rules as "houseRules",
         d.household_languages as "householdLanguages",
         d.primary_home_language as "primaryHomeLanguage",
         d.lease_duration as "leaseDuration",
         d.room_type as "roomType",
-        d.move_in_date as "moveInDate",
+        l."moveInDate" as "moveInDate",
         d.listing_created_at as "createdAt",
         d.view_count as "viewCount",
         d.city,
@@ -1289,6 +1400,7 @@ export async function getSearchDocListingsWithKeyset(
         d.review_count::text as "_cursorReviewCount",
         d.listing_created_at::text as "_cursorCreatedAt"
       FROM listing_search_docs d
+      JOIN "Listing" l ON l.id = d.id
       WHERE ${whereClause}
       ORDER BY ${orderByClause}
       LIMIT $${paramIndex++}
@@ -1449,14 +1561,21 @@ export async function getSearchDocListingsFirstPage(
         d.price,
         d.images,
         ${effectiveAvailableSql} as "availableSlots",
-        d.total_slots as "totalSlots",
+        l."totalSlots" as "totalSlots",
+        l."availabilitySource" as "availabilitySource",
+        l."openSlots" as "openSlots",
+        l."availableUntil" as "availableUntil",
+        l."minStayMonths" as "minStayMonths",
+        l."lastConfirmedAt" as "lastConfirmedAt",
+        l.status::text as status,
+        l."statusReason" as "statusReason",
         d.amenities,
         d.house_rules as "houseRules",
         d.household_languages as "householdLanguages",
         d.primary_home_language as "primaryHomeLanguage",
         d.lease_duration as "leaseDuration",
         d.room_type as "roomType",
-        d.move_in_date as "moveInDate",
+        l."moveInDate" as "moveInDate",
         d.listing_created_at as "createdAt",
         d.view_count as "viewCount",
         d.city,
@@ -1472,6 +1591,7 @@ export async function getSearchDocListingsFirstPage(
         d.review_count::text as "_cursorReviewCount",
         d.listing_created_at::text as "_cursorCreatedAt"
       FROM listing_search_docs d
+      JOIN "Listing" l ON l.id = d.id
       WHERE ${whereClause}
       ORDER BY ${orderByClause}
       LIMIT $${paramIndex++}

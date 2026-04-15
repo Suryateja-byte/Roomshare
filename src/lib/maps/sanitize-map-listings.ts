@@ -1,5 +1,6 @@
 import type { MapListingData } from "@/lib/search-types";
 import { buildPublicAvailability } from "@/lib/search/public-availability";
+import type { PublicAvailabilitySource } from "@/lib/search/public-availability";
 
 type MapListingInput = {
   id: string;
@@ -21,6 +22,14 @@ type MapListingInput = {
   reviewCount?: unknown;
   recommendedScore?: unknown;
   createdAt?: unknown;
+  availabilitySource?: PublicAvailabilitySource;
+  openSlots?: unknown;
+  availableUntil?: unknown;
+  minStayMonths?: unknown;
+  lastConfirmedAt?: unknown;
+  status?: unknown;
+  statusReason?: unknown;
+  publicAvailability?: MapListingData["publicAvailability"];
 };
 
 function toFiniteNumber(value: unknown, fallback = 0): number {
@@ -93,20 +102,42 @@ export function sanitizeMapListing(
       : [],
     roomType: toOptionalTrimmedString(listing.roomType),
     moveInDate: toSafeDate(listing.moveInDate) ?? undefined,
+    availabilitySource: listing.availabilitySource,
+    openSlots:
+      listing.openSlots == null ? null : toSafeSlotCount(listing.openSlots),
+    availableUntil: toSafeDate(listing.availableUntil),
+    minStayMonths:
+      listing.minStayMonths == null
+        ? undefined
+        : Math.max(1, toSafeSlotCount(listing.minStayMonths, 1)),
+    lastConfirmedAt: toSafeDate(listing.lastConfirmedAt),
+    status: toOptionalTrimmedString(listing.status),
+    statusReason: toOptionalTrimmedString(listing.statusReason) ?? null,
     location: {
       city: toOptionalTrimmedString(listing.location?.city),
       state: toOptionalTrimmedString(listing.location?.state),
       lat,
       lng,
     },
-    publicAvailability: buildPublicAvailability({
-      availableSlots: toSafeSlotCount(listing.availableSlots),
-      totalSlots: toSafeSlotCount(
-        listing.totalSlots,
-        toSafeSlotCount(listing.availableSlots)
-      ),
-      moveInDate: toSafeDate(listing.moveInDate),
-    }),
+    publicAvailability:
+      listing.publicAvailability ??
+      buildPublicAvailability({
+        availabilitySource: listing.availabilitySource,
+        availableSlots: toSafeSlotCount(listing.availableSlots),
+        totalSlots: toSafeSlotCount(
+          listing.totalSlots,
+          toSafeSlotCount(listing.availableSlots)
+        ),
+        moveInDate: toSafeDate(listing.moveInDate),
+        openSlots:
+          listing.openSlots == null ? null : toSafeSlotCount(listing.openSlots),
+        availableUntil: toSafeDate(listing.availableUntil),
+        minStayMonths:
+          listing.minStayMonths == null
+            ? undefined
+            : Math.max(1, toSafeSlotCount(listing.minStayMonths, 1)),
+        lastConfirmedAt: toSafeDate(listing.lastConfirmedAt),
+      }),
     tier: listing.tier,
     avgRating: toFiniteNumber(listing.avgRating, 0),
     reviewCount: Math.max(

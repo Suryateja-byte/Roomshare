@@ -47,6 +47,18 @@ jest.mock("@/lib/data", () => ({
   crossesAntimeridian: jest.fn(() => false),
 }));
 
+jest.mock("@/lib/prisma", () => ({
+  prisma: {
+    listing: {
+      findMany: jest.fn(),
+    },
+  },
+}));
+
+jest.mock("@/lib/availability", () => ({
+  getAvailabilityForListings: jest.fn(),
+}));
+
 // Mock search-doc-queries
 jest.mock("@/lib/search/search-doc-queries", () => ({
   isSearchDocEnabled: jest.fn(),
@@ -160,6 +172,8 @@ import { logger } from "@/lib/logger";
 import { withTimeout } from "@/lib/timeout-wrapper";
 import type { ListingData, MapListingData } from "@/lib/data";
 import { buildPublicAvailability } from "@/lib/search/public-availability";
+import { prisma } from "@/lib/prisma";
+import { getAvailabilityForListings } from "@/lib/availability";
 
 // ============================================================================
 // Cast mocks for type-safe access
@@ -242,6 +256,13 @@ const mockClampBoundsToMaxSpan = clampBoundsToMaxSpan as jest.MockedFunction<
   typeof clampBoundsToMaxSpan
 >;
 const mockWithTimeout = withTimeout as jest.MockedFunction<typeof withTimeout>;
+const mockPrismaListingFindMany = prisma.listing.findMany as jest.MockedFunction<
+  typeof prisma.listing.findMany
+>;
+const mockGetAvailabilityForListings =
+  getAvailabilityForListings as jest.MockedFunction<
+    typeof getAvailabilityForListings
+  >;
 
 // ============================================================================
 // Shared test fixtures
@@ -390,6 +411,25 @@ function setupDefaultMocks({
   mockGenerateQueryHash.mockReturnValue("abcdef1234567890");
   mockSemanticSearchQuery.mockResolvedValue(null);
   mockMapSemanticRowsToListingData.mockImplementation((rows) => rows as never);
+  (mockPrismaListingFindMany as unknown as jest.Mock).mockImplementation(
+    async (args?: { where?: { id?: { in?: string[] } } }) => {
+      const ids = args?.where?.id?.in ?? [];
+      return ids.map((id) => ({
+        id,
+        availabilitySource: "LEGACY_BOOKING" as const,
+        status: "ACTIVE",
+        statusReason: null,
+        totalSlots: 2,
+        availableSlots: 1,
+        openSlots: null,
+        moveInDate: null,
+        availableUntil: null,
+        minStayMonths: 1,
+        lastConfirmedAt: null,
+      }));
+    }
+  );
+  mockGetAvailabilityForListings.mockResolvedValue(new Map());
   mockTransformToListItems.mockImplementation((items) =>
     items.map((l) => ({
       id: l.id,

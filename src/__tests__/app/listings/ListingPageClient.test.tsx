@@ -140,6 +140,7 @@ function makeProps(
       householdLanguages: ["en"],
       totalSlots: 2,
       availableSlots: 1,
+      availabilitySource: "LEGACY_BOOKING",
       bookingMode: "REQUEST",
       holdTtlMinutes: 15,
       status: "ACTIVE",

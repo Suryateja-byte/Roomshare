@@ -19,7 +19,14 @@ import {
 } from "@/lib/constants";
 import { queryWithTimeout } from "@/lib/query-timeout";
 import { buildAvailabilitySqlFragments } from "@/lib/availability";
-import { buildPublicAvailability } from "@/lib/search/public-availability";
+import {
+  buildPublicAvailability,
+  resolvePublicAvailability,
+} from "@/lib/search/public-availability";
+
+function isPresent<T>(value: T | null | undefined): value is T {
+  return value != null;
+}
 
 // Re-export types and utilities from search-types for backward compatibility.
 // These were extracted to break the circular dependency: data.ts <-> search-doc-queries.ts.
@@ -526,6 +533,13 @@ export async function getMapListings(
             l.price,
             ${effectiveAvailableSql} as "availableSlots",
             l."totalSlots",
+            l."availabilitySource",
+            l."openSlots",
+            l."availableUntil",
+            l."minStayMonths",
+            l."lastConfirmedAt",
+            l."statusReason",
+            l.status,
             l."moveInDate",
             l."roomType",
             l.images,
@@ -551,31 +565,66 @@ export async function getMapListings(
     // eslint-disable-next-line @typescript-eslint/no-explicit-any -- Raw SQL query returns untyped rows; mapped to ListingData below
     const listings = await queryWithTimeout<any>(sqlQuery, queryParams);
 
-    return sanitizeMapListings(
-      listings.map((l) => ({
-        id: l.id,
-        title: l.title,
-        price: Number(l.price),
-        availableSlots: l.availableSlots,
-        totalSlots: l.totalSlots,
-        images: l.images || [],
-        roomType: l.roomType ?? undefined,
-        moveInDate: l.moveInDate ? new Date(l.moveInDate) : undefined,
-        location: {
-          city: l.city ?? undefined,
-          state: l.state ?? undefined,
-          lat: l.lat,
-          lng: l.lng,
-        },
-        publicAvailability: buildPublicAvailability({
-          availableSlots: l.availableSlots,
-          totalSlots: l.totalSlots,
-          moveInDate: l.moveInDate ? new Date(l.moveInDate) : undefined,
-        }),
-        avgRating: Number(l.avgRating) || 0,
-        reviewCount: Number(l.reviewCount) || 0,
-      }))
-    );
+    const mappedListings = listings
+      .map((l) => {
+        const moveInDate = l.moveInDate ? new Date(l.moveInDate) : undefined;
+        const availableUntil = l.availableUntil
+          ? new Date(l.availableUntil)
+          : null;
+        const lastConfirmedAt = l.lastConfirmedAt
+          ? new Date(l.lastConfirmedAt)
+          : null;
+        const resolvedAvailability = resolvePublicAvailability(
+          {
+            ...l,
+            moveInDate,
+            availableUntil,
+            lastConfirmedAt,
+            minStayMonths:
+              l.minStayMonths != null ? Number(l.minStayMonths) : undefined,
+          },
+          {
+            legacySnapshot: {
+              totalSlots: l.totalSlots,
+              effectiveAvailableSlots: l.availableSlots,
+            },
+          }
+        );
+
+        if (!resolvedAvailability.isPubliclyAvailable) {
+          return null;
+        }
+
+        return {
+          id: l.id,
+          title: l.title,
+          price: Number(l.price),
+          availableSlots: resolvedAvailability.effectiveAvailableSlots,
+          totalSlots: resolvedAvailability.totalSlots,
+          availabilitySource: resolvedAvailability.availabilitySource,
+          openSlots: resolvedAvailability.openSlots,
+          availableUntil,
+          minStayMonths: resolvedAvailability.minStayMonths,
+          lastConfirmedAt,
+          status: l.status,
+          statusReason: l.statusReason,
+          images: l.images || [],
+          roomType: l.roomType ?? undefined,
+          moveInDate,
+          location: {
+            city: l.city ?? undefined,
+            state: l.state ?? undefined,
+            lat: l.lat,
+            lng: l.lng,
+          },
+          publicAvailability: resolvedAvailability,
+          avgRating: Number(l.avgRating) || 0,
+          reviewCount: Number(l.reviewCount) || 0,
+        };
+      })
+      .filter(isPresent);
+
+    return sanitizeMapListings(mappedListings);
   } catch (error) {
     const dataError = wrapDatabaseError(error, "getMapListings");
     dataError.log({
@@ -873,6 +922,13 @@ export async function getListingsPaginated(
             l."leaseDuration",
             l."roomType",
             l."moveInDate",
+            l."availabilitySource",
+            l."openSlots",
+            l."availableUntil",
+            l."minStayMonths",
+            l."lastConfirmedAt",
+            l."statusReason",
+            l.status,
             l."createdAt",
             l."viewCount",
             loc.city,
@@ -911,39 +967,74 @@ export async function getListingsPaginated(
       totalPages > 0 ? Math.max(1, Math.min(effectivePage, totalPages)) : 1;
 
     // Map results and apply JS-level filters for amenities/house rules/languages
-    const results = listings.map((l) => ({
-      id: l.id,
-      title: l.title,
-      description: l.description,
-      price: Number(l.price),
-      images: l.images || [],
-      availableSlots: l.availableSlots,
-      totalSlots: l.totalSlots,
-      amenities: l.amenities || [],
-      houseRules: l.houseRules || [],
-      householdLanguages: l.household_languages || [],
-      primaryHomeLanguage: l.primary_home_language,
-      genderPreference: l.genderPreference,
-      householdGender: l.householdGender,
-      leaseDuration: l.leaseDuration,
-      roomType: l.roomType,
-      moveInDate: l.moveInDate ? new Date(l.moveInDate) : undefined,
-      publicAvailability: buildPublicAvailability({
-        availableSlots: l.availableSlots,
-        totalSlots: l.totalSlots,
-        moveInDate: l.moveInDate ? new Date(l.moveInDate) : undefined,
-      }),
-      createdAt: l.createdAt ? new Date(l.createdAt) : new Date(),
-      viewCount: Number(l.viewCount) || 0,
-      avgRating: Number(l.avg_rating) || 0,
-      reviewCount: Number(l.review_count) || 0,
-      location: {
-        city: l.city,
-        state: l.state,
-        lat: Number(l.lat) || 0,
-        lng: Number(l.lng) || 0,
-      },
-    }));
+    const results = listings
+      .map((l) => {
+        const moveInDate = l.moveInDate ? new Date(l.moveInDate) : undefined;
+        const availableUntil = l.availableUntil
+          ? new Date(l.availableUntil)
+          : null;
+        const lastConfirmedAt = l.lastConfirmedAt
+          ? new Date(l.lastConfirmedAt)
+          : null;
+        const resolvedAvailability = resolvePublicAvailability(
+          {
+            ...l,
+            moveInDate,
+            availableUntil,
+            lastConfirmedAt,
+            minStayMonths:
+              l.minStayMonths != null ? Number(l.minStayMonths) : undefined,
+          },
+          {
+            legacySnapshot: {
+              totalSlots: l.totalSlots,
+              effectiveAvailableSlots: l.availableSlots,
+            },
+          }
+        );
+
+        if (!resolvedAvailability.isPubliclyAvailable) {
+          return null;
+        }
+
+        return {
+          id: l.id,
+          title: l.title,
+          description: l.description,
+          price: Number(l.price),
+          images: l.images || [],
+          availableSlots: resolvedAvailability.effectiveAvailableSlots,
+          totalSlots: resolvedAvailability.totalSlots,
+          availabilitySource: resolvedAvailability.availabilitySource,
+          openSlots: resolvedAvailability.openSlots,
+          availableUntil,
+          minStayMonths: resolvedAvailability.minStayMonths,
+          lastConfirmedAt,
+          status: l.status,
+          statusReason: l.statusReason,
+          amenities: l.amenities || [],
+          houseRules: l.houseRules || [],
+          householdLanguages: l.household_languages || [],
+          primaryHomeLanguage: l.primary_home_language,
+          genderPreference: l.genderPreference,
+          householdGender: l.householdGender,
+          leaseDuration: l.leaseDuration,
+          roomType: l.roomType,
+          moveInDate,
+          publicAvailability: resolvedAvailability,
+          createdAt: l.createdAt ? new Date(l.createdAt) : new Date(),
+          viewCount: Number(l.viewCount) || 0,
+          avgRating: Number(l.avg_rating) || 0,
+          reviewCount: Number(l.review_count) || 0,
+          location: {
+            city: l.city,
+            state: l.state,
+            lat: Number(l.lat) || 0,
+            lng: Number(l.lng) || 0,
+          },
+        };
+      })
+    .filter(isPresent);
 
     // All filters are now applied at SQL level for accurate pagination counts:
     // - Languages: GIN index with && operator (OR logic)

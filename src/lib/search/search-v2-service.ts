@@ -61,6 +61,8 @@ import {
 import { logger, sanitizeErrorMessage } from "@/lib/logger";
 import { withTimeout, DEFAULT_TIMEOUTS } from "@/lib/timeout-wrapper";
 import { getAvailabilityForListings } from "@/lib/availability";
+import { prisma } from "@/lib/prisma";
+import { resolvePublicAvailabilityForListings } from "@/lib/search/public-availability";
 
 const VIBE_SOFT_FALLBACK_WARNING = "VIBE_SOFT_FALLBACK";
 
@@ -305,26 +307,76 @@ export async function executeSearchV2(
           let items = mapSemanticRowsToListingData(
             semanticRows.slice(0, pageSize)
           );
-          const availabilityByListing = await getAvailabilityForListings(
-            items.map((item) => item.id),
+          const listingRows = await prisma.listing.findMany({
+            where: { id: { in: items.map((item) => item.id) } },
+            select: {
+              id: true,
+              availabilitySource: true,
+              status: true,
+              statusReason: true,
+              totalSlots: true,
+              availableSlots: true,
+              openSlots: true,
+              moveInDate: true,
+              availableUntil: true,
+              minStayMonths: true,
+              lastConfirmedAt: true,
+            },
+          });
+          const listingRowsById = new Map(
+            listingRows.map((listing) => [listing.id, listing])
+          );
+          const legacyIds = listingRows
+            .filter((listing) => listing.availabilitySource === "LEGACY_BOOKING")
+            .map((listing) => listing.id);
+          const availabilityByListing =
+            legacyIds.length > 0
+              ? await getAvailabilityForListings(legacyIds, {
+                  startDate: parseDateParam(filterParams.moveInDate),
+                  endDate: parseDateParam(filterParams.endDate),
+                })
+              : new Map();
+          const resolvedAvailabilityByListing = resolvePublicAvailabilityForListings(
+            items.map((item) => ({
+              ...item,
+              ...(listingRowsById.get(item.id) ?? {}),
+            })),
             {
-              startDate: parseDateParam(filterParams.moveInDate),
-              endDate: parseDateParam(filterParams.endDate),
+              legacyAvailabilityByListing: availabilityByListing,
             }
           );
           const requiredSlots = Math.max(filterParams.minAvailableSlots ?? 1, 1);
           items = items
             .map((item) => {
-              const availability = availabilityByListing.get(item.id);
-              return availability
+              const resolvedAvailability =
+                resolvedAvailabilityByListing.get(item.id);
+              return resolvedAvailability
                 ? {
                     ...item,
-                    availableSlots: availability.effectiveAvailableSlots,
-                    totalSlots: availability.totalSlots,
+                    availabilitySource: resolvedAvailability.availabilitySource,
+                    availableSlots: resolvedAvailability.effectiveAvailableSlots,
+                    totalSlots: resolvedAvailability.totalSlots,
+                    openSlots: resolvedAvailability.openSlots,
+                    availableUntil: resolvedAvailability.availableUntil
+                      ? new Date(
+                          `${resolvedAvailability.availableUntil}T00:00:00.000Z`
+                        )
+                      : null,
+                    minStayMonths: resolvedAvailability.minStayMonths,
+                    lastConfirmedAt: resolvedAvailability.lastConfirmedAt
+                      ? new Date(resolvedAvailability.lastConfirmedAt)
+                      : null,
+                    status: listingRowsById.get(item.id)?.status,
+                    statusReason: listingRowsById.get(item.id)?.statusReason,
+                    publicAvailability: resolvedAvailability,
                   }
                 : item;
             })
-            .filter((item) => item.availableSlots >= requiredSlots);
+            .filter(
+              (item) =>
+                (resolvedAvailabilityByListing.get(item.id)?.isPubliclyAvailable ??
+                  true) && item.availableSlots >= requiredSlots
+            );
           const semanticResult: PaginatedResultHybrid<ListingData> = {
             items,
             total: hasNextPage ? null : items.length,

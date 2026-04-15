@@ -46,6 +46,13 @@ const INVENTORY_DELTA_CONFLICT_RESULT: UpdateBookingStatusErrorResult = {
   code: "INVENTORY_DELTA_CONFLICT",
 };
 
+const HOST_MANAGED_BOOKING_FORBIDDEN_RESULT: UpdateBookingStatusErrorResult = {
+  success: false,
+  error:
+    "This listing now uses host-managed availability. Contact the host instead.",
+  code: "HOST_MANAGED_BOOKING_FORBIDDEN",
+};
+
 function getInventoryDeltaConflictResult(
   error: unknown
 ): UpdateBookingStatusErrorResult | null {
@@ -110,6 +117,7 @@ export async function updateBookingStatus(
             ownerId: true,
             availableSlots: true,
             totalSlots: true,
+            availabilitySource: true,
             id: true,
             title: true,
             owner: {
@@ -125,6 +133,10 @@ export async function updateBookingStatus(
 
     if (!booking) {
       return { success: false, error: "Booking not found" };
+    }
+
+    if (booking.listing.availabilitySource === "HOST_MANAGED") {
+      return HOST_MANAGED_BOOKING_FORBIDDEN_RESULT;
     }
 
     // Only listing owner can accept/reject, or tenant can cancel their own booking

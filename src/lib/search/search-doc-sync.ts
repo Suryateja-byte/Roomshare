@@ -17,6 +17,7 @@ import { getAvailability } from "@/lib/availability";
 import { prisma } from "@/lib/prisma";
 import { logger, sanitizeErrorMessage } from "@/lib/logger";
 import { computeRecommendedScore } from "@/lib/search/recommended-score";
+import { resolvePublicAvailability } from "@/lib/search/public-availability";
 
 interface ListingSearchData {
   id: string;
@@ -34,6 +35,12 @@ interface ListingSearchData {
   moveInDate: Date | null;
   totalSlots: number;
   availableSlots: number;
+  availabilitySource: "LEGACY_BOOKING" | "HOST_MANAGED";
+  openSlots: number | null;
+  availableUntil: Date | null;
+  minStayMonths: number;
+  lastConfirmedAt: Date | null;
+  statusReason: string | null;
   viewCount: number;
   status: string;
   bookingMode: string;
@@ -74,6 +81,12 @@ async function fetchListingSearchData(
       l."moveInDate" as "moveInDate",
       l."totalSlots" as "totalSlots",
       l."availableSlots" as "availableSlots",
+      l."availabilitySource" as "availabilitySource",
+      l."openSlots" as "openSlots",
+      l."availableUntil" as "availableUntil",
+      l."minStayMonths" as "minStayMonths",
+      l."lastConfirmedAt" as "lastConfirmedAt",
+      l."statusReason" as "statusReason",
       l."viewCount" as "viewCount",
       l.status::text as status,
       l."booking_mode" as "bookingMode",
@@ -97,11 +110,38 @@ async function fetchListingSearchData(
   return results.length > 0 ? results[0] : null;
 }
 
+async function deleteSearchDocument(listingId: string): Promise<void> {
+  await prisma.$executeRaw`
+    DELETE FROM listing_search_docs
+    WHERE id = ${listingId}
+  `;
+}
+
 /**
  * Upsert a search document for a single listing
  */
 async function upsertSearchDocument(listing: ListingSearchData): Promise<void> {
-  const availability = await getAvailability(listing.id);
+  const legacyAvailability =
+    listing.availabilitySource === "LEGACY_BOOKING"
+      ? await getAvailability(listing.id)
+      : null;
+  const resolvedAvailability = resolvePublicAvailability(listing, {
+    legacySnapshot: legacyAvailability,
+  });
+
+  if (
+    listing.availabilitySource === "HOST_MANAGED" &&
+    !resolvedAvailability.isPubliclyAvailable
+  ) {
+    await deleteSearchDocument(listing.id);
+    logger.sync.info("Search doc sync hid invalid host-managed listing", {
+      action: "upsertSearchDocSync",
+      listingId: listing.id.slice(0, 8) + "...",
+      outcome: "host_managed_hidden_invalid",
+    });
+    return;
+  }
+
   const recommendedScore = computeRecommendedScore(
     listing.avgRating,
     listing.viewCount,
@@ -134,7 +174,7 @@ async function upsertSearchDocument(listing: ListingSearchData): Promise<void> {
     ) VALUES (
       ${listing.id}, ${listing.ownerId}, ${listing.title}, ${listing.description}, ${listing.price}, ${listing.images},
       ${listing.amenities}, ${listing.houseRules}, ${listing.householdLanguages}, ${listing.primaryHomeLanguage},
-      ${listing.leaseDuration}, ${listing.roomType}, ${listing.moveInDate}, ${listing.totalSlots}, ${availability?.effectiveAvailableSlots ?? listing.availableSlots},
+      ${listing.leaseDuration}, ${listing.roomType}, ${listing.moveInDate}, ${resolvedAvailability.totalSlots}, ${resolvedAvailability.effectiveAvailableSlots},
       ${listing.viewCount}, ${listing.status}, ${listing.createdAt},
       ${listing.address}, ${listing.city}, ${listing.state}, ${listing.zip},
       ST_SetSRID(ST_MakePoint(${listing.lng}, ${listing.lat}), 4326)::geography,

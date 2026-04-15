@@ -586,9 +586,11 @@ export async function PATCH(
             totalSlots: number;
             availableSlots: number;
             bookingMode: string;
+            availabilitySource: "LEGACY_BOOKING" | "HOST_MANAGED";
+            moveInDate: Date | null;
           }>
         >`
-                    SELECT "ownerId", "totalSlots", "availableSlots", "booking_mode" as "bookingMode"
+                    SELECT "ownerId", "totalSlots", "availableSlots", "booking_mode" as "bookingMode", "availabilitySource", "moveInDate"
                     FROM "Listing"
                     WHERE "id" = ${id}
                     FOR UPDATE
@@ -598,13 +600,26 @@ export async function PATCH(
           throw new Error("NOT_FOUND");
         }
 
-        // Phase 3: Block mode changes when future ACCEPTED bookings exist (D5/D8)
-        // PENDING bookings are NOT blocked — they are requests, not commitments
-        if (
+        const nextMoveInDate = moveInDate ? new Date(moveInDate) : null;
+        const moveInDateChanged =
+          (lockedListing.moveInDate?.toISOString().slice(0, 10) ?? null) !==
+          (nextMoveInDate?.toISOString().slice(0, 10) ?? null);
+        const bookingModeChanged =
           bookingMode !== undefined &&
           bookingMode !== null &&
-          bookingMode !== lockedListing.bookingMode
-        ) {
+          bookingMode !== lockedListing.bookingMode;
+        const totalSlotsChanged = totalSlots !== lockedListing.totalSlots;
+        const hostManagedInventoryMutation =
+          lockedListing.availabilitySource === "HOST_MANAGED" &&
+          (moveInDateChanged || bookingModeChanged || totalSlotsChanged);
+
+        if (hostManagedInventoryMutation) {
+          throw new Error("HOST_MANAGED_WRITE_PATH_REQUIRED");
+        }
+
+        // Phase 3: Block mode changes when future ACCEPTED bookings exist (D5/D8)
+        // PENDING bookings are NOT blocked — they are requests, not commitments
+        if (bookingModeChanged) {
           const futureAccepted = await tx.booking.count({
             where: {
               listingId: id,
@@ -619,6 +634,7 @@ export async function PATCH(
 
         // Phase 4: Block totalSlots reduction below committed bookings + active holds
         if (
+          lockedListing.availabilitySource === "LEGACY_BOOKING" &&
           totalSlots !== undefined &&
           totalSlots !== null &&
           totalSlots < lockedListing.totalSlots
@@ -629,13 +645,20 @@ export async function PATCH(
           }
         }
 
-        const currentAvailability = await getAvailability(id, { tx });
-        if (!currentAvailability) {
+        const currentAvailability =
+          lockedListing.availabilitySource === "LEGACY_BOOKING"
+            ? await getAvailability(id, { tx })
+            : null;
+        if (
+          lockedListing.availabilitySource === "LEGACY_BOOKING" &&
+          !currentAvailability
+        ) {
           throw new Error("LISTING_AVAILABILITY_NOT_FOUND");
         }
 
-        const reservedSlotsToday =
-          currentAvailability.acceptedSlots + currentAvailability.heldSlots;
+        const reservedSlotsToday = currentAvailability
+          ? currentAvailability.acceptedSlots + currentAvailability.heldSlots
+          : 0;
 
         const updatedListing = await tx.listing.update({
           where: { id },
@@ -658,8 +681,10 @@ export async function PATCH(
             leaseDuration: leaseDuration || null,
             roomType: roomType || null,
             totalSlots,
-            availableSlots: Math.max(0, totalSlots - reservedSlotsToday),
-            moveInDate: moveInDate ? new Date(moveInDate) : null,
+            ...(lockedListing.availabilitySource === "LEGACY_BOOKING" && {
+              availableSlots: Math.max(0, totalSlots - reservedSlotsToday),
+            }),
+            moveInDate: nextMoveInDate,
             ...(Array.isArray(images) && { images }),
             ...(bookingMode !== undefined &&
               bookingMode !== null && { bookingMode }),
@@ -667,6 +692,7 @@ export async function PATCH(
         });
 
         if (
+          lockedListing.availabilitySource === "LEGACY_BOOKING" &&
           totalSlots !== undefined &&
           totalSlots !== null &&
           totalSlots !== lockedListing.totalSlots
@@ -719,6 +745,16 @@ export async function PATCH(
                 "Cannot reduce total slots below the number committed by accepted bookings and active holds.",
             },
             { status: 400 }
+          );
+        }
+        if (error.message === "HOST_MANAGED_WRITE_PATH_REQUIRED") {
+          return NextResponse.json(
+            {
+              error:
+                "This listing now uses host-managed availability. Reload and use the new availability editor.",
+              code: "HOST_MANAGED_WRITE_PATH_REQUIRED",
+            },
+            { status: 409 }
           );
         }
       }

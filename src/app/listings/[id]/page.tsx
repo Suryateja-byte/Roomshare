@@ -10,6 +10,7 @@ import { features } from "@/lib/env";
 import { generateViewToken } from "@/app/api/metrics/hmac";
 import { getAvailability } from "@/lib/availability";
 import { resolveListingDetailDateParams } from "@/lib/search/listing-detail-link";
+import { resolvePublicAvailability } from "@/lib/search/public-availability";
 import ListingPageClient from "./ListingPageClient";
 
 const getListingWithLocation = cache(async (id: string) => {
@@ -193,7 +194,18 @@ export default async function ListingPage({ params, searchParams }: PageProps) {
   // Start similar listings fetch early (runs in parallel with remaining queries)
   const similarListingsPromise = getSimilarListings(id);
 
-  const [coordinates, acceptedBookings, reviews, availability] = await Promise.all([
+  const legacyAvailabilityPromise =
+    listing.availabilitySource === "LEGACY_BOOKING"
+      ? initialAvailabilityRange.startDate && initialAvailabilityRange.endDate
+        ? getAvailability(listing.id, {
+            startDate: initialAvailabilityRange.startDate,
+            endDate: initialAvailabilityRange.endDate,
+          })
+        : getAvailability(listing.id)
+      : Promise.resolve(null);
+
+  const [coordinates, acceptedBookings, reviews, legacyAvailability] =
+    await Promise.all([
     (async () => {
       if (!listing.location) {
         return null;
@@ -229,36 +241,50 @@ export default async function ListingPage({ params, searchParams }: PageProps) {
 
       return null;
     })(),
-    prisma.booking.findMany({
-      where: {
-        listingId: id,
-        OR: [
-          { status: "ACCEPTED" },
-          {
-            status: "HELD",
-            heldUntil: {
-              gt: new Date(),
-            },
+    listing.availabilitySource === "LEGACY_BOOKING"
+      ? prisma.booking.findMany({
+          where: {
+            listingId: id,
+            OR: [
+              { status: "ACCEPTED" },
+              {
+                status: "HELD",
+                heldUntil: {
+                  gt: new Date(),
+                },
+              },
+            ],
+            endDate: { gte: new Date() },
           },
-        ],
-        endDate: { gte: new Date() },
-      },
-      select: {
-        startDate: true,
-        endDate: true,
-      },
-      orderBy: {
-        startDate: "asc",
-      },
-    }),
-    getReviews(listing.id),
-    initialAvailabilityRange.startDate && initialAvailabilityRange.endDate
-      ? getAvailability(listing.id, {
-          startDate: initialAvailabilityRange.startDate,
-          endDate: initialAvailabilityRange.endDate,
+          select: {
+            startDate: true,
+            endDate: true,
+          },
+          orderBy: {
+            startDate: "asc",
+          },
         })
-      : getAvailability(listing.id),
+      : Promise.resolve([]),
+    getReviews(listing.id),
+    legacyAvailabilityPromise,
   ]);
+
+  const resolvedAvailability = resolvePublicAvailability(listing, {
+    legacySnapshot: legacyAvailability,
+  });
+  const availability =
+    legacyAvailability ?? {
+      listingId: listing.id,
+      totalSlots: resolvedAvailability.totalSlots,
+      effectiveAvailableSlots: resolvedAvailability.effectiveAvailableSlots,
+      heldSlots: 0,
+      acceptedSlots: 0,
+      rangeVersion: 0,
+      asOf: new Date().toISOString(),
+      availabilitySource: resolvedAvailability.availabilitySource,
+      isValid: resolvedAvailability.isValid,
+      isPubliclyAvailable: resolvedAvailability.isPubliclyAvailable,
+    };
 
   const similarListingsRaw = await similarListingsPromise;
 
@@ -314,7 +340,8 @@ export default async function ListingPage({ params, searchParams }: PageProps) {
             price: Number(listing.price),
             priceCurrency: "USD",
             availability:
-              listing.availableSlots > 0
+              resolvedAvailability.isPubliclyAvailable &&
+              availability.effectiveAvailableSlots > 0
                 ? "https://schema.org/InStock"
                 : "https://schema.org/SoldOut",
           },
@@ -354,8 +381,8 @@ export default async function ListingPage({ params, searchParams }: PageProps) {
           amenities: listing.amenities,
           householdLanguages: listing.householdLanguages,
           totalSlots: listing.totalSlots,
-          availableSlots:
-            availability?.effectiveAvailableSlots ?? listing.availableSlots,
+          availableSlots: resolvedAvailability.effectiveAvailableSlots,
+          availabilitySource: resolvedAvailability.availabilitySource,
           bookingMode: listing.bookingMode ?? "SHARED",
           status: listing.status,
           viewCount: listing.viewCount,
