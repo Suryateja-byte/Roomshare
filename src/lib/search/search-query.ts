@@ -22,6 +22,7 @@ export interface NormalizedSearchQuery {
   maxPrice?: number;
   amenities?: string[];
   moveInDate?: string;
+  endDate?: string;
   leaseDuration?: string;
   houseRules?: string[];
   languages?: string[];
@@ -160,6 +161,7 @@ export function normalizeSearchQuery(
     maxPrice,
     amenities: sortUnique(parsed.filterParams.amenities),
     moveInDate: parsed.filterParams.moveInDate,
+    endDate: parsed.filterParams.endDate,
     leaseDuration: parsed.filterParams.leaseDuration,
     houseRules: sortUnique(parsed.filterParams.houseRules),
     languages: sortUnique(parsed.filterParams.languages),
@@ -195,6 +197,7 @@ export function serializeSearchQuery(
   if (query.maxPrice !== undefined) params.set("maxPrice", String(query.maxPrice));
   query.amenities?.forEach((value) => params.append("amenities", value));
   if (query.moveInDate) params.set("moveInDate", query.moveInDate);
+  if (query.endDate) params.set("endDate", query.endDate);
   if (query.leaseDuration) params.set("leaseDuration", query.leaseDuration);
   query.houseRules?.forEach((value) => params.append("houseRules", value));
   query.languages?.forEach((value) => params.append("languages", value));
@@ -343,6 +346,7 @@ export function normalizedSearchQueryToFilterParams(
     maxPrice: query.maxPrice,
     amenities: query.amenities,
     moveInDate: query.moveInDate,
+    endDate: query.endDate,
     leaseDuration: query.leaseDuration,
     houseRules: query.houseRules,
     languages: query.languages,

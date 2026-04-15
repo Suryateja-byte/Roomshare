@@ -1,23 +1,25 @@
 /**
- * Tests for GET /api/cron/sweep-expired-holds route (Phase 4 - Soft Holds)
+ * Tests for GET /api/cron/sweep-expired-holds route.
  *
- * Tests cron auth validation, feature flag gating, advisory lock contention,
- * expired hold processing with slot restoration, version bumps, notifications
- * outside tx, empty batches, and partial batch failure resilience.
+ * Covers advisory-lock discovery, per-hold transaction isolation, stale hold
+ * handling, summary logging, and post-commit side effects.
  */
 
-jest.mock("@/lib/booking-audit", () => ({ logBookingAudit: jest.fn() }));
+jest.mock("@/lib/availability", () => ({
+  applyInventoryDeltas: jest.fn(),
+}));
 
-// --- Mocks (must be before imports) ---
+jest.mock("@/lib/booking-audit", () => ({
+  logBookingAudit: jest.fn(),
+}));
 
-const mockQueryRaw = jest.fn();
-const mockExecuteRaw = jest.fn();
+jest.mock("@/lib/search/search-doc-dirty", () => ({
+  markListingsDirty: jest.fn(),
+}));
 
 jest.mock("@/lib/prisma", () => ({
   prisma: {
     $transaction: jest.fn(),
-    $queryRaw: jest.fn(),
-    $executeRaw: jest.fn(),
   },
 }));
 
@@ -44,11 +46,15 @@ jest.mock("@/lib/logger", () => ({
       info: jest.fn(),
     },
   },
+  sanitizeErrorMessage: jest.fn((error: unknown) =>
+    error instanceof Error ? error.message : String(error ?? "Unknown error")
+  ),
 }));
 
 jest.mock("next/server", () => ({
   NextRequest: class MockNextRequest extends Request {
     declare headers: Headers;
+
     constructor(url: string, init?: RequestInit) {
       super(url, init);
     }
@@ -63,28 +69,36 @@ jest.mock("next/server", () => ({
 }));
 
 import { GET } from "@/app/api/cron/sweep-expired-holds/route";
-import { prisma } from "@/lib/prisma";
+import { applyInventoryDeltas } from "@/lib/availability";
+import { logBookingAudit } from "@/lib/booking-audit";
 import { validateCronAuth } from "@/lib/cron-auth";
 import { features } from "@/lib/env";
-import { createInternalNotification } from "@/lib/notifications";
 import { logger } from "@/lib/logger";
+import { createInternalNotification } from "@/lib/notifications";
+import { prisma } from "@/lib/prisma";
+import { markListingsDirty } from "@/lib/search/search-doc-dirty";
 import { NextRequest } from "next/server";
-import { logBookingAudit } from "@/lib/booking-audit";
 
-// --- Helpers ---
+type ExpiredHold = ReturnType<typeof makeExpiredHold>;
+type TransactionStep = (cb: Function) => Promise<unknown>;
+type PerHoldPlan = {
+  bookingUpdateCount?: number;
+  failAt?: "booking" | "listing";
+  error?: Error;
+};
 
 function createRequest(authHeader?: string): NextRequest {
   const headers: Record<string, string> = {};
   if (authHeader) {
-    headers["authorization"] = authHeader;
+    headers.authorization = authHeader;
   }
+
   return new NextRequest("http://localhost:3000/api/cron/sweep-expired-holds", {
     method: "GET",
     headers,
   });
 }
 
-/** Build a mock expired booking row matching the raw SQL query shape */
 function makeExpiredHold(
   overrides: Partial<{
     id: string;
@@ -93,6 +107,9 @@ function makeExpiredHold(
     slotsRequested: number;
     version: number;
     heldUntil: Date;
+    startDate: Date;
+    endDate: Date;
+    totalSlots: number;
     tenantEmail: string | null;
     tenantName: string | null;
     listingTitle: string;
@@ -107,7 +124,12 @@ function makeExpiredHold(
     tenantId: overrides.tenantId ?? "tenant-1",
     slotsRequested: overrides.slotsRequested ?? 1,
     version: overrides.version ?? 1,
-    heldUntil: overrides.heldUntil ?? new Date(Date.now() - 60000),
+    heldUntil:
+      overrides.heldUntil ?? new Date("2026-04-14T10:00:00.000Z"),
+    startDate:
+      overrides.startDate ?? new Date("2026-05-01T00:00:00.000Z"),
+    endDate: overrides.endDate ?? new Date("2026-06-01T00:00:00.000Z"),
+    totalSlots: overrides.totalSlots ?? 5,
     tenantEmail: overrides.tenantEmail ?? "tenant@example.com",
     tenantName: overrides.tenantName ?? "Tenant One",
     listingTitle: overrides.listingTitle ?? "Cozy Room",
@@ -117,64 +139,106 @@ function makeExpiredHold(
   };
 }
 
-/**
- * Sets up prisma.$transaction to invoke the callback with a mock tx object
- * and return the callback result.
- */
-function setupTransaction(opts: {
+function installTransactionQueue(steps: TransactionStep[]) {
+  const pending = [...steps];
+
+  (prisma.$transaction as jest.Mock).mockImplementation(async (cb: Function) => {
+    const step = pending.shift();
+    if (!step) {
+      throw new Error("Unexpected transaction");
+    }
+    return step(cb);
+  });
+
+  return pending;
+}
+
+function makeDiscoveryStep(opts: {
   lockAcquired?: boolean;
-  expiredBookings?: ReturnType<typeof makeExpiredHold>[];
-  executeRawError?: Error | null;
+  expiredBookings?: ExpiredHold[];
 }) {
-  const {
-    lockAcquired = true,
-    expiredBookings = [],
-    executeRawError = null,
-  } = opts;
+  const { lockAcquired = true, expiredBookings = [] } = opts;
+  const queryRaw = jest.fn();
+  let queryCallCount = 0;
 
-  // Reset per-call tracking
-  mockQueryRaw.mockReset();
-  mockExecuteRaw.mockReset();
+  queryRaw.mockImplementation(() => {
+    queryCallCount += 1;
 
-  // First $queryRaw call = advisory lock, second = find expired bookings
-  let queryRawCallIndex = 0;
-  mockQueryRaw.mockImplementation(() => {
-    queryRawCallIndex++;
-    if (queryRawCallIndex === 1) {
-      // Advisory lock query
+    if (queryCallCount === 1) {
       return Promise.resolve([{ locked: lockAcquired }]);
     }
-    // Expired bookings query
+
     return Promise.resolve(expiredBookings);
   });
 
-  if (executeRawError) {
-    mockExecuteRaw.mockRejectedValue(executeRawError);
-  } else {
-    mockExecuteRaw.mockResolvedValue(1);
-  }
-
-  (prisma.$transaction as jest.Mock).mockImplementation(
-    async (cb: Function) => {
-      const tx = {
-        $queryRaw: mockQueryRaw,
-        $executeRaw: mockExecuteRaw,
-      };
-      return cb(tx);
-    }
-  );
+  return {
+    queryRaw,
+    step: async (cb: Function) =>
+      cb({
+        $queryRaw: queryRaw,
+      }),
+  };
 }
 
-// --- Test suite ---
+function makePerHoldStep(plan: PerHoldPlan = {}) {
+  const executeRaw = jest.fn();
+  let executeCallCount = 0;
+
+  executeRaw.mockImplementation(() => {
+    executeCallCount += 1;
+
+    if (plan.failAt === "booking" && executeCallCount === 1) {
+      throw plan.error ?? new Error("Booking update failed");
+    }
+
+    if (executeCallCount === 1) {
+      return Promise.resolve(plan.bookingUpdateCount ?? 1);
+    }
+
+    if (plan.failAt === "listing" && executeCallCount === 2) {
+      throw plan.error ?? new Error("Listing update failed");
+    }
+
+    return Promise.resolve(1);
+  });
+
+  return {
+    executeRaw,
+    step: async (cb: Function) =>
+      cb({
+        $executeRaw: executeRaw,
+      }),
+  };
+}
+
+function setupTransactions(opts: {
+  lockAcquired?: boolean;
+  expiredBookings?: ExpiredHold[];
+  perHoldPlans?: PerHoldPlan[];
+}) {
+  const discovery = makeDiscoveryStep({
+    lockAcquired: opts.lockAcquired,
+    expiredBookings: opts.expiredBookings,
+  });
+  const holdSteps = (opts.perHoldPlans ?? []).map((plan) => makePerHoldStep(plan));
+
+  installTransactionQueue([discovery.step, ...holdSteps.map((step) => step.step)]);
+
+  return {
+    discoveryQueryRaw: discovery.queryRaw,
+    holdExecuteRaws: holdSteps.map((step) => step.executeRaw),
+  };
+}
+
+function findLogCall(mockFn: jest.Mock, message: string) {
+  return mockFn.mock.calls.find((call) => call[0] === message);
+}
 
 describe("GET /api/cron/sweep-expired-holds", () => {
   beforeEach(() => {
     jest.clearAllMocks();
 
-    // Default: auth passes (returns null = no error)
     (validateCronAuth as jest.Mock).mockReturnValue(null);
-
-    // Default: feature flag ON
     Object.defineProperty(features, "softHoldsEnabled", {
       value: true,
       writable: true,
@@ -183,261 +247,15 @@ describe("GET /api/cron/sweep-expired-holds", () => {
       value: false,
       writable: true,
     });
-
-    // Default: notifications succeed
+    (applyInventoryDeltas as jest.Mock).mockResolvedValue(undefined);
+    (logBookingAudit as jest.Mock).mockResolvedValue(undefined);
+    (markListingsDirty as jest.Mock).mockResolvedValue(undefined);
     (createInternalNotification as jest.Mock).mockResolvedValue({
       success: true,
     });
   });
 
-  // -------------------------------------------------------
-  // 1. Sweeper expires holds
-  // -------------------------------------------------------
-  it("expires HELD bookings, sets EXPIRED status, and restores listing slots", async () => {
-    const hold1 = makeExpiredHold({ id: "b-1", slotsRequested: 2 });
-    const hold2 = makeExpiredHold({
-      id: "b-2",
-      slotsRequested: 1,
-      listingId: "listing-2",
-    });
-    setupTransaction({ expiredBookings: [hold1, hold2] });
-
-    const response = await GET(createRequest());
-    const data = await response.json();
-
-    expect(response.status).toBe(200);
-    expect(data.success).toBe(true);
-    expect(data.expired).toBe(2);
-    expect(data.skipped).toBe(false);
-
-    // Should have called $executeRaw 4 times: 2 bookings x (UPDATE Booking + UPDATE Listing)
-    expect(mockExecuteRaw).toHaveBeenCalledTimes(4);
-  });
-
-  // -------------------------------------------------------
-  // 2. Version bump: version = version + 1
-  // -------------------------------------------------------
-  it("bumps booking version in the UPDATE statement", async () => {
-    const hold = makeExpiredHold({ id: "b-ver", version: 3 });
-    setupTransaction({ expiredBookings: [hold] });
-
-    await GET(createRequest());
-
-    // The first $executeRaw call is the booking update.
-    // Since it uses tagged template literals, the first argument is a TemplateStringsArray.
-    // We verify the SQL contains "version = version + 1"
-    const firstCall = mockExecuteRaw.mock.calls[0];
-    // Tagged template calls: first arg is strings array
-    const sqlParts = firstCall[0];
-    const fullSql = Array.isArray(sqlParts)
-      ? sqlParts.join("?")
-      : String(sqlParts);
-    expect(fullSql).toContain("version = version + 1");
-  });
-
-  // -------------------------------------------------------
-  // 3. Notifications outside tx
-  // -------------------------------------------------------
-  it("sends notifications after the transaction commits, not inside it", async () => {
-    const hold = makeExpiredHold({ id: "b-notif" });
-    setupTransaction({ expiredBookings: [hold] });
-
-    const callOrder: string[] = [];
-
-    (prisma.$transaction as jest.Mock).mockImplementation(
-      async (cb: Function) => {
-        const tx = {
-          $queryRaw: mockQueryRaw,
-          $executeRaw: mockExecuteRaw,
-        };
-        const result = cb(tx);
-        callOrder.push("tx-complete");
-        return result;
-      }
-    );
-    (createInternalNotification as jest.Mock).mockImplementation(async () => {
-      callOrder.push("notification");
-      return { success: true };
-    });
-
-    await GET(createRequest());
-
-    // tx-complete should come before notifications
-    const txIndex = callOrder.indexOf("tx-complete");
-    const firstNotifIndex = callOrder.indexOf("notification");
-    expect(txIndex).toBeLessThan(firstNotifIndex);
-
-    // 2 notifications per hold: tenant + host
-    expect(createInternalNotification).toHaveBeenCalledTimes(2);
-
-    // Verify tenant notification
-    expect(createInternalNotification).toHaveBeenCalledWith(
-      expect.objectContaining({
-        userId: hold.tenantId,
-        type: "BOOKING_HOLD_EXPIRED",
-      })
-    );
-
-    // Verify host notification
-    expect(createInternalNotification).toHaveBeenCalledWith(
-      expect.objectContaining({
-        userId: hold.hostId,
-        type: "BOOKING_EXPIRED",
-      })
-    );
-  });
-
-  // -------------------------------------------------------
-  // 4. Advisory lock - skip when held
-  // -------------------------------------------------------
-  it("skips sweep when advisory lock is already held by another sweeper", async () => {
-    setupTransaction({ lockAcquired: false });
-
-    const response = await GET(createRequest());
-    const data = await response.json();
-
-    expect(response.status).toBe(200);
-    expect(data.success).toBe(true);
-    expect(data.expired).toBe(0);
-    expect(data.skipped).toBe(true);
-    expect(data.reason).toBe("lock_held");
-
-    // No booking queries or updates should have been made
-    // queryRaw called once (lock check only), executeRaw never
-    expect(mockQueryRaw).toHaveBeenCalledTimes(1);
-    expect(mockExecuteRaw).not.toHaveBeenCalled();
-  });
-
-  // -------------------------------------------------------
-  // 5. Feature flag OFF - skip
-  // -------------------------------------------------------
-  it("returns early with skipped when soft holds feature is disabled", async () => {
-    Object.defineProperty(features, "softHoldsEnabled", {
-      value: false,
-      writable: true,
-    });
-    Object.defineProperty(features, "softHoldsDraining", {
-      value: false,
-      writable: true,
-    });
-
-    const response = await GET(createRequest());
-    const data = await response.json();
-
-    expect(response.status).toBe(200);
-    expect(data.success).toBe(true);
-    expect(data.expired).toBe(0);
-    expect(data.skipped).toBe(true);
-    expect(data.reason).toBe("soft_holds_disabled");
-
-    // No transaction started
-    expect(prisma.$transaction).not.toHaveBeenCalled();
-  });
-
-  // -------------------------------------------------------
-  // 6. Feature flag DRAIN - runs
-  // -------------------------------------------------------
-  it("runs the sweeper in drain mode to expire existing holds", async () => {
-    Object.defineProperty(features, "softHoldsEnabled", {
-      value: false,
-      writable: true,
-    });
-    Object.defineProperty(features, "softHoldsDraining", {
-      value: true,
-      writable: true,
-    });
-
-    const hold = makeExpiredHold({ id: "b-drain" });
-    setupTransaction({ expiredBookings: [hold] });
-
-    const response = await GET(createRequest());
-    const data = await response.json();
-
-    expect(response.status).toBe(200);
-    expect(data.success).toBe(true);
-    expect(data.expired).toBe(1);
-    expect(data.skipped).toBe(false);
-
-    // Transaction was called
-    expect(prisma.$transaction).toHaveBeenCalledTimes(1);
-  });
-
-  // -------------------------------------------------------
-  // 7. Empty batch
-  // -------------------------------------------------------
-  it("returns expired: 0 when no expired holds are found", async () => {
-    setupTransaction({ expiredBookings: [] });
-
-    const response = await GET(createRequest());
-    const data = await response.json();
-
-    expect(response.status).toBe(200);
-    expect(data.success).toBe(true);
-    expect(data.expired).toBe(0);
-
-    // Lock was acquired, bookings queried, but no updates
-    expect(mockQueryRaw).toHaveBeenCalledTimes(2);
-    expect(mockExecuteRaw).not.toHaveBeenCalled();
-
-    // No notifications sent
-    expect(createInternalNotification).not.toHaveBeenCalled();
-  });
-
-  // -------------------------------------------------------
-  // 8. Partial batch failure
-  // -------------------------------------------------------
-  it("propagates error when one hold fails to expire (tx rolls back)", async () => {
-    // In the current implementation, any failure inside the tx callback
-    // will cause the entire transaction to reject (Prisma rolls back).
-    // The route catches this and returns 500.
-    const hold1 = makeExpiredHold({ id: "b-ok" });
-    const hold2 = makeExpiredHold({ id: "b-fail" });
-
-    // Set up: lock succeeds, finds 2 bookings, first update ok, second throws
-    let executeCallCount = 0;
-    mockQueryRaw.mockReset();
-    let queryCallCount = 0;
-    mockQueryRaw.mockImplementation(() => {
-      queryCallCount++;
-      if (queryCallCount === 1) return Promise.resolve([{ locked: true }]);
-      return Promise.resolve([hold1, hold2]);
-    });
-    mockExecuteRaw.mockImplementation(() => {
-      executeCallCount++;
-      // First 2 calls succeed (hold1: booking update + listing update)
-      if (executeCallCount <= 2) return Promise.resolve(1);
-      // Third call (hold2 booking update) throws
-      throw new Error("Serialization failure");
-    });
-    (prisma.$transaction as jest.Mock).mockImplementation(
-      async (cb: Function) => {
-        const tx = {
-          $queryRaw: mockQueryRaw,
-          $executeRaw: mockExecuteRaw,
-        };
-        return cb(tx);
-      }
-    );
-
-    const response = await GET(createRequest());
-    const data = await response.json();
-
-    // Transaction error causes 500
-    expect(response.status).toBe(500);
-    expect(data.error).toBe("Sweeper failed");
-
-    // Logger captured the error
-    expect(logger.sync.error).toHaveBeenCalledWith(
-      "[sweep-expired-holds] Transaction failed",
-      expect.objectContaining({ error: "Serialization failure" })
-    );
-  });
-
-  // -------------------------------------------------------
-  // 9. Cron auth validation
-  // -------------------------------------------------------
   it("returns 401 when cron auth validation fails", async () => {
-    // Mock validateCronAuth to return a 401 response
     const authErrorResponse = {
       status: 401,
       json: async () => ({ error: "Unauthorized" }),
@@ -448,156 +266,362 @@ describe("GET /api/cron/sweep-expired-holds", () => {
     const response = await GET(createRequest());
 
     expect(response.status).toBe(401);
-    const data = await response.json();
-    expect(data.error).toBe("Unauthorized");
-
-    // No transaction started
+    expect(await response.json()).toEqual({ error: "Unauthorized" });
     expect(prisma.$transaction).not.toHaveBeenCalled();
   });
 
-  // -------------------------------------------------------
-  // 10. Booking audit logging
-  // -------------------------------------------------------
-  it("calls logBookingAudit with EXPIRED action and SYSTEM actor", async () => {
-    const hold = makeExpiredHold({ id: "b-audit" });
-    setupTransaction({ expiredBookings: [hold] });
+  it("returns skipped when soft holds are disabled", async () => {
+    Object.defineProperty(features, "softHoldsEnabled", {
+      value: false,
+      writable: true,
+    });
+    Object.defineProperty(features, "softHoldsDraining", {
+      value: false,
+      writable: true,
+    });
 
     const response = await GET(createRequest());
     const data = await response.json();
 
     expect(response.status).toBe(200);
-    expect(data.success).toBe(true);
-    expect(data.expired).toBe(1);
+    expect(data).toEqual(
+      expect.objectContaining({
+        success: true,
+        expired: 0,
+        selected: 0,
+        failed: 0,
+        stale: 0,
+        skipped: true,
+        reason: "soft_holds_disabled",
+      })
+    );
+    expect(prisma.$transaction).not.toHaveBeenCalled();
+  });
 
+  it("skips sweep when advisory lock is already held", async () => {
+    const { discoveryQueryRaw } = setupTransactions({
+      lockAcquired: false,
+      expiredBookings: [],
+    });
+
+    const response = await GET(createRequest());
+    const data = await response.json();
+
+    expect(response.status).toBe(200);
+    expect(data).toEqual(
+      expect.objectContaining({
+        success: true,
+        expired: 0,
+        selected: 0,
+        failed: 0,
+        stale: 0,
+        skipped: true,
+        reason: "lock_held",
+      })
+    );
+    expect(discoveryQueryRaw).toHaveBeenCalledTimes(1);
+    expect(prisma.$transaction).toHaveBeenCalledTimes(1);
+  });
+
+  it("returns zero counts when no expired holds are found", async () => {
+    setupTransactions({
+      lockAcquired: true,
+      expiredBookings: [],
+      perHoldPlans: [],
+    });
+
+    const response = await GET(createRequest());
+    const data = await response.json();
+
+    expect(response.status).toBe(200);
+    expect(data).toEqual(
+      expect.objectContaining({
+        success: true,
+        expired: 0,
+        selected: 0,
+        failed: 0,
+        stale: 0,
+        skipped: false,
+      })
+    );
+    expect(createInternalNotification).not.toHaveBeenCalled();
+    expect(markListingsDirty).not.toHaveBeenCalled();
+  });
+
+  it("expires one hold in its own transaction and sends notifications after commit", async () => {
+    const hold = makeExpiredHold({
+      id: "booking-success",
+      listingId: "listing-success",
+      slotsRequested: 2,
+      version: 7,
+    });
+    const discovery = makeDiscoveryStep({
+      lockAcquired: true,
+      expiredBookings: [hold],
+    });
+    const perHold = makePerHoldStep();
+    const callOrder: string[] = [];
+
+    installTransactionQueue([
+      discovery.step,
+      async (cb: Function) => {
+        const result = await perHold.step(cb);
+        callOrder.push("tx-complete");
+        return result;
+      },
+    ]);
+
+    (createInternalNotification as jest.Mock).mockImplementation(async () => {
+      callOrder.push("notification");
+      return { success: true };
+    });
+
+    const response = await GET(createRequest());
+    const data = await response.json();
+
+    expect(response.status).toBe(200);
+    expect(data).toEqual(
+      expect.objectContaining({
+        success: true,
+        expired: 1,
+        selected: 1,
+        failed: 0,
+        stale: 0,
+        skipped: false,
+      })
+    );
+
+    expect(prisma.$transaction).toHaveBeenCalledTimes(2);
+    expect(callOrder.indexOf("tx-complete")).toBeLessThan(
+      callOrder.indexOf("notification")
+    );
+
+    const bookingUpdateSqlParts = perHold.executeRaw.mock.calls[0][0];
+    const bookingUpdateSql = Array.isArray(bookingUpdateSqlParts)
+      ? bookingUpdateSqlParts.join("?")
+      : String(bookingUpdateSqlParts);
+    expect(bookingUpdateSql).toContain("version = ?");
+    expect(bookingUpdateSql).toContain('"heldUntil" <= NOW()');
+
+    const listingUpdateSqlParts = perHold.executeRaw.mock.calls[1][0];
+    const listingUpdateSql = Array.isArray(listingUpdateSqlParts)
+      ? listingUpdateSqlParts.join("?")
+      : String(listingUpdateSqlParts);
+    expect(listingUpdateSql.toUpperCase()).toContain("LEAST");
+
+    expect(applyInventoryDeltas).toHaveBeenCalledWith(
+      expect.anything(),
+      expect.objectContaining({
+        listingId: hold.listingId,
+        startDate: hold.startDate,
+        endDate: hold.endDate,
+        totalSlots: hold.totalSlots,
+        heldDelta: -hold.slotsRequested,
+      })
+    );
     expect(logBookingAudit).toHaveBeenCalledWith(
       expect.anything(),
       expect.objectContaining({
+        bookingId: hold.id,
         action: "EXPIRED",
         previousStatus: "HELD",
         newStatus: "EXPIRED",
-        actorId: null,
         actorType: "SYSTEM",
       })
     );
+    expect(createInternalNotification).toHaveBeenCalledTimes(2);
+    expect(markListingsDirty).toHaveBeenCalledWith(
+      [hold.listingId],
+      "booking_hold_expired"
+    );
   });
 
-  // -------------------------------------------------------
-  // 11. Multi-slot hold scenarios
-  // -------------------------------------------------------
-  describe("sweeper with multi-slot holds", () => {
-    it("restores correct slotsRequested for each hold in batch", async () => {
-      // Hold A: slotsRequested=2 on listing X
-      // Hold B: slotsRequested=3 on listing Y
-      const holdA = makeExpiredHold({
-        id: "b-multi-1",
-        listingId: "listing-x",
-        slotsRequested: 2,
-      });
-      const holdB = makeExpiredHold({
-        id: "b-multi-2",
-        listingId: "listing-y",
-        slotsRequested: 3,
-      });
-      setupTransaction({ expiredBookings: [holdA, holdB] });
-
-      const response = await GET(createRequest());
-      const data = await response.json();
-
-      expect(response.status).toBe(200);
-      expect(data.success).toBe(true);
-      expect(data.expired).toBe(2);
-
-      // 2 holds × 2 SQL calls each (UPDATE Booking + UPDATE Listing) = 4 total
-      expect(mockExecuteRaw).toHaveBeenCalledTimes(4);
-
-      // Collect the SQL strings from each $executeRaw call
-      const sqlCalls = mockExecuteRaw.mock.calls.map((call) => {
-        const sqlParts = call[0];
-        return Array.isArray(sqlParts) ? sqlParts.join("?") : String(sqlParts);
-      });
-
-      // The listing-update SQL calls carry the slotsRequested value as a
-      // bound parameter (the second element of the tagged-template call).
-      // We verify the bound values include 2 and 3 across the four calls.
-      const boundValues = mockExecuteRaw.mock.calls.flatMap((call) =>
-        call.slice(1)
-      );
-      expect(boundValues).toContain(2);
-      expect(boundValues).toContain(3);
-
-      // Each listing-update SQL should reference availableSlots
-      const listingUpdateSqls = sqlCalls.filter((sql) =>
-        sql.includes("availableSlots")
-      );
-      expect(listingUpdateSqls).toHaveLength(2);
+  it("continues processing later holds when a middle hold fails", async () => {
+    const holdA = makeExpiredHold({ id: "hold-a", listingId: "listing-a" });
+    const holdB = makeExpiredHold({ id: "hold-b", listingId: "listing-b" });
+    const holdC = makeExpiredHold({ id: "hold-c", listingId: "listing-c" });
+    const trackers = setupTransactions({
+      lockAcquired: true,
+      expiredBookings: [holdA, holdB, holdC],
+      perHoldPlans: [
+        {},
+        { failAt: "listing", error: new Error("INVENTORY_DELTA_CONFLICT") },
+        {},
+      ],
     });
 
-    it("restores slots for multiple holds on same listing", async () => {
-      const sharedListingId = "listing-shared";
-      // Two expired holds on the same listing
-      const holdA = makeExpiredHold({
-        id: "b-same-1",
-        listingId: sharedListingId,
-        slotsRequested: 2,
-      });
-      const holdB = makeExpiredHold({
-        id: "b-same-2",
-        listingId: sharedListingId,
-        slotsRequested: 1,
-      });
-      setupTransaction({ expiredBookings: [holdA, holdB] });
+    const response = await GET(createRequest());
+    const data = await response.json();
 
-      const response = await GET(createRequest());
-      const data = await response.json();
+    expect(response.status).toBe(200);
+    expect(data).toEqual(
+      expect.objectContaining({
+        success: true,
+        expired: 2,
+        selected: 3,
+        failed: 1,
+        stale: 0,
+        skipped: false,
+      })
+    );
+    expect(trackers.holdExecuteRaws).toHaveLength(3);
+    expect(trackers.holdExecuteRaws[2]).toHaveBeenCalled();
+    expect(applyInventoryDeltas).toHaveBeenCalledTimes(2);
+    expect(logBookingAudit).toHaveBeenCalledTimes(2);
+    expect(createInternalNotification).toHaveBeenCalledTimes(4);
+    expect(markListingsDirty).toHaveBeenCalledWith(
+      ["listing-a", "listing-c"],
+      "booking_hold_expired"
+    );
+    expect(
+      findLogCall(
+        logger.sync.warn as jest.Mock,
+        "[sweep-expired-holds] Sweep completed with partial failures"
+      )
+    ).toBeDefined();
+  });
 
-      expect(response.status).toBe(200);
-      expect(data.success).toBe(true);
-      expect(data.expired).toBe(2);
+  it("does not let a failed first hold block a later successful hold", async () => {
+    const holdA = makeExpiredHold({ id: "hold-first-fail", listingId: "listing-a" });
+    const holdB = makeExpiredHold({ id: "hold-second-ok", listingId: "listing-b" });
 
-      // 4 total $executeRaw calls (2 per hold)
-      expect(mockExecuteRaw).toHaveBeenCalledTimes(4);
-
-      // Both listing-update calls should target the same listing.
-      // The listing ID is passed as a bound parameter to the tagged template.
-      const allBoundValues = mockExecuteRaw.mock.calls.flatMap((call) =>
-        call.slice(1)
-      );
-      const listingIdMatches = allBoundValues.filter(
-        (v) => v === sharedListingId
-      );
-      // One listingId reference per hold's listing-update call
-      expect(listingIdMatches.length).toBeGreaterThanOrEqual(2);
+    setupTransactions({
+      lockAcquired: true,
+      expiredBookings: [holdA, holdB],
+      perHoldPlans: [
+        { failAt: "booking", error: new Error("Serialization failure") },
+        {},
+      ],
     });
 
-    it("slot restoration uses LEAST clamp to prevent overflow", async () => {
-      // Hold with slotsRequested=3; listing has availableSlots=4, totalSlots=5.
-      // LEAST(availableSlots + slotsRequested, totalSlots) = LEAST(7, 5) = 5.
-      // The SQL itself enforces the cap; we verify the template contains LEAST.
-      const hold = makeExpiredHold({
-        id: "b-clamp",
-        slotsRequested: 3,
-        listingId: "listing-clamp",
-      });
-      setupTransaction({ expiredBookings: [hold] });
+    const response = await GET(createRequest());
+    const data = await response.json();
 
-      await GET(createRequest());
+    expect(response.status).toBe(200);
+    expect(data).toEqual(
+      expect.objectContaining({
+        success: true,
+        expired: 1,
+        selected: 2,
+        failed: 1,
+        stale: 0,
+        skipped: false,
+      })
+    );
+    expect(createInternalNotification).toHaveBeenCalledTimes(2);
+    expect(markListingsDirty).toHaveBeenCalledWith(
+      ["listing-b"],
+      "booking_hold_expired"
+    );
+  });
 
-      // Find the listing-update $executeRaw call (the one whose SQL contains availableSlots)
-      const listingUpdateCall = mockExecuteRaw.mock.calls.find((call) => {
-        const sqlParts = call[0];
-        const sql = Array.isArray(sqlParts)
-          ? sqlParts.join("?")
-          : String(sqlParts);
-        return sql.includes("availableSlots");
-      });
-
-      expect(listingUpdateCall).toBeDefined();
-
-      const sqlParts = listingUpdateCall![0];
-      const fullSql = Array.isArray(sqlParts)
-        ? sqlParts.join("?")
-        : String(sqlParts);
-      expect(fullSql.toUpperCase()).toContain("LEAST");
+  it("counts stale holds when the guarded booking update affects zero rows", async () => {
+    const hold = makeExpiredHold({ id: "hold-stale", listingId: "listing-stale" });
+    setupTransactions({
+      lockAcquired: true,
+      expiredBookings: [hold],
+      perHoldPlans: [{ bookingUpdateCount: 0 }],
     });
+
+    const response = await GET(createRequest());
+    const data = await response.json();
+
+    expect(response.status).toBe(200);
+    expect(data).toEqual(
+      expect.objectContaining({
+        success: true,
+        expired: 0,
+        selected: 1,
+        failed: 0,
+        stale: 1,
+        skipped: false,
+      })
+    );
+    expect(applyInventoryDeltas).not.toHaveBeenCalled();
+    expect(logBookingAudit).not.toHaveBeenCalled();
+    expect(createInternalNotification).not.toHaveBeenCalled();
+    expect(markListingsDirty).not.toHaveBeenCalled();
+  });
+
+  it("returns 500 only when every selected hold fails unexpectedly", async () => {
+    const holdA = makeExpiredHold({ id: "hold-fail-a", listingId: "listing-a" });
+    const holdB = makeExpiredHold({ id: "hold-fail-b", listingId: "listing-b" });
+
+    setupTransactions({
+      lockAcquired: true,
+      expiredBookings: [holdA, holdB],
+      perHoldPlans: [
+        { failAt: "listing", error: new Error("Projection conflict") },
+        { failAt: "listing", error: new Error("Scalar cache conflict") },
+      ],
+    });
+
+    const response = await GET(createRequest());
+    const data = await response.json();
+
+    expect(response.status).toBe(500);
+    expect(data).toEqual(
+      expect.objectContaining({
+        success: false,
+        error: "Sweeper failed",
+        expired: 0,
+        selected: 2,
+        failed: 2,
+        stale: 0,
+        skipped: false,
+      })
+    );
+    expect(createInternalNotification).not.toHaveBeenCalled();
+    expect(markListingsDirty).not.toHaveBeenCalled();
+    expect(
+      findLogCall(
+        logger.sync.error as jest.Mock,
+        "[sweep-expired-holds] Sweep failed"
+      )
+    ).toBeDefined();
+  });
+
+  it("treats notification errors as non-fatal and records them in logs", async () => {
+    const hold = makeExpiredHold({ id: "hold-notif", listingId: "listing-notif" });
+    setupTransactions({
+      lockAcquired: true,
+      expiredBookings: [hold],
+      perHoldPlans: [{}],
+    });
+    (createInternalNotification as jest.Mock).mockRejectedValueOnce(
+      new Error("SMTP unavailable")
+    );
+
+    const response = await GET(createRequest());
+    const data = await response.json();
+
+    expect(response.status).toBe(200);
+    expect(data).toEqual(
+      expect.objectContaining({
+        success: true,
+        expired: 1,
+        selected: 1,
+        failed: 0,
+        stale: 0,
+        skipped: false,
+      })
+    );
+    expect(
+      findLogCall(
+        logger.sync.error as jest.Mock,
+        "[sweep-expired-holds] Notification failed"
+      )
+    ).toBeDefined();
+
+    const summaryCall = findLogCall(
+      logger.sync.info as jest.Mock,
+      "[sweep-expired-holds] Sweep complete"
+    );
+    expect(summaryCall).toBeDefined();
+    expect(summaryCall?.[1]).toEqual(
+      expect.objectContaining({
+        notificationFailures: 1,
+      })
+    );
   });
 });

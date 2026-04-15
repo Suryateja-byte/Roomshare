@@ -32,6 +32,7 @@ export interface BatchedFilterValues {
   roomType: string;
   leaseDuration: string;
   moveInDate: string;
+  endDate: string;
   amenities: string[];
   houseRules: string[];
   languages: string[];
@@ -49,6 +50,7 @@ export const emptyFilterValues: BatchedFilterValues = {
   roomType: "",
   leaseDuration: "",
   moveInDate: "",
+  endDate: "",
   amenities: [],
   houseRules: [],
   languages: [],
@@ -99,6 +101,34 @@ function parseEnumParam(
   return "";
 }
 
+const ISO_LOCAL_DATE_PATTERN = /^\d{4}-\d{2}-\d{2}$/;
+
+function normalizeCommittedDateRange(moveInDate: string, endDate: string): {
+  moveInDate: string;
+  endDate: string;
+} {
+  const normalizedMoveInDate = moveInDate.trim();
+  const normalizedEndDate = endDate.trim();
+
+  if (
+    !normalizedMoveInDate ||
+    !normalizedEndDate ||
+    !ISO_LOCAL_DATE_PATTERN.test(normalizedMoveInDate) ||
+    !ISO_LOCAL_DATE_PATTERN.test(normalizedEndDate) ||
+    normalizedEndDate <= normalizedMoveInDate
+  ) {
+    return {
+      moveInDate: normalizedMoveInDate,
+      endDate: "",
+    };
+  }
+
+  return {
+    moveInDate: normalizedMoveInDate,
+    endDate: normalizedEndDate,
+  };
+}
+
 /**
  * Read all filter values from URL search params.
  * Does NOT validate moveInDate against current date (that requires Date() which
@@ -108,6 +138,13 @@ function parseEnumParam(
 export function readFiltersFromURL(
   searchParams: URLSearchParams
 ): BatchedFilterValues {
+  const moveInDate =
+    searchParams.get("moveInDate") || searchParams.get("startDate") || "";
+  const { endDate } = normalizeCommittedDateRange(
+    moveInDate,
+    searchParams.get("endDate") || ""
+  );
+
   // Use getPriceParam to support budget aliases (minBudget/maxBudget)
   // with canonical params (minPrice/maxPrice) taking precedence
   const parsedMin = getPriceParam(searchParams, "min");
@@ -127,7 +164,8 @@ export function readFiltersFromURL(
       VALID_LEASE_DURATIONS,
       LEASE_DURATION_ALIASES
     ),
-    moveInDate: searchParams.get("moveInDate") || "",
+    moveInDate,
+    endDate,
     amenities: normalizeByAllowlist(
       parseParamList(searchParams, "amenities"),
       VALID_AMENITIES
@@ -176,6 +214,7 @@ function filtersEqual(a: BatchedFilterValues, b: BatchedFilterValues): boolean {
     a.roomType === b.roomType &&
     a.leaseDuration === b.leaseDuration &&
     a.moveInDate === b.moveInDate &&
+    a.endDate === b.endDate &&
     arraysEqual(a.amenities, b.amenities) &&
     arraysEqual(a.houseRules, b.houseRules) &&
     arraysEqual(a.languages, b.languages) &&
@@ -252,6 +291,7 @@ export function useBatchedFilters(
         "roomType",
         "leaseDuration",
         "moveInDate",
+        "endDate",
         "genderPreference",
         "householdGender",
         "minSlots",
@@ -322,7 +362,7 @@ export function useBatchedFilters(
     const today = new Date();
     today.setHours(0, 0, 0, 0);
     if (isNaN(d.getTime()) || d < today) {
-      const nextPending = { ...currentPending, moveInDate: "" };
+      const nextPending = { ...currentPending, moveInDate: "", endDate: "" };
       pendingRef.current = nextPending;
       setPendingState(nextPending);
     }
@@ -372,13 +412,21 @@ export function useBatchedFilters(
     const nextMaxPrice = nextPending.maxPrice
       ? Number.parseFloat(nextPending.maxPrice)
       : undefined;
+    const { endDate: nextEndDate } = normalizeCommittedDateRange(
+      nextPending.moveInDate,
+      nextPending.endDate
+    );
+    const sanitizedPending = {
+      ...nextPending,
+      endDate: nextEndDate,
+    };
     const parsedMinSlots = nextPending.minSlots
       ? parseInt(nextPending.minSlots, 10)
       : NaN;
 
     if (overrides) {
-      pendingRef.current = nextPending;
-      setPendingState(nextPending);
+      pendingRef.current = sanitizedPending;
+      setPendingState(sanitizedPending);
     }
 
     const currentQuery = normalizeSearchQuery(
@@ -388,19 +436,24 @@ export function useBatchedFilters(
       applySearchQueryChange(currentQuery, "filter", {
         minPrice: Number.isFinite(nextMinPrice) ? nextMinPrice : undefined,
         maxPrice: Number.isFinite(nextMaxPrice) ? nextMaxPrice : undefined,
-        roomType: nextPending.roomType || undefined,
-        leaseDuration: nextPending.leaseDuration || undefined,
-        moveInDate: nextPending.moveInDate || undefined,
+        roomType: sanitizedPending.roomType || undefined,
+        leaseDuration: sanitizedPending.leaseDuration || undefined,
+        moveInDate: sanitizedPending.moveInDate || undefined,
+        endDate: nextEndDate || undefined,
         amenities:
-          nextPending.amenities.length > 0 ? nextPending.amenities : undefined,
+          sanitizedPending.amenities.length > 0
+            ? sanitizedPending.amenities
+            : undefined,
         houseRules:
-          nextPending.houseRules.length > 0
-            ? nextPending.houseRules
+          sanitizedPending.houseRules.length > 0
+            ? sanitizedPending.houseRules
             : undefined,
         languages:
-          nextPending.languages.length > 0 ? nextPending.languages : undefined,
-        genderPreference: nextPending.genderPreference || undefined,
-        householdGender: nextPending.householdGender || undefined,
+          sanitizedPending.languages.length > 0
+            ? sanitizedPending.languages
+            : undefined,
+        genderPreference: sanitizedPending.genderPreference || undefined,
+        householdGender: sanitizedPending.householdGender || undefined,
         minSlots:
           Number.isFinite(parsedMinSlots) && parsedMinSlots >= 2
             ? parsedMinSlots

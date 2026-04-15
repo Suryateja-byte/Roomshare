@@ -38,6 +38,10 @@ import UserAvatar from "@/components/UserAvatar";
 import RoomPlaceholder from "@/components/listings/RoomPlaceholder";
 import { SlotBadge } from "@/components/listings/SlotBadge";
 import { Badge } from "@/components/ui/badge";
+import {
+  useAvailability,
+  type AvailabilitySnapshot,
+} from "@/hooks/useAvailability";
 import { useSession } from "next-auth/react";
 import ListingViewTracker from "./ListingViewTracker";
 
@@ -125,6 +129,9 @@ interface ListingPageClientProps {
   coordinates: { lat: number; lng: number } | null;
   similarListings?: Listing[];
   viewToken?: string;
+  initialStartDate?: string;
+  initialEndDate?: string;
+  initialAvailability?: AvailabilitySnapshot | null;
 }
 
 // Status badge with pulse animation
@@ -222,9 +229,14 @@ export default function ListingPageClient({
   coordinates,
   similarListings,
   viewToken,
+  initialStartDate,
+  initialEndDate,
+  initialAvailability,
 }: ListingPageClientProps) {
   const { data: session, status: sessionStatus } = useSession();
   const [hasHydrated, setHasHydrated] = useState(false);
+  const [startDate, setStartDate] = useState(initialStartDate ?? "");
+  const [endDate, setEndDate] = useState(initialEndDate ?? "");
   const hasImages = listing.images && listing.images.length > 0;
   const resolvedUserId = session?.user?.id ?? null;
   const resolvedIsOwner = isOwner || resolvedUserId === listing.ownerId;
@@ -236,6 +248,19 @@ export default function ListingPageClient({
     existingReview: userExistingReview,
     loaded: true,
   });
+  const { availability, refresh: refreshAvailability } = useAvailability(
+    listing.id,
+    startDate || undefined,
+    endDate || undefined,
+    {
+      enabled: listing.status === "ACTIVE",
+      initialData: initialAvailability ?? null,
+    }
+  );
+  const effectiveAvailableSlots =
+    availability?.effectiveAvailableSlots ??
+    initialAvailability?.effectiveAvailableSlots ??
+    listing.availableSlots;
 
   // Format gender preference for display
   const formatGenderPreference = (pref: string | null) => {
@@ -458,7 +483,7 @@ export default function ListingPageClient({
                   {listing.location?.city}, {listing.location?.state}
                 </InfoStat>
                 <SlotBadge
-                  availableSlots={listing.availableSlots}
+                  availableSlots={effectiveAvailableSlots}
                   totalSlots={listing.totalSlots}
                 />
                 {listing.bookingMode === "WHOLE_UNIT" && (
@@ -801,9 +826,15 @@ export default function ListingPageClient({
                       bookedDates={bookedDates}
                       holdEnabled={holdEnabled}
                       totalSlots={listing.totalSlots}
-                      availableSlots={listing.availableSlots}
+                      availableSlots={effectiveAvailableSlots}
                       bookingMode={listing.bookingMode}
                       holdTtlMinutes={listing.holdTtlMinutes}
+                      startDate={startDate}
+                      endDate={endDate}
+                      onStartDateChange={setStartDate}
+                      onEndDateChange={setEndDate}
+                      availability={availability}
+                      refreshAvailability={refreshAvailability}
                     />
                   </>
                 )}

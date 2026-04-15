@@ -560,7 +560,7 @@ describe("Hold + booking competing for last slots", () => {
     const result = await updateBookingStatus("booking-pending", "ACCEPTED");
 
     // 3 (held) + 3 (this booking) = 6 > 5 → CAPACITY_EXCEEDED
-    expect(result.success).toBeUndefined();
+    expect(result.success).toBe(false);
     expect(result.error).toBe(
       "Cannot accept: all slots for these dates are already booked"
     );
@@ -791,7 +791,7 @@ describe("Accept race for WHOLE_UNIT listing", () => {
     const result = await updateBookingStatus("booking-wu-b", "ACCEPTED");
 
     // WHOLE_UNIT: live range-aware availability is exhausted, regardless of the scalar cache.
-    expect(result.success).toBeUndefined();
+    expect(result.success).toBe(false);
     expect(result.error).toBe(
       "Cannot accept: all slots for these dates are already booked"
     );
@@ -825,7 +825,7 @@ describe("Accept race for WHOLE_UNIT listing", () => {
     const result = await updateBookingStatus("booking-wu-b", "ACCEPTED");
 
     // 4 (used) + 4 (WHOLE_UNIT slotsNeeded) = 8 > 4 → CAPACITY_EXCEEDED
-    expect(result.success).toBeUndefined();
+    expect(result.success).toBe(false);
     expect(result.error).toBe(
       "Cannot accept: all slots for these dates are already booked"
     );
@@ -860,7 +860,7 @@ describe("Accept race for WHOLE_UNIT listing", () => {
 
     const result = await updateBookingStatus("booking-wu-a", "ACCEPTED");
 
-    expect(result.success).toBeUndefined();
+    expect(result.success).toBe(false);
     expect(result.error).toContain("modified by another request");
     expect(result.code).toBe("CONCURRENT_MODIFICATION");
   });
@@ -893,7 +893,7 @@ describe("Accept race for WHOLE_UNIT listing", () => {
 
     const result = await updateBookingStatus("booking-wu-a", "ACCEPTED");
 
-    expect(result.success).toBeUndefined();
+    expect(result.success).toBe(false);
     expect(result.error).toBe("No available slots for this listing");
   });
 });
@@ -1035,7 +1035,7 @@ describe("Expired hold does not block subsequent booking", () => {
 
     const result = await updateBookingStatus("booking-held-race", "ACCEPTED");
 
-    expect(result.success).toBeUndefined();
+    expect(result.success).toBe(false);
     // The code path throws 'HOLD_EXPIRED_OR_MODIFIED' which maps to CONCURRENT_MODIFICATION
     expect(result.error).toContain("expired or was modified");
     expect(result.code).toBe("CONCURRENT_MODIFICATION");

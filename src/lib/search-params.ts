@@ -75,6 +75,7 @@ export interface RawSearchParams {
   minBudget?: string | string[];
   maxBudget?: string | string[];
   amenities?: string | string[];
+  startDate?: string | string[];
   moveInDate?: string | string[];
   endDate?: string | string[];
   leaseDuration?: string | string[];
@@ -486,7 +487,9 @@ export function parseSearchParams(raw: RawSearchParams): ParsedSearchParams {
     ? (getFirstValue(raw.sort) as SortOption)
     : "recommended";
 
-  const validMoveInDate = safeParseDate(getFirstValue(raw.moveInDate));
+  const validMoveInDate = safeParseDate(
+    getFirstValue(raw.moveInDate) ?? getFirstValue(raw.startDate)
+  );
   const validEndDate = safeParseDate(getFirstValue(raw.endDate));
   const validRoomType = safeParseEnum(
     getFirstValue(raw.roomType),

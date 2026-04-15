@@ -1,25 +1,28 @@
 /**
  * Daily Maintenance Cron Route
  *
- * Consolidates 6 cron tasks into a single route to fit within
- * Vercel Hobby plan's 2-cron limit. Each task runs independently
- * with its own try/catch — one failure does not block others.
+ * Consolidates background maintenance work into a single dispatcher route
+ * to fit within Vercel Hobby plan's 2-cron limit. Each task runs independently
+ * with its own try/catch, so one failure does not block others.
  *
- * Schedule: 0 3 * * * (daily at 3:00 AM UTC)
+ * Schedule: 2,17,32,47 * * * * (every 15 minutes, offset from the hold sweeper)
  *
- * Tasks (in order):
- * 1. Cleanup expired rate limit entries
- * 2. Cleanup expired idempotency keys
- * 3. Cleanup stale typing status indicators
- * 4. Reconcile listing slot counts (safety net)
- * 5. Refresh dirty search documents
+ * Every invocation:
+ * 1. Reconcile listing slot counts (safety net)
+ * 2. Refresh dirty search documents
+ *
+ * Daily window only (09:02-09:04 UTC):
+ * 3. Cleanup expired rate limit entries
+ * 4. Cleanup expired idempotency keys
+ * 5. Cleanup stale typing status indicators
  * 6. Process search alerts (email notifications)
  *
- * Tasks 4-6 are delegated to their existing route handlers via
- * internal fetch to avoid duplicating complex logic (SQL, geospatial, etc.).
- * Tasks 1-3 are simple DB deletes inlined here for efficiency.
+ * Delegated tasks are called via internal fetch to avoid duplicating complex
+ * logic (SQL, geospatial, etc.). Simple DB cleanup tasks stay inlined here.
  *
- * Individual routes are preserved for manual/debug invocation.
+ * The daily-only gate is time-based rather than persisted. That keeps the
+ * dispatcher within the 2-cron budget while preserving a once-daily cadence
+ * for low-priority maintenance tasks.
  */
 
 import { NextRequest, NextResponse } from "next/server";
@@ -33,9 +36,91 @@ import { headers } from "next/headers";
 interface TaskResult {
   task: string;
   success: boolean;
+  skipped?: boolean;
   detail?: Record<string, unknown>;
   error?: string;
   durationMs: number;
+}
+
+type TaskRunner = () => Promise<Record<string, unknown>>;
+
+function isDailyWindow(nowUtc: Date): boolean {
+  return (
+    nowUtc.getUTCHours() === 9 &&
+    nowUtc.getUTCMinutes() >= 2 &&
+    nowUtc.getUTCMinutes() <= 4
+  );
+}
+
+async function runTask(
+  results: TaskResult[],
+  task: string,
+  runner: TaskRunner
+): Promise<void> {
+  const startedAt = Date.now();
+
+  try {
+    const detail = await runner();
+    results.push({
+      task,
+      success: true,
+      detail,
+      durationMs: Date.now() - startedAt,
+    });
+  } catch (error) {
+    Sentry.captureException(error, {
+      tags: { cron: "daily-maintenance", task },
+    });
+    results.push({
+      task,
+      success: false,
+      error: sanitizeErrorMessage(error),
+      durationMs: Date.now() - startedAt,
+    });
+  }
+}
+
+async function runDelegatedTask(
+  results: TaskResult[],
+  task: string,
+  path: string,
+  cronSecret: string
+): Promise<void> {
+  const startedAt = Date.now();
+
+  try {
+    const { ok, data } = await callInternalCron(path, cronSecret);
+    results.push({
+      task,
+      success: ok,
+      detail: data,
+      durationMs: Date.now() - startedAt,
+    });
+  } catch (error) {
+    Sentry.captureException(error, {
+      tags: { cron: "daily-maintenance", task },
+    });
+    results.push({
+      task,
+      success: false,
+      error: sanitizeErrorMessage(error),
+      durationMs: Date.now() - startedAt,
+    });
+  }
+}
+
+function markSkippedTask(
+  results: TaskResult[],
+  task: string,
+  reason: string
+): void {
+  results.push({
+    task,
+    success: true,
+    skipped: true,
+    detail: { skipped: true, reason },
+    durationMs: 0,
+  });
 }
 
 /**
@@ -65,13 +150,29 @@ export async function GET(request: NextRequest) {
   if (authError) return authError;
 
   const cronSecret = process.env.CRON_SECRET ?? "";
+  const nowUtc = new Date();
+  const shouldRunDailyTasks = isDailyWindow(nowUtc);
   const startTime = Date.now();
   const results: TaskResult[] = [];
 
-  // --- Task 1: Cleanup expired rate limit entries ---
-  {
-    const t = Date.now();
-    try {
+  // --- Fast cadence tasks ---
+  await runDelegatedTask(
+    results,
+    "reconcile-slots",
+    "/api/cron/reconcile-slots",
+    cronSecret
+  );
+
+  await runDelegatedTask(
+    results,
+    "refresh-search-docs",
+    "/api/cron/refresh-search-docs",
+    cronSecret
+  );
+
+  // --- Daily-only tasks ---
+  if (shouldRunDailyTasks) {
+    await runTask(results, "cleanup-rate-limits", async () => {
       const result = await withRetry(
         () =>
           prisma.rateLimitEntry.deleteMany({
@@ -79,29 +180,11 @@ export async function GET(request: NextRequest) {
           }),
         { context: "cleanup-rate-limits" }
       );
-      results.push({
-        task: "cleanup-rate-limits",
-        success: true,
-        detail: { deleted: result.count },
-        durationMs: Date.now() - t,
-      });
-    } catch (error) {
-      Sentry.captureException(error, {
-        tags: { cron: "daily-maintenance", task: "cleanup-rate-limits" },
-      });
-      results.push({
-        task: "cleanup-rate-limits",
-        success: false,
-        error: sanitizeErrorMessage(error),
-        durationMs: Date.now() - t,
-      });
-    }
-  }
 
-  // --- Task 2: Cleanup expired idempotency keys ---
-  {
-    const t = Date.now();
-    try {
+      return { deleted: result.count };
+    });
+
+    await runTask(results, "cleanup-idempotency-keys", async () => {
       const result = await withRetry(
         () =>
           prisma.idempotencyKey.deleteMany({
@@ -109,29 +192,11 @@ export async function GET(request: NextRequest) {
           }),
         { context: "cleanup-idempotency-keys" }
       );
-      results.push({
-        task: "cleanup-idempotency-keys",
-        success: true,
-        detail: { deleted: result.count },
-        durationMs: Date.now() - t,
-      });
-    } catch (error) {
-      Sentry.captureException(error, {
-        tags: { cron: "daily-maintenance", task: "cleanup-idempotency-keys" },
-      });
-      results.push({
-        task: "cleanup-idempotency-keys",
-        success: false,
-        error: sanitizeErrorMessage(error),
-        durationMs: Date.now() - t,
-      });
-    }
-  }
 
-  // --- Task 3: Cleanup stale typing status entries ---
-  {
-    const t = Date.now();
-    try {
+      return { deleted: result.count };
+    });
+
+    await runTask(results, "cleanup-typing-status", async () => {
       const fiveMinutesAgo = new Date(Date.now() - 5 * 60 * 1000);
       const result = await withRetry(
         () =>
@@ -140,117 +205,42 @@ export async function GET(request: NextRequest) {
           }),
         { context: "cleanup-typing-status" }
       );
-      results.push({
-        task: "cleanup-typing-status",
-        success: true,
-        detail: { deleted: result.count },
-        durationMs: Date.now() - t,
-      });
-    } catch (error) {
-      Sentry.captureException(error, {
-        tags: { cron: "daily-maintenance", task: "cleanup-typing-status" },
-      });
-      results.push({
-        task: "cleanup-typing-status",
-        success: false,
-        error: sanitizeErrorMessage(error),
-        durationMs: Date.now() - t,
-      });
-    }
-  }
 
-  // --- Task 4: Reconcile listing slot counts (complex — delegate) ---
-  {
-    const t = Date.now();
-    try {
-      const { ok, data } = await callInternalCron(
-        "/api/cron/reconcile-slots",
-        cronSecret
-      );
-      results.push({
-        task: "reconcile-slots",
-        success: ok,
-        detail: data,
-        durationMs: Date.now() - t,
-      });
-    } catch (error) {
-      Sentry.captureException(error, {
-        tags: { cron: "daily-maintenance", task: "reconcile-slots" },
-      });
-      results.push({
-        task: "reconcile-slots",
-        success: false,
-        error: sanitizeErrorMessage(error),
-        durationMs: Date.now() - t,
-      });
-    }
-  }
+      return { deleted: result.count };
+    });
 
-  // --- Task 5: Refresh dirty search documents (complex — delegate) ---
-  {
-    const t = Date.now();
-    try {
-      const { ok, data } = await callInternalCron(
-        "/api/cron/refresh-search-docs",
-        cronSecret
-      );
-      results.push({
-        task: "refresh-search-docs",
-        success: ok,
-        detail: data,
-        durationMs: Date.now() - t,
-      });
-    } catch (error) {
-      Sentry.captureException(error, {
-        tags: { cron: "daily-maintenance", task: "refresh-search-docs" },
-      });
-      results.push({
-        task: "refresh-search-docs",
-        success: false,
-        error: sanitizeErrorMessage(error),
-        durationMs: Date.now() - t,
-      });
-    }
-  }
-
-  // --- Task 6: Process search alerts (complex — delegate) ---
-  {
-    const t = Date.now();
-    try {
-      const { ok, data } = await callInternalCron(
-        "/api/cron/search-alerts",
-        cronSecret
-      );
-      results.push({
-        task: "search-alerts",
-        success: ok,
-        detail: data,
-        durationMs: Date.now() - t,
-      });
-    } catch (error) {
-      Sentry.captureException(error, {
-        tags: { cron: "daily-maintenance", task: "search-alerts" },
-      });
-      results.push({
-        task: "search-alerts",
-        success: false,
-        error: sanitizeErrorMessage(error),
-        durationMs: Date.now() - t,
-      });
-    }
+    await runDelegatedTask(
+      results,
+      "search-alerts",
+      "/api/cron/search-alerts",
+      cronSecret
+    );
+  } else {
+    markSkippedTask(results, "cleanup-rate-limits", "outside_daily_window");
+    markSkippedTask(
+      results,
+      "cleanup-idempotency-keys",
+      "outside_daily_window"
+    );
+    markSkippedTask(results, "cleanup-typing-status", "outside_daily_window");
+    markSkippedTask(results, "search-alerts", "outside_daily_window");
   }
 
   // --- Summary ---
   const totalDurationMs = Date.now() - startTime;
-  const succeeded = results.filter((r) => r.success).length;
+  const succeeded = results.filter((r) => r.success && !r.skipped).length;
   const failed = results.filter((r) => !r.success).length;
+  const skipped = results.filter((r) => r.skipped).length;
 
   logger.sync.info(
-    `[daily-maintenance] Completed: ${succeeded} ok, ${failed} failed, ${totalDurationMs}ms`,
+    `[daily-maintenance] Completed: ${succeeded} ok, ${failed} failed, ${skipped} skipped, ${totalDurationMs}ms`,
     {
-      results: results.map(({ task, success, durationMs }) => ({
+      dailyWindow: shouldRunDailyTasks,
+      timestampUtc: nowUtc.toISOString(),
+      results: results.map(({ task, success, skipped, durationMs }) => ({
         task,
         success,
+        skipped: skipped ?? false,
         durationMs,
       })),
     }
@@ -259,6 +249,13 @@ export async function GET(request: NextRequest) {
   return NextResponse.json({
     success: failed === 0,
     tasks: results,
-    summary: { succeeded, failed, totalDurationMs },
+    summary: {
+      succeeded,
+      failed,
+      skipped,
+      dailyWindow: shouldRunDailyTasks,
+      timestampUtc: nowUtc.toISOString(),
+      totalDurationMs,
+    },
   });
 }

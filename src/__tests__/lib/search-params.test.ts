@@ -382,6 +382,49 @@ describe("parseSearchParams - date cases", () => {
     const result = parseSearchParams({ moveInDate });
     expect(result.filterParams.moveInDate).toBe(expected);
   });
+
+  test("accepts startDate as a legacy inbound alias for moveInDate", () => {
+    const result = parseSearchParams({
+      startDate: tomorrow,
+      endDate: nextYear,
+    });
+
+    expect(result.filterParams.moveInDate).toBe(tomorrow);
+    expect(result.filterParams.endDate).toBe(nextYear);
+  });
+
+  test("prefers moveInDate over startDate when both are present", () => {
+    const validEndDate = formatLocalDate(
+      new Date(nextYearDate.getTime() + 24 * 60 * 60 * 1000)
+    );
+    const result = parseSearchParams({
+      moveInDate: nextYear,
+      startDate: tomorrow,
+      endDate: validEndDate,
+    });
+
+    expect(result.filterParams.moveInDate).toBe(nextYear);
+    expect(result.filterParams.endDate).toBe(validEndDate);
+  });
+
+  test("drops orphan endDate when no valid start date exists", () => {
+    const result = parseSearchParams({
+      endDate: nextYear,
+    });
+
+    expect(result.filterParams.moveInDate).toBeUndefined();
+    expect(result.filterParams.endDate).toBeUndefined();
+  });
+
+  test("drops endDate when it is not after the moveInDate", () => {
+    const result = parseSearchParams({
+      moveInDate: nextYear,
+      endDate: tomorrow,
+    });
+
+    expect(result.filterParams.moveInDate).toBe(nextYear);
+    expect(result.filterParams.endDate).toBeUndefined();
+  });
 });
 
 describe("parseSearchParams - bounds cases", () => {

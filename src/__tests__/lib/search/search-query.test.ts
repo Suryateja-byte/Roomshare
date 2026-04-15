@@ -131,6 +131,49 @@ describe("search-query", () => {
     );
   });
 
+  it("preserves explicit endDate values through normalization and serialization", () => {
+    const query = normalizeSearchQuery(
+      new URLSearchParams("moveInDate=2026-05-01&endDate=2026-06-01")
+    );
+
+    expect(query.moveInDate).toBe("2026-05-01");
+    expect(query.endDate).toBe("2026-06-01");
+
+    const params = serializeSearchQuery(query);
+    expect(params.get("moveInDate")).toBe("2026-05-01");
+    expect(params.get("endDate")).toBe("2026-06-01");
+
+    expect(buildCanonicalSearchUrl(query, { includePagination: false })).toBe(
+      "/search?endDate=2026-06-01&moveInDate=2026-05-01"
+    );
+  });
+
+  it("normalizes inbound startDate aliases back to canonical search params", () => {
+    const query = normalizeSearchQuery(
+      new URLSearchParams("startDate=2026-05-01&endDate=2026-06-01")
+    );
+
+    expect(query.moveInDate).toBe("2026-05-01");
+    expect(query.endDate).toBe("2026-06-01");
+
+    expect(buildCanonicalSearchUrl(query, { includePagination: false })).toBe(
+      "/search?endDate=2026-06-01&moveInDate=2026-05-01"
+    );
+  });
+
+  it("drops orphan endDate values from canonical search URLs", () => {
+    const query = normalizeSearchQuery(
+      new URLSearchParams("endDate=2026-06-01")
+    );
+
+    expect(query.moveInDate).toBeUndefined();
+    expect(query.endDate).toBeUndefined();
+
+    expect(buildCanonicalSearchUrl(query, { includePagination: false })).toBe(
+      "/search"
+    );
+  });
+
   describe("buildSeoCanonicalSearchUrl", () => {
     it("returns bare /search for an empty query", () => {
       const url = buildSeoCanonicalSearchUrl(

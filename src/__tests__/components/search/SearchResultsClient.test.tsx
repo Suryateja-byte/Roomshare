@@ -13,6 +13,30 @@ import { SearchResultsClient } from "@/components/search/SearchResultsClient";
 import { fetchMoreListings } from "@/app/search/actions";
 import type { ListingData } from "@/lib/data";
 import { getFilterSuggestions } from "@/app/actions/filter-suggestions";
+import { findSplitStays } from "@/lib/search/split-stay";
+
+const mockListingCard = jest.fn(
+  ({
+    listing,
+    href,
+  }: {
+    listing: ListingData;
+    href?: string;
+  }) => (
+    <div
+      data-testid={`listing-${listing.id}`}
+      data-href={href ?? `/listings/${listing.id}`}
+    >
+      {listing.title}
+    </div>
+  )
+);
+
+const mockSplitStayCard = jest.fn(
+  (_props: Record<string, unknown>) => (
+    <div data-testid="split-stay-card">Split Stay</div>
+  )
+);
 
 // Mock fetchMoreListings server action
 jest.mock("@/app/search/actions", () => ({
@@ -47,8 +71,11 @@ jest.mock("next/image", () => ({
 
 // Mock ListingCard to simplify testing
 jest.mock("@/components/listings/ListingCard", () => {
-  return function MockListingCard({ listing }: { listing: ListingData }) {
-    return <div data-testid={`listing-${listing.id}`}>{listing.title}</div>;
+  return function MockListingCard(props: {
+    listing: ListingData;
+    href?: string;
+  }) {
+    return mockListingCard(props);
   };
 });
 
@@ -88,8 +115,8 @@ jest.mock("@/components/search/TotalPriceToggle", () => ({
 
 // Mock SplitStayCard
 jest.mock("@/components/search/SplitStayCard", () => ({
-  SplitStayCard: function MockSplitStayCard() {
-    return <div data-testid="split-stay-card">Split Stay</div>;
+  SplitStayCard: function MockSplitStayCard(props: Record<string, unknown>) {
+    return mockSplitStayCard(props);
   },
 }));
 
@@ -204,6 +231,71 @@ describe("SearchResultsClient", () => {
         "true"
       );
       expect(screen.queryByTestId("suggested-searches")).not.toBeInTheDocument();
+    });
+
+    it("passes canonical listing detail range hrefs when search includes moveInDate and endDate", () => {
+      render(
+        <SearchResultsClient
+          {...defaultProps}
+          searchParamsString="q=test&moveInDate=2026-05-01&endDate=2026-06-01"
+        />
+      );
+
+      expect(screen.getByTestId("listing-1")).toHaveAttribute(
+        "data-href",
+        "/listings/1?startDate=2026-05-01&endDate=2026-06-01"
+      );
+      expect(screen.getByTestId("listing-2")).toHaveAttribute(
+        "data-href",
+        "/listings/2?startDate=2026-05-01&endDate=2026-06-01"
+      );
+    });
+
+    it("keeps generic listing detail hrefs when search only includes moveInDate", () => {
+      render(
+        <SearchResultsClient
+          {...defaultProps}
+          searchParamsString="q=test&moveInDate=2026-05-01"
+        />
+      );
+
+      expect(screen.getByTestId("listing-1")).toHaveAttribute(
+        "data-href",
+        "/listings/1"
+      );
+      expect(screen.getByTestId("listing-2")).toHaveAttribute(
+        "data-href",
+        "/listings/2"
+      );
+    });
+
+    it("passes canonical listing detail date params through to split-stay cards", () => {
+      (findSplitStays as jest.Mock).mockReturnValueOnce([
+        {
+          first: createMockListing("split-1", "Split One"),
+          second: createMockListing("split-2", "Split Two"),
+          combinedPrice: 4300,
+          splitLabel: "2 mo + 2 mo",
+        },
+      ]);
+
+      render(
+        <SearchResultsClient
+          {...defaultProps}
+          searchParamsString="q=test&moveInDate=2026-05-01&endDate=2026-06-01"
+        />
+      );
+
+      expect(screen.getByTestId("split-stay-card")).toBeInTheDocument();
+      expect(mockSplitStayCard).toHaveBeenCalledWith(
+        expect.objectContaining({
+          listingDetailDateParams: {
+            moveInDate: "2026-05-01",
+            endDate: "2026-06-01",
+            startDate: null,
+          },
+        })
+      );
     });
 
     it("keeps the save-search callout desktop-only", async () => {

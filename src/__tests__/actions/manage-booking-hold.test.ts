@@ -109,9 +109,11 @@ import {
 import { checkRateLimit } from "@/lib/rate-limit";
 import { logBookingAudit } from "@/lib/booking-audit";
 import {
+  applyInventoryDeltas,
   expireOverlappingExpiredHolds,
   getAvailability,
 } from "@/lib/availability";
+import { logger } from "@/lib/logger";
 
 describe("manage-booking-hold — Phase 4 hold management paths", () => {
   const mockOwnerSession = {
@@ -185,6 +187,8 @@ describe("manage-booking-hold — Phase 4 hold management paths", () => {
       rangeVersion: 1,
       asOf: new Date().toISOString(),
     });
+    (expireOverlappingExpiredHolds as jest.Mock).mockResolvedValue(0);
+    (applyInventoryDeltas as jest.Mock).mockResolvedValue(undefined);
     (auth as jest.Mock).mockResolvedValue(mockOwnerSession);
     (createInternalNotification as jest.Mock).mockResolvedValue({
       success: true,
@@ -273,6 +277,60 @@ describe("manage-booking-hold — Phase 4 hold management paths", () => {
     );
   });
 
+  it("HELD->ACCEPTED returns INVENTORY_DELTA_CONFLICT when expiry cleanup hits inventory drift", async () => {
+    (prisma.booking.findUnique as jest.Mock).mockResolvedValue(mockHeldBooking);
+    (expireOverlappingExpiredHolds as jest.Mock).mockRejectedValueOnce(
+      new Error("INVENTORY_DELTA_CONFLICT")
+    );
+
+    (prisma.$transaction as jest.Mock).mockImplementation(async (callback) => {
+      const tx = {
+        $queryRaw: jest
+          .fn()
+          .mockResolvedValue([{ ownerId: "owner-123", status: "ACTIVE" }]),
+        $executeRaw: jest.fn(),
+        booking: { updateMany: jest.fn().mockResolvedValue({ count: 1 }) },
+      };
+      return callback(tx);
+    });
+
+    const result = await updateBookingStatus("booking-held-1", "ACCEPTED");
+
+    expect(result).toEqual({
+      success: false,
+      error:
+        "This booking could not be updated because availability changed. Please refresh and try again.",
+      code: "INVENTORY_DELTA_CONFLICT",
+    });
+  });
+
+  it("HELD->ACCEPTED returns INVENTORY_DELTA_CONFLICT when held inventory transfer fails", async () => {
+    (prisma.booking.findUnique as jest.Mock).mockResolvedValue(mockHeldBooking);
+    (applyInventoryDeltas as jest.Mock).mockRejectedValueOnce(
+      new Error("INVENTORY_DELTA_CONFLICT")
+    );
+
+    (prisma.$transaction as jest.Mock).mockImplementation(async (callback) => {
+      const tx = {
+        $queryRaw: jest
+          .fn()
+          .mockResolvedValue([{ ownerId: "owner-123", status: "ACTIVE" }]),
+        $executeRaw: jest.fn(),
+        booking: { updateMany: jest.fn().mockResolvedValue({ count: 1 }) },
+      };
+      return callback(tx);
+    });
+
+    const result = await updateBookingStatus("booking-held-1", "ACCEPTED");
+
+    expect(result).toEqual({
+      success: false,
+      error:
+        "This booking could not be updated because availability changed. Please refresh and try again.",
+      code: "INVENTORY_DELTA_CONFLICT",
+    });
+  });
+
   // -----------------------------------------------------------------------
   // 2. HELD->ACCEPTED — expired hold rejected
   // -----------------------------------------------------------------------
@@ -297,7 +355,7 @@ describe("manage-booking-hold — Phase 4 hold management paths", () => {
     );
 
     expect(result.error).toBe("This hold has expired.");
-    expect(result).not.toHaveProperty("success");
+    expect(result.success).toBe(false);
   });
 
   // -----------------------------------------------------------------------
@@ -424,6 +482,33 @@ describe("manage-booking-hold — Phase 4 hold management paths", () => {
     expect(mockTxExecuteRaw).toHaveBeenCalled();
   });
 
+  it("HELD->REJECTED returns INVENTORY_DELTA_CONFLICT when held-slot restore drifts", async () => {
+    (prisma.booking.findUnique as jest.Mock).mockResolvedValue(mockHeldBooking);
+    (applyInventoryDeltas as jest.Mock).mockRejectedValueOnce(
+      new Error("INVENTORY_DELTA_CONFLICT")
+    );
+
+    (prisma.$transaction as jest.Mock).mockImplementation(async (callback) => {
+      const tx = {
+        $queryRaw: jest
+          .fn()
+          .mockResolvedValue([{ ownerId: "owner-123", status: "ACTIVE" }]),
+        $executeRaw: jest.fn().mockResolvedValue(1),
+        booking: { updateMany: jest.fn().mockResolvedValue({ count: 1 }) },
+      };
+      return callback(tx);
+    });
+
+    const result = await updateBookingStatus("booking-held-1", "REJECTED");
+
+    expect(result).toEqual({
+      success: false,
+      error:
+        "This booking could not be updated because availability changed. Please refresh and try again.",
+      code: "INVENTORY_DELTA_CONFLICT",
+    });
+  });
+
   // -----------------------------------------------------------------------
   // 6. Authorization — tenant cancel
   // -----------------------------------------------------------------------
@@ -447,6 +532,32 @@ describe("manage-booking-hold — Phase 4 hold management paths", () => {
 
     expect(result.success).toBe(true);
     expect(prisma.$transaction).toHaveBeenCalled();
+  });
+
+  it("HELD->CANCELLED returns INVENTORY_DELTA_CONFLICT when held-slot restore drifts", async () => {
+    (auth as jest.Mock).mockResolvedValue(mockTenantSession);
+    (prisma.booking.findUnique as jest.Mock).mockResolvedValue(mockHeldBooking);
+    (applyInventoryDeltas as jest.Mock).mockRejectedValueOnce(
+      new Error("INVENTORY_DELTA_CONFLICT")
+    );
+
+    (prisma.$transaction as jest.Mock).mockImplementation(async (callback) => {
+      const tx = {
+        $queryRaw: jest.fn().mockResolvedValue([{ id: "listing-123" }]),
+        $executeRaw: jest.fn().mockResolvedValue(1),
+        booking: { updateMany: jest.fn().mockResolvedValue({ count: 1 }) },
+      };
+      return callback(tx);
+    });
+
+    const result = await updateBookingStatus("booking-held-1", "CANCELLED");
+
+    expect(result).toEqual({
+      success: false,
+      error:
+        "This booking could not be updated because availability changed. Please refresh and try again.",
+      code: "INVENTORY_DELTA_CONFLICT",
+    });
   });
 
   // -----------------------------------------------------------------------
@@ -639,7 +750,20 @@ describe("manage-booking-hold — Phase 4 hold management paths", () => {
 
     // Still returns the hold-expired error (the catch block swallows tx errors)
     expect(result.error).toBe("This hold has expired.");
-    expect(result).not.toHaveProperty("success");
+    expect(result.success).toBe(false);
+    expect(logger.sync.warn).toHaveBeenCalledWith(
+      "Inline expiry failed (code: INLINE_EXPIRY_FAILED)",
+      expect.objectContaining({
+        action: "updateBookingStatus",
+        bookingId: "booking-held-expired",
+        listingId: "listing-123",
+        targetStatus: "ACCEPTED",
+        heldUntil: mockExpiredHeldBooking.heldUntil.toISOString(),
+        code: "INLINE_EXPIRY_FAILED",
+        error: "Deadlock detected",
+      })
+    );
+    expect(logger.sync.debug).not.toHaveBeenCalled();
   });
 
   // -----------------------------------------------------------------------

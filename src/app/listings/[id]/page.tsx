@@ -9,6 +9,7 @@ import { sanitizeUnicode } from "@/lib/schemas";
 import { features } from "@/lib/env";
 import { generateViewToken } from "@/app/api/metrics/hmac";
 import { getAvailability } from "@/lib/availability";
+import { resolveListingDetailDateParams } from "@/lib/search/listing-detail-link";
 import ListingPageClient from "./ListingPageClient";
 
 const getListingWithLocation = cache(async (id: string) => {
@@ -70,6 +71,53 @@ const getSimilarListings = cache(async function getSimilarListings(
 
 interface PageProps {
   params: Promise<{ id: string }>;
+  searchParams?: Promise<{
+    startDate?: string | string[];
+    moveInDate?: string | string[];
+    endDate?: string | string[];
+  }>;
+}
+
+function parseDateParam(value: string | null): Date | null {
+  if (!value || !/^\d{4}-\d{2}-\d{2}$/.test(value)) {
+    return null;
+  }
+
+  const parsed = new Date(`${value}T00:00:00.000Z`);
+  return Number.isNaN(parsed.getTime()) ? null : parsed;
+}
+
+function resolveInitialAvailabilityRange(searchParams?: {
+  startDate?: string | string[];
+  moveInDate?: string | string[];
+  endDate?: string | string[];
+}) {
+  const resolvedRange = resolveListingDetailDateParams({
+    startDate: searchParams?.startDate,
+    moveInDate: searchParams?.moveInDate,
+    endDate: searchParams?.endDate,
+  });
+  const initialStartDate = resolvedRange.startDate ?? null;
+  const initialEndDate = resolvedRange.endDate ?? null;
+
+  const startDate = parseDateParam(initialStartDate);
+  const endDate = parseDateParam(initialEndDate);
+
+  if (startDate && endDate && endDate > startDate) {
+    return {
+      startDate,
+      endDate,
+      initialStartDate: initialStartDate ?? undefined,
+      initialEndDate: initialEndDate ?? undefined,
+    };
+  }
+
+  return {
+    startDate: undefined,
+    endDate: undefined,
+    initialStartDate: undefined,
+    initialEndDate: undefined,
+  };
 }
 
 export async function generateMetadata({
@@ -118,8 +166,11 @@ export async function generateMetadata({
   };
 }
 
-export default async function ListingPage({ params }: PageProps) {
+export default async function ListingPage({ params, searchParams }: PageProps) {
   const { id } = await params;
+  const rawSearchParams = searchParams ? await searchParams : undefined;
+  const initialAvailabilityRange =
+    resolveInitialAvailabilityRange(rawSearchParams);
   const listing = await getListingWithLocation(id);
 
   if (!listing) {
@@ -201,7 +252,12 @@ export default async function ListingPage({ params }: PageProps) {
       },
     }),
     getReviews(listing.id),
-    getAvailability(listing.id),
+    initialAvailabilityRange.startDate && initialAvailabilityRange.endDate
+      ? getAvailability(listing.id, {
+          startDate: initialAvailabilityRange.startDate,
+          endDate: initialAvailabilityRange.endDate,
+        })
+      : getAvailability(listing.id),
   ]);
 
   const similarListingsRaw = await similarListingsPromise;
@@ -332,6 +388,9 @@ export default async function ListingPage({ params }: PageProps) {
         coordinates={coordinates}
         similarListings={similarListings}
         viewToken={generateViewToken(listing.id)}
+        initialStartDate={initialAvailabilityRange.initialStartDate}
+        initialEndDate={initialAvailabilityRange.initialEndDate}
+        initialAvailability={availability}
       />
     </>
   );

@@ -1,20 +1,17 @@
 /**
  * Multi-slot booking lifecycle tests
  *
- * Traces multi-slot bookings through their complete lifecycle and verifies
- * slot arithmetic at every step:
- *
- * 1. SHARED mode: PENDING does not consume slots, ACCEPTED decrements,
- *    CANCELLED restores, double-cancel is clamped.
- * 2. HELD mode: HELD decrements at creation, HELD→ACCEPTED no additional
- *    decrement, HELD→EXPIRED/REJECTED/CANCELLED all restore.
- * 3. WHOLE_UNIT mode: slotsRequested is forced to totalSlots at creation,
- *    ACCEPTED consumes all, CANCELLED restores all.
- * 4. Mixed concurrent bookings: HELD is counted in capacity for new PENDING,
- *    HELD is counted when accepting PENDING, expired HELD is excluded.
+ * Verifies the current lifecycle contract against range-aware availability
+ * helpers instead of legacy overlap SUM mocks:
+ * - PENDING does not reserve inventory
+ * - HELD reserves inventory until transition or expiry
+ * - ACCEPTED reserves inventory
+ * - WHOLE_UNIT coerces to totalSlots
+ * - active HELD inventory affects later acceptance checks
+ * - expired HELD bookings are swept or excluded before capacity checks
  */
 
-// Mock @prisma/client FIRST to avoid SWC binary loading issues in WSL2
+// Mock @prisma/client FIRST to avoid SWC binary loading issues in WSL2.
 jest.mock("@prisma/client", () => ({
   Prisma: {
     TransactionIsolationLevel: {
@@ -104,6 +101,17 @@ jest.mock("@/lib/booking-state-machine", () => ({
   validateTransition: jest.fn(),
   isInvalidStateTransitionError: jest.fn().mockReturnValue(false),
 }));
+jest.mock("@/lib/search/search-doc-dirty", () => ({
+  markListingsDirty: jest.fn().mockResolvedValue(undefined),
+}));
+jest.mock("@/lib/test-barriers", () => ({
+  waitForTestBarrier: jest.fn().mockResolvedValue(undefined),
+}));
+jest.mock("@/lib/availability", () => ({
+  getAvailability: jest.fn(),
+  expireOverlappingExpiredHolds: jest.fn().mockResolvedValue(0),
+  applyInventoryDeltas: jest.fn().mockResolvedValue(undefined),
+}));
 
 import { createBooking, createHold } from "@/app/actions/booking";
 import { updateBookingStatus } from "@/app/actions/manage-booking";
@@ -111,37 +119,264 @@ import { prisma } from "@/lib/prisma";
 import { auth } from "@/auth";
 import { createInternalNotification } from "@/lib/notifications";
 import { sendNotificationEmailWithPreference } from "@/lib/email";
-
-// ---------------------------------------------------------------------------
-// Shared fixtures
-// ---------------------------------------------------------------------------
+import {
+  getAvailability,
+  expireOverlappingExpiredHolds,
+  applyInventoryDeltas,
+} from "@/lib/availability";
 
 const tenantSession = {
   user: { id: "tenant-001", email: "tenant@example.com" },
 };
-const ownerSession = { user: { id: "owner-999", email: "owner@example.com" } };
+const secondTenantSession = {
+  user: { id: "tenant-002", email: "tenant2@example.com" },
+};
+const ownerSession = {
+  user: { id: "owner-999", email: "owner@example.com" },
+};
 
 const futureStart = new Date(Date.now() + 30 * 24 * 60 * 60 * 1000);
 const futureEnd = new Date(Date.now() + 210 * 24 * 60 * 60 * 1000);
 
-// ---------------------------------------------------------------------------
-// Helper: build a booking object returned by prisma.booking.findUnique in
-// updateBookingStatus (it includes nested listing + tenant).
-// ---------------------------------------------------------------------------
+const LISTING_ID = "listing-shared";
+const WHOLE_UNIT_LISTING_ID = "listing-whole-unit";
+const OWNER_ID = "owner-999";
+
+const sharedListing = {
+  id: LISTING_ID,
+  title: "Shared Listing",
+  ownerId: OWNER_ID,
+  totalSlots: 5,
+  availableSlots: 5,
+  status: "ACTIVE",
+  price: 1000,
+  bookingMode: "SHARED",
+  holdTtlMinutes: 60,
+};
+
+const wholeUnitListing = {
+  id: WHOLE_UNIT_LISTING_ID,
+  title: "Whole Unit Listing",
+  ownerId: OWNER_ID,
+  totalSlots: 4,
+  availableSlots: 4,
+  status: "ACTIVE",
+  price: 2000,
+  bookingMode: "WHOLE_UNIT",
+  holdTtlMinutes: 60,
+};
+
+const mockOwner = {
+  id: OWNER_ID,
+  name: "Owner Name",
+  email: "owner@example.com",
+};
+
+const mockTenant = {
+  id: "tenant-001",
+  name: "Tenant Name",
+};
+
+const mockTenantTwo = {
+  id: "tenant-002",
+  name: "Tenant Two",
+};
+
+function makeAvailabilitySnapshot(overrides: {
+  listingId?: string;
+  totalSlots?: number;
+  effectiveAvailableSlots?: number;
+  heldSlots?: number;
+  acceptedSlots?: number;
+  rangeVersion?: number;
+} = {}) {
+  const totalSlots = overrides.totalSlots ?? sharedListing.totalSlots;
+  const acceptedSlots = overrides.acceptedSlots ?? 0;
+  const heldSlots = overrides.heldSlots ?? 0;
+
+  return {
+    listingId: overrides.listingId ?? LISTING_ID,
+    totalSlots,
+    effectiveAvailableSlots:
+      overrides.effectiveAvailableSlots ?? totalSlots - acceptedSlots - heldSlots,
+    heldSlots,
+    acceptedSlots,
+    rangeVersion: overrides.rangeVersion ?? 1,
+    asOf: new Date().toISOString(),
+  };
+}
+
+function buildCreateBookingTx(options: {
+  listing?: typeof sharedListing | typeof wholeUnitListing;
+  createdBooking?: { id: string; status: string; slotsRequested: number };
+  duplicateExact?: object | null;
+  duplicateOverlap?: object | null;
+  tenantRecord?: typeof mockTenant | typeof mockTenantTwo;
+}) {
+  const listing = options.listing ?? sharedListing;
+  const createdBooking =
+    options.createdBooking ?? {
+      id: "booking-pending-1",
+      status: "PENDING",
+      slotsRequested: 3,
+    };
+  const duplicateExact = options.duplicateExact ?? null;
+  const duplicateOverlap = options.duplicateOverlap ?? null;
+  const tenantRecord = options.tenantRecord ?? mockTenant;
+  let findFirstCallCount = 0;
+
+  return {
+    $queryRaw: jest.fn().mockResolvedValueOnce([listing]),
+    booking: {
+      findFirst: jest.fn().mockImplementation(() => {
+        findFirstCallCount += 1;
+        if (findFirstCallCount === 1) {
+          return Promise.resolve(duplicateExact);
+        }
+        return Promise.resolve(duplicateOverlap);
+      }),
+      create: jest.fn().mockResolvedValue(createdBooking),
+    },
+    user: {
+      findUnique: jest
+        .fn()
+        .mockImplementation(({ where }: { where: { id: string } }) => {
+          if (where.id === listing.ownerId) {
+            return Promise.resolve(mockOwner);
+          }
+          return Promise.resolve(tenantRecord);
+        }),
+    },
+  };
+}
+
+function buildCreateHoldTx(options: {
+  listing?: typeof sharedListing | typeof wholeUnitListing;
+  createdHold?: {
+    id: string;
+    status: string;
+    slotsRequested: number;
+    heldUntil: Date;
+  };
+  holdCount?: number;
+  duplicateHold?: object | null;
+  decrementResult?: number;
+  tenantRecord?: typeof mockTenant | typeof mockTenantTwo;
+}) {
+  const listing = options.listing ?? sharedListing;
+  const createdHold =
+    options.createdHold ?? {
+      id: "hold-1",
+      status: "HELD",
+      slotsRequested: 3,
+      heldUntil: new Date(Date.now() + 60 * 60 * 1000),
+    };
+  const holdCount = options.holdCount ?? 0;
+  const duplicateHold = options.duplicateHold ?? null;
+  const decrementResult = options.decrementResult ?? 1;
+  const tenantRecord = options.tenantRecord ?? mockTenant;
+
+  return {
+    $queryRaw: jest
+      .fn()
+      .mockResolvedValueOnce([{ count: BigInt(holdCount) }])
+      .mockResolvedValueOnce([listing]),
+    $executeRaw: jest.fn().mockResolvedValue(decrementResult),
+    booking: {
+      findFirst: jest.fn().mockResolvedValue(duplicateHold),
+      create: jest.fn().mockResolvedValue(createdHold),
+    },
+    user: {
+      findUnique: jest
+        .fn()
+        .mockImplementation(({ where }: { where: { id: string } }) => {
+          if (where.id === listing.ownerId) {
+            return Promise.resolve(mockOwner);
+          }
+          return Promise.resolve(tenantRecord);
+        }),
+    },
+  };
+}
+
+function buildPendingAcceptTx(options: {
+  listingRow?: {
+    availableSlots: number;
+    totalSlots: number;
+    id: string;
+    ownerId: string;
+    bookingMode: string;
+    status: string;
+  };
+  updateManyCount?: number;
+  executeRawResult?: number;
+} = {}) {
+  const listingRow =
+    options.listingRow ??
+    ({
+      availableSlots: 5,
+      totalSlots: 5,
+      id: LISTING_ID,
+      ownerId: OWNER_ID,
+      bookingMode: "SHARED",
+      status: "ACTIVE",
+    } as const);
+
+  return {
+    $queryRaw: jest.fn().mockResolvedValueOnce([listingRow]),
+    $executeRaw: jest.fn().mockResolvedValue(options.executeRawResult ?? 1),
+    booking: {
+      updateMany: jest
+        .fn()
+        .mockResolvedValue({ count: options.updateManyCount ?? 1 }),
+    },
+  };
+}
+
+function buildHeldAcceptTx(updateManyCount = 1) {
+  return {
+    $queryRaw: jest
+      .fn()
+      .mockResolvedValue([{ ownerId: OWNER_ID, status: "ACTIVE" }]),
+    $executeRaw: jest.fn(),
+    booking: {
+      updateMany: jest.fn().mockResolvedValue({ count: updateManyCount }),
+    },
+  };
+}
+
+function buildRestoreTx(options: {
+  queryRow?: unknown[];
+  updateManyCount?: number;
+  executeRawResult?: number;
+} = {}) {
+  return {
+    $queryRaw: jest
+      .fn()
+      .mockResolvedValue(options.queryRow ?? [{ id: LISTING_ID }]),
+    $executeRaw: jest.fn().mockResolvedValue(options.executeRawResult ?? 1),
+    booking: {
+      updateMany: jest
+        .fn()
+        .mockResolvedValue({ count: options.updateManyCount ?? 1 }),
+    },
+  };
+}
+
 function makeBookingForStatus(overrides: {
   id?: string;
+  listingId?: string;
   status?: string;
   slotsRequested?: number;
   version?: number;
-  listingId?: string;
-  listingTotalSlots?: number;
-  listingAvailableSlots?: number;
-  listingBookingMode?: string;
   heldUntil?: Date | null;
-}) {
+  listingTitle?: string;
+  listingAvailableSlots?: number;
+  listingTotalSlots?: number;
+} = {}) {
   return {
-    id: overrides.id ?? "booking-ms-1",
-    listingId: overrides.listingId ?? "listing-shared",
+    id: overrides.id ?? "booking-1",
+    listingId: overrides.listingId ?? LISTING_ID,
     tenantId: "tenant-001",
     status: overrides.status ?? "PENDING",
     slotsRequested: overrides.slotsRequested ?? 3,
@@ -151,12 +386,11 @@ function makeBookingForStatus(overrides: {
     totalPrice: 4800,
     heldUntil: overrides.heldUntil ?? null,
     listing: {
-      id: overrides.listingId ?? "listing-shared",
-      title: "Multi-Slot Listing",
-      ownerId: "owner-999",
+      id: overrides.listingId ?? LISTING_ID,
+      title: overrides.listingTitle ?? "Multi-Slot Listing",
+      ownerId: OWNER_ID,
       availableSlots: overrides.listingAvailableSlots ?? 5,
       totalSlots: overrides.listingTotalSlots ?? 5,
-      bookingMode: overrides.listingBookingMode ?? "SHARED",
       owner: { name: "Owner Name" },
     },
     tenant: {
@@ -167,1067 +401,647 @@ function makeBookingForStatus(overrides: {
   };
 }
 
-// ---------------------------------------------------------------------------
-// 1. SHARED mode: slotsRequested=3, totalSlots=5
-// ---------------------------------------------------------------------------
-describe("SHARED mode: slotsRequested=3, totalSlots=5", () => {
-  const sharedListing = {
-    id: "listing-shared",
-    title: "Shared Listing",
-    ownerId: "owner-999",
-    totalSlots: 5,
-    availableSlots: 5,
-    status: "ACTIVE",
-    price: 1000,
-    bookingMode: "SHARED",
-  };
+beforeEach(() => {
+  jest.clearAllMocks();
 
-  const mockOwner = {
-    id: "owner-999",
-    name: "Owner Name",
-    email: "owner@example.com",
-  };
-  const mockTenant = { id: "tenant-001", name: "Tenant Name" };
-
-  beforeEach(() => {
-    jest.clearAllMocks();
-    (auth as jest.Mock).mockResolvedValue(tenantSession);
-    (prisma.user.findUnique as jest.Mock).mockResolvedValue({
-      id: "tenant-001",
-      isSuspended: false,
-      emailVerified: new Date(),
-    });
-    (createInternalNotification as jest.Mock).mockResolvedValue({
-      success: true,
-    });
-    (sendNotificationEmailWithPreference as jest.Mock).mockResolvedValue({
-      success: true,
-    });
+  (auth as jest.Mock).mockResolvedValue(tenantSession);
+  (getAvailability as jest.Mock).mockResolvedValue(makeAvailabilitySnapshot());
+  (expireOverlappingExpiredHolds as jest.Mock).mockResolvedValue(0);
+  (applyInventoryDeltas as jest.Mock).mockResolvedValue(undefined);
+  (createInternalNotification as jest.Mock).mockResolvedValue({
+    success: true,
   });
+  (sendNotificationEmailWithPreference as jest.Mock).mockResolvedValue({
+    success: true,
+  });
+});
 
-  it("PENDING creation does NOT decrement availableSlots", async () => {
-    const mockExecuteRaw = jest.fn().mockResolvedValue(1);
-
-    (prisma.$transaction as jest.Mock).mockImplementation(async (callback) => {
-      const tx = {
-        booking: {
-          findFirst: jest.fn().mockResolvedValue(null),
-          create: jest.fn().mockResolvedValue({
-            id: "booking-ms-1",
-            status: "PENDING",
-            slotsRequested: 3,
-          }),
-        },
-        user: {
-          findUnique: jest
-            .fn()
-            .mockImplementation(({ where }: { where: { id: string } }) => {
-              if (where.id === "owner-999") return Promise.resolve(mockOwner);
-              if (where.id === "tenant-001") return Promise.resolve(mockTenant);
-              return Promise.resolve(null);
-            }),
-        },
-        $queryRaw: jest
-          .fn()
-          .mockResolvedValueOnce([sharedListing]) // FOR UPDATE listing
-          .mockResolvedValueOnce([{ total: BigInt(0) }]), // SUM ACCEPTED overlapping
-        $executeRaw: mockExecuteRaw,
-      };
-      return callback(tx);
+describe("Create flows", () => {
+  it("PENDING creation checks live availability without reserving inventory", async () => {
+    const tx = buildCreateBookingTx({
+      createdBooking: {
+        id: "booking-pending-1",
+        status: "PENDING",
+        slotsRequested: 3,
+      },
     });
+
+    (prisma.$transaction as jest.Mock).mockImplementation(async (callback) =>
+      callback(tx)
+    );
 
     const result = await createBooking(
-      "listing-shared",
+      LISTING_ID,
       futureStart,
       futureEnd,
       1000,
       3
     );
 
-    expect(result.success).toBe(true);
-    // $executeRaw must NOT be called — PENDING does not consume slots
-    expect(mockExecuteRaw).not.toHaveBeenCalled();
-  });
-
-  it("PENDING→ACCEPTED decrements availableSlots by slotsRequested (3)", async () => {
-    (auth as jest.Mock).mockResolvedValue(ownerSession);
-    (prisma.user.findUnique as jest.Mock).mockResolvedValue({
-      id: "owner-999",
-      isSuspended: false,
-      emailVerified: new Date(),
-    });
-
-    const booking = makeBookingForStatus({
-      status: "PENDING",
-      slotsRequested: 3,
-      listingAvailableSlots: 5,
-    });
-    (prisma.booking.findUnique as jest.Mock).mockResolvedValue(booking);
-
-    const mockExecuteRaw = jest.fn().mockResolvedValue(1);
-
-    (prisma.$transaction as jest.Mock).mockImplementation(async (callback) => {
-      const tx = {
-        $queryRaw: jest
-          .fn()
-          .mockResolvedValueOnce([
-            {
-              availableSlots: 5,
-              totalSlots: 5,
-              id: "listing-shared",
-              ownerId: "owner-999",
-              bookingMode: "SHARED",
-              status: "ACTIVE",
-            },
-          ])
-          .mockResolvedValueOnce([{ total: BigInt(0) }]), // SUM ACCEPTED + active HELD
-        $executeRaw: mockExecuteRaw,
-        booking: {
-          updateMany: jest.fn().mockResolvedValue({ count: 1 }),
-        },
-      };
-      return callback(tx);
-    });
-
-    const result = await updateBookingStatus("booking-ms-1", "ACCEPTED");
-
-    expect(result.success).toBe(true);
-    // $executeRaw must be called once for slot decrement
-    expect(mockExecuteRaw).toHaveBeenCalledTimes(1);
-    // The decrement call should reference slotsRequested=3
-    const decrementCall = mockExecuteRaw.mock.calls[0];
-    const sqlParts = Array.from(decrementCall[0] as TemplateStringsArray).join(
-      "?"
-    );
-    expect(sqlParts).toContain("availableSlots");
-    // Verify the decrement value passed is 3
-    expect(decrementCall).toContain(3);
-  });
-
-  it("ACCEPTED→CANCELLED restores availableSlots by slotsRequested (3)", async () => {
-    (auth as jest.Mock).mockResolvedValue(tenantSession);
-    (prisma.user.findUnique as jest.Mock).mockResolvedValue({
-      id: "tenant-001",
-      isSuspended: false,
-      emailVerified: new Date(),
-    });
-
-    const booking = makeBookingForStatus({
-      status: "ACCEPTED",
-      slotsRequested: 3,
-      listingAvailableSlots: 2,
-    });
-    (prisma.booking.findUnique as jest.Mock).mockResolvedValue(booking);
-
-    const mockExecuteRaw = jest.fn().mockResolvedValue(1);
-
-    (prisma.$transaction as jest.Mock).mockImplementation(async (callback) => {
-      const tx = {
-        $queryRaw: jest.fn().mockResolvedValue([{}]), // SELECT 1 FOR UPDATE
-        $executeRaw: mockExecuteRaw,
-        booking: {
-          updateMany: jest.fn().mockResolvedValue({ count: 1 }),
-        },
-      };
-      return callback(tx);
-    });
-
-    const result = await updateBookingStatus("booking-ms-1", "CANCELLED");
-
-    expect(result.success).toBe(true);
-    // $executeRaw must be called once — LEAST(availableSlots + 3, totalSlots)
-    expect(mockExecuteRaw).toHaveBeenCalledTimes(1);
-    const restoreCall = mockExecuteRaw.mock.calls[0];
-    const sqlParts = Array.from(restoreCall[0] as TemplateStringsArray).join(
-      "?"
-    );
-    expect(sqlParts).toContain("LEAST");
-    // Verify the restore value passed is 3
-    expect(restoreCall).toContain(3);
-  });
-
-  it("PENDING→CANCELLED does NOT call $executeRaw (PENDING holds no slots)", async () => {
-    (auth as jest.Mock).mockResolvedValue(tenantSession);
-    (prisma.user.findUnique as jest.Mock).mockResolvedValue({
-      id: "tenant-001",
-      isSuspended: false,
-      emailVerified: new Date(),
-    });
-
-    const booking = makeBookingForStatus({
-      status: "PENDING",
-      slotsRequested: 3,
-    });
-    (prisma.booking.findUnique as jest.Mock).mockResolvedValue(booking);
-
-    const mockExecuteRaw = jest.fn().mockResolvedValue(1);
-
-    (prisma.$transaction as jest.Mock).mockImplementation(async (callback) => {
-      const tx = {
-        $executeRaw: mockExecuteRaw,
-        booking: {
-          updateMany: jest.fn().mockResolvedValue({ count: 1 }),
-        },
-      };
-      return callback(tx);
-    });
-
-    const result = await updateBookingStatus("booking-ms-1", "CANCELLED");
-
-    expect(result.success).toBe(true);
-    expect(mockExecuteRaw).not.toHaveBeenCalled();
-  });
-
-  it("double-cancel on ACCEPTED: restore is clamped by LEAST(..., totalSlots)", async () => {
-    // Simulates a scenario where availableSlots is already at totalSlots-1 (4 of 5)
-    // and a cancel tries to restore 3 — result must be clamped to 5 not 7.
-    (auth as jest.Mock).mockResolvedValue(tenantSession);
-    (prisma.user.findUnique as jest.Mock).mockResolvedValue({
-      id: "tenant-001",
-      isSuspended: false,
-      emailVerified: new Date(),
-    });
-
-    const booking = makeBookingForStatus({
-      status: "ACCEPTED",
-      slotsRequested: 3,
-      listingAvailableSlots: 4,
-    });
-    (prisma.booking.findUnique as jest.Mock).mockResolvedValue(booking);
-
-    let capturedSql = "";
-    const mockExecuteRaw = jest
-      .fn()
-      .mockImplementation((strings: TemplateStringsArray) => {
-        capturedSql = Array.from(strings).join("?");
-        return Promise.resolve(1);
-      });
-
-    (prisma.$transaction as jest.Mock).mockImplementation(async (callback) => {
-      const tx = {
-        $queryRaw: jest.fn().mockResolvedValue([{}]),
-        $executeRaw: mockExecuteRaw,
-        booking: {
-          updateMany: jest.fn().mockResolvedValue({ count: 1 }),
-        },
-      };
-      return callback(tx);
-    });
-
-    const result = await updateBookingStatus("booking-ms-1", "CANCELLED");
-
-    expect(result.success).toBe(true);
-    // The restore UPDATE must use LEAST to prevent overflow
-    expect(capturedSql).toContain("LEAST");
-    expect(capturedSql).toContain('"totalSlots"');
-  });
-});
-
-// ---------------------------------------------------------------------------
-// 2. HELD mode: slotsRequested=3, totalSlots=5
-// ---------------------------------------------------------------------------
-describe("HELD mode: slotsRequested=3, totalSlots=5", () => {
-  const heldListing = {
-    id: "listing-held",
-    title: "Hold Listing",
-    ownerId: "owner-999",
-    totalSlots: 5,
-    availableSlots: 5,
-    status: "ACTIVE",
-    price: 1000,
-    bookingMode: "SHARED",
-    holdTtlMinutes: 60,
-  };
-
-  const mockOwner = {
-    id: "owner-999",
-    name: "Owner Name",
-    email: "owner@example.com",
-  };
-  const mockTenant = { id: "tenant-001", name: "Tenant Name" };
-
-  beforeEach(() => {
-    jest.clearAllMocks();
-    (auth as jest.Mock).mockResolvedValue(tenantSession);
-    (prisma.user.findUnique as jest.Mock).mockResolvedValue({
-      id: "tenant-001",
-      isSuspended: false,
-      emailVerified: new Date(),
-    });
-    (createInternalNotification as jest.Mock).mockResolvedValue({
+    expect(result).toEqual({
       success: true,
+      bookingId: "booking-pending-1",
     });
-    (sendNotificationEmailWithPreference as jest.Mock).mockResolvedValue({
-      success: true,
+    expect(expireOverlappingExpiredHolds).toHaveBeenCalledWith(tx, {
+      listingId: LISTING_ID,
+      startDate: futureStart,
+      endDate: futureEnd,
     });
+    expect(getAvailability).toHaveBeenCalledWith(
+      LISTING_ID,
+      expect.objectContaining({
+        startDate: futureStart,
+        endDate: futureEnd,
+        now: expect.any(Date),
+        tx,
+      })
+    );
+    expect(tx.booking.create).toHaveBeenCalledWith({
+      data: expect.objectContaining({
+        status: "PENDING",
+        slotsRequested: 3,
+      }),
+    });
+    expect(applyInventoryDeltas).not.toHaveBeenCalled();
   });
 
-  it("createHold decrements availableSlots by slotsRequested (3) at creation", async () => {
-    const mockExecuteRaw = jest.fn().mockResolvedValue(1);
-
-    (prisma.$transaction as jest.Mock).mockImplementation(async (callback) => {
-      const tx = {
-        booking: {
-          findFirst: jest.fn().mockResolvedValue(null),
-          create: jest.fn().mockResolvedValue({
-            id: "booking-hold-1",
-            status: "HELD",
-            slotsRequested: 3,
-          }),
-        },
-        user: {
-          findUnique: jest
-            .fn()
-            .mockImplementation(({ where }: { where: { id: string } }) => {
-              if (where.id === "owner-999") return Promise.resolve(mockOwner);
-              if (where.id === "tenant-001") return Promise.resolve(mockTenant);
-              return Promise.resolve(null);
-            }),
-        },
-        $queryRaw: jest
-          .fn()
-          .mockResolvedValueOnce([{ count: BigInt(0) }]) // COUNT active holds for user
-          .mockResolvedValueOnce([heldListing]) // FOR UPDATE listing
-          .mockResolvedValueOnce([{ total: BigInt(0) }]), // SUM ACCEPTED + active HELD
-        $executeRaw: mockExecuteRaw,
-      };
-      return callback(tx);
+  it("HELD creation reserves inventory through applyInventoryDeltas", async () => {
+    const heldUntil = new Date(Date.now() + 60 * 60 * 1000);
+    const tx = buildCreateHoldTx({
+      createdHold: {
+        id: "hold-1",
+        status: "HELD",
+        slotsRequested: 3,
+        heldUntil,
+      },
     });
+
+    (prisma.$transaction as jest.Mock).mockImplementation(async (callback) =>
+      callback(tx)
+    );
 
     const result = await createHold(
-      "listing-held",
+      LISTING_ID,
       futureStart,
       futureEnd,
       1000,
       3
     );
 
-    expect(result.success).toBe(true);
-    // $executeRaw must be called once to decrement slots
-    expect(mockExecuteRaw).toHaveBeenCalledTimes(1);
-    const decrementCall = mockExecuteRaw.mock.calls[0];
-    const sqlParts = Array.from(decrementCall[0] as TemplateStringsArray).join(
-      "?"
+    expect(result).toEqual(
+      expect.objectContaining({
+        success: true,
+        bookingId: "hold-1",
+        heldUntil: expect.any(String),
+      })
     );
-    expect(sqlParts).toContain("availableSlots");
-    // Verify the decrement value is 3
-    expect(decrementCall).toContain(3);
-  });
-
-  it("HELD→ACCEPTED does NOT call $executeRaw (slots already consumed at hold creation)", async () => {
-    (auth as jest.Mock).mockResolvedValue(ownerSession);
-    (prisma.user.findUnique as jest.Mock).mockResolvedValue({
-      id: "owner-999",
-      isSuspended: false,
-      emailVerified: new Date(),
+    expect(expireOverlappingExpiredHolds).toHaveBeenCalledWith(tx, {
+      listingId: LISTING_ID,
+      startDate: futureStart,
+      endDate: futureEnd,
     });
-
-    const futureHeldUntil = new Date(Date.now() + 60 * 60 * 1000); // 1 hour from now
-    const booking = makeBookingForStatus({
-      status: "HELD",
-      slotsRequested: 3,
-      listingAvailableSlots: 2, // already decremented at hold creation
-      heldUntil: futureHeldUntil,
-    });
-    (prisma.booking.findUnique as jest.Mock).mockResolvedValue(booking);
-
-    const mockExecuteRaw = jest.fn().mockResolvedValue(1);
-
-    (prisma.$transaction as jest.Mock).mockImplementation(async (callback) => {
-      const tx = {
-        $queryRaw: jest
-          .fn()
-          .mockResolvedValue([{ ownerId: "owner-999", status: "ACTIVE" }]), // FOR UPDATE
-        $executeRaw: mockExecuteRaw,
-        booking: {
-          updateMany: jest.fn().mockResolvedValue({ count: 1 }),
-        },
-      };
-      return callback(tx);
-    });
-
-    const result = await updateBookingStatus("booking-ms-1", "ACCEPTED");
-
-    expect(result.success).toBe(true);
-    // $executeRaw must NOT be called — HELD→ACCEPTED has no slot change (D4)
-    expect(mockExecuteRaw).not.toHaveBeenCalled();
-  });
-
-  it("HELD→CANCELLED restores availableSlots by slotsRequested (3)", async () => {
-    (auth as jest.Mock).mockResolvedValue(tenantSession);
-    (prisma.user.findUnique as jest.Mock).mockResolvedValue({
-      id: "tenant-001",
-      isSuspended: false,
-      emailVerified: new Date(),
-    });
-
-    const futureHeldUntil = new Date(Date.now() + 60 * 60 * 1000);
-    const booking = makeBookingForStatus({
-      status: "HELD",
-      slotsRequested: 3,
-      listingAvailableSlots: 2,
-      heldUntil: futureHeldUntil,
-    });
-    (prisma.booking.findUnique as jest.Mock).mockResolvedValue(booking);
-
-    const mockExecuteRaw = jest.fn().mockResolvedValue(1);
-
-    (prisma.$transaction as jest.Mock).mockImplementation(async (callback) => {
-      const tx = {
-        $queryRaw: jest.fn().mockResolvedValue([{}]), // SELECT 1 FOR UPDATE
-        $executeRaw: mockExecuteRaw,
-        booking: {
-          updateMany: jest.fn().mockResolvedValue({ count: 1 }),
-        },
-      };
-      return callback(tx);
-    });
-
-    const result = await updateBookingStatus("booking-ms-1", "CANCELLED");
-
-    expect(result.success).toBe(true);
-    // HELD→CANCELLED must restore 3 slots
-    expect(mockExecuteRaw).toHaveBeenCalledTimes(1);
-    const restoreCall = mockExecuteRaw.mock.calls[0];
-    const sqlParts = Array.from(restoreCall[0] as TemplateStringsArray).join(
-      "?"
+    expect(getAvailability).toHaveBeenCalledWith(
+      LISTING_ID,
+      expect.objectContaining({
+        startDate: futureStart,
+        endDate: futureEnd,
+        now: expect.any(Date),
+        tx,
+      })
     );
-    expect(sqlParts).toContain("LEAST");
-    expect(restoreCall).toContain(3);
-  });
-
-  it("HELD→REJECTED restores availableSlots by slotsRequested (3)", async () => {
-    (auth as jest.Mock).mockResolvedValue(ownerSession);
-    (prisma.user.findUnique as jest.Mock).mockResolvedValue({
-      id: "owner-999",
-      isSuspended: false,
-      emailVerified: new Date(),
+    expect(tx.booking.create).toHaveBeenCalledWith({
+      data: expect.objectContaining({
+        status: "HELD",
+        slotsRequested: 3,
+      }),
     });
-
-    const futureHeldUntil = new Date(Date.now() + 60 * 60 * 1000);
-    const booking = makeBookingForStatus({
-      status: "HELD",
-      slotsRequested: 3,
-      listingAvailableSlots: 2,
-      heldUntil: futureHeldUntil,
+    expect(applyInventoryDeltas).toHaveBeenCalledWith(tx, {
+      listingId: LISTING_ID,
+      startDate: futureStart,
+      endDate: futureEnd,
+      totalSlots: sharedListing.totalSlots,
+      heldDelta: 3,
     });
-    (prisma.booking.findUnique as jest.Mock).mockResolvedValue(booking);
-
-    const mockExecuteRaw = jest.fn().mockResolvedValue(1);
-
-    (prisma.$transaction as jest.Mock).mockImplementation(async (callback) => {
-      const tx = {
-        $queryRaw: jest
-          .fn()
-          .mockResolvedValue([{ ownerId: "owner-999", status: "ACTIVE" }]), // FOR UPDATE
-        $executeRaw: mockExecuteRaw,
-        booking: {
-          updateMany: jest.fn().mockResolvedValue({ count: 1 }),
-        },
-      };
-      return callback(tx);
-    });
-
-    const result = await updateBookingStatus("booking-ms-1", "REJECTED");
-
-    expect(result.success).toBe(true);
-    // HELD→REJECTED must restore slots (6c-ii)
-    expect(mockExecuteRaw).toHaveBeenCalledTimes(1);
-    const restoreCall = mockExecuteRaw.mock.calls[0];
-    const sqlParts = Array.from(restoreCall[0] as TemplateStringsArray).join(
-      "?"
-    );
-    expect(sqlParts).toContain("LEAST");
-    expect(restoreCall).toContain(3);
-  });
-
-  it("HELD→EXPIRED (inline expiry path) restores availableSlots via inline expiry transaction", async () => {
-    // When booking.heldUntil is in the past, updateBookingStatus auto-expires
-    // via the check-on-read inline expiry path (D9), which calls $executeRaw.
-    (auth as jest.Mock).mockResolvedValue(ownerSession);
-    (prisma.user.findUnique as jest.Mock).mockResolvedValue({
-      id: "owner-999",
-      isSuspended: false,
-      emailVerified: new Date(),
-    });
-
-    const pastHeldUntil = new Date(Date.now() - 60 * 1000); // 1 minute ago
-    const booking = makeBookingForStatus({
-      status: "HELD",
-      slotsRequested: 3,
-      listingAvailableSlots: 2,
-      heldUntil: pastHeldUntil,
-    });
-    (prisma.booking.findUnique as jest.Mock).mockResolvedValue(booking);
-
-    const mockExecuteRaw = jest.fn().mockResolvedValue(1);
-
-    (prisma.$transaction as jest.Mock).mockImplementation(async (callback) => {
-      const tx = {
-        $queryRaw: jest.fn().mockResolvedValue([{}]), // FOR UPDATE in inline expiry
-        $executeRaw: mockExecuteRaw,
-        booking: {
-          updateMany: jest.fn().mockResolvedValue({ count: 1 }),
-        },
-      };
-      return callback(tx);
-    });
-
-    const result = await updateBookingStatus("booking-ms-1", "ACCEPTED");
-
-    // The inline expiry path returns an error about expiry
-    expect(result.error).toBe("This hold has expired.");
-    // $executeRaw must have been called for the restore within the inline expiry transaction
-    expect(mockExecuteRaw).toHaveBeenCalledTimes(1);
-    const restoreCall = mockExecuteRaw.mock.calls[0];
-    const sqlParts = Array.from(restoreCall[0] as TemplateStringsArray).join(
-      "?"
-    );
-    expect(sqlParts).toContain("LEAST");
   });
 });
 
-// ---------------------------------------------------------------------------
-// 3. WHOLE_UNIT mode: totalSlots=4
-// ---------------------------------------------------------------------------
-describe("WHOLE_UNIT mode: totalSlots=4", () => {
-  const wholeUnitListing = {
-    id: "listing-wu",
-    title: "Whole Unit Listing",
-    ownerId: "owner-999",
-    totalSlots: 4,
-    availableSlots: 4,
-    status: "ACTIVE",
-    price: 2000,
-    bookingMode: "WHOLE_UNIT",
-    holdTtlMinutes: 60,
-  };
+describe("Status transitions", () => {
+  it("PENDING -> ACCEPTED rechecks availability and reserves accepted inventory", async () => {
+    (auth as jest.Mock).mockResolvedValue(ownerSession);
 
-  const mockOwner = {
-    id: "owner-999",
-    name: "Owner Name",
-    email: "owner@example.com",
-  };
-  const mockTenant = { id: "tenant-001", name: "Tenant Name" };
-
-  beforeEach(() => {
-    jest.clearAllMocks();
-    (auth as jest.Mock).mockResolvedValue(tenantSession);
-    (prisma.user.findUnique as jest.Mock).mockResolvedValue({
-      id: "tenant-001",
-      isSuspended: false,
-      emailVerified: new Date(),
+    const booking = makeBookingForStatus({
+      id: "booking-pending-accept",
+      status: "PENDING",
+      slotsRequested: 3,
     });
-    (createInternalNotification as jest.Mock).mockResolvedValue({
-      success: true,
-    });
-    (sendNotificationEmailWithPreference as jest.Mock).mockResolvedValue({
-      success: true,
-    });
-  });
+    const tx = buildPendingAcceptTx();
 
-  it("createBooking forces slotsRequested=totalSlots (4) for WHOLE_UNIT listing", async () => {
-    let capturedSlotsRequested: number | undefined;
-    const mockBookingCreate = jest
-      .fn()
-      .mockImplementation(({ data }: { data: { slotsRequested: number } }) => {
-        capturedSlotsRequested = data.slotsRequested;
-        return Promise.resolve({
-          id: "booking-wu-1",
-          status: "PENDING",
-          slotsRequested: data.slotsRequested,
-        });
-      });
-
-    (prisma.$transaction as jest.Mock).mockImplementation(async (callback) => {
-      const tx = {
-        booking: {
-          findFirst: jest.fn().mockResolvedValue(null),
-          create: mockBookingCreate,
-        },
-        user: {
-          findUnique: jest
-            .fn()
-            .mockImplementation(({ where }: { where: { id: string } }) => {
-              if (where.id === "owner-999") return Promise.resolve(mockOwner);
-              if (where.id === "tenant-001") return Promise.resolve(mockTenant);
-              return Promise.resolve(null);
-            }),
-        },
-        $queryRaw: jest
-          .fn()
-          .mockResolvedValueOnce([wholeUnitListing]) // FOR UPDATE listing
-          .mockResolvedValueOnce([{ total: BigInt(0) }]), // SUM ACCEPTED overlapping
-        $executeRaw: jest.fn(),
-      };
-      return callback(tx);
-    });
-
-    // User requests only 1 slot but listing is WHOLE_UNIT — should be overridden to 4
-    const result = await createBooking(
-      "listing-wu",
-      futureStart,
-      futureEnd,
-      2000,
-      1
+    (prisma.booking.findUnique as jest.Mock).mockResolvedValue(booking);
+    (getAvailability as jest.Mock).mockResolvedValueOnce(
+      makeAvailabilitySnapshot({
+        effectiveAvailableSlots: 3,
+        heldSlots: 0,
+        acceptedSlots: 2,
+      })
+    );
+    (prisma.$transaction as jest.Mock).mockImplementation(async (callback) =>
+      callback(tx)
     );
 
-    expect(result.success).toBe(true);
-    expect(capturedSlotsRequested).toBe(4); // forced to totalSlots
+    const result = await updateBookingStatus(
+      "booking-pending-accept",
+      "ACCEPTED"
+    );
+
+    expect(result).toEqual({ success: true });
+    expect(expireOverlappingExpiredHolds).toHaveBeenCalledWith(tx, {
+      listingId: booking.listingId,
+      startDate: booking.startDate,
+      endDate: booking.endDate,
+    });
+    expect(getAvailability).toHaveBeenCalledWith(
+      booking.listingId,
+      expect.objectContaining({
+        startDate: booking.startDate,
+        endDate: booking.endDate,
+        tx,
+      })
+    );
+    expect(applyInventoryDeltas).toHaveBeenCalledWith(tx, {
+      listingId: booking.listingId,
+      startDate: booking.startDate,
+      endDate: booking.endDate,
+      totalSlots: booking.listing.totalSlots,
+      acceptedDelta: 3,
+    });
   });
 
-  it("WHOLE_UNIT ACCEPTED consumes all slots (slotsNeeded=totalSlots=4)", async () => {
-    (auth as jest.Mock).mockResolvedValue(ownerSession);
-    (prisma.user.findUnique as jest.Mock).mockResolvedValue({
-      id: "owner-999",
-      isSuspended: false,
-      emailVerified: new Date(),
-    });
-
-    // Booking was created with slotsRequested=4 (enforced by WHOLE_UNIT at create time)
-    const booking = makeBookingForStatus({
-      id: "booking-wu-1",
-      status: "PENDING",
-      slotsRequested: 4,
-      listingId: "listing-wu",
-      listingTotalSlots: 4,
-      listingAvailableSlots: 4,
-      listingBookingMode: "WHOLE_UNIT",
-    });
-    (prisma.booking.findUnique as jest.Mock).mockResolvedValue(booking);
-
-    const mockExecuteRaw = jest.fn().mockResolvedValue(1);
-
-    (prisma.$transaction as jest.Mock).mockImplementation(async (callback) => {
-      const tx = {
-        $queryRaw: jest
-          .fn()
-          .mockResolvedValueOnce([
-            {
-              availableSlots: 4,
-              totalSlots: 4,
-              id: "listing-wu",
-              ownerId: "owner-999",
-              bookingMode: "WHOLE_UNIT",
-              status: "ACTIVE",
-            },
-          ])
-          .mockResolvedValueOnce([{ total: BigInt(0) }]),
-        $executeRaw: mockExecuteRaw,
-        booking: {
-          updateMany: jest.fn().mockResolvedValue({ count: 1 }),
-        },
-      };
-      return callback(tx);
-    });
-
-    const result = await updateBookingStatus("booking-wu-1", "ACCEPTED");
-
-    expect(result.success).toBe(true);
-    // $executeRaw must be called with slotsNeeded=4 (WHOLE_UNIT override)
-    expect(mockExecuteRaw).toHaveBeenCalledTimes(1);
-    const decrementCall = mockExecuteRaw.mock.calls[0];
-    expect(decrementCall).toContain(4);
-  });
-
-  it("WHOLE_UNIT ACCEPTED→CANCELLED restores all 4 slots", async () => {
+  it("ACCEPTED -> CANCELLED releases accepted inventory", async () => {
     (auth as jest.Mock).mockResolvedValue(tenantSession);
-    (prisma.user.findUnique as jest.Mock).mockResolvedValue({
-      id: "tenant-001",
-      isSuspended: false,
-      emailVerified: new Date(),
-    });
 
     const booking = makeBookingForStatus({
-      id: "booking-wu-1",
+      id: "booking-accepted-cancel",
       status: "ACCEPTED",
-      slotsRequested: 4,
-      listingId: "listing-wu",
-      listingTotalSlots: 4,
-      listingAvailableSlots: 0, // all consumed after accept
-      listingBookingMode: "WHOLE_UNIT",
+      slotsRequested: 3,
+      listingAvailableSlots: 2,
     });
+    const tx = buildRestoreTx();
+
     (prisma.booking.findUnique as jest.Mock).mockResolvedValue(booking);
-
-    const mockExecuteRaw = jest.fn().mockResolvedValue(1);
-
-    (prisma.$transaction as jest.Mock).mockImplementation(async (callback) => {
-      const tx = {
-        $queryRaw: jest.fn().mockResolvedValue([{}]), // SELECT 1 FOR UPDATE
-        $executeRaw: mockExecuteRaw,
-        booking: {
-          updateMany: jest.fn().mockResolvedValue({ count: 1 }),
-        },
-      };
-      return callback(tx);
-    });
-
-    const result = await updateBookingStatus("booking-wu-1", "CANCELLED");
-
-    expect(result.success).toBe(true);
-    // Must restore all 4 slots
-    expect(mockExecuteRaw).toHaveBeenCalledTimes(1);
-    const restoreCall = mockExecuteRaw.mock.calls[0];
-    const sqlParts = Array.from(restoreCall[0] as TemplateStringsArray).join(
-      "?"
+    (prisma.$transaction as jest.Mock).mockImplementation(async (callback) =>
+      callback(tx)
     );
-    expect(sqlParts).toContain("LEAST");
-    expect(restoreCall).toContain(4);
+
+    const result = await updateBookingStatus(
+      "booking-accepted-cancel",
+      "CANCELLED"
+    );
+
+    expect(result).toEqual({ success: true });
+    expect(applyInventoryDeltas).toHaveBeenCalledWith(tx, {
+      listingId: booking.listingId,
+      startDate: booking.startDate,
+      endDate: booking.endDate,
+      totalSlots: booking.listing.totalSlots,
+      acceptedDelta: -3,
+    });
   });
 
-  it("createHold with WHOLE_UNIT forces slotsRequested=4 and decrements by 4", async () => {
-    let capturedSlotsRequested: number | undefined;
-    const mockExecuteRaw = jest
-      .fn()
-      .mockImplementation(
-        (_strings: TemplateStringsArray, slotsValue: number) => {
-          capturedSlotsRequested = slotsValue;
-          return Promise.resolve(1);
-        }
-      );
-    const mockBookingCreate = jest
-      .fn()
-      .mockImplementation(({ data }: { data: { slotsRequested: number } }) => {
-        return Promise.resolve({
-          id: "booking-wu-hold-1",
-          status: "HELD",
-          slotsRequested: data.slotsRequested,
-        });
-      });
+  it("HELD -> ACCEPTED transfers held inventory without a second decrement", async () => {
+    (auth as jest.Mock).mockResolvedValue(ownerSession);
 
-    (prisma.$transaction as jest.Mock).mockImplementation(async (callback) => {
-      const tx = {
-        booking: {
-          findFirst: jest.fn().mockResolvedValue(null),
-          create: mockBookingCreate,
-        },
-        user: {
-          findUnique: jest
-            .fn()
-            .mockImplementation(({ where }: { where: { id: string } }) => {
-              if (where.id === "owner-999") return Promise.resolve(mockOwner);
-              if (where.id === "tenant-001") return Promise.resolve(mockTenant);
-              return Promise.resolve(null);
-            }),
-        },
-        $queryRaw: jest
-          .fn()
-          .mockResolvedValueOnce([{ count: BigInt(0) }]) // COUNT active holds
-          .mockResolvedValueOnce([wholeUnitListing]) // FOR UPDATE listing
-          .mockResolvedValueOnce([{ total: BigInt(0) }]), // SUM ACCEPTED + active HELD
-        $executeRaw: mockExecuteRaw,
-      };
-      return callback(tx);
+    const booking = makeBookingForStatus({
+      id: "booking-held-accept",
+      status: "HELD",
+      slotsRequested: 3,
+      heldUntil: new Date(Date.now() + 60 * 60 * 1000),
+      listingAvailableSlots: 2,
+    });
+    const tx = buildHeldAcceptTx();
+
+    (prisma.booking.findUnique as jest.Mock).mockResolvedValue(booking);
+    (prisma.$transaction as jest.Mock).mockImplementation(async (callback) =>
+      callback(tx)
+    );
+
+    const result = await updateBookingStatus("booking-held-accept", "ACCEPTED");
+
+    expect(result).toEqual({ success: true });
+    expect(getAvailability).not.toHaveBeenCalled();
+    expect(tx.$executeRaw).not.toHaveBeenCalled();
+    expect(applyInventoryDeltas).toHaveBeenCalledWith(tx, {
+      listingId: booking.listingId,
+      startDate: booking.startDate,
+      endDate: booking.endDate,
+      totalSlots: booking.listing.totalSlots,
+      heldDelta: -3,
+      acceptedDelta: 3,
+    });
+  });
+
+  it("HELD -> CANCELLED releases held inventory", async () => {
+    (auth as jest.Mock).mockResolvedValue(tenantSession);
+
+    const booking = makeBookingForStatus({
+      id: "booking-held-cancel",
+      status: "HELD",
+      slotsRequested: 3,
+      heldUntil: new Date(Date.now() + 60 * 60 * 1000),
+      listingAvailableSlots: 2,
+    });
+    const tx = buildRestoreTx();
+
+    (prisma.booking.findUnique as jest.Mock).mockResolvedValue(booking);
+    (prisma.$transaction as jest.Mock).mockImplementation(async (callback) =>
+      callback(tx)
+    );
+
+    const result = await updateBookingStatus(
+      "booking-held-cancel",
+      "CANCELLED"
+    );
+
+    expect(result).toEqual({ success: true });
+    expect(applyInventoryDeltas).toHaveBeenCalledWith(tx, {
+      listingId: booking.listingId,
+      startDate: booking.startDate,
+      endDate: booking.endDate,
+      totalSlots: booking.listing.totalSlots,
+      heldDelta: -3,
+    });
+  });
+
+  it("HELD -> REJECTED releases held inventory", async () => {
+    (auth as jest.Mock).mockResolvedValue(ownerSession);
+
+    const booking = makeBookingForStatus({
+      id: "booking-held-reject",
+      status: "HELD",
+      slotsRequested: 3,
+      heldUntil: new Date(Date.now() + 60 * 60 * 1000),
+      listingAvailableSlots: 2,
+    });
+    const tx = buildRestoreTx({
+      queryRow: [{ ownerId: OWNER_ID }],
     });
 
-    const result = await createHold(
-      "listing-wu",
+    (prisma.booking.findUnique as jest.Mock).mockResolvedValue(booking);
+    (prisma.$transaction as jest.Mock).mockImplementation(async (callback) =>
+      callback(tx)
+    );
+
+    const result = await updateBookingStatus("booking-held-reject", "REJECTED");
+
+    expect(result).toEqual({ success: true });
+    expect(applyInventoryDeltas).toHaveBeenCalledWith(tx, {
+      listingId: booking.listingId,
+      startDate: booking.startDate,
+      endDate: booking.endDate,
+      totalSlots: booking.listing.totalSlots,
+      heldDelta: -3,
+    });
+  });
+
+  it("maps inventory helper drift to INVENTORY_DELTA_CONFLICT instead of a generic error", async () => {
+    (auth as jest.Mock).mockResolvedValue(ownerSession);
+
+    const booking = makeBookingForStatus({
+      id: "booking-held-drift",
+      status: "HELD",
+      slotsRequested: 3,
+      heldUntil: new Date(Date.now() + 60 * 60 * 1000),
+    });
+    const tx = buildHeldAcceptTx();
+
+    (prisma.booking.findUnique as jest.Mock).mockResolvedValue(booking);
+    (applyInventoryDeltas as jest.Mock).mockRejectedValueOnce(
+      new Error("INVENTORY_DELTA_CONFLICT")
+    );
+    (prisma.$transaction as jest.Mock).mockImplementation(async (callback) =>
+      callback(tx)
+    );
+
+    const result = await updateBookingStatus("booking-held-drift", "ACCEPTED");
+
+    expect(result).toEqual({
+      success: false,
+      error:
+        "This booking could not be updated because availability changed. Please refresh and try again.",
+      code: "INVENTORY_DELTA_CONFLICT",
+    });
+  });
+
+  it("expired HELD bookings trigger inline expiry cleanup and return the hold-expired error", async () => {
+    (auth as jest.Mock).mockResolvedValue(ownerSession);
+
+    const booking = makeBookingForStatus({
+      id: "booking-held-expired",
+      status: "HELD",
+      slotsRequested: 3,
+      heldUntil: new Date(Date.now() - 5 * 60 * 1000),
+    });
+    const tx = {
+      $queryRaw: jest.fn().mockResolvedValue([{ id: LISTING_ID }]),
+      $executeRaw: jest.fn().mockResolvedValue(1),
+      booking: {
+        updateMany: jest.fn().mockResolvedValue({ count: 1 }),
+      },
+    };
+
+    (prisma.booking.findUnique as jest.Mock).mockResolvedValue(booking);
+    (expireOverlappingExpiredHolds as jest.Mock).mockResolvedValueOnce(1);
+    (prisma.$transaction as jest.Mock).mockImplementation(async (callback) =>
+      callback(tx)
+    );
+
+    const result = await updateBookingStatus("booking-held-expired", "ACCEPTED");
+
+    expect(result).toEqual({
+      success: false,
+      error: "This hold has expired.",
+    });
+    expect(expireOverlappingExpiredHolds).toHaveBeenCalledWith(tx, {
+      listingId: booking.listingId,
+      startDate: booking.startDate,
+      endDate: booking.endDate,
+    });
+  });
+});
+
+describe("WHOLE_UNIT coercion", () => {
+  it("createBooking coerces slotsRequested to totalSlots", async () => {
+    const tx = buildCreateBookingTx({
+      listing: wholeUnitListing,
+      createdBooking: {
+        id: "booking-wu-pending",
+        status: "PENDING",
+        slotsRequested: 4,
+      },
+    });
+
+    (getAvailability as jest.Mock).mockResolvedValueOnce(
+      makeAvailabilitySnapshot({
+        listingId: WHOLE_UNIT_LISTING_ID,
+        totalSlots: 4,
+        effectiveAvailableSlots: 4,
+      })
+    );
+    (prisma.$transaction as jest.Mock).mockImplementation(async (callback) =>
+      callback(tx)
+    );
+
+    const result = await createBooking(
+      WHOLE_UNIT_LISTING_ID,
       futureStart,
       futureEnd,
       2000,
       1
     );
 
-    expect(result.success).toBe(true);
-    expect(mockExecuteRaw).toHaveBeenCalledTimes(1);
-    // The decrement value must be 4 (totalSlots), not 1 (original request)
-    expect(capturedSlotsRequested).toBe(4);
+    expect(result).toEqual({
+      success: true,
+      bookingId: "booking-wu-pending",
+    });
+    expect(tx.booking.create).toHaveBeenCalledWith({
+      data: expect.objectContaining({
+        status: "PENDING",
+        slotsRequested: 4,
+      }),
+    });
+    expect(applyInventoryDeltas).not.toHaveBeenCalled();
+  });
+
+  it("createHold coerces slotsRequested to totalSlots and reserves all slots", async () => {
+    const heldUntil = new Date(Date.now() + 60 * 60 * 1000);
+    const tx = buildCreateHoldTx({
+      listing: wholeUnitListing,
+      createdHold: {
+        id: "hold-wu",
+        status: "HELD",
+        slotsRequested: 4,
+        heldUntil,
+      },
+    });
+
+    (getAvailability as jest.Mock).mockResolvedValueOnce(
+      makeAvailabilitySnapshot({
+        listingId: WHOLE_UNIT_LISTING_ID,
+        totalSlots: 4,
+        effectiveAvailableSlots: 4,
+      })
+    );
+    (prisma.$transaction as jest.Mock).mockImplementation(async (callback) =>
+      callback(tx)
+    );
+
+    const result = await createHold(
+      WHOLE_UNIT_LISTING_ID,
+      futureStart,
+      futureEnd,
+      2000,
+      1
+    );
+
+    expect(result).toEqual(
+      expect.objectContaining({
+        success: true,
+        bookingId: "hold-wu",
+      })
+    );
+    expect(tx.booking.create).toHaveBeenCalledWith({
+      data: expect.objectContaining({
+        status: "HELD",
+        slotsRequested: 4,
+      }),
+    });
+    expect(applyInventoryDeltas).toHaveBeenCalledWith(tx, {
+      listingId: WHOLE_UNIT_LISTING_ID,
+      startDate: futureStart,
+      endDate: futureEnd,
+      totalSlots: wholeUnitListing.totalSlots,
+      heldDelta: 4,
+    });
+  });
+
+  it("PENDING -> ACCEPTED uses totalSlots for WHOLE_UNIT even if the booking record is stale", async () => {
+    (auth as jest.Mock).mockResolvedValue(ownerSession);
+
+    const booking = makeBookingForStatus({
+      id: "booking-wu-accept",
+      listingId: WHOLE_UNIT_LISTING_ID,
+      status: "PENDING",
+      slotsRequested: 1,
+      listingTitle: "Whole Unit Listing",
+      listingAvailableSlots: 4,
+      listingTotalSlots: 4,
+    });
+    const tx = buildPendingAcceptTx({
+      listingRow: {
+        availableSlots: 4,
+        totalSlots: 4,
+        id: WHOLE_UNIT_LISTING_ID,
+        ownerId: OWNER_ID,
+        bookingMode: "WHOLE_UNIT",
+        status: "ACTIVE",
+      },
+    });
+
+    (prisma.booking.findUnique as jest.Mock).mockResolvedValue(booking);
+    (getAvailability as jest.Mock).mockResolvedValueOnce(
+      makeAvailabilitySnapshot({
+        listingId: WHOLE_UNIT_LISTING_ID,
+        totalSlots: 4,
+        effectiveAvailableSlots: 4,
+      })
+    );
+    (prisma.$transaction as jest.Mock).mockImplementation(async (callback) =>
+      callback(tx)
+    );
+
+    const result = await updateBookingStatus("booking-wu-accept", "ACCEPTED");
+
+    expect(result).toEqual({ success: true });
+    expect(applyInventoryDeltas).toHaveBeenCalledWith(tx, {
+      listingId: WHOLE_UNIT_LISTING_ID,
+      startDate: booking.startDate,
+      endDate: booking.endDate,
+      totalSlots: 4,
+      acceptedDelta: 4,
+    });
   });
 });
 
-// ---------------------------------------------------------------------------
-// 4. Mixed concurrent bookings: PENDING + HELD coexistence
-// ---------------------------------------------------------------------------
-describe("Mixed concurrent bookings: PENDING + HELD coexistence", () => {
-  const mixedListing = {
-    id: "listing-mix",
-    title: "Mixed Listing",
-    ownerId: "owner-999",
-    totalSlots: 5,
-    availableSlots: 5,
-    status: "ACTIVE",
-    price: 1000,
-    bookingMode: "SHARED",
-    holdTtlMinutes: 60,
-  };
-
-  const mockOwner = {
-    id: "owner-999",
-    name: "Owner Name",
-    email: "owner@example.com",
-  };
-  const mockTenant = { id: "tenant-001", name: "Tenant Name" };
-
-  beforeEach(() => {
-    jest.clearAllMocks();
-    (createInternalNotification as jest.Mock).mockResolvedValue({
-      success: true,
-    });
-    (sendNotificationEmailWithPreference as jest.Mock).mockResolvedValue({
-      success: true,
-    });
-  });
-
-  it("createBooking only counts ACCEPTED (not HELD) in capacity check: 0 ACCEPTED + 4 requested <= 5 total → succeeds", async () => {
-    // This test verifies that createBooking's capacity check only uses ACCEPTED overlapping
-    // slots (not HELD), which is by design — PENDING bookings don't consume slots.
-    // Even though 2 slots are actively HELD on overlapping dates, createBooking ignores them
-    // and allows a 4-slot PENDING request (0 ACCEPTED + 4 <= 5 totalSlots).
-    (auth as jest.Mock).mockResolvedValue({
-      user: { id: "tenant-002", email: "tenant2@example.com" },
-    });
-    (prisma.user.findUnique as jest.Mock).mockResolvedValue({
-      id: "tenant-002",
-      isSuspended: false,
-      emailVerified: new Date(),
-    });
-
-    const mockTenantTwo = { id: "tenant-002", name: "Tenant Two" };
-
-    (prisma.$transaction as jest.Mock).mockImplementation(async (callback) => {
-      const tx = {
-        booking: {
-          findFirst: jest.fn().mockResolvedValue(null),
-          create: jest.fn().mockResolvedValue({
-            id: "booking-pending-x",
-            status: "PENDING",
-            slotsRequested: 4,
-          }),
-        },
-        user: {
-          findUnique: jest
-            .fn()
-            .mockImplementation(({ where }: { where: { id: string } }) => {
-              if (where.id === "owner-999") return Promise.resolve(mockOwner);
-              return Promise.resolve(mockTenantTwo);
-            }),
-        },
-        // createBooking queries: 1) listing FOR UPDATE, 2) SUM ACCEPTED overlapping
-        $queryRaw: jest
-          .fn()
-          .mockResolvedValueOnce([{ ...mixedListing, availableSlots: 3 }]) // FOR UPDATE (2 slots held elsewhere)
-          .mockResolvedValueOnce([{ total: BigInt(0) }]), // SUM ACCEPTED only = 0
-        $executeRaw: jest.fn(),
-      };
-      return callback(tx);
-    });
-
-    // totalSlots=5, SUM(ACCEPTED overlapping)=0, slotsRequested=4 → 0+4=4 <= 5 → succeeds
-    const result = await createBooking(
-      "listing-mix",
-      futureStart,
-      futureEnd,
-      1000,
-      4
-    );
-
-    expect(result.success).toBe(true);
-  });
-
-  it("createHold counts ACCEPTED + active HELD in capacity check", async () => {
-    (auth as jest.Mock).mockResolvedValue(tenantSession);
-    (prisma.user.findUnique as jest.Mock).mockResolvedValue({
-      id: "tenant-001",
-      isSuspended: false,
-      emailVerified: new Date(),
-    });
-
-    // 2 ACCEPTED + 2 active HELD = 4 used; requesting 2 more would exceed capacity of 5
-    (prisma.$transaction as jest.Mock).mockImplementation(async (callback) => {
-      const tx = {
-        booking: {
-          findFirst: jest.fn().mockResolvedValue(null),
-          create: jest.fn(),
-        },
-        user: {
-          findUnique: jest
-            .fn()
-            .mockImplementation(({ where }: { where: { id: string } }) => {
-              if (where.id === "owner-999") return Promise.resolve(mockOwner);
-              if (where.id === "tenant-001") return Promise.resolve(mockTenant);
-              return Promise.resolve(null);
-            }),
-        },
-        $queryRaw: jest
-          .fn()
-          .mockResolvedValueOnce([{ count: BigInt(0) }]) // COUNT active holds for user
-          .mockResolvedValueOnce([{ ...mixedListing, availableSlots: 1 }]) // FOR UPDATE: 1 free
-          .mockResolvedValueOnce([{ total: BigInt(4) }]), // SUM ACCEPTED + active HELD = 4
-        $executeRaw: jest.fn(),
-      };
-      return callback(tx);
-    });
-
-    // totalSlots=5, usedSlots(ACCEPTED+HELD)=4, requesting 2 → 4+2=6 > 5 → should fail
-    const result = await createHold(
-      "listing-mix",
-      futureStart,
-      futureEnd,
-      1000,
-      2
-    );
-
-    expect(result.success).toBe(false);
-    expect(result.error).toContain("Not enough available slots");
-  });
-
-  it("active HELD is counted when accepting PENDING (capacity would be exceeded)", async () => {
+describe("Mixed HELD and PENDING behavior", () => {
+  it("active HELD inventory blocks accepting a PENDING booking when effective availability is too low", async () => {
     (auth as jest.Mock).mockResolvedValue(ownerSession);
-    (prisma.user.findUnique as jest.Mock).mockResolvedValue({
-      id: "owner-999",
-      isSuspended: false,
-      emailVerified: new Date(),
-    });
 
-    // PENDING booking wants 3 slots; meanwhile 3 active HELD slots exist on overlapping dates.
-    // totalSlots=5; SUM(ACCEPTED + active HELD excluding this booking) = 3;
-    // 3(HELD) + 3(this PENDING) = 6 > 5 → CAPACITY_EXCEEDED.
-    // availableSlots must be >= slotsRequested (3) so the pre-check doesn't fire first.
-    const pendingBooking = makeBookingForStatus({
-      id: "booking-pending-1",
+    const booking = makeBookingForStatus({
+      id: "booking-pending-blocked",
       status: "PENDING",
       slotsRequested: 3,
-      listingId: "listing-mix",
-      listingTotalSlots: 5,
-      listingAvailableSlots: 5, // enough to pass the availableSlots pre-check
     });
-    (prisma.booking.findUnique as jest.Mock).mockResolvedValue(pendingBooking);
+    const tx = buildPendingAcceptTx();
 
-    (prisma.$transaction as jest.Mock).mockImplementation(async (callback) => {
-      const tx = {
-        $queryRaw: jest
-          .fn()
-          .mockResolvedValueOnce([
-            // availableSlots=5 so the listing.availableSlots < slotsNeeded pre-check passes
-            {
-              availableSlots: 5,
-              totalSlots: 5,
-              id: "listing-mix",
-              ownerId: "owner-999",
-              bookingMode: "SHARED",
-              status: "ACTIVE",
-            },
-          ])
-          .mockResolvedValueOnce([{ total: BigInt(3) }]), // SUM: 3 slots from active HELD bookings
-        $executeRaw: jest.fn(),
-        booking: {
-          updateMany: jest.fn().mockResolvedValue({ count: 1 }),
-        },
-      };
-      return callback(tx);
-    });
-
-    const result = await updateBookingStatus("booking-pending-1", "ACCEPTED");
-
-    // usedSlots=3 (HELD) + slotsNeeded=3 (this PENDING) = 6 > totalSlots=5 → CAPACITY_EXCEEDED
-    expect(result.success).toBeUndefined();
-    expect(result.error).toBe(
-      "Cannot accept: all slots for these dates are already booked"
+    (prisma.booking.findUnique as jest.Mock).mockResolvedValue(booking);
+    (getAvailability as jest.Mock).mockResolvedValueOnce(
+      makeAvailabilitySnapshot({
+        effectiveAvailableSlots: 2,
+        heldSlots: 3,
+        acceptedSlots: 0,
+      })
     );
+    (prisma.$transaction as jest.Mock).mockImplementation(async (callback) =>
+      callback(tx)
+    );
+
+    const result = await updateBookingStatus(
+      "booking-pending-blocked",
+      "ACCEPTED"
+    );
+
+    expect(result).toEqual({
+      success: false,
+      error: "Cannot accept: all slots for these dates are already booked",
+    });
+    expect(applyInventoryDeltas).not.toHaveBeenCalled();
   });
 
-  it("expired HELD is excluded from capacity check when accepting PENDING", async () => {
+  it("HELD plus PENDING can be accepted when the remaining effective availability fits exactly", async () => {
     (auth as jest.Mock).mockResolvedValue(ownerSession);
-    (prisma.user.findUnique as jest.Mock).mockResolvedValue({
-      id: "owner-999",
-      isSuspended: false,
-      emailVerified: new Date(),
-    });
 
-    // PENDING booking wants 3 slots; the SUM query returns 0 (expired HELD excluded by heldUntil > NOW())
-    const pendingBooking = makeBookingForStatus({
-      id: "booking-pending-2",
-      status: "PENDING",
-      slotsRequested: 3,
-      listingId: "listing-mix",
-      listingTotalSlots: 5,
-      listingAvailableSlots: 5, // expired hold slots were returned
-    });
-    (prisma.booking.findUnique as jest.Mock).mockResolvedValue(pendingBooking);
-
-    const mockExecuteRaw = jest.fn().mockResolvedValue(1);
-
-    (prisma.$transaction as jest.Mock).mockImplementation(async (callback) => {
-      const tx = {
-        $queryRaw: jest
-          .fn()
-          .mockResolvedValueOnce([
-            {
-              availableSlots: 5,
-              totalSlots: 5,
-              id: "listing-mix",
-              ownerId: "owner-999",
-              bookingMode: "SHARED",
-              status: "ACTIVE",
-            },
-          ])
-          .mockResolvedValueOnce([{ total: BigInt(0) }]), // expired HELD not included in SUM
-        $executeRaw: mockExecuteRaw,
-        booking: {
-          updateMany: jest.fn().mockResolvedValue({ count: 1 }),
-        },
-      };
-      return callback(tx);
-    });
-
-    const result = await updateBookingStatus("booking-pending-2", "ACCEPTED");
-
-    // With 0 used (expired HELD excluded) + 3 requested = 3 <= 5 → ACCEPTED
-    expect(result.success).toBe(true);
-    expect(mockExecuteRaw).toHaveBeenCalledTimes(1);
-  });
-
-  it("HELD (3 slots) + PENDING (2 slots): accepting PENDING with exact remaining capacity succeeds", async () => {
-    (auth as jest.Mock).mockResolvedValue(ownerSession);
-    (prisma.user.findUnique as jest.Mock).mockResolvedValue({
-      id: "owner-999",
-      isSuspended: false,
-      emailVerified: new Date(),
-    });
-
-    // totalSlots=5, active HELD=3, PENDING requests 2 → 3+2=5 = totalSlots → exactly fits
-    const pendingBooking = makeBookingForStatus({
-      id: "booking-pending-3",
+    const booking = makeBookingForStatus({
+      id: "booking-pending-exact-fit",
       status: "PENDING",
       slotsRequested: 2,
-      listingId: "listing-mix",
-      listingTotalSlots: 5,
-      listingAvailableSlots: 2, // 3 held, 2 available
+      listingAvailableSlots: 2,
     });
-    (prisma.booking.findUnique as jest.Mock).mockResolvedValue(pendingBooking);
-
-    const mockExecuteRaw = jest.fn().mockResolvedValue(1);
-
-    (prisma.$transaction as jest.Mock).mockImplementation(async (callback) => {
-      const tx = {
-        $queryRaw: jest
-          .fn()
-          .mockResolvedValueOnce([
-            {
-              availableSlots: 2,
-              totalSlots: 5,
-              id: "listing-mix",
-              ownerId: "owner-999",
-              bookingMode: "SHARED",
-              status: "ACTIVE",
-            },
-          ])
-          .mockResolvedValueOnce([{ total: BigInt(3) }]), // 3 slots from active HELD
-        $executeRaw: mockExecuteRaw,
-        booking: {
-          updateMany: jest.fn().mockResolvedValue({ count: 1 }),
-        },
-      };
-      return callback(tx);
+    const tx = buildPendingAcceptTx({
+      listingRow: {
+        availableSlots: 2,
+        totalSlots: 5,
+        id: LISTING_ID,
+        ownerId: OWNER_ID,
+        bookingMode: "SHARED",
+        status: "ACTIVE",
+      },
     });
 
-    const result = await updateBookingStatus("booking-pending-3", "ACCEPTED");
+    (prisma.booking.findUnique as jest.Mock).mockResolvedValue(booking);
+    (getAvailability as jest.Mock).mockResolvedValueOnce(
+      makeAvailabilitySnapshot({
+        effectiveAvailableSlots: 2,
+        heldSlots: 3,
+        acceptedSlots: 0,
+      })
+    );
+    (prisma.$transaction as jest.Mock).mockImplementation(async (callback) =>
+      callback(tx)
+    );
 
-    // 3 (HELD) + 2 (PENDING being accepted) = 5 = totalSlots → exactly fits → success
-    expect(result.success).toBe(true);
-    expect(mockExecuteRaw).toHaveBeenCalledTimes(1);
-    const decrementCall = mockExecuteRaw.mock.calls[0];
-    // Decrement value should be 2 (slotsRequested for this PENDING)
-    expect(decrementCall).toContain(2);
+    const result = await updateBookingStatus(
+      "booking-pending-exact-fit",
+      "ACCEPTED"
+    );
+
+    expect(result).toEqual({ success: true });
+    expect(applyInventoryDeltas).toHaveBeenCalledWith(tx, {
+      listingId: booking.listingId,
+      startDate: booking.startDate,
+      endDate: booking.endDate,
+      totalSlots: 5,
+      acceptedDelta: 2,
+    });
+  });
+
+  it("expired HELD bookings are swept or excluded before a new PENDING booking is created", async () => {
+    (auth as jest.Mock).mockResolvedValue(secondTenantSession);
+
+    const tx = buildCreateBookingTx({
+      createdBooking: {
+        id: "booking-after-expired-hold",
+        status: "PENDING",
+        slotsRequested: 3,
+      },
+      tenantRecord: mockTenantTwo,
+    });
+
+    (expireOverlappingExpiredHolds as jest.Mock).mockResolvedValueOnce(1);
+    (getAvailability as jest.Mock).mockResolvedValueOnce(
+      makeAvailabilitySnapshot({
+        effectiveAvailableSlots: 5,
+        heldSlots: 0,
+        acceptedSlots: 0,
+      })
+    );
+    (prisma.$transaction as jest.Mock).mockImplementation(async (callback) =>
+      callback(tx)
+    );
+
+    const result = await createBooking(
+      LISTING_ID,
+      futureStart,
+      futureEnd,
+      1000,
+      3
+    );
+
+    expect(result).toEqual({
+      success: true,
+      bookingId: "booking-after-expired-hold",
+    });
+    expect(expireOverlappingExpiredHolds).toHaveBeenCalledWith(tx, {
+      listingId: LISTING_ID,
+      startDate: futureStart,
+      endDate: futureEnd,
+    });
+    expect(getAvailability).toHaveBeenCalledWith(
+      LISTING_ID,
+      expect.objectContaining({
+        startDate: futureStart,
+        endDate: futureEnd,
+        now: expect.any(Date),
+        tx,
+      })
+    );
   });
 });

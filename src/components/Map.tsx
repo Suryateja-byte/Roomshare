@@ -84,6 +84,7 @@ import {
   buildCanonicalSearchUrl,
   normalizeSearchQuery,
 } from "@/lib/search/search-query";
+import { buildListingDetailHref } from "@/lib/search/listing-detail-link";
 import { cn } from "@/lib/utils";
 import { useMediaQuery } from "@/hooks/useMediaQuery";
 import {
@@ -1160,6 +1161,9 @@ export default function MapComponent({
   // --- Controlled vs Uncontrolled View State ---
   // When viewState prop is provided, map runs in controlled mode
   const isControlledViewState = controlledViewState !== undefined;
+  const router = useRouter();
+  const searchParams = useSearchParams();
+  const searchParamsString = searchParams.toString();
 
   // --- Controlled vs Uncontrolled Selection ---
   // When selectedListingId prop is provided, selection is controlled by parent
@@ -1184,6 +1188,20 @@ export default function MapComponent({
     listings,
     internalSelectedListing,
   ]);
+  const listingDetailDateParams = useMemo(() => {
+    const params = new URLSearchParams(searchParamsString);
+
+    return {
+      startDate: params.get("startDate"),
+      moveInDate: params.get("moveInDate"),
+      endDate: params.get("endDate"),
+    };
+  }, [searchParamsString]);
+  const selectedListingHref = useMemo(() => {
+    if (!selectedListing) return null;
+
+    return buildListingDetailHref(selectedListing.id, listingDetailDateParams);
+  }, [listingDetailDateParams, selectedListing]);
 
   // Unified setter for selected listing that respects controlled/uncontrolled mode
   const setSelectedListing = useCallback(
@@ -1228,8 +1246,6 @@ export default function MapComponent({
   const markerRefs = useRef<globalThis.Map<string, HTMLDivElement>>(
     new globalThis.Map()
   );
-  const router = useRouter();
-  const searchParams = useSearchParams();
   const {
     mobileResultsView,
     setMobileMapOverlayActive,
@@ -1242,7 +1258,6 @@ export default function MapComponent({
     toggleCategory: togglePOICategory,
   } = usePOILayerState();
   const appliedPOICategories = activePOICategories;
-
   const {
     hasUserMoved,
     setHasUserMoved,
@@ -4160,6 +4175,7 @@ export default function MapComponent({
             <DesktopListingPreviewCard
               key={selectedListing.id}
               listing={selectedListing}
+              href={selectedListingHref ?? `/listings/${selectedListing.id}`}
               isDarkMode={isDarkMode}
               onClose={() => handleSelectedListingClose(true)}
               cardRef={selectedPopupCardRef}
@@ -4220,7 +4236,7 @@ export default function MapComponent({
                 </button>
 
                 <Link
-                  href={`/listings/${selectedListing.id}`}
+                  href={selectedListingHref ?? `/listings/${selectedListing.id}`}
                   className="flex items-stretch gap-3 p-3 pr-12"
                 >
                   <div className="relative h-24 w-24 shrink-0 overflow-hidden rounded-2xl bg-surface-container-high">

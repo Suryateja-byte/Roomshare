@@ -22,6 +22,10 @@ export function pendingToFilterParams(
     roomType: pending.roomType || undefined,
     leaseDuration: pending.leaseDuration || undefined,
     moveInDate: pending.moveInDate || undefined,
+    endDate:
+      pending.moveInDate && pending.endDate && pending.endDate > pending.moveInDate
+        ? pending.endDate
+        : undefined,
     amenities: pending.amenities.length > 0 ? pending.amenities : undefined,
     houseRules: pending.houseRules.length > 0 ? pending.houseRules : undefined,
     languages: pending.languages.length > 0 ? pending.languages : undefined,

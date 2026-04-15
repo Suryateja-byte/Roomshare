@@ -385,6 +385,9 @@ test.describe("Multi-slot booking contract", () => {
     await expect(listingPage.getByTestId("availability-badge")).toContainText(
       /2.*available/i
     );
+    await expect(listingPage.getByTestId("slot-badge")).toContainText(
+      /2 of 4 open/i
+    );
 
     const snapshot = await seed.getAvailability(listing.id, RANGE_A);
     expect(snapshot.effectiveAvailableSlots).toBe(2);
@@ -410,6 +413,7 @@ test.describe("Multi-slot booking contract", () => {
     await expect(page.getByTestId("availability-badge")).toContainText(
       /3.*available/i
     );
+    await expect(page.getByTestId("slot-badge")).toContainText(/All 3 open/i);
 
     const outcome = await placeHold(page);
     expect(outcome).toBe("success");
@@ -421,6 +425,15 @@ test.describe("Multi-slot booking contract", () => {
       })
       .toBe(2);
 
+    const refreshedPage = await newAuthedPage(browser, tenantA.storageStatePath);
+    await gotoListing(refreshedPage, listing, RANGE_A);
+    await expect(refreshedPage.getByTestId("availability-badge")).toContainText(
+      /2.*available/i
+    );
+    await expect(refreshedPage.getByTestId("slot-badge")).toContainText(
+      /2 of 3 open/i
+    );
+
     expect(
       await seed.countBookings({
         listingId: listing.id,
@@ -430,6 +443,7 @@ test.describe("Multi-slot booking contract", () => {
     ).toBe(1);
 
     await closePage(page);
+    await closePage(refreshedPage);
   });
 
   test("hold expiry restores capacity exactly once", async ({

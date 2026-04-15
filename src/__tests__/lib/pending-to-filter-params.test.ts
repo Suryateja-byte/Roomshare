@@ -9,6 +9,7 @@ describe("pendingToFilterParams", () => {
       roomType: "",
       leaseDuration: "",
       moveInDate: "",
+      endDate: "",
       amenities: [],
       houseRules: [],
       languages: [],
@@ -24,6 +25,7 @@ describe("pendingToFilterParams", () => {
     expect(result.roomType).toBeUndefined();
     expect(result.leaseDuration).toBeUndefined();
     expect(result.moveInDate).toBeUndefined();
+    expect(result.endDate).toBeUndefined();
     expect(result.amenities).toBeUndefined();
     expect(result.houseRules).toBeUndefined();
   });
@@ -35,6 +37,7 @@ describe("pendingToFilterParams", () => {
       roomType: "Private Room",
       leaseDuration: "6 months",
       moveInDate: "2026-06-01",
+      endDate: "2026-07-01",
       amenities: ["Wifi", "AC"],
       houseRules: ["No Smoking"],
       languages: ["en"],
@@ -50,6 +53,7 @@ describe("pendingToFilterParams", () => {
     expect(result.roomType).toBe("Private Room");
     expect(result.leaseDuration).toBe("6 months");
     expect(result.moveInDate).toBe("2026-06-01");
+    expect(result.endDate).toBe("2026-07-01");
     expect(result.amenities).toEqual(["Wifi", "AC"]);
     expect(result.houseRules).toEqual(["No Smoking"]);
   });
@@ -61,6 +65,7 @@ describe("pendingToFilterParams", () => {
       roomType: "",
       leaseDuration: "",
       moveInDate: "",
+      endDate: "",
       amenities: [],
       houseRules: [],
       languages: [],
@@ -82,6 +87,7 @@ describe("pendingToFilterParams", () => {
       roomType: "",
       leaseDuration: "",
       moveInDate: "",
+      endDate: "",
       amenities: [],
       houseRules: [],
       languages: [],
@@ -93,5 +99,27 @@ describe("pendingToFilterParams", () => {
     const result = pendingToFilterParams(pending);
 
     expect(result.minPrice).toBeUndefined();
+  });
+
+  it("drops endDate when the range is incomplete or invalid", () => {
+    const pending: BatchedFilterValues = {
+      minPrice: "",
+      maxPrice: "",
+      roomType: "",
+      leaseDuration: "",
+      moveInDate: "2026-06-01",
+      endDate: "2026-05-01",
+      amenities: [],
+      houseRules: [],
+      languages: [],
+      genderPreference: "",
+      householdGender: "",
+      minSlots: "",
+    };
+
+    const result = pendingToFilterParams(pending);
+
+    expect(result.moveInDate).toBe("2026-06-01");
+    expect(result.endDate).toBeUndefined();
   });
 });

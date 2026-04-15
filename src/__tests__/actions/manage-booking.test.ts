@@ -85,6 +85,12 @@ jest.mock("@/lib/logger", () => ({
   },
 }));
 
+jest.mock("@/lib/availability", () => ({
+  getAvailability: jest.fn(),
+  expireOverlappingExpiredHolds: jest.fn().mockResolvedValue(0),
+  applyInventoryDeltas: jest.fn().mockResolvedValue(undefined),
+}));
+
 import {
   updateBookingStatus,
   getMyBookings,
@@ -98,6 +104,11 @@ import { checkSuspension } from "@/app/actions/suspension";
 import { validateTransition } from "@/lib/booking-state-machine";
 import { checkRateLimit } from "@/lib/rate-limit";
 import { logBookingAudit } from "@/lib/booking-audit";
+import {
+  applyInventoryDeltas,
+  expireOverlappingExpiredHolds,
+  getAvailability,
+} from "@/lib/availability";
 
 describe("manage-booking actions", () => {
   const mockSession = {
@@ -157,6 +168,17 @@ describe("manage-booking actions", () => {
 
   beforeEach(() => {
     jest.clearAllMocks();
+    (getAvailability as jest.Mock).mockResolvedValue({
+      listingId: "listing-123",
+      totalSlots: 3,
+      effectiveAvailableSlots: 3,
+      heldSlots: 0,
+      acceptedSlots: 0,
+      rangeVersion: 1,
+      asOf: new Date().toISOString(),
+    });
+    (expireOverlappingExpiredHolds as jest.Mock).mockResolvedValue(0);
+    (applyInventoryDeltas as jest.Mock).mockResolvedValue(undefined);
     (auth as jest.Mock).mockResolvedValue(mockSession);
     (createInternalNotification as jest.Mock).mockResolvedValue({
       success: true,
@@ -389,7 +411,8 @@ describe("manage-booking actions", () => {
         expect(mockTx.$executeRaw).toHaveBeenCalled();
       });
 
-      it("returns error when no slots available", async () => {
+      it("returns capacity error when availability lookup shows no slots", async () => {
+        (getAvailability as jest.Mock).mockResolvedValueOnce(null);
         (prisma.$transaction as jest.Mock).mockImplementation(
           async (callback) => {
             const tx = {
@@ -410,10 +433,21 @@ describe("manage-booking actions", () => {
 
         const result = await updateBookingStatus("booking-123", "ACCEPTED");
 
-        expect(result.error).toBe("No available slots for this listing");
+        expect(result.error).toBe(
+          "Cannot accept: all slots for these dates are already booked"
+        );
       });
 
       it("returns error when capacity exceeded", async () => {
+        (getAvailability as jest.Mock).mockResolvedValueOnce({
+          listingId: "listing-123",
+          totalSlots: 2,
+          effectiveAvailableSlots: 0,
+          heldSlots: 1,
+          acceptedSlots: 1,
+          rangeVersion: 2,
+          asOf: new Date().toISOString(),
+        });
         (prisma.$transaction as jest.Mock).mockImplementation(
           async (callback) => {
             const tx = {
@@ -578,6 +612,43 @@ describe("manage-booking actions", () => {
         const result = await updateBookingStatus("booking-123", "ACCEPTED");
 
         expect(result.error).toBe("No available slots for this listing");
+      });
+
+      it("returns INVENTORY_DELTA_CONFLICT when day-inventory update fails", async () => {
+        (applyInventoryDeltas as jest.Mock).mockRejectedValueOnce(
+          new Error("INVENTORY_DELTA_CONFLICT")
+        );
+        (prisma.$transaction as jest.Mock).mockImplementation(
+          async (callback) => {
+            const tx = {
+              $queryRaw: jest.fn().mockResolvedValueOnce([
+                {
+                  availableSlots: 2,
+                  totalSlots: 3,
+                  id: "listing-123",
+                  ownerId: "owner-123",
+                  bookingMode: "SHARED",
+                  status: "ACTIVE",
+                },
+              ]),
+              $executeRaw: jest.fn().mockResolvedValue(1),
+              booking: {
+                updateMany: jest.fn().mockResolvedValue({ count: 1 }),
+              },
+            };
+            return callback(tx);
+          }
+        );
+
+        const result = await updateBookingStatus("booking-123", "ACCEPTED");
+
+        expect(result).toEqual({
+          success: false,
+          error:
+            "This booking could not be updated because availability changed. Please refresh and try again.",
+          code: "INVENTORY_DELTA_CONFLICT",
+        });
+        expect(result.error).not.toBe("Failed to update booking status");
       });
     });
 

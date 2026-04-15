@@ -42,6 +42,7 @@ import {
 } from "@/lib/search/search-query";
 import { getScenarioHeaderValue } from "@/lib/search/testing/search-scenarios";
 import { emitSearchClientMetric } from "@/lib/search/search-telemetry-client";
+import { buildListingDetailHref } from "@/lib/search/listing-detail-link";
 
 /**
  * Maximum accumulated listings before showing a "continue" link.
@@ -429,6 +430,16 @@ export function SearchResultsClient({
     return params;
   }, [activeSearchParamsString]);
 
+  const listingDetailDateParams = useMemo(() => {
+    const params = new URLSearchParams(activeSearchParamsString);
+
+    return {
+      startDate: params.get("startDate"),
+      moveInDate: params.get("moveInDate"),
+      endDate: params.get("endDate"),
+    };
+  }, [activeSearchParamsString]);
+
   const handleLoadMore = useCallback(async () => {
     if (!nextCursor || isLoadingRef.current) return;
 
@@ -800,6 +811,10 @@ export function SearchResultsClient({
                     >
                       <ListingCard
                         listing={listing}
+                        href={buildListingDetailHref(
+                          listing.id,
+                          listingDetailDateParams
+                        )}
                         isSaved={savedIdsSet.has(listing.id)}
                         priority={index === 0}
                         showTotalPrice={effectiveShowTotalPrice}
@@ -828,6 +843,7 @@ export function SearchResultsClient({
                       pair={pair}
                       showTotalPrice={effectiveShowTotalPrice}
                       estimatedMonths={estimatedMonths}
+                      listingDetailDateParams={listingDetailDateParams}
                     />
                   </ListingCardErrorBoundary>
                 ))}

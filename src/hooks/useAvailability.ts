@@ -2,7 +2,7 @@
 
 import { useCallback, useEffect, useRef, useState } from "react";
 
-interface AvailabilitySnapshot {
+export interface AvailabilitySnapshot {
   listingId: string;
   totalSlots: number;
   effectiveAvailableSlots: number;
@@ -19,12 +19,15 @@ export function useAvailability(
   options: {
     enabled?: boolean;
     intervalMs?: number;
+    initialData?: AvailabilitySnapshot | null;
   } = {}
 ) {
   const enabled = options.enabled ?? true;
   const intervalMs = options.intervalMs ?? 30000;
 
-  const [data, setData] = useState<AvailabilitySnapshot | null>(null);
+  const [data, setData] = useState<AvailabilitySnapshot | null>(
+    options.initialData ?? null
+  );
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const abortRef = useRef<AbortController | null>(null);

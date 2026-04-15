@@ -42,6 +42,12 @@ jest.mock("@/lib/listing-language-guard", () => ({
   checkListingLanguageCompliance: jest.fn().mockReturnValue({ allowed: true }),
 }));
 
+jest.mock("@/lib/availability", () => ({
+  getAvailability: jest.fn(),
+  getFuturePeakReservedLoad: jest.fn().mockResolvedValue(0),
+  syncFutureInventoryTotalSlots: jest.fn().mockResolvedValue(undefined),
+}));
+
 jest.mock("@/app/actions/suspension", () => ({
   checkSuspension: jest.fn().mockResolvedValue({ suspended: false }),
   checkEmailVerified: jest.fn().mockResolvedValue({ verified: true }),
@@ -118,6 +124,51 @@ process.env.SUPABASE_SERVICE_ROLE_KEY = "test-key";
 import { PATCH, DELETE } from "@/app/api/listings/[id]/route";
 import { prisma } from "@/lib/prisma";
 import { auth } from "@/auth";
+import {
+  getAvailability,
+  getFuturePeakReservedLoad,
+  syncFutureInventoryTotalSlots,
+} from "@/lib/availability";
+
+function makeAvailabilitySnapshot(
+  overrides: Partial<{
+    listingId: string;
+    totalSlots: number;
+    effectiveAvailableSlots: number;
+    heldSlots: number;
+    acceptedSlots: number;
+    rangeVersion: number;
+    asOf: string;
+  }> = {}
+) {
+  return {
+    listingId: "listing-abc",
+    totalSlots: 2,
+    effectiveAvailableSlots: 2,
+    heldSlots: 0,
+    acceptedSlots: 0,
+    rangeVersion: 0,
+    asOf: new Date("2026-04-14T00:00:00.000Z").toISOString(),
+    ...overrides,
+  };
+}
+
+function makeLockedListing(
+  overrides: Partial<{
+    ownerId: string;
+    totalSlots: number;
+    availableSlots: number;
+    bookingMode: string;
+  }> = {}
+) {
+  return {
+    ownerId: "owner-123",
+    totalSlots: 2,
+    availableSlots: 2,
+    bookingMode: "SHARED",
+    ...overrides,
+  };
+}
 
 describe("Listings API IDOR Protection", () => {
   const ownerSession = {
@@ -166,6 +217,9 @@ describe("Listings API IDOR Protection", () => {
 
   beforeEach(() => {
     jest.clearAllMocks();
+    (getAvailability as jest.Mock).mockResolvedValue(makeAvailabilitySnapshot());
+    (getFuturePeakReservedLoad as jest.Mock).mockResolvedValue(0);
+    (syncFutureInventoryTotalSlots as jest.Mock).mockResolvedValue(undefined);
   });
 
   describe("PATCH /api/listings/[id]", () => {
@@ -236,6 +290,259 @@ describe("Listings API IDOR Protection", () => {
       const sqlStrings = queryRawMock.mock.calls[0][0].join("");
       expect(sqlStrings).toContain("FOR UPDATE");
       expect(updateMock).toHaveBeenCalled();
+    });
+
+    it("recomputes availableSlots from live availability when cached value is stale high", async () => {
+      (auth as jest.Mock).mockResolvedValue(ownerSession);
+      (prisma.listing.findUnique as jest.Mock).mockResolvedValue({
+        ...mockListing,
+        totalSlots: 5,
+        availableSlots: 5,
+      });
+      (getAvailability as jest.Mock).mockResolvedValue(
+        makeAvailabilitySnapshot({
+          totalSlots: 5,
+          effectiveAvailableSlots: 4,
+          acceptedSlots: 1,
+          heldSlots: 0,
+        })
+      );
+
+      const queryRawMock = jest
+        .fn()
+        .mockResolvedValue([makeLockedListing({ totalSlots: 5, availableSlots: 5 })]);
+      const updateMock = jest
+        .fn()
+        .mockResolvedValue({ ...mockListing, totalSlots: 7, availableSlots: 6 });
+
+      (prisma.$transaction as jest.Mock).mockImplementation(async (callback) => {
+        const tx = {
+          $queryRaw: queryRawMock,
+          listing: { update: updateMock },
+          location: { update: jest.fn() },
+          $executeRaw: jest.fn(),
+        };
+        return callback(tx);
+      });
+
+      const request = new Request("http://localhost/api/listings/listing-abc", {
+        method: "PATCH",
+        body: JSON.stringify({ ...validPatchPayload, totalSlots: "7" }),
+      });
+
+      const response = await PATCH(request, {
+        params: Promise.resolve({ id: "listing-abc" }),
+      });
+
+      expect(response.status).toBe(200);
+      expect(updateMock).toHaveBeenCalledWith(
+        expect.objectContaining({
+          where: { id: "listing-abc" },
+          data: expect.objectContaining({
+            totalSlots: 7,
+            availableSlots: 6,
+          }),
+        })
+      );
+      expect(syncFutureInventoryTotalSlots).toHaveBeenCalledTimes(1);
+      expect((syncFutureInventoryTotalSlots as jest.Mock).mock.calls[0][1]).toBe(
+        "listing-abc"
+      );
+      expect((syncFutureInventoryTotalSlots as jest.Mock).mock.calls[0][2]).toBe(
+        7
+      );
+    });
+
+    it("recomputes availableSlots from live availability when cached value is stale low", async () => {
+      (auth as jest.Mock).mockResolvedValue(ownerSession);
+      (prisma.listing.findUnique as jest.Mock).mockResolvedValue({
+        ...mockListing,
+        totalSlots: 5,
+        availableSlots: 1,
+      });
+      (getAvailability as jest.Mock).mockResolvedValue(
+        makeAvailabilitySnapshot({
+          totalSlots: 5,
+          effectiveAvailableSlots: 4,
+          acceptedSlots: 1,
+          heldSlots: 0,
+        })
+      );
+
+      const queryRawMock = jest
+        .fn()
+        .mockResolvedValue([makeLockedListing({ totalSlots: 5, availableSlots: 1 })]);
+      const updateMock = jest
+        .fn()
+        .mockResolvedValue({ ...mockListing, totalSlots: 7, availableSlots: 6 });
+
+      (prisma.$transaction as jest.Mock).mockImplementation(async (callback) => {
+        const tx = {
+          $queryRaw: queryRawMock,
+          listing: { update: updateMock },
+          location: { update: jest.fn() },
+          $executeRaw: jest.fn(),
+        };
+        return callback(tx);
+      });
+
+      const request = new Request("http://localhost/api/listings/listing-abc", {
+        method: "PATCH",
+        body: JSON.stringify({ ...validPatchPayload, totalSlots: "7" }),
+      });
+
+      const response = await PATCH(request, {
+        params: Promise.resolve({ id: "listing-abc" }),
+      });
+
+      expect(response.status).toBe(200);
+      expect(updateMock).toHaveBeenCalledWith(
+        expect.objectContaining({
+          data: expect.objectContaining({
+            totalSlots: 7,
+            availableSlots: 6,
+          }),
+        })
+      );
+    });
+
+    it("uses live reserved slots when reducing totalSlots and still syncs future inventory", async () => {
+      (auth as jest.Mock).mockResolvedValue(ownerSession);
+      (prisma.listing.findUnique as jest.Mock).mockResolvedValue({
+        ...mockListing,
+        totalSlots: 5,
+        availableSlots: 5,
+      });
+      (getFuturePeakReservedLoad as jest.Mock).mockResolvedValue(3);
+      (getAvailability as jest.Mock).mockResolvedValue(
+        makeAvailabilitySnapshot({
+          totalSlots: 5,
+          effectiveAvailableSlots: 2,
+          acceptedSlots: 2,
+          heldSlots: 1,
+        })
+      );
+
+      const queryRawMock = jest
+        .fn()
+        .mockResolvedValue([makeLockedListing({ totalSlots: 5, availableSlots: 5 })]);
+      const updateMock = jest
+        .fn()
+        .mockResolvedValue({ ...mockListing, totalSlots: 4, availableSlots: 1 });
+
+      (prisma.$transaction as jest.Mock).mockImplementation(async (callback) => {
+        const tx = {
+          $queryRaw: queryRawMock,
+          listing: { update: updateMock },
+          location: { update: jest.fn() },
+          $executeRaw: jest.fn(),
+        };
+        return callback(tx);
+      });
+
+      const request = new Request("http://localhost/api/listings/listing-abc", {
+        method: "PATCH",
+        body: JSON.stringify({ ...validPatchPayload, totalSlots: "4" }),
+      });
+
+      const response = await PATCH(request, {
+        params: Promise.resolve({ id: "listing-abc" }),
+      });
+
+      expect(response.status).toBe(200);
+      expect(getFuturePeakReservedLoad).toHaveBeenCalledTimes(1);
+      expect(updateMock).toHaveBeenCalledWith(
+        expect.objectContaining({
+          data: expect.objectContaining({
+            totalSlots: 4,
+            availableSlots: 1,
+          }),
+        })
+      );
+      expect(syncFutureInventoryTotalSlots).toHaveBeenCalledTimes(1);
+      expect((syncFutureInventoryTotalSlots as jest.Mock).mock.calls[0][1]).toBe(
+        "listing-abc"
+      );
+      expect((syncFutureInventoryTotalSlots as jest.Mock).mock.calls[0][2]).toBe(
+        4
+      );
+    });
+
+    it("keeps the existing reduction block and does not fall back to stale math", async () => {
+      (auth as jest.Mock).mockResolvedValue(ownerSession);
+      (prisma.listing.findUnique as jest.Mock).mockResolvedValue({
+        ...mockListing,
+        totalSlots: 5,
+        availableSlots: 5,
+      });
+      (getFuturePeakReservedLoad as jest.Mock).mockResolvedValue(4);
+
+      const queryRawMock = jest
+        .fn()
+        .mockResolvedValue([makeLockedListing({ totalSlots: 5, availableSlots: 5 })]);
+      const updateMock = jest.fn();
+
+      (prisma.$transaction as jest.Mock).mockImplementation(async (callback) => {
+        const tx = {
+          $queryRaw: queryRawMock,
+          listing: { update: updateMock },
+          location: { update: jest.fn() },
+          $executeRaw: jest.fn(),
+        };
+        return callback(tx);
+      });
+
+      const request = new Request("http://localhost/api/listings/listing-abc", {
+        method: "PATCH",
+        body: JSON.stringify({ ...validPatchPayload, totalSlots: "3" }),
+      });
+
+      const response = await PATCH(request, {
+        params: Promise.resolve({ id: "listing-abc" }),
+      });
+
+      expect(response.status).toBe(400);
+      const body = await response.json();
+      expect(body.error).toContain("Cannot reduce total slots");
+      expect(getAvailability).not.toHaveBeenCalled();
+      expect(updateMock).not.toHaveBeenCalled();
+      expect(syncFutureInventoryTotalSlots).not.toHaveBeenCalled();
+    });
+
+    it("returns 500 when live availability is unexpectedly missing for a locked listing", async () => {
+      (auth as jest.Mock).mockResolvedValue(ownerSession);
+      (prisma.listing.findUnique as jest.Mock).mockResolvedValue(mockListing);
+      (getAvailability as jest.Mock).mockResolvedValue(null);
+
+      const queryRawMock = jest
+        .fn()
+        .mockResolvedValue([makeLockedListing({ totalSlots: 5, availableSlots: 5 })]);
+      const updateMock = jest.fn();
+
+      (prisma.$transaction as jest.Mock).mockImplementation(async (callback) => {
+        const tx = {
+          $queryRaw: queryRawMock,
+          listing: { update: updateMock },
+          location: { update: jest.fn() },
+          $executeRaw: jest.fn(),
+        };
+        return callback(tx);
+      });
+
+      const request = new Request("http://localhost/api/listings/listing-abc", {
+        method: "PATCH",
+        body: JSON.stringify({ ...validPatchPayload, totalSlots: "7" }),
+      });
+
+      const response = await PATCH(request, {
+        params: Promise.resolve({ id: "listing-abc" }),
+      });
+
+      expect(response.status).toBe(500);
+      const body = await response.json();
+      expect(body.error).toBe("Internal server error");
+      expect(updateMock).not.toHaveBeenCalled();
+      expect(syncFutureInventoryTotalSlots).not.toHaveBeenCalled();
     });
 
     it("returns 404 when transaction lock recheck finds ownership changed", async () => {

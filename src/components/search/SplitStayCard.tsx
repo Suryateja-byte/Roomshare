@@ -9,12 +9,17 @@ import {
   useListingFocusActions,
 } from "@/contexts/ListingFocusContext";
 import type { SplitStayPair } from "@/lib/search/split-stay";
+import {
+  buildListingDetailHref,
+  type ListingDetailDateParamSource,
+} from "@/lib/search/listing-detail-link";
 import { cn } from "@/lib/utils";
 
 interface SplitStayCardProps {
   pair: SplitStayPair;
   showTotalPrice?: boolean;
   estimatedMonths?: number;
+  listingDetailDateParams?: ListingDetailDateParamSource;
 }
 
 /**
@@ -25,6 +30,7 @@ export function SplitStayCard({
   pair,
   showTotalPrice,
   estimatedMonths,
+  listingDetailDateParams,
 }: SplitStayCardProps) {
   const { first, second, combinedPrice, splitLabel } = pair;
 
@@ -54,12 +60,17 @@ export function SplitStayCard({
       <div className="grid grid-cols-2 divide-outline-variant/20">
         <SplitStayHalf
           listing={first}
+          href={buildListingDetailHref(first.id, listingDetailDateParams ?? {})}
           label="First stay"
           months={firstMonths}
           showTotalPrice={showTotalPrice}
         />
         <SplitStayHalf
           listing={second}
+          href={buildListingDetailHref(
+            second.id,
+            listingDetailDateParams ?? {}
+          )}
           label="Then"
           months={secondMonths}
           showTotalPrice={showTotalPrice}
@@ -100,11 +111,13 @@ export function SplitStayCard({
 
 function SplitStayHalf({
   listing,
+  href,
   label,
   months,
   showTotalPrice,
 }: {
   listing: SplitStayPair["first"];
+  href: string;
   label: string;
   months: number;
   showTotalPrice?: boolean;
@@ -138,7 +151,7 @@ function SplitStayHalf({
       onBlur={() => setHovered(null)}
     >
       <Link
-        href={`/listings/${listing.id}`}
+        href={href}
         className="block p-3 hover:bg-surface-canvas transition-colors"
       >
         <div className="flex items-center justify-between mb-1.5">

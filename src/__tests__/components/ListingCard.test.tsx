@@ -190,6 +190,20 @@ describe("ListingCard", () => {
       expect(link).toHaveAttribute("href", "/listings/listing-123");
     });
 
+    it("honors a custom listing detail href", () => {
+      render(
+        <ListingCard
+          listing={mockListing}
+          href="/listings/listing-123?startDate=2026-05-01&endDate=2026-06-01"
+        />
+      );
+
+      expect(screen.getByRole("link")).toHaveAttribute(
+        "href",
+        "/listings/listing-123?startDate=2026-05-01&endDate=2026-06-01"
+      );
+    });
+
     it("keeps the card article rounded on mobile", () => {
       render(<ListingCard listing={mockListing} />);
       const article = screen.getByTestId("listing-card");

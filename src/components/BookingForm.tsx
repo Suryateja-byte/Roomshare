@@ -10,7 +10,7 @@ import {
   createHold,
   BookingResult,
 } from "@/app/actions/booking";
-import { useRouter, useSearchParams } from "next/navigation";
+import { useRouter } from "next/navigation";
 import {
   Loader2,
   LogIn,
@@ -25,7 +25,7 @@ import {
 import Link from "next/link";
 import { toast } from "sonner";
 import { useNetworkStatus } from "@/hooks/useNetworkStatus";
-import { useAvailability } from "@/hooks/useAvailability";
+import { type AvailabilitySnapshot } from "@/hooks/useAvailability";
 import { parseLocalDate, parseISODateAsLocal } from "@/lib/utils";
 import { SlotSelector } from "@/components/SlotSelector";
 
@@ -58,6 +58,12 @@ interface BookingFormProps {
   availableSlots?: number;
   bookingMode?: string;
   holdTtlMinutes?: number;
+  startDate?: string;
+  endDate?: string;
+  onStartDateChange?: (date: string) => void;
+  onEndDateChange?: (date: string) => void;
+  availability?: AvailabilitySnapshot | null;
+  refreshAvailability?: () => Promise<void> | void;
 }
 
 const MIN_BOOKING_DAYS = 30; // Industry standard minimum stay
@@ -98,9 +104,47 @@ export default function BookingForm({
   availableSlots,
   bookingMode,
   holdTtlMinutes,
+  startDate: controlledStartDate,
+  endDate: controlledEndDate,
+  onStartDateChange,
+  onEndDateChange,
+  availability,
+  refreshAvailability,
 }: BookingFormProps) {
-  const [startDate, setStartDate] = useState("");
-  const [endDate, setEndDate] = useState("");
+  const [uncontrolledStartDate, setUncontrolledStartDate] = useState(
+    controlledStartDate ?? ""
+  );
+  const [uncontrolledEndDate, setUncontrolledEndDate] = useState(
+    controlledEndDate ?? ""
+  );
+  const hasControlledStartDate =
+    controlledStartDate !== undefined && onStartDateChange !== undefined;
+  const hasControlledEndDate =
+    controlledEndDate !== undefined && onEndDateChange !== undefined;
+  const startDate = hasControlledStartDate
+    ? controlledStartDate
+    : uncontrolledStartDate;
+  const endDate = hasControlledEndDate ? controlledEndDate : uncontrolledEndDate;
+  const updateStartDate = useCallback(
+    (date: string) => {
+      if (hasControlledStartDate) {
+        onStartDateChange?.(date);
+        return;
+      }
+      setUncontrolledStartDate(date);
+    },
+    [hasControlledStartDate, onStartDateChange]
+  );
+  const updateEndDate = useCallback(
+    (date: string) => {
+      if (hasControlledEndDate) {
+        onEndDateChange?.(date);
+        return;
+      }
+      setUncontrolledEndDate(date);
+    },
+    [hasControlledEndDate, onEndDateChange]
+  );
 
   // Slot selector state: only show for multi-slot PER_SLOT listings
   const blocksWholeRange =
@@ -120,16 +164,7 @@ export default function BookingForm({
   const [availabilityAdjustmentMessage, setAvailabilityAdjustmentMessage] =
     useState("");
   const router = useRouter();
-  const searchParams = useSearchParams();
   const { isOffline } = useNetworkStatus();
-  const { availability, refresh: refreshAvailability } = useAvailability(
-    listingId,
-    startDate || undefined,
-    endDate || undefined,
-    {
-      enabled: status === "ACTIVE",
-    }
-  );
   const effectiveAvailableSlots =
     availability?.effectiveAvailableSlots ?? availableSlots ?? totalSlots ?? 1;
 
@@ -139,7 +174,53 @@ export default function BookingForm({
   const DEBOUNCE_MS = 1000; // Minimum time between submissions
 
   // Generate idempotency key on mount to prevent duplicate submissions on refresh
-  const idempotencyKeyRef = useRef<string>("");
+  const bookingIdempotencyKeyRef = useRef<string>("");
+  const holdIdempotencyKeyRef = useRef<string>("");
+
+  const createClientIdempotencyKey = useCallback(
+    (prefix: "booking" | "hold") =>
+      `${prefix}_${listingId}_${Date.now()}_${Math.random().toString(36).substring(2, 9)}`,
+    [listingId]
+  );
+
+  const createHoldRequestSignature = useCallback(
+    (holdStartDate: string, holdEndDate: string, holdSlots: number) =>
+      JSON.stringify({
+        listingId,
+        startDate: holdStartDate,
+        endDate: holdEndDate,
+        price,
+        slotsRequested: holdSlots,
+      }),
+    [listingId, price]
+  );
+
+  const clearPendingHoldIdempotency = useCallback(() => {
+    sessionStorage.removeItem(`hold_pending_key_${listingId}`);
+    sessionStorage.removeItem(`hold_pending_signature_${listingId}`);
+    holdIdempotencyKeyRef.current = "";
+  }, [listingId]);
+
+  const ensureHoldIdempotencyKey = useCallback(
+    (holdRequestSignature: string) => {
+      const pendingKeyStorageKey = `hold_pending_key_${listingId}`;
+      const pendingSignatureStorageKey = `hold_pending_signature_${listingId}`;
+      const pendingKey = sessionStorage.getItem(pendingKeyStorageKey);
+      const pendingSignature = sessionStorage.getItem(pendingSignatureStorageKey);
+
+      if (pendingKey && pendingSignature === holdRequestSignature) {
+        holdIdempotencyKeyRef.current = pendingKey;
+        return pendingKey;
+      }
+
+      const newKey = createClientIdempotencyKey("hold");
+      holdIdempotencyKeyRef.current = newKey;
+      sessionStorage.setItem(pendingKeyStorageKey, newKey);
+      sessionStorage.setItem(pendingSignatureStorageKey, holdRequestSignature);
+      return newKey;
+    },
+    [createClientIdempotencyKey, listingId]
+  );
 
   // On mount, check for pending submission key (page was refreshed during submission)
   // or generate a new one if no pending submission
@@ -149,13 +230,13 @@ export default function BookingForm({
     );
     if (pendingKey) {
       // Recover the pending key - this will be used if user resubmits
-      idempotencyKeyRef.current = pendingKey;
+      bookingIdempotencyKeyRef.current = pendingKey;
       // Recovered pending idempotency key for retry
     } else {
       // Generate a new key for this session
-      idempotencyKeyRef.current = `booking_${listingId}_${Date.now()}_${Math.random().toString(36).substring(2, 9)}`;
+      bookingIdempotencyKeyRef.current = createClientIdempotencyKey("booking");
     }
-  }, [listingId]);
+  }, [createClientIdempotencyKey, listingId]);
 
   // Check for previous successful submission (browser back navigation)
   useEffect(() => {
@@ -168,21 +249,6 @@ export default function BookingForm({
       );
     }
   }, [listingId]);
-
-  useEffect(() => {
-    const queryStartDate = searchParams.get("startDate");
-    const queryEndDate = searchParams.get("endDate");
-
-    if (
-      queryStartDate &&
-      queryEndDate &&
-      /^\d{4}-\d{2}-\d{2}$/.test(queryStartDate) &&
-      /^\d{4}-\d{2}-\d{2}$/.test(queryEndDate)
-    ) {
-      setStartDate((currentValue) => currentValue || queryStartDate);
-      setEndDate((currentValue) => currentValue || queryEndDate);
-    }
-  }, [searchParams]);
 
   // Warn user when navigating away during active submission
   useEffect(() => {
@@ -393,8 +459,8 @@ export default function BookingForm({
 
       // Generate and store idempotency key BEFORE showing modal
       // This ensures the key survives page refresh during confirmation or submission
-      const newKey = `booking_${listingId}_${Date.now()}_${Math.random().toString(36).substring(2, 9)}`;
-      idempotencyKeyRef.current = newKey;
+      const newKey = createClientIdempotencyKey("booking");
+      bookingIdempotencyKeyRef.current = newKey;
       sessionStorage.setItem(`booking_pending_key_${listingId}`, newKey);
 
       // Show confirmation modal
@@ -410,6 +476,7 @@ export default function BookingForm({
       hasSubmittedSuccessfully,
       isOffline,
       dateConflict,
+      createClientIdempotencyKey,
       listingId,
     ]
   );
@@ -438,7 +505,7 @@ export default function BookingForm({
     try {
       // Check if this idempotency key was already processed
       const processedKey = sessionStorage.getItem(
-        `booking_key_${idempotencyKeyRef.current}`
+        `booking_key_${bookingIdempotencyKeyRef.current}`
       );
       if (processedKey) {
         setMessage(
@@ -455,13 +522,13 @@ export default function BookingForm({
         parseLocalDate(endDate),
         price,
         effectiveSlots,
-        idempotencyKeyRef.current
+        bookingIdempotencyKeyRef.current
       );
 
       if (result.success) {
         // Mark this idempotency key as processed
         sessionStorage.setItem(
-          `booking_key_${idempotencyKeyRef.current}`,
+          `booking_key_${bookingIdempotencyKeyRef.current}`,
           "processed"
         );
         // Clear the pending key since submission succeeded
@@ -473,8 +540,8 @@ export default function BookingForm({
         setHasSubmittedSuccessfully(true);
         // Mark as submitted to prevent browser back resubmission
         sessionStorage.setItem(`booking_submitted_${listingId}`, "true");
-        setStartDate("");
-        setEndDate("");
+        updateStartDate("");
+        updateEndDate("");
         setTimeout(() => {
           router.push("/bookings");
         }, 1500);
@@ -527,7 +594,15 @@ export default function BookingForm({
       }, 2000);
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps -- intentional dependency omission to prevent infinite loops
-  }, [startDate, endDate, listingId, price, router]);
+  }, [
+    startDate,
+    endDate,
+    listingId,
+    price,
+    router,
+    updateEndDate,
+    updateStartDate,
+  ]);
 
   const handleRetry = useCallback(() => {
     // Reset error state and allow immediate retry
@@ -799,7 +874,7 @@ export default function BookingForm({
                 id="booking-start-date"
                 value={startDate}
                 onChange={(date) => {
-                  setStartDate(date);
+                  updateStartDate(date);
                   setFieldErrors((prev) => ({ ...prev, startDate: "" }));
                   if (errorType === "validation") {
                     setMessage("");
@@ -835,7 +910,7 @@ export default function BookingForm({
                 id="booking-end-date"
                 value={endDate}
                 onChange={(date) => {
-                  setEndDate(date);
+                  updateEndDate(date);
                   setFieldErrors((prev) => ({ ...prev, endDate: "" }));
                   if (errorType === "validation") {
                     setMessage("");
@@ -967,6 +1042,23 @@ export default function BookingForm({
               }
               onClick={async () => {
                 if (!startDate || !endDate || !bookingInfo?.isValid) return;
+                const holdRequestSignature = createHoldRequestSignature(
+                  startDate,
+                  endDate,
+                  effectiveSlots
+                );
+                const holdIdempotencyKey =
+                  ensureHoldIdempotencyKey(holdRequestSignature);
+                const processedKey = sessionStorage.getItem(
+                  `hold_key_${holdIdempotencyKey}`
+                );
+                if (processedKey) {
+                  clearPendingHoldIdempotency();
+                  setMessage("This hold was already submitted. Redirecting...");
+                  setHasSubmittedSuccessfully(true);
+                  setTimeout(() => router.push("/bookings"), 1500);
+                  return;
+                }
                 setIsLoading(true);
                 setMessage("");
                 setErrorType(null);
@@ -976,15 +1068,21 @@ export default function BookingForm({
                     parseLocalDate(startDate),
                     parseLocalDate(endDate),
                     price,
-                    effectiveSlots
+                    effectiveSlots,
+                    holdIdempotencyKey
                   );
                   if (result.success) {
+                    sessionStorage.setItem(
+                      `hold_key_${holdIdempotencyKey}`,
+                      "processed"
+                    );
+                    clearPendingHoldIdempotency();
                     setMessage(
                       "Hold placed. Availability is reserved until the hold expires or the host accepts."
                     );
                     setErrorType(null);
                     setHasSubmittedSuccessfully(true);
-                    await refreshAvailability();
+                    await refreshAvailability?.();
                     setTimeout(() => router.push("/bookings"), 1500);
                   } else {
                     setErrorType(categorizeError(result));
@@ -1004,7 +1102,7 @@ export default function BookingForm({
 
           {/* Error/Success Messages */}
           {message &&
-            (message.includes("success")
+            (hasSubmittedSuccessfully
               ? renderSuccessMessage()
               : renderErrorBanner())}
 

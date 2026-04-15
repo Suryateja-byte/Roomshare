@@ -3,6 +3,13 @@ import { render, screen } from "@testing-library/react";
 import ListingPageClient from "@/app/listings/[id]/ListingPageClient";
 
 const mockUseSession = jest.fn();
+const mockUseAvailability = jest.fn();
+const mockBookingForm = jest.fn((_: Record<string, unknown>) => (
+  <div data-testid="booking-form" />
+));
+const mockSlotBadge = jest.fn((_: Record<string, unknown>) => (
+  <div data-testid="slot-badge" />
+));
 
 jest.mock("next/dynamic", () => ({
   __esModule: true,
@@ -42,7 +49,7 @@ jest.mock("@/components/ImageGallery", () => ({
 
 jest.mock("@/components/BookingForm", () => ({
   __esModule: true,
-  default: () => <div data-testid="booking-form" />,
+  default: (props: Record<string, unknown>) => mockBookingForm(props),
 }));
 
 jest.mock("@/components/ReviewForm", () => ({
@@ -101,7 +108,11 @@ jest.mock("@/components/listings/RoomPlaceholder", () => ({
 }));
 
 jest.mock("@/components/listings/SlotBadge", () => ({
-  SlotBadge: () => <div data-testid="slot-badge" />,
+  SlotBadge: (props: Record<string, unknown>) => mockSlotBadge(props),
+}));
+
+jest.mock("@/hooks/useAvailability", () => ({
+  useAvailability: (...args: unknown[]) => mockUseAvailability(...args),
 }));
 
 jest.mock("@/components/ui/badge", () => ({
@@ -159,6 +170,9 @@ function makeProps(
     coordinates: null,
     similarListings: [],
     viewToken: "view-token-1",
+    initialStartDate: undefined,
+    initialEndDate: undefined,
+    initialAvailability: null,
     ...overrides,
   };
 }
@@ -166,6 +180,12 @@ function makeProps(
 describe("ListingPageClient", () => {
   beforeEach(() => {
     jest.clearAllMocks();
+    mockUseAvailability.mockReturnValue({
+      availability: null,
+      isLoading: false,
+      error: null,
+      refresh: jest.fn(),
+    });
     mockUseSession.mockReturnValue({
       data: {
         user: {
@@ -212,5 +232,57 @@ describe("ListingPageClient", () => {
     expect(screen.getByTestId("share-listing")).toBeInTheDocument();
     expect(screen.getByTestId("save-listing")).toBeInTheDocument();
     expect(screen.getByTestId("report-listing")).toBeInTheDocument();
+  });
+
+  it("feeds SlotBadge and BookingForm from the same live availability snapshot", async () => {
+    const refreshAvailability = jest.fn();
+    const availability = {
+      listingId: "listing-1",
+      totalSlots: 2,
+      effectiveAvailableSlots: 1,
+      heldSlots: 1,
+      acceptedSlots: 0,
+      rangeVersion: 4,
+      asOf: "2026-04-14T18:00:00.000Z",
+    };
+
+    mockUseAvailability.mockReturnValue({
+      availability,
+      isLoading: false,
+      error: null,
+      refresh: refreshAvailability,
+    });
+
+    render(
+      <ListingPageClient
+        {...makeProps({
+          initialStartDate: "2026-05-01",
+          initialEndDate: "2026-06-01",
+          initialAvailability: availability,
+        })}
+      />
+    );
+
+    await screen.findByTestId("slot-badge");
+    await screen.findByTestId("booking-form");
+
+    const slotBadgeProps = mockSlotBadge.mock.calls[0]?.[0];
+    expect(slotBadgeProps).toEqual(
+      expect.objectContaining({
+        availableSlots: availability.effectiveAvailableSlots,
+        totalSlots: availability.totalSlots,
+      })
+    );
+
+    const bookingFormProps = mockBookingForm.mock.calls[0]?.[0];
+    expect(bookingFormProps).toEqual(
+      expect.objectContaining({
+        startDate: "2026-05-01",
+        endDate: "2026-06-01",
+        availableSlots: availability.effectiveAvailableSlots,
+        availability,
+        refreshAvailability,
+      })
+    );
   });
 });

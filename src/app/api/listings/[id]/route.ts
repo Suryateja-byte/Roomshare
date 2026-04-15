@@ -30,6 +30,7 @@ import { z } from "zod";
 import { features } from "@/lib/env";
 import { syncListingEmbedding } from "@/lib/embeddings/sync";
 import {
+  getAvailability,
   getFuturePeakReservedLoad,
   syncFutureInventoryTotalSlots,
 } from "@/lib/availability";
@@ -628,6 +629,14 @@ export async function PATCH(
           }
         }
 
+        const currentAvailability = await getAvailability(id, { tx });
+        if (!currentAvailability) {
+          throw new Error("LISTING_AVAILABILITY_NOT_FOUND");
+        }
+
+        const reservedSlotsToday =
+          currentAvailability.acceptedSlots + currentAvailability.heldSlots;
+
         const updatedListing = await tx.listing.update({
           where: { id },
           data: {
@@ -649,14 +658,7 @@ export async function PATCH(
             leaseDuration: leaseDuration || null,
             roomType: roomType || null,
             totalSlots,
-            availableSlots: Math.max(
-              0,
-              Math.min(
-                lockedListing.availableSlots +
-                  (totalSlots - lockedListing.totalSlots),
-                totalSlots
-              )
-            ),
+            availableSlots: Math.max(0, totalSlots - reservedSlotsToday),
             moveInDate: moveInDate ? new Date(moveInDate) : null,
             ...(Array.isArray(images) && { images }),
             ...(bookingMode !== undefined &&

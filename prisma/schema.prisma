@@ -199,7 +199,7 @@ model Booking {
   rejectionReason String? // Optional reason when host rejects booking
   slotsRequested  Int           @default(1) // Phase 2: Number of slots this booking reserves
   version         Int           @default(1) // P0-04: Optimistic locking for race-safe updates
-  heldUntil       DateTime?                 // Phase 4: Expiry time for HELD bookings (null for non-holds)
+  heldUntil       DateTime?                 // Phase 4: Expiry time for HELD bookings; DB CHECK requires non-null when status=HELD
   heldAt          DateTime?                 // Phase 1: Timestamp when hold was created
   createdAt       DateTime      @default(now())
   updatedAt       DateTime      @updatedAt

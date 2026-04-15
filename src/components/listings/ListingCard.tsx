@@ -167,6 +167,7 @@ const PLACEHOLDER_IMAGES = [
 
 interface ListingCardProps {
   listing: Listing;
+  href?: string;
   isSaved?: boolean;
   className?: string;
   mobileVariant?: "default" | "feed";
@@ -195,6 +196,7 @@ function arePropsEqual(
     String(pl.moveInDate) === String(nl.moveInDate) &&
     pl.location.city === nl.location.city &&
     pl.location.state === nl.location.state &&
+    prev.href === next.href &&
     prev.isSaved === next.isSaved &&
     prev.className === next.className &&
     prev.mobileVariant === next.mobileVariant &&
@@ -206,6 +208,7 @@ function arePropsEqual(
 
 function ListingCardInner({
   listing,
+  href,
   isSaved,
   className,
   mobileVariant = "default",
@@ -254,6 +257,7 @@ function ListingCardInner({
     listing.location.state
   );
   const imageAlt = `${displayTitle} in ${formattedLocation}`;
+  const listingHref = href ?? `/listings/${listing.id}`;
 
   const displayRoomType = formatRoomType(listing.roomType);
   const displayMoveIn = formatMoveInDate(listing.moveInDate);
@@ -333,7 +337,7 @@ function ListingCardInner({
       </div>
 
       <Link
-        href={`/listings/${listing.id}`}
+        href={listingHref}
         onClick={isDragging ? (e) => e.preventDefault() : undefined}
         className={cn(
           "block focus:outline-none focus-visible:ring-2 focus-visible:ring-primary/30 focus-visible:ring-offset-2 flex-1 flex flex-col",

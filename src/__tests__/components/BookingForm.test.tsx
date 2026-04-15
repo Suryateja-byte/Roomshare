@@ -89,6 +89,35 @@ describe("BookingForm", () => {
     status: "ACTIVE" as const,
     bookedDates: [],
   };
+  const getFutureDateString = (daysFromToday: number) => {
+    const date = new Date();
+    date.setDate(date.getDate() + daysFromToday);
+    return date.toISOString().split("T")[0];
+  };
+  const getValidDateRange = (startOffsetDays = 7, endOffsetDays = 45) => ({
+    startDate: getFutureDateString(startOffsetDays),
+    endDate: getFutureDateString(endOffsetDays),
+  });
+  const buildHoldRequestSignature = ({
+    listingId,
+    startDate,
+    endDate,
+    price,
+    slotsRequested,
+  }: {
+    listingId: string;
+    startDate: string;
+    endDate: string;
+    price: number;
+    slotsRequested: number;
+  }) =>
+    JSON.stringify({
+      listingId,
+      startDate,
+      endDate,
+      price,
+      slotsRequested,
+    });
 
   beforeEach(() => {
     jest.clearAllMocks();
@@ -216,7 +245,9 @@ describe("BookingForm", () => {
     it("shows disclaimer text", () => {
       render(<BookingForm {...defaultProps} />);
 
-      expect(screen.getByText("You won't be charged yet")).toBeInTheDocument();
+      expect(
+        screen.getByText(/You won't be charged yet\./i)
+      ).toBeInTheDocument();
     });
   });
 
@@ -259,6 +290,186 @@ describe("BookingForm", () => {
       render(<BookingForm {...defaultProps} />);
 
       expect(screen.getByText(/already submitted/i)).toBeInTheDocument();
+    });
+
+    it("reuses a recovered pending hold key when the stored signature matches", async () => {
+      const { startDate, endDate } = getValidDateRange();
+      const recoveredHoldKey = "hold_listing-123_recovered";
+      const recoveredHoldSignature = buildHoldRequestSignature({
+        listingId: defaultProps.listingId,
+        startDate,
+        endDate,
+        price: defaultProps.price,
+        slotsRequested: 1,
+      });
+      sessionStorage.setItem(
+        `hold_pending_key_${defaultProps.listingId}`,
+        recoveredHoldKey
+      );
+      sessionStorage.setItem(
+        `hold_pending_signature_${defaultProps.listingId}`,
+        recoveredHoldSignature
+      );
+      (createHold as jest.Mock).mockResolvedValue({
+        success: true,
+        bookingId: "hold-abc",
+        heldUntil: new Date(Date.now() + 15 * 60 * 1000).toISOString(),
+        holdTtlMinutes: 15,
+      });
+
+      render(<BookingForm {...defaultProps} holdEnabled={true} />);
+
+      const startInput = screen.getByTestId("date-picker-booking-start-date");
+      const endInput = screen.getByTestId("date-picker-booking-end-date");
+
+      await act(async () => {
+        fireEvent.change(startInput, {
+          target: { value: startDate },
+        });
+      });
+      await act(async () => {
+        fireEvent.change(endInput, {
+          target: { value: endDate },
+        });
+      });
+
+      await act(async () => {
+        fireEvent.click(screen.getByRole("button", { name: /place hold/i }));
+      });
+
+      await waitFor(() => {
+        expect(createHold).toHaveBeenCalledTimes(1);
+      });
+
+      expect((createHold as jest.Mock).mock.calls[0][5]).toBe(recoveredHoldKey);
+    });
+
+    it("reuses the same hold key for same-request retries after a failed attempt", async () => {
+      const { startDate, endDate } = getValidDateRange();
+      const pendingKeyStorage = `hold_pending_key_${defaultProps.listingId}`;
+      const pendingSignatureStorage = `hold_pending_signature_${defaultProps.listingId}`;
+      const expectedSignature = buildHoldRequestSignature({
+        listingId: defaultProps.listingId,
+        startDate,
+        endDate,
+        price: defaultProps.price,
+        slotsRequested: 1,
+      });
+
+      (createHold as jest.Mock)
+        .mockResolvedValueOnce({
+          success: false,
+          error: "Temporary hold failure",
+        })
+        .mockResolvedValueOnce({
+          success: true,
+          bookingId: "hold-abc",
+          heldUntil: new Date(Date.now() + 15 * 60 * 1000).toISOString(),
+          holdTtlMinutes: 15,
+        });
+
+      render(<BookingForm {...defaultProps} holdEnabled={true} />);
+
+      const startInput = screen.getByTestId("date-picker-booking-start-date");
+      const endInput = screen.getByTestId("date-picker-booking-end-date");
+
+      await act(async () => {
+        fireEvent.change(startInput, {
+          target: { value: startDate },
+        });
+      });
+      await act(async () => {
+        fireEvent.change(endInput, {
+          target: { value: endDate },
+        });
+      });
+
+      await act(async () => {
+        fireEvent.click(screen.getByRole("button", { name: /place hold/i }));
+      });
+
+      await waitFor(() => {
+        expect(createHold).toHaveBeenCalledTimes(1);
+      });
+
+      const firstAttemptKey = (createHold as jest.Mock).mock.calls[0][5];
+      expect(sessionStorage.getItem(pendingKeyStorage)).toBe(firstAttemptKey);
+      expect(sessionStorage.getItem(pendingSignatureStorage)).toBe(
+        expectedSignature
+      );
+      expect(
+        screen.getByText(/temporary hold failure/i)
+      ).toBeInTheDocument();
+
+      await act(async () => {
+        fireEvent.click(screen.getByRole("button", { name: /place hold/i }));
+      });
+
+      await waitFor(() => {
+        expect(createHold).toHaveBeenCalledTimes(2);
+      });
+
+      expect((createHold as jest.Mock).mock.calls[1][5]).toBe(firstAttemptKey);
+    });
+
+    it("rotates the hold key when a failed retry changes the request shape", async () => {
+      const requestA = getValidDateRange(7, 45);
+      const requestB = getValidDateRange(10, 50);
+      const staleHoldKey = "hold_listing-123_stale";
+      const pendingKeyStorage = `hold_pending_key_${defaultProps.listingId}`;
+      const pendingSignatureStorage = `hold_pending_signature_${defaultProps.listingId}`;
+      const requestASignature = buildHoldRequestSignature({
+        listingId: defaultProps.listingId,
+        startDate: requestA.startDate,
+        endDate: requestA.endDate,
+        price: defaultProps.price,
+        slotsRequested: 1,
+      });
+      const requestBSignature = buildHoldRequestSignature({
+        listingId: defaultProps.listingId,
+        startDate: requestB.startDate,
+        endDate: requestB.endDate,
+        price: defaultProps.price,
+        slotsRequested: 1,
+      });
+
+      sessionStorage.setItem(pendingKeyStorage, staleHoldKey);
+      sessionStorage.setItem(pendingSignatureStorage, requestASignature);
+      (createHold as jest.Mock).mockResolvedValue({
+        success: false,
+        error: "Temporary hold failure",
+      });
+
+      render(<BookingForm {...defaultProps} holdEnabled={true} />);
+
+      const startInput = screen.getByTestId("date-picker-booking-start-date");
+      const endInput = screen.getByTestId("date-picker-booking-end-date");
+
+      await act(async () => {
+        fireEvent.change(startInput, {
+          target: { value: requestB.startDate },
+        });
+      });
+      await act(async () => {
+        fireEvent.change(endInput, {
+          target: { value: requestB.endDate },
+        });
+      });
+
+      await act(async () => {
+        fireEvent.click(screen.getByRole("button", { name: /place hold/i }));
+      });
+
+      await waitFor(() => {
+        expect(createHold).toHaveBeenCalledTimes(1);
+      });
+
+      const rotatedKey = (createHold as jest.Mock).mock.calls[0][5];
+      expect(rotatedKey).not.toBe(staleHoldKey);
+      expect(sessionStorage.getItem(pendingKeyStorage)).toBe(rotatedKey);
+      expect(sessionStorage.getItem(pendingSignatureStorage)).toBe(
+        requestBSignature
+      );
     });
   });
 
@@ -322,16 +533,7 @@ describe("BookingForm", () => {
 
   describe("submission flow", () => {
     // Helper: compute future dates that satisfy the 30-day minimum
-    const futureStart = (() => {
-      const d = new Date();
-      d.setDate(d.getDate() + 7);
-      return d.toISOString().split("T")[0];
-    })();
-    const futureEnd = (() => {
-      const d = new Date();
-      d.setDate(d.getDate() + 45); // 38 days from start, well over 30-day minimum
-      return d.toISOString().split("T")[0];
-    })();
+    const { startDate: futureStart, endDate: futureEnd } = getValidDateRange();
 
     /** Set both date inputs and click "Request to Book" to open the confirm modal */
     async function fillDatesAndSubmit() {
@@ -382,13 +584,17 @@ describe("BookingForm", () => {
       expect(callArgs[1]).toBeInstanceOf(Date);
       expect(callArgs[2]).toBeInstanceOf(Date);
       expect(callArgs[3]).toBe(1500);
+      expect(callArgs[5]).toEqual(expect.stringMatching(/^booking_listing-123_/));
 
       // Success message should appear
       await waitFor(() => {
-        expect(
-          screen.getByText(/request sent successfully/i)
-        ).toBeInTheDocument();
+        expect(screen.getByTestId("booking-success")).toBeInTheDocument();
       });
+      expect(
+        screen.getByText(
+          /Request sent\. This does not reserve inventory until the host accepts\./i
+        )
+      ).toBeInTheDocument();
     });
 
     it("shows capacity error when not enough slots available", async () => {
@@ -542,12 +748,16 @@ describe("BookingForm", () => {
       expect(callArgs[1]).toBeInstanceOf(Date);
       expect(callArgs[2]).toBeInstanceOf(Date);
       expect(callArgs[3]).toBe(1500);
+      expect(callArgs[5]).toEqual(expect.stringMatching(/^hold_listing-123_/));
 
       await waitFor(() => {
-        expect(
-          screen.getByText(/hold placed successfully/i)
-        ).toBeInTheDocument();
+        expect(screen.getByTestId("booking-success")).toBeInTheDocument();
       });
+      expect(
+        screen.getByText(
+          /Hold placed\. Availability is reserved until the hold expires or the host accepts\./i
+        )
+      ).toBeInTheDocument();
     });
 
     it("debounce: double-click confirm does not double-submit", async () => {

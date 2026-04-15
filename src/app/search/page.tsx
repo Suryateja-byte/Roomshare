@@ -58,6 +58,7 @@ type SearchPageSearchParams = {
   maxPrice?: string;
   amenities?: string | string[];
   moveInDate?: string;
+  endDate?: string;
   leaseDuration?: string;
   houseRules?: string | string[];
   languages?: string | string[];

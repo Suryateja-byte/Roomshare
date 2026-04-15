@@ -24,6 +24,7 @@ type PreviewListing = {
 
 interface DesktopListingPreviewCardProps {
   listing: PreviewListing;
+  href: string;
   isDarkMode: boolean;
   onClose: () => void;
   cardRef?: Ref<HTMLDivElement>;
@@ -58,6 +59,7 @@ function formatLocationLine(location: PreviewListing["location"]): string | null
 
 export default function DesktopListingPreviewCard({
   listing,
+  href,
   isDarkMode,
   onClose,
   cardRef,
@@ -170,7 +172,7 @@ export default function DesktopListingPreviewCard({
           <span className="text-sm text-on-surface-variant">/month</span>
         </div>
 
-        <Link href={`/listings/${listing.id}`} className="block">
+        <Link href={href} className="block">
           <Button
             size="sm"
             data-testid="map-popup-view-details"

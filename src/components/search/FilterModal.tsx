@@ -33,6 +33,7 @@ interface FilterModalProps {
 
   // Filter values
   moveInDate: string;
+  endDate?: string;
   leaseDuration: string;
   roomType: string;
   amenities: string[];
@@ -47,6 +48,7 @@ interface FilterModalProps {
 
   // Handlers
   onMoveInDateChange: (value: string) => void;
+  onEndDateChange?: (value: string) => void;
   onLeaseDurationChange: (value: string) => void;
   onRoomTypeChange: (value: string) => void;
   onToggleAmenity: (amenity: string) => void;
@@ -62,6 +64,7 @@ interface FilterModalProps {
 
   // Config
   minMoveInDate: string;
+  minEndDate?: string;
   amenityOptions: readonly string[];
   houseRuleOptions: readonly string[];
 
@@ -105,6 +108,7 @@ export function FilterModal({
   hasActiveFilters,
   activeFilterCount,
   moveInDate,
+  endDate,
   leaseDuration,
   roomType,
   amenities,
@@ -115,6 +119,7 @@ export function FilterModal({
   minSlots,
   onMinSlotsChange,
   onMoveInDateChange,
+  onEndDateChange,
   onLeaseDurationChange,
   onRoomTypeChange,
   onToggleAmenity,
@@ -126,6 +131,7 @@ export function FilterModal({
   onLanguageSearchChange,
   filteredLanguages,
   minMoveInDate,
+  minEndDate,
   amenityOptions,
   houseRuleOptions,
   // Price range
@@ -149,6 +155,7 @@ export function FilterModal({
   useBodyScrollLock(isOpen);
   const isDesktop = useMediaQuery("(min-width: 768px)");
   const isMobile = isDesktop === false;
+  const showEndDateField = Boolean(onEndDateChange);
 
   // Close on Escape key
   useEffect(() => {
@@ -259,6 +266,24 @@ export function FilterModal({
                 minDate={minMoveInDate}
               />
             </div>
+
+            {showEndDateField && (
+              <div className="space-y-2">
+                <label
+                  htmlFor="filter-end-date"
+                  className="text-sm font-semibold text-on-surface"
+                >
+                  End Date
+                </label>
+                <DatePicker
+                  id="filter-end-date"
+                  value={endDate}
+                  onChange={onEndDateChange!}
+                  placeholder="Select end date"
+                  minDate={minEndDate ?? minMoveInDate}
+                />
+              </div>
+            )}
 
             {/* Lease Duration */}
             <div className="space-y-2">
