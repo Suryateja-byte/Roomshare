@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useRef, useState } from "react";
 import { toast } from "sonner";
 import { startConversation } from "@/app/actions/chat";
 import { useRouter } from "next/navigation";
@@ -12,9 +12,14 @@ export default function ContactHostButton({
   listingId: string;
 }) {
   const [isLoading, setIsLoading] = useState(false);
+  const isStartingRef = useRef(false);
   const router = useRouter();
 
   const handleContact = async () => {
+    // Guard synchronously so rapid double-clicks in the same render frame
+    // cannot enqueue multiple startConversation actions before disabled applies.
+    if (isStartingRef.current) return;
+    isStartingRef.current = true;
     setIsLoading(true);
     try {
       const result = await startConversation(listingId);
@@ -35,6 +40,7 @@ export default function ContactHostButton({
       console.error("Failed to start conversation:", error);
       toast.error("Failed to start conversation");
     } finally {
+      isStartingRef.current = false;
       setIsLoading(false);
     }
   };

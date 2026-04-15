@@ -109,6 +109,14 @@ describe("Multi-slot booking feature flag cross-validation", () => {
     expect(features.multiSlotBooking).toBe(true);
   });
 
+  it("exposes contact-first listing flag when enabled", async () => {
+    process.env.ENABLE_CONTACT_FIRST_LISTINGS = "true";
+
+    const { features } = await import("@/lib/env");
+
+    expect(features.contactFirstListings).toBe(true);
+  });
+
   it("disables keyset pagination when CURSOR_SECRET is invalid", async () => {
     process.env.CURSOR_SECRET = "short";
 

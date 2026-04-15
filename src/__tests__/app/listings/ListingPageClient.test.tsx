@@ -1,5 +1,5 @@
 import React from "react";
-import { render, screen } from "@testing-library/react";
+import { render, screen, waitFor } from "@testing-library/react";
 import ListingPageClient from "@/app/listings/[id]/ListingPageClient";
 
 const mockUseSession = jest.fn();
@@ -190,6 +190,7 @@ describe("ListingPageClient", () => {
       data: {
         user: {
           id: "viewer-1",
+          emailVerified: new Date("2026-04-01T12:00:00.000Z"),
         },
       },
       status: "authenticated",
@@ -202,8 +203,21 @@ describe("ListingPageClient", () => {
         get: () => "application/json",
       },
       json: async () => ({
+        isLoggedIn: true,
         hasBookingHistory: false,
         existingReview: null,
+        primaryCta: "CONTACT_HOST",
+        canContact: true,
+        availabilitySource: "LEGACY_BOOKING",
+        canBook: true,
+        canHold: false,
+        bookingDisabledReason: null,
+        reviewEligibility: {
+          canPublicReview: false,
+          hasLegacyAcceptedBooking: false,
+          canLeavePrivateFeedback: false,
+          reason: "ACCEPTED_BOOKING_REQUIRED",
+        },
       }),
     }) as typeof fetch;
   });
@@ -283,6 +297,96 @@ describe("ListingPageClient", () => {
         availability,
         refreshAvailability,
       })
+    );
+  });
+
+  it("renders contact-first sidebar instead of BookingForm when enabled", async () => {
+    const availability = {
+      listingId: "listing-1",
+      totalSlots: 2,
+      effectiveAvailableSlots: 1,
+      heldSlots: 0,
+      acceptedSlots: 1,
+      rangeVersion: 4,
+      asOf: "2026-04-14T18:00:00.000Z",
+    };
+
+    mockUseAvailability.mockReturnValue({
+      availability,
+      isLoading: false,
+      error: null,
+      refresh: jest.fn(),
+    });
+
+    render(
+      <ListingPageClient
+        {...makeProps({
+          contactFirstEnabled: true,
+          initialAvailability: availability,
+        })}
+      />
+    );
+
+    await screen.findByTestId("contact-host-sidebar");
+
+    expect(screen.queryByTestId("booking-form")).not.toBeInTheDocument();
+    expect(screen.getByTestId("availability-badge")).toHaveTextContent(
+      "1 slot available"
+    );
+    expect(
+      screen.getByText("Contact host to confirm availability")
+    ).toBeInTheDocument();
+    expect(
+      screen.getByText("No booking request or hold is created from this page.")
+    ).toBeInTheDocument();
+  });
+
+  it("switches to the viewer-state contact-first contract even when the prop fallback is false", async () => {
+    mockUseSession.mockReturnValue({
+      data: null,
+      status: "unauthenticated",
+    });
+
+    global.fetch = jest.fn().mockResolvedValue({
+      ok: true,
+      status: 200,
+      headers: {
+        get: () => "application/json",
+      },
+      json: async () => ({
+        isLoggedIn: false,
+        hasBookingHistory: false,
+        existingReview: null,
+        primaryCta: "LOGIN_TO_MESSAGE",
+        canContact: false,
+        availabilitySource: "HOST_MANAGED",
+        canBook: false,
+        canHold: false,
+        bookingDisabledReason: "CONTACT_ONLY",
+        reviewEligibility: {
+          canPublicReview: false,
+          hasLegacyAcceptedBooking: false,
+          canLeavePrivateFeedback: false,
+          reason: "LOGIN_REQUIRED",
+        },
+      }),
+    }) as typeof fetch;
+
+    render(<ListingPageClient {...makeProps({ isLoggedIn: false })} />);
+
+    await waitFor(() => {
+      expect(screen.queryByTestId("booking-form")).not.toBeInTheDocument();
+    });
+
+    expect(screen.getByTestId("contact-host-sidebar")).toBeInTheDocument();
+    const loginLinks = screen.getAllByRole("link", {
+      name: "Sign in to contact host",
+    });
+
+    expect(loginLinks).toHaveLength(2);
+    expect(loginLinks[0]).toHaveAttribute("href", "/login");
+    expect(screen.getByTestId("availability-badge")).toHaveTextContent(
+      "1 slot available"
     );
   });
 });

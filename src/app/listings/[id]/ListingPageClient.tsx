@@ -132,6 +132,212 @@ interface ListingPageClientProps {
   initialStartDate?: string;
   initialEndDate?: string;
   initialAvailability?: AvailabilitySnapshot | null;
+  contactFirstEnabled?: boolean;
+}
+
+type ReviewEligibilityReason =
+  | "LOGIN_REQUIRED"
+  | "ELIGIBLE"
+  | "ALREADY_REVIEWED"
+  | "ACCEPTED_BOOKING_REQUIRED";
+
+type PrimaryCta =
+  | "EDIT_LISTING"
+  | "CONTACT_HOST"
+  | "LOGIN_TO_MESSAGE"
+  | "VERIFY_EMAIL_TO_MESSAGE";
+
+type AvailabilitySource = "LEGACY_BOOKING" | "HOST_MANAGED";
+
+type BookingDisabledReason =
+  | "CONTACT_ONLY"
+  | "LOGIN_REQUIRED"
+  | "EMAIL_VERIFICATION_REQUIRED"
+  | "OWNER_VIEW"
+  | "LISTING_UNAVAILABLE"
+  | null;
+
+interface ReviewEligibility {
+  canPublicReview: boolean;
+  hasLegacyAcceptedBooking: boolean;
+  canLeavePrivateFeedback: boolean;
+  reason: ReviewEligibilityReason;
+}
+
+interface ViewerState {
+  isLoggedIn: boolean;
+  hasBookingHistory: boolean;
+  existingReview: ListingPageClientProps["userExistingReview"];
+  primaryCta: PrimaryCta;
+  canContact: boolean;
+  availabilitySource: AvailabilitySource;
+  canBook: boolean;
+  canHold: boolean;
+  bookingDisabledReason: BookingDisabledReason;
+  reviewEligibility: ReviewEligibility;
+  loaded: boolean;
+}
+
+function buildFallbackReviewEligibility(options: {
+  isLoggedIn: boolean;
+  hasBookingHistory: boolean;
+  hasExistingReview: boolean;
+}): ReviewEligibility {
+  let reason: ReviewEligibilityReason = "LOGIN_REQUIRED";
+
+  if (options.isLoggedIn) {
+    if (options.hasExistingReview) {
+      reason = "ALREADY_REVIEWED";
+    } else if (options.hasBookingHistory) {
+      reason = "ELIGIBLE";
+    } else {
+      reason = "ACCEPTED_BOOKING_REQUIRED";
+    }
+  }
+
+  return {
+    canPublicReview:
+      options.isLoggedIn &&
+      options.hasBookingHistory &&
+      !options.hasExistingReview,
+    hasLegacyAcceptedBooking: options.hasBookingHistory,
+    canLeavePrivateFeedback: false,
+    reason,
+  };
+}
+
+function buildFallbackViewerState(options: {
+  isLoggedIn: boolean;
+  isOwner: boolean;
+  isEmailVerified: boolean;
+  isListingActive: boolean;
+  hasBookingHistory: boolean;
+  existingReview: ListingPageClientProps["userExistingReview"];
+  contactFirstEnabled: boolean;
+  holdEnabled: boolean;
+}): ViewerState {
+  const primaryCta: PrimaryCta = options.isOwner
+    ? "EDIT_LISTING"
+    : !options.isLoggedIn
+      ? "LOGIN_TO_MESSAGE"
+      : !options.isEmailVerified
+        ? "VERIFY_EMAIL_TO_MESSAGE"
+        : "CONTACT_HOST";
+
+  const canContact =
+    !options.isOwner &&
+    options.isLoggedIn &&
+    options.isEmailVerified &&
+    options.isListingActive;
+
+  const canBook =
+    !options.contactFirstEnabled &&
+    !options.isOwner &&
+    options.isLoggedIn &&
+    options.isEmailVerified &&
+    options.isListingActive;
+
+  let bookingDisabledReason: BookingDisabledReason = null;
+  if (!canBook) {
+    if (options.contactFirstEnabled) {
+      bookingDisabledReason = "CONTACT_ONLY";
+    } else if (options.isOwner) {
+      bookingDisabledReason = "OWNER_VIEW";
+    } else if (!options.isListingActive) {
+      bookingDisabledReason = "LISTING_UNAVAILABLE";
+    } else if (!options.isLoggedIn) {
+      bookingDisabledReason = "LOGIN_REQUIRED";
+    } else if (!options.isEmailVerified) {
+      bookingDisabledReason = "EMAIL_VERIFICATION_REQUIRED";
+    }
+  }
+
+  return {
+    isLoggedIn: options.isLoggedIn,
+    hasBookingHistory: options.hasBookingHistory,
+    existingReview: options.existingReview,
+    primaryCta,
+    canContact,
+    availabilitySource: options.contactFirstEnabled
+      ? "HOST_MANAGED"
+      : "LEGACY_BOOKING",
+    canBook,
+    canHold: canBook && options.holdEnabled,
+    bookingDisabledReason,
+    reviewEligibility: buildFallbackReviewEligibility({
+      isLoggedIn: options.isLoggedIn,
+      hasBookingHistory: options.hasBookingHistory,
+      hasExistingReview: !!options.existingReview,
+    }),
+    loaded: true,
+  };
+}
+
+function mergeViewerState(
+  fallbackState: ViewerState,
+  data: Partial<Omit<ViewerState, "loaded">>
+): ViewerState {
+  const primaryCta: PrimaryCta =
+    data.primaryCta === "EDIT_LISTING" ||
+    data.primaryCta === "CONTACT_HOST" ||
+    data.primaryCta === "LOGIN_TO_MESSAGE" ||
+    data.primaryCta === "VERIFY_EMAIL_TO_MESSAGE"
+      ? data.primaryCta
+      : fallbackState.primaryCta;
+
+  const availabilitySource: AvailabilitySource =
+    data.availabilitySource === "HOST_MANAGED" ||
+    data.availabilitySource === "LEGACY_BOOKING"
+      ? data.availabilitySource
+      : fallbackState.availabilitySource;
+
+  const bookingDisabledReason: BookingDisabledReason =
+    data.bookingDisabledReason === "CONTACT_ONLY" ||
+    data.bookingDisabledReason === "LOGIN_REQUIRED" ||
+    data.bookingDisabledReason === "EMAIL_VERIFICATION_REQUIRED" ||
+    data.bookingDisabledReason === "OWNER_VIEW" ||
+    data.bookingDisabledReason === "LISTING_UNAVAILABLE" ||
+    data.bookingDisabledReason === null
+      ? data.bookingDisabledReason
+      : fallbackState.bookingDisabledReason;
+
+  const reviewEligibility =
+    data.reviewEligibility &&
+    typeof data.reviewEligibility === "object" &&
+    typeof data.reviewEligibility.canPublicReview === "boolean" &&
+    typeof data.reviewEligibility.hasLegacyAcceptedBooking === "boolean" &&
+    typeof data.reviewEligibility.canLeavePrivateFeedback === "boolean"
+      ? (data.reviewEligibility as ReviewEligibility)
+      : fallbackState.reviewEligibility;
+
+  return {
+    ...fallbackState,
+    isLoggedIn:
+      typeof data.isLoggedIn === "boolean"
+        ? data.isLoggedIn
+        : fallbackState.isLoggedIn,
+    hasBookingHistory:
+      typeof data.hasBookingHistory === "boolean"
+        ? data.hasBookingHistory
+        : fallbackState.hasBookingHistory,
+    existingReview:
+      data.existingReview === null || data.existingReview
+        ? data.existingReview
+        : fallbackState.existingReview,
+    primaryCta,
+    canContact:
+      typeof data.canContact === "boolean"
+        ? data.canContact
+        : fallbackState.canContact,
+    availabilitySource,
+    canBook:
+      typeof data.canBook === "boolean" ? data.canBook : fallbackState.canBook,
+    canHold:
+      typeof data.canHold === "boolean" ? data.canHold : fallbackState.canHold,
+    bookingDisabledReason,
+    reviewEligibility,
+    loaded: true,
+  };
 }
 
 // Status badge with pulse animation
@@ -217,6 +423,129 @@ function StatCard({ label, value }: { label: string; value: number | string }) {
   );
 }
 
+function ContactFirstSidebarCard({
+  listingId,
+  price,
+  status,
+  bookingMode,
+  effectiveAvailableSlots,
+  primaryCta,
+  canContact,
+}: {
+  listingId: string;
+  price: number;
+  status: string;
+  bookingMode: string;
+  effectiveAvailableSlots: number;
+  primaryCta: PrimaryCta;
+  canContact: boolean;
+}) {
+  const isWholeUnit = bookingMode === "WHOLE_UNIT";
+  const availabilityLabel =
+    status !== "ACTIVE"
+      ? status === "PAUSED"
+        ? "Temporarily unavailable"
+        : "Currently unavailable"
+      : isWholeUnit
+        ? effectiveAvailableSlots > 0
+          ? "Whole unit available"
+          : "Whole unit unavailable"
+        : `${effectiveAvailableSlots} slot${effectiveAvailableSlots === 1 ? "" : "s"} available`;
+
+  return (
+    <div className="bg-surface-container-lowest rounded-3xl shadow-ambient-lg p-6">
+      <div className="flex justify-between items-end mb-6">
+        <div>
+          <span className="text-3xl font-bold text-on-surface">${price}</span>
+          <span className="text-on-surface-variant"> / month</span>
+        </div>
+      </div>
+
+      <div
+        className="mb-4 rounded-xl border border-outline-variant/20 bg-surface-canvas px-4 py-3"
+        data-testid="availability-badge"
+      >
+        <p className="text-sm font-semibold text-on-surface">
+          {availabilityLabel}
+        </p>
+      </div>
+
+      <div className="space-y-4 rounded-2xl border border-outline-variant/20 bg-surface-canvas p-4">
+        <div className="space-y-2">
+          <h3 className="text-base font-semibold text-on-surface">
+            Contact host to confirm availability
+          </h3>
+          <p className="text-sm text-on-surface-variant">
+            This listing is contact-first. Use messaging to confirm dates,
+            availability, and next steps with the host.
+          </p>
+        </div>
+
+        <div
+          data-testid="contact-host-sidebar"
+          className="[&>button]:bg-transparent [&>button]:border [&>button]:border-outline-variant/30 [&>button]:text-on-surface [&>button]:hover:bg-surface-container-high [&>button]:shadow-none"
+        >
+          <MessagingCta
+            listingId={listingId}
+            primaryCta={primaryCta}
+            canContact={canContact}
+          />
+        </div>
+
+        <p className="text-xs text-on-surface-variant">
+          No booking request or hold is created from this page.
+        </p>
+      </div>
+    </div>
+  );
+}
+
+function MessagingCta({
+  listingId,
+  primaryCta,
+  canContact,
+  className,
+}: {
+  listingId: string;
+  primaryCta: PrimaryCta;
+  canContact: boolean;
+  className?: string;
+}) {
+  if (primaryCta === "CONTACT_HOST" && canContact) {
+    return <ContactHostButton listingId={listingId} />;
+  }
+
+  if (primaryCta === "LOGIN_TO_MESSAGE") {
+    return (
+      <Link
+        href="/login"
+        className={cn(
+          "inline-flex h-11 w-full items-center justify-center rounded-xl border border-outline-variant/30 bg-transparent px-4 text-sm font-medium text-on-surface transition-colors hover:bg-surface-container-high",
+          className
+        )}
+      >
+        Sign in to contact host
+      </Link>
+    );
+  }
+
+  if (primaryCta === "VERIFY_EMAIL_TO_MESSAGE") {
+    return (
+      <Link
+        href="/verify-email"
+        className={cn(
+          "inline-flex h-11 w-full items-center justify-center rounded-xl border border-outline-variant/30 bg-transparent px-4 text-sm font-medium text-on-surface transition-colors hover:bg-surface-container-high",
+          className
+        )}
+      >
+        Verify email to contact host
+      </Link>
+    );
+  }
+
+  return null;
+}
+
 export default function ListingPageClient({
   listing,
   reviews,
@@ -232,6 +561,7 @@ export default function ListingPageClient({
   initialStartDate,
   initialEndDate,
   initialAvailability,
+  contactFirstEnabled = false,
 }: ListingPageClientProps) {
   const { data: session, status: sessionStatus } = useSession();
   const [hasHydrated, setHasHydrated] = useState(false);
@@ -241,13 +571,24 @@ export default function ListingPageClient({
   const resolvedUserId = session?.user?.id ?? null;
   const resolvedIsOwner = isOwner || resolvedUserId === listing.ownerId;
   const resolvedIsLoggedIn = isLoggedIn || sessionStatus === "authenticated";
+  const resolvedIsEmailVerified =
+    sessionStatus === "authenticated"
+      ? !!session?.user?.emailVerified
+      : resolvedIsLoggedIn;
   const viewerReady = isOwner || sessionStatus !== "loading";
   const canRenderGuestControls = viewerReady && !resolvedIsOwner;
-  const [viewerState, setViewerState] = useState({
-    hasBookingHistory: userHasBooking,
-    existingReview: userExistingReview,
-    loaded: true,
-  });
+  const [viewerState, setViewerState] = useState<ViewerState>(
+    buildFallbackViewerState({
+      isLoggedIn: resolvedIsLoggedIn,
+      isOwner: resolvedIsOwner,
+      isEmailVerified: resolvedIsEmailVerified,
+      isListingActive: listing.status === "ACTIVE",
+      hasBookingHistory: userHasBooking,
+      existingReview: userExistingReview,
+      contactFirstEnabled,
+      holdEnabled: holdEnabled === true,
+    })
+  );
   const { availability, refresh: refreshAvailability } = useAvailability(
     listing.id,
     startDate || undefined,
@@ -261,6 +602,10 @@ export default function ListingPageClient({
     availability?.effectiveAvailableSlots ??
     initialAvailability?.effectiveAvailableSlots ??
     listing.availableSlots;
+  const reviewBookingHistory =
+    viewerState.reviewEligibility.hasLegacyAcceptedBooking;
+  const usesContactFirstAvailability =
+    viewerState.availabilitySource === "HOST_MANAGED" || contactFirstEnabled;
 
   // Format gender preference for display
   const formatGenderPreference = (pref: string | null) => {
@@ -297,10 +642,20 @@ export default function ListingPageClient({
   }, []);
 
   useEffect(() => {
+    const fallbackViewerState = buildFallbackViewerState({
+      isLoggedIn: resolvedIsLoggedIn,
+      isOwner: resolvedIsOwner,
+      isEmailVerified: resolvedIsEmailVerified,
+      isListingActive: listing.status === "ACTIVE",
+      hasBookingHistory: userHasBooking,
+      existingReview: userExistingReview,
+      contactFirstEnabled,
+      holdEnabled: holdEnabled === true,
+    });
+
     if (resolvedIsOwner) {
       setViewerState({
-        hasBookingHistory: false,
-        existingReview: null,
+        ...fallbackViewerState,
         loaded: true,
       });
       return;
@@ -310,17 +665,11 @@ export default function ListingPageClient({
       return;
     }
 
-    if (!resolvedIsLoggedIn) {
-      setViewerState({
-        hasBookingHistory: false,
-        existingReview: null,
-        loaded: true,
-      });
-      return;
-    }
-
     const controller = new AbortController();
-    setViewerState((current) => ({ ...current, loaded: false }));
+    setViewerState({
+      ...fallbackViewerState,
+      loaded: false,
+    });
 
     void (async () => {
       try {
@@ -336,31 +685,34 @@ export default function ListingPageClient({
           throw new Error("Failed to load listing viewer state");
         }
 
-        const data = (await response.json()) as {
-          hasBookingHistory?: boolean;
-          existingReview?: ListingPageClientProps["userExistingReview"];
-        };
+        const data = (await response.json()) as Partial<Omit<ViewerState, "loaded">>;
 
-        setViewerState({
-          hasBookingHistory: data.hasBookingHistory === true,
-          existingReview: data.existingReview ?? null,
-          loaded: true,
-        });
+        setViewerState(mergeViewerState(fallbackViewerState, data));
       } catch (error) {
         if ((error as Error).name === "AbortError") {
           return;
         }
 
         setViewerState({
-          hasBookingHistory: false,
-          existingReview: null,
+          ...fallbackViewerState,
           loaded: true,
         });
       }
     })();
 
     return () => controller.abort();
-  }, [listing.id, resolvedIsLoggedIn, resolvedIsOwner, sessionStatus]);
+  }, [
+    contactFirstEnabled,
+    holdEnabled,
+    listing.id,
+    listing.status,
+    resolvedIsEmailVerified,
+    resolvedIsLoggedIn,
+    resolvedIsOwner,
+    sessionStatus,
+    userExistingReview,
+    userHasBooking,
+  ]);
 
   return (
     <div className="min-h-screen bg-surface-canvas pb-20">
@@ -652,7 +1004,11 @@ export default function ListingPageClient({
                         data-testid="contact-host-host-section"
                         className="mt-4 lg:hidden"
                       >
-                        <ContactHostButton listingId={listing.id} />
+                        <MessagingCta
+                          listingId={listing.id}
+                          primaryCta={viewerState.primaryCta}
+                          canContact={viewerState.canContact}
+                        />
                       </div>
                     )}
                   </div>
@@ -675,9 +1031,9 @@ export default function ListingPageClient({
                 {canRenderGuestControls && viewerState.loaded && (
                   <ReviewForm
                     listingId={listing.id}
-                    isLoggedIn={resolvedIsLoggedIn}
+                    isLoggedIn={viewerState.isLoggedIn}
                     hasExistingReview={!!viewerState.existingReview}
-                    hasBookingHistory={viewerState.hasBookingHistory}
+                    hasBookingHistory={reviewBookingHistory}
                     existingReview={viewerState.existingReview || undefined}
                   />
                 )}
@@ -810,32 +1166,52 @@ export default function ListingPageClient({
                 {/* Guest Booking Card */}
                 {canRenderGuestControls && (
                   <>
-                    <div
-                      data-testid="contact-host-sidebar"
-                      className="hidden lg:block [&>button]:bg-transparent [&>button]:border [&>button]:border-outline-variant/30 [&>button]:text-on-surface [&>button]:hover:bg-surface-container-high [&>button]:shadow-none"
-                    >
-                      <ContactHostButton listingId={listing.id} />
-                    </div>
-                    <BookingForm
-                      listingId={listing.id}
-                      price={listing.price}
-                      ownerId={listing.ownerId}
-                      isOwner={resolvedIsOwner}
-                      isLoggedIn={resolvedIsLoggedIn}
-                      status={listing.status as "ACTIVE" | "PAUSED" | "RENTED"}
-                      bookedDates={bookedDates}
-                      holdEnabled={holdEnabled}
-                      totalSlots={listing.totalSlots}
-                      availableSlots={effectiveAvailableSlots}
-                      bookingMode={listing.bookingMode}
-                      holdTtlMinutes={listing.holdTtlMinutes}
-                      startDate={startDate}
-                      endDate={endDate}
-                      onStartDateChange={setStartDate}
-                      onEndDateChange={setEndDate}
-                      availability={availability}
-                      refreshAvailability={refreshAvailability}
-                    />
+                    {usesContactFirstAvailability ? (
+                      <ContactFirstSidebarCard
+                        listingId={listing.id}
+                        price={listing.price}
+                        status={listing.status}
+                        bookingMode={listing.bookingMode}
+                        effectiveAvailableSlots={effectiveAvailableSlots}
+                        primaryCta={viewerState.primaryCta}
+                        canContact={viewerState.canContact}
+                      />
+                    ) : (
+                      <>
+                        <div
+                          data-testid="contact-host-sidebar"
+                          className="hidden lg:block [&>button]:bg-transparent [&>button]:border [&>button]:border-outline-variant/30 [&>button]:text-on-surface [&>button]:hover:bg-surface-container-high [&>button]:shadow-none"
+                        >
+                          <MessagingCta
+                            listingId={listing.id}
+                            primaryCta={viewerState.primaryCta}
+                            canContact={viewerState.canContact}
+                          />
+                        </div>
+                        <BookingForm
+                          listingId={listing.id}
+                          price={listing.price}
+                          ownerId={listing.ownerId}
+                          isOwner={resolvedIsOwner}
+                          isLoggedIn={viewerState.isLoggedIn}
+                          status={
+                            listing.status as "ACTIVE" | "PAUSED" | "RENTED"
+                          }
+                          bookedDates={bookedDates}
+                          holdEnabled={viewerState.canHold}
+                          totalSlots={listing.totalSlots}
+                          availableSlots={effectiveAvailableSlots}
+                          bookingMode={listing.bookingMode}
+                          holdTtlMinutes={listing.holdTtlMinutes}
+                          startDate={startDate}
+                          endDate={endDate}
+                          onStartDateChange={setStartDate}
+                          onEndDateChange={setEndDate}
+                          availability={availability}
+                          refreshAvailability={refreshAvailability}
+                        />
+                      </>
+                    )}
                   </>
                 )}
               </div>

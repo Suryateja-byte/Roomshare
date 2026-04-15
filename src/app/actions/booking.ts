@@ -397,6 +397,15 @@ export async function createBooking(
     };
   }
 
+  const { features } = await import("@/lib/env");
+  if (features.contactFirstListings) {
+    return {
+      success: false,
+      error: "This listing accepts messages only. Contact the host instead.",
+      code: "CONTACT_ONLY",
+    };
+  }
+
   const userId = session.user.id;
 
   // C4 FIX: Rate limit booking creation (per-user + per-IP, outside transaction)
@@ -454,7 +463,6 @@ export async function createBooking(
 
   // Phase 2: Feature flag gate — reject multi-slot when flag is OFF
   if (slotsRequested > 1) {
-    const { features } = await import("@/lib/env");
     if (!features.multiSlotBooking) {
       return {
         success: false,
@@ -977,6 +985,15 @@ export async function createHold(
     };
   }
 
+  const { features } = await import("@/lib/env");
+  if (features.contactFirstListings) {
+    return {
+      success: false,
+      error: "This listing accepts messages only. Contact the host instead.",
+      code: "CONTACT_ONLY",
+    };
+  }
+
   // Rate limit
   const headersList = await headers();
   const ip = getClientIPFromHeaders(headersList);
@@ -1033,7 +1050,6 @@ export async function createHold(
   }
 
   // Feature flag gate: must be ON (not DRAIN — drain blocks new holds)
-  const { features } = await import("@/lib/env");
   if (!features.softHoldsEnabled) {
     return {
       success: false,

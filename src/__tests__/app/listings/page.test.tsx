@@ -48,6 +48,7 @@ jest.mock("@/lib/env", () => ({
   features: {
     semanticSearch: false,
     softHoldsEnabled: true,
+    contactFirstListings: false,
   },
 }));
 

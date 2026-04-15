@@ -102,4 +102,13 @@ describe("ContactHostButton", () => {
       expect(screen.getByRole("button")).not.toBeDisabled();
     });
   });
+
+  it("ignores rapid double clicks before loading state is painted", async () => {
+    mockStartConversation.mockImplementation(() => new Promise(() => {}));
+
+    render(<ContactHostButton listingId="listing-123" />);
+    await userEvent.dblClick(screen.getByText("Contact Host"));
+
+    expect(mockStartConversation).toHaveBeenCalledTimes(1);
+  });
 });

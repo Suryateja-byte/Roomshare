@@ -231,7 +231,7 @@ export default function ReviewForm({
     );
   }
 
-  // Show "booking required" message for logged-in users without booking history
+  // Show accepted-booking requirement for logged-in users without booking history
   if (listingId && hasBookingHistory === false) {
     return (
       <div className="bg-surface-canvas p-6 rounded-xl border border-outline-variant/20">
@@ -240,10 +240,10 @@ export default function ReviewForm({
             <Calendar className="w-6 h-6 text-amber-600" />
           </div>
           <h3 className="font-semibold text-lg text-on-surface mb-2">
-            Booking required
+            Past stay required
           </h3>
           <p className="text-sm text-on-surface-variant">
-            You can leave a review after making a booking request for this
+            You can leave a public review after an accepted booking for this
             listing
           </p>
         </div>

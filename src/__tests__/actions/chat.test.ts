@@ -167,6 +167,12 @@ describe("Chat Actions", () => {
       const result = await startConversation("listing-123");
 
       expect(result).toEqual({ conversationId: "existing-conv-123" });
+      expect(prisma.conversationDeletion.deleteMany).toHaveBeenCalledWith({
+        where: {
+          conversationId: "existing-conv-123",
+          userId: "user-123",
+        },
+      });
       expect(prisma.conversation.create).not.toHaveBeenCalled();
     });
 
@@ -200,6 +206,32 @@ describe("Chat Actions", () => {
       expect(result).toEqual({ error: "Too many attempts. Please wait." });
       expect(prisma.listing.findUnique).not.toHaveBeenCalled();
       expect(prisma.conversation.create).not.toHaveBeenCalled();
+    });
+
+    it("retries once on serialization failure and preserves serializable isolation", async () => {
+      (prisma.$transaction as jest.Mock)
+        .mockRejectedValueOnce({ code: "P2034", message: "serialization" })
+        .mockImplementationOnce((fn: any) => fn(prisma));
+      (prisma.conversation.findFirst as jest.Mock).mockResolvedValue(null);
+      (prisma.conversation.create as jest.Mock).mockResolvedValue({
+        id: "new-conv-123",
+      });
+
+      const result = await startConversation("listing-123");
+
+      expect(result).toEqual({ conversationId: "new-conv-123" });
+      expect(prisma.$transaction).toHaveBeenCalledTimes(2);
+      expect(prisma.$transaction).toHaveBeenNthCalledWith(
+        1,
+        expect.any(Function),
+        { isolationLevel: "Serializable" }
+      );
+      expect(prisma.$transaction).toHaveBeenNthCalledWith(
+        2,
+        expect.any(Function),
+        { isolationLevel: "Serializable" }
+      );
+      expect(prisma.conversation.create).toHaveBeenCalledTimes(1);
     });
   });
 

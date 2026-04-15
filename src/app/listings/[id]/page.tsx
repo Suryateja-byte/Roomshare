@@ -391,6 +391,7 @@ export default async function ListingPage({ params, searchParams }: PageProps) {
         initialStartDate={initialAvailabilityRange.initialStartDate}
         initialEndDate={initialAvailabilityRange.initialEndDate}
         initialAvailability={availability}
+        contactFirstEnabled={features.contactFirstListings}
       />
     </>
   );
