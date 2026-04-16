@@ -41,6 +41,12 @@ export interface ResolvedPublicAvailability
   isPubliclyAvailable: boolean;
 }
 
+export interface PublicSearchEligibilityInput {
+  needsMigrationReview?: boolean | null;
+  statusReason?: string | null;
+  resolvedAvailability: ResolvedPublicAvailability;
+}
+
 export interface BuildPublicAvailabilityInput {
   availabilitySource?: PublicAvailabilitySource | null;
   openSlots?: number | null;
@@ -423,5 +429,15 @@ export function resolvePublicAvailabilityForListings<
         legacySnapshot: options.legacyAvailabilityByListing?.get(listing.id),
       }),
     ])
+  );
+}
+
+export function isListingEligibleForPublicSearch(
+  input: PublicSearchEligibilityInput
+): boolean {
+  return (
+    input.resolvedAvailability.searchEligible &&
+    input.needsMigrationReview !== true &&
+    input.statusReason !== "MIGRATION_REVIEW"
   );
 }

@@ -1,5 +1,6 @@
 import {
   buildPublicAvailability,
+  isListingEligibleForPublicSearch,
   resolvePublicAvailability,
   resolvePublicAvailabilityForListings,
 } from "@/lib/search/public-availability";
@@ -259,6 +260,99 @@ describe("search/public-availability", () => {
       autoPauseAt: null,
       publicStatus: "AVAILABLE",
     });
+  });
+
+  it("treats valid HOST_MANAGED listings as eligible for public list search", () => {
+    const resolvedAvailability = resolvePublicAvailability(
+      {
+        id: "listing-host-searchable",
+        availabilitySource: "HOST_MANAGED",
+        status: "ACTIVE",
+        openSlots: 2,
+        totalSlots: 4,
+        moveInDate: new Date("2026-06-01T00:00:00.000Z"),
+        availableUntil: new Date("2026-12-01T00:00:00.000Z"),
+        minStayMonths: 3,
+        lastConfirmedAt: "2026-04-15T12:30:00.000Z",
+      },
+      { now: new Date("2026-04-15T00:00:00.000Z") }
+    );
+
+    expect(
+      isListingEligibleForPublicSearch({
+        needsMigrationReview: false,
+        statusReason: null,
+        resolvedAvailability,
+      })
+    ).toBe(true);
+  });
+
+  it("excludes invalid and stale HOST_MANAGED listings from public list search", () => {
+    const invalidResolvedAvailability = resolvePublicAvailability(
+      {
+        id: "listing-host-invalid-search",
+        availabilitySource: "HOST_MANAGED",
+        status: "ACTIVE",
+        openSlots: 0,
+        totalSlots: 4,
+        moveInDate: new Date("2026-06-01T00:00:00.000Z"),
+      },
+      { now: new Date("2026-04-15T00:00:00.000Z") }
+    );
+    const staleResolvedAvailability = resolvePublicAvailability(
+      {
+        id: "listing-host-stale-search",
+        availabilitySource: "HOST_MANAGED",
+        status: "ACTIVE",
+        openSlots: 2,
+        totalSlots: 4,
+        moveInDate: new Date("2026-06-01T00:00:00.000Z"),
+        availableUntil: new Date("2026-12-01T00:00:00.000Z"),
+        minStayMonths: 3,
+        lastConfirmedAt: "2026-03-20T12:30:00.000Z",
+      },
+      { now: new Date("2026-04-15T12:30:00.000Z") }
+    );
+
+    expect(
+      isListingEligibleForPublicSearch({
+        needsMigrationReview: false,
+        statusReason: null,
+        resolvedAvailability: invalidResolvedAvailability,
+      })
+    ).toBe(false);
+    expect(
+      isListingEligibleForPublicSearch({
+        needsMigrationReview: false,
+        statusReason: null,
+        resolvedAvailability: staleResolvedAvailability,
+      })
+    ).toBe(false);
+  });
+
+  it("excludes migration-review listings from public list search", () => {
+    const resolvedAvailability = resolvePublicAvailability({
+      id: "listing-legacy-review",
+      availabilitySource: "LEGACY_BOOKING",
+      status: "ACTIVE",
+      availableSlots: 2,
+      totalSlots: 2,
+    });
+
+    expect(
+      isListingEligibleForPublicSearch({
+        needsMigrationReview: true,
+        statusReason: null,
+        resolvedAvailability,
+      })
+    ).toBe(false);
+    expect(
+      isListingEligibleForPublicSearch({
+        needsMigrationReview: false,
+        statusReason: "MIGRATION_REVIEW",
+        resolvedAvailability,
+      })
+    ).toBe(false);
   });
 
   it("maps public status snapshots from row status and reason", () => {

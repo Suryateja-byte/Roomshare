@@ -618,6 +618,449 @@ describe("search-v2-service", () => {
       expect(result.paginatedResult?.items[0]?.id).toBe("semantic-1");
     });
 
+    it("filters semantic candidates through the canonical public list-search predicate", async () => {
+      setupDefaultMocks();
+      (features as Record<string, unknown>).semanticSearch = true;
+      mockParseSearchParams.mockReturnValue(
+        defaultParsedSearchParams({
+          filterParams: {
+            query: "Irving",
+            vibeQuery: "quiet roommates",
+            bounds: BOUNDS,
+          },
+        })
+      );
+
+      const now = new Date();
+      const moveInDate = new Date(now.getTime() + 14 * 24 * 60 * 60 * 1000);
+      const availableUntil = new Date(now.getTime() + 120 * 24 * 60 * 60 * 1000);
+      const staleConfirmedAt = new Date(
+        now.getTime() - 22 * 24 * 60 * 60 * 1000
+      );
+      const semanticItems = [
+        makeListingData({ id: "eligible-host", availableSlots: 4, totalSlots: 4 }),
+        makeListingData({ id: "invalid-host", availableSlots: 4, totalSlots: 4 }),
+        makeListingData({ id: "stale-host", availableSlots: 4, totalSlots: 4 }),
+        makeListingData({ id: "legacy-review", availableSlots: 2, totalSlots: 2 }),
+      ];
+
+      mockSemanticSearchQuery.mockResolvedValue(
+        [{ id: "row-1" }, { id: "row-2" }, { id: "row-3" }, { id: "row-4" }] as never
+      );
+      mockMapSemanticRowsToListingData.mockReturnValue(semanticItems);
+      mockPrismaListingFindMany.mockResolvedValue([
+        {
+          id: "eligible-host",
+          availabilitySource: "HOST_MANAGED",
+          status: "ACTIVE",
+          statusReason: null,
+          needsMigrationReview: false,
+          totalSlots: 4,
+          availableSlots: 4,
+          openSlots: 2,
+          moveInDate,
+          availableUntil,
+          minStayMonths: 2,
+          lastConfirmedAt: now,
+        },
+        {
+          id: "invalid-host",
+          availabilitySource: "HOST_MANAGED",
+          status: "ACTIVE",
+          statusReason: null,
+          needsMigrationReview: false,
+          totalSlots: 4,
+          availableSlots: 4,
+          openSlots: 0,
+          moveInDate,
+          availableUntil,
+          minStayMonths: 2,
+          lastConfirmedAt: now,
+        },
+        {
+          id: "stale-host",
+          availabilitySource: "HOST_MANAGED",
+          status: "ACTIVE",
+          statusReason: null,
+          needsMigrationReview: false,
+          totalSlots: 4,
+          availableSlots: 4,
+          openSlots: 2,
+          moveInDate,
+          availableUntil,
+          minStayMonths: 2,
+          lastConfirmedAt: staleConfirmedAt,
+        },
+        {
+          id: "legacy-review",
+          availabilitySource: "LEGACY_BOOKING",
+          status: "ACTIVE",
+          statusReason: "MIGRATION_REVIEW",
+          needsMigrationReview: true,
+          totalSlots: 2,
+          availableSlots: 2,
+          openSlots: null,
+          moveInDate,
+          availableUntil: null,
+          minStayMonths: 1,
+          lastConfirmedAt: null,
+        },
+      ] as never);
+      mockGetAvailabilityForListings.mockResolvedValue(
+        new Map([
+          [
+            "legacy-review",
+            {
+              listingId: "legacy-review",
+              effectiveAvailableSlots: 2,
+              totalSlots: 2,
+              heldSlots: 0,
+              acceptedSlots: 0,
+              rangeVersion: 1,
+              asOf: new Date().toISOString(),
+            },
+          ],
+        ])
+      );
+
+      const result = await executeSearchV2({
+        rawParams: {
+          q: "Irving",
+          what: "quiet roommates",
+          minLat: "32.8",
+          maxLat: "32.9",
+          minLng: "-96.99",
+          maxLng: "-96.9",
+        },
+      });
+
+      expect(result.paginatedResult?.items.map((item) => item.id)).toEqual([
+        "eligible-host",
+      ]);
+      expect(result.response?.list.items.map((item) => item.id)).toEqual([
+        "eligible-host",
+      ]);
+      expect(mockPrismaListingFindMany).toHaveBeenCalledWith(
+        expect.objectContaining({
+          select: expect.objectContaining({
+            needsMigrationReview: true,
+          }),
+        })
+      );
+    });
+
+    it("fills semantic page 1 from later eligible matches and computes next page from eligible rows", async () => {
+      setupDefaultMocks();
+      (features as Record<string, unknown>).semanticSearch = true;
+      mockParseSearchParams.mockReturnValue(
+        defaultParsedSearchParams({
+          filterParams: {
+            query: "Irving",
+            vibeQuery: "quiet roommates",
+            bounds: BOUNDS,
+          },
+        })
+      );
+
+      const now = new Date("2026-04-15T12:30:00.000Z");
+      const staleConfirmedAt = new Date("2026-03-20T12:30:00.000Z");
+      const moveInDate = new Date("2026-06-01T00:00:00.000Z");
+      const availableUntil = new Date("2026-12-01T00:00:00.000Z");
+      const semanticRows = [
+        { id: "filtered-invalid" },
+        { id: "filtered-stale" },
+        { id: "eligible-1" },
+        { id: "eligible-2" },
+        { id: "eligible-3" },
+        { id: "eligible-4" },
+      ];
+      const listingRowsById: Record<string, Record<string, unknown>> = {
+        "filtered-invalid": {
+          id: "filtered-invalid",
+          availabilitySource: "HOST_MANAGED",
+          status: "ACTIVE",
+          statusReason: null,
+          needsMigrationReview: false,
+          totalSlots: 4,
+          availableSlots: 4,
+          openSlots: 0,
+          moveInDate,
+          availableUntil,
+          minStayMonths: 2,
+          lastConfirmedAt: now,
+        },
+        "filtered-stale": {
+          id: "filtered-stale",
+          availabilitySource: "HOST_MANAGED",
+          status: "ACTIVE",
+          statusReason: null,
+          needsMigrationReview: false,
+          totalSlots: 4,
+          availableSlots: 4,
+          openSlots: 2,
+          moveInDate,
+          availableUntil,
+          minStayMonths: 2,
+          lastConfirmedAt: staleConfirmedAt,
+        },
+        "eligible-1": {
+          id: "eligible-1",
+          availabilitySource: "HOST_MANAGED",
+          status: "ACTIVE",
+          statusReason: null,
+          needsMigrationReview: false,
+          totalSlots: 4,
+          availableSlots: 4,
+          openSlots: 2,
+          moveInDate,
+          availableUntil,
+          minStayMonths: 2,
+          lastConfirmedAt: now,
+        },
+        "eligible-2": {
+          id: "eligible-2",
+          availabilitySource: "HOST_MANAGED",
+          status: "ACTIVE",
+          statusReason: null,
+          needsMigrationReview: false,
+          totalSlots: 4,
+          availableSlots: 4,
+          openSlots: 2,
+          moveInDate,
+          availableUntil,
+          minStayMonths: 2,
+          lastConfirmedAt: now,
+        },
+        "eligible-3": {
+          id: "eligible-3",
+          availabilitySource: "HOST_MANAGED",
+          status: "ACTIVE",
+          statusReason: null,
+          needsMigrationReview: false,
+          totalSlots: 4,
+          availableSlots: 4,
+          openSlots: 2,
+          moveInDate,
+          availableUntil,
+          minStayMonths: 2,
+          lastConfirmedAt: now,
+        },
+        "eligible-4": {
+          id: "eligible-4",
+          availabilitySource: "HOST_MANAGED",
+          status: "ACTIVE",
+          statusReason: null,
+          needsMigrationReview: false,
+          totalSlots: 4,
+          availableSlots: 4,
+          openSlots: 2,
+          moveInDate,
+          availableUntil,
+          minStayMonths: 2,
+          lastConfirmedAt: now,
+        },
+      };
+
+      mockSemanticSearchQuery.mockImplementation(
+        async (_filters, limit = 0, offset = 0) =>
+          semanticRows.slice(offset, offset + limit) as never
+      );
+      mockMapSemanticRowsToListingData.mockImplementation(
+        (rows) =>
+          (rows as Array<{ id: string }>).map(({ id }) =>
+            makeListingData({ id, availableSlots: 4, totalSlots: 4 })
+          ) as never
+      );
+      (mockPrismaListingFindMany as unknown as jest.Mock).mockImplementation(
+        async (args?: { where?: { id?: { in?: string[] } } }) =>
+          (args?.where?.id?.in ?? []).map((id) => listingRowsById[id]) as never
+      );
+
+      const result = await executeSearchV2({
+        rawParams: {
+          q: "Irving",
+          what: "quiet roommates",
+          minLat: "32.8",
+          maxLat: "32.9",
+          minLng: "-96.99",
+          maxLng: "-96.9",
+        },
+        limit: 2,
+      });
+
+      expect(result.paginatedResult?.items.map((item) => item.id)).toEqual([
+        "eligible-1",
+        "eligible-2",
+      ]);
+      expect(result.paginatedResult?.hasNextPage).toBe(true);
+      expect(result.paginatedResult?.nextCursor).toBe("cursor-page-2");
+      expect(result.response?.list.items.map((item) => item.id)).toEqual([
+        "eligible-1",
+        "eligible-2",
+      ]);
+      expect(result.response?.list.nextCursor).toBe("cursor-page-2");
+      expect(mockSemanticSearchQuery.mock.calls.map((call) => call[2])).toEqual([
+        0,
+        3,
+      ]);
+    });
+
+    it("keeps later semantic pages stable after filtering ineligible ranked matches", async () => {
+      setupDefaultMocks();
+      (features as Record<string, unknown>).semanticSearch = true;
+      mockParseSearchParams.mockReturnValue(
+        defaultParsedSearchParams({
+          requestedPage: 2,
+          filterParams: {
+            query: "Irving",
+            vibeQuery: "quiet roommates",
+            bounds: BOUNDS,
+          },
+        })
+      );
+
+      const now = new Date("2026-04-15T12:30:00.000Z");
+      const staleConfirmedAt = new Date("2026-03-20T12:30:00.000Z");
+      const moveInDate = new Date("2026-06-01T00:00:00.000Z");
+      const availableUntil = new Date("2026-12-01T00:00:00.000Z");
+      const semanticRows = [
+        { id: "filtered-invalid" },
+        { id: "filtered-stale" },
+        { id: "eligible-1" },
+        { id: "eligible-2" },
+        { id: "eligible-3" },
+        { id: "eligible-4" },
+      ];
+      const listingRowsById: Record<string, Record<string, unknown>> = {
+        "filtered-invalid": {
+          id: "filtered-invalid",
+          availabilitySource: "HOST_MANAGED",
+          status: "ACTIVE",
+          statusReason: null,
+          needsMigrationReview: false,
+          totalSlots: 4,
+          availableSlots: 4,
+          openSlots: 0,
+          moveInDate,
+          availableUntil,
+          minStayMonths: 2,
+          lastConfirmedAt: now,
+        },
+        "filtered-stale": {
+          id: "filtered-stale",
+          availabilitySource: "HOST_MANAGED",
+          status: "ACTIVE",
+          statusReason: null,
+          needsMigrationReview: false,
+          totalSlots: 4,
+          availableSlots: 4,
+          openSlots: 2,
+          moveInDate,
+          availableUntil,
+          minStayMonths: 2,
+          lastConfirmedAt: staleConfirmedAt,
+        },
+        "eligible-1": {
+          id: "eligible-1",
+          availabilitySource: "HOST_MANAGED",
+          status: "ACTIVE",
+          statusReason: null,
+          needsMigrationReview: false,
+          totalSlots: 4,
+          availableSlots: 4,
+          openSlots: 2,
+          moveInDate,
+          availableUntil,
+          minStayMonths: 2,
+          lastConfirmedAt: now,
+        },
+        "eligible-2": {
+          id: "eligible-2",
+          availabilitySource: "HOST_MANAGED",
+          status: "ACTIVE",
+          statusReason: null,
+          needsMigrationReview: false,
+          totalSlots: 4,
+          availableSlots: 4,
+          openSlots: 2,
+          moveInDate,
+          availableUntil,
+          minStayMonths: 2,
+          lastConfirmedAt: now,
+        },
+        "eligible-3": {
+          id: "eligible-3",
+          availabilitySource: "HOST_MANAGED",
+          status: "ACTIVE",
+          statusReason: null,
+          needsMigrationReview: false,
+          totalSlots: 4,
+          availableSlots: 4,
+          openSlots: 2,
+          moveInDate,
+          availableUntil,
+          minStayMonths: 2,
+          lastConfirmedAt: now,
+        },
+        "eligible-4": {
+          id: "eligible-4",
+          availabilitySource: "HOST_MANAGED",
+          status: "ACTIVE",
+          statusReason: null,
+          needsMigrationReview: false,
+          totalSlots: 4,
+          availableSlots: 4,
+          openSlots: 2,
+          moveInDate,
+          availableUntil,
+          minStayMonths: 2,
+          lastConfirmedAt: now,
+        },
+      };
+
+      mockSemanticSearchQuery.mockImplementation(
+        async (_filters, limit = 0, offset = 0) =>
+          semanticRows.slice(offset, offset + limit) as never
+      );
+      mockMapSemanticRowsToListingData.mockImplementation(
+        (rows) =>
+          (rows as Array<{ id: string }>).map(({ id }) =>
+            makeListingData({ id, availableSlots: 4, totalSlots: 4 })
+          ) as never
+      );
+      (mockPrismaListingFindMany as unknown as jest.Mock).mockImplementation(
+        async (args?: { where?: { id?: { in?: string[] } } }) =>
+          (args?.where?.id?.in ?? []).map((id) => listingRowsById[id]) as never
+      );
+
+      const result = await executeSearchV2({
+        rawParams: {
+          q: "Irving",
+          what: "quiet roommates",
+          minLat: "32.8",
+          maxLat: "32.9",
+          minLng: "-96.99",
+          maxLng: "-96.9",
+        },
+        limit: 2,
+      });
+
+      expect(result.paginatedResult?.items.map((item) => item.id)).toEqual([
+        "eligible-3",
+        "eligible-4",
+      ]);
+      expect(result.paginatedResult?.hasNextPage).toBe(false);
+      expect(result.paginatedResult?.nextCursor).toBeNull();
+      expect(result.paginatedResult?.total).toBe(4);
+      expect(result.paginatedResult?.totalPages).toBe(2);
+      expect(mockEncodeCursor).not.toHaveBeenCalled();
+      expect(mockSemanticSearchQuery.mock.calls.map((call) => call[2])).toEqual([
+        0,
+        3,
+        6,
+      ]);
+    });
+
     it("falls back to broadened area results when semantic ranking returns no rows", async () => {
       const listItems = [
         makeListingData({

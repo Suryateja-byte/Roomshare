@@ -49,6 +49,7 @@ import type { KeysetCursor, SortOption, CursorRowData } from "./cursor";
 import { buildCursorFromRow, encodeKeysetCursor } from "./cursor";
 import {
   buildPublicAvailability,
+  isListingEligibleForPublicSearch,
   resolvePublicAvailability,
 } from "./public-availability";
 import pgvector from "pgvector";
@@ -111,6 +112,7 @@ interface ListingRaw {
   lastConfirmedAt?: string | Date | null;
   status?: string;
   statusReason?: string | null;
+  needsMigrationReview?: boolean | null;
   amenities: string[];
   houseRules: string[];
   householdLanguages: string[];
@@ -218,6 +220,7 @@ const MAX_MAP_MARKERS = 200;
 
 // Threshold for full COUNT vs hybrid mode
 const HYBRID_COUNT_THRESHOLD = 100;
+const HOST_MANAGED_STALE_INTERVAL_SQL = "INTERVAL '21 days'";
 
 // Maximum results for unbounded browse-all queries (no query, no bounds)
 // Prevents full-table scans while allowing homepage browsing.
@@ -511,8 +514,109 @@ export interface WhereBuilder {
   effectiveAvailableSql: string;
 }
 
-export function buildSearchDocWhereConditions(
-  filterParams: FilterParams
+function buildSearchDocListAvailabilitySqlFragments(options: {
+  minAvailableSlots?: number;
+  moveInDate?: string;
+  endDate?: string;
+  startParamIndex: number;
+}): {
+  effectiveAvailableSql: string;
+  slotConditionSql: string;
+  params: unknown[];
+  nextParamIndex: number;
+} {
+  const {
+    effectiveAvailableSql: legacyEffectiveAvailableSql,
+    params: legacyParams,
+    nextParamIndex: legacyNextParamIndex,
+  } = buildAvailabilitySqlFragments({
+    listingIdRef: "d.id",
+    totalSlotsRef: "d.total_slots",
+    minAvailableSlots: options.minAvailableSlots,
+    startDate: options.moveInDate,
+    endDate: options.endDate,
+    startParamIndex: options.startParamIndex,
+  });
+
+  const params = [...legacyParams];
+  let paramIndex = legacyNextParamIndex;
+  const hostManagedMinSlotsParam = `$${paramIndex++}`;
+  params.push(Math.max(options.minAvailableSlots ?? 1, 1));
+
+  let requestedMoveInDateParam: string | null = null;
+  let hostManagedMoveInLowerBoundSql = "TRUE";
+  if (options.moveInDate) {
+    requestedMoveInDateParam = `$${paramIndex++}`;
+    params.push(parseLocalDate(options.moveInDate));
+    hostManagedMoveInLowerBoundSql = `
+      l."moveInDate"::date <= ${requestedMoveInDateParam}::date
+    `.trim();
+  }
+
+  let hostManagedWindowCoverageSql = "TRUE";
+  if (options.endDate) {
+    const requestedEndDateParam = `$${paramIndex++}`;
+    params.push(parseLocalDate(options.endDate));
+    hostManagedWindowCoverageSql = `(
+      l."availableUntil" IS NULL
+      OR l."availableUntil"::date >= ${requestedEndDateParam}::date
+    )`;
+  } else if (requestedMoveInDateParam) {
+    hostManagedWindowCoverageSql = `(
+      l."availableUntil" IS NULL
+      OR l."availableUntil"::date >= ${requestedMoveInDateParam}::date
+    )`;
+  }
+
+  const hostManagedSlotConditionSql = `(
+    l."openSlots" IS NOT NULL
+    AND l."openSlots" >= ${hostManagedMinSlotsParam}
+    AND l."totalSlots" >= 1
+    AND l."openSlots" <= l."totalSlots"
+    AND l."moveInDate" IS NOT NULL
+    AND ${hostManagedMoveInLowerBoundSql}
+    AND l."minStayMonths" >= 1
+    AND (
+      l."availableUntil" IS NULL
+      OR l."availableUntil"::date >= CURRENT_DATE
+    )
+    AND (
+      l."availableUntil" IS NULL
+      OR l."availableUntil"::date >= l."moveInDate"::date
+    )
+    AND ${hostManagedWindowCoverageSql}
+    AND (
+      l."lastConfirmedAt" IS NULL
+      OR l."lastConfirmedAt" > NOW() - ${HOST_MANAGED_STALE_INTERVAL_SQL}
+    )
+  )`;
+
+  return {
+    effectiveAvailableSql: `(
+      CASE
+        WHEN l."availabilitySource" = 'HOST_MANAGED'
+          THEN GREATEST(COALESCE(l."openSlots", 0), 0)::int
+        ELSE ${legacyEffectiveAvailableSql}
+      END
+    )`,
+    slotConditionSql: `(
+      (
+        l."availabilitySource" = 'HOST_MANAGED'
+        AND ${hostManagedSlotConditionSql}
+      )
+      OR (
+        l."availabilitySource" <> 'HOST_MANAGED'
+        AND ${legacyEffectiveAvailableSql} >= ${hostManagedMinSlotsParam}
+      )
+    )`,
+    params,
+    nextParamIndex: paramIndex,
+  };
+}
+
+function buildSearchDocWhereConditionsInternal(
+  filterParams: FilterParams,
+  options: { listEligibility: boolean }
 ): WhereBuilder {
   // SECURITY INVARIANT:
   // - All user-derived values must be pushed to `params` and referenced as $N placeholders.
@@ -541,18 +645,31 @@ export function buildSearchDocWhereConditions(
     slotConditionSql,
     params,
     nextParamIndex,
-  } = buildAvailabilitySqlFragments({
-    listingIdRef: "d.id",
-    totalSlotsRef: "d.total_slots",
-    minAvailableSlots,
-    startDate: moveInDate,
-    endDate,
-    startParamIndex: 1,
-  });
+  } = options.listEligibility
+    ? buildSearchDocListAvailabilitySqlFragments({
+        minAvailableSlots,
+        moveInDate,
+        endDate,
+        startParamIndex: 1,
+      })
+    : buildAvailabilitySqlFragments({
+        listingIdRef: "d.id",
+        totalSlotsRef: "d.total_slots",
+        minAvailableSlots,
+        startDate: moveInDate,
+        endDate,
+        startParamIndex: 1,
+      });
 
   const conditions: string[] = [
     slotConditionSql,
-    "d.status = 'ACTIVE'",
+    `${options.listEligibility ? "l" : "d"}.status = 'ACTIVE'`,
+    ...(options.listEligibility
+      ? [
+          `COALESCE(l."needsMigrationReview", FALSE) = FALSE`,
+          `COALESCE(l."statusReason", '') <> 'MIGRATION_REVIEW'`,
+        ]
+      : []),
     "d.lat IS NOT NULL",
     "d.lng IS NOT NULL",
   ];
@@ -691,6 +808,22 @@ export function buildSearchDocWhereConditions(
   };
 }
 
+export function buildSearchDocWhereConditions(
+  filterParams: FilterParams
+): WhereBuilder {
+  return buildSearchDocWhereConditionsInternal(filterParams, {
+    listEligibility: false,
+  });
+}
+
+export function buildSearchDocListWhereConditions(
+  filterParams: FilterParams
+): WhereBuilder {
+  return buildSearchDocWhereConditionsInternal(filterParams, {
+    listEligibility: true,
+  });
+}
+
 // ============================================
 // ORDER BY Clause Builder with FTS Ranking
 // ============================================
@@ -765,7 +898,7 @@ async function getSearchDocLimitedCountInternal(
   }
 
   const { conditions, params: queryParams } =
-    buildSearchDocWhereConditions(params);
+    buildSearchDocListWhereConditions(params);
   const whereClause = joinWhereClauseWithSecurityInvariant(conditions);
 
   // Use subquery with LIMIT 101 to efficiently check if count > threshold
@@ -774,6 +907,7 @@ async function getSearchDocLimitedCountInternal(
     FROM (
       SELECT d.id
       FROM listing_search_docs d
+      JOIN "Listing" l ON l.id = d.id
       WHERE ${whereClause}
       LIMIT ${HYBRID_COUNT_THRESHOLD + 1}
     ) subq
@@ -825,7 +959,13 @@ export function mapRawListingsToPublic(listings: ListingRaw[]): ListingData[] {
       const { moveInDate, availableUntil, lastConfirmedAt, resolvedAvailability } =
         resolveRawPublicAvailability(l);
 
-      if (!resolvedAvailability.isPubliclyAvailable) {
+      if (
+        !isListingEligibleForPublicSearch({
+          needsMigrationReview: l.needsMigrationReview,
+          statusReason: l.statusReason,
+          resolvedAvailability,
+        })
+      ) {
         return null;
       }
 
@@ -1136,7 +1276,7 @@ async function getSearchDocListingsPaginatedInternal(
       paramIndex: startParamIndex,
       ftsQueryParamIndex,
       effectiveAvailableSql,
-    } = buildSearchDocWhereConditions(params);
+    } = buildSearchDocListWhereConditions(params);
     const whereClause = joinWhereClauseWithSecurityInvariant(conditions);
 
     // Build ORDER BY clause with ts_rank_cd tie-breaker when FTS is active
@@ -1189,6 +1329,7 @@ async function getSearchDocListingsPaginatedInternal(
         l."lastConfirmedAt" as "lastConfirmedAt",
         l.status::text as status,
         l."statusReason" as "statusReason",
+        l."needsMigrationReview" as "needsMigrationReview",
         d.amenities,
         d.house_rules as "houseRules",
         d.household_languages as "householdLanguages",
@@ -1348,7 +1489,7 @@ export async function getSearchDocListingsWithKeyset(
       paramIndex: startParamIndex,
       ftsQueryParamIndex,
       effectiveAvailableSql,
-    } = buildSearchDocWhereConditions(params);
+    } = buildSearchDocListWhereConditions(params);
 
     // Add keyset WHERE clause
     const keysetResult = buildKeysetWhereClause(
@@ -1390,6 +1531,7 @@ export async function getSearchDocListingsWithKeyset(
         l."lastConfirmedAt" as "lastConfirmedAt",
         l.status::text as status,
         l."statusReason" as "statusReason",
+        l."needsMigrationReview" as "needsMigrationReview",
         d.amenities,
         d.house_rules as "houseRules",
         d.household_languages as "householdLanguages",
@@ -1544,7 +1686,7 @@ export async function getSearchDocListingsFirstPage(
       paramIndex: startParamIndex,
       ftsQueryParamIndex,
       effectiveAvailableSql,
-    } = buildSearchDocWhereConditions(params);
+    } = buildSearchDocListWhereConditions(params);
     const whereClause = joinWhereClauseWithSecurityInvariant(conditions);
 
     // Build ORDER BY clause — skip ts_rank_cd for keyset (cursor doesn't capture rank)
@@ -1581,6 +1723,7 @@ export async function getSearchDocListingsFirstPage(
         l."lastConfirmedAt" as "lastConfirmedAt",
         l.status::text as status,
         l."statusReason" as "statusReason",
+        l."needsMigrationReview" as "needsMigrationReview",
         d.amenities,
         d.house_rules as "houseRules",
         d.household_languages as "householdLanguages",

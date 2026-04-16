@@ -7,6 +7,7 @@
 import {
   isSearchDocEnabled,
   buildOrderByClause,
+  buildSearchDocListWhereConditions,
   buildSearchDocWhereConditions,
   mapRawListingsToPublic,
   mapRawMapListingsToPublic,
@@ -240,6 +241,29 @@ describe("buildSearchDocWhereConditions", () => {
   });
 });
 
+describe("buildSearchDocListWhereConditions", () => {
+  it("adds migration-review and host-managed freshness guards to list search", () => {
+    const result = buildSearchDocListWhereConditions({});
+
+    expect(result.conditions).toContain(`COALESCE(l."needsMigrationReview", FALSE) = FALSE`);
+    expect(result.conditions).toContain(`COALESCE(l."statusReason", '') <> 'MIGRATION_REVIEW'`);
+    expect(result.conditions[0]).toContain(`l."availabilitySource" = 'HOST_MANAGED'`);
+    expect(result.conditions[0]).toContain(`NOW() - INTERVAL '21 days'`);
+    expect(result.params).toEqual([1, 1]);
+  });
+
+  it("enforces the requested move-in lower bound inside the host-managed list predicate", () => {
+    const result = buildSearchDocListWhereConditions({
+      moveInDate: "2026-05-01",
+    });
+
+    expect(result.conditions[0]).toContain(`l."moveInDate"::date <= $4::date`);
+    expect(result.conditions[0]).toContain(
+      `l."availableUntil"::date >= $4::date`
+    );
+  });
+});
+
 describe("buildOrderByClause", () => {
   it("includes ts_rank_cd for offset pagination with FTS", () => {
     const result = buildOrderByClause("recommended", 3, false);
@@ -331,6 +355,38 @@ describe("SearchDoc projection mapping", () => {
     const results = mapRawListingsToPublic([
       createHostManagedRaw({
         openSlots: 0,
+      }),
+    ]);
+
+    expect(results).toEqual([]);
+  });
+
+  it("suppresses stale HOST_MANAGED rows from list projection", () => {
+    const results = mapRawListingsToPublic([
+      createHostManagedRaw({
+        lastConfirmedAt: "2026-03-20T12:30:00.000Z",
+      }),
+    ]);
+
+    expect(results).toEqual([]);
+  });
+
+  it("suppresses migration-review rows from list projection even with positive slots", () => {
+    const results = mapRawListingsToPublic([
+      createHostManagedRaw({
+        availabilitySource: "LEGACY_BOOKING",
+        openSlots: null,
+        availableSlots: 2,
+        totalSlots: 2,
+        needsMigrationReview: true,
+      }),
+      createHostManagedRaw({
+        availabilitySource: "LEGACY_BOOKING",
+        openSlots: null,
+        availableSlots: 2,
+        totalSlots: 2,
+        needsMigrationReview: false,
+        statusReason: "MIGRATION_REVIEW",
       }),
     ]);
 

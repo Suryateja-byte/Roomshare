@@ -1496,5 +1496,19 @@ describe("slotThreshold parameterization", () => {
         }
       }
     });
+
+    it("enforces the requested move-in lower bound inside the host-managed eligibility SQL", async () => {
+      mockQueryWithTimeout.mockResolvedValue([{ total: BigInt(0) }]);
+
+      await getListingsPaginated({
+        moveInDate: "2026-05-01",
+        bounds: { minLat: 30, maxLat: 40, minLng: -120, maxLng: -110 },
+      });
+
+      for (const call of mockQueryWithTimeout.mock.calls) {
+        const sql = call[0] as string;
+        expect(sql).toContain(`l."moveInDate"::date <= $4::date`);
+      }
+    });
   });
 });

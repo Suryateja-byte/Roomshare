@@ -21,6 +21,7 @@ import { queryWithTimeout } from "@/lib/query-timeout";
 import { buildAvailabilitySqlFragments } from "@/lib/availability";
 import {
   buildPublicAvailability,
+  isListingEligibleForPublicSearch,
   resolvePublicAvailability,
 } from "@/lib/search/public-availability";
 
@@ -64,6 +65,8 @@ import {
 // Re-export for backward compatibility
 export { MIN_QUERY_LENGTH, MAX_QUERY_LENGTH };
 
+const HOST_MANAGED_STALE_INTERVAL_SQL = "INTERVAL '21 days'";
+
 // Unified count function for API routes
 // Gates behind isSearchDocEnabled() to support V1 fallback
 // Returns null for unbounded browse (no query, no bounds) or >100 results
@@ -96,6 +99,101 @@ export async function getLimitedCount(
 function parseDateOnly(value: string): Date {
   const [year, month, day] = value.split("-").map(Number);
   return new Date(year, month - 1, day);
+}
+
+function buildListSearchAvailabilitySqlFragments(options: {
+  minAvailableSlots?: number;
+  moveInDate?: string;
+  endDate?: string;
+  startParamIndex: number;
+}) {
+  const {
+    effectiveAvailableSql: legacyEffectiveAvailableSql,
+    params: legacyParams,
+    nextParamIndex: legacyNextParamIndex,
+  } = buildAvailabilitySqlFragments({
+    listingIdRef: 'l.id',
+    totalSlotsRef: 'l."totalSlots"',
+    minAvailableSlots: options.minAvailableSlots,
+    startDate: options.moveInDate,
+    endDate: options.endDate,
+    startParamIndex: options.startParamIndex,
+  });
+
+  const params = [...legacyParams];
+  let paramIndex = legacyNextParamIndex;
+  const hostManagedMinSlotsParam = `$${paramIndex++}`;
+  params.push(Math.max(options.minAvailableSlots ?? 1, 1));
+
+  let requestedMoveInDateParam: string | null = null;
+  let hostManagedMoveInLowerBoundSql = "TRUE";
+  if (options.moveInDate) {
+    requestedMoveInDateParam = `$${paramIndex++}`;
+    params.push(parseDateOnly(options.moveInDate));
+    hostManagedMoveInLowerBoundSql = `
+      l."moveInDate"::date <= ${requestedMoveInDateParam}::date
+    `.trim();
+  }
+
+  let hostManagedWindowCoverageSql = "TRUE";
+  if (options.endDate) {
+    const requestedEndDateParam = `$${paramIndex++}`;
+    params.push(parseDateOnly(options.endDate));
+    hostManagedWindowCoverageSql = `(
+      l."availableUntil" IS NULL
+      OR l."availableUntil"::date >= ${requestedEndDateParam}::date
+    )`;
+  } else if (requestedMoveInDateParam) {
+    hostManagedWindowCoverageSql = `(
+      l."availableUntil" IS NULL
+      OR l."availableUntil"::date >= ${requestedMoveInDateParam}::date
+    )`;
+  }
+
+  const hostManagedSlotConditionSql = `(
+    l."openSlots" IS NOT NULL
+    AND l."openSlots" >= ${hostManagedMinSlotsParam}
+    AND l."totalSlots" >= 1
+    AND l."openSlots" <= l."totalSlots"
+    AND l."moveInDate" IS NOT NULL
+    AND ${hostManagedMoveInLowerBoundSql}
+    AND l."minStayMonths" >= 1
+    AND (
+      l."availableUntil" IS NULL
+      OR l."availableUntil"::date >= CURRENT_DATE
+    )
+    AND (
+      l."availableUntil" IS NULL
+      OR l."availableUntil"::date >= l."moveInDate"::date
+    )
+    AND ${hostManagedWindowCoverageSql}
+    AND (
+      l."lastConfirmedAt" IS NULL
+      OR l."lastConfirmedAt" > NOW() - ${HOST_MANAGED_STALE_INTERVAL_SQL}
+    )
+  )`;
+
+  return {
+    effectiveAvailableSql: `(
+      CASE
+        WHEN l."availabilitySource" = 'HOST_MANAGED'
+          THEN GREATEST(COALESCE(l."openSlots", 0), 0)::int
+        ELSE ${legacyEffectiveAvailableSql}
+      END
+    )`,
+    slotConditionSql: `(
+      (
+        l."availabilitySource" = 'HOST_MANAGED'
+        AND ${hostManagedSlotConditionSql}
+      )
+      OR (
+        l."availabilitySource" <> 'HOST_MANAGED'
+        AND ${legacyEffectiveAvailableSql} >= ${hostManagedMinSlotsParam}
+      )
+    )`,
+    params,
+    nextParamIndex: paramIndex,
+  };
 }
 
 // hasValidCoordinates, crossesAntimeridian, ListingWithMetadata — see @/lib/search-types
@@ -702,11 +800,9 @@ export async function getListingsPaginated(
       slotConditionSql,
       params: availabilityParams,
       nextParamIndex,
-    } = buildAvailabilitySqlFragments({
-      listingIdRef: 'l.id',
-      totalSlotsRef: 'l."totalSlots"',
+    } = buildListSearchAvailabilitySqlFragments({
       minAvailableSlots,
-      startDate: moveInDate,
+      moveInDate,
       endDate,
       startParamIndex: 1,
     });
@@ -717,6 +813,8 @@ export async function getListingsPaginated(
     const conditions: string[] = [
       slotConditionSql,
       "l.status = 'ACTIVE'",
+      `COALESCE(l."needsMigrationReview", FALSE) = FALSE`,
+      `COALESCE(l."statusReason", '') <> 'MIGRATION_REVIEW'`,
       // Exclude listings with invalid coordinates (null, zero, or out of range)
       "ST_X(loc.coords::geometry) IS NOT NULL",
       "ST_Y(loc.coords::geometry) IS NOT NULL",
@@ -928,6 +1026,7 @@ export async function getListingsPaginated(
             l."minStayMonths",
             l."lastConfirmedAt",
             l."statusReason",
+            l."needsMigrationReview",
             l.status,
             l."createdAt",
             l."viewCount",
@@ -993,7 +1092,13 @@ export async function getListingsPaginated(
           }
         );
 
-        if (!resolvedAvailability.isPubliclyAvailable) {
+        if (
+          !isListingEligibleForPublicSearch({
+            needsMigrationReview: l.needsMigrationReview,
+            statusReason: l.statusReason,
+            resolvedAvailability,
+          })
+        ) {
           return null;
         }
 
@@ -1093,17 +1198,17 @@ async function getListingsCountEfficient(
     slotConditionSql,
     params: availabilityParams,
     nextParamIndex,
-  } = buildAvailabilitySqlFragments({
-    listingIdRef: 'l.id',
-    totalSlotsRef: 'l."totalSlots"',
+  } = buildListSearchAvailabilitySqlFragments({
     minAvailableSlots,
-    startDate: moveInDate,
+    moveInDate,
     endDate,
     startParamIndex: 1,
   });
   const conditions: string[] = [
     slotConditionSql,
     "l.status = 'ACTIVE'",
+    `COALESCE(l."needsMigrationReview", FALSE) = FALSE`,
+    `COALESCE(l."statusReason", '') <> 'MIGRATION_REVIEW'`,
     // Exclude listings with invalid coordinates
     "ST_X(loc.coords::geometry) IS NOT NULL",
     "ST_Y(loc.coords::geometry) IS NOT NULL",
