@@ -86,15 +86,32 @@ export function sanitizeMapListing(
     return null;
   }
 
+  const publicAvailability =
+    listing.publicAvailability ??
+    buildPublicAvailability({
+      availabilitySource: listing.availabilitySource,
+      openSlots:
+        listing.openSlots == null ? null : toSafeSlotCount(listing.openSlots),
+      availableSlots: toSafeSlotCount(listing.availableSlots),
+      totalSlots: toSafeSlotCount(
+        listing.totalSlots,
+        toSafeSlotCount(listing.availableSlots)
+      ),
+      moveInDate: toSafeDate(listing.moveInDate),
+      availableUntil: toSafeDate(listing.availableUntil),
+      minStayMonths:
+        listing.minStayMonths == null
+          ? undefined
+          : Math.max(1, toSafeSlotCount(listing.minStayMonths, 1)),
+      lastConfirmedAt: toSafeDate(listing.lastConfirmedAt),
+    });
+
   return {
     id: listing.id,
     title: listing.title?.trim() || "",
     price: Math.max(0, toFiniteNumber(listing.price, 0)),
-    availableSlots: toSafeSlotCount(listing.availableSlots),
-    totalSlots: toSafeSlotCount(
-      listing.totalSlots,
-      toSafeSlotCount(listing.availableSlots)
-    ),
+    availableSlots: toSafeSlotCount(publicAvailability.openSlots),
+    totalSlots: toSafeSlotCount(publicAvailability.totalSlots),
     images: Array.isArray(listing.images)
       ? listing.images.filter(
           (image): image is string => typeof image === "string"
@@ -102,15 +119,11 @@ export function sanitizeMapListing(
       : [],
     roomType: toOptionalTrimmedString(listing.roomType),
     moveInDate: toSafeDate(listing.moveInDate) ?? undefined,
-    availabilitySource: listing.availabilitySource,
-    openSlots:
-      listing.openSlots == null ? null : toSafeSlotCount(listing.openSlots),
-    availableUntil: toSafeDate(listing.availableUntil),
-    minStayMonths:
-      listing.minStayMonths == null
-        ? undefined
-        : Math.max(1, toSafeSlotCount(listing.minStayMonths, 1)),
-    lastConfirmedAt: toSafeDate(listing.lastConfirmedAt),
+    availabilitySource: publicAvailability.availabilitySource,
+    openSlots: toSafeSlotCount(publicAvailability.openSlots),
+    availableUntil: toSafeDate(publicAvailability.availableUntil),
+    minStayMonths: Math.max(1, toSafeSlotCount(publicAvailability.minStayMonths, 1)),
+    lastConfirmedAt: toSafeDate(publicAvailability.lastConfirmedAt),
     status: toOptionalTrimmedString(listing.status),
     statusReason: toOptionalTrimmedString(listing.statusReason) ?? null,
     location: {
@@ -119,25 +132,7 @@ export function sanitizeMapListing(
       lat,
       lng,
     },
-    publicAvailability:
-      listing.publicAvailability ??
-      buildPublicAvailability({
-        availabilitySource: listing.availabilitySource,
-        availableSlots: toSafeSlotCount(listing.availableSlots),
-        totalSlots: toSafeSlotCount(
-          listing.totalSlots,
-          toSafeSlotCount(listing.availableSlots)
-        ),
-        moveInDate: toSafeDate(listing.moveInDate),
-        openSlots:
-          listing.openSlots == null ? null : toSafeSlotCount(listing.openSlots),
-        availableUntil: toSafeDate(listing.availableUntil),
-        minStayMonths:
-          listing.minStayMonths == null
-            ? undefined
-            : Math.max(1, toSafeSlotCount(listing.minStayMonths, 1)),
-        lastConfirmedAt: toSafeDate(listing.lastConfirmedAt),
-      }),
+    publicAvailability,
     tier: listing.tier,
     avgRating: toFiniteNumber(listing.avgRating, 0),
     reviewCount: Math.max(

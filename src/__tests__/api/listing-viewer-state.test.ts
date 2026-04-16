@@ -47,6 +47,10 @@ jest.mock("@/lib/env", () => ({
   },
 }));
 
+jest.mock("@/lib/with-rate-limit", () => ({
+  withRateLimit: jest.fn().mockResolvedValue(null),
+}));
+
 import { GET } from "@/app/api/listings/[id]/viewer-state/route";
 import { prisma } from "@/lib/prisma";
 import { auth } from "@/auth";
@@ -58,6 +62,7 @@ const mockedFeatures = features as {
 };
 
 describe("GET /api/listings/[id]/viewer-state", () => {
+  const now = new Date("2026-04-15T12:00:00.000Z");
   const mockSession = {
     user: {
       id: "user-123",
@@ -75,6 +80,7 @@ describe("GET /api/listings/[id]/viewer-state", () => {
     });
 
   beforeEach(() => {
+    jest.useFakeTimers().setSystemTime(now);
     jest.clearAllMocks();
     (auth as jest.Mock).mockResolvedValue(mockSession);
     (prisma.listing.findUnique as jest.Mock).mockResolvedValue({
@@ -94,6 +100,10 @@ describe("GET /api/listings/[id]/viewer-state", () => {
     (prisma.booking.findFirst as jest.Mock).mockResolvedValue(null);
     mockedFeatures.contactFirstListings = false;
     mockedFeatures.softHoldsEnabled = true;
+  });
+
+  afterEach(() => {
+    jest.useRealTimers();
   });
 
   it("returns isLoggedIn: false for unauthenticated user with 200 status", async () => {
@@ -270,6 +280,58 @@ describe("GET /api/listings/[id]/viewer-state", () => {
     expect(data.canBook).toBe(false);
     expect(data.canHold).toBe(false);
     expect(data.bookingDisabledReason).toBe("LISTING_UNAVAILABLE");
+  });
+
+  it("treats stale HOST_MANAGED listings as unavailable for contact flow", async () => {
+    (prisma.listing.findUnique as jest.Mock).mockResolvedValue({
+      ownerId: "owner-456",
+      status: "ACTIVE",
+      availabilitySource: "HOST_MANAGED",
+      availableSlots: 2,
+      totalSlots: 3,
+      openSlots: 2,
+      moveInDate: new Date("2026-05-01T00:00:00.000Z"),
+      availableUntil: new Date("2026-12-01T00:00:00.000Z"),
+      minStayMonths: 1,
+      lastConfirmedAt: new Date("2026-03-20T12:00:00.000Z"),
+      statusReason: null,
+    });
+
+    const response = await GET(createRequest(), routeContext);
+    const data = await response.json();
+
+    expect(response.status).toBe(200);
+    expect(data.availabilitySource).toBe("HOST_MANAGED");
+    expect(data.canContact).toBe(false);
+    expect(data.canBook).toBe(false);
+    expect(data.canHold).toBe(false);
+    expect(data.bookingDisabledReason).toBe("LISTING_UNAVAILABLE");
+  });
+
+  it("keeps unconfirmed but valid HOST_MANAGED listings contactable", async () => {
+    (prisma.listing.findUnique as jest.Mock).mockResolvedValue({
+      ownerId: "owner-456",
+      status: "ACTIVE",
+      availabilitySource: "HOST_MANAGED",
+      availableSlots: 2,
+      totalSlots: 3,
+      openSlots: 2,
+      moveInDate: new Date("2026-05-01T00:00:00.000Z"),
+      availableUntil: new Date("2026-12-01T00:00:00.000Z"),
+      minStayMonths: 1,
+      lastConfirmedAt: null,
+      statusReason: null,
+    });
+
+    const response = await GET(createRequest(), routeContext);
+    const data = await response.json();
+
+    expect(response.status).toBe(200);
+    expect(data.availabilitySource).toBe("HOST_MANAGED");
+    expect(data.canContact).toBe(true);
+    expect(data.canBook).toBe(false);
+    expect(data.canHold).toBe(false);
+    expect(data.bookingDisabledReason).toBe("CONTACT_ONLY");
   });
 
   it("returns verify-email CTA when the viewer is logged in but unverified", async () => {

@@ -33,17 +33,26 @@ import { withRateLimit } from "@/lib/with-rate-limit";
 
 describe("GET /api/listings/[id]/status", () => {
   const mockParams = Promise.resolve({ id: "listing-123" });
+  const now = new Date("2026-04-15T12:00:00.000Z");
 
   beforeEach(() => {
+    jest.useFakeTimers().setSystemTime(now);
     jest.clearAllMocks();
     (withRateLimit as jest.Mock).mockResolvedValue(null);
+  });
+
+  afterEach(() => {
+    jest.useRealTimers();
   });
 
   describe("rate limiting", () => {
     it("applies rate limiting to prevent polling abuse", async () => {
       (prisma.listing.findUnique as jest.Mock).mockResolvedValue({
         id: "listing-123",
+        availabilitySource: "LEGACY_BOOKING",
         status: "ACTIVE",
+        statusReason: null,
+        lastConfirmedAt: null,
         updatedAt: new Date("2026-01-15T00:00:00Z"),
       });
 
@@ -79,7 +88,10 @@ describe("GET /api/listings/[id]/status", () => {
       const updatedAt = new Date("2026-01-15T12:00:00Z");
       (prisma.listing.findUnique as jest.Mock).mockResolvedValue({
         id: "listing-123",
+        availabilitySource: "HOST_MANAGED",
         status: "ACTIVE",
+        statusReason: null,
+        lastConfirmedAt: new Date("2026-04-01T12:00:00.000Z"),
         updatedAt,
       });
 
@@ -93,12 +105,22 @@ describe("GET /api/listings/[id]/status", () => {
       expect(data.id).toBe("listing-123");
       expect(data.status).toBe("ACTIVE");
       expect(data.updatedAt).toBe(updatedAt);
+      expect(data.publicStatus).toBe("AVAILABLE");
+      expect(data.statusReason).toBeNull();
+      expect(data.searchEligible).toBe(true);
+      expect(data.freshnessBucket).toBe("REMINDER");
+      expect(data.lastConfirmedAt).toBe("2026-04-01T12:00:00.000Z");
+      expect(data.staleAt).toBe("2026-04-22T12:00:00.000Z");
+      expect(data.autoPauseAt).toBe("2026-05-01T12:00:00.000Z");
     });
 
-    it("returns listing status for PAUSED listing", async () => {
+    it("returns NEEDS_RECONFIRMATION for stale auto-paused listings", async () => {
       (prisma.listing.findUnique as jest.Mock).mockResolvedValue({
         id: "listing-123",
         status: "PAUSED",
+        availabilitySource: "HOST_MANAGED",
+        statusReason: "STALE_AUTO_PAUSE",
+        lastConfirmedAt: new Date("2026-03-10T12:00:00.000Z"),
         updatedAt: new Date(),
       });
 
@@ -110,12 +132,18 @@ describe("GET /api/listings/[id]/status", () => {
       expect(response.status).toBe(200);
       const data = await response.json();
       expect(data.status).toBe("PAUSED");
+      expect(data.publicStatus).toBe("NEEDS_RECONFIRMATION");
+      expect(data.searchEligible).toBe(false);
+      expect(data.freshnessBucket).toBe("AUTO_PAUSE_DUE");
     });
 
-    it("returns listing status for RENTED listing", async () => {
+    it("returns stale host-managed listings as not search eligible", async () => {
       (prisma.listing.findUnique as jest.Mock).mockResolvedValue({
         id: "listing-123",
-        status: "RENTED",
+        status: "ACTIVE",
+        availabilitySource: "HOST_MANAGED",
+        statusReason: null,
+        lastConfirmedAt: new Date("2026-03-20T12:00:00.000Z"),
         updatedAt: new Date(),
       });
 
@@ -126,13 +154,18 @@ describe("GET /api/listings/[id]/status", () => {
 
       expect(response.status).toBe(200);
       const data = await response.json();
-      expect(data.status).toBe("RENTED");
+      expect(data.status).toBe("ACTIVE");
+      expect(data.searchEligible).toBe(false);
+      expect(data.freshnessBucket).toBe("STALE");
     });
 
-    it("queries only the necessary fields (id, status, updatedAt)", async () => {
+    it("queries only the necessary fields for the additive snapshot", async () => {
       (prisma.listing.findUnique as jest.Mock).mockResolvedValue({
         id: "listing-123",
         status: "ACTIVE",
+        availabilitySource: "LEGACY_BOOKING",
+        statusReason: null,
+        lastConfirmedAt: null,
         updatedAt: new Date(),
       });
 
@@ -145,7 +178,10 @@ describe("GET /api/listings/[id]/status", () => {
         where: { id: "listing-123" },
         select: {
           id: true,
+          availabilitySource: true,
           status: true,
+          statusReason: true,
+          lastConfirmedAt: true,
           updatedAt: true,
         },
       });
@@ -191,6 +227,9 @@ describe("GET /api/listings/[id]/status", () => {
       (prisma.listing.findUnique as jest.Mock).mockResolvedValue({
         id: "listing-123",
         status: "ACTIVE",
+        availabilitySource: "LEGACY_BOOKING",
+        statusReason: null,
+        lastConfirmedAt: null,
         updatedAt: new Date(),
       });
 

@@ -8,7 +8,10 @@ import {
   isSearchDocEnabled,
   buildOrderByClause,
   buildSearchDocWhereConditions,
+  mapRawListingsToPublic,
+  mapRawMapListingsToPublic,
 } from "@/lib/search/search-doc-queries";
+import { buildPublicAvailability } from "@/lib/search/public-availability";
 
 describe("buildSearchDocWhereConditions", () => {
   it("excludes listings with null coordinates from map results (F1.1)", () => {
@@ -283,6 +286,90 @@ describe("buildOrderByClause", () => {
       // All must end with id ASC for stable ordering
       expect(result).toContain("d.id ASC");
     }
+  });
+});
+
+describe("SearchDoc projection mapping", () => {
+  function createHostManagedRaw(overrides: Record<string, unknown> = {}) {
+    return {
+      id: "listing-1",
+      title: "Host Managed Listing",
+      description: "Quiet room",
+      price: 1200,
+      images: ["img-1.jpg"],
+      availableSlots: 2,
+      totalSlots: 4,
+      availabilitySource: "HOST_MANAGED" as const,
+      openSlots: 2,
+      availableUntil: "2026-12-01",
+      minStayMonths: 3,
+      lastConfirmedAt: "2026-04-15T12:30:00.000Z",
+      status: "ACTIVE",
+      statusReason: null,
+      amenities: ["WiFi"],
+      houseRules: ["No Smoking"],
+      householdLanguages: ["English"],
+      primaryHomeLanguage: "English",
+      leaseDuration: "6_months",
+      roomType: "private",
+      moveInDate: "2026-06-01",
+      viewCount: 10,
+      city: "San Francisco",
+      state: "CA",
+      lat: 37.7749,
+      lng: -122.4194,
+      avgRating: 4.5,
+      reviewCount: 8,
+      primaryImage: "img-1.jpg",
+      recommendedScore: 12.4,
+      createdAt: "2026-01-15T00:00:00.000Z",
+      ...overrides,
+    };
+  }
+
+  it("suppresses invalid HOST_MANAGED rows from list projection", () => {
+    const results = mapRawListingsToPublic([
+      createHostManagedRaw({
+        openSlots: 0,
+      }),
+    ]);
+
+    expect(results).toEqual([]);
+  });
+
+  it("suppresses invalid HOST_MANAGED rows from map projection", () => {
+    const results = mapRawMapListingsToPublic([
+      createHostManagedRaw({
+        openSlots: 0,
+      }),
+    ]);
+
+    expect(results).toEqual([]);
+  });
+
+  it("keeps map and list availability fields aligned for valid HOST_MANAGED rows", () => {
+    const listResult = mapRawListingsToPublic([createHostManagedRaw()])[0];
+    const mapResult = mapRawMapListingsToPublic([createHostManagedRaw()])[0];
+
+    expect(listResult.publicAvailability).toMatchObject(
+      buildPublicAvailability({
+        availabilitySource: "HOST_MANAGED",
+        openSlots: 2,
+        totalSlots: 4,
+        availableFrom: "2026-06-01",
+        availableUntil: "2026-12-01",
+        minStayMonths: 3,
+        lastConfirmedAt: "2026-04-15T12:30:00.000Z",
+      })
+    );
+    expect(mapResult.publicAvailability).toMatchObject(
+      listResult.publicAvailability
+    );
+    expect(mapResult.availabilitySource).toBe(
+      mapResult.publicAvailability.availabilitySource
+    );
+    expect(mapResult.availableSlots).toBe(mapResult.publicAvailability.openSlots);
+    expect(mapResult.totalSlots).toBe(mapResult.publicAvailability.totalSlots);
   });
 });
 

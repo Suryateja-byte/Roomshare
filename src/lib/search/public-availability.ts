@@ -1,5 +1,20 @@
 export type PublicAvailabilitySource = "LEGACY_BOOKING" | "HOST_MANAGED";
 
+export type FreshnessBucket =
+  | "NOT_APPLICABLE"
+  | "UNCONFIRMED"
+  | "NORMAL"
+  | "REMINDER"
+  | "STALE"
+  | "AUTO_PAUSE_DUE";
+
+export type PublicStatus =
+  | "AVAILABLE"
+  | "FULL"
+  | "CLOSED"
+  | "PAUSED"
+  | "NEEDS_RECONFIRMATION";
+
 export interface PublicAvailability {
   availabilitySource: PublicAvailabilitySource;
   openSlots: number;
@@ -10,7 +25,17 @@ export interface PublicAvailability {
   lastConfirmedAt: string | null;
 }
 
-export interface ResolvedPublicAvailability extends PublicAvailability {
+export interface FreshnessReadModel {
+  freshnessBucket: FreshnessBucket;
+  searchEligible: boolean;
+  staleAt: string | null;
+  autoPauseAt: string | null;
+  publicStatus: PublicStatus;
+}
+
+export interface ResolvedPublicAvailability
+  extends PublicAvailability,
+    FreshnessReadModel {
   effectiveAvailableSlots: number;
   isValid: boolean;
   isPubliclyAvailable: boolean;
@@ -49,6 +74,17 @@ interface ResolvePublicAvailabilityForListingsOptions {
   now?: Date;
   legacyAvailabilityByListing?: Map<string, LegacyAvailabilitySnapshotLike>;
 }
+
+interface BuildFreshnessReadModelOptions {
+  now?: Date;
+  isValid?: boolean;
+  isPubliclyAvailable?: boolean;
+}
+
+const DAY_IN_MS = 24 * 60 * 60 * 1000;
+const REMINDER_THRESHOLD_DAYS = 14;
+const STALE_THRESHOLD_DAYS = 21;
+const AUTO_PAUSE_THRESHOLD_DAYS = 30;
 
 function toSafeCount(value: number | null | undefined, fallback = 0): number {
   if (typeof value !== "number" || !Number.isFinite(value)) {
@@ -89,6 +125,131 @@ function toIsoString(value: Date | string | null | undefined): string | null {
   }
 
   return Number.isNaN(value.getTime()) ? null : value.toISOString();
+}
+
+function addDaysToIsoString(value: string, days: number): string | null {
+  const parsed = new Date(value);
+  if (Number.isNaN(parsed.getTime())) {
+    return null;
+  }
+
+  return new Date(parsed.getTime() + days * DAY_IN_MS).toISOString();
+}
+
+function resolvePublicStatus(
+  status: string | null | undefined,
+  statusReason: string | null | undefined
+): PublicStatus {
+  if (status === "ACTIVE") {
+    return "AVAILABLE";
+  }
+
+  if (status === "RENTED") {
+    return statusReason === "NO_OPEN_SLOTS" ? "FULL" : "CLOSED";
+  }
+
+  if (statusReason === "STALE_AUTO_PAUSE") {
+    return "NEEDS_RECONFIRMATION";
+  }
+
+  return "PAUSED";
+}
+
+function resolveHostManagedFreshness(
+  lastConfirmedAt: Date | string | null | undefined,
+  now: Date
+): Pick<FreshnessReadModel, "freshnessBucket" | "staleAt" | "autoPauseAt"> {
+  const normalizedLastConfirmedAt = toIsoString(lastConfirmedAt);
+
+  if (!normalizedLastConfirmedAt) {
+    return {
+      freshnessBucket: "UNCONFIRMED",
+      staleAt: null,
+      autoPauseAt: null,
+    };
+  }
+
+  const reminderAt = addDaysToIsoString(
+    normalizedLastConfirmedAt,
+    REMINDER_THRESHOLD_DAYS
+  );
+  const staleAt = addDaysToIsoString(
+    normalizedLastConfirmedAt,
+    STALE_THRESHOLD_DAYS
+  );
+  const autoPauseAt = addDaysToIsoString(
+    normalizedLastConfirmedAt,
+    AUTO_PAUSE_THRESHOLD_DAYS
+  );
+  const nowTime = now.getTime();
+  const reminderAtTime = reminderAt ? new Date(reminderAt).getTime() : null;
+  const staleAtTime = staleAt ? new Date(staleAt).getTime() : null;
+  const autoPauseAtTime = autoPauseAt ? new Date(autoPauseAt).getTime() : null;
+
+  if (autoPauseAtTime !== null && nowTime >= autoPauseAtTime) {
+    return {
+      freshnessBucket: "AUTO_PAUSE_DUE",
+      staleAt,
+      autoPauseAt,
+    };
+  }
+
+  if (staleAtTime !== null && nowTime >= staleAtTime) {
+    return {
+      freshnessBucket: "STALE",
+      staleAt,
+      autoPauseAt,
+    };
+  }
+
+  if (reminderAtTime !== null && nowTime >= reminderAtTime) {
+    return {
+      freshnessBucket: "REMINDER",
+      staleAt,
+      autoPauseAt,
+    };
+  }
+
+  return {
+    freshnessBucket: "NORMAL",
+    staleAt,
+    autoPauseAt,
+  };
+}
+
+export function buildFreshnessReadModel(
+  listing: PublicAvailabilityListingInput,
+  options: BuildFreshnessReadModelOptions = {}
+): FreshnessReadModel {
+  const publicStatus = resolvePublicStatus(listing.status, listing.statusReason);
+
+  if (listing.availabilitySource !== "HOST_MANAGED") {
+    return {
+      freshnessBucket: "NOT_APPLICABLE",
+      searchEligible: listing.status === "ACTIVE",
+      staleAt: null,
+      autoPauseAt: null,
+      publicStatus,
+    };
+  }
+
+  const freshness = resolveHostManagedFreshness(
+    listing.lastConfirmedAt,
+    options.now ?? new Date()
+  );
+  const isPubliclyAvailable =
+    options.isPubliclyAvailable ?? listing.status === "ACTIVE";
+  const isValid = options.isValid ?? isPubliclyAvailable;
+
+  return {
+    ...freshness,
+    publicStatus,
+    searchEligible:
+      isValid &&
+      isPubliclyAvailable &&
+      freshness.freshnessBucket !== "STALE" &&
+      freshness.freshnessBucket !== "AUTO_PAUSE_DUE",
+  };
 }
 
 export function buildPublicAvailability(
@@ -185,12 +346,18 @@ export function buildHostManagedPublicAvailability(
     availabilitySource: "HOST_MANAGED",
   });
   const isValid = isHostManagedAvailabilityValid(listing, now);
+  const freshnessReadModel = buildFreshnessReadModel(listing, {
+    now,
+    isValid,
+    isPubliclyAvailable: isValid,
+  });
 
   return {
     ...availability,
     effectiveAvailableSlots: isValid ? availability.openSlots : 0,
     isValid,
     isPubliclyAvailable: isValid,
+    ...freshnessReadModel,
   };
 }
 
@@ -217,12 +384,17 @@ export function buildLegacyPublicAvailability(
     openSlots: effectiveAvailableSlots,
     totalSlots,
   });
+  const freshnessReadModel = buildFreshnessReadModel({
+    ...listing,
+    availabilitySource: "LEGACY_BOOKING",
+  });
 
   return {
     ...availability,
     effectiveAvailableSlots,
     isValid: true,
     isPubliclyAvailable: listing.status === "ACTIVE",
+    ...freshnessReadModel,
   };
 }
 

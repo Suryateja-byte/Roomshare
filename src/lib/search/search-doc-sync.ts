@@ -1,25 +1,31 @@
 /**
- * Synchronous Search Document Upsert
+ * Shared SearchDoc projection helpers.
  *
- * Provides immediate search document creation for new listings.
- * This eliminates the 6-hour delay from batch processing, making
- * new listings immediately searchable.
- *
- * Usage:
- * - Call after listing creation to ensure immediate visibility
- * - Falls back gracefully on error (logs but doesn't fail the parent operation)
- * - Uses the same field mappings and scoring as the cron job
+ * Immediate sync and cron refresh both route through the same single-listing
+ * projection path so they classify and repair the same source states.
  */
 
 import "server-only";
 
 import { getAvailability } from "@/lib/availability";
-import { prisma } from "@/lib/prisma";
 import { logger, sanitizeErrorMessage } from "@/lib/logger";
+import { prisma } from "@/lib/prisma";
+import { hasValidCoordinates } from "@/lib/search-types";
+import {
+  resolvePublicAvailability,
+  type ResolvedPublicAvailability,
+} from "@/lib/search/public-availability";
 import { computeRecommendedScore } from "@/lib/search/recommended-score";
-import { resolvePublicAvailability } from "@/lib/search/public-availability";
 
-interface ListingSearchData {
+export type SearchDocProjectionOutcome =
+  | "upsert"
+  | "suppress_delete"
+  | "defer_retry"
+  | "confirmed_orphan";
+
+export type SearchDocDivergenceReason = "missing_doc" | "stale_doc" | null;
+
+interface ListingSearchSnapshot {
   id: string;
   ownerId: string;
   title: string;
@@ -45,26 +51,34 @@ interface ListingSearchData {
   status: string;
   bookingMode: string;
   createdAt: Date;
-  // Location data
-  address: string;
-  city: string;
-  state: string;
-  zip: string;
+  updatedAt: Date;
+  address: string | null;
+  city: string | null;
+  state: string | null;
+  zip: string | null;
   lat: number | null;
   lng: number | null;
-  // Review aggregation
   avgRating: number;
   reviewCount: number;
+  docUpdatedAt: Date | null;
+}
+
+export interface SearchDocProjectionResult {
+  listingId: string;
+  outcome: SearchDocProjectionOutcome;
+  divergenceReason: SearchDocDivergenceReason;
+  hadExistingDoc: boolean;
 }
 
 /**
- * Fetch listing data with location and review aggregation
- * Returns null if listing or location not found
+ * Fetches the listing snapshot required to project SearchDoc state.
+ * Uses a left join on Location so "listing exists but cannot be projected yet"
+ * is distinguishable from a truly missing listing row.
  */
-async function fetchListingSearchData(
+async function fetchListingSearchSnapshot(
   listingId: string
-): Promise<ListingSearchData | null> {
-  const results = await prisma.$queryRaw<ListingSearchData[]>`
+): Promise<ListingSearchSnapshot | null> {
+  const results = await prisma.$queryRaw<ListingSearchSnapshot[]>`
     SELECT
       l.id,
       l."ownerId" as "ownerId",
@@ -91,6 +105,7 @@ async function fetchListingSearchData(
       l.status::text as status,
       l."booking_mode" as "bookingMode",
       l."createdAt" as "createdAt",
+      l."updatedAt" as "updatedAt",
       loc.address,
       loc.city,
       loc.state,
@@ -98,16 +113,41 @@ async function fetchListingSearchData(
       ST_X(loc.coords::geometry) as lng,
       ST_Y(loc.coords::geometry) as lat,
       COALESCE(AVG(r.rating), 0)::float as "avgRating",
-      COUNT(r.id)::int as "reviewCount"
+      COUNT(r.id)::int as "reviewCount",
+      MAX(sd.doc_updated_at) as "docUpdatedAt"
     FROM "Listing" l
-    JOIN "Location" loc ON l.id = loc."listingId"
+    LEFT JOIN "Location" loc ON l.id = loc."listingId"
     LEFT JOIN "Review" r ON l.id = r."listingId"
+    LEFT JOIN listing_search_docs sd ON sd.id = l.id
     WHERE l.id = ${listingId}
-      AND loc.coords IS NOT NULL
     GROUP BY l.id, loc.id
   `;
 
-  return results.length > 0 ? results[0] : null;
+  return results[0] ?? null;
+}
+
+function truncateListingId(listingId: string): string {
+  return `${listingId.slice(0, 8)}...`;
+}
+
+function getProjectionDivergenceReason(
+  listing: ListingSearchSnapshot
+): SearchDocDivergenceReason {
+  if (!listing.docUpdatedAt) {
+    return "missing_doc";
+  }
+
+  return listing.docUpdatedAt < listing.updatedAt ? "stale_doc" : null;
+}
+
+function canProjectSearchDocument(listing: ListingSearchSnapshot): boolean {
+  return (
+    listing.address != null &&
+    listing.city != null &&
+    listing.state != null &&
+    listing.zip != null &&
+    hasValidCoordinates(listing.lat, listing.lng)
+  );
 }
 
 async function deleteSearchDocument(listingId: string): Promise<void> {
@@ -117,49 +157,24 @@ async function deleteSearchDocument(listingId: string): Promise<void> {
   `;
 }
 
-/**
- * Upsert a search document for a single listing
- */
-async function upsertSearchDocument(listing: ListingSearchData): Promise<void> {
-  const legacyAvailability =
-    listing.availabilitySource === "LEGACY_BOOKING"
-      ? await getAvailability(listing.id)
-      : null;
-  const resolvedAvailability = resolvePublicAvailability(listing, {
-    legacySnapshot: legacyAvailability,
-  });
-
-  if (
-    listing.availabilitySource === "HOST_MANAGED" &&
-    !resolvedAvailability.isPubliclyAvailable
-  ) {
-    await deleteSearchDocument(listing.id);
-    logger.sync.info("Search doc sync hid invalid host-managed listing", {
-      action: "upsertSearchDocSync",
-      listingId: listing.id.slice(0, 8) + "...",
-      outcome: "host_managed_hidden_invalid",
-    });
-    return;
-  }
-
+async function writeSearchDocument(
+  listing: ListingSearchSnapshot,
+  resolvedAvailability: ResolvedPublicAvailability
+): Promise<void> {
   const recommendedScore = computeRecommendedScore(
     listing.avgRating,
     listing.viewCount,
     listing.reviewCount,
     listing.createdAt
   );
-
-  // Compute lowercase arrays for case-insensitive filtering
-  const amenitiesLower = listing.amenities.map((a) => a.toLowerCase());
-  const houseRulesLower = listing.houseRules.map((r) => r.toLowerCase());
-  const householdLanguagesLower = listing.householdLanguages.map((l) =>
-    l.toLowerCase()
+  const amenitiesLower = listing.amenities.map((amenity) =>
+    amenity.toLowerCase()
+  );
+  const houseRulesLower = listing.houseRules.map((rule) => rule.toLowerCase());
+  const householdLanguagesLower = listing.householdLanguages.map((language) =>
+    language.toLowerCase()
   );
 
-  // Note: search_tsv (tsvector) is auto-populated by a BEFORE INSERT/UPDATE
-  // trigger defined in migration 20260116000000_search_doc_fts. The trigger
-  // builds a weighted tsvector from title (A), city/state (B), description (C).
-  // No need to set it here — the DB handles it on every INSERT and UPDATE.
   await prisma.$executeRaw`
     INSERT INTO listing_search_docs (
       id, owner_id, title, description, price, images,
@@ -221,49 +236,110 @@ async function upsertSearchDocument(listing: ListingSearchData): Promise<void> {
 }
 
 /**
- * Synchronously upsert a search document for a listing.
+ * Classify and repair SearchDoc state for a single listing.
  *
- * This function:
- * 1. Fetches the listing with all required relations (location, reviews)
- * 2. Computes the recommended_score using the same formula as cron
- * 3. Executes INSERT ON CONFLICT DO UPDATE to listing_search_docs
+ * The result is intentionally explicit so callers can decide whether the dirty
+ * flag should be cleared (`upsert`, `suppress_delete`, `confirmed_orphan`) or
+ * retained for a later retry (`defer_retry`).
+ */
+export async function projectSearchDocument(
+  listingId: string
+): Promise<SearchDocProjectionResult> {
+  const listing = await fetchListingSearchSnapshot(listingId);
+
+  if (!listing) {
+    await deleteSearchDocument(listingId);
+    return {
+      listingId,
+      outcome: "confirmed_orphan",
+      divergenceReason: null,
+      hadExistingDoc: false,
+    };
+  }
+
+  const divergenceReason = getProjectionDivergenceReason(listing);
+  const hadExistingDoc = listing.docUpdatedAt != null;
+
+  if (!canProjectSearchDocument(listing)) {
+    await deleteSearchDocument(listing.id);
+    return {
+      listingId: listing.id,
+      outcome: "defer_retry",
+      divergenceReason,
+      hadExistingDoc,
+    };
+  }
+
+  const resolvedAvailability =
+    listing.availabilitySource === "LEGACY_BOOKING"
+      ? resolvePublicAvailability(listing, {
+          legacySnapshot: await getAvailability(listing.id),
+        })
+      : resolvePublicAvailability(listing);
+
+  if (
+    listing.availabilitySource === "HOST_MANAGED" &&
+    !resolvedAvailability.isPubliclyAvailable
+  ) {
+    await deleteSearchDocument(listing.id);
+    return {
+      listingId: listing.id,
+      outcome: "suppress_delete",
+      divergenceReason,
+      hadExistingDoc,
+    };
+  }
+
+  await writeSearchDocument(listing, resolvedAvailability);
+
+  return {
+    listingId: listing.id,
+    outcome: "upsert",
+    divergenceReason,
+    hadExistingDoc,
+  };
+}
+
+/**
+ * Best-effort immediate SearchDoc refresh used by source writes.
  *
- * Errors are logged but do not throw - listing creation should not fail
- * if search doc sync fails. The cron job will catch up eventually.
- *
- * @param listingId - The ID of the listing to upsert
- * @returns true if successful, false if failed
+ * Returns true for terminal handled outcomes (`upsert`, `suppress_delete`) and
+ * false when the projection must wait for the durable cron backstop.
  */
 export async function upsertSearchDocSync(listingId: string): Promise<boolean> {
   try {
-    // Fetch listing with location and review data
-    const listingData = await fetchListingSearchData(listingId);
+    const result = await projectSearchDocument(listingId);
+    const logContext = {
+      action: "upsertSearchDocSync",
+      listingId: truncateListingId(listingId),
+      outcome: result.outcome,
+      divergenceReason: result.divergenceReason ?? undefined,
+    };
 
-    if (!listingData) {
-      // This can happen if location coords are not yet set
-      // The cron job will pick it up later
-      logger.sync.warn("Search doc sync: listing or location not found", {
-        action: "upsertSearchDocSync",
-        listingId: listingId.slice(0, 8) + "...",
-      });
+    if (result.outcome === "upsert") {
+      logger.sync.info("Search doc synced successfully", logContext);
+      return true;
+    }
+
+    if (result.outcome === "suppress_delete") {
+      logger.sync.info("Search doc sync suppressed host-managed listing", logContext);
+      return true;
+    }
+
+    if (result.outcome === "confirmed_orphan") {
+      logger.sync.warn("Search doc sync confirmed orphan listing", logContext);
       return false;
     }
 
-    // Upsert the search document
-    await upsertSearchDocument(listingData);
-
-    logger.sync.info("Search doc synced successfully", {
-      action: "upsertSearchDocSync",
-      listingId: listingId.slice(0, 8) + "...",
-    });
-
-    return true;
+    logger.sync.warn(
+      "Search doc sync deferred pending projection prerequisites",
+      logContext
+    );
+    return false;
   } catch (error) {
-    // Log but don't throw - we don't want to fail listing creation
-    // The dirty flag mechanism will ensure eventual consistency
     logger.sync.error("Search doc sync failed", {
       action: "upsertSearchDocSync",
-      listingId: listingId.slice(0, 8) + "...",
+      listingId: truncateListingId(listingId),
       error: sanitizeErrorMessage(error),
     });
     return false;

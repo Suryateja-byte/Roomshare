@@ -62,6 +62,7 @@ function buildViewerContract(options: {
   isOwner: boolean;
   isEmailVerified: boolean;
   isListingPubliclyAvailable: boolean;
+  isListingSearchEligible: boolean;
   availabilitySource: AvailabilitySource;
 }): {
   primaryCta: PrimaryCta;
@@ -83,7 +84,7 @@ function buildViewerContract(options: {
     !options.isOwner &&
     options.isLoggedIn &&
     options.isEmailVerified &&
-    options.isListingPubliclyAvailable;
+    options.isListingSearchEligible;
 
   const canBook =
     options.availabilitySource !== "HOST_MANAGED" &&
@@ -98,7 +99,8 @@ function buildViewerContract(options: {
   let bookingDisabledReason: BookingDisabledReason = null;
   if (!canBook) {
     if (options.availabilitySource === "HOST_MANAGED") {
-      bookingDisabledReason = options.isListingPubliclyAvailable
+      bookingDisabledReason =
+        options.isListingPubliclyAvailable && options.isListingSearchEligible
         ? "CONTACT_ONLY"
         : "LISTING_UNAVAILABLE";
     } else if (features.contactFirstListings) {
@@ -159,6 +161,7 @@ export async function GET(request: Request, { params }: RouteContext) {
     resolvedAvailability?.availabilitySource ?? "LEGACY_BOOKING";
   const isListingPubliclyAvailable =
     resolvedAvailability?.isPubliclyAvailable ?? false;
+  const isListingSearchEligible = resolvedAvailability?.searchEligible ?? false;
 
   if (!session?.user?.id) {
     const viewerContract = buildViewerContract({
@@ -166,6 +169,7 @@ export async function GET(request: Request, { params }: RouteContext) {
       isOwner: false,
       isEmailVerified: false,
       isListingPubliclyAvailable,
+      isListingSearchEligible,
       availabilitySource,
     });
     const response = NextResponse.json({
@@ -214,6 +218,7 @@ export async function GET(request: Request, { params }: RouteContext) {
       isOwner,
       isEmailVerified,
       isListingPubliclyAvailable,
+      isListingSearchEligible,
       availabilitySource,
     });
 
@@ -254,6 +259,7 @@ export async function GET(request: Request, { params }: RouteContext) {
           isOwner,
           isEmailVerified,
           isListingPubliclyAvailable,
+          isListingSearchEligible,
           availabilitySource,
         }),
         reviewEligibility: buildReviewEligibility({

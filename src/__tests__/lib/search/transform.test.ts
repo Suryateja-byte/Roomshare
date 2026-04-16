@@ -150,6 +150,66 @@ describe("search/transform", () => {
       expect(item.badges).toContain("near-match");
       expect(item.badges).toContain("multi-room");
     });
+
+    it("keeps alias fields aligned with host-managed publicAvailability", () => {
+      const publicAvailability = buildPublicAvailability({
+        availabilitySource: "HOST_MANAGED",
+        openSlots: 2,
+        totalSlots: 4,
+        availableFrom: "2026-06-01",
+        availableUntil: "2026-12-01",
+        minStayMonths: 3,
+        lastConfirmedAt: "2026-04-15T12:30:00.000Z",
+      });
+      const item = transformToListItem(
+        createListingData({
+          availableSlots: 99,
+          totalSlots: 99,
+          availabilitySource: "HOST_MANAGED",
+          openSlots: 2,
+          moveInDate: new Date("2026-06-01T00:00:00.000Z"),
+          availableUntil: new Date("2026-12-01T00:00:00.000Z"),
+          minStayMonths: 3,
+          lastConfirmedAt: new Date("2026-04-15T12:30:00.000Z"),
+          publicAvailability,
+        })
+      );
+
+      expect(item.availableSlots).toBe(2);
+      expect(item.totalSlots).toBe(4);
+      expect(item.publicAvailability).toEqual(publicAvailability);
+    });
+
+    it("builds host-managed fallback publicAvailability when none is provided", () => {
+      const listing = createListingData({
+        availabilitySource: "HOST_MANAGED",
+        openSlots: 2,
+        availableSlots: 2,
+        totalSlots: 4,
+        moveInDate: new Date("2026-06-01T00:00:00.000Z"),
+        availableUntil: new Date("2026-12-01T00:00:00.000Z"),
+        minStayMonths: 3,
+        lastConfirmedAt: new Date("2026-04-15T12:30:00.000Z"),
+      });
+      const item = transformToListItem({
+        ...listing,
+        publicAvailability: undefined as never,
+      });
+
+      expect(item.publicAvailability).toEqual(
+        buildPublicAvailability({
+          availabilitySource: "HOST_MANAGED",
+          openSlots: 2,
+          totalSlots: 4,
+          availableFrom: "2026-06-01",
+          availableUntil: "2026-12-01",
+          minStayMonths: 3,
+          lastConfirmedAt: "2026-04-15T12:30:00.000Z",
+        })
+      );
+      expect(item.availableSlots).toBe(2);
+      expect(item.totalSlots).toBe(4);
+    });
   });
 
   describe("transformToListItems", () => {
@@ -317,6 +377,40 @@ describe("search/transform", () => {
       expect(geojson.type).toBe("FeatureCollection");
       expect(geojson.features).toEqual([]);
     });
+
+    it("keeps geojson availability aliases aligned for host-managed fallbacks", () => {
+      const geojson = transformToGeoJSON([
+        {
+          id: "host-1",
+          title: "Host Managed",
+          price: 1400,
+          images: ["img.jpg"],
+          availableSlots: 9,
+          totalSlots: 9,
+          availabilitySource: "HOST_MANAGED",
+          openSlots: 2,
+          moveInDate: new Date("2026-06-01T00:00:00.000Z"),
+          availableUntil: new Date("2026-12-01T00:00:00.000Z"),
+          minStayMonths: 3,
+          lastConfirmedAt: new Date("2026-04-15T12:30:00.000Z"),
+          publicAvailability: undefined as never,
+          location: { lat: 37.7749, lng: -122.4194 },
+        },
+      ]);
+
+      expect(geojson.features[0].properties.availableSlots).toBe(2);
+      expect(geojson.features[0].properties.publicAvailability).toEqual(
+        buildPublicAvailability({
+          availabilitySource: "HOST_MANAGED",
+          openSlots: 2,
+          totalSlots: 9,
+          availableFrom: "2026-06-01",
+          availableUntil: "2026-12-01",
+          minStayMonths: 3,
+          lastConfirmedAt: "2026-04-15T12:30:00.000Z",
+        })
+      );
+    });
   });
 
   describe("transformToPins", () => {
@@ -419,6 +513,41 @@ describe("search/transform", () => {
       expect(primaryCount).toBe(15);
       expect(miniCount).toBe(5);
     });
+
+    it("keeps pin publicAvailability aligned with source listing aliases", () => {
+      const publicAvailability = buildPublicAvailability({
+        availabilitySource: "HOST_MANAGED",
+        openSlots: 2,
+        totalSlots: 4,
+        availableFrom: "2026-06-01",
+        availableUntil: "2026-12-01",
+        minStayMonths: 3,
+        lastConfirmedAt: "2026-04-15T12:30:00.000Z",
+      });
+      const pins = transformToPins([
+        createMapListingData("host-1", 37.7749, -122.4194, 1500),
+        {
+          id: "host-2",
+          title: "Host Managed",
+          price: 1500,
+          images: ["img.jpg"],
+          availableSlots: 99,
+          totalSlots: 99,
+          availabilitySource: "HOST_MANAGED",
+          openSlots: 2,
+          moveInDate: new Date("2026-06-01T00:00:00.000Z"),
+          availableUntil: new Date("2026-12-01T00:00:00.000Z"),
+          minStayMonths: 3,
+          lastConfirmedAt: new Date("2026-04-15T12:30:00.000Z"),
+          publicAvailability,
+          location: { lat: 37.7849, lng: -122.4194 },
+        },
+      ]);
+
+      expect(pins.find((pin) => pin.id === "host-2")?.publicAvailability).toEqual(
+        publicAvailability
+      );
+    });
   });
 
   describe("transformToMapResponse", () => {
@@ -499,6 +628,44 @@ describe("search/transform", () => {
 
       const response = transformToMapResponse(listings);
       expect(response.pins).toBeUndefined();
+    });
+
+    it("keeps geojson and pins aligned on host-managed publicAvailability", () => {
+      const publicAvailability = buildPublicAvailability({
+        availabilitySource: "HOST_MANAGED",
+        openSlots: 2,
+        totalSlots: 4,
+        availableFrom: "2026-06-01",
+        availableUntil: "2026-12-01",
+        minStayMonths: 3,
+        lastConfirmedAt: "2026-04-15T12:30:00.000Z",
+      });
+      const listings: MapListingData[] = [
+        {
+          id: "host-1",
+          title: "Host Managed",
+          price: 1400,
+          images: ["img.jpg"],
+          availableSlots: 99,
+          totalSlots: 99,
+          availabilitySource: "HOST_MANAGED",
+          openSlots: 2,
+          moveInDate: new Date("2026-06-01T00:00:00.000Z"),
+          availableUntil: new Date("2026-12-01T00:00:00.000Z"),
+          minStayMonths: 3,
+          lastConfirmedAt: new Date("2026-04-15T12:30:00.000Z"),
+          publicAvailability,
+          location: { lat: 37.7749, lng: -122.4194 },
+        },
+      ];
+
+      const response = transformToMapResponse(listings);
+
+      expect(response.geojson.features[0].properties.publicAvailability).toEqual(
+        publicAvailability
+      );
+      expect(response.geojson.features[0].properties.availableSlots).toBe(2);
+      expect(response.pins?.[0].publicAvailability).toEqual(publicAvailability);
     });
   });
 });

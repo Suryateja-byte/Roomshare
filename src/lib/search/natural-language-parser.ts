@@ -21,6 +21,7 @@ export interface ParsedNLQuery {
   houseRules: string[];
   leaseDuration?: string;
   minAvailableSlots?: string;
+  availabilityIntent?: "availability";
 }
 
 interface PatternRule {
@@ -141,15 +142,20 @@ const SLOT_PATTERNS: PatternRule[] = [
   },
 ];
 
+const AVAILABILITY_INTENT_PATTERN =
+  /\b(?:book(?:ing|ed)?|reserve(?:d|s|ing)?|hold(?:ing|s|ed)?)\b/i;
+
 // Words/phrases to strip from input before treating remainder as location
 const STRIP_PATTERNS = [
   // Price patterns
   /(?:under|below|less than|max|up to|at most|over|above|more than|min|at least|starting at|from|between)\s*\$?\s*\d[\d,]*(?:\s*(?:and|&|[-–to]+)\s*\$?\s*\d[\d,]*)*/gi,
   /\$\s*\d[\d,]*/g,
+  // Availability intent language
+  /\b(?:book(?:ing|ed)?|reserve(?:d|s|ing)?|hold(?:ing|s|ed)?)\b/gi,
   // Connectors
   /\b(?:in|near|around|close to|by|with|has|and|a|an|the|for|that|is|are)\b/gi,
   // Room types
-  /\b(?:private\s+room|shared\s+room|entire\s+place|whole\s+place|entire\s+home|full\s+apartment|studio|room)\b/gi,
+  /\b(?:private\s+room|shared\s+room|entire\s+place|whole\s+place|entire\s+home|full\s+apartment|studio|room|place|spot)\b/gi,
   // Amenities
   /\b(?:wifi|wi-fi|internet|ac|air\s*condition(?:ing|ed)?|parking|garage|washer|laundry|dryer|kitchen|cook|gym|fitness|pool|swimming|furnished|furniture)\b/gi,
   // House rules
@@ -233,6 +239,11 @@ export function parseNaturalLanguageQuery(input: string): ParsedNLQuery | null {
       hasStructuredData = true;
       break;
     }
+  }
+
+  if (AVAILABILITY_INTENT_PATTERN.test(trimmed)) {
+    result.availabilityIntent = "availability";
+    hasStructuredData = true;
   }
 
   if (!hasStructuredData) return null;

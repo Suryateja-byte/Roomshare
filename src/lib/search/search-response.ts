@@ -2,7 +2,8 @@ import type { ListingData, MapListingData } from "@/lib/search-types";
 import { generateSearchQueryHash } from "./query-hash";
 import type { NormalizedSearchQuery } from "./search-query";
 
-export const SEARCH_RESPONSE_VERSION = "2026-04-15.phase2-public-availability";
+export const SEARCH_RESPONSE_VERSION =
+  "2026-04-15.phase2-public-availability.search-contract-v1";
 
 export type SearchBackendSource = "v2" | "v1-fallback" | "map-api";
 
@@ -65,6 +66,7 @@ export function getSearchQueryHash(query: NormalizedSearchQuery): string {
     roomType: query.roomType,
     leaseDuration: query.leaseDuration,
     moveInDate: query.moveInDate,
+    endDate: query.endDate,
     genderPreference: query.genderPreference,
     householdGender: query.householdGender,
     bookingMode: query.bookingMode,

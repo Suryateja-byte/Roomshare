@@ -515,6 +515,64 @@ describe("search-v2-service", () => {
       );
     });
 
+    it("preserves host-managed publicAvailability across list and map response surfaces", async () => {
+      const hostManagedAvailability = buildPublicAvailability({
+        availabilitySource: "HOST_MANAGED",
+        openSlots: 2,
+        totalSlots: 4,
+        availableFrom: "2026-06-01",
+        availableUntil: "2026-12-01",
+        minStayMonths: 3,
+        lastConfirmedAt: "2026-04-15T12:30:00.000Z",
+      });
+      const listItems = [
+        makeListingData({
+          id: "host-listing",
+          availableSlots: 2,
+          totalSlots: 4,
+          availabilitySource: "HOST_MANAGED",
+          openSlots: 2,
+          availableUntil: new Date("2026-12-01T00:00:00.000Z"),
+          minStayMonths: 3,
+          lastConfirmedAt: new Date("2026-04-15T12:30:00.000Z"),
+          publicAvailability: hostManagedAvailability,
+        }),
+      ];
+      const mapItems = [
+        makeMapListingData({
+          id: "host-listing",
+          availableSlots: 2,
+          totalSlots: 4,
+          availabilitySource: "HOST_MANAGED",
+          openSlots: 2,
+          availableUntil: new Date("2026-12-01T00:00:00.000Z"),
+          minStayMonths: 3,
+          lastConfirmedAt: new Date("2026-04-15T12:30:00.000Z"),
+          publicAvailability: hostManagedAvailability,
+        }),
+      ];
+      setupDefaultMocks({ listItems, mapListings: mapItems });
+
+      const result = await executeSearchV2({
+        rawParams: {
+          minLat: "37.7",
+          maxLat: "37.85",
+          minLng: "-122.52",
+          maxLng: "-122.35",
+        },
+      });
+
+      expect(result.response?.list.items[0]?.publicAvailability).toEqual(
+        hostManagedAvailability
+      );
+      expect(result.paginatedResult?.items[0]?.publicAvailability).toEqual(
+        hostManagedAvailability
+      );
+      expect(result.response?.map.pins?.[0]?.publicAvailability).toEqual(
+        hostManagedAvailability
+      );
+    });
+
     it("uses vibeQuery for semantic ranking while preserving the location query", async () => {
       setupDefaultMocks();
       (features as Record<string, unknown>).semanticSearch = true;

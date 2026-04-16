@@ -56,12 +56,12 @@ describe("search/hash", () => {
     it("should generate same hash for arrays in different order", () => {
       const params1: HashableFilterParams = {
         amenities: ["wifi", "parking", "gym"],
-        houseRules: ["no_smoking", "no_pets"],
+        houseRules: ["Smoking allowed", "Pets allowed"],
       };
 
       const params2: HashableFilterParams = {
         amenities: ["gym", "wifi", "parking"],
-        houseRules: ["no_pets", "no_smoking"],
+        houseRules: ["Pets allowed", "Smoking allowed"],
       };
 
       expect(generateQueryHash(params1)).toBe(generateQueryHash(params2));
@@ -181,6 +181,57 @@ describe("search/hash", () => {
       const params2: HashableFilterParams = { query: "test" };
 
       expect(generateQueryHash(params1)).toBe(generateQueryHash(params2));
+    });
+
+    it("treats structural booking mode aliases as the same semantics", () => {
+      const params1: HashableFilterParams = {
+        bookingMode: "PER_SLOT",
+        minAvailableSlots: 2,
+      };
+      const params2: HashableFilterParams = {
+        bookingMode: "SHARED",
+        minAvailableSlots: 2,
+      };
+
+      expect(generateQueryHash(params1)).toBe(generateQueryHash(params2));
+    });
+
+    it("treats deprecated booking-only values as no-ops", () => {
+      const params1: HashableFilterParams = { bookingMode: "INSTANT" };
+      const params2: HashableFilterParams = { bookingMode: "REQUEST" };
+      const params3: HashableFilterParams = {};
+
+      expect(generateQueryHash(params1)).toBe(generateQueryHash(params3));
+      expect(generateQueryHash(params2)).toBe(generateQueryHash(params3));
+    });
+
+    it("matches the versioned golden hash for a representative normalized query", () => {
+      const params: HashableFilterParams = {
+        query: "Austin",
+        vibeQuery: "quiet roommates",
+        minPrice: 700,
+        maxPrice: 1400,
+        amenities: ["Parking", "Wifi"],
+        houseRules: ["Pets allowed"],
+        languages: ["English", "Spanish"],
+        roomType: "Private Room",
+        leaseDuration: "6 months",
+        moveInDate: "2026-05-01",
+        endDate: "2026-06-01",
+        genderPreference: "NO_PREFERENCE",
+        householdGender: "MIXED",
+        bookingMode: "PER_SLOT",
+        minAvailableSlots: 2,
+        nearMatches: true,
+        bounds: {
+          minLat: 30.1,
+          maxLat: 30.5,
+          minLng: -97.9,
+          maxLng: -97.5,
+        },
+      };
+
+      expect(generateQueryHash(params)).toBe("41d26badfeb46b49");
     });
   });
 

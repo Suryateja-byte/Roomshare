@@ -34,7 +34,11 @@ import {
   getFuturePeakReservedLoad,
   syncFutureInventoryTotalSlots,
 } from "@/lib/availability";
-import { requiresDedicatedHostManagedWritePath } from "@/lib/listings/host-managed-write";
+import {
+  prepareHostManagedListingWrite,
+  requiresDedicatedHostManagedWritePath,
+  type HostManagedListingWriteCurrent,
+} from "@/lib/listings/host-managed-write";
 
 const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL;
 const supabaseServiceKey = process.env.SUPABASE_SERVICE_ROLE_KEY;
@@ -125,6 +129,73 @@ const updateListingSchema = z.object({
   images: z.array(supabaseImageUrlSchema).max(10).optional(),
   bookingMode: listingBookingModeSchema,
 });
+
+const listingStatusSchema = z.enum(["ACTIVE", "PAUSED", "RENTED"]);
+const nonEmptyNumberishSchema = z
+  .union([z.number(), z.string().trim().min(1)])
+  .pipe(z.coerce.number());
+const integerLikeSchema = nonEmptyNumberishSchema.pipe(z.number().int());
+const nonNegativeIntegerLikeSchema = nonEmptyNumberishSchema.pipe(
+  z.number().int().min(0)
+);
+const optionalHostManagedDateSchema = z
+  .union([
+    z
+      .string()
+      .trim()
+      .min(1)
+      .refine((value) => !Number.isNaN(Date.parse(value)), {
+        message: "Invalid date format",
+      })
+      .transform((value) => new Date(value)),
+    z.null(),
+  ])
+  .optional();
+
+const hostManagedPatchSchema = z
+  .object({
+    expectedVersion: nonNegativeIntegerLikeSchema,
+    openSlots: z.union([integerLikeSchema, z.null()]).optional(),
+    totalSlots: integerLikeSchema.optional(),
+    moveInDate: optionalHostManagedDateSchema,
+    availableUntil: optionalHostManagedDateSchema,
+    minStayMonths: integerLikeSchema.optional(),
+    status: listingStatusSchema.optional(),
+  })
+  .strict();
+
+type LockedListingRow = HostManagedListingWriteCurrent & {
+  ownerId: string;
+  bookingMode: string;
+};
+
+const HOST_MANAGED_PATCH_KEYS = new Set([
+  "expectedVersion",
+  "openSlots",
+  "totalSlots",
+  "moveInDate",
+  "availableUntil",
+  "minStayMonths",
+  "status",
+]);
+
+function isRecord(value: unknown): value is Record<string, unknown> {
+  return value !== null && typeof value === "object" && !Array.isArray(value);
+}
+
+function isPureHostManagedPatchPayload(
+  value: unknown
+): value is Record<string, unknown> {
+  if (!isRecord(value)) {
+    return false;
+  }
+
+  const keys = Object.keys(value);
+  return (
+    keys.includes("expectedVersion") &&
+    keys.every((key) => HOST_MANAGED_PATCH_KEYS.has(key))
+  );
+}
 
 export async function DELETE(
   request: Request,
@@ -373,39 +444,6 @@ export async function PATCH(
       );
     }
 
-    const parsed = updateListingSchema.safeParse(rawBody);
-    if (!parsed.success) {
-      return NextResponse.json(
-        {
-          error: "Validation failed",
-          fields: parsed.error.flatten().fieldErrors,
-        },
-        { status: 400 }
-      );
-    }
-
-    const {
-      title,
-      description,
-      price,
-      amenities,
-      houseRules,
-      totalSlots,
-      address,
-      city,
-      state,
-      zip,
-      moveInDate,
-      leaseDuration,
-      roomType,
-      householdLanguages,
-      genderPreference,
-      householdGender,
-      primaryHomeLanguage,
-      images,
-      bookingMode,
-    } = parsed.data;
-
     // Check listing exists and user is the owner
     const listing = await prisma.listing.findUnique({
       where: { id },
@@ -416,384 +454,502 @@ export async function PATCH(
       return NextResponse.json({ error: "Listing not found" }, { status: 404 });
     }
 
-    // Validate language codes
-    if (householdLanguages && householdLanguages.length > 0) {
-      const langResult = householdLanguagesSchema.safeParse(householdLanguages);
-      if (!langResult.success) {
-        return NextResponse.json(
-          { error: "Invalid language codes" },
-          { status: 400 }
-        );
-      }
-    }
-
-    // Validate image URL ownership (prevent cross-user URL injection)
-    // URLs already stored on the listing are trusted (e.g. seed data
-    // uploaded by a different user); only NEW URLs must match the
-    // current user's storage prefix.
-    if (Array.isArray(images) && images.length > 0) {
-      const existingImageSet = new Set(listing.images as string[]);
-      const expectedPrefix = `listings/${userId}/`;
-      const hasInvalidImage = images.some((url) => {
-        if (existingImageSet.has(url)) return false; // already trusted
-        const storagePath = extractStoragePath(url);
-        return !storagePath || !storagePath.startsWith(expectedPrefix);
-      });
-      if (hasInvalidImage) {
-        return NextResponse.json(
-          { error: "One or more image URLs are invalid" },
-          { status: 400 }
-        );
-      }
-    }
-
-    // Check title for discriminatory language patterns (BE-H2)
-    if (title) {
-      const titleCheck = checkListingLanguageCompliance(title);
-      if (!titleCheck.allowed) {
-        await logger.warn("Listing title failed compliance check", {
-          route: "/api/listings/[id]",
-          method: "PATCH",
-          userId: userId.slice(0, 8) + "...",
-          field: "title",
-        });
-        return NextResponse.json(
-          {
-            error: titleCheck.message ?? "Content policy violation",
-            field: "title",
-          },
-          { status: 400 }
-        );
-      }
-    }
-
-    // Check description for discriminatory language patterns
-    if (description) {
-      const complianceCheck = checkListingLanguageCompliance(description);
-      if (!complianceCheck.allowed) {
-        await logger.warn("Listing description failed compliance check", {
-          route: "/api/listings/[id]",
-          method: "PATCH",
-          userId: userId.slice(0, 8) + "...",
-          field: "description",
-        });
-        return NextResponse.json(
-          {
-            error: complianceCheck.message ?? "Content policy violation",
-            field: "description",
-          },
-          { status: 400 }
-        );
-      }
-    }
-
-    // Check if address changed
-    const addressChanged =
-      listing.location &&
-      (listing.location.address !== address ||
-        listing.location.city !== city ||
-        listing.location.state !== state ||
-        listing.location.zip !== zip);
-
-    // Geocode BEFORE transaction if address changed
-    let coords: { lat: number; lng: number } | null = null;
-    if (addressChanged && listing.location) {
-      const fullAddress = `${address}, ${city}, ${state} ${zip}`;
-      try {
-        const geoResult = await geocodeAddress(fullAddress);
-        if (geoResult.status === "not_found") {
-          await logger.warn("Geocoding failed for listing update", {
-            route: "/api/listings/[id]",
-            method: "PATCH",
-            userId: userId.slice(0, 8) + "...",
-            city,
-            state,
-          });
-          return NextResponse.json(
-            {
-              error: "Could not find this address. Please check and try again.",
-            },
-            { status: 400 }
-          );
-        }
-        if (geoResult.status === "error") {
-          return NextResponse.json(
-            {
-              error:
-                "Address verification temporarily unavailable. Please try again.",
-            },
-            { status: 503, headers: { "Retry-After": "10" } }
-          );
-        }
-        coords = { lat: geoResult.lat, lng: geoResult.lng };
-      } catch (geoError) {
-        if (isCircuitOpenError(geoError)) {
-          return NextResponse.json(
-            {
-              error:
-                "Address verification service temporarily unavailable. Please try again shortly.",
-            },
-            { status: 503, headers: { "Retry-After": "30" } }
-          );
-        }
-        throw geoError;
-      }
-    }
-
-    const normalizedAmenities = normalizeStringList(amenities);
-    const normalizedHouseRules = normalizeStringList(houseRules);
-
-    // Allowlist validation for amenities and houseRules
-    const invalidAmenity = normalizedAmenities.find(
-      (item) =>
-        !VALID_AMENITIES.some((v) => v.toLowerCase() === item.toLowerCase())
-    );
-    if (invalidAmenity) {
-      return NextResponse.json(
-        { error: "Invalid amenity value" },
-        { status: 400 }
-      );
-    }
-    const invalidRule = normalizedHouseRules.find(
-      (item) =>
-        !VALID_HOUSE_RULES.some((v) => v.toLowerCase() === item.toLowerCase())
-    );
-    if (invalidRule) {
-      return NextResponse.json(
-        { error: "Invalid house rule value" },
-        { status: 400 }
-      );
-    }
-
-    // Phase 3: Feature flag gate for WHOLE_UNIT booking mode
-    if (bookingMode === "WHOLE_UNIT") {
-      const { features } = await import("@/lib/env");
-      if (!features.wholeUnitMode) {
-        return NextResponse.json(
-          { error: "Whole-unit booking mode is not currently available." },
-          { status: 400 }
-        );
-      }
-    }
+    const useDedicatedHostManagedPatch =
+      listing.availabilitySource === "HOST_MANAGED" &&
+      isPureHostManagedPatchPayload(rawBody);
 
     let result;
-    try {
-      // Ownership is re-validated inside the transaction under row lock
-      // to prevent TOCTOU between pre-check and update.
-      result = await prisma.$transaction(async (tx) => {
-        const [lockedListing] = await tx.$queryRaw<
-          Array<{
-            ownerId: string;
-            totalSlots: number;
-            availableSlots: number;
-            bookingMode: string;
-            availabilitySource: "LEGACY_BOOKING" | "HOST_MANAGED";
-            moveInDate: Date | null;
-          }>
-        >`
-                    SELECT "ownerId", "totalSlots", "availableSlots", "booking_mode" as "bookingMode", "availabilitySource", "moveInDate"
-                    FROM "Listing"
-                    WHERE "id" = ${id}
-                    FOR UPDATE
-                `;
+    let removedImageUrls: string[] = [];
 
-        if (!lockedListing || lockedListing.ownerId !== userId) {
-          throw new Error("NOT_FOUND");
-        }
-
-        const nextMoveInDate = moveInDate ? new Date(moveInDate) : null;
-        const moveInDateChanged =
-          (lockedListing.moveInDate?.toISOString().slice(0, 10) ?? null) !==
-          (nextMoveInDate?.toISOString().slice(0, 10) ?? null);
-        const bookingModeChanged =
-          bookingMode !== undefined &&
-          bookingMode !== null &&
-          bookingMode !== lockedListing.bookingMode;
-        const totalSlotsChanged = totalSlots !== lockedListing.totalSlots;
-        const hostManagedInventoryMutation =
-          requiresDedicatedHostManagedWritePath({
-            availabilitySource: lockedListing.availabilitySource,
-            moveInDateChanged,
-            bookingModeChanged,
-            totalSlotsChanged,
-          });
-
-        if (hostManagedInventoryMutation) {
-          throw new Error("HOST_MANAGED_WRITE_PATH_REQUIRED");
-        }
-
-        // Phase 3: Block mode changes when future ACCEPTED bookings exist (D5/D8)
-        // PENDING bookings are NOT blocked — they are requests, not commitments
-        if (bookingModeChanged) {
-          const futureAccepted = await tx.booking.count({
-            where: {
-              listingId: id,
-              status: "ACCEPTED",
-              endDate: { gte: new Date() },
-            },
-          });
-          if (futureAccepted > 0) {
-            throw new Error("BOOKING_MODE_CONFLICT");
-          }
-        }
-
-        // Phase 4: Block totalSlots reduction below committed bookings + active holds
-        if (
-          lockedListing.availabilitySource === "LEGACY_BOOKING" &&
-          totalSlots !== undefined &&
-          totalSlots !== null &&
-          totalSlots < lockedListing.totalSlots
-        ) {
-          const peakReservedLoad = await getFuturePeakReservedLoad(tx, id);
-          if (totalSlots < peakReservedLoad) {
-            throw new Error("SLOTS_REDUCTION_BLOCKED");
-          }
-        }
-
-        const currentAvailability =
-          lockedListing.availabilitySource === "LEGACY_BOOKING"
-            ? await getAvailability(id, { tx })
-            : null;
-        if (
-          lockedListing.availabilitySource === "LEGACY_BOOKING" &&
-          !currentAvailability
-        ) {
-          throw new Error("LISTING_AVAILABILITY_NOT_FOUND");
-        }
-
-        const reservedSlotsToday = currentAvailability
-          ? currentAvailability.acceptedSlots + currentAvailability.heldSlots
-          : 0;
-
-        const updatedListing = await tx.listing.update({
-          where: { id },
-          data: {
-            title,
-            description,
-            price,
-            amenities: normalizedAmenities,
-            houseRules: normalizedHouseRules,
-            householdLanguages: Array.isArray(householdLanguages)
-              ? householdLanguages
-                  .map((l: string) => l.trim().toLowerCase())
-                  .filter(isValidLanguageCode)
-              : [],
-            genderPreference: genderPreference || null,
-            householdGender: householdGender || null,
-            ...(primaryHomeLanguage !== undefined && {
-              primaryHomeLanguage: primaryHomeLanguage || null,
-            }),
-            leaseDuration: leaseDuration || null,
-            roomType: roomType || null,
-            totalSlots,
-            ...(lockedListing.availabilitySource === "LEGACY_BOOKING" && {
-              availableSlots: Math.max(0, totalSlots - reservedSlotsToday),
-            }),
-            moveInDate: nextMoveInDate,
-            ...(Array.isArray(images) && { images }),
-            ...(bookingMode !== undefined &&
-              bookingMode !== null && { bookingMode }),
+    if (useDedicatedHostManagedPatch) {
+      const parsedHostManagedPatch = hostManagedPatchSchema.safeParse(rawBody);
+      if (!parsedHostManagedPatch.success) {
+        return NextResponse.json(
+          {
+            error: "Validation failed",
+            fields: parsedHostManagedPatch.error.flatten().fieldErrors,
           },
+          { status: 400 }
+        );
+      }
+      const hostManagedPatch = parsedHostManagedPatch.data;
+
+      try {
+        const hostManagedResult = await prisma.$transaction(async (tx) => {
+          const [lockedListing] = await tx.$queryRaw<LockedListingRow[]>`
+            SELECT
+              id,
+              "ownerId",
+              version,
+              "availabilitySource",
+              status,
+              "statusReason",
+              "needsMigrationReview",
+              "openSlots",
+              "availableSlots",
+              "totalSlots",
+              "moveInDate",
+              "availableUntil",
+              "minStayMonths",
+              "lastConfirmedAt",
+              "freshnessReminderSentAt",
+              "freshnessWarningSentAt",
+              "autoPausedAt",
+              "booking_mode" as "bookingMode"
+            FROM "Listing"
+            WHERE "id" = ${id}
+            FOR UPDATE
+          `;
+
+          if (!lockedListing || lockedListing.ownerId !== userId) {
+            throw new Error("NOT_FOUND");
+          }
+
+          const preparedWrite = prepareHostManagedListingWrite(
+            lockedListing,
+            hostManagedPatch,
+            {
+              actor: "host",
+              now: new Date(),
+            }
+          );
+
+          if (!preparedWrite.ok) {
+            return {
+              ok: false,
+              error: preparedWrite.error,
+              code: preparedWrite.code,
+              httpStatus: preparedWrite.httpStatus,
+            } as const;
+          }
+
+          const updatedListing = await tx.listing.update({
+            where: { id },
+            data: preparedWrite.data,
+          });
+
+          return { ok: true, updatedListing } as const;
         });
 
-        if (
-          lockedListing.availabilitySource === "LEGACY_BOOKING" &&
-          totalSlots !== undefined &&
-          totalSlots !== null &&
-          totalSlots !== lockedListing.totalSlots
-        ) {
-          await syncFutureInventoryTotalSlots(tx, id, totalSlots);
-        }
-
-        // Update location if it exists and address changed
-        if (addressChanged && listing.location && coords) {
-          await tx.location.update({
-            where: { id: listing.location.id },
-            data: {
-              address,
-              city,
-              state,
-              zip,
+        if (!hostManagedResult.ok) {
+          return NextResponse.json(
+            {
+              error: hostManagedResult.error,
+              code: hostManagedResult.code,
             },
-          });
-
-          await tx.$executeRaw`
-                        UPDATE "Location"
-                        SET coords = ST_SetSRID(ST_MakePoint(${coords.lng}::float8, ${coords.lat}::float8), 4326)
-                        WHERE id = ${listing.location.id}
-                    `;
+            { status: hostManagedResult.httpStatus }
+          );
         }
 
-        return updatedListing;
-      });
-    } catch (error) {
-      if (error instanceof Error) {
-        if (error.message === "NOT_FOUND") {
+        result = hostManagedResult.updatedListing;
+      } catch (error) {
+        if (error instanceof Error && error.message === "NOT_FOUND") {
           return NextResponse.json(
             { error: "Listing not found" },
             { status: 404 }
           );
         }
-        if (error.message === "BOOKING_MODE_CONFLICT") {
+        throw error;
+      }
+    } else {
+      const parsed = updateListingSchema.safeParse(rawBody);
+      if (!parsed.success) {
+        return NextResponse.json(
+          {
+            error: "Validation failed",
+            fields: parsed.error.flatten().fieldErrors,
+          },
+          { status: 400 }
+        );
+      }
+
+      const {
+        title,
+        description,
+        price,
+        amenities,
+        houseRules,
+        totalSlots,
+        address,
+        city,
+        state,
+        zip,
+        moveInDate,
+        leaseDuration,
+        roomType,
+        householdLanguages,
+        genderPreference,
+        householdGender,
+        primaryHomeLanguage,
+        images,
+        bookingMode,
+      } = parsed.data;
+
+      if (householdLanguages && householdLanguages.length > 0) {
+        const langResult = householdLanguagesSchema.safeParse(householdLanguages);
+        if (!langResult.success) {
           return NextResponse.json(
-            {
-              error:
-                "Cannot change booking mode while active bookings exist. Cancel conflicting bookings first.",
-            },
+            { error: "Invalid language codes" },
             { status: 400 }
-          );
-        }
-        if (error.message === "SLOTS_REDUCTION_BLOCKED") {
-          return NextResponse.json(
-            {
-              error:
-                "Cannot reduce total slots below the number committed by accepted bookings and active holds.",
-            },
-            { status: 400 }
-          );
-        }
-        if (error.message === "HOST_MANAGED_WRITE_PATH_REQUIRED") {
-          return NextResponse.json(
-            {
-              error:
-                "This listing now uses host-managed availability. Reload and use the new availability editor.",
-              code: "HOST_MANAGED_WRITE_PATH_REQUIRED",
-            },
-            { status: 409 }
           );
         }
       }
-      throw error;
+
+      if (Array.isArray(images) && images.length > 0) {
+        const existingImageSet = new Set(listing.images as string[]);
+        const expectedPrefix = `listings/${userId}/`;
+        const hasInvalidImage = images.some((url) => {
+          if (existingImageSet.has(url)) return false;
+          const storagePath = extractStoragePath(url);
+          return !storagePath || !storagePath.startsWith(expectedPrefix);
+        });
+        if (hasInvalidImage) {
+          return NextResponse.json(
+            { error: "One or more image URLs are invalid" },
+            { status: 400 }
+          );
+        }
+      }
+
+      if (title) {
+        const titleCheck = checkListingLanguageCompliance(title);
+        if (!titleCheck.allowed) {
+          await logger.warn("Listing title failed compliance check", {
+            route: "/api/listings/[id]",
+            method: "PATCH",
+            userId: userId.slice(0, 8) + "...",
+            field: "title",
+          });
+          return NextResponse.json(
+            {
+              error: titleCheck.message ?? "Content policy violation",
+              field: "title",
+            },
+            { status: 400 }
+          );
+        }
+      }
+
+      if (description) {
+        const complianceCheck = checkListingLanguageCompliance(description);
+        if (!complianceCheck.allowed) {
+          await logger.warn("Listing description failed compliance check", {
+            route: "/api/listings/[id]",
+            method: "PATCH",
+            userId: userId.slice(0, 8) + "...",
+            field: "description",
+          });
+          return NextResponse.json(
+            {
+              error: complianceCheck.message ?? "Content policy violation",
+              field: "description",
+            },
+            { status: 400 }
+          );
+        }
+      }
+
+      const addressChanged =
+        listing.location &&
+        (listing.location.address !== address ||
+          listing.location.city !== city ||
+          listing.location.state !== state ||
+          listing.location.zip !== zip);
+
+      let coords: { lat: number; lng: number } | null = null;
+      if (addressChanged && listing.location) {
+        const fullAddress = `${address}, ${city}, ${state} ${zip}`;
+        try {
+          const geoResult = await geocodeAddress(fullAddress);
+          if (geoResult.status === "not_found") {
+            await logger.warn("Geocoding failed for listing update", {
+              route: "/api/listings/[id]",
+              method: "PATCH",
+              userId: userId.slice(0, 8) + "...",
+              city,
+              state,
+            });
+            return NextResponse.json(
+              {
+                error: "Could not find this address. Please check and try again.",
+              },
+              { status: 400 }
+            );
+          }
+          if (geoResult.status === "error") {
+            return NextResponse.json(
+              {
+                error:
+                  "Address verification temporarily unavailable. Please try again.",
+              },
+              { status: 503, headers: { "Retry-After": "10" } }
+            );
+          }
+          coords = { lat: geoResult.lat, lng: geoResult.lng };
+        } catch (geoError) {
+          if (isCircuitOpenError(geoError)) {
+            return NextResponse.json(
+              {
+                error:
+                  "Address verification service temporarily unavailable. Please try again shortly.",
+              },
+              { status: 503, headers: { "Retry-After": "30" } }
+            );
+          }
+          throw geoError;
+        }
+      }
+
+      const normalizedAmenities = normalizeStringList(amenities);
+      const normalizedHouseRules = normalizeStringList(houseRules);
+
+      const invalidAmenity = normalizedAmenities.find(
+        (item) =>
+          !VALID_AMENITIES.some((v) => v.toLowerCase() === item.toLowerCase())
+      );
+      if (invalidAmenity) {
+        return NextResponse.json(
+          { error: "Invalid amenity value" },
+          { status: 400 }
+        );
+      }
+      const invalidRule = normalizedHouseRules.find(
+        (item) =>
+          !VALID_HOUSE_RULES.some((v) => v.toLowerCase() === item.toLowerCase())
+      );
+      if (invalidRule) {
+        return NextResponse.json(
+          { error: "Invalid house rule value" },
+          { status: 400 }
+        );
+      }
+
+      if (bookingMode === "WHOLE_UNIT") {
+        const { features } = await import("@/lib/env");
+        if (!features.wholeUnitMode) {
+          return NextResponse.json(
+            { error: "Whole-unit booking mode is not currently available." },
+            { status: 400 }
+          );
+        }
+      }
+
+      if (Array.isArray(images) && Array.isArray(listing.images)) {
+        const oldSet = new Set(listing.images);
+        const newSet = new Set(images);
+        removedImageUrls = [...oldSet].filter((url) => !newSet.has(url));
+      }
+
+      try {
+        result = await prisma.$transaction(async (tx) => {
+          const [lockedListing] = await tx.$queryRaw<LockedListingRow[]>`
+            SELECT
+              id,
+              "ownerId",
+              version,
+              "availabilitySource",
+              status,
+              "statusReason",
+              "needsMigrationReview",
+              "openSlots",
+              "availableSlots",
+              "totalSlots",
+              "moveInDate",
+              "availableUntil",
+              "minStayMonths",
+              "lastConfirmedAt",
+              "freshnessReminderSentAt",
+              "freshnessWarningSentAt",
+              "autoPausedAt",
+              "booking_mode" as "bookingMode"
+            FROM "Listing"
+            WHERE "id" = ${id}
+            FOR UPDATE
+          `;
+
+          if (!lockedListing || lockedListing.ownerId !== userId) {
+            throw new Error("NOT_FOUND");
+          }
+
+          const nextMoveInDate = moveInDate ? new Date(moveInDate) : null;
+          const moveInDateChanged =
+            (lockedListing.moveInDate?.toISOString().slice(0, 10) ?? null) !==
+            (nextMoveInDate?.toISOString().slice(0, 10) ?? null);
+          const bookingModeChanged =
+            bookingMode !== undefined &&
+            bookingMode !== null &&
+            bookingMode !== lockedListing.bookingMode;
+          const totalSlotsChanged = totalSlots !== lockedListing.totalSlots;
+          const hostManagedInventoryMutation =
+            requiresDedicatedHostManagedWritePath({
+              availabilitySource: lockedListing.availabilitySource,
+              moveInDateChanged,
+              bookingModeChanged,
+              totalSlotsChanged,
+            });
+
+          if (hostManagedInventoryMutation) {
+            throw new Error("HOST_MANAGED_WRITE_PATH_REQUIRED");
+          }
+
+          if (bookingModeChanged) {
+            const futureAccepted = await tx.booking.count({
+              where: {
+                listingId: id,
+                status: "ACCEPTED",
+                endDate: { gte: new Date() },
+              },
+            });
+            if (futureAccepted > 0) {
+              throw new Error("BOOKING_MODE_CONFLICT");
+            }
+          }
+
+          if (
+            lockedListing.availabilitySource === "LEGACY_BOOKING" &&
+            totalSlots !== undefined &&
+            totalSlots !== null &&
+            totalSlots < lockedListing.totalSlots
+          ) {
+            const peakReservedLoad = await getFuturePeakReservedLoad(tx, id);
+            if (totalSlots < peakReservedLoad) {
+              throw new Error("SLOTS_REDUCTION_BLOCKED");
+            }
+          }
+
+          const currentAvailability =
+            lockedListing.availabilitySource === "LEGACY_BOOKING"
+              ? await getAvailability(id, { tx })
+              : null;
+          if (
+            lockedListing.availabilitySource === "LEGACY_BOOKING" &&
+            !currentAvailability
+          ) {
+            throw new Error("LISTING_AVAILABILITY_NOT_FOUND");
+          }
+
+          const reservedSlotsToday = currentAvailability
+            ? currentAvailability.acceptedSlots + currentAvailability.heldSlots
+            : 0;
+
+          const updatedListing = await tx.listing.update({
+            where: { id },
+            data: {
+              title,
+              description,
+              price,
+              amenities: normalizedAmenities,
+              houseRules: normalizedHouseRules,
+              householdLanguages: Array.isArray(householdLanguages)
+                ? householdLanguages
+                    .map((l: string) => l.trim().toLowerCase())
+                    .filter(isValidLanguageCode)
+                : [],
+              genderPreference: genderPreference || null,
+              householdGender: householdGender || null,
+              ...(primaryHomeLanguage !== undefined && {
+                primaryHomeLanguage: primaryHomeLanguage || null,
+              }),
+              leaseDuration: leaseDuration || null,
+              roomType: roomType || null,
+              totalSlots,
+              ...(lockedListing.availabilitySource === "LEGACY_BOOKING" && {
+                availableSlots: Math.max(0, totalSlots - reservedSlotsToday),
+              }),
+              moveInDate: nextMoveInDate,
+              ...(Array.isArray(images) && { images }),
+              ...(bookingMode !== undefined &&
+                bookingMode !== null && { bookingMode }),
+            },
+          });
+
+          if (
+            lockedListing.availabilitySource === "LEGACY_BOOKING" &&
+            totalSlots !== undefined &&
+            totalSlots !== null &&
+            totalSlots !== lockedListing.totalSlots
+          ) {
+            await syncFutureInventoryTotalSlots(tx, id, totalSlots);
+          }
+
+          if (addressChanged && listing.location && coords) {
+            await tx.location.update({
+              where: { id: listing.location.id },
+              data: {
+                address,
+                city,
+                state,
+                zip,
+              },
+            });
+
+            await tx.$executeRaw`
+              UPDATE "Location"
+              SET coords = ST_SetSRID(ST_MakePoint(${coords.lng}::float8, ${coords.lat}::float8), 4326)
+              WHERE id = ${listing.location.id}
+            `;
+          }
+
+          return updatedListing;
+        });
+      } catch (error) {
+        if (error instanceof Error) {
+          if (error.message === "NOT_FOUND") {
+            return NextResponse.json(
+              { error: "Listing not found" },
+              { status: 404 }
+            );
+          }
+          if (error.message === "BOOKING_MODE_CONFLICT") {
+            return NextResponse.json(
+              {
+                error:
+                  "Cannot change booking mode while active bookings exist. Cancel conflicting bookings first.",
+              },
+              { status: 400 }
+            );
+          }
+          if (error.message === "SLOTS_REDUCTION_BLOCKED") {
+            return NextResponse.json(
+              {
+                error:
+                  "Cannot reduce total slots below the number committed by accepted bookings and active holds.",
+              },
+              { status: 400 }
+            );
+          }
+          if (error.message === "HOST_MANAGED_WRITE_PATH_REQUIRED") {
+            return NextResponse.json(
+              {
+                error:
+                  "This listing now uses host-managed availability. Reload and use the new availability editor.",
+                code: "HOST_MANAGED_WRITE_PATH_REQUIRED",
+              },
+              { status: 409 }
+            );
+          }
+        }
+        throw error;
+      }
     }
 
     // Clean up removed images from storage (outside transaction — best-effort)
-    if (
-      Array.isArray(images) &&
-      listing.images &&
-      supabaseUrl &&
-      supabaseServiceKey
-    ) {
-      const oldSet = new Set(listing.images as string[]);
-      const newSet = new Set(images);
-      const removedUrls = [...oldSet].filter((url) => !newSet.has(url));
-
-      if (removedUrls.length > 0) {
-        try {
-          const supabase = createClient(supabaseUrl, supabaseServiceKey);
-          const paths = removedUrls
-            .map(extractStoragePath)
-            .filter((p): p is string => p !== null);
-          if (paths.length > 0) {
-            await supabase.storage.from("images").remove(paths);
-          }
-        } catch (storageError) {
-          logger.sync.warn("Failed to clean up removed images on edit", {
-            error:
-              storageError instanceof Error ? storageError.message : "Unknown",
-            route: "/api/listings/[id]",
-            method: "PATCH",
-          });
+    if (removedImageUrls.length > 0 && supabaseUrl && supabaseServiceKey) {
+      try {
+        const supabase = createClient(supabaseUrl, supabaseServiceKey);
+        const paths = removedImageUrls
+          .map(extractStoragePath)
+          .filter((p): p is string => p !== null);
+        if (paths.length > 0) {
+          await supabase.storage.from("images").remove(paths);
         }
+      } catch (storageError) {
+        logger.sync.warn("Failed to clean up removed images on edit", {
+          error:
+            storageError instanceof Error ? storageError.message : "Unknown",
+          route: "/api/listings/[id]",
+          method: "PATCH",
+        });
       }
     }
 

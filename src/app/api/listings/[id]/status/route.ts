@@ -3,6 +3,7 @@ import { prisma } from "@/lib/prisma";
 import { withRateLimit } from "@/lib/with-rate-limit";
 import { logger, sanitizeErrorMessage } from "@/lib/logger";
 import * as Sentry from "@sentry/nextjs";
+import { buildFreshnessReadModel } from "@/lib/search/public-availability";
 
 // Public endpoint - no auth required
 // Used by ListingFreshnessCheck to verify listing availability for all viewers
@@ -23,7 +24,10 @@ export async function GET(
       where: { id },
       select: {
         id: true,
+        availabilitySource: true,
         status: true,
+        statusReason: true,
+        lastConfirmedAt: true,
         updatedAt: true,
       },
     });
@@ -32,10 +36,19 @@ export async function GET(
       return NextResponse.json({ error: "Listing not found" }, { status: 404 });
     }
 
+    const freshnessSnapshot = buildFreshnessReadModel(listing);
+
     return NextResponse.json({
       id: listing.id,
       status: listing.status,
+      statusReason: listing.statusReason,
       updatedAt: listing.updatedAt,
+      publicStatus: freshnessSnapshot.publicStatus,
+      searchEligible: freshnessSnapshot.searchEligible,
+      freshnessBucket: freshnessSnapshot.freshnessBucket,
+      lastConfirmedAt: listing.lastConfirmedAt?.toISOString() ?? null,
+      staleAt: freshnessSnapshot.staleAt,
+      autoPauseAt: freshnessSnapshot.autoPauseAt,
     });
   } catch (error) {
     logger.sync.error("Error checking listing status", {

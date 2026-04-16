@@ -1,6 +1,7 @@
-import { MAX_SAFE_PAGE, MAX_SAFE_PRICE } from "@/lib/constants";
+import { MAX_SAFE_PAGE } from "@/lib/constants";
 import {
   buildRawParamsFromSearchParams,
+  normalizeSearchFilters,
   parseSearchParams,
   type RawSearchParams,
 } from "@/lib/search-params";
@@ -114,32 +115,45 @@ function normalizeBounds(
   };
 }
 
+function getNormalizedQueryFilters(
+  query: NormalizedSearchQuery
+): FilterParams {
+  const { availabilityIntent: _availabilityIntent, ...filters } =
+    normalizeSearchFilters(
+      {
+        query: query.query,
+        locationLabel: query.locationLabel,
+        vibeQuery: query.vibeQuery,
+        minPrice: query.minPrice,
+        maxPrice: query.maxPrice,
+        amenities: query.amenities,
+        moveInDate: query.moveInDate,
+        endDate: query.endDate,
+        leaseDuration: query.leaseDuration,
+        houseRules: query.houseRules,
+        languages: query.languages,
+        roomType: query.roomType,
+        genderPreference: query.genderPreference,
+        householdGender: query.householdGender,
+        bookingMode: query.bookingMode,
+        bounds: query.bounds,
+        minAvailableSlots: query.minSlots,
+        nearMatches: query.nearMatches,
+        sort: query.sort,
+      },
+      {
+        invalidRange: "drop",
+      }
+    );
+
+  return filters;
+}
+
 export function normalizeSearchQuery(
   input: RawSearchParams | URLSearchParams
 ): NormalizedSearchQuery {
   const raw = toRawSearchParams(input);
   const parsed = parseSearchParams(raw);
-
-  const rawMinPrice = parseFiniteFloat(
-    getFirstValue(raw.minPrice) ?? getFirstValue(raw.minBudget),
-    0,
-    MAX_SAFE_PRICE
-  );
-  const rawMaxPrice = parseFiniteFloat(
-    getFirstValue(raw.maxPrice) ?? getFirstValue(raw.maxBudget),
-    0,
-    MAX_SAFE_PRICE
-  );
-
-  let minPrice = rawMinPrice;
-  let maxPrice = rawMaxPrice;
-  if (
-    minPrice !== undefined &&
-    maxPrice !== undefined &&
-    minPrice > maxPrice
-  ) {
-    [minPrice, maxPrice] = [maxPrice, minPrice];
-  }
 
   const lat = parseFiniteFloat(getFirstValue(raw.lat), -90, 90);
   const lng = parseFiniteFloat(getFirstValue(raw.lng), -180, 180);
@@ -157,8 +171,8 @@ export function normalizeSearchQuery(
     query: parsed.q,
     locationLabel: parsed.locationLabel,
     vibeQuery: parsed.what,
-    minPrice,
-    maxPrice,
+    minPrice: parsed.filterParams.minPrice,
+    maxPrice: parsed.filterParams.maxPrice,
     amenities: sortUnique(parsed.filterParams.amenities),
     moveInDate: parsed.filterParams.moveInDate,
     endDate: parsed.filterParams.endDate,
@@ -188,30 +202,53 @@ export function serializeSearchQuery(
   options: SerializeOptions = {}
 ): URLSearchParams {
   const { includePagination = true } = options;
+  const normalizedFilters = getNormalizedQueryFilters(query);
   const params = new URLSearchParams();
 
-  if (query.query) params.set("q", query.query);
-  if (query.locationLabel) params.set("where", query.locationLabel);
-  if (query.vibeQuery) params.set("what", query.vibeQuery);
-  if (query.minPrice !== undefined) params.set("minPrice", String(query.minPrice));
-  if (query.maxPrice !== undefined) params.set("maxPrice", String(query.maxPrice));
-  query.amenities?.forEach((value) => params.append("amenities", value));
-  if (query.moveInDate) params.set("moveInDate", query.moveInDate);
-  if (query.endDate) params.set("endDate", query.endDate);
-  if (query.leaseDuration) params.set("leaseDuration", query.leaseDuration);
-  query.houseRules?.forEach((value) => params.append("houseRules", value));
-  query.languages?.forEach((value) => params.append("languages", value));
-  if (query.roomType) params.set("roomType", query.roomType);
-  if (query.genderPreference) {
-    params.set("genderPreference", query.genderPreference);
+  if (normalizedFilters.query) params.set("q", normalizedFilters.query);
+  if (normalizedFilters.locationLabel) {
+    params.set("where", normalizedFilters.locationLabel);
   }
-  if (query.householdGender) {
-    params.set("householdGender", query.householdGender);
+  if (normalizedFilters.vibeQuery) params.set("what", normalizedFilters.vibeQuery);
+  if (normalizedFilters.minPrice !== undefined) {
+    params.set("minPrice", String(normalizedFilters.minPrice));
   }
-  if (query.bookingMode) params.set("bookingMode", query.bookingMode);
-  if (query.minSlots !== undefined) params.set("minSlots", String(query.minSlots));
-  if (query.nearMatches === true) params.set("nearMatches", "true");
-  if (query.sort) params.set("sort", query.sort);
+  if (normalizedFilters.maxPrice !== undefined) {
+    params.set("maxPrice", String(normalizedFilters.maxPrice));
+  }
+  sortUnique(normalizedFilters.amenities)?.forEach((value) =>
+    params.append("amenities", value)
+  );
+  if (normalizedFilters.moveInDate) {
+    params.set("moveInDate", normalizedFilters.moveInDate);
+  }
+  if (normalizedFilters.endDate) params.set("endDate", normalizedFilters.endDate);
+  if (normalizedFilters.leaseDuration) {
+    params.set("leaseDuration", normalizedFilters.leaseDuration);
+  }
+  sortUnique(normalizedFilters.houseRules)?.forEach((value) =>
+    params.append("houseRules", value)
+  );
+  sortUnique(normalizedFilters.languages)?.forEach((value) =>
+    params.append("languages", value)
+  );
+  if (normalizedFilters.roomType) params.set("roomType", normalizedFilters.roomType);
+  if (normalizedFilters.genderPreference) {
+    params.set("genderPreference", normalizedFilters.genderPreference);
+  }
+  if (normalizedFilters.householdGender) {
+    params.set("householdGender", normalizedFilters.householdGender);
+  }
+  if (normalizedFilters.bookingMode) {
+    params.set("bookingMode", normalizedFilters.bookingMode);
+  }
+  if (normalizedFilters.minAvailableSlots !== undefined) {
+    params.set("minSlots", String(normalizedFilters.minAvailableSlots));
+  }
+  if (normalizedFilters.nearMatches === true) params.set("nearMatches", "true");
+  if (normalizedFilters.sort && normalizedFilters.sort !== "recommended") {
+    params.set("sort", normalizedFilters.sort);
+  }
 
   if (query.lat !== undefined && query.lng !== undefined) {
     params.set("lat", String(query.lat));
@@ -338,25 +375,5 @@ export function applySearchQueryChange(
 export function normalizedSearchQueryToFilterParams(
   query: NormalizedSearchQuery
 ): FilterParams {
-  return {
-    query: query.query,
-    locationLabel: query.locationLabel,
-    vibeQuery: query.vibeQuery,
-    minPrice: query.minPrice,
-    maxPrice: query.maxPrice,
-    amenities: query.amenities,
-    moveInDate: query.moveInDate,
-    endDate: query.endDate,
-    leaseDuration: query.leaseDuration,
-    houseRules: query.houseRules,
-    languages: query.languages,
-    roomType: query.roomType,
-    genderPreference: query.genderPreference,
-    householdGender: query.householdGender,
-    bookingMode: query.bookingMode,
-    minAvailableSlots: query.minSlots,
-    bounds: query.bounds,
-    sort: query.sort,
-    nearMatches: query.nearMatches,
-  };
+  return getNormalizedQueryFilters(query);
 }

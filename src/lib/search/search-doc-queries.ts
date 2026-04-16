@@ -137,6 +137,62 @@ interface ListingWithCursorRaw extends ListingRaw {
   _cursorCreatedAt: string | null;
 }
 
+type RawAvailabilityCarrier = {
+  id: string;
+  availableSlots: number;
+  totalSlots: number;
+  availabilitySource: "LEGACY_BOOKING" | "HOST_MANAGED";
+  openSlots: number | null;
+  availableUntil?: string | Date | null;
+  minStayMonths?: number | string | null;
+  lastConfirmedAt?: string | Date | null;
+  moveInDate?: string | Date | null;
+  status?: string;
+  statusReason?: string | null;
+};
+
+function parseOptionalDate(
+  value: string | Date | null | undefined
+): Date | null {
+  return value && !isNaN(new Date(value).getTime()) ? new Date(value) : null;
+}
+
+function resolveRawPublicAvailability(raw: RawAvailabilityCarrier): {
+  moveInDate: Date | undefined;
+  availableUntil: Date | null;
+  lastConfirmedAt: Date | null;
+  resolvedAvailability: ReturnType<typeof resolvePublicAvailability>;
+} {
+  const moveInDate = parseOptionalDate(raw.moveInDate) ?? undefined;
+  const availableUntil = parseOptionalDate(raw.availableUntil);
+  const lastConfirmedAt = parseOptionalDate(raw.lastConfirmedAt);
+  const normalized = {
+    ...raw,
+    moveInDate,
+    availableUntil,
+    lastConfirmedAt,
+    minStayMonths:
+      raw.minStayMonths != null ? Number(raw.minStayMonths) : undefined,
+  };
+
+  const resolvedAvailability =
+    raw.availabilitySource === "LEGACY_BOOKING"
+      ? resolvePublicAvailability(normalized, {
+          legacySnapshot: {
+            totalSlots: raw.totalSlots,
+            effectiveAvailableSlots: raw.availableSlots,
+          },
+        })
+      : resolvePublicAvailability(normalized);
+
+  return {
+    moveInDate,
+    availableUntil,
+    lastConfirmedAt,
+    resolvedAvailability,
+  };
+}
+
 /**
  * Execute a raw query with a statement timeout to prevent runaway queries.
  * Uses SET LOCAL inside a transaction so the timeout only applies to this query.
@@ -762,38 +818,12 @@ export async function getSearchDocLimitedCount(
  * Map raw SQL query results to ListingData objects.
  * Shared by all paginated listing queries to avoid duplication.
  */
-function mapRawListingsToPublic(listings: ListingRaw[]): ListingData[] {
+export function mapRawListingsToPublic(listings: ListingRaw[]): ListingData[] {
   return listings
     .filter((l) => hasValidCoordinates(Number(l.lat), Number(l.lng)))
     .map((l) => {
-      const moveInDate =
-        l.moveInDate && !isNaN(new Date(l.moveInDate).getTime())
-          ? new Date(l.moveInDate)
-          : undefined;
-      const availableUntil =
-        l.availableUntil && !isNaN(new Date(l.availableUntil).getTime())
-          ? new Date(l.availableUntil)
-          : null;
-      const lastConfirmedAt =
-        l.lastConfirmedAt && !isNaN(new Date(l.lastConfirmedAt).getTime())
-          ? new Date(l.lastConfirmedAt)
-          : null;
-      const resolvedAvailability = resolvePublicAvailability(
-        {
-          ...l,
-          moveInDate,
-          availableUntil,
-          lastConfirmedAt,
-          minStayMonths:
-            l.minStayMonths != null ? Number(l.minStayMonths) : undefined,
-        },
-        {
-          legacySnapshot: {
-            totalSlots: l.totalSlots,
-            effectiveAvailableSlots: l.availableSlots,
-          },
-        }
-      );
+      const { moveInDate, availableUntil, lastConfirmedAt, resolvedAvailability } =
+        resolveRawPublicAvailability(l);
 
       if (!resolvedAvailability.isPubliclyAvailable) {
         return null;
@@ -835,6 +865,59 @@ function mapRawListingsToPublic(listings: ListingRaw[]): ListingData[] {
       };
     })
     .filter(isPresent);
+}
+
+export function mapRawMapListingsToPublic(
+  listings: MapListingRaw[]
+): MapListingData[] {
+  return sanitizeMapListings(
+    listings
+      .map((listing) => {
+        const {
+          moveInDate,
+          availableUntil,
+          lastConfirmedAt,
+          resolvedAvailability,
+        } = resolveRawPublicAvailability(listing);
+
+        if (!resolvedAvailability.isPubliclyAvailable) {
+          return null;
+        }
+
+        return {
+          id: listing.id,
+          title: listing.title,
+          price: Number(listing.price),
+          availableSlots: resolvedAvailability.effectiveAvailableSlots,
+          totalSlots: resolvedAvailability.totalSlots,
+          images: listing.primaryImage ? [listing.primaryImage] : [],
+          roomType: listing.roomType ?? undefined,
+          moveInDate,
+          availabilitySource: resolvedAvailability.availabilitySource,
+          openSlots: resolvedAvailability.openSlots,
+          availableUntil,
+          minStayMonths: resolvedAvailability.minStayMonths,
+          lastConfirmedAt,
+          status: listing.status,
+          statusReason: listing.statusReason,
+          location: {
+            city: listing.city ?? undefined,
+            state: listing.state ?? undefined,
+            lat: Number(listing.lat),
+            lng: Number(listing.lng),
+          },
+          publicAvailability: resolvedAvailability,
+          avgRating: Number(listing.avgRating) || 0,
+          reviewCount: Number(listing.reviewCount) || 0,
+          recommendedScore:
+            listing.recommendedScore != null
+              ? Number(listing.recommendedScore)
+              : null,
+          createdAt: listing.createdAt ? new Date(listing.createdAt) : null,
+        };
+      })
+      .filter(isPresent)
+  );
 }
 
 // ============================================
@@ -929,78 +1012,7 @@ async function getSearchDocMapListingsInternal(
       ? listings.slice(0, MAX_MAP_MARKERS)
       : listings;
 
-    const mappedListings = sanitizeMapListings(
-      trimmedListings
-        .map((l) => {
-          const moveInDate =
-            l.moveInDate && !isNaN(new Date(l.moveInDate).getTime())
-              ? new Date(l.moveInDate)
-              : undefined;
-          const availableUntil =
-            l.availableUntil && !isNaN(new Date(l.availableUntil).getTime())
-              ? new Date(l.availableUntil)
-              : null;
-          const lastConfirmedAt =
-            l.lastConfirmedAt && !isNaN(new Date(l.lastConfirmedAt).getTime())
-              ? new Date(l.lastConfirmedAt)
-              : null;
-          const resolvedAvailability = resolvePublicAvailability(
-            {
-              ...l,
-              moveInDate,
-              availableUntil,
-              lastConfirmedAt,
-              minStayMonths:
-                l.minStayMonths != null ? Number(l.minStayMonths) : undefined,
-            },
-            {
-              legacySnapshot: {
-                totalSlots: l.totalSlots,
-                effectiveAvailableSlots: l.availableSlots,
-              },
-            }
-          );
-
-          if (!resolvedAvailability.isPubliclyAvailable) {
-            return null;
-          }
-
-          return {
-            id: l.id,
-            title: l.title,
-            price: Number(l.price),
-            availableSlots: resolvedAvailability.effectiveAvailableSlots,
-            totalSlots: resolvedAvailability.totalSlots,
-            images: l.primaryImage ? [l.primaryImage] : [],
-            roomType: l.roomType ?? undefined,
-            moveInDate,
-            availabilitySource: resolvedAvailability.availabilitySource,
-            openSlots: resolvedAvailability.openSlots,
-            availableUntil,
-            minStayMonths: resolvedAvailability.minStayMonths,
-            lastConfirmedAt,
-            status: l.status,
-            statusReason: l.statusReason,
-            location: {
-              city: l.city ?? undefined,
-              state: l.state ?? undefined,
-              // MED-4 FIX: Explicit Number() conversion — PostgreSQL raw queries may return
-              // numeric/float8 columns as strings depending on column type.
-              lat: Number(l.lat),
-              lng: Number(l.lng),
-            },
-            publicAvailability: resolvedAvailability,
-            avgRating: Number(l.avgRating) || 0,
-            reviewCount: Number(l.reviewCount) || 0,
-            // L-9 FIX: Use explicit null check instead of falsy coalescing.
-            // `Number(0) || null` falsely converts a valid score of 0 to null.
-            recommendedScore:
-              l.recommendedScore != null ? Number(l.recommendedScore) : null,
-            createdAt: l.createdAt ? new Date(l.createdAt) : null,
-          };
-        })
-        .filter(isPresent)
-    );
+    const mappedListings = mapRawMapListingsToPublic(trimmedListings);
 
     return {
       listings: mappedListings,

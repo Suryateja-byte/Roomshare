@@ -23,7 +23,41 @@ import {
   type SearchV2Mode,
   type SearchV2FeatureProperties,
 } from "./types";
-import { buildPublicAvailability } from "./public-availability";
+import {
+  buildPublicAvailability,
+  type PublicAvailability,
+} from "./public-availability";
+
+type AvailabilityLike = Pick<
+  ListingData | MapListingData,
+  | "availableSlots"
+  | "totalSlots"
+  | "publicAvailability"
+  | "availabilitySource"
+  | "openSlots"
+  | "moveInDate"
+  | "availableUntil"
+  | "minStayMonths"
+  | "lastConfirmedAt"
+>;
+
+function getNormalizedPublicAvailability(
+  listing: AvailabilityLike
+): PublicAvailability {
+  return (
+    listing.publicAvailability ??
+    buildPublicAvailability({
+      availabilitySource: listing.availabilitySource,
+      openSlots: listing.openSlots,
+      availableSlots: listing.availableSlots,
+      totalSlots: listing.totalSlots,
+      moveInDate: listing.moveInDate,
+      availableUntil: listing.availableUntil,
+      minStayMonths: listing.minStayMonths,
+      lastConfirmedAt: listing.lastConfirmedAt,
+    })
+  );
+}
 
 // ============================================================================
 // Mode Determination
@@ -63,6 +97,7 @@ export function shouldIncludePins(mapListingsCount: number): boolean {
  */
 export function transformToListItem(listing: ListingData): SearchV2ListItem {
   const badges: string[] = [];
+  const publicAvailability = getNormalizedPublicAvailability(listing);
 
   // Add near-match badge if applicable
   if (listing.isNearMatch) {
@@ -70,7 +105,7 @@ export function transformToListItem(listing: ListingData): SearchV2ListItem {
   }
 
   // Add multi-room badge if multiple slots
-  if (listing.totalSlots > 1) {
+  if (publicAvailability.totalSlots > 1) {
     badges.push("multi-room");
   }
 
@@ -82,15 +117,9 @@ export function transformToListItem(listing: ListingData): SearchV2ListItem {
     lat: listing.location.lat,
     lng: listing.location.lng,
     badges: badges.length > 0 ? badges : undefined,
-    availableSlots: listing.availableSlots,
-    totalSlots: listing.totalSlots,
-    publicAvailability:
-      listing.publicAvailability ??
-      buildPublicAvailability({
-        availableSlots: listing.availableSlots,
-        totalSlots: listing.totalSlots,
-        moveInDate: listing.moveInDate,
-      }),
+    availableSlots: publicAvailability.openSlots,
+    totalSlots: publicAvailability.totalSlots,
+    publicAvailability,
     // scoreHint is reserved for future relevance scoring
   };
 }
@@ -121,30 +150,28 @@ export function transformToListItems(
 export function transformToGeoJSON(
   listings: MapListingData[]
 ): SearchV2GeoJSON {
-  const features = listings.map((listing) => ({
-    type: "Feature" as const,
-    geometry: {
-      type: "Point" as const,
-      coordinates: [listing.location.lng, listing.location.lat] as [
-        number,
-        number,
-      ],
-    },
-    properties: {
-      id: listing.id,
-      title: listing.title,
-      price: listing.price,
-      image: listing.images[0] ?? null,
-      availableSlots: listing.availableSlots,
-      publicAvailability:
-        listing.publicAvailability ??
-        buildPublicAvailability({
-          availableSlots: listing.availableSlots,
-          totalSlots: listing.totalSlots ?? listing.availableSlots,
-          moveInDate: listing.moveInDate,
-        }),
-    } satisfies SearchV2FeatureProperties,
-  }));
+  const features = listings.map((listing) => {
+    const publicAvailability = getNormalizedPublicAvailability(listing);
+
+    return {
+      type: "Feature" as const,
+      geometry: {
+        type: "Point" as const,
+        coordinates: [listing.location.lng, listing.location.lat] as [
+          number,
+          number,
+        ],
+      },
+      properties: {
+        id: listing.id,
+        title: listing.title,
+        price: listing.price,
+        image: listing.images[0] ?? null,
+        availableSlots: publicAvailability.openSlots,
+        publicAvailability,
+      } satisfies SearchV2FeatureProperties,
+    };
+  });
 
   return {
     type: "FeatureCollection",
@@ -160,11 +187,13 @@ export function transformToGeoJSON(
  * Adapt MapListingData to MapMarkerListing interface for marker-utils.
  */
 function adaptToMarkerListing(listing: MapListingData): MapMarkerListing {
+  const publicAvailability = getNormalizedPublicAvailability(listing);
+
   return {
     id: listing.id,
     title: listing.title,
     price: listing.price,
-    availableSlots: listing.availableSlots,
+    availableSlots: publicAvailability.openSlots,
     images: listing.images,
     tier: listing.tier,
     location: listing.location,
@@ -211,18 +240,17 @@ export function transformToPins(
     // Explicitly pick best listing by lowest rank (highest score), not just [0]
     const bestListing = getBestListingInGroup(group.listings, rankMap);
     const sourceListing = listings.find((listing) => listing.id === bestListing.id);
+    const publicAvailability = sourceListing
+      ? getNormalizedPublicAvailability(sourceListing)
+      : buildPublicAvailability({
+          availableSlots: bestListing.availableSlots,
+        });
     return {
       id: bestListing.id,
       lat: group.lat,
       lng: group.lng,
       price: bestListing.price,
-      publicAvailability:
-        sourceListing?.publicAvailability ??
-        buildPublicAvailability({
-          availableSlots: bestListing.availableSlots,
-          totalSlots: sourceListing?.totalSlots ?? bestListing.availableSlots,
-          moveInDate: sourceListing?.moveInDate,
-        }),
+      publicAvailability,
       tier: group.tier,
       stackCount: group.listings.length > 1 ? group.listings.length : undefined,
     };
