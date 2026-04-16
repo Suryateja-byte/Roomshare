@@ -83,6 +83,7 @@ interface MapListingRaw {
   lastConfirmedAt: string | Date | null;
   status: string;
   statusReason: string | null;
+  needsMigrationReview?: boolean | null;
   primaryImage: string | null;
   roomType: string | null;
   moveInDate: string | Date | null;
@@ -615,8 +616,7 @@ function buildSearchDocListAvailabilitySqlFragments(options: {
 }
 
 function buildSearchDocWhereConditionsInternal(
-  filterParams: FilterParams,
-  options: { listEligibility: boolean }
+  filterParams: FilterParams
 ): WhereBuilder {
   // SECURITY INVARIANT:
   // - All user-derived values must be pushed to `params` and referenced as $N placeholders.
@@ -645,31 +645,18 @@ function buildSearchDocWhereConditionsInternal(
     slotConditionSql,
     params,
     nextParamIndex,
-  } = options.listEligibility
-    ? buildSearchDocListAvailabilitySqlFragments({
-        minAvailableSlots,
-        moveInDate,
-        endDate,
-        startParamIndex: 1,
-      })
-    : buildAvailabilitySqlFragments({
-        listingIdRef: "d.id",
-        totalSlotsRef: "d.total_slots",
-        minAvailableSlots,
-        startDate: moveInDate,
-        endDate,
-        startParamIndex: 1,
-      });
+  } = buildSearchDocListAvailabilitySqlFragments({
+    minAvailableSlots,
+    moveInDate,
+    endDate,
+    startParamIndex: 1,
+  });
 
   const conditions: string[] = [
     slotConditionSql,
-    `${options.listEligibility ? "l" : "d"}.status = 'ACTIVE'`,
-    ...(options.listEligibility
-      ? [
-          `COALESCE(l."needsMigrationReview", FALSE) = FALSE`,
-          `COALESCE(l."statusReason", '') <> 'MIGRATION_REVIEW'`,
-        ]
-      : []),
+    `l.status = 'ACTIVE'`,
+    `COALESCE(l."needsMigrationReview", FALSE) = FALSE`,
+    `COALESCE(l."statusReason", '') <> 'MIGRATION_REVIEW'`,
     "d.lat IS NOT NULL",
     "d.lng IS NOT NULL",
   ];
@@ -811,17 +798,13 @@ function buildSearchDocWhereConditionsInternal(
 export function buildSearchDocWhereConditions(
   filterParams: FilterParams
 ): WhereBuilder {
-  return buildSearchDocWhereConditionsInternal(filterParams, {
-    listEligibility: false,
-  });
+  return buildSearchDocWhereConditionsInternal(filterParams);
 }
 
 export function buildSearchDocListWhereConditions(
   filterParams: FilterParams
 ): WhereBuilder {
-  return buildSearchDocWhereConditionsInternal(filterParams, {
-    listEligibility: true,
-  });
+  return buildSearchDocWhereConditionsInternal(filterParams);
 }
 
 // ============================================
@@ -1020,7 +1003,13 @@ export function mapRawMapListingsToPublic(
           resolvedAvailability,
         } = resolveRawPublicAvailability(listing);
 
-        if (!resolvedAvailability.isPubliclyAvailable) {
+        if (
+          !isListingEligibleForPublicSearch({
+            needsMigrationReview: listing.needsMigrationReview,
+            statusReason: listing.statusReason,
+            resolvedAvailability,
+          })
+        ) {
           return null;
         }
 
@@ -1122,6 +1111,7 @@ async function getSearchDocMapListingsInternal(
       l."lastConfirmedAt" as "lastConfirmedAt",
       l.status::text as status,
       l."statusReason" as "statusReason",
+      l."needsMigrationReview" as "needsMigrationReview",
       d.images[1] as "primaryImage",
       d.room_type as "roomType",
       l."moveInDate" as "moveInDate",

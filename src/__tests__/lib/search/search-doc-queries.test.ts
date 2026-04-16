@@ -29,39 +29,55 @@ describe("buildSearchDocWhereConditions", () => {
 
     // Base conditions must filter to ACTIVE status only
     // PAUSED, DRAFT, ARCHIVED, etc. listings must never appear in search
-    expect(conditions).toContain("d.status = 'ACTIVE'");
+    expect(conditions).toContain(`l.status = 'ACTIVE'`);
+    expect(conditions).toContain(
+      `COALESCE(l."needsMigrationReview", FALSE) = FALSE`
+    );
+    expect(conditions).toContain(
+      `COALESCE(l."statusReason", '') <> 'MIGRATION_REVIEW'`
+    );
     // Verify no other status values are included
-    const statusConditions = conditions.filter((c) => c.includes("d.status"));
+    const statusConditions = conditions.filter((c) =>
+      c.includes(`l.status = 'ACTIVE'`)
+    );
     expect(statusConditions).toHaveLength(1);
   });
 
   it("requires range-aware availability >= $1 in base conditions", () => {
     const { conditions } = buildSearchDocWhereConditions({});
 
-    expect(conditions[0]).toContain(">= $1");
+    expect(conditions[0]).toContain(`l."availabilitySource" = 'HOST_MANAGED'`);
     expect(conditions[0]).toContain("generate_series");
   });
 
   it("defaults to >= 1 when minAvailableSlots is undefined", () => {
     const result = buildSearchDocWhereConditions({});
 
-    expect(result.params[0]).toBe(1);
+    expect(result.params).toEqual([1, 1]);
   });
 
   it("parameterizes >= N when minAvailableSlots is set", () => {
     const result = buildSearchDocWhereConditions({ minAvailableSlots: 3 });
 
-    expect(result.params[0]).toBe(3);
-    expect(result.conditions[0]).toContain(">= $1");
+    expect(result.params).toEqual([3, 3]);
+    expect(result.conditions[0]).toContain(">= $2");
   });
 
   it("starts with paramIndex 2 and no FTS when no filters applied", () => {
     const result = buildSearchDocWhereConditions({});
 
-    // With parameterized slot threshold at $1, params starts with [1]
-    expect(result.params).toHaveLength(1);
-    expect(result.paramIndex).toBe(2);
+    expect(result.params).toHaveLength(2);
+    expect(result.paramIndex).toBe(3);
     expect(result.ftsQueryParamIndex).toBeNull();
+  });
+
+  it("uses the same canonical eligibility predicate as list search", () => {
+    const mapResult = buildSearchDocWhereConditions({});
+    const listResult = buildSearchDocListWhereConditions({});
+
+    expect(mapResult.conditions).toEqual(listResult.conditions);
+    expect(mapResult.params).toEqual(listResult.params);
+    expect(mapResult.paramIndex).toBe(listResult.paramIndex);
   });
 
   describe("price filter conditions", () => {
@@ -330,6 +346,7 @@ describe("SearchDoc projection mapping", () => {
       lastConfirmedAt: "2026-04-15T12:30:00.000Z",
       status: "ACTIVE",
       statusReason: null,
+      needsMigrationReview: false,
       amenities: ["WiFi"],
       houseRules: ["No Smoking"],
       householdLanguages: ["English"],
@@ -403,6 +420,52 @@ describe("SearchDoc projection mapping", () => {
     expect(results).toEqual([]);
   });
 
+  it("keeps valid HOST_MANAGED rows in map projection", () => {
+    const results = mapRawMapListingsToPublic([createHostManagedRaw()]);
+
+    expect(results).toHaveLength(1);
+    expect(results[0]).toMatchObject({
+      id: "listing-1",
+      availabilitySource: "HOST_MANAGED",
+      availableSlots: 2,
+      totalSlots: 4,
+      status: "ACTIVE",
+      statusReason: null,
+    });
+  });
+
+  it("suppresses stale HOST_MANAGED rows from map projection", () => {
+    const results = mapRawMapListingsToPublic([
+      createHostManagedRaw({
+        lastConfirmedAt: "2026-03-20T12:30:00.000Z",
+      }),
+    ]);
+
+    expect(results).toEqual([]);
+  });
+
+  it("suppresses migration-review rows from map projection even with positive slots", () => {
+    const results = mapRawMapListingsToPublic([
+      createHostManagedRaw({
+        availabilitySource: "LEGACY_BOOKING",
+        openSlots: null,
+        availableSlots: 2,
+        totalSlots: 2,
+        needsMigrationReview: true,
+      }),
+      createHostManagedRaw({
+        availabilitySource: "LEGACY_BOOKING",
+        openSlots: null,
+        availableSlots: 2,
+        totalSlots: 2,
+        needsMigrationReview: false,
+        statusReason: "MIGRATION_REVIEW",
+      }),
+    ]);
+
+    expect(results).toEqual([]);
+  });
+
   it("keeps map and list availability fields aligned for valid HOST_MANAGED rows", () => {
     const listResult = mapRawListingsToPublic([createHostManagedRaw()])[0];
     const mapResult = mapRawMapListingsToPublic([createHostManagedRaw()])[0];
@@ -426,6 +489,44 @@ describe("SearchDoc projection mapping", () => {
     );
     expect(mapResult.availableSlots).toBe(mapResult.publicAvailability.openSlots);
     expect(mapResult.totalSlots).toBe(mapResult.publicAvailability.totalSlots);
+  });
+
+  it("keeps map and list inclusion aligned across representative public-discovery fixtures", () => {
+    const fixtures = [
+      createHostManagedRaw({ id: "eligible-host-managed" }),
+      createHostManagedRaw({
+        id: "invalid-host-managed",
+        openSlots: 0,
+      }),
+      createHostManagedRaw({
+        id: "stale-host-managed",
+        lastConfirmedAt: "2026-03-20T12:30:00.000Z",
+      }),
+      createHostManagedRaw({
+        id: "needs-migration-review",
+        availabilitySource: "LEGACY_BOOKING",
+        openSlots: null,
+        availableSlots: 2,
+        totalSlots: 2,
+        needsMigrationReview: true,
+      }),
+      createHostManagedRaw({
+        id: "status-migration-review",
+        availabilitySource: "LEGACY_BOOKING",
+        openSlots: null,
+        availableSlots: 2,
+        totalSlots: 2,
+        needsMigrationReview: false,
+        statusReason: "MIGRATION_REVIEW",
+      }),
+    ];
+
+    expect(mapRawListingsToPublic(fixtures).map((listing) => listing.id)).toEqual([
+      "eligible-host-managed",
+    ]);
+    expect(
+      mapRawMapListingsToPublic(fixtures).map((listing) => listing.id)
+    ).toEqual(["eligible-host-managed"]);
   });
 });
 

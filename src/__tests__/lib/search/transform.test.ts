@@ -612,6 +612,23 @@ describe("search/transform", () => {
       expect(response.pins).toEqual([]);
     });
 
+    it("preserves compatibility shape for canonically filtered map listings without reintroducing rows", () => {
+      const listings = [createMapListingData("eligible-only")];
+
+      const response = transformToMapResponse(listings);
+
+      expect(response.geojson.features.map((feature) => feature.properties.id)).toEqual([
+        "eligible-only",
+      ]);
+      expect(response.pins?.map((pin) => pin.id)).toEqual(["eligible-only"]);
+      expect(response.geojson.features[0].properties.publicAvailability).toEqual(
+        buildPublicAvailability({
+          availableSlots: 1,
+          totalSlots: 2,
+        })
+      );
+    });
+
     it("should include pins at threshold boundary (49 listings)", () => {
       const listings = Array.from({ length: 49 }, (_, i) =>
         createMapListingData(`${i}`, 37.7749 + i * 0.01, -122.4194)

@@ -461,13 +461,11 @@ export async function getMapListings(
     slotConditionSql,
     params: availabilityParams,
     nextParamIndex,
-  } = buildAvailabilitySqlFragments({
-    listingIdRef: 'l.id',
-    totalSlotsRef: 'l."totalSlots"',
+  } = buildListSearchAvailabilitySqlFragments({
     minAvailableSlots,
-    startDate: moveInDate,
     endDate,
     startParamIndex: 1,
+    moveInDate,
   });
 
   const queryParams = availabilityParams as Array<
@@ -477,6 +475,8 @@ export async function getMapListings(
   const conditions: string[] = [
     slotConditionSql,
     "l.status = 'ACTIVE'",
+    `COALESCE(l."needsMigrationReview", FALSE) = FALSE`,
+    `COALESCE(l."statusReason", '') <> 'MIGRATION_REVIEW'`,
     "ST_X(loc.coords::geometry) IS NOT NULL",
     "ST_Y(loc.coords::geometry) IS NOT NULL",
     "NOT (ST_X(loc.coords::geometry) = 0 AND ST_Y(loc.coords::geometry) = 0)",
@@ -637,6 +637,7 @@ export async function getMapListings(
             l."minStayMonths",
             l."lastConfirmedAt",
             l."statusReason",
+            l."needsMigrationReview",
             l.status,
             l."moveInDate",
             l."roomType",
@@ -689,7 +690,13 @@ export async function getMapListings(
           }
         );
 
-        if (!resolvedAvailability.isPubliclyAvailable) {
+        if (
+          !isListingEligibleForPublicSearch({
+            needsMigrationReview: l.needsMigrationReview,
+            statusReason: l.statusReason,
+            resolvedAvailability,
+          })
+        ) {
           return null;
         }
 
