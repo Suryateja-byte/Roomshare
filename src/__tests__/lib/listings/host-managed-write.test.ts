@@ -227,6 +227,8 @@ describe("host-managed-write", () => {
         moveInDateChanged: false,
         bookingModeChanged: false,
         totalSlotsChanged: true,
+        availableUntilChanged: false,
+        minStayMonthsChanged: false,
       })
     ).toBe(true);
 
@@ -236,6 +238,60 @@ describe("host-managed-write", () => {
         moveInDateChanged: false,
         bookingModeChanged: false,
         totalSlotsChanged: true,
+        availableUntilChanged: false,
+        minStayMonthsChanged: false,
+      })
+    ).toBe(false);
+  });
+
+  it("flags availableUntil edits on HOST_MANAGED rows as wrong write path", () => {
+    expect(
+      requiresDedicatedHostManagedWritePath({
+        availabilitySource: "HOST_MANAGED",
+        moveInDateChanged: false,
+        bookingModeChanged: false,
+        totalSlotsChanged: false,
+        availableUntilChanged: true,
+        minStayMonthsChanged: false,
+      })
+    ).toBe(true);
+  });
+
+  it("flags minStayMonths edits on HOST_MANAGED rows as wrong write path", () => {
+    expect(
+      requiresDedicatedHostManagedWritePath({
+        availabilitySource: "HOST_MANAGED",
+        moveInDateChanged: false,
+        bookingModeChanged: false,
+        totalSlotsChanged: false,
+        availableUntilChanged: false,
+        minStayMonthsChanged: true,
+      })
+    ).toBe(true);
+  });
+
+  it("allows availableUntil and minStayMonths edits on LEGACY_BOOKING rows via generic path", () => {
+    expect(
+      requiresDedicatedHostManagedWritePath({
+        availabilitySource: "LEGACY_BOOKING",
+        moveInDateChanged: false,
+        bookingModeChanged: false,
+        totalSlotsChanged: false,
+        availableUntilChanged: true,
+        minStayMonthsChanged: true,
+      })
+    ).toBe(false);
+  });
+
+  it("does not flag HOST_MANAGED rows when no tracked fields change", () => {
+    expect(
+      requiresDedicatedHostManagedWritePath({
+        availabilitySource: "HOST_MANAGED",
+        moveInDateChanged: false,
+        bookingModeChanged: false,
+        totalSlotsChanged: false,
+        availableUntilChanged: false,
+        minStayMonthsChanged: false,
       })
     ).toBe(false);
   });

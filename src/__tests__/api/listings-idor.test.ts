@@ -161,6 +161,8 @@ function makeLockedListing(
     bookingMode: string;
     availabilitySource: "LEGACY_BOOKING" | "HOST_MANAGED";
     moveInDate: Date | null;
+    availableUntil: Date | null;
+    minStayMonths: number;
   }> = {}
 ) {
   return {
@@ -170,6 +172,8 @@ function makeLockedListing(
     bookingMode: "SHARED",
     availabilitySource: "LEGACY_BOOKING" as const,
     moveInDate: new Date("2026-05-01T00:00:00.000Z"),
+    availableUntil: null as Date | null,
+    minStayMonths: 1,
     ...overrides,
   };
 }
@@ -337,6 +341,139 @@ describe("Listings API IDOR Protection", () => {
         code: "HOST_MANAGED_WRITE_PATH_REQUIRED",
       });
       expect(updateMock).not.toHaveBeenCalled();
+    });
+
+    it("returns 409 when generic PATCH mutates availableUntil on a HOST_MANAGED listing", async () => {
+      (auth as jest.Mock).mockResolvedValue(ownerSession);
+      (prisma.listing.findUnique as jest.Mock).mockResolvedValue(mockListing);
+      const queryRawMock = jest.fn().mockResolvedValue([
+        makeLockedListing({
+          availabilitySource: "HOST_MANAGED",
+          moveInDate: new Date("2026-05-01T00:00:00.000Z"),
+          availableUntil: new Date("2026-08-01T00:00:00.000Z"),
+          minStayMonths: 1,
+        }),
+      ]);
+      const updateMock = jest.fn();
+
+      (prisma.$transaction as jest.Mock).mockImplementation(async (callback) => {
+        const tx = {
+          $queryRaw: queryRawMock,
+          listing: { update: updateMock },
+          location: { update: jest.fn() },
+          $executeRaw: jest.fn(),
+          booking: { count: jest.fn() },
+        };
+        return callback(tx);
+      });
+
+      const request = new Request("http://localhost/api/listings/listing-abc", {
+        method: "PATCH",
+        body: JSON.stringify({
+          ...validPatchPayload,
+          availableUntil: "2026-12-01",
+        }),
+      });
+
+      const response = await PATCH(request, {
+        params: Promise.resolve({ id: "listing-abc" }),
+      });
+
+      expect(response.status).toBe(409);
+      await expect(response.json()).resolves.toEqual({
+        error:
+          "This listing now uses host-managed availability. Reload and use the new availability editor.",
+        code: "HOST_MANAGED_WRITE_PATH_REQUIRED",
+      });
+      expect(updateMock).not.toHaveBeenCalled();
+    });
+
+    it("returns 409 when generic PATCH mutates minStayMonths on a HOST_MANAGED listing", async () => {
+      (auth as jest.Mock).mockResolvedValue(ownerSession);
+      (prisma.listing.findUnique as jest.Mock).mockResolvedValue(mockListing);
+      const queryRawMock = jest.fn().mockResolvedValue([
+        makeLockedListing({
+          availabilitySource: "HOST_MANAGED",
+          moveInDate: new Date("2026-05-01T00:00:00.000Z"),
+          availableUntil: new Date("2026-08-01T00:00:00.000Z"),
+          minStayMonths: 1,
+        }),
+      ]);
+      const updateMock = jest.fn();
+
+      (prisma.$transaction as jest.Mock).mockImplementation(async (callback) => {
+        const tx = {
+          $queryRaw: queryRawMock,
+          listing: { update: updateMock },
+          location: { update: jest.fn() },
+          $executeRaw: jest.fn(),
+          booking: { count: jest.fn() },
+        };
+        return callback(tx);
+      });
+
+      const request = new Request("http://localhost/api/listings/listing-abc", {
+        method: "PATCH",
+        body: JSON.stringify({
+          ...validPatchPayload,
+          minStayMonths: 6,
+        }),
+      });
+
+      const response = await PATCH(request, {
+        params: Promise.resolve({ id: "listing-abc" }),
+      });
+
+      expect(response.status).toBe(409);
+      await expect(response.json()).resolves.toEqual({
+        error:
+          "This listing now uses host-managed availability. Reload and use the new availability editor.",
+        code: "HOST_MANAGED_WRITE_PATH_REQUIRED",
+      });
+      expect(updateMock).not.toHaveBeenCalled();
+    });
+
+    it("allows generic PATCH of availableUntil on LEGACY_BOOKING listings", async () => {
+      (auth as jest.Mock).mockResolvedValue(ownerSession);
+      (prisma.listing.findUnique as jest.Mock).mockResolvedValue(mockListing);
+      const queryRawMock = jest.fn().mockResolvedValue([
+        makeLockedListing({
+          availabilitySource: "LEGACY_BOOKING",
+          moveInDate: new Date("2026-05-01T00:00:00.000Z"),
+          availableUntil: new Date("2026-08-01T00:00:00.000Z"),
+          minStayMonths: 1,
+        }),
+      ]);
+      const updateMock = jest
+        .fn()
+        .mockResolvedValue({ ...mockListing, title: "Updated Title" });
+
+      (prisma.$transaction as jest.Mock).mockImplementation(async (callback) => {
+        const tx = {
+          $queryRaw: queryRawMock,
+          listing: { update: updateMock },
+          location: { update: jest.fn() },
+          $executeRaw: jest.fn(),
+          booking: { count: jest.fn() },
+        };
+        return callback(tx);
+      });
+
+      const request = new Request("http://localhost/api/listings/listing-abc", {
+        method: "PATCH",
+        body: JSON.stringify({
+          ...validPatchPayload,
+          availableUntil: "2026-12-01",
+          minStayMonths: 6,
+        }),
+      });
+
+      const response = await PATCH(request, {
+        params: Promise.resolve({ id: "listing-abc" }),
+      });
+
+      expect(response.status).toBe(200);
+      expect(updateMock).toHaveBeenCalled();
     });
 
     it("recomputes availableSlots from live availability when cached value is stale high", async () => {

@@ -800,12 +800,21 @@ export async function PATCH(
             bookingMode !== null &&
             bookingMode !== lockedListing.bookingMode;
           const totalSlotsChanged = totalSlots !== lockedListing.totalSlots;
+          const availableUntilChanged =
+            availableUntil !== undefined &&
+            (lockedListing.availableUntil?.toISOString().slice(0, 10) ?? null) !==
+              (nextAvailableUntil?.toISOString().slice(0, 10) ?? null);
+          const minStayMonthsChanged =
+            minStayMonths !== undefined &&
+            minStayMonths !== lockedListing.minStayMonths;
           const hostManagedInventoryMutation =
             requiresDedicatedHostManagedWritePath({
               availabilitySource: lockedListing.availabilitySource,
               moveInDateChanged,
               bookingModeChanged,
               totalSlotsChanged,
+              availableUntilChanged,
+              minStayMonthsChanged,
             });
 
           if (hostManagedInventoryMutation) {

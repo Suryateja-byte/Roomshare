@@ -113,6 +113,8 @@ export interface HostManagedLegacyWritePathInput {
   moveInDateChanged: boolean;
   bookingModeChanged: boolean;
   totalSlotsChanged: boolean;
+  availableUntilChanged: boolean;
+  minStayMonthsChanged: boolean;
 }
 
 function makeWriteError(
@@ -178,7 +180,9 @@ export function requiresDedicatedHostManagedWritePath(
     input.availabilitySource === "HOST_MANAGED" &&
     (input.moveInDateChanged ||
       input.bookingModeChanged ||
-      input.totalSlotsChanged)
+      input.totalSlotsChanged ||
+      input.availableUntilChanged ||
+      input.minStayMonthsChanged)
   );
 }
 
