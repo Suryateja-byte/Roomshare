@@ -102,7 +102,10 @@ jest.mock("@/lib/booking-state-machine", () => ({
   isInvalidStateTransitionError: jest.fn().mockReturnValue(false),
 }));
 jest.mock("@/lib/search/search-doc-dirty", () => ({
+  markListingDirty: jest.fn().mockResolvedValue(undefined),
   markListingsDirty: jest.fn().mockResolvedValue(undefined),
+  markListingDirtyInTx: jest.fn().mockResolvedValue(undefined),
+  markListingsDirtyInTx: jest.fn().mockResolvedValue(undefined),
 }));
 jest.mock("@/lib/test-barriers", () => ({
   waitForTestBarrier: jest.fn().mockResolvedValue(undefined),

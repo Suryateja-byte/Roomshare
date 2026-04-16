@@ -46,6 +46,13 @@ jest.mock("next/cache", () => ({
   revalidatePath: jest.fn(),
 }));
 
+jest.mock("@/lib/search/search-doc-dirty", () => ({
+  markListingDirty: jest.fn().mockResolvedValue(undefined),
+  markListingsDirty: jest.fn().mockResolvedValue(undefined),
+  markListingDirtyInTx: jest.fn().mockResolvedValue(undefined),
+  markListingsDirtyInTx: jest.fn().mockResolvedValue(undefined),
+}));
+
 import {
   updateListingStatus,
   reviewListingMigration,
@@ -683,19 +690,20 @@ describe("listing-status actions", () => {
   });
 
   describe("incrementViewCount", () => {
-    it("increments view count", async () => {
-      (prisma.listing.update as jest.Mock).mockResolvedValue(mockListing);
+    it("increments view count inside a transaction", async () => {
+      (mockTx.listing.update as jest.Mock).mockResolvedValue(mockListing);
 
       await incrementViewCount("listing-123");
 
-      expect(prisma.listing.update).toHaveBeenCalledWith({
+      expect(prisma.$transaction).toHaveBeenCalled();
+      expect(mockTx.listing.update).toHaveBeenCalledWith({
         where: { id: "listing-123" },
         data: { viewCount: { increment: 1 } },
       });
     });
 
     it("returns success: true", async () => {
-      (prisma.listing.update as jest.Mock).mockResolvedValue(mockListing);
+      (mockTx.listing.update as jest.Mock).mockResolvedValue(mockListing);
 
       const result = await incrementViewCount("listing-123");
 
@@ -703,7 +711,7 @@ describe("listing-status actions", () => {
     });
 
     it("returns error on failure", async () => {
-      (prisma.listing.update as jest.Mock).mockRejectedValue(
+      (mockTx.listing.update as jest.Mock).mockRejectedValue(
         new Error("DB Error")
       );
 
@@ -715,7 +723,7 @@ describe("listing-status actions", () => {
 
   describe("trackListingView", () => {
     beforeEach(() => {
-      (prisma.listing.update as jest.Mock).mockResolvedValue(mockListing);
+      (mockTx.listing.update as jest.Mock).mockResolvedValue(mockListing);
       (prisma.recentlyViewed.upsert as jest.Mock).mockResolvedValue({});
       (prisma.recentlyViewed.findMany as jest.Mock).mockResolvedValue([]);
     });
@@ -723,7 +731,7 @@ describe("listing-status actions", () => {
     it("always increments view count", async () => {
       await trackListingView("listing-123");
 
-      expect(prisma.listing.update).toHaveBeenCalledWith({
+      expect(mockTx.listing.update).toHaveBeenCalledWith({
         where: { id: "listing-123" },
         data: { viewCount: { increment: 1 } },
       });

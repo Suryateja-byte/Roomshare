@@ -73,6 +73,9 @@ jest.mock("@/lib/api-error-handler", () => ({
 // Mock search-doc-dirty (fire-and-forget)
 jest.mock("@/lib/search/search-doc-dirty", () => ({
   markListingDirty: jest.fn().mockResolvedValue(undefined),
+  markListingsDirty: jest.fn().mockResolvedValue(undefined),
+  markListingDirtyInTx: jest.fn().mockResolvedValue(undefined),
+  markListingsDirtyInTx: jest.fn().mockResolvedValue(undefined),
 }));
 
 // Mock pagination-schema

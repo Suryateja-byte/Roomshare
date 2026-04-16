@@ -67,6 +67,9 @@ jest.mock("@/lib/api-error-handler", () => ({
 
 jest.mock("@/lib/search/search-doc-dirty", () => ({
   markListingDirty: jest.fn().mockResolvedValue(undefined),
+  markListingsDirty: jest.fn().mockResolvedValue(undefined),
+  markListingDirtyInTx: jest.fn().mockResolvedValue(undefined),
+  markListingsDirtyInTx: jest.fn().mockResolvedValue(undefined),
 }));
 
 // Mock next/server to avoid NextRequest issues in Jest

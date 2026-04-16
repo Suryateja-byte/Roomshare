@@ -88,6 +88,9 @@ jest.mock("@/lib/with-rate-limit", () => ({
 
 jest.mock("@/lib/search/search-doc-dirty", () => ({
   markListingDirty: jest.fn().mockResolvedValue(undefined),
+  markListingsDirty: jest.fn().mockResolvedValue(undefined),
+  markListingDirtyInTx: jest.fn().mockResolvedValue(undefined),
+  markListingsDirtyInTx: jest.fn().mockResolvedValue(undefined),
 }));
 
 jest.mock("@sentry/nextjs", () => ({

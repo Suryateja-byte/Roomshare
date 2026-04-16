@@ -189,19 +189,16 @@ describe("search-doc-dirty", () => {
       } as unknown as DirtyMarkTxClient;
 
       // Simulate prisma.$transaction: callback runs, then a rollback.
+      // The test caller (below) throws AFTER markListingDirtyInTx returns to
+      // force the rollback path — `committed` stays false because the happy
+      // `return result` is never reached.
       let committed = false;
       const simulateTx = async <T>(
         cb: (tx: DirtyMarkTxClient) => Promise<T>
       ): Promise<T> => {
-        try {
-          const result = await cb(tx);
-          throw new Error("simulated source-write failure");
-          committed = true;
-          return result;
-        } catch (err) {
-          // emulate rollback: do not commit
-          throw err;
-        }
+        const result = await cb(tx);
+        committed = true;
+        return result;
       };
 
       await expect(

@@ -7,7 +7,7 @@ import { revalidatePath } from "next/cache";
 import { ListingStatus, ReportStatus } from "@prisma/client";
 import { logAdminAction } from "@/lib/audit";
 import { logger } from "@/lib/logger";
-import { markListingDirty } from "@/lib/search/search-doc-dirty";
+import { markListingDirtyInTx } from "@/lib/search/search-doc-dirty";
 import {
   checkRateLimit,
   RATE_LIMITS,
@@ -471,6 +471,8 @@ export async function updateListingStatus(
           data: preparedWrite.data,
         });
 
+        await markListingDirtyInTx(tx, listingId, "status_changed");
+
         return {
           success: true,
           listingTitle: listing.title,
@@ -487,6 +489,8 @@ export async function updateListingStatus(
         data: { status, version: listing.version + 1 },
       });
 
+      await markListingDirtyInTx(tx, listingId, "status_changed");
+
       return {
         success: true,
         listingTitle: listing.title,
@@ -501,16 +505,6 @@ export async function updateListingStatus(
     if ("error" in result) {
       return result;
     }
-
-    // Fire-and-forget: mark listing dirty for search doc refresh
-    markListingDirty(listingId, "status_changed").catch((err) => {
-      logger.sync.warn("markListingDirty failed", {
-        action: "adminUpdateListingStatus",
-        listingId,
-        reason: "status_changed",
-        error: err instanceof Error ? err.message : String(err),
-      });
-    });
 
     // Audit log
     await logAdminAction({
@@ -594,6 +588,8 @@ export async function reviewListingMigration(
         return reviewResult;
       }
 
+      await markListingDirtyInTx(tx, listingId, "listing_updated");
+
       return {
         ...reviewResult,
         listingTitle: listing.title,
@@ -606,15 +602,6 @@ export async function reviewListingMigration(
     if (!("success" in result) || !result.success) {
       return result;
     }
-
-    markListingDirty(listingId, "listing_updated").catch((err) => {
-      logger.sync.warn("markListingDirty failed", {
-        action: "adminReviewListingMigration",
-        listingId,
-        reason: "listing_updated",
-        error: err instanceof Error ? err.message : String(err),
-      });
-    });
 
     await logAdminAction({
       adminId: adminCheck.userId!,

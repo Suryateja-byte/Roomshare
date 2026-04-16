@@ -5,7 +5,7 @@ import { auth } from "@/auth";
 import { revalidatePath } from "next/cache";
 import { checkSuspension } from "./suspension";
 import { logger } from "@/lib/logger";
-import { markListingDirty } from "@/lib/search/search-doc-dirty";
+import { markListingDirtyInTx } from "@/lib/search/search-doc-dirty";
 import { z } from "zod";
 import {
   checkRateLimit,
@@ -162,6 +162,8 @@ export async function updateListingStatus(
             data: preparedWrite.data,
           });
 
+          await markListingDirtyInTx(tx, listingId, "status_changed");
+
           return {
             success: true,
             status: preparedWrite.status,
@@ -174,6 +176,8 @@ export async function updateListingStatus(
           where: { id: listingId },
           data: { status, version: currentListing.version + 1 },
         });
+
+        await markListingDirtyInTx(tx, listingId, "status_changed");
 
         return {
           success: true,
@@ -188,16 +192,6 @@ export async function updateListingStatus(
     if ("error" in result) {
       return result;
     }
-
-    // Side effects OUTSIDE transaction (no locks held)
-    markListingDirty(listingId, "status_changed").catch((err) => {
-      logger.sync.warn("markListingDirty failed", {
-        action: "updateListingStatus",
-        listingId,
-        reason: "status_changed",
-        error: err instanceof Error ? err.message : String(err),
-      });
-    });
 
     revalidatePath(`/listings/${listingId}`);
     revalidatePath("/profile");
@@ -260,11 +254,21 @@ export async function reviewListingMigration(
           return { error: "You can only update your own listings" } as const;
         }
 
-        return executeLockedListingMigrationReview(tx, currentListing, {
-          actor: "host",
-          expectedVersion,
-          now,
-        });
+        const reviewResult = await executeLockedListingMigrationReview(
+          tx,
+          currentListing,
+          {
+            actor: "host",
+            expectedVersion,
+            now,
+          }
+        );
+
+        if ("success" in reviewResult && reviewResult.success) {
+          await markListingDirtyInTx(tx, listingId, "listing_updated");
+        }
+
+        return reviewResult;
       },
       { timeout: 10000 }
     );
@@ -272,15 +276,6 @@ export async function reviewListingMigration(
     if (!("success" in result) || !result.success) {
       return result;
     }
-
-    markListingDirty(listingId, "listing_updated").catch((err) => {
-      logger.sync.warn("markListingDirty failed", {
-        action: "reviewListingMigration",
-        listingId,
-        reason: "listing_updated",
-        error: err instanceof Error ? err.message : String(err),
-      });
-    });
 
     revalidatePath(`/listings/${listingId}`);
     revalidatePath(`/listings/${listingId}/edit`);
@@ -398,6 +393,8 @@ export async function recoverHostManagedListing(
           data: preparedWrite.data,
         });
 
+        await markListingDirtyInTx(tx, listingId, "status_changed");
+
         return {
           success: true,
           status: preparedWrite.status,
@@ -411,15 +408,6 @@ export async function recoverHostManagedListing(
     if ("error" in result) {
       return result;
     }
-
-    markListingDirty(listingId, "status_changed").catch((err) => {
-      logger.sync.warn("markListingDirty failed", {
-        action: "recoverHostManagedListing",
-        listingId,
-        reason: "status_changed",
-        error: err instanceof Error ? err.message : String(err),
-      });
-    });
 
     revalidatePath(`/listings/${listingId}`);
     revalidatePath(`/listings/${listingId}/edit`);
@@ -469,18 +457,12 @@ export async function incrementViewCount(listingId: string) {
   }
 
   try {
-    await prisma.listing.update({
-      where: { id: listingId },
-      data: { viewCount: { increment: 1 } },
-    });
-    // Fire-and-forget: mark listing dirty for search doc refresh
-    markListingDirty(listingId, "view_count").catch((err) => {
-      logger.sync.warn("markListingDirty failed", {
-        action: "incrementViewCount",
-        listingId,
-        reason: "view_count",
-        error: err instanceof Error ? err.message : String(err),
+    await prisma.$transaction(async (tx) => {
+      await tx.listing.update({
+        where: { id: listingId },
+        data: { viewCount: { increment: 1 } },
       });
+      await markListingDirtyInTx(tx, listingId, "view_count");
     });
     return { success: true };
   } catch (error) {

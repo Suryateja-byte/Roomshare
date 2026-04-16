@@ -14,7 +14,10 @@ jest.mock("@/lib/booking-audit", () => ({
 }));
 
 jest.mock("@/lib/search/search-doc-dirty", () => ({
+  markListingDirty: jest.fn().mockResolvedValue(undefined),
   markListingsDirty: jest.fn(),
+  markListingDirtyInTx: jest.fn().mockResolvedValue(undefined),
+  markListingsDirtyInTx: jest.fn().mockResolvedValue(undefined),
 }));
 
 jest.mock("@/lib/prisma", () => ({

@@ -18,7 +18,7 @@ import {
 import { VALID_AMENITIES, VALID_HOUSE_RULES } from "@/lib/filter-schema";
 import { checkListingLanguageCompliance } from "@/lib/listing-language-guard";
 import { isValidLanguageCode } from "@/lib/languages";
-import { markListingDirty } from "@/lib/search/search-doc-dirty";
+import { markListingDirtyInTx } from "@/lib/search/search-doc-dirty";
 import { withRateLimit } from "@/lib/with-rate-limit";
 import { captureApiError } from "@/lib/api-error-handler";
 import { isCircuitOpenError } from "@/lib/circuit-breaker";
@@ -540,6 +540,8 @@ export async function PATCH(
             data: preparedWrite.data,
           });
 
+          await markListingDirtyInTx(tx, id, "listing_updated");
+
           return { ok: true, updatedListing } as const;
         });
 
@@ -921,6 +923,8 @@ export async function PATCH(
             `;
           }
 
+          await markListingDirtyInTx(tx, id, "listing_updated");
+
           return updatedListing;
         });
       } catch (error) {
@@ -984,15 +988,9 @@ export async function PATCH(
       }
     }
 
-    // Fire-and-forget: mark listing dirty for search doc refresh
-    markListingDirty(id, "listing_updated").catch((err) => {
-      logger.sync.warn("markListingDirty failed", {
-        route: "/api/listings/[id]",
-        method: "PATCH",
-        listingId: id,
-        error: err instanceof Error ? err.message : String(err),
-      });
-    });
+    // markListingDirty is now called in-transaction alongside the listing
+    // update (CFM-405b) so the dirty flag and the source write commit or roll
+    // back atomically. See src/lib/search/search-doc-dirty.ts.
 
     if (features.semanticSearch) {
       syncListingEmbedding(id).catch((err) => {

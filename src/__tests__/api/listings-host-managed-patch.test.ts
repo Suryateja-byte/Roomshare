@@ -47,6 +47,9 @@ jest.mock("@/app/actions/suspension", () => ({
 
 jest.mock("@/lib/search/search-doc-dirty", () => ({
   markListingDirty: jest.fn().mockResolvedValue(undefined),
+  markListingsDirty: jest.fn().mockResolvedValue(undefined),
+  markListingDirtyInTx: jest.fn().mockResolvedValue(undefined),
+  markListingsDirtyInTx: jest.fn().mockResolvedValue(undefined),
 }));
 
 jest.mock("@/lib/api-error-handler", () => ({
@@ -125,7 +128,7 @@ import {
   getFuturePeakReservedLoad,
   syncFutureInventoryTotalSlots,
 } from "@/lib/availability";
-import { markListingDirty } from "@/lib/search/search-doc-dirty";
+import { markListingDirtyInTx } from "@/lib/search/search-doc-dirty";
 
 const ownerSession = {
   user: { id: "owner-123", email: "owner@example.com", isSuspended: false },
@@ -333,7 +336,8 @@ describe("PATCH /api/listings/[id] host-managed contract", () => {
     expect(getAvailability).not.toHaveBeenCalled();
     expect(getFuturePeakReservedLoad).not.toHaveBeenCalled();
     expect(syncFutureInventoryTotalSlots).not.toHaveBeenCalled();
-    expect(markListingDirty).toHaveBeenCalledWith(
+    expect(markListingDirtyInTx).toHaveBeenCalledWith(
+      expect.anything(),
       "listing-abc",
       "listing_updated"
     );
