@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect, useRef, useMemo } from "react";
+import { useState, useEffect, useRef, useMemo, useCallback } from "react";
 import { useRouter } from "next/navigation";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -48,6 +48,7 @@ import {
   AlertDialogTitle,
 } from "@/components/ui/alert-dialog";
 import ImageUploader from "@/components/listings/ImageUploader";
+import ListingFreshnessCheck from "@/components/ListingFreshnessCheck";
 import { ImageIcon } from "lucide-react";
 
 interface ImageObject {
@@ -77,8 +78,16 @@ interface Listing {
   leaseDuration: string | null;
   roomType: string | null;
   bookingMode: string;
+  availabilitySource?: "LEGACY_BOOKING" | "HOST_MANAGED";
+  version?: number;
+  status?: "ACTIVE" | "PAUSED" | "RENTED";
+  statusReason?: string | null;
+  openSlots?: number | null;
   totalSlots: number;
-  moveInDate: Date | null;
+  moveInDate: Date | string | null;
+  availableUntil?: Date | string | null;
+  minStayMonths?: number | null;
+  lastConfirmedAt?: Date | string | null;
   updatedAt?: string;
   location: {
     address: string;
@@ -116,16 +125,476 @@ interface EditListingFormData {
 }
 
 // Format date for input (YYYY-MM-DD)
-const formatDateForInput = (date: Date | null) => {
+const formatDateForInput = (date: Date | string | null | undefined) => {
   if (!date) return "";
+  if (typeof date === "string") {
+    const match = date.match(/^(\d{4}-\d{2}-\d{2})/);
+    if (match) {
+      return match[1];
+    }
+  }
   const d = new Date(date);
-  const year = d.getFullYear();
-  const month = String(d.getMonth() + 1).padStart(2, "0");
-  const day = String(d.getDate()).padStart(2, "0");
+  const year = d.getUTCFullYear();
+  const month = String(d.getUTCMonth() + 1).padStart(2, "0");
+  const day = String(d.getUTCDate()).padStart(2, "0");
   return `${year}-${month}-${day}`;
 };
 
-export default function EditListingForm({
+function HostManagedEditListingForm({ listing }: EditListingFormProps) {
+  const router = useRouter();
+  const [loading, setLoading] = useState(false);
+  const [error, setError] = useState("");
+  const [fieldErrors, setFieldErrors] = useState<Record<string, string>>({});
+  const [version, setVersion] = useState(listing.version ?? 0);
+  const [formModified, setFormModified] = useState(false);
+  const [moveInDate, setMoveInDate] = useState(
+    formatDateForInput(listing.moveInDate)
+  );
+  const [availableUntil, setAvailableUntil] = useState(
+    formatDateForInput(listing.availableUntil)
+  );
+  const [status, setStatus] = useState(listing.status ?? "ACTIVE");
+  const [openSlots, setOpenSlots] = useState(String(listing.openSlots ?? 0));
+  const [totalSlots, setTotalSlots] = useState(String(listing.totalSlots));
+  const [minStayMonths, setMinStayMonths] = useState(
+    String(listing.minStayMonths ?? 1)
+  );
+  const [reloadSuggested, setReloadSuggested] = useState(false);
+  const [pendingReload, setPendingReload] = useState(false);
+  const formRef = useRef<HTMLFormElement>(null);
+  const submitAbortRef = useRef<AbortController | null>(null);
+  const previousSnapshotKeyRef = useRef<string | null>(null);
+  const pendingReloadSnapshotKeyRef = useRef<string | null>(null);
+  const navGuard = useNavigationGuard(
+    formModified && !loading && !pendingReload,
+    "You have unsaved changes. Leave without saving?"
+  );
+  const isFormDisabled = loading || pendingReload;
+
+  const latestSnapshot = useMemo(
+    () => ({
+      version: listing.version ?? 0,
+      moveInDate: formatDateForInput(listing.moveInDate),
+      availableUntil: formatDateForInput(listing.availableUntil),
+      status: listing.status ?? "ACTIVE",
+      openSlots: String(listing.openSlots ?? 0),
+      totalSlots: String(listing.totalSlots),
+      minStayMonths: String(listing.minStayMonths ?? 1),
+    }),
+    [
+      listing.availableUntil,
+      listing.minStayMonths,
+      listing.moveInDate,
+      listing.openSlots,
+      listing.status,
+      listing.totalSlots,
+      listing.version,
+    ]
+  );
+
+  const latestSnapshotKey = useMemo(
+    () =>
+      [
+        latestSnapshot.version,
+        latestSnapshot.moveInDate,
+        latestSnapshot.availableUntil,
+        latestSnapshot.status,
+        latestSnapshot.openSlots,
+        latestSnapshot.totalSlots,
+        latestSnapshot.minStayMonths,
+      ].join("|"),
+    [latestSnapshot]
+  );
+
+  const hydrateFromListing = useCallback(() => {
+    setVersion(latestSnapshot.version);
+    setMoveInDate(latestSnapshot.moveInDate);
+    setAvailableUntil(latestSnapshot.availableUntil);
+    setStatus(latestSnapshot.status);
+    setOpenSlots(latestSnapshot.openSlots);
+    setTotalSlots(latestSnapshot.totalSlots);
+    setMinStayMonths(latestSnapshot.minStayMonths);
+    setError("");
+    setFieldErrors({});
+    setReloadSuggested(false);
+    setFormModified(false);
+    setPendingReload(false);
+    pendingReloadSnapshotKeyRef.current = null;
+  }, [latestSnapshot]);
+
+  useEffect(() => {
+    return () => {
+      submitAbortRef.current?.abort();
+    };
+  }, []);
+
+  useEffect(() => {
+    const previousSnapshotKey = previousSnapshotKeyRef.current;
+    previousSnapshotKeyRef.current = latestSnapshotKey;
+
+    if (pendingReload) {
+      if (pendingReloadSnapshotKeyRef.current === latestSnapshotKey) {
+        return;
+      }
+      hydrateFromListing();
+      return;
+    }
+
+    if (
+      previousSnapshotKey === null ||
+      previousSnapshotKey === latestSnapshotKey
+    ) {
+      return;
+    }
+
+    if (!formModified) {
+      hydrateFromListing();
+      return;
+    }
+
+    setReloadSuggested(true);
+  }, [formModified, hydrateFromListing, latestSnapshotKey, pendingReload]);
+
+  const FieldError = ({ field }: { field: string }) => {
+    if (!fieldErrors[field]) return null;
+    return (
+      <p className="text-red-500 text-xs mt-1 flex items-center gap-1">
+        <AlertCircle className="w-3 h-3" />
+        {fieldErrors[field]}
+      </p>
+    );
+  };
+
+  const handleSubmit = async (e: React.FormEvent<HTMLFormElement>) => {
+    e.preventDefault();
+    if (pendingReload) {
+      return;
+    }
+
+    setLoading(true);
+    setError("");
+    setFieldErrors({});
+    setReloadSuggested(false);
+
+    const controller = new AbortController();
+    submitAbortRef.current = controller;
+
+    try {
+      const res = await fetch(`/api/listings/${listing.id}`, {
+        method: "PATCH",
+        signal: controller.signal,
+        headers: {
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify({
+          expectedVersion: version,
+          openSlots: Number(openSlots),
+          totalSlots: Number(totalSlots),
+          moveInDate: moveInDate || null,
+          availableUntil: availableUntil || null,
+          minStayMonths: Number(minStayMonths),
+          status,
+        }),
+      });
+
+      const json = await res.json();
+
+      if (!res.ok) {
+        if (json.fields) {
+          setFieldErrors(json.fields);
+        }
+
+        if (json.code === "VERSION_CONFLICT") {
+          setReloadSuggested(true);
+          throw new Error(
+            "This listing was updated elsewhere. Reload to continue editing or reapply your changes."
+          );
+        }
+
+        throw new Error(json.error || "Failed to update listing");
+      }
+
+      if (typeof json.version === "number") {
+        setVersion(json.version);
+      }
+
+      navGuard.disable();
+      router.push(`/listings/${listing.id}`);
+    } catch (err: unknown) {
+      if (err instanceof Error && err.name === "AbortError") return;
+      Sentry.captureException(err, {
+        tags: { component: "HostManagedEditListingForm", action: "submit" },
+      });
+      setError(
+        err instanceof Error ? err.message : "An unexpected error occurred"
+      );
+      window.scrollTo({ top: 0, behavior: "smooth" });
+    } finally {
+      submitAbortRef.current = null;
+      setLoading(false);
+    }
+  };
+
+  const handleReloadLatest = () => {
+    pendingReloadSnapshotKeyRef.current = latestSnapshotKey;
+    setPendingReload(true);
+    router.refresh();
+  };
+
+  return (
+    <>
+      <Link
+        data-testid="listing-cancel-button"
+        href={`/listings/${listing.id}`}
+        className="inline-flex items-center text-sm text-muted-foreground hover:text-foreground mb-6"
+      >
+        <ArrowLeft className="w-4 h-4 mr-1" />
+        Back to listing
+      </Link>
+
+      <div className="mb-8">
+        <ListingFreshnessCheck listingId={listing.id} canManage={true} />
+      </div>
+
+      {error && (
+        <div className="bg-red-50 border border-red-100 px-4 py-4 rounded-xl mb-8">
+          <div className="flex items-start justify-between gap-4">
+            <div className="flex items-start gap-3">
+              <AlertCircle className="w-5 h-5 text-red-600 flex-shrink-0 mt-0.5" />
+              <div>
+                <p className="text-sm font-medium text-red-900">
+                  Failed to save changes
+                </p>
+                <p className="text-sm text-red-600 mt-1">{error}</p>
+              </div>
+            </div>
+            <Button
+              type="button"
+              variant="outline"
+              size="sm"
+              onClick={() =>
+                reloadSuggested
+                  ? handleReloadLatest()
+                  : formRef.current?.requestSubmit()
+              }
+              disabled={isFormDisabled}
+              className="flex-shrink-0 text-red-700 border-outline-variant/20 hover:bg-red-100"
+            >
+              <RefreshCcw className="w-4 h-4 mr-1" />
+              {pendingReload
+                ? "Reloading..."
+                : reloadSuggested
+                  ? "Reload latest"
+                  : "Retry"}
+            </Button>
+          </div>
+        </div>
+      )}
+
+      {!error && reloadSuggested && (
+        <div className="bg-amber-50 border border-amber-100 px-4 py-4 rounded-xl mb-8">
+          <div className="flex items-start justify-between gap-4">
+            <div className="flex items-start gap-3">
+              <AlertCircle className="w-5 h-5 text-amber-600 flex-shrink-0 mt-0.5" />
+              <div>
+                <p className="text-sm font-medium text-amber-900">
+                  A newer version is available
+                </p>
+                <p className="text-sm text-amber-700 mt-1">
+                  Reload the latest listing snapshot to discard unsaved changes
+                  and continue editing with the current version.
+                </p>
+              </div>
+            </div>
+            <Button
+              type="button"
+              variant="outline"
+              size="sm"
+              onClick={handleReloadLatest}
+              disabled={isFormDisabled}
+              className="flex-shrink-0 text-amber-700 border-outline-variant/20 hover:bg-amber-100"
+            >
+              <RefreshCcw className="w-4 h-4 mr-1" />
+              {pendingReload ? "Reloading..." : "Reload latest"}
+            </Button>
+          </div>
+        </div>
+      )}
+
+      <form
+        ref={formRef}
+        data-testid="edit-listing-form"
+        onSubmit={handleSubmit}
+        onChange={() => setFormModified(true)}
+        className="space-y-8"
+      >
+        <div className="space-y-6">
+          <h3 className="text-lg font-semibold font-display text-on-surface flex items-center gap-2">
+            <Home className="w-4 h-4" /> Host-managed availability
+          </h3>
+          <p className="text-sm text-on-surface-variant">
+            Update the live availability fields for this host-managed listing.
+            This save uses the dedicated versioned availability contract.
+          </p>
+
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+            <div>
+              <Label htmlFor="openSlots">Open Slots</Label>
+              <Input
+                id="openSlots"
+                name="openSlots"
+                type="number"
+                min="0"
+                step="1"
+                value={openSlots}
+                onChange={(e) => setOpenSlots(e.target.value)}
+                disabled={isFormDisabled}
+              />
+              <FieldError field="openSlots" />
+            </div>
+            <div>
+              <Label htmlFor="totalSlots">Total Slots</Label>
+              <Input
+                id="totalSlots"
+                name="totalSlots"
+                type="number"
+                min="1"
+                step="1"
+                value={totalSlots}
+                onChange={(e) => setTotalSlots(e.target.value)}
+                disabled={isFormDisabled}
+              />
+              <FieldError field="totalSlots" />
+            </div>
+          </div>
+
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+            <div>
+              <Label htmlFor="moveInDate">Move-in Date</Label>
+              <DatePicker
+                id="moveInDate"
+                value={moveInDate}
+                onChange={setMoveInDate}
+                placeholder="Select move-in date"
+                disabled={isFormDisabled}
+              />
+              <FieldError field="moveInDate" />
+            </div>
+            <div>
+              <Label htmlFor="availableUntil">Available Until</Label>
+              <DatePicker
+                id="availableUntil"
+                value={availableUntil}
+                onChange={setAvailableUntil}
+                placeholder="Select end date"
+                disabled={isFormDisabled}
+              />
+              <FieldError field="availableUntil" />
+            </div>
+          </div>
+
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+            <div>
+              <Label htmlFor="minStayMonths">Minimum Stay (Months)</Label>
+              <Input
+                id="minStayMonths"
+                name="minStayMonths"
+                type="number"
+                min="1"
+                step="1"
+                value={minStayMonths}
+                onChange={(e) => setMinStayMonths(e.target.value)}
+                disabled={isFormDisabled}
+              />
+              <FieldError field="minStayMonths" />
+            </div>
+            <div>
+              <Label htmlFor="status">Status</Label>
+              <select
+                id="status"
+                name="status"
+                value={status}
+                onChange={(e) =>
+                  setStatus(e.target.value as "ACTIVE" | "PAUSED" | "RENTED")
+                }
+                disabled={isFormDisabled}
+                className="mt-1 flex h-10 w-full rounded-md border border-outline-variant/20 bg-surface-canvas px-3 py-2 text-sm text-on-surface"
+              >
+                <option value="ACTIVE">Active</option>
+                <option value="PAUSED">Paused</option>
+                <option value="RENTED">Rented</option>
+              </select>
+              <FieldError field="status" />
+            </div>
+          </div>
+
+          <div>
+            <Label htmlFor="expectedVersion">Expected Version</Label>
+            <Input
+              id="expectedVersion"
+              name="expectedVersion"
+              value={String(version)}
+              readOnly
+              disabled
+            />
+          </div>
+        </div>
+
+        <div className="pt-6 flex gap-4">
+          <Button
+            type="button"
+            variant="outline"
+            onClick={() => router.push(`/listings/${listing.id}`)}
+            disabled={isFormDisabled}
+            size="lg"
+            className="flex-1 h-14 rounded-xl"
+          >
+            Cancel
+          </Button>
+          <Button
+            type="submit"
+            disabled={isFormDisabled}
+            size="lg"
+            className="flex-1 h-14 rounded-xl shadow-ambient-lg shadow-on-surface/10 text-lg"
+            data-testid="listing-save-button"
+          >
+            {loading || pendingReload ? (
+              <>
+                <Loader2 className="w-5 h-5 animate-spin mr-2" />
+                {pendingReload ? "Reloading..." : "Updating..."}
+              </>
+            ) : (
+              "Save Changes"
+            )}
+          </Button>
+        </div>
+      </form>
+
+      {navGuard.showDialog && (
+        <AlertDialog open={navGuard.showDialog}>
+          <AlertDialogContent>
+            <AlertDialogHeader>
+              <AlertDialogTitle>Unsaved Changes</AlertDialogTitle>
+              <AlertDialogDescription>
+                {navGuard.message}
+              </AlertDialogDescription>
+            </AlertDialogHeader>
+            <AlertDialogFooter>
+              <AlertDialogCancel onClick={navGuard.onStay}>
+                Stay
+              </AlertDialogCancel>
+              <AlertDialogAction onClick={navGuard.onLeave}>
+                Leave
+              </AlertDialogAction>
+            </AlertDialogFooter>
+          </AlertDialogContent>
+        </AlertDialog>
+      )}
+    </>
+  );
+}
+
+function LegacyEditListingForm({
   listing,
   enableWholeUnitMode = false,
 }: EditListingFormProps) {
@@ -1103,4 +1572,12 @@ export default function EditListingForm({
       )}
     </>
   );
+}
+
+export default function EditListingForm(props: EditListingFormProps) {
+  if (props.listing.availabilitySource === "HOST_MANAGED") {
+    return <HostManagedEditListingForm {...props} />;
+  }
+
+  return <LegacyEditListingForm {...props} />;
 }

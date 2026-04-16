@@ -391,4 +391,32 @@ describe("ListingPageClient", () => {
       "1 slot available"
     );
   });
+
+  it("renders the owner freshness panel for host-managed listings", async () => {
+    mockUseSession.mockReturnValue({
+      data: {
+        user: {
+          id: "owner-1",
+          emailVerified: new Date("2026-04-01T12:00:00.000Z"),
+        },
+      },
+      status: "authenticated",
+    });
+
+    render(
+      <ListingPageClient
+        {...makeProps({
+          isOwner: true,
+          listing: {
+            ...makeProps().listing,
+            availabilitySource: "HOST_MANAGED",
+          },
+        })}
+      />
+    );
+
+    expect(await screen.findAllByTestId("listing-freshness-check")).toHaveLength(
+      1
+    );
+  });
 });

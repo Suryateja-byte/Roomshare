@@ -10,6 +10,7 @@ interface DatePickerProps {
   onChange: (date: string) => void;
   placeholder?: string;
   minDate?: string;
+  disabled?: boolean;
   className?: string;
   id?: string;
   "aria-describedby"?: string;
@@ -37,6 +38,7 @@ export function DatePicker({
   onChange,
   placeholder = "Select date",
   minDate,
+  disabled = false,
   className,
   id,
   "aria-describedby": ariaDescribedBy,
@@ -55,6 +57,12 @@ export function DatePicker({
   React.useEffect(() => {
     setMounted(true);
   }, []);
+
+  React.useEffect(() => {
+    if (disabled) {
+      setOpen(false);
+    }
+  }, [disabled]);
 
   const selectedDate = value ? parseLocalDate(value) : null;
   const today = new Date();
@@ -179,6 +187,7 @@ export function DatePicker({
       <button
         type="button"
         id={id}
+        disabled={disabled}
         aria-describedby={ariaDescribedBy}
         className={cn(
           "w-full flex items-center justify-between gap-2 p-2.5 sm:p-3 rounded-lg",
@@ -210,6 +219,7 @@ export function DatePicker({
       <Popover.Trigger
         type="button"
         id={id}
+        disabled={disabled}
         aria-describedby={ariaDescribedBy}
         aria-invalid={ariaInvalid}
         className={cn(
@@ -219,6 +229,7 @@ export function DatePicker({
           "hover:border-outline-variant/30",
           "focus:outline-none focus:ring-2 focus:ring-primary/30",
           "transition-all duration-200",
+          "disabled:cursor-not-allowed disabled:opacity-60 disabled:hover:border-outline-variant/20",
           "text-sm touch-target text-left",
           className
         )}
@@ -232,12 +243,14 @@ export function DatePicker({
           {value && (
             <span
               role="button"
-              tabIndex={0}
+              tabIndex={disabled ? -1 : 0}
               onClick={(e) => {
+                if (disabled) return;
                 e.stopPropagation();
                 handleClear();
               }}
               onKeyDown={(e) => {
+                if (disabled) return;
                 if (e.key === "Enter" || e.key === " ") {
                   e.stopPropagation();
                   handleClear();
@@ -269,29 +282,31 @@ export function DatePicker({
         >
           {/* Header */}
           <div className="flex items-center justify-between mb-4">
-            <button
-              type="button"
-              onClick={(e) => {
-                e.stopPropagation();
-                handlePrevMonth();
-              }}
-              className="p-2 hover:bg-surface-container-high rounded-lg transition-colors"
-              aria-label="Previous month"
-            >
+              <button
+                type="button"
+                disabled={disabled}
+                onClick={(e) => {
+                  e.stopPropagation();
+                  handlePrevMonth();
+                }}
+                className="p-2 hover:bg-surface-container-high rounded-lg transition-colors disabled:cursor-not-allowed disabled:opacity-60 disabled:hover:bg-transparent"
+                aria-label="Previous month"
+              >
               <ChevronLeft className="w-4 h-4 text-on-surface-variant" />
             </button>
             <span className="text-sm font-semibold text-on-surface">
               {MONTHS[viewDate.getMonth()]} {viewDate.getFullYear()}
             </span>
-            <button
-              type="button"
-              onClick={(e) => {
-                e.stopPropagation();
-                handleNextMonth();
-              }}
-              className="p-2 hover:bg-surface-container-high rounded-lg transition-colors"
-              aria-label="Next month"
-            >
+              <button
+                type="button"
+                disabled={disabled}
+                onClick={(e) => {
+                  e.stopPropagation();
+                  handleNextMonth();
+                }}
+                className="p-2 hover:bg-surface-container-high rounded-lg transition-colors disabled:cursor-not-allowed disabled:opacity-60 disabled:hover:bg-transparent"
+                aria-label="Next month"
+              >
               <ChevronRight className="w-4 h-4 text-on-surface-variant" />
             </button>
           </div>
@@ -318,7 +333,7 @@ export function DatePicker({
                 <button
                   key={index}
                   type="button"
-                  disabled={day.isDisabled}
+                  disabled={disabled || day.isDisabled}
                   onClick={() => handleDateSelect(day.date)}
                   className={cn(
                     "h-9 w-9 flex items-center justify-center text-sm rounded-lg transition-all duration-200",
@@ -343,15 +358,17 @@ export function DatePicker({
           <div className="flex items-center justify-between mt-4 pt-3 border-t border-surface-container-high">
             <button
               type="button"
+              disabled={disabled}
               onClick={handleClear}
-              className="text-sm font-medium text-on-surface-variant hover:text-on-surface transition-colors"
+              className="text-sm font-medium text-on-surface-variant hover:text-on-surface transition-colors disabled:cursor-not-allowed disabled:opacity-60 disabled:hover:text-on-surface-variant"
             >
               Clear
             </button>
             <button
               type="button"
+              disabled={disabled}
               onClick={handleToday}
-              className="text-sm font-medium text-on-surface hover:text-on-surface-variant transition-colors"
+              className="text-sm font-medium text-on-surface hover:text-on-surface-variant transition-colors disabled:cursor-not-allowed disabled:opacity-60 disabled:hover:text-on-surface"
             >
               Today
             </button>

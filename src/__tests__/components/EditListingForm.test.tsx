@@ -13,8 +13,13 @@ import userEvent from "@testing-library/user-event";
 import EditListingForm from "@/app/listings/[id]/edit/EditListingForm";
 
 // Mock dependencies
+const mockRouter = {
+  push: jest.fn(),
+  refresh: jest.fn(),
+};
+
 jest.mock("next/navigation", () => ({
-  useRouter: () => ({ push: jest.fn() }),
+  useRouter: () => mockRouter,
 }));
 
 jest.mock("@/hooks/useFormPersistence", () => ({
@@ -69,6 +74,11 @@ jest.mock("@/components/listings/ImageUploader", () => ({
   ),
 }));
 
+jest.mock("@/components/ListingFreshnessCheck", () => ({
+  __esModule: true,
+  default: () => <div data-testid="listing-freshness-check" />,
+}));
+
 // Capture roomType Select onValueChange for triggering changes in tests
 let roomTypeOnValueChange: ((val: string) => void) | undefined;
 
@@ -110,8 +120,14 @@ const defaultListing = {
   leaseDuration: "12 months",
   roomType: "Private Room",
   bookingMode: "SHARED",
+  availabilitySource: "LEGACY_BOOKING" as const,
+  version: 3,
+  status: "ACTIVE" as const,
+  openSlots: null,
   totalSlots: 2,
   moveInDate: null,
+  availableUntil: null,
+  minStayMonths: 1,
   updatedAt: "2025-01-01T00:00:00.000Z",
   location: {
     address: "123 Main St",
@@ -120,6 +136,18 @@ const defaultListing = {
     zip: "78701",
   },
   images: ["https://example.com/photo1.jpg"],
+};
+
+const hostManagedListing = {
+  ...defaultListing,
+  availabilitySource: "HOST_MANAGED" as const,
+  version: 9,
+  status: "PAUSED" as const,
+  openSlots: 2,
+  totalSlots: 3,
+  moveInDate: "2026-05-01",
+  availableUntil: "2026-08-01",
+  minStayMonths: 2,
 };
 
 describe("EditListingForm — bookingMode", () => {
@@ -227,15 +255,9 @@ describe("EditListingForm — bookingMode", () => {
 // ===========================================================================
 
 describe("EditListingForm — PATCH submission", () => {
-  const mockPush = jest.fn();
-
   beforeEach(() => {
     jest.clearAllMocks();
     roomTypeOnValueChange = undefined;
-    // Re-mock router with capturable push
-    jest
-      .spyOn(require("next/navigation"), "useRouter")
-      .mockReturnValue({ push: mockPush });
     (global.fetch as jest.Mock).mockResolvedValue({
       ok: true,
       json: () => Promise.resolve({ id: "listing-123" }),
@@ -393,5 +415,230 @@ describe("EditListingForm — PATCH submission", () => {
 
     // Form should still be on the page (not redirected)
     expect(screen.getByText("Save Changes")).toBeInTheDocument();
+  });
+
+  it("sends the dedicated host-managed PATCH payload for HOST_MANAGED listings", async () => {
+    render(<EditListingForm listing={hostManagedListing} />);
+
+    await userEvent.click(screen.getByText("Save Changes"));
+
+    await waitFor(() => {
+      expect(global.fetch).toHaveBeenCalledWith(
+        "/api/listings/listing-123",
+        expect.objectContaining({
+          method: "PATCH",
+        })
+      );
+    });
+
+    const callBody = JSON.parse(
+      (global.fetch as jest.Mock).mock.calls[0][1].body
+    );
+
+    expect(callBody).toEqual({
+      expectedVersion: 9,
+      openSlots: 2,
+      totalSlots: 3,
+      moveInDate: "2026-05-01",
+      availableUntil: "2026-08-01",
+      minStayMonths: 2,
+      status: "PAUSED",
+    });
+  });
+
+  it("does not send legacy listing fields for HOST_MANAGED rows", async () => {
+    render(<EditListingForm listing={hostManagedListing} />);
+
+    await userEvent.click(screen.getByText("Save Changes"));
+
+    await waitFor(() => {
+      expect(global.fetch).toHaveBeenCalled();
+    });
+
+    const callBody = JSON.parse(
+      (global.fetch as jest.Mock).mock.calls[0][1].body
+    );
+
+    expect(callBody).not.toHaveProperty("title");
+    expect(callBody).not.toHaveProperty("description");
+    expect(callBody).not.toHaveProperty("price");
+    expect(callBody).not.toHaveProperty("bookingMode");
+    expect(callBody).not.toHaveProperty("images");
+  });
+
+  it("rehydrates the latest host-managed snapshot after reload is requested", async () => {
+    (global.fetch as jest.Mock).mockResolvedValueOnce({
+      ok: false,
+      status: 409,
+      json: () =>
+        Promise.resolve({
+          error:
+            "This listing was updated elsewhere. Reload to continue editing or reapply your changes.",
+          code: "VERSION_CONFLICT",
+        }),
+    });
+
+    const { rerender } = render(<EditListingForm listing={hostManagedListing} />);
+
+    fireEvent.change(screen.getByLabelText("Open Slots"), {
+      target: { value: "1" },
+    });
+
+    await userEvent.click(screen.getByText("Save Changes"));
+
+    await waitFor(() => {
+      expect(screen.getByText("Failed to save changes")).toBeInTheDocument();
+    });
+
+    await userEvent.click(screen.getByRole("button", { name: "Reload latest" }));
+
+    await waitFor(() => {
+      expect(mockRouter.refresh).toHaveBeenCalled();
+      expect(screen.getByText("Failed to save changes")).toBeInTheDocument();
+      expect(
+        screen.getAllByRole("button", { name: "Reloading..." }).length
+      ).toBeGreaterThan(0);
+      expect(
+        (screen.getByLabelText("Expected Version") as HTMLInputElement).value
+      ).toBe("9");
+      expect(screen.getByTestId("listing-save-button")).toBeDisabled();
+      expect(screen.getByLabelText("Move-in Date")).toBeDisabled();
+      expect(screen.getByLabelText("Available Until")).toBeDisabled();
+    });
+
+    await userEvent.click(screen.getByTestId("listing-save-button"));
+    expect(global.fetch).toHaveBeenCalledTimes(1);
+
+    rerender(
+      <EditListingForm
+        listing={{
+          ...hostManagedListing,
+          version: 10,
+          status: "ACTIVE",
+          openSlots: 4,
+          totalSlots: 5,
+          moveInDate: "2026-06-01",
+          availableUntil: "2026-09-01",
+          minStayMonths: 3,
+        }}
+      />
+    );
+
+    await waitFor(() => {
+      expect((screen.getByLabelText("Open Slots") as HTMLInputElement).value).toBe(
+        "4"
+      );
+      expect(
+        (screen.getByLabelText("Total Slots") as HTMLInputElement).value
+      ).toBe("5");
+      expect(
+        (screen.getByLabelText("Minimum Stay (Months)") as HTMLInputElement)
+          .value
+      ).toBe("3");
+      expect((screen.getByLabelText("Expected Version") as HTMLInputElement).value).toBe(
+        "10"
+      );
+      expect((screen.getByLabelText("Status") as HTMLSelectElement).value).toBe(
+        "ACTIVE"
+      );
+      expect(screen.getByTestId("listing-save-button")).toBeEnabled();
+    });
+
+    expect(
+      screen.queryByText("Failed to save changes")
+    ).not.toBeInTheDocument();
+    expect(
+      screen.queryByText("A newer version is available")
+    ).not.toBeInTheDocument();
+  });
+
+  it("auto-syncs pristine host-managed state when refreshed props arrive", async () => {
+    const { rerender } = render(<EditListingForm listing={hostManagedListing} />);
+
+    rerender(
+      <EditListingForm
+        listing={{
+          ...hostManagedListing,
+          version: 10,
+          status: "ACTIVE",
+          openSlots: 4,
+          totalSlots: 5,
+          moveInDate: "2026-06-01",
+          availableUntil: "2026-09-01",
+          minStayMonths: 3,
+        }}
+      />
+    );
+
+    await waitFor(() => {
+      expect((screen.getByLabelText("Open Slots") as HTMLInputElement).value).toBe(
+        "4"
+      );
+      expect((screen.getByLabelText("Expected Version") as HTMLInputElement).value).toBe(
+        "10"
+      );
+      expect((screen.getByLabelText("Status") as HTMLSelectElement).value).toBe(
+        "ACTIVE"
+      );
+    });
+  });
+
+  it("preserves dirty host-managed drafts when refreshed props arrive", async () => {
+    const { rerender } = render(<EditListingForm listing={hostManagedListing} />);
+
+    fireEvent.change(screen.getByLabelText("Open Slots"), {
+      target: { value: "1" },
+    });
+
+    rerender(
+      <EditListingForm
+        listing={{
+          ...hostManagedListing,
+          version: 10,
+          status: "ACTIVE",
+          openSlots: 4,
+          totalSlots: 5,
+          moveInDate: "2026-06-01",
+          availableUntil: "2026-09-01",
+          minStayMonths: 3,
+        }}
+      />
+    );
+
+    await waitFor(() => {
+      expect(
+        screen.getByText("A newer version is available")
+      ).toBeInTheDocument();
+    });
+
+    expect((screen.getByLabelText("Open Slots") as HTMLInputElement).value).toBe(
+      "1"
+    );
+    expect((screen.getByLabelText("Expected Version") as HTMLInputElement).value).toBe(
+      "9"
+    );
+    expect((screen.getByLabelText("Status") as HTMLSelectElement).value).toBe(
+      "PAUSED"
+    );
+  });
+
+  it("keeps the LEGACY_BOOKING submission path unchanged", async () => {
+    render(<EditListingForm listing={defaultListing} />);
+
+    await userEvent.click(screen.getByText("Add Image"));
+    await userEvent.click(screen.getByText("Save Changes"));
+
+    await waitFor(() => {
+      expect(global.fetch).toHaveBeenCalled();
+    });
+
+    const callBody = JSON.parse(
+      (global.fetch as jest.Mock).mock.calls[0][1].body
+    );
+
+    expect(callBody).toHaveProperty("title", "Test Listing");
+    expect(callBody).toHaveProperty("description", "A great place to live");
+    expect(callBody).toHaveProperty("price", "1500");
+    expect(callBody).not.toHaveProperty("expectedVersion");
   });
 });

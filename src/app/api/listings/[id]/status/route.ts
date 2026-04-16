@@ -24,6 +24,7 @@ export async function GET(
       where: { id },
       select: {
         id: true,
+        version: true,
         availabilitySource: true,
         status: true,
         statusReason: true,
@@ -40,6 +41,8 @@ export async function GET(
 
     return NextResponse.json({
       id: listing.id,
+      version: listing.version,
+      availabilitySource: listing.availabilitySource,
       status: listing.status,
       statusReason: listing.statusReason,
       updatedAt: listing.updatedAt,

@@ -51,6 +51,9 @@ export default async function EditListingPage({ params }: PageProps) {
           listing={{
             ...listing,
             price: Number(listing.price),
+            moveInDate: listing.moveInDate?.toISOString() ?? null,
+            availableUntil: listing.availableUntil?.toISOString() ?? null,
+            lastConfirmedAt: listing.lastConfirmedAt?.toISOString() ?? null,
             updatedAt: listing.updatedAt.toISOString(),
           }}
           enableWholeUnitMode={features.wholeUnitMode}

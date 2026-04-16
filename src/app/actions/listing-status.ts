@@ -26,9 +26,11 @@ const isReasonableId = (id: string) =>
   /^[\w-]+$/.test(id);
 
 export type ListingStatus = "ACTIVE" | "PAUSED" | "RENTED";
+export type HostManagedRecoveryMode = "RECONFIRM" | "REOPEN";
 
 const statusSchema = z.enum(["ACTIVE", "PAUSED", "RENTED"]);
 const versionSchema = z.number().int().min(0);
+const recoveryModeSchema = z.enum(["RECONFIRM", "REOPEN"]);
 type LockedListingRow = HostManagedListingWriteCurrent & { ownerId: string };
 
 export async function updateListingStatus(
@@ -203,6 +205,151 @@ export async function updateListingStatus(
       error: error instanceof Error ? error.message : "Unknown error",
     });
     return { error: "Failed to update listing status" };
+  }
+}
+
+export async function recoverHostManagedListing(
+  listingId: string,
+  expectedVersion: number,
+  mode: HostManagedRecoveryMode
+) {
+  if (!isReasonableId(listingId)) {
+    return { error: "Invalid listing ID format" };
+  }
+
+  if (!versionSchema.safeParse(expectedVersion).success) {
+    return { error: "Invalid listing version", code: "INVALID_VERSION" };
+  }
+
+  if (!recoveryModeSchema.safeParse(mode).success) {
+    return { error: "Invalid recovery mode" };
+  }
+
+  const session = await auth();
+  if (!session?.user?.id) {
+    return { error: "Unauthorized" };
+  }
+
+  const suspension = await checkSuspension();
+  if (suspension.suspended) {
+    return { error: suspension.error || "Account suspended" };
+  }
+
+  try {
+    const result = await prisma.$transaction(
+      async (tx) => {
+        const rows = await tx.$queryRaw<LockedListingRow[]>`
+        SELECT
+          "id",
+          "ownerId",
+          "version",
+          "availabilitySource",
+          "status",
+          "statusReason",
+          "needsMigrationReview",
+          "openSlots",
+          "availableSlots",
+          "totalSlots",
+          "moveInDate",
+          "availableUntil",
+          "minStayMonths",
+          "lastConfirmedAt",
+          "freshnessReminderSentAt",
+          "freshnessWarningSentAt",
+          "autoPausedAt"
+        FROM "Listing"
+        WHERE id = ${listingId}
+        FOR UPDATE
+      `;
+
+        if (rows.length === 0) {
+          return { error: "Listing not found" } as const;
+        }
+
+        if (rows[0].ownerId !== session.user.id) {
+          return { error: "You can only update your own listings" } as const;
+        }
+
+        const currentListing = rows[0];
+
+        if (currentListing.availabilitySource !== "HOST_MANAGED") {
+          return {
+            error: HOST_MANAGED_WRITE_ERROR_MESSAGES.HOST_MANAGED_WRITE_PATH_REQUIRED,
+            code: "HOST_MANAGED_WRITE_PATH_REQUIRED",
+          } as const;
+        }
+
+        const preparedWrite = prepareHostManagedListingWrite(
+          currentListing,
+          {
+            expectedVersion,
+            openSlots: currentListing.openSlots,
+            totalSlots: currentListing.totalSlots,
+            moveInDate: currentListing.moveInDate,
+            availableUntil: currentListing.availableUntil,
+            minStayMonths: currentListing.minStayMonths,
+            status: mode === "REOPEN" ? "ACTIVE" : currentListing.status,
+          },
+          {
+            actor: "host",
+            now: new Date(),
+          }
+        );
+
+        if (!preparedWrite.ok) {
+          return {
+            error: preparedWrite.error,
+            code: preparedWrite.code,
+          } as const;
+        }
+
+        await tx.listing.update({
+          where: { id: listingId },
+          data: preparedWrite.data,
+        });
+
+        return {
+          success: true,
+          status: preparedWrite.status,
+          statusReason: preparedWrite.statusReason,
+          version: preparedWrite.nextVersion,
+        } as const;
+      },
+      { timeout: 10000 }
+    );
+
+    if ("error" in result) {
+      return result;
+    }
+
+    markListingDirty(listingId, "status_changed").catch((err) => {
+      logger.sync.warn("markListingDirty failed", {
+        action: "recoverHostManagedListing",
+        listingId,
+        reason: "status_changed",
+        error: err instanceof Error ? err.message : String(err),
+      });
+    });
+
+    revalidatePath(`/listings/${listingId}`);
+    revalidatePath(`/listings/${listingId}/edit`);
+    revalidatePath("/profile");
+    revalidatePath("/search");
+
+    return {
+      success: true,
+      status: result.status,
+      statusReason: result.statusReason,
+      version: result.version,
+    };
+  } catch (error) {
+    logger.sync.error("Failed to recover host-managed listing", {
+      action: "recoverHostManagedListing",
+      listingId,
+      mode,
+      error: error instanceof Error ? error.message : "Unknown error",
+    });
+    return { error: "Failed to recover listing availability" };
   }
 }
 

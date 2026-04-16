@@ -734,7 +734,7 @@ export default function ListingPageClient({
         viewToken={viewToken}
       />
 
-      {/* Real-time freshness check for non-owners */}
+      {/* Real-time availability check for non-owners */}
       {canRenderGuestControls && (
         <ListingFreshnessCheck listingId={listing.id} />
       )}
@@ -1087,6 +1087,16 @@ export default function ListingPageClient({
                         <span className="relative inline-flex rounded-full h-2 w-2 bg-green-500" />
                       </span>
                     </div>
+
+                    {listing.availabilitySource === "HOST_MANAGED" && (
+                      <div className="mb-6">
+                        <ListingFreshnessCheck
+                          listingId={listing.id}
+                          canManage={true}
+                          reviewHref={`/listings/${listing.id}/edit`}
+                        />
+                      </div>
+                    )}
 
                     {/* Status Toggle */}
                     <div className="mb-6">

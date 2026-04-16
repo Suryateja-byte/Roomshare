@@ -1,6 +1,7 @@
 "use client";
 
-import { useState } from "react";
+import { useEffect, useRef, useState } from "react";
+import { useRouter } from "next/navigation";
 import { toast } from "sonner";
 import { Eye, EyeOff, Home, ChevronDown } from "lucide-react";
 import {
@@ -43,15 +44,28 @@ export default function ListingStatusToggle({
   currentStatus,
   currentVersion,
 }: ListingStatusToggleProps) {
+  const router = useRouter();
   const [status, setStatus] = useState<ListingStatus>(currentStatus);
   const [version, setVersion] = useState(currentVersion);
   const [isOpen, setIsOpen] = useState(false);
   const [isUpdating, setIsUpdating] = useState(false);
+  const [awaitingRefresh, setAwaitingRefresh] = useState(false);
+  const awaitingRefreshRef = useRef(false);
+
+  useEffect(() => {
+    setStatus(currentStatus);
+    setVersion(currentVersion);
+    if (awaitingRefreshRef.current) {
+      awaitingRefreshRef.current = false;
+      setAwaitingRefresh(false);
+    }
+  }, [currentStatus, currentVersion]);
 
   const config = statusConfig[status];
+  const isInteractionDisabled = isUpdating || awaitingRefresh;
 
   const handleStatusChange = async (newStatus: ListingStatus) => {
-    if (newStatus === status) {
+    if (newStatus === status || isInteractionDisabled) {
       setIsOpen(false);
       return;
     }
@@ -60,12 +74,20 @@ export default function ListingStatusToggle({
     const result = await updateListingStatus(listingId, newStatus, version);
 
     if (result.error) {
-      toast.error(result.error);
+      if (result.code === "VERSION_CONFLICT") {
+        awaitingRefreshRef.current = true;
+        setAwaitingRefresh(true);
+        toast.error("Listing changed elsewhere. Refreshing the latest version...");
+        router.refresh();
+      } else {
+        toast.error(result.error);
+      }
     } else {
       setStatus(result.status ?? newStatus);
       if (typeof result.version === "number") {
         setVersion(result.version);
       }
+      router.refresh();
     }
 
     setIsUpdating(false);
@@ -76,7 +98,7 @@ export default function ListingStatusToggle({
     <div className="relative">
       <button
         onClick={() => setIsOpen(!isOpen)}
-        disabled={isUpdating}
+        disabled={isInteractionDisabled}
         className={`flex items-center gap-2 px-4 py-2 rounded-xl border ${config.color} transition-all hover:shadow-ambient disabled:opacity-60`}
       >
         <span className={`w-2 h-2 rounded-full ${config.dotColor}`} />

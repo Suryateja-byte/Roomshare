@@ -88,6 +88,7 @@ describe("GET /api/listings/[id]/status", () => {
       const updatedAt = new Date("2026-01-15T12:00:00Z");
       (prisma.listing.findUnique as jest.Mock).mockResolvedValue({
         id: "listing-123",
+        version: 7,
         availabilitySource: "HOST_MANAGED",
         status: "ACTIVE",
         statusReason: null,
@@ -103,6 +104,8 @@ describe("GET /api/listings/[id]/status", () => {
       expect(response.status).toBe(200);
       const data = await response.json();
       expect(data.id).toBe("listing-123");
+      expect(data.version).toBe(7);
+      expect(data.availabilitySource).toBe("HOST_MANAGED");
       expect(data.status).toBe("ACTIVE");
       expect(data.updatedAt).toBe(updatedAt);
       expect(data.publicStatus).toBe("AVAILABLE");
@@ -117,6 +120,7 @@ describe("GET /api/listings/[id]/status", () => {
     it("returns NEEDS_RECONFIRMATION for stale auto-paused listings", async () => {
       (prisma.listing.findUnique as jest.Mock).mockResolvedValue({
         id: "listing-123",
+        version: 3,
         status: "PAUSED",
         availabilitySource: "HOST_MANAGED",
         statusReason: "STALE_AUTO_PAUSE",
@@ -140,6 +144,7 @@ describe("GET /api/listings/[id]/status", () => {
     it("returns stale host-managed listings as not search eligible", async () => {
       (prisma.listing.findUnique as jest.Mock).mockResolvedValue({
         id: "listing-123",
+        version: 4,
         status: "ACTIVE",
         availabilitySource: "HOST_MANAGED",
         statusReason: null,
@@ -162,6 +167,7 @@ describe("GET /api/listings/[id]/status", () => {
     it("queries only the necessary fields for the additive snapshot", async () => {
       (prisma.listing.findUnique as jest.Mock).mockResolvedValue({
         id: "listing-123",
+        version: 2,
         status: "ACTIVE",
         availabilitySource: "LEGACY_BOOKING",
         statusReason: null,
@@ -178,6 +184,7 @@ describe("GET /api/listings/[id]/status", () => {
         where: { id: "listing-123" },
         select: {
           id: true,
+          version: true,
           availabilitySource: true,
           status: true,
           statusReason: true,
@@ -226,6 +233,7 @@ describe("GET /api/listings/[id]/status", () => {
     it("returns status without any authentication", async () => {
       (prisma.listing.findUnique as jest.Mock).mockResolvedValue({
         id: "listing-123",
+        version: 1,
         status: "ACTIVE",
         availabilitySource: "LEGACY_BOOKING",
         statusReason: null,
