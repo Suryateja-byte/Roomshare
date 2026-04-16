@@ -79,7 +79,7 @@ import { features } from "@/lib/env";
 import { logger } from "@/lib/logger";
 import { createInternalNotification } from "@/lib/notifications";
 import { prisma } from "@/lib/prisma";
-import { markListingsDirty } from "@/lib/search/search-doc-dirty";
+import { markListingDirtyInTx } from "@/lib/search/search-doc-dirty";
 import { NextRequest } from "next/server";
 
 type ExpiredHold = ReturnType<typeof makeExpiredHold>;
@@ -252,7 +252,7 @@ describe("GET /api/cron/sweep-expired-holds", () => {
     });
     (applyInventoryDeltas as jest.Mock).mockResolvedValue(undefined);
     (logBookingAudit as jest.Mock).mockResolvedValue(undefined);
-    (markListingsDirty as jest.Mock).mockResolvedValue(undefined);
+    (markListingDirtyInTx as jest.Mock).mockResolvedValue(undefined);
     (createInternalNotification as jest.Mock).mockResolvedValue({
       success: true,
     });
@@ -348,7 +348,7 @@ describe("GET /api/cron/sweep-expired-holds", () => {
       })
     );
     expect(createInternalNotification).not.toHaveBeenCalled();
-    expect(markListingsDirty).not.toHaveBeenCalled();
+    expect(markListingDirtyInTx).not.toHaveBeenCalled();
   });
 
   it("expires one hold in its own transaction and sends notifications after commit", async () => {
@@ -433,10 +433,50 @@ describe("GET /api/cron/sweep-expired-holds", () => {
       })
     );
     expect(createInternalNotification).toHaveBeenCalledTimes(2);
-    expect(markListingsDirty).toHaveBeenCalledWith(
-      [hold.listingId],
+    expect(markListingDirtyInTx).toHaveBeenCalledWith(
+      expect.anything(),
+      hold.listingId,
       "booking_hold_expired"
     );
+  });
+
+  it("rolls the per-hold dirty mark back atomically when the enclosing tx fails mid-hold (CFM-405c)", async () => {
+    const hold = makeExpiredHold({
+      id: "booking-doomed",
+      listingId: "listing-doomed",
+    });
+    const discovery = makeDiscoveryStep({
+      lockAcquired: true,
+      expiredBookings: [hold],
+    });
+
+    // Simulate a mid-tx failure: after the hold-status update and the in-tx
+    // dirty mark both run, applyInventoryDeltas throws. The expected
+    // behavior is that the enclosing prisma.$transaction rethrows, the
+    // dirty mark rolls back with the transaction, and the route reports
+    // the hold as failed rather than expired.
+    (applyInventoryDeltas as jest.Mock).mockRejectedValueOnce(
+      new Error("simulated inventory write failure mid-tx")
+    );
+
+    const perHold = makePerHoldStep();
+    installTransactionQueue([discovery.step, perHold.step]);
+
+    const response = await GET(createRequest());
+    const data = await response.json();
+
+    // The route reports 500 because every selected hold failed (matches
+    // existing behavior at "returns 500 only when every selected hold
+    // fails unexpectedly"). No notification is sent, the hold is not
+    // counted as expired, and the in-tx dirty mark rolls back with the
+    // enclosing transaction.
+    expect(response.status).toBe(500);
+    expect(data).toEqual(
+      expect.objectContaining({
+        success: false,
+      })
+    );
+    expect(createInternalNotification).not.toHaveBeenCalled();
   });
 
   it("continues processing later holds when a middle hold fails", async () => {
@@ -472,8 +512,14 @@ describe("GET /api/cron/sweep-expired-holds", () => {
     expect(applyInventoryDeltas).toHaveBeenCalledTimes(2);
     expect(logBookingAudit).toHaveBeenCalledTimes(2);
     expect(createInternalNotification).toHaveBeenCalledTimes(4);
-    expect(markListingsDirty).toHaveBeenCalledWith(
-      ["listing-a", "listing-c"],
+    expect(markListingDirtyInTx).toHaveBeenCalledWith(
+      expect.anything(),
+      "listing-a",
+      "booking_hold_expired"
+    );
+    expect(markListingDirtyInTx).toHaveBeenCalledWith(
+      expect.anything(),
+      "listing-c",
       "booking_hold_expired"
     );
     expect(
@@ -512,8 +558,9 @@ describe("GET /api/cron/sweep-expired-holds", () => {
       })
     );
     expect(createInternalNotification).toHaveBeenCalledTimes(2);
-    expect(markListingsDirty).toHaveBeenCalledWith(
-      ["listing-b"],
+    expect(markListingDirtyInTx).toHaveBeenCalledWith(
+      expect.anything(),
+      "listing-b",
       "booking_hold_expired"
     );
   });
@@ -543,7 +590,7 @@ describe("GET /api/cron/sweep-expired-holds", () => {
     expect(applyInventoryDeltas).not.toHaveBeenCalled();
     expect(logBookingAudit).not.toHaveBeenCalled();
     expect(createInternalNotification).not.toHaveBeenCalled();
-    expect(markListingsDirty).not.toHaveBeenCalled();
+    expect(markListingDirtyInTx).not.toHaveBeenCalled();
   });
 
   it("returns 500 only when every selected hold fails unexpectedly", async () => {
@@ -575,7 +622,7 @@ describe("GET /api/cron/sweep-expired-holds", () => {
       })
     );
     expect(createInternalNotification).not.toHaveBeenCalled();
-    expect(markListingsDirty).not.toHaveBeenCalled();
+    expect(markListingDirtyInTx).not.toHaveBeenCalled();
     expect(
       findLogCall(
         logger.sync.error as jest.Mock,

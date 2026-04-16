@@ -1,7 +1,7 @@
 import type { ListingStatus, Prisma } from "@prisma/client";
 
-import { features } from "../env";
 import { prisma } from "../prisma";
+import { markListingDirtyInTx } from "../search/search-doc-dirty";
 import {
   MIGRATION_COHORTS,
   MIGRATION_REASON_CODES,
@@ -167,23 +167,9 @@ function buildReportRow(
   };
 }
 
-async function markListingDirtyAfterMigration(listingId: string): Promise<void> {
-  if (!features.searchDoc) {
-    return;
-  }
-
-  try {
-    await prisma.$executeRaw`
-      INSERT INTO listing_search_doc_dirty (listing_id, reason, marked_at)
-      VALUES (${listingId}, ${"listing_updated"}, NOW())
-      ON CONFLICT (listing_id) DO UPDATE SET
-        reason = EXCLUDED.reason,
-        marked_at = NOW()
-    `;
-  } catch {
-    // Best-effort only. A later dirty-doc repair loop can recover.
-  }
-}
+// CFM-405c: markListingDirtyAfterMigration is no longer needed as a separate
+// post-tx helper — the migration backfill tx now calls markListingDirtyInTx
+// directly so the dirty mark commits atomically with the listing update.
 
 export function planHostManagedMigrationBackfill(
   snapshot: ListingMigrationSnapshot,
@@ -465,6 +451,8 @@ export async function applyHostManagedMigrationBackfillForListing(
       },
     });
 
+    await markListingDirtyInTx(tx, listingId, "listing_updated");
+
     return {
       listingId,
       outcome: "applied" as const,
@@ -472,10 +460,6 @@ export async function applyHostManagedMigrationBackfillForListing(
       updateData: backfillPlan.updateData,
     };
   });
-
-  if (result.outcome === "applied") {
-    await markListingDirtyAfterMigration(listingId);
-  }
 
   return result;
 }

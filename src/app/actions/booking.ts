@@ -24,7 +24,7 @@ import {
   expireOverlappingExpiredHolds,
   getAvailability,
 } from "@/lib/availability";
-import { markListingsDirty } from "@/lib/search/search-doc-dirty";
+import { markListingsDirtyInTx } from "@/lib/search/search-doc-dirty";
 import { waitForTestBarrier } from "@/lib/test-barriers";
 
 // Booking result type for structured error handling
@@ -291,6 +291,8 @@ async function executeBookingTransaction(
     actorType: "USER",
     details: { slotsRequested: booking.slotsRequested, listingId },
   });
+
+  await markListingsDirtyInTx(tx, [listing.id], "listing_updated");
 
   return {
     success: true,
@@ -927,6 +929,8 @@ async function executeHoldTransaction(
     details: { slotsRequested: effectiveSlotsRequested, listingId, heldUntil },
   });
 
+  await markListingsDirtyInTx(tx, [listing.id], "listing_updated");
+
   return {
     success: true,
     bookingId: booking.id,
@@ -983,7 +987,7 @@ async function runHoldSideEffects(
 
   revalidatePath(`/listings/${result.listingId}`);
   revalidatePath("/bookings");
-  await markListingsDirty([result.listingId], "listing_updated");
+  // markListingsDirty is now called inside executeHoldTransaction (CFM-405c)
 }
 
 /**

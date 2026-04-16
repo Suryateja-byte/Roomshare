@@ -58,7 +58,7 @@ jest.mock("next/server", () => ({
 import { GET } from "@/app/api/cron/reconcile-slots/route";
 import { prisma } from "@/lib/prisma";
 import { validateCronAuth } from "@/lib/cron-auth";
-import { markListingsDirty } from "@/lib/search/search-doc-dirty";
+import { markListingsDirtyInTx } from "@/lib/search/search-doc-dirty";
 import {
   getAvailability,
   rebuildListingDayInventory,
@@ -196,7 +196,8 @@ describe("GET /api/cron/reconcile-slots", () => {
     });
 
     await GET(createRequest("Bearer valid"));
-    expect(markListingsDirty).toHaveBeenCalledWith(
+    expect(markListingsDirtyInTx).toHaveBeenCalledWith(
+      expect.anything(),
       ["listing-1"],
       "reconcile_slots"
     );

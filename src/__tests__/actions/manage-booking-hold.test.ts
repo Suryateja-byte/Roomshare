@@ -234,10 +234,7 @@ describe("manage-booking-hold — Phase 4 hold management paths", () => {
 
     expect(result.success).toBe(true);
 
-    // The HELD->ACCEPTED path should NOT call $executeRaw (no slot decrement)
-    expect(mockTxExecuteRaw).not.toHaveBeenCalled();
-
-    // But it SHOULD update booking status to ACCEPTED with heldUntil cleared
+    // The HELD->ACCEPTED path should still update the booking status
     expect(mockTxUpdateMany).toHaveBeenCalledWith({
       where: { id: "booking-held-1", status: "HELD", version: 1 },
       data: {
@@ -246,6 +243,17 @@ describe("manage-booking-hold — Phase 4 hold management paths", () => {
         version: { increment: 1 },
       },
     });
+
+    // CFM-405c: the only $executeRaw call in this path is the in-tx dirty
+    // mark (INSERT INTO listing_search_doc_dirty). There must be no slot-
+    // decrement $executeRaw (which would UPDATE "Listing").
+    const executeRawArgs = mockTxExecuteRaw.mock.calls.map((call) =>
+      Array.isArray(call[0]) ? call[0].join("") : String(call[0])
+    );
+    const updateListingSlotsCall = executeRawArgs.find((sql) =>
+      /UPDATE\s+"Listing".*availableSlots/i.test(sql)
+    );
+    expect(updateListingSlotsCall).toBeUndefined();
   });
 
   // -----------------------------------------------------------------------

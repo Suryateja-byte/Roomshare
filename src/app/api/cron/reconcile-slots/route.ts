@@ -11,7 +11,7 @@ import { logger } from "@/lib/logger";
 import { validateCronAuth } from "@/lib/cron-auth";
 import { prisma } from "@/lib/prisma";
 import { RECONCILER_ADVISORY_LOCK_KEY } from "@/lib/hold-constants";
-import { markListingsDirty } from "@/lib/search/search-doc-dirty";
+import { markListingsDirtyInTx } from "@/lib/search/search-doc-dirty";
 import {
   getAvailability,
   rebuildListingDayInventory,
@@ -65,6 +65,10 @@ export async function GET(request: NextRequest) {
         }
       }
 
+      if (fixedIds.length > 0) {
+        await markListingsDirtyInTx(tx, fixedIds, "reconcile_slots");
+      }
+
       return {
         skipped: false,
         drifted,
@@ -81,10 +85,6 @@ export async function GET(request: NextRequest) {
         skipped: true,
         reason: result.reason,
       });
-    }
-
-    if (result.fixedIds.length > 0) {
-      await markListingsDirty(result.fixedIds, "reconcile_slots");
     }
 
     const durationMs = Date.now() - startTime;

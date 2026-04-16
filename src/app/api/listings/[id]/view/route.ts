@@ -3,7 +3,7 @@ import { auth } from "@/auth";
 import { prisma } from "@/lib/prisma";
 import { checkRateLimit, getClientIP, RATE_LIMITS } from "@/lib/rate-limit";
 import { logger, sanitizeErrorMessage } from "@/lib/logger";
-import { markListingDirty } from "@/lib/search/search-doc-dirty";
+import { markListingDirtyInTx } from "@/lib/search/search-doc-dirty";
 import { validateViewToken } from "@/app/api/metrics/hmac";
 
 // NOTE: No CSRF validation on this endpoint by design.
@@ -46,18 +46,12 @@ export async function POST(request: Request, { params }: RouteContext) {
   }
 
   try {
-    await prisma.listing.update({
-      where: { id },
-      data: { viewCount: { increment: 1 } },
-    });
-
-    markListingDirty(id, "view_count").catch((err) => {
-      logger.sync.warn("markListingDirty failed", {
-        route: "/api/listings/[id]/view",
-        listingId: id,
-        reason: "view_count",
-        error: err instanceof Error ? err.message : String(err),
+    await prisma.$transaction(async (tx) => {
+      await tx.listing.update({
+        where: { id },
+        data: { viewCount: { increment: 1 } },
       });
+      await markListingDirtyInTx(tx, id, "view_count");
     });
 
     if (session?.user?.id) {

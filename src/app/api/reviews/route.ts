@@ -10,7 +10,7 @@ import { logger, sanitizeErrorMessage } from "@/lib/logger";
 import { captureApiError } from "@/lib/api-error-handler";
 import { validateCsrf } from "@/lib/csrf";
 import { z } from "zod";
-import { markListingDirty } from "@/lib/search/search-doc-dirty";
+import { markListingDirtyInTx } from "@/lib/search/search-doc-dirty";
 import {
   parsePaginationParams,
   buildPaginationResponse,
@@ -173,22 +173,30 @@ export async function POST(request: Request) {
 
     let review;
     try {
-      review = await prisma.review.create({
-        data: {
-          authorId: session.user.id,
-          listingId,
-          targetUserId,
-          rating,
-          comment,
-        },
-        include: {
-          author: {
-            select: {
-              name: true,
-              image: true,
+      review = await prisma.$transaction(async (tx) => {
+        const created = await tx.review.create({
+          data: {
+            authorId: session.user.id,
+            listingId,
+            targetUserId,
+            rating,
+            comment,
+          },
+          include: {
+            author: {
+              select: {
+                name: true,
+                image: true,
+              },
             },
           },
-        },
+        });
+
+        if (listingId) {
+          await markListingDirtyInTx(tx, listingId, "review_changed");
+        }
+
+        return created;
       });
     } catch (err) {
       if (
@@ -201,16 +209,6 @@ export async function POST(request: Request) {
         );
       }
       throw err;
-    }
-
-    // Fire-and-forget: mark listing dirty for search doc refresh
-    if (listingId) {
-      markListingDirty(listingId, "review_changed").catch((err) => {
-        logger.sync.warn("[API] Failed to mark listing dirty", {
-          listingId: listingId,
-          error: sanitizeErrorMessage(err),
-        });
-      });
     }
 
     // P1-22 FIX: Send notification in background (non-blocking)
@@ -416,34 +414,34 @@ export async function PUT(request: Request) {
       );
     }
 
-    // Update the review
-    const updatedReview = await prisma.review.update({
-      where: { id: reviewId },
-      data: {
-        rating,
-        comment,
-      },
-      include: {
-        author: {
-          select: {
-            name: true,
-            image: true,
+    // Update the review (in-tx so the dirty mark commits atomically)
+    const updatedReview = await prisma.$transaction(async (tx) => {
+      const updated = await tx.review.update({
+        where: { id: reviewId },
+        data: {
+          rating,
+          comment,
+        },
+        include: {
+          author: {
+            select: {
+              name: true,
+              image: true,
+            },
           },
         },
-      },
-    });
+      });
 
-    // Fire-and-forget: mark listing dirty for search doc refresh
-    if (existingReview.listingId) {
-      markListingDirty(existingReview.listingId, "review_changed").catch(
-        (err) => {
-          logger.sync.warn("[API] Failed to mark listing dirty", {
-            listingId: existingReview.listingId,
-            error: sanitizeErrorMessage(err),
-          });
-        }
-      );
-    }
+      if (existingReview.listingId) {
+        await markListingDirtyInTx(
+          tx,
+          existingReview.listingId,
+          "review_changed"
+        );
+      }
+
+      return updated;
+    });
 
     return NextResponse.json(updatedReview);
   } catch (error) {
@@ -508,22 +506,20 @@ export async function DELETE(request: Request) {
       );
     }
 
-    // Delete the review
-    await prisma.review.delete({
-      where: { id: reviewId },
-    });
+    // Delete the review (in-tx so the dirty mark commits atomically)
+    await prisma.$transaction(async (tx) => {
+      await tx.review.delete({
+        where: { id: reviewId },
+      });
 
-    // Fire-and-forget: mark listing dirty for search doc refresh
-    if (existingReview.listingId) {
-      markListingDirty(existingReview.listingId, "review_changed").catch(
-        (err) => {
-          logger.sync.warn("[API] Failed to mark listing dirty", {
-            listingId: existingReview.listingId,
-            error: sanitizeErrorMessage(err),
-          });
-        }
-      );
-    }
+      if (existingReview.listingId) {
+        await markListingDirtyInTx(
+          tx,
+          existingReview.listingId,
+          "review_changed"
+        );
+      }
+    });
 
     return NextResponse.json({
       success: true,

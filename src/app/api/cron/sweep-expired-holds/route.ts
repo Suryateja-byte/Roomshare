@@ -27,7 +27,7 @@ import {
 import { logger, sanitizeErrorMessage } from "@/lib/logger";
 import { createInternalNotification } from "@/lib/notifications";
 import { prisma } from "@/lib/prisma";
-import { markListingsDirty } from "@/lib/search/search-doc-dirty";
+import { markListingDirtyInTx } from "@/lib/search/search-doc-dirty";
 
 interface ExpiredHoldRow {
   id: string;
@@ -189,6 +189,8 @@ async function processExpiredHold(
       },
     });
 
+    await markListingDirtyInTx(tx, hold.listingId, "booking_hold_expired");
+
     return { status: "expired" } as const;
   });
 }
@@ -314,9 +316,9 @@ export async function GET(request: NextRequest) {
     const affectedListingIds = [
       ...new Set(successfulHolds.map((hold) => hold.listingId)),
     ];
-    if (affectedListingIds.length > 0) {
-      await markListingsDirty(affectedListingIds, "booking_hold_expired");
-    }
+    // markListingDirty is now called inside processExpiredHold's transaction
+    // per hold (CFM-405c), so each hold's dirty mark commits atomically with
+    // its own source write. No batched post-tx mark is required.
 
     const durationMs = Date.now() - startTime;
     const summary: SweepSummary = {

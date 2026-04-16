@@ -36,16 +36,29 @@ jest.mock("next/server", () => {
   };
 });
 
-jest.mock("@/lib/prisma", () => ({
-  prisma: {
-    listing: { update: jest.fn() },
-    recentlyViewed: {
-      upsert: jest.fn(),
-      findMany: jest.fn(),
-      deleteMany: jest.fn(),
+jest.mock("@/lib/prisma", () => {
+  const listingMock = { update: jest.fn() };
+  const recentlyViewedMock = {
+    upsert: jest.fn(),
+    findMany: jest.fn(),
+    deleteMany: jest.fn(),
+  };
+  const txClient = {
+    listing: listingMock,
+    recentlyViewed: recentlyViewedMock,
+    $executeRaw: jest.fn(),
+  };
+  return {
+    prisma: {
+      listing: listingMock,
+      recentlyViewed: recentlyViewedMock,
+      $transaction: jest.fn((fn: (tx: typeof txClient) => unknown) =>
+        fn(txClient)
+      ),
+      $executeRaw: jest.fn(),
     },
-  },
-}));
+  };
+});
 
 jest.mock("@/auth", () => ({
   auth: jest.fn(),

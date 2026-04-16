@@ -22,21 +22,36 @@ jest.mock("next/server", () => ({
 }));
 
 // Mock dependencies before imports
-jest.mock("@/lib/prisma", () => ({
-  prisma: {
-    review: {
-      findFirst: jest.fn(),
-      findUnique: jest.fn(),
-      findMany: jest.fn(),
-      create: jest.fn(),
-      update: jest.fn(),
-      delete: jest.fn(),
-      count: jest.fn(),
+jest.mock("@/lib/prisma", () => {
+  const reviewMock = {
+    findFirst: jest.fn(),
+    findUnique: jest.fn(),
+    findMany: jest.fn(),
+    create: jest.fn(),
+    update: jest.fn(),
+    delete: jest.fn(),
+    count: jest.fn(),
+  };
+  const bookingMock = { findFirst: jest.fn() };
+  const listingMock = { findUnique: jest.fn() };
+  const txClient = {
+    review: reviewMock,
+    booking: bookingMock,
+    listing: listingMock,
+    $executeRaw: jest.fn(),
+  };
+  return {
+    prisma: {
+      review: reviewMock,
+      booking: bookingMock,
+      listing: listingMock,
+      $transaction: jest.fn((fn: (tx: typeof txClient) => unknown) =>
+        fn(txClient)
+      ),
+      $executeRaw: jest.fn(),
     },
-    booking: { findFirst: jest.fn() },
-    listing: { findUnique: jest.fn() },
-  },
-}));
+  };
+});
 
 jest.mock("@/auth", () => ({ auth: jest.fn() }));
 

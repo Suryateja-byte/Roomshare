@@ -14,7 +14,7 @@ import { withRateLimitRedis } from "@/lib/with-rate-limit-redis";
 import { createListingApiSchema } from "@/lib/schemas";
 import { checkListingLanguageCompliance } from "@/lib/listing-language-guard";
 import { isValidLanguageCode } from "@/lib/languages";
-import { markListingDirty } from "@/lib/search/search-doc-dirty";
+import { markListingDirtyInTx } from "@/lib/search/search-doc-dirty";
 import { checkSuspension, checkEmailVerified } from "@/app/actions/suspension";
 import { withIdempotency } from "@/lib/idempotency";
 import { upsertSearchDocSync } from "@/lib/search/search-doc-sync";
@@ -436,6 +436,8 @@ export async function POST(request: Request) {
                 WHERE id = ${location.id}
             `;
 
+      await markListingDirtyInTx(tx, listing.id, "listing_created");
+
       return listing;
     };
 
@@ -496,15 +498,9 @@ export async function POST(request: Request) {
         });
       });
 
-      // 17. Fire-and-forget: mark listing dirty as backup
-      markListingDirty(listing.id, "listing_created").catch((err) => {
-        logger.sync.warn("Failed to mark listing dirty", {
-          route: "/api/listings",
-          method: "POST",
-          listingId: listing.id,
-          error: err instanceof Error ? err.message : String(err),
-        });
-      });
+      // markListingDirty is now committed atomically inside createListingInTx
+      // (CFM-405c) so a crash between tx commit and mark cannot leave the
+      // search doc stale.
     };
 
     // 11. Check for idempotency key header (1F) — validate format (M-S6)

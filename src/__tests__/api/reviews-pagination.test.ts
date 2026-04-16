@@ -10,25 +10,38 @@
  */
 
 // Mock Prisma before imports
-jest.mock("@/lib/prisma", () => ({
-  prisma: {
-    review: {
-      findMany: jest.fn(),
-      count: jest.fn(),
-      create: jest.fn(),
-      findFirst: jest.fn(),
+jest.mock("@/lib/prisma", () => {
+  const reviewMock = {
+    findMany: jest.fn(),
+    count: jest.fn(),
+    create: jest.fn(),
+    findFirst: jest.fn(),
+    update: jest.fn(),
+    delete: jest.fn(),
+  };
+  const bookingMock = { findFirst: jest.fn() };
+  const listingMock = { findUnique: jest.fn() };
+  const notificationMock = { create: jest.fn() };
+  const txClient = {
+    review: reviewMock,
+    booking: bookingMock,
+    listing: listingMock,
+    notification: notificationMock,
+    $executeRaw: jest.fn(),
+  };
+  return {
+    prisma: {
+      review: reviewMock,
+      booking: bookingMock,
+      listing: listingMock,
+      notification: notificationMock,
+      $transaction: jest.fn((fn: (tx: typeof txClient) => unknown) =>
+        fn(txClient)
+      ),
+      $executeRaw: jest.fn(),
     },
-    booking: {
-      findFirst: jest.fn(),
-    },
-    listing: {
-      findUnique: jest.fn(),
-    },
-    notification: {
-      create: jest.fn(),
-    },
-  },
-}));
+  };
+});
 
 jest.mock("@/auth", () => ({
   auth: jest.fn(),

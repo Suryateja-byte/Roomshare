@@ -140,7 +140,7 @@ import { checkListingLanguageCompliance } from "@/lib/listing-language-guard";
 import { withIdempotency } from "@/lib/idempotency";
 import { upsertSearchDocSync } from "@/lib/search/search-doc-sync";
 import { triggerInstantAlerts } from "@/lib/search-alerts";
-import { markListingDirty } from "@/lib/search/search-doc-dirty";
+import { markListingDirtyInTx } from "@/lib/search/search-doc-dirty";
 
 // ---------------------------------------------------------------------------
 // Shared fixtures
@@ -264,10 +264,11 @@ describe("POST /api/listings — extended edge cases", () => {
       expect(response.status).toBe(201);
       expect(upsertSearchDocSync).toHaveBeenCalledWith("listing-new");
       expect(triggerInstantAlerts).toHaveBeenCalled();
-      expect(markListingDirty).toHaveBeenCalledWith(
-        "listing-new",
-        "listing_created"
-      );
+      // CFM-405c: markListingDirtyInTx is called inside createListingInTx,
+      // which withIdempotency wraps. This test mocks withIdempotency to
+      // return a pre-canned result without executing the tx callback, so
+      // the dirty-mark assertion belongs on the non-idempotent path
+      // test further down rather than here.
     });
 
     it("does NOT fire side effects when idempotency result IS cached", async () => {
@@ -285,7 +286,7 @@ describe("POST /api/listings — extended edge cases", () => {
       expect(response.status).toBe(201);
       expect(upsertSearchDocSync).not.toHaveBeenCalled();
       expect(triggerInstantAlerts).not.toHaveBeenCalled();
-      expect(markListingDirty).not.toHaveBeenCalled();
+      expect(markListingDirtyInTx).not.toHaveBeenCalled();
     });
 
     it("returns 409 when idempotency reports a conflict", async () => {
@@ -644,10 +645,11 @@ describe("POST /api/listings — extended edge cases", () => {
       );
     });
 
-    it("calls markListingDirty with listing ID on success", async () => {
+    it("calls markListingDirtyInTx with listing ID on success (in-tx)", async () => {
       const response = await POST(makeRequest(validBody));
       expect(response.status).toBe(201);
-      expect(markListingDirty).toHaveBeenCalledWith(
+      expect(markListingDirtyInTx).toHaveBeenCalledWith(
+        expect.anything(),
         "listing-new",
         "listing_created"
       );
@@ -663,22 +665,12 @@ describe("POST /api/listings — extended edge cases", () => {
       expect(response.status).toBe(201);
     });
 
-    it("still returns 201 when markListingDirty fails (fire-and-forget)", async () => {
-      (markListingDirty as jest.Mock).mockRejectedValue(
-        new Error("Redis down")
-      );
-
-      const response = await POST(makeRequest(validBody));
-      // markListingDirty failure is caught via .catch(), so the response should still be 201
-      expect(response.status).toBe(201);
-    });
-
     it("does not call side effects when validation fails", async () => {
       const response = await POST(makeRequest({ ...validBody, price: "-1" }));
       expect(response.status).toBe(400);
       expect(upsertSearchDocSync).not.toHaveBeenCalled();
       expect(triggerInstantAlerts).not.toHaveBeenCalled();
-      expect(markListingDirty).not.toHaveBeenCalled();
+      expect(markListingDirtyInTx).not.toHaveBeenCalled();
     });
   });
 

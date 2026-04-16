@@ -14,7 +14,7 @@ import {
   expireOverlappingExpiredHolds,
   getAvailability,
 } from "@/lib/availability";
-import { markListingsDirty } from "@/lib/search/search-doc-dirty";
+import { markListingsDirtyInTx } from "@/lib/search/search-doc-dirty";
 import { waitForTestBarrier } from "@/lib/test-barriers";
 import {
   validateTransition,
@@ -210,7 +210,9 @@ export async function updateBookingStatus(
       throw error;
     }
 
-    let capacityChanged = false;
+    // capacityChanged was used pre-CFM-405c to gate a post-tx markListingsDirty;
+    // the dirty mark is now inside each capacity-changing tx, so we no longer
+    // need to track this flag at function scope.
 
     // Handle ACCEPTED status with atomic transaction to prevent double-booking
     if (status === "ACCEPTED") {
@@ -292,8 +294,13 @@ export async function updateBookingStatus(
               heldDelta: -booking.slotsRequested,
               acceptedDelta: booking.slotsRequested,
             });
+
+            await markListingsDirtyInTx(
+              tx,
+              [booking.listing.id],
+              "listing_updated"
+            );
           });
-          capacityChanged = true;
         } catch (error) {
           if (error instanceof Error) {
             if (error.message === "UNAUTHORIZED_IN_TRANSACTION") {
@@ -442,8 +449,13 @@ export async function updateBookingStatus(
                 version: booking.version,
               },
             });
+
+            await markListingsDirtyInTx(
+              tx,
+              [booking.listing.id],
+              "listing_updated"
+            );
           });
-          capacityChanged = true;
         } catch (error) {
           if (error instanceof Error) {
             if (error.message === "UNAUTHORIZED_IN_TRANSACTION") {
@@ -610,10 +622,15 @@ export async function updateBookingStatus(
             actorType: "HOST",
             details: { rejectionReason, version: booking.version },
           });
+
+          if (booking.status === "HELD") {
+            await markListingsDirtyInTx(
+              tx,
+              [booking.listing.id],
+              "listing_updated"
+            );
+          }
         });
-        if (booking.status === "HELD") {
-          capacityChanged = true;
-        }
       } catch (error) {
         if (error instanceof Error) {
           if (error.message === "UNAUTHORIZED_IN_TRANSACTION") {
@@ -740,8 +757,13 @@ export async function updateBookingStatus(
                 previousStatus: booking.status,
               },
             });
+
+            await markListingsDirtyInTx(
+              tx,
+              [booking.listing.id],
+              "listing_updated"
+            );
           });
-          capacityChanged = true;
         } catch (error) {
           if (
             error instanceof Error &&
@@ -828,9 +850,8 @@ export async function updateBookingStatus(
 
     revalidatePath("/bookings");
     revalidatePath(`/listings/${booking.listing.id}`);
-    if (capacityChanged) {
-      await markListingsDirty([booking.listing.id], "listing_updated");
-    }
+    // markListingsDirty is now called inside each capacity-changing tx branch
+    // (CFM-405c) so it commits atomically with the booking status transition.
 
     return { success: true };
   } catch (error: unknown) {
