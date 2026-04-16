@@ -95,6 +95,7 @@ describe("GET /api/listings/[id]/viewer-state", () => {
       minStayMonths: 1,
       lastConfirmedAt: null,
       statusReason: null,
+      needsMigrationReview: false,
     });
     (prisma.review.findFirst as jest.Mock).mockResolvedValue(null);
     (prisma.booking.findFirst as jest.Mock).mockResolvedValue(null);
@@ -269,6 +270,7 @@ describe("GET /api/listings/[id]/viewer-state", () => {
       minStayMonths: 1,
       lastConfirmedAt: null,
       statusReason: null,
+      needsMigrationReview: false,
     });
 
     const response = await GET(createRequest(), routeContext);
@@ -295,6 +297,7 @@ describe("GET /api/listings/[id]/viewer-state", () => {
       minStayMonths: 1,
       lastConfirmedAt: new Date("2026-03-20T12:00:00.000Z"),
       statusReason: null,
+      needsMigrationReview: false,
     });
 
     const response = await GET(createRequest(), routeContext);
@@ -321,6 +324,7 @@ describe("GET /api/listings/[id]/viewer-state", () => {
       minStayMonths: 1,
       lastConfirmedAt: null,
       statusReason: null,
+      needsMigrationReview: false,
     });
 
     const response = await GET(createRequest(), routeContext);
@@ -351,5 +355,156 @@ describe("GET /api/listings/[id]/viewer-state", () => {
     expect(data.canBook).toBe(false);
     expect(data.canHold).toBe(false);
     expect(data.bookingDisabledReason).toBe("EMAIL_VERIFICATION_REQUIRED");
+  });
+
+  it("exposes publicAvailability block with resolved fields for LEGACY_BOOKING listings", async () => {
+    const response = await GET(createRequest(), routeContext);
+    const data = await response.json();
+
+    expect(response.status).toBe(200);
+    expect(data.publicAvailability).toMatchObject({
+      availabilitySource: "LEGACY_BOOKING",
+      openSlots: 2,
+      totalSlots: 3,
+      minStayMonths: 1,
+      lastConfirmedAt: null,
+      publicStatus: "AVAILABLE",
+      freshnessBucket: "NOT_APPLICABLE",
+      isPubliclyAvailable: true,
+      searchEligible: true,
+      isValid: true,
+    });
+    expect(data.publicAvailability.availableFrom).toBe("2026-05-01");
+  });
+
+  it("exposes publicAvailability block with HOST_MANAGED freshness for host-managed listings", async () => {
+    (prisma.listing.findUnique as jest.Mock).mockResolvedValue({
+      ownerId: "owner-456",
+      status: "ACTIVE",
+      availabilitySource: "HOST_MANAGED",
+      availableSlots: 2,
+      totalSlots: 3,
+      openSlots: 2,
+      moveInDate: new Date("2026-05-01T00:00:00.000Z"),
+      availableUntil: new Date("2026-12-01T00:00:00.000Z"),
+      minStayMonths: 1,
+      lastConfirmedAt: new Date("2026-04-10T12:00:00.000Z"),
+      statusReason: null,
+      needsMigrationReview: false,
+    });
+
+    const response = await GET(createRequest(), routeContext);
+    const data = await response.json();
+
+    expect(response.status).toBe(200);
+    expect(data.publicAvailability).toMatchObject({
+      availabilitySource: "HOST_MANAGED",
+      openSlots: 2,
+      totalSlots: 3,
+      minStayMonths: 1,
+      publicStatus: "AVAILABLE",
+      freshnessBucket: "NORMAL",
+      isPubliclyAvailable: true,
+      searchEligible: true,
+      isValid: true,
+      effectiveAvailableSlots: 2,
+    });
+    expect(data.publicAvailability.lastConfirmedAt).toBe(
+      "2026-04-10T12:00:00.000Z"
+    );
+    expect(data.publicAvailability.availableFrom).toBe("2026-05-01");
+    expect(data.publicAvailability.availableUntil).toBe("2026-12-01");
+  });
+
+  it("exposes needsMigrationReview: true when listing is flagged for migration review", async () => {
+    (prisma.listing.findUnique as jest.Mock).mockResolvedValue({
+      ownerId: "owner-456",
+      status: "ACTIVE",
+      availabilitySource: "HOST_MANAGED",
+      availableSlots: 2,
+      totalSlots: 3,
+      openSlots: 2,
+      moveInDate: new Date("2026-05-01T00:00:00.000Z"),
+      availableUntil: new Date("2026-12-01T00:00:00.000Z"),
+      minStayMonths: 1,
+      lastConfirmedAt: new Date("2026-04-10T12:00:00.000Z"),
+      statusReason: "MIGRATION_REVIEW",
+      needsMigrationReview: true,
+    });
+
+    const response = await GET(createRequest(), routeContext);
+    const data = await response.json();
+
+    expect(response.status).toBe(200);
+    expect(data.needsMigrationReview).toBe(true);
+    expect(data.publicAvailability).not.toBeNull();
+    expect(data.publicAvailability.availabilitySource).toBe("HOST_MANAGED");
+  });
+
+  it("defaults needsMigrationReview to false when the flag is absent or false", async () => {
+    const response = await GET(createRequest(), routeContext);
+    const data = await response.json();
+
+    expect(response.status).toBe(200);
+    expect(data.needsMigrationReview).toBe(false);
+  });
+
+  it("exposes publicAvailability and needsMigrationReview for logged-out viewers", async () => {
+    (auth as jest.Mock).mockResolvedValue(null);
+
+    const response = await GET(createRequest(), routeContext);
+    const data = await response.json();
+
+    expect(response.status).toBe(200);
+    expect(data.isLoggedIn).toBe(false);
+    expect(data.needsMigrationReview).toBe(false);
+    expect(data.publicAvailability).toMatchObject({
+      availabilitySource: "LEGACY_BOOKING",
+      openSlots: 2,
+      totalSlots: 3,
+      isPubliclyAvailable: true,
+    });
+  });
+
+  it("exposes publicAvailability and needsMigrationReview on database-error fallback", async () => {
+    (prisma.review.findFirst as jest.Mock).mockRejectedValue(
+      new Error("DB error")
+    );
+
+    const response = await GET(createRequest(), routeContext);
+    const data = await response.json();
+
+    expect(response.status).toBe(200);
+    expect(data.isLoggedIn).toBe(true);
+    expect(data.needsMigrationReview).toBe(false);
+    expect(data.publicAvailability).toMatchObject({
+      availabilitySource: "LEGACY_BOOKING",
+      openSlots: 2,
+      totalSlots: 3,
+    });
+  });
+
+  it("requests needsMigrationReview from prisma (select includes the field)", async () => {
+    await GET(createRequest(), routeContext);
+
+    expect(prisma.listing.findUnique).toHaveBeenCalledWith(
+      expect.objectContaining({
+        where: { id: "listing-123" },
+        select: expect.objectContaining({
+          needsMigrationReview: true,
+        }),
+      })
+    );
+  });
+
+  it("returns publicAvailability: null when the listing does not exist", async () => {
+    (prisma.listing.findUnique as jest.Mock).mockResolvedValue(null);
+
+    const response = await GET(createRequest(), routeContext);
+    const data = await response.json();
+
+    expect(response.status).toBe(200);
+    expect(data.publicAvailability).toBeNull();
+    expect(data.needsMigrationReview).toBe(false);
   });
 });

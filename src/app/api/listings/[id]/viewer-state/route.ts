@@ -1,10 +1,19 @@
+// Viewer-state contract:
+// - `canBook` and `canHold` are permanent-false compatibility fields under
+//   contact-first. They remain in the response so older client bundles don't
+//   crash; `bookingDisabledReason` is the explanation channel for why booking
+//   UI should not render. New clients should rely on `primaryCta`,
+//   `canContact`, and `publicAvailability` instead.
 import { NextResponse } from "next/server";
 import { auth } from "@/auth";
 import { prisma } from "@/lib/prisma";
 import { features } from "@/lib/env";
 import { withRateLimit } from "@/lib/with-rate-limit";
 import { logger, sanitizeErrorMessage } from "@/lib/logger";
-import { resolvePublicAvailability } from "@/lib/search/public-availability";
+import {
+  resolvePublicAvailability,
+  type ResolvedPublicAvailability,
+} from "@/lib/search/public-availability";
 
 interface RouteContext {
   params: Promise<{ id: string }>;
@@ -149,12 +158,13 @@ export async function GET(request: Request, { params }: RouteContext) {
       minStayMonths: true,
       lastConfirmedAt: true,
       statusReason: true,
+      needsMigrationReview: true,
     },
   });
 
   const isOwner = !!session?.user?.id && listing?.ownerId === session.user.id;
   const isEmailVerified = !!session?.user?.emailVerified;
-  const resolvedAvailability = listing
+  const resolvedAvailability: ResolvedPublicAvailability | null = listing
     ? resolvePublicAvailability(listing)
     : null;
   const availabilitySource: AvailabilitySource =
@@ -162,6 +172,9 @@ export async function GET(request: Request, { params }: RouteContext) {
   const isListingPubliclyAvailable =
     resolvedAvailability?.isPubliclyAvailable ?? false;
   const isListingSearchEligible = resolvedAvailability?.searchEligible ?? false;
+  const needsMigrationReview = listing?.needsMigrationReview === true;
+  const publicAvailability: ResolvedPublicAvailability | null =
+    resolvedAvailability;
 
   if (!session?.user?.id) {
     const viewerContract = buildViewerContract({
@@ -177,6 +190,8 @@ export async function GET(request: Request, { params }: RouteContext) {
       hasBookingHistory: false,
       existingReview: null,
       ...viewerContract,
+      publicAvailability,
+      needsMigrationReview,
       reviewEligibility: buildReviewEligibility({
         isLoggedIn: false,
         hasAcceptedBooking: false,
@@ -234,6 +249,8 @@ export async function GET(request: Request, { params }: RouteContext) {
           }
         : null,
       ...viewerContract,
+      publicAvailability,
+      needsMigrationReview,
       reviewEligibility: buildReviewEligibility({
         isLoggedIn: true,
         hasAcceptedBooking: !!bookingExists,
@@ -262,6 +279,8 @@ export async function GET(request: Request, { params }: RouteContext) {
           isListingSearchEligible,
           availabilitySource,
         }),
+        publicAvailability,
+        needsMigrationReview,
         reviewEligibility: buildReviewEligibility({
           isLoggedIn: true,
           hasAcceptedBooking: false,
