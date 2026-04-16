@@ -439,4 +439,137 @@ describe("ListingCard", () => {
       );
     });
   });
+
+  describe("publicAvailability prop path (CFM-603)", () => {
+    it("prefers publicAvailability.openSlots over legacy availableSlots in slot badge", () => {
+      const listing = {
+        ...mockListing,
+        availableSlots: 99,
+        totalSlots: 99,
+        publicAvailability: {
+          availabilitySource: "HOST_MANAGED" as const,
+          openSlots: 1,
+          totalSlots: 3,
+          availableFrom: "2026-05-01",
+          availableUntil: null,
+          minStayMonths: 1,
+          lastConfirmedAt: "2026-04-01T00:00:00Z",
+          publicStatus: "AVAILABLE" as const,
+          freshnessBucket: "NORMAL" as const,
+        },
+      };
+      render(<ListingCard listing={listing} />);
+      expect(screen.getByTestId("slot-badge")).toHaveTextContent("1 of 3 open");
+    });
+
+    it("renders 'Needs reconfirmation' on stale host-managed listings", () => {
+      const listing = {
+        ...mockListing,
+        publicAvailability: {
+          availabilitySource: "HOST_MANAGED" as const,
+          openSlots: 2,
+          totalSlots: 3,
+          availableFrom: "2026-05-01",
+          availableUntil: null,
+          minStayMonths: 1,
+          lastConfirmedAt: "2025-12-01T00:00:00Z",
+          publicStatus: "NEEDS_RECONFIRMATION" as const,
+          freshnessBucket: "STALE" as const,
+        },
+      };
+      render(<ListingCard listing={listing} />);
+      expect(screen.getByTestId("slot-badge")).toHaveTextContent(
+        /needs reconfirmation/i
+      );
+    });
+
+    it("renders 'Full' when publicStatus=FULL", () => {
+      const listing = {
+        ...mockListing,
+        availableSlots: 0,
+        totalSlots: 3,
+        publicAvailability: {
+          availabilitySource: "HOST_MANAGED" as const,
+          openSlots: 0,
+          totalSlots: 3,
+          availableFrom: null,
+          availableUntil: null,
+          minStayMonths: 1,
+          lastConfirmedAt: "2026-04-01T00:00:00Z",
+          publicStatus: "FULL" as const,
+          freshnessBucket: "NORMAL" as const,
+        },
+      };
+      render(<ListingCard listing={listing} />);
+      expect(screen.getByTestId("slot-badge")).toHaveTextContent(/full/i);
+    });
+
+    it("renders 'Closed' when publicStatus=CLOSED (statusReason=AVAILABLE_UNTIL_PASSED)", () => {
+      const listing = {
+        ...mockListing,
+        publicAvailability: {
+          availabilitySource: "HOST_MANAGED" as const,
+          openSlots: 0,
+          totalSlots: 3,
+          availableFrom: null,
+          availableUntil: "2025-12-31",
+          minStayMonths: 1,
+          lastConfirmedAt: "2026-04-01T00:00:00Z",
+          publicStatus: "CLOSED" as const,
+          freshnessBucket: "NORMAL" as const,
+        },
+      };
+      render(<ListingCard listing={listing} />);
+      expect(screen.getByTestId("slot-badge")).toHaveTextContent(/closed/i);
+    });
+
+    it("prefers publicAvailability.availableFrom over legacy moveInDate", () => {
+      const listing = {
+        ...mockListing,
+        moveInDate: "2025-01-01",
+        publicAvailability: {
+          availabilitySource: "HOST_MANAGED" as const,
+          openSlots: 2,
+          totalSlots: 3,
+          availableFrom: "2026-06-15",
+          availableUntil: null,
+          minStayMonths: 1,
+          lastConfirmedAt: "2026-04-01T00:00:00Z",
+          publicStatus: "AVAILABLE" as const,
+          freshnessBucket: "NORMAL" as const,
+        },
+      };
+      render(<ListingCard listing={listing} />);
+      // "Available Jun 15" derives from publicAvailability.availableFrom,
+      // not from moveInDate=2025-01-01.
+      expect(
+        screen.getByText(/available jun 15/i)
+      ).toBeInTheDocument();
+    });
+
+    it("aria-label slot count derives from publicAvailability when present", () => {
+      const listing = {
+        ...mockListing,
+        availableSlots: 99,
+        totalSlots: 99,
+        publicAvailability: {
+          availabilitySource: "HOST_MANAGED" as const,
+          openSlots: 2,
+          totalSlots: 4,
+          availableFrom: "2026-05-01",
+          availableUntil: null,
+          minStayMonths: 1,
+          lastConfirmedAt: "2026-04-01T00:00:00Z",
+          publicStatus: "AVAILABLE" as const,
+          freshnessBucket: "NORMAL" as const,
+        },
+      };
+      render(<ListingCard listing={listing} />);
+      const article = screen.getByTestId("listing-card");
+      expect(article).toHaveAttribute(
+        "aria-label",
+        expect.stringContaining("2 of 4 spots available")
+      );
+    });
+  });
 });

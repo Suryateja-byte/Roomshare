@@ -11,7 +11,7 @@ import {
   useListingFocusActions,
   useIsListingFocused,
 } from "@/contexts/ListingFocusContext";
-import { SlotBadge } from "./SlotBadge";
+import { SlotBadge, type SlotBadgePublicAvailability } from "./SlotBadge";
 
 export interface Listing {
   id: string;
@@ -32,6 +32,13 @@ export interface Listing {
   roomType?: string;
   moveInDate?: Date | string;
   leaseDuration?: string;
+  /**
+   * Normalized availability contract (CFM-202/404). When present,
+   * slot/availability labels are derived from this rather than the legacy
+   * availableSlots/totalSlots fields, and the card uses availableFrom /
+   * publicStatus / freshnessBucket to render freshness-aware strings.
+   */
+  publicAvailability?: SlotBadgePublicAvailability;
 }
 
 // State abbreviation map
@@ -196,6 +203,14 @@ function arePropsEqual(
     String(pl.moveInDate) === String(nl.moveInDate) &&
     pl.location.city === nl.location.city &&
     pl.location.state === nl.location.state &&
+    pl.publicAvailability?.openSlots === nl.publicAvailability?.openSlots &&
+    pl.publicAvailability?.totalSlots === nl.publicAvailability?.totalSlots &&
+    pl.publicAvailability?.publicStatus ===
+      nl.publicAvailability?.publicStatus &&
+    pl.publicAvailability?.freshnessBucket ===
+      nl.publicAvailability?.freshnessBucket &&
+    pl.publicAvailability?.availableFrom ===
+      nl.publicAvailability?.availableFrom &&
     prev.href === next.href &&
     prev.isSaved === next.isSaved &&
     prev.className === next.className &&
@@ -239,7 +254,11 @@ function ListingCardInner({
     : [PLACEHOLDER_IMAGES[placeholderIndex]];
   const showImagePlaceholder = !hasValidImages;
 
-  const isAvailable = listing.availableSlots > 0;
+  const effectiveOpenSlots =
+    listing.publicAvailability?.openSlots ?? listing.availableSlots;
+  const effectiveTotalSlots =
+    listing.publicAvailability?.totalSlots ?? listing.totalSlots;
+  const isAvailable = effectiveOpenSlots > 0;
   const avgRating = Number.isFinite(listing.avgRating)
     ? listing.avgRating
     : null;
@@ -260,7 +279,9 @@ function ListingCardInner({
   const listingHref = href ?? `/listings/${listing.id}`;
 
   const displayRoomType = formatRoomType(listing.roomType);
-  const displayMoveIn = formatMoveInDate(listing.moveInDate);
+  const displayMoveIn = formatMoveInDate(
+    listing.publicAvailability?.availableFrom ?? listing.moveInDate
+  );
   const displayLease = formatLeaseDuration(listing.leaseDuration);
 
   const srParts: string[] = [];
@@ -272,16 +293,16 @@ function ListingCardInner({
   if (hasRating) srParts.push(`rated ${avgRating!.toFixed(1)} out of 5`);
   else srParts.push("new listing");
 
-  if (listing.totalSlots > 1) {
+  if (effectiveTotalSlots > 1) {
     srParts.push(
       isAvailable
-        ? `${listing.availableSlots} of ${listing.totalSlots} spots available`
+        ? `${effectiveOpenSlots} of ${effectiveTotalSlots} spots available`
         : "currently filled"
     );
   } else {
     srParts.push(
       isAvailable
-        ? `${listing.availableSlots} spot${listing.availableSlots !== 1 ? "s" : ""} available`
+        ? `${effectiveOpenSlots} spot${effectiveOpenSlots !== 1 ? "s" : ""} available`
         : "currently filled"
     );
   }
@@ -367,8 +388,9 @@ function ListingCardInner({
 
           <div className="absolute top-4 left-4 z-20 flex flex-col gap-2">
             <SlotBadge
-              availableSlots={listing.availableSlots}
-              totalSlots={listing.totalSlots}
+              availableSlots={effectiveOpenSlots}
+              totalSlots={effectiveTotalSlots}
+              publicAvailability={listing.publicAvailability}
               overlay
             />
             {isTopRated ? (
