@@ -21,6 +21,7 @@ const UPSERT_CONCURRENCY = 10;
 type DivergenceCounters = {
   missingDoc: number;
   staleDoc: number;
+  versionSkew: number;
 };
 
 type OutcomeCounters = {
@@ -43,6 +44,7 @@ function createDivergenceCounters(): DivergenceCounters {
   return {
     missingDoc: 0,
     staleDoc: 0,
+    versionSkew: 0,
   };
 }
 
@@ -110,6 +112,8 @@ function countProjectionResults(results: SearchDocProjectionResult[]): {
       divergences.missingDoc += 1;
     } else if (result.divergenceReason === "stale_doc") {
       divergences.staleDoc += 1;
+    } else if (result.divergenceReason === "version_skew") {
+      divergences.versionSkew += 1;
     }
   }
 
@@ -135,6 +139,7 @@ export async function GET(request: NextRequest) {
         deferred: 0,
         divergentMissingDoc: 0,
         divergentStaleDoc: 0,
+        divergentVersionSkew: 0,
         durationMs: Date.now() - startTime,
         timestamp: new Date().toISOString(),
       });
@@ -165,6 +170,7 @@ export async function GET(request: NextRequest) {
       orphans: outcomes.confirmed_orphan,
       divergentMissingDoc: divergences.missingDoc,
       divergentStaleDoc: divergences.staleDoc,
+      divergentVersionSkew: divergences.versionSkew,
       errors: errors.length,
       totalDirty: dirtyIds.length,
       durationMs,
@@ -178,6 +184,7 @@ export async function GET(request: NextRequest) {
       deferred: outcomes.defer_retry,
       divergentMissingDoc: divergences.missingDoc,
       divergentStaleDoc: divergences.staleDoc,
+      divergentVersionSkew: divergences.versionSkew,
       errors: errors.length,
       durationMs,
       timestamp: new Date().toISOString(),

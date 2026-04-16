@@ -101,8 +101,50 @@ describe("GET /api/cron/refresh-search-docs", () => {
       deferred: 0,
       divergentMissingDoc: 0,
       divergentStaleDoc: 0,
+      divergentVersionSkew: 0,
     });
     expect(mockProjectSearchDocument).not.toHaveBeenCalled();
+  });
+
+  it("counts version_skew divergences independently of stale_doc and missing_doc", async () => {
+    mockQueryRaw.mockResolvedValue([
+      { listing_id: "listing-a" },
+      { listing_id: "listing-b" },
+      { listing_id: "listing-c" },
+    ]);
+    mockProjectSearchDocument
+      .mockResolvedValueOnce({
+        listingId: "listing-a",
+        outcome: "upsert",
+        divergenceReason: "version_skew",
+        hadExistingDoc: true,
+      })
+      .mockResolvedValueOnce({
+        listingId: "listing-b",
+        outcome: "upsert",
+        divergenceReason: "version_skew",
+        hadExistingDoc: true,
+      })
+      .mockResolvedValueOnce({
+        listingId: "listing-c",
+        outcome: "upsert",
+        divergenceReason: "stale_doc",
+        hadExistingDoc: true,
+      });
+
+    const response = await GET(createRequest("Bearer valid"));
+    const data = await response.json();
+
+    expect(data).toMatchObject({
+      success: true,
+      processed: 3,
+      orphans: 0,
+      suppressed: 0,
+      deferred: 0,
+      divergentMissingDoc: 0,
+      divergentStaleDoc: 1,
+      divergentVersionSkew: 2,
+    });
   });
 
   it("clears dirty flags for handled suppressions and true orphans", async () => {

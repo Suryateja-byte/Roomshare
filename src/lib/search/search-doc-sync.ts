@@ -23,7 +23,19 @@ export type SearchDocProjectionOutcome =
   | "defer_retry"
   | "confirmed_orphan";
 
-export type SearchDocDivergenceReason = "missing_doc" | "stale_doc" | null;
+export type SearchDocDivergenceReason =
+  | "missing_doc"
+  | "stale_doc"
+  | "version_skew"
+  | null;
+
+/**
+ * Current search-doc projection contract version. Bump this whenever the
+ * projection shape (columns written, semantics) changes. The cron compares
+ * this against `listing_search_docs.projection_version` to detect shape drift
+ * even when the underlying listing.updatedAt has not moved.
+ */
+export const SEARCH_DOC_PROJECTION_VERSION = 1;
 
 interface ListingSearchSnapshot {
   id: string;
@@ -60,7 +72,10 @@ interface ListingSearchSnapshot {
   lng: number | null;
   avgRating: number;
   reviewCount: number;
+  version: number;
   docUpdatedAt: Date | null;
+  docSourceVersion: number | null;
+  docProjectionVersion: number | null;
 }
 
 export interface SearchDocProjectionResult {
@@ -106,6 +121,7 @@ async function fetchListingSearchSnapshot(
       l."booking_mode" as "bookingMode",
       l."createdAt" as "createdAt",
       l."updatedAt" as "updatedAt",
+      l."version" as "version",
       loc.address,
       loc.city,
       loc.state,
@@ -114,7 +130,9 @@ async function fetchListingSearchSnapshot(
       ST_Y(loc.coords::geometry) as lat,
       COALESCE(AVG(r.rating), 0)::float as "avgRating",
       COUNT(r.id)::int as "reviewCount",
-      MAX(sd.doc_updated_at) as "docUpdatedAt"
+      MAX(sd.doc_updated_at) as "docUpdatedAt",
+      MAX(sd.source_version) as "docSourceVersion",
+      MAX(sd.projection_version) as "docProjectionVersion"
     FROM "Listing" l
     LEFT JOIN "Location" loc ON l.id = loc."listingId"
     LEFT JOIN "Review" r ON l.id = r."listingId"
@@ -130,11 +148,29 @@ function truncateListingId(listingId: string): string {
   return `${listingId.slice(0, 8)}...`;
 }
 
-function getProjectionDivergenceReason(
-  listing: ListingSearchSnapshot
+export function getProjectionDivergenceReason(
+  listing: Pick<
+    ListingSearchSnapshot,
+    | "docUpdatedAt"
+    | "updatedAt"
+    | "version"
+    | "docSourceVersion"
+    | "docProjectionVersion"
+  >
 ): SearchDocDivergenceReason {
   if (!listing.docUpdatedAt) {
     return "missing_doc";
+  }
+
+  const sourceVersionSkew =
+    listing.docSourceVersion != null &&
+    listing.version > listing.docSourceVersion;
+  const projectionVersionSkew =
+    listing.docProjectionVersion != null &&
+    listing.docProjectionVersion < SEARCH_DOC_PROJECTION_VERSION;
+
+  if (sourceVersionSkew || projectionVersionSkew) {
+    return "version_skew";
   }
 
   return listing.docUpdatedAt < listing.updatedAt ? "stale_doc" : null;
@@ -185,6 +221,7 @@ async function writeSearchDocument(
       avg_rating, review_count, recommended_score,
       amenities_lower, house_rules_lower, household_languages_lower,
       booking_mode,
+      projection_version, source_version,
       doc_created_at, doc_updated_at
     ) VALUES (
       ${listing.id}, ${listing.ownerId}, ${listing.title}, ${listing.description}, ${listing.price}, ${listing.images},
@@ -197,6 +234,7 @@ async function writeSearchDocument(
       ${listing.avgRating}, ${listing.reviewCount}, ${recommendedScore},
       ${amenitiesLower}, ${houseRulesLower}, ${householdLanguagesLower},
       ${listing.bookingMode},
+      ${SEARCH_DOC_PROJECTION_VERSION}, ${listing.version},
       NOW(), NOW()
     )
     ON CONFLICT (id) DO UPDATE SET
@@ -231,6 +269,8 @@ async function writeSearchDocument(
       house_rules_lower = EXCLUDED.house_rules_lower,
       household_languages_lower = EXCLUDED.household_languages_lower,
       booking_mode = EXCLUDED.booking_mode,
+      projection_version = EXCLUDED.projection_version,
+      source_version = EXCLUDED.source_version,
       doc_updated_at = NOW()
   `;
 }
