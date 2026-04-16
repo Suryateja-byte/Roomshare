@@ -48,6 +48,7 @@ jest.mock("next/cache", () => ({
 
 import {
   updateListingStatus,
+  reviewListingMigration,
   recoverHostManagedListing,
   incrementViewCount,
   trackListingView,
@@ -77,6 +78,7 @@ describe("listing-status actions", () => {
   function makeLockedListingRow(
     overrides: Partial<{
       ownerId: string;
+      title: string;
       version: number;
       availabilitySource: "LEGACY_BOOKING" | "HOST_MANAGED";
       status: "ACTIVE" | "PAUSED" | "RENTED";
@@ -92,11 +94,17 @@ describe("listing-status actions", () => {
       freshnessReminderSentAt: Date | null;
       freshnessWarningSentAt: Date | null;
       autoPausedAt: Date | null;
+      pendingBookingCount: number;
+      acceptedBookingCount: number;
+      heldBookingCount: number;
+      futureInventoryRowCount: number;
+      futurePeakReservedLoad: number;
     }> = {}
   ) {
     return {
       id: "listing-123",
       ownerId: "user-123",
+      title: "Cozy Room",
       version: 3,
       availabilitySource: "LEGACY_BOOKING" as const,
       status: "ACTIVE" as const,
@@ -112,6 +120,11 @@ describe("listing-status actions", () => {
       freshnessReminderSentAt: null,
       freshnessWarningSentAt: null,
       autoPausedAt: null,
+      pendingBookingCount: 0,
+      acceptedBookingCount: 0,
+      heldBookingCount: 0,
+      futureInventoryRowCount: 0,
+      futurePeakReservedLoad: 0,
       ...overrides,
     };
   }
@@ -301,6 +314,24 @@ describe("listing-status actions", () => {
         });
         expect(mockTx.listing.update).not.toHaveBeenCalled();
       });
+
+      it("blocks LEGACY_BOOKING ACTIVE when migration review is still required", async () => {
+        (mockTx.$queryRaw as jest.Mock).mockResolvedValue([
+          makeLockedListingRow({
+            needsMigrationReview: true,
+            status: "PAUSED",
+          }),
+        ]);
+
+        const result = await updateListingStatus("listing-123", "ACTIVE", 3);
+
+        expect(result).toEqual({
+          error:
+            "This listing must finish migration review before it can be made active.",
+          code: "HOST_MANAGED_MIGRATION_REVIEW_REQUIRED",
+        });
+        expect(mockTx.listing.update).not.toHaveBeenCalled();
+      });
     });
 
     describe("error handling", () => {
@@ -316,6 +347,169 @@ describe("listing-status actions", () => {
         const result = await updateListingStatus("listing-123", "PAUSED", 3);
 
         expect(result.error).toBe("Failed to update listing status");
+      });
+    });
+
+    describe("reviewListingMigration", () => {
+      it("converts valid legacy listings into paused host-managed rows", async () => {
+        (mockTx.$queryRaw as jest.Mock).mockResolvedValue([
+          makeLockedListingRow({
+            needsMigrationReview: true,
+            status: "ACTIVE",
+            availableUntil: new Date("2026-08-01T00:00:00.000Z"),
+            minStayMonths: 2,
+          }),
+        ]);
+        (mockTx.listing.update as jest.Mock).mockResolvedValue({
+          id: "listing-123",
+        });
+
+        const result = await reviewListingMigration("listing-123", 3);
+
+        expect(result).toEqual({
+          success: true,
+          listingId: "listing-123",
+          availabilitySource: "HOST_MANAGED",
+          needsMigrationReview: false,
+          status: "PAUSED",
+          statusReason: "HOST_PAUSED",
+          version: 4,
+        });
+        expect(mockTx.listing.update).toHaveBeenCalledWith({
+          where: { id: "listing-123" },
+          data: expect.objectContaining({
+            availabilitySource: "HOST_MANAGED",
+            needsMigrationReview: false,
+            status: "PAUSED",
+            statusReason: "HOST_PAUSED",
+            openSlots: 2,
+            availableSlots: 2,
+            totalSlots: 2,
+            minStayMonths: 2,
+            version: 4,
+          }),
+        });
+      });
+
+      it("returns stable blocker reasons when review cannot proceed", async () => {
+        (mockTx.$queryRaw as jest.Mock).mockResolvedValue([
+          makeLockedListingRow({
+            needsMigrationReview: true,
+            pendingBookingCount: 1,
+            moveInDate: null,
+          }),
+        ]);
+
+        const result = await reviewListingMigration("listing-123", 3);
+
+        expect(result).toEqual({
+          error:
+            "Resolve the listed migration blockers before reviewing this listing.",
+          code: "MIGRATION_REVIEW_BLOCKED",
+          reasonCodes: ["HAS_PENDING_BOOKINGS", "MISSING_MOVE_IN_DATE"],
+          reasons: [
+            expect.objectContaining({ code: "HAS_PENDING_BOOKINGS" }),
+            expect.objectContaining({ code: "MISSING_MOVE_IN_DATE" }),
+          ],
+          helperErrorCode: null,
+          helperError: null,
+        });
+        expect(mockTx.listing.update).not.toHaveBeenCalled();
+      });
+
+      it("keeps already-host-managed review listings blocked while legacy blockers remain", async () => {
+        (mockTx.$queryRaw as jest.Mock).mockResolvedValue([
+          makeLockedListingRow({
+            availabilitySource: "HOST_MANAGED",
+            needsMigrationReview: true,
+            status: "PAUSED",
+            statusReason: "MIGRATION_REVIEW",
+            openSlots: 2,
+            availableSlots: 2,
+            totalSlots: 2,
+            minStayMonths: 2,
+            availableUntil: new Date("2026-08-01T00:00:00.000Z"),
+            pendingBookingCount: 1,
+            acceptedBookingCount: 1,
+            heldBookingCount: 1,
+            futureInventoryRowCount: 2,
+          }),
+        ]);
+
+        const result = await reviewListingMigration("listing-123", 3);
+
+        expect(result).toEqual({
+          error:
+            "Resolve the listed migration blockers before reviewing this listing.",
+          code: "MIGRATION_REVIEW_BLOCKED",
+          reasonCodes: [
+            "HAS_PENDING_BOOKINGS",
+            "HAS_ACCEPTED_BOOKINGS",
+            "HAS_HELD_BOOKINGS",
+            "HAS_FUTURE_INVENTORY_ROWS",
+          ],
+          reasons: [
+            expect.objectContaining({
+              code: "HAS_PENDING_BOOKINGS",
+              severity: "blocked",
+            }),
+            expect.objectContaining({
+              code: "HAS_ACCEPTED_BOOKINGS",
+              severity: "blocked",
+            }),
+            expect.objectContaining({
+              code: "HAS_HELD_BOOKINGS",
+              severity: "blocked",
+            }),
+            expect.objectContaining({
+              code: "HAS_FUTURE_INVENTORY_ROWS",
+              severity: "blocked",
+            }),
+          ],
+          helperErrorCode: null,
+          helperError: null,
+        });
+        expect(mockTx.listing.update).not.toHaveBeenCalled();
+      });
+
+      it("marks already-host-managed review listings as reviewed without reopening", async () => {
+        (mockTx.$queryRaw as jest.Mock).mockResolvedValue([
+          makeLockedListingRow({
+            availabilitySource: "HOST_MANAGED",
+            needsMigrationReview: true,
+            status: "ACTIVE",
+            statusReason: "MIGRATION_REVIEW",
+            openSlots: 2,
+            availableSlots: 2,
+            totalSlots: 3,
+            minStayMonths: 2,
+            availableUntil: new Date("2026-08-01T00:00:00.000Z"),
+          }),
+        ]);
+
+        const result = await reviewListingMigration("listing-123", 3);
+
+        expect(result).toEqual({
+          success: true,
+          listingId: "listing-123",
+          availabilitySource: "HOST_MANAGED",
+          needsMigrationReview: false,
+          status: "PAUSED",
+          statusReason: "HOST_PAUSED",
+          version: 4,
+        });
+        expect(mockTx.listing.update).toHaveBeenCalledWith({
+          where: { id: "listing-123" },
+          data: expect.objectContaining({
+            availabilitySource: "HOST_MANAGED",
+            needsMigrationReview: false,
+            status: "PAUSED",
+            statusReason: "HOST_PAUSED",
+            openSlots: 2,
+            availableSlots: 2,
+            totalSlots: 3,
+          }),
+        });
       });
     });
 

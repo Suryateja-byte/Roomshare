@@ -4,6 +4,7 @@ import { prisma } from "@/lib/prisma";
 import Link from "next/link";
 import { ArrowLeft, Home } from "lucide-react";
 import ListingList from "./ListingList";
+import { getListingMigrationReviewStates } from "@/lib/migration/review";
 
 export const metadata = {
   title: "Listing Moderation | Admin | RoomShare",
@@ -64,6 +65,10 @@ export default async function AdminListingsPage() {
     }),
     prisma.listing.count(),
   ]);
+  const migrationReviewByListingId = await getListingMigrationReviewStates(
+    listings.map((listing) => listing.id),
+    { actor: "admin" }
+  );
 
   return (
     <div className="min-h-screen bg-surface-canvas">
@@ -98,6 +103,7 @@ export default async function AdminListingsPage() {
             ...l,
             price: Number(l.price),
           }))}
+          migrationReviewByListingId={migrationReviewByListingId}
           totalListings={totalListings}
         />
       </div>

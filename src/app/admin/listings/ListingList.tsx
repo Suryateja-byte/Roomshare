@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { toast } from "sonner";
 import { updateListingStatus, deleteListing } from "@/app/actions/admin";
 import { formatPrice } from "@/lib/format";
@@ -21,6 +21,8 @@ import {
 } from "lucide-react";
 import Link from "next/link";
 import Image from "next/image";
+import ListingMigrationReviewPanel from "@/components/ListingMigrationReviewPanel";
+import type { ListingMigrationReviewState } from "@/lib/migration/review";
 
 type ListingStatus = "ACTIVE" | "PAUSED" | "RENTED";
 
@@ -50,6 +52,7 @@ interface Listing {
 
 interface ListingListProps {
   initialListings: Listing[];
+  migrationReviewByListingId: Record<string, ListingMigrationReviewState>;
   totalListings: number;
 }
 
@@ -69,6 +72,7 @@ const statusConfig = {
 
 export default function ListingList({
   initialListings,
+  migrationReviewByListingId,
   totalListings,
 }: ListingListProps) {
   const [listings, setListings] = useState(initialListings);
@@ -79,6 +83,10 @@ export default function ListingList({
   const [processingId, setProcessingId] = useState<string | null>(null);
   const [openMenuId, setOpenMenuId] = useState<string | null>(null);
   const [deleteConfirmId, setDeleteConfirmId] = useState<string | null>(null);
+
+  useEffect(() => {
+    setListings(initialListings);
+  }, [initialListings]);
 
   const handleStatusChange = async (
     listingId: string,
@@ -273,6 +281,31 @@ export default function ListingList({
                           Owner: {listing.owner.name || "Unknown"} (
                           {listing.owner.email})
                         </p>
+
+                        <div className="mt-3">
+                          <ListingMigrationReviewPanel
+                            actor="admin"
+                            listingId={listing.id}
+                            expectedVersion={listing.version}
+                            reviewState={
+                              migrationReviewByListingId[listing.id] ?? null
+                            }
+                            editHref={`/listings/${listing.id}`}
+                            onReviewed={(result) => {
+                              setListings((prev) =>
+                                prev.map((current) =>
+                                  current.id === listing.id
+                                    ? {
+                                        ...current,
+                                        status: result.status,
+                                        version: result.version,
+                                      }
+                                    : current
+                                )
+                              );
+                            }}
+                          />
+                        </div>
                       </div>
 
                       {/* Actions */}

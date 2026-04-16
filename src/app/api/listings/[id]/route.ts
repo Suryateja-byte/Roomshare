@@ -113,6 +113,18 @@ const updateListingSchema = z.object({
       z.null(),
     ])
     .optional(),
+  availableUntil: z
+    .union([
+      z
+        .string()
+        .trim()
+        .refine((value) => !Number.isNaN(Date.parse(value)), {
+          message: "Invalid date format",
+        }),
+      z.null(),
+    ])
+    .optional(),
+  minStayMonths: z.coerce.number().int().min(1).optional(),
   leaseDuration: listingLeaseDurationSchema,
   roomType: listingRoomTypeSchema,
   householdLanguages: z
@@ -575,6 +587,8 @@ export async function PATCH(
         state,
         zip,
         moveInDate,
+        availableUntil,
+        minStayMonths,
         leaseDuration,
         roomType,
         householdLanguages,
@@ -772,6 +786,12 @@ export async function PATCH(
           }
 
           const nextMoveInDate = moveInDate ? new Date(moveInDate) : null;
+          const nextAvailableUntil =
+            availableUntil === undefined
+              ? lockedListing.availableUntil
+              : availableUntil
+                ? new Date(availableUntil)
+                : null;
           const moveInDateChanged =
             (lockedListing.moveInDate?.toISOString().slice(0, 10) ?? null) !==
             (nextMoveInDate?.toISOString().slice(0, 10) ?? null);
@@ -857,6 +877,8 @@ export async function PATCH(
                 availableSlots: Math.max(0, totalSlots - reservedSlotsToday),
               }),
               moveInDate: nextMoveInDate,
+              availableUntil: nextAvailableUntil,
+              ...(minStayMonths !== undefined && { minStayMonths }),
               ...(Array.isArray(images) && { images }),
               ...(bookingMode !== undefined &&
                 bookingMode !== null && { bookingMode }),

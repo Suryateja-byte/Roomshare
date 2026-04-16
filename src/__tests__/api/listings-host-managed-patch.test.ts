@@ -164,6 +164,18 @@ function makeHostManagedListing() {
   };
 }
 
+function makeLegacyListing() {
+  return {
+    ...makeHostManagedListing(),
+    availabilitySource: "LEGACY_BOOKING" as const,
+    availableSlots: 2,
+    openSlots: null,
+    needsMigrationReview: true,
+    status: "ACTIVE" as const,
+    statusReason: null,
+  };
+}
+
 function makeLockedHostManagedListing(
   overrides: Partial<{
     ownerId: string;
@@ -193,6 +205,45 @@ function makeLockedHostManagedListing(
     totalSlots: 2,
     moveInDate: new Date("2026-05-01T00:00:00.000Z"),
     availableUntil: new Date("2026-08-01T00:00:00.000Z"),
+    minStayMonths: 1,
+    lastConfirmedAt: null,
+    freshnessReminderSentAt: new Date("2026-04-01T00:00:00.000Z"),
+    freshnessWarningSentAt: new Date("2026-04-08T00:00:00.000Z"),
+    autoPausedAt: new Date("2026-04-10T00:00:00.000Z"),
+    bookingMode: "SHARED",
+    ...overrides,
+  };
+}
+
+function makeLockedLegacyListing(
+  overrides: Partial<{
+    ownerId: string;
+    version: number;
+    status: "ACTIVE" | "PAUSED" | "RENTED";
+    statusReason: string | null;
+    needsMigrationReview: boolean;
+    openSlots: number | null;
+    availableSlots: number;
+    totalSlots: number;
+    moveInDate: Date | null;
+    availableUntil: Date | null;
+    minStayMonths: number;
+    bookingMode: string;
+  }> = {}
+) {
+  return {
+    id: "listing-abc",
+    ownerId: "owner-123",
+    version: 3,
+    availabilitySource: "LEGACY_BOOKING" as const,
+    status: "ACTIVE" as const,
+    statusReason: null,
+    needsMigrationReview: true,
+    openSlots: null,
+    availableSlots: 2,
+    totalSlots: 2,
+    moveInDate: new Date("2026-05-01T00:00:00.000Z"),
+    availableUntil: null,
     minStayMonths: 1,
     lastConfirmedAt: null,
     freshnessReminderSentAt: new Date("2026-04-01T00:00:00.000Z"),
@@ -506,5 +557,63 @@ describe("PATCH /api/listings/[id] host-managed contract", () => {
     expect(getAvailability).not.toHaveBeenCalled();
     expect(getFuturePeakReservedLoad).not.toHaveBeenCalled();
     expect(syncFutureInventoryTotalSlots).not.toHaveBeenCalled();
+  });
+
+  it("persists legacy review-fix fields without opening an alternate host-managed path", async () => {
+    (prisma.listing.findUnique as jest.Mock).mockResolvedValue(
+      makeLegacyListing()
+    );
+    (getAvailability as jest.Mock).mockResolvedValue({
+      acceptedSlots: 0,
+      heldSlots: 0,
+    });
+    const queryRawMock = jest
+      .fn()
+      .mockResolvedValue([makeLockedLegacyListing()]);
+    const updateMock = jest.fn().mockResolvedValue({
+      id: "listing-abc",
+      version: 3,
+      availableUntil: new Date("2026-09-01T00:00:00.000Z"),
+      minStayMonths: 3,
+    });
+    (prisma.$transaction as jest.Mock).mockImplementation(
+      makeTransaction(queryRawMock, updateMock)
+    );
+
+    const response = await PATCH(
+      new Request("http://localhost/api/listings/listing-abc", {
+        method: "PATCH",
+        body: JSON.stringify({
+          title: "Updated Title",
+          description: "Updated description",
+          price: "1200",
+          totalSlots: "2",
+          address: "123 Main St",
+          city: "San Francisco",
+          state: "CA",
+          zip: "94102",
+          moveInDate: "2026-05-01T00:00:00.000Z",
+          availableUntil: "2026-09-01T00:00:00.000Z",
+          minStayMonths: 3,
+          bookingMode: "SHARED",
+        }),
+      }),
+      { params: Promise.resolve({ id: "listing-abc" }) }
+    );
+
+    expect(response.status).toBe(200);
+    expect(updateMock).toHaveBeenCalledWith(
+      expect.objectContaining({
+        where: { id: "listing-abc" },
+        data: expect.objectContaining({
+          title: "Updated Title",
+          totalSlots: 2,
+          moveInDate: new Date("2026-05-01T00:00:00.000Z"),
+          availableUntil: new Date("2026-09-01T00:00:00.000Z"),
+          minStayMonths: 3,
+        }),
+      })
+    );
+    expect(getAvailability).toHaveBeenCalled();
   });
 });

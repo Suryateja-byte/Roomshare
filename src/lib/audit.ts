@@ -18,6 +18,7 @@ export type AdminAction =
   | "LISTING_HIDDEN"
   | "LISTING_RENTED"
   | "LISTING_RESTORED"
+  | "LISTING_MIGRATION_REVIEWED"
   // Report management
   | "REPORT_RESOLVED"
   | "REPORT_DISMISSED"

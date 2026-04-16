@@ -49,7 +49,9 @@ import {
 } from "@/components/ui/alert-dialog";
 import ImageUploader from "@/components/listings/ImageUploader";
 import ListingFreshnessCheck from "@/components/ListingFreshnessCheck";
+import ListingMigrationReviewPanel from "@/components/ListingMigrationReviewPanel";
 import { ImageIcon } from "lucide-react";
+import type { ListingMigrationReviewState } from "@/lib/migration/review";
 
 interface ImageObject {
   file?: File;
@@ -79,6 +81,7 @@ interface Listing {
   roomType: string | null;
   bookingMode: string;
   availabilitySource?: "LEGACY_BOOKING" | "HOST_MANAGED";
+  needsMigrationReview?: boolean;
   version?: number;
   status?: "ACTIVE" | "PAUSED" | "RENTED";
   statusReason?: string | null;
@@ -100,6 +103,7 @@ interface Listing {
 
 interface EditListingFormProps {
   listing: Listing;
+  migrationReview?: ListingMigrationReviewState | null;
   enableWholeUnitMode?: boolean;
 }
 
@@ -115,6 +119,8 @@ interface EditListingFormData {
   amenities: string;
   houseRules: string;
   moveInDate: string;
+  availableUntil?: string;
+  minStayMonths?: string;
   leaseDuration: string;
   roomType: string;
   genderPreference: string;
@@ -140,7 +146,10 @@ const formatDateForInput = (date: Date | string | null | undefined) => {
   return `${year}-${month}-${day}`;
 };
 
-function HostManagedEditListingForm({ listing }: EditListingFormProps) {
+function HostManagedEditListingForm({
+  listing,
+  migrationReview = null,
+}: EditListingFormProps) {
   const router = useRouter();
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState("");
@@ -351,6 +360,22 @@ function HostManagedEditListingForm({ listing }: EditListingFormProps) {
         <ArrowLeft className="w-4 h-4 mr-1" />
         Back to listing
       </Link>
+
+      <div className="mb-8">
+        <ListingMigrationReviewPanel
+          actor="host"
+          listingId={listing.id}
+          expectedVersion={version}
+          reviewState={migrationReview}
+          onReviewed={(result) => {
+            setVersion(result.version);
+            setStatus(result.status);
+            setError("");
+            setFieldErrors({});
+            setFormModified(false);
+          }}
+        />
+      </div>
 
       <div className="mb-8">
         <ListingFreshnessCheck listingId={listing.id} canManage={true} />
@@ -596,6 +621,7 @@ function HostManagedEditListingForm({ listing }: EditListingFormProps) {
 
 function LegacyEditListingForm({
   listing,
+  migrationReview = null,
   enableWholeUnitMode = false,
 }: EditListingFormProps) {
   const router = useRouter();
@@ -624,6 +650,12 @@ function LegacyEditListingForm({
   const [moveInDate, setMoveInDate] = useState(
     formatDateForInput(listing.moveInDate)
   );
+  const [availableUntil, setAvailableUntil] = useState(
+    formatDateForInput(listing.availableUntil)
+  );
+  const [minStayMonths, setMinStayMonths] = useState(
+    String(listing.minStayMonths ?? 1)
+  );
   const [leaseDuration, setLeaseDuration] = useState(
     listing.leaseDuration || ""
   );
@@ -637,6 +669,7 @@ function LegacyEditListingForm({
   const [bookingMode, setBookingMode] = useState(
     listing.bookingMode || "SHARED"
   );
+  const isMigrationReviewMode = Boolean(migrationReview?.isReviewRequired);
 
   // Ref to track user-initiated roomType changes (prevents auto-set on mount/restore)
   const userChangedRoomType = useRef(false);
@@ -715,6 +748,8 @@ function LegacyEditListingForm({
         amenities: listing.amenities.join(", "),
         houseRules: listing.houseRules.join(", "),
         moveInDate,
+        availableUntil,
+        minStayMonths,
         leaseDuration,
         roomType,
         genderPreference,
@@ -746,6 +781,8 @@ function LegacyEditListingForm({
         (form.elements.namedItem("houseRules") as HTMLTextAreaElement)?.value ||
         "",
       moveInDate,
+      availableUntil,
+      minStayMonths,
       leaseDuration,
       roomType,
       genderPreference,
@@ -795,6 +832,12 @@ function LegacyEditListingForm({
 
     setMoveInDate(
       persistedData.moveInDate || formatDateForInput(listing.moveInDate)
+    );
+    setAvailableUntil(
+      persistedData.availableUntil || formatDateForInput(listing.availableUntil)
+    );
+    setMinStayMonths(
+      persistedData.minStayMonths || String(listing.minStayMonths ?? 1)
     );
     setLeaseDuration(
       persistedData.leaseDuration || listing.leaseDuration || ""
@@ -858,6 +901,8 @@ function LegacyEditListingForm({
   }, [
     description,
     moveInDate,
+    availableUntil,
+    minStayMonths,
     leaseDuration,
     roomType,
     genderPreference,
@@ -940,6 +985,13 @@ function LegacyEditListingForm({
           ...data,
           householdLanguages: selectedLanguages,
           moveInDate: moveInDate || undefined,
+          availableUntil: isMigrationReviewMode
+            ? availableUntil || null
+            : undefined,
+          minStayMonths:
+            isMigrationReviewMode && minStayMonths.trim().length > 0
+              ? Number(minStayMonths)
+              : undefined,
           leaseDuration: leaseDuration || undefined,
           roomType: roomType || undefined,
           genderPreference: genderPreference || undefined,
@@ -964,7 +1016,12 @@ function LegacyEditListingForm({
       cancelSave();
       clearPersistedData();
       navGuard.disable();
-      router.push(`/listings/${listing.id}`);
+      setFormModified(false);
+      if (isMigrationReviewMode) {
+        router.refresh();
+      } else {
+        router.push(`/listings/${listing.id}`);
+      }
     } catch (err: unknown) {
       if (err instanceof Error && err.name === "AbortError") return; // Component unmounted
       Sentry.captureException(err, {
@@ -992,6 +1049,15 @@ function LegacyEditListingForm({
         <ArrowLeft className="w-4 h-4 mr-1" />
         Back to listing
       </Link>
+
+      <div className="mb-8">
+        <ListingMigrationReviewPanel
+          actor="host"
+          listingId={listing.id}
+          expectedVersion={listing.version ?? 0}
+          reviewState={migrationReview}
+        />
+      </div>
 
       {error && (
         <div className="bg-red-50 border border-red-100 px-4 py-4 rounded-xl mb-8">
@@ -1291,6 +1357,44 @@ function LegacyEditListingForm({
               When can tenants move in? (Optional)
             </p>
           </div>
+
+          {isMigrationReviewMode && (
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+              <div>
+                <Label htmlFor="availableUntil">Available Until</Label>
+                <DatePicker
+                  id="availableUntil"
+                  value={availableUntil}
+                  onChange={setAvailableUntil}
+                  placeholder="Select availability end date"
+                  disabled={loading}
+                />
+                <p className="text-xs text-on-surface-variant mt-2 pl-1">
+                  Keep this blank for open-ended availability, or choose a
+                  future date before review.
+                </p>
+                <FieldError field="availableUntil" />
+              </div>
+              <div>
+                <Label htmlFor="minStayMonths">Minimum Stay (Months)</Label>
+                <Input
+                  id="minStayMonths"
+                  name="minStayMonths"
+                  type="number"
+                  min="1"
+                  step="1"
+                  value={minStayMonths}
+                  onChange={(e) => setMinStayMonths(e.target.value)}
+                  disabled={loading}
+                />
+                <p className="text-xs text-on-surface-variant mt-2 pl-1">
+                  Host-managed listings require a minimum stay of at least 1
+                  month.
+                </p>
+                <FieldError field="minStayMonths" />
+              </div>
+            </div>
+          )}
 
           <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
             <div>

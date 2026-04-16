@@ -84,6 +84,7 @@ import {
   suspendUser,
   getListingsForAdmin,
   updateListingStatus,
+  reviewListingMigration,
   deleteListing,
   getReports,
   resolveReport,
@@ -460,6 +461,11 @@ describe("admin actions", () => {
         freshnessReminderSentAt: Date | null;
         freshnessWarningSentAt: Date | null;
         autoPausedAt: Date | null;
+        pendingBookingCount: number;
+        acceptedBookingCount: number;
+        heldBookingCount: number;
+        futureInventoryRowCount: number;
+        futurePeakReservedLoad: number;
       }> = {}
     ) {
       return {
@@ -481,6 +487,11 @@ describe("admin actions", () => {
         freshnessReminderSentAt: null,
         freshnessWarningSentAt: null,
         autoPausedAt: null,
+        pendingBookingCount: 0,
+        acceptedBookingCount: 0,
+        heldBookingCount: 0,
+        futureInventoryRowCount: 0,
+        futurePeakReservedLoad: 0,
         ...overrides,
       };
     }
@@ -614,6 +625,210 @@ describe("admin actions", () => {
           statusReason: null,
           version: 8,
         }),
+      });
+    });
+
+    it("blocks LEGACY_BOOKING ACTIVE when migration review is still required", async () => {
+      mockListingStatusTx({
+        ...makeStatusListing(),
+        needsMigrationReview: true,
+        status: "PAUSED",
+      });
+
+      const result = await updateListingStatus("listing-123", "ACTIVE", 7);
+
+      expect(result).toEqual({
+        error:
+          "This listing must finish migration review before it can be made active.",
+        code: "HOST_MANAGED_MIGRATION_REVIEW_REQUIRED",
+      });
+    });
+  });
+
+  describe("reviewListingMigration", () => {
+    function makeReviewListing(
+      overrides: Partial<{
+        id: string;
+        status: "ACTIVE" | "PAUSED" | "RENTED";
+        title: string;
+        ownerId: string;
+        version: number;
+        availabilitySource: "LEGACY_BOOKING" | "HOST_MANAGED";
+        statusReason: string | null;
+        needsMigrationReview: boolean;
+        openSlots: number | null;
+        availableSlots: number;
+        totalSlots: number;
+        moveInDate: Date | null;
+        availableUntil: Date | null;
+        minStayMonths: number;
+        lastConfirmedAt: Date | null;
+        freshnessReminderSentAt: Date | null;
+        freshnessWarningSentAt: Date | null;
+        autoPausedAt: Date | null;
+        pendingBookingCount: number;
+        acceptedBookingCount: number;
+        heldBookingCount: number;
+        futureInventoryRowCount: number;
+        futurePeakReservedLoad: number;
+      }> = {}
+    ) {
+      return {
+        id: "listing-123",
+        status: "ACTIVE" as const,
+        title: "Test Listing",
+        ownerId: "owner-123",
+        version: 7,
+        availabilitySource: "LEGACY_BOOKING" as const,
+        statusReason: null,
+        needsMigrationReview: true,
+        openSlots: null,
+        availableSlots: 2,
+        totalSlots: 2,
+        moveInDate: new Date("2026-05-01T00:00:00.000Z"),
+        availableUntil: null,
+        minStayMonths: 1,
+        lastConfirmedAt: null,
+        freshnessReminderSentAt: null,
+        freshnessWarningSentAt: null,
+        autoPausedAt: null,
+        pendingBookingCount: 0,
+        acceptedBookingCount: 0,
+        heldBookingCount: 0,
+        futureInventoryRowCount: 0,
+        futurePeakReservedLoad: 0,
+        ...overrides,
+      };
+    }
+
+    function mockReviewTx(
+      listingRow: ReturnType<typeof makeReviewListing> | null,
+      update = jest.fn().mockResolvedValue({})
+    ) {
+      (prisma.$transaction as jest.Mock).mockImplementation(
+        async (fn: (tx: unknown) => Promise<unknown>) =>
+          fn({
+            $queryRaw: jest.fn().mockResolvedValue(listingRow ? [listingRow] : []),
+            listing: { update },
+          })
+      );
+      return { update };
+    }
+
+    it("uses the shared review path for valid legacy listings", async () => {
+      const { update } = mockReviewTx({
+        ...makeReviewListing(),
+        needsMigrationReview: true,
+        availableUntil: new Date("2026-08-01T00:00:00.000Z"),
+        minStayMonths: 2,
+      });
+      (logAdminAction as jest.Mock).mockResolvedValue({});
+
+      const result = await reviewListingMigration("listing-123", 7);
+
+      expect(result).toEqual(
+        expect.objectContaining({
+          success: true,
+          availabilitySource: "HOST_MANAGED",
+          needsMigrationReview: false,
+          status: "PAUSED",
+          statusReason: "ADMIN_PAUSED",
+          version: 8,
+        })
+      );
+      expect(update).toHaveBeenCalledWith({
+        where: { id: "listing-123" },
+        data: expect.objectContaining({
+          availabilitySource: "HOST_MANAGED",
+          needsMigrationReview: false,
+          status: "PAUSED",
+          statusReason: "ADMIN_PAUSED",
+          openSlots: 2,
+          availableSlots: 2,
+          version: 8,
+        }),
+      });
+      expect(logAdminAction).toHaveBeenCalledWith(
+        expect.objectContaining({
+          action: "LISTING_MIGRATION_REVIEWED",
+        })
+      );
+    });
+
+    it("returns stable blocker reasons when admin review is still blocked", async () => {
+      mockReviewTx({
+        ...makeReviewListing(),
+        needsMigrationReview: true,
+        acceptedBookingCount: 1,
+        moveInDate: null,
+      });
+
+      const result = await reviewListingMigration("listing-123", 7);
+
+      expect(result).toEqual({
+        error:
+          "Resolve the listed migration blockers before reviewing this listing.",
+        code: "MIGRATION_REVIEW_BLOCKED",
+        reasonCodes: ["HAS_ACCEPTED_BOOKINGS", "MISSING_MOVE_IN_DATE"],
+        reasons: [
+          expect.objectContaining({ code: "HAS_ACCEPTED_BOOKINGS" }),
+          expect.objectContaining({ code: "MISSING_MOVE_IN_DATE" }),
+        ],
+        helperErrorCode: null,
+        helperError: null,
+      });
+    });
+
+    it("keeps already-host-managed review listings blocked while legacy blockers remain", async () => {
+      mockReviewTx({
+        ...makeReviewListing(),
+        availabilitySource: "HOST_MANAGED",
+        needsMigrationReview: true,
+        status: "PAUSED",
+        statusReason: "MIGRATION_REVIEW",
+        openSlots: 2,
+        availableSlots: 2,
+        totalSlots: 2,
+        minStayMonths: 2,
+        availableUntil: new Date("2026-08-01T00:00:00.000Z"),
+        pendingBookingCount: 1,
+        acceptedBookingCount: 1,
+        heldBookingCount: 1,
+        futureInventoryRowCount: 2,
+      });
+
+      const result = await reviewListingMigration("listing-123", 7);
+
+      expect(result).toEqual({
+        error:
+          "Resolve the listed migration blockers before reviewing this listing.",
+        code: "MIGRATION_REVIEW_BLOCKED",
+        reasonCodes: [
+          "HAS_PENDING_BOOKINGS",
+          "HAS_ACCEPTED_BOOKINGS",
+          "HAS_HELD_BOOKINGS",
+          "HAS_FUTURE_INVENTORY_ROWS",
+        ],
+        reasons: [
+          expect.objectContaining({
+            code: "HAS_PENDING_BOOKINGS",
+            severity: "blocked",
+          }),
+          expect.objectContaining({
+            code: "HAS_ACCEPTED_BOOKINGS",
+            severity: "blocked",
+          }),
+          expect.objectContaining({
+            code: "HAS_HELD_BOOKINGS",
+            severity: "blocked",
+          }),
+          expect.objectContaining({
+            code: "HAS_FUTURE_INVENTORY_ROWS",
+            severity: "blocked",
+          }),
+        ],
+        helperErrorCode: null,
+        helperError: null,
       });
     });
   });

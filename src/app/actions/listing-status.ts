@@ -17,6 +17,10 @@ import {
   type HostManagedListingWriteCurrent,
   prepareHostManagedListingWrite,
 } from "@/lib/listings/host-managed-write";
+import {
+  executeLockedListingMigrationReview,
+  fetchLockedListingMigrationReviewRecord,
+} from "@/lib/migration/review";
 // Basic listingId format check — rejects empty/absurdly long strings
 // without being as strict as CUID/UUID validation (allows test IDs)
 const isReasonableId = (id: string) =>
@@ -104,6 +108,14 @@ export async function updateListingStatus(
           return {
             error: HOST_MANAGED_WRITE_ERROR_MESSAGES.VERSION_CONFLICT,
             code: "VERSION_CONFLICT",
+          } as const;
+        }
+
+        if (currentListing.needsMigrationReview && status === "ACTIVE") {
+          return {
+            error:
+              HOST_MANAGED_WRITE_ERROR_MESSAGES.HOST_MANAGED_MIGRATION_REVIEW_REQUIRED,
+            code: "HOST_MANAGED_MIGRATION_REVIEW_REQUIRED",
           } as const;
         }
 
@@ -205,6 +217,84 @@ export async function updateListingStatus(
       error: error instanceof Error ? error.message : "Unknown error",
     });
     return { error: "Failed to update listing status" };
+  }
+}
+
+export async function reviewListingMigration(
+  listingId: string,
+  expectedVersion: number
+) {
+  if (!isReasonableId(listingId)) {
+    return { error: "Invalid listing ID format" };
+  }
+
+  if (!versionSchema.safeParse(expectedVersion).success) {
+    return { error: "Invalid listing version", code: "INVALID_VERSION" };
+  }
+
+  const session = await auth();
+  if (!session?.user?.id) {
+    return { error: "Unauthorized" };
+  }
+
+  const suspension = await checkSuspension();
+  if (suspension.suspended) {
+    return { error: suspension.error || "Account suspended" };
+  }
+
+  try {
+    const now = new Date();
+    const result = await prisma.$transaction(
+      async (tx) => {
+        const currentListing = await fetchLockedListingMigrationReviewRecord(
+          tx,
+          listingId,
+          now
+        );
+
+        if (!currentListing) {
+          return { error: "Listing not found" } as const;
+        }
+
+        if (currentListing.ownerId !== session.user.id) {
+          return { error: "You can only update your own listings" } as const;
+        }
+
+        return executeLockedListingMigrationReview(tx, currentListing, {
+          actor: "host",
+          expectedVersion,
+          now,
+        });
+      },
+      { timeout: 10000 }
+    );
+
+    if (!("success" in result) || !result.success) {
+      return result;
+    }
+
+    markListingDirty(listingId, "listing_updated").catch((err) => {
+      logger.sync.warn("markListingDirty failed", {
+        action: "reviewListingMigration",
+        listingId,
+        reason: "listing_updated",
+        error: err instanceof Error ? err.message : String(err),
+      });
+    });
+
+    revalidatePath(`/listings/${listingId}`);
+    revalidatePath(`/listings/${listingId}/edit`);
+    revalidatePath("/profile");
+    revalidatePath("/search");
+
+    return result;
+  } catch (error) {
+    logger.sync.error("Failed to review listing migration", {
+      action: "reviewListingMigration",
+      listingId,
+      error: error instanceof Error ? error.message : "Unknown error",
+    });
+    return { error: "Failed to review listing migration" };
   }
 }
 

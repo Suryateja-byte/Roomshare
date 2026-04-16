@@ -18,6 +18,10 @@ import {
   HOST_MANAGED_WRITE_ERROR_MESSAGES,
   prepareHostManagedListingWrite,
 } from "@/lib/listings/host-managed-write";
+import {
+  executeLockedListingMigrationReview,
+  fetchLockedListingMigrationReviewRecord,
+} from "@/lib/migration/review";
 
 // Helper to check admin status — exported for use in other admin action files (verification.ts etc.)
 export async function requireAdmin() {
@@ -434,6 +438,14 @@ export async function updateListingStatus(
         } as const;
       }
 
+      if (listing.needsMigrationReview && status === "ACTIVE") {
+        return {
+          error:
+            HOST_MANAGED_WRITE_ERROR_MESSAGES.HOST_MANAGED_MIGRATION_REVIEW_REQUIRED,
+          code: "HOST_MANAGED_MIGRATION_REVIEW_REQUIRED",
+        } as const;
+      }
+
       if (listing.availabilitySource === "HOST_MANAGED") {
         const preparedWrite = prepareHostManagedListingWrite(
           listing,
@@ -536,6 +548,105 @@ export async function updateListingStatus(
       error: error instanceof Error ? error.message : "Unknown error",
     });
     return { error: "Failed to update listing status" };
+  }
+}
+
+export async function reviewListingMigration(
+  listingId: string,
+  expectedVersion: number
+) {
+  const adminCheck = await requireAdmin();
+  if (adminCheck.error) {
+    return { error: adminCheck.error };
+  }
+
+  const headersList = await headers();
+  const ip = getClientIPFromHeaders(headersList);
+  const rl = await checkRateLimit(
+    `${ip}:${adminCheck.userId}`,
+    "adminWrite",
+    RATE_LIMITS.adminWrite
+  );
+  if (!rl.success) {
+    return { error: "Too many requests. Please slow down." };
+  }
+
+  try {
+    const now = new Date();
+    const result = await prisma.$transaction(async (tx) => {
+      const listing = await fetchLockedListingMigrationReviewRecord(
+        tx,
+        listingId,
+        now
+      );
+
+      if (!listing) {
+        return { error: "Listing not found" } as const;
+      }
+
+      const reviewResult = await executeLockedListingMigrationReview(tx, listing, {
+        actor: "admin",
+        expectedVersion,
+        now,
+      });
+
+      if (!reviewResult.success) {
+        return reviewResult;
+      }
+
+      return {
+        ...reviewResult,
+        listingTitle: listing.title,
+        ownerId: listing.ownerId,
+        previousAvailabilitySource: listing.availabilitySource,
+        previousNeedsMigrationReview: listing.needsMigrationReview,
+      } as const;
+    });
+
+    if (!("success" in result) || !result.success) {
+      return result;
+    }
+
+    markListingDirty(listingId, "listing_updated").catch((err) => {
+      logger.sync.warn("markListingDirty failed", {
+        action: "adminReviewListingMigration",
+        listingId,
+        reason: "listing_updated",
+        error: err instanceof Error ? err.message : String(err),
+      });
+    });
+
+    await logAdminAction({
+      adminId: adminCheck.userId!,
+      action: "LISTING_MIGRATION_REVIEWED",
+      targetType: "Listing",
+      targetId: listingId,
+      details: {
+        listingTitle: result.listingTitle,
+        ownerId: result.ownerId,
+        previousAvailabilitySource: result.previousAvailabilitySource,
+        previousNeedsMigrationReview: result.previousNeedsMigrationReview,
+        newAvailabilitySource: result.availabilitySource,
+        newNeedsMigrationReview: result.needsMigrationReview,
+        newStatus: result.status,
+        statusReason: result.statusReason,
+      },
+    });
+
+    revalidatePath("/admin/listings");
+    revalidatePath(`/listings/${listingId}`);
+    revalidatePath(`/listings/${listingId}/edit`);
+    revalidatePath("/search");
+
+    return result;
+  } catch (error) {
+    logger.sync.error("Failed to review listing migration (admin)", {
+      action: "adminReviewListingMigration",
+      adminId: adminCheck.userId,
+      listingId,
+      error: error instanceof Error ? error.message : "Unknown error",
+    });
+    return { error: "Failed to review listing migration" };
   }
 }
 

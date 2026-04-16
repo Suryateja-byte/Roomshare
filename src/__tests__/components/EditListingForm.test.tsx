@@ -11,6 +11,7 @@ import {
 } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import EditListingForm from "@/app/listings/[id]/edit/EditListingForm";
+import type { ListingMigrationReviewState } from "@/lib/migration/review";
 
 // Mock dependencies
 const mockRouter = {
@@ -77,6 +78,16 @@ jest.mock("@/components/listings/ImageUploader", () => ({
 jest.mock("@/components/ListingFreshnessCheck", () => ({
   __esModule: true,
   default: () => <div data-testid="listing-freshness-check" />,
+}));
+
+jest.mock("@/components/ListingMigrationReviewPanel", () => ({
+  __esModule: true,
+  default: ({ reviewState }: { reviewState?: { reviewActionLabel?: string } | null }) =>
+    reviewState ? (
+      <div data-testid="listing-migration-review-panel">
+        {reviewState.reviewActionLabel}
+      </div>
+    ) : null,
 }));
 
 // Capture roomType Select onValueChange for triggering changes in tests
@@ -148,6 +159,40 @@ const hostManagedListing = {
   moveInDate: "2026-05-01",
   availableUntil: "2026-08-01",
   minStayMonths: 2,
+};
+
+const migrationReviewState: ListingMigrationReviewState = {
+  listingId: "listing-123",
+  availabilitySource: "LEGACY_BOOKING" as const,
+  needsMigrationReview: true,
+  status: "ACTIVE" as const,
+  statusReason: null,
+  cohort: "manual_review" as const,
+  publicStatus: "AVAILABLE",
+  searchEligible: true,
+  isReviewRequired: true,
+  canReviewNow: false,
+  reviewActionLabel: "Convert and keep paused" as const,
+  reasonCodes: ["MISSING_MOVE_IN_DATE"],
+  reasons: [
+    {
+      code: "MISSING_MOVE_IN_DATE" as const,
+      summary: "Move-in date is missing.",
+      fixHint: "Set a move-in date before reviewing this listing.",
+      severity: "fix" as const,
+    },
+  ],
+  blockingReasonCodes: ["MISSING_MOVE_IN_DATE"],
+  blockingReasons: [
+    {
+      code: "MISSING_MOVE_IN_DATE" as const,
+      summary: "Move-in date is missing.",
+      fixHint: "Set a move-in date before reviewing this listing.",
+      severity: "fix" as const,
+    },
+  ],
+  helperErrorCode: null,
+  helperError: null,
 };
 
 describe("EditListingForm — bookingMode", () => {
@@ -415,6 +460,47 @@ describe("EditListingForm — PATCH submission", () => {
 
     // Form should still be on the page (not redirected)
     expect(screen.getByText("Save Changes")).toBeInTheDocument();
+  });
+
+  it("shows migration review state and legacy review fields on the edit surface", () => {
+    render(
+      <EditListingForm
+        listing={defaultListing}
+        migrationReview={migrationReviewState}
+      />
+    );
+
+    expect(
+      screen.getByTestId("listing-migration-review-panel")
+    ).toHaveTextContent("Convert and keep paused");
+    expect(screen.getByLabelText("Available Until")).toBeInTheDocument();
+    expect(
+      screen.getByLabelText("Minimum Stay (Months)")
+    ).toBeInTheDocument();
+  });
+
+  it("refreshes the edit page in place after saving review fixes", async () => {
+    render(
+      <EditListingForm
+        listing={defaultListing}
+        migrationReview={migrationReviewState}
+      />
+    );
+
+    await userEvent.click(screen.getByText("Add Image"));
+    await userEvent.click(screen.getByText("Save Changes"));
+
+    await waitFor(() => {
+      expect(mockRouter.refresh).toHaveBeenCalled();
+    });
+    expect(mockRouter.push).not.toHaveBeenCalled();
+
+    const callBody = JSON.parse(
+      (global.fetch as jest.Mock).mock.calls[0][1].body
+    );
+
+    expect(callBody.availableUntil).toBeNull();
+    expect(callBody.minStayMonths).toBe(1);
   });
 
   it("sends the dedicated host-managed PATCH payload for HOST_MANAGED listings", async () => {
