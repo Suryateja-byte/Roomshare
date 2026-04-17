@@ -1,15 +1,11 @@
 import { render, waitFor } from "@testing-library/react";
 import { SearchUrlCanonicalizer } from "@/components/search/SearchUrlCanonicalizer";
 
-const mockRouterReplace = jest.fn();
 const mockPathname = jest.fn();
 const mockSearchParams = jest.fn();
 const mockEmitSearchClientMetric = jest.fn();
 
 jest.mock("next/navigation", () => ({
-  useRouter: () => ({
-    replace: mockRouterReplace,
-  }),
   usePathname: () => mockPathname(),
   useSearchParams: () => mockSearchParams(),
 }));
@@ -43,7 +39,6 @@ describe("SearchUrlCanonicalizer", () => {
       );
     });
 
-    expect(mockRouterReplace).not.toHaveBeenCalled();
     expect(mockEmitSearchClientMetric).toHaveBeenCalledWith({
       metric: "cfm.search.legacy_url_count",
       alias: "startDate",
@@ -70,7 +65,6 @@ describe("SearchUrlCanonicalizer", () => {
       expect(replaceStateSpy).not.toHaveBeenCalled();
     });
 
-    expect(mockRouterReplace).not.toHaveBeenCalled();
     expect(mockEmitSearchClientMetric).not.toHaveBeenCalled();
   });
 });

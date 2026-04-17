@@ -56,6 +56,14 @@ function canonicalize(url: string): string {
 }
 
 describe("query-hash semantic equivalence (CFM-403)", () => {
+  beforeAll(() => {
+    jest.useFakeTimers({ now: new Date("2026-01-01T00:00:00.000Z") });
+  });
+
+  afterAll(() => {
+    jest.useRealTimers();
+  });
+
   describe("equivalence cases — MUST hash identically", () => {
     it("param order is irrelevant", () => {
       // URLSearchParams preserves insertion order; the hash must not.

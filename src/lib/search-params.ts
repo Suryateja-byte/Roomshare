@@ -58,6 +58,29 @@ export const LEGACY_URL_ALIASES = [
 
 export type LegacyUrlAlias = (typeof LEGACY_URL_ALIASES)[number];
 
+/**
+ * Registry of legacy URL aliases the parser still accepts.
+ *
+ * Update ritual when adding or removing an alias:
+ * 1. Update the parser logic (`parseSearchParams`, `normalizeSearchFilters`,
+ *    or `normalizeSearchQuery`) to add or remove the fallback.
+ * 2. Update `PARSER_LEGACY_ALIAS_MAP`.
+ * 3. Update `LEGACY_URL_ALIASES`.
+ * 4. Update `src/__tests__/lib/search/cfm-604-legacy-url-parity.test.ts`.
+ *
+ * This must remain a distinct declaration from `LEGACY_URL_ALIASES` so the
+ * guard test can fail if the parser registry and telemetry allowlist drift.
+ */
+export const PARSER_LEGACY_ALIAS_MAP = {
+  startDate: "moveInDate",
+  minBudget: "minPrice",
+  maxBudget: "maxPrice",
+  minAvailableSlots: "minSlots",
+  pageNumber: "page",
+  cursorStack: "cursor",
+  where: "locationLabel",
+} as const satisfies Record<LegacyUrlAlias, string>;
+
 export const LEGACY_URL_SURFACES = ["ssr", "spa", "saved-search"] as const;
 
 export type LegacyUrlSurface = (typeof LEGACY_URL_SURFACES)[number];

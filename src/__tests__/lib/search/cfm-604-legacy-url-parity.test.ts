@@ -62,6 +62,14 @@ function hashOf(queryString: string): string {
 }
 
 describe("CFM-604 legacy URL parity", () => {
+  beforeAll(() => {
+    jest.useFakeTimers({ now: new Date("2026-01-01T00:00:00.000Z") });
+  });
+
+  afterAll(() => {
+    jest.useRealTimers();
+  });
+
   it.each(LEGACY_PARITY_CASES)(
     "$name",
     ({ legacy, canonical }) => {
