@@ -55,6 +55,7 @@ type InternalBookingResult =
       bookingId: string;
       listingId: string;
       listingTitle: string;
+      availabilitySource: "LEGACY_BOOKING" | "HOST_MANAGED";
       listingOwnerId: string;
       ownerEmail: string | null;
       ownerName: string | null;
@@ -66,11 +67,15 @@ type TransactionClient = Parameters<
   Parameters<typeof prisma.$transaction>[0]
 >[0];
 
-function hostManagedBookingForbiddenResult(): {
+function hostManagedBookingForbiddenResult(kind: "booking" | "hold"): {
   success: false;
   error: string;
   code: string;
 } {
+  logger.sync.info("cfm.booking.create_blocked_count", {
+    reason: "host_managed",
+    kind,
+  });
   return {
     success: false,
     error:
@@ -79,11 +84,15 @@ function hostManagedBookingForbiddenResult(): {
   };
 }
 
-function contactOnlyBookingResult(): {
+function contactOnlyBookingResult(kind: "booking" | "hold"): {
   success: false;
   error: string;
   code: string;
 } {
+  logger.sync.info("cfm.booking.create_blocked_count", {
+    reason: "contact_only",
+    kind,
+  });
   return {
     success: false,
     error: "This listing accepts messages only. Contact the host instead.",
@@ -147,7 +156,7 @@ async function executeBookingTransaction(
   }
 
   if (listing.availabilitySource === "HOST_MANAGED") {
-    return hostManagedBookingForbiddenResult();
+    return hostManagedBookingForbiddenResult("booking");
   }
 
   // P1 FIX: Validate client-provided price against authoritative DB price
@@ -313,12 +322,6 @@ async function executeBookingTransaction(
     },
   });
 
-  logBookingCreateCompletion({
-    kind: "booking",
-    availabilitySource: listing.availabilitySource,
-    bookingId: booking.id,
-  });
-
   await logBookingAudit(tx, {
     bookingId: booking.id,
     action: "CREATED",
@@ -336,6 +339,7 @@ async function executeBookingTransaction(
     bookingId: booking.id,
     listingId: listing.id,
     listingTitle: listing.title,
+    availabilitySource: listing.availabilitySource,
     listingOwnerId: listing.ownerId,
     ownerEmail: owner.email,
     ownerName: owner.name,
@@ -432,8 +436,23 @@ export async function createBooking(
   slotsRequested: number = 1,
   idempotencyKey?: string
 ): Promise<BookingResult> {
+  const headersList = await headers();
+  const ip = getClientIPFromHeaders(headersList);
+  const preGateRl = await checkRateLimit(
+    ip,
+    "createPreAuth",
+    RATE_LIMITS.createPreAuthByIp
+  );
+  if (!preGateRl.success) {
+    return {
+      success: false,
+      error: "Too many requests. Please wait.",
+      code: "RATE_LIMITED",
+    };
+  }
+
   if (features.contactFirstListings) {
-    return contactOnlyBookingResult();
+    return contactOnlyBookingResult("booking");
   }
 
   const session = await auth();
@@ -461,8 +480,6 @@ export async function createBooking(
   const userId = session.user.id;
 
   // C4 FIX: Rate limit booking creation (per-user + per-IP, outside transaction)
-  const headersList = await headers();
-  const ip = getClientIPFromHeaders(headersList);
   const userRl = await checkRateLimit(
     userId,
     "createBooking",
@@ -610,6 +627,12 @@ export async function createBooking(
 
     // Run side effects only for NEW bookings (not cached responses)
     if (!idempotencyResult.cached && idempotencyResult.result.success) {
+      logBookingCreateCompletion({
+        kind: "booking",
+        availabilitySource: idempotencyResult.result.availabilitySource,
+        bookingId: idempotencyResult.result.bookingId,
+      });
+
       try {
         await runBookingSideEffects(
           idempotencyResult.result,
@@ -655,6 +678,12 @@ export async function createBooking(
 
       // Run side effects for successful booking
       if (result.success) {
+        logBookingCreateCompletion({
+          kind: "booking",
+          availabilitySource: result.availabilitySource,
+          bookingId: result.bookingId,
+        });
+
         try {
           await runBookingSideEffects(result, startDate, endDate);
         } catch (sideEffectError) {
@@ -734,6 +763,7 @@ type InternalHoldResult =
       bookingId: string;
       listingId: string;
       listingTitle: string;
+      availabilitySource: "LEGACY_BOOKING" | "HOST_MANAGED";
       listingOwnerId: string;
       ownerEmail: string | null;
       ownerName: string | null;
@@ -798,7 +828,7 @@ async function executeHoldTransaction(
   }
 
   if (listing.availabilitySource === "HOST_MANAGED") {
-    return hostManagedBookingForbiddenResult();
+    return hostManagedBookingForbiddenResult("hold");
   }
 
   // Price validation
@@ -943,12 +973,6 @@ async function executeHoldTransaction(
     },
   });
 
-  logBookingCreateCompletion({
-    kind: "hold",
-    availabilitySource: listing.availabilitySource,
-    bookingId: booking.id,
-  });
-
   await applyInventoryDeltas(tx, {
     listingId,
     startDate,
@@ -974,6 +998,7 @@ async function executeHoldTransaction(
     bookingId: booking.id,
     listingId: listing.id,
     listingTitle: listing.title,
+    availabilitySource: listing.availabilitySource,
     listingOwnerId: listing.ownerId,
     ownerEmail: owner.email,
     ownerName: owner.name,
@@ -1041,8 +1066,23 @@ export async function createHold(
   slotsRequested: number = 1,
   idempotencyKey?: string
 ): Promise<BookingResult> {
+  const headersList = await headers();
+  const ip = getClientIPFromHeaders(headersList);
+  const preGateRl = await checkRateLimit(
+    ip,
+    "createPreAuth",
+    RATE_LIMITS.createPreAuthByIp
+  );
+  if (!preGateRl.success) {
+    return {
+      success: false,
+      error: "Too many requests. Please wait.",
+      code: "RATE_LIMITED",
+    };
+  }
+
   if (features.contactFirstListings) {
-    return contactOnlyBookingResult();
+    return contactOnlyBookingResult("hold");
   }
 
   const session = await auth();
@@ -1055,8 +1095,6 @@ export async function createHold(
   }
 
   // Rate limit
-  const headersList = await headers();
-  const ip = getClientIPFromHeaders(headersList);
   const userRl = await checkRateLimit(
     session.user.id,
     "createHold",
@@ -1237,6 +1275,12 @@ export async function createHold(
     }
 
     if (!idempotencyResult.cached && idempotencyResult.result.success) {
+      logBookingCreateCompletion({
+        kind: "hold",
+        availabilitySource: idempotencyResult.result.availabilitySource,
+        bookingId: idempotencyResult.result.bookingId,
+      });
+
       try {
         await runHoldSideEffects(idempotencyResult.result, startDate, endDate);
       } catch (sideEffectError) {
@@ -1275,6 +1319,12 @@ export async function createHold(
       );
 
       if (result.success) {
+        logBookingCreateCompletion({
+          kind: "hold",
+          availabilitySource: result.availabilitySource,
+          bookingId: result.bookingId,
+        });
+
         try {
           await runHoldSideEffects(result, startDate, endDate);
         } catch (sideEffectError) {

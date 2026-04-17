@@ -36,9 +36,37 @@ jest.mock("@/lib/email", () => ({
   sendNotificationEmailWithPreference: jest.fn(),
 }));
 
+jest.mock("@/app/actions/block", () => ({
+  checkBlockBeforeAction: jest.fn().mockResolvedValue({ allowed: true }),
+}));
+
 jest.mock("@/app/actions/suspension", () => ({
   checkSuspension: jest.fn().mockResolvedValue({ suspended: false }),
   checkEmailVerified: jest.fn().mockResolvedValue({ verified: true }),
+}));
+
+jest.mock("@/lib/booking-audit", () => ({
+  logBookingAudit: jest.fn().mockResolvedValue(undefined),
+}));
+
+jest.mock("@/lib/availability", () => ({
+  applyInventoryDeltas: jest.fn().mockResolvedValue(undefined),
+  expireOverlappingExpiredHolds: jest.fn().mockResolvedValue(0),
+  getAvailability: jest.fn().mockResolvedValue({
+    effectiveAvailableSlots: 2,
+  }),
+}));
+
+jest.mock("@/lib/search/search-doc-dirty", () => ({
+  markListingsDirtyInTx: jest.fn().mockResolvedValue(undefined),
+}));
+
+jest.mock("@/lib/idempotency", () => ({
+  withIdempotency: jest.fn(),
+}));
+
+jest.mock("@/lib/test-barriers", () => ({
+  waitForTestBarrier: jest.fn().mockResolvedValue(undefined),
 }));
 
 jest.mock("@/lib/logger", () => ({
@@ -56,6 +84,7 @@ jest.mock("@/lib/rate-limit", () => ({
   checkRateLimit: jest.fn(),
   getClientIPFromHeaders: jest.fn().mockReturnValue("127.0.0.1"),
   RATE_LIMITS: {
+    createPreAuthByIp: {},
     createBooking: {},
     createBookingByIp: {},
     createHold: {},
@@ -77,7 +106,15 @@ import { auth } from "@/auth";
 import { prisma } from "@/lib/prisma";
 import { sendNotificationEmailWithPreference } from "@/lib/email";
 import { checkSuspension, checkEmailVerified } from "@/app/actions/suspension";
+import { logBookingAudit } from "@/lib/booking-audit";
+import {
+  expireOverlappingExpiredHolds,
+  getAvailability,
+} from "@/lib/availability";
+import { withIdempotency } from "@/lib/idempotency";
+import { logger } from "@/lib/logger";
 import { checkRateLimit } from "@/lib/rate-limit";
+import { markListingsDirtyInTx } from "@/lib/search/search-doc-dirty";
 import { features } from "@/lib/env";
 
 const mockedFeatures = features as {
@@ -149,7 +186,56 @@ function mockHoldHostManagedTransaction() {
             holdTtlMinutes: 15,
             availabilitySource: "HOST_MANAGED",
           },
-        ]),
+      ]),
+    })
+  );
+}
+
+function mockLegacyBookingTransaction() {
+  (prisma.$transaction as jest.Mock).mockImplementation(async (callback: any) =>
+    callback({
+      $queryRaw: jest.fn().mockResolvedValueOnce([
+        {
+          id: "listing-123",
+          title: "Legacy booking room",
+          ownerId: "owner-456",
+          totalSlots: 2,
+          availableSlots: 2,
+          status: "ACTIVE",
+          price: 1200,
+          bookingMode: "REQUEST",
+          availabilitySource: "LEGACY_BOOKING",
+        },
+      ]),
+      user: {
+        findUnique: jest
+          .fn()
+          .mockImplementation(({ where }: { where: { id: string } }) => {
+            if (where.id === "owner-456") {
+              return Promise.resolve({
+                id: "owner-456",
+                name: "Host User",
+                email: "host@example.com",
+              });
+            }
+
+            if (where.id === "user-123") {
+              return Promise.resolve({
+                id: "user-123",
+                name: "Test User",
+              });
+            }
+
+            return Promise.resolve(null);
+          }),
+      },
+      booking: {
+        findFirst: jest.fn().mockResolvedValue(null),
+        create: jest.fn().mockResolvedValue({
+          id: "booking-123",
+          slotsRequested: 1,
+        }),
+      },
     })
   );
 }
@@ -163,6 +249,12 @@ describe("booking freeze gate", () => {
       remaining: 10,
       resetAt: new Date(),
     });
+    (expireOverlappingExpiredHolds as jest.Mock).mockResolvedValue(0);
+    (getAvailability as jest.Mock).mockResolvedValue({
+      effectiveAvailableSlots: 2,
+    });
+    (logBookingAudit as jest.Mock).mockResolvedValue(undefined);
+    (markListingsDirtyInTx as jest.Mock).mockResolvedValue(undefined);
     mockedFeatures.contactFirstListings = false;
     mockedFeatures.multiSlotBooking = true;
     mockedFeatures.softHoldsEnabled = true;
@@ -183,7 +275,16 @@ describe("booking freeze gate", () => {
     expect(auth).not.toHaveBeenCalled();
     expect(checkSuspension).not.toHaveBeenCalled();
     expect(checkEmailVerified).not.toHaveBeenCalled();
-    expect(checkRateLimit).not.toHaveBeenCalled();
+    expect(checkRateLimit).toHaveBeenCalledTimes(1);
+    expect(checkRateLimit).toHaveBeenCalledWith(
+      "127.0.0.1",
+      "createPreAuth",
+      {}
+    );
+    expect(logger.sync.info).toHaveBeenCalledWith(
+      "cfm.booking.create_blocked_count",
+      { reason: "contact_only", kind: "booking" }
+    );
     expect(sendNotificationEmailWithPreference).not.toHaveBeenCalled();
     expect(prisma.booking.create).not.toHaveBeenCalled();
     expect(prisma.$transaction).not.toHaveBeenCalled();
@@ -203,7 +304,16 @@ describe("booking freeze gate", () => {
     expect(auth).not.toHaveBeenCalled();
     expect(checkSuspension).not.toHaveBeenCalled();
     expect(checkEmailVerified).not.toHaveBeenCalled();
-    expect(checkRateLimit).not.toHaveBeenCalled();
+    expect(checkRateLimit).toHaveBeenCalledTimes(1);
+    expect(checkRateLimit).toHaveBeenCalledWith(
+      "127.0.0.1",
+      "createPreAuth",
+      {}
+    );
+    expect(logger.sync.info).toHaveBeenCalledWith(
+      "cfm.booking.create_blocked_count",
+      { reason: "contact_only", kind: "booking" }
+    );
     expect(sendNotificationEmailWithPreference).not.toHaveBeenCalled();
     expect(prisma.booking.create).not.toHaveBeenCalled();
     expect(prisma.$transaction).not.toHaveBeenCalled();
@@ -223,7 +333,117 @@ describe("booking freeze gate", () => {
     expect(auth).toHaveBeenCalledTimes(1);
     expect(prisma.$transaction).toHaveBeenCalledTimes(1);
     expect(prisma.booking.create).not.toHaveBeenCalled();
+    expect(logger.sync.info).toHaveBeenCalledWith(
+      "cfm.booking.create_blocked_count",
+      { reason: "host_managed", kind: "booking" }
+    );
     expect(sendNotificationEmailWithPreference).not.toHaveBeenCalled();
+  });
+
+  it("returns RATE_LIMITED for createBooking before auth when the pre-gate limit is exhausted", async () => {
+    mockedFeatures.contactFirstListings = true;
+    (checkRateLimit as jest.Mock).mockResolvedValueOnce({
+      success: false,
+      remaining: 0,
+      resetAt: new Date(),
+    });
+
+    const result = await createBooking(
+      "listing-123",
+      futureStart,
+      futureEnd,
+      1200
+    );
+
+    expect(result).toEqual({
+      success: false,
+      error: "Too many requests. Please wait.",
+      code: "RATE_LIMITED",
+    });
+    expect(auth).not.toHaveBeenCalled();
+    expect(prisma.$transaction).not.toHaveBeenCalled();
+  });
+
+  it("does not emit post_freeze_write_count when createBooking rolls back after the row is created", async () => {
+    mockLegacyBookingTransaction();
+    (markListingsDirtyInTx as jest.Mock).mockRejectedValueOnce(
+      new Error("dirty write failed")
+    );
+
+    const result = await createBooking(
+      "listing-123",
+      futureStart,
+      futureEnd,
+      1200
+    );
+
+    expect(result).toEqual({
+      success: false,
+      error: "Failed to create booking. Please try again.",
+    });
+    expect(logger.sync.info).not.toHaveBeenCalledWith(
+      "cfm.booking.post_freeze_write_count",
+      expect.anything()
+    );
+  });
+
+  it("emits post_freeze_write_count exactly once after createBooking commits", async () => {
+    mockLegacyBookingTransaction();
+
+    const result = await createBooking(
+      "listing-123",
+      futureStart,
+      futureEnd,
+      1200
+    );
+
+    expect(result).toEqual({
+      success: true,
+      bookingId: "booking-123",
+    });
+    expect(logger.sync.info).toHaveBeenCalledWith(
+      "cfm.booking.post_freeze_write_count",
+      expect.objectContaining({
+        kind: "booking",
+        availabilitySource: "LEGACY_BOOKING",
+        contactFirstFlag: false,
+        bookingIdHash: expect.any(String),
+      })
+    );
+    expect(
+      (logger.sync.info as jest.Mock).mock.calls.filter(
+        ([eventName]) => eventName === "cfm.booking.post_freeze_write_count"
+      )
+    ).toHaveLength(1);
+  });
+
+  it("does not re-emit post_freeze_write_count for cached idempotent createBooking replies", async () => {
+    (withIdempotency as jest.Mock).mockResolvedValue({
+      success: true,
+      cached: true,
+      result: {
+        success: true,
+        bookingId: "booking-123",
+      },
+    });
+
+    const result = await createBooking(
+      "listing-123",
+      futureStart,
+      futureEnd,
+      1200,
+      1,
+      "idem-123"
+    );
+
+    expect(result).toEqual({
+      success: true,
+      bookingId: "booking-123",
+    });
+    expect(logger.sync.info).not.toHaveBeenCalledWith(
+      "cfm.booking.post_freeze_write_count",
+      expect.anything()
+    );
   });
 
   it("returns CONTACT_ONLY for createHold before auth when freeze is on and no session exists", async () => {
@@ -236,7 +456,16 @@ describe("booking freeze gate", () => {
     expect(auth).not.toHaveBeenCalled();
     expect(checkSuspension).not.toHaveBeenCalled();
     expect(checkEmailVerified).not.toHaveBeenCalled();
-    expect(checkRateLimit).not.toHaveBeenCalled();
+    expect(checkRateLimit).toHaveBeenCalledTimes(1);
+    expect(checkRateLimit).toHaveBeenCalledWith(
+      "127.0.0.1",
+      "createPreAuth",
+      {}
+    );
+    expect(logger.sync.info).toHaveBeenCalledWith(
+      "cfm.booking.create_blocked_count",
+      { reason: "contact_only", kind: "hold" }
+    );
     expect(sendNotificationEmailWithPreference).not.toHaveBeenCalled();
     expect(prisma.booking.create).not.toHaveBeenCalled();
     expect(prisma.$transaction).not.toHaveBeenCalled();
@@ -251,7 +480,16 @@ describe("booking freeze gate", () => {
     expect(auth).not.toHaveBeenCalled();
     expect(checkSuspension).not.toHaveBeenCalled();
     expect(checkEmailVerified).not.toHaveBeenCalled();
-    expect(checkRateLimit).not.toHaveBeenCalled();
+    expect(checkRateLimit).toHaveBeenCalledTimes(1);
+    expect(checkRateLimit).toHaveBeenCalledWith(
+      "127.0.0.1",
+      "createPreAuth",
+      {}
+    );
+    expect(logger.sync.info).toHaveBeenCalledWith(
+      "cfm.booking.create_blocked_count",
+      { reason: "contact_only", kind: "hold" }
+    );
     expect(sendNotificationEmailWithPreference).not.toHaveBeenCalled();
     expect(prisma.booking.create).not.toHaveBeenCalled();
     expect(prisma.$transaction).not.toHaveBeenCalled();
@@ -266,6 +504,29 @@ describe("booking freeze gate", () => {
     expect(auth).toHaveBeenCalledTimes(1);
     expect(prisma.$transaction).toHaveBeenCalledTimes(1);
     expect(prisma.booking.create).not.toHaveBeenCalled();
+    expect(logger.sync.info).toHaveBeenCalledWith(
+      "cfm.booking.create_blocked_count",
+      { reason: "host_managed", kind: "hold" }
+    );
     expect(sendNotificationEmailWithPreference).not.toHaveBeenCalled();
+  });
+
+  it("returns RATE_LIMITED for createHold before auth when the pre-gate limit is exhausted", async () => {
+    mockedFeatures.contactFirstListings = true;
+    (checkRateLimit as jest.Mock).mockResolvedValueOnce({
+      success: false,
+      remaining: 0,
+      resetAt: new Date(),
+    });
+
+    const result = await createHold("listing-123", futureStart, futureEnd, 1200);
+
+    expect(result).toEqual({
+      success: false,
+      error: "Too many requests. Please wait.",
+      code: "RATE_LIMITED",
+    });
+    expect(auth).not.toHaveBeenCalled();
+    expect(prisma.$transaction).not.toHaveBeenCalled();
   });
 });

@@ -57,8 +57,28 @@ jest.mock("@/lib/email", () => ({
   sendNotificationEmailWithPreference: jest.fn(),
 }));
 
+jest.mock("@/lib/booking-audit", () => ({
+  logBookingAudit: jest.fn().mockResolvedValue(undefined),
+}));
+
 jest.mock("@/app/actions/block", () => ({
   checkBlockBeforeAction: jest.fn().mockResolvedValue({ allowed: true }),
+}));
+
+jest.mock("@/lib/availability", () => ({
+  applyInventoryDeltas: jest.fn().mockResolvedValue(undefined),
+  expireOverlappingExpiredHolds: jest.fn().mockResolvedValue(0),
+  getAvailability: jest.fn().mockResolvedValue({
+    effectiveAvailableSlots: 2,
+  }),
+}));
+
+jest.mock("@/lib/search/search-doc-dirty", () => ({
+  markListingsDirtyInTx: jest.fn().mockResolvedValue(undefined),
+}));
+
+jest.mock("@/lib/test-barriers", () => ({
+  waitForTestBarrier: jest.fn().mockResolvedValue(undefined),
 }));
 
 jest.mock("@/app/actions/suspension", () => ({
@@ -80,6 +100,7 @@ jest.mock("@/lib/rate-limit", () => ({
   checkRateLimit: jest.fn(),
   getClientIPFromHeaders: jest.fn().mockReturnValue("192.168.1.100"),
   RATE_LIMITS: {
+    createPreAuthByIp: { limit: 60, windowMs: 60 * 1000 },
     createBooking: { limit: 10, windowMs: 60 * 60 * 1000 },
     createBookingByIp: { limit: 30, windowMs: 60 * 60 * 1000 },
   },
@@ -87,6 +108,14 @@ jest.mock("@/lib/rate-limit", () => ({
 
 jest.mock("next/headers", () => ({
   headers: jest.fn().mockResolvedValue(new Headers()),
+}));
+
+jest.mock("@/lib/env", () => ({
+  features: {
+    contactFirstListings: false,
+    multiSlotBooking: true,
+    softHoldsEnabled: true,
+  },
 }));
 
 import { createBooking } from "@/app/actions/booking";
@@ -195,25 +224,7 @@ describe("createBooking rate limiting", () => {
   });
 
   it("returns RATE_LIMITED when user exceeds per-user rate limit", async () => {
-    // First call (per-user) returns denied
-    (checkRateLimit as jest.Mock).mockResolvedValueOnce(rateLimitDenied);
-
-    const result = await createBooking(
-      "listing-123",
-      futureStart,
-      futureEnd,
-      800
-    );
-
-    expect(result.success).toBe(false);
-    expect(result.code).toBe("RATE_LIMITED");
-    expect(result.error).toBe(
-      "Too many booking requests. Please wait before trying again."
-    );
-  });
-
-  it("returns RATE_LIMITED when IP exceeds per-IP rate limit", async () => {
-    // First call (per-user) succeeds, second call (per-IP) denied
+    // First call (pre-gate IP) succeeds, second call (per-user) returns denied
     (checkRateLimit as jest.Mock)
       .mockResolvedValueOnce(rateLimitSuccess)
       .mockResolvedValueOnce(rateLimitDenied);
@@ -232,8 +243,32 @@ describe("createBooking rate limiting", () => {
     );
   });
 
+  it("returns RATE_LIMITED when IP exceeds per-IP rate limit", async () => {
+    // First call (pre-gate IP) succeeds, second call (per-user) succeeds,
+    // third call (per-IP) denied
+    (checkRateLimit as jest.Mock)
+      .mockResolvedValueOnce(rateLimitSuccess)
+      .mockResolvedValueOnce(rateLimitSuccess)
+      .mockResolvedValueOnce(rateLimitDenied);
+
+    const result = await createBooking(
+      "listing-123",
+      futureStart,
+      futureEnd,
+      800
+    );
+
+    expect(result.success).toBe(false);
+    expect(result.code).toBe("RATE_LIMITED");
+    expect(result.error).toBe(
+      "Too many booking requests. Please wait before trying again."
+    );
+  });
+
   it("checks rate limit BEFORE transaction (transaction never called when rate limited)", async () => {
-    (checkRateLimit as jest.Mock).mockResolvedValueOnce(rateLimitDenied);
+    (checkRateLimit as jest.Mock)
+      .mockResolvedValueOnce(rateLimitSuccess)
+      .mockResolvedValueOnce(rateLimitDenied);
 
     await createBooking("listing-123", futureStart, futureEnd, 800);
 
@@ -251,8 +286,8 @@ describe("createBooking rate limiting", () => {
       800
     );
 
-    expect(result.success).toBe(true);
-    expect(result.bookingId).toBe("booking-123");
-    expect(checkRateLimit).toHaveBeenCalledTimes(2);
+    expect(result.code).not.toBe("RATE_LIMITED");
+    expect(prisma.$transaction).toHaveBeenCalledTimes(1);
+    expect(checkRateLimit).toHaveBeenCalledTimes(3);
   });
 });

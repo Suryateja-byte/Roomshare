@@ -287,6 +287,7 @@ export const RATE_LIMITS = {
   // Phase 2: Rate limit booking creation (C4 fix — was unprotected)
   createBooking: { limit: 10, windowMs: 60 * 60 * 1000 }, // 10 per hour (per user)
   createBookingByIp: { limit: 30, windowMs: 60 * 60 * 1000 }, // 30 per hour (per IP — higher for shared NAT)
+  createPreAuthByIp: { limit: 60, windowMs: 60_000 }, // 60 per minute per IP (pre-freeze-gate abuse cap)
   // Phase 4: Rate limit hold creation
   createHold: { limit: 10, windowMs: 60 * 60 * 1000 }, // 10 holds/hour per user
   createHoldByIp: { limit: 30, windowMs: 60 * 60 * 1000 }, // 30 holds/hour per IP

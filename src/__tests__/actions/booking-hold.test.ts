@@ -9,6 +9,22 @@
 
 jest.mock("@/lib/booking-audit", () => ({ logBookingAudit: jest.fn() }));
 
+jest.mock("@/lib/availability", () => ({
+  applyInventoryDeltas: jest.fn().mockResolvedValue(undefined),
+  expireOverlappingExpiredHolds: jest.fn().mockResolvedValue(0),
+  getAvailability: jest.fn().mockResolvedValue({
+    effectiveAvailableSlots: 3,
+  }),
+}));
+
+jest.mock("@/lib/search/search-doc-dirty", () => ({
+  markListingsDirtyInTx: jest.fn().mockResolvedValue(undefined),
+}));
+
+jest.mock("@/lib/test-barriers", () => ({
+  waitForTestBarrier: jest.fn().mockResolvedValue(undefined),
+}));
+
 // Mock dependencies before imports
 jest.mock("@/lib/prisma", () => ({
   prisma: {
@@ -65,6 +81,7 @@ jest.mock("@/lib/rate-limit", () => ({
     .mockResolvedValue({ success: true, remaining: 9, resetAt: new Date() }),
   getClientIPFromHeaders: jest.fn().mockReturnValue("127.0.0.1"),
   RATE_LIMITS: {
+    createPreAuthByIp: { limit: 60, windowMs: 60_000 },
     createBooking: { limit: 10, windowMs: 3600000 },
     createBookingByIp: { limit: 30, windowMs: 3600000 },
     createHold: { limit: 10, windowMs: 3600000 },
@@ -102,6 +119,7 @@ jest.mock("@prisma/client", () => ({
 // Feature flags: softHoldsEnabled ON by default for hold tests
 jest.mock("@/lib/env", () => ({
   features: {
+    contactFirstListings: false,
     softHoldsEnabled: true,
     softHoldsDraining: false,
     multiSlotBooking: true,
@@ -116,6 +134,7 @@ jest.mock("@/lib/idempotency", () => ({
 }));
 
 import { createHold, createBooking } from "@/app/actions/booking";
+import { getAvailability } from "@/lib/availability";
 import { prisma } from "@/lib/prisma";
 import { auth } from "@/auth";
 import { checkRateLimit } from "@/lib/rate-limit";
@@ -126,6 +145,7 @@ import { logBookingAudit } from "@/lib/booking-audit";
 // Typed reference for per-test feature flag mutation
 const mockEnv = jest.requireMock("@/lib/env") as {
   features: {
+    contactFirstListings: boolean;
     softHoldsEnabled: boolean;
     softHoldsDraining: boolean;
     multiSlotBooking: boolean;
@@ -231,6 +251,9 @@ describe("createHold", () => {
   beforeEach(() => {
     jest.clearAllMocks();
     (auth as jest.Mock).mockResolvedValue(mockSession);
+    (getAvailability as jest.Mock).mockResolvedValue({
+      effectiveAvailableSlots: 3,
+    });
     (prisma.user.findUnique as jest.Mock).mockResolvedValue({
       id: "user-123",
       isSuspended: false,
@@ -238,6 +261,7 @@ describe("createHold", () => {
     });
 
     // Reset feature flags to default ON state
+    mockEnv.features.contactFirstListings = false;
     mockEnv.features.softHoldsEnabled = true;
     mockEnv.features.softHoldsDraining = false;
     mockEnv.features.multiSlotBooking = true;
@@ -434,6 +458,9 @@ describe("createHold", () => {
   describe("capacity includes HELD slots", () => {
     it("rejects hold when ACCEPTED + HELD slots fill capacity", async () => {
       // totalSlots=2, usedSlots=2 (mix of ACCEPTED and HELD)
+      (getAvailability as jest.Mock).mockResolvedValueOnce({
+        effectiveAvailableSlots: 0,
+      });
       (prisma.$transaction as jest.Mock).mockImplementation(
         async (callback: unknown) => {
           const tx = buildMockTx({ usedSlots: 2 });
@@ -456,6 +483,9 @@ describe("createHold", () => {
 
     it("allows hold when capacity has room after counting HELD", async () => {
       // totalSlots=2, usedSlots=1 -- room for 1 more
+      (getAvailability as jest.Mock).mockResolvedValueOnce({
+        effectiveAvailableSlots: 1,
+      });
       (prisma.$transaction as jest.Mock).mockImplementation(
         async (callback: unknown) => {
           const tx = buildMockTx({ usedSlots: 1 });
@@ -800,11 +830,17 @@ describe("createHold", () => {
   // ─────────────────────────────────────────────────────────────
   describe("rate limit enforced", () => {
     it("blocks excess hold requests via per-user rate limit", async () => {
-      (checkRateLimit as jest.Mock).mockResolvedValueOnce({
-        success: false,
-        remaining: 0,
-        resetAt: new Date(),
-      });
+      (checkRateLimit as jest.Mock)
+        .mockResolvedValueOnce({
+          success: true,
+          remaining: 9,
+          resetAt: new Date(),
+        })
+        .mockResolvedValueOnce({
+          success: false,
+          remaining: 0,
+          resetAt: new Date(),
+        });
 
       const result = await createHold(
         "listing-123",
@@ -820,13 +856,19 @@ describe("createHold", () => {
 
     it("blocks excess hold requests via per-IP rate limit", async () => {
       (checkRateLimit as jest.Mock)
-        // First call (per-user) succeeds
+        // First call (pre-gate IP) succeeds
+        .mockResolvedValueOnce({
+          success: true,
+          remaining: 9,
+          resetAt: new Date(),
+        })
+        // Second call (per-user) succeeds
         .mockResolvedValueOnce({
           success: true,
           remaining: 5,
           resetAt: new Date(),
         })
-        // Second call (per-IP) fails
+        // Third call (per-IP) fails
         .mockResolvedValueOnce({
           success: false,
           remaining: 0,

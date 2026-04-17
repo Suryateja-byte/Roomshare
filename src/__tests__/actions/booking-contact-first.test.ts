@@ -53,6 +53,7 @@ jest.mock("@/lib/rate-limit", () => ({
   checkRateLimit: jest.fn(),
   getClientIPFromHeaders: jest.fn().mockReturnValue("127.0.0.1"),
   RATE_LIMITS: {
+    createPreAuthByIp: {},
     createBooking: {},
     createBookingByIp: {},
     createHold: {},
@@ -119,7 +120,13 @@ describe("booking actions when contact-first listings are enabled", () => {
       error: "This listing accepts messages only. Contact the host instead.",
       code: "CONTACT_ONLY",
     });
-    expect(checkRateLimit).not.toHaveBeenCalled();
+    expect(checkRateLimit).toHaveBeenCalledTimes(1);
+    expect(checkRateLimit).toHaveBeenCalledWith(
+      "127.0.0.1",
+      "createPreAuth",
+      {}
+    );
+    expect(auth).not.toHaveBeenCalled();
     expect(prisma.$transaction).not.toHaveBeenCalled();
   });
 
@@ -136,7 +143,13 @@ describe("booking actions when contact-first listings are enabled", () => {
       error: "This listing accepts messages only. Contact the host instead.",
       code: "CONTACT_ONLY",
     });
-    expect(checkRateLimit).not.toHaveBeenCalled();
+    expect(checkRateLimit).toHaveBeenCalledTimes(1);
+    expect(checkRateLimit).toHaveBeenCalledWith(
+      "127.0.0.1",
+      "createPreAuth",
+      {}
+    );
+    expect(auth).not.toHaveBeenCalled();
     expect(prisma.$transaction).not.toHaveBeenCalled();
   });
 });
