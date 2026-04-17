@@ -26,6 +26,8 @@ import {
 } from "@/lib/availability";
 import { markListingsDirtyInTx } from "@/lib/search/search-doc-dirty";
 import { waitForTestBarrier } from "@/lib/test-barriers";
+import { features } from "@/lib/env";
+import { hashIdForLog } from "@/lib/messaging/cfm-messaging-telemetry";
 
 // Booking result type for structured error handling
 export type BookingResult = {
@@ -75,6 +77,35 @@ function hostManagedBookingForbiddenResult(): {
       "This listing now uses host-managed availability. Contact the host instead.",
     code: "HOST_MANAGED_BOOKING_FORBIDDEN",
   };
+}
+
+function contactOnlyBookingResult(): {
+  success: false;
+  error: string;
+  code: string;
+} {
+  return {
+    success: false,
+    error: "This listing accepts messages only. Contact the host instead.",
+    code: "CONTACT_ONLY",
+  };
+}
+
+function logBookingCreateCompletion({
+  kind,
+  availabilitySource,
+  bookingId,
+}: {
+  kind: "booking" | "hold";
+  availabilitySource: "LEGACY_BOOKING" | "HOST_MANAGED";
+  bookingId: string;
+}): void {
+  logger.sync.info("cfm.booking.post_freeze_write_count", {
+    kind,
+    availabilitySource,
+    contactFirstFlag: features.contactFirstListings,
+    bookingIdHash: hashIdForLog(bookingId),
+  });
 }
 
 /**
@@ -282,6 +313,12 @@ async function executeBookingTransaction(
     },
   });
 
+  logBookingCreateCompletion({
+    kind: "booking",
+    availabilitySource: listing.availabilitySource,
+    bookingId: booking.id,
+  });
+
   await logBookingAudit(tx, {
     bookingId: booking.id,
     action: "CREATED",
@@ -395,6 +432,10 @@ export async function createBooking(
   slotsRequested: number = 1,
   idempotencyKey?: string
 ): Promise<BookingResult> {
+  if (features.contactFirstListings) {
+    return contactOnlyBookingResult();
+  }
+
   const session = await auth();
   if (!session?.user?.id) {
     return {
@@ -414,15 +455,6 @@ export async function createBooking(
     return {
       success: false,
       error: emailCheck.error || "Please verify your email to book",
-    };
-  }
-
-  const { features } = await import("@/lib/env");
-  if (features.contactFirstListings) {
-    return {
-      success: false,
-      error: "This listing accepts messages only. Contact the host instead.",
-      code: "CONTACT_ONLY",
     };
   }
 
@@ -911,6 +943,12 @@ async function executeHoldTransaction(
     },
   });
 
+  logBookingCreateCompletion({
+    kind: "hold",
+    availabilitySource: listing.availabilitySource,
+    bookingId: booking.id,
+  });
+
   await applyInventoryDeltas(tx, {
     listingId,
     startDate,
@@ -1003,21 +1041,16 @@ export async function createHold(
   slotsRequested: number = 1,
   idempotencyKey?: string
 ): Promise<BookingResult> {
+  if (features.contactFirstListings) {
+    return contactOnlyBookingResult();
+  }
+
   const session = await auth();
   if (!session?.user?.id) {
     return {
       success: false,
       error: "You must be logged in to place a hold",
       code: "SESSION_EXPIRED",
-    };
-  }
-
-  const { features } = await import("@/lib/env");
-  if (features.contactFirstListings) {
-    return {
-      success: false,
-      error: "This listing accepts messages only. Contact the host instead.",
-      code: "CONTACT_ONLY",
     };
   }
 
@@ -1114,8 +1147,7 @@ export async function createHold(
 
   // Feature flag gate for multi-slot
   if (slotsRequested > 1) {
-    const { features: feats } = await import("@/lib/env");
-    if (!feats.multiSlotBooking) {
+    if (!features.multiSlotBooking) {
       return {
         success: false,
         error: "Multi-slot holds are not currently available.",
