@@ -74,11 +74,6 @@ interface Review {
   } | null;
 }
 
-interface BookedDateRange {
-  startDate: string;
-  endDate: string;
-}
-
 interface ListingPageClientProps {
   listing: {
     id: string;
@@ -93,7 +88,6 @@ interface ListingPageClientProps {
     version: number;
     availabilitySource: AvailabilitySource;
     bookingMode: string;
-    holdTtlMinutes: number;
     status: string;
     viewCount: number;
     genderPreference: string | null;
@@ -122,7 +116,6 @@ interface ListingPageClientProps {
     comment: string;
     createdAt: string;
   } | null;
-  bookedDates: BookedDateRange[];
   holdEnabled?: boolean;
   coordinates: { lat: number; lng: number } | null;
   similarListings?: Listing[];

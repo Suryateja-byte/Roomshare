@@ -204,8 +204,7 @@ export default async function ListingPage({ params, searchParams }: PageProps) {
         : getAvailability(listing.id)
       : Promise.resolve(null);
 
-  const [coordinates, acceptedBookings, reviews, legacyAvailability] =
-    await Promise.all([
+  const [coordinates, reviews, legacyAvailability] = await Promise.all([
     (async () => {
       if (!listing.location) {
         return null;
@@ -241,30 +240,6 @@ export default async function ListingPage({ params, searchParams }: PageProps) {
 
       return null;
     })(),
-    listing.availabilitySource === "LEGACY_BOOKING"
-      ? prisma.booking.findMany({
-          where: {
-            listingId: id,
-            OR: [
-              { status: "ACCEPTED" },
-              {
-                status: "HELD",
-                heldUntil: {
-                  gt: new Date(),
-                },
-              },
-            ],
-            endDate: { gte: new Date() },
-          },
-          select: {
-            startDate: true,
-            endDate: true,
-          },
-          orderBy: {
-            startDate: "asc",
-          },
-        })
-      : Promise.resolve([]),
     getReviews(listing.id),
     legacyAvailabilityPromise,
   ]);
@@ -287,12 +262,6 @@ export default async function ListingPage({ params, searchParams }: PageProps) {
     };
 
   const similarListingsRaw = await similarListingsPromise;
-
-  // Format booked dates for client - using YYYY-MM-DD to avoid timezone issues
-  const bookedDates = acceptedBookings.map((b) => ({
-    startDate: b.startDate.toISOString().split("T")[0],
-    endDate: b.endDate.toISOString().split("T")[0],
-  }));
 
   const similarListings = similarListingsRaw.map((row) => ({
     id: row.id,
@@ -403,7 +372,6 @@ export default async function ListingPage({ params, searchParams }: PageProps) {
             isVerified: listing.owner.isVerified,
             createdAt: listing.owner.createdAt,
           },
-          holdTtlMinutes: listing.holdTtlMinutes ?? 15,
           ownerId: listing.ownerId,
         }}
         reviews={reviews}
@@ -411,7 +379,6 @@ export default async function ListingPage({ params, searchParams }: PageProps) {
         isLoggedIn={!!session?.user}
         userHasBooking={false}
         userExistingReview={null}
-        bookedDates={bookedDates}
         holdEnabled={features.softHoldsEnabled}
         coordinates={coordinates}
         similarListings={similarListings}

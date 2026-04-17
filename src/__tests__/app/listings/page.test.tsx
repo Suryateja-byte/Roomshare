@@ -74,6 +74,7 @@ describe("ListingPage SSR availability bootstrap", () => {
     householdLanguages: ["en"],
     totalSlots: 4,
     availableSlots: 4,
+    availabilitySource: "LEGACY_BOOKING",
     bookingMode: "SHARED",
     holdTtlMinutes: 20,
     status: "ACTIVE",

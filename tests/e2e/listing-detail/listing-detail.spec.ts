@@ -414,7 +414,7 @@ test.describe("LD: Owner View", () => {
 
     // Public booking CTA must NOT be visible
     await expect(
-      page.getByRole("button", { name: /Request to Book/i })
+      page.getByRole("button", { name: /request to book/i })
     ).not.toBeVisible({ timeout: 3_000 });
     // Save button must NOT be visible for owner
     await expect(
@@ -493,7 +493,7 @@ test.describe("LD: Contact-First Sidebar", () => {
     await expect(page.locator("#booking-start-date")).toHaveCount(0);
     await expect(page.locator("#booking-end-date")).toHaveCount(0);
     await expect(
-      page.getByRole("button", { name: /Request to Book/i })
+      page.getByRole("button", { name: /request to book/i })
     ).toHaveCount(0);
   });
 });

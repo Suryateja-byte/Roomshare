@@ -122,7 +122,6 @@ function makeProps(
       version: 3,
       availabilitySource: "LEGACY_BOOKING",
       bookingMode: "REQUEST",
-      holdTtlMinutes: 15,
       status: "ACTIVE",
       viewCount: 12,
       genderPreference: null,
@@ -146,7 +145,6 @@ function makeProps(
     isLoggedIn: true,
     userHasBooking: false,
     userExistingReview: null,
-    bookedDates: [],
     holdEnabled: true,
     coordinates: null,
     similarListings: [],
@@ -234,7 +232,7 @@ describe("listing detail public CTA cleanup", () => {
         />
       );
 
-      expect(() => screen.getByText("Request to Book")).toThrow();
+      expect(() => screen.getByText(/request to book/i)).toThrow();
       expect(() => screen.getByText("Place Hold")).toThrow();
       expect(
         screen.getByText("Contact host to confirm availability")
