@@ -36,6 +36,7 @@ import {
   SEARCH_DOC_PROJECTION_VERSION,
   upsertSearchDocSync,
 } from "@/lib/search/search-doc-sync";
+import { logger } from "@/lib/logger";
 import { prisma } from "@/lib/prisma";
 
 function makeListing(overrides: {
@@ -101,6 +102,7 @@ function makeProjectableListingSnapshot(overrides: Record<string, unknown> = {})
 
 const mockQueryRaw = prisma.$queryRaw as jest.Mock;
 const mockExecuteRaw = prisma.$executeRaw as jest.Mock;
+const mockInfo = logger.sync.info as jest.Mock;
 
 describe("getProjectionDivergenceReason", () => {
   beforeEach(() => {
@@ -199,6 +201,7 @@ describe("getProjectionDivergenceReason", () => {
       listingId: "listing-1",
       outcome: "upsert",
       divergenceReason: "version_skew",
+      casSuppressionReason: "older_source_version",
       writeApplied: false,
       listingVersion: 5,
       docSourceVersion: 4,
@@ -210,6 +213,9 @@ describe("getProjectionDivergenceReason", () => {
     expect(writeSql).toContain(
       "WHERE listing_search_docs.source_version <= EXCLUDED.source_version"
     );
+    expect(writeSql).toContain(
+      "AND listing_search_docs.projection_version <= EXCLUDED.projection_version"
+    );
   });
 
   it("treats CAS-suppressed writes as a handled sync outcome", async () => {
@@ -217,5 +223,63 @@ describe("getProjectionDivergenceReason", () => {
     mockExecuteRaw.mockResolvedValueOnce(0);
 
     await expect(upsertSearchDocSync("listing-1")).resolves.toBe(true);
+  });
+
+  it("classifies projection-version CAS suppression before the write and logs only hashed ids", async () => {
+    mockQueryRaw.mockResolvedValueOnce([
+      makeProjectableListingSnapshot({
+        version: 5,
+        docSourceVersion: 5,
+        docProjectionVersion: SEARCH_DOC_PROJECTION_VERSION + 1,
+      }),
+    ]);
+    mockExecuteRaw.mockResolvedValueOnce(0);
+
+    const result = await projectSearchDocument("listing-1");
+
+    expect(result).toMatchObject({
+      listingId: "listing-1",
+      outcome: "upsert",
+      casSuppressionReason: "older_projection_version",
+      writeApplied: false,
+      listingVersion: 5,
+      docSourceVersion: 5,
+      docProjectionVersion: SEARCH_DOC_PROJECTION_VERSION + 1,
+    });
+    expect(mockInfo).toHaveBeenCalledWith(
+      "Search doc write suppressed by version CAS",
+      expect.objectContaining({
+        event: "cfm.search.doc.cas_suppressed",
+        listingIdHash: expect.stringMatching(/^[0-9a-f]{16}$/),
+        reason: "older_projection_version",
+      })
+    );
+
+    const logPayload = mockInfo.mock.calls[mockInfo.mock.calls.length - 1]?.[1];
+    expect(logPayload).not.toHaveProperty("listingId");
+    expect(JSON.stringify(logPayload)).not.toContain("listing-1");
+  });
+
+  it("prefers source-version CAS suppression when both versions look older than the existing doc", async () => {
+    mockQueryRaw.mockResolvedValueOnce([
+      makeProjectableListingSnapshot({
+        version: 4,
+        docSourceVersion: 5,
+        docProjectionVersion: SEARCH_DOC_PROJECTION_VERSION + 1,
+      }),
+    ]);
+    mockExecuteRaw.mockResolvedValueOnce(0);
+
+    const result = await projectSearchDocument("listing-1");
+
+    expect(result).toMatchObject({
+      listingId: "listing-1",
+      outcome: "upsert",
+      casSuppressionReason: "older_source_version",
+      writeApplied: false,
+      listingVersion: 4,
+      docSourceVersion: 5,
+      docProjectionVersion: SEARCH_DOC_PROJECTION_VERSION + 1,
+    });
   });
 });

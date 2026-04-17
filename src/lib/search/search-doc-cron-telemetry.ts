@@ -5,21 +5,33 @@ const SEARCH_DOC_CRON_REASON_LABELS = [
 ] as const;
 
 const SEARCH_DOC_CRON_ERROR_REASON_LABELS = ["projection_error"] as const;
+const SEARCH_DOC_CRON_CAS_SUPPRESSION_REASON_LABELS = [
+  "older_source_version",
+  "older_projection_version",
+] as const;
 
 export type SearchDocCronReasonLabel =
   (typeof SEARCH_DOC_CRON_REASON_LABELS)[number];
 export type SearchDocCronErrorReasonLabel =
   (typeof SEARCH_DOC_CRON_ERROR_REASON_LABELS)[number];
+export type SearchDocCronCasSuppressionReasonLabel =
+  (typeof SEARCH_DOC_CRON_CAS_SUPPRESSION_REASON_LABELS)[number];
 
 type ReasonCounterMap = Record<SearchDocCronReasonLabel, number>;
 type ErrorCounterMap = Record<SearchDocCronErrorReasonLabel, number>;
+type CasSuppressionCounterMap = Record<
+  SearchDocCronCasSuppressionReasonLabel,
+  number
+>;
 
 interface SearchDocCronTelemetryStore {
   divergenceCounts: ReasonCounterMap;
   repairedCounts: ReasonCounterMap;
+  casSuppressedCounts: CasSuppressionCounterMap;
   processedCount: number;
   errorCounts: ErrorCounterMap;
   dirtyQueueAgeSeconds: number[];
+  lastRunPartial: boolean;
 }
 
 const INTERNAL_TO_METRIC_REASON: Record<string, SearchDocCronReasonLabel> = {
@@ -44,12 +56,21 @@ function createErrorCounterMap(): ErrorCounterMap {
   };
 }
 
+function createCasSuppressionCounterMap(): CasSuppressionCounterMap {
+  return {
+    older_source_version: 0,
+    older_projection_version: 0,
+  };
+}
+
 const telemetryStore: SearchDocCronTelemetryStore = {
   divergenceCounts: createReasonCounterMap(),
   repairedCounts: createReasonCounterMap(),
+  casSuppressedCounts: createCasSuppressionCounterMap(),
   processedCount: 0,
   errorCounts: createErrorCounterMap(),
   dirtyQueueAgeSeconds: [],
+  lastRunPartial: false,
 };
 
 function sanitizeCount(value: number | undefined): number {
@@ -92,6 +113,13 @@ function getErrorCount(
   return sanitizeCount(counts?.[reason]);
 }
 
+function getCasSuppressionCount(
+  counts: Partial<Record<string, number>> | undefined,
+  reason: SearchDocCronCasSuppressionReasonLabel
+): number {
+  return sanitizeCount(counts?.[reason]);
+}
+
 export function toSearchDocCronReasonLabel(
   reason: string | null | undefined
 ): SearchDocCronReasonLabel | null {
@@ -105,15 +133,19 @@ export function toSearchDocCronReasonLabel(
 export function recordSearchDocCronRun({
   divergenceCounts,
   repairedCounts,
+  casSuppressedCounts,
   processedCount = 0,
   errorCounts,
   dirtyQueueAgeSeconds,
+  partial = false,
 }: {
   divergenceCounts?: Partial<Record<string, number>>;
   repairedCounts?: Partial<Record<string, number>>;
+  casSuppressedCounts?: Partial<Record<string, number>>;
   processedCount?: number;
   errorCounts?: Partial<Record<string, number>>;
   dirtyQueueAgeSeconds?: number[];
+  partial?: boolean;
 }): void {
   for (const reason of SEARCH_DOC_CRON_REASON_LABELS) {
     telemetryStore.divergenceCounts[reason] = getReasonCount(
@@ -132,7 +164,15 @@ export function recordSearchDocCronRun({
     telemetryStore.errorCounts[reason] += getErrorCount(errorCounts, reason);
   }
 
+  for (const reason of SEARCH_DOC_CRON_CAS_SUPPRESSION_REASON_LABELS) {
+    telemetryStore.casSuppressedCounts[reason] += getCasSuppressionCount(
+      casSuppressedCounts,
+      reason
+    );
+  }
+
   telemetryStore.dirtyQueueAgeSeconds = sanitizeAgeSamples(dirtyQueueAgeSeconds);
+  telemetryStore.lastRunPartial = partial;
 }
 
 export function getSearchDocCronTelemetrySnapshot() {
@@ -150,6 +190,7 @@ export function getSearchDocCronTelemetrySnapshot() {
   return {
     divergenceCounts: { ...telemetryStore.divergenceCounts },
     repairedCounts: { ...telemetryStore.repairedCounts },
+    casSuppressedCounts: { ...telemetryStore.casSuppressedCounts },
     processedCount: telemetryStore.processedCount,
     errorCounts: { ...telemetryStore.errorCounts },
     dirtyQueueAgeSeconds: {
@@ -158,6 +199,7 @@ export function getSearchDocCronTelemetrySnapshot() {
       count: sortedDirtyQueueAgeSeconds.length,
       sum: dirtyQueueAgeSum,
     },
+    lastRunPartial: telemetryStore.lastRunPartial,
   };
 }
 
@@ -166,12 +208,15 @@ export const getSearchDocCronSnapshot = getSearchDocCronTelemetrySnapshot;
 export function resetSearchDocCronTelemetryForTests(): void {
   telemetryStore.divergenceCounts = createReasonCounterMap();
   telemetryStore.repairedCounts = createReasonCounterMap();
+  telemetryStore.casSuppressedCounts = createCasSuppressionCounterMap();
   telemetryStore.processedCount = 0;
   telemetryStore.errorCounts = createErrorCounterMap();
   telemetryStore.dirtyQueueAgeSeconds = [];
+  telemetryStore.lastRunPartial = false;
 }
 
 export {
+  SEARCH_DOC_CRON_CAS_SUPPRESSION_REASON_LABELS,
   SEARCH_DOC_CRON_ERROR_REASON_LABELS,
   SEARCH_DOC_CRON_REASON_LABELS,
 };

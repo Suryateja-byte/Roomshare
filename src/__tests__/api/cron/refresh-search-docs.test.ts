@@ -42,6 +42,16 @@ jest.mock("@/lib/search/search-doc-sync", () => ({
   projectSearchDocument: jest.fn(),
 }));
 
+jest.mock("@/lib/search/search-doc-cron-telemetry", () => {
+  const actual = jest.requireActual("@/lib/search/search-doc-cron-telemetry");
+  return {
+    ...actual,
+    recordSearchDocCronRun: jest.fn((args: unknown) =>
+      actual.recordSearchDocCronRun(args)
+    ),
+  };
+});
+
 jest.mock("next/server", () => ({
   NextRequest: class MockNextRequest extends Request {
     declare headers: Headers;
@@ -63,6 +73,7 @@ import { GET as getMetricsOps } from "@/app/api/metrics/ops/route";
 import { validateCronAuth } from "@/lib/cron-auth";
 import { logger } from "@/lib/logger";
 import { prisma } from "@/lib/prisma";
+import * as searchDocCronTelemetry from "@/lib/search/search-doc-cron-telemetry";
 import {
   getSearchDocCronTelemetrySnapshot,
   resetSearchDocCronTelemetryForTests,
@@ -129,6 +140,7 @@ const mockExecuteRaw = prisma.$executeRaw as jest.Mock;
 const mockValidateCronAuth = validateCronAuth as jest.Mock;
 const mockProjectSearchDocument = projectSearchDocument as jest.Mock;
 const mockInfo = logger.sync.info as jest.Mock;
+const mockWarn = logger.sync.warn as jest.Mock;
 
 describe("GET /api/cron/refresh-search-docs", () => {
   const originalEnv = process.env;
@@ -136,6 +148,8 @@ describe("GET /api/cron/refresh-search-docs", () => {
   beforeEach(() => {
     jest.clearAllMocks();
     resetSearchDocCronTelemetryForTests();
+    mockInfo.mockImplementation(() => undefined);
+    mockWarn.mockImplementation(() => undefined);
     process.env = {
       ...originalEnv,
       METRICS_SECRET: "test-metrics-secret-32-chars-min!!",
@@ -208,6 +222,7 @@ describe("GET /api/cron/refresh-search-docs", () => {
         listingId: "listing-a",
         outcome: "upsert",
         divergenceReason: "version_skew",
+        casSuppressionReason: null,
         hadExistingDoc: true,
         listingVersion: 5,
         docSourceVersion: 3,
@@ -218,6 +233,7 @@ describe("GET /api/cron/refresh-search-docs", () => {
         listingId: "listing-b",
         outcome: "upsert",
         divergenceReason: "version_skew",
+        casSuppressionReason: null,
         hadExistingDoc: true,
         listingVersion: 6,
         docSourceVersion: 4,
@@ -228,6 +244,7 @@ describe("GET /api/cron/refresh-search-docs", () => {
         listingId: "listing-c",
         outcome: "upsert",
         divergenceReason: "stale_doc",
+        casSuppressionReason: null,
         hadExistingDoc: true,
         listingVersion: 3,
         docSourceVersion: 3,
@@ -267,6 +284,7 @@ describe("GET /api/cron/refresh-search-docs", () => {
         listingId: "host-1",
         outcome: "suppress_delete",
         divergenceReason: "stale_doc",
+        casSuppressionReason: null,
         hadExistingDoc: true,
         listingVersion: 2,
         docSourceVersion: 2,
@@ -277,6 +295,7 @@ describe("GET /api/cron/refresh-search-docs", () => {
         listingId: "gone-1",
         outcome: "confirmed_orphan",
         divergenceReason: null,
+        casSuppressionReason: null,
         hadExistingDoc: false,
         listingVersion: null,
         docSourceVersion: null,
@@ -312,6 +331,7 @@ describe("GET /api/cron/refresh-search-docs", () => {
       listingId: "listing-1",
       outcome: "defer_retry",
       divergenceReason: "missing_doc",
+      casSuppressionReason: null,
       hadExistingDoc: false,
       listingVersion: 2,
       docSourceVersion: null,
@@ -351,6 +371,7 @@ describe("GET /api/cron/refresh-search-docs", () => {
         listingId: "upsert-1",
         outcome: "upsert",
         divergenceReason: "missing_doc",
+        casSuppressionReason: null,
         hadExistingDoc: false,
         listingVersion: 3,
         docSourceVersion: null,
@@ -361,6 +382,7 @@ describe("GET /api/cron/refresh-search-docs", () => {
         listingId: "defer-1",
         outcome: "defer_retry",
         divergenceReason: "stale_doc",
+        casSuppressionReason: null,
         hadExistingDoc: true,
         listingVersion: 4,
         docSourceVersion: 4,
@@ -371,6 +393,7 @@ describe("GET /api/cron/refresh-search-docs", () => {
         listingId: "suppress-1",
         outcome: "suppress_delete",
         divergenceReason: null,
+        casSuppressionReason: null,
         hadExistingDoc: false,
         listingVersion: 5,
         docSourceVersion: null,
@@ -414,6 +437,7 @@ describe("GET /api/cron/refresh-search-docs", () => {
         listingId: "missing-1",
         outcome: "upsert",
         divergenceReason: "missing_doc",
+        casSuppressionReason: null,
         hadExistingDoc: false,
         listingVersion: 3,
         docSourceVersion: null,
@@ -424,6 +448,7 @@ describe("GET /api/cron/refresh-search-docs", () => {
         listingId: "stale-1",
         outcome: "upsert",
         divergenceReason: "stale_doc",
+        casSuppressionReason: null,
         hadExistingDoc: true,
         listingVersion: 4,
         docSourceVersion: 4,
@@ -434,6 +459,7 @@ describe("GET /api/cron/refresh-search-docs", () => {
         listingId: "skew-1",
         outcome: "upsert",
         divergenceReason: "version_skew",
+        casSuppressionReason: null,
         hadExistingDoc: true,
         listingVersion: 5,
         docSourceVersion: 4,
@@ -444,6 +470,7 @@ describe("GET /api/cron/refresh-search-docs", () => {
         listingId: "rescan-1",
         outcome: "upsert",
         divergenceReason: "stale_doc",
+        casSuppressionReason: null,
         hadExistingDoc: true,
         listingVersion: 6,
         docSourceVersion: 6,
@@ -478,6 +505,10 @@ describe("GET /api/cron/refresh-search-docs", () => {
         stale: 2,
         version_skew: 1,
       },
+      casSuppressedCounts: {
+        older_source_version: 0,
+        older_projection_version: 0,
+      },
       processedCount: 4,
       errorCounts: {
         projection_error: 0,
@@ -488,6 +519,7 @@ describe("GET /api/cron/refresh-search-docs", () => {
         count: 3,
         sum: 130,
       },
+      lastRunPartial: false,
     });
 
     const metricsResponse = await getMetricsOps(createMetricsRequest());
@@ -512,6 +544,10 @@ describe("GET /api/cron/refresh-search-docs", () => {
     );
     expect(metricsText).toContain("cfm_search_dirty_queue_age_seconds_count 3");
     expect(metricsText).toContain("cfm_search_dirty_queue_age_seconds_sum 130");
+    expect(metricsText).toContain(
+      'cfm_search_doc_cas_suppressed_count{reason="older_source_version"} 0'
+    );
+    expect(metricsText).toContain("cfm_search_doc_cron_last_run_partial 0");
     expect(metricsText).toContain("cfm_search_refresh_processed_count 4");
     expect(metricsText).toContain(
       'cfm_search_refresh_error_count{reason="projection_error"} 0'
@@ -555,6 +591,7 @@ describe("GET /api/cron/refresh-search-docs", () => {
       listingId: "listing-1",
       outcome: "upsert",
       divergenceReason: "missing_doc",
+      casSuppressionReason: null,
       hadExistingDoc: false,
       listingVersion: 3,
       docSourceVersion: null,
@@ -574,6 +611,66 @@ describe("GET /api/cron/refresh-search-docs", () => {
     expect(mockProjectSearchDocument).toHaveBeenCalledTimes(1);
   });
 
+  it("tracks CAS-suppressed writes by reason and exposes the counter series", async () => {
+    const now = Date.parse("2026-04-17T18:00:00.000Z");
+    jest.spyOn(Date, "now").mockReturnValue(now);
+    mockQueryRaw.mockResolvedValueOnce([
+      buildDirtyEntry("projection-1", new Date(now - 10_000)),
+      buildDirtyEntry("source-1", new Date(now - 20_000)),
+    ]);
+    mockProjectSearchDocument
+      .mockResolvedValueOnce({
+        listingId: "projection-1",
+        outcome: "upsert",
+        divergenceReason: null,
+        casSuppressionReason: "older_projection_version",
+        hadExistingDoc: true,
+        listingVersion: 5,
+        docSourceVersion: 5,
+        docProjectionVersion: 2,
+        writeApplied: false,
+      })
+      .mockResolvedValueOnce({
+        listingId: "source-1",
+        outcome: "upsert",
+        divergenceReason: null,
+        casSuppressionReason: "older_source_version",
+        hadExistingDoc: true,
+        listingVersion: 4,
+        docSourceVersion: 5,
+        docProjectionVersion: 1,
+        writeApplied: false,
+      });
+
+    const response = await getRefreshSearchDocs(createRequest("Bearer valid"));
+    const data = await response.json();
+
+    expect(data).toMatchObject({
+      success: true,
+      processed: 2,
+      repaired: 0,
+      casSuppressedOlderSourceVersion: 1,
+      casSuppressedOlderProjectionVersion: 1,
+      partial: false,
+    });
+
+    const snapshot = getSearchDocCronTelemetrySnapshot();
+    expect(snapshot.casSuppressedCounts).toEqual({
+      older_source_version: 1,
+      older_projection_version: 1,
+    });
+    expect(snapshot.lastRunPartial).toBe(false);
+
+    const metricsResponse = await getMetricsOps(createMetricsRequest());
+    const metricsText = await metricsResponse.text();
+    expect(metricsText).toContain(
+      'cfm_search_doc_cas_suppressed_count{reason="older_source_version"} 1'
+    );
+    expect(metricsText).toContain(
+      'cfm_search_doc_cas_suppressed_count{reason="older_projection_version"} 1'
+    );
+  });
+
   it("skips the rescan phase when the cron time budget is exhausted", async () => {
     process.env.SEARCH_DOC_CRON_TIME_BUDGET_MS = "10";
     const nowSpy = jest.spyOn(Date, "now");
@@ -590,6 +687,7 @@ describe("GET /api/cron/refresh-search-docs", () => {
       listingId: "listing-1",
       outcome: "upsert",
       divergenceReason: "missing_doc",
+      casSuppressionReason: null,
       hadExistingDoc: false,
       listingVersion: 3,
       docSourceVersion: null,
@@ -607,5 +705,122 @@ describe("GET /api/cron/refresh-search-docs", () => {
     });
     expect(mockQueryRaw).toHaveBeenCalledTimes(1);
     expect(mockProjectSearchDocument).toHaveBeenCalledTimes(1);
+  });
+
+  it("records a partial run from finally when the cron body throws", async () => {
+    const recordRunSpy = searchDocCronTelemetry
+      .recordSearchDocCronRun as jest.Mock;
+    const now = Date.parse("2026-04-17T18:00:00.000Z");
+    jest.spyOn(Date, "now").mockReturnValue(now);
+    mockQueryRaw.mockResolvedValueOnce([
+      buildDirtyEntry("listing-1", new Date(now - 10_000)),
+    ]);
+    mockProjectSearchDocument.mockResolvedValueOnce({
+      listingId: "listing-1",
+      outcome: "upsert",
+      divergenceReason: "missing_doc",
+      casSuppressionReason: null,
+      hadExistingDoc: false,
+      listingVersion: 3,
+      docSourceVersion: null,
+      docProjectionVersion: null,
+      writeApplied: true,
+    });
+    mockInfo.mockImplementation((message: string) => {
+      if (message === "[SearchDoc Cron] Complete") {
+        throw new Error("log failed");
+      }
+    });
+
+    const response = await getRefreshSearchDocs(createRequest("Bearer valid"));
+    const snapshot = getSearchDocCronTelemetrySnapshot();
+
+    expect(response.status).toBe(500);
+    expect(recordRunSpy).toHaveBeenCalledTimes(1);
+    expect(recordRunSpy).toHaveBeenCalledWith(
+      expect.objectContaining({
+        processedCount: 1,
+        partial: true,
+      })
+    );
+    expect(snapshot.lastRunPartial).toBe(true);
+  });
+
+  it("truncates the phase-2 rescan when the max-duration safety margin is exhausted", async () => {
+    const base = Date.parse("2026-04-17T18:00:00.000Z");
+    const nowSpy = jest.spyOn(Date, "now");
+    const nowValues = [
+      base,
+      base,
+      base,
+      base + 25_000,
+      base + 28_500,
+      base + 28_500,
+      base + 28_500,
+    ];
+    nowSpy.mockImplementation(() => nowValues.shift() ?? base + 28_500);
+    mockQueryRaw
+      .mockResolvedValueOnce([buildDirtyEntry("dirty-1", new Date(base - 10_000))])
+      .mockResolvedValueOnce([
+        { id: "rescan-1" },
+        { id: "rescan-2" },
+        { id: "rescan-3" },
+        { id: "rescan-4" },
+        { id: "rescan-5" },
+        { id: "rescan-6" },
+        { id: "rescan-7" },
+        { id: "rescan-8" },
+        { id: "rescan-9" },
+        { id: "rescan-10" },
+      ]);
+    mockProjectSearchDocument
+      .mockResolvedValueOnce({
+        listingId: "dirty-1",
+        outcome: "upsert",
+        divergenceReason: "missing_doc",
+        casSuppressionReason: null,
+        hadExistingDoc: false,
+        listingVersion: 1,
+        docSourceVersion: null,
+        docProjectionVersion: null,
+        writeApplied: true,
+      })
+      .mockResolvedValue({
+        listingId: "rescan-1",
+        outcome: "upsert",
+        divergenceReason: "stale_doc",
+        casSuppressionReason: null,
+        hadExistingDoc: true,
+        listingVersion: 2,
+        docSourceVersion: 2,
+        docProjectionVersion: 1,
+        writeApplied: true,
+      });
+
+    const response = await getRefreshSearchDocs(createRequest("Bearer valid"));
+    const data = await response.json();
+
+    expect(data).toMatchObject({
+      success: true,
+      processed: 6,
+      repaired: 6,
+      partial: true,
+    });
+    expect(mockProjectSearchDocument.mock.calls.map(([listingId]) => listingId)).toEqual([
+      "dirty-1",
+      "rescan-1",
+      "rescan-2",
+      "rescan-3",
+      "rescan-4",
+      "rescan-5",
+    ]);
+    expect(mockWarn).toHaveBeenCalledWith(
+      "[SearchDoc Cron] Rescan truncated by time budget",
+      expect.objectContaining({
+        event: "search_doc_cron_rescan_truncated",
+        dropped: 5,
+      })
+    );
+    expect(getSearchDocCronTelemetrySnapshot().lastRunPartial).toBe(true);
   });
 });

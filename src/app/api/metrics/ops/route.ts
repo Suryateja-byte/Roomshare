@@ -10,6 +10,14 @@
 import crypto from "crypto";
 import { getServerEnv } from "@/lib/env";
 import {
+  FRESHNESS_CRON_ELIGIBLE_METRIC,
+  FRESHNESS_CRON_EMITTED_METRIC,
+  FRESHNESS_CRON_ERROR_STAGES,
+  FRESHNESS_NOTIFICATION_KINDS,
+  FRESHNESS_NOTIFICATION_SENT_METRIC,
+  getFreshnessCronTelemetrySnapshot,
+} from "@/lib/freshness/freshness-cron-telemetry";
+import {
   PRIVATE_FEEDBACK_CATEGORIES,
   PRIVATE_FEEDBACK_DENIAL_REASONS,
 } from "@/lib/reports/private-feedback";
@@ -17,6 +25,7 @@ import { getPrivateFeedbackTelemetrySnapshot } from "@/lib/reports/private-feedb
 import { LEGACY_URL_ALIASES, LEGACY_URL_SURFACES } from "@/lib/search-params";
 import {
   getSearchDocCronTelemetrySnapshot,
+  SEARCH_DOC_CRON_CAS_SUPPRESSION_REASON_LABELS,
   SEARCH_DOC_CRON_ERROR_REASON_LABELS,
   SEARCH_DOC_CRON_REASON_LABELS,
 } from "@/lib/search/search-doc-cron-telemetry";
@@ -49,6 +58,10 @@ function computePercentile(sorted: number[], p: number): number {
   return sorted[Math.max(0, idx)];
 }
 
+function toPrometheusMetricName(metric: string): string {
+  return metric.replaceAll(".", "_");
+}
+
 export async function GET(request: Request) {
   const authHeader = request.headers.get("authorization");
   const { METRICS_SECRET: expectedToken } = getServerEnv();
@@ -67,6 +80,7 @@ export async function GET(request: Request) {
   const memory = process.memoryUsage();
   const version = process.env.VERCEL_GIT_COMMIT_SHA?.slice(0, 8) || "dev";
   const feedbackTelemetry = getPrivateFeedbackTelemetrySnapshot();
+  const freshnessTelemetry = getFreshnessCronTelemetrySnapshot();
   const searchDocCronTelemetry = getSearchDocCronTelemetrySnapshot();
   const searchTelemetry = getSearchTelemetrySnapshot();
 
@@ -178,6 +192,67 @@ export async function GET(request: Request) {
         `cfm_feedback_denied_count{reason="${reason}"} ${feedbackTelemetry.deniedCounts[reason]}`
     ),
     ``,
+    `# HELP ${toPrometheusMetricName(FRESHNESS_CRON_ELIGIBLE_METRIC)} Total number of due listings selected in the latest freshness cron run`,
+    `# TYPE ${toPrometheusMetricName(FRESHNESS_CRON_ELIGIBLE_METRIC)} gauge`,
+    ...FRESHNESS_NOTIFICATION_KINDS.map(
+      (kind) =>
+        `${toPrometheusMetricName(FRESHNESS_CRON_ELIGIBLE_METRIC)}{kind="${kind}"} ${freshnessTelemetry.eligibleCounts[kind]}`
+    ),
+    ``,
+    `# HELP ${toPrometheusMetricName(FRESHNESS_CRON_EMITTED_METRIC)} Total number of freshness reminder or warning notifications emitted`,
+    `# TYPE ${toPrometheusMetricName(FRESHNESS_CRON_EMITTED_METRIC)} counter`,
+    ...FRESHNESS_NOTIFICATION_KINDS.map(
+      (kind) =>
+        `${toPrometheusMetricName(FRESHNESS_CRON_EMITTED_METRIC)}{kind="${kind}"} ${freshnessTelemetry.emittedCounts[kind]}`
+    ),
+    ``,
+    `# HELP ${toPrometheusMetricName(FRESHNESS_NOTIFICATION_SENT_METRIC)} Total number of canonical freshness reminder or warning notifications emitted`,
+    `# TYPE ${toPrometheusMetricName(FRESHNESS_NOTIFICATION_SENT_METRIC)} counter`,
+    ...FRESHNESS_NOTIFICATION_KINDS.map(
+      (kind) =>
+        `${toPrometheusMetricName(FRESHNESS_NOTIFICATION_SENT_METRIC)}{kind="${kind}"} ${freshnessTelemetry.notificationSentCounts[kind]}`
+    ),
+    ``,
+    `# HELP cfm_cron_freshness_reminder_error_count Total number of freshness cron failures by kind and stage`,
+    `# TYPE cfm_cron_freshness_reminder_error_count counter`,
+    ...FRESHNESS_NOTIFICATION_KINDS.flatMap((kind) =>
+      FRESHNESS_CRON_ERROR_STAGES.map(
+        (stage) =>
+          `cfm_cron_freshness_reminder_error_count{kind="${kind}",stage="${stage}"} ${freshnessTelemetry.errorCounts[kind][stage]}`
+      )
+    ),
+    ``,
+    `# HELP cfm_cron_freshness_reminder_skipped_preference_count Total number of reminder emails skipped due to host email preferences`,
+    `# TYPE cfm_cron_freshness_reminder_skipped_preference_count counter`,
+    ...FRESHNESS_NOTIFICATION_KINDS.map(
+      (kind) =>
+        `cfm_cron_freshness_reminder_skipped_preference_count{kind="${kind}"} ${freshnessTelemetry.skippedPreferenceCounts[kind]}`
+    ),
+    ``,
+    `# HELP cfm_cron_freshness_reminder_skipped_auto_pause_count Total number of freshness candidates skipped because they reached auto-pause age`,
+    `# TYPE cfm_cron_freshness_reminder_skipped_auto_pause_count counter`,
+    `cfm_cron_freshness_reminder_skipped_auto_pause_count ${freshnessTelemetry.skippedAutoPauseCount}`,
+    ``,
+    `# HELP cfm_cron_freshness_reminder_skipped_unconfirmed_count Total number of freshness candidates skipped because lastConfirmedAt was missing`,
+    `# TYPE cfm_cron_freshness_reminder_skipped_unconfirmed_count counter`,
+    `cfm_cron_freshness_reminder_skipped_unconfirmed_count ${freshnessTelemetry.skippedUnconfirmedCount}`,
+    ``,
+    `# HELP cfm_cron_freshness_reminder_skipped_stale_row_count Total number of freshness token updates skipped because the row changed during dispatch`,
+    `# TYPE cfm_cron_freshness_reminder_skipped_stale_row_count counter`,
+    `cfm_cron_freshness_reminder_skipped_stale_row_count ${freshnessTelemetry.skippedStaleRowCount}`,
+    ``,
+    `# HELP cfm_cron_freshness_reminder_skipped_suspended_count Total number of freshness candidates skipped because the owner is suspended`,
+    `# TYPE cfm_cron_freshness_reminder_skipped_suspended_count counter`,
+    `cfm_cron_freshness_reminder_skipped_suspended_count ${freshnessTelemetry.skippedSuspendedCount}`,
+    ``,
+    `# HELP cfm_cron_freshness_reminder_budget_exhausted_count Total number of freshness cron runs that stopped because the time budget was exhausted`,
+    `# TYPE cfm_cron_freshness_reminder_budget_exhausted_count counter`,
+    `cfm_cron_freshness_reminder_budget_exhausted_count ${freshnessTelemetry.budgetExhaustedCount}`,
+    ``,
+    `# HELP cfm_cron_freshness_reminder_lock_held_count Total number of freshness cron invocations skipped because another run already held the advisory lock`,
+    `# TYPE cfm_cron_freshness_reminder_lock_held_count counter`,
+    `cfm_cron_freshness_reminder_lock_held_count ${freshnessTelemetry.lockHeldCount}`,
+    ``,
     `# HELP cfm_search_doc_divergence_count Total number of detected search doc divergences in the latest cron run`,
     `# TYPE cfm_search_doc_divergence_count gauge`,
     ...SEARCH_DOC_CRON_REASON_LABELS.map(
@@ -191,6 +266,17 @@ export async function GET(request: Request) {
       (reason) =>
         `cfm_search_doc_repaired_count{reason="${reason}"} ${searchDocCronTelemetry.repairedCounts[reason]}`
     ),
+    ``,
+    `# HELP cfm_search_doc_cas_suppressed_count Total number of CAS-suppressed write attempts by the search doc cron`,
+    `# TYPE cfm_search_doc_cas_suppressed_count counter`,
+    ...SEARCH_DOC_CRON_CAS_SUPPRESSION_REASON_LABELS.map(
+      (reason) =>
+        `cfm_search_doc_cas_suppressed_count{reason="${reason}"} ${searchDocCronTelemetry.casSuppressedCounts[reason]}`
+    ),
+    ``,
+    `# HELP cfm_search_doc_cron_last_run_partial 1 if the most recent cron run recorded partial/interrupted metrics, 0 if the run completed cleanly`,
+    `# TYPE cfm_search_doc_cron_last_run_partial gauge`,
+    `cfm_search_doc_cron_last_run_partial ${searchDocCronTelemetry.lastRunPartial ? 1 : 0}`,
     ``,
     `# HELP cfm_search_dirty_queue_age_seconds Age of dirty search-doc queue entries in seconds from the latest cron batch`,
     `# TYPE cfm_search_dirty_queue_age_seconds summary`,

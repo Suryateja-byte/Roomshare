@@ -30,6 +30,10 @@ export type SearchDocDivergenceReason =
   | "version_skew"
   | null;
 
+export type CasSuppressionReason =
+  | "older_source_version"
+  | "older_projection_version";
+
 /**
  * Current search-doc projection contract version. Bump this whenever the
  * projection shape (columns written, semantics) changes. The cron compares
@@ -83,6 +87,7 @@ export interface SearchDocProjectionResult {
   listingId: string;
   outcome: SearchDocProjectionOutcome;
   divergenceReason: SearchDocDivergenceReason;
+  casSuppressionReason: CasSuppressionReason | null;
   hadExistingDoc: boolean;
   listingVersion: number | null;
   docSourceVersion: number | null;
@@ -187,6 +192,32 @@ function canProjectSearchDocument(listing: ListingSearchSnapshot): boolean {
   );
 }
 
+function classifyCasSuppressionReason(
+  listing: Pick<
+    ListingSearchSnapshot,
+    "version" | "docSourceVersion" | "docProjectionVersion"
+  >
+): CasSuppressionReason {
+  // This is best-effort diagnostic labeling from the pre-write snapshot. A
+  // concurrent winner can still land between the read and the UPSERT attempt.
+  // Prefer source-version skew when both dimensions look stale.
+  if (
+    listing.docSourceVersion != null &&
+    listing.docSourceVersion > listing.version
+  ) {
+    return "older_source_version";
+  }
+
+  if (
+    listing.docProjectionVersion != null &&
+    listing.docProjectionVersion > SEARCH_DOC_PROJECTION_VERSION
+  ) {
+    return "older_projection_version";
+  }
+
+  return "older_source_version";
+}
+
 async function deleteSearchDocument(listingId: string): Promise<void> {
   await prisma.$executeRaw`
     DELETE FROM listing_search_docs
@@ -274,6 +305,7 @@ async function writeSearchDocument(
       source_version = EXCLUDED.source_version,
       doc_updated_at = NOW()
     WHERE listing_search_docs.source_version <= EXCLUDED.source_version
+      AND listing_search_docs.projection_version <= EXCLUDED.projection_version
   `;
 
   return rowsAffected > 0;
@@ -297,6 +329,7 @@ export async function projectSearchDocument(
       listingId,
       outcome: "confirmed_orphan",
       divergenceReason: null,
+      casSuppressionReason: null,
       hadExistingDoc: false,
       listingVersion: null,
       docSourceVersion: null,
@@ -314,6 +347,7 @@ export async function projectSearchDocument(
       listingId: listing.id,
       outcome: "defer_retry",
       divergenceReason,
+      casSuppressionReason: null,
       hadExistingDoc,
       listingVersion: listing.version,
       docSourceVersion: listing.docSourceVersion,
@@ -338,6 +372,7 @@ export async function projectSearchDocument(
       listingId: listing.id,
       outcome: "suppress_delete",
       divergenceReason,
+      casSuppressionReason: null,
       hadExistingDoc,
       listingVersion: listing.version,
       docSourceVersion: listing.docSourceVersion,
@@ -347,10 +382,15 @@ export async function projectSearchDocument(
   }
 
   const writeApplied = await writeSearchDocument(listing, resolvedAvailability);
+  const casSuppressionReason = writeApplied
+    ? null
+    : classifyCasSuppressionReason(listing);
 
   if (!writeApplied) {
-    logger.sync.debug("Search doc write suppressed by source_version CAS", {
+    logger.sync.info("Search doc write suppressed by version CAS", {
+      event: "cfm.search.doc.cas_suppressed",
       listingIdHash: hashIdForLog(listing.id),
+      reason: casSuppressionReason,
       listingVersion: listing.version,
       docSourceVersion: listing.docSourceVersion,
       docProjectionVersion: listing.docProjectionVersion,
@@ -361,6 +401,7 @@ export async function projectSearchDocument(
     listingId: listing.id,
     outcome: "upsert",
     divergenceReason,
+    casSuppressionReason,
     hadExistingDoc,
     listingVersion: listing.version,
     docSourceVersion: listing.docSourceVersion,

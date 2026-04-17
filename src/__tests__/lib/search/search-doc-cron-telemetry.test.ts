@@ -40,6 +40,10 @@ describe("search-doc cron telemetry", () => {
         stale: 1,
         version_skew: 0,
       },
+      casSuppressedCounts: {
+        older_source_version: 0,
+        older_projection_version: 0,
+      },
       processedCount: 4,
       errorCounts: {
         projection_error: 2,
@@ -50,6 +54,7 @@ describe("search-doc cron telemetry", () => {
         count: 3,
         sum: 150,
       },
+      lastRunPartial: false,
     });
   });
 
@@ -66,6 +71,10 @@ describe("search-doc cron telemetry", () => {
         projection_error: 1,
       },
       dirtyQueueAgeSeconds: [30, 60],
+      casSuppressedCounts: {
+        older_source_version: 1,
+      },
+      partial: true,
     });
 
     recordSearchDocCronRun({
@@ -77,6 +86,10 @@ describe("search-doc cron telemetry", () => {
       },
       processedCount: 3,
       dirtyQueueAgeSeconds: [5],
+      casSuppressedCounts: {
+        older_projection_version: 2,
+      },
+      partial: false,
     });
 
     expect(getSearchDocCronTelemetrySnapshot()).toEqual({
@@ -90,6 +103,10 @@ describe("search-doc cron telemetry", () => {
         stale: 0,
         version_skew: 1,
       },
+      casSuppressedCounts: {
+        older_source_version: 1,
+        older_projection_version: 2,
+      },
       processedCount: 5,
       errorCounts: {
         projection_error: 1,
@@ -100,6 +117,7 @@ describe("search-doc cron telemetry", () => {
         count: 1,
         sum: 5,
       },
+      lastRunPartial: false,
     });
   });
 
@@ -131,6 +149,10 @@ describe("search-doc cron telemetry", () => {
         stale: 0,
         version_skew: 0,
       },
+      casSuppressedCounts: {
+        older_source_version: 0,
+        older_projection_version: 0,
+      },
       processedCount: 0,
       errorCounts: {
         projection_error: 0,
@@ -141,6 +163,7 @@ describe("search-doc cron telemetry", () => {
         count: 0,
         sum: 0,
       },
+      lastRunPartial: false,
     });
   });
 });

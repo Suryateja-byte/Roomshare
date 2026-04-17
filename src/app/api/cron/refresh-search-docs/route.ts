@@ -14,8 +14,8 @@ import { logger, sanitizeErrorMessage } from "@/lib/logger";
 import { hashIdForLog } from "@/lib/messaging/cfm-messaging-telemetry";
 import { prisma } from "@/lib/prisma";
 import {
-  getSearchDocCronTelemetrySnapshot,
   recordSearchDocCronRun,
+  type SearchDocCronCasSuppressionReasonLabel,
   toSearchDocCronReasonLabel,
   type SearchDocCronReasonLabel,
 } from "@/lib/search/search-doc-cron-telemetry";
@@ -29,6 +29,8 @@ export const maxDuration = 30;
 const DEFAULT_BATCH_SIZE = 100;
 const DEFAULT_RESCAN_SAMPLE_SIZE = 50;
 const DEFAULT_TIME_BUDGET_MS = 20_000;
+const MAX_DURATION_MS = maxDuration * 1000;
+const RESCAN_CHUNK_SAFETY_MARGIN_MS = 3_000;
 const UPSERT_CONCURRENCY = 10;
 const RESCAN_CONCURRENCY = 5;
 
@@ -40,6 +42,10 @@ type OutcomeCounters = {
 };
 
 type ReasonCounters = Record<SearchDocCronReasonLabel, number>;
+type CasSuppressionCounters = Record<
+  SearchDocCronCasSuppressionReasonLabel,
+  number
+>;
 
 type DirtyListingEntry = {
   listing_id: string;
@@ -92,6 +98,13 @@ function createReasonCounters(): ReasonCounters {
   };
 }
 
+function createCasSuppressionCounters(): CasSuppressionCounters {
+  return {
+    older_source_version: 0,
+    older_projection_version: 0,
+  };
+}
+
 function addOutcomeCounters(
   target: OutcomeCounters,
   source: OutcomeCounters
@@ -106,6 +119,14 @@ function addReasonCounters(target: ReasonCounters, source: ReasonCounters): void
   target.missing += source.missing;
   target.stale += source.stale;
   target.version_skew += source.version_skew;
+}
+
+function addCasSuppressionCounters(
+  target: CasSuppressionCounters,
+  source: CasSuppressionCounters
+): void {
+  target.older_source_version += source.older_source_version;
+  target.older_projection_version += source.older_projection_version;
 }
 
 function sumReasonCounters(counts: ReasonCounters): number {
@@ -136,6 +157,24 @@ function computeDirtyQueueAgeSeconds(
       return Math.round(ageSeconds * 100) / 100;
     })
     .filter((ageSeconds): ageSeconds is number => ageSeconds != null);
+}
+
+function computePercentile(sortedSamples: number[], percentile: number): number {
+  if (sortedSamples.length === 0) {
+    return 0;
+  }
+
+  const index = Math.ceil((percentile / 100) * sortedSamples.length) - 1;
+  return sortedSamples[Math.max(0, index)];
+}
+
+function summarizeDirtyQueueAgeSeconds(samples: number[]) {
+  const sortedSamples = [...samples].sort((left, right) => left - right);
+
+  return {
+    p50: computePercentile(sortedSamples, 50),
+    p95: computePercentile(sortedSamples, 95),
+  };
 }
 
 async function fetchDirtyListingEntries(limit: number): Promise<DirtyListingEntry[]> {
@@ -193,12 +232,23 @@ async function clearDirtyFlags(listingIds: string[]): Promise<number> {
 async function processWithConcurrency<I, T>(
   items: I[],
   fn: (item: I) => Promise<T>,
-  concurrency: number
-): Promise<{ fulfilled: T[]; rejected: { item: I; error: unknown }[] }> {
+  concurrency: number,
+  shouldContinue: () => boolean = () => true
+): Promise<{
+  fulfilled: T[];
+  rejected: { item: I; error: unknown }[];
+  truncated: boolean;
+}> {
   const fulfilled: T[] = [];
   const rejected: { item: I; error: unknown }[] = [];
+  let truncated = false;
 
   for (let i = 0; i < items.length; i += concurrency) {
+    if (!shouldContinue()) {
+      truncated = i < items.length;
+      break;
+    }
+
     const chunk = items.slice(i, i + concurrency);
     const results = await Promise.allSettled(chunk.map(fn));
     for (let j = 0; j < results.length; j++) {
@@ -211,7 +261,7 @@ async function processWithConcurrency<I, T>(
     }
   }
 
-  return { fulfilled, rejected };
+  return { fulfilled, rejected, truncated };
 }
 
 function shouldClearDirtyFlag(result: SearchDocProjectionResult): boolean {
@@ -245,48 +295,68 @@ function countProjectionResults(results: SearchDocProjectionResult[]): {
   return { outcomes, divergences, repaired };
 }
 
-function logDivergenceRepairs(
+function reportProjectionResults(
   results: SearchDocProjectionResult[],
   phase: "dirty" | "rescan"
-): void {
+): { casSuppressed: CasSuppressionCounters } {
+  const casSuppressed = createCasSuppressionCounters();
+
   for (const result of results) {
-    const reason = toSearchDocCronReasonLabel(result.divergenceReason);
-    if (!reason || result.outcome !== "upsert" || !result.writeApplied) {
+    if (result.outcome !== "upsert") {
       continue;
     }
 
-    logger.sync.info("cfm.search.doc.divergence_detected", {
-      event: "cfm.search.doc.divergence_detected",
-      phase,
-      listingIdHash: hashIdForLog(result.listingId),
-      reason,
-      listingVersion: result.listingVersion ?? undefined,
-      docSourceVersion: result.docSourceVersion ?? undefined,
-      docProjectionVersion: result.docProjectionVersion ?? undefined,
-    });
+    if (result.writeApplied) {
+      const reason = toSearchDocCronReasonLabel(result.divergenceReason);
+      if (!reason) {
+        continue;
+      }
+
+      logger.sync.info("cfm.search.doc.divergence_detected", {
+        event: "cfm.search.doc.divergence_detected",
+        phase,
+        listingIdHash: hashIdForLog(result.listingId),
+        reason,
+        listingVersion: result.listingVersion ?? undefined,
+        docSourceVersion: result.docSourceVersion ?? undefined,
+        docProjectionVersion: result.docProjectionVersion ?? undefined,
+      });
+      continue;
+    }
+
+    if (result.casSuppressionReason) {
+      casSuppressed[result.casSuppressionReason] += 1;
+    }
   }
+
+  return { casSuppressed };
 }
 
 export async function GET(request: NextRequest) {
+  let cronStarted = false;
+  let partial = true;
+  let responsePartial = false;
+  let cronStartMs = 0;
+  const totalOutcomes = createOutcomeCounters();
+  const totalDivergences = createReasonCounters();
+  const totalRepaired = createReasonCounters();
+  const totalCasSuppressed = createCasSuppressionCounters();
+  let totalErrors = 0;
+  let rescanned = 0;
+  let dirtyIds: string[] = [];
+  let dirtyQueueAgeSeconds: number[] = [];
+
   try {
     const authError = validateCronAuth(request);
     if (authError) {
       return authError;
     }
 
-    const startTime = Date.now();
+    cronStartMs = Date.now();
+    cronStarted = true;
     const dirtyEntries = await fetchDirtyListingEntries(getBatchSize());
-    const dirtyIds = dirtyEntries.map((entry) => entry.listing_id);
-    const dirtyQueueAgeSeconds = computeDirtyQueueAgeSeconds(
-      dirtyEntries,
-      Date.now()
-    );
-
-    const totalOutcomes = createOutcomeCounters();
-    const totalDivergences = createReasonCounters();
-    const totalRepaired = createReasonCounters();
-    let totalErrors = 0;
-    let rescanned = 0;
+    dirtyIds = dirtyEntries.map((entry) => entry.listing_id);
+    dirtyQueueAgeSeconds = computeDirtyQueueAgeSeconds(dirtyEntries, Date.now());
 
     const dirtyPhase = await processWithConcurrency(
       dirtyIds,
@@ -304,11 +374,14 @@ export async function GET(request: NextRequest) {
     addReasonCounters(totalDivergences, dirtyCounts.divergences);
     addReasonCounters(totalRepaired, dirtyCounts.repaired);
     totalErrors += dirtyPhase.rejected.length;
-    logDivergenceRepairs(dirtyPhase.fulfilled, "dirty");
+    addCasSuppressionCounters(
+      totalCasSuppressed,
+      reportProjectionResults(dirtyPhase.fulfilled, "dirty").casSuppressed
+    );
 
     const shouldRunRescan =
       features.searchDocRescan &&
-      Date.now() - startTime < getTimeBudgetMs() &&
+      Date.now() - cronStartMs < getTimeBudgetMs() &&
       getRescanSampleSize() > 0;
 
     if (shouldRunRescan) {
@@ -322,7 +395,10 @@ export async function GET(request: NextRequest) {
         const rescanPhase = await processWithConcurrency(
           rescanIds,
           async (listingId) => projectSearchDocument(listingId),
-          RESCAN_CONCURRENCY
+          RESCAN_CONCURRENCY,
+          () =>
+            MAX_DURATION_MS - (Date.now() - cronStartMs) >=
+            RESCAN_CHUNK_SAFETY_MARGIN_MS
         );
 
         const rescanCounts = countProjectionResults(rescanPhase.fulfilled);
@@ -330,29 +406,40 @@ export async function GET(request: NextRequest) {
         addReasonCounters(totalDivergences, rescanCounts.divergences);
         addReasonCounters(totalRepaired, rescanCounts.repaired);
         totalErrors += rescanPhase.rejected.length;
-        logDivergenceRepairs(rescanPhase.fulfilled, "rescan");
+        addCasSuppressionCounters(
+          totalCasSuppressed,
+          reportProjectionResults(rescanPhase.fulfilled, "rescan").casSuppressed
+        );
+
+        if (rescanPhase.truncated) {
+          logger.sync.warn("[SearchDoc Cron] Rescan truncated by time budget", {
+            event: "search_doc_cron_rescan_truncated",
+            processed: rescanPhase.fulfilled.length,
+            dropped:
+              rescanIds.length -
+              rescanPhase.fulfilled.length -
+              rescanPhase.rejected.length,
+            durationMs: Date.now() - cronStartMs,
+          });
+        }
+
+        responsePartial = rescanPhase.truncated;
       } catch (error) {
         logger.sync.warn("[SearchDoc Cron] Rescan skipped", {
           event: "search_doc_cron_rescan_skipped",
           error: sanitizeErrorMessage(error),
           sampleSize: getRescanSampleSize(),
         });
+        responsePartial = false;
       }
+    } else {
+      responsePartial = false;
     }
 
     const processed = totalOutcomes.upsert;
     const repaired = sumReasonCounters(totalRepaired);
-
-    recordSearchDocCronRun({
-      divergenceCounts: totalDivergences,
-      repairedCounts: totalRepaired,
-      processedCount: processed,
-      errorCounts: { projection_error: totalErrors },
-      dirtyQueueAgeSeconds,
-    });
-
-    const telemetrySnapshot = getSearchDocCronTelemetrySnapshot();
-    const durationMs = Date.now() - startTime;
+    const queueAgeSummary = summarizeDirtyQueueAgeSeconds(dirtyQueueAgeSeconds);
+    const durationMs = Date.now() - cronStartMs;
 
     logger.sync.info("[SearchDoc Cron] Complete", {
       event: "search_doc_cron_complete",
@@ -364,13 +451,19 @@ export async function GET(request: NextRequest) {
       divergentMissingDoc: totalDivergences.missing,
       divergentStaleDoc: totalDivergences.stale,
       divergentVersionSkew: totalDivergences.version_skew,
-      dirtyQueueAgeP50Sec: telemetrySnapshot.dirtyQueueAgeSeconds.p50,
-      dirtyQueueAgeP95Sec: telemetrySnapshot.dirtyQueueAgeSeconds.p95,
+      casSuppressedOlderSourceVersion: totalCasSuppressed.older_source_version,
+      casSuppressedOlderProjectionVersion:
+        totalCasSuppressed.older_projection_version,
+      dirtyQueueAgeP50Sec: queueAgeSummary.p50,
+      dirtyQueueAgeP95Sec: queueAgeSummary.p95,
       errors: totalErrors,
       totalDirty: dirtyIds.length,
       rescanned,
       durationMs,
+      partial: responsePartial,
     });
+
+    partial = responsePartial;
 
     return NextResponse.json({
       success: totalErrors === 0,
@@ -382,10 +475,14 @@ export async function GET(request: NextRequest) {
       divergentMissingDoc: totalDivergences.missing,
       divergentStaleDoc: totalDivergences.stale,
       divergentVersionSkew: totalDivergences.version_skew,
-      dirtyQueueAgeP50Sec: telemetrySnapshot.dirtyQueueAgeSeconds.p50,
-      dirtyQueueAgeP95Sec: telemetrySnapshot.dirtyQueueAgeSeconds.p95,
+      casSuppressedOlderSourceVersion: totalCasSuppressed.older_source_version,
+      casSuppressedOlderProjectionVersion:
+        totalCasSuppressed.older_projection_version,
+      dirtyQueueAgeP50Sec: queueAgeSummary.p50,
+      dirtyQueueAgeP95Sec: queueAgeSummary.p95,
       errors: totalErrors,
       durationMs,
+      partial: responsePartial,
       timestamp: new Date().toISOString(),
     });
   } catch (error) {
@@ -396,5 +493,28 @@ export async function GET(request: NextRequest) {
       { error: "SearchDoc refresh failed" },
       { status: 500 }
     );
+  } finally {
+    if (cronStarted) {
+      // JS finally blocks do not run on SIGKILL/maxDuration termination. The
+      // per-chunk rescan budget above is the primary defense for timeout exits.
+      recordSearchDocCronRun({
+        divergenceCounts: totalDivergences,
+        repairedCounts: totalRepaired,
+        casSuppressedCounts: totalCasSuppressed,
+        processedCount: totalOutcomes.upsert,
+        errorCounts: { projection_error: totalErrors },
+        dirtyQueueAgeSeconds,
+        partial,
+      });
+
+      if (partial) {
+        logger.sync.warn("[SearchDoc Cron] Partial run recorded", {
+          event: "search_doc_cron_partial",
+          processed: totalOutcomes.upsert,
+          errors: totalErrors,
+          durationMs: cronStartMs === 0 ? 0 : Date.now() - cronStartMs,
+        });
+      }
+    }
   }
 }

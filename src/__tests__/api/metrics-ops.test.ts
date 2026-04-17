@@ -15,6 +15,10 @@ jest.mock("@/lib/env", () => ({
 
 import { GET } from "@/app/api/metrics/ops/route";
 import {
+  recordFreshnessCronRun,
+  resetFreshnessCronTelemetryForTests,
+} from "@/lib/freshness/freshness-cron-telemetry";
+import {
   recordSearchDocCronRun,
   resetSearchDocCronTelemetryForTests,
 } from "@/lib/search/search-doc-cron-telemetry";
@@ -29,6 +33,7 @@ describe("GET /api/metrics/ops", () => {
 
   beforeEach(() => {
     jest.clearAllMocks();
+    resetFreshnessCronTelemetryForTests();
     resetSearchDocCronTelemetryForTests();
     resetSearchTelemetryForTests();
     process.env = {
@@ -93,6 +98,31 @@ describe("GET /api/metrics/ops", () => {
         projection_error: 1,
       },
       dirtyQueueAgeSeconds: [20, 40, 90],
+      casSuppressedCounts: {
+        older_source_version: 2,
+        older_projection_version: 1,
+      },
+      partial: true,
+    });
+    recordFreshnessCronRun({
+      eligibleCounts: {
+        reminder: 2,
+        warning: 1,
+      },
+      emittedCounts: {
+        reminder: 1,
+        warning: 1,
+      },
+      errorCounts: {
+        warning: {
+          email: 1,
+        },
+      },
+      skippedPreferenceCounts: {
+        reminder: 1,
+      },
+      skippedSuspendedCount: 1,
+      budgetExhausted: true,
     });
 
     const req = new Request("http://localhost/api/metrics/ops", {
@@ -106,8 +136,28 @@ describe("GET /api/metrics/ops", () => {
     expect(text).toContain("search_request_latency_ms_count 1");
     expect(text).toContain('search_backend_source{backend_source="v2"} 1');
     expect(text).toContain("search_client_abort_total 1");
+    expect(text).toContain(
+      'cfm_cron_freshness_reminder_eligible_count{kind="reminder"} 2'
+    );
+    expect(text).toContain(
+      'cfm_cron_freshness_reminder_emitted_count{kind="warning"} 1'
+    );
+    expect(text).toContain(
+      'cfm_listing_freshness_notification_sent_count{kind="reminder"} 1'
+    );
+    expect(text).toContain(
+      'cfm_cron_freshness_reminder_error_count{kind="warning",stage="email"} 1'
+    );
+    expect(text).toContain(
+      'cfm_cron_freshness_reminder_skipped_preference_count{kind="reminder"} 1'
+    );
+    expect(text).toContain("cfm_cron_freshness_reminder_budget_exhausted_count 1");
     expect(text).toContain('cfm_search_doc_divergence_count{reason="missing"} 1');
     expect(text).toContain('cfm_search_doc_repaired_count{reason="stale"} 1');
+    expect(text).toContain(
+      'cfm_search_doc_cas_suppressed_count{reason="older_source_version"} 2'
+    );
+    expect(text).toContain("cfm_search_doc_cron_last_run_partial 1");
     expect(text).toContain('cfm_search_dirty_queue_age_seconds{quantile="0.95"} 90');
     expect(text).toContain("cfm_search_refresh_processed_count 4");
     expect(text).toContain(
