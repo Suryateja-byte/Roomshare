@@ -94,7 +94,7 @@ For every P0/P1 failure mode in the plan doc, at least one observable signal exi
 | Projection version skew | `cfm.search.doc.divergence_count{reason=version_skew}` (gauge) | **> 0** sustained 15 min after a version bump | Sentry | §7.5 |
 | Stale doc by age | `cfm.search.doc.divergence_count{reason=stale}` (gauge) | **p95 age > 5 min** | Sentry | §7.5 |
 | Dirty-doc backlog growth | `cfm.search.dirty_queue_age_seconds` (summary: p50/p95) | **p95 > 600** | Sentry | §7.5 |
-| Map/list result-set disagreement | reuse existing `search_map_list_mismatch_total` (counter) | `rate[15m] > 0.05` | Sentry | `MONITORING.md` §Alerting |
+| Map/list result-set disagreement | reuse existing `search_map_list_mismatch_total` (counter) for both `/api/map-listings` and `/api/search/v2` | `rate[15m] > 0.05` | Sentry | `MONITORING.md` §Alerting |
 | Query-hash version bump did not invalidate caches | `cfm.search.query_hash_version_mismatch_count` (counter) | **> 0** | Sentry | §7.6 |
 
 ### P0 — Messaging / contact CTA safety (pre-CFM-103 / CFM-1003 public cutover)

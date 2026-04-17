@@ -6,7 +6,7 @@
 >
 > **Owner convention** (single-dev codebase per `CLAUDE.md`): `Owner = @Suryateja-byte; Reviewer = critic-agent (in-session) / human post-merge`. This convention applies to every row below and is not repeated per-line.
 >
-> **Last verified**: 2026-04-16 (branch `codex/contact-first-multislot`). Any cross-cutting CFM PR MUST update this date + the affected rows.
+> **Last verified**: 2026-04-17 (branch `codex/contact-first-multislot`). Any cross-cutting CFM PR MUST update this date + the affected rows.
 >
 > **Cross-links**:
 > - [`docs/plans/cfm-migration-plan.md`](../plans/cfm-migration-plan.md) — upstream plan (the "Current Repo Surfaces In Scope" section on lines 45–135 is the seed list for this inventory).
@@ -104,7 +104,7 @@
 | `src/app/api/search/v2/route.ts` | API route | reader | search | 4 | done_needs_audit | List API. |
 | `src/app/api/search/listings/route.ts` | API route | reader | search | 4 | done_needs_audit | Canonical listings endpoint. |
 | `src/app/api/search/facets/route.ts` | API route | reader | search | 4, 6 | done_needs_audit | Facet counts; must share predicate (Invariant #5). |
-| `src/app/api/map-listings/route.ts` | API route | reader | search, map | 4, 6 | not_started | CFM-406 separate map rollout + CFM-602 map cutover. |
+| `src/app/api/map-listings/route.ts` | API route | reader | search, map | 4, 6 | done_needs_audit | CFM-602 cut the shared map path; CFM-406 locks parity via `src/__tests__/fixes/cfm-406-list-map-parity.test.ts` and the shared predicate source in `src/lib/search/search-doc-queries.ts`. |
 | `src/app/api/search-count/route.ts` | API route | reader | search | 4 | done_needs_audit | Area-count endpoint; must use canonical predicate. |
 | `src/components/SearchForm.tsx` | client component | reader | search | 4 | done_needs_audit | URL emission; pairs with CFM-604 URL canonicalizer. |
 | `src/components/search/FilterModal.tsx` | client component | reader | search | 4, 6 | done_needs_audit | Filter chip surface. |
@@ -261,7 +261,7 @@ Direct `depends_on` edges from `.claude/task-tracker.json` (2026-04-16 snapshot)
 | CFM-403 | 4 | CFM-401 | ✅ done |
 | CFM-404 | 4 | CFM-202 | done_needs_audit |
 | CFM-405 | 4 | CFM-203 | ✅ done (405a/b/c) |
-| CFM-406 | 4 | CFM-402, CFM-404 | not_started |
+| CFM-406 | 4 | CFM-402, CFM-404 | done_needs_audit |
 | CFM-501 | 5 | CFM-201 | done_needs_audit |
 | CFM-502 | 5 | CFM-501 | not_started |
 | CFM-503 | 5 | CFM-501 | done_needs_audit |
@@ -337,6 +337,8 @@ Surfaces discovered during inventory that the plan doc's "Current Repo Surfaces 
 | `src/__tests__/compliance/sql-safety.test.ts` | 24 failing tests tracked as CFM-601-F1. | 4, 6 | Followup ticket; fix post-Wave-3. |
 | Pre-existing `src/__tests__/api/hybrid-count-threshold.test.ts` / `unbounded-browse-protection.test.ts` | CFM-F2 pre-existing failures bisected to `a79fff43`. | 4, 6 | Followup ticket. |
 
+CFM-406 is a regression-lock ticket, not a fresh runtime cut: CFM-602 already aligned the map and list predicate/availability pipeline, and CFM-406 adds parity guards plus doc upkeep so that alignment cannot silently drift.
+
 ### 5.1 Documented accepted gaps (from CFM-004 observability spec)
 
 - **Invariant #10** (rollback semantics) — no runtime counter. Mitigation: pre-flight test suite under CFM-901.
@@ -374,6 +376,7 @@ These two indexes together are the Phase 6 picklist.
 
 | Date | Change |
 |---|---|
+| 2026-04-17 | CFM-406: Added list/map parity regression guards + inventory/observability updates. |
 | 2026-04-16 | Initial inventory (CFM-001). Reflects tracker snapshot as of branch `codex/contact-first-multislot` and Wave 2 completion. |
 | 2026-04-16 | CFM-001 nit: corrected §2.4 and §5 row 13 — `src/app/actions/chat.ts` is the real messaging server action (`startConversation`, `sendMessage`), not a chatbot. The three surfaces genuinely missing from the plan's list are `src/lib/messages.ts`, `/api/messages/route.ts`, `/app/messages/**`. |
 | 2026-04-16 | CFM-1003: §2.5 header cross-links to `docs/migration/cfm-retention-policy.md` (no-drop policy for Booking / BookingAuditLog / ListingDayInventory + all enum values). |
