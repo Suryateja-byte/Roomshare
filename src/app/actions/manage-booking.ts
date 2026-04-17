@@ -21,6 +21,7 @@ import {
   isInvalidStateTransitionError,
   type BookingStatus,
 } from "@/lib/booking-state-machine";
+import { hashIdForLog as hashHmacId } from "@/lib/messaging/cfm-messaging-telemetry";
 
 export type { BookingStatus } from "@/lib/booking-state-machine";
 
@@ -46,13 +47,6 @@ const INVENTORY_DELTA_CONFLICT_RESULT: UpdateBookingStatusErrorResult = {
   code: "INVENTORY_DELTA_CONFLICT",
 };
 
-const HOST_MANAGED_BOOKING_FORBIDDEN_RESULT: UpdateBookingStatusErrorResult = {
-  success: false,
-  error:
-    "This listing now uses host-managed availability. Contact the host instead.",
-  code: "HOST_MANAGED_BOOKING_FORBIDDEN",
-};
-
 function getInventoryDeltaConflictResult(
   error: unknown
 ): UpdateBookingStatusErrorResult | null {
@@ -64,6 +58,31 @@ function getInventoryDeltaConflictResult(
   }
 
   return null;
+}
+
+function logLegacyTransition(
+  booking: {
+    id: string;
+    status: BookingStatus;
+    listing: {
+      id: string;
+      availabilitySource: string;
+    };
+  },
+  toStatus: BookingStatus
+): void {
+  if (booking.listing.availabilitySource !== "HOST_MANAGED") {
+    return;
+  }
+
+  logger.sync.info("cfm.bookings.legacy_transition", {
+    action: "updateBookingStatus",
+    bookingIdHash: hashHmacId(booking.id),
+    listingIdHash: hashHmacId(booking.listing.id),
+    fromStatus: booking.status,
+    toStatus,
+    code: "CFM_LEGACY_ROW_TRANSITION",
+  });
 }
 
 export async function updateBookingStatus(
@@ -133,10 +152,6 @@ export async function updateBookingStatus(
 
     if (!booking) {
       return { success: false, error: "Booking not found" };
-    }
-
-    if (booking.listing.availabilitySource === "HOST_MANAGED") {
-      return HOST_MANAGED_BOOKING_FORBIDDEN_RESULT;
     }
 
     // Only listing owner can accept/reject, or tenant can cancel their own booking
@@ -520,6 +535,8 @@ export async function updateBookingStatus(
         }
       }
 
+      logLegacyTransition(booking, status);
+
       // Notify tenant of acceptance (outside transaction for performance)
       // Guard: tenant may be null if they deleted their account (SetNull FK)
       try {
@@ -655,6 +672,8 @@ export async function updateBookingStatus(
         }
         throw error;
       }
+
+      logLegacyTransition(booking, status);
 
       // Build rejection message with optional reason
       const reasonText = rejectionReason?.trim()
@@ -826,6 +845,8 @@ export async function updateBookingStatus(
           throw error;
         }
       }
+
+      logLegacyTransition(booking, status);
 
       // Notify host of cancellation
       try {

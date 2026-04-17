@@ -91,6 +91,14 @@ jest.mock("@/lib/availability", () => ({
   applyInventoryDeltas: jest.fn().mockResolvedValue(undefined),
 }));
 
+jest.mock("@/lib/search/search-doc-dirty", () => ({
+  markListingsDirtyInTx: jest.fn().mockResolvedValue(undefined),
+}));
+
+jest.mock("@/lib/test-barriers", () => ({
+  waitForTestBarrier: jest.fn().mockResolvedValue(undefined),
+}));
+
 import {
   updateBookingStatus,
   getMyBookings,
@@ -101,7 +109,10 @@ import { revalidatePath } from "next/cache";
 import { createInternalNotification } from "@/lib/notifications";
 import { sendNotificationEmailWithPreference } from "@/lib/email";
 import { checkSuspension } from "@/app/actions/suspension";
-import { validateTransition } from "@/lib/booking-state-machine";
+import {
+  validateTransition,
+  isInvalidStateTransitionError,
+} from "@/lib/booking-state-machine";
 import { checkRateLimit } from "@/lib/rate-limit";
 import { logBookingAudit } from "@/lib/booking-audit";
 import {
@@ -109,6 +120,7 @@ import {
   expireOverlappingExpiredHolds,
   getAvailability,
 } from "@/lib/availability";
+import { logger } from "@/lib/logger";
 
 describe("manage-booking actions", () => {
   const mockSession = {
@@ -141,6 +153,7 @@ describe("manage-booking actions", () => {
     ownerId: "owner-123",
     availableSlots: 2,
     totalSlots: 3,
+    availabilitySource: "LEGACY_BOOKING",
     owner: {
       name: "Owner User",
     },
@@ -253,27 +266,212 @@ describe("manage-booking actions", () => {
       });
     });
 
-    describe("host-managed listing guard", () => {
-      it("rejects legacy booking lifecycle updates for HOST_MANAGED listings", async () => {
+    describe("legacy HOST_MANAGED transitions", () => {
+      const makeLegacyBooking = ({
+        status = "PENDING",
+        heldUntil = null,
+      }: {
+        status?: string;
+        heldUntil?: Date | null;
+      } = {}) => ({
+        ...mockBooking,
+        status,
+        heldUntil,
+        listing: {
+          ...mockListing,
+          availabilitySource: "HOST_MANAGED",
+        },
+      });
+
+      const mockPendingAcceptTransaction = () => {
+        (prisma.$transaction as jest.Mock).mockImplementation(
+          async (callback) => {
+            const tx = {
+              $queryRaw: jest.fn().mockResolvedValue([
+                {
+                  availableSlots: 2,
+                  totalSlots: 3,
+                  id: "listing-123",
+                  ownerId: "owner-123",
+                  bookingMode: "SHARED",
+                  status: "ACTIVE",
+                },
+              ]),
+              $executeRaw: jest.fn().mockResolvedValue(1),
+              booking: {
+                updateMany: jest.fn().mockResolvedValue({ count: 1 }),
+              },
+            };
+            return callback(tx);
+          }
+        );
+      };
+
+      const mockHeldAcceptTransaction = () => {
+        (prisma.$transaction as jest.Mock).mockImplementation(
+          async (callback) => {
+            const tx = {
+              $queryRaw: jest
+                .fn()
+                .mockResolvedValue([{ ownerId: "owner-123", status: "ACTIVE" }]),
+              booking: {
+                updateMany: jest.fn().mockResolvedValue({ count: 1 }),
+              },
+            };
+            return callback(tx);
+          }
+        );
+      };
+
+      const mockRejectTransaction = () => {
+        (prisma.$transaction as jest.Mock).mockImplementation(
+          async (callback) => {
+            const tx = {
+              $queryRaw: jest.fn().mockResolvedValue([{ ownerId: "owner-123" }]),
+              booking: {
+                updateMany: jest.fn().mockResolvedValue({ count: 1 }),
+              },
+            };
+            return callback(tx);
+          }
+        );
+      };
+
+      const mockPendingCancelTransaction = () => {
+        (prisma.$transaction as jest.Mock).mockImplementation(
+          async (callback) => {
+            const tx = {
+              booking: {
+                updateMany: jest.fn().mockResolvedValue({ count: 1 }),
+              },
+            };
+            return callback(tx);
+          }
+        );
+      };
+
+      const mockConsumedCancelTransaction = () => {
+        (prisma.$transaction as jest.Mock).mockImplementation(
+          async (callback) => {
+            const tx = {
+              $queryRaw: jest.fn().mockResolvedValue([]),
+              $executeRaw: jest.fn().mockResolvedValue(1),
+              booking: {
+                updateMany: jest.fn().mockResolvedValue({ count: 1 }),
+              },
+            };
+            return callback(tx);
+          }
+        );
+      };
+
+      it("allows tenant to cancel a legacy PENDING booking on a HOST_MANAGED listing", async () => {
+        (auth as jest.Mock).mockResolvedValue(mockTenantSession);
+        (prisma.booking.findUnique as jest.Mock).mockResolvedValue(
+          makeLegacyBooking({ status: "PENDING" })
+        );
+        mockPendingCancelTransaction();
+
+        const result = await updateBookingStatus("booking-123", "CANCELLED");
+
+        expect(result).toEqual({ success: true });
+
+        const legacyLogCall = (logger.sync.info as jest.Mock).mock.calls.find(
+          ([message]) => message === "cfm.bookings.legacy_transition"
+        );
+
+        expect(legacyLogCall).toBeDefined();
+        const [, payload] = legacyLogCall as [string, Record<string, string>];
+        expect(payload).toEqual(
+          expect.objectContaining({
+            action: "updateBookingStatus",
+            fromStatus: "PENDING",
+            toStatus: "CANCELLED",
+            code: "CFM_LEGACY_ROW_TRANSITION",
+          })
+        );
+        expect(payload.bookingIdHash).toMatch(/^[a-f0-9]{16}$/);
+        expect(payload.listingIdHash).toMatch(/^[a-f0-9]{16}$/);
+        expect(payload).not.toHaveProperty("bookingId");
+        expect(payload).not.toHaveProperty("listingId");
+        expect(JSON.stringify(payload)).not.toContain("booking-123");
+        expect(JSON.stringify(payload)).not.toContain("listing-123");
+      });
+
+      it("allows tenant to cancel a legacy ACCEPTED booking on a HOST_MANAGED listing", async () => {
+        (auth as jest.Mock).mockResolvedValue(mockTenantSession);
+        (prisma.booking.findUnique as jest.Mock).mockResolvedValue(
+          makeLegacyBooking({ status: "ACCEPTED" })
+        );
+        mockConsumedCancelTransaction();
+
+        const result = await updateBookingStatus("booking-123", "CANCELLED");
+
+        expect(result).toEqual({ success: true });
+      });
+
+      it("allows host to accept a legacy PENDING booking on a HOST_MANAGED listing", async () => {
         (auth as jest.Mock).mockResolvedValue(mockOwnerSession);
-        (prisma.booking.findUnique as jest.Mock).mockResolvedValue({
-          ...mockBooking,
-          listing: {
-            ...mockListing,
-            availabilitySource: "HOST_MANAGED",
-          },
-        });
+        (prisma.booking.findUnique as jest.Mock).mockResolvedValue(
+          makeLegacyBooking({ status: "PENDING" })
+        );
+        mockPendingAcceptTransaction();
+
+        const result = await updateBookingStatus("booking-123", "ACCEPTED");
+
+        expect(result).toEqual({ success: true });
+      });
+
+      it("allows host to reject a legacy PENDING booking on a HOST_MANAGED listing", async () => {
+        (auth as jest.Mock).mockResolvedValue(mockOwnerSession);
+        (prisma.booking.findUnique as jest.Mock).mockResolvedValue(
+          makeLegacyBooking({ status: "PENDING" })
+        );
+        mockRejectTransaction();
+
+        const result = await updateBookingStatus("booking-123", "REJECTED");
+
+        expect(result).toEqual({ success: true });
+      });
+
+      it("allows host to accept a fresh legacy HELD booking on a HOST_MANAGED listing", async () => {
+        (auth as jest.Mock).mockResolvedValue(mockOwnerSession);
+        (prisma.booking.findUnique as jest.Mock).mockResolvedValue(
+          makeLegacyBooking({
+            status: "HELD",
+            heldUntil: new Date("2027-01-01T00:00:00.000Z"),
+          })
+        );
+        mockHeldAcceptTransaction();
+
+        const result = await updateBookingStatus("booking-123", "ACCEPTED");
+
+        expect(result).toEqual({ success: true });
+      });
+
+      it("rejects accepting an expired legacy HELD booking on a HOST_MANAGED listing", async () => {
+        (auth as jest.Mock).mockResolvedValue(mockOwnerSession);
+        (prisma.booking.findUnique as jest.Mock).mockResolvedValue(
+          makeLegacyBooking({
+            status: "HELD",
+            heldUntil: new Date("2024-01-01T00:00:00.000Z"),
+          })
+        );
+        (prisma.$transaction as jest.Mock).mockImplementation(
+          async (callback) => {
+            const tx = {
+              $queryRaw: jest.fn().mockResolvedValue([]),
+            };
+            return callback(tx);
+          }
+        );
 
         const result = await updateBookingStatus("booking-123", "ACCEPTED");
 
         expect(result).toEqual({
           success: false,
-          error:
-            "This listing now uses host-managed availability. Contact the host instead.",
-          code: "HOST_MANAGED_BOOKING_FORBIDDEN",
+          error: "This hold has expired.",
         });
-        expect(validateTransition).not.toHaveBeenCalled();
-        expect(prisma.$transaction).not.toHaveBeenCalled();
       });
     });
 
@@ -304,6 +502,14 @@ describe("manage-booking actions", () => {
 
       it("only tenant can CANCEL bookings", async () => {
         (auth as jest.Mock).mockResolvedValue(mockOwnerSession);
+
+        const result = await updateBookingStatus("booking-123", "CANCELLED");
+
+        expect(result.error).toBe("Only the tenant can cancel a booking");
+      });
+
+      it("blocks a random user from cancelling another tenant's booking", async () => {
+        (auth as jest.Mock).mockResolvedValue(mockSession);
 
         const result = await updateBookingStatus("booking-123", "CANCELLED");
 
@@ -396,6 +602,44 @@ describe("manage-booking actions", () => {
         const result = await updateBookingStatus("booking-123", "CANCELLED");
 
         expect(result.success).toBe(true);
+      });
+    });
+
+    describe("transition guards", () => {
+      it("rejects manual EXPIRED transitions", async () => {
+        (auth as jest.Mock).mockResolvedValue(mockOwnerSession);
+
+        const result = await updateBookingStatus("booking-123", "EXPIRED");
+
+        expect(result).toEqual({
+          success: false,
+          error: "Cannot manually expire bookings",
+          code: "INVALID_TARGET_STATUS",
+        });
+        expect(prisma.booking.findUnique).not.toHaveBeenCalled();
+      });
+
+      it("rejects invalid state transitions", async () => {
+        (auth as jest.Mock).mockResolvedValue(mockOwnerSession);
+        (prisma.booking.findUnique as jest.Mock).mockResolvedValue({
+          ...mockBooking,
+          status: "CANCELLED",
+        });
+        (validateTransition as jest.Mock).mockImplementationOnce(() => {
+          throw new Error("INVALID_STATE_TRANSITION");
+        });
+        (isInvalidStateTransitionError as unknown as jest.Mock).mockReturnValueOnce(
+          true
+        );
+
+        const result = await updateBookingStatus("booking-123", "ACCEPTED");
+
+        expect(result).toEqual({
+          success: false,
+          error: "Cannot change booking from CANCELLED to ACCEPTED",
+          code: "INVALID_STATE_TRANSITION",
+        });
+        expect(prisma.$transaction).not.toHaveBeenCalled();
       });
     });
 

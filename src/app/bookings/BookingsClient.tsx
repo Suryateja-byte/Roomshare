@@ -43,6 +43,9 @@ import {
   AlertDialogHeader,
   AlertDialogTitle,
 } from "@/components/ui/alert-dialog";
+import { Badge } from "@/components/ui/badge";
+
+type AvailabilitySource = "LEGACY_BOOKING" | "HOST_MANAGED";
 
 type Booking = {
   id: string;
@@ -57,6 +60,7 @@ type Booking = {
     id: string;
     title: string;
     price: number;
+    availabilitySource?: AvailabilitySource;
     location: {
       city: string;
       state: string;
@@ -175,6 +179,7 @@ function BookingCard({
   const locationText = booking.listing.location
     ? `${booking.listing.location.city}, ${booking.listing.location.state}`
     : "Location not specified";
+  const isLegacyRow = booking.listing.availabilitySource === "HOST_MANAGED";
 
   const showActions =
     type === "received" && ["PENDING", "HELD"].includes(booking.status);
@@ -201,7 +206,19 @@ function BookingCard({
             </p>
           </div>
           <div className="flex flex-col items-end gap-1">
-            <StatusBadge status={booking.status} />
+            <div className="flex flex-wrap justify-end gap-2">
+              <StatusBadge status={booking.status} />
+              {isLegacyRow && (
+                <Badge
+                  variant="outline"
+                  size="sm"
+                  aria-label="Listing has migrated to host-managed — this is a legacy booking"
+                  className="border-outline-variant/30 bg-surface-container-high text-on-surface-variant"
+                >
+                  Legacy booking
+                </Badge>
+              )}
+            </div>
             {booking.status === "HELD" && booking.heldUntil && (
               <HoldCountdown
                 heldUntil={
@@ -519,6 +536,9 @@ export default function BookingsClient({
     statusFilter === "ALL"
       ? allBookings
       : allBookings.filter((b) => b.status === statusFilter);
+  const hasLegacyBookings = [...bookings.sent, ...bookings.received].some(
+    (booking) => booking.listing.availabilitySource === "HOST_MANAGED"
+  );
   const pendingReceivedCount = bookings.received.filter(
     (b) => b.status === "PENDING" || b.status === "HELD"
   ).length;
@@ -591,6 +611,17 @@ export default function BookingsClient({
             <p className="text-sm text-on-surface-variant">
               You&apos;re offline. Booking actions are disabled until you
               reconnect.
+            </p>
+          </div>
+        )}
+
+        {hasLegacyBookings && (
+          <div className="mb-6 flex items-start gap-3 rounded-xl border border-outline-variant/20 bg-surface-container-lowest p-4">
+            <AlertCircle className="mt-0.5 h-5 w-5 flex-shrink-0 text-on-surface-variant" />
+            <p className="text-sm text-on-surface-variant">
+              New bookings are paused. You can still manage existing requests
+              and holds here. To start a new conversation with a host, use
+              Messages.
             </p>
           </div>
         )}
