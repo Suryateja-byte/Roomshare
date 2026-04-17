@@ -247,10 +247,11 @@ Prepare the system for migration without changing user behavior.
 - Goal: enumerate all repo surfaces participating in booking, availability, search, reviews, messaging, admin, cron, and tests
 - Primary files:
   - all files listed in "Current Repo Surfaces In Scope"
+  - authoritative output: [`docs/migration/cfm-inventory.md`](../migration/cfm-inventory.md)
 - Output:
-  - dependency matrix
-  - owners/reviewers list
-  - migration sequence map
+  - dependency matrix (see §4 of `cfm-inventory.md`)
+  - owners/reviewers list (single owner convention declared in the doc header)
+  - migration sequence map (see §4.2 of `cfm-inventory.md`)
 - Acceptance:
   - each affected route, action, job, and UI surface has a migration owner
   - each surface is classified as reader, writer, repair loop, or history-only
