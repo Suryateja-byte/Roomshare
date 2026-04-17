@@ -257,7 +257,7 @@ describe("POST /api/reports", () => {
     });
   });
 
-  it("rejects feedback when the user never contacted the host", async () => {
+  it("rejects feedback when the user has no reporter-authored message", async () => {
     mockedFeatures.privateFeedback = true;
     (prisma.conversation.findFirst as jest.Mock).mockResolvedValue(null);
 
@@ -274,6 +274,17 @@ describe("POST /api/reports", () => {
 
     expect(response.status).toBe(403);
     expect(body.error).toContain("after contacting this host");
+    expect(prisma.conversation.findFirst).toHaveBeenCalledWith({
+      where: {
+        listingId: "listing-1",
+        AND: [
+          { participants: { some: { id: "user-123" } } },
+          { participants: { some: { id: "owner-456" } } },
+        ],
+        messages: { some: { senderId: "user-123" } },
+      },
+      select: { id: true },
+    });
     expect(recordPrivateFeedbackDenied).toHaveBeenCalledWith({
       reason: "no_prior_conversation",
       listingId: "listing-1",
@@ -379,6 +390,17 @@ describe("POST /api/reports", () => {
 
     expect(response.status).toBe(200);
     expect(body.id).toBe("private-feedback-1");
+    expect(prisma.conversation.findFirst).toHaveBeenCalledWith({
+      where: {
+        listingId: "listing-1",
+        AND: [
+          { participants: { some: { id: "user-123" } } },
+          { participants: { some: { id: "owner-456" } } },
+        ],
+        messages: { some: { senderId: "user-123" } },
+      },
+      select: { id: true },
+    });
     expect(prisma.report.create).toHaveBeenCalledWith({
       data: {
         listingId: "listing-1",

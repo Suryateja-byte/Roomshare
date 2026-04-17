@@ -80,31 +80,39 @@ export default async function ChatPage({
     conversation.listing.ownerId !== userId &&
     session.user.emailVerified
   ) {
-    const [acceptedBooking, existingPrivateFeedback] = await Promise.all([
-      prisma.booking.findFirst({
-        where: {
-          listingId: conversation.listing.id,
-          tenantId: userId,
-          status: "ACCEPTED",
-        },
-        select: { id: true },
-      }),
-      prisma.report.findFirst({
-        where: {
-          listingId: conversation.listing.id,
-          reporterId: userId,
-          kind: "PRIVATE_FEEDBACK",
-          status: { in: [...ACTIVE_REPORT_STATUSES] },
-        },
-        select: { id: true },
-      }),
-    ]);
+    const [acceptedBooking, existingPrivateFeedback, reporterHasMessaged] =
+      await Promise.all([
+        prisma.booking.findFirst({
+          where: {
+            listingId: conversation.listing.id,
+            tenantId: userId,
+            status: "ACCEPTED",
+          },
+          select: { id: true },
+        }),
+        prisma.report.findFirst({
+          where: {
+            listingId: conversation.listing.id,
+            reporterId: userId,
+            kind: "PRIVATE_FEEDBACK",
+            status: { in: [...ACTIVE_REPORT_STATUSES] },
+          },
+          select: { id: true },
+        }),
+        prisma.message.findFirst({
+          where: {
+            conversationId: conversation.id,
+            senderId: session.user.id,
+          },
+          select: { id: true },
+        }),
+      ]);
 
     canLeavePrivateFeedback = canLeavePrivateFeedbackForViewer({
       isLoggedIn: true,
       isOwner: false,
       isEmailVerified: true,
-      hasPriorConversation: true,
+      hasPriorConversation: Boolean(reporterHasMessaged),
       hasAcceptedBooking: !!acceptedBooking,
       hasExistingPrivateFeedback: !!existingPrivateFeedback,
     });

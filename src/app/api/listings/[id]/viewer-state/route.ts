@@ -254,6 +254,7 @@ export async function GET(request: Request, { params }: RouteContext) {
                   { participants: { some: { id: session.user.id } } },
                   { participants: { some: { id: listing.ownerId } } },
                 ],
+                messages: { some: { senderId: session.user.id } },
               },
               select: { id: true },
             })

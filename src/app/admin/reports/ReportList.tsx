@@ -57,6 +57,7 @@ interface Report {
 interface ReportListProps {
   initialReports: Report[];
   totalReports: number;
+  initialKindFilter?: "all" | ReportKind;
 }
 
 const statusConfig = {
@@ -87,10 +88,13 @@ const kindConfig = {
 export default function ReportList({
   initialReports,
   totalReports,
+  initialKindFilter = "all",
 }: ReportListProps) {
   const [reports, setReports] = useState(initialReports);
   const [statusFilter, setStatusFilter] = useState<"all" | ReportStatus>("all");
-  const [kindFilter, setKindFilter] = useState<"all" | ReportKind>("all");
+  const [kindFilter, setKindFilter] = useState<"all" | ReportKind>(
+    initialKindFilter
+  );
   const [processingId, setProcessingId] = useState<string | null>(null);
   const [actionModalId, setActionModalId] = useState<string | null>(null);
   const [adminNotes, setAdminNotes] = useState("");

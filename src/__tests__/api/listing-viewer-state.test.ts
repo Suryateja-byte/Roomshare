@@ -256,6 +256,17 @@ describe("GET /api/listings/[id]/viewer-state", () => {
       canLeavePrivateFeedback: true,
       reason: "ACCEPTED_BOOKING_REQUIRED",
     });
+    expect(prisma.conversation.findFirst).toHaveBeenCalledWith({
+      where: {
+        listingId: "listing-123",
+        AND: [
+          { participants: { some: { id: "user-123" } } },
+          { participants: { some: { id: "owner-456" } } },
+        ],
+        messages: { some: { senderId: "user-123" } },
+      },
+      select: { id: true },
+    });
     expect(prisma.report.findFirst).toHaveBeenCalledWith({
       where: {
         listingId: "listing-123",
@@ -287,7 +298,7 @@ describe("GET /api/listings/[id]/viewer-state", () => {
     });
   });
 
-  it("returns canLeavePrivateFeedback=false without a prior conversation", async () => {
+  it("returns canLeavePrivateFeedback=false without a reporter-authored message", async () => {
     mockedFeatures.privateFeedback = true;
     (prisma.conversation.findFirst as jest.Mock).mockResolvedValue(null);
 
@@ -299,6 +310,17 @@ describe("GET /api/listings/[id]/viewer-state", () => {
       hasLegacyAcceptedBooking: false,
       canLeavePrivateFeedback: false,
       reason: "ACCEPTED_BOOKING_REQUIRED",
+    });
+    expect(prisma.conversation.findFirst).toHaveBeenCalledWith({
+      where: {
+        listingId: "listing-123",
+        AND: [
+          { participants: { some: { id: "user-123" } } },
+          { participants: { some: { id: "owner-456" } } },
+        ],
+        messages: { some: { senderId: "user-123" } },
+      },
+      select: { id: true },
     });
   });
 

@@ -230,6 +230,7 @@ export async function POST(request: Request) {
             { participants: { some: { id: session.user.id } } },
             { participants: { some: { id: listing.ownerId } } },
           ],
+          messages: { some: { senderId: session.user.id } },
         },
         select: { id: true },
       });
