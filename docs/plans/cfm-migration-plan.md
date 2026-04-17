@@ -269,6 +269,7 @@ Prepare the system for migration without changing user behavior.
   - normalized input contract
   - normalized response contract
   - deprecation map for legacy params
+  - **Docs: [`docs/search-contract.md`](../search-contract.md)** (CFM-002, committed)
 - Acceptance:
   - contract covers `minSlots`, `moveInDate`, current stay-length inputs, and `bookingMode`
   - query-hash versioning strategy documented

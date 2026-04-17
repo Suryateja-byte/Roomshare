@@ -1,3 +1,7 @@
+// Canonical search contract: see docs/search-contract.md for the prose
+// reference covering input shape, response shape, query-hash versioning,
+// deprecation map, and backward-compat rules. This file is the source of
+// truth for the URL -> NormalizedSearchFilters normalization step.
 import { normalizeLanguages } from "./languages";
 import {
   MAX_SAFE_PRICE,
