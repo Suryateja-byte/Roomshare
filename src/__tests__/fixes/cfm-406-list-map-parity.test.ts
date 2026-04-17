@@ -250,28 +250,33 @@ describe("CFM-406 list/map parity regression guards", () => {
   });
 
   it("no-map-only-flag", () => {
-    const envSource = readFileSync(
-      join(process.cwd(), "src/lib/env.ts"),
-      "utf8"
-    );
-    const searchDocSource = readFileSync(
-      join(process.cwd(), "src/lib/search/search-doc-queries.ts"),
-      "utf8"
-    );
-    const searchV2RouteSource = readFileSync(
-      join(process.cwd(), "src/app/api/search/v2/route.ts"),
-      "utf8"
-    );
-    const combinedSource = [
-      envSource,
-      searchDocSource,
-      searchV2RouteSource,
-    ].join("\n");
+    // Lock the flag set across every surface where a map-only bypass would
+    // plausibly be introduced: env definitions, the shared query module, the
+    // list API, the map API, and the data-fetcher layer.
+    const lockedFiles = [
+      "src/lib/env.ts",
+      "src/lib/search/search-doc-queries.ts",
+      "src/app/api/search/v2/route.ts",
+      "src/app/api/map-listings/route.ts",
+      "src/lib/data.ts",
+    ];
+    const combinedSource = lockedFiles
+      .map((relPath) => readFileSync(join(process.cwd(), relPath), "utf8"))
+      .join("\n");
 
     expect(combinedSource).toContain("ENABLE_SEARCH_DOC");
     expect(combinedSource).toContain("features.searchV2");
+
+    // Specific-name lock: reject any known shape of a new map-only flag.
     expect(combinedSource).not.toMatch(
       /\bENABLE_MAP\b|\bMAP_SEARCH_DOC\b|\bmapSearchDoc\b|\bsearchV2Map\b/
+    );
+
+    // Structural lock: reject any creatively-named new flag on features with
+    // map/cohort/gate/bypass/override semantics. Broader pattern so future
+    // authors cannot slip a bypass past the specific-name lock.
+    expect(combinedSource).not.toMatch(
+      /\bfeatures\.\w*(?:Map|Cohort|Gate|Bypass|Override)\b/
     );
   });
 
@@ -286,29 +291,29 @@ describe("CFM-406 list/map parity regression guards", () => {
       unknown
     >;
 
-    const overlappingKeys = [
-      "id",
-      "title",
-      "price",
-      "availableSlots",
-      "totalSlots",
-      "availabilitySource",
-      "openSlots",
-      "availableUntil",
-      "minStayMonths",
-      "lastConfirmedAt",
-      "status",
-      "statusReason",
-      "publicAvailability",
-      "location",
-      "roomType",
-      "moveInDate",
-      "avgRating",
-      "reviewCount",
-    ] as const;
+    // Known design divergences that MUST stay divergent (list carries the
+    // full field; map carries a trimmed-for-payload variant derived from a
+    // different raw input). Adding a new entry here requires a deliberate
+    // review — this is the only place that sanctions list/map drift.
+    const KNOWN_DIVERGENT_KEYS = new Set<string>([
+      "images", // list: full array from Listing.images; map: [primaryImage] only.
+    ]);
+
+    // Dynamic intersection: any field that shows up in BOTH mappers' outputs
+    // must carry the same value for the same input. If a future author adds
+    // a shared field to one side without mirroring it, this test fails
+    // without having to remember to extend a hardcoded list.
+    const overlappingKeys = Object.keys(listResult).filter(
+      (key) => key in mapResult && !KNOWN_DIVERGENT_KEYS.has(key)
+    );
+
+    expect(overlappingKeys.length).toBeGreaterThan(0);
 
     for (const key of overlappingKeys) {
-      expect(mapResult[key]).toEqual(listResult[key]);
+      expect({ key, value: mapResult[key] }).toEqual({
+        key,
+        value: listResult[key],
+      });
     }
   });
 });
