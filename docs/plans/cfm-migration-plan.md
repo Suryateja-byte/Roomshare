@@ -466,6 +466,7 @@ Create one safe write path for host-managed availability before real listings mi
 - Acceptance:
   - required fields and machine error codes are documented
   - invalid combinations are rejected deterministically
+- Docs: [`docs/host-managed-patch-contract.md`](../host-managed-patch-contract.md) (CFM-302, committed)
 
 #### CFM-303 - Implement freshness read model
 

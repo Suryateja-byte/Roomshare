@@ -333,6 +333,9 @@ Future additions should append here and bump the relevant version constant.
 
 - `docs/plans/cfm-migration-plan.md` — full migration plan. CFM-002 section
   at line ~258.
+- `docs/host-managed-patch-contract.md` — writer counterpart: the
+  authoritative contract for `PATCH /api/listings/:id` on host-managed
+  listings (CFM-302).
 - `.claude/CLAUDE.md` — project-wide operating rules (architecture
   boundaries, reliability rules).
 - Source-of-truth types: `src/lib/search-params.ts`,
