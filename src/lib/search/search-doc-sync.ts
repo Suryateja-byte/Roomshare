@@ -9,6 +9,7 @@ import "server-only";
 
 import { getAvailability } from "@/lib/availability";
 import { logger, sanitizeErrorMessage } from "@/lib/logger";
+import { hashIdForLog } from "@/lib/messaging/cfm-messaging-telemetry";
 import { prisma } from "@/lib/prisma";
 import { hasValidCoordinates } from "@/lib/search-types";
 import {
@@ -83,6 +84,10 @@ export interface SearchDocProjectionResult {
   outcome: SearchDocProjectionOutcome;
   divergenceReason: SearchDocDivergenceReason;
   hadExistingDoc: boolean;
+  listingVersion: number | null;
+  docSourceVersion: number | null;
+  docProjectionVersion: number | null;
+  writeApplied: boolean;
 }
 
 /**
@@ -144,10 +149,6 @@ async function fetchListingSearchSnapshot(
   return results[0] ?? null;
 }
 
-function truncateListingId(listingId: string): string {
-  return `${listingId.slice(0, 8)}...`;
-}
-
 export function getProjectionDivergenceReason(
   listing: Pick<
     ListingSearchSnapshot,
@@ -196,7 +197,7 @@ async function deleteSearchDocument(listingId: string): Promise<void> {
 async function writeSearchDocument(
   listing: ListingSearchSnapshot,
   resolvedAvailability: ResolvedPublicAvailability
-): Promise<void> {
+): Promise<boolean> {
   const recommendedScore = computeRecommendedScore(
     listing.avgRating,
     listing.viewCount,
@@ -211,7 +212,7 @@ async function writeSearchDocument(
     language.toLowerCase()
   );
 
-  await prisma.$executeRaw`
+  const rowsAffected = await prisma.$executeRaw`
     INSERT INTO listing_search_docs (
       id, owner_id, title, description, price, images,
       amenities, house_rules, household_languages, primary_home_language,
@@ -272,7 +273,10 @@ async function writeSearchDocument(
       projection_version = EXCLUDED.projection_version,
       source_version = EXCLUDED.source_version,
       doc_updated_at = NOW()
+    WHERE listing_search_docs.source_version <= EXCLUDED.source_version
   `;
+
+  return rowsAffected > 0;
 }
 
 /**
@@ -294,6 +298,10 @@ export async function projectSearchDocument(
       outcome: "confirmed_orphan",
       divergenceReason: null,
       hadExistingDoc: false,
+      listingVersion: null,
+      docSourceVersion: null,
+      docProjectionVersion: null,
+      writeApplied: false,
     };
   }
 
@@ -307,6 +315,10 @@ export async function projectSearchDocument(
       outcome: "defer_retry",
       divergenceReason,
       hadExistingDoc,
+      listingVersion: listing.version,
+      docSourceVersion: listing.docSourceVersion,
+      docProjectionVersion: listing.docProjectionVersion,
+      writeApplied: false,
     };
   }
 
@@ -327,16 +339,33 @@ export async function projectSearchDocument(
       outcome: "suppress_delete",
       divergenceReason,
       hadExistingDoc,
+      listingVersion: listing.version,
+      docSourceVersion: listing.docSourceVersion,
+      docProjectionVersion: listing.docProjectionVersion,
+      writeApplied: false,
     };
   }
 
-  await writeSearchDocument(listing, resolvedAvailability);
+  const writeApplied = await writeSearchDocument(listing, resolvedAvailability);
+
+  if (!writeApplied) {
+    logger.sync.debug("Search doc write suppressed by source_version CAS", {
+      listingIdHash: hashIdForLog(listing.id),
+      listingVersion: listing.version,
+      docSourceVersion: listing.docSourceVersion,
+      docProjectionVersion: listing.docProjectionVersion,
+    });
+  }
 
   return {
     listingId: listing.id,
     outcome: "upsert",
     divergenceReason,
     hadExistingDoc,
+    listingVersion: listing.version,
+    docSourceVersion: listing.docSourceVersion,
+    docProjectionVersion: listing.docProjectionVersion,
+    writeApplied,
   };
 }
 
@@ -351,7 +380,7 @@ export async function upsertSearchDocSync(listingId: string): Promise<boolean> {
     const result = await projectSearchDocument(listingId);
     const logContext = {
       action: "upsertSearchDocSync",
-      listingId: truncateListingId(listingId),
+      listingIdHash: hashIdForLog(listingId),
       outcome: result.outcome,
       divergenceReason: result.divergenceReason ?? undefined,
     };
@@ -379,7 +408,7 @@ export async function upsertSearchDocSync(listingId: string): Promise<boolean> {
   } catch (error) {
     logger.sync.error("Search doc sync failed", {
       action: "upsertSearchDocSync",
-      listingId: truncateListingId(listingId),
+      listingIdHash: hashIdForLog(listingId),
       error: sanitizeErrorMessage(error),
     });
     return false;

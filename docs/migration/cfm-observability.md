@@ -100,6 +100,7 @@ For every P0/P1 failure mode in the plan doc, at least one observable signal exi
 | Projection version skew | `cfm.search.doc.divergence_count{reason=version_skew}` (gauge) | **> 0** sustained 15 min after a version bump | Sentry | §7.5 |
 | Stale doc by age | `cfm.search.doc.divergence_count{reason=stale}` (gauge) | **p95 age > 5 min** | Sentry | §7.5 |
 | Dirty-doc backlog growth | `cfm.search.dirty_queue_age_seconds` (summary: p50/p95) | **p95 > 600** | Sentry | §7.5 |
+| Search-doc repairs by reason | `cfm.search.doc.repaired_count{reason=missing\\|version_skew\\|stale}` (counter) | dashboard-only informational signal | dashboard | §7.5 |
 | Map/list result-set disagreement | reuse existing `search_map_list_mismatch_total` (counter) for both `/api/map-listings` and `/api/search/v2` | `rate[15m] > 0.05` | Sentry | `MONITORING.md` §Alerting |
 | Query-hash version bump did not invalidate caches | `cfm.search.query_hash_version_mismatch_count` (counter) | **> 0** | Sentry | §7.6 |
 | Legacy search aliases still arriving | `cfm.search.legacy_url_count{alias,surface}` (counter) | dashboard-only until CFM-1002; precondition is 14-day p50 `< 1/min` per alias | dashboard | §7.6 |
@@ -257,6 +258,7 @@ Must-have panels:
 4. **Query-hash version mismatch** — `cfm.search.query_hash_version_mismatch_count` (should read 0 after a version bump has had 1 cache-TTL worth of time).
 5. **Legacy URL alias rate** — `rate(cfm.search.legacy_url_count[1h])` split by `alias`. Goal: monotonic decay after CFM-604; CFM-1002 precondition is 14-day p50 `< 1/min` per alias.
 6. **Backfill run overlay** — correlate `cfm.backfill.progress`, `cfm.backfill.deferred`, and `cfm.backfill.error` with search-divergence spikes during cohort-backfill windows.
+7. **Repair volume** — `rate(cfm.search.doc.repaired_count[15m])` split by `reason`; informational only, paired with the divergence gauge.
 
 ### 5.5 Messaging Safety (owner: product/messaging)
 
@@ -452,3 +454,4 @@ Each signal above has a concrete verification path that can be executed before r
 |---|---|
 | 2026-04-16 | Initial version (CFM-004). Defines metric namespace, log dimensions, failure-mode matrix, dashboards, divergence SQL, invariant/gate coverage, and phase exit gates. |
 | 2026-04-17 | Added the CFM-502 `cfm.backfill.*` structured-log events, the runbook link for §7.9, and the search-dashboard overlay reference for cohort backfill monitoring. |
+| 2026-04-17 | CFM-803 wired `cfm.search.doc.divergence_count`, `cfm.search.dirty_queue_age_seconds`, and `cfm.search.doc.repaired_count` into `/api/metrics/ops`, and added the bounded dirty-doc rescan plus CAS-safe repair loop. |

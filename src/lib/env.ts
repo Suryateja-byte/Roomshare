@@ -98,6 +98,7 @@ const serverEnvSchema = z
     // Search optimization (optional - defaults to slow LIKE queries if not enabled)
     // CRITICAL: Should be enabled in production for performance
     ENABLE_SEARCH_DOC: z.enum(["true", "false"]).optional(),
+    ENABLE_SEARCH_DOC_RESCAN: z.enum(["true", "false"]).optional(),
 
     // Cloudflare Turnstile (bot protection - required in production)
     TURNSTILE_SECRET_KEY: z.string().optional(),
@@ -485,6 +486,15 @@ export const features = {
   // SearchDoc optimized queries (CRITICAL for production performance)
   get searchDoc() {
     return process.env.ENABLE_SEARCH_DOC === "true";
+  },
+  get searchDocRescan() {
+    if (process.env.ENABLE_SEARCH_DOC_RESCAN) {
+      return process.env.ENABLE_SEARCH_DOC_RESCAN === "true";
+    }
+    if (process.env.SEARCH_DOC_RESCAN_ENABLED) {
+      return process.env.SEARCH_DOC_RESCAN_ENABLED === "true";
+    }
+    return true;
   },
   // Cloudflare Turnstile bot protection
   get turnstile() {

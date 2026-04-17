@@ -19,6 +19,7 @@ jest.mock("@/lib/availability", () => ({
 jest.mock("@/lib/logger", () => ({
   logger: {
     sync: {
+      debug: jest.fn(),
       info: jest.fn(),
       warn: jest.fn(),
       error: jest.fn(),
@@ -31,8 +32,11 @@ jest.mock("@/lib/logger", () => ({
 
 import {
   getProjectionDivergenceReason,
+  projectSearchDocument,
   SEARCH_DOC_PROJECTION_VERSION,
+  upsertSearchDocSync,
 } from "@/lib/search/search-doc-sync";
+import { prisma } from "@/lib/prisma";
 
 function makeListing(overrides: {
   docUpdatedAt?: Date | null;
@@ -51,7 +55,60 @@ function makeListing(overrides: {
   };
 }
 
+function makeProjectableListingSnapshot(overrides: Record<string, unknown> = {}) {
+  return {
+    id: "listing-1",
+    ownerId: "owner-1",
+    title: "Sunny room",
+    description: "Quiet host-managed room",
+    price: 1200,
+    images: ["image-1"],
+    amenities: ["Desk"],
+    houseRules: ["No smoking"],
+    householdLanguages: ["English"],
+    primaryHomeLanguage: "English",
+    leaseDuration: "monthly",
+    roomType: "private_room",
+    moveInDate: new Date("2026-05-01T00:00:00.000Z"),
+    totalSlots: 2,
+    availableSlots: 1,
+    availabilitySource: "HOST_MANAGED",
+    openSlots: 1,
+    availableUntil: null,
+    minStayMonths: 1,
+    lastConfirmedAt: new Date("2026-04-10T00:00:00.000Z"),
+    statusReason: null,
+    viewCount: 10,
+    status: "ACTIVE",
+    bookingMode: "contact-first",
+    createdAt: new Date("2026-04-01T00:00:00.000Z"),
+    updatedAt: new Date("2026-04-10T00:00:00.000Z"),
+    address: "123 Main St",
+    city: "Austin",
+    state: "TX",
+    zip: "78701",
+    lat: 30.2672,
+    lng: -97.7431,
+    avgRating: 4.5,
+    reviewCount: 3,
+    version: 5,
+    docUpdatedAt: new Date("2026-04-01T00:00:00.000Z"),
+    docSourceVersion: 4,
+    docProjectionVersion: SEARCH_DOC_PROJECTION_VERSION,
+    ...overrides,
+  };
+}
+
+const mockQueryRaw = prisma.$queryRaw as jest.Mock;
+const mockExecuteRaw = prisma.$executeRaw as jest.Mock;
+
 describe("getProjectionDivergenceReason", () => {
+  beforeEach(() => {
+    jest.clearAllMocks();
+    mockQueryRaw.mockReset();
+    mockExecuteRaw.mockReset();
+  });
+
   it("returns 'missing_doc' when no search doc row exists", () => {
     expect(
       getProjectionDivergenceReason(makeListing({ docUpdatedAt: null }))
@@ -130,5 +187,35 @@ describe("getProjectionDivergenceReason", () => {
   it("exports SEARCH_DOC_PROJECTION_VERSION as an integer >= 1", () => {
     expect(Number.isInteger(SEARCH_DOC_PROJECTION_VERSION)).toBe(true);
     expect(SEARCH_DOC_PROJECTION_VERSION).toBeGreaterThanOrEqual(1);
+  });
+
+  it("suppresses stale cron writes when a newer doc version already won the race", async () => {
+    mockQueryRaw.mockResolvedValueOnce([makeProjectableListingSnapshot()]);
+    mockExecuteRaw.mockResolvedValueOnce(0);
+
+    const result = await projectSearchDocument("listing-1");
+
+    expect(result).toMatchObject({
+      listingId: "listing-1",
+      outcome: "upsert",
+      divergenceReason: "version_skew",
+      writeApplied: false,
+      listingVersion: 5,
+      docSourceVersion: 4,
+    });
+
+    const writeSql = Array.from(
+      mockExecuteRaw.mock.calls[0][0] as TemplateStringsArray
+    ).join(" ");
+    expect(writeSql).toContain(
+      "WHERE listing_search_docs.source_version <= EXCLUDED.source_version"
+    );
+  });
+
+  it("treats CAS-suppressed writes as a handled sync outcome", async () => {
+    mockQueryRaw.mockResolvedValueOnce([makeProjectableListingSnapshot()]);
+    mockExecuteRaw.mockResolvedValueOnce(0);
+
+    await expect(upsertSearchDocSync("listing-1")).resolves.toBe(true);
   });
 });

@@ -15,6 +15,11 @@ import {
 } from "@/lib/reports/private-feedback";
 import { getPrivateFeedbackTelemetrySnapshot } from "@/lib/reports/private-feedback-telemetry";
 import { LEGACY_URL_ALIASES, LEGACY_URL_SURFACES } from "@/lib/search-params";
+import {
+  getSearchDocCronTelemetrySnapshot,
+  SEARCH_DOC_CRON_ERROR_REASON_LABELS,
+  SEARCH_DOC_CRON_REASON_LABELS,
+} from "@/lib/search/search-doc-cron-telemetry";
 import { getSearchTelemetrySnapshot } from "@/lib/search/search-telemetry";
 
 export const runtime = "nodejs";
@@ -62,6 +67,7 @@ export async function GET(request: Request) {
   const memory = process.memoryUsage();
   const version = process.env.VERCEL_GIT_COMMIT_SHA?.slice(0, 8) || "dev";
   const feedbackTelemetry = getPrivateFeedbackTelemetrySnapshot();
+  const searchDocCronTelemetry = getSearchDocCronTelemetrySnapshot();
   const searchTelemetry = getSearchTelemetrySnapshot();
 
   // Compute duration percentiles from samples
@@ -170,6 +176,38 @@ export async function GET(request: Request) {
     ...PRIVATE_FEEDBACK_DENIAL_REASONS.map(
       (reason) =>
         `cfm_feedback_denied_count{reason="${reason}"} ${feedbackTelemetry.deniedCounts[reason]}`
+    ),
+    ``,
+    `# HELP cfm_search_doc_divergence_count Total number of detected search doc divergences in the latest cron run`,
+    `# TYPE cfm_search_doc_divergence_count gauge`,
+    ...SEARCH_DOC_CRON_REASON_LABELS.map(
+      (reason) =>
+        `cfm_search_doc_divergence_count{reason="${reason}"} ${searchDocCronTelemetry.divergenceCounts[reason]}`
+    ),
+    ``,
+    `# HELP cfm_search_doc_repaired_count Total number of repaired search doc divergences`,
+    `# TYPE cfm_search_doc_repaired_count counter`,
+    ...SEARCH_DOC_CRON_REASON_LABELS.map(
+      (reason) =>
+        `cfm_search_doc_repaired_count{reason="${reason}"} ${searchDocCronTelemetry.repairedCounts[reason]}`
+    ),
+    ``,
+    `# HELP cfm_search_dirty_queue_age_seconds Age of dirty search-doc queue entries in seconds from the latest cron batch`,
+    `# TYPE cfm_search_dirty_queue_age_seconds summary`,
+    `cfm_search_dirty_queue_age_seconds{quantile="0.5"} ${searchDocCronTelemetry.dirtyQueueAgeSeconds.p50}`,
+    `cfm_search_dirty_queue_age_seconds{quantile="0.95"} ${searchDocCronTelemetry.dirtyQueueAgeSeconds.p95}`,
+    `cfm_search_dirty_queue_age_seconds_count ${searchDocCronTelemetry.dirtyQueueAgeSeconds.count}`,
+    `cfm_search_dirty_queue_age_seconds_sum ${searchDocCronTelemetry.dirtyQueueAgeSeconds.sum}`,
+    ``,
+    `# HELP cfm_search_refresh_processed_count Total number of search doc refresh upserts processed`,
+    `# TYPE cfm_search_refresh_processed_count counter`,
+    `cfm_search_refresh_processed_count ${searchDocCronTelemetry.processedCount}`,
+    ``,
+    `# HELP cfm_search_refresh_error_count Total number of search doc refresh projection errors`,
+    `# TYPE cfm_search_refresh_error_count counter`,
+    ...SEARCH_DOC_CRON_ERROR_REASON_LABELS.map(
+      (reason) =>
+        `cfm_search_refresh_error_count{reason="${reason}"} ${searchDocCronTelemetry.errorCounts[reason]}`
     ),
   ].join("\n");
 
