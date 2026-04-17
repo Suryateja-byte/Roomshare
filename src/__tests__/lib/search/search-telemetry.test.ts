@@ -11,6 +11,7 @@ jest.mock("@/lib/logger", () => ({
 import { logger } from "@/lib/logger";
 import {
   getSearchTelemetrySnapshot,
+  recordLegacyUrlUsage,
   recordSearchClientAbort,
   recordSearchLoadMoreError,
   recordSearchMapListMismatch,
@@ -69,6 +70,10 @@ describe("search telemetry", () => {
       queryHash: "hash-6",
       reason: "superseded",
     });
+    recordLegacyUrlUsage({
+      alias: "startDate",
+      surface: "ssr",
+    });
 
     const snapshot = getSearchTelemetrySnapshot();
 
@@ -82,6 +87,7 @@ describe("search telemetry", () => {
     expect(snapshot.loadMoreErrorTotal).toBe(1);
     expect(snapshot.mapListMismatchTotal).toBe(1);
     expect(snapshot.clientAbortTotal).toBe(1);
+    expect(snapshot.legacyUrlCounts.ssr.startDate).toBe(1);
 
     expect(logger.sync.info).toHaveBeenCalledWith(
       "search_request_latency_ms",
@@ -96,6 +102,13 @@ describe("search telemetry", () => {
       expect.objectContaining({
         route: "search-listings-api",
         queryHash: "hash-2",
+      })
+    );
+    expect(logger.sync.info).toHaveBeenCalledWith(
+      "cfm.search.legacy_url_count",
+      expect.objectContaining({
+        alias: "startDate",
+        surface: "ssr",
       })
     );
   });

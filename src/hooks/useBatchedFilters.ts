@@ -432,6 +432,7 @@ export function useBatchedFilters(
     const currentQuery = normalizeSearchQuery(
       new URLSearchParams(searchParams.toString())
     );
+    // CFM-604: canonical-on-write guarantee — must go through buildCanonicalSearchUrl.
     const searchUrl = buildCanonicalSearchUrl(
       applySearchQueryChange(currentQuery, "filter", {
         minPrice: Number.isFinite(nextMinPrice) ? nextMinPrice : undefined,

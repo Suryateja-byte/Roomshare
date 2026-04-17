@@ -46,6 +46,22 @@ export { MAX_SAFE_PRICE, MAX_SAFE_PAGE, MAX_ARRAY_ITEMS };
 // Re-exported here for consumers that import from search-params.
 export type { SortOption, FilterParams, FilterCriteria };
 
+export const LEGACY_URL_ALIASES = [
+  "startDate",
+  "minBudget",
+  "maxBudget",
+  "minAvailableSlots",
+  "pageNumber",
+  "cursorStack",
+  "where",
+] as const;
+
+export type LegacyUrlAlias = (typeof LEGACY_URL_ALIASES)[number];
+
+export const LEGACY_URL_SURFACES = ["ssr", "spa", "saved-search"] as const;
+
+export type LegacyUrlSurface = (typeof LEGACY_URL_SURFACES)[number];
+
 /**
  * Returns true if any narrowing filter is active (excludes query, bounds, sort, nearMatches).
  * Used to distinguish "unbounded browse" (no filters) from "filtered browse" (filters but no query/bounds).
@@ -88,6 +104,7 @@ export interface RawSearchParams {
   genderPreference?: string | string[];
   householdGender?: string | string[];
   bookingMode?: string | string[];
+  minAvailableSlots?: string | string[];
   minSlots?: string | string[];
   minLat?: string | string[];
   maxLat?: string | string[];
@@ -208,6 +225,30 @@ export function buildRawParamsFromSearchParams(
   });
 
   return rawParams;
+}
+
+export function detectLegacyUrlAliases(
+  raw:
+    | URLSearchParams
+    | Record<string, string | string[] | number | boolean | undefined>,
+  options: { includeWhere?: boolean } = {}
+): LegacyUrlAlias[] {
+  const { includeWhere = true } = options;
+  const has = (key: string): boolean => {
+    if (raw instanceof URLSearchParams) {
+      return raw.has(key);
+    }
+
+    return raw[key] !== undefined;
+  };
+
+  return LEGACY_URL_ALIASES.filter((alias) => {
+    if (alias === "where" && !includeWhere) {
+      return false;
+    }
+
+    return has(alias);
+  });
 }
 
 /**
@@ -727,7 +768,7 @@ export function parseSearchParams(raw: RawSearchParams): ParsedSearchParams {
   const what = normalizeTextField(getFirstValue(raw.what));
 
   const requestedPage = safeParseInt(
-    getFirstValue(raw.page),
+    getFirstValue(raw.page) ?? getFirstValue(raw.pageNumber),
     1,
     MAX_SAFE_PAGE,
     1
@@ -797,6 +838,7 @@ export function parseSearchParams(raw: RawSearchParams): ParsedSearchParams {
       householdGender: getFirstValue(raw.householdGender),
       bookingMode: getFirstValue(raw.bookingMode),
       bounds,
+      minAvailableSlots: getFirstValue(raw.minAvailableSlots),
       minSlots: getFirstValue(raw.minSlots),
       nearMatches: getFirstValue(raw.nearMatches),
       sort: getFirstValue(raw.sort),

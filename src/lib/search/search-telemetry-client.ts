@@ -1,5 +1,7 @@
 "use client";
 
+import type { LegacyUrlAlias } from "@/lib/search-params";
+
 type SearchClientMetric =
   | {
       metric: "search_client_abort_total";
@@ -13,6 +15,11 @@ type SearchClientMetric =
       queryHash?: string;
       responseQueryHash?: string;
       reason: string;
+    }
+  | {
+      metric: "cfm.search.legacy_url_count";
+      alias: LegacyUrlAlias;
+      surface: "spa";
     };
 
 export function emitSearchClientMetric(metric: SearchClientMetric): void {

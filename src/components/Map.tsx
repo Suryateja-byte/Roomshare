@@ -2924,6 +2924,7 @@ export default function MapComponent({
         return; // Bounds haven't meaningfully changed, skip search
       }
       lastSearchBoundsRef.current = { ...bounds };
+      // CFM-604: canonical-on-write guarantee — must go through buildCanonicalSearchUrl.
       const url = buildCanonicalSearchUrl(
         applySearchQueryChange(
           normalizeSearchQuery(new URLSearchParams(searchParams.toString())),

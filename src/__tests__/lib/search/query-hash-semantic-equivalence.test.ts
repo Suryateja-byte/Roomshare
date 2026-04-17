@@ -14,15 +14,45 @@
 
 import { normalizeSearchQuery } from "@/lib/search/search-query";
 import { getSearchQueryHash } from "@/lib/search/search-response";
+import { buildCanonicalSearchUrl } from "@/lib/search/search-query";
 import {
   generateSearchQueryHash,
   type HashableSearchQuery,
 } from "@/lib/search/query-hash";
 
+const FUTURE_MOVE_IN_DATE = "2027-02-01";
+const CFM_604_URL_PARITY_CASES = [
+  {
+    legacy: `startDate=${FUTURE_MOVE_IN_DATE}`,
+    canonical: `moveInDate=${FUTURE_MOVE_IN_DATE}`,
+  },
+  {
+    legacy: "minBudget=500&maxBudget=2200",
+    canonical: "maxPrice=2200&minPrice=500",
+  },
+  {
+    legacy: "minAvailableSlots=2",
+    canonical: "minSlots=2",
+  },
+  {
+    legacy: "pageNumber=3",
+    canonical: "page=3",
+  },
+  {
+    legacy: "cursorStack=cursor-token",
+    canonical: "cursor=cursor-token",
+  },
+];
+
 function hashOf(url: string): string {
   const params = new URLSearchParams(url.startsWith("?") ? url : `?${url}`);
   const query = normalizeSearchQuery(params);
   return getSearchQueryHash(query);
+}
+
+function canonicalize(url: string): string {
+  const params = new URLSearchParams(url.startsWith("?") ? url : `?${url}`);
+  return buildCanonicalSearchUrl(normalizeSearchQuery(params));
 }
 
 describe("query-hash semantic equivalence (CFM-403)", () => {
@@ -93,6 +123,15 @@ describe("query-hash semantic equivalence (CFM-403)", () => {
       const legacy = hashOf("startDate=2026-05-01");
       expect(canonical).toBe(legacy);
     });
+  });
+
+  describe("URL-serialization parity (CFM-604)", () => {
+    it.each(CFM_604_URL_PARITY_CASES)(
+      "$legacy serializes to the same canonical URL as $canonical",
+      ({ legacy, canonical }) => {
+        expect(canonicalize(legacy)).toBe(canonicalize(canonical));
+      }
+    );
   });
 
   describe("counter cases — MUST hash differently", () => {

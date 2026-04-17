@@ -159,7 +159,10 @@ export function normalizeSearchQuery(
   const lng = parseFiniteFloat(getFirstValue(raw.lng), -180, 180);
   const hasPointCoords = lat !== undefined && lng !== undefined;
 
-  const cursor = getFirstValue(raw.cursor)?.trim() || undefined;
+  const cursor =
+    getFirstValue(raw.cursor)?.trim() ||
+    getFirstValue(raw.cursorStack)?.trim() ||
+    undefined;
   const page =
     cursor === undefined
       ? parsePositiveInt(

@@ -52,6 +52,12 @@ cfm.{subsystem}.{object}.{action}_{unit}
 
 Labels are lowercase, use `_` as separator, and MUST NOT contain free-form user input. Permitted label values are enumerated per-metric in §3.
 
+Current bounded search-URL legacy labels:
+
+- `cfm.search.legacy_url_count{alias,surface}`:
+  `alias ∈ {startDate,minBudget,maxBudget,minAvailableSlots,pageNumber,cursorStack,where}`
+  and `surface ∈ {ssr,spa,saved-search}`.
+
 **Forbidden label keys** (these are PII per CLAUDE.md non-negotiable #1 and are ALSO high-cardinality):
 
 - `listing_id`, `user_id`, `host_id`, `conversation_id`, `email`, `phone`, `ip`, `address`, `query_text`.
@@ -96,6 +102,7 @@ For every P0/P1 failure mode in the plan doc, at least one observable signal exi
 | Dirty-doc backlog growth | `cfm.search.dirty_queue_age_seconds` (summary: p50/p95) | **p95 > 600** | Sentry | §7.5 |
 | Map/list result-set disagreement | reuse existing `search_map_list_mismatch_total` (counter) for both `/api/map-listings` and `/api/search/v2` | `rate[15m] > 0.05` | Sentry | `MONITORING.md` §Alerting |
 | Query-hash version bump did not invalidate caches | `cfm.search.query_hash_version_mismatch_count` (counter) | **> 0** | Sentry | §7.6 |
+| Legacy search aliases still arriving | `cfm.search.legacy_url_count{alias,surface}` (counter) | dashboard-only until CFM-1002; precondition is 14-day p50 `< 1/min` per alias | dashboard | §7.6 |
 
 ### P0 — Messaging / contact CTA safety (pre-CFM-103 / CFM-1003 public cutover)
 
@@ -157,6 +164,7 @@ All `booking`, `hold`, `listing`, `search`, `viewer-state`, `messaging`, and `cr
 | `statusReason` | enum per [`docs/plans/cfm-migration-plan.md`](../plans/cfm-migration-plan.md#statusreason) or `null` | listing row |
 | `queryHashVersion` | integer (current `SEARCH_QUERY_HASH_VERSION`) | `src/lib/search/query-hash.ts` |
 | `searchContractVersion` | integer (current `SEARCH_CONTRACT_VERSION`) | `docs/search-contract.md` §3.3 |
+| `legacyUrlAlias` | `startDate` \| `minBudget` \| `maxBudget` \| `minAvailableSlots` \| `pageNumber` \| `cursorStack` \| `where` \| `null` | legacy URL telemetry / canonicalizer path |
 | `migrationPhase` | `0` — `10` (current plan phase) | env `CFM_MIGRATION_PHASE` (CFM-003) |
 | `cohort` | `clean` \| `blocked` \| `review` \| `legacy_drain` \| `unknown` | listing row (`needsMigrationReview` + `availabilitySource`) |
 
@@ -236,7 +244,8 @@ Must-have panels:
 2. **Doc/row divergence** — `cfm.search.doc.divergence_count` stacked by `reason` (`missing|version_skew|stale`).
 3. **Map/list mismatch rate** — `rate(search_map_list_mismatch_total[15m])` (existing metric from `MONITORING.md`).
 4. **Query-hash version mismatch** — `cfm.search.query_hash_version_mismatch_count` (should read 0 after a version bump has had 1 cache-TTL worth of time).
-5. **Backfill run overlay** — correlate `cfm.backfill.progress`, `cfm.backfill.deferred`, and `cfm.backfill.error` with search-divergence spikes during cohort-backfill windows.
+5. **Legacy URL alias rate** — `rate(cfm.search.legacy_url_count[1h])` split by `alias`. Goal: monotonic decay after CFM-604; CFM-1002 precondition is 14-day p50 `< 1/min` per alias.
+6. **Backfill run overlay** — correlate `cfm.backfill.progress`, `cfm.backfill.deferred`, and `cfm.backfill.error` with search-divergence spikes during cohort-backfill windows.
 
 ### 5.5 Messaging Safety (owner: product/messaging)
 

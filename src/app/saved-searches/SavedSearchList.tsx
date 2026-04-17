@@ -149,6 +149,7 @@ export default function SavedSearchList({
                 </button>
 
                 {/* Open Search */}
+                {/* CFM-604: canonical-on-write guarantee — buildSearchUrl() funnels through buildCanonicalSearchUrl. */}
                 <Link
                   href={buildSearchUrl(search.filters as SearchFilters)}
                   className="inline-flex items-center gap-2 px-4 py-2 bg-primary text-on-primary rounded-lg text-sm font-medium hover:bg-primary/90 transition-colors"

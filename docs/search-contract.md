@@ -310,14 +310,14 @@ Regression coverage:
 Legacy URL params accepted at `RawSearchParams` boundary, with planned
 removal phases:
 
-| Legacy param | Current behavior | Deprecated | Removal target |
-|---|---|---|---|
-| `startDate` | Translated to `moveInDate`. | Yes (since CFM-001). | After CFM-604 (SearchForm + FilterModal writes) canonicalizes URL on write. |
-| `minBudget` / `maxBudget` | Translated to `minPrice` / `maxPrice`. | Yes. | Same as above. |
-| `minAvailableSlots` (URL-side) | Alias of `minSlots`. Internal filter field remains `minAvailableSlots`. | Soft-deprecated. | Keep URL alias indefinitely for link compatibility; normalize on write. |
-| `where` | Parsed as `locationLabel`; no hard filter. | Yes. | Can be removed after CFM-603 confirms no UI emits it. |
-| `pageNumber` | Alias of `page`. | Yes. | Can be removed when no shared links carry it. |
-| `cursorStack` | Alias of `cursor`. | Yes. | Same as above. |
+| Legacy param | Current behavior | Deprecated | Telemetry | Removal target |
+|---|---|---|---|---|
+| `startDate` | Translated to `moveInDate`. | Yes (since CFM-001). | `cfm.search.legacy_url_count{alias="startDate",surface}` | After CFM-604 lock + telemetry. |
+| `minBudget` / `maxBudget` | Translated to `minPrice` / `maxPrice`. | Yes. | `cfm.search.legacy_url_count{alias="minBudget"\|"maxBudget",surface}` | Same as above. |
+| `minAvailableSlots` (URL-side) | Alias of `minSlots`. Internal filter field remains `minAvailableSlots`. | Soft-deprecated. | `cfm.search.legacy_url_count{alias="minAvailableSlots",surface}` | Keep URL alias indefinitely for link compatibility; normalize on write. |
+| `where` | Parsed as `locationLabel`; no hard filter. | Yes. | Reserved in the telemetry allowlist; not emitted while canonical serialization still writes `where`. | Can be removed after CFM-603 confirms no UI emits it. |
+| `pageNumber` | Alias of `page`. | Yes. | `cfm.search.legacy_url_count{alias="pageNumber",surface}` | Can be removed when no shared links carry it. |
+| `cursorStack` | Alias of `cursor`. | Yes. | `cfm.search.legacy_url_count{alias="cursorStack",surface}` | Same as above. |
 
 Unknown URL params (including old keys not in this table) are silently
 ignored. Old shared URLs parse cleanly and produce a best-effort search.
@@ -360,6 +360,7 @@ Future additions should append here and bump the relevant version constant.
 | 2026-04-15 | `cfm-search-contract-v1` | Initial contract — CFM-002 documents existing implementation. `SEARCH_QUERY_HASH_VERSION = "2026-04-15.cfm-search-contract-v1"`, `SEARCH_RESPONSE_VERSION = "2026-04-15.phase2-public-availability.search-contract-v1"`, `SEARCH_DOC_PROJECTION_VERSION = 1`. |
 | 2026-04-16 | `cfm-search-contract-v1` | CFM-403: §3.4 enumerates every caller of `queryHash`; §3.5 adds the semantic-equivalence invariant and the load-bearing regression test reference. No contract version bump — docs + test only. |
 | 2026-04-16 | `cfm-search-contract-v1` | CFM-004: cross-link to `docs/migration/cfm-observability.md` for the runtime monitoring of the invariants in §3.5. No contract change. |
+| 2026-04-17 | `cfm-search-contract-v1` | CFM-604: §4 adds legacy-alias telemetry, documents the `minAvailableSlots` alias explicitly, and ties URL-write canonicalization to the saved-search reopen coverage. No contract version bump. |
 
 ---
 

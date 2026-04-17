@@ -4,11 +4,17 @@ import { prisma } from "@/lib/prisma";
 import { auth } from "@/auth";
 import { revalidatePath } from "next/cache";
 import {
+  detectLegacyUrlAliases,
+  normalizeSearchFilters as normalizeLegacySearchFilters,
+} from "@/lib/search-params";
+import {
   normalizeSearchFilters,
+  normalizedSearchQueryToSearchFilters,
   type SearchFilters,
 } from "@/lib/search-utils";
 import type { Prisma } from "@prisma/client";
 import { logger } from "@/lib/logger";
+import { recordLegacyUrlUsage } from "@/lib/search/search-telemetry";
 import { z } from "zod";
 import { headers } from "next/headers";
 import { checkServerComponentRateLimit } from "@/lib/with-rate-limit";
@@ -92,9 +98,57 @@ const savedSearchFiltersWriteSchema = z
 
 /** Safely parse filters JSON from DB, falling back to empty object on invalid data. */
 function parseSavedSearchFilters(raw: unknown): SearchFilters {
+  if (raw && typeof raw === "object" && !Array.isArray(raw)) {
+    for (const alias of detectLegacyUrlAliases(
+      raw as Record<string, string | string[] | number | boolean | undefined>
+    )) {
+      recordLegacyUrlUsage({ alias, surface: "saved-search" });
+    }
+  }
+
   const result = savedSearchFiltersSchema.safeParse(raw);
   if (result.success) {
-    return normalizeSearchFilters(result.data as SearchFilters);
+    const legacyCompatibleInput = result.data as Record<string, unknown>;
+    const normalized = normalizeLegacySearchFilters(
+      {
+        ...legacyCompatibleInput,
+        locationLabel:
+          legacyCompatibleInput.locationLabel ?? legacyCompatibleInput.where,
+        minPrice:
+          legacyCompatibleInput.minPrice ?? legacyCompatibleInput.minBudget,
+        maxPrice:
+          legacyCompatibleInput.maxPrice ?? legacyCompatibleInput.maxBudget,
+        minAvailableSlots:
+          legacyCompatibleInput.minAvailableSlots ??
+          legacyCompatibleInput.minSlots,
+      },
+      {
+        invalidRange: "drop",
+        overlongText: "truncate",
+      }
+    );
+
+    return normalizedSearchQueryToSearchFilters({
+      query: normalized.query,
+      locationLabel: normalized.locationLabel,
+      vibeQuery: normalized.vibeQuery,
+      minPrice: normalized.minPrice,
+      maxPrice: normalized.maxPrice,
+      amenities: normalized.amenities,
+      moveInDate: normalized.moveInDate,
+      endDate: normalized.endDate,
+      leaseDuration: normalized.leaseDuration,
+      houseRules: normalized.houseRules,
+      languages: normalized.languages,
+      roomType: normalized.roomType,
+      genderPreference: normalized.genderPreference,
+      householdGender: normalized.householdGender,
+      bookingMode: normalized.bookingMode,
+      minSlots: normalized.minAvailableSlots,
+      bounds: normalized.bounds,
+      sort: normalized.sort,
+      nearMatches: normalized.nearMatches,
+    });
   }
   logger.sync.warn(
     "Invalid saved search filters in DB, falling back to empty",

@@ -74,12 +74,14 @@ export function MobileMapStatusCard({
 
   const handleClearFilters = () => {
     const cleared = clearAllFilters(searchParams);
+    // CFM-604: canonical-on-write guarantee — clearAllFilters() serializes canonically.
     router.push(`/search${cleared ? `?${cleared}` : ""}`);
   };
 
   const handleNearMatches = () => {
     const currentQuery = normalizeSearchQuery(searchParams);
     router.push(
+      // CFM-604: canonical-on-write guarantee — must go through buildCanonicalSearchUrl.
       buildCanonicalSearchUrl(
         applySearchQueryChange(currentQuery, "filter", {
           nearMatches: true,
@@ -92,6 +94,7 @@ export function MobileMapStatusCard({
     const currentQuery = normalizeSearchQuery(searchParams);
     const keysToRemove = new Set(SUGGESTION_TYPE_TO_PARAMS[suggestion.type]);
     router.push(
+      // CFM-604: canonical-on-write guarantee — must go through buildCanonicalSearchUrl.
       buildCanonicalSearchUrl(
         applySearchQueryChange(currentQuery, "filter", {
           minPrice: keysToRemove.has("minPrice") ? undefined : currentQuery.minPrice,

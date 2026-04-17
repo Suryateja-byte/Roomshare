@@ -503,6 +503,7 @@ export default function SearchForm({
 
         setIsSearching(true);
         setShowFilters(false);
+        // CFM-604: canonical-on-write guarantee — must go through buildCanonicalSearchUrl.
         const searchUrl = buildCanonicalSearchUrl(
           normalizeSearchQuery(current)
         );
@@ -596,6 +597,7 @@ export default function SearchForm({
       ) {
         intentQuery.bounds = currentQuery.bounds;
       }
+      // CFM-604: canonical-on-write guarantee — must go through buildCanonicalSearchUrl.
       const searchUrl = buildCanonicalSearchUrl(
         applySearchQueryChange(intentQuery, "filter", {
           minPrice: finalMinPrice ?? undefined,
@@ -767,6 +769,7 @@ export default function SearchForm({
     const preserved = clearAllFilters(
       new URLSearchParams(searchParams.toString())
     );
+    // CFM-604: canonical-on-write guarantee — clearAllFilters() serializes canonically.
     const searchUrl = `/search${preserved ? `?${preserved}` : ""}`;
     if (transitionContext) {
       transitionContext.navigateWithTransition(searchUrl, {

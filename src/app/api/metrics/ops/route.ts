@@ -9,6 +9,7 @@
 
 import crypto from "crypto";
 import { getServerEnv } from "@/lib/env";
+import { LEGACY_URL_ALIASES, LEGACY_URL_SURFACES } from "@/lib/search-params";
 import { getSearchTelemetrySnapshot } from "@/lib/search/search-telemetry";
 
 export const runtime = "nodejs";
@@ -141,6 +142,15 @@ export async function GET(request: Request) {
     `# HELP search_client_abort_total Total number of aborted client search requests`,
     `# TYPE search_client_abort_total counter`,
     `search_client_abort_total ${searchTelemetry.clientAbortTotal}`,
+    ``,
+    `# HELP cfm_search_legacy_url_count Total number of legacy search URL aliases observed`,
+    `# TYPE cfm_search_legacy_url_count counter`,
+    ...LEGACY_URL_SURFACES.flatMap((surface) =>
+      LEGACY_URL_ALIASES.map(
+        (alias) =>
+          `cfm_search_legacy_url_count{alias="${alias}",surface="${surface}"} ${searchTelemetry.legacyUrlCounts[surface][alias]}`
+      )
+    ),
   ].join("\n");
 
   return new Response(prometheusFormat, {

@@ -64,6 +64,7 @@ export default function SortSelect({ currentSort }: SortSelectProps) {
       const currentQuery = normalizeSearchQuery(
         new URLSearchParams(searchParams.toString())
       );
+      // CFM-604: canonical-on-write guarantee — must go through buildCanonicalSearchUrl.
       const url = buildCanonicalSearchUrl(
         applySearchQueryChange(currentQuery, "sort", {
           sort: newSort === "recommended" ? undefined : (newSort as SortOption),

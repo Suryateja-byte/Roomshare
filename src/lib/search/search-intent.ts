@@ -89,6 +89,7 @@ export function buildSearchIntentParams(
           values.selectedLocation.lng
         )
     );
+    // CFM-604: canonical-on-write guarantee — intent URLs serialize via the canonical query builder.
     return serializeSearchQuery(
       applySearchQueryChange(currentQuery, "location", {
         query: undefined,
@@ -120,5 +121,6 @@ export function buildSearchIntentParams(
   nextQuery.lat = undefined;
   nextQuery.lng = undefined;
 
+  // CFM-604: canonical-on-write guarantee — intent URLs serialize via the canonical query builder.
   return serializeSearchQuery(nextQuery);
 }

@@ -15,6 +15,7 @@ import { Button } from "@/components/ui/button";
 import {
   parseSearchParams,
   buildRawParamsFromSearchParams,
+  detectLegacyUrlAliases,
   type RawSearchParams,
 } from "@/lib/search-params";
 import { executeSearchV2 } from "@/lib/search/search-v2-service";
@@ -45,6 +46,7 @@ import {
   SEARCH_SCENARIO_HEADER,
 } from "@/lib/search/testing/search-scenarios";
 import {
+  recordLegacyUrlUsage,
   recordSearchRequestLatency,
   recordSearchV2Fallback,
   recordSearchZeroResults,
@@ -238,6 +240,11 @@ export async function generateMetadata({
 export default async function SearchPage({ searchParams }: SearchPageProps) {
   const requestStartTime = performance.now();
   const rawParams = await searchParams;
+  for (const alias of detectLegacyUrlAliases(rawParams, {
+    includeWhere: false,
+  })) {
+    recordLegacyUrlUsage({ alias, surface: "ssr" });
+  }
   const normalizedQuery = normalizeSearchQuery(rawParams as RawSearchParams);
 
   const {
@@ -310,6 +317,7 @@ export default async function SearchPage({ searchParams }: SearchPageProps) {
       throw new Error(`Unhandled scenario state: ${scenarioState.kind}`);
     }
 
+    // CFM-604: canonical-on-write guarantee — SSR search URLs serialize via the canonical query builder.
     const searchParamsString = serializeSearchQuery(normalizedQuery, {
       includePagination: false,
     }).toString();
@@ -524,6 +532,7 @@ export default async function SearchPage({ searchParams }: SearchPageProps) {
 
   // Build search params string for client-side "Load more" fetches
   // Include all filter/sort params but NOT cursor/page (those are managed client-side)
+  // CFM-604: canonical-on-write guarantee — SSR search URLs serialize via the canonical query builder.
   const searchParamsString = serializeSearchQuery(normalizedQuery, {
     includePagination: false,
   }).toString();

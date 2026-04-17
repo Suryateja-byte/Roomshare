@@ -190,6 +190,7 @@ export function SearchResultsClient({
   );
   const canonicalSearchParamsString = useMemo(
     () =>
+      // CFM-604: canonical-on-write guarantee — client fetch URLs serialize via the canonical query builder.
       serializeSearchQuery(currentNormalizedQuery, {
         includePagination: false,
       }).toString(),
@@ -720,12 +721,15 @@ export function SearchResultsClient({
               </Suspense>
             </div>
           ) : (
-            <Link
-              href={`/search?${clearAllFilters(new URLSearchParams(activeSearchParamsString))}`}
-              className="mt-6 px-4 py-2.5 rounded-full border border-outline-variant/20 bg-transparent hover:bg-surface-canvas text-on-surface text-sm font-medium transition-colors touch-target"
-            >
-              Clear all filters
-            </Link>
+            <>
+              {/* CFM-604: canonical-on-write guarantee — clearAllFilters() serializes canonically. */}
+              <Link
+                href={`/search?${clearAllFilters(new URLSearchParams(activeSearchParamsString))}`}
+                className="mt-6 px-4 py-2.5 rounded-full border border-outline-variant/20 bg-transparent hover:bg-surface-canvas text-on-surface text-sm font-medium transition-colors touch-target"
+              >
+                Clear all filters
+              </Link>
+            </>
           )}
         </div>
       ) : (

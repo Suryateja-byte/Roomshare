@@ -144,6 +144,7 @@ export function searchParamsToSearchFilters(
 
 // Build search URL from filters
 export function buildSearchUrl(filters: SearchFilters): string {
+  // CFM-604: canonical-on-write guarantee — saved-search URLs funnel through buildCanonicalSearchUrl.
   return buildCanonicalSearchUrl(searchFiltersToNormalizedQuery(filters), {
     includePagination: false,
   });

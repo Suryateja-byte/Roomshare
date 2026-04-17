@@ -5,6 +5,11 @@ import { getClientIP } from "@/lib/rate-limit";
 import { isOriginAllowed, isHostAllowed } from "@/lib/origin-guard";
 import { logger, sanitizeErrorMessage } from "@/lib/logger";
 import {
+  LEGACY_URL_ALIASES,
+  type LegacyUrlAlias,
+} from "@/lib/search-params";
+import {
+  recordLegacyUrlUsage,
   recordSearchClientAbort,
   recordSearchMapListMismatch,
 } from "@/lib/search/search-telemetry";
@@ -15,6 +20,7 @@ const MAX_BODY_SIZE = 2_000;
 const ALLOWED_METRICS = new Set([
   "search_client_abort_total",
   "search_map_list_mismatch_total",
+  "cfm.search.legacy_url_count",
 ]);
 const ALLOWED_ROUTES = new Set([
   "search-results-client",
@@ -27,6 +33,8 @@ const ALLOWED_REASONS = new Set([
   "stale-query-hash",
   "stale-request-key",
 ]);
+const ALLOWED_LEGACY_URL_ALIASES = new Set<string>(LEGACY_URL_ALIASES);
+const ALLOWED_LEGACY_URL_SURFACES = new Set(["spa"]);
 
 type SearchClientTelemetryPayload =
   | {
@@ -41,6 +49,11 @@ type SearchClientTelemetryPayload =
       queryHash?: string;
       responseQueryHash?: string;
       reason: string;
+    }
+  | {
+      metric: "cfm.search.legacy_url_count";
+      alias: LegacyUrlAlias;
+      surface: "spa";
     };
 
 function isShortOptionalString(value: unknown, maxLength: number): boolean {
@@ -60,9 +73,31 @@ function validatePayload(
 
   const obj = body as Record<string, unknown>;
 
+  if (typeof obj.metric !== "string" || !ALLOWED_METRICS.has(obj.metric)) {
+    return { valid: false };
+  }
+
+  if (obj.metric === "cfm.search.legacy_url_count") {
+    if (
+      typeof obj.alias !== "string" ||
+      !ALLOWED_LEGACY_URL_ALIASES.has(obj.alias) ||
+      typeof obj.surface !== "string" ||
+      !ALLOWED_LEGACY_URL_SURFACES.has(obj.surface)
+    ) {
+      return { valid: false };
+    }
+
+    return {
+      valid: true,
+      payload: {
+        metric: "cfm.search.legacy_url_count",
+        alias: obj.alias as LegacyUrlAlias,
+        surface: "spa",
+      },
+    };
+  }
+
   if (
-    typeof obj.metric !== "string" ||
-    !ALLOWED_METRICS.has(obj.metric) ||
     typeof obj.route !== "string" ||
     !ALLOWED_ROUTES.has(obj.route) ||
     typeof obj.reason !== "string" ||
@@ -161,7 +196,7 @@ export async function POST(request: Request) {
         queryHash: validation.payload.queryHash,
         reason: validation.payload.reason,
       });
-    } else {
+    } else if (validation.payload.metric === "search_map_list_mismatch_total") {
       recordSearchMapListMismatch({
         route:
           validation.payload.route === "search-results-client"
@@ -170,6 +205,11 @@ export async function POST(request: Request) {
         queryHash: validation.payload.queryHash,
         responseQueryHash: validation.payload.responseQueryHash,
         reason: validation.payload.reason,
+      });
+    } else {
+      recordLegacyUrlUsage({
+        alias: validation.payload.alias,
+        surface: validation.payload.surface,
       });
     }
 

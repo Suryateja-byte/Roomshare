@@ -691,8 +691,8 @@ Switch public discovery and listing detail to one host-managed availability mode
   - `src/components/SearchForm.tsx`
   - `src/components/search/FilterModal.tsx`
 - Acceptance:
-  - old search links work
-  - newly edited or saved URLs are canonicalized
+  - [x] old search links work — evidence: `src/__tests__/lib/search/cfm-604-legacy-url-parity.test.ts`, `tests/e2e/search-url-legacy-reopen.spec.ts`
+  - [x] newly edited or saved URLs are canonicalized — evidence: `src/__tests__/components/search/SearchUrlCanonicalizer.test.tsx`, `src/__tests__/actions/saved-search-reopen.test.ts`
 
 ### Exit Criteria
 
@@ -875,9 +875,9 @@ Remove dead active-product code while keeping historical data structures.
 
 - Goal: explicitly separate cleanup from destructive data removal
 - Primary files:
-  - docs and retention policies
+  - docs and retention policies — authoritative output: [`docs/migration/cfm-retention-policy.md`](../migration/cfm-retention-policy.md)
 - Acceptance:
-  - no early plan exists to drop booking tables, enums, or audit logs
+  - no early plan exists to drop booking tables, enums, or audit logs (see §4 "forbidden list" + §9 reviewer checklist in `cfm-retention-policy.md`)
 
 ### Exit Criteria
 

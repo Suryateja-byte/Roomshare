@@ -1,4 +1,10 @@
 import { logger } from "@/lib/logger";
+import {
+  LEGACY_URL_ALIASES,
+  LEGACY_URL_SURFACES,
+  type LegacyUrlAlias,
+  type LegacyUrlSurface,
+} from "@/lib/search-params";
 import type { SearchBackendSource } from "./search-response";
 
 export type SearchTelemetryRoute =
@@ -24,9 +30,22 @@ interface SearchTelemetryStore {
   loadMoreErrorTotal: number;
   zeroResultsTotal: number;
   clientAbortTotal: number;
+  legacyUrlCounts: Record<LegacyUrlSurface, Record<LegacyUrlAlias, number>>;
 }
 
 const MAX_REQUEST_LATENCY_SAMPLES = 1000;
+
+function createLegacyUrlCounts(): Record<
+  LegacyUrlSurface,
+  Record<LegacyUrlAlias, number>
+> {
+  return Object.fromEntries(
+    LEGACY_URL_SURFACES.map((surface) => [
+      surface,
+      Object.fromEntries(LEGACY_URL_ALIASES.map((alias) => [alias, 0])),
+    ])
+  ) as Record<LegacyUrlSurface, Record<LegacyUrlAlias, number>>;
+}
 
 const telemetryStore: SearchTelemetryStore = {
   requestLatencies: new Array<SearchRequestLatencyRecord | undefined>(
@@ -45,6 +64,7 @@ const telemetryStore: SearchTelemetryStore = {
   loadMoreErrorTotal: 0,
   zeroResultsTotal: 0,
   clientAbortTotal: 0,
+  legacyUrlCounts: createLegacyUrlCounts(),
 };
 
 function computePercentile(samples: number[], percentile: number): number {
@@ -195,11 +215,34 @@ export function recordSearchClientAbort({
   });
 }
 
+export function recordLegacyUrlUsage({
+  alias,
+  surface,
+}: {
+  alias: LegacyUrlAlias;
+  surface: LegacyUrlSurface;
+}): void {
+  telemetryStore.legacyUrlCounts[surface][alias] += 1;
+  logger.sync.info("cfm.search.legacy_url_count", {
+    alias,
+    surface,
+    total: telemetryStore.legacyUrlCounts[surface][alias],
+  });
+}
+
 export function getSearchTelemetrySnapshot() {
   const validLatencies = telemetryStore.requestLatencies
     .filter((entry): entry is SearchRequestLatencyRecord => entry !== undefined)
     .map((entry) => entry.durationMs)
     .sort((left, right) => left - right);
+  const legacyUrlCounts = createLegacyUrlCounts();
+
+  for (const surface of LEGACY_URL_SURFACES) {
+    for (const alias of LEGACY_URL_ALIASES) {
+      legacyUrlCounts[surface][alias] =
+        telemetryStore.legacyUrlCounts[surface][alias];
+    }
+  }
 
   return {
     requestLatency: {
@@ -217,6 +260,7 @@ export function getSearchTelemetrySnapshot() {
     loadMoreErrorTotal: telemetryStore.loadMoreErrorTotal,
     zeroResultsTotal: telemetryStore.zeroResultsTotal,
     clientAbortTotal: telemetryStore.clientAbortTotal,
+    legacyUrlCounts,
   };
 }
 
@@ -237,4 +281,5 @@ export function resetSearchTelemetryForTests(): void {
   telemetryStore.loadMoreErrorTotal = 0;
   telemetryStore.zeroResultsTotal = 0;
   telemetryStore.clientAbortTotal = 0;
+  telemetryStore.legacyUrlCounts = createLegacyUrlCounts();
 }
