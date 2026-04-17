@@ -359,6 +359,7 @@ Future additions should append here and bump the relevant version constant.
 |---|---|---|
 | 2026-04-15 | `cfm-search-contract-v1` | Initial contract — CFM-002 documents existing implementation. `SEARCH_QUERY_HASH_VERSION = "2026-04-15.cfm-search-contract-v1"`, `SEARCH_RESPONSE_VERSION = "2026-04-15.phase2-public-availability.search-contract-v1"`, `SEARCH_DOC_PROJECTION_VERSION = 1`. |
 | 2026-04-16 | `cfm-search-contract-v1` | CFM-403: §3.4 enumerates every caller of `queryHash`; §3.5 adds the semantic-equivalence invariant and the load-bearing regression test reference. No contract version bump — docs + test only. |
+| 2026-04-16 | `cfm-search-contract-v1` | CFM-004: cross-link to `docs/migration/cfm-observability.md` for the runtime monitoring of the invariants in §3.5. No contract change. |
 
 ---
 
@@ -369,6 +370,10 @@ Future additions should append here and bump the relevant version constant.
 - `docs/host-managed-patch-contract.md` — writer counterpart: the
   authoritative contract for `PATCH /api/listings/:id` on host-managed
   listings (CFM-302).
+- `docs/migration/cfm-observability.md` — migration observability spec
+  (CFM-004). Defines the dirty-doc divergence counter
+  (`cfm.search.doc.divergence_count`) and query-hash-version-mismatch
+  counter that monitor the invariants in §3.5 at runtime.
 - `.claude/CLAUDE.md` — project-wide operating rules (architecture
   boundaries, reliability rules).
 - Source-of-truth types: `src/lib/search-params.ts`,

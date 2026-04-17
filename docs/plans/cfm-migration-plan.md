@@ -291,14 +291,14 @@ Prepare the system for migration without changing user behavior.
 
 - Goal: define the metrics, alerts, dashboards, and log dimensions required before rollout
 - Primary files:
-  - docs only in this phase
+  - docs only in this phase — authoritative spec: [`docs/migration/cfm-observability.md`](../migration/cfm-observability.md)
 - Output:
   - migration dashboard spec
   - dirty-doc divergence checks
   - stale listing monitoring
   - legacy write leakage monitoring
 - Acceptance:
-  - every P0/P1 migration failure mode has an observable signal
+  - every P0/P1 migration failure mode has an observable signal (see §3 and §8 of `cfm-observability.md`)
 
 ### Exit Criteria
 

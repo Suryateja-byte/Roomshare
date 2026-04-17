@@ -243,6 +243,7 @@ doc and `HOST_MANAGED_PATCH_KEYS`.
 | Date | Change |
 |---|---|
 | 2026-04-16 | Initial doc (CFM-302). Captures the contract as of CFM-504. |
+| 2026-04-16 | CFM-004: cross-link to `docs/migration/cfm-observability.md` for runtime monitoring of non-negotiable invariants #2 and #9. No contract change. |
 
 ---
 
@@ -251,6 +252,11 @@ doc and `HOST_MANAGED_PATCH_KEYS`.
 - `docs/search-contract.md` — normalized search input + response contract
   (CFM-002). `PublicAvailability` is the reader counterpart to these writes.
 - `docs/plans/cfm-migration-plan.md` — full migration plan.
+- `docs/migration/cfm-observability.md` — migration observability spec
+  (CFM-004). Defines the host-managed invariant tripwires
+  (`cfm.listing.host_managed_invariant_violation_count`) and the
+  repair-loop clobber guard (`cfm.cron.host_managed_clobber_count`) that
+  enforce non-negotiable invariants #2 and #9 at runtime.
 - Source of truth:
   `src/app/api/listings/[id]/route.ts` (schema + dispatch),
   `src/lib/listings/host-managed-write.ts` (helper + error codes).
