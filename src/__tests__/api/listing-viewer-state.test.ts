@@ -174,6 +174,29 @@ describe("GET /api/listings/[id]/viewer-state", () => {
     });
   });
 
+  it("keeps HELD bookings from unlocking public reviews (regression lock)", async () => {
+    (prisma.booking.findFirst as jest.Mock).mockResolvedValue(null);
+
+    const response = await GET(createRequest(), routeContext);
+    const data = await response.json();
+
+    expect(response.status).toBe(200);
+    expect(prisma.booking.findFirst).toHaveBeenCalledWith({
+      where: {
+        listingId: "listing-123",
+        tenantId: "user-123",
+        status: "ACCEPTED",
+      },
+      select: { id: true },
+    });
+    expect(data.reviewEligibility).toEqual({
+      canPublicReview: false,
+      hasLegacyAcceptedBooking: false,
+      canLeavePrivateFeedback: false,
+      reason: "ACCEPTED_BOOKING_REQUIRED",
+    });
+  });
+
   it("returns existingReview with correct shape when review exists", async () => {
     const createdAt = new Date("2025-01-15T10:00:00Z");
     (prisma.review.findFirst as jest.Mock).mockResolvedValue({

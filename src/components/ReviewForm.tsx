@@ -243,8 +243,8 @@ export default function ReviewForm({
             Past stay required
           </h3>
           <p className="text-sm text-on-surface-variant">
-            You can leave a public review after an accepted booking for this
-            listing
+            Only past guests with a confirmed stay at this listing can leave a
+            public review.
           </p>
         </div>
       </div>

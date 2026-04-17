@@ -116,7 +116,9 @@ export async function POST(request: Request) {
       // Require booking history before allowing review (prevents fake reviews)
       if (!hasBooking) {
         return NextResponse.json(
-          { error: "You must have a booking to review this listing" },
+          {
+            error: "Only past guests with a confirmed stay can review this listing",
+          },
           { status: 403 }
         );
       }

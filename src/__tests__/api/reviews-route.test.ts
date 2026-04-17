@@ -231,7 +231,9 @@ describe("Reviews API Route", () => {
       const res = await POST(createRequest("POST", validBody));
       expect(res.status).toBe(403);
       const body = await res.json();
-      expect(body.error).toContain("booking");
+      expect(body.error).toBe(
+        "Only past guests with a confirmed stay can review this listing"
+      );
     });
 
     it("creates review successfully for listing", async () => {

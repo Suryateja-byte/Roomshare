@@ -375,8 +375,79 @@ describe("/api/reviews", () => {
 
         expect(response.status).toBe(403);
         expect(data.error).toBe(
-          "You must have a booking to review this listing"
+          "Only past guests with a confirmed stay can review this listing"
         );
+      });
+
+      it("BIZ-02 regression: HELD booking does not unlock listing reviews", async () => {
+        (prisma.review.findFirst as jest.Mock).mockResolvedValue(null);
+        (prisma.booking.findFirst as jest.Mock).mockResolvedValue(null);
+
+        const response = await POST(
+          createRequest({
+            listingId: "listing-123",
+            rating: 5,
+            comment: "Great place!",
+          })
+        );
+        const data = await response.json();
+
+        expect(response.status).toBe(403);
+        expect(data.error).toBe(
+          "Only past guests with a confirmed stay can review this listing"
+        );
+        expect(prisma.booking.findFirst).toHaveBeenCalledWith({
+          where: {
+            listingId: "listing-123",
+            tenantId: "user-123",
+            status: "ACCEPTED",
+          },
+        });
+      });
+
+      it("BIZ-02 regression: messaging without a booking still cannot create a public review", async () => {
+        (prisma.review.findFirst as jest.Mock).mockResolvedValue(null);
+        (prisma.booking.findFirst as jest.Mock).mockResolvedValue(null);
+
+        const response = await POST(
+          createRequest({
+            listingId: "listing-123",
+            rating: 4,
+            comment: "We already chatted",
+          })
+        );
+        const data = await response.json();
+
+        expect(response.status).toBe(403);
+        expect(data.error).toBe(
+          "Only past guests with a confirmed stay can review this listing"
+        );
+      });
+
+      it("BIZ-02 regression: orphaned accepted bookings with tenantId null cannot be reused by another account", async () => {
+        (prisma.review.findFirst as jest.Mock).mockResolvedValue(null);
+        (prisma.booking.findFirst as jest.Mock).mockResolvedValue(null);
+
+        const response = await POST(
+          createRequest({
+            listingId: "listing-123",
+            rating: 4,
+            comment: "Trying to reuse an orphaned booking",
+          })
+        );
+        const data = await response.json();
+
+        expect(response.status).toBe(403);
+        expect(data.error).toBe(
+          "Only past guests with a confirmed stay can review this listing"
+        );
+        expect(prisma.booking.findFirst).toHaveBeenCalledWith({
+          where: {
+            listingId: "listing-123",
+            tenantId: "user-123",
+            status: "ACCEPTED",
+          },
+        });
       });
 
       it("BIZ-04: blocks self-review", async () => {
