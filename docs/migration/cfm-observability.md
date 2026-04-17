@@ -122,6 +122,12 @@ For every P0/P1 failure mode in the plan doc, at least one observable signal exi
 | `availabilitySource` flips | `cfm.availability.source_flip_count{from,to}` (counter, `from/to ∈ {LEGACY_BOOKING, HOST_MANAGED}`) | informational; `to=LEGACY_BOOKING` on migrated listing **> 0** is an alert | Sentry | §7.9 |
 | Listings stuck in review bucket | `cfm.listing.needs_migration_review_count` (gauge, hourly) | static count > 2 days | email | §7.9 |
 | Cohort backfill job error | `cfm.cron.cohort_backfill.error_count` (counter) | **> 0** | Sentry | §7.9 |
+| Clean cohort converted during backfill | `cfm.backfill.converted` (structured log; one event per converted listing) | informational; must match the applied-count summary for a run | dashboard + log query | §7.9 |
+| Blocked/manual legacy listing stamped for review | `cfm.backfill.review_flag_set` (structured log; one event per stamped listing) | informational; must match the stamped-count summary for a run | dashboard + log query | §7.9 |
+| Listing skipped during re-check | `cfm.backfill.skipped` (structured log) | informational; investigate spikes above dry-run expectations | dashboard + log query | §7.9 |
+| Listing deferred after bounded retries | `cfm.backfill.deferred` (structured log) | **> 0** on a canary or sustained full-run growth | email | §7.9 |
+| Backfill mutation raised an error | `cfm.backfill.error` (structured log) | **> 0** | Sentry | §7.9 |
+| Active backfill run heartbeat | `cfm.backfill.progress` (structured log) | no heartbeat for > 15 min during an active run | dashboard only | §7.9 |
 
 ### P1 — Review/trust policy (CFM-701)
 
@@ -177,6 +183,17 @@ await listingLogger.info("listing.patched", { diff: ... });
 
 This way all downstream log lines inherit the migration context with no per-call boilerplate.
 
+### CFM-502 backfill event schema
+
+| Event | Required fields | Notes |
+|---|---|---|
+| `cfm.backfill.converted` | `listingId`, `runId`, `cohort="clean_auto_convert"`, `fromSource`, `toSource`, `previousVersion`, `nextVersion`, `actor` | Emitted by `applyHostManagedMigrationBackfillForListing` after the atomic listing update + dirty mark succeeds. |
+| `cfm.backfill.review_flag_set` | `listingId`, `runId`, `cohort`, `reasons`, `fromSource`, `toSource`, `previousVersion`, `nextVersion`, `actor` | Emitted by `applyNeedsReviewFlagForListing` when only `needsMigrationReview` is stamped. `fromSource` and `toSource` should both remain `LEGACY_BOOKING`. |
+| `cfm.backfill.skipped` | `listingId`, `runId`, `cohort`, `reasons`, `outcome`, `previousVersion`, `nextVersion`, `fromSource`, `toSource`, `actor` | `outcome ∈ {already_host_managed, already_flagged, blocked_has_been_reclassified}`. |
+| `cfm.backfill.deferred` | `listingId`, `runId`, `attempts`, `lastErrorCode`, `actor` | Emitted by the script after bounded version-conflict retries are exhausted for a row. |
+| `cfm.backfill.error` | `listingId`, `runId`, `message`, `actor` | Message must stay redacted through the existing logger sanitization path. |
+| `cfm.backfill.progress` | `runId`, `appliedCount`, `stampedCount`, `skippedCount`, `deferredCount`, `batchCursor`, `actor` | Heartbeat for an active run; use alongside the CLI summary for operator progress. |
+
 ---
 
 ## 5. Dashboards Spec
@@ -219,6 +236,7 @@ Must-have panels:
 2. **Doc/row divergence** — `cfm.search.doc.divergence_count` stacked by `reason` (`missing|version_skew|stale`).
 3. **Map/list mismatch rate** — `rate(search_map_list_mismatch_total[15m])` (existing metric from `MONITORING.md`).
 4. **Query-hash version mismatch** — `cfm.search.query_hash_version_mismatch_count` (should read 0 after a version bump has had 1 cache-TTL worth of time).
+5. **Backfill run overlay** — correlate `cfm.backfill.progress`, `cfm.backfill.deferred`, and `cfm.backfill.error` with search-divergence spikes during cohort-backfill windows.
 
 ### 5.5 Messaging Safety (owner: product/messaging)
 
@@ -331,7 +349,7 @@ Each signal above points at a runbook anchor. The anchors below are stubs; full 
 - **§7.6 Query-hash version mismatch** — CDN/edge cache did not invalidate. Actions: verify `SEARCH_QUERY_HASH_VERSION` bumped, confirm any external cache TTL has elapsed, force-purge if necessary.
 - **§7.7 Messaging duplicate** — two conversations for same participant pair. Actions: merge via admin tool, verify dedup key in messaging contact handler.
 - **§7.8 Stale listing** — expected to be empty after CFM-801. Actions: verify freshness cron is running, inspect per-bucket counts, re-run threshold job manually if needed.
-- **§7.9 Cohort backfill** — stuck review bucket. Actions: run `review` listing export from admin and triage manually; review backfill job logs.
+- **§7.9 Cohort backfill** — stuck review bucket. Actions: follow the [`CFM backfill runbook`](./cfm-backfill-runbook.md), inspect the `Run ID`-correlated `cfm.backfill.*` log stream, rerun deferred rows, and use the review export only for listings that remain blocked after the backfill rerun.
 - **§7.10 Unauthorized review** — review created without accepted booking. Actions: delete review, identify bypass, harden review eligibility (CFM-701).
 - **§7.11 Legacy drain** — open bookings past deadline. Actions: list via 6.7, nudge hosts to terminate, force-terminate per legal-safe policy.
 
@@ -413,3 +431,4 @@ Each signal above has a concrete verification path that can be executed before r
 | Date | Change |
 |---|---|
 | 2026-04-16 | Initial version (CFM-004). Defines metric namespace, log dimensions, failure-mode matrix, dashboards, divergence SQL, invariant/gate coverage, and phase exit gates. |
+| 2026-04-17 | Added the CFM-502 `cfm.backfill.*` structured-log events, the runbook link for §7.9, and the search-dashboard overlay reference for cohort backfill monitoring. |

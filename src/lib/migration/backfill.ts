@@ -1,5 +1,6 @@
-import type { ListingStatus, Prisma } from "@prisma/client";
+import { Prisma, type ListingStatus } from "@prisma/client";
 
+import { logger, sanitizeErrorMessage } from "../logger";
 import { prisma } from "../prisma";
 import { markListingDirtyInTx } from "../search/search-doc-dirty";
 import {
@@ -15,6 +16,9 @@ import {
 type QueryClient = Prisma.TransactionClient | typeof prisma;
 
 const DEFAULT_BATCH_SIZE = 200;
+const DEFAULT_BACKFILL_RUN_ID = "cfm-backfill-untracked";
+const BACKFILL_ACTOR = "cfm-backfill-script";
+const VERSION_CONFLICT_ERROR_CODE = "P2025";
 
 interface RawListingMigrationSnapshot {
   id: string;
@@ -107,6 +111,30 @@ export interface ApplyHostManagedMigrationBackfillResult {
   updateData: HostManagedMigrationUpdateData | null;
 }
 
+export interface ApplyNeedsReviewFlagForListingResult {
+  listingId: string;
+  outcome: "applied" | "skipped" | "not_found";
+  classification: ListingMigrationClassification | null;
+}
+
+export interface BackfillProgressEventPayload {
+  appliedCount: number;
+  stampedCount: number;
+  skippedCount: number;
+  deferredCount: number;
+  batchCursor: string | null;
+}
+
+type BackfillSkipOutcome =
+  | "already_host_managed"
+  | "already_flagged"
+  | "blocked_has_been_reclassified";
+
+interface BackfillEventToEmit {
+  event: string;
+  payload: Record<string, unknown>;
+}
+
 function getInventoryWindowStart(now: Date): Date {
   return new Date(now.toISOString().slice(0, 10));
 }
@@ -165,6 +193,109 @@ function buildReportRow(
     classification,
     backfillPlan,
   };
+}
+
+function emitBackfillEvent(
+  event: string,
+  payload: Record<string, unknown>,
+  runId: string
+): void {
+  logger.sync.info(event, {
+    actor: BACKFILL_ACTOR,
+    runId,
+    ...payload,
+  });
+}
+
+function emitBackfillErrorEvent(
+  listingId: string,
+  error: unknown,
+  runId: string
+): void {
+  emitBackfillEvent(
+    "cfm.backfill.error",
+    {
+      listingId,
+      message: sanitizeErrorMessage(error),
+    },
+    runId
+  );
+}
+
+function getSkipOutcomeForSnapshot(
+  snapshot: ListingMigrationSnapshot
+): BackfillSkipOutcome {
+  if (snapshot.availabilitySource !== "LEGACY_BOOKING") {
+    return "already_host_managed";
+  }
+
+  if (snapshot.needsMigrationReview) {
+    return "already_flagged";
+  }
+
+  return "blocked_has_been_reclassified";
+}
+
+function buildSkippedEvent(
+  listingId: string,
+  snapshot: ListingMigrationSnapshot,
+  classification: ListingMigrationClassification
+): BackfillEventToEmit {
+  return {
+    event: "cfm.backfill.skipped",
+    payload: {
+      listingId,
+      cohort: classification.cohort,
+      reasons: classification.reasons,
+      outcome: getSkipOutcomeForSnapshot(snapshot),
+      previousVersion: snapshot.version,
+      nextVersion: snapshot.version,
+      fromSource: snapshot.availabilitySource,
+      toSource: snapshot.availabilitySource,
+    },
+  };
+}
+
+function makeVersionConflictError(listingId: string): Error & { code: string } {
+  return Object.assign(
+    new Error(`Listing ${listingId} changed between report generation and apply.`),
+    { code: VERSION_CONFLICT_ERROR_CODE }
+  );
+}
+
+export function isVersionConflictError(error: unknown): boolean {
+  return (
+    error instanceof Prisma.PrismaClientKnownRequestError
+      ? error.code === VERSION_CONFLICT_ERROR_CODE
+      : typeof error === "object" &&
+        error !== null &&
+        "code" in error &&
+        error.code === VERSION_CONFLICT_ERROR_CODE
+  );
+}
+
+export function logBackfillDeferred(
+  listingId: string,
+  runId: string,
+  attempts: number,
+  lastErrorCode: string | null
+): void {
+  emitBackfillEvent(
+    "cfm.backfill.deferred",
+    {
+      listingId,
+      attempts,
+      lastErrorCode,
+    },
+    runId
+  );
+}
+
+export function logBackfillProgress(
+  payload: BackfillProgressEventPayload,
+  runId: string
+): void {
+  emitBackfillEvent("cfm.backfill.progress", { ...payload }, runId);
 }
 
 // CFM-405c: markListingDirtyAfterMigration is no longer needed as a separate
@@ -418,48 +549,178 @@ export async function generateHostManagedMigrationReport(
 
 export async function applyHostManagedMigrationBackfillForListing(
   listingId: string,
-  now: Date = new Date()
+  now: Date = new Date(),
+  runId: string = DEFAULT_BACKFILL_RUN_ID
 ): Promise<ApplyHostManagedMigrationBackfillResult> {
-  const result = await prisma.$transaction(async (tx) => {
-    const snapshot = await fetchLockedListingMigrationSnapshot(tx, listingId, now);
+  try {
+    const transactionOutcome = await prisma.$transaction(async (tx) => {
+      const snapshot = await fetchLockedListingMigrationSnapshot(tx, listingId, now);
 
-    if (!snapshot) {
+      if (!snapshot) {
+        return {
+          result: {
+            listingId,
+            outcome: "not_found" as const,
+            classification: null,
+            updateData: null,
+          },
+          eventToEmit: null,
+        };
+      }
+
+      const backfillPlan = planHostManagedMigrationBackfill(snapshot, now);
+
+      if (!backfillPlan.shouldApply || !backfillPlan.updateData) {
+        return {
+          result: {
+            listingId,
+            outcome: "skipped" as const,
+            classification: backfillPlan.classification,
+            updateData: null,
+          },
+          eventToEmit: buildSkippedEvent(
+            listingId,
+            snapshot,
+            backfillPlan.classification
+          ),
+        };
+      }
+
+      await tx.listing.update({
+        where: { id: listingId },
+        data: {
+          ...backfillPlan.updateData,
+          version: { increment: 1 },
+        },
+      });
+
+      await markListingDirtyInTx(tx, listingId, "listing_updated");
+
       return {
-        listingId,
-        outcome: "not_found" as const,
-        classification: null,
-        updateData: null,
+        result: {
+          listingId,
+          outcome: "applied" as const,
+          classification: backfillPlan.classification,
+          updateData: backfillPlan.updateData,
+        },
+        eventToEmit: {
+          event: "cfm.backfill.converted",
+          payload: {
+            listingId,
+            cohort: backfillPlan.classification.cohort,
+            reasons: backfillPlan.classification.reasons,
+            fromSource: snapshot.availabilitySource,
+            toSource: backfillPlan.updateData.availabilitySource,
+            previousVersion: snapshot.version,
+            nextVersion: snapshot.version + 1,
+          },
+        },
       };
-    }
-
-    const backfillPlan = planHostManagedMigrationBackfill(snapshot, now);
-
-    if (!backfillPlan.shouldApply || !backfillPlan.updateData) {
-      return {
-        listingId,
-        outcome: "skipped" as const,
-        classification: backfillPlan.classification,
-        updateData: null,
-      };
-    }
-
-    await tx.listing.update({
-      where: { id: listingId },
-      data: {
-        ...backfillPlan.updateData,
-        version: { increment: 1 },
-      },
     });
 
-    await markListingDirtyInTx(tx, listingId, "listing_updated");
+    if (transactionOutcome.eventToEmit) {
+      emitBackfillEvent(
+        transactionOutcome.eventToEmit.event,
+        transactionOutcome.eventToEmit.payload,
+        runId
+      );
+    }
 
-    return {
-      listingId,
-      outcome: "applied" as const,
-      classification: backfillPlan.classification,
-      updateData: backfillPlan.updateData,
-    };
-  });
+    return transactionOutcome.result;
+  } catch (error) {
+    emitBackfillErrorEvent(listingId, error, runId);
+    throw error;
+  }
+}
 
-  return result;
+export async function applyNeedsReviewFlagForListing(
+  listingId: string,
+  now: Date = new Date(),
+  runId: string = DEFAULT_BACKFILL_RUN_ID,
+  expectedVersion?: number
+): Promise<ApplyNeedsReviewFlagForListingResult> {
+  try {
+    const transactionOutcome = await prisma.$transaction(async (tx) => {
+      const snapshot = await fetchLockedListingMigrationSnapshot(tx, listingId, now);
+
+      if (!snapshot) {
+        return {
+          result: {
+            listingId,
+            outcome: "not_found" as const,
+            classification: null,
+          },
+          eventToEmit: null,
+        };
+      }
+
+      if (
+        typeof expectedVersion === "number" &&
+        expectedVersion !== snapshot.version
+      ) {
+        throw makeVersionConflictError(listingId);
+      }
+
+      const classification = classifyListingForHostManagedMigration(snapshot, now);
+      const shouldApplyReviewFlag =
+        snapshot.availabilitySource === "LEGACY_BOOKING" &&
+        (classification.cohort === "blocked_legacy_state" ||
+          classification.cohort === "manual_review") &&
+        !snapshot.needsMigrationReview;
+
+      if (!shouldApplyReviewFlag) {
+        return {
+          result: {
+            listingId,
+            outcome: "skipped" as const,
+            classification,
+          },
+          eventToEmit: buildSkippedEvent(listingId, snapshot, classification),
+        };
+      }
+
+      await tx.listing.update({
+        where: { id: listingId, version: snapshot.version },
+        data: {
+          needsMigrationReview: true,
+          version: { increment: 1 },
+        },
+      });
+
+      // Review-flag-only writes keep the listing on the legacy availability path,
+      // so the search projection does not observe a material change.
+      return {
+        result: {
+          listingId,
+          outcome: "applied" as const,
+          classification,
+        },
+        eventToEmit: {
+          event: "cfm.backfill.review_flag_set",
+          payload: {
+            listingId,
+            cohort: classification.cohort,
+            reasons: classification.reasons,
+            fromSource: snapshot.availabilitySource,
+            toSource: snapshot.availabilitySource,
+            previousVersion: snapshot.version,
+            nextVersion: snapshot.version + 1,
+          },
+        },
+      };
+    });
+
+    if (transactionOutcome.eventToEmit) {
+      emitBackfillEvent(
+        transactionOutcome.eventToEmit.event,
+        transactionOutcome.eventToEmit.payload,
+        runId
+      );
+    }
+
+    return transactionOutcome.result;
+  } catch (error) {
+    emitBackfillErrorEvent(listingId, error, runId);
+    throw error;
+  }
 }
