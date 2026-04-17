@@ -965,6 +965,8 @@ const history = await getTargetAuditHistory("User", "user_456");
 
 ## Migration Guide
 
+> **CFM Retention Guardrail**: Booking / BookingAuditLog / ListingDayInventory tables, all `BookingStatus` enum values (including `HELD` and `EXPIRED`), and compatibility columns on `Listing` (`availableSlots`, `bookingMode`, `holdTtlMinutes`) are retained indefinitely per [`docs/migration/cfm-retention-policy.md`](migration/cfm-retention-policy.md). Any migration authored during CFM phases that touches those structures MUST pass the §9 reviewer checklist in the retention policy.
+
 ### Creating Migrations
 
 ```bash

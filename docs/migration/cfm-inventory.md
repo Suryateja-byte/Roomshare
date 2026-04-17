@@ -126,6 +126,8 @@
 
 ### 2.5 Bookings history & legacy lifecycle (phase 9, 10)
 
+> All rows in this section are "history-only" per [`docs/migration/cfm-retention-policy.md`](./cfm-retention-policy.md) — retained indefinitely. No CFM phase drops booking tables, enum values, or audit logs.
+
 | Path | Type | Role | Touches | Phase(s) | Status | Notes |
 |---|---|---|---|---|---|---|
 | `src/app/bookings/page.tsx` | route (SSR) | reader | booking | 1, 9 | not_started | CFM-104 keeps interactive only for legacy rows; CFM-901 converts to history-first. |
@@ -374,3 +376,4 @@ These two indexes together are the Phase 6 picklist.
 |---|---|
 | 2026-04-16 | Initial inventory (CFM-001). Reflects tracker snapshot as of branch `codex/contact-first-multislot` and Wave 2 completion. |
 | 2026-04-16 | CFM-001 nit: corrected §2.4 and §5 row 13 — `src/app/actions/chat.ts` is the real messaging server action (`startConversation`, `sendMessage`), not a chatbot. The three surfaces genuinely missing from the plan's list are `src/lib/messages.ts`, `/api/messages/route.ts`, `/app/messages/**`. |
+| 2026-04-16 | CFM-1003: §2.5 header cross-links to `docs/migration/cfm-retention-policy.md` (no-drop policy for Booking / BookingAuditLog / ListingDayInventory + all enum values). |
