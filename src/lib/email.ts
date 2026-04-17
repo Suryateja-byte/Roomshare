@@ -215,6 +215,7 @@ const emailTypeToPreferenceKey: Record<string, keyof NotificationPreferences> =
     bookingHoldRequest: "emailBookingRequests",
     bookingExpired: "emailBookingUpdates",
     bookingHoldExpired: "emailBookingUpdates",
+    listingFreshnessReminder: "emailBookingUpdates",
     newMessage: "emailMessages",
     newReview: "emailReviews",
     searchAlert: "emailSearchAlerts",

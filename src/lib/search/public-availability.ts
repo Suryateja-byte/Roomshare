@@ -88,9 +88,9 @@ interface BuildFreshnessReadModelOptions {
 }
 
 const DAY_IN_MS = 24 * 60 * 60 * 1000;
-const REMINDER_THRESHOLD_DAYS = 14;
-const STALE_THRESHOLD_DAYS = 21;
-const AUTO_PAUSE_THRESHOLD_DAYS = 30;
+export const REMINDER_THRESHOLD_DAYS = 14;
+export const STALE_THRESHOLD_DAYS = 21;
+export const AUTO_PAUSE_THRESHOLD_DAYS = 30;
 
 function toSafeCount(value: number | null | undefined, fallback = 0): number {
   if (typeof value !== "number" || !Number.isFinite(value)) {

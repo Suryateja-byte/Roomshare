@@ -14,7 +14,9 @@ export type NotificationType =
   | "NEW_MESSAGE"
   | "NEW_REVIEW"
   | "LISTING_SAVED"
-  | "SEARCH_ALERT";
+  | "SEARCH_ALERT"
+  | "LISTING_FRESHNESS_REMINDER"
+  | "LISTING_STALE_WARNING";
 
 export interface CreateNotificationInput {
   userId: string;

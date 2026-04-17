@@ -106,4 +106,35 @@ describe("email preference mapping for new types", () => {
     );
     expect(result.skipped).toBe(true);
   });
+
+  it("listingFreshnessReminder respects emailBookingUpdates=false", async () => {
+    mockFindUnique.mockResolvedValue({
+      notificationPreferences: { emailBookingUpdates: false },
+    });
+    const result = await sendNotificationEmailWithPreference(
+      "listingFreshnessReminder",
+      "user-1",
+      "test@test.com",
+      { hostName: "H", listingTitle: "L", listingId: "listing-1" }
+    );
+    expect(result.skipped).toBe(true);
+  });
+
+  it("listingStaleWarning is not preference-gated", async () => {
+    mockFindUnique.mockResolvedValue({
+      notificationPreferences: { emailBookingUpdates: false },
+    });
+    mockFetchWithTimeout.mockResolvedValue({ ok: true });
+
+    const result = await sendNotificationEmailWithPreference(
+      "listingStaleWarning",
+      "user-1",
+      "test@test.com",
+      { hostName: "H", listingTitle: "L", listingId: "listing-1" }
+    );
+
+    expect(result.success).toBe(true);
+    expect(result.skipped).toBeUndefined();
+    expect(mockFindUnique).not.toHaveBeenCalled();
+  });
 });

@@ -131,6 +131,20 @@ describe("Multi-slot booking feature flag cross-validation", () => {
     expect(envModule.features.privateFeedback).toBe(true);
   });
 
+  it("keeps freshness notifications disabled by default and exposes the flag when enabled", async () => {
+    let envModule = await import("@/lib/env");
+    expect(envModule.features.freshnessNotifications).toBe(false);
+
+    jest.resetModules();
+    process.env = {
+      ...baseEnv,
+      ENABLE_FRESHNESS_NOTIFICATIONS: "on",
+    } as unknown as NodeJS.ProcessEnv;
+
+    envModule = await import("@/lib/env");
+    expect(envModule.features.freshnessNotifications).toBe(true);
+  });
+
   it("disables keyset pagination when CURSOR_SECRET is invalid", async () => {
     process.env.CURSOR_SECRET = "short";
 

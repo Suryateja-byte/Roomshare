@@ -133,6 +133,8 @@ describe("notifications", () => {
         "NEW_REVIEW",
         "LISTING_SAVED",
         "SEARCH_ALERT",
+        "LISTING_FRESHNESS_REMINDER",
+        "LISTING_STALE_WARNING",
       ];
 
       it.each(allTypes)("creates notification with type %s", async (type) => {

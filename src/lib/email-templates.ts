@@ -327,6 +327,68 @@ export const emailTemplates = {
     };
   },
 
+  listingFreshnessReminder: (data: {
+    hostName: string;
+    listingTitle: string;
+    listingId: string;
+  }) => {
+    const safeHostName = escapeHtml(data.hostName);
+    const safeListingTitle = escapeHtml(data.listingTitle);
+    const listingHref = buildAppHref(
+      `/listings/${encodeURIComponent(data.listingId)}`
+    );
+
+    return {
+      subject: "Confirm your listing is still available",
+      html: baseTemplate(`
+            <h2 style="margin: 0 0 16px; color: #18181b; font-size: 20px;">Confirm Your Listing</h2>
+            <p style="margin: 0 0 24px; color: #52525b; font-size: 16px; line-height: 1.6;">
+                Hi ${safeHostName},
+            </p>
+            <p style="margin: 0 0 24px; color: #52525b; font-size: 16px; line-height: 1.6;">
+                Please confirm that <strong>"${safeListingTitle}"</strong> is still available.
+            </p>
+            <p style="margin: 0 0 24px; color: #52525b; font-size: 16px; line-height: 1.6;">
+                A quick freshness check keeps your listing details current and helps avoid stale availability.
+            </p>
+            <a href="${listingHref}" style="display: inline-block; background-color: #18181b; color: #ffffff; text-decoration: none; padding: 14px 28px; border-radius: 8px; font-weight: 600; font-size: 14px;">
+                Confirm Availability
+            </a>
+        `),
+    };
+  },
+
+  listingStaleWarning: (data: {
+    hostName: string;
+    listingTitle: string;
+    listingId: string;
+  }) => {
+    const safeHostName = escapeHtml(data.hostName);
+    const safeListingTitle = escapeHtml(data.listingTitle);
+    const listingHref = buildAppHref(
+      `/listings/${encodeURIComponent(data.listingId)}`
+    );
+
+    return {
+      subject: "Your listing needs a freshness check",
+      html: baseTemplate(`
+            <h2 style="margin: 0 0 16px; color: #18181b; font-size: 20px;">Freshness Check Required</h2>
+            <p style="margin: 0 0 24px; color: #52525b; font-size: 16px; line-height: 1.6;">
+                Hi ${safeHostName},
+            </p>
+            <p style="margin: 0 0 24px; color: #52525b; font-size: 16px; line-height: 1.6;">
+                <strong>"${safeListingTitle}"</strong> needs a freshness check before it can return to search results.
+            </p>
+            <p style="margin: 0 0 24px; color: #52525b; font-size: 16px; line-height: 1.6;">
+                Confirm that the listing is still available to restore its visibility and keep your availability details accurate.
+            </p>
+            <a href="${listingHref}" style="display: inline-block; background-color: #18181b; color: #ffffff; text-decoration: none; padding: 14px 28px; border-radius: 8px; font-weight: 600; font-size: 14px;">
+                Review Listing Availability
+            </a>
+        `),
+    };
+  },
+
   welcomeEmail: (data: { userName: string; verificationUrl?: string }) => {
     const safeUserName = escapeHtml(data.userName);
     const safeVerificationUrl = data.verificationUrl

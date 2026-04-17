@@ -16,6 +16,7 @@
  * 4. Cleanup expired idempotency keys
  * 5. Cleanup stale typing status indicators
  * 6. Process search alerts (email notifications)
+ * 7. Process listing freshness reminders and stale warnings
  *
  * Delegated tasks are called via internal fetch to avoid duplicating complex
  * logic (SQL, geospatial, etc.). Simple DB cleanup tasks stay inlined here.
@@ -28,6 +29,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
 import * as Sentry from "@sentry/nextjs";
+import { features } from "@/lib/env";
 import { logger, sanitizeErrorMessage } from "@/lib/logger";
 import { withRetry } from "@/lib/retry";
 import { validateCronAuth } from "@/lib/cron-auth";
@@ -215,6 +217,17 @@ export async function GET(request: NextRequest) {
       "/api/cron/search-alerts",
       cronSecret
     );
+
+    if (features.freshnessNotifications) {
+      await runDelegatedTask(
+        results,
+        "freshness-reminders",
+        "/api/cron/freshness-reminders",
+        cronSecret
+      );
+    } else {
+      markSkippedTask(results, "freshness-reminders", "feature_disabled");
+    }
   } else {
     markSkippedTask(results, "cleanup-rate-limits", "outside_daily_window");
     markSkippedTask(
@@ -224,6 +237,7 @@ export async function GET(request: NextRequest) {
     );
     markSkippedTask(results, "cleanup-typing-status", "outside_daily_window");
     markSkippedTask(results, "search-alerts", "outside_daily_window");
+    markSkippedTask(results, "freshness-reminders", "outside_daily_window");
   }
 
   // --- Summary ---
