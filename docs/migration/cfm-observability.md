@@ -193,14 +193,19 @@ This way all downstream log lines inherit the migration context with no per-call
 
 ### CFM-502 backfill event schema
 
+All listing-scoped CFM-502 backfill events emit `listingIdHash`, produced by
+`hashIdForLog` in `src/lib/messaging/cfm-messaging-telemetry.ts`. The value is a
+deterministic 16-hex token, so dashboards and log queries can correlate a
+listing's backfill lifecycle without exposing raw IDs.
+
 | Event | Required fields | Notes |
 |---|---|---|
-| `cfm.backfill.converted` | `listingId`, `runId`, `cohort="clean_auto_convert"`, `fromSource`, `toSource`, `previousVersion`, `nextVersion`, `actor` | Emitted by `applyHostManagedMigrationBackfillForListing` after the atomic listing update + dirty mark succeeds. |
-| `cfm.backfill.review_flag_set` | `listingId`, `runId`, `cohort`, `reasons`, `fromSource`, `toSource`, `previousVersion`, `nextVersion`, `actor` | Emitted by `applyNeedsReviewFlagForListing` when only `needsMigrationReview` is stamped. `fromSource` and `toSource` should both remain `LEGACY_BOOKING`. |
-| `cfm.backfill.skipped` | `listingId`, `runId`, `cohort`, `reasons`, `outcome`, `previousVersion`, `nextVersion`, `fromSource`, `toSource`, `actor` | `outcome ∈ {already_host_managed, already_flagged, blocked_has_been_reclassified}`. |
-| `cfm.backfill.deferred` | `listingId`, `runId`, `attempts`, `lastErrorCode`, `actor` | Emitted by the script after bounded version-conflict retries are exhausted for a row. |
-| `cfm.backfill.error` | `listingId`, `runId`, `message`, `actor` | Message must stay redacted through the existing logger sanitization path. |
-| `cfm.backfill.progress` | `runId`, `appliedCount`, `stampedCount`, `skippedCount`, `deferredCount`, `batchCursor`, `actor` | Heartbeat for an active run; use alongside the CLI summary for operator progress. |
+| `cfm.backfill.converted` | `listingIdHash`, `runId`, `cohort="clean_auto_convert"`, `fromSource`, `toSource`, `previousVersion`, `nextVersion`, `actor` | Emitted by `applyHostManagedMigrationBackfillForListing` after the atomic listing update + dirty mark succeeds. |
+| `cfm.backfill.review_flag_set` | `listingIdHash`, `runId`, `cohort`, `reasons`, `fromSource`, `toSource`, `previousVersion`, `nextVersion`, `actor` | Emitted by `applyNeedsReviewFlagForListing` when only `needsMigrationReview` is stamped. `fromSource` and `toSource` should both remain `LEGACY_BOOKING`. |
+| `cfm.backfill.skipped` | `listingIdHash`, `runId`, `cohort`, `reasons`, `outcome`, `previousVersion`, `nextVersion`, `fromSource`, `toSource`, `actor` | `outcome ∈ {already_host_managed, already_flagged, blocked_has_been_reclassified}`. |
+| `cfm.backfill.deferred` | `listingIdHash`, `runId`, `attempts`, `lastErrorCode`, `actor` | Emitted by the script after bounded version-conflict retries are exhausted for a row. |
+| `cfm.backfill.error` | `listingIdHash`, `runId`, `message`, `actor` | Message must stay redacted through the existing logger sanitization path. |
+| `cfm.backfill.progress` | `runId`, `appliedCount`, `stampedCount`, `skippedCount`, `deferredCount`, `batchCursor`, `actor` | Heartbeat for an active run; this event is intentionally listing-free and does not emit a listing-scoped identifier. |
 
 ---
 

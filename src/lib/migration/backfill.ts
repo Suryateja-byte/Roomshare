@@ -1,6 +1,7 @@
 import { Prisma, type ListingStatus } from "@prisma/client";
 
 import { logger, sanitizeErrorMessage } from "../logger";
+import { hashIdForLog } from "../messaging/cfm-messaging-telemetry";
 import { prisma } from "../prisma";
 import { markListingDirtyInTx } from "../search/search-doc-dirty";
 import {
@@ -212,11 +213,17 @@ function emitBackfillErrorEvent(
   error: unknown,
   runId: string
 ): void {
+  const listingIdHash = hashIdForLog(listingId);
+  const message = sanitizeErrorMessage(error).replaceAll(
+    listingId,
+    listingIdHash
+  );
+
   emitBackfillEvent(
     "cfm.backfill.error",
     {
-      listingId,
-      message: sanitizeErrorMessage(error),
+      listingIdHash,
+      message,
     },
     runId
   );
@@ -241,10 +248,12 @@ function buildSkippedEvent(
   snapshot: ListingMigrationSnapshot,
   classification: ListingMigrationClassification
 ): BackfillEventToEmit {
+  const listingIdHash = hashIdForLog(listingId);
+
   return {
     event: "cfm.backfill.skipped",
     payload: {
-      listingId,
+      listingIdHash,
       cohort: classification.cohort,
       reasons: classification.reasons,
       outcome: getSkipOutcomeForSnapshot(snapshot),
@@ -256,9 +265,9 @@ function buildSkippedEvent(
   };
 }
 
-function makeVersionConflictError(listingId: string): Error & { code: string } {
+function makeVersionConflictError(): Error & { code: string } {
   return Object.assign(
-    new Error(`Listing ${listingId} changed between report generation and apply.`),
+    new Error("Listing changed between report generation and apply."),
     { code: VERSION_CONFLICT_ERROR_CODE }
   );
 }
@@ -280,10 +289,12 @@ export function logBackfillDeferred(
   attempts: number,
   lastErrorCode: string | null
 ): void {
+  const listingIdHash = hashIdForLog(listingId);
+
   emitBackfillEvent(
     "cfm.backfill.deferred",
     {
-      listingId,
+      listingIdHash,
       attempts,
       lastErrorCode,
     },
@@ -486,6 +497,9 @@ async function fetchLockedListingMigrationSnapshot(
         AND ldi.day >= ${inventoryWindowStart}::date
     ) inventory_counts ON TRUE
     WHERE l.id = ${listingId}
+    -- Convert-path correctness relies on this row lock for serialization.
+    -- Stamp writes still use version CAS because their expectedVersion is
+    -- captured before the locked re-read; convert does not need both guards.
     FOR UPDATE OF l
   `;
 
@@ -586,6 +600,8 @@ export async function applyHostManagedMigrationBackfillForListing(
         };
       }
 
+      const listingIdHash = hashIdForLog(listingId);
+
       await tx.listing.update({
         where: { id: listingId },
         data: {
@@ -606,7 +622,7 @@ export async function applyHostManagedMigrationBackfillForListing(
         eventToEmit: {
           event: "cfm.backfill.converted",
           payload: {
-            listingId,
+            listingIdHash,
             cohort: backfillPlan.classification.cohort,
             reasons: backfillPlan.classification.reasons,
             fromSource: snapshot.availabilitySource,
@@ -654,13 +670,6 @@ export async function applyNeedsReviewFlagForListing(
         };
       }
 
-      if (
-        typeof expectedVersion === "number" &&
-        expectedVersion !== snapshot.version
-      ) {
-        throw makeVersionConflictError(listingId);
-      }
-
       const classification = classifyListingForHostManagedMigration(snapshot, now);
       const shouldApplyReviewFlag =
         snapshot.availabilitySource === "LEGACY_BOOKING" &&
@@ -678,6 +687,15 @@ export async function applyNeedsReviewFlagForListing(
           eventToEmit: buildSkippedEvent(listingId, snapshot, classification),
         };
       }
+
+      if (
+        typeof expectedVersion === "number" &&
+        expectedVersion !== snapshot.version
+      ) {
+        throw makeVersionConflictError();
+      }
+
+      const listingIdHash = hashIdForLog(listingId);
 
       await tx.listing.update({
         where: { id: listingId, version: snapshot.version },
@@ -698,7 +716,7 @@ export async function applyNeedsReviewFlagForListing(
         eventToEmit: {
           event: "cfm.backfill.review_flag_set",
           payload: {
-            listingId,
+            listingIdHash,
             cohort: classification.cohort,
             reasons: classification.reasons,
             fromSource: snapshot.availabilitySource,

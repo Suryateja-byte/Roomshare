@@ -42,7 +42,18 @@ Apply a single listing:
 pnpm exec ts-node scripts/cfm-migration-backfill.ts --apply --i-understand --listing-id <listing-id>
 ```
 
-## 3. Dry-Run Output
+## 3. Lock Model
+
+- Convert path: `applyHostManagedMigrationBackfillForListing` re-reads the
+  listing through `fetchLockedListingMigrationSnapshot`, which acquires
+  `FOR UPDATE OF l`. That row lock is the serialization guard for the convert
+  path; there is no separate version CAS on the `HOST_MANAGED` flip.
+- Stamp path: `applyNeedsReviewFlagForListing` also re-reads under the same row
+  lock, then re-classifies the listing before attempting the write. Only rows
+  that remain stamp-eligible take the `where: { id, version }` optimistic check;
+  rows that drift to a clean cohort skip instead of deferring.
+
+## 4. Dry-Run Output
 
 Every invocation prints a correlated `Run ID` plus the three-line write surface summary:
 
@@ -52,15 +63,15 @@ Every invocation prints a correlated `Run ID` plus the three-line write surface 
 
 The three numbers must add up to `Listings scanned` before you proceed to `--apply`.
 
-## 4. Apply Procedure
+## 5. Apply Procedure
 
 1. Run the dry-run command and capture the `Run ID`, cohort counts, and the three-line write summary in the change record.
 2. Confirm the dry-run matches expectations for the intended environment and batch size.
 3. Run the matching `--apply --i-understand` command.
-4. Watch the `cfm.backfill.progress` heartbeat and the `cfm.backfill.deferred` / `cfm.backfill.error` streams for the same `Run ID`.
-5. If the run ends with deferred rows, leave the exit code as success, inspect the affected listing IDs in logs, and re-run the same command. Deferred rows are safe to pick up on the next run.
+4. Watch the `cfm.backfill.progress` heartbeat and the `cfm.backfill.deferred` / `cfm.backfill.error` streams for the same `Run ID`. Listing-scoped events now log `listingIdHash`, not raw IDs.
+5. If the run ends with deferred rows, leave the exit code as success, inspect the affected `listingIdHash` values in logs, map them back to candidate listing IDs with `hashIdForLog(listing.id)`, and re-run the same command. Deferred rows are safe to pick up on the next run.
 
-## 5. Verification SQL
+## 6. Verification SQL
 
 Run these queries immediately after an apply canary and again after the full run.
 
@@ -118,20 +129,24 @@ SELECT COUNT(*) FROM "Listing" WHERE "openSlots" IS NOT NULL AND "openSlots" > "
 -- expected: 0
 ```
 
-## 6. Observability
+## 7. Observability
 
 Use the `Run ID` printed by the script to correlate every log line for a single invocation.
 
 - Structured log events: `cfm.backfill.converted`, `cfm.backfill.review_flag_set`, `cfm.backfill.skipped`, `cfm.backfill.deferred`, `cfm.backfill.error`, `cfm.backfill.progress`.
+- For listing-level correlation, query `listingIdHash` rather than raw listing IDs. Compute the token with `hashIdForLog(listing.id)` from `src/lib/messaging/cfm-messaging-telemetry.ts`.
 - Dashboard references:
   - [`docs/migration/cfm-observability.md` §5.2](./cfm-observability.md#52-host-managed-invariant-tripwire-owner-backend) for `cfm.availability.source_flip_count` and `cfm.listing.needs_migration_review_count`.
   - [`docs/migration/cfm-observability.md` §5.4](./cfm-observability.md#54-search-consistency-owner-search) for search-consistency overlays during active backfill windows.
 - Alert anchors:
   - [`docs/migration/cfm-observability.md` §7.9](./cfm-observability.md#7-failure-mode-runbook-anchors) for cohort-backfill incident response.
 
-## 7. Rollback Procedure
+## 8. Rollback Procedure
 
-Rollback stays manual and row-granular. Export the affected listing IDs from the structured logs for the `Run ID` you are reverting.
+Rollback stays manual and row-granular. Export the affected `listingIdHash`
+values from the structured logs for the `Run ID` you are reverting, then map
+them back to listing IDs in an app shell with `hashIdForLog` before running the
+SQL below.
 
 Rollback converted listings from a canary:
 
