@@ -19,6 +19,11 @@ import {
   markConversationMessagesAsReadForUser,
   userCanAccessConversation,
 } from "@/lib/messages";
+import {
+  hashIdForLog,
+  recordConversationStartPath,
+  type ConversationStartPath,
+} from "@/lib/messaging/cfm-messaging-telemetry";
 
 const sendMessageSchema = z.object({
   conversationId: z.string().trim().min(1).max(100),
@@ -87,7 +92,9 @@ export async function startConversation(listingId: string) {
     // to prevent duplicate conversations from concurrent requests (TOCTOU race).
     // One retry is enough: the winner commits, the retry acquires the same lock
     // and finds the conversation created by the winning transaction.
-    let result: { conversationId: string } | null = null;
+    let result:
+      | { conversationId: string; path: ConversationStartPath }
+      | null = null;
     for (let attempt = 1; attempt <= 2; attempt++) {
       try {
         result = await prisma.$transaction(
@@ -111,11 +118,19 @@ export async function startConversation(listingId: string) {
             });
 
             if (existing) {
-              // Resurrect: clear per-user deletion record if it exists
-              await tx.conversationDeletion.deleteMany({
-                where: { conversationId: existing.id, userId },
-              });
-              return { conversationId: existing.id };
+              // Resurrect: clear per-user deletion record if it exists.
+              // `count` distinguishes the "existing" vs "resurrected" path
+              // for the cfm.messaging.conv.start_path telemetry.
+              const { count: clearedDeletions } =
+                await tx.conversationDeletion.deleteMany({
+                  where: { conversationId: existing.id, userId },
+                });
+              return {
+                conversationId: existing.id,
+                path: (clearedDeletions > 0
+                  ? "resurrected"
+                  : "existing") as ConversationStartPath,
+              };
             }
 
             const conversation = await tx.conversation.create({
@@ -127,7 +142,10 @@ export async function startConversation(listingId: string) {
               },
             });
 
-            return { conversationId: conversation.id };
+            return {
+              conversationId: conversation.id,
+              path: "created" as ConversationStartPath,
+            };
           },
           { isolationLevel: "Serializable" }
         );
@@ -136,8 +154,8 @@ export async function startConversation(listingId: string) {
         if (attempt === 1 && isSerializationFailure(error)) {
           logger.sync.debug("startConversation serialization conflict, retrying", {
             action: "startConversation",
-            listingId,
-            userId,
+            listingIdHash: hashIdForLog(listingId),
+            userIdHash: hashIdForLog(userId),
           });
           continue;
         }
@@ -145,7 +163,24 @@ export async function startConversation(listingId: string) {
       }
     }
 
-    return result ?? { error: "Failed to start conversation" };
+    if (result) {
+      // CFM-003: structured log + metric so the messaging precondition
+      // DoD (docs/migration/cfm-messaging-precondition.md) is observable
+      // in production. No raw PII — ids are HMAC-hashed.
+      logger.sync.info("startConversation:resolved", {
+        path: result.path,
+        listingIdHash: hashIdForLog(listingId),
+        userIdHash: hashIdForLog(userId),
+      });
+      recordConversationStartPath({
+        path: result.path,
+        listingId,
+        userId,
+      });
+      return { conversationId: result.conversationId };
+    }
+
+    return { error: "Failed to start conversation" };
   } catch (error: unknown) {
     logger.sync.error("Failed to start conversation", {
       action: "startConversation",
