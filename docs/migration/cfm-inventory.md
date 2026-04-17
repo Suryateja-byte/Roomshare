@@ -122,7 +122,7 @@
 | `src/app/messages/page.tsx` | route (SSR) | reader | messaging | — | n/a | Inbox view; passive. |
 | `src/app/messages/[id]/page.tsx` / `ChatWindow.tsx` | route + client | reader | messaging | — | n/a | Thread view; passive. |
 | `src/components/chat/BlockedConversationBanner.tsx` / `NearbyPlacesCard.tsx` | client component | reader | messaging | — | n/a | UX adornments. |
-| `src/app/actions/chat.ts` | server action | — | (chatbot) | — | n/a | **Not the conversation-contact surface** — this is the AI chatbot helper. Cleared out of CFM scope during inventory. |
+| `src/app/actions/chat.ts` | server action | writer | messaging | 0, 7 | done_needs_audit | Real messaging server action — exports `startConversation` (with in-tx dedup against TOCTOU races) and `sendMessage`. Target of CFM-003 dedup precondition. |
 
 ### 2.5 Bookings history & legacy lifecycle (phase 9, 10)
 
@@ -331,7 +331,7 @@ Surfaces discovered during inventory that the plan doc's "Current Repo Surfaces 
 | `src/app/api/listings/[id]/availability/route.ts` | Per-listing availability endpoint — reader. | 4, 6 | done_needs_audit; verify it uses CFM-404 shape. |
 | `src/app/api/listings/route.ts` (collection) | Host list + create — may need write-path guard. | 3, 5 | done_needs_audit. |
 | `src/app/actions/saved-search.ts` | Writer that must canonicalize on write. | 4, 6 | Extended by CFM-604. |
-| `src/lib/messages.ts` + `src/app/api/messages/route.ts` + `src/app/messages/**` | Real messaging surfaces. Plan listed only `ContactHostButton.tsx` + `chat.ts` (chatbot — wrong). | 0, 7 | Add to CFM-003 scope. Documented here. |
+| `src/lib/messages.ts` + `src/app/api/messages/route.ts` + `src/app/messages/**` | Real messaging data layer, REST surface, and inbox/thread routes. Plan listed `ContactHostButton.tsx` + `chat.ts` (both correct — `chat.ts` is the server action, not a chatbot) but omitted these three additional surfaces that CFM-003 will need to touch. | 0, 7 | Add to CFM-003 scope. Documented here. |
 | `src/__tests__/compliance/sql-safety.test.ts` | 24 failing tests tracked as CFM-601-F1. | 4, 6 | Followup ticket; fix post-Wave-3. |
 | Pre-existing `src/__tests__/api/hybrid-count-threshold.test.ts` / `unbounded-browse-protection.test.ts` | CFM-F2 pre-existing failures bisected to `a79fff43`. | 4, 6 | Followup ticket. |
 
@@ -373,3 +373,4 @@ These two indexes together are the Phase 6 picklist.
 | Date | Change |
 |---|---|
 | 2026-04-16 | Initial inventory (CFM-001). Reflects tracker snapshot as of branch `codex/contact-first-multislot` and Wave 2 completion. |
+| 2026-04-16 | CFM-001 nit: corrected §2.4 and §5 row 13 — `src/app/actions/chat.ts` is the real messaging server action (`startConversation`, `sendMessage`), not a chatbot. The three surfaces genuinely missing from the plan's list are `src/lib/messages.ts`, `/api/messages/route.ts`, `/app/messages/**`. |
