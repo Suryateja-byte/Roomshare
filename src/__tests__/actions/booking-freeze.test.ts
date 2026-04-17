@@ -387,6 +387,29 @@ describe("booking freeze gate", () => {
     );
   });
 
+  it("does not emit post_freeze_write_count when createBooking rolls back via logBookingAudit failure", async () => {
+    mockLegacyBookingTransaction();
+    (logBookingAudit as jest.Mock).mockRejectedValueOnce(
+      new Error("audit log failed")
+    );
+
+    const result = await createBooking(
+      "listing-123",
+      futureStart,
+      futureEnd,
+      1200
+    );
+
+    expect(result).toEqual({
+      success: false,
+      error: "Failed to create booking. Please try again.",
+    });
+    expect(logger.sync.info).not.toHaveBeenCalledWith(
+      "cfm.booking.post_freeze_write_count",
+      expect.anything()
+    );
+  });
+
   it("emits post_freeze_write_count exactly once after createBooking commits", async () => {
     mockLegacyBookingTransaction();
 

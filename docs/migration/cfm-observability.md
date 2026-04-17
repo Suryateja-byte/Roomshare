@@ -74,7 +74,7 @@ For every P0/P1 failure mode in the plan doc, at least one observable signal exi
 | `createHold` succeeded after freeze | `cfm.booking.post_freeze_write_count{kind=hold}` (counter) | **> 0** | Sentry high-priority + PagerDuty | §7.1 |
 | `viewer-state` exposed `canBook=true` post-freeze | `cfm.viewer_state.can_book_true_count` (counter) | **> 0** | Sentry high-priority | §7.2 |
 | `viewer-state` exposed `canHold=true` post-freeze | `cfm.viewer_state.can_hold_true_count` (counter) | **> 0** | Sentry high-priority | §7.2 |
-| Contact-first gate blocked a create attempt | `cfm.booking.create_blocked_count{reason=contact_only|freeze|invalid}` (counter) | informational (expected > 0 by design) | dashboard only | n/a |
+| Contact-first gate blocked a create attempt | `cfm.booking.create_blocked_count{reason=contact_only\|host_managed,kind=booking\|hold}` (counter) | informational (expected > 0 by design) | dashboard only | n/a |
 
 ### P0 — Host-managed invariant violations (post-CFM-401/402)
 
