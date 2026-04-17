@@ -9,6 +9,11 @@
 
 import crypto from "crypto";
 import { getServerEnv } from "@/lib/env";
+import {
+  PRIVATE_FEEDBACK_CATEGORIES,
+  PRIVATE_FEEDBACK_DENIAL_REASONS,
+} from "@/lib/reports/private-feedback";
+import { getPrivateFeedbackTelemetrySnapshot } from "@/lib/reports/private-feedback-telemetry";
 import { LEGACY_URL_ALIASES, LEGACY_URL_SURFACES } from "@/lib/search-params";
 import { getSearchTelemetrySnapshot } from "@/lib/search/search-telemetry";
 
@@ -56,6 +61,7 @@ export async function GET(request: Request) {
 
   const memory = process.memoryUsage();
   const version = process.env.VERCEL_GIT_COMMIT_SHA?.slice(0, 8) || "dev";
+  const feedbackTelemetry = getPrivateFeedbackTelemetrySnapshot();
   const searchTelemetry = getSearchTelemetrySnapshot();
 
   // Compute duration percentiles from samples
@@ -150,6 +156,20 @@ export async function GET(request: Request) {
         (alias) =>
           `cfm_search_legacy_url_count{alias="${alias}",surface="${surface}"} ${searchTelemetry.legacyUrlCounts[surface][alias]}`
       )
+    ),
+    ``,
+    `# HELP cfm_feedback_submission_count Total number of accepted private feedback submissions`,
+    `# TYPE cfm_feedback_submission_count counter`,
+    ...PRIVATE_FEEDBACK_CATEGORIES.map(
+      (category) =>
+        `cfm_feedback_submission_count{category="${category}"} ${feedbackTelemetry.submissionCounts[category]}`
+    ),
+    ``,
+    `# HELP cfm_feedback_denied_count Total number of denied private feedback submissions`,
+    `# TYPE cfm_feedback_denied_count counter`,
+    ...PRIVATE_FEEDBACK_DENIAL_REASONS.map(
+      (reason) =>
+        `cfm_feedback_denied_count{reason="${reason}"} ${feedbackTelemetry.deniedCounts[reason]}`
     ),
   ].join("\n");
 

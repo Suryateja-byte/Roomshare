@@ -28,6 +28,8 @@ jest.mock("@/lib/prisma", () => ({
     listing: { findUnique: jest.fn() },
     review: { findFirst: jest.fn() },
     booking: { findFirst: jest.fn() },
+    conversation: { findFirst: jest.fn() },
+    report: { findFirst: jest.fn() },
   },
 }));
 
@@ -44,6 +46,7 @@ jest.mock("@/lib/env", () => ({
   features: {
     contactFirstListings: false,
     softHoldsEnabled: true,
+    privateFeedback: false,
   },
 }));
 
@@ -59,6 +62,7 @@ import { features } from "@/lib/env";
 const mockedFeatures = features as {
   contactFirstListings: boolean;
   softHoldsEnabled: boolean;
+  privateFeedback: boolean;
 };
 
 describe("GET /api/listings/[id]/viewer-state", () => {
@@ -99,8 +103,11 @@ describe("GET /api/listings/[id]/viewer-state", () => {
     });
     (prisma.review.findFirst as jest.Mock).mockResolvedValue(null);
     (prisma.booking.findFirst as jest.Mock).mockResolvedValue(null);
+    (prisma.conversation.findFirst as jest.Mock).mockResolvedValue(null);
+    (prisma.report.findFirst as jest.Mock).mockResolvedValue(null);
     mockedFeatures.contactFirstListings = false;
     mockedFeatures.softHoldsEnabled = true;
+    mockedFeatures.privateFeedback = false;
   });
 
   afterEach(() => {
@@ -232,6 +239,84 @@ describe("GET /api/listings/[id]/viewer-state", () => {
 
     expect(response.status).toBe(200);
     expect(data.existingReview).toBeNull();
+  });
+
+  it("returns canLeavePrivateFeedback=true only when every gate passes", async () => {
+    mockedFeatures.privateFeedback = true;
+    (prisma.conversation.findFirst as jest.Mock).mockResolvedValue({
+      id: "conversation-1",
+    });
+
+    const response = await GET(createRequest(), routeContext);
+    const data = await response.json();
+
+    expect(data.reviewEligibility).toEqual({
+      canPublicReview: false,
+      hasLegacyAcceptedBooking: false,
+      canLeavePrivateFeedback: true,
+      reason: "ACCEPTED_BOOKING_REQUIRED",
+    });
+    expect(prisma.report.findFirst).toHaveBeenCalledWith({
+      where: {
+        listingId: "listing-123",
+        reporterId: "user-123",
+        kind: "PRIVATE_FEEDBACK",
+        status: { in: ["OPEN", "RESOLVED"] },
+      },
+      select: { id: true },
+    });
+  });
+
+  it("returns canLeavePrivateFeedback=false when an accepted booking exists", async () => {
+    mockedFeatures.privateFeedback = true;
+    (prisma.booking.findFirst as jest.Mock).mockResolvedValue({
+      id: "booking-1",
+    });
+    (prisma.conversation.findFirst as jest.Mock).mockResolvedValue({
+      id: "conversation-1",
+    });
+
+    const response = await GET(createRequest(), routeContext);
+    const data = await response.json();
+
+    expect(data.reviewEligibility).toEqual({
+      canPublicReview: true,
+      hasLegacyAcceptedBooking: true,
+      canLeavePrivateFeedback: false,
+      reason: "ELIGIBLE",
+    });
+  });
+
+  it("returns canLeavePrivateFeedback=false without a prior conversation", async () => {
+    mockedFeatures.privateFeedback = true;
+    (prisma.conversation.findFirst as jest.Mock).mockResolvedValue(null);
+
+    const response = await GET(createRequest(), routeContext);
+    const data = await response.json();
+
+    expect(data.reviewEligibility).toEqual({
+      canPublicReview: false,
+      hasLegacyAcceptedBooking: false,
+      canLeavePrivateFeedback: false,
+      reason: "ACCEPTED_BOOKING_REQUIRED",
+    });
+  });
+
+  it("never exposes private feedback content in the viewer-state payload", async () => {
+    mockedFeatures.privateFeedback = true;
+    (prisma.conversation.findFirst as jest.Mock).mockResolvedValue({
+      id: "conversation-1",
+    });
+    (prisma.report.findFirst as jest.Mock).mockResolvedValue({
+      id: "report-1",
+      details: "PRIVATE_FEEDBACK_SHOULD_NOT_LEAK",
+    });
+
+    const response = await GET(createRequest(), routeContext);
+    const data = await response.json();
+
+    expect(JSON.stringify(data)).not.toContain("PRIVATE_FEEDBACK_SHOULD_NOT_LEAK");
+    expect(data.reviewEligibility.canLeavePrivateFeedback).toBe(false);
   });
 
   it("returns default state on database error (graceful degradation)", async () => {

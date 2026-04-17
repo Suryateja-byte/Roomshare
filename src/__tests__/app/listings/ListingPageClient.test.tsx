@@ -68,6 +68,12 @@ jest.mock("@/components/ReportButton", () => ({
   default: () => <button data-testid="report-listing">Report</button>,
 }));
 
+jest.mock("@/components/PrivateFeedbackDialog", () => ({
+  __esModule: true,
+  default: ({ open }: { open: boolean }) =>
+    open ? <div data-testid="private-feedback-dialog">Dialog</div> : null,
+}));
+
 jest.mock("@/components/ShareListingButton", () => ({
   __esModule: true,
   default: () => <button data-testid="share-listing">Share</button>,
@@ -215,9 +221,9 @@ describe("ListingPageClient", () => {
     expect(titleGroup).toHaveClass("min-w-0");
     expect(titleGroup).toHaveClass("flex-1");
     expect(actions).toHaveClass("w-full");
-    expect(actions).toHaveClass("justify-end");
+    expect(actions).toHaveClass("flex-col");
+    expect(actions).toHaveClass("items-end");
     expect(actions).toHaveClass("md:w-auto");
-    expect(actions).toHaveClass("md:flex-nowrap");
 
     expect(
       screen.getByRole("heading", {
@@ -227,6 +233,41 @@ describe("ListingPageClient", () => {
     expect(screen.getByTestId("share-listing")).toBeInTheDocument();
     expect(screen.getByTestId("save-listing")).toBeInTheDocument();
     expect(screen.getByTestId("report-listing")).toBeInTheDocument();
+  });
+
+  it("shows the private feedback link when viewer-state allows it", async () => {
+    global.fetch = jest.fn().mockResolvedValue({
+      ok: true,
+      status: 200,
+      headers: {
+        get: () => "application/json",
+      },
+      json: async () => ({
+        isLoggedIn: true,
+        hasBookingHistory: false,
+        existingReview: null,
+        primaryCta: "CONTACT_HOST",
+        canContact: true,
+        availabilitySource: "LEGACY_BOOKING",
+        canBook: true,
+        canHold: false,
+        bookingDisabledReason: null,
+        reviewEligibility: {
+          canPublicReview: false,
+          hasLegacyAcceptedBooking: false,
+          canLeavePrivateFeedback: true,
+          reason: "ACCEPTED_BOOKING_REQUIRED",
+        },
+      }),
+    }) as typeof fetch;
+
+    render(<ListingPageClient {...makeProps()} />);
+
+    expect(
+      await screen.findByRole("button", {
+        name: /not a booking, but want to share feedback/i,
+      })
+    ).toBeInTheDocument();
   });
 
   it("feeds SlotBadge from the server snapshot when one is provided", async () => {

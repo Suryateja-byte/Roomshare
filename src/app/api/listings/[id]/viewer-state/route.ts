@@ -11,6 +11,10 @@ import { features } from "@/lib/env";
 import { withRateLimit } from "@/lib/with-rate-limit";
 import { logger, sanitizeErrorMessage } from "@/lib/logger";
 import {
+  ACTIVE_REPORT_STATUSES,
+  canLeavePrivateFeedback,
+} from "@/lib/reports/private-feedback";
+import {
   resolvePublicAvailability,
   type ResolvedPublicAvailability,
 } from "@/lib/search/public-availability";
@@ -43,8 +47,12 @@ type BookingDisabledReason =
 
 function buildReviewEligibility(options: {
   isLoggedIn: boolean;
+  isOwner: boolean;
+  isEmailVerified: boolean;
   hasAcceptedBooking: boolean;
   hasExistingReview: boolean;
+  hasPriorConversation: boolean;
+  hasExistingPrivateFeedback: boolean;
 }) {
   let reason: ReviewEligibilityReason = "LOGIN_REQUIRED";
 
@@ -61,7 +69,14 @@ function buildReviewEligibility(options: {
   return {
     canPublicReview: options.isLoggedIn && options.hasAcceptedBooking,
     hasLegacyAcceptedBooking: options.hasAcceptedBooking,
-    canLeavePrivateFeedback: false,
+    canLeavePrivateFeedback: canLeavePrivateFeedback({
+      isLoggedIn: options.isLoggedIn,
+      isOwner: options.isOwner,
+      isEmailVerified: options.isEmailVerified,
+      hasPriorConversation: options.hasPriorConversation,
+      hasAcceptedBooking: options.hasAcceptedBooking,
+      hasExistingPrivateFeedback: options.hasExistingPrivateFeedback,
+    }),
     reason,
   };
 }
@@ -194,8 +209,12 @@ export async function GET(request: Request, { params }: RouteContext) {
       needsMigrationReview,
       reviewEligibility: buildReviewEligibility({
         isLoggedIn: false,
+        isOwner: false,
+        isEmailVerified: false,
         hasAcceptedBooking: false,
         hasExistingReview: false,
+        hasPriorConversation: false,
+        hasExistingPrivateFeedback: false,
       }),
     });
     response.headers.set("Cache-Control", "private, no-store");
@@ -203,7 +222,8 @@ export async function GET(request: Request, { params }: RouteContext) {
   }
 
   try {
-    const [existingReview, bookingExists] = await Promise.all([
+    const [existingReview, bookingExists, conversationExists, existingPrivateFeedback] =
+      await Promise.all([
       prisma.review.findFirst({
         where: {
           listingId: id,
@@ -226,7 +246,30 @@ export async function GET(request: Request, { params }: RouteContext) {
           id: true,
         },
       }),
-    ]);
+        features.privateFeedback && !isOwner && listing
+          ? prisma.conversation.findFirst({
+              where: {
+                listingId: id,
+                AND: [
+                  { participants: { some: { id: session.user.id } } },
+                  { participants: { some: { id: listing.ownerId } } },
+                ],
+              },
+              select: { id: true },
+            })
+          : Promise.resolve(null),
+        features.privateFeedback && !isOwner && listing
+          ? prisma.report.findFirst({
+              where: {
+                listingId: id,
+                reporterId: session.user.id,
+                kind: "PRIVATE_FEEDBACK",
+                status: { in: [...ACTIVE_REPORT_STATUSES] },
+              },
+              select: { id: true },
+            })
+          : Promise.resolve(null),
+      ]);
 
     const viewerContract = buildViewerContract({
       isLoggedIn: true,
@@ -253,8 +296,12 @@ export async function GET(request: Request, { params }: RouteContext) {
       needsMigrationReview,
       reviewEligibility: buildReviewEligibility({
         isLoggedIn: true,
+        isOwner,
+        isEmailVerified,
         hasAcceptedBooking: !!bookingExists,
         hasExistingReview: !!existingReview,
+        hasPriorConversation: !!conversationExists,
+        hasExistingPrivateFeedback: !!existingPrivateFeedback,
       }),
     });
     response.headers.set("Cache-Control", "private, no-store");
@@ -283,8 +330,12 @@ export async function GET(request: Request, { params }: RouteContext) {
         needsMigrationReview,
         reviewEligibility: buildReviewEligibility({
           isLoggedIn: true,
+          isOwner,
+          isEmailVerified,
           hasAcceptedBooking: false,
           hasExistingReview: false,
+          hasPriorConversation: false,
+          hasExistingPrivateFeedback: false,
         }),
       },
       {

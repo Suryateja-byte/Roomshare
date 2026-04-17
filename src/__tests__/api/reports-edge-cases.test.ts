@@ -12,6 +12,9 @@ jest.mock("@/lib/prisma", () => ({
     listing: {
       findUnique: jest.fn(),
     },
+    conversation: {
+      findFirst: jest.fn(),
+    },
   },
 }));
 
@@ -19,8 +22,25 @@ jest.mock("@/auth", () => ({
   auth: jest.fn(),
 }));
 
+jest.mock("@/app/actions/suspension", () => ({
+  checkSuspension: jest.fn().mockResolvedValue({ suspended: false }),
+}));
+
+jest.mock("@/lib/env", () => ({
+  features: { privateFeedback: false },
+}));
+
 jest.mock("@/lib/with-rate-limit", () => ({
   withRateLimit: jest.fn().mockResolvedValue(null),
+}));
+
+jest.mock("@/lib/csrf", () => ({
+  validateCsrf: jest.fn().mockReturnValue(null),
+}));
+
+jest.mock("@/lib/reports/private-feedback-telemetry", () => ({
+  recordPrivateFeedbackDenied: jest.fn(),
+  recordPrivateFeedbackSubmission: jest.fn(),
 }));
 
 jest.mock("next/server", () => ({
@@ -47,7 +67,12 @@ import { auth } from "@/auth";
 
 describe("POST /api/reports — edge cases", () => {
   const mockSession = {
-    user: { id: "user-123", name: "Test User", email: "test@example.com" },
+    user: {
+      id: "user-123",
+      name: "Test User",
+      email: "test@example.com",
+      emailVerified: new Date("2026-04-01T12:00:00.000Z"),
+    },
   };
 
   beforeEach(() => {

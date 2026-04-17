@@ -28,6 +28,7 @@ import ReviewForm from "@/components/ReviewForm";
 import ReviewList from "@/components/ReviewList";
 import ContactHostButton from "@/components/ContactHostButton";
 import DeleteListingButton from "@/components/DeleteListingButton";
+import PrivateFeedbackDialog from "@/components/PrivateFeedbackDialog";
 import ReportButton from "@/components/ReportButton";
 import ShareListingButton from "@/components/ShareListingButton";
 import SaveListingButton from "@/components/SaveListingButton";
@@ -557,6 +558,7 @@ export default function ListingPageClient({
 }: ListingPageClientProps) {
   const { data: session, status: sessionStatus } = useSession();
   const [hasHydrated, setHasHydrated] = useState(false);
+  const [privateFeedbackOpen, setPrivateFeedbackOpen] = useState(false);
   const hasImages = listing.images && listing.images.length > 0;
   const resolvedUserId = session?.user?.id ?? null;
   const resolvedIsOwner = isOwner || resolvedUserId === listing.ownerId;
@@ -760,17 +762,39 @@ export default function ListingPageClient({
             {/* Action buttons */}
             <div
               data-testid="listing-detail-actions"
-              className="flex w-full flex-wrap items-center justify-end gap-2 self-end md:w-auto md:flex-none md:flex-nowrap md:self-auto [&>*]:shrink-0"
+              className="flex w-full flex-col items-end gap-2 self-end md:w-auto md:flex-none md:self-auto"
             >
-              <ShareListingButton
-                listingId={listing.id}
-                title={listing.title}
-              />
-              {canRenderGuestControls && resolvedIsLoggedIn && (
-                <SaveListingButton listingId={listing.id} />
-              )}
+              <div className="flex w-full flex-wrap items-center justify-end gap-2 md:w-auto md:flex-nowrap [&>*]:shrink-0">
+                <ShareListingButton
+                  listingId={listing.id}
+                  title={listing.title}
+                />
+                {canRenderGuestControls && resolvedIsLoggedIn && (
+                  <SaveListingButton listingId={listing.id} />
+                )}
+                {canRenderGuestControls && (
+                  <ReportButton listingId={listing.id} />
+                )}
+              </div>
+              {canRenderGuestControls &&
+                viewerState.reviewEligibility.canLeavePrivateFeedback && (
+                  <button
+                    type="button"
+                    onClick={() => setPrivateFeedbackOpen(true)}
+                    className="text-xs font-medium text-on-surface-variant underline-offset-4 transition hover:text-on-surface hover:underline"
+                  >
+                    Not a booking, but want to share feedback? Leave private
+                    feedback
+                  </button>
+                )}
               {canRenderGuestControls && (
-                <ReportButton listingId={listing.id} />
+                <PrivateFeedbackDialog
+                  listingId={listing.id}
+                  listingTitle={listing.title}
+                  open={privateFeedbackOpen}
+                  onOpenChange={setPrivateFeedbackOpen}
+                  targetUserId={listing.ownerId}
+                />
               )}
             </div>
           </div>

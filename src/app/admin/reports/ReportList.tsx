@@ -22,9 +22,11 @@ import Link from "next/link";
 import Image from "next/image";
 
 type ReportStatus = "OPEN" | "RESOLVED" | "DISMISSED";
+type ReportKind = "ABUSE_REPORT" | "PRIVATE_FEEDBACK";
 
 interface Report {
   id: string;
+  kind: ReportKind;
   reason: string;
   details: string | null;
   status: ReportStatus;
@@ -71,12 +73,24 @@ const statusConfig = {
   },
 };
 
+const kindConfig = {
+  ABUSE_REPORT: {
+    label: "Abuse Report",
+    color: "bg-red-100 text-red-700",
+  },
+  PRIVATE_FEEDBACK: {
+    label: "Private Feedback",
+    color: "bg-blue-100 text-blue-700",
+  },
+};
+
 export default function ReportList({
   initialReports,
   totalReports,
 }: ReportListProps) {
   const [reports, setReports] = useState(initialReports);
   const [statusFilter, setStatusFilter] = useState<"all" | ReportStatus>("all");
+  const [kindFilter, setKindFilter] = useState<"all" | ReportKind>("all");
   const [processingId, setProcessingId] = useState<string | null>(null);
   const [actionModalId, setActionModalId] = useState<string | null>(null);
   const [adminNotes, setAdminNotes] = useState("");
@@ -133,10 +147,12 @@ export default function ReportList({
     }
   };
 
-  const filteredReports =
-    statusFilter === "all"
-      ? reports
-      : reports.filter((r) => r.status === statusFilter);
+  const filteredReports = reports.filter((report) => {
+    const matchesStatus =
+      statusFilter === "all" || report.status === statusFilter;
+    const matchesKind = kindFilter === "all" || report.kind === kindFilter;
+    return matchesStatus && matchesKind;
+  });
 
   const openCount = reports.filter((r) => r.status === "OPEN").length;
 
@@ -160,6 +176,22 @@ export default function ReportList({
                 {openCount}
               </span>
             )}
+          </button>
+        ))}
+      </div>
+
+      <div className="flex gap-2 mb-6">
+        {(["all", "ABUSE_REPORT", "PRIVATE_FEEDBACK"] as const).map((f) => (
+          <button
+            key={f}
+            onClick={() => setKindFilter(f)}
+            className={`px-4 py-2 rounded-lg font-medium text-sm transition-colors ${
+              kindFilter === f
+                ? "bg-on-surface text-white"
+                : "bg-surface-container-lowest text-on-surface-variant hover:bg-surface-container-high/50 border border-outline-variant/20"
+            }`}
+          >
+            {f === "all" ? "All types" : kindConfig[f].label}
           </button>
         ))}
       </div>
@@ -223,12 +255,19 @@ export default function ReportList({
                     </div>
 
                     {/* Status Badge */}
-                    <span
-                      className={`px-3 py-1 rounded-full text-xs font-medium flex items-center gap-1 ${statusConfig[report.status].color}`}
-                    >
-                      <StatusIcon className="w-3 h-3" />
-                      {statusConfig[report.status].label}
-                    </span>
+                    <div className="flex flex-wrap items-center justify-end gap-2">
+                      <span
+                        className={`px-3 py-1 rounded-full text-xs font-medium ${kindConfig[report.kind].color}`}
+                      >
+                        {kindConfig[report.kind].label}
+                      </span>
+                      <span
+                        className={`px-3 py-1 rounded-full text-xs font-medium flex items-center gap-1 ${statusConfig[report.status].color}`}
+                      >
+                        <StatusIcon className="w-3 h-3" />
+                        {statusConfig[report.status].label}
+                      </span>
+                    </div>
                   </div>
 
                   {/* Report Details */}

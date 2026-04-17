@@ -95,7 +95,7 @@ export default async function AdminReportsPage() {
                 Reports Management
               </h1>
               <p className="text-on-surface-variant">
-                Review and resolve user reports
+                Review abuse reports and private feedback
               </p>
             </div>
           </div>

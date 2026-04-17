@@ -37,6 +37,7 @@ The contact-first migration deprecates the public booking **creation** path. It 
 | `Booking` (`prisma/schema.prisma:208`) | Invariant #4 review eligibility + admin audit + support lookups. | CFM-901 `/bookings` history-first page; admin tools; review eligibility check in `viewer-state`. |
 | `BookingAuditLog` (`prisma/schema.prisma:434`) | Incident forensics; invariant #4 evidence chain. | Admin booking audit API (`/api/bookings/[id]/audit/route.ts`); incident-response tooling. |
 | `ListingDayInventory` (`prisma/schema.prisma:236`) | Historical reporting; legacy listings that are still on `LEGACY_BOOKING` during drain. | Legacy-drain admin views. On `HOST_MANAGED` listings this table is read-only per Invariant #2 but the table itself is retained. |
+| `Report` (both `ABUSE_REPORT` and `PRIVATE_FEEDBACK`) | Abuse forensics + retained private-feedback history for admin investigation. | `/admin/reports` and trust/safety workflows. |
 | `ConversationDeletion`, `TypingStatus` | Not booking-related; listed only because CFM touches messaging (CFM-003). Unchanged. | Messaging server actions. |
 
 ### 2.2 Enums retained (including values that look like "legacy" values)

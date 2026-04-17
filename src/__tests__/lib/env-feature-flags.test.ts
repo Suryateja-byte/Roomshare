@@ -117,6 +117,20 @@ describe("Multi-slot booking feature flag cross-validation", () => {
     expect(features.contactFirstListings).toBe(true);
   });
 
+  it("keeps private feedback disabled by default and exposes the flag when enabled", async () => {
+    let envModule = await import("@/lib/env");
+    expect(envModule.features.privateFeedback).toBe(false);
+
+    jest.resetModules();
+    process.env = {
+      ...baseEnv,
+      ENABLE_PRIVATE_FEEDBACK: "true",
+    } as unknown as NodeJS.ProcessEnv;
+
+    envModule = await import("@/lib/env");
+    expect(envModule.features.privateFeedback).toBe(true);
+  });
+
   it("disables keyset pagination when CURSOR_SECRET is invalid", async () => {
     process.env.CURSOR_SECRET = "short";
 

@@ -142,6 +142,8 @@ For every P0/P1 failure mode in the plan doc, at least one observable signal exi
 |---|---|---|---|---|
 | Review created without an accepted-booking row | `cfm.review.unauthorized_create_count` (counter) | **> 0** | Sentry | §7.10 |
 | Contact-only user attempted a public review | `cfm.review.contact_only_attempt_count` (counter) | informational | dashboard | — |
+| Private feedback submitted | `cfm.feedback.submission_count{category}` (`category ∈ {unresponsive_host, misleading_listing_details, pressure_tactics, general_concern}`) | informational | dashboard | CFM-703 |
+| Private feedback denied by a trust gate | `cfm.feedback.denied_count{reason}` (`reason ∈ {duplicate, feature_disabled, has_accepted_booking, invalid_target, no_prior_conversation, rate_limit, self_target, suspended, unverified_email}`) | any unexpected spike over baseline | dashboard + Sentry trend review | CFM-703 |
 
 ### P1 — Legacy drain (CFM-901/902/903/904)
 
@@ -167,6 +169,10 @@ All `booking`, `hold`, `listing`, `search`, `viewer-state`, `messaging`, and `cr
 | `legacyUrlAlias` | `startDate` \| `minBudget` \| `maxBudget` \| `minAvailableSlots` \| `pageNumber` \| `cursorStack` \| `where` \| `null` | legacy URL telemetry / canonicalizer path |
 | `migrationPhase` | `0` — `10` (current plan phase) | env `CFM_MIGRATION_PHASE` (CFM-003) |
 | `cohort` | `clean` \| `blocked` \| `review` \| `legacy_drain` \| `unknown` | listing row (`needsMigrationReview` + `availabilitySource`) |
+| `reporterIdHash` | 16-hex HMAC or sha256 fallback token | `hashIdForLog` for CFM-703 feedback telemetry |
+| `targetUserIdHash` | 16-hex HMAC or sha256 fallback token | `hashIdForLog` for CFM-703 feedback telemetry |
+| `feedbackCategory` | `unresponsive_host` \| `misleading_listing_details` \| `pressure_tactics` \| `general_concern` \| `null` | CFM-703 private-feedback submission telemetry |
+| `feedbackDeniedReason` | `duplicate` \| `feature_disabled` \| `has_accepted_booking` \| `invalid_target` \| `no_prior_conversation` \| `rate_limit` \| `self_target` \| `suspended` \| `unverified_email` \| `null` | CFM-703 private-feedback denial telemetry |
 
 ### Forbidden fields (non-negotiable #1)
 

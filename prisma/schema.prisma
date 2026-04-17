@@ -66,6 +66,7 @@ model User {
   reviewsReceived         Review[]               @relation("ReviewTarget")
   bookings                Booking[]
   reportsMade             Report[]               @relation("ReportsMade")
+  reportsAboutMe          Report[]               @relation("ReportsAboutUser")
   reportsReviewed         Report[]               @relation("ReportsReviewed")
   recentlyViewed          RecentlyViewed[]
   notifications           Notification[]
@@ -254,12 +255,22 @@ enum ReportStatus {
   DISMISSED
 }
 
+enum ReportKind {
+  ABUSE_REPORT
+  PRIVATE_FEEDBACK
+}
+
 model Report {
   id         String       @id @default(cuid())
   listingId  String
   reporterId String
   reason     String
   details    String?
+  // Private feedback. Never exposed in public review or listing surfaces.
+  // See CFM-703. `kind = PRIVATE_FEEDBACK` rows MUST NOT bleed into
+  // /api/reviews, /api/listings*, or any public viewer-state payload.
+  kind         ReportKind   @default(ABUSE_REPORT)
+  targetUserId String?      @db.Text
   status     ReportStatus @default(OPEN)
   adminNotes String?
   reviewedBy String?
@@ -267,12 +278,15 @@ model Report {
   createdAt  DateTime     @default(now())
   updatedAt  DateTime     @updatedAt
 
-  listing  Listing @relation(fields: [listingId], references: [id], onDelete: Cascade)
-  reporter User    @relation("ReportsMade", fields: [reporterId], references: [id], onDelete: Cascade)
-  reviewer User?   @relation("ReportsReviewed", fields: [reviewedBy], references: [id], onDelete: SetNull)
+  listing    Listing @relation(fields: [listingId], references: [id], onDelete: Cascade)
+  reporter   User    @relation("ReportsMade", fields: [reporterId], references: [id], onDelete: Cascade)
+  reviewer   User?   @relation("ReportsReviewed", fields: [reviewedBy], references: [id], onDelete: SetNull)
+  targetUser User?   @relation("ReportsAboutUser", fields: [targetUserId], references: [id], onDelete: SetNull)
 
   @@index([status])
   @@index([listingId])
+  @@index([kind, status])
+  @@index([targetUserId])
 }
 
 model Location {

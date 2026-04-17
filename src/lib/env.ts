@@ -109,6 +109,7 @@ const serverEnvSchema = z
     ENABLE_SOFT_HOLDS: z.enum(["on", "drain", "off"]).optional(),
     ENABLE_BOOKING_AUDIT: z.enum(["true", "false"]).optional(),
     ENABLE_CONTACT_FIRST_LISTINGS: z.enum(["true", "false"]).optional(),
+    ENABLE_PRIVATE_FEEDBACK: z.enum(["true", "false"]).optional(),
 
     // AI / Embeddings
     GEMINI_API_KEY: z.string().min(1).optional(),
@@ -511,6 +512,9 @@ export const features = {
   },
   get contactFirstListings() {
     return process.env.ENABLE_CONTACT_FIRST_LISTINGS === "true";
+  },
+  get privateFeedback() {
+    return process.env.ENABLE_PRIVATE_FEEDBACK === "true";
   },
   // Search debug ranking (only allowed in non-production, or with explicit env override)
   // This gates ?debugRank=1 and ?ranker=1 URL overrides to prevent leaking debug signals

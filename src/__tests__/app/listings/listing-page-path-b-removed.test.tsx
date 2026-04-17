@@ -67,6 +67,11 @@ jest.mock("@/components/ReportButton", () => ({
   default: () => <button data-testid="report-listing">Report</button>,
 }));
 
+jest.mock("@/components/PrivateFeedbackDialog", () => ({
+  __esModule: true,
+  default: () => null,
+}));
+
 jest.mock("@/components/ShareListingButton", () => ({
   __esModule: true,
   default: () => <button data-testid="share-listing">Share</button>,
