@@ -2,7 +2,7 @@
  * Booking Authorization Boundaries E2E Tests
  *
  * Validates that booking actions enforce proper authorization:
- * - Unauthenticated users see login prompt instead of booking form
+ * - Unauthenticated users see the contact-host sign-in CTA on listing detail
  * - User A cannot cancel User B's booking
  * - User A cannot view User B's booking details
  * - Booking on non-existent listing shows error
@@ -30,10 +30,10 @@ test.describe("Booking Authorization Boundaries @critical @booking @security", (
 
   // ─── BAB-01: Unauthenticated user sees login gate ──────────────
 
-  test.describe("BAB-01: Unauthenticated booking gate", () => {
+  test.describe("BAB-01: Unauthenticated contact gate", () => {
     test.use({ storageState: { cookies: [], origins: [] } });
 
-    test("Unauthenticated user sees login prompt instead of booking form", async ({
+    test("Unauthenticated user sees the sign-in CTA on listing detail", async ({
       page,
     }) => {
       // Find any listing URL via search
@@ -53,28 +53,27 @@ test.describe("Booking Authorization Boundaries @critical @booking @security", (
       // Wait for page to settle
       await page.waitForLoadState("networkidle", { timeout: 20_000 }).catch(() => {});
 
-      // Should see "Sign in to book this room" instead of a booking form.
-      // On mobile, may need to scroll down to the booking section.
-      const signInGate = page.getByText("Sign in to book this room");
+      // Should see the contact-first sign-in CTA.
+      const signInGate = page.getByRole("link", {
+        name: /sign in to contact host/i,
+      });
       const gateVisible = await signInGate.isVisible().catch(() => false);
       if (!gateVisible) {
-        // Scroll down to where the booking form would be
+        // Scroll down to the contact sidebar if needed.
         await page.evaluate(() => window.scrollTo(0, document.body.scrollHeight));
         await page.waitForTimeout(1000);
       }
-      await expect(signInGate).toBeVisible({ timeout: 20_000 });
+      await expect(signInGate.first()).toBeVisible({ timeout: 20_000 });
 
-      // The "Request to Book" button should NOT be visible
+      // The removed public booking CTA should not be visible.
       const bookButton = page
         .locator("main")
         .getByRole("button", { name: /request to book/i });
       expect(await bookButton.count()).toBe(0);
 
-      // The sign-in link/button should be present
-      const signInButton = page.getByRole("link", { name: /sign in to continue/i })
-        .or(page.getByRole("button", { name: /sign in to continue/i }))
-        .first();
-      await expect(signInButton).toBeVisible({ timeout: 5_000 });
+      await expect(
+        page.getByText(/contact host to confirm availability/i)
+      ).toBeVisible({ timeout: 5_000 });
     });
   });
 

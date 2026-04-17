@@ -3,10 +3,6 @@ import { render, screen, waitFor } from "@testing-library/react";
 import ListingPageClient from "@/app/listings/[id]/ListingPageClient";
 
 const mockUseSession = jest.fn();
-const mockUseAvailability = jest.fn();
-const mockBookingForm = jest.fn((_: Record<string, unknown>) => (
-  <div data-testid="booking-form" />
-));
 const mockSlotBadge = jest.fn((_: Record<string, unknown>) => (
   <div data-testid="slot-badge" />
 ));
@@ -45,11 +41,6 @@ jest.mock("@/components/listings/ListingCard", () => ({
 jest.mock("@/components/ImageGallery", () => ({
   __esModule: true,
   default: () => <div data-testid="image-gallery" />,
-}));
-
-jest.mock("@/components/BookingForm", () => ({
-  __esModule: true,
-  default: (props: Record<string, unknown>) => mockBookingForm(props),
 }));
 
 jest.mock("@/components/ReviewForm", () => ({
@@ -109,10 +100,6 @@ jest.mock("@/components/listings/RoomPlaceholder", () => ({
 
 jest.mock("@/components/listings/SlotBadge", () => ({
   SlotBadge: (props: Record<string, unknown>) => mockSlotBadge(props),
-}));
-
-jest.mock("@/hooks/useAvailability", () => ({
-  useAvailability: (...args: unknown[]) => mockUseAvailability(...args),
 }));
 
 jest.mock("@/components/ui/badge", () => ({
@@ -182,12 +169,6 @@ function makeProps(
 describe("ListingPageClient", () => {
   beforeEach(() => {
     jest.clearAllMocks();
-    mockUseAvailability.mockReturnValue({
-      availability: null,
-      isLoading: false,
-      error: null,
-      refresh: jest.fn(),
-    });
     mockUseSession.mockReturnValue({
       data: {
         user: {
@@ -250,8 +231,7 @@ describe("ListingPageClient", () => {
     expect(screen.getByTestId("report-listing")).toBeInTheDocument();
   });
 
-  it("feeds SlotBadge and BookingForm from the same live availability snapshot", async () => {
-    const refreshAvailability = jest.fn();
+  it("feeds SlotBadge from the server snapshot when one is provided", async () => {
     const availability = {
       listingId: "listing-1",
       totalSlots: 2,
@@ -262,25 +242,15 @@ describe("ListingPageClient", () => {
       asOf: "2026-04-14T18:00:00.000Z",
     };
 
-    mockUseAvailability.mockReturnValue({
-      availability,
-      isLoading: false,
-      error: null,
-      refresh: refreshAvailability,
-    });
-
     render(
       <ListingPageClient
         {...makeProps({
-          initialStartDate: "2026-05-01",
-          initialEndDate: "2026-06-01",
           initialAvailability: availability,
         })}
       />
     );
 
     await screen.findByTestId("slot-badge");
-    await screen.findByTestId("booking-form");
 
     const slotBadgeProps = mockSlotBadge.mock.calls[0]?.[0];
     expect(slotBadgeProps).toEqual(
@@ -289,20 +259,9 @@ describe("ListingPageClient", () => {
         totalSlots: availability.totalSlots,
       })
     );
-
-    const bookingFormProps = mockBookingForm.mock.calls[0]?.[0];
-    expect(bookingFormProps).toEqual(
-      expect.objectContaining({
-        startDate: "2026-05-01",
-        endDate: "2026-06-01",
-        availableSlots: availability.effectiveAvailableSlots,
-        availability,
-        refreshAvailability,
-      })
-    );
   });
 
-  it("renders contact-first sidebar instead of BookingForm when enabled", async () => {
+  it("renders the contact-first sidebar for legacy listings", async () => {
     const availability = {
       listingId: "listing-1",
       totalSlots: 2,
@@ -313,17 +272,9 @@ describe("ListingPageClient", () => {
       asOf: "2026-04-14T18:00:00.000Z",
     };
 
-    mockUseAvailability.mockReturnValue({
-      availability,
-      isLoading: false,
-      error: null,
-      refresh: jest.fn(),
-    });
-
     render(
       <ListingPageClient
         {...makeProps({
-          contactFirstEnabled: true,
           initialAvailability: availability,
         })}
       />
@@ -331,7 +282,6 @@ describe("ListingPageClient", () => {
 
     await screen.findByTestId("contact-host-sidebar");
 
-    expect(screen.queryByTestId("booking-form")).not.toBeInTheDocument();
     expect(screen.getByTestId("availability-badge")).toHaveTextContent(
       "1 slot available"
     );
@@ -377,7 +327,9 @@ describe("ListingPageClient", () => {
     render(<ListingPageClient {...makeProps({ isLoggedIn: false })} />);
 
     await waitFor(() => {
-      expect(screen.queryByTestId("booking-form")).not.toBeInTheDocument();
+      expect(
+        screen.getByText("Contact host to confirm availability")
+      ).toBeInTheDocument();
     });
 
     expect(screen.getByTestId("contact-host-sidebar")).toBeInTheDocument();

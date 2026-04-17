@@ -24,7 +24,6 @@ import type { Listing } from "@/components/listings/ListingCard";
 
 // Import existing functional components
 import ImageGallery from "@/components/ImageGallery";
-import BookingForm from "@/components/BookingForm";
 import ReviewForm from "@/components/ReviewForm";
 import ReviewList from "@/components/ReviewList";
 import ContactHostButton from "@/components/ContactHostButton";
@@ -38,10 +37,7 @@ import UserAvatar from "@/components/UserAvatar";
 import RoomPlaceholder from "@/components/listings/RoomPlaceholder";
 import { SlotBadge } from "@/components/listings/SlotBadge";
 import { Badge } from "@/components/ui/badge";
-import {
-  useAvailability,
-  type AvailabilitySnapshot,
-} from "@/hooks/useAvailability";
+import type { AvailabilitySnapshot } from "@/lib/availability";
 import { useSession } from "next-auth/react";
 import ListingViewTracker from "./ListingViewTracker";
 
@@ -559,20 +555,15 @@ export default function ListingPageClient({
   isLoggedIn,
   userHasBooking,
   userExistingReview,
-  bookedDates,
   holdEnabled,
   coordinates,
   similarListings,
   viewToken,
-  initialStartDate,
-  initialEndDate,
   initialAvailability,
   contactFirstEnabled = false,
 }: ListingPageClientProps) {
   const { data: session, status: sessionStatus } = useSession();
   const [hasHydrated, setHasHydrated] = useState(false);
-  const [startDate, setStartDate] = useState(initialStartDate ?? "");
-  const [endDate, setEndDate] = useState(initialEndDate ?? "");
   const hasImages = listing.images && listing.images.length > 0;
   const resolvedUserId = session?.user?.id ?? null;
   const resolvedIsOwner = isOwner || resolvedUserId === listing.ownerId;
@@ -596,26 +587,11 @@ export default function ListingPageClient({
       availabilitySource: listing.availabilitySource,
     })
   );
-  const { availability, refresh: refreshAvailability } = useAvailability(
-    listing.id,
-    startDate || undefined,
-    endDate || undefined,
-    {
-      enabled:
-        listing.status === "ACTIVE" &&
-        listing.availabilitySource === "LEGACY_BOOKING",
-      initialData: initialAvailability ?? null,
-    }
-  );
   const effectiveAvailableSlots =
-    availability?.effectiveAvailableSlots ??
     initialAvailability?.effectiveAvailableSlots ??
     listing.availableSlots;
   const reviewBookingHistory =
     viewerState.reviewEligibility.hasLegacyAcceptedBooking;
-  const usesContactFirstAvailability =
-    viewerState.availabilitySource === "HOST_MANAGED" ||
-    viewerState.bookingDisabledReason === "CONTACT_ONLY";
 
   // Format gender preference for display
   const formatGenderPreference = (pref: string | null) => {
@@ -1189,54 +1165,15 @@ export default function ListingPageClient({
 
                 {/* Guest Booking Card */}
                 {canRenderGuestControls && (
-                  <>
-                    {usesContactFirstAvailability ? (
-                      <ContactFirstSidebarCard
-                        listingId={listing.id}
-                        price={listing.price}
-                        status={listing.status}
-                        bookingMode={listing.bookingMode}
-                        effectiveAvailableSlots={effectiveAvailableSlots}
-                        primaryCta={viewerState.primaryCta}
-                        canContact={viewerState.canContact}
-                      />
-                    ) : (
-                      <>
-                        <div
-                          data-testid="contact-host-sidebar"
-                          className="hidden lg:block [&>button]:bg-transparent [&>button]:border [&>button]:border-outline-variant/30 [&>button]:text-on-surface [&>button]:hover:bg-surface-container-high [&>button]:shadow-none"
-                        >
-                          <MessagingCta
-                            listingId={listing.id}
-                            primaryCta={viewerState.primaryCta}
-                            canContact={viewerState.canContact}
-                          />
-                        </div>
-                        <BookingForm
-                          listingId={listing.id}
-                          price={listing.price}
-                          ownerId={listing.ownerId}
-                          isOwner={resolvedIsOwner}
-                          isLoggedIn={viewerState.isLoggedIn}
-                          status={
-                            listing.status as "ACTIVE" | "PAUSED" | "RENTED"
-                          }
-                          bookedDates={bookedDates}
-                          holdEnabled={viewerState.canHold}
-                          totalSlots={listing.totalSlots}
-                          availableSlots={effectiveAvailableSlots}
-                          bookingMode={listing.bookingMode}
-                          holdTtlMinutes={listing.holdTtlMinutes}
-                          startDate={startDate}
-                          endDate={endDate}
-                          onStartDateChange={setStartDate}
-                          onEndDateChange={setEndDate}
-                          availability={availability}
-                          refreshAvailability={refreshAvailability}
-                        />
-                      </>
-                    )}
-                  </>
+                  <ContactFirstSidebarCard
+                    listingId={listing.id}
+                    price={listing.price}
+                    status={listing.status}
+                    bookingMode={listing.bookingMode}
+                    effectiveAvailableSlots={effectiveAvailableSlots}
+                    primaryCta={viewerState.primaryCta}
+                    canContact={viewerState.canContact}
+                  />
                 )}
               </div>
             </div>

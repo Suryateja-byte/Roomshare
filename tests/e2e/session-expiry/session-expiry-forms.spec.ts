@@ -4,14 +4,8 @@
  *
  * Tests form behavior when session expires mid-submission:
  * - ReviewForm: NO session expiry handling (test.fixme documents the gap)
- * - BookingForm: Partial handling (inline message, no auto-redirect)
  * - CreateListingForm: Generic error, draft in localStorage (test.fixme)
  * - EditListingForm: Generic error (test.fixme)
- *
- * References:
- *   ReviewForm.tsx — NO 401 check, full data loss risk
- *   BookingForm.tsx:165-166 — categorizeError recognizes SESSION_EXPIRED as 'auth'
- *   BookingForm.tsx:305-306 — Shows "Your session has expired. Please sign in again."
  */
 
 import {
@@ -117,97 +111,6 @@ test.describe("Session Expiry: Form Submissions", () => {
     await expect(
       page.getByText(/session.*expired|sign in|unauthorized|please log in/i)
     ).toBeVisible({ timeout: 15000 });
-  });
-
-  // BookingForm — partial handling (inline message but no auto-redirect)
-  test(`${tags.auth} ${tags.sessionExpiry} - SE-FM03: BookingForm shows session expired message`, async ({
-    page,
-  }) => {
-    // Navigate to a listing with booking capability
-    await page.goto(
-      `/search?minLat=${SF_BOUNDS.minLat}&maxLat=${SF_BOUNDS.maxLat}&minLng=${SF_BOUNDS.minLng}&maxLng=${SF_BOUNDS.maxLng}`
-    );
-    await page.waitForLoadState("domcontentloaded");
-
-    const container = searchResultsContainer(page);
-    const listingLink = container.locator(selectors.listingCard).first();
-    if (!(await listingLink.isVisible({ timeout: 15000 }).catch(() => false))) {
-      test.skip(true, "No listings available");
-      return;
-    }
-    // Click h3 title instead of <a> to avoid ImageCarousel's pointerDown setting isDragging=true
-    await listingLink.locator("h3").first().click();
-    await page.waitForURL(/\/listings\/.+/);
-
-    // Look for booking form elements (date inputs, booking CTA)
-    const bookBtn = page
-      .getByRole("button", { name: /book|reserve|request/i })
-      .first();
-    if (!(await bookBtn.isVisible({ timeout: 5000 }).catch(() => false))) {
-      test.skip(true, "No booking button available on this listing");
-      return;
-    }
-
-    // Select dates before booking (required by client-side validation)
-    // --- Start date (2 months ahead) ---
-    const startDateTrigger = page.locator("#booking-start-date");
-    await page
-      .locator("#booking-start-date[data-state]")
-      .waitFor({ state: "visible", timeout: 15_000 });
-    await startDateTrigger.click({ force: true });
-
-    const nextMonthBtn = page.locator('button[aria-label="Next month"]');
-    await nextMonthBtn.waitFor({ state: "visible", timeout: 10_000 });
-    for (let i = 0; i < 2; i++) {
-      await nextMonthBtn.dispatchEvent("click");
-      await nextMonthBtn.waitFor({ state: "visible", timeout: 5_000 });
-    }
-
-    const startDayBtn = page
-      .locator(
-        '[data-radix-popper-content-wrapper] button, [class*="popover"] button'
-      )
-      .filter({ hasText: /^1$/ })
-      .first();
-    await startDayBtn.waitFor({ state: "visible", timeout: 5_000 });
-    await startDayBtn.dispatchEvent("click");
-    await expect(page.locator('[data-radix-popper-content-wrapper]')).not.toBeVisible({ timeout: 5_000 }).catch(() => {});
-
-    // --- End date (4 months ahead) ---
-    const endDateTrigger = page.locator("#booking-end-date");
-    await page
-      .locator("#booking-end-date[data-state]")
-      .waitFor({ state: "visible", timeout: 10_000 });
-    await endDateTrigger.click({ force: true });
-    await expect(page.locator('[data-radix-popper-content-wrapper]')).toBeVisible({ timeout: 5_000 });
-
-    const nextMonthBtnEnd = page.locator('button[aria-label="Next month"]');
-    await nextMonthBtnEnd.waitFor({ state: "visible", timeout: 10_000 });
-    for (let i = 0; i < 4; i++) {
-      await nextMonthBtnEnd.dispatchEvent("click");
-      await nextMonthBtnEnd.waitFor({ state: "visible", timeout: 5_000 });
-    }
-
-    const endDayBtn = page
-      .locator(
-        '[data-radix-popper-content-wrapper] button, [class*="popover"] button'
-      )
-      .filter({ hasText: /^1$/ })
-      .first();
-    await endDayBtn.waitFor({ state: "visible", timeout: 5_000 });
-    await endDayBtn.dispatchEvent("click");
-    await expect(page.locator('[data-radix-popper-content-wrapper]')).not.toBeVisible({ timeout: 5_000 }).catch(() => {});
-
-    // Expire session AFTER dates are selected (before booking attempt)
-    await expireSession(page);
-    await bookBtn.click();
-
-    // BookingForm should show inline session expired message (role="alert")
-    // The categorizeError function maps SESSION_EXPIRED -> 'auth' error type
-    // which renders: "Your session has expired. Please sign in again."
-    await expect(page.getByText(/session.*expired|sign in again/i)).toBeVisible(
-      { timeout: 20000 }
-    );
   });
 
   // EditListingForm — generic error on session expiry

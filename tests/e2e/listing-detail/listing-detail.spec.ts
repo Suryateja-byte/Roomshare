@@ -2,7 +2,7 @@
  * Listing Detail Page — Functional E2E Tests (LD-01 through LD-22)
  *
  * Coverage: /listings/[id] — visitor view, owner view, gallery,
- * booking form basics, reviews, action buttons.
+ * contact-first sidebar, reviews, action buttons.
  *
  * Seed data used:
  *   "Reviewer Nob Hill Apartment" — owned by e2e-reviewer → test user sees VISITOR view
@@ -136,7 +136,7 @@ test.describe("LD: Page Load & Content (Visitor)", () => {
     await expect(page.getByText("Identity verified")).toBeVisible();
   });
 
-  test("LD-06  price in booking sidebar", async ({ page, nav }) => {
+  test("LD-06  price in contact-first sidebar", async ({ page, nav }) => {
     const found = await goToListing(page, nav, "Reviewer Nob Hill");
     test.skip(!found, "Listing not found");
 
@@ -144,7 +144,7 @@ test.describe("LD: Page Load & Content (Visitor)", () => {
     await expect(page.getByText(/\$1,?500/).first()).toBeVisible();
     await expect(page.getByText(/\/ month|\/mo/).first()).toBeVisible();
     await expect(
-      page.getByRole("button", { name: /Request to Book/i })
+      page.getByText(/contact host to confirm availability/i)
     ).toBeVisible();
   });
 
@@ -397,7 +397,7 @@ test.describe("LD: Image Gallery", () => {
 // Block 4: Owner View ("Sunny Mission Room")
 // ═══════════════════════════════════════════════════════════════════════════
 test.describe("LD: Owner View", () => {
-  test("LD-14  owner sees management card, NOT booking form", async ({
+  test("LD-14  owner sees management card and no public booking CTA", async ({
     page,
     nav,
   }) => {
@@ -412,7 +412,7 @@ test.describe("LD: Owner View", () => {
     // "View listing as guest" link
     await expect(page.getByText("View listing as guest")).toBeVisible();
 
-    // Booking form must NOT be visible
+    // Public booking CTA must NOT be visible
     await expect(
       page.getByRole("button", { name: /Request to Book/i })
     ).not.toBeVisible({ timeout: 3_000 });
@@ -464,48 +464,42 @@ test.describe("LD: Owner View", () => {
 });
 
 // ═══════════════════════════════════════════════════════════════════════════
-// Block 5: Booking Form Basics ("Reviewer Nob Hill Apartment")
+// Block 5: Contact-First Sidebar ("Reviewer Nob Hill Apartment")
 // ═══════════════════════════════════════════════════════════════════════════
-test.describe("LD: Booking Form", () => {
-  test("LD-18  date pickers exist with labels", async ({ page, nav }) => {
-    const found = await goToListing(page, nav, "Reviewer Nob Hill");
-    test.skip(!found, "Listing not found");
-
-    await expect(page.getByText("Check-in")).toBeVisible();
-    await expect(page.getByText("Check-out")).toBeVisible();
-    await expect(page.locator("#booking-start-date")).toBeAttached();
-    await expect(page.locator("#booking-end-date")).toBeAttached();
-  });
-
-  test("LD-19  DatePicker opens on click (hydration-aware)", async ({
+test.describe("LD: Contact-First Sidebar", () => {
+  test("LD-18  contact-first copy and availability badge are visible", async ({
     page,
     nav,
-  }, testInfo) => {
-    test.skip(
-      testInfo.project.name.includes("Mobile"),
-      "Desktop-only DatePicker test"
-    );
-
+  }) => {
     const found = await goToListing(page, nav, "Reviewer Nob Hill");
     test.skip(!found, "Listing not found");
 
-    // Wait for hydration
-    await page
-      .locator("#booking-start-date[data-state]")
-      .waitFor({ state: "attached", timeout: 15_000 });
-
-    // Click opens calendar popover
-    await page.locator("#booking-start-date").click();
     await expect(
-      page
-        .getByRole("button", { name: /next month/i })
-        .or(page.locator("[aria-label='Go to next month']"))
-    ).toBeVisible({ timeout: 5_000 });
+      page.getByText(/contact host to confirm availability/i)
+    ).toBeVisible();
+    await expect(page.getByTestId("availability-badge")).toBeVisible();
+    await expect(
+      page.getByText(/no booking request or hold is created from this page/i)
+    ).toBeVisible();
+  });
+
+  test("LD-19  removed booking controls stay absent", async ({
+    page,
+    nav,
+  }) => {
+    const found = await goToListing(page, nav, "Reviewer Nob Hill");
+    test.skip(!found, "Listing not found");
+
+    await expect(page.locator("#booking-start-date")).toHaveCount(0);
+    await expect(page.locator("#booking-end-date")).toHaveCount(0);
+    await expect(
+      page.getByRole("button", { name: /Request to Book/i })
+    ).toHaveCount(0);
   });
 });
 
 // ═══════════════════════════════════════════════════════════════════════════
-// Block 5b: Unauthenticated booking CTA (separate describe for storageState)
+// Block 5b: Unauthenticated contact CTA (separate describe for storageState)
 // ═══════════════════════════════════════════════════════════════════════════
 test.describe("LD: Unauthenticated", () => {
   test.use({ storageState: { cookies: [], origins: [] } });
@@ -517,8 +511,9 @@ test.describe("LD: Unauthenticated", () => {
     const found = await goToListing(page, nav, "Reviewer Nob Hill");
     test.skip(!found, "Listing not found");
 
-    // Should see login prompt instead of booking form
-    const signInCta = page.getByText(/Sign in to book this room/i).first();
+    const signInCta = page
+      .getByRole("link", { name: /sign in to contact host/i })
+      .first();
     await expect(signInCta).toBeVisible({ timeout: 10000 });
   });
 });
