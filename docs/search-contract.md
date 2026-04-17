@@ -228,13 +228,13 @@ in a later phase once `grep` confirms no remaining consumers.
 The query hash is how clients cache search results and how the server detects
 "same query different page" vs "query changed, invalidate."
 
-### 3.1 Two version constants
+### 3.1 Three version constants
 
 | Constant | File:line | Bumps when |
 |---|---|---|
 | `SEARCH_QUERY_HASH_VERSION` | `src/lib/search/query-hash.ts:29-30` | The canonical filter shape or normalization changes (e.g., adding a new filter field, changing how `bounds` are quantized). Forces clients to recompute the hash for every cached query. |
 | `SEARCH_RESPONSE_VERSION` | `src/lib/search/search-response.ts:5-6` | The response payload shape changes (e.g., adding a field to `PublicAvailability`, renaming `badges`). Forces clients to invalidate cached payloads. |
-| `SEARCH_DOC_PROJECTION_VERSION` | `src/lib/search/search-doc-sync.ts` (CFM-405a) | The server-side projection from listing row → search doc changes. Causes every existing doc to be marked `version_skew` and resyncrhonized on the next cron pass. |
+| `SEARCH_DOC_PROJECTION_VERSION` | `src/lib/search/search-doc-sync.ts` (CFM-405a) | The server-side projection from listing row → search doc changes. Causes every existing doc to be marked `version_skew` and resynchronized on the next cron pass. |
 
 ### 3.2 Bump rules
 
