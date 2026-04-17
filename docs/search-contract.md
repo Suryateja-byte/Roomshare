@@ -271,6 +271,38 @@ Bump `SEARCH_DOC_PROJECTION_VERSION` when:
 - For coordinated bumps (e.g., filter field changes shape AND response shape):
   ship both bumps in the same commit so clients invalidate atomically.
 
+### 3.4 Callers that read `queryHash`
+
+Every place the string is consumed downstream. Bumping
+`SEARCH_QUERY_HASH_VERSION` invalidates all of these:
+
+| Caller | File:line | What it does with the hash |
+|---|---|---|
+| `createSearchResponseMeta` | `src/lib/search/search-response.ts:46-55` | Stamps every response envelope with `queryHash`. |
+| Search v2 service cache key | `src/lib/search/search-v2-service.ts:647-751` | Keys the in-memory / edge cache that short-circuits repeat queries. |
+| Search telemetry | `src/lib/search/search-telemetry.ts:78-130` | Observability tag grouping repeat queries in logs / metrics. |
+| Search scenarios fixtures | `src/lib/search/testing/search-scenarios.ts:53-532` | Test-only override to simulate a known hash. |
+
+New cache layers (Redis / edge KV) must derive their key from this hash so
+they invalidate atomically with the contract. If a new consumer is added,
+extend this table and consider whether a coordinated bump is needed.
+
+### 3.5 Semantic-equivalence invariant
+
+Two URL strings that parse to the same `NormalizedSearchQuery` MUST hash to
+the same value. This is the load-bearing property that makes
+`queryHash`-keyed caches correct. It is enforced by routing both hash calls
+through `normalizeHashableSearchQuery` (`query-hash.ts:36-89`), which
+re-runs `normalizeSearchFilters` + canonical sort / lowercase / bound
+quantization.
+
+Regression coverage:
+- `src/__tests__/lib/search/query-hash-semantic-equivalence.test.ts` (CFM-403)
+  — URL → hash pipeline equivalence + counter-case divergence.
+- `src/__tests__/lib/search/hash.test.ts` — lower-level
+  `HashableFilterParams` coverage for the older `generateQueryHash` helper
+  (used by the v2 service cache key).
+
 ---
 
 ## 4. Deprecation map
@@ -326,6 +358,7 @@ Future additions should append here and bump the relevant version constant.
 | Date | Version | Change |
 |---|---|---|
 | 2026-04-15 | `cfm-search-contract-v1` | Initial contract — CFM-002 documents existing implementation. `SEARCH_QUERY_HASH_VERSION = "2026-04-15.cfm-search-contract-v1"`, `SEARCH_RESPONSE_VERSION = "2026-04-15.phase2-public-availability.search-contract-v1"`, `SEARCH_DOC_PROJECTION_VERSION = 1`. |
+| 2026-04-16 | `cfm-search-contract-v1` | CFM-403: §3.4 enumerates every caller of `queryHash`; §3.5 adds the semantic-equivalence invariant and the load-bearing regression test reference. No contract version bump — docs + test only. |
 
 ---
 
