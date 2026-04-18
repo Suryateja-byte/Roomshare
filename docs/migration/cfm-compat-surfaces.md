@@ -17,7 +17,8 @@
 1. `cfm.search.legacy_url_count` is quiet for 14 days with `p50 < 1/min` and total count over 14 days = `0` for every relevant `(alias, surface)` series.
 2. Product owner acknowledges that no supported client, marketing link, SEO landing page, or affiliate surface still depends on the alias.
 3. `CFM-604-F2` is merged before the telemetry readout is trusted, because the alert-matcher bypass currently understates saved-search legacy traffic.
-4. A fresh caller sweep at the merge `HEAD` still shows only the readers listed below.
+4. Operator note: telemetry surge is expected on the `CFM-604-F2` deploy; start the 14-day `CFM-1002-B` window after F2 lands, not before.
+5. A fresh caller sweep at the merge `HEAD` still shows only the readers listed below.
 
 | Field/alias | Defined at | Readers | Safe-to-remove precondition | Future ticket |
 |---|---|---|---|---|

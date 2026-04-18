@@ -3,6 +3,7 @@ import "server-only";
 import { prisma } from "./prisma";
 import { sendNotificationEmail } from "./email";
 import { Prisma } from "@prisma/client";
+import { parseSavedSearchFilters } from "@/lib/search/saved-search-parser";
 import { buildSearchUrl, type SearchFilters } from "./search-utils";
 import { validateSearchFilters } from "./search-params";
 import { logger, sanitizeErrorMessage } from "./logger";
@@ -26,6 +27,23 @@ function validateAlertFilters(raw: unknown): SearchFilters {
     }
   }
   return validated;
+}
+
+function parseFiltersForAlerts(raw: Prisma.JsonValue): SearchFilters | null {
+  const parsed = parseSavedSearchFilters(raw);
+  if (!parsed) {
+    return null;
+  }
+
+  const city =
+    raw && typeof raw === "object" && !Array.isArray(raw) && "city" in raw
+      ? (raw as Record<string, unknown>).city
+      : undefined;
+
+  return validateAlertFilters({
+    ...parsed,
+    ...(typeof city === "string" ? { city } : {}),
+  });
 }
 
 // Type for new listing data used in instant alerts
@@ -159,7 +177,13 @@ export async function processSearchAlerts(): Promise<ProcessResult> {
           }
 
           // S-02 FIX: Validate filters from DB instead of raw cast
-          const filters = validateAlertFilters(savedSearch.filters);
+          const filters = parseFiltersForAlerts(savedSearch.filters);
+          if (!filters) {
+            result.details.push(
+              `Skipping ${savedSearch.id} - invalid saved search filters`
+            );
+            continue;
+          }
           const sinceDate = savedSearch.lastAlertAt || savedSearch.createdAt;
 
           // Build query to find new matching listings
@@ -512,7 +536,10 @@ export async function triggerInstantAlerts(
         }
 
         // S-02 FIX: Validate filters from DB instead of raw cast
-        const filters = validateAlertFilters(savedSearch.filters);
+        const filters = parseFiltersForAlerts(savedSearch.filters);
+        if (!filters) {
+          continue;
+        }
 
         // Check if the new listing matches this saved search
         if (!matchesFilters(newListing, filters)) {
