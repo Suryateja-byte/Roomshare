@@ -380,6 +380,47 @@ describe("updateBookingStatus legacy mutations gate (CFM-902)", () => {
     expect(prisma.$transaction).toHaveBeenCalled();
   });
 
+  it('allows non-admin ACCEPTED through when flag is "on" (explicit default)', async () => {
+    mockedFeatures.legacyBookingMutations = true;
+    (auth as jest.Mock).mockResolvedValue(ownerSession);
+    mockAcceptedTransaction();
+
+    const result = await updateBookingStatus("booking-123", "ACCEPTED");
+
+    expect(result).toEqual({ success: true });
+    expect(logger.sync.info).not.toHaveBeenCalledWith(
+      "cfm.booking.legacy_mutation_blocked_count",
+      expect.anything()
+    );
+    expect(checkRateLimit).toHaveBeenCalled();
+    expect(prisma.$transaction).toHaveBeenCalled();
+  });
+
+  it('allows non-admin ACCEPTED through when flag is unset (missing env = on)', async () => {
+    const originalValue = process.env.ENABLE_LEGACY_BOOKING_MUTATIONS;
+    delete process.env.ENABLE_LEGACY_BOOKING_MUTATIONS;
+    // Emulate env-based default by leaving mockedFeatures at getter truthy
+    mockedFeatures.legacyBookingMutations = true;
+    (auth as jest.Mock).mockResolvedValue(ownerSession);
+    mockAcceptedTransaction();
+
+    try {
+      const result = await updateBookingStatus("booking-123", "ACCEPTED");
+
+      expect(result).toEqual({ success: true });
+      expect(logger.sync.info).not.toHaveBeenCalledWith(
+        "cfm.booking.legacy_mutation_blocked_count",
+        expect.anything()
+      );
+      expect(checkRateLimit).toHaveBeenCalled();
+      expect(prisma.$transaction).toHaveBeenCalled();
+    } finally {
+      if (originalValue !== undefined) {
+        process.env.ENABLE_LEGACY_BOOKING_MUTATIONS = originalValue;
+      }
+    }
+  });
+
   it('lets admin-owner reach the existing EXPIRED guard when flag is "off"', async () => {
     mockedFeatures.legacyBookingMutations = false;
     (auth as jest.Mock).mockResolvedValue(adminOwnerSession);

@@ -93,9 +93,16 @@ async function runDelegatedTask(
 
   try {
     const { ok, data } = await callInternalCron(path, cronSecret);
+    // CFM-904-F2: Promote detail.skipped === true to the top-level `skipped`
+    // field so summary counters correctly tag flag-gated early-returns (e.g.
+    // reconcile-slots when ENABLE_LEGACY_CRONS=off) as skipped rather than
+    // succeeded. The authoritative signal remains the cron's own
+    // cfm.cron.legacy_*_skipped_count log line.
+    const skipped = data?.skipped === true;
     results.push({
       task,
       success: ok,
+      skipped: skipped || undefined,
       detail: data,
       durationMs: Date.now() - startedAt,
     });
