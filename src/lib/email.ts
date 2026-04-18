@@ -4,6 +4,9 @@
 // Uses Resend API for sending emails
 
 import { emailTemplates } from "./email-templates";
+import { features } from "@/lib/env";
+import { logger } from "@/lib/logger";
+import { hashIdForLog } from "@/lib/messaging/cfm-messaging-telemetry";
 import { prisma } from "@/lib/prisma";
 import { fetchWithTimeout, FetchTimeoutError } from "./fetch-with-timeout";
 import { circuitBreakers, isCircuitOpenError } from "./circuit-breaker";
@@ -224,6 +227,16 @@ const emailTypeToPreferenceKey: Record<string, keyof NotificationPreferences> =
     marketing: "emailMarketing",
   };
 
+export const BOOKING_EMAIL_TEMPLATE_KEYS = new Set<string>([
+  "bookingRequest",
+  "bookingAccepted",
+  "bookingRejected",
+  "bookingCancelled",
+  "bookingHoldRequest",
+  "bookingExpired",
+  "bookingHoldExpired",
+]);
+
 /**
  * Send notification email while respecting user's notification preferences
  * This wrapper checks if the user has disabled this type of email notification
@@ -240,6 +253,14 @@ export async function sendNotificationEmailWithPreference(
   data: Parameters<(typeof emailTemplates)[typeof type]>[0]
 ): Promise<{ success: boolean; skipped?: boolean; error?: string }> {
   try {
+    if (BOOKING_EMAIL_TEMPLATE_KEYS.has(type) && !features.bookingNotifications) {
+      logger.sync.info("cfm.notifications.booking_emission_blocked_count", {
+        type,
+        kind: "email",
+      });
+      return { success: true, skipped: true };
+    }
+
     // Check if this email type has a preference mapping
     const prefKey = emailTypeToPreferenceKey[type];
 
@@ -261,9 +282,10 @@ export async function sendNotificationEmailWithPreference(
       // If preference is explicitly set to false, skip sending
       // Default behavior (undefined/missing key) = enabled (send email)
       if (prefs[prefKey] === false) {
-        console.log(
-          `[EMAIL] Skipped ${type} email to ${userId} - user preference disabled`
-        );
+        logger.sync.info("email.preference_skipped", {
+          type,
+          userIdHash: hashIdForLog(userId),
+        });
         return { success: true, skipped: true };
       }
     }

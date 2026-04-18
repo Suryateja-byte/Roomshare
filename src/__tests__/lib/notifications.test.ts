@@ -5,6 +5,13 @@
 
 import { prisma } from "@/lib/prisma";
 
+jest.mock("@/lib/env", () => ({
+  features: {
+    bookingNotifications: true,
+    contactFirstListings: false,
+  },
+}));
+
 // Mock the logger before importing the module under test
 jest.mock("@/lib/logger", () => ({
   logger: {
@@ -18,18 +25,30 @@ jest.mock("@/lib/logger", () => ({
   },
 }));
 
+jest.mock("@/lib/messaging/cfm-messaging-telemetry", () => ({
+  hashIdForLog: jest.fn(() => "a1b2c3d4e5f6a7b8"),
+}));
+
 import {
+  BOOKING_NOTIFICATION_TYPES,
   createInternalNotification,
   type NotificationType,
   type CreateNotificationInput,
 } from "@/lib/notifications";
+import { features } from "@/lib/env";
 import { logger } from "@/lib/logger";
 
 const mockNotificationCreate = prisma.notification.create as jest.Mock;
+const mockedFeatures = features as {
+  bookingNotifications: boolean;
+  contactFirstListings: boolean;
+};
 
 describe("notifications", () => {
   beforeEach(() => {
     jest.clearAllMocks();
+    mockedFeatures.bookingNotifications = true;
+    mockedFeatures.contactFirstListings = false;
   });
 
   describe("createInternalNotification", () => {
@@ -99,7 +118,7 @@ describe("notifications", () => {
         "Failed to create notification",
         expect.objectContaining({
           action: "createInternalNotification",
-          userId: "user-123",
+          userIdHash: "a1b2c3d4e5f6a7b8",
           type: "BOOKING_REQUEST",
           error: "Unique constraint violation",
         })
@@ -118,6 +137,137 @@ describe("notifications", () => {
           error: "Unknown error",
         })
       );
+    });
+
+    describe("booking emission gate", () => {
+      it("emits BOOKING_REQUEST when booking notifications are on by default", async () => {
+        mockNotificationCreate.mockResolvedValue({});
+
+        const result = await createInternalNotification(baseInput);
+
+        expect(result).toEqual({ success: true });
+        expect(mockNotificationCreate).toHaveBeenCalledTimes(1);
+        expect(logger.sync.info as jest.Mock).not.toHaveBeenCalled();
+      });
+
+      it("short-circuits BOOKING_REQUEST when booking notifications are off", async () => {
+        mockedFeatures.bookingNotifications = false;
+
+        const result = await createInternalNotification(baseInput);
+
+        expect(result).toEqual({ success: true });
+        expect(mockNotificationCreate).not.toHaveBeenCalled();
+        expect(logger.sync.info as jest.Mock).toHaveBeenCalledWith(
+          "cfm.notifications.booking_emission_blocked_count",
+          {
+            type: "BOOKING_REQUEST",
+            kind: "inapp",
+          }
+        );
+      });
+
+      it.each(BOOKING_NOTIFICATION_TYPES)(
+        "short-circuits %s when booking notifications are off",
+        async (type) => {
+          mockedFeatures.bookingNotifications = false;
+
+          const result = await createInternalNotification({
+            ...baseInput,
+            type,
+          });
+
+          expect(result).toEqual({ success: true });
+          expect(mockNotificationCreate).not.toHaveBeenCalled();
+          expect(logger.sync.info as jest.Mock).toHaveBeenCalledWith(
+            "cfm.notifications.booking_emission_blocked_count",
+            {
+              type,
+              kind: "inapp",
+            }
+          );
+        }
+      );
+
+      it("does not gate NEW_MESSAGE when booking notifications are off", async () => {
+        mockedFeatures.bookingNotifications = false;
+        mockNotificationCreate.mockResolvedValue({});
+
+        const result = await createInternalNotification({
+          ...baseInput,
+          type: "NEW_MESSAGE",
+        });
+
+        expect(result).toEqual({ success: true });
+        expect(mockNotificationCreate).toHaveBeenCalledTimes(1);
+        expect(logger.sync.info as jest.Mock).not.toHaveBeenCalled();
+      });
+
+      it("does not gate LISTING_STALE_WARNING when booking notifications are off", async () => {
+        mockedFeatures.bookingNotifications = false;
+        mockNotificationCreate.mockResolvedValue({});
+
+        const result = await createInternalNotification({
+          ...baseInput,
+          type: "LISTING_STALE_WARNING",
+        });
+
+        expect(result).toEqual({ success: true });
+        expect(mockNotificationCreate).toHaveBeenCalledTimes(1);
+        expect(logger.sync.info as jest.Mock).not.toHaveBeenCalled();
+      });
+
+      it("emits bypass teeth when BOOKING_REQUEST reaches the helper with contact-first enabled", async () => {
+        mockNotificationCreate.mockResolvedValue({});
+        mockedFeatures.contactFirstListings = true;
+
+        const result = await createInternalNotification(baseInput);
+
+        expect(result).toEqual({ success: true });
+        expect(mockNotificationCreate).toHaveBeenCalledTimes(1);
+        expect(logger.sync.info as jest.Mock).toHaveBeenCalledWith(
+          "cfm.notifications.booking_emission_bypass_count",
+          {
+            type: "BOOKING_REQUEST",
+            userIdHash: "a1b2c3d4e5f6a7b8",
+          }
+        );
+      });
+
+      it("does not emit bypass teeth for BOOKING_ACCEPTED", async () => {
+        mockNotificationCreate.mockResolvedValue({});
+        mockedFeatures.contactFirstListings = true;
+
+        const result = await createInternalNotification({
+          ...baseInput,
+          type: "BOOKING_ACCEPTED",
+        });
+
+        expect(result).toEqual({ success: true });
+        expect(mockNotificationCreate).toHaveBeenCalledTimes(1);
+        expect(logger.sync.info as jest.Mock).not.toHaveBeenCalledWith(
+          "cfm.notifications.booking_emission_bypass_count",
+          expect.anything()
+        );
+      });
+
+      it("never logs a raw userId in the bypass signal", async () => {
+        mockNotificationCreate.mockResolvedValue({});
+        mockedFeatures.contactFirstListings = true;
+
+        await createInternalNotification(baseInput);
+
+        const bypassCall = (logger.sync.info as jest.Mock).mock.calls.find(
+          ([event]) => event === "cfm.notifications.booking_emission_bypass_count"
+        );
+
+        expect(bypassCall).toBeDefined();
+        expect(bypassCall?.[1]).toEqual({
+          type: "BOOKING_REQUEST",
+          userIdHash: "a1b2c3d4e5f6a7b8",
+        });
+        expect(bypassCall?.[1]).not.toHaveProperty("userId");
+        expect(JSON.stringify(bypassCall?.[1])).not.toContain("user-123");
+      });
     });
 
     describe("notification types", () => {

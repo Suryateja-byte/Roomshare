@@ -288,17 +288,32 @@ export async function DELETE(
 
         // Batch-create notifications for tenants with pending bookings
         if (pendingBookings.length > 0) {
-          await tx.notification.createMany({
-            data: pendingBookings
-              .filter((booking) => booking.tenantId != null)
-              .map((booking) => ({
-                userId: booking.tenantId!,
-                type: "BOOKING_CANCELLED",
-                title: "Booking Request Cancelled",
-                message: `Your pending booking request for "${listing.title}" has been cancelled because the host removed the listing.`,
-                link: "/bookings",
-              })),
-          });
+          const pendingBookingNotifications = pendingBookings
+            .filter((booking) => booking.tenantId != null)
+            .map((booking) => ({
+              userId: booking.tenantId!,
+              type: "BOOKING_CANCELLED" as const,
+              title: "Booking Request Cancelled",
+              message: `Your pending booking request for "${listing.title}" has been cancelled because the host removed the listing.`,
+              link: "/bookings",
+            }));
+
+          if (pendingBookingNotifications.length > 0) {
+            if (!features.bookingNotifications) {
+              logger.sync.info(
+                "cfm.notifications.booking_emission_blocked_count",
+                {
+                  type: "BOOKING_CANCELLED",
+                  kind: "inapp",
+                  source: "batch",
+                }
+              );
+            } else {
+              await tx.notification.createMany({
+                data: pendingBookingNotifications,
+              });
+            }
+          }
         }
 
         // Phase 4: Notify tenants with active HELD bookings
@@ -311,17 +326,32 @@ export async function DELETE(
           select: { id: true, tenantId: true },
         });
         if (heldBookings.length > 0) {
-          await tx.notification.createMany({
-            data: heldBookings
-              .filter((booking) => booking.tenantId != null)
-              .map((booking) => ({
-                userId: booking.tenantId!,
-                type: "BOOKING_HOLD_EXPIRED",
-                title: "Hold Cancelled",
-                message: `Your hold on "${listing.title}" has been cancelled because the host removed the listing.`,
-                link: "/bookings",
-              })),
-          });
+          const heldBookingNotifications = heldBookings
+            .filter((booking) => booking.tenantId != null)
+            .map((booking) => ({
+              userId: booking.tenantId!,
+              type: "BOOKING_HOLD_EXPIRED" as const,
+              title: "Hold Cancelled",
+              message: `Your hold on "${listing.title}" has been cancelled because the host removed the listing.`,
+              link: "/bookings",
+            }));
+
+          if (heldBookingNotifications.length > 0) {
+            if (!features.bookingNotifications) {
+              logger.sync.info(
+                "cfm.notifications.booking_emission_blocked_count",
+                {
+                  type: "BOOKING_HOLD_EXPIRED",
+                  kind: "inapp",
+                  source: "batch",
+                }
+              );
+            } else {
+              await tx.notification.createMany({
+                data: heldBookingNotifications,
+              });
+            }
+          }
         }
 
         // Delete listing — Location and bookings cascade-deleted automatically

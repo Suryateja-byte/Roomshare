@@ -111,6 +111,7 @@ const serverEnvSchema = z
     ENABLE_BOOKING_AUDIT: z.enum(["true", "false"]).optional(),
     ENABLE_CONTACT_FIRST_LISTINGS: z.enum(["true", "false"]).optional(),
     ENABLE_BOOKINGS_HISTORY_FIRST: z.enum(["true", "false"]).optional(),
+    ENABLE_BOOKING_NOTIFICATIONS: z.enum(["on", "off"]).optional(),
     ENABLE_PRIVATE_FEEDBACK: z.enum(["true", "false"]).optional(),
     ENABLE_FRESHNESS_NOTIFICATIONS: z.enum(["on", "off"]).optional(),
     ENABLE_STALE_AUTO_PAUSE: z.enum(["on", "off"]).optional(),
@@ -539,6 +540,9 @@ export const features = {
   },
   get bookingsHistoryFirst() {
     return process.env.ENABLE_BOOKINGS_HISTORY_FIRST === "true";
+  },
+  get bookingNotifications() {
+    return process.env.ENABLE_BOOKING_NOTIFICATIONS !== "off";
   },
   get privateFeedback() {
     return process.env.ENABLE_PRIVATE_FEEDBACK === "true";

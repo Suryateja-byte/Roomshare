@@ -158,6 +158,22 @@ For every P0/P1 failure mode in the plan doc, at least one observable signal exi
 | `/bookings` views emitted with history-first mode labels | `cfm.booking.history_first_view_count{mode=history_first\|escape_hatch}` (counter; emitted from `src/app/bookings/page.tsx`) | informational; expect monotonic growth in `mode=history_first` after flag flip | dashboard | §7.11 |
 | `/bookings` reads served from history-first path | `cfm.booking.history_first_serve_ratio` (gauge) | `< 1.0` after CFM-902 | dashboard | §7.11 |
 
+### P1 — Notification emission gate (CFM-903)
+
+| Failure mode | Signal | Threshold | Alert channel | Runbook |
+|---|---|---|---|---|
+| Flag off: booking notification or email emission correctly blocked | `cfm.notifications.booking_emission_blocked_count{type,kind,source}` (counter) | informational; steady-state `> 0` is expected after the flag flips off | dashboard only | §7.11 |
+| `BOOKING_REQUEST` reached the helper despite the contact-first freeze | `cfm.notifications.booking_emission_bypass_count{type}` (counter) | **> 0** after `ENABLE_CONTACT_FIRST_LISTINGS=true` | Sentry high-priority | §7.1 |
+| `BOOKING_HOLD_REQUEST` reached the helper despite the contact-first freeze | `cfm.notifications.booking_emission_bypass_count{type}` (counter) | **> 0** after `ENABLE_CONTACT_FIRST_LISTINGS=true` | Sentry high-priority | §7.1 |
+
+Labels:
+
+- `type` for `kind=inapp` is bounded to `{BOOKING_REQUEST, BOOKING_HOLD_REQUEST, BOOKING_ACCEPTED, BOOKING_REJECTED, BOOKING_CANCELLED, BOOKING_EXPIRED, BOOKING_HOLD_EXPIRED}`.
+- `type` for `kind=email` is bounded to `{bookingRequest, bookingAccepted, bookingRejected, bookingCancelled, bookingHoldRequest, bookingExpired, bookingHoldExpired}`.
+- `kind` is bounded to `{inapp, email}`.
+- `source` is bounded to `{batch}` when present and omitted for single-emitter helper calls.
+- `cfm.notifications.booking_emission_bypass_count{type}` only accepts `{BOOKING_REQUEST, BOOKING_HOLD_REQUEST}` and carries `userIdHash` in structured-log metadata, never as a metric label.
+
 ---
 
 ## 4. Structured Log Dimensions

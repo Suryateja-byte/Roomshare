@@ -6,6 +6,7 @@ import { auth } from "@/auth";
 import { revalidatePath } from "next/cache";
 import { ListingStatus, ReportStatus } from "@prisma/client";
 import { logAdminAction } from "@/lib/audit";
+import { features } from "@/lib/env";
 import { logger } from "@/lib/logger";
 import { markListingDirtyInTx } from "@/lib/search/search-doc-dirty";
 import {
@@ -691,17 +692,29 @@ export async function deleteListing(listingId: string) {
 
       // Batch-create notifications for affected tenants
       if (pendingBookings.length > 0) {
-        await tx.notification.createMany({
-          data: pendingBookings
-            .filter((booking) => booking.tenantId != null)
-            .map((booking) => ({
-              userId: booking.tenantId!,
+        const pendingBookingNotifications = pendingBookings
+          .filter((booking) => booking.tenantId != null)
+          .map((booking) => ({
+            userId: booking.tenantId!,
+            type: "BOOKING_CANCELLED" as const,
+            title: "Booking Request Cancelled",
+            message: `Your pending booking request for "${listing.title}" has been cancelled because the listing was removed by an administrator.`,
+            link: "/bookings",
+          }));
+
+        if (pendingBookingNotifications.length > 0) {
+          if (!features.bookingNotifications) {
+            logger.sync.info("cfm.notifications.booking_emission_blocked_count", {
               type: "BOOKING_CANCELLED",
-              title: "Booking Request Cancelled",
-              message: `Your pending booking request for "${listing.title}" has been cancelled because the listing was removed by an administrator.`,
-              link: "/bookings",
-            })),
-        });
+              kind: "inapp",
+              source: "batch",
+            });
+          } else {
+            await tx.notification.createMany({
+              data: pendingBookingNotifications,
+            });
+          }
+        }
       }
 
       // Delete the listing
@@ -968,17 +981,29 @@ export async function resolveReportAndRemoveListing(
 
       // Batch-create notifications for affected tenants (skip deleted accounts)
       if (affectedBookings.length > 0) {
-        await tx.notification.createMany({
-          data: affectedBookings
-            .filter((booking) => booking.tenantId != null)
-            .map((booking) => ({
-              userId: booking.tenantId!,
+        const affectedBookingNotifications = affectedBookings
+          .filter((booking) => booking.tenantId != null)
+          .map((booking) => ({
+            userId: booking.tenantId!,
+            type: "BOOKING_CANCELLED" as const,
+            title: "Booking Cancelled - Listing Removed",
+            message: `Your booking for "${listing.title}" has been cancelled because the listing was removed due to a policy violation.`,
+            link: "/bookings",
+          }));
+
+        if (affectedBookingNotifications.length > 0) {
+          if (!features.bookingNotifications) {
+            logger.sync.info("cfm.notifications.booking_emission_blocked_count", {
               type: "BOOKING_CANCELLED",
-              title: "Booking Cancelled - Listing Removed",
-              message: `Your booking for "${listing.title}" has been cancelled because the listing was removed due to a policy violation.`,
-              link: "/bookings",
-            })),
-        });
+              kind: "inapp",
+              source: "batch",
+            });
+          } else {
+            await tx.notification.createMany({
+              data: affectedBookingNotifications,
+            });
+          }
+        }
       }
 
       // Update report status
