@@ -111,6 +111,7 @@ model Listing {
   houseRules              String[]
   leaseDuration           String?
   roomType                String?
+  normalizedAddress       String?
   householdLanguages      String[]                  @default([]) @map("household_languages")
   primaryHomeLanguage     String?                   @map("primary_home_language")
   genderPreference        String?
@@ -146,6 +147,9 @@ model Listing {
   recentlyViewed          RecentlyViewed[]
 
   @@index([ownerId])
+  // Defined as a PARTIAL index (WHERE status IN ACTIVE, PAUSED) in the migration SQL.
+  // Prisma's introspection cannot round-trip WHERE predicates; do NOT regenerate via `db pull`.
+  @@index([ownerId, normalizedAddress])
   @@index([status])
   @@index([createdAt])
   @@index([status, createdAt])

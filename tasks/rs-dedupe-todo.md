@@ -8,7 +8,7 @@
 
 Each task is a fresh Codex prompt. Critic pass between tasks. Coordinator commits after critic green-light.
 
-- [ ] **Task 1 — Foundation utilities (pure TS, no side effects)**
+- [x] **Task 1 — Foundation utilities (pure TS, no side effects)** — commit `361858bd` (2026-04-18). 19 tests pass. Critic APPROVE_WITH_NITS (non-blocking).
   - `src/lib/env.ts`: add `searchListingDedup`, `listingCreateCollisionWarn` flags (default OFF)
   - `src/lib/search/normalize-listing-title.ts` (new)
   - `src/lib/search/normalize-address.ts` (new, TS canonical per arch advisory)
@@ -18,7 +18,7 @@ Each task is a fresh Codex prompt. Critic pass between tasks. Coordinator commit
   - Acceptance: `pnpm lint && pnpm typecheck && pnpm test` green; all new tests cover invariants.
   - **No DB changes. No server wiring. No UI.** Pure foundation.
 
-- [ ] **Task 2 — Prisma migration (write, do not apply)**
+- [x] **Task 2 — Prisma migration (written, not applied)** — migration dir `20260418171531_add_listing_normalized_address`. Option B chosen: no SQL function, TS backfill. 6 tests pass. Critic APPROVE_WITH_NITS (2 non-blocking). **User gate pending: `prisma migrate deploy` against staging.**
   - `prisma/schema.prisma`: add `Listing.normalizedAddress String?`
   - `prisma/migrations/<timestamp>_add_listing_normalized_address/migration.sql`: ADD COLUMN + index + SQL function + chunked backfill skeleton
   - Rollback note + data-safety note
