@@ -30,6 +30,8 @@ interface SearchTelemetryStore {
   loadMoreErrorTotal: number;
   zeroResultsTotal: number;
   clientAbortTotal: number;
+  dedupAppliedTotal: number;
+  dedupOverflowTotal: number;
   legacyUrlCounts: Record<LegacyUrlSurface, Record<LegacyUrlAlias, number>>;
 }
 
@@ -64,6 +66,8 @@ const telemetryStore: SearchTelemetryStore = {
   loadMoreErrorTotal: 0,
   zeroResultsTotal: 0,
   clientAbortTotal: 0,
+  dedupAppliedTotal: 0,
+  dedupOverflowTotal: 0,
   legacyUrlCounts: createLegacyUrlCounts(),
 };
 
@@ -215,6 +219,39 @@ export function recordSearchClientAbort({
   });
 }
 
+export function recordSearchDedupApplied({
+  rowsIn,
+  groupsOut,
+  maxGroupSize,
+}: {
+  rowsIn: number;
+  groupsOut: number;
+  maxGroupSize: number;
+}): void {
+  telemetryStore.dedupAppliedTotal += 1;
+  logger.sync.info("search_dedup_applied_total", {
+    rowsIn,
+    groupsOut,
+    maxGroupSize,
+    total: telemetryStore.dedupAppliedTotal,
+  });
+}
+
+export function recordSearchDedupOverflow({
+  groupKeyPrefix8,
+  queryHashPrefix8,
+}: {
+  groupKeyPrefix8: string;
+  queryHashPrefix8: string;
+}): void {
+  telemetryStore.dedupOverflowTotal += 1;
+  logger.sync.warn("search_dedup_overflow_total", {
+    groupKeyPrefix8,
+    queryHashPrefix8,
+    total: telemetryStore.dedupOverflowTotal,
+  });
+}
+
 export function recordLegacyUrlUsage({
   alias,
   surface,
@@ -281,5 +318,7 @@ export function resetSearchTelemetryForTests(): void {
   telemetryStore.loadMoreErrorTotal = 0;
   telemetryStore.zeroResultsTotal = 0;
   telemetryStore.clientAbortTotal = 0;
+  telemetryStore.dedupAppliedTotal = 0;
+  telemetryStore.dedupOverflowTotal = 0;
   telemetryStore.legacyUrlCounts = createLegacyUrlCounts();
 }

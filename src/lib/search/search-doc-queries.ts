@@ -15,6 +15,7 @@
 
 import "server-only";
 
+import { createHash } from "node:crypto";
 import { prisma } from "@/lib/prisma";
 import { wrapDatabaseError } from "@/lib/errors";
 import { unstable_cache } from "next/cache";
@@ -57,9 +58,19 @@ import { getCachedQueryEmbedding } from "@/lib/embeddings/query-cache";
 import { logger } from "@/lib/logger";
 import { joinWhereClauseWithSecurityInvariant } from "@/lib/sql-safety";
 import { buildAvailabilitySqlFragments } from "@/lib/availability";
+import {
+  applyServerDedup,
+  type SearchRowForDedup,
+} from "./dedup-pipeline";
+import { generateSearchQueryHash } from "./query-hash";
+import {
+  recordSearchDedupApplied,
+  recordSearchDedupOverflow,
+} from "./search-telemetry";
 
 // Statement timeout for search queries (5 seconds)
 const SEARCH_QUERY_TIMEOUT_MS = 5000;
+const SEARCH_DEDUP_LOOK_AHEAD = 16;
 
 function isPresent<T>(value: T | null | undefined): value is T {
   return value != null;
@@ -123,8 +134,12 @@ interface ListingRaw {
   moveInDate?: string | Date;
   createdAt?: string | Date;
   viewCount: number | string;
+  ownerId?: string;
+  normalizedAddress?: string | null;
+  address?: string | null;
   city: string;
   state: string;
+  zip?: string | null;
   lat: number | string;
   lng: number | string;
   avgRating: number | string | null;
@@ -222,6 +237,16 @@ const MAX_MAP_MARKERS = 200;
 // Threshold for full COUNT vs hybrid mode
 const HYBRID_COUNT_THRESHOLD = 100;
 const HOST_MANAGED_STALE_INTERVAL_SQL = "INTERVAL '21 days'";
+export const SEARCH_DOC_ALLOWED_SQL_LITERALS = new Set([
+  "ACTIVE",
+  "HOST_MANAGED",
+  "ACCEPTED",
+  "HELD",
+  "MIGRATION_REVIEW",
+  "english",
+  "1 day",
+  "21 days",
+]);
 
 // Maximum results for unbounded browse-all queries (no query, no bounds)
 // Prevents full-table scans while allowing homepage browsing.
@@ -241,7 +266,7 @@ function quantizeBound(value: number): number {
 }
 
 /** Shared base fields for search cache keys */
-function buildBaseCacheFields(params: FilterParams) {
+export function buildBaseCacheFields(params: FilterParams) {
   return {
     q: params.query?.toLowerCase().trim() || "",
     minPrice: params.minPrice ?? "",
@@ -257,13 +282,14 @@ function buildBaseCacheFields(params: FilterParams) {
     householdGender: params.householdGender || "",
     bookingMode: params.bookingMode || "",
     minAvailableSlots: String(params.minAvailableSlots ?? 1),
+    dedup: features.searchListingDedup ? "v1" : "off",
     bounds: params.bounds
       ? `${quantizeBound(params.bounds.minLng)},${quantizeBound(params.bounds.minLat)},${quantizeBound(params.bounds.maxLng)},${quantizeBound(params.bounds.maxLat)}`
       : "",
   };
 }
 
-function createSearchDocListCacheKey(params: FilterParams): string {
+export function createSearchDocListCacheKey(params: FilterParams): string {
   return JSON.stringify({
     ...buildBaseCacheFields(params),
     page: params.page ?? 1,
@@ -283,6 +309,150 @@ function createSearchDocMapCacheKey(params: FilterParams): string {
 
 function createSearchDocCountCacheKey(params: FilterParams): string {
   return JSON.stringify(buildBaseCacheFields(params));
+}
+
+type ListingGroupMetadata = Pick<ListingData, "groupKey" | "groupSummary">;
+
+type DedupedListingRows<T extends ListingRaw> = {
+  rows: T[];
+  groupMetadataById: Map<string, ListingGroupMetadata>;
+  cursorBoundaryRow: T | null;
+};
+
+function buildSearchQueryHashPrefix8(params: FilterParams): string {
+  return generateSearchQueryHash({
+    query: params.query,
+    vibeQuery: params.vibeQuery,
+    minPrice: params.minPrice,
+    maxPrice: params.maxPrice,
+    amenities: params.amenities,
+    houseRules: params.houseRules,
+    languages: params.languages,
+    roomType: params.roomType,
+    leaseDuration: params.leaseDuration,
+    moveInDate: params.moveInDate,
+    endDate: params.endDate,
+    genderPreference: params.genderPreference,
+    householdGender: params.householdGender,
+    bookingMode: params.bookingMode,
+    minAvailableSlots: params.minAvailableSlots,
+    nearMatches: params.nearMatches,
+    bounds: params.bounds,
+  }).slice(0, 8);
+}
+
+function hashGroupKeyPrefix8(groupKey: string): string {
+  return createHash("sha256").update(groupKey).digest("hex").slice(0, 8);
+}
+
+function toSearchRowForDedup(row: ListingRaw): SearchRowForDedup {
+  return {
+    id: row.id,
+    ownerId: row.ownerId ?? "",
+    title: row.title,
+    price: Number(row.price),
+    roomType: row.roomType ?? null,
+    moveInDate: row.moveInDate ?? null,
+    availableUntil: row.availableUntil ?? null,
+    openSlots: row.openSlots ?? null,
+    totalSlots: row.totalSlots,
+    normalizedAddress: row.normalizedAddress ?? null,
+    location: {
+      address: row.address ?? null,
+      city: row.city,
+      state: row.state,
+      zip: row.zip ?? null,
+    },
+  };
+}
+
+function attachListingGroupMetadata(
+  listings: ListingData[],
+  groupMetadataById: Map<string, ListingGroupMetadata>
+): ListingData[] {
+  if (groupMetadataById.size === 0) {
+    return listings;
+  }
+
+  return listings.map((listing) => {
+    const groupMetadata = groupMetadataById.get(listing.id);
+    return groupMetadata ? { ...listing, ...groupMetadata } : listing;
+  });
+}
+
+function dedupeListingRows<T extends ListingRaw>(
+  rows: T[],
+  params: FilterParams,
+  limit: number
+): DedupedListingRows<T> {
+  const fallbackCursorBoundaryRow =
+    limit > 0 && rows.length > 0 ? rows[Math.min(limit - 1, rows.length - 1)] : null;
+
+  if (!features.searchListingDedup) {
+    return {
+      rows,
+      groupMetadataById: new Map<string, ListingGroupMetadata>(),
+      cursorBoundaryRow: fallbackCursorBoundaryRow,
+    };
+  }
+
+  const dedupResult = applyServerDedup(
+    rows.map((row) => toSearchRowForDedup(row)),
+    {
+      enabled: true,
+      limit,
+      lookAhead: SEARCH_DEDUP_LOOK_AHEAD,
+    }
+  );
+
+  recordSearchDedupApplied(dedupResult.metrics);
+
+  const groupMetadataById = new Map<string, ListingGroupMetadata>();
+  for (const canonical of dedupResult.canonicals) {
+    groupMetadataById.set(canonical.id, {
+      groupKey: canonical.groupKey,
+      groupSummary: canonical.groupSummary,
+    });
+  }
+
+  const rawRowsById = new Map(rows.map((row) => [row.id, row]));
+  const canonicalRows = dedupResult.canonicals
+    .map((canonical) => rawRowsById.get(canonical.id))
+    .filter(isPresent);
+
+  const queryHashPrefix8 = buildSearchQueryHashPrefix8(params);
+  for (const canonicalId of dedupResult.overflowCanonicalIds) {
+    const groupMetadata = groupMetadataById.get(canonicalId);
+    if (!groupMetadata?.groupKey) {
+      continue;
+    }
+
+    recordSearchDedupOverflow({
+      groupKeyPrefix8: hashGroupKeyPrefix8(groupMetadata.groupKey),
+      queryHashPrefix8,
+    });
+  }
+
+  const emittedIds = new Set<string>();
+  for (const canonical of dedupResult.canonicals.slice(0, limit)) {
+    emittedIds.add(canonical.id);
+    for (const siblingId of canonical.groupSummary.siblingIds) {
+      emittedIds.add(siblingId);
+    }
+  }
+
+  let cursorBoundaryRow: T | null = null;
+  for (const row of rows) {
+    if (emittedIds.has(row.id)) {
+      cursorBoundaryRow = row;
+    }
+  }
+
+  return {
+    rows: canonicalRows,
+    groupMetadataById,
+    cursorBoundaryRow: cursorBoundaryRow ?? fallbackCursorBoundaryRow,
+  };
 }
 
 // ============================================
@@ -656,7 +826,7 @@ function buildSearchDocWhereConditionsInternal(
     slotConditionSql,
     `l.status = 'ACTIVE'`,
     `COALESCE(l."needsMigrationReview", FALSE) = FALSE`,
-    `COALESCE(l."statusReason", '') <> 'MIGRATION_REVIEW'`,
+    `l."statusReason" IS DISTINCT FROM 'MIGRATION_REVIEW'`,
     "d.lat IS NOT NULL",
     "d.lng IS NOT NULL",
   ];
@@ -882,7 +1052,10 @@ async function getSearchDocLimitedCountInternal(
 
   const { conditions, params: queryParams } =
     buildSearchDocListWhereConditions(params);
-  const whereClause = joinWhereClauseWithSecurityInvariant(conditions);
+  const whereClause = joinWhereClauseWithSecurityInvariant(
+    conditions,
+    SEARCH_DOC_ALLOWED_SQL_LITERALS
+  );
 
   // Use subquery with LIMIT 101 to efficiently check if count > threshold
   const limitedCountQuery = `
@@ -1088,7 +1261,10 @@ async function getSearchDocMapListingsInternal(
     ftsQueryParamIndex,
     effectiveAvailableSql,
   } = buildSearchDocWhereConditions(effectiveParams);
-  const whereClause = joinWhereClauseWithSecurityInvariant(conditions);
+  const whereClause = joinWhereClauseWithSecurityInvariant(
+    conditions,
+    SEARCH_DOC_ALLOWED_SQL_LITERALS
+  );
   const sortOption = (effectiveParams.sort || "recommended") as SortOption;
   const orderByClause = buildOrderByClause(sortOption, ftsQueryParamIndex);
 
@@ -1210,9 +1386,15 @@ async function expandWithNearMatches(
   });
 
   const exactIds = new Set(items.map((item) => item.id));
+  const exactGroupKeys = new Set(
+    items.map((item) => item.groupKey).filter((groupKey): groupKey is string => !!groupKey)
+  );
 
   const nearMatchItems = expandedResult.items
-    .filter((item) => !exactIds.has(item.id))
+    // Expanded rows can collapse into an already-emitted canonical group.
+    .filter(
+      (item) => !exactIds.has(item.id) && !(item.groupKey && exactGroupKeys.has(item.groupKey))
+    )
     .slice(0, LOW_RESULTS_THRESHOLD)
     .map((item) => {
       // EU-C: Guard against Invalid Date before calling toISOString()
@@ -1267,7 +1449,10 @@ async function getSearchDocListingsPaginatedInternal(
       ftsQueryParamIndex,
       effectiveAvailableSql,
     } = buildSearchDocListWhereConditions(params);
-    const whereClause = joinWhereClauseWithSecurityInvariant(conditions);
+    const whereClause = joinWhereClauseWithSecurityInvariant(
+      conditions,
+      SEARCH_DOC_ALLOWED_SQL_LITERALS
+    );
 
     // Build ORDER BY clause with ts_rank_cd tie-breaker when FTS is active
     const orderByClause = buildOrderByClause(sort, ftsQueryParamIndex);
@@ -1298,8 +1483,10 @@ async function getSearchDocListingsPaginatedInternal(
 
     const offset = (safePage - 1) * effectiveLimit;
 
-    // Fetch limit+1 items to determine hasNextPage
-    const fetchLimit = effectiveLimit + 1;
+    // Fetch extra raw rows when dedupe is enabled so page sizing is based on canonicals.
+    const fetchLimit = features.searchListingDedup
+      ? effectiveLimit + SEARCH_DEDUP_LOOK_AHEAD + 1
+      : effectiveLimit + 1;
     let paramIndex = startParamIndex;
 
     // Main query - reads from denormalized SearchDoc
@@ -1320,6 +1507,8 @@ async function getSearchDocListingsPaginatedInternal(
         l.status::text as status,
         l."statusReason" as "statusReason",
         l."needsMigrationReview" as "needsMigrationReview",
+        l."ownerId" as "ownerId",
+        l."normalizedAddress" as "normalizedAddress",
         d.amenities,
         d.house_rules as "houseRules",
         d.household_languages as "householdLanguages",
@@ -1329,8 +1518,10 @@ async function getSearchDocListingsPaginatedInternal(
         l."moveInDate" as "moveInDate",
         d.listing_created_at as "createdAt",
         d.view_count as "viewCount",
+        d.address,
         d.city,
         d.state,
+        d.zip,
         d.lat,
         d.lng,
         d.avg_rating as "avgRating",
@@ -1346,8 +1537,11 @@ async function getSearchDocListingsPaginatedInternal(
 
     const listings = await queryWithTimeout<ListingRaw>(dataQuery, dataParams);
 
-    // Map results to ListingData
-    const results = mapRawListingsToPublic(listings);
+    const deduped = dedupeListingRows(listings, params, effectiveLimit);
+    const results = attachListingGroupMetadata(
+      mapRawListingsToPublic(deduped.rows),
+      deduped.groupMetadataById
+    );
 
     // Determine hasNextPage using limit+1 pattern
     // Use effectiveLimit for unbounded browse cap
@@ -1491,7 +1685,10 @@ export async function getSearchDocListingsWithKeyset(
     const allParams = [...queryParams, ...keysetResult.params];
     let paramIndex = keysetResult.nextParamIndex;
 
-    const whereClause = joinWhereClauseWithSecurityInvariant(conditions);
+    const whereClause = joinWhereClauseWithSecurityInvariant(
+      conditions,
+      SEARCH_DOC_ALLOWED_SQL_LITERALS
+    );
 
     // Build ORDER BY clause — skip ts_rank_cd for keyset (cursor doesn't capture rank)
     const orderByClause = buildOrderByClause(
@@ -1500,8 +1697,10 @@ export async function getSearchDocListingsWithKeyset(
       true
     );
 
-    // Fetch limit+1 items to determine hasNextPage
-    const fetchLimit = limit + 1;
+    // Fetch extra raw rows when dedupe is enabled so page sizing is based on canonicals.
+    const fetchLimit = features.searchListingDedup
+      ? limit + SEARCH_DEDUP_LOOK_AHEAD + 1
+      : limit + 1;
 
     // Main query with cursor row data columns for building next cursor
     // Note: Numeric values are cast to text to preserve precision for cursor encoding
@@ -1522,6 +1721,8 @@ export async function getSearchDocListingsWithKeyset(
         l.status::text as status,
         l."statusReason" as "statusReason",
         l."needsMigrationReview" as "needsMigrationReview",
+        l."ownerId" as "ownerId",
+        l."normalizedAddress" as "normalizedAddress",
         d.amenities,
         d.house_rules as "houseRules",
         d.household_languages as "householdLanguages",
@@ -1531,8 +1732,10 @@ export async function getSearchDocListingsWithKeyset(
         l."moveInDate" as "moveInDate",
         d.listing_created_at as "createdAt",
         d.view_count as "viewCount",
+        d.address,
         d.city,
         d.state,
+        d.zip,
         d.lat,
         d.lng,
         d.avg_rating as "avgRating",
@@ -1557,8 +1760,11 @@ export async function getSearchDocListingsWithKeyset(
       dataParams
     );
 
-    // Map results to ListingData
-    const results = mapRawListingsToPublic(listings);
+    const deduped = dedupeListingRows(listings, params, limit);
+    const results = attachListingGroupMetadata(
+      mapRawListingsToPublic(deduped.rows),
+      deduped.groupMetadataById
+    );
 
     // Determine hasNextPage using limit+1 pattern
     const hasNextPage = results.length > limit;
@@ -1570,9 +1776,8 @@ export async function getSearchDocListingsWithKeyset(
 
     // Build nextCursor from the last item
     let nextCursor: string | null = null;
-    if (hasNextPage && listings.length > 0) {
-      // Use the last item within limit (not the extra one)
-      const lastRawItem = listings[limit - 1];
+    if (hasNextPage && deduped.cursorBoundaryRow) {
+      const lastRawItem = deduped.cursorBoundaryRow;
       const cursorRowData: CursorRowData = {
         id: lastRawItem.id,
         listing_created_at:
@@ -1677,7 +1882,10 @@ export async function getSearchDocListingsFirstPage(
       ftsQueryParamIndex,
       effectiveAvailableSql,
     } = buildSearchDocListWhereConditions(params);
-    const whereClause = joinWhereClauseWithSecurityInvariant(conditions);
+    const whereClause = joinWhereClauseWithSecurityInvariant(
+      conditions,
+      SEARCH_DOC_ALLOWED_SQL_LITERALS
+    );
 
     // Build ORDER BY clause — skip ts_rank_cd for keyset (cursor doesn't capture rank)
     const orderByClause = buildOrderByClause(
@@ -1692,8 +1900,10 @@ export async function getSearchDocListingsFirstPage(
     const totalPages =
       limitedCount !== null ? Math.ceil(limitedCount / limit) : null;
 
-    // Fetch limit+1 items to determine hasNextPage
-    const fetchLimit = limit + 1;
+    // Fetch extra raw rows when dedupe is enabled so page sizing is based on canonicals.
+    const fetchLimit = features.searchListingDedup
+      ? limit + SEARCH_DEDUP_LOOK_AHEAD + 1
+      : limit + 1;
     let paramIndex = startParamIndex;
 
     // Main query with cursor row data columns
@@ -1714,6 +1924,8 @@ export async function getSearchDocListingsFirstPage(
         l.status::text as status,
         l."statusReason" as "statusReason",
         l."needsMigrationReview" as "needsMigrationReview",
+        l."ownerId" as "ownerId",
+        l."normalizedAddress" as "normalizedAddress",
         d.amenities,
         d.house_rules as "houseRules",
         d.household_languages as "householdLanguages",
@@ -1723,8 +1935,10 @@ export async function getSearchDocListingsFirstPage(
         l."moveInDate" as "moveInDate",
         d.listing_created_at as "createdAt",
         d.view_count as "viewCount",
+        d.address,
         d.city,
         d.state,
+        d.zip,
         d.lat,
         d.lng,
         d.avg_rating as "avgRating",
@@ -1749,8 +1963,11 @@ export async function getSearchDocListingsFirstPage(
       dataParams
     );
 
-    // Map results to ListingData
-    const results = mapRawListingsToPublic(listings);
+    const deduped = dedupeListingRows(listings, params, limit);
+    const results = attachListingGroupMetadata(
+      mapRawListingsToPublic(deduped.rows),
+      deduped.groupMetadataById
+    );
 
     // Determine hasNextPage using limit+1 pattern
     const hasNextPage = results.length > limit;
@@ -1779,9 +1996,8 @@ export async function getSearchDocListingsFirstPage(
 
     // Build nextCursor from the last item
     let nextCursor: string | null = null;
-    if (hasNextPage && listings.length > 0) {
-      // Use the last item within limit (not the extra one)
-      const lastRawItem = listings[Math.min(limit - 1, listings.length - 1)];
+    if (hasNextPage && deduped.cursorBoundaryRow) {
+      const lastRawItem = deduped.cursorBoundaryRow;
       const cursorRowData: CursorRowData = {
         id: lastRawItem.id,
         listing_created_at:

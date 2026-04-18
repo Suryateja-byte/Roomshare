@@ -24,7 +24,7 @@ Each task is a fresh Codex prompt. Critic pass between tasks. Coordinator commit
   - Rollback note + data-safety note
   - **USER GATE:** Coordinator runs `prisma migrate dev` only after user confirms staging-first run.
 
-- [ ] **Task 3 — Server dedup wiring + cache-key isolation**
+- [x] **Task 3 — Server dedup wiring + cache-key isolation** — 7 new pipeline tests + 49 regression tests pass. Critic flagged pre-existing branch dirt as out-of-scope; coordinator re-scoped and landed catch-up commits separately (`a837a4f2`, `aef404bf`). Task 3 main commit: see below.
   - `src/lib/search/search-doc-queries.ts`: call `groupListings()` post-fetch when `searchListingDedup === true`, preserve ordering, emit `groupKey` + `groupSummary`
   - `expandWithNearMatches` + `findSplitStays`: skip by `groupKey`
   - Cache-key bump: add `dedup: "v1" | "off"` slot

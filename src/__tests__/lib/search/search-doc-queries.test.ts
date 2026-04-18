@@ -5,6 +5,7 @@
  */
 
 import {
+  SEARCH_DOC_ALLOWED_SQL_LITERALS,
   isSearchDocEnabled,
   buildOrderByClause,
   buildSearchDocListWhereConditions,
@@ -13,6 +14,7 @@ import {
   mapRawMapListingsToPublic,
 } from "@/lib/search/search-doc-queries";
 import { buildPublicAvailability } from "@/lib/search/public-availability";
+import { joinWhereClauseWithSecurityInvariant } from "@/lib/sql-safety";
 
 describe("buildSearchDocWhereConditions", () => {
   it("excludes listings with null coordinates from map results (F1.1)", () => {
@@ -33,9 +35,7 @@ describe("buildSearchDocWhereConditions", () => {
     expect(conditions).toContain(
       `COALESCE(l."needsMigrationReview", FALSE) = FALSE`
     );
-    expect(conditions).toContain(
-      `COALESCE(l."statusReason", '') <> 'MIGRATION_REVIEW'`
-    );
+    expect(conditions).toContain(`l."statusReason" IS DISTINCT FROM 'MIGRATION_REVIEW'`);
     // Verify no other status values are included
     const statusConditions = conditions.filter((c) =>
       c.includes(`l.status = 'ACTIVE'`)
@@ -78,6 +78,25 @@ describe("buildSearchDocWhereConditions", () => {
     expect(mapResult.conditions).toEqual(listResult.conditions);
     expect(mapResult.params).toEqual(listResult.params);
     expect(mapResult.paramIndex).toBe(listResult.paramIndex);
+  });
+
+  it("joins map/searchdoc conditions under the scoped SQL-literal allowlist", () => {
+    const { conditions } = buildSearchDocWhereConditions({
+      query: "studio",
+      bounds: {
+        minLng: -122.5,
+        minLat: 37.7,
+        maxLng: -122.3,
+        maxLat: 37.8,
+      },
+    });
+
+    expect(() =>
+      joinWhereClauseWithSecurityInvariant(
+        conditions,
+        SEARCH_DOC_ALLOWED_SQL_LITERALS
+      )
+    ).not.toThrow();
   });
 
   describe("price filter conditions", () => {
@@ -262,7 +281,7 @@ describe("buildSearchDocListWhereConditions", () => {
     const result = buildSearchDocListWhereConditions({});
 
     expect(result.conditions).toContain(`COALESCE(l."needsMigrationReview", FALSE) = FALSE`);
-    expect(result.conditions).toContain(`COALESCE(l."statusReason", '') <> 'MIGRATION_REVIEW'`);
+    expect(result.conditions).toContain(`l."statusReason" IS DISTINCT FROM 'MIGRATION_REVIEW'`);
     expect(result.conditions[0]).toContain(`l."availabilitySource" = 'HOST_MANAGED'`);
     expect(result.conditions[0]).toContain(`NOW() - INTERVAL '21 days'`);
     expect(result.params).toEqual([1, 1]);
@@ -277,6 +296,20 @@ describe("buildSearchDocListWhereConditions", () => {
     expect(result.conditions[0]).toContain(
       `l."availableUntil"::date >= $4::date`
     );
+  });
+
+  it("joins list/searchdoc conditions under the scoped SQL-literal allowlist", () => {
+    const { conditions } = buildSearchDocListWhereConditions({
+      query: "studio",
+      moveInDate: "2026-05-01",
+    });
+
+    expect(() =>
+      joinWhereClauseWithSecurityInvariant(
+        conditions,
+        SEARCH_DOC_ALLOWED_SQL_LITERALS
+      )
+    ).not.toThrow();
   });
 });
 
