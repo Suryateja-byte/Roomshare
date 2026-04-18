@@ -640,9 +640,10 @@ export async function runFreshnessDispatcher(
       continue;
     }
 
-    if (kind === "reminder" && listing.owner.email && emailResult.skipped) {
-      counters.skippedPreference.reminder += 1;
-    }
+    const isPreferenceSkipped =
+      kind === "reminder" &&
+      listing.owner.email &&
+      emailResult.skipped === true;
 
     try {
       const updated = await markFreshnessNotificationSent(listing, kind, new Date());
@@ -656,6 +657,17 @@ export async function runFreshnessDispatcher(
       logger.sync.error("[freshness-reminders] Token flip failed", {
         ...logMeta,
         error: sanitizeErrorMessage(error),
+      });
+      continue;
+    }
+
+    if (isPreferenceSkipped) {
+      counters.skippedPreference[kind] += 1;
+      logger.sync.info("[freshness-reminders] Notification preference-skipped", {
+        ...logMeta,
+        canonicalMetric: FRESHNESS_NOTIFICATION_SENT_METRIC,
+        operationalMetric: FRESHNESS_CRON_EMITTED_METRIC,
+        emailSkipped: true,
       });
       continue;
     }

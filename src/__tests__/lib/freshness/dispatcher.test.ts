@@ -185,7 +185,7 @@ describe("freshness dispatcher", () => {
       selected: 2,
       processed: 2,
       emitted: {
-        reminder: 1,
+        reminder: 0,
         warning: 1,
       },
       skippedPreference: {
@@ -222,6 +222,8 @@ describe("freshness dispatcher", () => {
       "listing-reminder@example.com",
       expect.objectContaining({ listingId: "listing-reminder" })
     );
+    expect(mockSendNotificationEmailWithPreference).toHaveBeenCalledTimes(1);
+    expect(mockSendNotificationEmail).toHaveBeenCalledTimes(1);
     expect(mockUpdateMany).toHaveBeenCalledTimes(2);
     expect(getFreshnessCronTelemetrySnapshot()).toMatchObject({
       eligibleCounts: {
@@ -229,7 +231,7 @@ describe("freshness dispatcher", () => {
         warning: 1,
       },
       emittedCounts: {
-        reminder: 1,
+        reminder: 0,
         warning: 1,
       },
       skippedPreferenceCounts: {
@@ -284,6 +286,74 @@ describe("freshness dispatcher", () => {
     expect(mockSendNotificationEmailWithPreference).not.toHaveBeenCalled();
     expect(mockUpdateMany).not.toHaveBeenCalled();
     expect(getFreshnessCronTelemetrySnapshot().skippedSuspendedCount).toBe(1);
+  });
+
+  it("does not inflate emitted.reminder when reminder preference is disabled", async () => {
+    mockFindMany
+      .mockResolvedValueOnce([])
+      .mockResolvedValueOnce([
+        { id: "listing-reminder", lastConfirmedAt: daysAgo(now, 15) },
+      ])
+      .mockResolvedValueOnce([makeListing("listing-reminder", daysAgo(now, 15))]);
+    mockSendNotificationEmailWithPreference.mockResolvedValueOnce({
+      success: true,
+      skipped: true,
+    });
+
+    const summary = await runFreshnessDispatcher(now);
+
+    expect(summary.emitted.reminder).toBe(0);
+    expect(summary.skippedPreference.reminder).toBe(1);
+    expect(mockSendNotificationEmailWithPreference).toHaveBeenCalledTimes(1);
+    expect(mockSendNotificationEmail).not.toHaveBeenCalled();
+    expect(mockUpdateMany).toHaveBeenCalledTimes(1);
+    expect(getFreshnessCronTelemetrySnapshot()).toMatchObject({
+      emittedCounts: {
+        reminder: 0,
+        warning: 0,
+      },
+      skippedPreferenceCounts: {
+        reminder: 1,
+        warning: 0,
+      },
+    });
+  });
+
+  it("fires exactly one outbound send per reminder candidate", async () => {
+    mockFindMany
+      .mockResolvedValueOnce([
+        { id: "listing-warning", lastConfirmedAt: daysAgo(now, 22) },
+      ])
+      .mockResolvedValueOnce([
+        { id: "listing-reminder", lastConfirmedAt: daysAgo(now, 15) },
+      ])
+      .mockResolvedValueOnce([
+        makeListing("listing-warning", daysAgo(now, 22)),
+        makeListing("listing-reminder", daysAgo(now, 15)),
+      ]);
+    mockSendNotificationEmailWithPreference.mockResolvedValueOnce({
+      success: true,
+      skipped: true,
+    });
+
+    const summary = await runFreshnessDispatcher(now);
+
+    expect(summary.emitted.reminder).toBe(0);
+    expect(summary.skippedPreference.reminder).toBe(1);
+    expect(summary.emitted.warning).toBe(1);
+    expect(mockSendNotificationEmailWithPreference).toHaveBeenCalledTimes(1);
+    expect(mockSendNotificationEmail).toHaveBeenCalledTimes(1);
+    expect(mockUpdateMany).toHaveBeenCalledTimes(2);
+    expect(getFreshnessCronTelemetrySnapshot()).toMatchObject({
+      emittedCounts: {
+        reminder: 0,
+        warning: 1,
+      },
+      skippedPreferenceCounts: {
+        reminder: 1,
+        warning: 0,
+      },
+    });
   });
 
   it("keeps the warning selection window above the auto-pause cutoff", async () => {
