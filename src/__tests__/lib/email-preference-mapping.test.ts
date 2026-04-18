@@ -62,10 +62,8 @@ jest.mock("@/lib/logger", () => ({
 
 process.env.RESEND_API_KEY = "test-key-123";
 
-import {
-  BOOKING_EMAIL_TEMPLATE_KEYS,
-  sendNotificationEmailWithPreference,
-} from "@/lib/email";
+import { sendNotificationEmailWithPreference } from "@/lib/email";
+import { BOOKING_EMAIL_TEMPLATE_KEYS } from "@/lib/email-booking-gate";
 import { features } from "@/lib/env";
 import { logger } from "@/lib/logger";
 import { prisma } from "@/lib/prisma";

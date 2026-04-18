@@ -4,6 +4,7 @@
 // Uses Resend API for sending emails
 
 import { emailTemplates } from "./email-templates";
+import { BOOKING_EMAIL_TEMPLATE_KEYS } from "./email-booking-gate";
 import { features } from "@/lib/env";
 import { logger } from "@/lib/logger";
 import { hashIdForLog } from "@/lib/messaging/cfm-messaging-telemetry";
@@ -226,16 +227,6 @@ const emailTypeToPreferenceKey: Record<string, keyof NotificationPreferences> =
     searchAlert: "emailSearchAlerts",
     marketing: "emailMarketing",
   };
-
-export const BOOKING_EMAIL_TEMPLATE_KEYS = new Set<string>([
-  "bookingRequest",
-  "bookingAccepted",
-  "bookingRejected",
-  "bookingCancelled",
-  "bookingHoldRequest",
-  "bookingExpired",
-  "bookingHoldExpired",
-]);
 
 /**
  * Send notification email while respecting user's notification preferences
