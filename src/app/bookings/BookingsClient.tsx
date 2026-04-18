@@ -81,6 +81,7 @@ type Booking = {
 interface BookingsClientProps {
   sentBookings: Booking[];
   receivedBookings: Booking[];
+  isHistoryFirstMode?: boolean;
 }
 
 const statusConfig = {
@@ -144,6 +145,7 @@ function BookingCard({
   type,
   onStatusUpdate,
   isOffline,
+  isHistoryFirstMode = false,
 }: {
   booking: Booking;
   type: "sent" | "received";
@@ -153,6 +155,7 @@ function BookingCard({
     rejectionReason?: string
   ) => Promise<void>;
   isOffline: boolean;
+  isHistoryFirstMode?: boolean;
 }) {
   const [updatingStatus, setUpdatingStatus] = useState<BookingStatus | null>(
     null
@@ -182,9 +185,13 @@ function BookingCard({
   const isLegacyRow = booking.listing.availabilitySource === "HOST_MANAGED";
 
   const showActions =
-    type === "received" && ["PENDING", "HELD"].includes(booking.status);
+    !isHistoryFirstMode &&
+    type === "received" &&
+    ["PENDING", "HELD"].includes(booking.status);
   const showCancelButton =
-    type === "sent" && ["PENDING", "ACCEPTED", "HELD"].includes(booking.status);
+    !isHistoryFirstMode &&
+    type === "sent" &&
+    ["PENDING", "ACCEPTED", "HELD"].includes(booking.status);
 
   return (
     <div
@@ -353,126 +360,133 @@ function BookingCard({
           </div>
         )}
 
-        {/* Cancel Confirmation Dialog */}
-        <AlertDialog open={showCancelDialog} onOpenChange={setShowCancelDialog}>
-          <AlertDialogContent>
-            <AlertDialogHeader>
-              <div className="flex items-center gap-3 mb-2">
-                <div className="w-10 h-10 rounded-full bg-red-100 flex items-center justify-center">
-                  <AlertTriangle className="w-5 h-5 text-red-600" />
+        {!isHistoryFirstMode && (
+          <>
+            {/* Cancel Confirmation Dialog */}
+            <AlertDialog
+              open={showCancelDialog}
+              onOpenChange={setShowCancelDialog}
+            >
+              <AlertDialogContent>
+                <AlertDialogHeader>
+                  <div className="flex items-center gap-3 mb-2">
+                    <div className="w-10 h-10 rounded-full bg-red-100 flex items-center justify-center">
+                      <AlertTriangle className="w-5 h-5 text-red-600" />
+                    </div>
+                    <AlertDialogTitle>Cancel this booking?</AlertDialogTitle>
+                  </div>
+                  <AlertDialogDescription className="text-left">
+                    <span className="block mb-2">
+                      You&apos;re about to cancel your booking for:
+                    </span>
+                    <span className="block font-semibold text-on-surface">
+                      {booking.listing.title}
+                    </span>
+                    <span className="block text-sm mt-1">
+                      {formatDate(booking.startDate)} —{" "}
+                      {formatDate(booking.endDate)}
+                    </span>
+                    <span className="block text-sm mt-3 text-red-600">
+                      This action cannot be undone.
+                    </span>
+                  </AlertDialogDescription>
+                </AlertDialogHeader>
+                <AlertDialogFooter>
+                  <AlertDialogCancel disabled={isUpdating}>
+                    Keep Booking
+                  </AlertDialogCancel>
+                  <AlertDialogAction
+                    onClick={() => {
+                      setShowCancelDialog(false);
+                      handleStatusUpdate("CANCELLED");
+                    }}
+                    disabled={isUpdating}
+                    className="bg-red-600 hover:bg-red-700 text-white"
+                  >
+                    {isUpdating ? "Cancelling..." : "Yes, Cancel Booking"}
+                  </AlertDialogAction>
+                </AlertDialogFooter>
+              </AlertDialogContent>
+            </AlertDialog>
+
+            {/* Reject Booking Dialog */}
+            <AlertDialog
+              open={showRejectDialog}
+              onOpenChange={(open) => {
+                setShowRejectDialog(open);
+                if (!open) setRejectionReason("");
+              }}
+            >
+              <AlertDialogContent>
+                <AlertDialogHeader>
+                  <div className="flex items-center gap-3 mb-2">
+                    <div className="w-10 h-10 rounded-full bg-amber-100 flex items-center justify-center">
+                      <XCircle className="w-5 h-5 text-amber-600" />
+                    </div>
+                    <AlertDialogTitle>
+                      Reject this booking request?
+                    </AlertDialogTitle>
+                  </div>
+                  <AlertDialogDescription className="text-left">
+                    <span className="block mb-2">
+                      You&apos;re about to reject the booking request from:
+                    </span>
+                    <span className="block font-semibold text-on-surface">
+                      {booking.tenant?.name || "Tenant"}
+                    </span>
+                    <span className="block text-sm mt-1">
+                      For: {booking.listing.title}
+                    </span>
+                    <span className="block text-sm">
+                      {formatDate(booking.startDate)} —{" "}
+                      {formatDate(booking.endDate)}
+                    </span>
+                  </AlertDialogDescription>
+                </AlertDialogHeader>
+
+                <div className="py-2">
+                  <label
+                    htmlFor="rejection-reason"
+                    className="block text-sm font-medium text-on-surface-variant mb-2"
+                  >
+                    Reason for rejection (optional)
+                  </label>
+                  <textarea
+                    id="rejection-reason"
+                    value={rejectionReason}
+                    onChange={(e) => setRejectionReason(e.target.value)}
+                    placeholder="Let the tenant know why you're declining their request..."
+                    className="w-full px-3 py-2 text-sm border border-outline-variant/20 rounded-lg bg-surface-container-lowest text-on-surface placeholder-on-surface-variant focus:outline-none focus:ring-2 focus:ring-primary resize-none"
+                    rows={3}
+                    maxLength={500}
+                    disabled={isUpdating}
+                  />
+                  <p className="text-xs text-on-surface-variant mt-1 text-right">
+                    {rejectionReason.length}/500
+                  </p>
                 </div>
-                <AlertDialogTitle>Cancel this booking?</AlertDialogTitle>
-              </div>
-              <AlertDialogDescription className="text-left">
-                <span className="block mb-2">
-                  You&apos;re about to cancel your booking for:
-                </span>
-                <span className="block font-semibold text-on-surface">
-                  {booking.listing.title}
-                </span>
-                <span className="block text-sm mt-1">
-                  {formatDate(booking.startDate)} —{" "}
-                  {formatDate(booking.endDate)}
-                </span>
-                <span className="block text-sm mt-3 text-red-600">
-                  This action cannot be undone.
-                </span>
-              </AlertDialogDescription>
-            </AlertDialogHeader>
-            <AlertDialogFooter>
-              <AlertDialogCancel disabled={isUpdating}>
-                Keep Booking
-              </AlertDialogCancel>
-              <AlertDialogAction
-                onClick={() => {
-                  setShowCancelDialog(false);
-                  handleStatusUpdate("CANCELLED");
-                }}
-                disabled={isUpdating}
-                className="bg-red-600 hover:bg-red-700 text-white"
-              >
-                {isUpdating ? "Cancelling..." : "Yes, Cancel Booking"}
-              </AlertDialogAction>
-            </AlertDialogFooter>
-          </AlertDialogContent>
-        </AlertDialog>
 
-        {/* Reject Booking Dialog */}
-        <AlertDialog
-          open={showRejectDialog}
-          onOpenChange={(open) => {
-            setShowRejectDialog(open);
-            if (!open) setRejectionReason("");
-          }}
-        >
-          <AlertDialogContent>
-            <AlertDialogHeader>
-              <div className="flex items-center gap-3 mb-2">
-                <div className="w-10 h-10 rounded-full bg-amber-100 flex items-center justify-center">
-                  <XCircle className="w-5 h-5 text-amber-600" />
-                </div>
-                <AlertDialogTitle>
-                  Reject this booking request?
-                </AlertDialogTitle>
-              </div>
-              <AlertDialogDescription className="text-left">
-                <span className="block mb-2">
-                  You&apos;re about to reject the booking request from:
-                </span>
-                <span className="block font-semibold text-on-surface">
-                  {booking.tenant?.name || "Tenant"}
-                </span>
-                <span className="block text-sm mt-1">
-                  For: {booking.listing.title}
-                </span>
-                <span className="block text-sm">
-                  {formatDate(booking.startDate)} —{" "}
-                  {formatDate(booking.endDate)}
-                </span>
-              </AlertDialogDescription>
-            </AlertDialogHeader>
-
-            <div className="py-2">
-              <label
-                htmlFor="rejection-reason"
-                className="block text-sm font-medium text-on-surface-variant mb-2"
-              >
-                Reason for rejection (optional)
-              </label>
-              <textarea
-                id="rejection-reason"
-                value={rejectionReason}
-                onChange={(e) => setRejectionReason(e.target.value)}
-                placeholder="Let the tenant know why you're declining their request..."
-                className="w-full px-3 py-2 text-sm border border-outline-variant/20 rounded-lg bg-surface-container-lowest text-on-surface placeholder-on-surface-variant focus:outline-none focus:ring-2 focus:ring-primary resize-none"
-                rows={3}
-                maxLength={500}
-                disabled={isUpdating}
-              />
-              <p className="text-xs text-on-surface-variant mt-1 text-right">
-                {rejectionReason.length}/500
-              </p>
-            </div>
-
-            <AlertDialogFooter>
-              <AlertDialogCancel disabled={isUpdating}>
-                Cancel
-              </AlertDialogCancel>
-              <AlertDialogAction
-                onClick={() => {
-                  const reason = rejectionReason.trim() || undefined;
-                  setShowRejectDialog(false);
-                  setRejectionReason("");
-                  handleStatusUpdate("REJECTED", reason);
-                }}
-                disabled={isUpdating}
-                className="bg-amber-600 hover:bg-amber-700 text-white"
-              >
-                {isUpdating ? "Rejecting..." : "Reject Booking"}
-              </AlertDialogAction>
-            </AlertDialogFooter>
-          </AlertDialogContent>
-        </AlertDialog>
+                <AlertDialogFooter>
+                  <AlertDialogCancel disabled={isUpdating}>
+                    Cancel
+                  </AlertDialogCancel>
+                  <AlertDialogAction
+                    onClick={() => {
+                      const reason = rejectionReason.trim() || undefined;
+                      setShowRejectDialog(false);
+                      setRejectionReason("");
+                      handleStatusUpdate("REJECTED", reason);
+                    }}
+                    disabled={isUpdating}
+                    className="bg-amber-600 hover:bg-amber-700 text-white"
+                  >
+                    {isUpdating ? "Rejecting..." : "Reject Booking"}
+                  </AlertDialogAction>
+                </AlertDialogFooter>
+              </AlertDialogContent>
+            </AlertDialog>
+          </>
+        )}
 
         <p className="text-xs text-on-surface-variant mt-4">
           Requested on {formatDate(booking.createdAt)}
@@ -485,6 +499,7 @@ function BookingCard({
 export default function BookingsClient({
   sentBookings,
   receivedBookings,
+  isHistoryFirstMode = false,
 }: BookingsClientProps) {
   const [activeTab, setActiveTab] = useState<"sent" | "received">("received");
   const [viewMode, setViewMode] = useState<"list" | "calendar">("list");
@@ -592,7 +607,9 @@ export default function BookingsClient({
               My Bookings
             </h1>
             <p className="text-on-surface-variant mt-2">
-              Manage your booking requests and reservations
+              {isHistoryFirstMode
+                ? "Your booking history (read-only)."
+                : "Manage your booking requests and reservations"}
             </p>
           </div>
           <Link
@@ -619,9 +636,9 @@ export default function BookingsClient({
           <div className="mb-6 flex items-start gap-3 rounded-xl border border-outline-variant/20 bg-surface-container-lowest p-4">
             <AlertCircle className="mt-0.5 h-5 w-5 flex-shrink-0 text-on-surface-variant" />
             <p className="text-sm text-on-surface-variant">
-              New bookings are paused. You can still manage existing requests
-              and holds here. To start a new conversation with a host, use
-              Messages.
+              {isHistoryFirstMode
+                ? "This is your booking history. To start a new conversation with a host, use Messages."
+                : "New bookings are paused. You can still manage existing requests and holds here. To start a new conversation with a host, use Messages."}
             </p>
           </div>
         )}
@@ -795,6 +812,7 @@ export default function BookingsClient({
                     type={activeTab}
                     onStatusUpdate={handleStatusUpdate}
                     isOffline={isOffline}
+                    isHistoryFirstMode={isHistoryFirstMode}
                   />
                 ))}
               </div>

@@ -155,6 +155,7 @@ For every P0/P1 failure mode in the plan doc, at least one observable signal exi
 | Failure mode | Signal | Threshold | Alert channel | Runbook |
 |---|---|---|---|---|
 | Legacy bookings still open past drain deadline | `cfm.booking.legacy_open_count` (gauge, daily) | **static count for 3 days** | email | §7.11 |
+| `/bookings` views emitted with history-first mode labels | `cfm.booking.history_first_view_count{mode=history_first\|escape_hatch}` (counter; emitted from `src/app/bookings/page.tsx`) | informational; expect monotonic growth in `mode=history_first` after flag flip | dashboard | §7.11 |
 | `/bookings` reads served from history-first path | `cfm.booking.history_first_serve_ratio` (gauge) | `< 1.0` after CFM-902 | dashboard | §7.11 |
 
 ---
