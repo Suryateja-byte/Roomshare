@@ -230,6 +230,7 @@ export async function POST(request: Request) {
             { participants: { some: { id: session.user.id } } },
             { participants: { some: { id: listing.ownerId } } },
           ],
+          // NOTE: Message.deletedAt intentionally omitted so deleted messages still count as prior conversation for PRIVATE_FEEDBACK audit.
           messages: { some: { senderId: session.user.id } },
         },
         select: { id: true },

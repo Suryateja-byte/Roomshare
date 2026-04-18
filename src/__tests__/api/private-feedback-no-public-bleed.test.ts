@@ -531,4 +531,139 @@ describe("private feedback no-public-bleed contract", () => {
     expect(response.status).toBe(200);
     expectNoReportLeak(await response.json());
   });
+
+  it("does not leak PRIVATE_FEEDBACK report rows from GET /api/listings/[id]/viewer-state", async () => {
+    const LISTING_ID = "listing-viewer-state-1";
+    const VIEWER_ID = "viewer-user-1";
+    const OWNER_ID = "owner-user-1";
+    const leakedReport = {
+      id: "report-viewerstate-fixture",
+      body: "VIEWERSTATE_PF_BODY_SHOULD_NOT_LEAK",
+      details: "VIEWERSTATE_PF_DETAILS_SHOULD_NOT_LEAK",
+      reporterId: "VIEWERSTATE_PF_REPORTER_SHOULD_NOT_LEAK",
+      targetUserId: "VIEWERSTATE_PF_TARGET_SHOULD_NOT_LEAK",
+      resolution: "VIEWERSTATE_PF_RESOLUTION_SHOULD_NOT_LEAK",
+      kind: "PRIVATE_FEEDBACK" as const,
+      status: "OPEN" as const,
+    };
+    const reportFindFirst = jest.fn().mockResolvedValue(leakedReport);
+
+    jest.doMock("next/server", () => ({
+      NextResponse: {
+        json: (
+          data: unknown,
+          init?: { status?: number; headers?: Record<string, string> }
+        ) => {
+          const headersMap = new Map(Object.entries(init?.headers || {}));
+
+          return {
+            status: init?.status || 200,
+            json: async () => data,
+            headers: {
+              get: (key: string) => headersMap.get(key) || null,
+              set: (key: string, value: string) => headersMap.set(key, value),
+              entries: () => headersMap.entries(),
+            },
+          };
+        },
+      },
+    }));
+    jest.doMock("@/auth", () => ({
+      auth: jest.fn().mockResolvedValue({
+        user: {
+          id: VIEWER_ID,
+          emailVerified: new Date("2026-04-01T00:00:00.000Z"),
+        },
+      }),
+    }));
+    jest.doMock("@/lib/with-rate-limit", () => ({
+      withRateLimit: jest.fn().mockResolvedValue(null),
+    }));
+    jest.doMock("@/lib/env", () => ({
+      features: {
+        privateFeedback: true,
+        contactFirstListings: true,
+        softHoldsEnabled: false,
+      },
+    }));
+    jest.doMock("@/lib/logger", () => ({
+      logger: { sync: { error: jest.fn(), warn: jest.fn(), info: jest.fn() } },
+      sanitizeErrorMessage: jest.fn((value: unknown) => String(value)),
+    }));
+    jest.doMock("@/lib/search/public-availability", () => ({
+      resolvePublicAvailability: jest.fn().mockReturnValue({
+        availabilitySource: "HOST_MANAGED",
+        isPubliclyAvailable: true,
+        searchEligible: true,
+        openSlots: 1,
+        totalSlots: 1,
+        effectiveAvailableSlots: 1,
+        isAvailable: true,
+        unavailableReason: null,
+      }),
+    }));
+    jest.doMock("@/lib/reports/private-feedback", () => {
+      const actual = jest.requireActual("@/lib/reports/private-feedback");
+
+      return {
+        ...actual,
+        canLeavePrivateFeedback: jest.fn(actual.canLeavePrivateFeedback),
+      };
+    });
+    jest.doMock("@/lib/prisma", () => ({
+      prisma: {
+        listing: {
+          findUnique: jest.fn().mockResolvedValue({
+            ownerId: OWNER_ID,
+            status: "ACTIVE",
+            availabilitySource: "HOST_MANAGED",
+            availableSlots: 1,
+            totalSlots: 1,
+            openSlots: 1,
+            moveInDate: new Date("2026-05-01T00:00:00.000Z"),
+            availableUntil: null,
+            minStayMonths: 1,
+            lastConfirmedAt: null,
+            statusReason: null,
+            needsMigrationReview: false,
+          }),
+        },
+        review: { findFirst: jest.fn().mockResolvedValue(null) },
+        booking: { findFirst: jest.fn().mockResolvedValue(null) },
+        conversation: { findFirst: jest.fn().mockResolvedValue({ id: "conv-1" }) },
+        report: { findFirst: reportFindFirst },
+      },
+    }));
+
+    const { GET } = await import("@/app/api/listings/[id]/viewer-state/route");
+    const privateFeedback = await import("@/lib/reports/private-feedback");
+
+    const response = await GET(
+      new Request(`http://localhost/api/listings/${LISTING_ID}/viewer-state`),
+      { params: Promise.resolve({ id: LISTING_ID }) }
+    );
+
+    expect(response.status).toBe(200);
+    expect(reportFindFirst).toHaveBeenCalledWith(
+      expect.objectContaining({
+        select: { id: true },
+      })
+    );
+
+    const payload = await response.json();
+    expectNoReportLeak(payload);
+
+    const serialized = JSON.stringify(payload);
+    expect(serialized).not.toContain(leakedReport.id);
+    expect(serialized).not.toContain(leakedReport.body);
+    expect(serialized).not.toContain(leakedReport.details);
+    expect(serialized).not.toContain(leakedReport.reporterId);
+    expect(serialized).not.toContain(leakedReport.targetUserId);
+    expect(serialized).not.toContain(leakedReport.resolution);
+    expect(privateFeedback.canLeavePrivateFeedback).toHaveBeenCalledWith(
+      expect.objectContaining({ hasExistingPrivateFeedback: true })
+    );
+    expect(payload.reviewEligibility.canLeavePrivateFeedback).toBe(false);
+    expect(payload).not.toHaveProperty("existingPrivateFeedback");
+  });
 });
