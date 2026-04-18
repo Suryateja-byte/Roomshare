@@ -10,7 +10,11 @@ jest.mock("@/lib/logger", () => ({
 
 import { logger } from "@/lib/logger";
 import {
+  getOwnerHashPrefix8,
   getSearchTelemetrySnapshot,
+  recordListingCreateCollisionDetected,
+  recordListingCreateCollisionModerationGated,
+  recordListingCreateCollisionResolved,
   recordLegacyUrlUsage,
   recordSearchClientAbort,
   recordSearchLoadMoreError,
@@ -22,9 +26,20 @@ import {
 } from "@/lib/search/search-telemetry";
 
 describe("search telemetry", () => {
+  const originalOwnerHashSalt = process.env.OWNER_HASH_SALT;
+
   beforeEach(() => {
     resetSearchTelemetryForTests();
     jest.clearAllMocks();
+    delete process.env.OWNER_HASH_SALT;
+  });
+
+  afterEach(() => {
+    if (originalOwnerHashSalt === undefined) {
+      delete process.env.OWNER_HASH_SALT;
+    } else {
+      process.env.OWNER_HASH_SALT = originalOwnerHashSalt;
+    }
   });
 
   it("tracks request latency, backend source counts, and counters", () => {
@@ -109,6 +124,48 @@ describe("search telemetry", () => {
       expect.objectContaining({
         alias: "startDate",
         surface: "ssr",
+      })
+    );
+  });
+
+  it("records listing collision telemetry with hashed owner prefixes", () => {
+    process.env.OWNER_HASH_SALT = "test-owner-hash-salt-32-characters!!";
+    const ownerHashPrefix8 = getOwnerHashPrefix8("owner-123");
+
+    expect(ownerHashPrefix8).toHaveLength(8);
+
+    recordListingCreateCollisionDetected({
+      ownerHashPrefix8,
+      siblingCount: 2,
+    });
+    recordListingCreateCollisionResolved({
+      ownerHashPrefix8,
+      action: "proceed",
+    });
+    recordListingCreateCollisionModerationGated({
+      ownerHashPrefix8,
+      windowCount24h: 3,
+    });
+
+    expect(logger.sync.info).toHaveBeenCalledWith(
+      "listing_create_collision_detected_total",
+      expect.objectContaining({
+        ownerHashPrefix8,
+        siblingCount: 2,
+      })
+    );
+    expect(logger.sync.info).toHaveBeenCalledWith(
+      "listing_create_collision_resolved_total",
+      expect.objectContaining({
+        ownerHashPrefix8,
+        action: "proceed",
+      })
+    );
+    expect(logger.sync.warn).toHaveBeenCalledWith(
+      "listing_create_collision_moderation_gated_total",
+      expect.objectContaining({
+        ownerHashPrefix8,
+        windowCount24h: 3,
       })
     );
   });

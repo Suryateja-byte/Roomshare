@@ -28,6 +28,28 @@ import {
 } from "@/lib/profile-completion";
 import { features } from "@/lib/env";
 import { syncListingEmbedding } from "@/lib/embeddings/sync";
+import { normalizeAddress } from "@/lib/search/normalize-address";
+import {
+  checkCollisionRateLimit,
+  findCollisions,
+  type CollisionSibling,
+} from "@/lib/listings/collision-detector";
+import {
+  getOwnerHashPrefix8,
+  recordListingCreateCollisionDetected,
+  recordListingCreateCollisionModerationGated,
+  recordListingCreateCollisionResolved,
+} from "@/lib/search/search-telemetry";
+
+class ListingCollisionCandidatesError extends Error {
+  readonly siblings: CollisionSibling[];
+
+  constructor(siblings: CollisionSibling[]) {
+    super("COLLISION_CANDIDATES");
+    this.name = "ListingCollisionCandidatesError";
+    this.siblings = siblings;
+  }
+}
 
 export async function GET(request: Request) {
   // Use Redis-backed limiter for high-volume read path consistency.
@@ -417,7 +439,67 @@ export async function POST(request: Request) {
         throw new Error("MAX_LISTINGS_EXCEEDED");
       }
 
-      const listing = await tx.listing.create({ data: listingCreateData });
+      let needsMigrationReview = false;
+      let normalizedAddressForCreate: string | undefined;
+
+      if (features.listingCreateCollisionWarn) {
+        normalizedAddressForCreate = normalizeAddress({
+          address,
+          city,
+          state,
+          zip,
+        });
+
+        const collisionAckHeader = request.headers.get("x-collision-ack");
+        const ownerHashPrefix8 = getOwnerHashPrefix8(userId);
+
+        if (collisionAckHeader !== "1") {
+          const siblings = await findCollisions({
+            ownerId: userId,
+            normalizedAddress: normalizedAddressForCreate,
+            moveInDate: listingCreateData.moveInDate,
+            availableUntil: null,
+            tx,
+          });
+
+          if (siblings.length > 0) {
+            recordListingCreateCollisionDetected({
+              ownerHashPrefix8,
+              siblingCount: siblings.length,
+            });
+            throw new ListingCollisionCandidatesError(siblings);
+          }
+        } else {
+          const rateLimit = await checkCollisionRateLimit({
+            ownerId: userId,
+            normalizedAddress: normalizedAddressForCreate ?? "",
+            tx,
+          });
+
+          if (rateLimit.needsModeration) {
+            needsMigrationReview = true;
+            recordListingCreateCollisionModerationGated({
+              ownerHashPrefix8,
+              windowCount24h: rateLimit.windowCount,
+            });
+          }
+
+          recordListingCreateCollisionResolved({
+            ownerHashPrefix8,
+            action: rateLimit.needsModeration ? "moderation_gated" : "proceed",
+          });
+        }
+      }
+
+      const listing = await tx.listing.create({
+        data: {
+          ...listingCreateData,
+          ...(normalizedAddressForCreate !== undefined
+            ? { normalizedAddress: normalizedAddressForCreate }
+            : {}),
+          ...(needsMigrationReview ? { needsMigrationReview: true } : {}),
+        },
+      });
 
       const location = await tx.location.create({
         data: {
@@ -552,6 +634,15 @@ export async function POST(request: Request) {
         await fireSideEffects({ ...result, price: Number(result.price) });
       }
     } catch (txError) {
+      if (txError instanceof ListingCollisionCandidatesError) {
+        return NextResponse.json(
+          {
+            error: "COLLISION_CANDIDATES",
+            siblings: txError.siblings,
+          },
+          { status: 409 }
+        );
+      }
       if (
         txError instanceof Error &&
         txError.message === "MAX_LISTINGS_EXCEEDED"

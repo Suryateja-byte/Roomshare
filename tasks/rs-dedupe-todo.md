@@ -30,7 +30,7 @@ Each task is a fresh Codex prompt. Critic pass between tasks. Coordinator commit
   - Cache-key bump: add `dedup: "v1" | "off"` slot
   - Integration tests: T-06, T-07, T-09', T-10, T-11, T-12, T-15 server, T-21 (FINAL-PLAN §8.1)
 
-- [ ] **Task 4 — Collision detection in createListingInTx**
+- [x] **Task 4 — Collision detection in createListingInTx** — 18 tests pass (6 suites). Critic caught chicken-and-egg rate-limit proxy (needsMigrationReview signal was circular); coordinator fixed by counting same-owner+same-address creates in 24h window directly. Flag `listingCreateCollisionWarn` default OFF.
   - `src/app/api/listings/route.ts`: `tx.$queryRaw` collision check inside tx, rate-limit 4/24h → `needsMigrationReview=true`
   - Write-path sync of `normalizedAddress`
   - Integration tests: I7, I8, I9, T-20 server, API-probe spec

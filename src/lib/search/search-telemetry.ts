@@ -1,3 +1,4 @@
+import { createHash, createHmac } from "crypto";
 import { logger } from "@/lib/logger";
 import {
   LEGACY_URL_ALIASES,
@@ -32,6 +33,9 @@ interface SearchTelemetryStore {
   clientAbortTotal: number;
   dedupAppliedTotal: number;
   dedupOverflowTotal: number;
+  listingCreateCollisionDetectedTotal: number;
+  listingCreateCollisionResolvedTotal: number;
+  listingCreateCollisionModerationGatedTotal: number;
   legacyUrlCounts: Record<LegacyUrlSurface, Record<LegacyUrlAlias, number>>;
 }
 
@@ -68,6 +72,9 @@ const telemetryStore: SearchTelemetryStore = {
   clientAbortTotal: 0,
   dedupAppliedTotal: 0,
   dedupOverflowTotal: 0,
+  listingCreateCollisionDetectedTotal: 0,
+  listingCreateCollisionResolvedTotal: 0,
+  listingCreateCollisionModerationGatedTotal: 0,
   legacyUrlCounts: createLegacyUrlCounts(),
 };
 
@@ -92,6 +99,23 @@ function recordLatencySample(durationMs: number): void {
   telemetryStore.requestLatencyIndex += 1;
   telemetryStore.requestLatencyCount += 1;
   telemetryStore.requestLatencySum += durationMs;
+}
+
+function getOwnerHash16(ownerId: string): string {
+  const ownerHashSalt = process.env.OWNER_HASH_SALT;
+
+  if (ownerHashSalt && ownerHashSalt.length > 0) {
+    return createHmac("sha256", ownerHashSalt)
+      .update(ownerId)
+      .digest("hex")
+      .slice(0, 16);
+  }
+
+  return createHash("sha256").update(ownerId).digest("hex").slice(0, 16);
+}
+
+export function getOwnerHashPrefix8(ownerId: string): string {
+  return getOwnerHash16(ownerId).slice(0, 8);
 }
 
 export function recordSearchRequestLatency({
@@ -252,6 +276,51 @@ export function recordSearchDedupOverflow({
   });
 }
 
+export function recordListingCreateCollisionDetected({
+  ownerHashPrefix8,
+  siblingCount,
+}: {
+  ownerHashPrefix8: string;
+  siblingCount: number;
+}): void {
+  telemetryStore.listingCreateCollisionDetectedTotal += 1;
+  logger.sync.info("listing_create_collision_detected_total", {
+    ownerHashPrefix8,
+    siblingCount,
+    total: telemetryStore.listingCreateCollisionDetectedTotal,
+  });
+}
+
+export function recordListingCreateCollisionResolved({
+  ownerHashPrefix8,
+  action,
+}: {
+  ownerHashPrefix8: string;
+  action: "proceed" | "moderation_gated";
+}): void {
+  telemetryStore.listingCreateCollisionResolvedTotal += 1;
+  logger.sync.info("listing_create_collision_resolved_total", {
+    ownerHashPrefix8,
+    action,
+    total: telemetryStore.listingCreateCollisionResolvedTotal,
+  });
+}
+
+export function recordListingCreateCollisionModerationGated({
+  ownerHashPrefix8,
+  windowCount24h,
+}: {
+  ownerHashPrefix8: string;
+  windowCount24h: number;
+}): void {
+  telemetryStore.listingCreateCollisionModerationGatedTotal += 1;
+  logger.sync.warn("listing_create_collision_moderation_gated_total", {
+    ownerHashPrefix8,
+    windowCount24h,
+    total: telemetryStore.listingCreateCollisionModerationGatedTotal,
+  });
+}
+
 export function recordLegacyUrlUsage({
   alias,
   surface,
@@ -320,5 +389,8 @@ export function resetSearchTelemetryForTests(): void {
   telemetryStore.clientAbortTotal = 0;
   telemetryStore.dedupAppliedTotal = 0;
   telemetryStore.dedupOverflowTotal = 0;
+  telemetryStore.listingCreateCollisionDetectedTotal = 0;
+  telemetryStore.listingCreateCollisionResolvedTotal = 0;
+  telemetryStore.listingCreateCollisionModerationGatedTotal = 0;
   telemetryStore.legacyUrlCounts = createLegacyUrlCounts();
 }
