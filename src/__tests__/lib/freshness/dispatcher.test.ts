@@ -356,6 +356,42 @@ describe("freshness dispatcher", () => {
     });
   });
 
+  it("fires exactly one outbound send per reminder for two eligible listings (loop/retry regression guard)", async () => {
+    mockFindMany
+      .mockResolvedValueOnce([])
+      .mockResolvedValueOnce([
+        { id: "listing-reminder-a", lastConfirmedAt: daysAgo(now, 15) },
+        { id: "listing-reminder-b", lastConfirmedAt: daysAgo(now, 16) },
+      ])
+      .mockResolvedValueOnce([
+        makeListing("listing-reminder-a", daysAgo(now, 15)),
+        makeListing("listing-reminder-b", daysAgo(now, 16)),
+      ]);
+    mockSendNotificationEmailWithPreference
+      .mockResolvedValueOnce({ success: true })
+      .mockResolvedValueOnce({ success: true });
+
+    const summary = await runFreshnessDispatcher(now);
+
+    expect(summary.emitted.reminder).toBe(2);
+    expect(summary.skippedPreference.reminder).toBe(0);
+    // Reminders route through sendNotificationEmailWithPreference (preference-gated).
+    // mockSendNotificationEmail is the warning path; must not fire when no warnings eligible.
+    expect(mockSendNotificationEmailWithPreference).toHaveBeenCalledTimes(2);
+    expect(mockSendNotificationEmail).not.toHaveBeenCalled();
+    expect(mockUpdateMany).toHaveBeenCalledTimes(2);
+    expect(getFreshnessCronTelemetrySnapshot()).toMatchObject({
+      emittedCounts: {
+        reminder: 2,
+        warning: 0,
+      },
+      skippedPreferenceCounts: {
+        reminder: 0,
+        warning: 0,
+      },
+    });
+  });
+
   it("keeps the warning selection window above the auto-pause cutoff", async () => {
     mockFindMany
       .mockResolvedValueOnce([])

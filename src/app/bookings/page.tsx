@@ -18,6 +18,10 @@ export default async function BookingsPage() {
     redirect("/login");
   }
 
+  logger.sync.info("cfm.booking.history_first_view_count", {
+    mode: isHistoryFirstMode ? "history_first" : "escape_hatch",
+  });
+
   const { sentBookings, receivedBookings, error } = await getMyBookings();
 
   if (error) {
@@ -36,10 +40,6 @@ export default async function BookingsPage() {
     ...b,
     totalPrice: Number(b.totalPrice),
     listing: { ...b.listing, price: Number(b.listing.price) },
-  });
-
-  logger.sync.info("cfm.booking.history_first_view_count", {
-    mode: isHistoryFirstMode ? "history_first" : "escape_hatch",
   });
 
   return (
