@@ -73,6 +73,9 @@ blob-report/
 playwright/.auth/
 output/playwright/
 
+# AI session state (not project code)
+memory-bank/activeContext.md
+
 # AI tool configs (not project code)
 .superpowers/
 .agent/
