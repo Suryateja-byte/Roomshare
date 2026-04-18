@@ -10,7 +10,10 @@ import {
 } from "@/lib/search-params";
 import {
   recordLegacyUrlUsage,
+  recordListingCreateCollisionActionSelected,
   recordSearchClientAbort,
+  recordSearchDedupMemberClick,
+  recordSearchDedupOpenPanelClick,
   recordSearchMapListMismatch,
 } from "@/lib/search/search-telemetry";
 
@@ -21,6 +24,9 @@ const ALLOWED_METRICS = new Set([
   "search_client_abort_total",
   "search_map_list_mismatch_total",
   "cfm.search.legacy_url_count",
+  "search_dedup_open_panel_click",
+  "search_dedup_member_click",
+  "listing_create_collision_action_selected",
 ]);
 const ALLOWED_ROUTES = new Set([
   "search-results-client",
@@ -35,6 +41,12 @@ const ALLOWED_REASONS = new Set([
 ]);
 const ALLOWED_LEGACY_URL_ALIASES = new Set<string>(LEGACY_URL_ALIASES);
 const ALLOWED_LEGACY_URL_SURFACES = new Set(["spa"]);
+const ALLOWED_COLLISION_ACTIONS = new Set([
+  "update",
+  "add_date",
+  "create_separate",
+  "cancel",
+]);
 
 type SearchClientTelemetryPayload =
   | {
@@ -54,7 +66,30 @@ type SearchClientTelemetryPayload =
       metric: "cfm.search.legacy_url_count";
       alias: LegacyUrlAlias;
       surface: "spa";
+    }
+  | {
+      metric: "search_dedup_open_panel_click";
+      groupSize: number;
+      queryHashPrefix8: string;
+    }
+  | {
+      metric: "search_dedup_member_click";
+      groupSize: number;
+      memberIndex: number;
+    }
+  | {
+      metric: "listing_create_collision_action_selected";
+      action: "update" | "add_date" | "create_separate" | "cancel";
     };
+
+function isSafeNonNegativeInteger(value: unknown): value is number {
+  return (
+    typeof value === "number" &&
+    Number.isInteger(value) &&
+    Number.isFinite(value) &&
+    value >= 0
+  );
+}
 
 function isShortOptionalString(value: unknown, maxLength: number): boolean {
   return (
@@ -93,6 +128,60 @@ function validatePayload(
         metric: "cfm.search.legacy_url_count",
         alias: obj.alias as LegacyUrlAlias,
         surface: "spa",
+      },
+    };
+  }
+
+  if (obj.metric === "search_dedup_open_panel_click") {
+    if (
+      !isSafeNonNegativeInteger(obj.groupSize) ||
+      typeof obj.queryHashPrefix8 !== "string" ||
+      !isShortOptionalString(obj.queryHashPrefix8, 32)
+    ) {
+      return { valid: false };
+    }
+
+    return {
+      valid: true,
+      payload: {
+        metric: "search_dedup_open_panel_click",
+        groupSize: obj.groupSize,
+        queryHashPrefix8: obj.queryHashPrefix8,
+      },
+    };
+  }
+
+  if (obj.metric === "search_dedup_member_click") {
+    if (
+      !isSafeNonNegativeInteger(obj.groupSize) ||
+      !isSafeNonNegativeInteger(obj.memberIndex)
+    ) {
+      return { valid: false };
+    }
+
+    return {
+      valid: true,
+      payload: {
+        metric: "search_dedup_member_click",
+        groupSize: obj.groupSize,
+        memberIndex: obj.memberIndex,
+      },
+    };
+  }
+
+  if (obj.metric === "listing_create_collision_action_selected") {
+    if (
+      typeof obj.action !== "string" ||
+      !ALLOWED_COLLISION_ACTIONS.has(obj.action)
+    ) {
+      return { valid: false };
+    }
+
+    return {
+      valid: true,
+      payload: {
+        metric: "listing_create_collision_action_selected",
+        action: obj.action as "update" | "add_date" | "create_separate" | "cancel",
       },
     };
   }
@@ -205,6 +294,22 @@ export async function POST(request: Request) {
         queryHash: validation.payload.queryHash,
         responseQueryHash: validation.payload.responseQueryHash,
         reason: validation.payload.reason,
+      });
+    } else if (validation.payload.metric === "search_dedup_open_panel_click") {
+      recordSearchDedupOpenPanelClick({
+        groupSize: validation.payload.groupSize,
+        queryHashPrefix8: validation.payload.queryHashPrefix8,
+      });
+    } else if (validation.payload.metric === "search_dedup_member_click") {
+      recordSearchDedupMemberClick({
+        groupSize: validation.payload.groupSize,
+        memberIndex: validation.payload.memberIndex,
+      });
+    } else if (
+      validation.payload.metric === "listing_create_collision_action_selected"
+    ) {
+      recordListingCreateCollisionActionSelected({
+        action: validation.payload.action,
       });
     } else {
       recordLegacyUrlUsage({

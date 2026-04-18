@@ -1,5 +1,6 @@
 "use client";
 
+import { useEffect } from "react";
 import {
   Dialog,
   DialogClose,
@@ -7,6 +8,7 @@ import {
   DialogHeader,
   DialogTitle,
 } from "@/components/ui/dialog";
+import { emitSearchDedupOpenPanelClick } from "@/lib/search/search-telemetry-client";
 import type { GroupSummary } from "@/lib/search-types";
 import { GroupDatesActionList, type GroupDatesSharedProps } from "./GroupDatesPanel";
 
@@ -18,6 +20,7 @@ interface GroupDatesModalProps {
   onClose: () => void;
   onMemberClick?: (memberId: string, index: number) => void;
   onOverflowClick?: () => void;
+  queryHashPrefix8?: string;
 }
 
 function formatTitle(count: number): string {
@@ -32,7 +35,16 @@ export default function GroupDatesModal({
   onClose,
   onMemberClick,
   onOverflowClick,
+  queryHashPrefix8,
 }: GroupDatesModalProps) {
+  useEffect(() => {
+    if (!open) return;
+    emitSearchDedupOpenPanelClick({
+      groupSize: summary.siblingIds.length + 1,
+      queryHashPrefix8: queryHashPrefix8 ?? "none",
+    });
+  }, [open, queryHashPrefix8, summary.siblingIds.length]);
+
   return (
     <Dialog open={open} onOpenChange={(nextOpen) => !nextOpen && onClose()}>
       <DialogContent

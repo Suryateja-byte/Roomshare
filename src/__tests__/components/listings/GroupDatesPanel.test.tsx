@@ -6,6 +6,16 @@ import { buildPublicAvailability } from "@/lib/search/public-availability";
 import type { ListingData } from "@/lib/data";
 import type { GroupSummary } from "@/lib/search-types";
 
+const mockEmitSearchDedupOpenPanelClick = jest.fn();
+const mockEmitSearchDedupMemberClick = jest.fn();
+
+jest.mock("@/lib/search/search-telemetry-client", () => ({
+  emitSearchDedupOpenPanelClick: (payload: unknown) =>
+    mockEmitSearchDedupOpenPanelClick(payload),
+  emitSearchDedupMemberClick: (payload: unknown) =>
+    mockEmitSearchDedupMemberClick(payload),
+}));
+
 function createListing(overrides: Partial<ListingData> = {}): ListingData {
   return {
     id: "listing-mar20",
@@ -66,6 +76,11 @@ afterAll(() => {
   window.matchMedia = originalMatchMedia;
 });
 
+beforeEach(() => {
+  mockEmitSearchDedupOpenPanelClick.mockClear();
+  mockEmitSearchDedupMemberClick.mockClear();
+});
+
 function Harness({
   summary = createSummary(),
   onMemberClick = jest.fn(),
@@ -97,11 +112,12 @@ function Harness({
           summary={summary}
           panelId={panelId}
           triggerId={triggerId}
-          onMemberClick={onMemberClick}
-          onOverflowClick={onOverflowClick}
-          onClose={() => {
-            setOpen(false);
-            document.getElementById(triggerId)?.focus();
+      onMemberClick={onMemberClick}
+      onOverflowClick={onOverflowClick}
+      queryHashPrefix8="cafebabe"
+      onClose={() => {
+        setOpen(false);
+        document.getElementById(triggerId)?.focus();
           }}
         />
       ) : null}
@@ -134,6 +150,13 @@ describe("GroupDatesPanel", () => {
     await userEvent.click(screen.getAllByTestId("group-dates-chip")[1]);
 
     expect(onMemberClick).toHaveBeenCalledWith("listing-apr18", 1);
+    expect(mockEmitSearchDedupMemberClick).toHaveBeenCalledWith({
+      groupSize: 3,
+      memberIndex: 1,
+    });
+    expect(
+      mockEmitSearchDedupMemberClick.mock.invocationCallOrder[0]
+    ).toBeLessThan(onMemberClick.mock.invocationCallOrder[0]);
   });
 
   it('renders the "See all dates →" affordance when groupOverflow is true', async () => {
@@ -197,6 +220,19 @@ describe("GroupDatesPanel", () => {
       expect(
         screen.queryByRole("region", { name: /\+2 more dates/i })
       ).not.toBeInTheDocument();
+    });
+  });
+
+  it("emits an open-panel metric with the query hash prefix", async () => {
+    render(<Harness />);
+
+    await userEvent.click(
+      screen.getByRole("button", { name: /\+2 more dates/i })
+    );
+
+    expect(mockEmitSearchDedupOpenPanelClick).toHaveBeenCalledWith({
+      groupSize: 3,
+      queryHashPrefix8: "cafebabe",
     });
   });
 });

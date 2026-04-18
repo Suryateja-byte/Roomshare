@@ -36,6 +36,9 @@ interface SearchTelemetryStore {
   listingCreateCollisionDetectedTotal: number;
   listingCreateCollisionResolvedTotal: number;
   listingCreateCollisionModerationGatedTotal: number;
+  dedupOpenPanelClickTotal: number;
+  dedupMemberClickTotal: number;
+  listingCreateCollisionActionSelectedTotal: number;
   legacyUrlCounts: Record<LegacyUrlSurface, Record<LegacyUrlAlias, number>>;
 }
 
@@ -75,6 +78,9 @@ const telemetryStore: SearchTelemetryStore = {
   listingCreateCollisionDetectedTotal: 0,
   listingCreateCollisionResolvedTotal: 0,
   listingCreateCollisionModerationGatedTotal: 0,
+  dedupOpenPanelClickTotal: 0,
+  dedupMemberClickTotal: 0,
+  listingCreateCollisionActionSelectedTotal: 0,
   legacyUrlCounts: createLegacyUrlCounts(),
 };
 
@@ -321,6 +327,48 @@ export function recordListingCreateCollisionModerationGated({
   });
 }
 
+export function recordSearchDedupOpenPanelClick({
+  groupSize,
+  queryHashPrefix8,
+}: {
+  groupSize: number;
+  queryHashPrefix8: string;
+}): void {
+  telemetryStore.dedupOpenPanelClickTotal += 1;
+  logger.sync.info("search_dedup_open_panel_click", {
+    groupSize,
+    queryHashPrefix8,
+    total: telemetryStore.dedupOpenPanelClickTotal,
+  });
+}
+
+export function recordSearchDedupMemberClick({
+  groupSize,
+  memberIndex,
+}: {
+  groupSize: number;
+  memberIndex: number;
+}): void {
+  telemetryStore.dedupMemberClickTotal += 1;
+  logger.sync.info("search_dedup_member_click", {
+    groupSize,
+    memberIndex,
+    total: telemetryStore.dedupMemberClickTotal,
+  });
+}
+
+export function recordListingCreateCollisionActionSelected({
+  action,
+}: {
+  action: "update" | "add_date" | "create_separate" | "cancel";
+}): void {
+  telemetryStore.listingCreateCollisionActionSelectedTotal += 1;
+  logger.sync.info("listing_create_collision_action_selected", {
+    action,
+    total: telemetryStore.listingCreateCollisionActionSelectedTotal,
+  });
+}
+
 export function recordLegacyUrlUsage({
   alias,
   surface,
@@ -366,6 +414,18 @@ export function getSearchTelemetrySnapshot() {
     loadMoreErrorTotal: telemetryStore.loadMoreErrorTotal,
     zeroResultsTotal: telemetryStore.zeroResultsTotal,
     clientAbortTotal: telemetryStore.clientAbortTotal,
+    dedupAppliedTotal: telemetryStore.dedupAppliedTotal,
+    dedupOverflowTotal: telemetryStore.dedupOverflowTotal,
+    dedupOpenPanelClickTotal: telemetryStore.dedupOpenPanelClickTotal,
+    dedupMemberClickTotal: telemetryStore.dedupMemberClickTotal,
+    listingCreateCollisionDetectedTotal:
+      telemetryStore.listingCreateCollisionDetectedTotal,
+    listingCreateCollisionResolvedTotal:
+      telemetryStore.listingCreateCollisionResolvedTotal,
+    listingCreateCollisionModerationGatedTotal:
+      telemetryStore.listingCreateCollisionModerationGatedTotal,
+    listingCreateCollisionActionSelectedTotal:
+      telemetryStore.listingCreateCollisionActionSelectedTotal,
     legacyUrlCounts,
   };
 }
@@ -392,5 +452,8 @@ export function resetSearchTelemetryForTests(): void {
   telemetryStore.listingCreateCollisionDetectedTotal = 0;
   telemetryStore.listingCreateCollisionResolvedTotal = 0;
   telemetryStore.listingCreateCollisionModerationGatedTotal = 0;
+  telemetryStore.dedupOpenPanelClickTotal = 0;
+  telemetryStore.dedupMemberClickTotal = 0;
+  telemetryStore.listingCreateCollisionActionSelectedTotal = 0;
   telemetryStore.legacyUrlCounts = createLegacyUrlCounts();
 }

@@ -12,11 +12,14 @@ import { logger } from "@/lib/logger";
 import {
   getOwnerHashPrefix8,
   getSearchTelemetrySnapshot,
+  recordListingCreateCollisionActionSelected,
   recordListingCreateCollisionDetected,
   recordListingCreateCollisionModerationGated,
   recordListingCreateCollisionResolved,
   recordLegacyUrlUsage,
   recordSearchClientAbort,
+  recordSearchDedupMemberClick,
+  recordSearchDedupOpenPanelClick,
   recordSearchLoadMoreError,
   recordSearchMapListMismatch,
   recordSearchRequestLatency,
@@ -166,6 +169,41 @@ describe("search telemetry", () => {
       expect.objectContaining({
         ownerHashPrefix8,
         windowCount24h: 3,
+      })
+    );
+  });
+
+  it("records grouped-listing client telemetry events", () => {
+    recordSearchDedupOpenPanelClick({
+      groupSize: 4,
+      queryHashPrefix8: "deadbeef",
+    });
+    recordSearchDedupMemberClick({
+      groupSize: 4,
+      memberIndex: 2,
+    });
+    recordListingCreateCollisionActionSelected({
+      action: "create_separate",
+    });
+
+    expect(logger.sync.info).toHaveBeenCalledWith(
+      "search_dedup_open_panel_click",
+      expect.objectContaining({
+        groupSize: 4,
+        queryHashPrefix8: "deadbeef",
+      })
+    );
+    expect(logger.sync.info).toHaveBeenCalledWith(
+      "search_dedup_member_click",
+      expect.objectContaining({
+        groupSize: 4,
+        memberIndex: 2,
+      })
+    );
+    expect(logger.sync.info).toHaveBeenCalledWith(
+      "listing_create_collision_action_selected",
+      expect.objectContaining({
+        action: "create_separate",
       })
     );
   });

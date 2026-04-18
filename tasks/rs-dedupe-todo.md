@@ -42,7 +42,7 @@ Each task is a fresh Codex prompt. Critic pass between tasks. Coordinator commit
   - `SearchResultsClient.tsx`: pass summary, `seenGroupKeysRef`
   - Playwright: T-01, T-02 (the bug!), T-03, T-04, T-05, T-08, T-13, T-14, T-15 selectors
 
-- [ ] **Task 6 — CreateCollisionModal + client retry**
+- [x] **Task 6 — CreateCollisionModal + client retry + F5-1 + F5-2** — 91 tests pass (6 suites). Coordinator-implemented after Codex hung. Playwright T-16..T-20 deferred to Task 6b. Telemetry snapshot exposure fixed per critic. Flag `listingCreateCollisionWarn` default OFF.
   - `CreateCollisionModal.tsx` (new): 3 radios per §4.3 with `canUpdate` gating
   - Client POST /api/listings retries with `x-collision-ack: 1`
   - Playwright: T-16, T-17, T-18, T-19, T-20 visual

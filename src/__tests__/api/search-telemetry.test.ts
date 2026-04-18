@@ -68,4 +68,35 @@ describe("POST /api/metrics/search", () => {
     expect(res.status).toBe(400);
     expect(getSearchTelemetrySnapshot().clientAbortTotal).toBe(0);
   });
+
+  it("accepts grouped-card panel open metrics", async () => {
+    const req = new Request("http://localhost/api/metrics/search", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        metric: "search_dedup_open_panel_click",
+        groupSize: 4,
+        queryHashPrefix8: "deadbeef",
+      }),
+    });
+
+    const res = await POST(req);
+
+    expect(res.status).toBe(200);
+  });
+
+  it("accepts collision action metrics", async () => {
+    const req = new Request("http://localhost/api/metrics/search", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        metric: "listing_create_collision_action_selected",
+        action: "add_date",
+      }),
+    });
+
+    const res = await POST(req);
+
+    expect(res.status).toBe(200);
+  });
 });

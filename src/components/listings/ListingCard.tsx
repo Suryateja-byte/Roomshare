@@ -203,6 +203,7 @@ interface ListingCardProps {
   priority?: boolean;
   showTotalPrice?: boolean;
   estimatedMonths?: number;
+  queryHashPrefix8?: string;
 }
 
 function arePropsEqual(
@@ -240,13 +241,18 @@ function arePropsEqual(
     pl.groupSummary?.availableFromDates.join(",") ===
       nl.groupSummary?.availableFromDates.join(",") &&
     pl.groupSummary?.groupOverflow === nl.groupSummary?.groupOverflow &&
+    pl.groupSummary?.combinedOpenSlots ===
+      nl.groupSummary?.combinedOpenSlots &&
+    pl.groupSummary?.combinedTotalSlots ===
+      nl.groupSummary?.combinedTotalSlots &&
     prev.href === next.href &&
     prev.isSaved === next.isSaved &&
     prev.className === next.className &&
     prev.mobileVariant === next.mobileVariant &&
     prev.priority === next.priority &&
     prev.showTotalPrice === next.showTotalPrice &&
-    prev.estimatedMonths === next.estimatedMonths
+    prev.estimatedMonths === next.estimatedMonths &&
+    prev.queryHashPrefix8 === next.queryHashPrefix8
   );
 }
 
@@ -259,6 +265,7 @@ function ListingCardInner({
   priority = false,
   showTotalPrice = false,
   estimatedMonths = 1,
+  queryHashPrefix8,
 }: ListingCardProps) {
   const [imageErrors, setImageErrors] = useState<Set<number>>(new Set());
   const [isDragging, setIsDragging] = useState(false);
@@ -287,12 +294,18 @@ function ListingCardInner({
     : [PLACEHOLDER_IMAGES[placeholderIndex]];
   const showImagePlaceholder = !hasValidImages;
 
-  const effectiveOpenSlots =
-    listing.publicAvailability?.openSlots ?? listing.availableSlots;
-  const effectiveTotalSlots =
-    listing.publicAvailability?.totalSlots ?? listing.totalSlots;
   const groupSummary = listing.groupSummary ?? null;
   const hasGroupDates = (groupSummary?.siblingIds.length ?? 0) > 0;
+  const effectiveOpenSlots = hasGroupDates
+    ? (groupSummary?.combinedOpenSlots ??
+      listing.publicAvailability?.openSlots ??
+      listing.availableSlots)
+    : (listing.publicAvailability?.openSlots ?? listing.availableSlots);
+  const effectiveTotalSlots = hasGroupDates
+    ? (groupSummary?.combinedTotalSlots ??
+      listing.publicAvailability?.totalSlots ??
+      listing.totalSlots)
+    : (listing.publicAvailability?.totalSlots ?? listing.totalSlots);
   const panelId = `group-dates-panel-${listing.id}`;
   const triggerId = `${panelId}-trigger`;
   const isAvailable = effectiveOpenSlots > 0;
@@ -321,6 +334,11 @@ function ListingCardInner({
     listing.publicAvailability?.availableFrom ?? listing.moveInDate
   );
   const displayLease = formatLeaseDuration(listing.leaseDuration);
+  const groupDateCount = (groupSummary?.siblingIds.length ?? 0) + 1;
+  const slotBadgeLabel =
+    groupSummary && effectiveOpenSlots > 0
+      ? `All ${effectiveOpenSlots} open across ${groupDateCount} date${groupDateCount === 1 ? "" : "s"}`
+      : undefined;
   const groupTriggerLabel = useMemo(() => {
     if (!hasGroupDates) return null;
     return `+${extraDateCount} more date${extraDateCount === 1 ? "" : "s"}`;
@@ -475,7 +493,8 @@ function ListingCardInner({
             <SlotBadge
               availableSlots={effectiveOpenSlots}
               totalSlots={effectiveTotalSlots}
-              publicAvailability={listing.publicAvailability}
+              publicAvailability={groupSummary ? undefined : listing.publicAvailability}
+              labelOverride={slotBadgeLabel}
               overlay
             />
             {isTopRated ? (
@@ -567,6 +586,7 @@ function ListingCardInner({
             <GroupDatesPanel
               canonical={listing}
               summary={groupSummary}
+              queryHashPrefix8={queryHashPrefix8}
               panelId={panelId}
               triggerId={triggerId}
               onMemberClick={handleGroupMemberClick}
@@ -577,6 +597,7 @@ function ListingCardInner({
           <GroupDatesModal
             canonical={listing}
             summary={groupSummary}
+            queryHashPrefix8={queryHashPrefix8}
             panelId={panelId}
             open={isMobile && isGroupDatesOpen}
             onClose={() => closeGroupDates(true)}

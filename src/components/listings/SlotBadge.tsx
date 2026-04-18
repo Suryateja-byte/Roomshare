@@ -33,6 +33,7 @@ interface SlotBadgeProps {
   publicAvailability?: SlotBadgePublicAvailability;
   overlay?: boolean;
   className?: string;
+  labelOverride?: string;
 }
 
 const overlayBase =
@@ -114,6 +115,7 @@ export function SlotBadge({
   publicAvailability,
   overlay,
   className,
+  labelOverride,
 }: SlotBadgeProps) {
   const resolved = publicAvailability
     ? getStatusFromPublicAvailability(publicAvailability)
@@ -130,6 +132,10 @@ export function SlotBadge({
       Math.min(availableSlots, safeTotalSlots)
     );
     ({ label, variant } = getSlotStatus(safeAvailableSlots, safeTotalSlots));
+  }
+
+  if (labelOverride) {
+    label = labelOverride;
   }
 
   if (overlay) {

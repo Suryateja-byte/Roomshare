@@ -172,6 +172,30 @@ describe("ListingCard", () => {
       expect(screen.getByText("2 of 3 open")).toBeInTheDocument();
     });
 
+    it("renders grouped-card slot totals across all dates", () => {
+      const listing = {
+        ...mockListing,
+        availableSlots: 2,
+        totalSlots: 3,
+        groupSummary: {
+          groupKey: "group-key-1",
+          siblingIds: ["listing-234", "listing-345", "listing-456"],
+          availableFromDates: [
+            "2026-03-20",
+            "2026-04-18",
+            "2026-05-15",
+            "2026-06-01",
+          ],
+          combinedOpenSlots: 8,
+          combinedTotalSlots: 8,
+          groupOverflow: false,
+        },
+      };
+
+      render(<ListingCard listing={listing} />);
+      expect(screen.getByText("All 8 open across 4 dates")).toBeInTheDocument();
+    });
+
     it("renders availability badge as Filled when no slots", () => {
       const filledListing = { ...mockListing, availableSlots: 0 };
       render(<ListingCard listing={filledListing} />);

@@ -23,6 +23,7 @@ const webServerEnv = Object.fromEntries(
 
 if (runningDedupeSuite) {
   webServerEnv.FEATURE_SEARCH_LISTING_DEDUP = "true";
+  webServerEnv.FEATURE_LISTING_CREATE_COLLISION_WARN = "true";
 }
 
 /**

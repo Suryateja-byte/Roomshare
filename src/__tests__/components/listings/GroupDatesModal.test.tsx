@@ -6,6 +6,16 @@ import { buildPublicAvailability } from "@/lib/search/public-availability";
 import type { ListingData } from "@/lib/data";
 import type { GroupSummary } from "@/lib/search-types";
 
+const mockEmitSearchDedupOpenPanelClick = jest.fn();
+const mockEmitSearchDedupMemberClick = jest.fn();
+
+jest.mock("@/lib/search/search-telemetry-client", () => ({
+  emitSearchDedupOpenPanelClick: (payload: unknown) =>
+    mockEmitSearchDedupOpenPanelClick(payload),
+  emitSearchDedupMemberClick: (payload: unknown) =>
+    mockEmitSearchDedupMemberClick(payload),
+}));
+
 function createListing(overrides: Partial<ListingData> = {}): ListingData {
   return {
     id: "listing-mar20",
@@ -71,6 +81,11 @@ afterAll(() => {
   window.matchMedia = originalMatchMedia;
 });
 
+beforeEach(() => {
+  mockEmitSearchDedupOpenPanelClick.mockClear();
+  mockEmitSearchDedupMemberClick.mockClear();
+});
+
 function Harness({
   initialOpen = true,
   summary = createSummary(),
@@ -89,6 +104,7 @@ function Harness({
       <GroupDatesModal
         canonical={createListing()}
         summary={summary}
+        queryHashPrefix8="feedface"
         panelId="group-dates-modal-test"
         open={open}
         onClose={() => setOpen(false)}
@@ -160,5 +176,36 @@ describe("GroupDatesModal", () => {
     expect(
       screen.getByRole("heading", { name: /1 other move-in date available/i })
     ).toBeInTheDocument();
+  });
+
+  it("emits panel-open and member-click telemetry", async () => {
+    const onMemberClick = jest.fn();
+    const user = userEvent.setup();
+    render(
+      <div>
+        <GroupDatesModal
+          canonical={createListing()}
+          summary={createSummary()}
+          queryHashPrefix8="feedface"
+          panelId="group-dates-modal-test"
+          open={true}
+          onClose={jest.fn()}
+          onMemberClick={onMemberClick}
+        />
+      </div>
+    );
+
+    expect(mockEmitSearchDedupOpenPanelClick).toHaveBeenCalledWith({
+      groupSize: 4,
+      queryHashPrefix8: "feedface",
+    });
+
+    await user.click(screen.getAllByTestId("group-dates-chip")[2]);
+
+    expect(mockEmitSearchDedupMemberClick).toHaveBeenCalledWith({
+      groupSize: 4,
+      memberIndex: 2,
+    });
+    expect(onMemberClick).toHaveBeenCalledWith("listing-may15", 2);
   });
 });

@@ -867,6 +867,7 @@ export function SearchResultsClient({
                         priority={index === 0}
                         showTotalPrice={effectiveShowTotalPrice}
                         estimatedMonths={estimatedMonths}
+                        queryHashPrefix8={responseMeta.queryHash?.slice(0, 8)}
                       />
                     </div>
                   </ListingCardErrorBoundary>

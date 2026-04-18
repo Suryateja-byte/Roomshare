@@ -3,6 +3,10 @@
 import { useEffect, useMemo, useRef } from "react";
 import { cn } from "@/lib/utils";
 import type { GroupSummary } from "@/lib/search-types";
+import {
+  emitSearchDedupMemberClick,
+  emitSearchDedupOpenPanelClick,
+} from "@/lib/search/search-telemetry-client";
 
 type GroupDatesCanonical = {
   id: string;
@@ -17,6 +21,7 @@ export interface GroupDatesSharedProps {
   summary: GroupSummary;
   onMemberClick?: (memberId: string, index: number) => void;
   onOverflowClick?: () => void;
+  queryHashPrefix8?: string;
 }
 
 export interface GroupDatesPanelProps extends GroupDatesSharedProps {
@@ -112,7 +117,7 @@ export function GroupDatesActionList({
   autoFocusFirstChip = false,
   onClose,
   className,
-}: GroupDatesSharedProps & {
+}: Omit<GroupDatesSharedProps, "queryHashPrefix8"> & {
   autoFocusFirstChip?: boolean;
   onClose?: () => void;
   className?: string;
@@ -122,6 +127,7 @@ export function GroupDatesActionList({
     () => buildGroupDateEntries(canonical, summary),
     [canonical, summary]
   );
+  const groupSize = summary.siblingIds.length + 1;
 
   useEffect(() => {
     if (!autoFocusFirstChip) return;
@@ -146,7 +152,13 @@ export function GroupDatesActionList({
           data-testid="group-dates-chip"
           aria-label={entry.longLabel}
           className="inline-flex min-h-[40px] items-center rounded-full border border-outline-variant/30 bg-surface-container-high px-3 py-2 text-sm font-medium text-on-surface transition-colors hover:bg-surface-container-highest focus:outline-none focus-visible:ring-2 focus-visible:ring-primary/30 focus-visible:ring-offset-2"
-          onClick={() => onMemberClick?.(entry.memberId, index)}
+          onClick={() => {
+            emitSearchDedupMemberClick({
+              groupSize,
+              memberIndex: index,
+            });
+            onMemberClick?.(entry.memberId, index);
+          }}
         >
           {entry.shortLabel}
         </button>
@@ -173,7 +185,15 @@ export default function GroupDatesPanel({
   onMemberClick,
   onOverflowClick,
   onClose,
+  queryHashPrefix8,
 }: GroupDatesPanelProps) {
+  useEffect(() => {
+    emitSearchDedupOpenPanelClick({
+      groupSize: summary.siblingIds.length + 1,
+      queryHashPrefix8: queryHashPrefix8 ?? "none",
+    });
+  }, [queryHashPrefix8, summary.siblingIds.length]);
+
   return (
     <div
       id={panelId}
