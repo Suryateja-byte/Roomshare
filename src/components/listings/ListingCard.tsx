@@ -1,7 +1,15 @@
 "use client";
 
-import { memo, useState, useCallback } from "react";
+import {
+  memo,
+  useState,
+  useCallback,
+  useMemo,
+  useRef,
+  useEffect,
+} from "react";
 import Link from "next/link";
+import { useRouter } from "next/navigation";
 import { Star, Home, MapPin } from "lucide-react";
 import FavoriteButton from "../FavoriteButton";
 import { ImageCarousel } from "./ImageCarousel";
@@ -12,6 +20,10 @@ import {
   useIsListingFocused,
 } from "@/contexts/ListingFocusContext";
 import { SlotBadge, type SlotBadgePublicAvailability } from "./SlotBadge";
+import { useMediaQuery } from "@/hooks/useMediaQuery";
+import type { GroupSummary } from "@/lib/search-types";
+import GroupDatesPanel from "./GroupDatesPanel";
+import GroupDatesModal from "./GroupDatesModal";
 
 export interface Listing {
   id: string;
@@ -39,6 +51,8 @@ export interface Listing {
    * publicStatus / freshnessBucket to render freshness-aware strings.
    */
   publicAvailability?: SlotBadgePublicAvailability;
+  groupKey?: string | null;
+  groupSummary?: GroupSummary | null;
 }
 
 // State abbreviation map
@@ -163,6 +177,14 @@ function formatRoomType(roomType?: string): string | null {
   return labels[roomType] || roomType;
 }
 
+function buildRelatedListingHref(
+  listingHref: string,
+  listingId: string
+): string {
+  const [, queryString] = listingHref.split("?");
+  return queryString ? `/listings/${listingId}?${queryString}` : `/listings/${listingId}`;
+}
+
 const PLACEHOLDER_IMAGES = [
   "https://images.unsplash.com/photo-1522708323590-d24dbb6b0267?auto=format&fit=crop&w=800&q=80",
   "https://images.unsplash.com/photo-1502672260266-1c1ef2d93688?auto=format&fit=crop&w=800&q=80",
@@ -211,6 +233,13 @@ function arePropsEqual(
       nl.publicAvailability?.freshnessBucket &&
     pl.publicAvailability?.availableFrom ===
       nl.publicAvailability?.availableFrom &&
+    pl.groupKey === nl.groupKey &&
+    pl.groupSummary?.groupKey === nl.groupSummary?.groupKey &&
+    pl.groupSummary?.siblingIds.join(",") ===
+      nl.groupSummary?.siblingIds.join(",") &&
+    pl.groupSummary?.availableFromDates.join(",") ===
+      nl.groupSummary?.availableFromDates.join(",") &&
+    pl.groupSummary?.groupOverflow === nl.groupSummary?.groupOverflow &&
     prev.href === next.href &&
     prev.isSaved === next.isSaved &&
     prev.className === next.className &&
@@ -233,9 +262,13 @@ function ListingCardInner({
 }: ListingCardProps) {
   const [imageErrors, setImageErrors] = useState<Set<number>>(new Set());
   const [isDragging, setIsDragging] = useState(false);
+  const [isGroupDatesOpen, setIsGroupDatesOpen] = useState(false);
   const { setHovered, setActive, hasProvider, focusSourceRef } =
     useListingFocusActions();
   const { isHovered, isActive } = useIsListingFocused(listing.id);
+  const router = useRouter();
+  const isMobile = useMediaQuery("(max-width: 767px)") === true;
+  const groupTriggerRef = useRef<HTMLButtonElement | null>(null);
 
   const handleImageError = useCallback((index: number) => {
     setImageErrors((prev) => new Set(prev).add(index));
@@ -258,6 +291,10 @@ function ListingCardInner({
     listing.publicAvailability?.openSlots ?? listing.availableSlots;
   const effectiveTotalSlots =
     listing.publicAvailability?.totalSlots ?? listing.totalSlots;
+  const groupSummary = listing.groupSummary ?? null;
+  const hasGroupDates = (groupSummary?.siblingIds.length ?? 0) > 0;
+  const panelId = `group-dates-panel-${listing.id}`;
+  const triggerId = `${panelId}-trigger`;
   const isAvailable = effectiveOpenSlots > 0;
   const avgRating = Number.isFinite(listing.avgRating)
     ? listing.avgRating
@@ -277,12 +314,59 @@ function ListingCardInner({
   );
   const imageAlt = `${displayTitle} in ${formattedLocation}`;
   const listingHref = href ?? `/listings/${listing.id}`;
+  const extraDateCount = groupSummary?.siblingIds.length ?? 0;
 
   const displayRoomType = formatRoomType(listing.roomType);
   const displayMoveIn = formatMoveInDate(
     listing.publicAvailability?.availableFrom ?? listing.moveInDate
   );
   const displayLease = formatLeaseDuration(listing.leaseDuration);
+  const groupTriggerLabel = useMemo(() => {
+    if (!hasGroupDates) return null;
+    return `+${extraDateCount} more date${extraDateCount === 1 ? "" : "s"}`;
+  }, [extraDateCount, hasGroupDates]);
+
+  useEffect(() => {
+    setIsGroupDatesOpen(false);
+  }, [isMobile, listing.id]);
+
+  const focusTrigger = useCallback(() => {
+    requestAnimationFrame(() => {
+      groupTriggerRef.current?.focus();
+    });
+  }, []);
+
+  const closeGroupDates = useCallback(
+    (returnFocus = true) => {
+      setIsGroupDatesOpen(false);
+      if (returnFocus) {
+        focusTrigger();
+      }
+    },
+    [focusTrigger]
+  );
+
+  const handleGroupDatesTrigger = useCallback(() => {
+    setIsGroupDatesOpen((previousOpen) => {
+      if (previousOpen) {
+        return false;
+      }
+      return true;
+    });
+  }, []);
+
+  const handleGroupMemberClick = useCallback(
+    (memberId: string) => {
+      closeGroupDates(false);
+      router.push(buildRelatedListingHref(listingHref, memberId));
+    },
+    [closeGroupDates, listingHref, router]
+  );
+
+  const handleGroupOverflowClick = useCallback(() => {
+    closeGroupDates(false);
+    router.push(listingHref);
+  }, [closeGroupDates, listingHref, router]);
 
   const srParts: string[] = [];
   srParts.push(
@@ -360,8 +444,9 @@ function ListingCardInner({
       <Link
         href={listingHref}
         onClick={isDragging ? (e) => e.preventDefault() : undefined}
+        data-testid="listing-card-link"
         className={cn(
-          "block focus:outline-none focus-visible:ring-2 focus-visible:ring-primary/30 focus-visible:ring-offset-2 flex-1 flex flex-col",
+          "block focus:outline-none focus-visible:ring-2 focus-visible:ring-primary/30 focus-visible:ring-offset-2 flex flex-1 flex-col",
           isDragging && "pointer-events-none"
         )}
       >
@@ -459,6 +544,47 @@ function ListingCardInner({
           </p>
         </div>
       </Link>
+      {hasGroupDates && groupSummary ? (
+        <>
+          <div className="px-4 pb-4">
+            <button
+              ref={groupTriggerRef}
+              id={triggerId}
+              type="button"
+              role="button"
+              tabIndex={0}
+              data-testid="group-dates-trigger"
+              aria-controls={panelId}
+              aria-expanded={isGroupDatesOpen}
+              aria-haspopup={isMobile ? "dialog" : undefined}
+              className="inline-flex min-h-[32px] items-center rounded-full px-1 py-1 text-sm font-medium text-primary transition-colors hover:text-primary/80 focus:outline-none focus-visible:ring-2 focus-visible:ring-primary/30 focus-visible:ring-offset-2"
+              onClick={handleGroupDatesTrigger}
+            >
+              {groupTriggerLabel}
+            </button>
+          </div>
+          {isGroupDatesOpen && !isMobile ? (
+            <GroupDatesPanel
+              canonical={listing}
+              summary={groupSummary}
+              panelId={panelId}
+              triggerId={triggerId}
+              onMemberClick={handleGroupMemberClick}
+              onOverflowClick={handleGroupOverflowClick}
+              onClose={() => closeGroupDates(true)}
+            />
+          ) : null}
+          <GroupDatesModal
+            canonical={listing}
+            summary={groupSummary}
+            panelId={panelId}
+            open={isMobile && isGroupDatesOpen}
+            onClose={() => closeGroupDates(true)}
+            onMemberClick={handleGroupMemberClick}
+            onOverflowClick={handleGroupOverflowClick}
+          />
+        </>
+      ) : null}
     </article>
   );
 }

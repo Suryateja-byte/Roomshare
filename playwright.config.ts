@@ -12,6 +12,19 @@ dns.setDefaultResultOrder("ipv4first");
 dotenv.config({ path: path.resolve(__dirname, ".env.local") });
 dotenv.config({ path: path.resolve(__dirname, ".env") });
 
+const runningDedupeSuite = process.argv.some(
+  (arg) => arg.includes("tests/e2e/dedupe") || arg.includes("/dedupe/")
+);
+const webServerEnv = Object.fromEntries(
+  Object.entries(process.env).filter(
+    (entry): entry is [string, string] => entry[1] != null
+  )
+);
+
+if (runningDedupeSuite) {
+  webServerEnv.FEATURE_SEARCH_LISTING_DEDUP = "true";
+}
+
 /**
  * Playwright configuration for RoomShare E2E tests
  * @see https://playwright.dev/docs/test-configuration
@@ -181,15 +194,11 @@ export default defineConfig({
     : {
         command: "pnpm run dev",
         url: "http://localhost:3000/api/health/ready",
-        reuseExistingServer: true,
+        reuseExistingServer: !runningDedupeSuite,
         timeout: 180000,
         stdout: "pipe",
         stderr: "pipe",
-        env: Object.fromEntries(
-          Object.entries(process.env).filter(
-            (entry): entry is [string, string] => entry[1] != null
-          )
-        ),
+        env: webServerEnv,
       },
 
   /* Output folder for test artifacts */

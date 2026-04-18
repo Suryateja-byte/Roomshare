@@ -5,6 +5,19 @@ import {
   useIsListingFocused,
 } from "@/contexts/ListingFocusContext";
 
+const mockPush = jest.fn();
+const mockUseMediaQuery = jest.fn<boolean | undefined, [string]>();
+
+jest.mock("next/navigation", () => ({
+  useRouter: () => ({
+    push: mockPush,
+  }),
+}));
+
+jest.mock("@/hooks/useMediaQuery", () => ({
+  useMediaQuery: (query: string) => mockUseMediaQuery(query),
+}));
+
 jest.mock("@/contexts/ListingFocusContext", () => ({
   useListingFocusActions: jest.fn(),
   useIsListingFocused: jest.fn(),
@@ -90,6 +103,8 @@ const mockListing = {
 };
 
 beforeEach(() => {
+  mockPush.mockReset();
+  mockUseMediaQuery.mockReturnValue(false);
   mockUseListingFocusActions.mockReturnValue({
     setHovered: jest.fn(),
     setActive: jest.fn(),

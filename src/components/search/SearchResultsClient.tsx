@@ -50,6 +50,14 @@ import { buildListingDetailHref } from "@/lib/search/listing-detail-link";
  */
 const MAX_ACCUMULATED = 60;
 
+function getSeenGroupKeys(listings: ListingData[]): Set<string> {
+  return new Set(
+    listings
+      .map((listing) => listing.groupKey)
+      .filter((groupKey): groupKey is string => Boolean(groupKey))
+  );
+}
+
 function formatMobileResultsLabel(
   total: number | null,
   hasZeroResults: boolean,
@@ -156,6 +164,7 @@ export function SearchResultsClient({
   const seenIdsRef = useRef<Set<string>>(
     new Set(initialListings.map((l) => l.id))
   );
+  const seenGroupKeysRef = useRef<Set<string>>(getSeenGroupKeys(initialListings));
   // Track which listing IDs have already had favorites fetched (#16)
   // Prevents refetching favorites for all IDs on every "Load More"
   const fetchedFavIdsRef = useRef<Set<string>>(new Set());
@@ -314,6 +323,7 @@ export function SearchResultsClient({
         setExtraListings([]);
         setNextCursor(data.data.nextCursor);
         seenIdsRef.current = new Set(data.data.items.map((l) => l.id));
+        seenGroupKeysRef.current = getSeenGroupKeys(data.data.items);
         fetchedFavIdsRef.current = new Set();
         totalCountRef.current = data.data.items.length;
       } catch (err) {
@@ -327,7 +337,13 @@ export function SearchResultsClient({
     })();
 
     return () => controller.abort();
-  }, [canonicalSearchParamsString, clientSideSearchEnabled, currentQueryHash, currentSearchParamsString]);
+  }, [
+    canonicalSearchParamsString,
+    clientSideSearchEnabled,
+    currentQueryHash,
+    currentSearchParamsString,
+    testScenario,
+  ]);
 
   // Use client-fetched data when available, otherwise fall back to SSR props
   const effectiveListings = clientFetchedListings ?? initialListings;
@@ -352,6 +368,7 @@ export function SearchResultsClient({
       setNextCursor(initialNextCursor);
       setLoadMoreAnnouncement("");
       seenIdsRef.current = new Set(initialListings.map((l) => l.id));
+      seenGroupKeysRef.current = getSeenGroupKeys(initialListings);
       fetchedFavIdsRef.current = new Set(); // Reset favorites tracking on new search
     }
   }, [initialDataFingerprint, initialNextCursor, initialListings]);
@@ -499,12 +516,39 @@ export function SearchResultsClient({
       // Defensive guard: ensure items is an array (protects against malformed server responses)
       const items = Array.isArray(result.items) ? result.items : [];
 
-      // Deduplicate by ID
+      let duplicateIdDrops = 0;
+      let duplicateGroupKeyDrops = 0;
+
+      // Deduplicate by ID and canonical group key.
       const dedupedItems = items.filter((item) => {
-        if (seenIdsRef.current.has(item.id)) return false;
+        const hasSeenId = seenIdsRef.current.has(item.id);
+        const hasSeenGroupKey = Boolean(
+          item.groupKey && seenGroupKeysRef.current.has(item.groupKey)
+        );
+
+        if (hasSeenId) {
+          duplicateIdDrops += 1;
+        }
+        if (hasSeenGroupKey) {
+          duplicateGroupKeyDrops += 1;
+        }
+
         seenIdsRef.current.add(item.id);
-        return true;
+        if (item.groupKey) {
+          seenGroupKeysRef.current.add(item.groupKey);
+        }
+
+        return !hasSeenId && !hasSeenGroupKey;
       });
+
+      if (
+        process.env.NODE_ENV !== "production" &&
+        (duplicateIdDrops > 0 || duplicateGroupKeyDrops > 0)
+      ) {
+        console.warn(
+          `[search-results-client] dropped duplicate paginated items ids=${duplicateIdDrops} groupKeys=${duplicateGroupKeyDrops}`
+        );
+      }
 
       setExtraListings((prev) => {
         const next = [...prev, ...dedupedItems];
@@ -538,7 +582,7 @@ export function SearchResultsClient({
       setIsLoadingMore(false);
     }
     // F2 FIX: Removed allListings dep — count read from totalCountRef instead
-  }, [nextCursor, rawParams, effectiveTotal, effectiveListings.length]);
+  }, [nextCursor, rawParams, effectiveTotal, effectiveListings.length, testScenario]);
 
   const total = effectiveTotal;
   // When client-fetched data is active, derive zero-results from effective total

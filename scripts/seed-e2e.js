@@ -14,6 +14,10 @@ const prisma = new PrismaClient();
 
 const E2E_USER_EMAIL = process.env.E2E_TEST_EMAIL || 'e2e-test@roomshare.dev';
 const E2E_USER_PASSWORD = process.env.E2E_TEST_PASSWORD || 'TestPassword123!';
+const DEFAULT_IMAGES = [
+  'https://images.unsplash.com/photo-1522708323590-d24dbb6b0267?w=600',
+  'https://images.unsplash.com/photo-1502672260266-1c1ef2d93688?w=600',
+];
 
 // SF locations within the bounds used by E2E tests
 const SF_LISTINGS = [
@@ -229,6 +233,190 @@ const SF_LISTINGS = [
   },
 ];
 
+const DEDUPE_SINGLETON_SEED = {
+  id: 'e2e-dedupe-singleton',
+  title: 'E2E Dedupe Singleton Room',
+  description: 'A single listing used to verify the list renders without a grouping affordance.',
+  price: 980,
+  roomType: 'Private Room',
+  lat: 37.7842,
+  lng: -122.4068,
+  address: '811 Sutter St',
+  city: 'San Francisco',
+  state: 'CA',
+  zip: '94109',
+  moveInDate: '2026-02-10T00:00:00.000Z',
+  createdAt: '2026-01-10T12:00:00.000Z',
+};
+
+const DEDUPE_GROUP_SEEDS = [
+  {
+    id: 'e2e-dedupe-clone-mar20',
+    title: 'E2E Dedupe Clone Group',
+    description: 'Canonical dedupe listing for the grouped-date search specs.',
+    price: 1000,
+    roomType: 'Private Room',
+    lat: 37.7861,
+    lng: -122.4094,
+    address: '1555 Market St',
+    city: 'San Francisco',
+    state: 'CA',
+    zip: '94103',
+    moveInDate: '2026-03-20T00:00:00.000Z',
+    createdAt: '2026-01-04T12:00:00.000Z',
+  },
+  {
+    id: 'e2e-dedupe-clone-apr18',
+    title: 'E2E Dedupe Clone Group',
+    description: 'Sibling dedupe listing for the grouped-date search specs.',
+    price: 1000,
+    roomType: 'Private Room',
+    lat: 37.7861,
+    lng: -122.4094,
+    address: '1555 Market St',
+    city: 'San Francisco',
+    state: 'CA',
+    zip: '94103',
+    moveInDate: '2026-04-18T00:00:00.000Z',
+    createdAt: '2026-01-03T12:00:00.000Z',
+  },
+  {
+    id: 'e2e-dedupe-clone-may15',
+    title: 'E2E Dedupe Clone Group',
+    description: 'Sibling dedupe listing for the grouped-date search specs.',
+    price: 1000,
+    roomType: 'Private Room',
+    lat: 37.7861,
+    lng: -122.4094,
+    address: '1555 Market St',
+    city: 'San Francisco',
+    state: 'CA',
+    zip: '94103',
+    moveInDate: '2026-05-15T00:00:00.000Z',
+    createdAt: '2026-01-02T12:00:00.000Z',
+  },
+  {
+    id: 'e2e-dedupe-clone-jun01',
+    title: 'E2E Dedupe Clone Group',
+    description: 'Sibling dedupe listing for the grouped-date search specs.',
+    price: 1000,
+    roomType: 'Private Room',
+    lat: 37.7861,
+    lng: -122.4094,
+    address: '1555 Market St',
+    city: 'San Francisco',
+    state: 'CA',
+    zip: '94103',
+    moveInDate: '2026-06-01T00:00:00.000Z',
+    createdAt: '2026-01-01T12:00:00.000Z',
+  },
+];
+
+const CROSS_OWNER_SEEDS = [
+  {
+    id: 'e2e-cross-owner-a',
+    title: 'E2E Cross Owner Visual',
+    description: 'Cross-owner seed listing A to verify the list never merges different owners.',
+    price: 1450,
+    roomType: 'Private Room',
+    lat: 37.7902,
+    lng: -122.4051,
+    address: '88 3rd St',
+    city: 'San Francisco',
+    state: 'CA',
+    zip: '94103',
+    moveInDate: '2026-04-01T00:00:00.000Z',
+    createdAt: '2026-01-08T12:00:00.000Z',
+  },
+  {
+    id: 'e2e-cross-owner-b',
+    title: 'E2E Cross Owner Visual',
+    description: 'Cross-owner seed listing B to verify the list never merges different owners.',
+    price: 1450,
+    roomType: 'Private Room',
+    lat: 37.7908,
+    lng: -122.4045,
+    address: '88 3rd St',
+    city: 'San Francisco',
+    state: 'CA',
+    zip: '94103',
+    moveInDate: '2026-04-15T00:00:00.000Z',
+    createdAt: '2026-01-07T12:00:00.000Z',
+  },
+];
+
+async function upsertListingWithLocation(ownerId, seed) {
+  const listing = await prisma.listing.upsert({
+    where: { id: seed.id },
+    update: {
+      ownerId,
+      title: seed.title,
+      description: seed.description,
+      price: seed.price,
+      roomType: seed.roomType,
+      amenities: ['Wifi', 'Furnished', 'Kitchen'],
+      houseRules: ['No Smoking', 'Quiet Hours 10pm-8am'],
+      householdLanguages: ['en'],
+      leaseDuration: '6 months',
+      totalSlots: 2,
+      availableSlots: 1,
+      moveInDate: new Date(seed.moveInDate),
+      images: DEFAULT_IMAGES,
+      createdAt: new Date(seed.createdAt),
+      location: {
+        upsert: {
+          update: {
+            address: seed.address,
+            city: seed.city,
+            state: seed.state,
+            zip: seed.zip,
+          },
+          create: {
+            address: seed.address,
+            city: seed.city,
+            state: seed.state,
+            zip: seed.zip,
+          },
+        },
+      },
+    },
+    create: {
+      id: seed.id,
+      ownerId,
+      title: seed.title,
+      description: seed.description,
+      price: seed.price,
+      roomType: seed.roomType,
+      amenities: ['Wifi', 'Furnished', 'Kitchen'],
+      houseRules: ['No Smoking', 'Quiet Hours 10pm-8am'],
+      householdLanguages: ['en'],
+      leaseDuration: '6 months',
+      totalSlots: 2,
+      availableSlots: 1,
+      moveInDate: new Date(seed.moveInDate),
+      images: DEFAULT_IMAGES,
+      createdAt: new Date(seed.createdAt),
+      location: {
+        create: {
+          address: seed.address,
+          city: seed.city,
+          state: seed.state,
+          zip: seed.zip,
+        },
+      },
+    },
+  });
+
+  const point = `POINT(${seed.lng} ${seed.lat})`;
+  await prisma.$executeRaw`
+    UPDATE "Location"
+    SET coords = ST_SetSRID(ST_GeomFromText(${point}), 4326)
+    WHERE "listingId" = ${listing.id}
+  `;
+
+  return listing;
+}
+
 async function main() {
   console.log('🌱 Seeding E2E test data...');
 
@@ -420,6 +608,29 @@ async function main() {
     },
   });
   console.log(`  ✓ Third user: ${thirdUser.email} (${thirdUser.id})`);
+
+  const dedupeSingleton = await upsertListingWithLocation(
+    reviewer.id,
+    DEDUPE_SINGLETON_SEED
+  );
+  console.log(`  ✓ Dedupe singleton: ${dedupeSingleton.id}`);
+
+  const dedupeGroupListings = [];
+  for (const seed of DEDUPE_GROUP_SEEDS) {
+    const listing = await upsertListingWithLocation(reviewer.id, seed);
+    dedupeGroupListings.push(listing);
+  }
+  console.log(
+    `  ✓ Dedupe clone group: ${dedupeGroupListings.map((listing) => listing.id).join(', ')}`
+  );
+
+  const crossOwnerListings = [
+    await upsertListingWithLocation(reviewer.id, CROSS_OWNER_SEEDS[0]),
+    await upsertListingWithLocation(thirdUser.id, CROSS_OWNER_SEEDS[1]),
+  ];
+  console.log(
+    `  ✓ Cross-owner listings: ${crossOwnerListings.map((listing) => listing.id).join(', ')}`
+  );
 
   // 6. Add reviews to first listing
   if (createdListings.length > 0) {
@@ -902,11 +1113,22 @@ async function main() {
   const seedManifest = {
     generatedAt: new Date().toISOString(),
     listingsByTitle: Object.fromEntries(
-      [...createdListings, reviewerListing].map((listing) => [
+      [
+        ...createdListings,
+        reviewerListing,
+        dedupeSingleton,
+        ...dedupeGroupListings,
+        ...crossOwnerListings,
+      ].map((listing) => [
         listing.title,
         listing.id,
       ])
     ),
+    dedupe: {
+      singletonId: dedupeSingleton.id,
+      groupIds: dedupeGroupListings.map((listing) => listing.id),
+      crossOwnerIds: crossOwnerListings.map((listing) => listing.id),
+    },
   };
   const seedManifestDir = path.resolve(__dirname, '../playwright/.cache');
   fs.mkdirSync(seedManifestDir, { recursive: true });

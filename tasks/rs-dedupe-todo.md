@@ -35,7 +35,7 @@ Each task is a fresh Codex prompt. Critic pass between tasks. Coordinator commit
   - Write-path sync of `normalizedAddress`
   - Integration tests: I7, I8, I9, T-20 server, API-probe spec
 
-- [ ] **Task 5 — List UI grouping**
+- [ ] **Task 5 — List UI grouping** *(in progress: UI/components/tests/specs implemented locally; verification pending)*
   - `ListingCard.tsx`: "+N more dates" affordance
   - `GroupDatesPanel.tsx` (new): desktop inline expand
   - `GroupDatesModal.tsx` (new): mobile modal (no new bottom-sheet snap)
