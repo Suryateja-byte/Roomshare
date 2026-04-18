@@ -1,6 +1,6 @@
 # CFM-1002 Compatibility Surfaces
 
-> **Scope**: authoritative Stage-B / Stage-C inventory for CFM-1002 on branch `codex/contact-first-multislot` at `HEAD b6b4e0b8`.
+> **Scope**: authoritative Stage-B / Stage-C inventory for CFM-1002 on branch `codex/contact-first-multislot` at `HEAD c0c22d69` (Stage-A landing commit).
 >
 > **Verification rule**: every file:line citation below was re-verified at `HEAD` on 2026-04-17 with `rg -n` plus numbered file reads.
 
