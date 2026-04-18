@@ -2,6 +2,7 @@ import "server-only";
 
 import { PrismaClient, Prisma } from "@prisma/client";
 import { logger } from "./logger";
+import { extractPrismaEventMeta } from "./prisma-log";
 
 const globalForPrisma = globalThis as unknown as {
   prisma: PrismaClient | undefined;
@@ -97,19 +98,11 @@ function createPrismaClient(): PrismaClient {
   };
 
   extendedClient.$on("error", (e) => {
-    logger.sync.error("Prisma error", {
-      target: e.target,
-      message: e.message,
-      timestamp: e.timestamp.toISOString(),
-    });
+    logger.sync.error("Prisma error", extractPrismaEventMeta(e as unknown));
   });
 
   extendedClient.$on("warn", (e) => {
-    logger.sync.warn("Prisma warning", {
-      target: e.target,
-      message: e.message,
-      timestamp: e.timestamp.toISOString(),
-    });
+    logger.sync.warn("Prisma warning", extractPrismaEventMeta(e as unknown));
   });
 
   // Slow query detection: log queries exceeding 1 second
