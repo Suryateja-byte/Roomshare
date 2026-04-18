@@ -47,6 +47,35 @@ const eslintConfig = defineConfig([
     rules: {
       // Style rules
       "prefer-const": "warn",
+      "no-restricted-imports": [
+        "error",
+        {
+          paths: [
+            {
+              name: "@/components/BookingForm",
+              message:
+                "CFM-701 retired this component/hook. See docs/migration/cfm-ui-cleanup-close-out.md.",
+            },
+            {
+              name: "@/components/SlotSelector",
+              message:
+                "CFM-701 retired this component/hook. See docs/migration/cfm-ui-cleanup-close-out.md.",
+            },
+            {
+              name: "@/hooks/useAvailability",
+              message:
+                "CFM-701 retired this component/hook. See docs/migration/cfm-ui-cleanup-close-out.md.",
+            },
+          ],
+          patterns: [
+            {
+              group: ["**/BookingForm", "**/SlotSelector", "**/useAvailability"],
+              message:
+                "CFM-701 retired this component/hook. See docs/migration/cfm-ui-cleanup-close-out.md.",
+            },
+          ],
+        },
+      ],
       // Allow underscore-prefixed variables to signal intentionally unused bindings
       "@typescript-eslint/no-unused-vars": [
         "warn",

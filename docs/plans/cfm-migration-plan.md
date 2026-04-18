@@ -861,6 +861,7 @@ Remove dead active-product code while keeping historical data structures.
   - related public create paths
 - Acceptance:
   - no public codepath references booking creation
+- Status: done (verification + revival guard landed, deletion was CFM-701 c6ef7c60).
 
 #### CFM-1002 - Remove booking-only search filters and compatibility aliases when safe
 
