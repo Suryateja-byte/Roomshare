@@ -11,6 +11,7 @@
 > - [`docs/OPERATIONS.md`](../OPERATIONS.md) — alerting checklist, SLO targets, runbooks.
 > - [`docs/search-contract.md`](../search-contract.md) — public search payload contract (§3.4 / §3.5 are the source of truth for the divergence signals in §3 below).
 > - [`docs/host-managed-patch-contract.md`](../host-managed-patch-contract.md) — host-managed PATCH semantics (the source of truth for the host-managed invariant signals in §3).
+> - [`docs/migration/cfm-compat-surfaces.md`](./cfm-compat-surfaces.md) — exact CFM-1002-B/C compat inventory and `HEAD`-verified file:line evidence.
 
 ---
 
@@ -104,7 +105,7 @@ For every P0/P1 failure mode in the plan doc, at least one observable signal exi
 | Concurrent writer lost CAS race | `cfm.search.doc.cas_suppressed_count{reason=older_source_version\\|older_projection_version}` (counter) | dashboard-only informational signal | dashboard | §7.5 |
 | Map/list result-set disagreement | reuse existing `search_map_list_mismatch_total` (counter) for both `/api/map-listings` and `/api/search/v2` | `rate[15m] > 0.05` | Sentry | `MONITORING.md` §Alerting |
 | Query-hash version bump did not invalidate caches | `cfm.search.query_hash_version_mismatch_count` (counter) | **> 0** | Sentry | §7.6 |
-| Legacy search aliases still arriving | `cfm.search.legacy_url_count{alias,surface}` (counter) | dashboard-only until CFM-1002; precondition is 14-day p50 `< 1/min` per alias | dashboard | §7.6 |
+| Legacy search aliases still arriving | `cfm.search.legacy_url_count{alias,surface}` (counter) | dashboard-only until CFM-1002-B; Stage-B gate is 14-day `p50 < 1/min` per `(alias,surface)` **and** total count over 14 days = `0` (see §7.6.1) | dashboard | §7.6 |
 
 ### P0 — Messaging / contact CTA safety (pre-CFM-103 / CFM-1003 public cutover)
 
@@ -281,7 +282,7 @@ Must-have panels:
 2. **Doc/row divergence** — `cfm.search.doc.divergence_count` stacked by `reason` (`missing|version_skew|stale`).
 3. **Map/list mismatch rate** — `rate(search_map_list_mismatch_total[15m])` (existing metric from `MONITORING.md`).
 4. **Query-hash version mismatch** — `cfm.search.query_hash_version_mismatch_count` (should read 0 after a version bump has had 1 cache-TTL worth of time).
-5. **Legacy URL alias rate** — `rate(cfm.search.legacy_url_count[1h])` split by `alias`. Goal: monotonic decay after CFM-604; CFM-1002 precondition is 14-day p50 `< 1/min` per alias.
+5. **Legacy URL alias retirement gate** — pair `sum by (alias, surface) (increase(cfm_search_legacy_url_count_total[14d]))` with a p50 panel over `sum by (alias, surface) (rate(cfm_search_legacy_url_count_total[1m]))`. Goal: every relevant series reads `0` over the last 14 days before CFM-1002-B.
 6. **Backfill run overlay** — correlate `cfm.backfill.progress`, `cfm.backfill.deferred`, and `cfm.backfill.error` with search-divergence spikes during cohort-backfill windows.
 7. **Repair volume** — `rate(cfm.search.doc.repaired_count[15m])` split by `reason`; informational only, paired with the divergence gauge.
 
@@ -400,6 +401,54 @@ Each signal above points at a runbook anchor. The anchors below are stubs; full 
 - **§7.9 Cohort backfill** — stuck review bucket. Actions: follow the [`CFM backfill runbook`](./cfm-backfill-runbook.md), inspect the `Run ID`-correlated `cfm.backfill.*` log stream, rerun deferred rows, and use the review export only for listings that remain blocked after the backfill rerun.
 - **§7.10 Unauthorized review** — review created without accepted booking. Actions: delete review, identify bypass, harden review eligibility (CFM-701).
 - **§7.11 Legacy drain** — open bookings past deadline. Actions: list via 6.7, nudge hosts to terminate, force-terminate per legal-safe policy.
+
+### 7.6.1 CFM-1002 Alias Retirement Gate
+
+Use this runbook before opening, approving, or merging `CFM-1002-B`.
+
+Prometheus/Grafana query notes:
+
+- The code/log metric is named `cfm.search.legacy_url_count`, but Prometheus exposition is `cfm_search_legacy_url_count_total`.
+- Evaluate the queries below by `(alias, surface)`, not by alias alone.
+
+**14-day total-count panel**
+
+```promql
+sum by (alias, surface) (
+  increase(cfm_search_legacy_url_count_total[14d])
+)
+```
+
+**14-day p50 rate panel**
+
+```promql
+quantile_over_time(
+  0.50,
+  (
+    sum by (alias, surface) (
+      rate(cfm_search_legacy_url_count_total[1m])
+    )
+  )[14d:1m]
+)
+```
+
+Stage-B preconditions:
+
+1. The 14-day total-count panel is `0` for every relevant `(alias, surface)` series.
+2. The 14-day p50 panel is `< 1/min` for every relevant `(alias, surface)` series.
+3. Product owner acknowledgment is recorded that no supported client, marketing link, SEO surface, or affiliate entrypoint still depends on the alias shape.
+4. `CFM-604-F2` is already merged. Until then, the alert-matcher path bypasses saved-search telemetry and makes the 14-day count artificially low.
+5. The compat inventory in [`docs/migration/cfm-compat-surfaces.md`](./cfm-compat-surfaces.md) still matches the merge `HEAD`, including any alias-specific exceptions such as `where`.
+
+Sign-off:
+
+- Attach dashboard screenshots for the two panels above.
+- Record the product owner acknowledgment in the ticket or PR before merge.
+
+Rollback:
+
+- Revert the eventual Stage-B and/or Stage-C deletion commits.
+- No data rollback is required; this is contract cleanup only.
 
 ---
 

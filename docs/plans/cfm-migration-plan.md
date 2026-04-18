@@ -867,7 +867,15 @@ Remove dead active-product code while keeping historical data structures.
 
 - Goal: clean up translation layers after old clients and URLs have aged out
 - Primary files:
+  - `docs/migration/cfm-compat-surfaces.md`
   - search params/query/response/transform files
+- Sub-stages:
+  - `CFM-1002-A` (docs-only): publish the compat-surface inventory, operator gate, and lesson learned.
+    - Preconditions: re-verify every cited surface at merge `HEAD`; no runtime/code deletion in this sub-stage.
+  - `CFM-1002-B` (URL alias cleanup): remove legacy URL alias readers only after the operator gate in `docs/migration/cfm-observability.md` is satisfied.
+    - Preconditions: 14-day telemetry quiet, product-owner acknowledgment, `CFM-604-F2` merged, and the `docs/migration/cfm-compat-surfaces.md` caller sweep still matches `HEAD`.
+  - `CFM-1002-C` (viewer-state compat cleanup): remove `canBook`, `canHold`, and `bookingDisabledReason` only after internal readers are gone.
+    - Preconditions: `src/app/listings/[id]/ListingPageClient.tsx` no longer reads the fields, the reader removal has soaked in production, and tests no longer assert the compat shape.
 - Acceptance:
   - deprecation telemetry is low enough
   - no supported client depends on compatibility aliases
