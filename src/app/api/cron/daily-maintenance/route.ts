@@ -17,6 +17,7 @@
  * 5. Cleanup stale typing status indicators
  * 6. Process search alerts (email notifications)
  * 7. Process listing freshness reminders and stale warnings
+ * 8. Auto-pause day-30 stale listings after warnings have been emitted
  *
  * Delegated tasks are called via internal fetch to avoid duplicating complex
  * logic (SQL, geospatial, etc.). Simple DB cleanup tasks stay inlined here.
@@ -228,6 +229,17 @@ export async function GET(request: NextRequest) {
     } else {
       markSkippedTask(results, "freshness-reminders", "feature_disabled");
     }
+
+    if (features.staleAutoPause) {
+      await runDelegatedTask(
+        results,
+        "stale-auto-pause",
+        "/api/cron/stale-auto-pause",
+        cronSecret
+      );
+    } else {
+      markSkippedTask(results, "stale-auto-pause", "feature_disabled");
+    }
   } else {
     markSkippedTask(results, "cleanup-rate-limits", "outside_daily_window");
     markSkippedTask(
@@ -238,6 +250,7 @@ export async function GET(request: NextRequest) {
     markSkippedTask(results, "cleanup-typing-status", "outside_daily_window");
     markSkippedTask(results, "search-alerts", "outside_daily_window");
     markSkippedTask(results, "freshness-reminders", "outside_daily_window");
+    markSkippedTask(results, "stale-auto-pause", "outside_daily_window");
   }
 
   // --- Summary ---

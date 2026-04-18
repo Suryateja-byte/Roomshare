@@ -565,6 +565,54 @@ describe("listing-status actions", () => {
         });
       });
 
+      it("reopens stale auto-paused HOST_MANAGED listings and clears all freshness timestamps", async () => {
+        (mockTx.$queryRaw as jest.Mock).mockResolvedValue([
+          makeLockedListingRow({
+            availabilitySource: "HOST_MANAGED",
+            status: "PAUSED",
+            statusReason: "STALE_AUTO_PAUSE",
+            openSlots: 2,
+            availableSlots: 2,
+            totalSlots: 2,
+            moveInDate: new Date("2026-05-01T00:00:00.000Z"),
+            availableUntil: new Date("2026-08-01T00:00:00.000Z"),
+            minStayMonths: 2,
+            lastConfirmedAt: new Date("2026-03-10T00:00:00.000Z"),
+            freshnessReminderSentAt: new Date("2026-04-10T00:00:00.000Z"),
+            freshnessWarningSentAt: new Date("2026-04-12T00:00:00.000Z"),
+            autoPausedAt: new Date("2026-04-14T00:00:00.000Z"),
+          }),
+        ]);
+        (mockTx.listing.update as jest.Mock).mockResolvedValue({
+          id: "listing-123",
+        });
+
+        const result = await recoverHostManagedListing(
+          "listing-123",
+          3,
+          "REOPEN"
+        );
+
+        expect(result).toEqual({
+          success: true,
+          status: "ACTIVE",
+          statusReason: null,
+          version: 4,
+        });
+        expect(mockTx.listing.update).toHaveBeenCalledWith({
+          where: { id: "listing-123" },
+          data: expect.objectContaining({
+            version: 4,
+            status: "ACTIVE",
+            statusReason: null,
+            lastConfirmedAt: expect.any(Date),
+            freshnessReminderSentAt: null,
+            freshnessWarningSentAt: null,
+            autoPausedAt: null,
+          }),
+        });
+      });
+
       it("rejects reopen when host-managed invariants fail", async () => {
         (mockTx.$queryRaw as jest.Mock).mockResolvedValue([
           makeLockedListingRow({
@@ -617,6 +665,48 @@ describe("listing-status actions", () => {
           code: "VERSION_CONFLICT",
         });
       });
+    });
+
+    it("keeps autoPausedAt untouched when updateListingStatus reactivates an auto-paused listing", async () => {
+      (mockTx.$queryRaw as jest.Mock).mockResolvedValue([
+        makeLockedListingRow({
+          availabilitySource: "HOST_MANAGED",
+          status: "PAUSED",
+          statusReason: "STALE_AUTO_PAUSE",
+          openSlots: 2,
+          availableSlots: 2,
+          totalSlots: 2,
+          moveInDate: new Date("2026-05-01T00:00:00.000Z"),
+          availableUntil: new Date("2026-08-01T00:00:00.000Z"),
+          autoPausedAt: new Date("2026-04-14T00:00:00.000Z"),
+        }),
+      ]);
+      (mockTx.listing.update as jest.Mock).mockResolvedValue({
+        ...mockListing,
+        status: "ACTIVE",
+      });
+
+      const result = await updateListingStatus("listing-123", "ACTIVE", 3);
+
+      expect(result).toEqual({
+        success: true,
+        status: "ACTIVE",
+        statusReason: null,
+        version: 4,
+      });
+      expect(mockTx.listing.update).toHaveBeenCalledWith({
+        where: { id: "listing-123" },
+        data: expect.objectContaining({
+          version: 4,
+          status: "ACTIVE",
+          statusReason: null,
+        }),
+      });
+      const updateData = (mockTx.listing.update as jest.Mock).mock.calls[0][0]
+        .data;
+      expect(updateData).not.toHaveProperty("autoPausedAt");
+      expect(updateData).not.toHaveProperty("freshnessReminderSentAt");
+      expect(updateData).not.toHaveProperty("freshnessWarningSentAt");
     });
 
     describe("transaction safety (FOR UPDATE)", () => {

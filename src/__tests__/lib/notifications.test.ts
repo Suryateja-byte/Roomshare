@@ -135,6 +135,7 @@ describe("notifications", () => {
         "SEARCH_ALERT",
         "LISTING_FRESHNESS_REMINDER",
         "LISTING_STALE_WARNING",
+        "LISTING_AUTO_PAUSED",
       ];
 
       it.each(allTypes)("creates notification with type %s", async (type) => {

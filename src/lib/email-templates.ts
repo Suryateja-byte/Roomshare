@@ -389,6 +389,39 @@ export const emailTemplates = {
     };
   },
 
+  listingAutoPaused: (data: {
+    hostName: string;
+    listingTitle: string;
+    listingId: string;
+  }) => {
+    const safeHostName = escapeHtml(data.hostName);
+    const safeListingTitle = escapeHtml(data.listingTitle);
+    const listingHref = buildAppHref(
+      `/listings/${encodeURIComponent(data.listingId)}`
+    );
+
+    return {
+      subject: sanitizeSubject(
+        "Your listing has been paused for reconfirmation"
+      ),
+      html: baseTemplate(`
+            <h2 style="margin: 0 0 16px; color: #18181b; font-size: 20px;">Listing Paused for Reconfirmation</h2>
+            <p style="margin: 0 0 24px; color: #52525b; font-size: 16px; line-height: 1.6;">
+                Hi ${safeHostName},
+            </p>
+            <p style="margin: 0 0 24px; color: #52525b; font-size: 16px; line-height: 1.6;">
+                <strong>"${safeListingTitle}"</strong> has been paused until you reconfirm its availability.
+            </p>
+            <p style="margin: 0 0 24px; color: #52525b; font-size: 16px; line-height: 1.6;">
+                Reopen the listing to confirm your availability details, restore visibility, and reset the freshness timer.
+            </p>
+            <a href="${listingHref}" style="display: inline-block; background-color: #18181b; color: #ffffff; text-decoration: none; padding: 14px 28px; border-radius: 8px; font-weight: 600; font-size: 14px;">
+                Reconfirm Listing
+            </a>
+        `),
+    };
+  },
+
   welcomeEmail: (data: { userName: string; verificationUrl?: string }) => {
     const safeUserName = escapeHtml(data.userName);
     const safeVerificationUrl = data.verificationUrl

@@ -16,7 +16,8 @@ export type NotificationType =
   | "LISTING_SAVED"
   | "SEARCH_ALERT"
   | "LISTING_FRESHNESS_REMINDER"
-  | "LISTING_STALE_WARNING";
+  | "LISTING_STALE_WARNING"
+  | "LISTING_AUTO_PAUSED";
 
 export interface CreateNotificationInput {
   userId: string;

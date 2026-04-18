@@ -15,7 +15,9 @@ jest.mock("@/lib/env", () => ({
 
 import { GET } from "@/app/api/metrics/ops/route";
 import {
+  recordAutoPauseCronRun,
   recordFreshnessCronRun,
+  resetAutoPauseCronTelemetryForTests,
   resetFreshnessCronTelemetryForTests,
 } from "@/lib/freshness/freshness-cron-telemetry";
 import {
@@ -33,6 +35,7 @@ describe("GET /api/metrics/ops", () => {
 
   beforeEach(() => {
     jest.clearAllMocks();
+    resetAutoPauseCronTelemetryForTests();
     resetFreshnessCronTelemetryForTests();
     resetSearchDocCronTelemetryForTests();
     resetSearchTelemetryForTests();
@@ -124,6 +127,19 @@ describe("GET /api/metrics/ops", () => {
       skippedSuspendedCount: 1,
       budgetExhausted: true,
     });
+    recordAutoPauseCronRun({
+      eligibleCount: 3,
+      autoPausedCount: 2,
+      emittedCount: 1,
+      errorCounts: {
+        email: 1,
+      },
+      skippedCounts: {
+        no_warning: 1,
+        version_conflict: 1,
+      },
+      budgetExhausted: true,
+    });
 
     const req = new Request("http://localhost/api/metrics/ops", {
       headers: { authorization: "Bearer test-metrics-secret-32-chars-min!!" },
@@ -152,6 +168,16 @@ describe("GET /api/metrics/ops", () => {
       'cfm_cron_freshness_reminder_skipped_preference_count{kind="reminder"} 1'
     );
     expect(text).toContain("cfm_cron_freshness_reminder_budget_exhausted_count 1");
+    expect(text).toContain("cfm_listing_auto_paused_count 2");
+    expect(text).toContain("cfm_cron_stale_auto_pause_eligible_count 3");
+    expect(text).toContain("cfm_cron_stale_auto_pause_emitted_count 1");
+    expect(text).toContain(
+      'cfm_cron_stale_auto_pause_error_count{stage="email"} 1'
+    );
+    expect(text).toContain(
+      'cfm_cron_stale_auto_pause_skipped_count{reason="version_conflict"} 1'
+    );
+    expect(text).toContain("cfm_cron_stale_auto_pause_budget_exhausted_count 1");
     expect(text).toContain('cfm_search_doc_divergence_count{reason="missing"} 1');
     expect(text).toContain('cfm_search_doc_repaired_count{reason="stale"} 1');
     expect(text).toContain(

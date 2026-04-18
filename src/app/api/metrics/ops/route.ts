@@ -10,11 +10,17 @@
 import crypto from "crypto";
 import { getServerEnv } from "@/lib/env";
 import {
+  AUTO_PAUSE_COUNT_METRIC,
+  AUTO_PAUSE_CRON_ELIGIBLE_METRIC,
+  AUTO_PAUSE_CRON_EMITTED_METRIC,
+  AUTO_PAUSE_CRON_ERROR_STAGES,
+  AUTO_PAUSE_CRON_SKIP_REASONS,
   FRESHNESS_CRON_ELIGIBLE_METRIC,
   FRESHNESS_CRON_EMITTED_METRIC,
   FRESHNESS_CRON_ERROR_STAGES,
   FRESHNESS_NOTIFICATION_KINDS,
   FRESHNESS_NOTIFICATION_SENT_METRIC,
+  getAutoPauseCronTelemetrySnapshot,
   getFreshnessCronTelemetrySnapshot,
 } from "@/lib/freshness/freshness-cron-telemetry";
 import {
@@ -81,6 +87,7 @@ export async function GET(request: Request) {
   const version = process.env.VERCEL_GIT_COMMIT_SHA?.slice(0, 8) || "dev";
   const feedbackTelemetry = getPrivateFeedbackTelemetrySnapshot();
   const freshnessTelemetry = getFreshnessCronTelemetrySnapshot();
+  const autoPauseTelemetry = getAutoPauseCronTelemetrySnapshot();
   const searchDocCronTelemetry = getSearchDocCronTelemetrySnapshot();
   const searchTelemetry = getSearchTelemetrySnapshot();
 
@@ -252,6 +259,40 @@ export async function GET(request: Request) {
     `# HELP cfm_cron_freshness_reminder_lock_held_count Total number of freshness cron invocations skipped because another run already held the advisory lock`,
     `# TYPE cfm_cron_freshness_reminder_lock_held_count counter`,
     `cfm_cron_freshness_reminder_lock_held_count ${freshnessTelemetry.lockHeldCount}`,
+    ``,
+    `# HELP ${toPrometheusMetricName(AUTO_PAUSE_COUNT_METRIC)} Total number of listings successfully auto-paused for stale availability`,
+    `# TYPE ${toPrometheusMetricName(AUTO_PAUSE_COUNT_METRIC)} counter`,
+    `${toPrometheusMetricName(AUTO_PAUSE_COUNT_METRIC)} ${autoPauseTelemetry.autoPausedCount}`,
+    ``,
+    `# HELP ${toPrometheusMetricName(AUTO_PAUSE_CRON_ELIGIBLE_METRIC)} Total number of due listings selected in the latest stale auto-pause run`,
+    `# TYPE ${toPrometheusMetricName(AUTO_PAUSE_CRON_ELIGIBLE_METRIC)} gauge`,
+    `${toPrometheusMetricName(AUTO_PAUSE_CRON_ELIGIBLE_METRIC)} ${autoPauseTelemetry.eligibleCount}`,
+    ``,
+    `# HELP ${toPrometheusMetricName(AUTO_PAUSE_CRON_EMITTED_METRIC)} Total number of stale auto-pause notifications emitted after a successful pause`,
+    `# TYPE ${toPrometheusMetricName(AUTO_PAUSE_CRON_EMITTED_METRIC)} counter`,
+    `${toPrometheusMetricName(AUTO_PAUSE_CRON_EMITTED_METRIC)} ${autoPauseTelemetry.emittedCount}`,
+    ``,
+    `# HELP cfm_cron_stale_auto_pause_error_count Total number of stale auto-pause failures by stage`,
+    `# TYPE cfm_cron_stale_auto_pause_error_count counter`,
+    ...AUTO_PAUSE_CRON_ERROR_STAGES.map(
+      (stage) =>
+        `cfm_cron_stale_auto_pause_error_count{stage="${stage}"} ${autoPauseTelemetry.errorCounts[stage]}`
+    ),
+    ``,
+    `# HELP cfm_cron_stale_auto_pause_skipped_count Total number of stale auto-pause candidates skipped by bounded reason`,
+    `# TYPE cfm_cron_stale_auto_pause_skipped_count counter`,
+    ...AUTO_PAUSE_CRON_SKIP_REASONS.map(
+      (reason) =>
+        `cfm_cron_stale_auto_pause_skipped_count{reason="${reason}"} ${autoPauseTelemetry.skippedCounts[reason]}`
+    ),
+    ``,
+    `# HELP cfm_cron_stale_auto_pause_budget_exhausted_count Total number of stale auto-pause runs that stopped because the time budget was exhausted`,
+    `# TYPE cfm_cron_stale_auto_pause_budget_exhausted_count counter`,
+    `cfm_cron_stale_auto_pause_budget_exhausted_count ${autoPauseTelemetry.budgetExhaustedCount}`,
+    ``,
+    `# HELP cfm_cron_stale_auto_pause_lock_held_count Total number of stale auto-pause invocations skipped because another run already held the advisory lock`,
+    `# TYPE cfm_cron_stale_auto_pause_lock_held_count counter`,
+    `cfm_cron_stale_auto_pause_lock_held_count ${autoPauseTelemetry.lockHeldCount}`,
     ``,
     `# HELP cfm_search_doc_divergence_count Total number of detected search doc divergences in the latest cron run`,
     `# TYPE cfm_search_doc_divergence_count gauge`,

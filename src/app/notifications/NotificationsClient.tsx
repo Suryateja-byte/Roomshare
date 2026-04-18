@@ -61,6 +61,7 @@ const notificationIcons: Record<NotificationType, typeof Bell> = {
   SEARCH_ALERT: Search,
   LISTING_FRESHNESS_REMINDER: Clock,
   LISTING_STALE_WARNING: AlertTriangle,
+  LISTING_AUTO_PAUSED: AlertTriangle,
 };
 
 const notificationColors: Record<NotificationType, string> = {
@@ -77,6 +78,7 @@ const notificationColors: Record<NotificationType, string> = {
   SEARCH_ALERT: "bg-orange-100 text-orange-600",
   LISTING_FRESHNESS_REMINDER: "bg-sky-100 text-sky-700",
   LISTING_STALE_WARNING: "bg-amber-100 text-amber-700",
+  LISTING_AUTO_PAUSED: "bg-amber-100 text-amber-700",
 };
 
 function formatDate(date: Date) {

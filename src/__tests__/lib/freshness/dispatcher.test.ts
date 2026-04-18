@@ -286,6 +286,30 @@ describe("freshness dispatcher", () => {
     expect(getFreshnessCronTelemetrySnapshot().skippedSuspendedCount).toBe(1);
   });
 
+  it("keeps the warning selection window above the auto-pause cutoff", async () => {
+    mockFindMany
+      .mockResolvedValueOnce([])
+      .mockResolvedValueOnce([])
+      .mockResolvedValueOnce([]);
+
+    await runFreshnessDispatcher(now);
+
+    expect(mockFindMany).toHaveBeenNthCalledWith(
+      1,
+      expect.objectContaining({
+        where: expect.objectContaining({
+          availabilitySource: "HOST_MANAGED",
+          status: "ACTIVE",
+          freshnessWarningSentAt: null,
+          lastConfirmedAt: expect.objectContaining({
+            lte: daysAgo(now, 21),
+            gt: daysAgo(now, 30),
+          }),
+        }),
+      })
+    );
+  });
+
   it("stays disabled behind ENABLE_FRESHNESS_NOTIFICATIONS=off", async () => {
     Object.defineProperty(features, "freshnessNotifications", {
       value: false,

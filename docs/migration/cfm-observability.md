@@ -123,6 +123,8 @@ For every P0/P1 failure mode in the plan doc, at least one observable signal exi
 | Listings past 30d still `ACTIVE` | `cfm.listing.stale_still_active_count` (gauge) | **> 0** sustained 2 h | Sentry | §7.8 |
 | Reminder/warning emails sent | `cfm.listing.freshness_notification_sent_count{kind=reminder|warning}` (counter) | informational | dashboard | — |
 | Freshness cron emissions | `cfm.cron.freshness_reminder.emitted_count{kind=reminder|warning}` (counter) | informational | dashboard | §7.8 |
+| Auto-paused listings | `cfm.listing.auto_paused_count` (counter) | informational | dashboard | §7.8 |
+| Auto-pause cron emissions | `cfm.cron.stale_auto_pause.emitted_count` (counter) | informational | dashboard | §7.8 |
 | Recovery: auto-paused → ACTIVE via reconfirm | `cfm.listing.freshness_recovered_count` (counter) | informational | dashboard | — |
 
 ### P1 — Cohort / migration write-time signals (CFM-501/502)
@@ -248,7 +250,7 @@ Must-have panels:
 1. **Bucket counts** — `cfm.listing.freshness_bucket_count` as a stacked gauge.
 2. **Funnel** — daily transitions: normal → reminder → warning → auto_paused, computed from `cfm.listing.freshness_notification_sent_count`.
 3. **Search-leakage tripwires** — `cfm.listing.stale_in_search_count`, `cfm.listing.stale_still_active_count`.
-4. **Cron health** — `cfm.cron.freshness_reminder.emitted_count`, `cfm.cron.freshness_reminder.error_count`, `cfm.cron.freshness_reminder.lock_held_count`.
+4. **Cron health** — `cfm.cron.freshness_reminder.emitted_count`, `cfm.cron.freshness_reminder.error_count`, `cfm.cron.freshness_reminder.lock_held_count`, `cfm.cron.stale_auto_pause.emitted_count`, `cfm.cron.stale_auto_pause.error_count`, `cfm.cron.stale_auto_pause.lock_held_count`.
 5. **Recovery rate** — `rate(cfm.listing.freshness_recovered_count[24h])`.
 
 ### 5.4 Search Consistency (owner: search)
@@ -374,6 +376,7 @@ Each signal above points at a runbook anchor. The anchors below are stubs; full 
 - **§7.6 Query-hash version mismatch** — CDN/edge cache did not invalidate. Actions: verify `SEARCH_QUERY_HASH_VERSION` bumped, confirm any external cache TTL has elapsed, force-purge if necessary.
 - **§7.7 Messaging duplicate** — two conversations for same participant pair. Actions: merge via admin tool, verify dedup key in messaging contact handler.
 - **§7.8 Stale listing** — expected to be empty after CFM-801. Actions: verify the freshness cron ran during the 09:02-09:04 UTC daily window, confirm `cfm.cron.freshness_reminder.emitted_count` is moving over the last 24 hours, inspect per-bucket counts, and re-run `/api/cron/freshness-reminders` manually with `CRON_SECRET` if needed. If `cfm.cron.freshness_reminder.error_count{stage="email"}` climbs, inspect the email circuit breaker state before retrying.
+- **§7.8 Stale auto-pause** — informational-only today. Actions: verify `cfm.listing.auto_paused_count` or `cfm.cron.stale_auto_pause.emitted_count` moved in the same 09:02-09:04 UTC window after `freshness-reminders`, and re-run `/api/cron/stale-auto-pause` manually with `CRON_SECRET` if stale day-30 listings remain `ACTIVE`. All logs must continue to use hashed listing IDs only.
 - **§7.9 Cohort backfill** — stuck review bucket. Actions: follow the [`CFM backfill runbook`](./cfm-backfill-runbook.md), inspect the `Run ID`-correlated `cfm.backfill.*` log stream, rerun deferred rows, and use the review export only for listings that remain blocked after the backfill rerun.
 - **§7.10 Unauthorized review** — review created without accepted booking. Actions: delete review, identify bypass, harden review eligibility (CFM-701).
 - **§7.11 Legacy drain** — open bookings past deadline. Actions: list via 6.7, nudge hosts to terminate, force-terminate per legal-safe policy.
@@ -407,7 +410,7 @@ Every non-negotiable invariant and cross-cutting acceptance gate from the plan d
 | Booking Freeze | `cfm.booking.post_freeze_write_count`, `cfm.viewer_state.can_book_true_count`, `cfm.viewer_state.can_hold_true_count` |
 | Host-Managed Invariant | `cfm.listing.host_managed_invariant_violation_count` (all `invariant=` labels) |
 | Review & Trust | `cfm.review.unauthorized_create_count`, `cfm.review.contact_only_attempt_count` |
-| Freshness | `cfm.listing.freshness_bucket_count`, `cfm.listing.stale_in_search_count`, `cfm.listing.stale_still_active_count`, `cfm.listing.freshness_notification_sent_count`, `cfm.cron.freshness_reminder.emitted_count`, `cfm.listing.freshness_recovered_count` |
+| Freshness | `cfm.listing.freshness_bucket_count`, `cfm.listing.stale_in_search_count`, `cfm.listing.stale_still_active_count`, `cfm.listing.freshness_notification_sent_count`, `cfm.cron.freshness_reminder.emitted_count`, `cfm.listing.auto_paused_count`, `cfm.cron.stale_auto_pause.emitted_count`, `cfm.listing.freshness_recovered_count` |
 | Operational Safety | `cfm.search.dirty_queue_age_seconds`, `cfm.search.doc.divergence_count`, `cfm.messaging.conv.duplicate_pair_count`, `cfm.messaging.contact_cta.start_latency_ms` |
 
 ---

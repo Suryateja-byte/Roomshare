@@ -145,6 +145,36 @@ describe("Multi-slot booking feature flag cross-validation", () => {
     expect(envModule.features.freshnessNotifications).toBe(true);
   });
 
+  it("keeps stale auto-pause disabled by default and exposes the flag when enabled", async () => {
+    let envModule = await import("@/lib/env");
+    expect(envModule.features.staleAutoPause).toBe(false);
+
+    jest.resetModules();
+    process.env = {
+      ...baseEnv,
+      ENABLE_FRESHNESS_NOTIFICATIONS: "on",
+      ENABLE_STALE_AUTO_PAUSE: "on",
+    } as unknown as NodeJS.ProcessEnv;
+
+    envModule = await import("@/lib/env");
+    expect(envModule.features.staleAutoPause).toBe(true);
+  });
+
+  it("throws when STALE_AUTO_PAUSE=on without FRESHNESS_NOTIFICATIONS=on", async () => {
+    process.env.ENABLE_STALE_AUTO_PAUSE = "on";
+
+    const consoleSpy = jest.spyOn(console, "error").mockImplementation();
+    const { getServerEnv } = await import("@/lib/env");
+
+    expect(() => getServerEnv()).toThrow("Invalid environment configuration");
+    expect(consoleSpy).toHaveBeenCalledWith(
+      expect.stringContaining(
+        "ENABLE_STALE_AUTO_PAUSE=on requires ENABLE_FRESHNESS_NOTIFICATIONS=on"
+      )
+    );
+    consoleSpy.mockRestore();
+  });
+
   it("disables keyset pagination when CURSOR_SECRET is invalid", async () => {
     process.env.CURSOR_SECRET = "short";
 

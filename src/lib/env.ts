@@ -112,6 +112,7 @@ const serverEnvSchema = z
     ENABLE_CONTACT_FIRST_LISTINGS: z.enum(["true", "false"]).optional(),
     ENABLE_PRIVATE_FEEDBACK: z.enum(["true", "false"]).optional(),
     ENABLE_FRESHNESS_NOTIFICATIONS: z.enum(["on", "off"]).optional(),
+    ENABLE_STALE_AUTO_PAUSE: z.enum(["on", "off"]).optional(),
 
     // AI / Embeddings
     GEMINI_API_KEY: z.string().min(1).optional(),
@@ -180,6 +181,17 @@ const serverEnvSchema = z
         code: z.ZodIssueCode.custom,
         message: "ENABLE_BOOKING_AUDIT requires ENABLE_SOFT_HOLDS=on",
         path: ["ENABLE_BOOKING_AUDIT"],
+      });
+    }
+    if (
+      data.ENABLE_STALE_AUTO_PAUSE === "on" &&
+      data.ENABLE_FRESHNESS_NOTIFICATIONS !== "on"
+    ) {
+      ctx.addIssue({
+        code: z.ZodIssueCode.custom,
+        message:
+          "ENABLE_STALE_AUTO_PAUSE=on requires ENABLE_FRESHNESS_NOTIFICATIONS=on",
+        path: ["ENABLE_STALE_AUTO_PAUSE"],
       });
     }
     if (
@@ -529,6 +541,9 @@ export const features = {
   },
   get freshnessNotifications() {
     return process.env.ENABLE_FRESHNESS_NOTIFICATIONS === "on";
+  },
+  get staleAutoPause() {
+    return process.env.ENABLE_STALE_AUTO_PAUSE === "on";
   },
   // Search debug ranking (only allowed in non-production, or with explicit env override)
   // This gates ?debugRank=1 and ?ranker=1 URL overrides to prevent leaking debug signals

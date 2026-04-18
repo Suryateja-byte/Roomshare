@@ -373,6 +373,7 @@ enum NotificationType {
   SEARCH_ALERT
   LISTING_FRESHNESS_REMINDER
   LISTING_STALE_WARNING
+  LISTING_AUTO_PAUSED
 }
 
 model Notification {

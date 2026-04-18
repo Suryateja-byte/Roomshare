@@ -216,6 +216,8 @@ const emailTypeToPreferenceKey: Record<string, keyof NotificationPreferences> =
     bookingExpired: "emailBookingUpdates",
     bookingHoldExpired: "emailBookingUpdates",
     listingFreshnessReminder: "emailBookingUpdates",
+    // listingStaleWarning and listingAutoPaused are intentionally omitted:
+    // both are safety-critical freshness messages and must always send.
     newMessage: "emailMessages",
     newReview: "emailReviews",
     searchAlert: "emailSearchAlerts",
