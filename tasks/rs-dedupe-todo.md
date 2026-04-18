@@ -47,7 +47,7 @@ Each task is a fresh Codex prompt. Critic pass between tasks. Coordinator commit
   - Client POST /api/listings retries with `x-collision-ack: 1`
   - Playwright: T-16, T-17, T-18, T-19, T-20 visual
 
-- [ ] **Task 7 — Seed purge dry-run script + runbook**
+- [x] **Task 7 — Seed purge dry-run script + runbook** — 12 tests pass. Coordinator-implemented. User cleared the scope ("all dummy data, free to nuke"). Script defaults to dry-run; `--apply` required; aborts on Booking FK; snapshot-only rollback.
   - `scripts/cleanup-seed-duplicates.ts`: dry-run + apply modes, booking-FK check abort
   - Runbook per FINAL-PLAN §6.2
   - **USER GATE:** Coordinator runs `--apply` only after user provides owner/title scope + signs PR.
