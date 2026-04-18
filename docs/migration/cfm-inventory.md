@@ -144,8 +144,8 @@
 | `src/lib/notifications.ts` | library | notification | notification | 8, 9 | done_needs_audit | CFM-903 turns off booking-only notifications. |
 | `src/lib/email.ts` / `email-templates.ts` | library | notification | notification | 8, 9 | done_needs_audit | Templates for freshness (CFM-801) + review (CFM-702). |
 | `src/app/notifications/NotificationsClient.tsx` | client component | reader | notification | 9 | done_needs_audit | Inbox. |
-| `src/app/api/cron/sweep-expired-holds/route.ts` | cron | repair-loop | hold | 1, 9 | partially_done | CFM-405c: per-hold tx marks listing dirty. Invariant #9: must skip `HOST_MANAGED`. CFM-904 retires when safe. |
-| `src/app/api/cron/reconcile-slots/route.ts` | cron | repair-loop | inventory | 4, 9 | partially_done | CFM-405c: marks listings dirty in-tx. Invariant #9: host-managed-skip. CFM-904 retires when safe. |
+| `src/app/api/cron/sweep-expired-holds/route.ts` | cron | repair-loop | hold | 1, 9 | done | CFM-904 (`09dba2b0`) flag-gate via `ENABLE_LEGACY_CRONS`; route retained per CFM-1003. Runbook: `docs/migration/cfm-904-cron-retirement-runbook.md`. |
+| `src/app/api/cron/reconcile-slots/route.ts` | cron | repair-loop | inventory | 4, 9 | done | CFM-904 (`09dba2b0`) flag-gate via `ENABLE_LEGACY_CRONS`; route retained per CFM-1003. Invoked by `daily-maintenance` every 15 min. Runbook: `docs/migration/cfm-904-cron-retirement-runbook.md`. |
 | `src/app/api/cron/refresh-search-docs/route.ts` | cron | repair-loop | search-doc | 4, 8 | done_needs_audit | CFM-405/CFM-803 backstop refresh. |
 | `src/app/api/cron/search-alerts/route.ts` | cron | notification | search | 8 | done_needs_audit | Saved-search notifications. |
 | `src/app/api/cron/daily-maintenance/route.ts` | cron | repair-loop | cleanup | — | done_needs_audit | General cleanup; no CFM semantics. |
@@ -276,10 +276,10 @@ Direct `depends_on` edges from `.claude/task-tracker.json` (2026-04-16 snapshot)
 | CFM-801 | 8 | CFM-303, CFM-304 | not_started |
 | CFM-802 | 8 | CFM-801 | not_started |
 | CFM-803 | 8 | CFM-405 | not_started |
-| CFM-901 | 9 | CFM-104 | not_started |
-| CFM-902 | 9 | CFM-901 | not_started |
-| CFM-903 | 9 | CFM-101 | not_started |
-| CFM-904 | 9 | CFM-902 | not_started |
+| CFM-901 | 9 | CFM-104 | done (`3c2ca127`) |
+| CFM-902 | 9 | CFM-901 | done (`75d61a29`) |
+| CFM-903 | 9 | CFM-101 | done (`1b3f4072` + F1 `4faa94bd`) |
+| CFM-904 | 9 | CFM-902 | done (`09dba2b0` + F1 `<this>`) |
 | CFM-1001 | 10 | CFM-701, CFM-902 | not_started |
 | CFM-1002 | 10 | CFM-1001 | not_started |
 | CFM-1003 | 10 | (none) | not_started |
