@@ -18,6 +18,20 @@ import type {
 // Core Types
 // ============================================
 
+export interface GroupSummary {
+  groupKey: string;
+  siblingIds: string[];
+  availableFromDates: string[];
+  combinedOpenSlots: number;
+  combinedTotalSlots: number;
+  groupOverflow: boolean;
+  windows?: Array<{
+    availableFrom: string;
+    availableUntil: string | null;
+    openSlots: number;
+  }>;
+}
+
 export interface ListingData {
   id: string;
   title: string;
@@ -52,6 +66,8 @@ export interface ListingData {
   lastConfirmedAt?: Date | null;
   status?: string;
   statusReason?: string | null;
+  groupKey?: string | null;
+  groupSummary?: GroupSummary | null;
   // Near-match indicator for search results that partially match filters
   isNearMatch?: boolean;
 }

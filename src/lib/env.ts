@@ -117,6 +117,10 @@ const serverEnvSchema = z
     ENABLE_PRIVATE_FEEDBACK: z.enum(["true", "false"]).optional(),
     ENABLE_FRESHNESS_NOTIFICATIONS: z.enum(["on", "off"]).optional(),
     ENABLE_STALE_AUTO_PAUSE: z.enum(["on", "off"]).optional(),
+    FEATURE_SEARCH_LISTING_DEDUP: z.enum(["true", "false"]).optional(),
+    FEATURE_LISTING_CREATE_COLLISION_WARN: z
+      .enum(["true", "false"])
+      .optional(),
 
     // AI / Embeddings
     GEMINI_API_KEY: z.string().min(1).optional(),
@@ -560,6 +564,12 @@ export const features = {
   },
   get staleAutoPause() {
     return process.env.ENABLE_STALE_AUTO_PAUSE === "on";
+  },
+  get searchListingDedup() {
+    return process.env.FEATURE_SEARCH_LISTING_DEDUP === "true";
+  },
+  get listingCreateCollisionWarn() {
+    return process.env.FEATURE_LISTING_CREATE_COLLISION_WARN === "true";
   },
   // Search debug ranking (only allowed in non-production, or with explicit env override)
   // This gates ?debugRank=1 and ?ranker=1 URL overrides to prevent leaking debug signals
