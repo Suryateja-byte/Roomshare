@@ -5,8 +5,8 @@
 -- Rollback:
 --   1. Preferred rollback is the feature flag: ENABLE_PRIVATE_FEEDBACK=false.
 --   2. Day-1 schema rollback is mechanically reversible:
---      DROP INDEX CONCURRENTLY IF EXISTS "Report_targetUserId_idx";
---      DROP INDEX CONCURRENTLY IF EXISTS "Report_kind_status_idx";
+--      DROP INDEX IF EXISTS "Report_targetUserId_idx";
+--      DROP INDEX IF EXISTS "Report_kind_status_idx";
 --      ALTER TABLE "Report" DROP CONSTRAINT IF EXISTS "Report_targetUserId_fkey";
 --      ALTER TABLE "Report" DROP COLUMN IF EXISTS "targetUserId",
 --        DROP COLUMN IF EXISTS "kind";
@@ -18,6 +18,8 @@
 -- - Adds a constant-default kind so existing rows remain ABUSE_REPORT.
 -- - Adds a nullable targetUserId FK without changing any existing cascade rule.
 -- - No legacy report rows are rewritten or deleted.
+-- - Prisma deploy runs this migration in a transaction, so these indexes must
+--   use regular CREATE INDEX to remain deployable.
 
 DO $$
 BEGIN
@@ -34,8 +36,8 @@ ALTER TABLE "Report"
   ADD CONSTRAINT "Report_targetUserId_fkey"
   FOREIGN KEY ("targetUserId") REFERENCES "User"("id") ON DELETE SET NULL ON UPDATE CASCADE;
 
-CREATE INDEX CONCURRENTLY IF NOT EXISTS "Report_kind_status_idx"
+CREATE INDEX IF NOT EXISTS "Report_kind_status_idx"
   ON "Report" ("kind", "status");
 
-CREATE INDEX CONCURRENTLY IF NOT EXISTS "Report_targetUserId_idx"
+CREATE INDEX IF NOT EXISTS "Report_targetUserId_idx"
   ON "Report" ("targetUserId");
