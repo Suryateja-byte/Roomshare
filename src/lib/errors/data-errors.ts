@@ -63,6 +63,20 @@ export class QueryError extends DataError {
 }
 
 /**
+ * Database schema does not match the code's expectations
+ */
+export class SchemaMismatchError extends DataError {
+  constructor(operation: string, cause?: Error) {
+    super(`Database schema mismatch: ${operation}`, {
+      code: "SCHEMA_MISMATCH",
+      retryable: false,
+      cause,
+    });
+    this.name = "SchemaMismatchError";
+  }
+}
+
+/**
  * Database connection or timeout error
  */
 export class ConnectionError extends DataError {
@@ -97,6 +111,94 @@ export function isDataError(error: unknown): error is DataError {
   return error instanceof DataError;
 }
 
+function normalizeError(error: unknown): Error {
+  if (error instanceof Error) {
+    return error;
+  }
+
+  if (
+    error &&
+    typeof error === "object" &&
+    "message" in error &&
+    typeof error.message === "string"
+  ) {
+    return new Error(error.message);
+  }
+
+  return new Error(String(error));
+}
+
+function collectErrorDetails(
+  value: unknown,
+  details: string[],
+  seen: Set<object>
+): void {
+  if (typeof value === "string" || typeof value === "number") {
+    details.push(String(value));
+    return;
+  }
+
+  if (!value || typeof value !== "object") {
+    return;
+  }
+
+  if (seen.has(value)) {
+    return;
+  }
+  seen.add(value);
+
+  if (value instanceof Error) {
+    details.push(value.name, value.message);
+  }
+
+  const record = value as Record<string, unknown>;
+  const relevantKeys = [
+    "code",
+    "message",
+    "detail",
+    "hint",
+    "meta",
+    "cause",
+    "table",
+    "column",
+    "reason",
+  ];
+
+  for (const key of relevantKeys) {
+    collectErrorDetails(record[key], details, seen);
+  }
+}
+
+function buildSearchableErrorText(error: unknown, cause: Error): string {
+  const details: string[] = [];
+  collectErrorDetails(error, details, new Set<object>());
+  details.push(cause.message);
+  return details.join(" ").toLowerCase();
+}
+
+function isSchemaMismatch(searchableText: string): boolean {
+  if (
+    searchableText.includes("42703") ||
+    searchableText.includes("42p01") ||
+    searchableText.includes("42704")
+  ) {
+    return true;
+  }
+
+  return (
+    /column\b.*\bdoes not exist/.test(searchableText) ||
+    /relation\b.*\bdoes not exist/.test(searchableText) ||
+    /table\b.*\bdoes not exist/.test(searchableText) ||
+    /type\b.*\bdoes not exist/.test(searchableText) ||
+    /enum\b.*\bdoes not exist/.test(searchableText) ||
+    searchableText.includes("undefined column") ||
+    searchableText.includes("undefined table") ||
+    searchableText.includes("undefined object") ||
+    searchableText.includes("database schema is not in sync") ||
+    searchableText.includes("schema drift")
+  );
+}
+
 /**
  * Helper to wrap unknown errors into typed DataError instances
  * Detects connection-related errors and wraps appropriately
@@ -110,18 +212,22 @@ export function wrapDatabaseError(
     return error;
   }
 
-  const cause = error instanceof Error ? error : new Error(String(error));
-  const message = cause.message.toLowerCase();
+  const cause = normalizeError(error);
+  const searchableText = buildSearchableErrorText(error, cause);
+
+  if (isSchemaMismatch(searchableText)) {
+    return new SchemaMismatchError(operation, cause);
+  }
 
   // Detect connection-related errors
   if (
-    message.includes("connection") ||
-    message.includes("timeout") ||
-    message.includes("econnrefused") ||
-    message.includes("econnreset") ||
-    message.includes("etimedout") ||
-    message.includes("pool") ||
-    message.includes("socket")
+    searchableText.includes("connection") ||
+    searchableText.includes("timeout") ||
+    searchableText.includes("econnrefused") ||
+    searchableText.includes("econnreset") ||
+    searchableText.includes("etimedout") ||
+    searchableText.includes("pool") ||
+    searchableText.includes("socket")
   ) {
     return new ConnectionError(cause);
   }
