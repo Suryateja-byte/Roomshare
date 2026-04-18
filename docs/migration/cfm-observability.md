@@ -158,6 +158,8 @@ For every P0/P1 failure mode in the plan doc, at least one observable signal exi
 | `/bookings` views emitted with history-first mode labels | `cfm.booking.history_first_view_count{mode=history_first\|escape_hatch}` (counter; emitted from `src/app/bookings/page.tsx`) | informational; expect monotonic growth in `mode=history_first` after flag flip | dashboard | §7.11 |
 | `/bookings` reads served from history-first path | `cfm.booking.history_first_serve_ratio` (gauge) | `< 1.0` after CFM-902 | dashboard | §7.11 |
 | Flag off: legacy booking mutation correctly blocked or admin-bypassed | `cfm.booking.legacy_mutation_blocked_count{action,role,reason}` (counter; `action ∈ {accept,reject,cancel,other}`, `role ∈ {admin,non_admin}`, `reason ∈ {flag_off,admin_bypass}`) | informational; steady-state `role=non_admin,reason=flag_off > 0` is expected after the flip | dashboard only | §7.11 |
+| Flag off: legacy sweep cron correctly skips all work | `cfm.cron.legacy_sweep_skipped_count{reason}` (counter; `reason ∈ {flag_off}`) | informational; steady-state `reason=flag_off` every 5 min is expected after the flip | dashboard only | §7.11 |
+| Flag off: legacy reconcile cron correctly skips all work | `cfm.cron.legacy_reconcile_skipped_count{reason}` (counter; `reason ∈ {flag_off}`) | informational; each operator-triggered run should emit exactly one skipped count while the flag remains off | dashboard only | §7.11 |
 
 ### P1 — Notification emission gate (CFM-903)
 

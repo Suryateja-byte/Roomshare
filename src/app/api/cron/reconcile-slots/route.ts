@@ -7,6 +7,7 @@
 
 import { NextRequest, NextResponse } from "next/server";
 
+import { features } from "@/lib/env";
 import { logger } from "@/lib/logger";
 import { validateCronAuth } from "@/lib/cron-auth";
 import { prisma } from "@/lib/prisma";
@@ -21,6 +22,13 @@ export async function GET(request: NextRequest) {
   try {
     const authError = validateCronAuth(request);
     if (authError) return authError;
+
+    if (!features.legacyCrons) {
+      logger.sync.info("cfm.cron.legacy_reconcile_skipped_count", {
+        reason: "flag_off",
+      });
+      return NextResponse.json({ skipped: true, reason: "flag_off" });
+    }
 
     const startTime = Date.now();
 

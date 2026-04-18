@@ -17,6 +17,12 @@ jest.mock("@/lib/cron-auth", () => ({
   validateCronAuth: jest.fn(),
 }));
 
+jest.mock("@/lib/env", () => ({
+  features: {
+    legacyCrons: true,
+  },
+}));
+
 jest.mock("@/lib/logger", () => ({
   logger: {
     sync: {
@@ -56,13 +62,15 @@ jest.mock("next/server", () => ({
 }));
 
 import { GET } from "@/app/api/cron/reconcile-slots/route";
-import { prisma } from "@/lib/prisma";
 import { validateCronAuth } from "@/lib/cron-auth";
-import { markListingsDirtyInTx } from "@/lib/search/search-doc-dirty";
 import {
   getAvailability,
   rebuildListingDayInventory,
 } from "@/lib/availability";
+import { features } from "@/lib/env";
+import { logger } from "@/lib/logger";
+import { prisma } from "@/lib/prisma";
+import { markListingsDirtyInTx } from "@/lib/search/search-doc-dirty";
 import { NextRequest } from "next/server";
 
 function createRequest(authHeader?: string): NextRequest {
@@ -78,6 +86,10 @@ describe("GET /api/cron/reconcile-slots", () => {
   beforeEach(() => {
     jest.clearAllMocks();
     (validateCronAuth as jest.Mock).mockReturnValue(null);
+    Object.defineProperty(features, "legacyCrons", {
+      value: true,
+      writable: true,
+    });
     (getAvailability as jest.Mock).mockResolvedValue({
       listingId: "listing-1",
       totalSlots: 3,
@@ -90,18 +102,27 @@ describe("GET /api/cron/reconcile-slots", () => {
     (rebuildListingDayInventory as jest.Mock).mockResolvedValue(undefined);
   });
 
-  it("returns 401 without valid CRON_SECRET", async () => {
+  it("returns 401 without valid CRON_SECRET before the legacy gate", async () => {
     const mockResp = {
       status: 401,
       json: async () => ({ error: "Unauthorized" }),
     };
+    Object.defineProperty(features, "legacyCrons", {
+      value: false,
+      writable: true,
+    });
     (validateCronAuth as jest.Mock).mockReturnValue(mockResp);
 
     const response = await GET(createRequest());
     expect(response.status).toBe(401);
+    expect(prisma.$transaction).not.toHaveBeenCalled();
+    expect(logger.sync.info).not.toHaveBeenCalledWith(
+      "cfm.cron.legacy_reconcile_skipped_count",
+      expect.anything()
+    );
   });
 
-  it("runs unconditionally regardless of feature flags", async () => {
+  it("runs when legacy crons remain enabled", async () => {
     (prisma.$transaction as jest.Mock).mockImplementation(async (fn: any) => {
       return fn({
         $queryRaw: jest.fn().mockResolvedValueOnce([{ locked: true }]),
@@ -115,6 +136,26 @@ describe("GET /api/cron/reconcile-slots", () => {
     const data = await response.json();
     expect(data.drifted).toBe(0);
     expect(data.reconciled).toBe(0);
+  });
+
+  it("returns skipped when legacy crons are disabled without touching the database", async () => {
+    Object.defineProperty(features, "legacyCrons", {
+      value: false,
+      writable: true,
+    });
+
+    const response = await GET(createRequest("Bearer valid"));
+    const data = await response.json();
+
+    expect(response.status).toBe(200);
+    expect(data).toEqual({ skipped: true, reason: "flag_off" });
+    expect(prisma.$transaction).not.toHaveBeenCalled();
+    expect(rebuildListingDayInventory).not.toHaveBeenCalled();
+    expect(getAvailability).not.toHaveBeenCalled();
+    expect(logger.sync.info).toHaveBeenCalledWith(
+      "cfm.cron.legacy_reconcile_skipped_count",
+      { reason: "flag_off" }
+    );
   });
 
   it("skips when advisory lock not acquired", async () => {

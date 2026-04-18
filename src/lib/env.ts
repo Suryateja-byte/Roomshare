@@ -113,6 +113,7 @@ const serverEnvSchema = z
     ENABLE_BOOKINGS_HISTORY_FIRST: z.enum(["true", "false"]).optional(),
     ENABLE_BOOKING_NOTIFICATIONS: z.enum(["on", "off"]).optional(),
     ENABLE_LEGACY_BOOKING_MUTATIONS: z.enum(["on", "off"]).optional(),
+    ENABLE_LEGACY_CRONS: z.enum(["on", "off"]).optional(),
     ENABLE_PRIVATE_FEEDBACK: z.enum(["true", "false"]).optional(),
     ENABLE_FRESHNESS_NOTIFICATIONS: z.enum(["on", "off"]).optional(),
     ENABLE_STALE_AUTO_PAUSE: z.enum(["on", "off"]).optional(),
@@ -547,6 +548,9 @@ export const features = {
   },
   get legacyBookingMutations() {
     return process.env.ENABLE_LEGACY_BOOKING_MUTATIONS !== "off";
+  },
+  get legacyCrons() {
+    return process.env.ENABLE_LEGACY_CRONS !== "off";
   },
   get privateFeedback() {
     return process.env.ENABLE_PRIVATE_FEEDBACK === "true";

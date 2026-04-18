@@ -32,6 +32,7 @@ jest.mock("@/lib/cron-auth", () => ({
 
 jest.mock("@/lib/env", () => ({
   features: {
+    legacyCrons: true,
     softHoldsEnabled: true,
     softHoldsDraining: false,
   },
@@ -250,6 +251,10 @@ describe("GET /api/cron/sweep-expired-holds", () => {
       value: false,
       writable: true,
     });
+    Object.defineProperty(features, "legacyCrons", {
+      value: true,
+      writable: true,
+    });
     (applyInventoryDeltas as jest.Mock).mockResolvedValue(undefined);
     (logBookingAudit as jest.Mock).mockResolvedValue(undefined);
     (markListingDirtyInTx as jest.Mock).mockResolvedValue(undefined);
@@ -258,12 +263,16 @@ describe("GET /api/cron/sweep-expired-holds", () => {
     });
   });
 
-  it("returns 401 when cron auth validation fails", async () => {
+  it("returns 401 when cron auth validation fails before the legacy gate", async () => {
     const authErrorResponse = {
       status: 401,
       json: async () => ({ error: "Unauthorized" }),
       headers: new Map(),
     };
+    Object.defineProperty(features, "legacyCrons", {
+      value: false,
+      writable: true,
+    });
     (validateCronAuth as jest.Mock).mockReturnValue(authErrorResponse);
 
     const response = await GET(createRequest());
@@ -271,6 +280,30 @@ describe("GET /api/cron/sweep-expired-holds", () => {
     expect(response.status).toBe(401);
     expect(await response.json()).toEqual({ error: "Unauthorized" });
     expect(prisma.$transaction).not.toHaveBeenCalled();
+    expect(logger.sync.info).not.toHaveBeenCalledWith(
+      "cfm.cron.legacy_sweep_skipped_count",
+      expect.anything()
+    );
+  });
+
+  it("returns skipped when legacy crons are disabled without touching the database", async () => {
+    Object.defineProperty(features, "legacyCrons", {
+      value: false,
+      writable: true,
+    });
+
+    const response = await GET(createRequest("Bearer valid"));
+    const data = await response.json();
+
+    expect(response.status).toBe(200);
+    expect(data).toEqual({ skipped: true, reason: "flag_off" });
+    expect(prisma.$transaction).not.toHaveBeenCalled();
+    expect(createInternalNotification).not.toHaveBeenCalled();
+    expect(markListingDirtyInTx).not.toHaveBeenCalled();
+    expect(logger.sync.info).toHaveBeenCalledWith(
+      "cfm.cron.legacy_sweep_skipped_count",
+      { reason: "flag_off" }
+    );
   });
 
   it("returns skipped when soft holds are disabled", async () => {

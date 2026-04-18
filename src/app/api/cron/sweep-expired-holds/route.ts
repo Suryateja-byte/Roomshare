@@ -202,6 +202,13 @@ export async function GET(request: NextRequest) {
     const authError = validateCronAuth(request);
     if (authError) return authError;
 
+    if (!features.legacyCrons) {
+      logger.sync.info("cfm.cron.legacy_sweep_skipped_count", {
+        reason: "flag_off",
+      });
+      return NextResponse.json({ skipped: true, reason: "flag_off" });
+    }
+
     if (!features.softHoldsEnabled && !features.softHoldsDraining) {
       const durationMs = Date.now() - startTime;
       logSweepSummary("info", "[sweep-expired-holds] Sweep skipped", {
