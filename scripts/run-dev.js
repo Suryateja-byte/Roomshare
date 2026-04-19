@@ -2,7 +2,7 @@
 
 const fs = require("fs");
 const path = require("path");
-const { spawn } = require("child_process");
+const { spawn, spawnSync } = require("child_process");
 
 const projectNextDir = `${process.cwd()}/.next`;
 const rawArgs = process.argv.slice(2);
@@ -16,6 +16,7 @@ const shouldWarmRoutes =
 const LOGIN_WARMUP_URL = "/login";
 const SEARCH_WARMUP_URL =
   "/search?minLat=37.70&maxLat=37.84&minLng=-122.52&maxLng=-122.35";
+const command = process.platform === "win32" ? "pnpm.cmd" : "pnpm";
 
 function removeIfExists(targetPath) {
   try {
@@ -50,6 +51,156 @@ function logWorkspaceWarning() {
       "  For fast startup and page rendering, move the repo under ~/... and run pnpm dev there.",
     ].join("\n"),
   );
+}
+
+function isMigrationStateFailure(output) {
+  return (
+    output.includes("have not yet been applied") ||
+    output.includes("drift detected") ||
+    output.includes("not in sync with the migration history") ||
+    output.includes("database schema is not in sync") ||
+    output.includes("_prisma_migrations") ||
+    output.includes("p3005") ||
+    output.includes("p3006") ||
+    output.includes("p3009") ||
+    output.includes("p3014")
+  );
+}
+
+function formatMigrationGuardOutput(output) {
+  const lines = output
+    .split(/\r?\n/)
+    .map((line) => line.trimEnd())
+    .filter(Boolean);
+
+  return lines.slice(-12).map((line) => `  ${line}`).join("\n");
+}
+
+// Refuse to boot dev against a database whose migration history is behind the repo.
+function verifyMigrationState() {
+  const result = spawnSync(command, ["prisma", "migrate", "status"], {
+    cwd: process.cwd(),
+    env: process.env,
+    encoding: "utf8",
+    timeout: 15000,
+  });
+
+  if (result.error) {
+    console.warn(
+      `[roomshare] Skipping migration status preflight: ${result.error.message}`,
+    );
+    return true;
+  }
+
+  const combinedOutput = `${result.stdout ?? ""}\n${result.stderr ?? ""}`.toLowerCase();
+  if (result.status === 0) {
+    return true;
+  }
+
+  if (!isMigrationStateFailure(combinedOutput)) {
+    console.warn(
+      "[roomshare] Skipping migration guard after unexpected prisma migrate status failure.",
+    );
+    return true;
+  }
+
+  console.error(
+    [
+      "[roomshare] Refusing to start dev server: database schema is behind the repo or migration history is inconsistent.",
+      "  Run `pnpm prisma migrate deploy` and then `pnpm prisma migrate status`.",
+      "  Prisma output:",
+      formatMigrationGuardOutput(`${result.stdout ?? ""}\n${result.stderr ?? ""}`),
+    ].join("\n"),
+  );
+  return false;
+}
+
+// Watch prisma/migrations for new directories appearing after dev boot.
+// The boot-time guard above only runs once, so a migration generated during a
+// running session (the "I just ran prisma migrate diff and forgot to deploy"
+// case) silently breaks /search and POST /api/listings until restart.
+// This watcher re-runs `prisma migrate status` whenever a new entry appears
+// and emits a single loud warning to the terminal. It deliberately does NOT
+// kill the dev server, since developers commonly generate then apply within
+// a few seconds.
+function watchMigrationsDir() {
+  if (process.env.ROOMSHARE_DISABLE_MIGRATION_WATCHER === "1") {
+    return;
+  }
+  const dir = path.join(process.cwd(), "prisma", "migrations");
+  if (!fs.existsSync(dir)) {
+    return;
+  }
+
+  const isMigrationEntry = (name) =>
+    name && name !== "migration_lock.toml" && !name.startsWith(".");
+
+  const snapshot = () => {
+    try {
+      return new Set(fs.readdirSync(dir).filter(isMigrationEntry));
+    } catch {
+      return new Set();
+    }
+  };
+
+  let known = snapshot();
+  const warnedFor = new Set();
+  let recheckTimer = null;
+
+  const recheck = () => {
+    recheckTimer = null;
+    const current = snapshot();
+    const added = [...current].filter((name) => !known.has(name));
+    known = current;
+    const unwarned = added.filter((name) => !warnedFor.has(name));
+    if (unwarned.length === 0) {
+      return;
+    }
+
+    const status = spawnSync(command, ["prisma", "migrate", "status"], {
+      cwd: process.cwd(),
+      env: process.env,
+      encoding: "utf8",
+      timeout: 15000,
+    });
+    if (status.error) {
+      return;
+    }
+    const out = `${status.stdout ?? ""}\n${status.stderr ?? ""}`;
+    if (status.status === 0 || !isMigrationStateFailure(out.toLowerCase())) {
+      // Migration was applied between detection and recheck — nothing to warn about.
+      return;
+    }
+
+    for (const name of unwarned) {
+      warnedFor.add(name);
+    }
+    console.error(
+      [
+        "",
+        "[roomshare] ⚠️  New migration(s) detected on disk but DB is behind:",
+        ...unwarned.map((name) => `    + ${name}`),
+        "  Run:  pnpm prisma migrate deploy   (then restart `pnpm dev` to re-arm the guard)",
+        "  Until applied, /search list rendering and POST /api/listings will throw 42703.",
+        "",
+      ].join("\n"),
+    );
+  };
+
+  try {
+    fs.watch(dir, { persistent: false }, () => {
+      // Debounce so a single `prisma migrate dev` (which writes README, SQL,
+      // and a .gitkeep-style file in quick succession) only triggers once.
+      if (recheckTimer) {
+        return;
+      }
+      recheckTimer = setTimeout(recheck, 750);
+    });
+  } catch (error) {
+    console.warn(
+      `[roomshare] Migration watcher disabled: ${error instanceof Error ? error.message : "unknown error"}`,
+    );
+  }
 }
 
 function buildNextArgs() {
@@ -134,8 +285,10 @@ async function warmDevRoutes() {
 
 prepareNextDir();
 logWorkspaceWarning();
-
-const command = process.platform === "win32" ? "pnpm.cmd" : "pnpm";
+if (!verifyMigrationState()) {
+  process.exit(1);
+}
+watchMigrationsDir();
 const child = spawn(command, buildNextArgs(), {
   stdio: ["inherit", "pipe", "pipe"],
   env: {
