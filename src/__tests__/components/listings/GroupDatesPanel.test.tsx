@@ -53,6 +53,41 @@ function createSummary(overrides: Partial<GroupSummary> = {}): GroupSummary {
     combinedOpenSlots: 3,
     combinedTotalSlots: 6,
     groupOverflow: false,
+    members: [
+      {
+        listingId: "listing-mar20",
+        availableFrom: "2026-03-20",
+        availableUntil: null,
+        startDate: "2026-03-20",
+        endDate: undefined,
+        openSlots: 1,
+        totalSlots: 2,
+        isCanonical: true,
+        roomType: "Private Room",
+      },
+      {
+        listingId: "listing-apr18",
+        availableFrom: "2026-04-18",
+        availableUntil: null,
+        startDate: "2026-04-18",
+        endDate: undefined,
+        openSlots: 1,
+        totalSlots: 2,
+        isCanonical: false,
+        roomType: "Private Room",
+      },
+      {
+        listingId: "listing-may15",
+        availableFrom: "2026-05-15",
+        availableUntil: null,
+        startDate: "2026-05-15",
+        endDate: undefined,
+        openSlots: 1,
+        totalSlots: 2,
+        isCanonical: false,
+        roomType: "Private Room",
+      },
+    ],
     ...overrides,
   };
 }
@@ -149,7 +184,10 @@ describe("GroupDatesPanel", () => {
     );
     await userEvent.click(screen.getAllByTestId("group-dates-chip")[1]);
 
-    expect(onMemberClick).toHaveBeenCalledWith("listing-apr18", 1);
+    expect(onMemberClick).toHaveBeenCalledWith(
+      expect.objectContaining({ listingId: "listing-apr18" }),
+      1
+    );
     expect(mockEmitSearchDedupMemberClick).toHaveBeenCalledWith({
       groupSize: 3,
       memberIndex: 1,
@@ -183,8 +221,16 @@ describe("GroupDatesPanel", () => {
     await user.keyboard("{Enter}");
     await user.keyboard(" ");
 
-    expect(onMemberClick).toHaveBeenNthCalledWith(1, "listing-mar20", 0);
-    expect(onMemberClick).toHaveBeenNthCalledWith(2, "listing-mar20", 0);
+    expect(onMemberClick).toHaveBeenNthCalledWith(
+      1,
+      expect.objectContaining({ listingId: "listing-mar20" }),
+      0
+    );
+    expect(onMemberClick).toHaveBeenNthCalledWith(
+      2,
+      expect.objectContaining({ listingId: "listing-mar20" }),
+      0
+    );
   });
 
   it("keeps aria-expanded and aria-controls aligned with the trigger and panel", async () => {

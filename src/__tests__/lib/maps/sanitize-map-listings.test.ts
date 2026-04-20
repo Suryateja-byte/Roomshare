@@ -42,18 +42,23 @@ describe("sanitize-map-listings", () => {
       tier: "primary",
     });
 
-    expect(listing).toEqual({
-      id: "listing-1",
-      title: "Sanitized listing",
-      price: 0,
-      availableSlots: 3,
-      images: ["one.jpg", "two.jpg"],
-      location: { lat: 30.2672, lng: -97.7431 },
-      tier: "primary",
-      avgRating: 0,
-      reviewCount: 0,
-      recommendedScore: null,
-      createdAt: null,
-    });
+    expect(listing).toEqual(
+      expect.objectContaining({
+        id: "listing-1",
+        title: "Sanitized listing",
+        price: 0,
+        availableSlots: 3,
+        totalSlots: 3,
+        images: ["one.jpg", "two.jpg"],
+        location: expect.objectContaining({ lat: 30.2672, lng: -97.7431 }),
+        tier: "primary",
+        avgRating: 0,
+        reviewCount: 0,
+        recommendedScore: null,
+        createdAt: null,
+        groupContext: null,
+        groupSummary: null,
+      })
+    );
   });
 });

@@ -58,6 +58,52 @@ function createSummary(overrides: Partial<GroupSummary> = {}): GroupSummary {
     combinedOpenSlots: 4,
     combinedTotalSlots: 8,
     groupOverflow: false,
+    members: [
+      {
+        listingId: "listing-mar20",
+        availableFrom: "2026-03-20",
+        availableUntil: null,
+        startDate: "2026-03-20",
+        endDate: undefined,
+        openSlots: 1,
+        totalSlots: 2,
+        isCanonical: true,
+        roomType: "Private Room",
+      },
+      {
+        listingId: "listing-apr18",
+        availableFrom: "2026-04-18",
+        availableUntil: null,
+        startDate: "2026-04-18",
+        endDate: undefined,
+        openSlots: 1,
+        totalSlots: 2,
+        isCanonical: false,
+        roomType: "Private Room",
+      },
+      {
+        listingId: "listing-may15",
+        availableFrom: "2026-05-15",
+        availableUntil: null,
+        startDate: "2026-05-15",
+        endDate: undefined,
+        openSlots: 1,
+        totalSlots: 2,
+        isCanonical: false,
+        roomType: "Private Room",
+      },
+      {
+        listingId: "listing-jun01",
+        availableFrom: "2026-06-01",
+        availableUntil: null,
+        startDate: "2026-06-01",
+        endDate: undefined,
+        openSlots: 1,
+        totalSlots: 2,
+        isCanonical: false,
+        roomType: "Private Room",
+      },
+    ],
     ...overrides,
   };
 }
@@ -165,11 +211,35 @@ describe("GroupDatesModal", () => {
     ).toBeInTheDocument();
 
     rerender(
-      <Harness
-        summary={createSummary({
-          siblingIds: ["listing-apr18"],
-          availableFromDates: ["2026-03-20", "2026-04-18"],
-        })}
+        <Harness
+          summary={createSummary({
+            siblingIds: ["listing-apr18"],
+            availableFromDates: ["2026-03-20", "2026-04-18"],
+            members: [
+              {
+                listingId: "listing-mar20",
+                availableFrom: "2026-03-20",
+                availableUntil: null,
+                startDate: "2026-03-20",
+                endDate: undefined,
+                openSlots: 1,
+                totalSlots: 2,
+                isCanonical: true,
+                roomType: "Private Room",
+              },
+              {
+                listingId: "listing-apr18",
+                availableFrom: "2026-04-18",
+                availableUntil: null,
+                startDate: "2026-04-18",
+                endDate: undefined,
+                openSlots: 1,
+                totalSlots: 2,
+                isCanonical: false,
+                roomType: "Private Room",
+              },
+            ],
+          })}
       />
     );
 
@@ -206,6 +276,9 @@ describe("GroupDatesModal", () => {
       groupSize: 4,
       memberIndex: 2,
     });
-    expect(onMemberClick).toHaveBeenCalledWith("listing-may15", 2);
+    expect(onMemberClick).toHaveBeenCalledWith(
+      expect.objectContaining({ listingId: "listing-may15" }),
+      2
+    );
   });
 });

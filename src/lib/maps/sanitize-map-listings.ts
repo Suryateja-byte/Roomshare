@@ -1,4 +1,8 @@
-import type { MapListingData } from "@/lib/search-types";
+import type {
+  GroupContextPresentation,
+  GroupSummary,
+  MapListingData,
+} from "@/lib/search-types";
 import { buildPublicAvailability } from "@/lib/search/public-availability";
 import type { PublicAvailabilitySource } from "@/lib/search/public-availability";
 
@@ -30,6 +34,9 @@ type MapListingInput = {
   status?: unknown;
   statusReason?: unknown;
   publicAvailability?: MapListingData["publicAvailability"];
+  groupKey?: unknown;
+  groupSummary?: GroupSummary | null;
+  groupContext?: GroupContextPresentation | null;
 };
 
 function toFiniteNumber(value: unknown, fallback = 0): number {
@@ -126,6 +133,9 @@ export function sanitizeMapListing(
     lastConfirmedAt: toSafeDate(publicAvailability.lastConfirmedAt),
     status: toOptionalTrimmedString(listing.status),
     statusReason: toOptionalTrimmedString(listing.statusReason) ?? null,
+    groupKey: toOptionalTrimmedString(listing.groupKey) ?? null,
+    groupSummary: listing.groupSummary ?? null,
+    groupContext: listing.groupContext ?? null,
     location: {
       city: toOptionalTrimmedString(listing.location?.city),
       state: toOptionalTrimmedString(listing.location?.state),

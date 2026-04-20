@@ -34,6 +34,7 @@ import { buildCanonicalFilterParamsFromSearchParams } from "@/lib/search-params"
 import { normalizeSearchQuery } from "@/lib/search/search-query";
 import {
   getSearchQueryHash,
+  SEARCH_RESPONSE_VERSION,
   type SearchMapState,
   type SearchResponseMeta,
 } from "@/lib/search/search-response";
@@ -393,6 +394,8 @@ export function v2MapDataToListings(v2MapData: V2MapData): MapListingData[] {
           title: feature.properties.title ?? "",
           price: feature.properties.price,
           availableSlots: feature.properties.availableSlots,
+          publicAvailability: feature.properties.publicAvailability,
+          groupContext: feature.properties.groupContext ?? null,
           images: feature.properties.image ? [feature.properties.image] : [],
           location: { lng, lat },
           // Add tier from pins lookup (defaults to undefined if not in pins mode)
@@ -438,6 +441,7 @@ export default function PersistentMapWrapper({
   // Check for v2 data from context (injected by page.tsx via V2MapDataSetter)
   const v2MapData = useV2MapData();
   const { isV2Enabled, setIsV2Enabled } = useIsV2Enabled();
+  const cacheContractKey = `${SEARCH_RESPONSE_VERSION}:${isV2Enabled ? "v2" : "v1"}`;
   // P2-FIX (#124): Use state instead of ref for last V2 data to ensure memo dependencies are correct
   // Using a ref in useMemo causes stale data because refs aren't tracked by React
   const [lastV2Data, setLastV2Data] = useState<V2MapData | null>(null);
@@ -498,6 +502,12 @@ export default function PersistentMapWrapper({
       setLastV2Data(null);
     }
   }, [v2MapData, isV2Enabled]);
+
+  useEffect(() => {
+    spatialCacheRef.current.clear();
+    lastFetchedBoundsRef.current = null;
+    previousListingsRef.current = [];
+  }, [cacheContractKey]);
 
   // Compute effective listings based on data source (v2 context or v1 fetch)
   // Memoized for stable reference to prevent unnecessary Map re-renders

@@ -9,7 +9,7 @@ import {
   DialogTitle,
 } from "@/components/ui/dialog";
 import { emitSearchDedupOpenPanelClick } from "@/lib/search/search-telemetry-client";
-import type { GroupSummary } from "@/lib/search-types";
+import type { GroupSummary, GroupSummaryMember } from "@/lib/search-types";
 import { GroupDatesActionList, type GroupDatesSharedProps } from "./GroupDatesPanel";
 
 interface GroupDatesModalProps {
@@ -18,7 +18,7 @@ interface GroupDatesModalProps {
   open: boolean;
   panelId: string;
   onClose: () => void;
-  onMemberClick?: (memberId: string, index: number) => void;
+  onMemberClick?: (member: GroupSummaryMember, index: number) => void;
   onOverflowClick?: () => void;
   queryHashPrefix8?: string;
 }
@@ -40,10 +40,10 @@ export default function GroupDatesModal({
   useEffect(() => {
     if (!open) return;
     emitSearchDedupOpenPanelClick({
-      groupSize: summary.siblingIds.length + 1,
+      groupSize: summary.members?.length ?? 0,
       queryHashPrefix8: queryHashPrefix8 ?? "none",
     });
-  }, [open, queryHashPrefix8, summary.siblingIds.length]);
+  }, [open, queryHashPrefix8, summary.members]);
 
   return (
     <Dialog open={open} onOpenChange={(nextOpen) => !nextOpen && onClose()}>
@@ -63,7 +63,7 @@ export default function GroupDatesModal({
         </DialogClose>
         <DialogHeader className="pr-14 text-left">
           <DialogTitle className="text-base font-semibold text-on-surface sm:text-lg">
-            {formatTitle(summary.siblingIds.length)}
+            {formatTitle(Math.max((summary.members?.length ?? 0) - 1, 0))}
           </DialogTitle>
         </DialogHeader>
         <GroupDatesActionList

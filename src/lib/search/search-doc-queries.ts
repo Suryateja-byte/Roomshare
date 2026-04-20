@@ -58,10 +58,8 @@ import { getCachedQueryEmbedding } from "@/lib/embeddings/query-cache";
 import { logger } from "@/lib/logger";
 import { joinWhereClauseWithSecurityInvariant } from "@/lib/sql-safety";
 import { buildAvailabilitySqlFragments } from "@/lib/availability";
-import {
-  applyServerDedup,
-  type SearchRowForDedup,
-} from "./dedup-pipeline";
+import { applyServerDedup, type SearchRowForDedup } from "./dedup-pipeline";
+import { buildGroupMetadataById } from "./dedup";
 import { generateSearchQueryHash } from "./query-hash";
 import {
   recordSearchDedupApplied,
@@ -83,6 +81,8 @@ function isPresent<T>(value: T | null | undefined): value is T {
 /** Raw row shape from map listings query */
 interface MapListingRaw {
   id: string;
+  ownerId?: string;
+  normalizedAddress?: string | null;
   title: string;
   price: number | string;
   availableSlots: number;
@@ -311,7 +311,10 @@ function createSearchDocCountCacheKey(params: FilterParams): string {
   return JSON.stringify(buildBaseCacheFields(params));
 }
 
-type ListingGroupMetadata = Pick<ListingData, "groupKey" | "groupSummary">;
+type ListingGroupMetadata = Pick<
+  ListingData,
+  "groupKey" | "groupSummary" | "groupContext"
+>;
 
 type DedupedListingRows<T extends ListingRaw> = {
   rows: T[];
@@ -412,6 +415,7 @@ function dedupeListingRows<T extends ListingRaw>(
     groupMetadataById.set(canonical.id, {
       groupKey: canonical.groupKey,
       groupSummary: canonical.groupSummary,
+      groupContext: canonical.groupContext,
     });
   }
 
@@ -1166,7 +1170,7 @@ export function mapRawListingsToPublic(listings: ListingRaw[]): ListingData[] {
 export function mapRawMapListingsToPublic(
   listings: MapListingRaw[]
 ): MapListingData[] {
-  return sanitizeMapListings(
+  const sanitizedListings = sanitizeMapListings(
     listings
       .map((listing) => {
         const {
@@ -1220,6 +1224,26 @@ export function mapRawMapListingsToPublic(
       })
       .filter(isPresent)
   );
+
+  const groupMetadataById = buildGroupMetadataById(
+    listings.map((listing) => ({
+      id: listing.id,
+      ownerId: listing.ownerId ?? "",
+      normalizedAddress: listing.normalizedAddress ?? "",
+      priceCents: Math.round(Number(listing.price) * 100),
+      title: listing.title,
+      roomType: listing.roomType ?? null,
+      moveInDate: listing.moveInDate ?? null,
+      availableUntil: listing.availableUntil ?? null,
+      openSlots: listing.openSlots ?? null,
+      totalSlots: Number(listing.totalSlots) || 0,
+    }))
+  );
+
+  return sanitizedListings.map((listing) => {
+    const groupMetadata = groupMetadataById.get(listing.id);
+    return groupMetadata ? { ...listing, ...groupMetadata } : listing;
+  });
 }
 
 // ============================================
@@ -1276,6 +1300,8 @@ async function getSearchDocMapListingsInternal(
   const sqlQuery = `
     SELECT
       d.id,
+      l."ownerId" as "ownerId",
+      l."normalizedAddress" as "normalizedAddress",
       d.title,
       d.price,
       ${effectiveAvailableSql} as "availableSlots",

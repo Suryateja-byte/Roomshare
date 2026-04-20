@@ -177,6 +177,13 @@ describe("ListingCard", () => {
         ...mockListing,
         availableSlots: 2,
         totalSlots: 3,
+        groupContext: {
+          siblingCount: 3,
+          dateCount: 4,
+          completeness: "complete" as const,
+          secondaryLabel: "Also available on 3 similar dates",
+          contextKey: "siblings:3|dates:4|completeness:complete",
+        },
         groupSummary: {
           groupKey: "group-key-1",
           siblingIds: ["listing-234", "listing-345", "listing-456"],
@@ -189,11 +196,60 @@ describe("ListingCard", () => {
           combinedOpenSlots: 8,
           combinedTotalSlots: 8,
           groupOverflow: false,
+          members: [
+            {
+              listingId: "listing-123",
+              availableFrom: "2026-03-20",
+              availableUntil: null,
+              startDate: "2026-03-20",
+              endDate: undefined,
+              openSlots: 2,
+              totalSlots: 3,
+              isCanonical: true,
+              roomType: "Private Room",
+            },
+            {
+              listingId: "listing-234",
+              availableFrom: "2026-04-18",
+              availableUntil: null,
+              startDate: "2026-04-18",
+              endDate: undefined,
+              openSlots: 2,
+              totalSlots: 2,
+              isCanonical: false,
+              roomType: "Private Room",
+            },
+            {
+              listingId: "listing-345",
+              availableFrom: "2026-05-15",
+              availableUntil: null,
+              startDate: "2026-05-15",
+              endDate: undefined,
+              openSlots: 2,
+              totalSlots: 2,
+              isCanonical: false,
+              roomType: "Private Room",
+            },
+            {
+              listingId: "listing-456",
+              availableFrom: "2026-06-01",
+              availableUntil: null,
+              startDate: "2026-06-01",
+              endDate: undefined,
+              openSlots: 2,
+              totalSlots: 1,
+              isCanonical: false,
+              roomType: "Private Room",
+            },
+          ],
         },
       };
 
       render(<ListingCard listing={listing} />);
-      expect(screen.getByText("All 8 open across 4 dates")).toBeInTheDocument();
+      expect(screen.getByText("2 of 3 open")).toBeInTheDocument();
+      expect(
+        screen.getByText("Also available on 3 similar dates")
+      ).toBeInTheDocument();
     });
 
     it("renders availability badge as Filled when no slots", () => {
@@ -607,7 +663,7 @@ describe("ListingCard", () => {
       const article = screen.getByTestId("listing-card");
       expect(article).toHaveAttribute(
         "aria-label",
-        expect.stringContaining("2 of 4 spots available")
+        expect.stringContaining("2 of 4 open")
       );
     });
   });

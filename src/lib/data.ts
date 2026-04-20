@@ -11,6 +11,8 @@ import {
 import { hasActiveFilters } from "@/lib/search-params";
 import { clampBoundsToMaxSpan } from "@/lib/validation";
 import { sanitizeMapListings } from "@/lib/maps/sanitize-map-listings";
+import { buildGroupMetadataById } from "@/lib/search/dedup";
+import { normalizeAddress } from "@/lib/search/normalize-address";
 import {
   MIN_QUERY_LENGTH,
   MAX_QUERY_LENGTH,
@@ -627,6 +629,7 @@ export async function getMapListings(
   const sqlQuery = `
         SELECT
             l.id,
+            l."ownerId" as "ownerId",
             l.title,
             l.price,
             ${effectiveAvailableSql} as "availableSlots",
@@ -642,8 +645,10 @@ export async function getMapListings(
             l."moveInDate",
             l."roomType",
             l.images,
+            loc.address,
             loc.city,
             loc.state,
+            loc.zip,
             ST_X(loc.coords::geometry) as lng,
             ST_Y(loc.coords::geometry) as lat,
             COALESCE(r.avg_rating, 0) as "avgRating",
@@ -729,7 +734,31 @@ export async function getMapListings(
       })
       .filter(isPresent);
 
-    return sanitizeMapListings(mappedListings);
+    const sanitizedListings = sanitizeMapListings(mappedListings);
+    const groupMetadataById = buildGroupMetadataById(
+      listings.map((listing) => ({
+        id: listing.id,
+        ownerId: listing.ownerId ?? "",
+        normalizedAddress: normalizeAddress({
+          address: listing.address ?? null,
+          city: listing.city ?? null,
+          state: listing.state ?? null,
+          zip: listing.zip ?? null,
+        }),
+        priceCents: Math.round(Number(listing.price) * 100),
+        title: listing.title,
+        roomType: listing.roomType ?? null,
+        moveInDate: listing.moveInDate ?? null,
+        availableUntil: listing.availableUntil ?? null,
+        openSlots: listing.openSlots ?? null,
+        totalSlots: Number(listing.totalSlots) || 0,
+      }))
+    );
+
+    return sanitizedListings.map((listing) => {
+      const groupMetadata = groupMetadataById.get(listing.id);
+      return groupMetadata ? { ...listing, ...groupMetadata } : listing;
+    });
   } catch (error) {
     const dataError = wrapDatabaseError(error, "getMapListings");
     dataError.log({

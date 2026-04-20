@@ -25,11 +25,32 @@ export interface GroupSummary {
   combinedOpenSlots: number;
   combinedTotalSlots: number;
   groupOverflow: boolean;
+  members?: GroupSummaryMember[];
   windows?: Array<{
     availableFrom: string;
     availableUntil: string | null;
     openSlots: number;
   }>;
+}
+
+export interface GroupSummaryMember {
+  listingId: string;
+  availableFrom: string;
+  availableUntil: string | null;
+  startDate?: string;
+  endDate?: string;
+  openSlots: number;
+  totalSlots: number;
+  isCanonical: boolean;
+  roomType?: string | null;
+}
+
+export interface GroupContextPresentation {
+  siblingCount: number;
+  dateCount: number;
+  completeness: "complete" | "partial";
+  secondaryLabel?: string;
+  contextKey: string;
 }
 
 export interface ListingData {
@@ -68,6 +89,7 @@ export interface ListingData {
   statusReason?: string | null;
   groupKey?: string | null;
   groupSummary?: GroupSummary | null;
+  groupContext?: GroupContextPresentation | null;
   // Near-match indicator for search results that partially match filters
   isNearMatch?: boolean;
 }
@@ -168,6 +190,9 @@ export interface MapListingData {
   lastConfirmedAt?: Date | null;
   status?: string;
   statusReason?: string | null;
+  groupKey?: string | null;
+  groupSummary?: GroupSummary | null;
+  groupContext?: GroupContextPresentation | null;
   /** Pin tier for V2 mode: primary = larger pin, mini = smaller pin */
   tier?: "primary" | "mini";
   /** Average rating for ranking pins (optional — not all query paths populate this) */

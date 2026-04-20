@@ -6,6 +6,12 @@
  * displaying multiple listings at the same location.
  */
 
+import {
+  getAvailabilityPresentation,
+  type AvailabilityPublicAvailability,
+} from "@/lib/search/availability-presentation";
+import type { GroupContextPresentation } from "@/lib/search-types";
+
 /** Coordinate precision for grouping (~1.1m at equator) */
 export const COORD_PRECISION = 5;
 
@@ -18,8 +24,11 @@ export interface MapMarkerListing {
   title: string;
   price: number;
   availableSlots: number;
+  totalSlots?: number;
   ownerId?: string;
   images?: string[];
+  publicAvailability?: AvailabilityPublicAvailability;
+  groupContext?: GroupContextPresentation | null;
   tier?: "primary" | "mini";
   location: {
     lat: number;
@@ -64,10 +73,17 @@ function buildExactCloneKey(
   listing: MapMarkerListing,
   precision: number
 ): string {
+  const presentation = getAvailabilityPresentation({
+    availableSlots: listing.availableSlots,
+    totalSlots: listing.totalSlots,
+    publicAvailability: listing.publicAvailability,
+    groupContext: listing.groupContext,
+  });
+
   return [
     normalizeCloneTitle(listing.title),
     listing.price,
-    listing.availableSlots,
+    presentation.presentationKey,
     listing.tier ?? "",
     listing.location.lat.toFixed(precision),
     listing.location.lng.toFixed(precision),

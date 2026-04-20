@@ -355,7 +355,7 @@ export function FilterModal({
                 Minimum Open Spots
               </label>
               <p className="text-xs text-on-surface-variant -mt-1">
-                Show listings with at least this many available spots
+                Show listings with at least this many open spots
               </p>
               <div className="flex items-center gap-3">
                 <Button
@@ -376,7 +376,7 @@ export function FilterModal({
                   <Minus className="h-4 w-4" />
                 </Button>
                 <span className="min-w-[3rem] text-center text-sm font-medium text-on-surface">
-                  {minSlots === undefined ? "Any" : minSlots}
+                  {minSlots === undefined ? "Open only" : minSlots}
                 </span>
                 <Button
                   type="button"

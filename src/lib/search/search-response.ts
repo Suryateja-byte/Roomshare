@@ -3,7 +3,7 @@ import { generateSearchQueryHash } from "./query-hash";
 import type { NormalizedSearchQuery } from "./search-query";
 
 export const SEARCH_RESPONSE_VERSION =
-  "2026-04-15.phase2-public-availability.search-contract-v1";
+  "2026-04-19.canonical-availability-parity.search-contract-v2";
 
 export type SearchBackendSource = "v2" | "v1-fallback" | "map-api";
 

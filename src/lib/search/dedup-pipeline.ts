@@ -1,6 +1,6 @@
 import { groupListings, type ListingLike } from "@/lib/search/dedup";
 import { normalizeAddress } from "@/lib/search/normalize-address";
-import type { GroupSummary } from "@/lib/search-types";
+import type { GroupContextPresentation, GroupSummary } from "@/lib/search-types";
 
 export type SearchRowForDedup = {
   id: string;
@@ -24,6 +24,7 @@ export type SearchRowForDedup = {
 type CanonicalSearchRow = SearchRowForDedup & {
   groupKey: string;
   groupSummary: GroupSummary;
+  groupContext: GroupContextPresentation;
 };
 
 type SearchDedupWorkingRow = ListingLike & {
@@ -49,7 +50,13 @@ export function applyServerDedup(
   rows: SearchRowForDedup[],
   opts: { enabled: boolean; limit: number; lookAhead?: number }
 ): {
-  canonicals: Array<SearchRowForDedup & { groupKey: string; groupSummary: GroupSummary }>;
+  canonicals: Array<
+    SearchRowForDedup & {
+      groupKey: string;
+      groupSummary: GroupSummary;
+      groupContext: GroupContextPresentation;
+    }
+  >;
   overflowCanonicalIds: Set<string>;
   metrics: {
     rowsIn: number;
@@ -94,10 +101,11 @@ export function applyServerDedup(
   );
 
   const canonicals = groupedCanonicals.map(
-    ({ sourceRow, groupKey, groupSummary }) => ({
+    ({ sourceRow, groupKey, groupSummary, groupContext }) => ({
       ...sourceRow,
       groupKey,
       groupSummary,
+      groupContext,
     })
   );
 

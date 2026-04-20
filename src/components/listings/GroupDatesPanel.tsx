@@ -2,7 +2,7 @@
 
 import { useEffect, useMemo, useRef } from "react";
 import { cn } from "@/lib/utils";
-import type { GroupSummary } from "@/lib/search-types";
+import type { GroupSummary, GroupSummaryMember } from "@/lib/search-types";
 import {
   emitSearchDedupMemberClick,
   emitSearchDedupOpenPanelClick,
@@ -19,7 +19,7 @@ type GroupDatesCanonical = {
 export interface GroupDatesSharedProps {
   canonical: GroupDatesCanonical;
   summary: GroupSummary;
-  onMemberClick?: (memberId: string, index: number) => void;
+  onMemberClick?: (member: GroupSummaryMember, index: number) => void;
   onOverflowClick?: () => void;
   queryHashPrefix8?: string;
 }
@@ -31,28 +31,10 @@ export interface GroupDatesPanelProps extends GroupDatesSharedProps {
 }
 
 type GroupDateEntry = {
-  memberId: string;
+  member: GroupSummaryMember;
   shortLabel: string;
   longLabel: string;
 };
-
-function normalizeDateToIso(value?: Date | string | null): string | null {
-  if (!value) return null;
-
-  if (typeof value === "string") {
-    const directMatch = value.trim().match(/^(\d{4}-\d{2}-\d{2})(?:$|T|\s)/);
-    if (directMatch) {
-      return directMatch[1];
-    }
-
-    const parsed = new Date(value);
-    return Number.isNaN(parsed.getTime())
-      ? null
-      : parsed.toISOString().slice(0, 10);
-  }
-
-  return Number.isNaN(value.getTime()) ? null : value.toISOString().slice(0, 10);
-}
 
 function parseIsoDate(isoDate: string): Date | null {
   const match = isoDate.match(/^(\d{4})-(\d{2})-(\d{2})$/);
@@ -79,32 +61,72 @@ function formatGroupDate(
   }).format(parsed);
 }
 
-function buildGroupDateEntries(
-  canonical: GroupDatesCanonical,
-  summary: GroupSummary
-): GroupDateEntry[] {
-  const canonicalIso = normalizeDateToIso(
-    canonical.publicAvailability?.availableFrom ?? canonical.moveInDate
-  );
-  const remainingSiblingIds = [...summary.siblingIds];
+function buildBaseLabels(member: GroupSummaryMember): {
+  shortLabel: string;
+  longLabel: string;
+} {
+  const shortStart = formatGroupDate(member.availableFrom, {
+    month: "short",
+    day: "numeric",
+  });
+  const longStart = formatGroupDate(member.availableFrom, {
+    month: "long",
+    day: "numeric",
+    year: "numeric",
+  });
 
-  return summary.availableFromDates.map((isoDate) => {
-    const memberId =
-      canonicalIso && isoDate === canonicalIso
-        ? canonical.id
-        : (remainingSiblingIds.shift() ?? canonical.id);
+  if (member.availableUntil && member.availableUntil !== member.availableFrom) {
+    const shortEnd = formatGroupDate(member.availableUntil, {
+      month: "short",
+      day: "numeric",
+    });
+    const longEnd = formatGroupDate(member.availableUntil, {
+      month: "long",
+      day: "numeric",
+      year: "numeric",
+    });
 
     return {
-      memberId,
-      shortLabel: `Available ${formatGroupDate(isoDate, {
-        month: "short",
-        day: "numeric",
-      })}`,
-      longLabel: `Available ${formatGroupDate(isoDate, {
-        month: "long",
-        day: "numeric",
-        year: "numeric",
-      })}`,
+      shortLabel: `Available ${shortStart} to ${shortEnd}`,
+      longLabel: `Available ${longStart} to ${longEnd}`,
+    };
+  }
+
+  return {
+    shortLabel: `Available ${shortStart}`,
+    longLabel: `Available ${longStart}`,
+  };
+}
+
+function buildGroupDateEntries(
+  _canonical: GroupDatesCanonical,
+  summary: GroupSummary
+): GroupDateEntry[] {
+  const members = summary.members ?? [];
+  if (members.length <= 1) {
+    return [];
+  }
+
+  const baseEntries = members.map((member) => ({
+    member,
+    ...buildBaseLabels(member),
+  }));
+  const duplicateCounts = new Map<string, number>();
+
+  return baseEntries.map((entry) => {
+    const duplicateIndex = duplicateCounts.get(entry.shortLabel) ?? 0;
+    duplicateCounts.set(entry.shortLabel, duplicateIndex + 1);
+
+    if (duplicateIndex === 0) {
+      return entry;
+    }
+
+    const suffix =
+      entry.member.roomType?.trim() || entry.member.listingId.slice(-4);
+    return {
+      ...entry,
+      shortLabel: `${entry.shortLabel} · ${suffix}`,
+      longLabel: `${entry.longLabel} · ${suffix}`,
     };
   });
 }
@@ -127,7 +149,7 @@ export function GroupDatesActionList({
     () => buildGroupDateEntries(canonical, summary),
     [canonical, summary]
   );
-  const groupSize = summary.siblingIds.length + 1;
+  const groupSize = summary.members?.length ?? 0;
 
   useEffect(() => {
     if (!autoFocusFirstChip) return;
@@ -146,7 +168,7 @@ export function GroupDatesActionList({
     >
       {entries.map((entry, index) => (
         <button
-          key={`${entry.memberId}-${entry.shortLabel}`}
+          key={`${entry.member.listingId}-${entry.shortLabel}`}
           ref={index === 0 ? firstChipRef : null}
           type="button"
           data-testid="group-dates-chip"
@@ -157,7 +179,7 @@ export function GroupDatesActionList({
               groupSize,
               memberIndex: index,
             });
-            onMemberClick?.(entry.memberId, index);
+            onMemberClick?.(entry.member, index);
           }}
         >
           {entry.shortLabel}
@@ -189,10 +211,10 @@ export default function GroupDatesPanel({
 }: GroupDatesPanelProps) {
   useEffect(() => {
     emitSearchDedupOpenPanelClick({
-      groupSize: summary.siblingIds.length + 1,
+      groupSize: summary.members?.length ?? 0,
       queryHashPrefix8: queryHashPrefix8 ?? "none",
     });
-  }, [queryHashPrefix8, summary.siblingIds.length]);
+  }, [queryHashPrefix8, summary.members]);
 
   return (
     <div

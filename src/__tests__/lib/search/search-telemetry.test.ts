@@ -27,14 +27,30 @@ import {
   recordSearchZeroResults,
   resetSearchTelemetryForTests,
 } from "@/lib/search/search-telemetry";
+import {
+  emitSearchDedupMemberClick,
+  emitSearchDedupOpenPanelClick,
+} from "@/lib/search/search-telemetry-client";
 
 describe("search telemetry", () => {
   const originalOwnerHashSalt = process.env.OWNER_HASH_SALT;
+  const originalNodeEnv = process.env.NODE_ENV;
+  const originalSendBeacon = navigator.sendBeacon;
+  const originalFetch = global.fetch;
 
   beforeEach(() => {
     resetSearchTelemetryForTests();
     jest.clearAllMocks();
     delete process.env.OWNER_HASH_SALT;
+    Object.defineProperty(process.env, "NODE_ENV", {
+      configurable: true,
+      value: originalNodeEnv,
+    });
+    Object.defineProperty(navigator, "sendBeacon", {
+      configurable: true,
+      value: originalSendBeacon,
+    });
+    global.fetch = originalFetch;
   });
 
   afterEach(() => {
@@ -43,6 +59,15 @@ describe("search telemetry", () => {
     } else {
       process.env.OWNER_HASH_SALT = originalOwnerHashSalt;
     }
+    Object.defineProperty(process.env, "NODE_ENV", {
+      configurable: true,
+      value: originalNodeEnv,
+    });
+    Object.defineProperty(navigator, "sendBeacon", {
+      configurable: true,
+      value: originalSendBeacon,
+    });
+    global.fetch = originalFetch;
   });
 
   it("tracks request latency, backend source counts, and counters", () => {
@@ -204,6 +229,69 @@ describe("search telemetry", () => {
       "listing_create_collision_action_selected",
       expect.objectContaining({
         action: "create_separate",
+      })
+    );
+  });
+
+  it("emits dedupe panel-open client metrics via sendBeacon", async () => {
+    Object.defineProperty(process.env, "NODE_ENV", {
+      configurable: true,
+      value: "development",
+    });
+    const sendBeacon = jest.fn(() => true);
+    Object.defineProperty(navigator, "sendBeacon", {
+      configurable: true,
+      value: sendBeacon,
+    });
+
+    emitSearchDedupOpenPanelClick({
+      groupSize: 4,
+      queryHashPrefix8: "deadbeef",
+    });
+
+    expect(sendBeacon).toHaveBeenCalledTimes(1);
+    const [url, payload] = sendBeacon.mock.calls[0] as unknown as [
+      string,
+      BodyInit,
+    ];
+    expect(url).toBe("/api/metrics/search");
+    await expect(new Response(payload).text()).resolves.toBe(
+      JSON.stringify({
+        metric: "search_dedup_open_panel_click",
+        groupSize: 4,
+        queryHashPrefix8: "deadbeef",
+      })
+    );
+  });
+
+  it("emits dedupe member-click client metrics via fetch when sendBeacon is unavailable", () => {
+    Object.defineProperty(process.env, "NODE_ENV", {
+      configurable: true,
+      value: "development",
+    });
+    Object.defineProperty(navigator, "sendBeacon", {
+      configurable: true,
+      value: undefined,
+    });
+    const fetchMock = jest.fn().mockResolvedValue(new Response(null));
+    global.fetch = fetchMock as typeof fetch;
+
+    emitSearchDedupMemberClick({
+      groupSize: 4,
+      memberIndex: 2,
+    });
+
+    expect(fetchMock).toHaveBeenCalledWith(
+      "/api/metrics/search",
+      expect.objectContaining({
+        method: "POST",
+        keepalive: true,
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          metric: "search_dedup_member_click",
+          groupSize: 4,
+          memberIndex: 2,
+        }),
       })
     );
   });

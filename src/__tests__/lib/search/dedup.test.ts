@@ -103,6 +103,41 @@ describe("search/dedup", () => {
       combinedOpenSlots: 6,
       combinedTotalSlots: 9,
       groupOverflow: false,
+      members: [
+        {
+          listingId: "listing-a",
+          availableFrom: "2026-06-10",
+          availableUntil: null,
+          startDate: "2026-06-10",
+          endDate: undefined,
+          openSlots: 1,
+          totalSlots: 3,
+          isCanonical: true,
+          roomType: "private",
+        },
+        {
+          listingId: "listing-b",
+          availableFrom: "2026-06-01",
+          availableUntil: null,
+          startDate: "2026-06-01",
+          endDate: undefined,
+          openSlots: 2,
+          totalSlots: 3,
+          isCanonical: false,
+          roomType: "private",
+        },
+        {
+          listingId: "listing-c",
+          availableFrom: "2026-06-10",
+          availableUntil: null,
+          startDate: "2026-06-10",
+          endDate: undefined,
+          openSlots: 3,
+          totalSlots: 3,
+          isCanonical: false,
+          roomType: "private",
+        },
+      ],
     });
   });
 

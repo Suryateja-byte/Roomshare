@@ -16,12 +16,17 @@ import { ImageCarousel } from "./ImageCarousel";
 import { cn } from "@/lib/utils";
 import { formatPrice } from "@/lib/format";
 import {
+  getAvailabilityPresentation,
+  type AvailabilityPublicAvailability,
+} from "@/lib/search/availability-presentation";
+import {
   useListingFocusActions,
   useIsListingFocused,
 } from "@/contexts/ListingFocusContext";
-import { SlotBadge, type SlotBadgePublicAvailability } from "./SlotBadge";
+import { SlotBadge } from "./SlotBadge";
 import { useMediaQuery } from "@/hooks/useMediaQuery";
-import type { GroupSummary } from "@/lib/search-types";
+import type { GroupContextPresentation, GroupSummary } from "@/lib/search-types";
+import { buildListingDetailHref } from "@/lib/search/listing-detail-link";
 import GroupDatesPanel from "./GroupDatesPanel";
 import GroupDatesModal from "./GroupDatesModal";
 
@@ -50,9 +55,10 @@ export interface Listing {
    * availableSlots/totalSlots fields, and the card uses availableFrom /
    * publicStatus / freshnessBucket to render freshness-aware strings.
    */
-  publicAvailability?: SlotBadgePublicAvailability;
+  publicAvailability?: AvailabilityPublicAvailability;
   groupKey?: string | null;
   groupSummary?: GroupSummary | null;
+  groupContext?: GroupContextPresentation | null;
 }
 
 // State abbreviation map
@@ -177,14 +183,6 @@ function formatRoomType(roomType?: string): string | null {
   return labels[roomType] || roomType;
 }
 
-function buildRelatedListingHref(
-  listingHref: string,
-  listingId: string
-): string {
-  const [, queryString] = listingHref.split("?");
-  return queryString ? `/listings/${listingId}?${queryString}` : `/listings/${listingId}`;
-}
-
 const PLACEHOLDER_IMAGES = [
   "https://images.unsplash.com/photo-1522708323590-d24dbb6b0267?auto=format&fit=crop&w=800&q=80",
   "https://images.unsplash.com/photo-1502672260266-1c1ef2d93688?auto=format&fit=crop&w=800&q=80",
@@ -235,16 +233,38 @@ function arePropsEqual(
     pl.publicAvailability?.availableFrom ===
       nl.publicAvailability?.availableFrom &&
     pl.groupKey === nl.groupKey &&
+    pl.groupContext?.contextKey === nl.groupContext?.contextKey &&
     pl.groupSummary?.groupKey === nl.groupSummary?.groupKey &&
-    pl.groupSummary?.siblingIds.join(",") ===
-      nl.groupSummary?.siblingIds.join(",") &&
-    pl.groupSummary?.availableFromDates.join(",") ===
-      nl.groupSummary?.availableFromDates.join(",") &&
-    pl.groupSummary?.groupOverflow === nl.groupSummary?.groupOverflow &&
-    pl.groupSummary?.combinedOpenSlots ===
-      nl.groupSummary?.combinedOpenSlots &&
-    pl.groupSummary?.combinedTotalSlots ===
-      nl.groupSummary?.combinedTotalSlots &&
+    (pl.groupSummary?.members ?? [])
+      .map(
+        (member) =>
+          [
+            member.listingId,
+            member.availableFrom,
+            member.availableUntil ?? "",
+            member.startDate ?? "",
+            member.endDate ?? "",
+            member.openSlots,
+            member.totalSlots,
+            member.isCanonical ? "1" : "0",
+          ].join(":")
+      )
+      .join(",") ===
+      (nl.groupSummary?.members ?? [])
+        .map(
+          (member) =>
+            [
+              member.listingId,
+              member.availableFrom,
+              member.availableUntil ?? "",
+              member.startDate ?? "",
+              member.endDate ?? "",
+              member.openSlots,
+              member.totalSlots,
+              member.isCanonical ? "1" : "0",
+            ].join(":")
+        )
+        .join(",") &&
     prev.href === next.href &&
     prev.isSaved === next.isSaved &&
     prev.className === next.className &&
@@ -295,20 +315,22 @@ function ListingCardInner({
   const showImagePlaceholder = !hasValidImages;
 
   const groupSummary = listing.groupSummary ?? null;
-  const hasGroupDates = (groupSummary?.siblingIds.length ?? 0) > 0;
-  const effectiveOpenSlots = hasGroupDates
-    ? (groupSummary?.combinedOpenSlots ??
-      listing.publicAvailability?.openSlots ??
-      listing.availableSlots)
-    : (listing.publicAvailability?.openSlots ?? listing.availableSlots);
-  const effectiveTotalSlots = hasGroupDates
-    ? (groupSummary?.combinedTotalSlots ??
-      listing.publicAvailability?.totalSlots ??
-      listing.totalSlots)
-    : (listing.publicAvailability?.totalSlots ?? listing.totalSlots);
+  const groupContext = listing.groupContext ?? null;
+  const hasGroupDates =
+    (groupSummary?.members?.length ?? 0) > 1 &&
+    groupContext?.completeness === "complete";
+  const effectiveOpenSlots =
+    listing.publicAvailability?.openSlots ?? listing.availableSlots;
+  const effectiveTotalSlots =
+    listing.publicAvailability?.totalSlots ?? listing.totalSlots;
   const panelId = `group-dates-panel-${listing.id}`;
   const triggerId = `${panelId}-trigger`;
-  const isAvailable = effectiveOpenSlots > 0;
+  const availabilityPresentation = getAvailabilityPresentation({
+    availableSlots: listing.availableSlots,
+    totalSlots: listing.totalSlots,
+    publicAvailability: listing.publicAvailability,
+    groupContext,
+  });
   const avgRating = Number.isFinite(listing.avgRating)
     ? listing.avgRating
     : null;
@@ -327,18 +349,13 @@ function ListingCardInner({
   );
   const imageAlt = `${displayTitle} in ${formattedLocation}`;
   const listingHref = href ?? `/listings/${listing.id}`;
-  const extraDateCount = groupSummary?.siblingIds.length ?? 0;
+  const extraDateCount = Math.max((groupSummary?.members?.length ?? 0) - 1, 0);
 
   const displayRoomType = formatRoomType(listing.roomType);
   const displayMoveIn = formatMoveInDate(
     listing.publicAvailability?.availableFrom ?? listing.moveInDate
   );
   const displayLease = formatLeaseDuration(listing.leaseDuration);
-  const groupDateCount = (groupSummary?.siblingIds.length ?? 0) + 1;
-  const slotBadgeLabel =
-    groupSummary && effectiveOpenSlots > 0
-      ? `All ${effectiveOpenSlots} open across ${groupDateCount} date${groupDateCount === 1 ? "" : "s"}`
-      : undefined;
   const groupTriggerLabel = useMemo(() => {
     if (!hasGroupDates) return null;
     return `+${extraDateCount} more date${extraDateCount === 1 ? "" : "s"}`;
@@ -374,11 +391,16 @@ function ListingCardInner({
   }, []);
 
   const handleGroupMemberClick = useCallback(
-    (memberId: string) => {
+    (member: NonNullable<GroupSummary["members"]>[number]) => {
       closeGroupDates(false);
-      router.push(buildRelatedListingHref(listingHref, memberId));
+      router.push(
+        buildListingDetailHref(member.listingId, {
+          startDate: member.startDate,
+          endDate: member.endDate,
+        })
+      );
     },
-    [closeGroupDates, listingHref, router]
+    [closeGroupDates, router]
   );
 
   const handleGroupOverflowClick = useCallback(() => {
@@ -395,18 +417,9 @@ function ListingCardInner({
   if (hasRating) srParts.push(`rated ${avgRating!.toFixed(1)} out of 5`);
   else srParts.push("new listing");
 
-  if (effectiveTotalSlots > 1) {
-    srParts.push(
-      isAvailable
-        ? `${effectiveOpenSlots} of ${effectiveTotalSlots} spots available`
-        : "currently filled"
-    );
-  } else {
-    srParts.push(
-      isAvailable
-        ? `${effectiveOpenSlots} spot${effectiveOpenSlots !== 1 ? "s" : ""} available`
-        : "currently filled"
-    );
+  srParts.push(availabilityPresentation.ariaLabel);
+  if (availabilityPresentation.secondaryGroupLabel) {
+    srParts.push(availabilityPresentation.secondaryGroupLabel);
   }
   srParts.push(formattedLocation);
   if (displayMoveIn) srParts.push(displayMoveIn);
@@ -493,8 +506,7 @@ function ListingCardInner({
             <SlotBadge
               availableSlots={effectiveOpenSlots}
               totalSlots={effectiveTotalSlots}
-              publicAvailability={groupSummary ? undefined : listing.publicAvailability}
-              labelOverride={slotBadgeLabel}
+              publicAvailability={listing.publicAvailability}
               overlay
             />
             {isTopRated ? (
@@ -561,6 +573,11 @@ function ListingCardInner({
               ? [displayMoveIn, displayLease].filter(Boolean).join(" · ") || formattedLocation
               : [formattedLocation, displayMoveIn, displayLease].filter(Boolean).join(" · ")}
           </p>
+          {availabilityPresentation.secondaryGroupLabel ? (
+            <p className="mt-2 text-xs font-medium text-on-surface-variant">
+              {availabilityPresentation.secondaryGroupLabel}
+            </p>
+          ) : null}
         </div>
       </Link>
       {hasGroupDates && groupSummary ? (

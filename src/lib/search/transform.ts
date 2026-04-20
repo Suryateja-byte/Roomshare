@@ -120,6 +120,8 @@ export function transformToListItem(listing: ListingData): SearchV2ListItem {
     availableSlots: publicAvailability.openSlots,
     totalSlots: publicAvailability.totalSlots,
     publicAvailability,
+    groupSummary: listing.groupSummary ?? null,
+    groupContext: listing.groupContext ?? null,
     // scoreHint is reserved for future relevance scoring
   };
 }
@@ -169,6 +171,7 @@ export function transformToGeoJSON(
         image: listing.images[0] ?? null,
         availableSlots: publicAvailability.openSlots,
         publicAvailability,
+        groupContext: listing.groupContext ?? null,
       } satisfies SearchV2FeatureProperties,
     };
   });
@@ -194,6 +197,9 @@ function adaptToMarkerListing(listing: MapListingData): MapMarkerListing {
     title: listing.title,
     price: listing.price,
     availableSlots: publicAvailability.openSlots,
+    totalSlots: publicAvailability.totalSlots,
+    publicAvailability,
+    groupContext: listing.groupContext ?? null,
     images: listing.images,
     tier: listing.tier,
     location: listing.location,

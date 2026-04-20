@@ -1,10 +1,10 @@
 import { Badge } from "@/components/ui/badge";
+import {
+  getAvailabilityPresentation,
+  type AvailabilityPresentationState,
+  type AvailabilityPublicAvailability,
+} from "@/lib/search/availability-presentation";
 import { cn } from "@/lib/utils";
-import type {
-  FreshnessBucket,
-  PublicAvailability,
-  PublicStatus,
-} from "@/lib/search/public-availability";
 
 /**
  * Subset of ResolvedPublicAvailability the badge reads. SearchV2ListItem
@@ -13,10 +13,7 @@ import type {
  * freshness fields. We accept both and treat the freshness fields as
  * optional at the component boundary (CFM-603).
  */
-export type SlotBadgePublicAvailability = PublicAvailability & {
-  publicStatus?: PublicStatus;
-  freshnessBucket?: FreshnessBucket;
-};
+export type SlotBadgePublicAvailability = AvailabilityPublicAvailability;
 
 interface SlotBadgeProps {
   /**
@@ -54,59 +51,21 @@ interface ResolvedStatus {
   variant: StatusVariant;
 }
 
-/**
- * Derive the label + visual variant from the resolved publicAvailability
- * shape. Freshness takes priority over slot count: a host-managed listing
- * that is STALE or AUTO_PAUSE_DUE renders "Needs reconfirmation" regardless
- * of slot availability (the listing should not be marketed as open).
- */
-function getStatusFromPublicAvailability(
-  publicAvailability: SlotBadgePublicAvailability
-): ResolvedStatus | null {
-  const { publicStatus, freshnessBucket, openSlots, totalSlots } =
-    publicAvailability;
-
-  // Freshness takes priority for host-managed listings.
-  if (
-    freshnessBucket === "STALE" ||
-    freshnessBucket === "AUTO_PAUSE_DUE" ||
-    publicStatus === "NEEDS_RECONFIRMATION"
-  ) {
-    return { label: "Needs reconfirmation", variant: "warning" };
+function toStatusVariant(state: AvailabilityPresentationState): StatusVariant {
+  switch (state) {
+    case "needs-reconfirmation":
+      return "warning";
+    case "closed":
+    case "paused":
+      return "neutral";
+    case "full":
+    case "filled":
+      return "destructive";
+    case "partial":
+      return "info";
+    default:
+      return "success";
   }
-
-  if (publicStatus === "CLOSED") {
-    return { label: "Closed", variant: "neutral" };
-  }
-
-  if (publicStatus === "PAUSED") {
-    return { label: "Paused", variant: "neutral" };
-  }
-
-  if (publicStatus === "FULL") {
-    return { label: "Full", variant: "destructive" };
-  }
-
-  if (publicStatus === "AVAILABLE") {
-    return getSlotStatus(openSlots, totalSlots);
-  }
-
-  // publicStatus not provided — caller passed only the narrow
-  // PublicAvailability shape. Fall back to slot-count derivation.
-  return getSlotStatus(openSlots, totalSlots);
-}
-
-function getSlotStatus(available: number, total: number): ResolvedStatus {
-  if (total <= 1) {
-    return available > 0
-      ? { label: "Available", variant: "success" }
-      : { label: "Filled", variant: "destructive" };
-  }
-
-  if (available === 0) return { label: "Filled", variant: "destructive" };
-  if (available === total)
-    return { label: `All ${total} open`, variant: "success" };
-  return { label: `${available} of ${total} open`, variant: "info" };
 }
 
 export function SlotBadge({
@@ -117,22 +76,14 @@ export function SlotBadge({
   className,
   labelOverride,
 }: SlotBadgeProps) {
-  const resolved = publicAvailability
-    ? getStatusFromPublicAvailability(publicAvailability)
-    : null;
+  const presentation = getAvailabilityPresentation({
+    availableSlots,
+    totalSlots,
+    publicAvailability,
+  });
 
-  let label: string;
-  let variant: StatusVariant;
-  if (resolved) {
-    ({ label, variant } = resolved);
-  } else {
-    const safeTotalSlots = Math.max(totalSlots, 1);
-    const safeAvailableSlots = Math.max(
-      0,
-      Math.min(availableSlots, safeTotalSlots)
-    );
-    ({ label, variant } = getSlotStatus(safeAvailableSlots, safeTotalSlots));
-  }
+  let label = presentation.primaryLabel;
+  let variant = toStatusVariant(presentation.state);
 
   if (labelOverride) {
     label = labelOverride;

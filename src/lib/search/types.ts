@@ -7,6 +7,10 @@
 
 import type { Feature, FeatureCollection, Point } from "geojson";
 import type { PublicAvailability } from "./public-availability";
+import type {
+  GroupContextPresentation,
+  GroupSummary,
+} from "@/lib/search-types";
 
 // ============================================================================
 // Constants (re-exported from canonical source for backward compatibility)
@@ -30,6 +34,7 @@ export interface SearchV2FeatureProperties {
   image: string | null;
   availableSlots: number;
   publicAvailability: PublicAvailability;
+  groupContext?: GroupContextPresentation | null;
   /** @deprecated No longer populated in API responses (S3 security fix) */
   ownerId?: string;
 }
@@ -59,6 +64,8 @@ export interface SearchV2ListItem {
   totalSlots?: number;
   /** Normalized additive availability contract for future readers */
   publicAvailability: PublicAvailability;
+  groupSummary?: GroupSummary | null;
+  groupContext?: GroupContextPresentation | null;
   /** Relevance score hint for debugging/sorting */
   scoreHint?: number | null;
 }
