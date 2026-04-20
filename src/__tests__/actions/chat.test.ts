@@ -114,6 +114,7 @@ describe("Chat Actions", () => {
     const mockListing = {
       id: "listing-123",
       ownerId: "owner-456",
+      status: "ACTIVE" as const,
     };
 
     beforeEach(() => {
@@ -145,8 +146,29 @@ describe("Chat Actions", () => {
 
       const result = await startConversation("invalid-listing");
 
-      expect(result).toEqual({ error: "Listing not found" });
+      expect(result).toEqual({
+        error: "Listing not found",
+        code: "LISTING_NOT_FOUND",
+      });
     });
+
+    it.each(["PAUSED", "RENTED"] as const)(
+      "blocks new conversation when listing is %s (stale-tab guard)",
+      async (status) => {
+        (prisma.listing.findUnique as jest.Mock).mockResolvedValue({
+          ...mockListing,
+          status,
+        });
+
+        const result = await startConversation("listing-123");
+
+        expect(result).toEqual({
+          error: "This listing is no longer active. New messages are paused.",
+          code: "LISTING_INACTIVE",
+        });
+        expect(prisma.conversation.create).not.toHaveBeenCalled();
+      },
+    );
 
     it("returns error when trying to chat with self", async () => {
       (prisma.listing.findUnique as jest.Mock).mockResolvedValue({
@@ -242,6 +264,7 @@ describe("Chat Actions", () => {
         { id: "user-123", name: "Test User", email: "test@example.com" },
         { id: "other-456", name: "Other User", email: "other@example.com" },
       ],
+      listing: { status: "ACTIVE" as const },
     };
 
     const mockMessage = {
@@ -308,6 +331,24 @@ describe("Chat Actions", () => {
         data: { updatedAt: expect.any(Date) },
       });
     });
+
+    it.each(["PAUSED", "RENTED"] as const)(
+      "blocks message-send when listing is %s (stale-tab guard)",
+      async (status) => {
+        (prisma.conversation.findUnique as jest.Mock).mockResolvedValue({
+          ...mockConversation,
+          listing: { status },
+        });
+
+        const result = await sendMessage("conv-123", "Hello!");
+
+        expect(result).toEqual({
+          error: "This listing is no longer active. New messages are paused.",
+          code: "LISTING_INACTIVE",
+        });
+        expect(prisma.message.create).not.toHaveBeenCalled();
+      },
+    );
   });
 
   describe("getConversations", () => {

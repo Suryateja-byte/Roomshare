@@ -24,6 +24,7 @@ import {
   recordConversationStartPath,
   type ConversationStartPath,
 } from "@/lib/messaging/cfm-messaging-telemetry";
+import { evaluateListingContactable } from "@/lib/messaging/listing-contactable";
 
 const sendMessageSchema = z.object({
   conversationId: z.string().trim().min(1).max(100),
@@ -62,12 +63,16 @@ export async function startConversation(listingId: string) {
 
     const userId = session.user.id;
 
-    const listing = await prisma.listing.findUnique({
+    const listingRow = await prisma.listing.findUnique({
       where: { id: listingId },
-      select: { ownerId: true },
+      select: { ownerId: true, status: true },
     });
 
-    if (!listing) return { error: "Listing not found" };
+    const contactable = evaluateListingContactable(listingRow);
+    if (!contactable.ok) {
+      return { error: contactable.message, code: contactable.code };
+    }
+    const listing = contactable.listing;
     if (listing.ownerId === userId)
       return { error: "Cannot chat with yourself" };
 
@@ -237,11 +242,19 @@ export async function sendMessage(conversationId: string, content: string) {
         participants: {
           select: { id: true, name: true },
         },
+        listing: {
+          select: { status: true },
+        },
       },
     });
 
     if (!conversation || conversation.deletedAt) {
       return { error: "Conversation not found" };
+    }
+
+    const contactable = evaluateListingContactable(conversation.listing);
+    if (!contactable.ok) {
+      return { error: contactable.message, code: contactable.code };
     }
 
     // P1-17 FIX: Verify user is a participant in the conversation (IDOR protection)
