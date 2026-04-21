@@ -1,0 +1,31 @@
+----------------------------|---------|----------|---------|---------|-------------------
+File                        | % Stmts | % Branch | % Funcs | % Lines | Uncovered Line #s 
+----------------------------|---------|----------|---------|---------|-------------------
+All files                   |   96.74 |    85.83 |     100 |   97.53 |                   
+ audit                      |    92.3 |     62.5 |     100 |    92.3 |                   
+  events.ts                 |    92.3 |     62.5 |     100 |    92.3 | 29                
+ db                         |   97.29 |    86.11 |     100 |   97.29 |                   
+  optimistic-lock.ts        |     100 |      100 |     100 |     100 |                   
+  with-actor.ts             |   96.77 |    84.37 |     100 |   96.77 | 46                
+ flags                      |     100 |      100 |     100 |     100 |                   
+  phase01.ts                |     100 |      100 |     100 |     100 |                   
+ identity                   |   97.54 |    86.76 |     100 |   97.41 |                   
+  advisory-locks.ts         |    90.9 |    66.66 |     100 |      90 | 9,49              
+  canonical-address.ts      |     100 |       85 |     100 |     100 | 85-93             
+  canonicalizer-version.ts  |     100 |      100 |     100 |     100 |                   
+  errors.ts                 |     100 |      100 |     100 |     100 |                   
+  mutate-unit.ts            |   97.72 |    96.15 |     100 |   97.56 | 128               
+  resolve-or-create-unit.ts |     100 |      100 |     100 |     100 |                   
+ outbox                     |     100 |      100 |     100 |     100 |                   
+  append.ts                 |     100 |      100 |     100 |     100 |                   
+ validation/category        |   92.85 |      100 |     100 |     100 |                   
+  index.ts                  |     100 |      100 |     100 |     100 |                   
+  schema.ts                 |    90.9 |      100 |     100 |     100 |                   
+----------------------------|---------|----------|---------|---------|-------------------
+
+Test Suites: 16 passed, 16 total
+Tests:       74 passed, 74 total
+Snapshots:   0 total
+Time:        6.592 s
+Ran all test suites matching phase01|with-actor|advisory-locks|canonical-address|canonicalizer-version|optimistic-lock|mutate-unit|resolve-or-create-unit|flags/phase01|validation/category/schema.
+Force exiting Jest: Have you considered using `--detectOpenHandles` to detect async operations that kept running after all tests finished?

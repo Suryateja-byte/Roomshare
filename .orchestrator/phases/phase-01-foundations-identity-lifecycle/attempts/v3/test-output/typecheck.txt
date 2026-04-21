@@ -1,0 +1,6 @@
+
+> roomshare@0.1.0 typecheck /home/surya/roomshare
+> rm -rf .next/dev/types && next typegen && tsc --noEmit
+
+Generating route types...
+✓ Types generated successfully

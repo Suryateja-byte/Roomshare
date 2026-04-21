@@ -1,0 +1,60 @@
+      388 |       expect(meta.listingIdHash).toMatch(/^[0-9a-f]{16}$/);
+      389 |       expect(meta.userIdHash).toMatch(/^[0-9a-f]{16}$/);
+
+      at Object.toBeDefined (src/__tests__/actions/chat-dedup.test.ts:386:24)
+
+FAIL src/__tests__/api/map-listings-route.test.ts
+  ● Test suite failed to run
+
+    TypeError: Cannot read properties of undefined (reading 'map')
+
+      50 | > {
+      51 |   return Object.fromEntries(
+    > 52 |     LEGACY_URL_SURFACES.map((surface) => [
+         |                         ^
+      53 |       surface,
+      54 |       Object.fromEntries(LEGACY_URL_ALIASES.map((alias) => [alias, 0])),
+      55 |     ])
+
+      at map (src/lib/search/search-telemetry.ts:52:25)
+      at Object.createLegacyUrlCounts (src/lib/search/search-telemetry.ts:84:20)
+      at Object.<anonymous> (src/app/api/map-listings/route.ts:41:26)
+      at Object.<anonymous> (src/__tests__/api/map-listings-route.test.ts:117:16)
+
+FAIL src/__tests__/lib/search/transform.test.ts
+  ● search/transform › transformToListItem › should transform basic listing data
+
+    expect(received).toEqual(expected) // deep equality
+
+    - Expected  - 0
+    + Received  + 2
+
+    @@ -1,8 +1,10 @@
+      Object {
+        "availableSlots": 1,
+        "badges": undefined,
+    +   "groupContext": null,
+    +   "groupSummary": null,
+        "id": "test-id",
+        "image": "image1.jpg",
+        "lat": 37.7749,
+        "lng": -122.4194,
+        "price": 1500,
+
+      102 |       const item = transformToListItem(listing);
+      103 |
+    > 104 |       expect(item).toEqual({
+          |                    ^
+      105 |         id: "test-id",
+      106 |         title: "Test Listing",
+      107 |         price: 1500,
+
+      at Object.toEqual (src/__tests__/lib/search/transform.test.ts:104:20)
+
+
+Test Suites: 27 failed, 2 skipped, 400 passed, 427 of 429 total
+Tests:       127 failed, 8 skipped, 7646 passed, 7781 total
+Snapshots:   0 total
+Time:        30.817 s
+Ran all test suites.
+ ELIFECYCLE  Test failed. See above for more details.

@@ -1,0 +1,17 @@
+# Per-attempt logs / diffs / scratch — reproducible from git history and agent replay;
+# we keep only spec.md, review JSONs, and the approved attempt's summary artifacts.
+attempts/*/stderr.txt
+attempts/*/stdout.txt
+attempts/*/diff.patch
+attempts/*/diff-stat.txt
+attempts/*/git-status.txt
+attempts/*/base-commit.txt
+attempts/*/retry-note.txt
+attempts/*/generator-note.txt
+attempts/*/phase01-scoped.diff
+attempts/*/generator-v*.diff
+
+# Any prior (rejected) attempt dirs — history preserved in review JSONs + spec.md.
+attempts/v1/
+attempts/v1-planonly/
+attempts/v2/

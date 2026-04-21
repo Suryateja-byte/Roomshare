@@ -1,0 +1,66 @@
+
+> roomshare@0.1.0 lint /home/surya/roomshare
+> eslint src --ext .ts,.tsx --cache --cache-location .next/cache/eslint
+
+
+/home/surya/roomshare/src/app/api/search/facets/route.ts
+  43:10  warning  'features' is defined but never used. Allowed unused vars must match /^_/u  @typescript-eslint/no-unused-vars
+
+/home/surya/roomshare/src/components/ListingFreshnessCheck.tsx
+  143:6  warning  React Hook useCallback has a missing dependency: 'checkListingStatus'. Either include it or remove the dependency array  react-hooks/exhaustive-deps
+
+/home/surya/roomshare/src/components/Map.tsx
+    46:10  warning  'Button' is defined but never used. Allowed unused vars must match /^_/u                                                      @typescript-eslint/no-unused-vars
+   120:10  warning  'getLongitudeSpan' is defined but never used. Allowed unused vars must match /^_/u                                            @typescript-eslint/no-unused-vars
+   128:10  warning  'isLongitudeWithinBounds' is defined but never used. Allowed unused vars must match /^_/u                                     @typescript-eslint/no-unused-vars
+  1202:3   warning  'disableAutoFit' is assigned a value but never used. Allowed unused args must match /^_/u                                     @typescript-eslint/no-unused-vars
+  2237:6   warning  React Hook useEffect has a missing dependency: 'selectedListing'. Either include it or remove the dependency array            react-hooks/exhaustive-deps
+  2365:6   warning  React Hook useMemo has an unnecessary dependency: 'popupPlacementRevision'. Either exclude it or remove the dependency array  react-hooks/exhaustive-deps
+  2466:6   warning  React Hook useEffect has a missing dependency: 'selectedListing'. Either include it or remove the dependency array            react-hooks/exhaustive-deps
+  2606:9   warning  'handleHideMap' is assigned a value but never used. Allowed unused vars must match /^_/u                                      @typescript-eslint/no-unused-vars
+
+/home/surya/roomshare/src/components/filters/filter-chip-utils.ts
+  43:7  warning  'PRESERVED_PARAMS' is assigned a value but never used. Allowed unused vars must match /^_/u  @typescript-eslint/no-unused-vars
+
+/home/surya/roomshare/src/components/listings/SlotBadge.tsx
+  49:11  warning  'ResolvedStatus' is defined but never used. Allowed unused vars must match /^_/u  @typescript-eslint/no-unused-vars
+  86:7   warning  'variant' is never reassigned. Use 'const' instead                                prefer-const
+
+/home/surya/roomshare/src/components/map/BoundaryLayer.tsx
+  30:31  warning  'isDarkMode' is defined but never used. Allowed unused args must match /^_/u  @typescript-eslint/no-unused-vars
+  41:31  warning  'isDarkMode' is defined but never used. Allowed unused args must match /^_/u  @typescript-eslint/no-unused-vars
+
+/home/surya/roomshare/src/components/search/InlineFilterStrip.tsx
+    5:10  warning  'SlidersHorizontal' is defined but never used. Allowed unused vars must match /^_/u                               @typescript-eslint/no-unused-vars
+    7:8   warning  'DesktopQuickFilters' is defined but never used. Allowed unused vars must match /^_/u                             @typescript-eslint/no-unused-vars
+   11:3   warning  'QUICK_FILTER_ACTIVE_BADGE_CLASSNAME' is defined but never used. Allowed unused vars must match /^_/u             @typescript-eslint/no-unused-vars
+   74:10  warning  'formatPriceQuickLabel' is defined but never used. Allowed unused vars must match /^_/u                           @typescript-eslint/no-unused-vars
+   84:10  warning  'formatMoveInQuickLabel' is defined but never used. Allowed unused vars must match /^_/u                          @typescript-eslint/no-unused-vars
+   96:10  warning  'formatRoomTypeQuickLabel' is defined but never used. Allowed unused vars must match /^_/u                        @typescript-eslint/no-unused-vars
+  120:10  warning  'PrimaryFilterButton' is defined but never used. Allowed unused vars must match /^_/u                             @typescript-eslint/no-unused-vars
+  176:10  warning  'hasMounted' is assigned a value but never used. Allowed unused elements of array destructuring must match /^_/u  @typescript-eslint/no-unused-vars
+  255:9   warning  'showInlineFilterStrip' is assigned a value but never used. Allowed unused vars must match /^_/u                  @typescript-eslint/no-unused-vars
+  279:9   warning  'committedMinPrice' is assigned a value but never used. Allowed unused vars must match /^_/u                      @typescript-eslint/no-unused-vars
+  282:9   warning  'committedMaxPrice' is assigned a value but never used. Allowed unused vars must match /^_/u                      @typescript-eslint/no-unused-vars
+  311:9   warning  'handleOpenFilters' is assigned a value but never used. Allowed unused vars must match /^_/u                      @typescript-eslint/no-unused-vars
+  316:9   warning  'handleQuickFilterOpenChange' is assigned a value but never used. Allowed unused vars must match /^_/u            @typescript-eslint/no-unused-vars
+  406:9   warning  'handlePriceDraftClear' is assigned a value but never used. Allowed unused vars must match /^_/u                  @typescript-eslint/no-unused-vars
+  413:9   warning  'handlePriceApply' is assigned a value but never used. Allowed unused vars must match /^_/u                       @typescript-eslint/no-unused-vars
+  418:9   warning  'handleMoveInSelect' is assigned a value but never used. Allowed unused vars must match /^_/u                     @typescript-eslint/no-unused-vars
+  428:9   warning  'handleMoveInClear' is assigned a value but never used. Allowed unused vars must match /^_/u                      @typescript-eslint/no-unused-vars
+  433:9   warning  'handleRoomTypeSelect' is assigned a value but never used. Allowed unused vars must match /^_/u                   @typescript-eslint/no-unused-vars
+  441:9   warning  'handleLeaseDurationSelect' is assigned a value but never used. Allowed unused vars must match /^_/u              @typescript-eslint/no-unused-vars
+  449:9   warning  'renderAppliedFilters' is assigned a value but never used. Allowed unused vars must match /^_/u                   @typescript-eslint/no-unused-vars
+
+/home/surya/roomshare/src/components/search/MobileSearchOverlay.tsx
+  268:5  warning  React Hook useCallback has an unnecessary dependency: 'recentSearches'. Either exclude it or remove the dependency array  react-hooks/exhaustive-deps
+
+/home/surya/roomshare/src/lib/search/testing/search-scenarios.ts
+  6:8  warning  'SearchListPayload' is defined but never used. Allowed unused vars must match /^_/u  @typescript-eslint/no-unused-vars
+
+/home/surya/roomshare/src/lib/test-barriers.ts
+  15:3  warning  Unused eslint-disable directive (no problems were reported from 'no-var')
+
+✖ 38 problems (0 errors, 38 warnings)
+  0 errors and 2 warnings potentially fixable with the `--fix` option.
+

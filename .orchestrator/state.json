@@ -1,0 +1,24 @@
+{
+  "current_phase": 1,
+  "status": "phase_01_planning",
+  "phase_count": 10,
+  "phases": [
+    { "id": "01", "slug": "foundations-identity-lifecycle", "status": "planning" },
+    { "id": "02", "slug": "outbox-filter-projections", "status": "pending" },
+    { "id": "03", "slug": "semantic-projection", "status": "pending" },
+    { "id": "04", "slug": "search-grouped-render-snapshots", "status": "pending" },
+    { "id": "05", "slug": "privacy-contact-host-ghost", "status": "pending" },
+    { "id": "06", "slug": "monetization-stripe-entitlement", "status": "pending" },
+    { "id": "07", "slug": "saved-searches-alerts-revalidation", "status": "pending" },
+    { "id": "08", "slug": "client-cache-coherence", "status": "pending" },
+    { "id": "09", "slug": "cutover-retire-booking", "status": "pending" },
+    { "id": "10", "slug": "launch-hardening-drills", "status": "pending" }
+  ],
+  "notes": [
+    "Master plan: .orchestrator/master-plan.md (v10.0).",
+    "Pre-launch, dummy data only — destructive migrations accepted per memory project_data_status.md.",
+    "Current branch: codex/contact-first-multislot; HEAD 9e78c4e9.",
+    "Infra side-fix 2026-04-21 (phase 01 v3 prep): installed @electric-sql/pglite ^0.4.4 as devDependency to enable in-process real-Postgres tests (CHECK constraints + triggers + advisory locks verified). Also updated pnpm.lockfile bumps: react-dom 19.2.5, react-map-gl 8.1.1, eslint-config-next 16.2.3, prettier 3.8.2 (routine minors from resolving updated devDeps).",
+    "Generator swap 2026-04-21 12:25 (user-directed): replaced `codex exec --full-auto` with Claude Sonnet 4.6 subagent as the Generator role for the remainder of the orchestration. Same Planner (Opus) and Reviewer (Opus) roles unchanged. v3 is the first Sonnet-generated attempt; v1/v2 under `attempts/` were Codex."
+  ]
+}

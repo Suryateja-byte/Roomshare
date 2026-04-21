@@ -27,6 +27,12 @@ import { logger } from "@/lib/logger";
 type TransactionClient = Parameters<
   Parameters<typeof prisma.$transaction>[0]
 >[0];
+type TransactionHost = {
+  $transaction<T>(
+    fn: (tx: TransactionClient) => Promise<T>,
+    options?: Record<string, unknown>
+  ): Promise<T>;
+};
 
 export interface IdempotencySuccess<T> {
   success: true;
@@ -115,16 +121,24 @@ export async function withIdempotency<T>(
   userId: string,
   endpoint: string,
   requestBody: unknown,
-  operation: (tx: TransactionClient) => Promise<T>
+  operation: (tx: TransactionClient) => Promise<T>,
+  options?: {
+    client?: TransactionHost;
+  }
 ): Promise<IdempotencyResult<T>> {
   const requestHash = computeRequestHash(requestBody);
+  const client = options?.client ?? prisma;
+  const transaction = client.$transaction as <R>(
+    fn: (tx: TransactionClient) => Promise<R>,
+    options?: Record<string, unknown>
+  ) => Promise<R>;
 
   // Retry loop for SERIALIZABLE serialization conflicts
   for (let attempt = 1; attempt <= MAX_SERIALIZATION_RETRIES; attempt++) {
     try {
       // ENTIRE flow runs in ONE transaction - lock held until commit
-      return await prisma.$transaction(
-        async (tx) => {
+      return await transaction(
+        async (tx: TransactionClient) => {
           // ─────────────────────────────────────────────────────────────
           // Step 1: Atomic claim via INSERT ON CONFLICT DO NOTHING
           // ─────────────────────────────────────────────────────────────
@@ -294,3 +308,9 @@ export function idempotencyResponse<T>(result: IdempotencyResult<T>): {
     headers: result.cached ? { "X-Idempotency-Replayed": "true" } : undefined,
   };
 }
+
+export const IDEMPOTENCY_ENDPOINT_RESOLVE_UNIT =
+  "identity:resolveOrCreateUnit" as const;
+export const IDEMPOTENCY_ENDPOINT_MUTATE_UNIT =
+  "identity:mutateUnit" as const;
+export const IDEMPOTENCY_ENDPOINT_CONTACT = "identity:contact" as const;

@@ -1,0 +1,43 @@
+{
+  "verdict": "APPROVE",
+  "findings": [
+    {
+      "severity": "MAJOR",
+      "category": "tests",
+      "location": "src/__tests__/db/phase01-advisory-lock-contention.test.ts:46-80",
+      "issue": "AC#5 uses Path B: a single PGlite instance with Promise.all. PGlite is single-connection per instance, so its internal async queue is what serializes the 10 callers — not the pg_advisory_xact_lock call. Removing the acquireXactLock() call from src/lib/identity/resolve-or-create-unit.ts:50-53 would still yield exactly 1 physical_units row and 9 created:false because the UNIQUE INDEX on (canonical_address_hash, canonical_unit) + ON CONFLICT DO UPDATE is sufficient on its own. The separate test at lines 82-95 only proves the SQL is syntactically accepted by PGlite; it does not prove the lock is issued before the INSERT. The test file header (lines 11-16) openly documents this limitation and defers full multi-connection contention proof to a Postgres testcontainer. Per the v3 reviewer guidance this is MAJOR (documented downgrade), not BLOCKER.",
+      "required-outcome": "Before Phase 02 lands (or as a follow-up in this phase's deferred work), prove AC#5 against a substrate that permits two concurrent in-flight transactions (Postgres testcontainer, pg-gateway over PGlite, or two file-backed PGlite processes). Add a variant where acquireXactLock() is stubbed out and assert the test fails — that proves the lock is load-bearing rather than observationally redundant."
+    },
+    {
+      "severity": "MINOR",
+      "category": "code-quality",
+      "location": "src/__tests__/db/phase01-schema.test.ts:19",
+      "issue": "hostActor is imported but not used in this file. Does not fail lint (pnpm lint exits 0 with 38 pre-existing warnings, none new) and does not fail typecheck, but the leftover import is noise.",
+      "required-outcome": "Remove the unused hostActor import."
+    },
+    {
+      "severity": "MINOR",
+      "category": "code-quality",
+      "location": "src/lib/identity/mutate-unit.ts:108-109",
+      "issue": "Carried forward from v2-review MINOR. resultingEpoch is Math.max(epoch over affected units) + 1, applied to all affected units. For MERGE with heterogeneous source epochs (A=2, B=5, T=7) every affected row jumps to 8 — spec's per-unit monotonic intent is not declared either way. Tests pin this behavior (phase01-identity-mutation.test.ts assert SPLIT targets all land at resulting_epoch=6 from max=5+1), so the behavior is intentional; only the spec-vs-impl clarification is absent.",
+      "required-outcome": "In a follow-up phase, either (a) update spec §6.2/§14 to explicitly declare 'global-ceiling' epoch semantics and cite the pinned test, or (b) bump each affected unit by +1 independently. No code change required for Phase 01 approval."
+    },
+    {
+      "severity": "MINOR",
+      "category": "tests",
+      "location": "src/__tests__/db/phase01-advisory-lock-contention.test.ts:82-95",
+      "issue": "The 'advisory lock SQL reaches pg_advisory_xact_lock(hashtext(key)) without error' test only asserts non-throwing. It does not assert the SQL was actually issued (could, for example, observe the PGlite transaction handle's query log or mock-wrap tx.$executeRaw to capture the emitted text). The stronger signal promised by the v3 manager brief ('SQL log shows pg_advisory_xact_lock issued before the INSERT') is not executed.",
+      "required-outcome": "Follow-up test: wrap the PGlite tx handle with a query spy and assert the sequence 'SET LOCAL lock_timeout' → 'pg_advisory_xact_lock(hashtext(...))' → 'INSERT INTO physical_units' is emitted, in that order, per caller. No code change required for Phase 01 approval."
+    }
+  ],
+  "convergence": "improving",
+  "deferred": [
+    "Postgres testcontainer or pg-gateway-over-PGlite harness for full multi-connection contention proof on AC#5 (advisory lock). Path B resolves v2's BLOCKER to MAJOR; full concurrency fidelity remains deferred per v2-review §deferred.",
+    "Branch-coverage threshold (currently only statement/function/line are gated at 90%). Branch coverage on src/lib/audit/events.ts is 62.5%; acceptable for Phase 01 since statements ≥90% are enforced.",
+    "LSP-only editor hints: two TS2349 warnings and one unused-var on phase01-advisory-lock-contention.test.ts:84 and phase01-moderation-precedence.test.ts:179. tsc --noEmit does not flag them; Jest compiles and runs cleanly; pnpm lint exits 0. Treat as editor noise.",
+    "Full-run 'pnpm test' exits 1 with 27 failing suites / 127 failing tests — all pre-existing WIP on branch codex/contact-first-multislot (booking/*, search/*, SlotBadge, chat-dedup, etc.). Zero Phase 01 suites in the fail list (verified: grep of phase01|identity|validation/category|outbox|with-actor|optimistic-lock|audit/events|flags/phase01 against full-run-fail-suites.txt returns empty). Per v2-review this is classified MAJOR-accepted with required-outcome deferred to Phase 09; carried forward unchanged in v3.",
+    "Spec §Edge Cases #4 lint rule banning direct Prisma calls to physical_units/host_unit_claims/listing_inventories outside withActor (v2 deferred item still open).",
+    "Migration rollback-runbook.md referenced in spec §Rollback still not authored (v2 deferred item still open).",
+    "hashtext() collision edge case (spec Edge Case #10) — PGlite exposes the real hashtext so collisions are now possible in principle, but no test constructs one. Fidelity improvement, not a correctness gap."
+  ]
+}

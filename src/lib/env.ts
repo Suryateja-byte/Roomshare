@@ -571,6 +571,9 @@ export const features = {
   get listingCreateCollisionWarn() {
     return process.env.FEATURE_LISTING_CREATE_COLLISION_WARN === "true";
   },
+  get phase01CanonicalWrites() {
+    return process.env.FEATURE_PHASE01_CANONICAL_WRITES === "true";
+  },
   // Search debug ranking (only allowed in non-production, or with explicit env override)
   // This gates ?debugRank=1 and ?ranker=1 URL overrides to prevent leaking debug signals
   get searchDebugRanking() {

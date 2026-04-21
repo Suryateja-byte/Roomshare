@@ -112,6 +112,7 @@ model Listing {
   leaseDuration           String?
   roomType                String?
   normalizedAddress       String?
+  physicalUnitId          String?                   @map("physical_unit_id")
   householdLanguages      String[]                  @default([]) @map("household_languages")
   primaryHomeLanguage     String?                   @map("primary_home_language")
   genderPreference        String?
@@ -562,4 +563,145 @@ model IdempotencyKey {
   @@unique([userId, endpoint, key], map: "IdempotencyKey_user_endpoint_key_idx")
   @@index([expiresAt])
   @@index([userId, endpoint])
+}
+
+model PhysicalUnit {
+  id                   String   @id @default(cuid())
+  unitIdentityEpoch    Int      @default(1) @map("unit_identity_epoch")
+  canonicalAddressHash String   @map("canonical_address_hash")
+  canonicalUnit        String   @default("_none_") @map("canonical_unit")
+  canonicalizerVersion String   @map("canonicalizer_version")
+  privacyVersion       Int      @default(1) @map("privacy_version")
+  geocodeStatus        String   @default("PENDING") @map("geocode_status")
+  lifecycleStatus      String   @default("ACTIVE") @map("lifecycle_status")
+  publishStatus        String   @default("DRAFT") @map("publish_status")
+  supersedesUnitIds    String[] @default([]) @map("supersedes_unit_ids")
+  supersededByUnitId   String?  @map("superseded_by_unit_id")
+  sourceVersion        BigInt   @default(1) @map("source_version")
+  rowVersion           BigInt   @default(1) @map("row_version")
+  createdAt            DateTime @default(now()) @map("created_at")
+  updatedAt            DateTime @updatedAt @map("updated_at")
+
+  @@unique([canonicalAddressHash, canonicalUnit], map: "physical_units_canonical_unique_idx")
+  @@index([lifecycleStatus])
+  @@index([publishStatus])
+  @@map("physical_units")
+}
+
+model HostUnitClaim {
+  id                       String   @id @default(cuid())
+  unitId                   String   @map("unit_id")
+  hostUserId               String   @map("host_user_id")
+  claimStatus              String   @default("UNVERIFIED") @map("claim_status")
+  unitIdentityEpochWrittenAt Int    @map("unit_identity_epoch_written_at")
+  sourceVersion            BigInt   @default(1) @map("source_version")
+  rowVersion               BigInt   @default(1) @map("row_version")
+  lifecycleStatus          String   @default("ACTIVE") @map("lifecycle_status")
+  publishStatus            String   @default("DRAFT") @map("publish_status")
+  privacyVersion           Int      @default(1) @map("privacy_version")
+  canonicalAddressHash     String   @map("canonical_address_hash")
+  canonicalizerVersion     String   @map("canonicalizer_version")
+  createdAt                DateTime @default(now()) @map("created_at")
+  updatedAt                DateTime @updatedAt @map("updated_at")
+
+  @@unique([unitId, hostUserId])
+  @@map("host_unit_claims")
+}
+
+model ListingInventory {
+  id                        String                  @id @default(cuid())
+  unitId                    String                  @map("unit_id")
+  unitIdentityEpochWrittenAt Int                    @map("unit_identity_epoch_written_at")
+  inventoryKey              String                  @map("inventory_key")
+  roomCategory              String                  @map("room_category")
+  spaceLabel                String?                 @map("space_label")
+  capacityGuests            Int?                    @map("capacity_guests")
+  totalBeds                 Int?                    @map("total_beds")
+  openBeds                  Int?                    @map("open_beds")
+  availableFrom             DateTime                @db.Date @map("available_from")
+  availableUntil            DateTime?               @db.Date @map("available_until")
+  availabilityRange         Unsupported("tstzrange") @map("availability_range")
+  price                     Decimal                 @db.Decimal(10, 2)
+  leaseMinMonths            Int?                    @map("lease_min_months")
+  leaseMaxMonths            Int?                    @map("lease_max_months")
+  leaseNegotiable           Boolean                 @default(false) @map("lease_negotiable")
+  genderPreference          String?                 @map("gender_preference")
+  householdGender           String?                 @map("household_gender")
+  lifecycleStatus           String                  @default("ACTIVE") @map("lifecycle_status")
+  publishStatus             String                  @default("DRAFT") @map("publish_status")
+  sourceVersion             BigInt                  @default(1) @map("source_version")
+  rowVersion                BigInt                  @default(1) @map("row_version")
+  lastPublishedVersion      BigInt?                 @map("last_published_version")
+  lastEmbeddedVersion       String?                 @map("last_embedded_version")
+  canonicalizerVersion      String                  @map("canonicalizer_version")
+  canonicalAddressHash      String                  @map("canonical_address_hash")
+  privacyVersion            Int                     @default(1) @map("privacy_version")
+  supersedesUnitIds         String[]                @default([]) @map("supersedes_unit_ids")
+  supersededByUnitId        String?                 @map("superseded_by_unit_id")
+  createdAt                 DateTime                @default(now()) @map("created_at")
+  updatedAt                 DateTime                @updatedAt @map("updated_at")
+
+  @@unique([unitId, inventoryKey])
+  @@map("listing_inventories")
+}
+
+model IdentityMutation {
+  id             String   @id @default(cuid())
+  kind           String
+  fromUnitIds    String[] @map("from_unit_ids")
+  toUnitIds      String[] @map("to_unit_ids")
+  reasonCode     String   @map("reason_code")
+  operatorId     String?  @map("operator_id")
+  resultingEpoch Int      @map("resulting_epoch")
+  createdAt      DateTime @default(now()) @map("created_at")
+
+  @@map("identity_mutations")
+}
+
+model OutboxEvent {
+  id                String   @id @default(cuid())
+  aggregateType     String   @map("aggregate_type")
+  aggregateId       String   @map("aggregate_id")
+  kind              String
+  payload           Json
+  sourceVersion     BigInt   @map("source_version")
+  unitIdentityEpoch Int      @map("unit_identity_epoch")
+  priority          Int      @default(100)
+  status            String   @default("PENDING")
+  attemptCount      Int      @default(0) @map("attempt_count")
+  nextAttemptAt     DateTime @default(now()) @map("next_attempt_at")
+  lastError         String?  @map("last_error")
+  dlqReason         String?  @map("dlq_reason")
+  createdAt         DateTime @default(now()) @map("created_at")
+  updatedAt         DateTime @updatedAt @map("updated_at")
+
+  @@map("outbox_events")
+}
+
+model CacheInvalidation {
+  id                String   @id @default(cuid())
+  unitId            String   @map("unit_id")
+  projectionEpoch   BigInt   @map("projection_epoch")
+  unitIdentityEpoch Int      @map("unit_identity_epoch")
+  reason            String
+  enqueuedAt        DateTime @default(now()) @map("enqueued_at")
+  consumedAt        DateTime? @map("consumed_at")
+  consumedBy        String?  @map("consumed_by")
+
+  @@map("cache_invalidations")
+}
+
+model AuditEvent {
+  id                String   @id @default(cuid())
+  kind              String
+  actorRole         String   @map("actor_role")
+  actorId           String?  @map("actor_id")
+  aggregateType     String   @map("aggregate_type")
+  aggregateId       String   @map("aggregate_id")
+  details           Json
+  requestId         String?  @map("request_id")
+  unitIdentityEpoch Int?     @map("unit_identity_epoch")
+  createdAt         DateTime @default(now()) @map("created_at")
+
+  @@map("audit_events")
 }
