@@ -91,6 +91,9 @@ describe("HANDLERS routing table", () => {
       "CACHE_INVALIDATE",
       "GEOCODE_NEEDED",
       "EMBED_NEEDED",
+      "PAYMENT_WEBHOOK",
+      "ALERT_MATCH",
+      "ALERT_DELIVER",
     ];
     for (const kind of expectedKinds) {
       expect(HANDLERS).toHaveProperty(kind);

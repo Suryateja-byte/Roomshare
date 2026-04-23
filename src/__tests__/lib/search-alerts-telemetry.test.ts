@@ -1,17 +1,42 @@
-jest.mock("@/lib/prisma", () => ({
-  prisma: {
+jest.mock("@/lib/prisma", () => {
+  const prisma: {
+    $transaction: jest.Mock;
+    savedSearch: Record<string, jest.Mock>;
+    alertSubscription: Record<string, jest.Mock>;
+    alertDelivery: Record<string, jest.Mock>;
+    outboxEvent: Record<string, jest.Mock>;
+    listing: Record<string, jest.Mock>;
+    notification: Record<string, jest.Mock>;
+  } = {
+    $transaction: jest.fn(),
     savedSearch: {
       findMany: jest.fn(),
       update: jest.fn(),
     },
+    alertSubscription: {
+      upsert: jest.fn(),
+    },
+    alertDelivery: {
+      create: jest.fn(),
+    },
+    outboxEvent: {
+      create: jest.fn(),
+    },
     listing: {
       count: jest.fn(),
+      findMany: jest.fn(),
+      findUnique: jest.fn(),
     },
     notification: {
       create: jest.fn(),
     },
-  },
-}));
+  };
+  prisma.$transaction.mockImplementation(
+    async (callback: (tx: unknown) => unknown) => callback(prisma)
+  );
+
+  return { prisma };
+});
 
 jest.mock("@/lib/email", () => ({
   sendNotificationEmail: jest.fn(),
@@ -83,6 +108,55 @@ describe("search-alerts telemetry routing", () => {
     (prisma.notification.create as jest.Mock).mockResolvedValue({});
     (prisma.savedSearch.update as jest.Mock).mockResolvedValue({});
     (prisma.listing.count as jest.Mock).mockResolvedValue(2);
+    (prisma.listing.findMany as jest.Mock).mockResolvedValue([
+      {
+        id: "listing-1",
+        ownerId: "host-1",
+        physicalUnitId: "unit-1",
+        status: "ACTIVE",
+        statusReason: null,
+        needsMigrationReview: false,
+        availabilitySource: "LEGACY_BOOKING",
+        availableSlots: 1,
+        totalSlots: 1,
+        openSlots: 1,
+        moveInDate: null,
+        availableUntil: null,
+        minStayMonths: 1,
+        lastConfirmedAt: new Date("2026-04-20T00:00:00.000Z"),
+      },
+    ]);
+    (prisma.listing.findUnique as jest.Mock).mockResolvedValue({
+      id: "listing-123",
+      ownerId: "host-1",
+      physicalUnitId: "unit-1",
+      status: "ACTIVE",
+      statusReason: null,
+      needsMigrationReview: false,
+      availabilitySource: "LEGACY_BOOKING",
+      availableSlots: 1,
+      totalSlots: 1,
+      openSlots: 1,
+      moveInDate: null,
+      availableUntil: null,
+      minStayMonths: 1,
+      lastConfirmedAt: new Date("2026-04-20T00:00:00.000Z"),
+    });
+    (prisma.alertSubscription.upsert as jest.Mock).mockResolvedValue({
+      id: "subscription-123",
+      savedSearchId: "search-123",
+      userId: "user-123",
+      channel: "EMAIL",
+      frequency: "DAILY",
+      active: true,
+      lastDeliveredAt: null,
+    });
+    (prisma.alertDelivery.create as jest.Mock).mockResolvedValue({
+      id: "delivery-123",
+    });
+    (prisma.outboxEvent.create as jest.Mock).mockResolvedValue({
+      id: "outbox-123",
+    });
   });
 
   it("emits legacy saved-search telemetry and matches canonical filters in processSearchAlerts", async () => {

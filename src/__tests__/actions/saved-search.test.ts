@@ -2,8 +2,13 @@
  * Tests for saved-search server actions
  */
 
-jest.mock("@/lib/prisma", () => ({
-  prisma: {
+jest.mock("@/lib/prisma", () => {
+  const prisma: {
+    $transaction: jest.Mock;
+    savedSearch: Record<string, jest.Mock>;
+    alertSubscription: Record<string, jest.Mock>;
+  } = {
+    $transaction: jest.fn(),
     savedSearch: {
       count: jest.fn(),
       create: jest.fn(),
@@ -11,8 +16,16 @@ jest.mock("@/lib/prisma", () => ({
       delete: jest.fn(),
       update: jest.fn(),
     },
-  },
-}));
+    alertSubscription: {
+      upsert: jest.fn(),
+    },
+  };
+  prisma.$transaction.mockImplementation(
+    async (callback: (tx: unknown) => unknown) => callback(prisma)
+  );
+
+  return { prisma };
+});
 
 jest.mock("@/auth", () => ({
   auth: jest.fn(),
@@ -100,7 +113,7 @@ describe("Saved Search Actions", () => {
       });
 
       expect(prisma.savedSearch.create).toHaveBeenCalledWith({
-        data: {
+        data: expect.objectContaining({
           userId: "user-123",
           name: "My Search",
           query: "apartment",
@@ -110,8 +123,35 @@ describe("Saved Search Actions", () => {
             maxPrice: 1500,
             roomType: "Private Room",
           }),
+          searchSpecJson: expect.objectContaining({
+            version: "2026-04-23.phase07-saved-search-v1",
+            filters: expect.objectContaining({
+              query: "apartment",
+              minPrice: 500,
+              maxPrice: 1500,
+              roomType: "Private Room",
+            }),
+            requestedOccupants: 1,
+          }),
+          searchSpecHash: expect.any(String),
+          embeddingVersionAtSave: expect.any(String),
+          rankerProfileVersionAtSave: expect.any(String),
+          unitIdentityEpochFloor: 1,
+          active: true,
           alertEnabled: true,
           alertFrequency: "DAILY",
+          alertSubscriptions: {
+            create: {
+              user: { connect: { id: "user-123" } },
+              channel: "EMAIL",
+              frequency: "DAILY",
+              active: true,
+            },
+          },
+        }),
+        select: {
+          id: true,
+          alertEnabled: true,
         },
       });
       expect(revalidatePath).toHaveBeenCalledWith("/saved-searches");
@@ -136,6 +176,13 @@ describe("Saved Search Actions", () => {
           data: expect.objectContaining({
             alertEnabled: true,
             alertFrequency: "DAILY",
+            alertSubscriptions: {
+              create: expect.objectContaining({
+                channel: "EMAIL",
+                frequency: "DAILY",
+                active: true,
+              }),
+            },
           }),
         })
       );
@@ -262,7 +309,9 @@ describe("Saved Search Actions", () => {
 
     it("enables alert", async () => {
       (prisma.savedSearch.update as jest.Mock).mockResolvedValue({
+        id: "search-123",
         alertEnabled: true,
+        alertFrequency: "DAILY",
       });
 
       const result = await toggleSearchAlert("search-123", true);
@@ -273,7 +322,26 @@ describe("Saved Search Actions", () => {
           userId: "user-123",
         },
         data: { alertEnabled: true },
-        select: { alertEnabled: true },
+        select: { id: true, alertEnabled: true, alertFrequency: true },
+      });
+      expect(prisma.alertSubscription.upsert).toHaveBeenCalledWith({
+        where: {
+          savedSearchId_channel: {
+            savedSearchId: "search-123",
+            channel: "EMAIL",
+          },
+        },
+        create: {
+          savedSearchId: "search-123",
+          userId: "user-123",
+          channel: "EMAIL",
+          frequency: "DAILY",
+          active: true,
+        },
+        update: {
+          active: true,
+          frequency: "DAILY",
+        },
       });
       expect(result).toEqual({
         success: true,
@@ -283,7 +351,9 @@ describe("Saved Search Actions", () => {
 
     it("disables alert", async () => {
       (prisma.savedSearch.update as jest.Mock).mockResolvedValue({
+        id: "search-123",
         alertEnabled: false,
+        alertFrequency: "DAILY",
       });
 
       const result = await toggleSearchAlert("search-123", false);
@@ -294,7 +364,26 @@ describe("Saved Search Actions", () => {
           userId: "user-123",
         },
         data: { alertEnabled: false },
-        select: { alertEnabled: true },
+        select: { id: true, alertEnabled: true, alertFrequency: true },
+      });
+      expect(prisma.alertSubscription.upsert).toHaveBeenCalledWith({
+        where: {
+          savedSearchId_channel: {
+            savedSearchId: "search-123",
+            channel: "EMAIL",
+          },
+        },
+        create: {
+          savedSearchId: "search-123",
+          userId: "user-123",
+          channel: "EMAIL",
+          frequency: "DAILY",
+          active: false,
+        },
+        update: {
+          active: false,
+          frequency: "DAILY",
+        },
       });
       expect(result).toEqual({
         success: true,
@@ -304,7 +393,9 @@ describe("Saved Search Actions", () => {
 
     it("returns LOCKED when enabling alerts without an active pass", async () => {
       (prisma.savedSearch.update as jest.Mock).mockResolvedValue({
+        id: "search-123",
         alertEnabled: true,
+        alertFrequency: "DAILY",
       });
       mockEvaluateSavedSearchAlertPaywall.mockResolvedValue({
         enabled: true,

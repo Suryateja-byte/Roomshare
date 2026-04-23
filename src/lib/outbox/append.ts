@@ -8,6 +8,8 @@ const OutboxAggregateTypeSchema = z.enum([
   "HOST_UNIT_CLAIM",
   "IDENTITY_MUTATION",
   "PAYMENT",
+  "SAVED_SEARCH",
+  "ALERT_DELIVERY",
 ]);
 
 const OutboxKindSchema = z.enum([
@@ -22,6 +24,8 @@ const OutboxKindSchema = z.enum([
   "GEOCODE_NEEDED",
   "EMBED_NEEDED",
   "PAYMENT_WEBHOOK",
+  "ALERT_MATCH",
+  "ALERT_DELIVER",
 ]);
 
 const AppendOutboxInputSchema = z.object({

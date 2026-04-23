@@ -72,6 +72,8 @@ model User {
   notifications           Notification[]
   verificationRequests    VerificationRequest[]
   savedSearches           SavedSearch[]
+  alertSubscriptions       AlertSubscription[]
+  alertDeliveries          AlertDelivery[]
   blockedUsers            BlockedUser[]          @relation("BlocksMade")
   blockedByUsers          BlockedUser[]          @relation("BlocksReceived")
   auditLogs               AuditLog[]             @relation("AuditLogs")
@@ -428,19 +430,90 @@ enum AlertFrequency {
 }
 
 model SavedSearch {
-  id             String         @id @default(cuid())
-  userId         String
-  name           String
-  query          String?
-  filters        Json // Store all filter params as JSON
-  alertEnabled   Boolean        @default(true)
-  alertFrequency AlertFrequency @default(DAILY)
-  lastAlertAt    DateTime?
-  createdAt      DateTime       @default(now())
-  user           User           @relation(fields: [userId], references: [id], onDelete: Cascade)
+  id                         String              @id @default(cuid())
+  userId                     String
+  name                       String
+  query                      String?
+  filters                    Json // Store all filter params as JSON
+  searchSpecJson             Json?               @map("search_spec_json")
+  searchSpecHash             String?             @map("search_spec_hash")
+  embeddingVersionAtSave     String?             @map("embedding_version_at_save")
+  rankerProfileVersionAtSave String?             @map("ranker_profile_version_at_save")
+  unitIdentityEpochFloor     Int?                @map("unit_identity_epoch_floor")
+  active                     Boolean             @default(true)
+  alertEnabled               Boolean             @default(true)
+  alertFrequency             AlertFrequency      @default(DAILY)
+  lastAlertAt                DateTime?
+  createdAt                  DateTime            @default(now())
+  user                       User                @relation(fields: [userId], references: [id], onDelete: Cascade)
+  alertSubscriptions         AlertSubscription[]
+  alertDeliveries            AlertDelivery[]
 
   @@index([userId])
   @@index([alertEnabled, lastAlertAt])
+  @@index([active, userId], map: "SavedSearch_active_userId_idx")
+  @@index([searchSpecHash], map: "SavedSearch_search_spec_hash_idx")
+}
+
+model AlertSubscription {
+  id              String          @id @default(cuid())
+  savedSearchId   String          @map("saved_search_id")
+  userId          String          @map("user_id")
+  channel         String          @default("EMAIL")
+  frequency       AlertFrequency  @default(DAILY)
+  active          Boolean         @default(true)
+  lastDeliveredAt DateTime?       @map("last_delivered_at")
+  createdAt       DateTime        @default(now()) @map("created_at")
+  updatedAt       DateTime        @updatedAt @map("updated_at")
+  savedSearch     SavedSearch     @relation(fields: [savedSearchId], references: [id], onDelete: Cascade)
+  user            User            @relation(fields: [userId], references: [id], onDelete: Cascade)
+  deliveries      AlertDelivery[]
+
+  @@unique([savedSearchId, channel], map: "alert_subscriptions_saved_search_channel_key")
+  @@index([active, channel, frequency, lastDeliveredAt], map: "alert_subscriptions_active_channel_frequency_last_idx")
+  @@index([userId, active], map: "alert_subscriptions_user_active_idx")
+  @@map("alert_subscriptions")
+}
+
+model AlertDelivery {
+  id                      String            @id @default(cuid())
+  subscriptionId          String            @map("subscription_id")
+  savedSearchId           String            @map("saved_search_id")
+  userId                  String            @map("user_id")
+  channel                 String            @default("EMAIL")
+  deliveryKind            String            @default("SCHEDULED") @map("delivery_kind")
+  status                  String            @default("PENDING")
+  dropReason              String?           @map("drop_reason")
+  idempotencyKey          String            @unique(map: "alert_deliveries_idempotency_key_key") @map("idempotency_key")
+  targetListingId         String?           @map("target_listing_id")
+  targetUnitId            String?           @map("target_unit_id")
+  targetInventoryId       String?           @map("target_inventory_id")
+  targetUnitIdentityEpoch Int?              @map("target_unit_identity_epoch")
+  queryHash               String?           @map("query_hash")
+  embeddingVersion        String?           @map("embedding_version")
+  rankerProfileVersion    String?           @map("ranker_profile_version")
+  projectionEpoch         BigInt?           @map("projection_epoch")
+  newListingsCount        Int               @default(0) @map("new_listings_count")
+  payload                 Json              @default("{}")
+  scheduledFor            DateTime          @default(now()) @map("scheduled_for")
+  expiresAt               DateTime          @default(dbgenerated("(CURRENT_TIMESTAMP + INTERVAL '7 days')")) @map("expires_at")
+  claimedAt               DateTime?         @map("claimed_at")
+  deliveredAt             DateTime?         @map("delivered_at")
+  droppedAt               DateTime?         @map("dropped_at")
+  lastError               String?           @map("last_error")
+  attemptCount            Int               @default(0) @map("attempt_count")
+  createdAt               DateTime          @default(now()) @map("created_at")
+  updatedAt               DateTime          @updatedAt @map("updated_at")
+  subscription            AlertSubscription @relation(fields: [subscriptionId], references: [id], onDelete: Cascade)
+  savedSearch             SavedSearch       @relation(fields: [savedSearchId], references: [id], onDelete: Cascade)
+  user                    User              @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([status, scheduledFor], map: "alert_deliveries_status_scheduled_idx")
+  @@index([subscriptionId, status, scheduledFor], map: "alert_deliveries_subscription_status_scheduled_idx")
+  @@index([savedSearchId, createdAt], map: "alert_deliveries_saved_search_created_idx")
+  @@index([targetUnitId, targetInventoryId, status], map: "alert_deliveries_target_status_idx")
+  @@index([userId, status], map: "alert_deliveries_user_status_idx")
+  @@map("alert_deliveries")
 }
 
 model ReviewResponse {

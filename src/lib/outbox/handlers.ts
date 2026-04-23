@@ -24,6 +24,10 @@ import {
   processCapturedStripeEvent,
 } from "@/lib/payments/webhook-worker";
 import {
+  deliverQueuedSearchAlert,
+  processSearchAlerts,
+} from "@/lib/search-alerts";
+import {
   recordProjectionLag,
   recordTombstoneHideLatency,
 } from "@/lib/metrics/projection-lag";
@@ -393,6 +397,53 @@ async function handlePaymentWebhookEvent(
   }
 }
 
+async function handleAlertMatchEvent(
+  _tx: TransactionClient,
+  event: OutboxRow
+): Promise<HandlerResult> {
+  try {
+    await processSearchAlerts();
+    recordProjectionLag(event.kind, Date.now() - event.createdAt.getTime());
+    return { outcome: "completed" };
+  } catch (err) {
+    return {
+      outcome: "transient_error",
+      retryAfterMs: 30_000,
+      lastError: err instanceof Error ? err.message : String(err),
+    };
+  }
+}
+
+async function handleAlertDeliverEvent(
+  tx: TransactionClient,
+  event: OutboxRow
+): Promise<HandlerResult> {
+  try {
+    const deliveryId =
+      typeof event.payload.deliveryId === "string"
+        ? event.payload.deliveryId
+        : event.aggregateId;
+    const result = await deliverQueuedSearchAlert(tx, deliveryId);
+
+    if (result.status === "retry") {
+      return {
+        outcome: "transient_error",
+        retryAfterMs: 30_000,
+        lastError: result.error,
+      };
+    }
+
+    recordProjectionLag(event.kind, Date.now() - event.createdAt.getTime());
+    return { outcome: "completed" };
+  } catch (err) {
+    return {
+      outcome: "transient_error",
+      retryAfterMs: 30_000,
+      lastError: err instanceof Error ? err.message : String(err),
+    };
+  }
+}
+
 // ─────────────────────────────────────────────────────────────────────────────
 // Handler routing table
 // ─────────────────────────────────────────────────────────────────────────────
@@ -408,4 +459,6 @@ export const HANDLERS: Record<OutboxKind, OutboxHandler> = {
   GEOCODE_NEEDED: handleGeocodeNeededEvent,
   EMBED_NEEDED: handleEmbedNeededEvent,
   PAYMENT_WEBHOOK: handlePaymentWebhookEvent,
+  ALERT_MATCH: handleAlertMatchEvent,
+  ALERT_DELIVER: handleAlertDeliverEvent,
 };

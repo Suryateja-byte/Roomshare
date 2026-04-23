@@ -1,0 +1,18 @@
+{
+  "slice": "schema-fixtures",
+  "verdict": "approved",
+  "findings": [
+    {
+      "severity": "medium",
+      "status": "fixed",
+      "summary": "The Prisma unique constraint for alert delivery idempotency initially relied on Prisma's generated name instead of the migration's explicit index name.",
+      "resolution": "Added the explicit Prisma map name `alert_deliveries_idempotency_key_key`."
+    }
+  ],
+  "rationale": "The migration is expand-only, preserves legacy SavedSearch rows, constrains Phase 07 alert channel/status/drop values, and has PGlite schema coverage plus Prisma validation.",
+  "checks_reviewed": [
+    "pnpm exec prisma validate",
+    "pnpm test -- --runTestsByPath src/__tests__/db/phase07-schema.test.ts --runInBand"
+  ],
+  "next_action": "Proceed to canonical saved-search contract slice."
+}

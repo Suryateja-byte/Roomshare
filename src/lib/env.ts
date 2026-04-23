@@ -138,6 +138,7 @@ const serverEnvSchema = z
     KILL_SWITCH_DISABLE_PAYMENTS: z.enum(["true", "false"]).optional(),
     KILL_SWITCH_FREEZE_NEW_GRANTS: z.enum(["true", "false"]).optional(),
     KILL_SWITCH_EMERGENCY_OPEN_PAYWALL: z.enum(["true", "false"]).optional(),
+    KILL_SWITCH_DISABLE_ALERTS: z.enum(["true", "false"]).optional(),
     ENABLE_BOOKING_NOTIFICATIONS: z.enum(["on", "off"]).optional(),
     ENABLE_LEGACY_CRONS: z.enum(["on", "off"]).optional(),
     ENABLE_PRIVATE_FEEDBACK: z.enum(["true", "false"]).optional(),
@@ -682,6 +683,9 @@ export const features = {
   },
   get emergencyOpenPaywall() {
     return process.env.KILL_SWITCH_EMERGENCY_OPEN_PAYWALL === "true";
+  },
+  get disableAlerts() {
+    return process.env.KILL_SWITCH_DISABLE_ALERTS === "true";
   },
   get bookingNotifications() {
     return process.env.ENABLE_BOOKING_NOTIFICATIONS !== "off";

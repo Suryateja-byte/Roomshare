@@ -4,9 +4,24 @@
 
 jest.mock("@/lib/prisma", () => ({
   prisma: {
+    $transaction: jest.fn(async (callback: (tx: unknown) => unknown) =>
+      callback((jest.requireMock("@/lib/prisma") as { prisma: unknown }).prisma)
+    ),
     savedSearch: {
       findMany: jest.fn(),
       update: jest.fn(),
+    },
+    alertSubscription: {
+      upsert: jest.fn(),
+      update: jest.fn(),
+    },
+    alertDelivery: {
+      create: jest.fn(),
+      findUnique: jest.fn(),
+      update: jest.fn(),
+    },
+    outboxEvent: {
+      create: jest.fn(),
     },
     listing: {
       count: jest.fn(),
@@ -43,12 +58,24 @@ jest.mock("@/lib/payments/search-alert-paywall", () => ({
     mockGetUsersWithUnlockedSearchAlerts(...args),
 }));
 
-import { processSearchAlerts, triggerInstantAlerts } from "@/lib/search-alerts";
+import {
+  deliverQueuedSearchAlert,
+  processSearchAlerts,
+  triggerInstantAlerts,
+} from "@/lib/search-alerts";
 import { prisma } from "@/lib/prisma";
 import { sendNotificationEmail } from "@/lib/email";
 import { logger } from "@/lib/logger";
 
 describe("search-alerts", () => {
+  const originalDisableAlerts = process.env.KILL_SWITCH_DISABLE_ALERTS;
+  function restoreDisableAlerts() {
+    if (originalDisableAlerts === undefined) {
+      delete process.env.KILL_SWITCH_DISABLE_ALERTS;
+    } else {
+      process.env.KILL_SWITCH_DISABLE_ALERTS = originalDisableAlerts;
+    }
+  }
   const mockUser = {
     id: "user-123",
     name: "Test User",
@@ -71,6 +98,7 @@ describe("search-alerts", () => {
     return {
       id,
       ownerId: "host-123",
+      physicalUnitId: "unit-123",
       status: "ACTIVE",
       statusReason: null,
       needsMigrationReview: false,
@@ -87,6 +115,7 @@ describe("search-alerts", () => {
 
   beforeEach(() => {
     jest.clearAllMocks();
+    restoreDisableAlerts();
     (sendNotificationEmail as jest.Mock).mockResolvedValue({ success: true });
     (prisma.listing.findMany as jest.Mock).mockResolvedValue(
       Array.from({ length: 5 }, (_, index) =>
@@ -96,9 +125,30 @@ describe("search-alerts", () => {
     (prisma.listing.findUnique as jest.Mock).mockResolvedValue(
       buildPublicListing()
     );
+    (prisma.alertSubscription.upsert as jest.Mock).mockResolvedValue({
+      id: "subscription-123",
+      savedSearchId: "search-123",
+      userId: "user-123",
+      channel: "EMAIL",
+      frequency: "DAILY",
+      active: true,
+      lastDeliveredAt: null,
+    });
+    (prisma.alertDelivery.create as jest.Mock).mockResolvedValue({
+      id: "delivery-123",
+    });
+    (prisma.alertDelivery.update as jest.Mock).mockResolvedValue({});
+    (prisma.alertSubscription.update as jest.Mock).mockResolvedValue({});
+    (prisma.outboxEvent.create as jest.Mock).mockResolvedValue({
+      id: "outbox-123",
+    });
     mockGetUsersWithUnlockedSearchAlerts.mockImplementation(
       async (userIds: string[]) => new Set(userIds)
     );
+  });
+
+  afterAll(() => {
+    restoreDisableAlerts();
   });
 
   describe("processSearchAlerts", () => {
@@ -240,15 +290,24 @@ describe("search-alerts", () => {
         const result = await processSearchAlerts();
 
         expect(result.alertsSent).toBe(1);
-        expect(sendNotificationEmail).toHaveBeenCalledWith(
-          "searchAlert",
-          mockUser.email,
-          expect.objectContaining({
-            userName: mockUser.name,
-            searchQuery: mockSavedSearch.name,
+        expect(sendNotificationEmail).not.toHaveBeenCalled();
+        expect(prisma.alertDelivery.create).toHaveBeenCalledWith({
+          data: expect.objectContaining({
+            savedSearchId: mockSavedSearch.id,
+            userId: mockUser.id,
+            deliveryKind: "SCHEDULED",
             newListingsCount: 5,
-          })
-        );
+          }),
+          select: { id: true },
+        });
+        expect(prisma.outboxEvent.create).toHaveBeenCalledWith({
+          data: expect.objectContaining({
+            aggregateType: "ALERT_DELIVERY",
+            aggregateId: "delivery-123",
+            kind: "ALERT_DELIVER",
+          }),
+          select: { id: true },
+        });
       });
 
       it("does not send alert when no matching listings", async () => {
@@ -284,7 +343,7 @@ describe("search-alerts", () => {
         expect(sendNotificationEmail).not.toHaveBeenCalled();
       });
 
-      it("creates in-app notification when listings match", async () => {
+      it("creates durable delivery when listings match", async () => {
         (prisma.savedSearch.findMany as jest.Mock).mockResolvedValue([
           mockSavedSearch,
         ]);
@@ -294,11 +353,35 @@ describe("search-alerts", () => {
 
         await processSearchAlerts();
 
-        expect(prisma.notification.create).toHaveBeenCalledWith({
+        expect(prisma.notification.create).not.toHaveBeenCalled();
+        expect(prisma.alertDelivery.create).toHaveBeenCalledWith({
           data: expect.objectContaining({
+            savedSearchId: mockSavedSearch.id,
             userId: mockUser.id,
-            type: "SEARCH_ALERT",
+            deliveryKind: "SCHEDULED",
           }),
+          select: { id: true },
+        });
+      });
+
+      it("does not count duplicate durable deliveries as errors", async () => {
+        (prisma.savedSearch.findMany as jest.Mock).mockResolvedValue([
+          mockSavedSearch,
+        ]);
+        (prisma.listing.count as jest.Mock).mockResolvedValue(1);
+        (prisma.alertDelivery.create as jest.Mock).mockRejectedValue({
+          code: "P2002",
+        });
+        (prisma.savedSearch.update as jest.Mock).mockResolvedValue({});
+
+        const result = await processSearchAlerts();
+
+        expect(result.alertsSent).toBe(0);
+        expect(result.errors).toBe(0);
+        expect(prisma.outboxEvent.create).not.toHaveBeenCalled();
+        expect(prisma.savedSearch.update).toHaveBeenCalledWith({
+          where: { id: mockSavedSearch.id },
+          data: { lastAlertAt: expect.any(Date) },
         });
       });
 
@@ -333,16 +416,14 @@ describe("search-alerts", () => {
     });
 
     describe("error handling", () => {
-      it("tracks errors for failed email sends", async () => {
+      it("tracks errors for failed delivery enqueue", async () => {
         (prisma.savedSearch.findMany as jest.Mock).mockResolvedValue([
           mockSavedSearch,
         ]);
         (prisma.listing.count as jest.Mock).mockResolvedValue(5);
-        (sendNotificationEmail as jest.Mock).mockResolvedValue({
-          success: false,
-          error: "Email failed",
-        });
-        (prisma.notification.create as jest.Mock).mockResolvedValue({});
+        (prisma.alertDelivery.create as jest.Mock).mockRejectedValue(
+          new Error("Queue failed")
+        );
         (prisma.savedSearch.update as jest.Mock).mockResolvedValue({});
 
         const result = await processSearchAlerts();
@@ -386,6 +467,147 @@ describe("search-alerts", () => {
           expect.arrayContaining([expect.stringContaining("Fatal error")])
         );
       });
+    });
+  });
+
+  describe("deliverQueuedSearchAlert", () => {
+    function buildDelivery(overrides: Record<string, unknown> = {}) {
+      return {
+        id: "delivery-123",
+        subscriptionId: "subscription-123",
+        savedSearchId: "search-123",
+        userId: "user-123",
+        deliveryKind: "INSTANT",
+        status: "PENDING",
+        expiresAt: new Date(Date.now() + 60_000),
+        targetListingId: "listing-123",
+        targetUnitId: "unit-123",
+        newListingsCount: 1,
+        payload: {
+          listingTitle: "Cozy Room",
+          listingUrl: "/listings/listing-123",
+        },
+        subscription: {
+          id: "subscription-123",
+          active: true,
+        },
+        savedSearch: {
+          id: "search-123",
+          name: "NYC Rooms",
+          filters: { city: "New York" },
+          active: true,
+          alertEnabled: true,
+          user: mockUser,
+        },
+        ...overrides,
+      };
+    }
+
+    it("sends only after final target, preference, and paywall revalidation", async () => {
+      (prisma.alertDelivery.findUnique as jest.Mock).mockResolvedValue(
+        buildDelivery()
+      );
+      (prisma.notification.create as jest.Mock).mockResolvedValue({});
+      (prisma.savedSearch.update as jest.Mock).mockResolvedValue({});
+
+      const result = await deliverQueuedSearchAlert(
+        prisma as Parameters<typeof deliverQueuedSearchAlert>[0],
+        "delivery-123"
+      );
+
+      expect(result).toEqual({ status: "delivered" });
+      expect(sendNotificationEmail).toHaveBeenCalledWith(
+        "searchAlert",
+        mockUser.email,
+        expect.objectContaining({
+          searchQuery: "NYC Rooms",
+          newListingsCount: 1,
+        })
+      );
+      expect(prisma.notification.create).toHaveBeenCalledWith({
+        data: expect.objectContaining({
+          userId: mockUser.id,
+          type: "SEARCH_ALERT",
+          link: "/listings/listing-123",
+        }),
+      });
+      expect(prisma.alertDelivery.update).toHaveBeenCalledWith({
+        where: { id: "delivery-123" },
+        data: expect.objectContaining({
+          status: "DELIVERED",
+          deliveredAt: expect.any(Date),
+        }),
+      });
+    });
+
+    it("drops tombstoned or unpublished delivery targets before email", async () => {
+      (prisma.alertDelivery.findUnique as jest.Mock).mockResolvedValue(
+        buildDelivery()
+      );
+      (prisma.listing.findUnique as jest.Mock).mockResolvedValue({
+        ...buildPublicListing("listing-123"),
+        status: "PAUSED",
+        statusReason: "SUPPRESSED",
+      });
+
+      const result = await deliverQueuedSearchAlert(
+        prisma as Parameters<typeof deliverQueuedSearchAlert>[0],
+        "delivery-123"
+      );
+
+      expect(result).toEqual({
+        status: "dropped",
+        reason: "TARGET_NOT_PUBLIC",
+      });
+      expect(sendNotificationEmail).not.toHaveBeenCalled();
+      expect(prisma.alertDelivery.update).toHaveBeenCalledWith({
+        where: { id: "delivery-123" },
+        data: expect.objectContaining({
+          status: "DROPPED",
+          dropReason: "TARGET_NOT_PUBLIC",
+        }),
+      });
+    });
+
+    it("drops paywall-locked deliveries before email", async () => {
+      mockGetUsersWithUnlockedSearchAlerts.mockResolvedValue(new Set());
+      (prisma.alertDelivery.findUnique as jest.Mock).mockResolvedValue(
+        buildDelivery()
+      );
+
+      const result = await deliverQueuedSearchAlert(
+        prisma as Parameters<typeof deliverQueuedSearchAlert>[0],
+        "delivery-123"
+      );
+
+      expect(result).toEqual({
+        status: "dropped",
+        reason: "PAYWALL_LOCKED",
+      });
+      expect(sendNotificationEmail).not.toHaveBeenCalled();
+    });
+
+    it("pauses matching and delivery when alerts are disabled", async () => {
+      process.env.KILL_SWITCH_DISABLE_ALERTS = "true";
+
+      const processResult = await processSearchAlerts();
+      expect(processResult).toEqual({
+        processed: 0,
+        alertsSent: 0,
+        errors: 0,
+        details: ["Search alerts disabled by kill switch"],
+      });
+      expect(prisma.savedSearch.findMany).not.toHaveBeenCalled();
+
+      const deliverResult = await deliverQueuedSearchAlert(
+        prisma as Parameters<typeof deliverQueuedSearchAlert>[0],
+        "delivery-123"
+      );
+      expect(deliverResult).toEqual({
+        status: "retry",
+        error: "Search alerts disabled",
+      });
+      expect(prisma.alertDelivery.findUnique).not.toHaveBeenCalled();
     });
   });
 
@@ -454,7 +676,17 @@ describe("search-alerts", () => {
         const result = await triggerInstantAlerts(newListing);
 
         expect(result.sent).toBe(1);
-        expect(sendNotificationEmail).toHaveBeenCalled();
+        expect(sendNotificationEmail).not.toHaveBeenCalled();
+        expect(prisma.alertDelivery.create).toHaveBeenCalledWith({
+          data: expect.objectContaining({
+            savedSearchId: instantSearch.id,
+            userId: mockUser.id,
+            deliveryKind: "INSTANT",
+            targetListingId: newListing.id,
+            newListingsCount: 1,
+          }),
+          select: { id: true },
+        });
       });
 
       it("drops matching instant alert targets that are no longer publicly visible", async () => {
@@ -567,7 +799,7 @@ describe("search-alerts", () => {
     });
 
     describe("notifications", () => {
-      it("creates in-app notification with listing details", async () => {
+      it("creates durable instant delivery with listing details", async () => {
         (prisma.savedSearch.findMany as jest.Mock).mockResolvedValue([
           instantSearch,
         ]);
@@ -576,12 +808,17 @@ describe("search-alerts", () => {
 
         await triggerInstantAlerts(newListing);
 
-        expect(prisma.notification.create).toHaveBeenCalledWith({
+        expect(prisma.notification.create).not.toHaveBeenCalled();
+        expect(prisma.alertDelivery.create).toHaveBeenCalledWith({
           data: expect.objectContaining({
             userId: mockUser.id,
-            type: "SEARCH_ALERT",
-            link: `/listings/${newListing.id}`,
+            deliveryKind: "INSTANT",
+            targetListingId: newListing.id,
+            payload: expect.objectContaining({
+              listingUrl: `/listings/${newListing.id}`,
+            }),
           }),
+          select: { id: true },
         });
       });
 
@@ -664,14 +901,13 @@ describe("search-alerts", () => {
     });
 
     describe("error handling", () => {
-      it("tracks error for failed email", async () => {
+      it("tracks error for failed delivery enqueue", async () => {
         (prisma.savedSearch.findMany as jest.Mock).mockResolvedValue([
           instantSearch,
         ]);
-        (sendNotificationEmail as jest.Mock).mockResolvedValue({
-          success: false,
-          error: "Failed",
-        });
+        (prisma.alertDelivery.create as jest.Mock).mockRejectedValue(
+          new Error("Queue failed")
+        );
 
         const result = await triggerInstantAlerts(newListing);
 

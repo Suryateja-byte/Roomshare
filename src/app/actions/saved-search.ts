@@ -3,10 +3,8 @@
 import { prisma } from "@/lib/prisma";
 import { auth } from "@/auth";
 import { revalidatePath } from "next/cache";
-import {
-  normalizeSearchFilters,
-  type SearchFilters,
-} from "@/lib/search-utils";
+import { type SearchFilters } from "@/lib/search-utils";
+import { buildCanonicalSavedSearchMetadata } from "@/lib/search/saved-search-canonical";
 import { parseSavedSearchFilters } from "@/lib/search/saved-search-parser";
 import type { Prisma } from "@prisma/client";
 import { logger } from "@/lib/logger";
@@ -106,9 +104,12 @@ export async function saveSearch(input: SaveSearchInput) {
 
     // Canonicalize filters before storing so saved-search reopen flows always
     // round-trip through the same normalized search schema as live URLs.
-    const normalizedFilters = normalizeSearchFilters(input.filters);
+    const canonical = buildCanonicalSavedSearchMetadata(input.filters);
+    const normalizedFilters = canonical.filters;
     const strippedFilters =
       savedSearchFiltersWriteSchema.parse(normalizedFilters);
+    const alertEnabled = input.alertEnabled ?? true;
+    const alertFrequency = input.alertFrequency ?? "DAILY";
 
     const savedSearch = await prisma.savedSearch.create({
       data: {
@@ -116,8 +117,27 @@ export async function saveSearch(input: SaveSearchInput) {
         name: nameValidation.data,
         query: normalizedFilters.query,
         filters: strippedFilters as Prisma.InputJsonValue,
-        alertEnabled: input.alertEnabled ?? true,
-        alertFrequency: input.alertFrequency ?? "DAILY",
+        searchSpecJson:
+          canonical.searchSpecJson as unknown as Prisma.InputJsonValue,
+        searchSpecHash: canonical.searchSpecHash,
+        embeddingVersionAtSave: canonical.embeddingVersionAtSave,
+        rankerProfileVersionAtSave: canonical.rankerProfileVersionAtSave,
+        unitIdentityEpochFloor: canonical.unitIdentityEpochFloor,
+        active: true,
+        alertEnabled,
+        alertFrequency,
+        alertSubscriptions: {
+          create: {
+            user: { connect: { id: session.user.id } },
+            channel: "EMAIL",
+            frequency: alertFrequency,
+            active: alertEnabled,
+          },
+        },
+      },
+      select: {
+        id: true,
+        alertEnabled: true,
       },
     });
     const paywallSummary = await evaluateSavedSearchAlertPaywall({
@@ -222,13 +242,37 @@ export async function toggleSearchAlert(searchId: string, enabled: boolean) {
   if (rateLimited) return rateLimited;
 
   try {
-    const updated = await prisma.savedSearch.update({
-      where: {
-        id: searchId,
-        userId: session.user.id,
-      },
-      data: { alertEnabled: enabled },
-      select: { alertEnabled: true },
+    const updated = await prisma.$transaction(async (tx) => {
+      const savedSearch = await tx.savedSearch.update({
+        where: {
+          id: searchId,
+          userId: session.user.id,
+        },
+        data: { alertEnabled: enabled },
+        select: { id: true, alertEnabled: true, alertFrequency: true },
+      });
+
+      await tx.alertSubscription.upsert({
+        where: {
+          savedSearchId_channel: {
+            savedSearchId: savedSearch.id,
+            channel: "EMAIL",
+          },
+        },
+        create: {
+          savedSearchId: savedSearch.id,
+          userId: session.user.id,
+          channel: "EMAIL",
+          frequency: savedSearch.alertFrequency,
+          active: enabled,
+        },
+        update: {
+          active: enabled,
+          frequency: savedSearch.alertFrequency,
+        },
+      });
+
+      return savedSearch;
     });
     const paywallSummary = await evaluateSavedSearchAlertPaywall({
       userId: session.user.id,

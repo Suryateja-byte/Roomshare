@@ -7,9 +7,12 @@ import { parseSavedSearchFilters } from "@/lib/search/saved-search-parser";
 import { buildSearchUrl, type SearchFilters } from "./search-utils";
 import { validateSearchFilters } from "./search-params";
 import { logger, sanitizeErrorMessage } from "./logger";
+import { features } from "@/lib/env";
 import { parseLocalDate } from "./utils";
 import { getUsersWithUnlockedSearchAlerts } from "@/lib/payments/search-alert-paywall";
 import { resolvePublicListingVisibilityState } from "@/lib/listings/public-contact-contract";
+import { appendOutboxEvent } from "@/lib/outbox/append";
+import type { TransactionClient } from "@/lib/db/with-actor";
 
 /**
  * Validate alert filters from DB. Uses validateSearchFilters for common fields
@@ -77,8 +80,16 @@ type SavedSearchForAlerts = {
   id: string;
   name: string;
   filters: Prisma.JsonValue;
+  alertEnabled: boolean;
+  alertFrequency: "INSTANT" | "DAILY" | "WEEKLY";
   lastAlertAt: Date | null;
   createdAt: Date;
+  searchSpecHash?: string | null;
+  embeddingVersionAtSave?: string | null;
+  rankerProfileVersionAtSave?: string | null;
+  unitIdentityEpochFloor?: number | null;
+  active?: boolean;
+  alertSubscriptions?: AlertSubscriptionForAlerts[];
   user: {
     id: string;
     name: string | null;
@@ -87,12 +98,23 @@ type SavedSearchForAlerts = {
   };
 };
 
+type AlertSubscriptionForAlerts = {
+  id: string;
+  savedSearchId: string;
+  userId: string;
+  channel: string;
+  frequency: "INSTANT" | "DAILY" | "WEEKLY";
+  active: boolean;
+  lastDeliveredAt: Date | null;
+};
+
 // L2 fix: Use shared parseLocalDate from @/lib/utils
 const parseDateOnly = parseLocalDate;
 const SEARCH_ALERT_BATCH_SIZE = 100;
 const ALERT_LISTING_SELECT = {
   id: true,
   ownerId: true,
+  physicalUnitId: true,
   status: true,
   statusReason: true,
   needsMigrationReview: true,
@@ -122,12 +144,12 @@ function isDeliverableAlertListing(listing: AlertListing | null | undefined) {
   return resolvePublicListingVisibilityState(listing).isPubliclyVisible;
 }
 
-async function countDeliverableAlertListings(
+async function findDeliverableAlertListings(
   where: Prisma.ListingWhereInput,
   expectedCount: number
 ) {
   if (expectedCount <= 0) {
-    return 0;
+    return [];
   }
 
   const listings = await prisma.listing.findMany({
@@ -135,7 +157,7 @@ async function countDeliverableAlertListings(
     select: ALERT_LISTING_SELECT,
   });
 
-  return listings.filter(isDeliverableAlertListing).length;
+  return listings.filter(isDeliverableAlertListing);
 }
 
 async function isInstantAlertListingStillDeliverable(listingId: string) {
@@ -147,6 +169,351 @@ async function isInstantAlertListingStillDeliverable(listingId: string) {
   return isDeliverableAlertListing(listing);
 }
 
+function getEmailSubscription(
+  savedSearch: SavedSearchForAlerts
+): AlertSubscriptionForAlerts | null {
+  return (
+    savedSearch.alertSubscriptions?.find(
+      (subscription) => subscription.channel === "EMAIL"
+    ) ?? null
+  );
+}
+
+async function ensureEmailSubscriptionForSavedSearch(
+  savedSearch: SavedSearchForAlerts
+): Promise<AlertSubscriptionForAlerts | null> {
+  const existing = getEmailSubscription(savedSearch);
+  if (existing) {
+    return existing.active ? existing : null;
+  }
+
+  const created = await prisma.alertSubscription.upsert({
+    where: {
+      savedSearchId_channel: {
+        savedSearchId: savedSearch.id,
+        channel: "EMAIL",
+      },
+    },
+    create: {
+      savedSearchId: savedSearch.id,
+      userId: savedSearch.user.id,
+      channel: "EMAIL",
+      frequency: savedSearch.alertFrequency,
+      active: savedSearch.alertEnabled,
+    },
+    update: {
+      frequency: savedSearch.alertFrequency,
+      active: savedSearch.alertEnabled,
+    },
+  });
+
+  return created.active ? created : null;
+}
+
+function isUniqueConstraintError(error: unknown): boolean {
+  return (
+    error !== null &&
+    typeof error === "object" &&
+    "code" in error &&
+    (error as { code?: unknown }).code === "P2002"
+  );
+}
+
+type DeliveryKind = "INSTANT" | "SCHEDULED";
+
+async function enqueueAlertDelivery(input: {
+  subscription: AlertSubscriptionForAlerts;
+  savedSearch: SavedSearchForAlerts;
+  deliveryKind: DeliveryKind;
+  idempotencyKey: string;
+  newListingsCount: number;
+  filters: SearchFilters;
+  targetListingId?: string | null;
+  targetUnitId?: string | null;
+  targetInventoryId?: string | null;
+  targetUnitIdentityEpoch?: number | null;
+  payload?: Record<string, unknown>;
+}): Promise<{ queued: boolean; deliveryId: string | null }> {
+  try {
+    const delivery = await prisma.$transaction(async (tx) => {
+      const created = await tx.alertDelivery.create({
+        data: {
+          subscriptionId: input.subscription.id,
+          savedSearchId: input.savedSearch.id,
+          userId: input.savedSearch.user.id,
+          channel: "EMAIL",
+          deliveryKind: input.deliveryKind,
+          status: "PENDING",
+          idempotencyKey: input.idempotencyKey,
+          targetListingId: input.targetListingId ?? null,
+          targetUnitId: input.targetUnitId ?? null,
+          targetInventoryId: input.targetInventoryId ?? null,
+          targetUnitIdentityEpoch: input.targetUnitIdentityEpoch ?? null,
+          queryHash: input.savedSearch.searchSpecHash ?? null,
+          embeddingVersion: input.savedSearch.embeddingVersionAtSave ?? null,
+          rankerProfileVersion:
+            input.savedSearch.rankerProfileVersionAtSave ?? null,
+          newListingsCount: input.newListingsCount,
+          payload: {
+            searchName: input.savedSearch.name,
+            searchUrl: buildSearchUrl(input.filters),
+            unitIdentityEpochFloor:
+              input.savedSearch.unitIdentityEpochFloor ?? null,
+            ...input.payload,
+          } as Prisma.InputJsonObject,
+        },
+        select: { id: true },
+      });
+
+      await appendOutboxEvent(tx, {
+        aggregateType: "ALERT_DELIVERY",
+        aggregateId: created.id,
+        kind: "ALERT_DELIVER",
+        payload: {
+          deliveryId: created.id,
+          savedSearchId: input.savedSearch.id,
+          subscriptionId: input.subscription.id,
+        },
+        sourceVersion: BigInt(1),
+        unitIdentityEpoch: input.targetUnitIdentityEpoch ?? 1,
+        priority: 60,
+      });
+
+      return created;
+    });
+
+    return { queued: true, deliveryId: delivery.id };
+  } catch (error) {
+    if (isUniqueConstraintError(error)) {
+      return { queued: false, deliveryId: null };
+    }
+    throw error;
+  }
+}
+
+type AlertDeliveryOutcome =
+  | { status: "delivered" }
+  | { status: "dropped"; reason: string }
+  | { status: "noop" }
+  | { status: "retry"; error: string };
+
+function getPayloadObject(payload: Prisma.JsonValue): Record<string, unknown> {
+  return payload && typeof payload === "object" && !Array.isArray(payload)
+    ? (payload as Record<string, unknown>)
+    : {};
+}
+
+function getPayloadStringArray(
+  payload: Record<string, unknown>,
+  key: string
+): string[] {
+  const value = payload[key];
+  return Array.isArray(value)
+    ? value.filter((item): item is string => typeof item === "string")
+    : [];
+}
+
+async function dropAlertDelivery(
+  client: typeof prisma,
+  deliveryId: string,
+  reason: string
+): Promise<AlertDeliveryOutcome> {
+  await client.alertDelivery.update({
+    where: { id: deliveryId },
+    data: {
+      status: "DROPPED",
+      dropReason: reason,
+      droppedAt: new Date(),
+    },
+  });
+  return { status: "dropped", reason };
+}
+
+async function countCurrentlyDeliverableTargets(
+  client: typeof prisma,
+  listingIds: string[]
+): Promise<number> {
+  if (listingIds.length === 0) {
+    return 0;
+  }
+
+  const listings = await client.listing.findMany({
+    where: { id: { in: listingIds } },
+    select: ALERT_LISTING_SELECT,
+  });
+
+  return listings.filter(isDeliverableAlertListing).length;
+}
+
+export async function deliverQueuedSearchAlert(
+  client: TransactionClient,
+  deliveryId: string
+): Promise<AlertDeliveryOutcome> {
+  const db = client as unknown as typeof prisma;
+  if (features.disableAlerts) {
+    return { status: "retry", error: "Search alerts disabled" };
+  }
+
+  const delivery = await db.alertDelivery.findUnique({
+    where: { id: deliveryId },
+    include: {
+      subscription: true,
+      savedSearch: {
+        include: {
+          user: {
+            select: {
+              id: true,
+              name: true,
+              email: true,
+              notificationPreferences: true,
+            },
+          },
+        },
+      },
+    },
+  });
+
+  if (!delivery) {
+    return { status: "dropped", reason: "TARGET_MISSING" };
+  }
+
+  if (delivery.status === "DELIVERED" || delivery.status === "DROPPED") {
+    return { status: "noop" };
+  }
+
+  if (delivery.expiresAt.getTime() <= Date.now()) {
+    return dropAlertDelivery(db, delivery.id, "EXPIRED");
+  }
+
+  if (
+    !delivery.subscription.active ||
+    !delivery.savedSearch.active ||
+    !delivery.savedSearch.alertEnabled
+  ) {
+    return dropAlertDelivery(db, delivery.id, "SUBSCRIPTION_INACTIVE");
+  }
+
+  const user = delivery.savedSearch.user;
+  if (!user.email || !isSearchAlertsEnabled(user.notificationPreferences)) {
+    return dropAlertDelivery(db, delivery.id, "PREFERENCE_DISABLED");
+  }
+
+  const unlockedIds = await getUsersWithUnlockedSearchAlerts(
+    [user.id],
+    db as Parameters<typeof getUsersWithUnlockedSearchAlerts>[1]
+  );
+  if (!unlockedIds.has(user.id)) {
+    return dropAlertDelivery(db, delivery.id, "PAYWALL_LOCKED");
+  }
+
+  const filters = parseFiltersForAlerts(delivery.savedSearch.filters);
+  if (!filters) {
+    return dropAlertDelivery(db, delivery.id, "TARGET_MISSING");
+  }
+
+  const payload = getPayloadObject(delivery.payload);
+  let newListingsCount = delivery.newListingsCount;
+  let notificationLink =
+    typeof payload.listingUrl === "string"
+      ? payload.listingUrl
+      : buildSearchUrl(filters);
+
+  if (delivery.targetListingId) {
+    const listing = await db.listing.findUnique({
+      where: { id: delivery.targetListingId },
+      select: ALERT_LISTING_SELECT,
+    });
+
+    if (!listing) {
+      return dropAlertDelivery(db, delivery.id, "TARGET_MISSING");
+    }
+
+    if (
+      delivery.targetUnitId &&
+      listing.physicalUnitId &&
+      delivery.targetUnitId !== listing.physicalUnitId
+    ) {
+      return dropAlertDelivery(db, delivery.id, "STALE_EPOCH");
+    }
+
+    if (!isDeliverableAlertListing(listing)) {
+      return dropAlertDelivery(db, delivery.id, "TARGET_NOT_PUBLIC");
+    }
+
+    newListingsCount = 1;
+    notificationLink = `/listings/${delivery.targetListingId}`;
+  } else {
+    const targetListingIds = getPayloadStringArray(payload, "targetListingIds");
+    const deliverableCount = await countCurrentlyDeliverableTargets(
+      db,
+      targetListingIds
+    );
+    if (targetListingIds.length > 0 && deliverableCount === 0) {
+      return dropAlertDelivery(db, delivery.id, "TARGET_NOT_PUBLIC");
+    }
+    if (deliverableCount > 0) {
+      newListingsCount = deliverableCount;
+    }
+  }
+
+  const emailResult = await sendNotificationEmail("searchAlert", user.email, {
+    userName: user.name || "User",
+    searchQuery: delivery.savedSearch.name,
+    newListingsCount,
+    searchId: delivery.savedSearch.id,
+  });
+
+  if (!emailResult.success) {
+    await db.alertDelivery.update({
+      where: { id: delivery.id },
+      data: {
+        status: "PENDING",
+        lastError: emailResult.error || "Email failed",
+        attemptCount: { increment: 1 },
+      },
+    });
+    return { status: "retry", error: emailResult.error || "Email failed" };
+  }
+
+  await db.notification.create({
+    data: {
+      userId: user.id,
+      type: "SEARCH_ALERT",
+      title:
+        delivery.deliveryKind === "INSTANT"
+          ? "New listing matches your search!"
+          : "New listings match your search!",
+      message:
+        delivery.deliveryKind === "INSTANT" &&
+        typeof payload.listingTitle === "string"
+          ? `"${payload.listingTitle}" matches your saved search "${delivery.savedSearch.name}"`
+          : `${newListingsCount} new listing${newListingsCount > 1 ? "s" : ""} match your saved search "${delivery.savedSearch.name}"`,
+      link: notificationLink,
+    },
+  });
+
+  await db.alertDelivery.update({
+    where: { id: delivery.id },
+    data: {
+      status: "DELIVERED",
+      deliveredAt: new Date(),
+      lastError: null,
+    },
+  });
+
+  await db.savedSearch.update({
+    where: { id: delivery.savedSearchId },
+    data: { lastAlertAt: new Date() },
+  });
+
+  await db.alertSubscription.update({
+    where: { id: delivery.subscriptionId },
+    data: { lastDeliveredAt: new Date() },
+  });
+
+  return { status: "delivered" };
+}
+
 export async function processSearchAlerts(): Promise<ProcessResult> {
   const result: ProcessResult = {
     processed: 0,
@@ -156,11 +523,17 @@ export async function processSearchAlerts(): Promise<ProcessResult> {
   };
 
   try {
+    if (features.disableAlerts) {
+      result.details.push("Search alerts disabled by kill switch");
+      return result;
+    }
+
     const now = new Date();
     const oneDayAgo = new Date(now.getTime() - 24 * 60 * 60 * 1000);
     const oneWeekAgo = new Date(now.getTime() - 7 * 24 * 60 * 60 * 1000);
 
     const baseWhere = {
+      active: true,
       alertEnabled: true,
       OR: [
         // Never alerted
@@ -187,6 +560,10 @@ export async function processSearchAlerts(): Promise<ProcessResult> {
         await prisma.savedSearch.findMany({
           where: baseWhere,
           include: {
+            alertSubscriptions: {
+              where: { channel: "EMAIL" },
+              take: 1,
+            },
             user: {
               select: {
                 id: true,
@@ -244,6 +621,15 @@ export async function processSearchAlerts(): Promise<ProcessResult> {
 
           if (!unlockedAlertUsers.get(savedSearch.user.id)) {
             result.details.push(`Skipping ${savedSearch.id} - alerts locked`);
+            continue;
+          }
+
+          const subscription =
+            await ensureEmailSubscriptionForSavedSearch(savedSearch);
+          if (!subscription) {
+            result.details.push(
+              `Skipping ${savedSearch.id} - subscription inactive`
+            );
             continue;
           }
 
@@ -352,68 +738,49 @@ export async function processSearchAlerts(): Promise<ProcessResult> {
           const candidateListingsCount = await prisma.listing.count({
             where: whereClause,
           });
-          const newListingsCount = await countDeliverableAlertListings(
+          const deliverableListings = await findDeliverableAlertListings(
             whereClause,
             candidateListingsCount
           );
+          const newListingsCount = deliverableListings.length;
 
           if (newListingsCount > 0) {
-            // Send email notification
-            const emailResult = await sendNotificationEmail(
-              "searchAlert",
-              savedSearch.user.email,
-              {
-                userName: savedSearch.user.name || "User",
-                searchQuery: savedSearch.name,
-                newListingsCount,
-                searchId: savedSearch.id,
-              }
-            );
+            const targetListingIds = deliverableListings
+              .map((listing) => listing.id)
+              .slice(0, 25);
+            const delivery = await enqueueAlertDelivery({
+              subscription,
+              savedSearch,
+              deliveryKind: "SCHEDULED",
+              idempotencyKey: [
+                "alert",
+                subscription.id,
+                "scheduled",
+                savedSearch.alertFrequency,
+                sinceDate.toISOString(),
+              ].join(":"),
+              newListingsCount,
+              filters,
+              payload: {
+                targetListingIds,
+              },
+            });
 
-            if (emailResult.success) {
+            if (delivery.queued) {
               result.alertsSent++;
               result.details.push(
-                `Sent alert for ${savedSearch.id}: ${newListingsCount} new listings`
+                `Queued alert for ${savedSearch.id}: ${newListingsCount} new listings`
               );
             } else {
-              result.errors++;
               result.details.push(
-                `Failed to send email for ${savedSearch.id}: ${emailResult.error}`
+                `Skipped duplicate alert for ${savedSearch.id}: ${newListingsCount} new listings`
               );
             }
 
-            // P0 FIX: Use Promise.allSettled for batch resilience
-            // Ensures notification creation and lastAlertAt update are both attempted
-            // even if one fails, preventing inconsistent state
-            const [notificationResult, updateResult] = await Promise.allSettled(
-              [
-                prisma.notification.create({
-                  data: {
-                    userId: savedSearch.user.id,
-                    type: "SEARCH_ALERT",
-                    title: "New listings match your search!",
-                    message: `${newListingsCount} new listing${newListingsCount > 1 ? "s" : ""} match your saved search "${savedSearch.name}"`,
-                    link: buildSearchUrl(filters),
-                  },
-                }),
-                prisma.savedSearch.update({
-                  where: { id: savedSearch.id },
-                  data: { lastAlertAt: now },
-                }),
-              ]
-            );
-
-            // Log any partial failures for debugging
-            if (notificationResult.status === "rejected") {
-              result.details.push(
-                `Warning: notification creation failed for ${savedSearch.id}: ${notificationResult.reason}`
-              );
-            }
-            if (updateResult.status === "rejected") {
-              result.details.push(
-                `Warning: lastAlertAt update failed for ${savedSearch.id}: ${updateResult.reason}`
-              );
-            }
+            await prisma.savedSearch.update({
+              where: { id: savedSearch.id },
+              data: { lastAlertAt: now },
+            });
           } else {
             // P0 FIX: Still update lastAlertAt even when no new listings
             // Prevents re-processing the same time window repeatedly
@@ -573,14 +940,26 @@ export async function triggerInstantAlerts(
   let errors = 0;
 
   try {
+    if (features.disableAlerts) {
+      logger.sync.info("Instant alerts skipped - alerts disabled", {
+        action: "triggerInstantAlerts",
+      });
+      return { sent, errors };
+    }
+
     // M3 fix: Paginate instant subscriptions to prevent unbounded fetches
     const MAX_INSTANT_SUBSCRIPTIONS = 500;
     const instantSearches = await prisma.savedSearch.findMany({
       where: {
+        active: true,
         alertEnabled: true,
         alertFrequency: "INSTANT",
       },
       include: {
+        alertSubscriptions: {
+          where: { channel: "EMAIL" },
+          take: 1,
+        },
         user: {
           select: {
             id: true,
@@ -617,6 +996,12 @@ export async function triggerInstantAlerts(
           continue;
         }
 
+        const subscription =
+          await ensureEmailSubscriptionForSavedSearch(savedSearch);
+        if (!subscription) {
+          continue;
+        }
+
         // S-02 FIX: Validate filters from DB instead of raw cast
         const filters = parseFiltersForAlerts(savedSearch.filters);
         if (!filters) {
@@ -643,65 +1028,43 @@ export async function triggerInstantAlerts(
           listingId: newListing.id,
         });
 
-        // Send email notification
-        const emailResult = await sendNotificationEmail(
-          "searchAlert",
-          savedSearch.user.email,
-          {
-            userName: savedSearch.user.name || "User",
-            searchQuery: savedSearch.name,
-            newListingsCount: 1,
-            searchId: savedSearch.id,
-          }
-        );
+        const delivery = await enqueueAlertDelivery({
+          subscription,
+          savedSearch,
+          deliveryKind: "INSTANT",
+          idempotencyKey: [
+            "alert",
+            subscription.id,
+            "instant",
+            newListing.id,
+          ].join(":"),
+          newListingsCount: 1,
+          filters,
+          targetListingId: newListing.id,
+          payload: {
+            listingTitle: newListing.title,
+            listingCity: newListing.city,
+            listingPrice: newListing.price,
+            listingUrl: `/listings/${newListing.id}`,
+          },
+        });
 
-        if (!emailResult.success) {
-          logger.sync.warn("Instant alert email failed", {
+        if (!delivery.queued) {
+          logger.sync.debug("Instant alert duplicate skipped", {
             action: "triggerInstantAlerts",
             savedSearchId: savedSearch.id,
-            error: emailResult.error || "unknown",
+            listingId: newListing.id,
           });
-          errors++;
           continue;
         }
 
-        // P0 FIX: Use Promise.allSettled for batch resilience
-        // Ensures notification creation and lastAlertAt update are both attempted
-        // even if one fails, preventing inconsistent state
-        const [notificationResult, updateResult] = await Promise.allSettled([
-          prisma.notification.create({
-            data: {
-              userId: savedSearch.user.id,
-              type: "SEARCH_ALERT",
-              title: "New listing matches your search!",
-              message: `"${newListing.title}" in ${newListing.city} - $${newListing.price}/mo`,
-              link: `/listings/${newListing.id}`,
-            },
-          }),
-          prisma.savedSearch.update({
-            where: { id: savedSearch.id },
-            data: { lastAlertAt: new Date() },
-          }),
-        ]);
-
-        // Log any partial failures for debugging
-        if (notificationResult.status === "rejected") {
-          logger.sync.warn("Instant alert notification create failed", {
-            action: "triggerInstantAlerts",
-            savedSearchId: savedSearch.id,
-            error: String(notificationResult.reason),
-          });
-        }
-        if (updateResult.status === "rejected") {
-          logger.sync.warn("Instant alert lastAlertAt update failed", {
-            action: "triggerInstantAlerts",
-            savedSearchId: savedSearch.id,
-            error: String(updateResult.reason),
-          });
-        }
+        await prisma.savedSearch.update({
+          where: { id: savedSearch.id },
+          data: { lastAlertAt: new Date() },
+        });
 
         sent++;
-        logger.sync.info("Instant alert sent", {
+        logger.sync.info("Instant alert queued", {
           action: "triggerInstantAlerts",
           savedSearchId: savedSearch.id,
           listingId: newListing.id,

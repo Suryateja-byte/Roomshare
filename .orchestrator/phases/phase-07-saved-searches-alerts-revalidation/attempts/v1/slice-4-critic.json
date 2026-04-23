@@ -1,0 +1,12 @@
+{
+  "slice": "final-revalidation-safety-runbook",
+  "verdict": "approved",
+  "findings": [],
+  "rationale": "The kill switch pauses matching and delivery without deleting rows, delivery revalidates target visibility, paywall, user preferences, and subscription state before outbound email/notification creation, and the runbook documents safe pause/resume and tombstone incidents without PII logging.",
+  "checks_reviewed": [
+    "pnpm test -- --runTestsByPath src/__tests__/lib/search-alerts.test.ts --runInBand",
+    "pnpm test -- --runTestsByPath src/__tests__/lib/search-alerts.test.ts src/__tests__/lib/search-alerts-telemetry.test.ts --runInBand",
+    "pnpm exec tsc --noEmit --pretty false"
+  ],
+  "next_action": "Run final Phase 07/regression validation and produce approval artifacts."
+}
